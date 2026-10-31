@@ -38,7 +38,7 @@ fn saved_floor(name: &str) -> (Scene, String) {
 #[test]
 fn gpu_generate_bakes_lightmaps_then_probes_and_writes_the_scene() {
     let (mut scene, path) = saved_floor("writes");
-    let report = generate_lighting(&mut scene, Some(&path), None).unwrap();
+    let report = generate_lighting(&mut scene, Some(&path), None, &mut |_| {}).unwrap();
     assert_eq!(report.lightmaps, 1);
     assert!(report.probes.auto_placed_light, "the probe step ran after");
     assert_eq!(report.saved, LightingSave::Written);
@@ -54,7 +54,7 @@ fn gpu_generate_bakes_lightmaps_then_probes_and_writes_the_scene() {
 fn gpu_generate_bakes_with_the_scenes_settings() {
     let (mut scene, path) = saved_floor("settings");
     scene.lighting_settings.lightmaps.directional = false;
-    generate_lighting(&mut scene, Some(&path), None).unwrap();
+    generate_lighting(&mut scene, Some(&path), None, &mut |_| {}).unwrap();
     assert!(scene.lightmaps.directions.is_empty(), "directional was off");
 }
 
@@ -62,7 +62,7 @@ fn gpu_generate_bakes_with_the_scenes_settings() {
 fn an_unsaved_scene_cannot_generate() {
     let mut scene = Scene::new();
     assert_eq!(
-        generate_lighting(&mut scene, None, None),
+        generate_lighting(&mut scene, None, None, &mut |_| {}),
         Err(UNSAVED.to_string())
     );
 }
@@ -89,7 +89,7 @@ fn generate_is_refused_in_play() {
     let (mut scene, path) = saved_floor("play");
     let before = std::fs::read(&path).unwrap();
     scene.set_playing(true);
-    let refused = generate_lighting(&mut scene, Some(&path), None);
+    let refused = generate_lighting(&mut scene, Some(&path), None, &mut |_| {});
     assert_eq!(refused.unwrap_err(), crate::scene::LIGHTING_IN_PLAY);
     assert_eq!(
         std::fs::read(&path).unwrap(),

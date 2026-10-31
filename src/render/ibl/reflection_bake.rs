@@ -76,19 +76,35 @@ impl Renderer {
     /// `cubemap_path` at it. Returns the number of probes baked, or an error if a file
     /// could not be written. With no probes it is a successful no-op (0 baked).
     pub fn bake_reflections(&mut self, scene: &mut Scene, out_dir: &Path) -> Result<usize, String> {
-        let default = scene.lighting_settings.reflections.resolution;
-        let probes = scene.reflection_probes.probes.clone();
-        for (i, probe) in probes.iter().enumerate() {
-            let resolution = clamp_resolution(probe.resolution.unwrap_or(default));
-            let bytes = self.bake_reflection(scene, probe, resolution);
-            let path = out_dir.join(format!("reflection_probe_{i}.ktx2"));
-            crate::core::fs::written::write(&path, &bytes).map_err(|e| {
-                format!("Failed to write reflection cubemap {}: {e}", path.display())
-            })?;
-            let path_str = path.to_string_lossy().into_owned();
-            scene.reflection_probes.set_cubemap(i, path_str);
+        for i in 0..scene.reflection_probes.len() {
+            self.bake_reflection_into(scene, i, out_dir)?;
         }
         Ok(scene.reflection_probes.len())
+    }
+
+    /// Bake reflection probe `i` of `scene` at its resolution into
+    /// `out_dir/reflection_probe_<i>.ktx2` and point the probe at it: one step of
+    /// [`Renderer::bake_reflections`], which the editor takes one frame at a time
+    /// (#1602). A probe index past the set bakes nothing.
+    pub fn bake_reflection_into(
+        &mut self,
+        scene: &mut Scene,
+        i: usize,
+        out_dir: &Path,
+    ) -> Result<(), String> {
+        let Some(probe) = scene.reflection_probes.probes.get(i).cloned() else {
+            return Ok(());
+        };
+        let default = scene.lighting_settings.reflections.resolution;
+        let resolution = clamp_resolution(probe.resolution.unwrap_or(default));
+        let bytes = self.bake_reflection(scene, &probe, resolution);
+        let path = out_dir.join(format!("reflection_probe_{i}.ktx2"));
+        crate::core::fs::written::write(&path, &bytes)
+            .map_err(|e| format!("Failed to write reflection cubemap {}: {e}", path.display()))?;
+        scene
+            .reflection_probes
+            .set_cubemap(i, path.to_string_lossy().into_owned());
+        Ok(())
     }
 }
 

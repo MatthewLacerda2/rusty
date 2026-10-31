@@ -7,7 +7,8 @@
 //!      the static colliders', #1584) — UNLESS that
 //!      set is already manually authored, in which case its placement is left untouched;
 //!   2. runs the two existing dev bakes — the multi-bounce light-probe bake (#250, #285,
-//!      `probe_bake`) and the GGX reflection-probe bake (#252, `reflection_bake`).
+//!      `probe_bake`) and the GGX reflection-probe bake (#252, `reflection_bake`) — as
+//!      one job stepped a probe or a few at a time (`steps`, #1602).
 //!
 //! Placement is the deterministic, pure step (`scene::lighting::placement`); the bakes
 //! are the render/dev step. This module is the single path both callers route through,
@@ -23,6 +24,7 @@
 //! It reads `navigation` only for the walkable extent light probes fill and the
 //! floor plan reflection probes are placed on, handed to placement as plain data.
 
+use super::steps::LightingBake;
 use crate::navigation::NavigationGraph;
 use crate::scene::lighting::placement::{self, ReflectionPlacement};
 use crate::scene::Scene;
@@ -62,30 +64,35 @@ pub struct LightingBakeReport {
 /// report on success; errors only when a bake's own contract fails (e.g. reflections
 /// need a saved scene path to write the cubemaps beside). A missing GPU adapter is NOT
 /// an error — each bake skips gracefully and the report's `ran_*` flag is `false`.
+/// Runs [`start_lighting`]'s job to the end, its progress lines to `say`.
 pub fn bake_lighting(
     scene: &mut Scene,
     scene_path: Option<&str>,
     nav: Option<&NavigationGraph>,
     params: LightingBakeParams,
+    say: &mut dyn FnMut(String),
 ) -> Result<LightingBakeReport, String> {
-    let auto_placed_light = auto_place_light(scene, nav, params.probe_spacing);
-    let auto_placed_reflection = auto_place_reflection(scene, nav, &params.reflection);
+    let mut job = start_lighting(scene, scene_path, nav, params);
+    while !job.step(scene, say)? {}
+    Ok(job.report())
+}
 
-    let light_probes = scene.probes.probes.len();
-    let reflection_probes = scene.reflection_probes.len();
-
-    let ran_light_bake = crate::dev::bake::probe::bake_scene_probes(scene)?;
-    let ran_reflection_bake =
-        crate::dev::bake::reflection::bake_scene_reflections(scene, scene_path)?;
-
-    Ok(LightingBakeReport {
-        light_probes,
-        reflection_probes,
-        auto_placed_light,
-        auto_placed_reflection,
-        ran_light_bake,
-        ran_reflection_bake,
-    })
+/// Auto-place (per the manual-vs-auto rule) and return the bake of both probe sets
+/// as a job to step ([`LightingBake::step`]): the editor takes one step a frame.
+pub fn start_lighting(
+    scene: &mut Scene,
+    scene_path: Option<&str>,
+    nav: Option<&NavigationGraph>,
+    params: LightingBakeParams,
+) -> LightingBake {
+    let report = LightingBakeReport {
+        auto_placed_light: auto_place_light(scene, nav, params.probe_spacing),
+        auto_placed_reflection: auto_place_reflection(scene, nav, &params.reflection),
+        light_probes: scene.probes.probes.len(),
+        reflection_probes: scene.reflection_probes.len(),
+        ..Default::default()
+    };
+    LightingBake::start(scene, scene_path, report)
 }
 
 /// Auto-place the light-probe grid when the set is empty; returns whether it placed.

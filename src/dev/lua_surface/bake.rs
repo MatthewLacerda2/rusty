@@ -80,7 +80,7 @@ fn register_lighting<'scope>(
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     type BakeArgs = (Option<f32>, Option<f32>);
-    let (scene, scene_path, nav) = (ctx.scene, ctx.scene_path, ctx.nav);
+    let (scene, scene_path, nav, console) = (ctx.scene, ctx.scene_path, ctx.nav, ctx.console);
     put(
         &global_table(lua, "Lighting")?,
         "Bake",
@@ -89,9 +89,15 @@ fn register_lighting<'scope>(
             let path = scene_path.borrow();
             let nav = nav.borrow();
             let params = bake_params(spacing, region)?;
-            let report =
-                lighting_bake::bake_lighting(&mut scene, path.as_deref(), Some(&nav), params)
-                    .map_err(mlua::Error::external)?;
+            let mut say = |line| console.borrow_mut().info(line);
+            let report = lighting_bake::bake_lighting(
+                &mut scene,
+                path.as_deref(),
+                Some(&nav),
+                params,
+                &mut say,
+            )
+            .map_err(mlua::Error::external)?;
             Ok(report.ran_light_bake || report.ran_reflection_bake)
         }),
     )

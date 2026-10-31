@@ -7,27 +7,30 @@
 //!
 //! The lightmap step runs in the background (#808): the button starts a
 //! [`LightmapBakeJob`], the card shows its progress with a Cancel button, and
-//! [`poll`] applies the result on the UI thread when the worker finishes, then runs
-//! the probe step and writes the lighting. A cancelled bake writes nothing. The
+//! [`poll`] applies the result on the UI thread when the worker finishes. The probe
+//! step then runs one step a frame (#1602, Unity's `BakeAsync`): the probes capture
+//! through the GPU, so they stay on the UI thread, but no frame waits on more than a
+//! reflection probe or a few light probes, and the editor and the MCP keep answering.
+//! The bar shows `probe i of n`, the console each pass and probe. Then [`poll`] writes
+//! the lighting. A bake cancelled during the lightmaps writes nothing; the probe step
+//! has no Cancel, since it bakes into the scene's probes in place. The
 //! settings under the button (#810's directional mode among them) are the scene's,
 //! as `Lighting.SetSettings{…}` edits them.
 
 use crate::editor::widgets::DragRange;
 use std::path::Path;
-use std::time::Duration;
 
 use egui_phosphor::regular as icon;
 
-use crate::dev::bake::generate_lighting::finish;
-use crate::dev::bake::lightmap::{BakeOutcome, LightmapBakeJob};
+use crate::dev::bake::lightmap::LightmapBakeJob;
+use crate::dev::bake::steps::{LightingBake, Stage};
 use crate::editor::EditorUi;
-use crate::navigation::NavigationGraph;
 use crate::scene::lighting::lightmap::BakeSettings;
-use crate::scene::{LightingSave, Scene, SceneId};
+use crate::scene::{Scene, SceneId};
 use crate::scripting::ConsoleLogs;
 
-/// How often the editor repaints while a bake runs, so the bar moves on its own.
-const PROGRESS_REPAINT: Duration = Duration::from_millis(100);
+mod poll;
+pub use poll::poll;
 
 /// A background Generate Lighting and the scene it belongs to: the scene's runtime
 /// identity and the editor's open scene file when it started. A result for a scene
@@ -36,9 +39,31 @@ const PROGRESS_REPAINT: Duration = Duration::from_millis(100);
 /// longer mean the same meshes, and its lighting would be written into a file as if
 /// it were current.
 pub struct ActiveBake {
-    job: LightmapBakeJob,
+    step: Step,
     scene: SceneId,
     path: Option<String>,
+}
+
+/// Which half of Generate Lighting is running.
+enum Step {
+    /// The lightmaps, on their worker.
+    Lightmaps(LightmapBakeJob),
+    /// The probes, a step a frame, once `lightmaps` landed, writing to `path`.
+    Probes {
+        job: Box<LightingBake>,
+        lightmaps: usize,
+        path: String,
+    },
+}
+
+impl ActiveBake {
+    /// The scene file the bake writes.
+    pub fn scene_path(&self) -> &str {
+        match &self.step {
+            Step::Lightmaps(job) => job.scene_path(),
+            Step::Probes { path, .. } => path,
+        }
+    }
 }
 
 pub fn draw(
@@ -73,7 +98,7 @@ pub fn draw(
     if generate.clicked() {
         start(editor, scene, console);
     }
-    draw_progress(ui, editor);
+    draw_progress(ui, editor, scene);
 }
 
 /// The scene's lightmap knobs; returns whether any changed.
@@ -142,7 +167,7 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
         Ok(job) => {
             console.info("Generating lighting in the background…".into());
             editor.dev.lightmap_bake = Some(ActiveBake {
-                job,
+                step: Step::Lightmaps(job),
                 scene: scene.id(),
                 path: Some(path),
             });
@@ -151,12 +176,15 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     }
 }
 
-/// The running bake's bar and its Cancel button, under the button.
-fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
+/// The running bake's bar, and its Cancel button during the lightmaps.
+fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &Scene) {
     let Some(active) = &editor.dev.lightmap_bake else {
         return;
     };
-    let job = &active.job;
+    let job = match &active.step {
+        Step::Lightmaps(job) => job,
+        Step::Probes { job, .. } => return draw_probe_progress(ui, job.stage(scene)),
+    };
     let (done, total) = job.progress();
     let text = match (job.is_cancelled(), total) {
         (true, _) => "Cancelling…".to_string(),
@@ -173,54 +201,26 @@ fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
     });
 }
 
-/// Each frame the inspector draws: keep the UI repainting while a bake runs, and once
-/// the lightmaps land, apply them, bake the probes and write the lighting. Runs
-/// whether or not the scene card is showing, and waits while the scene plays.
-pub fn poll(
-    editor: &mut EditorUi,
-    ctx: &egui::Context,
-    scene: &mut Scene,
-    log: &mut ConsoleLogs,
-    nav: &NavigationGraph,
-) {
-    let open = editor.current_scene_path();
-    let Some(active) = &mut editor.dev.lightmap_bake else {
-        return;
-    };
-    if scene.is_playing() {
-        // The World holds the play state; the result waits for Stop's restore (#1374).
-        return ctx.request_repaint_after(PROGRESS_REPAINT);
-    }
-    if active.scene != scene.id() || active.path != open {
-        // Its result would land on another scene's entities: drop it (dropping the
-        // job stops the worker) rather than apply it.
-        editor.dev.lightmap_bake = None;
-        log.warn("Generate Lighting dropped: the open scene changed".into());
-        return;
-    }
-    let Some(outcome) = active.job.poll(scene) else {
-        ctx.request_repaint_after(PROGRESS_REPAINT);
-        return;
-    };
-    let path = active.job.scene_path().to_string();
-    editor.dev.lightmap_bake = None;
-    let lightmaps = match outcome {
-        BakeOutcome::Baked(n) => n,
-        BakeOutcome::Cancelled => {
-            return log.info("Generate Lighting cancelled; kept the old lighting".into())
+/// The probe step's bar: `probe i of n` of the light probes' pass or the reflections.
+fn draw_probe_progress(ui: &mut egui::Ui, stage: Stage) {
+    let (done, total, text) = match stage {
+        Stage::Light {
+            bounce,
+            done,
+            total,
+        } => (
+            done,
+            total,
+            format!("Light probes, bounce {bounce}: {done} / {total}"),
+        ),
+        Stage::Reflection { done, total } => {
+            (done, total, format!("Reflection probes: {done} / {total}"))
         }
-        BakeOutcome::Failed(e) => return log.error(format!("Generate Lighting failed: {e}")),
+        Stage::Done => (1, 1, "Saving…".to_string()),
     };
-    match finish(scene, &path, Some(nav), lightmaps) {
-        Ok(report) => {
-            // A file that could not take the lighting alone needs the whole scene saved.
-            editor.is_dirty |= report.saved == LightingSave::NeedsSceneSave;
-            log.info(report.summary());
-        }
-        Err(e) => log.error(format!("Generate Lighting failed: {e}")),
-    }
+    let bar = egui::ProgressBar::new(done as f32 / total.max(1) as f32).text(text);
+    ui.add_sized([180.0, 20.0], bar);
 }
 
 #[cfg(test)]
-#[path = "bake_tests.rs"]
 mod tests;
