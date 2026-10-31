@@ -108,8 +108,8 @@ impl Harness {
         let result = {
             let world = self.world.borrow();
             crate::dev::screenshot::share_world(&mut self.capture, &world, width, height);
+            let camera = world.main_view();
             let scene = world.scene().borrow();
-            let camera = world.camera().borrow();
             self.capture.draw(&scene, &camera, width, height)
         };
         match result {

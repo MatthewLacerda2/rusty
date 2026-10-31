@@ -39,7 +39,7 @@ pub fn register<'scope>(
     camera: &'scope RefCell<Camera>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
-    let ui_view = move || view::ui_view(screen, video, camera);
+    let ui_view = move || view::ui_view(screen, video, camera, &scene.borrow());
     put(
         &table,
         "GetRect",

@@ -30,7 +30,7 @@ use super::stage::Stage;
 use super::world::World;
 use crate::audio::Occluder;
 use crate::physics::{is_hittable, PhysicsWorld};
-use crate::scene::{layer_in_mask, Scene};
+use crate::scene::{game_camera_from_scene, layer_in_mask, Scene};
 
 /// Register the audio systems. The auto-start runs once in `Startup`, after the
 /// scene + scripts are live (so a `Start` script could already have toggled a
@@ -56,8 +56,8 @@ impl super::GameWorld {
 /// Blend the reverb zones around the active camera onto the reverb bus (#469).
 /// Zones are summed in entity-id order, so two runs blend bit-identically.
 fn resolve_reverb(world: &mut World, res: &mut Resources) {
-    let listener = res.camera.borrow().position;
     let scene = world.scene.borrow();
+    let listener = game_camera_from_scene(&res.camera.borrow(), &scene).position;
     let mut ids = scene.world.ids_with_reverb_zone();
     ids.retain(|&id| scene.world.is_active_in_hierarchy(id));
     ids.sort_unstable();
@@ -76,8 +76,8 @@ fn resolve_reverb(world: &mut World, res: &mut Resources) {
 /// on unscaled time like the mixer.
 fn occlude_voices(world: &mut World, res: &mut Resources) {
     let dt = res.time.borrow().unscaled_delta_time;
-    let listener = res.camera.borrow().position;
     let scene = world.scene.borrow();
+    let listener = game_camera_from_scene(&res.camera.borrow(), &scene).position;
     let lookup = |id| {
         let source = scene.world.audio(id)?.clone();
         Some((source, scene.world.world_position(id)))

@@ -8,7 +8,7 @@ use rusty::core::settings::graphics_options::GraphicsOption;
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::harness::Harness;
 use rusty::dev::screenshot::capture_world_into;
-use rusty::scene::Camera;
+use rusty::scene::camera::{set_view_orientation, set_view_position};
 
 use crate::gpu::bloom_screenshot::scene;
 use crate::gpu::mean_brightness;
@@ -19,7 +19,12 @@ fn a_capture_drops_the_effect_an_option_forbids() {
     let h = Harness::new(&out, "");
     let world = h.world.borrow();
     *world.scene().borrow_mut() = scene(true);
-    *world.camera().borrow_mut() = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
+    // The shot is the main view: the scene's camera entity, moved as `Camera.*` does.
+    {
+        let (mut cam, mut scene) = (world.camera().borrow_mut(), world.scene().borrow_mut());
+        set_view_position(&mut cam, &mut scene, Vec3::new(0.0, 0.0, 5.0));
+        set_view_orientation(&mut cam, &mut scene, -90.0, 0.0);
+    }
     let mut host = CaptureHost::new();
     let mut shot = |allow: bool, name: &str| {
         let cell = world.script_manager().graphics_cell();
