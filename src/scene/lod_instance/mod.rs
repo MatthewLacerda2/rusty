@@ -14,7 +14,7 @@
 use glam::Vec3;
 
 use crate::asset::lod::LodSet;
-use crate::asset::ImportedAsset;
+use crate::asset::{Imported, ImportedAsset};
 use crate::components::rendering::lod_group::default_thresholds;
 use crate::components::{LodGroupComponent, LodLevel};
 use crate::scene::asset_instance::instantiate_imported;
@@ -27,7 +27,7 @@ use crate::scene::Scene;
 pub fn instantiate_lod_set(
     scene: &mut Scene,
     path: &str,
-    asset: &ImportedAsset,
+    asset: &Imported,
     set: &LodSet,
     name: Option<&str>,
     position: Vec3,
