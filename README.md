@@ -212,7 +212,7 @@ or be cloned anywhere.
 or Unity's `ProjectVersion.txt`. It records the **engine commit** the project was
 last opened with (embedded in each engine build), that commit's place in history
 (`git rev-list --count`), and the build settings. Every merge to `main` is a new
-engine and rusty keeps no backward compatibility, so moving **forward** is the
+engine and backward compatibility is not a concern, so moving **forward** is the
 normal case: a newer engine opens the project without asking, and an edit-open
 records it and logs one `[Project]` warning naming the `git log` of what changed (on
 stderr, in the editor console and in the MCP's replies), so the game can be brought

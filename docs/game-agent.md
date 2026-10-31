@@ -63,9 +63,9 @@ Every path the game stores is **relative to the project root**, `/`-separated
 
 ## After an engine upgrade
 
-Every merge to the engine's `main` is a new engine, and the engine keeps **no
-backward compatibility**: an upgrade may break the game, by design, and the game
-is what moves. Opening the project with a newer engine doesn't ask; it records the
+Every merge to the engine's `main` is a new engine, and backward compatibility is
+**not a concern** for it: an upgrade may break the game, and the game is what
+moves. Opening the project with a newer engine doesn't ask; it records the
 new engine in `project.rusty` and logs one engine warning:
 
 ```text

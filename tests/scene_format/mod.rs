@@ -47,8 +47,8 @@ fn scene_format_matches_its_fingerprint() {
     panic!(
         "the scene file format changed:\n{}\n{}\n\n\
          This changes what saved scenes and prefabs hold. No migration is owed \
-         (CLAUDE.md, *No backward compatibility*): update the engine's fixtures and \
-         the default scene, then update {FINGERPRINT} with\n  \
+         (CLAUDE.md, *Backward compatibility is not a concern*): update the \
+         engine's fixtures and the default scene, then update {FINGERPRINT} with\n  \
          RUSTY_BLESS_SCENE_FORMAT=1 cargo nextest run -E 'test(scene_format)'\n\
          and say in the PR what changed.",
         removed.join("\n"),

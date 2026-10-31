@@ -2,7 +2,7 @@
 //! the one running (#853, #1319).
 //!
 //! An engine is a commit and its place in history ([`commit`]). Every merge to
-//! `main` is a new engine, and rusty keeps no backward compatibility, so moving
+//! `main` is a new engine, and backward compatibility is not a concern, so moving
 //! **forward** is the normal case: an [`Upgrade`](Verdict::Upgrade) opens without
 //! asking and says what changed hands. Only an **older** engine, or one from another
 //! line of history, is worth a warning. (Unity Hub asks on every version change;

@@ -290,7 +290,7 @@ the ones tooling or a past mistake depends on.
 - **The approval test.** A finding is filed with `planning`, and never folded in, when
   it changes the engine's design (the five kinds, the one API surface, the
   determinism rule) or a convention in this file. A stored format is not on the list:
-  it changes freely (*No backward compatibility*, below).
+  it changes freely (*Backward compatibility is not a concern*, below).
 - **Bug and doc fixes merge without waiting.** They are filed without `planning` and
   merged like any other ready PR, even when the fix changes how a scene plays.
   **Guard:** a change to the five kinds, the one API surface or the determinism rule
@@ -406,15 +406,18 @@ dependency pinned to a commit (#413; `deny.toml` requires a `rev` on every git d
 only its adapter (Lua → zimmer document, file writes, patch-path resolution).
 
 ## Conventions that matter
-- **No backward compatibility; everything is version 1** (the operator, 2026-10-20).
-  No game has been built on rusty yet, so nothing saved has to keep loading. A stored
-  format (scene, prefab, save, asset sidecar) changes freely, with no migration, no
-  compatibility shim, no legacy alias and no format-version bump. A PR that changes one
-  updates the engine's own fixtures and the default scene in the same change.
+- **Backward compatibility is not a concern; everything is version 1** (the
+  operator, 2026-10-20; restated 2026-10-31). rusty's one user is its operator, who
+  tests the engine as much as building games with it, so what is saved need not keep
+  loading across engine versions, games or not: an upgrade may break a game, and the
+  game is what moves. A stored format (scene, prefab, save, asset sidecar) changes
+  freely: no migration, compatibility shim, legacy alias or format-version bump is
+  owed. Keeping old files loading is not wrong, only never a reason to hold a change
+  back or to add machinery for it. A PR that changes a format updates the engine's
+  own fixtures and the default scene in the same change.
   `Converter::version` is not a format version: it only tells the import cache to
   re-make its files, and still bumps when a converter's output changes (a test holds
-  it: `asset::convert::fingerprint`, #1286). When games
-  exist, the operator revisits this rule.
+  it: `asset::convert::fingerprint`, #1286).
 - **Unity is the bar; rusty reaches it as needed** (the operator, 2026-10-27). Unity
   Engine is the measure of what rusty must be capable of, in quality and in capability:
   everything it gives a developer is the destination, never a menu to pick a subset
