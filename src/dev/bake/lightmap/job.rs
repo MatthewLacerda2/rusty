@@ -89,6 +89,11 @@ impl LightmapBakeJob {
         &self.scene_path
     }
 
+    /// Whether the worker has finished, so [`Self::poll`] would land its result.
+    pub fn is_finished(&self) -> bool {
+        self.worker.as_ref().is_none_or(|w| w.is_finished())
+    }
+
     /// `None` while the worker runs. Once it has finished, apply its result to
     /// `scene` and say how it ended; the job is spent after that.
     pub fn poll(&mut self, scene: &mut Scene) -> Option<BakeOutcome> {

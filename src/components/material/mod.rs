@@ -57,7 +57,7 @@ fn is_true(value: &bool) -> bool {
 /// via a per-vertex tangent attribute + TBN in `fs_main`). The transparency story —
 /// `render_mode` + `alpha` + `alpha_cutoff` (#242) — drives blend/discard. No field is a
 /// write-only no-op.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MaterialAsset {
     #[serde(default = "default_base_color")]
     pub base_color: [f32; 3],

@@ -86,6 +86,24 @@ fn advance(
     let Step::Lightmaps(job) = step else {
         return advance_probes(step, scene, log);
     };
+    if !job.is_finished() {
+        return None;
+    }
+    // A bake is no edit (#1631): what it writes never joins an Undo step.
+    scene.unrecorded(|scene| land_lightmaps(step, scene, log, nav))
+}
+
+/// Apply the finished lightmaps, then start the probe step (placing the probes
+/// when the scene has none).
+fn land_lightmaps(
+    step: &mut Step,
+    scene: &mut Scene,
+    log: &mut ConsoleLogs,
+    nav: &NavigationGraph,
+) -> Option<bool> {
+    let Step::Lightmaps(job) = step else {
+        return None;
+    };
     let lightmaps = match job.poll(scene)? {
         BakeOutcome::Baked(n) => n,
         BakeOutcome::Cancelled => {
@@ -120,7 +138,7 @@ fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> 
     };
     let mut say = |line| log.info(line);
     let stepped = job.step(scene, &mut say).and_then(|done| match done {
-        true => job.commit(scene).map(|()| true),
+        true => scene.unrecorded(|scene| job.commit(scene)).map(|()| true),
         false => Ok(false),
     });
     match stepped {

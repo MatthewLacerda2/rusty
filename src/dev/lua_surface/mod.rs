@@ -60,4 +60,6 @@ mod editor_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod undo_tests;
+#[cfg(test)]
 mod voices_tests;

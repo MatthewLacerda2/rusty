@@ -1,6 +1,6 @@
 //! src/ecs/bundle.rs — document -> single-placement hecs bundle (#345).
 //!
-//! `world.rs`'s `place`/`overwrite` route every whole-entity write through
+//! `placement.rs`'s `place`/`overwrite` route every whole-entity write through
 //! [`build_bundle`] so a document's mandatory + optional columns land in ONE
 //! archetype placement, instead of N sequential `insert_one` calls that would
 //! each re-migrate the entity through its own archetype (O(k) placement, not

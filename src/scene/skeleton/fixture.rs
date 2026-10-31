@@ -23,7 +23,7 @@ pub(super) fn animated_model(tag: &str) -> AssetRef {
 }
 
 /// Instantiate the animated fixture as `Hero`, skeleton and all.
-pub(super) fn hero(scene: &mut Scene, tag: &str) -> u32 {
+pub(crate) fn hero(scene: &mut Scene, tag: &str) -> u32 {
     crate::scene::asset_instance::instantiate_asset(
         scene,
         &animated_model(tag).to_string_ref(),

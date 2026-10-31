@@ -2,15 +2,20 @@ use egui::containers::menu::MenuConfig;
 use egui::PopupCloseBehavior;
 use egui_phosphor::regular as icon;
 
+mod edit_menu;
 mod scene_io;
 mod transport;
+
+#[cfg(feature = "dev")]
+pub(crate) use edit_menu::repl_input_id;
+pub use edit_menu::typing_holds_step;
 
 use crate::editor::menu_create;
 use crate::editor::EditorUi;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
-/// TOP BAR — a classic menu bar (File / GameObject / Config / About) over the
+/// TOP BAR — a classic menu bar (File / Edit / GameObject / Config / About) over the
 /// toolbar row (scene name, centred Play / Stop). Always visible. Scene I/O, object
 /// creation and quality live in the menus; the toolbar row is just play-state.
 pub fn draw(
@@ -20,6 +25,7 @@ pub fn draw(
     console: &mut ConsoleLogs,
     is_playing: &mut bool,
 ) {
+    edit_menu::shortcuts(editor, ui.ctx(), scene);
     let t = editor.theme;
     egui::Panel::top("Header Panel")
         .frame(
@@ -37,7 +43,7 @@ pub fn draw(
     draw_about_window(editor, ui.ctx());
 }
 
-/// File / GameObject / Config / About menus.
+/// File / Edit / GameObject / Config / About menus.
 fn draw_menu_bar(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
@@ -50,6 +56,7 @@ fn draw_menu_bar(
     let config = MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside);
     egui::MenuBar::new().config(config).ui(ui, |ui| {
         file_menu(editor, ui, scene, console, is_playing);
+        edit_menu::edit_menu(editor, ui, scene);
 
         // The GameObject menu — the Unity-style home for creating objects (#255).
         menu_create::game_object_menu(editor, ui, scene);
