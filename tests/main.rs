@@ -60,6 +60,7 @@ mod ragdoll;
 mod reflection_probes;
 mod ribbons;
 mod scene_format;
+mod scene_name_api;
 mod scene_roundtrip;
 mod selectable_api;
 mod sound_api;

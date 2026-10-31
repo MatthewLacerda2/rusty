@@ -16,6 +16,8 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.AddScript` | `(id, path, [fields])` | `true` if the entity exists — see below |
 | `Scene.SetParent` | `(id, parent_id)` | — (errors on a parenting cycle); a `nil` parent unparents, as Unity's `SetParent(null)` |
 | `Scene.ClearParent` | `(id)` | — |
+| `Scene.GetName` | `(id)` | the entity's name, as Unity's `gameObject.name` (`nil` for a missing or `nil` id) |
+| `Scene.SetName` | `(id, name)` | `true` if an entity existed at `id` — renames it, as the inspector's name field does, and the new name is saved with the scene. As in Unity, an empty name and a name another entity already has are both allowed (`FindEntityByName` returns the first match) |
 | `Scene.SetActive` | `(id, active)` | `true` if an entity existed at `id` — Unity's `SetActive`; its callbacks follow the edge (`OnEnable` / `OnDisable`) |
 | `Scene.IsActive` | `(id)` | Unity's `activeSelf`: the entity's own `active` flag (`false` for a missing or `nil` id; an inactive ancestor still hides it) |
 | `Scene.IsActiveInHierarchy` | `(id)` | Unity's `activeInHierarchy`: `true` when the entity and every ancestor are active (`false` for a missing or `nil` id) — what decides whether it draws, simulates and ticks |
