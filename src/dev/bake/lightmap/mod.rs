@@ -146,7 +146,7 @@ fn write_page(
     size: u32,
     bytes: Vec<u8>,
 ) -> Result<String, String> {
-    let path = dir.join(format!("{prefix}_{k}_{:08x}.png", fnv1a(&bytes)));
+    let path = dir.join(format!("{prefix}_{k}_{:08x}.png", content_tag(&bytes)));
     let image =
         image::RgbaImage::from_raw(size, size, bytes).ok_or("lightmap page size mismatch")?;
     image
@@ -157,9 +157,9 @@ fn write_page(
     Ok(crate::core::paths::to_slash(&path))
 }
 
-/// FNV-1a over the texels, folded to 32 bits: the file name's content tag.
-fn fnv1a(bytes: &[u8]) -> u32 {
-    let hash = crate::core::hash::fnv1a64(bytes);
+/// The texels' content hash, folded to 32 bits: the file name's content tag.
+fn content_tag(bytes: &[u8]) -> u32 {
+    let hash = crate::core::hash::content(bytes);
     (hash ^ (hash >> 32)) as u32
 }
 

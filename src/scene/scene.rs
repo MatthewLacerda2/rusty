@@ -131,6 +131,11 @@ pub struct Scene {
     /// dev-only `Debug.GetAdaptedExposure` reads it.
     #[cfg(feature = "dev")]
     pub screen_exposure: Option<f32>,
+    /// Whether the editor's Generate Lighting is baking this scene (Unity's
+    /// `Lightmapping.isRunning`, #1602): its frontend writes it each frame, and
+    /// `Lighting.Generate()` / `Lighting.Bake()` refuse while it is set. Never serialized.
+    #[cfg(feature = "dev")]
+    pub lighting_bake_running: bool,
     /// Per-entity runtime shader-param overrides (#670). Runtime-only, never serialized.
     pub shader_overrides: crate::scene::shader_overrides::ShaderOverrides,
     /// The write-log generation (`core::fs::written`) when the meshes were last read
@@ -174,6 +179,8 @@ impl Default for Scene {
             ui_time: 0.0,
             #[cfg(feature = "dev")]
             screen_exposure: None,
+            #[cfg(feature = "dev")]
+            lighting_bake_running: false,
             shader_overrides: Default::default(),
             meshes_read_at: 0,
             meshes_reimported: BTreeMap::new(),
