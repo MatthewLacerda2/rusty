@@ -100,8 +100,9 @@ fn gpu_a_material_naming_a_baked_shader_renders_with_it() {
         &mut renderer,
         &sphere("blue_only", RenderMode::Transparent),
     ));
+    // One tinted layer: its back faces no longer draw a second (#1615).
     assert!(
-        glass.0 < clear.0 / 2,
+        glass.0 * 3 < clear.0 * 2,
         "tinted glass: {glass:?} vs {clear:?}"
     );
 }

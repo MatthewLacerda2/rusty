@@ -4,7 +4,30 @@
 
 use std::ops::Range;
 
-use super::{CasterBatch, CasterData, CasterKey};
+use super::super::clips::CasterClip;
+use super::{CasterBatch, CasterData, CasterFrame, CasterKey};
+use crate::components::RenderFace;
+
+/// How one material slot casts: its clip (`None` casts plainly) and its material's
+/// render face (#1615).
+pub(super) type SlotCast<'f> = (Option<&'f CasterClip>, RenderFace);
+
+/// Entity `id`'s `(slot, run)` draws, joined by how each slot casts.
+pub(super) fn slot_runs<'f>(
+    frame: &CasterFrame<'f>,
+    id: u32,
+    runs: Vec<(usize, Range<u32>)>,
+) -> Vec<(Range<u32>, SlotCast<'f>)> {
+    let face = |slot| {
+        frame
+            .scene
+            .material_entry_at(id, slot)
+            .map(|(_, m)| m.render_face)
+    };
+    join_alike(runs, |slot| {
+        (frame.clips.get(&(id, slot)), face(slot).unwrap_or_default())
+    })
+}
 
 /// A mesh's `(slot, run)` draws ([`GpuMesh::runs`]) paired with how each slot casts
 /// its shadow (`clip_of(slot)`: its clip, and its render face, #1615), adjacent runs
@@ -61,7 +84,7 @@ pub(super) fn batch_casters(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render::passes::shadows::clips::{CasterClip, Clip, Cutout};
+    use crate::render::passes::shadows::clips::{Clip, Cutout};
 
     fn cutout(material: usize) -> CasterClip {
         CasterClip {

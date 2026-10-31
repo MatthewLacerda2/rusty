@@ -15,7 +15,7 @@
 use glam::Mat4;
 
 use super::LazyPipeline;
-use crate::components::RenderFace;
+use crate::components::{MaterialAsset, RenderFace};
 
 /// Whether `world` mirrors what it places: a negative determinant reverses a
 /// mesh's winding, so face culling would keep the wrong side.
@@ -52,6 +52,12 @@ impl Facing {
             RenderFace::Back if is_mirrored(world) => Self::Ccw,
             RenderFace::Back => Self::Cw,
         }
+    }
+
+    /// The state a mesh placed by `world` draws `material` with: its render face,
+    /// `Front` with none.
+    pub(crate) fn of_material(world: Mat4, material: Option<&MaterialAsset>) -> Self {
+        Self::of(world, material.map_or(RenderFace::Front, |m| m.render_face))
     }
 
     /// The winding the pipeline takes as front.

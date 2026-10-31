@@ -44,7 +44,7 @@ use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
 use buffer::{CasterData, CasterRecords, CasterUpload};
 use glam::Mat4;
-use runs::{batch_casters, join_alike};
+use runs::{batch_casters, slot_runs};
 pub(super) use sweep::Sweep;
 
 /// The facing a caster placed by `world` draws with: every triangle when it is
@@ -199,18 +199,7 @@ impl ShadowRenderer {
             if !sweep.takes(scene.world.is_static(id) && !moving) {
                 continue;
             }
-            let runs = gpu_mesh.runs(&mesh, material.as_deref());
-            let faces = |slot| {
-                scene
-                    .material_entry_at(id, slot)
-                    .map(|(_, m)| m.render_face)
-            };
-            let runs = join_alike(runs, |slot| {
-                (
-                    frame.clips.get(&(id, slot)),
-                    faces(slot).unwrap_or_default(),
-                )
-            });
+            let runs = slot_runs(frame, id, gpu_mesh.runs(&mesh, material.as_deref()));
             let world = scene.world.local_to_world(id);
             // A skinned caster is bounded by its posed skeleton (#833); one whose pose
             // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.

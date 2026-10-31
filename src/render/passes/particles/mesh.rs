@@ -121,10 +121,9 @@ impl Renderer {
             ..self.with_map_channels(material_data(true, material), material)
         };
         // Particles are placed unmirrored: the material's face alone picks the cull.
-        let face = material.map(|m| m.render_face).unwrap_or_default();
         let key = BatchKey {
             pipeline,
-            facing: Facing::of(Mat4::IDENTITY, face),
+            facing: Facing::of_material(Mat4::IDENTITY, material),
             mesh,
             // The emitter names one material: the whole mesh is one run.
             indices: (0..num_indices).into(),
