@@ -15,6 +15,12 @@ impl EditorUi {
         self.scene_path.borrow().clone()
     }
 
+    /// [`current_scene_path`](Self::current_scene_path) lent to `f` without a copy,
+    /// for a read every frame (the editor remembering its open scene, #1618).
+    pub fn with_current_scene_path<R>(&self, f: impl FnOnce(Option<&str>) -> R) -> R {
+        f(self.scene_path.borrow().as_deref())
+    }
+
     /// Make `path` the scene file the editor (and `Scene.Save()`) writes back to.
     pub fn set_current_scene_path(&mut self, path: Option<String>) {
         *self.scene_path.borrow_mut() = path;
@@ -24,32 +30,37 @@ impl EditorUi {
     /// a path that is not a file is refused, and during play the swap is deferred to
     /// the tick's tail. In edit mode the scene loads at once, becomes the current
     /// scene file, and both selections clear so the inspector shows Scene Settings.
+    /// Returns whether the World now holds the file's scene.
     pub(crate) fn open_scene(
         &mut self,
         scene: &mut Scene,
         console: &mut ConsoleLogs,
         path: &str,
         is_playing: bool,
-    ) {
+    ) -> bool {
         if !Path::new(path).is_file() {
             console.error(format!("Failed to load scene: no scene file at '{path}'"));
-            return;
+            return false;
         }
         if is_playing {
             scene.request_load(path.to_string());
             console.info(format!("Scene load queued: {path}"));
-            return;
+            return false;
         }
         match scene.load_from_file(path) {
             Ok(()) => console.info(format!("Scene loaded from {path}")),
             // The World is the new file's: so is the current scene file (#1374).
             Err(err) if err.replaced_world() => console.warn(format!("Scene {path}: {err}")),
-            Err(err) => return console.error(format!("Failed to load scene: {err}")),
+            Err(err) => {
+                console.error(format!("Failed to load scene: {err}"));
+                return false;
+            }
         }
         self.set_current_scene_path(Some(path.to_string()));
         self.selected_entity_id = None;
         self.selected_asset_path = None;
         self.is_dirty = true;
+        true
     }
 
     /// Save the scene to `path`, which becomes the current scene file.

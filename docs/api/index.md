@@ -59,7 +59,7 @@ same evaluator the console uses, so every namespace below resolves through it
 identically — there is no separate, thinner headless surface.
 
 ```
-cargo run --bin session --features dev               # boot + seed the default scene
+cargo run --bin session --features dev               # boot the project's boot scene
 cargo run --bin session --features dev -- <scene>    # boot a specific scene file
 cargo run --bin session --features dev -- --empty    # start from an empty scene
 ```

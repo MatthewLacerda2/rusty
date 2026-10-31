@@ -17,6 +17,7 @@ use mlua::{Lua, Table};
 use crate::api::{put, snapshot, ApiScopedCtx, Reg};
 use crate::dev::preview::{capture_asset, capture_material, PreviewOptions};
 use crate::preview::PreviewMesh;
+use crate::scene::game_camera_from_scene;
 use crate::scripting::Mark;
 
 /// Register the `Debug` namespace onto `lua` (dev builds only).
@@ -209,11 +210,9 @@ fn register_snapshot<'scope>(
     let camera = ctx.camera;
     let time = ctx.time;
     let (screen, video) = (ctx.screen, ctx.video);
-    let view = move || {
-        screen
-            .borrow()
-            .view(&video.borrow(), Some(camera.borrow().clone()))
-    };
+    // The main view (#1619): the camera entity's pose and lens when the scene has one.
+    let main = move || game_camera_from_scene(&camera.borrow(), &scene.borrow());
+    let view = move || screen.borrow().view(&video.borrow(), Some(main()));
     put(
         table,
         "Snapshot",
@@ -222,7 +221,7 @@ fn register_snapshot<'scope>(
             let bones = opts.and_then(|o| o.get::<Option<bool>>("bones").ok().flatten());
             let value = snapshot::world_value_with(
                 &scene.borrow(),
-                &camera.borrow(),
+                &main(),
                 time.borrow().frame_count,
                 scene.borrow().is_playing(),
                 &view(),

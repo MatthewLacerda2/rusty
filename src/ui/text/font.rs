@@ -1,4 +1,4 @@
-//! src/ui/text/font.rs — font assets: loading, the bundled default, kerning (#419).
+//! src/ui/text/font.rs — font assets: loading, the bundled default, metrics (#419, #1328).
 //!
 //! A font is a `.ttf` / `.otf` file referenced by path, like a texture; `None` is
 //! the bundled default (Instrument Sans, SIL OFL 1.1 — the license sits beside it
@@ -7,80 +7,92 @@
 //! does not load falls back to the default (with one warning), so a text never
 //! vanishes over a typo.
 //!
-//! Kerning is read from the font's GPOS `kern` feature (pair adjustment, both
-//! formats) — what modern fonts ship — falling back to the legacy `kern` table.
-//! Full shaping (ligatures, marks, RTL, CJK) is out of scope (`docs/ui.md`).
+//! Faces are read with `skrifa`; shaping (`shape`, with `harfrust`) and outlines
+//! (`outline`) are pure functions of the font bytes, so layout is deterministic.
 
 use crate::core::collections::Map;
+use std::ops::Range;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use ab_glyph::{Font, FontArc, GlyphId, PxScale};
+use super::shape::Shaped;
+
+use skrifa::instance::{LocationRef, Size};
+use skrifa::{FontRef, MetadataProvider};
+
+pub use skrifa::GlyphId;
 
 /// The bundled default font's bytes.
 const DEFAULT_FONT: &[u8] = include_bytes!("../../../engine/fonts/InstrumentSans-Regular.ttf");
 
-/// One loaded font: the parsed face plus its kerning lookups.
+/// One loaded font: its bytes, the shaper's per-font tables and plans, and its metrics.
 pub struct FontData {
-    font: FontArc,
     bytes: Arc<[u8]>,
-    /// GPOS lookup indices the `kern` feature names (empty: use the `kern` table).
-    kern_lookups: Vec<u16>,
-    /// Pair kerning already resolved, in font units.
-    kern_memo: Mutex<Map<(u16, u16), f32>>,
+    pub(super) shaper: harfrust::ShaperData,
+    /// Shape plans by (direction, script), built on first use: a plan compiles the
+    /// font's lookups, so building one per run would dominate a HUD's layout.
+    pub(super) plans: Mutex<Vec<PlanEntry>>,
+    /// Shaped runs by (text, unligated ranges): `shape` memoises here.
+    pub(super) runs: Mutex<Map<RunKey, Arc<[Shaped]>>>,
+    units_per_em: f32,
+    /// Ascent, descent and line gap in font units, all positive.
+    vertical: [f32; 3],
 }
+
+/// A cached shape plan and the segment properties it was built for.
+pub(super) type PlanEntry = (
+    harfrust::Direction,
+    harfrust::Script,
+    Arc<harfrust::ShapePlan>,
+);
+
+/// A shaped run's memo key: its text and the byte ranges kept unligated.
+pub(super) type RunKey = (String, Vec<Range<usize>>);
 
 /// A shared handle to a loaded font.
 pub type FontHandle = Arc<FontData>;
 
 impl FontData {
     fn parse(bytes: Arc<[u8]>) -> Option<Self> {
-        let font = FontArc::try_from_vec(bytes.to_vec()).ok()?;
-        let kern_lookups = kern_lookups(&bytes);
+        let face = FontRef::new(&bytes).ok()?;
+        let m = face.metrics(Size::unscaled(), LocationRef::default());
+        if m.units_per_em == 0 {
+            return None;
+        }
+        let shaper = harfrust::ShaperData::new(&face);
         Some(Self {
-            font,
+            units_per_em: f32::from(m.units_per_em),
+            vertical: [m.ascent, -m.descent, m.leading.max(0.0)],
+            shaper,
+            plans: Mutex::default(),
+            runs: Mutex::default(),
             bytes,
-            kern_lookups,
-            kern_memo: Mutex::new(Map::default()),
         })
     }
 
-    /// The parsed face (glyph ids, advances, outlines).
-    pub fn font(&self) -> &FontArc {
-        &self.font
-    }
-
-    /// The `PxScale` that makes one em `size` pixels (ab_glyph scales by
-    /// `ascent - descent`, UI sizes are ems, as in Unity and CSS).
-    pub fn em_scale(&self, size: f32) -> PxScale {
-        let upem = self.font.units_per_em().unwrap_or(1000.0);
-        PxScale::from(size * self.font.height_unscaled() / upem)
+    /// The parsed face. The bytes parsed once in [`FontData::parse`], so this holds.
+    pub(super) fn face(&self) -> FontRef<'_> {
+        match FontRef::new(&self.bytes) {
+            Ok(f) => f,
+            Err(_) => unreachable!("a FontData's bytes parsed when it loaded"),
+        }
     }
 
     /// Font units per em.
     pub fn units_per_em(&self) -> f32 {
-        self.font.units_per_em().unwrap_or(1000.0)
+        self.units_per_em
+    }
+
+    /// Ascent, descent and line gap at em size `size`, all positive.
+    pub fn vertical_metrics(&self, size: f32) -> [f32; 3] {
+        self.vertical.map(|v| v * size / self.units_per_em)
     }
 
     /// The glyph for `c`, or `None` when the font lacks it.
     pub fn glyph(&self, c: char) -> Option<GlyphId> {
-        let id = self.font.glyph_id(c);
-        (id.0 != 0).then_some(id)
-    }
-
-    /// The horizontal kerning between `a` and `b`, in font units.
-    pub fn kern_units(&self, a: GlyphId, b: GlyphId) -> f32 {
-        let key = (a.0, b.0);
-        let mut memo = self.kern_memo.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(k) = memo.get(&key) {
-            return *k;
-        }
-        let k = if self.kern_lookups.is_empty() {
-            self.font.kern_unscaled(a, b)
-        } else {
-            gpos_kern(&self.bytes, &self.kern_lookups, a, b).unwrap_or(0.0)
-        };
-        memo.insert(key, k);
-        k
+        self.face()
+            .charmap()
+            .map(c)
+            .filter(|g| *g != GlyphId::NOTDEF)
     }
 }
 
@@ -127,62 +139,6 @@ fn bundled() -> FontData {
     }
 }
 
-/// The GPOS lookups the `kern` feature uses, in order, deduplicated.
-fn kern_lookups(bytes: &[u8]) -> Vec<u16> {
-    let Ok(face) = ttf_parser::Face::parse(bytes, 0) else {
-        return Vec::new();
-    };
-    let Some(gpos) = face.tables().gpos else {
-        return Vec::new();
-    };
-    let tag = ttf_parser::Tag::from_bytes(b"kern");
-    let mut out: Vec<u16> = gpos
-        .features
-        .into_iter()
-        .filter(|f| f.tag == tag)
-        .flat_map(|f| f.lookup_indices)
-        .collect();
-    out.sort_unstable();
-    out.dedup();
-    out
-}
-
-/// The first pair adjustment among `lookups` that covers `(a, b)`, as the first
-/// glyph's x-advance change in font units.
-fn gpos_kern(bytes: &[u8], lookups: &[u16], a: GlyphId, b: GlyphId) -> Option<f32> {
-    use ttf_parser::gpos::{PairAdjustment, PositioningSubtable};
-    let face = ttf_parser::Face::parse(bytes, 0).ok()?;
-    let gpos = face.tables().gpos?;
-    let (a, b) = (ttf_parser::GlyphId(a.0), ttf_parser::GlyphId(b.0));
-    for &index in lookups {
-        let Some(lookup) = gpos.lookups.get(index) else {
-            continue;
-        };
-        for sub in lookup.subtables.into_iter::<PositioningSubtable>() {
-            let PositioningSubtable::Pair(pair) = sub else {
-                continue;
-            };
-            let hit = match pair {
-                PairAdjustment::Format1 { coverage, sets } => coverage
-                    .get(a)
-                    .and_then(|i| sets.get(i))
-                    .and_then(|set| set.get(b)),
-                PairAdjustment::Format2 {
-                    coverage,
-                    classes,
-                    matrix,
-                } => coverage
-                    .get(a)
-                    .and_then(|_| matrix.get((classes.0.get(a), classes.1.get(b)))),
-            };
-            if let Some((first, _)) = hit {
-                return Some(f32::from(first.x_advance));
-            }
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,13 +155,21 @@ mod tests {
     }
 
     #[test]
-    fn gpos_kerning_tightens_classic_pairs() {
+    fn bytes_that_are_not_a_font_do_not_parse() {
+        assert!(FontData::parse(Arc::from(&b"not a font"[..])).is_none());
+        let cut = &DEFAULT_FONT[..DEFAULT_FONT.len() / 3];
+        // A truncated face either refuses to parse or still answers without panicking.
+        if let Some(f) = FontData::parse(Arc::from(cut)) {
+            let _ = f.glyph('A');
+        }
+    }
+
+    #[test]
+    fn metrics_scale_with_the_em_size() {
         let d = default_font();
-        let (a, v) = (d.glyph('A'), d.glyph('V'));
-        let (Some(a), Some(v)) = (a, v) else {
-            panic!("the default font has A and V")
-        };
-        assert!(d.kern_units(a, v) < 0.0, "AV kerns tighter");
-        assert_eq!(d.kern_units(a, v), d.kern_units(a, v), "memoized");
+        let [a, desc, _] = d.vertical_metrics(10.0);
+        let [a2, desc2, _] = d.vertical_metrics(20.0);
+        assert!(a > 0.0 && desc > 0.0);
+        assert!((a2 - 2.0 * a).abs() < 1e-4 && (desc2 - 2.0 * desc).abs() < 1e-4);
     }
 }

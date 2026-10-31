@@ -14,7 +14,7 @@ pub use picker::capture_picker;
 use super::{icon, EditorFrontend};
 use crate::app::GameWorld;
 use crate::core::project::bench::recent;
-use crate::core::project::{Opened, PROJECT_FILE};
+use crate::core::project::{Access, Opened, PROJECT_FILE};
 use crate::core::settings::video::VideoSettings;
 use crate::editor::project_picker::ProjectPicker;
 use crate::shell::{boot, Launch, Shell};
@@ -51,8 +51,10 @@ pub fn launch_picker() {
     );
 }
 
-/// Boot the editor's game on the seeded default scene of the open project. An engine
-/// mismatch is logged to the editor console as well as stderr.
+/// Boot the editor's game on the open project's boot scene
+/// (`core::project::boot_scene`: the scene this machine last had open, then the
+/// startup scene, then an empty one, #1618). An engine mismatch is logged to the
+/// editor console as well as stderr.
 fn prepare(
     opened: &Opened,
 ) -> (
@@ -64,7 +66,9 @@ fn prepare(
         eprintln!("[Project] could not update the recent projects: {err}");
     }
     boot::seed_project_workspace();
-    let mut game = boot::load_game(crate::scene::DEFAULT_SCENE_PATH);
+    let startup = &opened.settings.build.startup_scene;
+    let plan = crate::core::project::boot_scene(&opened.root, startup, Access::Edit);
+    let mut game = boot::load_game(&plan.unwrap_or_default());
     // Editor scripting works outside Play, as in Unity (#1339): the console line
     // and MCP `eval` drive the edit scene; Stop brings this runtime back.
     let init = game.init_edit_runtime();

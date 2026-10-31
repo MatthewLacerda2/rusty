@@ -13,6 +13,8 @@ mod hosts;
 mod index;
 mod index_edges;
 mod play_bin;
+#[cfg(feature = "editor")]
+pub mod timeline;
 mod timing;
 
 /// Walk, turn, a REPL line and API calls that move the world and draw from

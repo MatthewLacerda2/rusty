@@ -95,7 +95,7 @@ fn draw_shape_selector(ui: &mut egui::Ui, shape: &mut ColliderShape) -> bool {
             "Sphere" => ColliderShape::Sphere { radius: 0.5 },
             "Cylinder" => ColliderShape::Cylinder {
                 radius: 0.5,
-                height: 1.0,
+                height: 2.0,
             },
             "Capsule" => ColliderShape::Capsule {
                 radius: 0.5,

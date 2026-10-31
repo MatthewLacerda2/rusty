@@ -89,7 +89,7 @@ pub(crate) fn text_quads(
 fn corners(lo: Vec2, hi: Vec2, g: &PlacedGlyph) -> [Vec2; 4] {
     let shear = |p: Vec2| {
         let dx = if g.faux_italic {
-            (p.y - g.origin.y) * ITALIC_SHEAR
+            (p.y - g.baseline) * ITALIC_SHEAR
         } else {
             0.0
         };
@@ -162,5 +162,27 @@ mod tests {
             glyph.sdf[2] + glyph.sdf[3] <= SPREAD,
             "effects stay in the field"
         );
+    }
+
+    #[test]
+    fn faux_italic_shears_about_the_baseline_not_a_raised_origin() {
+        let glyph = |y: f32| PlacedGlyph {
+            glyph: crate::ui::text::font::GlyphId::NOTDEF,
+            face: 0,
+            origin: Vec2::new(0.0, y),
+            baseline: 0.0,
+            size: 10.0,
+            color: Vec4::ONE,
+            faux_bold: false,
+            faux_italic: true,
+        };
+        let (lo, hi) = (Vec2::new(0.0, 5.0), Vec2::new(2.0, 9.0));
+        let raised = corners(lo, hi, &glyph(5.0));
+        assert_eq!(
+            raised,
+            corners(lo, hi, &glyph(0.0)),
+            "a mark leans with its base"
+        );
+        assert_eq!(raised[0].x, 5.0 * ITALIC_SHEAR);
     }
 }
