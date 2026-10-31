@@ -118,6 +118,7 @@ pub fn build_manifest(root: &Path) -> AssetManifest {
 /// Import one file into its [`AssetEntry`], or `None` if it can't be imported. A
 /// file whose path can't be referenced (#1295) is skipped with a warning naming why.
 fn entry_for(path: &str) -> Option<AssetEntry> {
+    // A plain import: listing the project must not fill the import cache (#857).
     let asset = import_file(Path::new(path)).ok()?;
     let sub_objects = asset
         .sub_meshes

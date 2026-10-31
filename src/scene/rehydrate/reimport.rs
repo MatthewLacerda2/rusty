@@ -1,8 +1,9 @@
 //! src/scene/rehydrate/reimport.rs — re-import the meshes already in a scene when
 //! their model changed: an import setting (Generate Lightmap UVs, #831; the Scale
-//! Factor, #1398) or the file itself (#1242). Each model file is imported once per
-//! call however many instances name it, so a Dust2-sized level with hundreds of one
-//! prop parses and unwraps it once per edit.
+//! Factor, #1398) or the file itself (#1242). Each model file is looked up once per
+//! call however many instances name it, through its shared import
+//! (`asset::imported`, #857), so a Dust2-sized level with hundreds of one prop
+//! parses and unwraps it once per edit, and not at all when nothing changed.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -10,7 +11,7 @@ use std::path::Path;
 use glam::Vec3;
 
 use super::{install, RehydratedMesh};
-use crate::asset::{self, AssetRef, ImportedAsset, SubMesh};
+use crate::asset::{self, AssetRef, Imported, MeshRevision, SubMesh};
 use crate::components::{ColliderComponent, ColliderShape};
 use crate::core::fs::written::Stale;
 use crate::scene::prefab::diff::masked;
@@ -61,7 +62,7 @@ pub fn reimport_written(scene: &mut Scene, stale: &Stale) -> usize {
 /// Re-import every mesh whose reference's file `names` accepts, importing each such
 /// file once. Returns the ids of the entities whose mesh was rebuilt.
 fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bool) -> Vec<u32> {
-    let mut imported: BTreeMap<String, Option<ImportedAsset>> = BTreeMap::new();
+    let mut imported: BTreeMap<String, Option<Imported>> = BTreeMap::new();
     let mut rebuilt = Vec::new();
     for id in scene.world.ids_with_mesh() {
         let Some((reference, was_skinned)) = scene.world.mesh(id).and_then(|m| {
@@ -75,10 +76,10 @@ fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bo
         }
         let asset = imported
             .entry(reference.path)
-            .or_insert_with_key(|file| asset::import_file(Path::new(file)).ok());
+            .or_insert_with_key(|file| asset::imported(Path::new(file)).ok());
         let sub = asset
             .as_ref()
-            .and_then(|a| a.sub_mesh(&reference.sub_object));
+            .and_then(|a| Some((a.sub_mesh(&reference.sub_object)?, a.revision)));
         // A linked prefab entity's refit is the model's, never an override (#1527).
         let linked = scene.world.prefab_link(id).is_some();
         let before = linked.then(|| scene.world.reference_document(id)).flatten();
@@ -94,8 +95,14 @@ fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bo
 
 /// Put `sub` on entity `id`'s mesh, and refit its mesh collider's box to it. A
 /// skinned mesh (before or after) takes the new rig, its bones re-bound, when `rig`
-/// says so, and is kept otherwise. Returns whether the mesh was rebuilt.
-fn reimport_entity_mesh(scene: &mut Scene, id: u32, sub: &SubMesh, rig: Rig) -> bool {
+/// says so, and is kept otherwise. `revision` is the import's `sub` came from.
+/// Returns whether the mesh was rebuilt.
+fn reimport_entity_mesh(
+    scene: &mut Scene,
+    id: u32,
+    (sub, revision): (&SubMesh, MeshRevision),
+    rig: Rig,
+) -> bool {
     let was_skinned = scene.world.mesh(id).is_some_and(|m| m.skin.is_some());
     let skinned = was_skinned || sub.skin.is_some();
     if skinned && rig == Rig::Keep {
@@ -108,7 +115,7 @@ fn reimport_entity_mesh(scene: &mut Scene, id: u32, sub: &SubMesh, rig: Rig) -> 
     // replaced, and re-bound to the new one by name.
     let hung = skinned.then(|| scene.take_skeleton(id));
     if let Some(mut mesh) = scene.world.mesh_mut(id) {
-        install(&mut mesh, RehydratedMesh::from_sub_mesh(sub));
+        install(&mut mesh, RehydratedMesh::from_sub_mesh(sub, revision));
     }
     if let Some(hung) = hung {
         scene.restore_skeleton(id, hung);
