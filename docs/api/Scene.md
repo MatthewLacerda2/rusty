@@ -270,7 +270,10 @@ one name and never drift.
   node path, so a Scale Factor change (`Assets.SetModelImportSettings`) or a re-written
   file rebuilds the open scene's instances from the new import at once and every other
   scene's on load, and an edit made to a part (a moved wall, a renamed node) is an
-  override that survives it. The prefab verbs below work on it (`ListPrefabOverrides`,
+  override that survives it. The model's materials (`kit.glb::Wood`, or the one
+  `kit.glb::#default` its unmaterialled nodes share) are the scene's once placed: an
+  edit to one (`Material.SetColor`) shows on every instance of the model and survives
+  a re-import, Play→Stop and a load, as Unity's extracted material does. The prefab verbs below work on it (`ListPrefabOverrides`,
   `RevertPrefabOverrides`, `ReimportPrefab`, `RevertPrefabField`) except the two
   apply-to-source ones, which error: a model is read-only, as in Unity. A node added to
   the file is not spawned into existing instances yet, and a node removed from it
