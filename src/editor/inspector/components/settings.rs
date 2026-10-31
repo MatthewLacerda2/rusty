@@ -23,6 +23,34 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     ui.separator();
     ui.add_space(5.0);
 
+    // 1–3. Skybox and ambient light, through the shared environment ops.
+    draw_environment(editor, ui, scene);
+
+    // 4. Fog — distance + height, applied to every world-space pass.
+    draw_fog(editor, ui, scene);
+    ui.add_space(8.0);
+
+    // 5. Tags & Layers — rename the project's shared layer slots, referenced by an
+    // entity's Layer dropdown in the entity inspector.
+    draw_layers(editor, ui, scene);
+    ui.add_space(8.0);
+
+    // 6. Layer Collision Matrix — which layer collides with which (#91).
+    draw_collision_matrix(editor, ui, scene);
+
+    ui.add_space(15.0);
+    ui.separator();
+    ui.add_space(5.0);
+    ui.colored_label(
+        t.text_secondary,
+        "Select an entity from Hierarchy\nor click a project asset to inspect.",
+    );
+}
+
+/// The skybox path and the ambient colour and intensity, each written through its
+/// `authoring::environment` op, the one `Lighting.Set*` calls (#1612).
+fn draw_environment(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
+    let t = theme::from_ui(ui);
     // 1. Skybox Path
     ui.horizontal(|ui| {
         ui.label("Skybox:");
@@ -63,26 +91,6 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
         editor.is_dirty = true;
     }
     ui.add_space(8.0);
-
-    // 4. Fog — distance + height, applied to every world-space pass.
-    draw_fog(editor, ui, scene);
-    ui.add_space(8.0);
-
-    // 5. Tags & Layers — rename the project's shared layer slots, referenced by an
-    // entity's Layer dropdown in the entity inspector.
-    draw_layers(editor, ui, scene);
-    ui.add_space(8.0);
-
-    // 6. Layer Collision Matrix — which layer collides with which (#91).
-    draw_collision_matrix(editor, ui, scene);
-
-    ui.add_space(15.0);
-    ui.separator();
-    ui.add_space(5.0);
-    ui.colored_label(
-        t.text_secondary,
-        "Select an entity from Hierarchy\nor click a project asset to inspect.",
-    );
 }
 
 /// The Tags & Layers surface: rename the project's 32 layer slots. Layer 0 is the
