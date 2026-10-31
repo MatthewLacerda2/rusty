@@ -880,4 +880,15 @@ scene.reflection_probes.probes[].resolution: u32
 scene.reflection_probes.probes[].shadows: bool
 scene.selected_entity_id: option
 scene.selected_entity_id: u32
+scene.sky.cloud_coverage: f32
+scene.sky.cloud_opacity: f32
+scene.sky.ground: option
+scene.sky.ground: tuple(3)
+scene.sky.ground[]: f32
+scene.sky.horizon: option
+scene.sky.horizon: tuple(3)
+scene.sky.horizon[]: f32
+scene.sky.zenith: option
+scene.sky.zenith: tuple(3)
+scene.sky.zenith[]: f32
 scene.skybox_path: string
