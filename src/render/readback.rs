@@ -1,10 +1,11 @@
 //! src/render/readback.rs — offscreen colour target → CPU bytes → PNG.
 //!
-//! The one place the engine copies a rendered texture back to the CPU. Three callers
-//! need it — the dev screenshot (`dev/screenshot.rs`), the cubemap capture
-//! (`render/ibl/cubemap_capture.rs`), and the headless asset preview
-//! (`dev/preview.rs`, #353) — and each had grown (or was about to grow) its own copy
-//! of the same fiddly alignment dance.
+//! The one place the engine copies a rendered texture back to the CPU. Its callers
+//! — the dev screenshot (`dev/screenshot.rs`), the cubemap capture
+//! (`render/ibl/cubemap_capture.rs`), the headless asset preview (`dev/preview.rs`,
+//! #353) and the reflection probes' GPU prefilter (`reflection_prefilter::gpu`,
+//! #1602) — had each grown (or were about to grow) a copy of the same fiddly
+//! alignment dance.
 //!
 //! That dance is the whole reason this deserves a home: `copy_texture_to_buffer`
 //! requires every row padded to [`wgpu::COPY_BYTES_PER_ROW_ALIGNMENT`] (256), so a
@@ -149,6 +150,17 @@ fn map_and_unpad(
     unpadded_bytes_per_row: u32,
     height: u32,
 ) -> Vec<u8> {
+    let mut pixels = Vec::with_capacity((unpadded_bytes_per_row * height) as usize);
+    map(device, buffer, |mapped| {
+        for row in mapped.chunks(padded_bytes_per_row as usize) {
+            pixels.extend_from_slice(&row[..unpadded_bytes_per_row as usize]);
+        }
+    });
+    pixels
+}
+
+/// Map the readback buffer (blocking), hand its bytes to `read`, and unmap it.
+fn map(device: &wgpu::Device, buffer: &wgpu::Buffer, read: impl FnOnce(&[u8])) {
     let slice = buffer.slice(..);
     let (tx, rx) = std::sync::mpsc::channel();
     slice.map_async(wgpu::MapMode::Read, move |res| {
@@ -161,13 +173,79 @@ fn map_and_unpad(
     let mapped = slice
         .get_mapped_range()
         .expect("the readback buffer was just mapped");
-    let mut pixels = Vec::with_capacity((unpadded_bytes_per_row * height) as usize);
-    for row in mapped.chunks(padded_bytes_per_row as usize) {
-        pixels.extend_from_slice(&row[..unpadded_bytes_per_row as usize]);
-    }
+    read(&mapped);
     drop(mapped);
     buffer.unmap();
-    pixels
+}
+
+/// Every mip of a six-layer RGBA8 `texture` (a cube's faces), level `i` being
+/// `sizes[i]` square, in one copy and one map (#1602): `levels[i][layer]`, each
+/// tightly packed, row-major, top to bottom.
+pub(crate) fn read_cube_mips_rgba8(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    texture: &wgpu::Texture,
+    sizes: &[u32],
+) -> Vec<[Vec<u8>; 6]> {
+    let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+    let pitch = |size: u32| (size * 4).div_ceil(align) * align;
+    let offsets: Vec<u64> = sizes
+        .iter()
+        .scan(0u64, |at, &size| {
+            let offset = *at;
+            *at += u64::from(pitch(size) * size) * 6;
+            Some(offset)
+        })
+        .collect();
+    let total: u64 = sizes.iter().map(|&s| u64::from(pitch(s) * s) * 6).sum();
+    let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Cube Readback Buffer"),
+        size: total,
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("Cube Readback Copy"),
+    });
+    for (mip_level, (&size, &offset)) in (0..).zip(sizes.iter().zip(&offsets)) {
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture,
+                mip_level,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset,
+                    bytes_per_row: Some(pitch(size)),
+                    rows_per_image: Some(size),
+                },
+            },
+            wgpu::Extent3d {
+                width: size,
+                height: size,
+                depth_or_array_layers: 6,
+            },
+        );
+    }
+    queue.submit(std::iter::once(encoder.finish()));
+    let mut levels = Vec::with_capacity(sizes.len());
+    map(device, &buffer, |bytes| {
+        for (&size, &offset) in sizes.iter().zip(&offsets) {
+            let (pitch, row, rows) = (pitch(size) as usize, (size * 4) as usize, size as usize);
+            levels.push(std::array::from_fn(|layer| {
+                let start = offset as usize + layer * pitch * rows;
+                bytes[start..start + pitch * rows]
+                    .chunks(pitch)
+                    .flat_map(|r| &r[..row])
+                    .copied()
+                    .collect()
+            }));
+        }
+    });
+    levels
 }
 
 /// Write packed RGBA8 `pixels` to `path` as a PNG, creating the parent directory if

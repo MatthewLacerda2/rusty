@@ -3,7 +3,7 @@
 //! The specular sibling of the light-probe bake (`probe/bake.rs`). For each reflection
 //! probe it captures the STATIC scene to a 6-face cubemap from the probe position
 //! (`capture_static_cubemap`, #243), GGX-prefilters it into a roughness mip chain
-//! (`reflection_prefilter`), encodes the result to KTX2 (`ktx2_encode`), writes that file
+//! (`reflection_prefilter`, on the GPU since #1602), encodes the result to KTX2 (`ktx2_encode`), writes that file
 //! next to the scene, and stores its path on the probe (the `cubemap_path` field from
 //! #244). Each frame loads it through the probe array's cubemap cache
 //! (`Renderer::cached_cubemap`), and the forward pass reflects it.
@@ -21,8 +21,9 @@ use std::path::Path;
 
 use crate::render::ibl::cubemap_capture::CaptureLens;
 use crate::render::ibl::ktx2_encode::encode_cubemap;
-use crate::render::ibl::reflection_prefilter::prefilter;
-use crate::render::Renderer;
+use crate::render::ibl::reflection_prefilter::gpu::ProbePrefilter;
+use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
+use crate::render::{CubemapCapture, Renderer};
 use crate::scene::lighting::reflection_probe::clamp_resolution;
 use crate::scene::{ReflectionProbe, Scene};
 
@@ -47,7 +48,7 @@ impl Renderer {
             shadows: probe.shadows,
         };
         let capture = self.capture_reflection_cubemap(scene, probe.position, resolution, lens);
-        let prefiltered = prefilter(&capture);
+        let prefiltered = self.prefilter_gpu(&capture);
         // The mip a fully-rough surface samples (CPU mirror of the shader's selection),
         // logged so a bake's roughness range is visible when debugging a probe.
         log::debug!(
@@ -59,6 +60,15 @@ impl Renderer {
             )
         );
         encode_cubemap(&prefiltered)
+    }
+
+    /// GGX-prefilter `capture` on the GPU (#1602), building the pipeline on the
+    /// renderer's first bake.
+    pub(crate) fn prefilter_gpu(&self, capture: &CubemapCapture) -> PrefilteredCubemap {
+        let filter = self
+            .probe_prefilter
+            .get_or_init(|| ProbePrefilter::new(&self.device));
+        filter.run((&self.device, &self.queue), capture)
     }
 
     /// Bake every reflection probe in `scene` at its resolution, writing each one's KTX2 cubemap into

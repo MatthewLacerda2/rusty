@@ -6,9 +6,9 @@
 // `roughness * (mips - 1)` by `forward::lighting::environment_reflection` exactly as a
 // probe cube is.
 //
-// The convolution is `render::ibl::reflection_prefilter`'s, on the GPU: the split-sum
-// N = V = R assumption, Hammersley half-vectors drawn toward the GGX lobe, each
-// reflected into a light direction and weighted by N·L. Two sources:
+// The convolution is `render::ibl::reflection_prefilter`'s, on the GPU, through the
+// sampling the probe prefilter shares (`ibl::ggx`): each light direction weighted by
+// N·L. Two sources:
 // - the panorama (`params.p.z == 1`): sampled at the mip whose texel matches the
 //   sample's solid angle (filtered importance sampling), so a few taps blur
 //   without sparkle;
@@ -18,6 +18,7 @@
 //   cycle) never rebakes it.
 
 #import common::{PI, equirect_uv, procedural_sky}
+#import ibl::ggx::{ggx_light, tangent_frame}
 
 struct Params {
     // x: roughness, y: face size in texels, z: 1 for the panorama (0: procedural),
@@ -76,19 +77,9 @@ fn mirror_lod(size: f32) -> f32 {
     return clamp(0.5 * log2(cube_texel / panorama_texel()), 0.0, last);
 }
 
-fn radical_inverse_vdc(bits: u32) -> f32 {
-    return f32(reverseBits(bits)) * 2.3283064e-10;
-}
-
-fn hammersley(i: u32, n: u32) -> vec2<f32> {
-    return vec2<f32>(f32(i) / f32(n), radical_inverse_vdc(i));
-}
-
 // GGX split-sum convolution around `n`, as `reflection_prefilter::convolve`.
 fn convolve(n: vec3<f32>, roughness: f32) -> vec4<f32> {
-    let up = select(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 0.0, 1.0), abs(n.z) < 0.999);
-    let tangent = normalize(cross(up, n));
-    let bitangent = cross(n, tangent);
+    let frame = tangent_frame(n);
     let a = roughness * roughness;
     let a2 = a * a;
     let texel = panorama_texel();
@@ -97,12 +88,9 @@ fn convolve(n: vec3<f32>, roughness: f32) -> vec4<f32> {
     var color = vec4<f32>(0.0);
     var weight = 0.0;
     for (var i = 0u; i < samples; i = i + 1u) {
-        let xi = hammersley(i, samples);
-        let phi = 2.0 * PI * xi.x;
-        let cos_theta = sqrt((1.0 - xi.y) / (1.0 + (a2 - 1.0) * xi.y));
-        let sin_theta = sqrt(max(1.0 - cos_theta * cos_theta, 0.0));
-        let h = normalize(tangent * sin_theta * cos(phi) + bitangent * sin_theta * sin(phi) + n * cos_theta);
-        let l = normalize(2.0 * dot(n, h) * h - n);
+        let ggx = ggx_light(i, samples, a2, frame);
+        let l = ggx.xyz;
+        let cos_theta = ggx.w;
         let ndotl = dot(n, l);
         if (ndotl > 0.0) {
             // GGX D at this half-vector; with N = V its pdf over L is D / 4.
