@@ -36,7 +36,9 @@ def machine() -> reclaim.Machine:
         elif "merge-tree" in argv or "--version" in argv:
             code = 1
         return subprocess.CompletedProcess(argv, code, out, err)
-    return reclaim.Machine(answer)
+    found = reclaim.Machine(answer)
+    found.alive = lambda pid: True  # a lock's owner runs: never the real process table (#1658)
+    return found
 
 
 def branch(name: str, tip: str) -> tuple[str, str]:
