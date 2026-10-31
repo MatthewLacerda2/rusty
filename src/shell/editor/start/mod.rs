@@ -69,7 +69,7 @@ fn prepare(
     boot::seed_project_workspace();
     let startup = &opened.settings.build.startup_scene;
     let plan = crate::core::project::boot_scene(&opened.root, startup, Access::Edit);
-    let game = world(&plan.unwrap_or_default(), ProjectSource::project_file());
+    let game = world(&plan.unwrap_or_default(), ProjectSource::bound(opened));
     if let Some(warning) = opened.engine.warning() {
         game.console()
             .borrow_mut()

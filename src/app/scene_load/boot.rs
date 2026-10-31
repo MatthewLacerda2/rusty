@@ -12,7 +12,7 @@
 use std::path::PathBuf;
 
 use super::super::game::GameWorld;
-use crate::core::project::{BootPlan, ProjectSettings, PROJECT_FILE};
+use crate::core::project::{BootPlan, Opened, ProjectSettings, PROJECT_FILE};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
@@ -29,9 +29,20 @@ pub enum ProjectSource {
 }
 
 impl ProjectSource {
-    /// The open project's `project.rusty` (the working directory's), bound.
-    pub fn project_file() -> Self {
-        Self::Bound(PathBuf::from(PROJECT_FILE))
+    /// `opened`'s `project.rusty`, bound by its absolute path, so the binding never
+    /// follows the working directory to another project.
+    pub fn bound(opened: &Opened) -> Self {
+        Self::Bound(opened.root.join(PROJECT_FILE))
+    }
+
+    /// The engine's default settings, unbound: a world with no project (tests).
+    pub fn defaults() -> Self {
+        Self::ReadOnly(ProjectSettings::default())
+    }
+
+    /// The settings opening `opened` read, unbound.
+    pub fn read_only(opened: &Opened) -> Self {
+        Self::ReadOnly(opened.settings.clone())
     }
 }
 
@@ -40,7 +51,9 @@ impl GameWorld {
     /// from `source`, start the graphics options from the project's defaults (a
     /// player's saved choice, loaded later by the shell, still wins), and run on the
     /// project's decal budgets and quality presets. A bound file that can't be read
-    /// is logged to the console and leaves the defaults. Every entry point calls it.
+    /// or parsed leaves the defaults and is said once, as an engine error, so the
+    /// editor's console and a session's replies both carry it. Every entry point
+    /// calls it.
     pub fn open_project(&self, source: ProjectSource) {
         let opened = {
             let mut app = self.resources.application.borrow_mut();
@@ -53,7 +66,7 @@ impl GameWorld {
             }
         };
         if let Err(err) = opened {
-            self.resources.console.borrow_mut().error(err);
+            log::error!("[Project] {err}; running on the default settings");
         }
         let defaults = self.resources.application.borrow().graphics_defaults();
         let graphics = self.resources.script_manager.graphics_cell();

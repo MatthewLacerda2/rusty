@@ -30,7 +30,7 @@ use serde_json::json;
 use super::console;
 use crate::app::{GameWorld, ProjectSource};
 use crate::core::input::InputState;
-use crate::core::project::{Access, BootPlan, ProjectSettings};
+use crate::core::project::{Access, BootPlan};
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
@@ -50,18 +50,19 @@ impl Session {
     /// engine cells, optionally load `boot_scene` and bake nav, then construct the
     /// world and initialise the evaluator **without entering play**. `boot_scene`
     /// empty means start from an empty scene (the agent authors into it live).
-    /// No project is opened: the engine's default settings, unbound (tests and
-    /// embedders).
+    /// No project is opened: the engine's default settings, unbound. For tests,
+    /// which want a world free of any project file; an entry point on a real
+    /// project calls [`boot`](Self::boot) with that project's settings.
     pub fn new(boot_scene: &str) -> Result<Self, String> {
-        let defaults = ProjectSource::ReadOnly(ProjectSettings::default());
-        Self::boot(&BootPlan::of(boot_scene), defaults)
+        Self::boot(&BootPlan::of(boot_scene), ProjectSource::defaults())
     }
 
     /// [`new`](Self::new) on the first of `plan`'s scenes that loads
     /// (`app::load_boot_scene`), an empty scene when none does (#1618), under the
     /// `project`'s settings (#1652): `session` and `session-mcp` bind the open
-    /// project's file ([`ProjectSource::project_file`]), as the editor does, so
-    /// `Application`'s and `Graphics`' project setters write it.
+    /// project's file ([`ProjectSource::bound`]), as the editor does, so
+    /// `Application`'s and `Graphics`' project setters write it; `editor-capture`
+    /// reads it ([`ProjectSource::read_only`]).
     pub fn boot(plan: &BootPlan, project: ProjectSource) -> Result<Self, String> {
         crate::scene::seed_default_scripts();
 
@@ -144,7 +145,8 @@ impl Session {
     }
 }
 
-/// Open the project and resolve the boot scene from a session bin's CLI args.
+/// Open the project and resolve the boot scene from a session bin's CLI args, with
+/// the project's file to bind ([`ProjectSource::bound`], #1652).
 ///
 /// Shared by the `session` and `session-mcp` bins so they parse arguments
 /// identically. The accepted forms are:
@@ -161,14 +163,15 @@ impl Session {
 ///
 /// `--project` may sit anywhere; it is taken out first and the rest is read as the
 /// scene argument.
-pub fn boot_scene_from_args(args: &[String]) -> BootPlan {
+pub fn boot_from_args(args: &[String]) -> (BootPlan, ProjectSource) {
     let mut rest = args.to_vec();
     let opened = crate::core::project::open_from_args(&mut rest, Access::Edit);
-    match rest.first().map(String::as_str) {
+    let plan = match rest.first().map(String::as_str) {
         Some("--empty") => BootPlan::default(),
         Some(path) => BootPlan::of(path),
         None => seeded_boot_scene(&opened),
-    }
+    };
+    (plan, ProjectSource::bound(&opened))
 }
 
 /// Seed the default scene into the open project, then plan the scene it boots on,

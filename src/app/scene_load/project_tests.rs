@@ -86,17 +86,22 @@ fn a_read_only_project_is_never_written() {
 }
 
 #[test]
-fn an_unreadable_project_file_is_logged_and_leaves_the_defaults() {
+fn an_unparseable_project_file_is_said_once_and_leaves_the_defaults() {
+    crate::logging::init();
     let path = crate::test_temp::dir().join("project.rusty");
     std::fs::write(&path, "{ not json").unwrap();
     let game = world();
     game.open_project(ProjectSource::Bound(path));
-    let app = game.resources.application.borrow();
-    assert_eq!(app.build(), &Default::default());
+    game.apply_project_settings(); // entering Play rereads the file
+    assert_eq!(
+        game.resources.application.borrow().build(),
+        &Default::default()
+    );
+    // Everything raised: what a session's reply carries, and the console.
+    let said = crate::logging::forward(game.console());
+    assert_eq!(said.len(), 1, "one message, the parse error: {said:?}");
+    assert!(!said[0].contains("last read"), "{said:?}");
     let console = game.console().borrow();
-    let errors = console
-        .messages
-        .iter()
-        .filter(|(_, l)| *l == LogLevel::Error);
-    assert_eq!(errors.count(), 1, "said once on the console");
+    let levels: Vec<_> = console.messages.iter().map(|(_, l)| l.clone()).collect();
+    assert_eq!(levels, [LogLevel::Error], "{:?}", console.messages);
 }

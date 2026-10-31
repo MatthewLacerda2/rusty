@@ -84,8 +84,10 @@ fn play_reads_the_projects_settings() {
         .arg(&dir)
         .output()
         .expect("play runs");
-    let results = std::fs::read_to_string(dir.join("results.json")).unwrap();
-    assert!(out.status.success(), "{results}");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "play failed: {stderr}");
+    let results = std::fs::read_to_string(dir.join("results.json"));
+    assert!(results.is_ok(), "no results.json: {stderr}");
     let file = std::fs::read_to_string(game.join("project.rusty")).unwrap();
     assert!(
         !file.contains("Arena"),

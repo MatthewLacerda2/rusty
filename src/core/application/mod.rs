@@ -156,15 +156,15 @@ impl Application {
         };
         self.path = Some(path);
         let text = read?;
-        let file = match &text {
-            Some(text) => ProjectFile::from_json(text)?,
-            None => ProjectFile::default(),
-        };
+        let parsed = text.as_deref().map(ProjectFile::from_json);
+        // Kept even when it doesn't parse: `reread` then waits for the file to
+        // change instead of saying the same parse error again (#1652).
+        self.read_from = text;
+        let file = parsed.transpose()?.unwrap_or_default();
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
         self.quality = file.quality;
         self.decal_limits = file.decals;
         self.demos = file.demos;
-        self.read_from = text;
         Ok(())
     }
 

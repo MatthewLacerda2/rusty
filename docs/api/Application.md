@@ -35,11 +35,15 @@ splits on whether it authors the project or runs it:
 - **The editor and the headless session** (`session`, `session-mcp`, the agent's
   path) bind the file: the setters write it, leaving the rest of it alone — they are
   the API twin of **File → Build Settings**.
-- **The player and `play`** (and a demo replay, which plays under the settings it
-  was recorded with) read it but never write it back, so a setter only changes the
-  running value. Saved `Video`
+- **The player, `play` and `editor-capture`** read it but never write it back, so a
+  setter only changes the running value. Saved `Video`
 settings (a player's own fullscreen choice) win over `SetWindowMode`, which is only
 the first-launch default.
+
+A demo replay is the one run that doesn't play under this file: it plays under the
+settings recorded in the demo's header, the ones it was recorded with (#1581). A file
+that can't be read or parsed leaves the defaults and is reported once, as an error,
+in the editor's console and in a session's next reply.
 
 **Graphics option defaults** live in the same file, under `"graphics_options"`: an
 object of option name → `bool` (`{ "motion_blur": false }`), every option it omits

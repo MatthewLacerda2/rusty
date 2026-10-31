@@ -48,7 +48,7 @@ impl Embedded {
         let back = std::env::current_dir().map_err(|e| e.to_string())?;
         let opened = project::open(root, Access::Edit)?;
         let boot_scene = session::seeded_boot_scene(&opened);
-        match Session::boot(&boot_scene, ProjectSource::project_file()) {
+        match Session::boot(&boot_scene, ProjectSource::bound(&opened)) {
             Ok(session) => {
                 *self.session.borrow_mut() = session;
                 Ok(())
