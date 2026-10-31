@@ -28,9 +28,10 @@
 
 use glam::Vec3;
 
-use super::bake::project_cubemap;
+use super::solve::BounceSolve;
 use crate::render::Renderer;
 use crate::scene::lighting::lightmap::{baked_direct_sh, BakeScene};
+use crate::scene::lighting::probe::ProbeVolume;
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
 
@@ -63,91 +64,38 @@ impl Renderer {
     /// one indirect bounce. Stops at [`MAX_BOUNCES`] or when a pass adds less than
     /// [`CONVERGENCE_EPSILON`] energy, whichever comes first; then every probe gains
     /// the direct light of the scene's `Baked` lights (#809). With no probes it is a
-    /// no-op. Returns a [`BounceReport`] describing the termination.
+    /// no-op. Returns a [`BounceReport`] describing the termination. The solve is
+    /// `probe::solve::BounceSolve` run to its end; the editor steps the same one across frames.
     pub fn bake_probes_multibounce(&mut self, scene: &mut Scene, resolution: u32) -> BounceReport {
-        let report = self.solve_bounces(scene, resolution);
-        add_baked_direct(scene);
-        report
-    }
-
-    /// The bounce iteration itself: the captured (surface) light only.
-    fn solve_bounces(&mut self, scene: &mut Scene, resolution: u32) -> BounceReport {
-        let positions: Vec<Vec3> = scene.probes.probes.iter().map(|p| p.position).collect();
-        if positions.is_empty() {
-            return BounceReport {
-                bounces: 0,
-                converged: true,
-            };
-        }
-
-        // Bounce 1: direct-only capture, exactly today's single-capture result.
-        let mut field = self.bake_pass(scene, &positions, resolution, false);
-        write_field(scene, &field);
-
-        for bounce in 2..=MAX_BOUNCES {
-            // Re-light the static scene from the field just written (the previous
-            // bounce's SH), then project the added indirect light into a new field.
-            let next = self.bake_pass(scene, &positions, resolution, true);
-            let converged = pass_converged(&field, &next, CONVERGENCE_EPSILON);
-            field = next;
-            write_field(scene, &field);
-            if converged {
-                return BounceReport {
-                    bounces: bounce,
-                    converged: true,
-                };
+        let mut solve = BounceSolve::new(scene, resolution);
+        loop {
+            if let Some(report) = solve.step(self, scene) {
+                // Nothing edits the scene inside this call, so its probes are the ones baked.
+                let committed = solve.commit(scene);
+                debug_assert!(committed.is_ok(), "{committed:?}");
+                return report;
             }
         }
-
-        BounceReport {
-            bounces: MAX_BOUNCES,
-            converged: false,
-        }
-    }
-
-    /// One full pass: capture and project every probe at `positions`. `with_probes`
-    /// selects the lit capture (static surfaces sample the current probe field, for
-    /// bounce ≥2) versus the direct-only [`Renderer::bake_probe`] (bounce 1), so
-    /// the single-bounce baseline the tests read is the shipped code.
-    fn bake_pass(
-        &mut self,
-        scene: &Scene,
-        positions: &[Vec3],
-        resolution: u32,
-        with_probes: bool,
-    ) -> Vec<Sh9> {
-        positions
-            .iter()
-            .map(|&p| {
-                if with_probes {
-                    let capture = self.capture_static_cubemap_lit(scene, p, resolution);
-                    project_cubemap(&capture)
-                } else {
-                    self.bake_probe(scene, p, resolution)
-                }
-            })
-            .collect()
     }
 }
 
-/// Write a freshly-solved SH field onto the scene's probes (one SH per probe, in
+/// Write a freshly-solved SH field onto a solve's probes (one SH per probe, in
 /// order). The next bounce's lit capture reads these back through the probe field.
-fn write_field(scene: &mut Scene, field: &[Sh9]) {
-    for (probe, &sh) in scene.probes.probes.iter_mut().zip(field) {
+pub(super) fn write_field(volume: &mut ProbeVolume, field: &[Sh9]) {
+    for (probe, &sh) in volume.probes.iter_mut().zip(field) {
         probe.sh = sh;
     }
 }
 
-/// Add the direct light of the scene's `Baked` lights to every probe (#809), shadowed
-/// by the static meshes the lightmap bake sees.
-fn add_baked_direct(scene: &mut Scene) {
-    let positions: Vec<Vec3> = scene.probes.probes.iter().map(|p| p.position).collect();
+/// Add the direct light of `scene`'s `Baked` lights to every probe of `volume` (#809),
+/// shadowed by the static meshes the lightmap bake sees.
+pub(super) fn add_baked_direct(scene: &Scene, volume: &mut ProbeVolume) {
+    let positions: Vec<Vec3> = volume.probes.iter().map(|p| p.position).collect();
     if positions.is_empty() {
         return;
     }
     let statics = BakeScene::gather(scene, &|_| None);
-    for (probe, direct) in scene
-        .probes
+    for (probe, direct) in volume
         .probes
         .iter_mut()
         .zip(baked_direct_sh(&statics, &positions))
