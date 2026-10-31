@@ -241,7 +241,7 @@ its check and its command changed to match).
   binary is the one harness that runs a real project (`--project <dir>`, default
   `./project`; `Harness::in_user_workspace`): an agent play-tests its game, on the
   project's startup scene or `--scene <path>` (#1343). `Harness::new` builds the
-  engine's demo scene in memory instead, the fixture the engine's own tests use. Test code
+  engine's default scene in memory instead, the fixture the engine's own tests use. Test code
   that names `in_user_workspace` or `scenario::run(` fails `make rules`
   (`test-user-workspace`, #980).
 - **A run renders at a Game view size** (#1583): 1280x720 unless `play --size
@@ -354,7 +354,8 @@ Cargo resolves features for `cargo build` without the dev-dependencies. If a
 dev-dependency switches on a feature that the normal build leaves off, `cargo test`
 compiles its own copy of that crate, of everything above it, and of rusty. proptest
 did this to `getrandom`'s `std` feature, and that doubled ahash, hecs, wgpu and egui
-(#552). `Cargo.toml` now names `getrandom` with `std` directly to close the gap.
+(#552). `Cargo.toml` once named `getrandom` with `std` directly to close the gap;
+#1334 builds proptest without its default features instead and dropped that pin.
 **Don't let a dev-dependency turn on a feature the normal build lacks.** The
 `feature-split` gate (`make feature-split`, `.github/scripts/feature_split.py`, #979)
 compares the two resolutions on every run. Test-only crates (proptest and its
@@ -486,6 +487,12 @@ on `PATH` or named by `RUSTY_BLENDER`:
 
     cargo nextest run --features dev --run-ignored only -E 'test(/convert::blend::|^export::blend::/)'
 
+That filter takes in Blender's converter fingerprint
+(`converter_fingerprints_hold_for_blender`, *Converter fingerprints* below), whose
+rows are Linux's at the Blender CI pins: with another Blender, or on macOS, it fails
+on the program or the hash, not on a bug. Add `and not test(converter_fingerprints)`
+to the filter there.
+
 Finding Blender (not found, too old, the override, a version that fails, hangs or
 cannot start, a newer one put earlier on `PATH`)
 is tested in the ordinary suite with fake executables, and the cache's handling of
@@ -506,11 +513,14 @@ make editor-capture OUT=after.png ARGS="--select Player"
 # or: cargo run --features dev --bin editor-capture -- --out after.png --play --game
 ```
 
-Options: `--scene <path>` (default: the built-in default scene, in memory), `--select
+Options: `--project <dir>` (default `./project`), `--scene <path>` (a `.scene` in the
+project; default: the built-in default scene, in memory), `--select
 <name>`, `--select-asset <path>` (project-relative, e.g. `assets/scenes/a.scene`: open an asset's Inspector card — a `.scene`'s bake
 buttons, an image, audio or prefab card; exclusive with `--select`), `--frame` (frame the selection in the Scene view, as the F key does), `--play`
 (the Play-mode chrome; the sim is not stepped), `--game` (the Game tab), `--size <W>x<H>`
-(default 1600x900), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
+(default 1600x900), `--demo <file>` and `--demo-tick <n>` (a demo open on the Game
+view's timeline, replayed to tick `n`, default 0; #1598), `--pointer <X>,<Y>` (the
+pointer held there, in pixels, so a hover shows), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
 on, #854, over a sample recent list dated against a fixed time; the page names show
 *New Project*, *Open* and the different-engine prompt). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a
@@ -520,7 +530,8 @@ Each frame runs the editor's own `EditorUi::draw`, renders the scene into the vi
 rect the layout asked for, and binds it as the viewport's texture; the last frame is
 painted with `egui_wgpu` and read back. A fixed size, a 1× scale, a fixed frame count
 and a synthetic clock make it **deterministic**: the same scene and options give the same
-bytes on the same machine. What it cannot show: hover states, open menus and popups.
+bytes on the same machine. What it cannot show: open menus and popups, and a hover
+anywhere but at the one `--pointer` position.
 
 **An editor-visible branch captures before (on `main`) and after** of the panel it
 changes, and its coder looks at both and says what it saw in the PR; no PNG goes to
@@ -606,7 +617,7 @@ loads from disk (#1343). It is gitignored and seeded through the seed manifest,
 which keeps a local edit, so an edited copy changes what the bench measures. A
 deleted copy is not seeded again (#1618): to measure the default again, delete it
 and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
-(only that line: the others record the seeded scripts).
+(only that line: the others record the seeded scripts and starter materials).
 
 - **the scene** — 50 skinned soldiers (a procedural 16-bone, ~12k-triangle rig with a
   walk cycle and hitboxes) walking the navmesh with a Lua brain each (patrol + a
@@ -620,7 +631,7 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `renderer_ms` (CPU time recording the frame), `gpu_ms` and `gpu.<pass>` (GPU time
   at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
-  `triangles`, `culled_entities`, `lights_dropped`, `lights_culled`,
+  `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
   `decals_visible`, `decal_cluster_refs`, and the systems
   `update_scripts`, `tick_nav`, `step_physics`, `animate`. Every GPU pass prints
   every run (0 when it did not run), so the rows are stable.
@@ -732,9 +743,13 @@ program. A changed output at the blessed version fails, naming the converter: bu
 its `version` in `convert/converter.rs`, then re-bless with `make bless-converters`.
 A bumped version, a different Blender or an added fixture fails until re-blessed;
 re-blessing a changed output at the blessed version is refused, so the bless never
-stands in for the bump. The check runs on Linux only (another platform's maths
-library may round a float differently): `make test` holds the engine's own
-converters, CI's `blender` job holds Blender's rows, at the Blender it pins.
+stands in for the bump. The rows are Linux's (another platform's maths library may
+round a float differently): `make test` holds the engine's own converters, on Linux
+only, and CI's `blender` job holds Blender's rows, at the Blender it pins. Blender's
+check is `#[ignore]`d rather than Linux-only, and `make bless-converters` re-blesses
+its rows whenever a Blender is on the machine, writing that Blender's version: bless
+on Linux with the pinned Blender, or with none installed, or the `blender` job fails
+on the rows it wrote.
 
 ## Example (unit, in-module)
 See `tools/lint/src/size/` — `mod.rs` mounts a `#[cfg(test)] mod tests` (`tests.rs`)

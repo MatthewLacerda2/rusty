@@ -34,8 +34,8 @@ pub fn seed_project_workspace() {
     }
 }
 
-/// The project tree an asset refresh sweeps (the content browser's root, Unity's
-/// `Assets/`): an `.mp3` anywhere under it is converted to `.wav` (#385).
+/// The project tree an asset refresh sweeps (Unity's `Assets/`): an `.mp3`
+/// anywhere under it is converted to `.wav` (#385).
 pub const ASSET_ROOT: &str = crate::core::project::ASSETS_DIR;
 
 /// Import what arrived in the project since the last look (Unity's asset refresh):

@@ -3,7 +3,7 @@
 //! First-class engine components: the engine expects these and its systems
 //! interface with them (e.g. NavMeshAgent <-> baked navmesh), exactly like
 //! Unity's built-in components. Each is its own hecs column (`ecs::world`),
-//! attached only when present; `Entity` (defined in `entity.rs`) is the
+//! attached only when present; `Entity` (defined in `entity/mod.rs`) is the
 //! document shape one GameObject's columns assemble into/out of, not live
 //! storage. `Transform` is mandatory.
 

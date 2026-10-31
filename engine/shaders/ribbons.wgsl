@@ -1,4 +1,4 @@
-// assets/shaders/ribbons.wgsl — camera-facing ribbons: trails and lines (#441).
+// engine/shaders/ribbons.wgsl — camera-facing ribbons: trails and lines (#441).
 //
 // The CPU builds each ribbon as a strip of point pairs: both vertices of a pair
 // sit on the centre line with the line's tangent, the width and colour at that

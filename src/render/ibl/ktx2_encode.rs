@@ -1,4 +1,4 @@
-//! src/render/ktx2_encode.rs — hand-rolled KTX2 writer for baked cubemaps (#245).
+//! src/render/ibl/ktx2_encode.rs — hand-rolled KTX2 writer for baked cubemaps (#245).
 //!
 //! The `ktx2` crate (0.3.0) is PARSE-ONLY — it has a `Reader` but no writer — so the
 //! reflection bake hand-rolls the encode over the same binary layout the crate's `Reader`

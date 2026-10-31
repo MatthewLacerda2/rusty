@@ -12,9 +12,9 @@
 //! Records are keyed by their packed bytes ([`RecordTable`](super::RecordTable)):
 //! every frame each distinct record is stored once, sorted by its bytes
 //! (`render::draw::batch::FrameDraws::pack`), so draws with identical material values
-//! share one, a camera that moves and reorders the draws packs the same array, and
-//! the array is written to the GPU only when its bytes changed since the last upload
-//! (`DrawBuffers::upload`).
+//! share one, a camera that moves and reorders the draws packs the same array while it
+//! sees the same materials, and the array is written to the GPU only when its bytes
+//! changed since the last upload (`DrawBuffers::upload`).
 //!
 //! **Adding a material field.** Add it to [`MaterialData`] (spend a `_pad` word, or
 //! append a 16-byte run at the end, keeping the size a multiple of 16), mirror it in

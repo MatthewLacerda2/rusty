@@ -124,7 +124,7 @@ fmt: ## [gate] rustfmt, engine and tools/lint
 	cargo fmt --all --check
 	cargo fmt --manifest-path tools/lint/Cargo.toml --check
 
-size: ## [gate] File-length cap on .rs and .py, full scan (tools/lint)
+size: ## [gate] File-length cap on .rs, .py, .lua and .wgsl, full scan (tools/lint)
 	$(LINT)
 
 rules: ## [gate] Finding-based rules with inline allows, one module each in tools/lint/src/rules (docs/linting.md lists them)

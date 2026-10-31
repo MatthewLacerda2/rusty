@@ -1,6 +1,6 @@
 //! src/core/application/ — `Application`: build settings + the quit request.
 //!
-//! The standalone player (#431) needs two small pieces of engine-wide state that are
+//! The standalone player (#431) needs a few small pieces of engine-wide state that are
 //! neither scene data nor save data:
 //!
 //! * **[`BuildSettings`]** — Unity's "Build Settings / Player Settings", minimal: which
@@ -33,8 +33,9 @@
 //!   harness) has no edit mode to return to, and refuses a script's request.
 //!
 //! ## Persistence
-//! Like [`Storage`](crate::core::storage::Storage), the file is read once at a boundary
-//! (boot) and an unbound instance ([`Application::new`]) never touches disk — the
+//! Like [`Storage`](crate::core::storage::Storage), the file is read at a boundary
+//! (boot; a bound instance re-reads the budgets and presets, see `reread`) and an
+//! unbound instance ([`Application::new`]) never touches disk — the
 //! harness and tests stay reproducible. Unlike `Storage`, a setter on a *bound*
 //! instance writes the file straight away: build settings are authoring-time project
 //! config, edited rarely and deliberately, never from inside `FixedUpdate`. The player

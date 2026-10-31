@@ -23,7 +23,7 @@ through it, so world and camera canvases are hit, listed and clicked too.
 | `UI.SetShader` | `(id, name)` | — draw `id`'s graphics (its `Image`, `Shape` and `Text`) with the baked ui shader `name` (#427); `nil` or `""` restores the standard shader. Naming a different shader drops the old one's param values. Errors when `id` has none of them. See below |
 | `UI.GetShader` | `(id)` | the ui shader `id`'s graphics draw with (its first graphic's in draw order: Image, Shape, Text), or `nil` |
 | `UI.SetShaderParam` | `(id, name, value)` | — set a **runtime** param of the shader on every graphic of `id` that names one, e.g. `"dissolve.amount"`; `value` is a number or an array (one number broadcasts). Strict: an unknown or baked param, or a wrong count, errors listing the runtime params; so does calling it before `SetShader` |
-| `UI.GetShaderParam` | `(id, name)` | the value it draws with: the one set, else the baked default (a number, or an array for a vector param) |
+| `UI.GetShaderParam` | `(id, name)` | the value it draws with: the one set, else the baked default (a number, or an array for a vector param). Errors when `id` has no Image, Shape or Text, names no shader, or the param is not a runtime one |
 
 **An Image's native size arrives at the next tick** (#1221). A `Simple` or `Filled`
 Image fitted to its content (`LayoutElement` preferred size, a layout group) measures

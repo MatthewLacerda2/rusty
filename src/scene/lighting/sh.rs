@@ -1,4 +1,4 @@
-//! src/scene/sh.rs — Spherical-harmonics (SH) math for light probes.
+//! src/scene/lighting/sh.rs — Spherical-harmonics (SH) math for light probes.
 //!
 //! Hand-rolled order-2 (L2) real spherical harmonics over `glam`, no external
 //! micro-dependency. An L2 SH irradiance signal is 9 basis coefficients, each an

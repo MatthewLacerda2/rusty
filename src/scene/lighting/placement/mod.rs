@@ -1,4 +1,4 @@
-//! src/scene/lighting/placement.rs — Deterministic auto-placement of IBL probes.
+//! src/scene/lighting/placement/ — Deterministic auto-placement of IBL probes.
 //!
 //! The "place well" half of the one-button bake (#246): given the STATIC scene (and,
 //! when available, the walkable extent of the baked nav surface), compute where light

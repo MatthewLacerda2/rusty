@@ -6,7 +6,8 @@
 //! editor, the physics write-back, IK, the Animator): when the value changed, the
 //! entity is queued as moved ([`World::moved`]), O(1): its subtree's matrices go dirty
 //! before the next read and its colliders' AABBs are due a refresh (#1157). An
-//! unchanged value lands as a no-op, so a guard taken only to read costs nothing.
+//! unchanged value lands as a no-op, so a guard taken only to read moves nothing
+//! (a recording journal still notes the entity, `ecs::journal`).
 
 use std::ops::{Deref, DerefMut};
 

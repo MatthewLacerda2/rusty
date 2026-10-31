@@ -36,7 +36,7 @@ coder *changing* it must know.
 
 ## Gates on this code
 - **`make scripts` is a hard gate** (in `make gates` and `lint.yml`): `unittest` over
-  `.github/scripts/tests/`. Tests are grouped there by area — `verdict/`, `queue/`,
+  `.github/scripts/tests/` (and `tools/launcher/tests/`). Tests are grouped there by area — `verdict/`, `queue/`,
   `watch/`, `reclaim/`, `board/`, `checks/`, `mutants/`, `dispatch/`, `health/`,
   `resolved/`, `ruleset/` — each a package; a new area gets its own folder. A test never
   reaches GitHub or pushes: it fakes `gh` and `git` the way
@@ -66,7 +66,8 @@ coder *changing* it must know.
   meant for rusty's watch killed scorsese's too. Find rusty's by its working directory
   (`lsof -a -p <pid> -d cwd`) and kill that PID.
 - **Its exit statuses are an interface**: 1 (read the hand-backs), 3 (the machine or
-  GitHub failed), 4 (another watch holds the lock), 5 (relaunch), and a last line
+  GitHub failed), 4 (another watch holds the lock), 5 (relaunch), 6 (a stop was
+  requested, `make queue-stop`; `merging/watch/ending.py`), and a last line
   `watch: resume: <command>`. The skills and the orchestrator read them, so a change
   to one updates `ci-merge` in the same pull request.
 - **The supervisor** (`queue-daemon.py`, #908) adds two statuses of its own, 7 (its

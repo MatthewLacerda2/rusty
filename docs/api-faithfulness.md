@@ -1,7 +1,13 @@
 # API faithfulness catalog
 
-Every `api::` **setter** (and the writes behind `Spawn`/`Emit`-style verbs) is
-listed here with its faithfulness status and the **read-site** that proves it. The
+An `api::` **setter** (and the writes behind `Spawn`/`Emit`-style verbs) is
+listed here with its faithfulness status and the **read-site** that proves it.
+The list is kept by hand and is behind the live surface: whole namespaces with
+setters (`Lighting`, `Probe`, `Reflection`, `Assets`, `Component`, `Random`) and
+many setters added since (Material's surface options, the per-entity `Camera`
+setters, much of `Graphics` (fog, vignette, film grain, white balance, …),
+`Animator`'s parameters) have no row yet. A missing row means the setter is not
+audited here, not that it is a no-op. The
 audit (issue #178) exists because the `api::` surface can carry setters that are
 *named-but-not-wired*: a `Set*` that writes a field nothing downstream reads, so a
 headless agent saves a scene that only looks wrong when a human finally opens it.
@@ -55,16 +61,16 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `SetMetallic` | ✅ | renderer — `draw::uniforms::material_data` packs `metallic` into the draw's `MaterialData` record; `shader.wgsl` PBR uses it |
 | `SetRoughness` | ✅ | renderer — same path, `roughness` uniform |
 | `SetColor` | ✅ | renderer — writes `base_color` through `authoring::material::set_base_color`, the inspector's op; `draw::uniforms::material_data` packs it as `MaterialData.color_tint`, and `shader.wgsl` multiplies the albedo by it (#1368) |
-| `SetTexture` | ✅ | renderer — `draw::upload_scene_assets` calls `load_texture(path)` for every active entity **each frame**, and `draw_resources::build_solid_resource` binds `gpu_textures[path]`. A runtime path change loads + binds next frame. (This is the issue's "canonical no-op"; it is **wired** in the current renderer.) Round-trips. |
-| `SetMetallicMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `draw_resources::build_solid_resource` assembles the per-entity group(2) material bind group, and `shader.wgsl` samples `t_metallic` (`.b` channel) × the metallic scalar (#202, closed #184) |
+| `SetTexture` | ✅ | renderer — `draw::upload_scene_assets` loads every entity's material maps, active or not (#1363), **each frame**, and `Renderer::material_bind_group` (`render::draw::materials`) binds the texture. A runtime path change loads + binds next frame. (This is the issue's "canonical no-op"; it is **wired** in the current renderer.) Round-trips. |
+| `SetMetallicMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `Renderer::material_bind_group` (`render::draw::materials`) assembles the group(2) material bind group, and `shader.wgsl` samples `t_metallic` (`.b` channel) × the metallic scalar (#202, closed #184) |
 | `SetRoughnessMap` | ✅ | renderer — same path; `shader.wgsl` samples `t_roughness` (`.g` channel) × the roughness scalar (#202, closed #184) |
 | `SetEmissive` | ✅ | renderer — `draw::uniforms::material_data` packs `emissive` into the draw's `MaterialData` record; `shader.wgsl` adds it after lighting (blooms when >1.0) (#222) |
-| `SetNormalMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `build_solid_resource` binds `t_normal` to the group(2) material bind group, and `shader.wgsl` perturbs the shading normal in tangent space (per-vertex tangents + TBN) (#207) |
+| `SetNormalMap` | ✅ | renderer — `draw::upload_scene_assets` loads the map, `Renderer::material_bind_group` binds `t_normal` to the group(2) material bind group, and `shader.wgsl` perturbs the shading normal in tangent space (per-vertex tangents + TBN) (#207) |
 | `SetEmissiveMap` | ✅ | renderer — same upload/bind path; `shader.wgsl` samples `t_emissive` and modulates the emissive factor (`factor × map.rgb`) (#207) |
-| `DefineAsset` | ✅ | renderer + round-trip (#271) — writes a `MaterialAsset` into `scene.materials` under a chosen name; an entity referencing that name via its `MaterialComponent` is sampled by the renderer through the SAME per-entity material path as every row above (`draw_resources::build_solid_resource` + `shader.wgsl`). The asset is part of `SceneData` (`materials` map), so it survives save→load. Proven by `tests/material_authoring.rs` (round-trip; entity-uses-asset; clamps/unknown-mode degrade; packed map slots) |
+| `DefineAsset` | ✅ | renderer + round-trip (#271) — writes a `MaterialAsset` into `scene.materials` under a chosen name; an entity referencing that name via its `MaterialComponent` is sampled by the renderer through the SAME per-entity material path as every row above (`Renderer::material_bind_group` + `shader.wgsl`). The asset is part of `SceneData` (`materials` map), so it survives save→load. Proven by `tests/material_authoring.rs` (round-trip; entity-uses-asset; clamps/unknown-mode degrade; packed map slots) |
 | `Set` / `SetAt` (+ `Get` / `GetAll`) | ✅ | renderer + round-trip (#1285) — write `MaterialComponent::materials[slot]` through `authoring::material::set_slot`; `draw::resources::solid_draw_items` draws each material slot over the index run `GpuMesh::runs` pairs it with, Unity's way (`draw::batch::material_runs`), with `Scene::material_entry_at(id, slot)` (shadows: `shadows::clips::slot_clip`). The list is part of `SceneData`. Proven by `gpu::multi_material_screenshot` (two runs, two colours; `SetAt` recolours only its run) and `asset_instance::multi_material_tests` (round-trip) |
 | `GetAsset` / `HasAsset` | ✅ | round-trip — read-back of the named library asset (canonical JSON / presence), so the authored asset is observable through the same surface |
-| `SetShader` (+ the recipe's `shader` key) | ✅ | renderer (#396) — `draw_resources::solid_draw_item` resolves `MaterialAsset::shader` to a pipeline id through `gpu::pipelines::surface::SurfaceShaders` (lazy, cached by name, log-once fallback to the standard shader, rebuilt on re-bake); `draw_batches` binds that variant's opaque/transparent pipeline. Proven by `surface_tests.rs` (a baked variant renders differently; missing/postfx modules fall back pixel-identically; a re-bake rebuilds) |
+| `SetShader` (+ the recipe's `shader` key) | ✅ | renderer (#396) — `Renderer::slot_key` (`render::draw::solid_key`) resolves `MaterialAsset::shader` to a pipeline id through `gpu::pipelines::surface::SurfaceShaders` (lazy, cached by name, log-once fallback to the standard shader, rebuilt on re-bake); `draw_batches` binds that variant's opaque/transparent pipeline. Proven by `surface_tests.rs` (a baked variant renders differently; missing/postfx modules fall back pixel-identically; a re-bake rebuilds) |
 
 ### `Animator` — over `Entity.animator`
 
@@ -93,7 +99,7 @@ per-module unit tests (e.g. `api/light.rs`) are the pattern.
 | `RevertPrefabOverrides` / `ReimportPrefab` | ✅ | rebuild each instance entity from a fresh source baseline (re-applying overrides on reimport); the resulting component values feed the same renderer/sim read-sites as any edited entity |
 | `ApplyPrefabToSource` / `ApplyPrefabFieldToSource` | ✅ | write the instance's overrides into the source `.prefab` on disk (reusing the override setter + the one `.prefab` writer), then clear them — other instances pick the edit up on reload/reimport (#268) |
 | `SetActive` | ✅ | sim + renderer — the same `active` flag `Deactivate` clears, read through Unity's `activeInHierarchy` (`World::is_active_in_hierarchy`, #1363): an inactive parent hides and stops its subtree — the script lifecycle's `OnEnable`/`OnDisable` edge sweep, Animators, physics, nav, audio (a voice stops on the falling edge, a `play_on_start` source replays on the rising one, `app/audio/activity.rs`), layout groups, UI hit-testing and drawing all ask it; round-trips (`tests/ui/widgets/reads.rs`, #422) |
-| `SetStatic` | ✅ | sim + renderer — `World::set_static`, the inspector checkbox's write: physics makes the body Fixed (`physics::shape::build::classify`, re-read each tick); the cascade and atlas sweeps put it in the cached static bake (`shadows::casters::prepare_casters`, re-baked when `World::static_revision` moves, #1496); probe SH skips it (`draw::uniforms::entity_probe_sh`); the lightmap input (`scene::lighting::lightmap::input`), probe placement (`scene::lighting::placement::static_scene_aabb`), the navmesh bounds (`navigation::bounds`) and the probe cubemap capture (`draw::resources`, `static_capture`) read it at their next bake; round-trips as `is_static`. Proven by `tests/static_flag_api.rs` (a Rigidbody set static from Lua stops falling) and `gpu_a_static_flag_flip_rebakes_with_no_one_invalidating` |
+| `SetStatic` | ✅ | sim + renderer — `World::set_static`, the inspector checkbox's write: physics makes the body Fixed (`physics::shape::build::classify`, re-read each tick); the cascade and atlas sweeps put it in the cached static bake (`shadows::casters::prepare_casters`, re-baked when `World::static_revision` moves, #1496); probe SH skips it (`draw::uniforms::entity_probe_sh`); the lightmap input (`scene::lighting::lightmap::input`), probe placement (`scene::lighting::placement::static_scene_aabb`), the navmesh bounds (`navigation::bounds`) and the probe cubemap capture (`draw::resources`, `capture.static_only`) read it at their next bake; round-trips as `is_static`. Proven by `tests/static_flag_api.rs` (a Rigidbody set static from Lua stops falling) and `gpu_a_static_flag_flip_rebakes_with_no_one_invalidating` |
 | `SetName` | ✅ | sim + editor — `World::set_name`, the inspector name field's write: `World::find_by_name` (`Scene.FindEntityByName`), `Scene.FindChild`, the hierarchy and inspector read it; round-trips with the scene. Proven by `tests/scene_name_api.rs` (`a_rename_is_saved_with_the_scene`) |
 
 ### `Navigation` — over `Scene.nav_settings`
@@ -224,13 +230,13 @@ change.)
 |---|---|---|
 | `To` / `Sequence` | ✅ | each tick writes through the property's own authoring op (`Transform` fields directly, with the collider re-sync), so the read-site is that component's setter row above/below — `CanvasGroup.SetAlpha`, `Image.SetColor`, `Light.SetIntensity`, … (`src/scripting/tests/tweens.rs`, `tests/tweens.rs`) |
 
-### `Camera` — over the shared `scene::Camera`
+### `Camera` — over the main camera entity, else the shared `scene::Camera` (#1619)
 
 | Setter | Status | Read-site |
 |---|---|---|
-| `SetPosition` | ✅ | renderer — `app/systems/camera_sync.rs` + view matrix |
-| `SetYaw` / `SetPitch` | ✅ | renderer — `Camera::forward`/view matrix (pitch clamped) |
-| `SetFov` | ✅ | renderer — projection matrix (clamped 1..179°) |
+| `SetPosition` | ✅ | renderer — `scene::camera::set_view_position` moves the main camera entity's Transform when the scene has one, and the view `Camera` either way; `app/systems/camera_sync.rs` mirrors the pose into the view matrix (`tests/camera/main_view.rs`) |
+| `SetYaw` / `SetPitch` | ✅ | renderer — `set_view_orientation` rebuilds the entity's world rotation (pitch clamped ±89°, roll dropped); `Camera::forward`/view matrix |
+| `SetFov` | ✅ | renderer — `set_view_fov` sets the main camera entity's `fieldOfView` (its lens) and the view camera's; projection matrix (clamped 1..179°) |
 
 ### `Light` — over `Entity.light`
 
@@ -538,7 +544,7 @@ rejected patch, note or option). zimmer's own render tests live in scorsese.
 
 | Status | Count |
 |---|---|
-| ✅ faithful | 125 |
+| ✅ faithful | every row above |
 | ⚠️ partial | 0 |
 | ❌ no-op | 0 |
 

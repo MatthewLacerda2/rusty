@@ -16,8 +16,9 @@
 //! `--record-audio <path>` captures the whole run's final audio mix to a WAV
 //! (#1579), named from the launch directory like the other paths.
 //!
-//! Drives `app::GameWorld::tick` at a fixed 1/60 timestep with NO window/GPU, runs
-//! the given Lua scenario, and writes <out_dir>/results.json + <out_dir>/console.log.
+//! Drives `app::GameWorld::tick` at a fixed 1/60 timestep (a `--demo` replay at each
+//! tick's recorded `dt`) with NO window/GPU, runs the given Lua scenario, and writes
+//! <out_dir>/results.json + <out_dir>/console.log.
 //! Deterministic: fixed dt + frame-count timers, so reruns are identical.
 //!
 //! Every run is recorded as a demo in the project's `saved/demos/` (#1581).

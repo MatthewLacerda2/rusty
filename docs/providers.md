@@ -24,9 +24,9 @@ names the variable and every place that was checked.
 ## The budget
 
 Each project keeps a budget and a running total of what it has spent, in
-`provider_budget.json` at the project root (#829), created on the first call. It is
-the project's own setting, not regenerable output, so it sits at the root rather
-than under `cache/`:
+`provider_budget.json` at the project root (#829), created by the first call that
+spends. It is the project's own setting, not regenerable output, so it sits at the
+root rather than under `cache/`:
 
 ```json
 {

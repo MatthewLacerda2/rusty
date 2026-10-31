@@ -5,14 +5,15 @@
 //! script runtime — plus the play-mode bookkeeping the tick advances (play-state,
 //! the frame counter, the edit-mode snapshot, the per-frame dt). Storage of record
 //! (the `Scene`) is NOT here; it is threaded alongside `Resources` as the `&mut
-//! Scene` world argument, so a system sees `(&mut Scene, &mut Resources)` — the
-//! canonical two-argument form (issue #39). The borrow checker now keeps the world
-//! and the resources distinct at the system boundary.
+//! World` argument (`app::World`, a handle to the `Scene`), so a system sees
+//! `(&mut World, &mut Resources)` — the canonical two-argument form (issue #39).
+//! The borrow checker now keeps the world and the resources distinct at the system
+//! boundary.
 //!
 //! The engine-resource fields are still `Rc<RefCell<…>>` handles: the mlua script
 //! closures capture them with a `'static` lifetime, and the editor / renderer share
 //! the very same cells. Converting that script-facing surface fully off `Rc<RefCell>`
-//! is a follow-up (issue #39's hardest part). Threading `&mut Scene`/`&mut Resources`
+//! is a follow-up (issue #39's hardest part). Threading `&mut World`/`&mut Resources`
 //! through the system call path — done here — removes the borrow-panic risk from the
 //! engine systems themselves: they no longer reach through one opaque blob.
 

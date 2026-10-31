@@ -43,7 +43,7 @@ Dev builds read it back with `Debug.AudioEvents` and the live per-source roster 
 | `Audio.SetMasterVolume` | `(v)` | — (clamped to `[0, 1]`; re-folds every live voice) |
 | `Audio.GetSpeakerMode` | `()` | `string` — `"headphones"`, `"tv"` or `"home_theater"` (the default) |
 | `Audio.SetSpeakerMode` | `(mode)` | — (one of the names above, case-insensitive; anything else is an error). Persisted; see [Speaker mode](#speaker-mode) |
-| `Audio.GetSpatial` | `(id)` | `(gain, pan, playing, occlusion)` — the source's resolved 3D state against the listener (the active camera): `gain` linear pre-master (occlusion muffle included), `pan` `[-1, 1]` (left→right), `playing` bool, `occlusion` the smoothed [occlusion](#occlusion) factor `[0, 1]` (`0` when not playing) |
+| `Audio.GetSpatial` | `(id)` | `(gain, pan, playing, occlusion)` — the source's resolved 3D state against the listener (the main view): `gain` linear pre-master (occlusion muffle included), `pan` `[-1, 1]` (left→right), `playing` bool, `occlusion` the smoothed [occlusion](#occlusion) factor `[0, 1]` (`0` when not playing) |
 | `Audio.SetOcclusionSettings` | `({ strength, layer_mask, voices_per_tick })` | — changes the fields the table names: `strength` `[0, 1]` (default 1; 0 turns occlusion off), `layer_mask` (bit per layer, default all), `voices_per_tick` (≥ 1, default 16). An unknown key is an error |
 | `Audio.GetOcclusionSettings` | `()` | table — `strength`, `layer_mask`, `voices_per_tick` |
 | `Audio.SetOcclusionEnabled` | `(id, bool)` | — sets the entity's `AudioSource.occlusion_enabled` (default `true`); an entity with no `AudioSource` is an error |
@@ -71,7 +71,8 @@ component's authoring fields).
 
 ### 3D spatialization
 
-The **listener is the active camera**. Each `AudioSource` resolves to a per-source
+The **listener is the main view**: the scene's main camera entity, or the free view
+camera when there is none (see [`Camera`](Camera.md), *Which pose these move*). Each `AudioSource` resolves to a per-source
 `(gain, pan)` from the listener and source world transforms (read back via
 `Audio.GetSpatial`):
 
@@ -90,7 +91,7 @@ back quieter and panned left.
 
 **What reaches the speakers.** Every frame, after the sim advances, the windowed
 runtime (editor and standalone player alike) re-resolves each live voice against the
-active camera and hands the device its gain (× master), pan, rate and pause state.
+listener and hands the device its gain (× master), pan, rate and pause state.
 `Audio.GetSpatial` and the device mix come from the **same** resolve call, so the
 read-back is what plays. A voice started mid-frame is resolved against the previous
 frame's listener, so its first samples are already spatialized. Pan changes are
@@ -115,8 +116,8 @@ A spatialized source (`spatial_blend > 0`, `occlusion_enabled`) heard through a
 wall is **muffled**: quieter and low-passed, so a shot behind concrete sounds
 unlike one in line of sight (Steam Audio's occlusion, cut down).
 
-- **Casts.** Three rays go through the physics world from the listener (the active
-  camera) to the source: one at the source and one 0.5 m to each side of it, level,
+- **Casts.** Three rays go through the physics world from the listener (the main
+  view) to the source: one at the source and one 0.5 m to each side of it, level,
   across the line of sight. The fraction blocked is the **occlusion factor**, so
   stepping past a door frame takes it through ⅓ and ⅔ instead of flipping it.
   Triggers pass sound, the collider the listener stands in is looked past, and so
@@ -229,7 +230,7 @@ so a blend stepped once a frame never clicks.
 
 Unity's `AudioReverbZone`: an entity with an
 [`AudioReverbZone`](AudioReverbZone.md) is a sphere that sets the reverb of the
-world mix while the listener (the active camera) is inside it. The listener's
+world mix while the listener (the main view) is inside it. The listener's
 **weight** in a zone is 1 within its `min_distance`, 0 at or past its
 `max_distance`, and linear between. Each `LateUpdate` the zones blend:
 

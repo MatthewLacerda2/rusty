@@ -1,12 +1,13 @@
 //! src/ui/text/lines.rs — measured items → lines: wrapping and overflow (#419).
 //!
 //! **Wrapping** is greedy: a line breaks after the last whitespace that keeps it
-//! within the width; a word wider than the whole width breaks between characters.
+//! within the width; a word wider than the whole width breaks between clusters (a
+//! mark never leaves its base).
 //! Whitespace that ends a wrapped line is not counted in its width, and a soft
 //! break drops the whitespace it lands on. `\n` always breaks.
 //!
 //! **Overflow** keeps the lines that fit the rect's height entirely (`Truncate`,
-//! `Ellipsis`); an unwrapped line wider than the rect loses the characters past its
+//! `Ellipsis`); an unwrapped line wider than the rect loses the clusters past its
 //! edge, and `Ellipsis` ends the last kept line — or any cut line — with `…`.
 
 use super::measure::{Item, LineMetrics, Measurer};

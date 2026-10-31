@@ -1,4 +1,4 @@
-//! src/procgen/recipe/params.rs — each op's params as its own struct (#1485).
+//! src/procgen/recipe/params/mod.rs — each op's params as its own struct (#1485).
 //!
 //! [`super::OpKind`] is a tagged enum of newtype variants, `Noise(Noise)`, so the
 //! dispatcher matches every op on one line and hands the op its params whole. The

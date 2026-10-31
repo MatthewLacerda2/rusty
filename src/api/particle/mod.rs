@@ -1,4 +1,4 @@
-//! src/api/particle.rs — `Particles` namespace.
+//! src/api/particle/mod.rs — `Particles` namespace.
 //!
 //! Script/REPL/bot control over an entity's `ParticleEmitterComponent`: fire
 //! one-off emissions (`Emit`/`Burst`), gate the emitter (`SetActive`), retune the

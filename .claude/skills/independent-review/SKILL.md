@@ -8,7 +8,7 @@ description: Use before a rusty PR gets the `queue` label when it implements eng
 ## Why it exists
 
 The operator does not read the code (root `CLAUDE.md`, *Unity is the
-reference*), so besides the gates a PR gets one outside read: this one. A coder
+bar*), so besides the gates a PR gets one outside read: this one. A coder
 reviewing its own diff reviews what it meant to write, not what it wrote, and
 the orchestrator who briefed it shares the brief's blind spots. The reviewer is
 a separate agent that reads the PR the way an outsider would, and it is never

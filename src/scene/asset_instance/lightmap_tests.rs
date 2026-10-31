@@ -1,6 +1,6 @@
 //! Generate Lightmap UVs from the scene's side (#831): ticking it re-imports the
 //! model's meshes already in the scene, through the one verb the inspector and the
-//! `Assets` API share (its Lua side: `scripting::tests_assets`).
+//! `Assets` API share (its Lua side: `scripting::tests::assets`).
 
 use glam::Vec3;
 

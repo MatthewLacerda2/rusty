@@ -1,4 +1,4 @@
-//! src/api/camera.rs — `Camera` namespace.
+//! src/api/camera/mod.rs — `Camera` namespace.
 //!
 //! Get/Set for position, yaw, pitch and fov of the main view, plus `GetForward`/`GetRight` basis vectors so a controller
 //! script can move and aim relative to where the camera looks, and the world ↔

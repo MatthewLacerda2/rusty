@@ -3,8 +3,10 @@
 //!
 //! The environment (#1612) is Unity's `RenderSettings`: the skybox panorama, the
 //! ambient light and the procedural sky's look (#1620: zenith, horizon and ground
-//! colours, cloud coverage and opacity), read and written through the same `authoring::environment` ops the
-//! Scene Settings panel calls, saved with the scene and present in every build.
+//! colours, cloud coverage and opacity), read and written through the same
+//! `authoring::environment` ops the Scene Settings panel calls, saved with the scene
+//! (a change made in Play reverts at Stop, like every scene value) and present in
+//! every build.
 //!
 //! `Lighting.Bake()` is the "place well + bake right now" workflow (#246): in one call
 //! it auto-places light probes and reflection probes from the static scene (unless a set

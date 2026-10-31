@@ -1,4 +1,4 @@
-//! src/editor/viewport_gizmo.rs — the draggable move gizmo (#183).
+//! src/editor/viewport/gizmo.rs — the draggable move gizmo (#183).
 //!
 //! Draws (via the renderer's pre-built axis arrows) at the selected entity's world
 //! position; this module is the *interaction* half: hit-testing the pick ray against

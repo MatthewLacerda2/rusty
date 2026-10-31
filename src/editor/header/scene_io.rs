@@ -1,6 +1,6 @@
 //! The editor's current scene file and its verbs: the File menu's new / reset /
-//! load / save, and the one open and one save every other editor surface (the content grid's double-click,
-//! the scene asset's inspector buttons) goes through, so they never drift apart (#997).
+//! load / save, and the one open and one save every other editor surface (the scene
+//! asset's inspector buttons) goes through, so they never drift apart (#997).
 
 use std::path::Path;
 
@@ -75,7 +75,7 @@ impl EditorUi {
     }
 }
 
-/// Save and Load act on the CURRENT scene file (set on load / double-click). A scene
+/// Save and Load act on the CURRENT scene file (set on load). A scene
 /// never saved (File ▸ New) has none, and the verb is refused: falling back to a
 /// real file would write an empty scene over it (#1374). Unity would open Save As;
 /// the editor has none yet, so it says so, as `Scene.Save()` does.

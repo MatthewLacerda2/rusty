@@ -4,8 +4,8 @@
 //! inventory as a project-wide, reference-ready manifest. `Assets.Manifest()` (and
 //! its `Assets.List` alias) walks the project asset root, imports every model file,
 //! and returns each file's addressable sub-objects with their footprint (AABB) and
-//! material count — the same catalogue the content browser shows a human, so the
-//! agent gets parity. Every `reference` round-trips through `AssetRef` /
+//! material count — the catalogue a human sees in the OS file manager and the
+//! asset inspector, so the agent gets parity. Every `reference` round-trips through `AssetRef` /
 //! `import_sub_mesh`, so the instantiate verb can place exactly what the manifest
 //! names. `Assets.Refresh()` is the editor's auto-refresh on demand: it imports what
 //! arrived since the last look (MP3 → WAV, #385).
@@ -33,7 +33,7 @@ use crate::core::paths::to_slash;
 use crate::scene::Scene;
 
 /// The project asset root the manifest walks — the open project's `assets/`, the
-/// same tree the content browser's Sources panel roots at.
+/// tree every asset reference is relative to.
 const ASSET_ROOT: &str = crate::core::project::ASSETS_DIR;
 
 /// Register the `Assets` namespace onto `lua`.

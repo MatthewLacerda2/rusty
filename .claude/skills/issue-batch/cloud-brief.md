@@ -183,7 +183,7 @@ a coder real time.
   passed and macOS failed twice on 2026-10-28 (#1515's Metal frames, #1525;
   #1520's aarch64 bake bits). Never commit a golden hash taken on one platform
   (`docs/testing.md`).
-- **Windows runs only when asked** (#1395): a branch that touches paths, separators,
+- **Windows runs on a branch only when asked** (#1395; it runs nightly on `main`): a branch that touches paths, separators,
   process spawning or other platform code dispatches `gh workflow run windows.yml --ref
   <branch>` and quotes the run in its PR. Nothing else runs Windows on a PR.
 - Never fall back to `cargo test`: CI runs nextest, and its per-test process

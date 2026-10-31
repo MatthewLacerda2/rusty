@@ -16,7 +16,7 @@ is ignored. The model is in [`docs/ui.md`](../ui.md).
 | `Selectable.IsInteractable` | `(id)` | whether it accepts input now — its flag and every `CanvasGroup.interactable` above it |
 | `Selectable.GetState` | `(id)` | the state name it shows this tick, or `nil` without a Selectable |
 | `Selectable.GetTransition` / `SetTransition` | `(id)` / `(id, name)` | `"None"`, `"ColorTint"` or `"SpriteSwap"` |
-| `Selectable.GetTargetGraphic` / `SetTargetGraphic` | `(id)` / `(id, targetId)` | the entity whose Image / Text shows the state; `nil` is the Selectable's own entity |
+| `Selectable.GetTargetGraphic` / `SetTargetGraphic` | `(id)` / `(id, targetId)` | the entity whose Image, Shape and Text show the state; `nil` is the Selectable's own entity |
 | `Selectable.GetColor` / `SetColor` | `(id, state)` / `(id, state, r, g, b, [a])` | `ColorTint` colour for `state`, display-space RGBA 0..1 |
 | `Selectable.GetFadeDuration` / `SetFadeDuration` | `(id)` / `(id, seconds)` | `ColorTint` fade, in unscaled seconds (≥ 0) |
 | `Selectable.GetSprite` / `SetSprite` | `(id, state)` / `(id, state, path)` | `SpriteSwap` texture for `state`, or `nil` (the Image's own; `"Normal"` always is) |

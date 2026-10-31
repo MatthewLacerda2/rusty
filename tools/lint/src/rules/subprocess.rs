@@ -1,7 +1,8 @@
 //! `subprocess`: the engine never starts another program (#975).
 //!
-//! A shipped game runs on what it carries, and the one program the engine starts
-//! is Blender, to convert a `.blend` while authoring (CLAUDE.md, *One format
+//! A shipped game runs on what it carries. The engine starts Blender, to convert a
+//! `.blend` while authoring, and debug builds run `git` for the engine commit
+//! (`core::project::engine::commit`), each allowed inline (CLAUDE.md, *One format
 //! inside*; `asset::convert::blend`, #1072). A line of `src/` that names
 //! `std::process::Command` (`process::` and the word `Command` on one code line, so
 //! `use std::process::{Command, Stdio}` counts) is a finding; a legitimate use says

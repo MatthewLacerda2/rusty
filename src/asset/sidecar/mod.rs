@@ -4,7 +4,7 @@
 //! **import settings only** — never identity. Reference identity is path-based
 //! (`path::sub_object`), DECIDED in issue #74, so the sidecar deliberately carries
 //! no GUID. The sub-object map it stores is a human-readable cache of what the
-//! file exposes (so the Content Browser can list sub-objects without re-importing);
+//! file exposes (so the model inspector can list sub-objects without re-importing);
 //! it is regenerated from the file on demand and is never the source of truth.
 //!
 //! Format is JSON for diffability, matching the scene document's choice.

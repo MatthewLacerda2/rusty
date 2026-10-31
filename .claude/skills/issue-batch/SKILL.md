@@ -190,8 +190,9 @@ lives only in the scratchpad.
 `make queue-daemon ARGS="--no-check --since <batch start>"`, from a worktree under
 `.claude/worktrees/`. It detaches (a background command dies at two hours), logs
 to `.git/merge-queue/queue.log`, moves its worktree to `origin/main` before each
-watch, and restarts the watch by itself on every planned exit: the deadline and a
-hand-back at once, "nothing left" after ten minutes, `relaunch:` (status 5, the
+watch, and restarts the watch by itself on every planned exit: the deadline at
+once, "nothing left" after ten minutes (an exit with a hand-back, status 1, is timed
+by which of the two ended it), `relaunch:` (status 5, the
 queue's own code changed, #967) at once, the machine or GitHub failing with a
 backoff, five times in a row at most. It locks its worktree (`git worktree lock`,
 reason `merge-queue supervisor pid <pid>`) so `make reclaim` leaves it alone; a

@@ -6,11 +6,11 @@
 //! Editor integration:
 //!   - the current scene file (`EditorUi::current_scene_path`, one value with the
 //!     script runtime's `Scene.Save()` target, #1366) — Save writes back HERE
-//!     (not a hardcoded demo path); Load (incl. double-click in the assets
-//!     browser) sets it.
+//!     (not a hardcoded demo path); Load (incl. the scene asset's Load Scene button)
+//!     sets it.
 //!   - one standardised scene extension (`.scene`, JSON inside).
 //!
-//! Default scene (there is always at least one):
+//! Default scene (a deleted one stays deleted, #1618):
 //!   - Built in Rust by `scene::default_scene::build` (#667).
 //!   - Seeded into the project's `assets/scenes/` on boot with the bundled scripts
 //!     (`seed`, through the seed `manifest` so unedited files follow engine fixes,

@@ -1,4 +1,4 @@
-//! src/scene/prefab_apply.rs — apply a linked instance's overrides BACK to source (#268).
+//! src/scene/prefab/apply.rs — apply a linked instance's overrides BACK to source (#268).
 //!
 //! The missing direction of the prefab override workflow: #216 gave revert / reimport
 //! (edits that live on the *instance*); this writes an instance's live

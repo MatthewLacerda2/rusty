@@ -3,8 +3,9 @@
 // Draws a solid the forward pass already drew, from the same mesh, instance,
 // per-draw uniform, bone palette and material group, into a one-channel mask:
 // 1 where the selection covers the view. Vertices are placed by the forward pass's
-// own `vertex_to_world`, so the mask can never disagree with the solid about where
-// it is, how it is posed, or which LOD it shows. `outline/edge.wgsl` rings it.
+// own `vertex_to_world`, so the mask agrees with the solid about where it is, how it
+// is posed and which LOD it shows; a surface shader's vertex blocks (#1524) are not
+// run (`passes::outline`). `outline/edge.wgsl` rings it.
 
 #import common::VertexInput
 #import forward::bindings::{camera, material, normal_to_world, s_diffuse, t_diffuse, vertex_to_world}

@@ -1,4 +1,4 @@
-//! src/dev/harness.rs — Headless deterministic runner (the agent's hands)
+//! src/dev/harness/ — Headless deterministic runner (the agent's hands)
 //!
 //! Builds a `GameWorld` with NO window/GPU, runs the fixed-timestep clock as fast as
 //! the CPU allows, and exposes the control surface an agent needs:

@@ -6,7 +6,7 @@ the verdict already has:
 - **An issue-less pull request that touches code is a bug fix.** CLAUDE.md:
   "Issue-less PRs are allowed only for documentation updates or bug fixes". So a
   pull request that names no issue (no closing keyword, no `Refs #N`) and changes
-  anything but Markdown, or touches `docs/api/` (which tests parse), is refused
+  anything but Markdown, or touches a Markdown file code reads (`changes.CODE_DOCS`), is refused
   unless it is labelled `bug` or is Dependabot's. #795 and #787 slipped through.
 - **No image lands on `main`.** The cloud brief: "Never leave a PNG on the branch
   that merges"; captures go on a throwaway commit (`docs/testing.md`). An image

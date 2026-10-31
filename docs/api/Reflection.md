@@ -67,7 +67,7 @@ path and the runtime falls back to the skybox. `Move`/`SetBox`/`SetCubemap`/`Set
 | `Reflection.SetCubemap` | `(index, path)` | — (point the probe at a baked cubemap KTX2 file) |
 | `Reflection.Set` | `(index, { position?, boxMin?, boxMax?, cubemap?, boxProjection?, blendDistance?, importance?, resolution?, nearClip?, farClip?, shadows?, intensity? })` | — (changes only the fields it names, each clamped to its range) |
 | `Reflection.Get` | `(index)` | every field above as a table, or `nil` |
-| `Reflection.Bake` *(dev-only)* | `()` | `true` if the bake ran, `false` if no GPU/software adapter was available (skipped) — the real prefiltered cubemap bake |
+| `Reflection.Bake` *(dev-only)* | `()` | `true` if the bake ran (or there are no probes, a no-op), `false` if no GPU/software adapter was available (skipped) — the real prefiltered cubemap bake |
 | `Reflection.Remove` | `(index)` | — |
 | `Reflection.Clear` | `()` | — (removes every probe) |
 | `Reflection.Count` | `()` | probe count |
@@ -81,7 +81,8 @@ reads the sharp base level, a rough surface a blurrier one), encodes the result 
 probe at it. Glossy surfaces inside the probe's box then reflect that baked cubemap,
 parallax-corrected, with roughness selecting the mip — instead of the global skybox. It
 needs a GPU or software adapter (e.g. lavapipe); with none it skips gracefully and
-returns `false`, never erroring. It **errors** only when the scene is unsaved (there is
-nowhere to write the cubemaps). It is **dev-only** (an authoring action driving a headless
+returns `false` rather than erroring. It **errors** when the scene is unsaved (there is
+nowhere to write the cubemaps), when a cubemap file cannot be written, and while the
+editor's Generate Lighting runs (see `Lighting.md`). It is **dev-only** (an authoring action driving a headless
 renderer), so it is absent from ship builds. Save the scene afterward to persist each
 probe's `cubemap_path` into the `.scene` document.

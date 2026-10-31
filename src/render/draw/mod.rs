@@ -36,7 +36,7 @@ impl Renderer {
         self.upload_scene_assets(scene);
 
         // The baked reflection probes nearest the primary camera (#245, #1206); each
-        // draw then reflects the one whose box holds it.
+        // object then blends up to two of them and the sky (#1584).
         self.update_reflection_probes(scene, camera.position);
         // The scene's baked lightmap pages (#438) and their direction pages (#810):
         // rebinding group 0 only on a change.

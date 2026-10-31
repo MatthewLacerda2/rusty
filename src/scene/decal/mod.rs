@@ -1,4 +1,4 @@
-//! src/scene/decal.rs — box-projector decal records (bullet holes, scorch, splats).
+//! src/scene/decal/ — box-projector decal records (bullet holes, scorch, splats).
 //!
 //! A decal is a *volume* (an oriented box), not a flat sticker. The renderer
 //! (`render::decals`, #638) bins each box into the light clusters, and the forward

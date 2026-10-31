@@ -83,20 +83,20 @@ only its mandatory `Transform` — the menu's **Create Empty**.
 
 **`kind`** is one of the Add Component menu's first-class components,
 case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
-`Texture` (alias `Material`), `NavMeshAgent`, `NavMeshObstacle` (alias
+`Texture` (alias `Material`), `NavMeshAgent` (alias `NavAgent`), `NavMeshObstacle` (alias
 `NavObstacle`), `OffMeshLink` (alias `NavMeshLink`), `NavMeshModifierVolume` (alias
-`NavModifier`), `Camera`, `Particles`,
+`NavModifier`), `Camera`, `Particles` (alias `ParticleSystem`),
 `PostProcessing`, `Audio` (alias `AudioSource`), `AudioReverbZone` (alias
 `ReverbZone`), `Canvas`, `RectTransform`,
 `Image`, `CanvasGroup`, `RectMask` (alias `RectMask2D`), `Mask`,
-`BackdropFilter` (alias `Backdrop`), `Text` (alias
-`TextMeshPro`), `Shape`, `Selectable`, `LayoutGroup`, `LayoutElement` (alias
+`BackdropFilter` (alias `Backdrop`), `Text` (aliases
+`TextMeshPro`, `TextMeshProUGUI`), `Shape`, `Selectable`, `LayoutGroup`, `LayoutElement` (alias
 `ContentSizeFitter`), `Joint` (aliases `FixedJoint`, `HingeJoint`,
 `CharacterJoint` — all add a default `Fixed` joint; set its kind with
 `Joint.SetKind`), `CharacterController` (alias `Character`), `LODGroup` (alias `LOD`), `Trail` (alias `TrailRenderer`),
 `Line` (alias `LineRenderer`).
 Each is added with the inspector's default values; adding an
-existing kind replaces it. (Scripts attach by path, not as a defaulted kind: see
+existing kind replaces it. An unknown kind is an error. (Scripts attach by path, not as a defaulted kind: see
 `AddScript`.)
 
 **`AddScript(id, path, [fields])`** is the Add Component menu's script entries:
@@ -207,9 +207,10 @@ scene — additive loading is not supported.
   the scene Play was pressed in** (and its scene file), not the one play ended in
   — Stop rewinds to the edit snapshot, as always. The standalone player has no
   Stop; it simply keeps running the loaded scene.
-- **Errors:** a path with no file errors at the call, naming the path. A file that
-  exists but fails to parse at the swap is reported to the console, and the
-  current scene keeps running.
+- **Errors:** a path with no file errors at the call, naming the path. In edit
+  mode a file that fails to load errors at the call too, and the current scene
+  stays. During play a file that exists but fails to parse at the swap is reported
+  to the console, and the current scene keeps running.
 - **Loading screens:** the load is synchronous at the tick's tail — there is no
   async/streamed loading. For a one-frame "Loading…" screen, activate a loading
   canvas, then call `Scene.Load` on the next tick.

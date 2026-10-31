@@ -52,7 +52,7 @@ pub fn capture_into(
 
 /// One-shot [`capture_into`]: builds a throwaway [`CaptureHost`], takes the shot, drops
 /// it. Prefer holding a host when taking more than one.
-/// Test seam for `tests/gpu/bloom_screenshot.rs`.
+/// Test seam for the GPU screenshot tests (`tests/gpu/`).
 pub fn capture(
     scene: &Scene,
     camera: &Camera,

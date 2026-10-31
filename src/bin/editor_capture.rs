@@ -20,8 +20,9 @@
 //!   --demo-tick <n>     replay the demo to tick n first (default 0)
 //!   --pointer <X>,<Y>   hold the pointer here, in pixels (a hover label shows)
 //!   --picker [<page>]   the project picker the editor starts on (#854), over a
-//!                       sample recent list; <page> is `new`, `open` or
-//!                       `mismatch` (the different-engine prompt)
+//!                       sample recent list; <page> is `new`, `open`,
+//!                       `mismatch` (the different-engine prompt) or `focus`
+//!                       (a focused row); without one, the project list
 //! ```
 //!
 //! Deterministic: a fixed size, scale and frame count. Exits 0 when written, 1 when the

@@ -1,8 +1,8 @@
-//! src/editor/inspector_context.rs — the inspector's read-only frame context.
+//! src/editor/inspector/components/context.rs — the inspector's read-only frame context.
 //!
 //! Everything the entity inspector needs that requires reading the WHOLE scene, gathered
 //! up front: the layer labels/mask set, the parenting matrix + name + valid-parent list,
-//! and the linked-prefab instance root. It is collected before `inspector.rs` takes the
+//! and the linked-prefab instance root. It is collected before `inspector/mod.rs` takes the
 //! mutable entity guard (which borrows the scene for the rest of the frame), so these
 //! whole-scene reads can't fight that borrow.
 
