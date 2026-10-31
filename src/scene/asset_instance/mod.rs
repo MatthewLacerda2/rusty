@@ -242,12 +242,13 @@ pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Resu
     }
     asset::sidecar::set_scale(source, scale).map_err(|e| e.to_string())?;
     // A whole-model instance is rebuilt from the scaled import, its parts' offsets
-    // with it (#1637); a lone sub-object only re-imports its mesh.
-    let refit = |scene: &mut Scene| {
+    // with it (#1637), so the refit skips its static parts; a lone sub-object only
+    // re-imports its mesh.
+    let refit = |scene: &mut Scene, skip: &_| {
         let before = crate::scene::lod_instance::lod0_extents(scene);
-        let ids = rehydrate::model_writes::reimport_noted(scene, path, Rig::Rebuild);
+        let ids = rehydrate::model_writes::reimport_noted_except(scene, path, Rig::Rebuild, skip);
         crate::scene::lod_instance::rescale_groups_over(scene, &ids, &before);
-        ids.len()
+        ids.len() + skip.len()
     };
     Ok(crate::scene::prefab::restamp::restamp_models(
         scene,

@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 
 use crate::components::{visit_override_refs, PrefabOverrides};
 use crate::scene::prefab::instance::{self, instance_members};
-use crate::scene::prefab::link::propagate;
+use crate::scene::prefab::link::{propagate, propagate_from};
 use crate::scene::prefab::live::sync_overrides;
 use crate::scene::prefab::overrides::apply_overrides;
 use crate::scene::prefab::source::{read_source, read_writable};
@@ -101,13 +101,14 @@ pub fn revert_instance_field(
     path: &str,
 ) -> Result<bool, String> {
     let root = instance_root(scene, entity_id)?;
-    read_source(&link_source(scene, root)?)?;
+    let source = link_source(scene, root)?;
+    let prefab = read_source(&source)?;
     let ids = instance_ids(scene, root)?;
     sync_overrides(&mut scene.world, &ids);
     if !drop_override(scene, entity_id, path) {
         return Ok(false);
     }
-    propagate(scene, root)?;
+    propagate_from(scene, root, &source, &prefab)?;
     Ok(true)
 }
 

@@ -4,10 +4,10 @@
 //! instances it has, so a Dust2-sized level holding hundreds of one model builds
 //! that model's prefab once.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::scene::prefab::instance::instance_members;
-use crate::scene::prefab::link::{link_source, propagate_from};
+use crate::scene::prefab::link::{finish_rebuild, link_source, rebuild_instance};
 use crate::scene::prefab::live::sync_overrides;
 use crate::scene::prefab::source::{is_model_source, read_source};
 use crate::scene::{PrefabData, Scene};
@@ -18,23 +18,29 @@ use crate::scene::{PrefabData, Scene};
 /// rebuilt from the model as it imports now with those overrides on top. So a
 /// part keeps a hand edit and takes everything else (a Scale Factor's offsets, a
 /// moved node) from the file. It writes entities but is no edit: unrecorded, as a
-/// bake is, when an instance is there to rebuild.
+/// bake is, when an instance is there to rebuild. `refit` is handed the instances'
+/// static meshed parts, which the rebuild re-imports anyway, for it to skip; a
+/// skinned part is left to it, since its rig and bones are the refit's to move.
 pub fn restamp_models<R>(
     scene: &mut Scene,
     names: impl Fn(&str) -> bool,
-    refit: impl FnOnce(&mut Scene) -> R,
+    refit: impl FnOnce(&mut Scene, &BTreeSet<u32>) -> R,
 ) -> R {
     let roots = instance_roots(scene, |s| is_model_source(s) && names(s));
     if roots.is_empty() {
-        return refit(scene);
+        return refit(scene, &BTreeSet::new());
     }
     scene.unrecorded(|scene| {
+        let mut skip = BTreeSet::new();
         for &root in &roots {
-            if let Some(ids) = instance_members(scene, root) {
-                sync_overrides(&mut scene.world, &ids);
-            }
+            let Some(ids) = instance_members(scene, root) else {
+                continue;
+            };
+            sync_overrides(&mut scene.world, &ids);
+            let is_static = |id: &u32| scene.world.mesh(*id).is_some_and(|m| m.skin.is_none());
+            skip.extend(ids.iter().copied().filter(is_static));
         }
-        let out = refit(scene);
+        let out = refit(scene, &skip);
         propagate_roots(scene, roots);
         out
     })
@@ -52,18 +58,22 @@ pub(super) fn instance_roots(scene: &Scene, pick: impl Fn(&str) -> bool) -> Vec<
 }
 
 /// Propagate each of `roots`, reading each source once; a root whose source can't
-/// be read is skipped.
+/// be read is skipped. The whole-scene passes run once, after the last instance.
 pub(super) fn propagate_roots(scene: &mut Scene, roots: Vec<u32>) {
     let mut sources: BTreeMap<String, Option<PrefabData>> = BTreeMap::new();
+    let mut rebuilt = false;
     for root in roots {
         let Ok(source) = link_source(scene, root) else {
             continue;
         };
         let prefab = sources
-            .entry(source)
+            .entry(source.clone())
             .or_insert_with_key(|s| read_source(s).ok());
         if let Some(prefab) = prefab.as_ref() {
-            let _ = propagate_from(scene, root, prefab);
+            rebuilt |= rebuild_instance(scene, root, &source, prefab, true).is_ok();
         }
+    }
+    if rebuilt {
+        finish_rebuild(scene);
     }
 }

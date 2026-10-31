@@ -27,24 +27,33 @@ use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::live::{entity_overrides, keep_root_placement, sync_overrides};
 use crate::scene::prefab::overrides::apply_overrides;
 use crate::scene::prefab::restamp::{instance_roots, propagate_roots};
-use crate::scene::prefab::source::{read_source, rekey};
+use crate::scene::prefab::source::{read_source, rekey, GONE};
+use crate::scene::prefab::{stamp_prefab, Merge};
 use crate::scene::serialize::rehydrate_entity_mesh;
-use crate::scene::{instantiate_prefab, PrefabData, Scene};
+use crate::scene::{PrefabData, Scene};
 
-/// Build the fresh source baselines for one instance, keyed by source `local_id`.
-/// Instantiates the source into a SCRATCH scene that already shares `scene`'s
-/// material library, so the merge reuses identical entries and rewrites references to
-/// the very same library keys the instance uses — then folds any newly-introduced
-/// materials back into `scene`. The returned entities are mesh-rehydrated and carry
+/// Build the fresh source baselines for one instance of `source`, keyed by source
+/// `local_id`. Instantiates the source into a SCRATCH scene that borrows `scene`'s
+/// material library (moved in and back, never cloned), so the merge reuses its
+/// entries and rewrites references to the very same library keys the instance uses,
+/// and what it adds comes back with it. A model's keys resolve to the scene's entry
+/// as it stands, an edited one included (`Merge::KeepScene`, #1637). The returned
+/// entities are mesh-rehydrated and carry
 /// their LOCAL ids, component references included (callers move those into the
 /// instance's ids with [`in_instance_space`] and overwrite identity/structure). A
 /// reference to one of the scratch skeleton's bones keeps the bone by name in
 /// `bone_refs` (#1264), naming its skinned entity meanwhile. Also returns the keys
 /// the merge added, for [`drop_unused`] once the instance is rebuilt (#1576).
-fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> (BTreeMap<u32, Entity>, Vec<String>) {
+fn fresh_baselines(
+    scene: &mut Scene,
+    source: &str,
+    prefab: &PrefabData,
+) -> (BTreeMap<u32, Entity>, Vec<String>) {
     let mut scratch = Scene::new();
-    scratch.materials = scene.materials.clone();
-    let root = instantiate_prefab(&mut scratch, prefab, None);
+    scratch.materials = std::mem::take(&mut scene.materials);
+    let merge = Merge::for_source(source);
+    let (root, added) = stamp_prefab(&mut scratch, prefab, None, None, merge);
+    scene.materials = std::mem::take(&mut scratch.materials);
 
     // Map each scratch entity back to its source local id via subtree order: the
     // instantiate assigned local `l` -> `base + l`, so subtracting the base recovers
@@ -61,14 +70,6 @@ fn fresh_baselines(scene: &mut Scene, prefab: &PrefabData) -> (BTreeMap<u32, Ent
         entity.remap_refs(&|r| Some(r.wrapping_sub(base)));
         out.insert(entity.id.wrapping_sub(base), entity);
     }
-
-    // Carry back any materials the merge added (a brand-new key, or a uniquified one).
-    let added = scratch
-        .materials
-        .keys()
-        .filter(|k| !scene.materials.contains_key(*k));
-    let added = added.cloned().collect();
-    scene.materials = scratch.materials;
     (out, added)
 }
 
@@ -107,63 +108,86 @@ pub fn reimport_instance(scene: &mut Scene, root_id: u32) -> Result<(), String> 
 /// [`reimport_instance`] re-applying the overrides the links hold as they are, for a
 /// caller that has just synced them and dropped one (a per-field revert or apply).
 pub(super) fn propagate(scene: &mut Scene, root_id: u32) -> Result<(), String> {
-    let prefab = load_instance_source(scene, root_id)?;
-    propagate_from(scene, root_id, &prefab)
+    let source = link_source(scene, root_id)?;
+    propagate_from(scene, root_id, &source, &read_source(&source)?)
 }
 
-/// [`propagate`] from `prefab`, the instance's source as already read.
+/// [`propagate`] from `prefab`, the instance's `source` as already read.
 pub(super) fn propagate_from(
     scene: &mut Scene,
     root_id: u32,
+    source: &str,
     prefab: &PrefabData,
+) -> Result<(), String> {
+    rebuild_instance(scene, root_id, source, prefab, true)?;
+    finish_rebuild(scene);
+    Ok(())
+}
+
+/// Rebuild every entity of the instance at `root_id` from `prefab` (its `source` as
+/// already read), re-applying its overrides when `keep` and dropping them
+/// otherwise. Leaves out the whole-scene passes ([`finish_rebuild`]), which a caller
+/// rebuilding many instances runs once after them (`restamp::propagate_roots`).
+pub(super) fn rebuild_instance(
+    scene: &mut Scene,
+    root_id: u32,
+    source: &str,
+    prefab: &PrefabData,
+    keep: bool,
 ) -> Result<(), String> {
     let ids = require_instance(scene, root_id)?;
     rekey(&mut scene.world, &ids, prefab);
-    let (baselines, added) = fresh_baselines(scene, prefab);
+    let (baselines, added) = fresh_baselines(scene, source, prefab);
     let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
-        rebuild_entity(scene, id, &baselines, true);
+        if !keep {
+            if let Some(mut link) = scene.world.prefab_link_mut(id) {
+                link.overrides = Default::default();
+            }
+        }
+        rebuild_entity(scene, id, &baselines, keep);
     }
     // Only what a slot still names after the overrides stays: a material deleted
     // from the scene is not brought back by its prefab's copy (#1576).
     drop_unused(scene, &added);
-    // A rebuilt skinned mesh lost its bone binding; re-bind it by name (#453).
+    Ok(())
+}
+
+/// The whole-scene passes a rebuild needs once, however many instances it rebuilt:
+/// a rebuilt skinned mesh lost its bone binding, re-bound by name (#453), and every
+/// collider is refreshed.
+pub(super) fn finish_rebuild(scene: &mut Scene) {
     scene.sync_skeletons();
     scene.update_all_colliders();
-    Ok(())
 }
 
 /// Drop every override on the instance and rebuild it straight from the fresh source
 /// baseline (the instance becomes a pristine copy of the current source).
 pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), String> {
-    let ids = require_instance(scene, root_id)?;
-    let prefab = load_instance_source(scene, root_id)?;
-    rekey(&mut scene.world, &ids, &prefab);
-    let (baselines, added) = fresh_baselines(scene, &prefab);
-    let baselines = in_instance_space(scene, &ids, baselines);
-    for id in ids {
-        if let Some(mut link) = scene.world.prefab_link_mut(id) {
-            link.overrides = Default::default();
-        }
-        rebuild_entity(scene, id, &baselines, false);
-    }
-    drop_unused(scene, &added);
-    scene.sync_skeletons();
-    scene.update_all_colliders();
+    require_instance(scene, root_id)?;
+    let source = link_source(scene, root_id)?;
+    rebuild_instance(scene, root_id, &source, &read_source(&source)?, false)?;
+    finish_rebuild(scene);
     Ok(())
 }
 
 /// The live override paths of the instance, as `"<local_id>:<json-pointer>"`
-/// strings sorted for a stable read. Empty when the instance has no overrides.
+/// strings sorted for a stable read; a model part whose node left the model has no
+/// local id and reads `"<node path> (gone):<json-pointer>"` (#1637). Empty when the
+/// instance has no overrides.
 pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String>, String> {
     let ids = require_instance(scene, root_id)?;
     let mut out = Vec::new();
     for id in ids {
-        let Some(local_id) = local_id_of(scene, id) else {
+        let Some(link) = scene.world.prefab_link(id) else {
             continue;
         };
+        let label = match (link.local_id, link.node.as_deref()) {
+            (GONE, Some(node)) => format!("{node} (gone)"),
+            (local_id, _) => local_id.to_string(),
+        };
         for key in entity_overrides(&scene.world, id).keys() {
-            out.push(format!("{local_id}:{key}"));
+            out.push(format!("{label}:{key}"));
         }
     }
     out.sort();
@@ -231,12 +255,6 @@ fn require_instance(scene: &Scene, root_id: u32) -> Result<Vec<u32>, String> {
 /// The source `local_id` recorded on entity `id`, if it is linked.
 fn local_id_of(scene: &Scene, id: u32) -> Option<u32> {
     scene.world.prefab_link(id).map(|l| l.local_id)
-}
-
-/// Read the source (a `.prefab`, or a model's current import) an instance's root
-/// links to.
-fn load_instance_source(scene: &Scene, root_id: u32) -> Result<PrefabData, String> {
-    read_source(&link_source(scene, root_id)?)
 }
 
 /// The source path recorded on the instance root.

@@ -15,11 +15,11 @@
 //! frame after Stop, and by then the restored edit scene was read from disk after it
 //! (`Scene::meshes_read_at`), so nothing is read twice.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::core::fs::written::{note_written, written_since, Stale};
 use crate::scene::prefab::restamp::restamp_models;
-use crate::scene::rehydrate::{reimport_model_ids, reimport_written, Rig};
+use crate::scene::rehydrate::{reimport_model_except, reimport_written, Rig};
 use crate::scene::Scene;
 
 /// How far into the write log the scene's meshes have been brought up to date.
@@ -54,7 +54,8 @@ impl ModelWrites {
         }
         // A whole-model instance of a re-written model is rebuilt from it (#1637).
         let stale = Stale::new(paths);
-        let refit = |scene: &mut Scene| reimport_written(scene, &stale);
+        let refit =
+            |scene: &mut Scene, skip: &_| reimport_written(scene, &stale, skip) + skip.len();
         restamp_models(scene, |source| stale.matches(source), refit)
     }
 }
@@ -73,9 +74,20 @@ fn already_read(read: &BTreeMap<String, u64>, path: &str) -> bool {
 /// and the meshes are not read twice, whatever other notes are waiting. Returns the
 /// ids of the entities rebuilt.
 pub fn reimport_noted(scene: &mut Scene, path: &str, rig: Rig) -> Vec<u32> {
+    reimport_noted_except(scene, path, rig, &BTreeSet::new())
+}
+
+/// [`reimport_noted`] leaving out the entities in `skip` (a linked model
+/// instance's parts, which its rebuild re-imports, #1637).
+pub fn reimport_noted_except(
+    scene: &mut Scene,
+    path: &str,
+    rig: Rig,
+    skip: &BTreeSet<u32>,
+) -> Vec<u32> {
     let at = note_written(path);
     scene.meshes_reimported.insert(path.to_string(), at);
-    reimport_model_ids(scene, path, rig)
+    reimport_model_except(scene, path, rig, skip)
 }
 
 #[cfg(test)]

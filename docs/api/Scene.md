@@ -274,7 +274,10 @@ one name and never drift.
   `RevertPrefabOverrides`, `ReimportPrefab`, `RevertPrefabField`) except the two
   apply-to-source ones, which error: a model is read-only, as in Unity. A node added to
   the file is not spawned into existing instances yet, and a node removed from it
-  leaves its entity as it was (#1665).
+  leaves its entity as it was (#1665). glTF has no stable node ids, so a part is
+  matched to its node by path, and same-named sibling nodes by their order among
+  themselves (`Kit/Cube`, `Kit/Cube[1]`): reordering two of them in the file swaps
+  which part takes which node.
 
 - **`Scene.Instantiate(assetRef, [name], [x, y, z])`** — spawns one entity from an
   importable model sub-object reference (`path::sub_object`, the `reference` field
@@ -370,7 +373,9 @@ On-instance:
   load.
 - **`Scene.ListPrefabOverrides(instanceRootId)`** — the read verb: the instance's
   overrides as `"localId:key"` strings, sorted (e.g. `"1:+/light"`, `"1:-/camera"`,
-  `"1:/scripts/#size"`, `"1:/transform/position/0"`).
+  `"1:/scripts/#size"`, `"1:/transform/position/0"`). A model part whose node left
+  the model (#1665) has no local id and is named by its node path instead:
+  `"Kit/Wall (gone):/transform/position/0"`.
 
 Apply-to-source (the Unity "Apply → Prefab" direction):
 

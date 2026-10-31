@@ -34,12 +34,14 @@ use crate::scene::{extract_prefab, Scene};
 /// instance of it: a root entity named after the file, and its node tree under
 /// it. Returns the root's id.
 pub fn instantiate_model(scene: &mut Scene, path: &str, asset: &Imported, position: Vec3) -> u32 {
-    let root = instantiate_prefab_linked(scene, &model_prefab(path, asset), None, path);
-    if let Some(mut t) = scene.world.transform_mut(root) {
-        t.position = position;
+    let mut prefab = model_prefab(path, asset);
+    // Placed before the stamp, so its one collider refresh sees the parts where they
+    // land; a root's placement is its own, never an override.
+    let root = prefab.root;
+    if let Some(entity) = prefab.entities.iter_mut().find(|e| e.id == root) {
+        entity.transform.position = position;
     }
-    scene.update_all_colliders();
-    root
+    instantiate_prefab_linked(scene, &prefab, None, path)
 }
 
 /// The model at `path` (imported as `asset`) as a prefab: its node tree spawned
@@ -176,8 +178,12 @@ fn file_stem(path: &str) -> String {
 #[cfg(test)]
 mod bone_tests;
 #[cfg(test)]
+mod gone_tests;
+#[cfg(test)]
 mod link_tests;
 #[cfg(test)]
 mod lod_tests;
+#[cfg(test)]
+mod material_tests;
 #[cfg(test)]
 mod tests;

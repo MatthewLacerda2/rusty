@@ -73,7 +73,7 @@ pub struct PrefabData {
 /// material is inserted under a uniquified name and the instance's references are
 /// rewritten to it — so an instance never silently adopts a different scene material.
 pub fn instantiate_prefab(scene: &mut Scene, prefab: &PrefabData, parent: Option<u32>) -> u32 {
-    stamp_prefab(scene, prefab, parent, None)
+    stamp_prefab(scene, prefab, parent, None, Merge::Uniquify).0
 }
 
 /// Clone a prefab into `scene` as a **linked** instance (#216): identical to
@@ -87,20 +87,46 @@ pub fn instantiate_prefab_linked(
     parent: Option<u32>,
     source: &str,
 ) -> u32 {
-    stamp_prefab(scene, prefab, parent, Some(source))
+    let merge = Merge::for_source(source);
+    stamp_prefab(scene, prefab, parent, Some(source), merge).0
+}
+
+/// How a stamp merges a prefab's materials into the scene library.
+#[derive(Clone, Copy)]
+enum Merge {
+    /// A key the scene holds with other data is copied in as `"{key} (n)"`: a
+    /// `.prefab`'s bare names (`Wood`) can collide with another source's.
+    Uniquify,
+    /// A key the scene holds is the scene's: a model's keys are namespaced by its
+    /// path (`kit.glb::Wood`), so the scene's entry under one *is* that model's
+    /// material, edited or not, as a re-import never overwrites Unity's extracted
+    /// material (#1637). A propagation reads it, never replaces it.
+    KeepScene,
+}
+
+impl Merge {
+    /// The merge a stamp linked to `source` takes.
+    fn for_source(source: &str) -> Self {
+        match source::is_model_source(source) {
+            true => Merge::KeepScene,
+            false => Merge::Uniquify,
+        }
+    }
 }
 
 /// Stamp one fresh copy of `prefab` into `scene`. `link_source = Some(path)` makes it
 /// a linked instance (every entity gets a `PrefabLink`); `None` is the unpacked v1
 /// copy. Fresh sequential ids come from the allocator (local id `l` -> `base + l`),
-/// so the operation is deterministic (no wall-clock/RNG).
+/// so the operation is deterministic (no wall-clock/RNG). Returns the new root and
+/// the material keys the merge added to the library.
 fn stamp_prefab(
     scene: &mut Scene,
     prefab: &PrefabData,
     parent: Option<u32>,
     link_source: Option<&str>,
-) -> u32 {
-    let renames = merge_materials(scene, &prefab.materials);
+    merge: Merge,
+) -> (u32, Vec<String>) {
+    let (renames, added) = merge_materials(scene, &prefab.materials, merge);
     let base = scene.world.next_id();
     let mut new_root = base + prefab.root;
     let mut bone_parents = Vec::new();
@@ -146,7 +172,7 @@ fn stamp_prefab(
         let ids = prefab.entities.iter().map(|e| base + e.id);
         live::take_baselines(&mut scene.world, ids.collect::<Vec<_>>());
     }
-    new_root
+    (new_root, added)
 }
 
 /// Rewrite an entity's material references through the merge rename map (a no-op when
@@ -164,28 +190,32 @@ fn rename_entity_material(entity: &mut Entity, renames: &BTreeMap<String, String
 }
 
 /// Merge a prefab's material slice into the scene library, returning the rename map
-/// (prefab key -> scene key) for keys that had to be uniquified. An identical
-/// existing entry is reused (no rename); a new key is inserted as-is (no rename);
-/// only a *conflicting* key (same name, different data) is uniquified.
+/// (prefab key -> scene key) for keys that had to be uniquified, and the keys added.
+/// An identical existing entry is reused (no rename); a new key is inserted as-is
+/// (no rename); a *conflicting* key (same name, different data) is uniquified, or
+/// kept as the scene holds it under [`Merge::KeepScene`].
 fn merge_materials(
     scene: &mut Scene,
     materials: &BTreeMap<String, MaterialAsset>,
-) -> BTreeMap<String, String> {
+    merge: Merge,
+) -> (BTreeMap<String, String>, Vec<String>) {
     let mut renames = BTreeMap::new();
+    let mut added = Vec::new();
     for (key, asset) in materials {
-        match scene.materials.get(key) {
-            Some(existing) if materials_equal(existing, asset) => {} // reuse, no rename
+        let key = match scene.materials.get(key) {
+            None => key.clone(),
+            Some(_) if matches!(merge, Merge::KeepScene) => continue,
+            Some(existing) if materials_equal(existing, asset) => continue,
             Some(_) => {
                 let unique = uniquify(&scene.materials, key);
-                scene.materials.insert(unique.clone(), asset.clone());
-                renames.insert(key.clone(), unique);
+                renames.insert(key.clone(), unique.clone());
+                unique
             }
-            None => {
-                scene.materials.insert(key.clone(), asset.clone());
-            }
-        }
+        };
+        scene.materials.insert(key.clone(), asset.clone());
+        added.push(key);
     }
-    renames
+    (renames, added)
 }
 
 /// Pick a fresh `"{key} (n)"` name not already present in the library.
