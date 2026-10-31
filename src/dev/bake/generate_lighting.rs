@@ -62,11 +62,14 @@ pub fn generate_lighting(
     refuse_while_baking(scene)?;
     let path = scene_path.ok_or(UNSAVED)?;
     let settings = scene.lighting_settings.lightmaps;
-    let lightmaps = bake_scene_lightmaps(scene, Some(path), &settings)?;
-    let mut probes = start_probes(scene, path, nav)?;
-    while !probes.step(scene, say)? {}
-    probes.commit(scene)?;
-    finish(scene, path, lightmaps, probes.report())
+    // A bake is no edit (#1631): the console line's Undo step leaves it out.
+    scene.unrecorded(|scene| {
+        let lightmaps = bake_scene_lightmaps(scene, Some(path), &settings)?;
+        let mut probes = start_probes(scene, path, nav)?;
+        while !probes.step(scene, say)? {}
+        probes.commit(scene)?;
+        finish(scene, path, lightmaps, probes.report())
+    })
 }
 
 /// The probe step after the lightmaps, as a job to step ([`LightingBake::step`]):

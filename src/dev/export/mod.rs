@@ -12,7 +12,9 @@
 //! from the cache (`asset::convert::cached_gltf` and `texture_ref` both resolve a
 //! source's cache by its path, the source present or not). Every image's
 //! compressed copy is made current first and shipped beside it (#1574), so the
-//! player never encodes a texture nor writes one into its install.
+//! player never encodes a texture nor writes one into its install. Every baked
+//! shader stale against the engine's shaders is re-baked from its recipe the same
+//! way (#1638, `shadergen::rebake::refresh_all`), so the player composes none.
 //!
 //! What is copied: `project.rusty` (the build settings, and the mark that makes
 //! the import cache project-relative), the seed manifest, everything under
@@ -35,7 +37,7 @@ use std::path::{Path, PathBuf};
 
 use crate::asset::convert::{cached_gltf, convertible_sources};
 use crate::core::paths;
-use crate::core::project::{create_skeleton, is_project, ASSETS_DIR, PROJECT_FILE};
+use crate::core::project::{create_skeleton, is_project, ASSETS_DIR, PROJECT_FILE, SHADERS_DIR};
 use crate::scene::io::SEED_MANIFEST_PATH;
 
 /// What an export did.
@@ -62,6 +64,10 @@ pub fn export(out: &Path) -> Result<Exported, String> {
     // An image that fails is warned of and ships uncompressed, as Unity builds
     // with an import error logged.
     crate::asset::texture_import::refresh_all(Path::new(ASSETS_DIR));
+    // A baked shader stale against this engine's shaders is re-baked from its
+    // recipe, so the player loads it as shipped (#1638); one that fails is
+    // warned of and ships as it is.
+    crate::shadergen::rebake::refresh_all(&paths::native(SHADERS_DIR));
     let existed = out.is_dir();
     let written = copy_runtime_files(Path::new("."), &sources, &out).and_then(|files| {
         create_skeleton(&out)?;

@@ -33,7 +33,11 @@ impl Scene {
     /// Enter or leave Play. Only `GameWorld`'s transition (`enter_play` /
     /// `exit_play`) calls this outside tests, so every reader sees the state
     /// change at the same moment.
+    /// Entering Play forgets the Undo history: Stop restores Play's changes.
     pub(crate) fn set_playing(&mut self, playing: bool) {
+        if playing && !self.playing {
+            self.clear_undo();
+        }
         self.playing = playing;
     }
 
@@ -74,6 +78,8 @@ impl Scene {
             !(self.playing && why == Despawn::EditMode),
             "an edit-mode despawn of {ids:?} in Play skips script teardown; use Scene::destroy"
         );
+        // Before the World forgets them: a recorded edit keeps their entries (#1631).
+        self.keep_dropped_lightmaps(ids);
         self.world.despawn_all(ids);
         for &id in ids {
             self.shader_overrides.clear(id, None);

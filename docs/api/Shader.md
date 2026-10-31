@@ -10,7 +10,8 @@ The bake **validates the assembled module by composing it through `naga_oil`** �
 engine's other shader modules registered) — and **rejects a module that won't compile, writing no file**. So a bad
 shader is caught at authoring time and never ships. On success the module is written
 to the authored-shader workspace (`assets/shaders/<name>.wgsl` by default),
-registered by name. A **surface** module is then used by naming it on a material —
+registered by name, with its runtime-param layout (`<name>.params.json`) and its
+recipe (`<name>.recipe.json`) beside it. A **surface** module is then used by naming it on a material —
 `Material.SetShader(id, "enemy_toon")` or a recipe's `shader` key (see `Material.md`);
 re-baking it in a running session rebuilds it on the next frame. An edit made to a
 `.wgsl` module (or its `.params.json`) **outside** the engine, in a text editor, is
@@ -19,6 +20,29 @@ MCP-embedded session, or the standalone player, sees it only once it is baked ag
 with `Shader.Bake`. A **ui** module is
 used by naming it on a UI graphic — `UI.SetShader(id, "hud_glitch")` (see
 [*The `ui` pass*](#the-ui-pass)).
+
+**A baked module follows the engine** (#1638), as Unity recompiles a shader when
+its includes change. Its first line is a fingerprint of what it was composed from
+(the assembled module, its params and the engine shader modules it can import).
+When the renderer loads it (a surface, ui or post-FX module, or the editor's shader
+preview), or boot seeds the default scene's `default_rim`, and the engine's shaders
+have changed since the bake, it is **re-baked from its `<name>.recipe.json`** in
+place, with one console line naming it: re-baking by hand after an engine update is
+never needed. A shipped player never writes into its install: it re-composes a
+stale module from its recipe in memory and leaves the files as shipped.
+
+- **An edited recipe** takes effect at the module's next load (a restart, or the
+  next write to the module), not live; `Shader.Bake` applies one at once.
+- **No recipe, no re-bake.** A `.wgsl` with no recipe beside it (hand-written, or
+  baked by `Shader.Bake` before #1638) is left alone; if it no longer composes, the
+  renderer logs that once and draws the standard shader.
+- **A deleted module stays deleted**, even with its recipe left beside it.
+- **A hand edit to a baked module** lasts until its recipe or the engine changes,
+  when the re-bake replaces it; delete the recipe to keep it for good. That includes
+  the seeded `default_rim`, whose recipe was seeded with it: a hand edit to it is
+  replaced at the first engine update.
+- **A re-bake that fails** (its recipe names a block since removed, say) is logged
+  once, and the module is loaded as it is.
 
 This is authoring shaders that **fit the engine**, not a general-purpose shader
 compiler: the agent composes only from the curated block library — there is no
@@ -99,11 +123,13 @@ assembles byte-identical WGSL.
   `material()` (#1616: tint, PBR scalars, map flags, cutout, the transparent-surface
   and mapping terms), and a per-instance `instances` array (world matrix, probe SH).
   The shadow casters bind the same `draw` and record, so `material()` reads in the
-  shadow stage too. A surface variant baked before #470 was written against the old
-  per-entity layout — re-bake it. One baked before #1616 imports the old per-draw
-  `entity` uniform, which no longer exists, so the renderer refuses it: it logs that
-  once and draws the material with the standard shader until the variant is
-  re-baked (`Shader.Bake` again; an automatic re-bake is #1638).
+  shadow stage too. A variant baked with a recipe beside it is re-baked
+  automatically when the engine's shaders change (above), so the notes below
+  about variants baked before a change apply only to recipe-less modules (baked
+  before #1638): bake them once more with `Shader.Bake`. One baked before #1616
+  imports the old per-draw `entity` uniform, which no longer exists, so the
+  renderer refuses it: it logs that once and draws the material with the standard
+  shader until the variant is re-baked.
   Surface decals (#638) are folded into `fs_main`'s material inputs before the
   lighting, so a variant carries them like the standard shader. A surface variant
   baked before #638 carries the old `fs_main` and **shows no decals** until it is

@@ -22,7 +22,7 @@
 
 use glam::Vec3;
 
-use crate::asset::{self, ImportedAsset};
+use crate::asset::{self, Imported, ImportedAsset};
 use crate::components::{ColliderComponent, MaterialComponent};
 use crate::scene::authoring::material_asset_from_import;
 use crate::scene::lod_instance::instantiate_lod_set;
@@ -77,7 +77,7 @@ pub fn instantiate_asset(
 pub fn instantiate_imported(
     scene: &mut Scene,
     path: &str,
-    asset: &ImportedAsset,
+    asset: &Imported,
     sub: &str,
     name: Option<&str>,
     position: Vec3,
@@ -102,7 +102,11 @@ pub fn instantiate_imported(
     }
     scene.world.set_mesh(
         id,
-        Some(rehydrate::asset_mesh_component_of(&reference, sub_mesh)),
+        Some(rehydrate::asset_mesh_component_of(
+            &reference,
+            sub_mesh,
+            asset.revision,
+        )),
     );
     // A skinned sub-object brings its skeleton as child bone entities (#453).
     scene.sync_skeleton(id);

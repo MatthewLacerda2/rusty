@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use super::layers::LAYER_COUNT;
 
 /// Symmetric collision table over the [`LAYER_COUNT`] shared layers.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CollisionMatrix {
     rows: [u32; LAYER_COUNT],
 }

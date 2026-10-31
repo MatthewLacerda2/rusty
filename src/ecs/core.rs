@@ -224,7 +224,11 @@ impl World {
     }
 
     /// The document of entity `id`, its mesh copied by `mesh`.
-    fn document(&self, id: u32, mesh: fn(&MeshComponent) -> MeshComponent) -> Option<Entity> {
+    pub(super) fn document(
+        &self,
+        id: u32,
+        mesh: fn(&MeshComponent) -> MeshComponent,
+    ) -> Option<Entity> {
         let core = self.component::<Core>(id)?;
         let name = (*self.name(id)?).clone();
         let transform = (*self.transform(id)?).clone();

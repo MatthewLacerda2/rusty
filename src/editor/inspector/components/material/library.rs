@@ -2,16 +2,16 @@
 //! the scene's library, as deleting a material asset in Unity does. A click asks
 //! for a confirm that lists the material's users; confirming deletes it through
 //! the shared `authoring::material::delete_asset` op `Material.DeleteAsset` calls
-//! (with `force`, so each user falls back to its default material), and keeps one
-//! *Undo* step that puts the asset and every user it moved back.
+//! (with `force`, so each user falls back to its default material). The editor's
+//! Undo (`scene::undo`, #1631) puts the asset and every user it moved back.
 //!
 //! Listing users and deleting need the whole `Scene` (live decals are users), so
 //! the card only emits a [`MaterialAction`], applied after the card pass. The
-//! confirm and the *Undo* belong to the scene they were made in: a scene change
-//! drops both ([`MaterialDelete::keep_scene`]).
+//! confirm belongs to the scene it was made in: a scene change drops it
+//! ([`MaterialDelete::keep_scene`]).
 
 use crate::editor::EditorUi;
-use crate::scene::authoring::material::{self as mat_ops, DeletedMaterial};
+use crate::scene::authoring::material as mat_ops;
 use crate::scene::{Scene, SceneId};
 
 /// The editor's delete state across frames.
@@ -19,8 +19,6 @@ use crate::scene::{Scene, SceneId};
 pub struct MaterialDelete {
     /// The material waiting on the confirm.
     confirm: Option<Confirm>,
-    /// The last delete, for *Undo*.
-    undo: Option<DeletedMaterial>,
 }
 
 /// A delete waiting on its confirm.
@@ -32,14 +30,11 @@ struct Confirm {
 }
 
 impl MaterialDelete {
-    /// Drop the confirm and the *Undo* when they were made in a scene other than
-    /// `scene`, the one the inspector now shows.
+    /// Drop the confirm when it was made in a scene other than `scene`, the one
+    /// the inspector now shows.
     pub fn keep_scene(&mut self, scene: SceneId) {
         if self.confirm.as_ref().is_some_and(|c| c.scene != scene) {
             self.confirm = None;
-        }
-        if self.undo.as_ref().is_some_and(|u| u.scene != scene) {
-            self.undo = None;
         }
     }
 }
@@ -51,12 +46,10 @@ pub enum MaterialAction {
     /// Delete this material.
     Delete(String),
     Cancel,
-    Undo,
 }
 
 /// Draw the card's *Delete* row for library material `key`: the confirm while one
-/// is up for `key`, else the delete button, and the *Undo* of the last delete
-/// while it holds.
+/// is up for `key`, else the delete button.
 pub(super) fn draw(
     ui: &mut egui::Ui,
     state: &MaterialDelete,
@@ -72,11 +65,6 @@ pub(super) fn draw(
                     *action = Some(MaterialAction::Ask(key.to_string()));
                 }
             });
-        }
-    }
-    if let Some(undo) = &state.undo {
-        if ui.button(format!("Undo delete of {}", undo.key)).clicked() {
-            *action = Some(MaterialAction::Undo);
         }
     }
 }
@@ -129,18 +117,8 @@ pub(in crate::editor::inspector) fn apply(
         }
         MaterialAction::Delete(key) => {
             state.confirm = None;
-            let deleted = mat_ops::delete_asset(scene, &key, true);
-            deleted
-                .map(|d| state.undo = Some(d))
+            mat_ops::delete_asset(scene, &key, true)
                 .map_err(|e| log::warn!("[Editor] delete material: {e}"))
-                .is_ok()
-        }
-        MaterialAction::Undo => {
-            let Some(deleted) = state.undo.take() else {
-                return false;
-            };
-            mat_ops::restore_asset(scene, deleted)
-                .map_err(|e| log::warn!("[Editor] undo delete material: {e}"))
                 .is_ok()
         }
     }
@@ -169,32 +147,45 @@ mod tests {
         assert!(apply(&mut editor, &mut scene, delete));
         assert!(editor.material_delete.confirm.is_none());
         assert!(!scene.materials.contains_key("tile"));
+    }
 
-        assert!(apply(&mut editor, &mut scene, MaterialAction::Undo));
-        assert!(scene.materials.contains_key("tile"));
+    /// The editor's one Undo takes a delete back (#1631): the card keeps none.
+    #[test]
+    fn the_editors_undo_takes_a_delete_back() {
+        let mut editor = EditorUi::new(Default::default());
+        let mut scene = Scene::new();
+        scene.materials.insert("tile".into(), Default::default());
+        let id = scene.add_entity("Floor".into());
+        scene
+            .world
+            .set_material(id, Some(MaterialComponent::new("tile")));
+        let before = crate::scene::to_scene_data(&scene);
+
+        scene.begin_edits();
+        let delete = MaterialAction::Delete("tile".into());
+        assert!(apply(&mut editor, &mut scene, delete));
+        scene.commit_edits(None);
+        scene.undo();
         assert_eq!(scene.world.material(id).unwrap().first(), "tile");
-        assert!(editor.material_delete.undo.is_none(), "one undo step");
+        let after = crate::scene::to_scene_data(&scene);
+        assert_eq!(
+            serde_json::to_value(after).ok(),
+            serde_json::to_value(before).ok()
+        );
     }
 
     #[test]
-    fn a_scene_change_drops_the_confirm_and_the_undo() {
+    fn a_scene_change_drops_the_confirm() {
         let mut editor = EditorUi::new(Default::default());
         let mut scene = Scene::new();
-        for key in ["tile", "spare"] {
-            scene.materials.insert(key.into(), Default::default());
-        }
-        let delete = MaterialAction::Delete("spare".into());
-        assert!(apply(&mut editor, &mut scene, delete));
+        scene.materials.insert("tile".into(), Default::default());
         let ask = MaterialAction::Ask("tile".into());
         apply(&mut editor, &mut scene, ask);
 
         let state = &mut editor.material_delete;
         state.keep_scene(scene.id());
-        assert!(
-            state.confirm.is_some() && state.undo.is_some(),
-            "same scene"
-        );
+        assert!(state.confirm.is_some(), "same scene");
         state.keep_scene(Scene::new().id());
-        assert!(state.confirm.is_none() && state.undo.is_none());
+        assert!(state.confirm.is_none());
     }
 }

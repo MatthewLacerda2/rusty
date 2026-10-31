@@ -48,7 +48,7 @@ impl Dissolve {
 
 impl Drop for Dissolve {
     fn drop(&mut self) {
-        for ext in ["wgsl", "params.json"] {
+        for ext in ["wgsl", "params.json", "recipe.json"] {
             let _ = std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{}.{ext}", self.shader));
         }
         let _ = std::fs::remove_file(&self.mask);
