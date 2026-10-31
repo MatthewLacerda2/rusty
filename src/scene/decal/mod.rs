@@ -23,8 +23,8 @@
 //! restore puts back the edit-mode decals, dropping every one Play stamped.
 //!
 //! **Owned decals follow their owner (#1649).** The despawn door drops a destroyed
-//! entity's decals with it ([`DecalSet::take_owned`]), and an Undo of the Destroy
-//! puts them back in their place in the blend order ([`DecalSet::put_back`]), as
+//! entity's decals with it (`DecalSet::take_owned`), and an Undo of the Destroy
+//! puts them back in their place in the blend order (`DecalSet::put_back`), as
 //! a projector under a GameObject goes and comes back with it in Unity.
 
 use crate::asset::MapRef;
