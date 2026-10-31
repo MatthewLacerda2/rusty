@@ -13,7 +13,7 @@
 
 use glam::Vec3;
 
-use super::sanitize::{clamped, finite3_or, finite_or, non_negative};
+use super::sanitize::{clamped, finite3_or, finite_or, non_negative, optional_color_or};
 use crate::scene::{Scene, SkySettings};
 
 /// Set the skybox panorama's path, as the scene file stores it; an empty path goes
@@ -38,30 +38,20 @@ pub fn set_ambient_intensity(scene: &mut Scene, intensity: f32) {
 // `FogSettings`: a caller passes `&mut scene.sky`, and a loaded block is held
 // through the same ops (`held_sky`).
 
-/// A sky colour as the setters store it: each channel `≥ 0`; a NaN or infinite
-/// channel refuses the colour whole and keeps `current`.
-fn sky_color(color: Option<Vec3>, current: Option<Vec3>) -> Option<Vec3> {
-    match color {
-        Some(c) if c.is_finite() => Some(c.max(Vec3::ZERO)),
-        Some(_) => current,
-        None => None,
-    }
-}
-
 /// Set the sky's zenith colour (linear RGB); `None` follows the ambient colour.
 pub fn set_sky_zenith(sky: &mut SkySettings, color: Option<Vec3>) {
-    sky.zenith = sky_color(color, sky.zenith);
+    sky.zenith = optional_color_or(color, sky.zenith);
 }
 
 /// Set the sky's horizon colour (linear RGB); `None` lifts the zenith toward white.
 pub fn set_sky_horizon(sky: &mut SkySettings, color: Option<Vec3>) {
-    sky.horizon = sky_color(color, sky.horizon);
+    sky.horizon = optional_color_or(color, sky.horizon);
 }
 
 /// Set the ground colour below the horizon (linear RGB); `None` is a quarter of
 /// the zenith.
 pub fn set_sky_ground(sky: &mut SkySettings, color: Option<Vec3>) {
-    sky.ground = sky_color(color, sky.ground);
+    sky.ground = optional_color_or(color, sky.ground);
 }
 
 /// Set the cloud coverage, clamped to `0..=1` (`0`: a clear sky). A NaN or

@@ -104,6 +104,16 @@ pub(super) fn finite3_or(v: Vec3, fallback: Vec3) -> Vec3 {
     }
 }
 
+/// An optional colour (`None`: derived elsewhere), each channel floored at `0`; one
+/// with a NaN or infinite channel is refused whole and `current` is kept.
+pub(super) fn optional_color_or(v: Option<Vec3>, current: Option<Vec3>) -> Option<Vec3> {
+    match v {
+        Some(c) if c.is_finite() => Some(c.max(Vec3::ZERO)),
+        Some(_) => current,
+        None => None,
+    }
+}
+
 /// `v`, or `Vec4::ZERO` when any component is NaN or infinite.
 pub(super) fn finite4(v: Vec4) -> Vec4 {
     if v.is_finite() {
