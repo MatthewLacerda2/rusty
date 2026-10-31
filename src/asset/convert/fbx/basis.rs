@@ -1,11 +1,15 @@
 //! The change of basis from an FBX file's axes to glTF's (+X right, +Y up, +Z
 //! front), baked into every vertex and transform.
 //!
-//! ufbx can convert axes too, but only by rotating the top-level nodes, and the
-//! engine places a model's meshes without their node transforms: a Z-up mesh
-//! would lie on its back. So the converter conjugates instead, the way Blender's
-//! glTF exporter does: a point becomes `C·p`, a transform `C·M·C⁻¹`, and every
-//! world transform comes out in glTF's axes with the meshes upright in their own.
+//! ufbx can convert axes too, but only by rotating the top-level nodes. The
+//! converter conjugates instead, the way Blender's glTF exporter does: a point
+//! becomes `C·p`, a transform `C·M·C⁻¹`, and every world transform comes out in
+//! glTF's axes with the meshes upright in their own. Now that a model spawns
+//! with its node transforms (#1083) either way would stand a Z-up file up; the
+//! conjugation stays because it adds no synthetic rotation to the roots (a
+//! single-node prop spawns with an identity rotation, not a quarter turn on X),
+//! a mesh is upright even when spawned alone by its `file::sub` reference, and
+//! the animation keys go through the very same calls (`Basis::local`).
 
 use glam::{DMat3, DMat4, DQuat, DVec3};
 
