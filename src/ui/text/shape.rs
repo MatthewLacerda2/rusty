@@ -172,9 +172,10 @@ mod tests {
     fn an_unligated_range_splits_a_ligature_and_keeps_kerning() {
         let f = font::default_font();
         assert_eq!(shape(&f, "fi", &[]).len(), 1);
-        assert_eq!(shape(&f, "fi", &[0..2]).len(), 2);
+        let both = [Range { start: 0, end: 2 }];
+        assert_eq!(shape(&f, "fi", &both).len(), 2);
         let sum = |g: &[Shaped]| g.iter().map(|s| s.advance).sum::<f32>();
-        assert_eq!(sum(&shape(&f, "AV", &[0..2])), advance_sum("AV"));
+        assert_eq!(sum(&shape(&f, "AV", &both)), advance_sum("AV"));
         assert!(shape(&f, "AV", &[])[0].bare > shape(&f, "AV", &[])[0].advance);
     }
 }
