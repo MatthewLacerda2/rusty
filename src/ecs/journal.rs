@@ -55,11 +55,6 @@ impl World {
         self.journal.recording = false;
     }
 
-    /// Whether anything was recorded since the last take.
-    pub fn journal_pending(&self) -> bool {
-        self.journal.taken.is_some()
-    }
-
     /// Take what was recorded (`None` when nothing was); recording is unchanged.
     pub fn journal_take(&mut self) -> Option<Journaled> {
         self.journal.taken.take()

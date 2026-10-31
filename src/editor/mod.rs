@@ -268,3 +268,7 @@ mod nav_sync_tests;
 #[cfg(test)]
 #[path = "selection_tests.rs"]
 mod selection_tests;
+
+#[cfg(test)]
+#[path = "undo_tests.rs"]
+mod undo_tests;

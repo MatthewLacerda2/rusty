@@ -34,30 +34,13 @@ pub(super) fn shortcuts(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut 
 pub(super) fn edit_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let playing = scene.is_playing();
     ui.menu_button("Edit", |ui| {
-        let ctx = ui.ctx().clone();
         let undo = scene.undo_name().map(|n| format!("Undo {n}"));
-        if item(
-            ui,
-            &ctx,
-            icon::ARROW_U_UP_LEFT,
-            undo,
-            "Undo",
-            &UNDO,
-            playing,
-        ) {
+        if item(ui, icon::ARROW_U_UP_LEFT, undo, "Undo", &UNDO, playing) {
             editor.is_dirty |= scene.undo().is_some();
             ui.close();
         }
         let redo = scene.redo_name().map(|n| format!("Redo {n}"));
-        if item(
-            ui,
-            &ctx,
-            icon::ARROW_U_UP_RIGHT,
-            redo,
-            "Redo",
-            &REDO,
-            playing,
-        ) {
+        if item(ui, icon::ARROW_U_UP_RIGHT, redo, "Redo", &REDO, playing) {
             editor.is_dirty |= scene.redo().is_some();
             ui.close();
         }
@@ -67,7 +50,6 @@ pub(super) fn edit_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
 /// One menu entry: `label` when there is a step, `fallback` greyed out when not.
 fn item(
     ui: &mut egui::Ui,
-    ctx: &egui::Context,
     glyph: &str,
     label: Option<String>,
     fallback: &str,
@@ -76,6 +58,6 @@ fn item(
 ) -> bool {
     let enabled = label.is_some() && !playing;
     let text = format!("{glyph}  {}", label.as_deref().unwrap_or(fallback));
-    let button = egui::Button::new(text).shortcut_text(ctx.format_shortcut(shortcut));
+    let button = egui::Button::new(text).shortcut_text(ui.ctx().format_shortcut(shortcut));
     ui.add_enabled(enabled, button).clicked()
 }

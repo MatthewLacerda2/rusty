@@ -54,6 +54,8 @@ pub struct UndoStack {
     redo: Vec<Step>,
     /// Whether an edit is open (between `begin_edits` and `commit_edits`).
     open: bool,
+    /// Whether the open edit is a follow-up (`begin_follow_up`): no baseline taken.
+    follow_up: bool,
     /// The scene level as it stood when the open edit began, and its bytes.
     level: Option<SceneLevel>,
     level_bytes: Vec<u8>,
@@ -68,9 +70,24 @@ impl Scene {
         if self.is_playing() {
             return;
         }
-        if !self.history.open {
+        if !self.history.open || std::mem::take(&mut self.history.follow_up) {
             self.history.open = true;
             self.rebaseline_level();
+        }
+        self.world.journal_resume();
+    }
+
+    /// Open an edit for a frame no one touched, closed by
+    /// [`Scene::commit_follow_up`]: entity writes are recorded as ever, but the
+    /// scene level is compared only when something was written, so an idle frame
+    /// costs nothing (serializing a Dust2-sized scene level twice a frame does).
+    pub fn begin_follow_up(&mut self) {
+        if self.is_playing() {
+            return;
+        }
+        if !self.history.open {
+            self.history.open = true;
+            self.history.follow_up = true;
         }
         self.world.journal_resume();
     }
@@ -120,9 +137,13 @@ impl Scene {
     fn take_step(&mut self, name: Option<&str>) -> Option<Step> {
         self.world.journal_pause();
         let journaled = self.world.journal_take();
+        let follow_up = std::mem::take(&mut self.history.follow_up);
         if !std::mem::take(&mut self.history.open) || self.is_playing() {
             return None;
         }
+        // A follow-up that wrote nothing compares nothing; one that did compares
+        // against the last baseline taken, when one is still held.
+        let compare = !(follow_up && journaled.is_none()) && self.history.level.is_some();
         let (next_id, before) = journaled.map_or((self.world.next_id(), BTreeMap::new()), |j| {
             (j.next_id, j.before)
         });
@@ -130,8 +151,7 @@ impl Scene {
             .into_iter()
             .filter(|(id, before)| changed(before.as_ref(), self.world.record(*id).as_ref()))
             .collect();
-        let level = self
-            .level_changed()
+        let level = (compare && self.level_changed())
             .then(|| self.history.level.take())
             .flatten();
         if entities.is_empty() && level.is_none() {
