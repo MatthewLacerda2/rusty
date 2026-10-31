@@ -8,7 +8,7 @@ use glam::{Mat4, Vec3};
 use crate::scene::Camera;
 
 /// The six faces of a cubemap, in the conventional +X,-X,+Y,-Y,+Z,-Z order. The
-/// index into [`CubemapCapture::faces`] is `face as usize`.
+/// index into [`CubemapCapture::faces`](super::cubemap_capture::CubemapCapture::faces) is `face as usize`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CubemapFace {
     PosX,

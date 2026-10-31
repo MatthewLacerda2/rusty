@@ -13,41 +13,9 @@ pub(super) fn sample(r: &Renderer, cube: &wgpu::Texture, taps: &[(Vec3, f32)]) -
         ..Default::default()
     });
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
-    let words: Vec<f32> = taps.iter().flat_map(|(d, l)| [d.x, d.y, d.z, *l]).collect();
-    let dirs = wgpu::util::DeviceExt::create_buffer_init(
-        device,
-        &wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&words),
-            usage: wgpu::BufferUsages::STORAGE,
-        },
-    );
-    let out = device.create_texture(&wgpu::TextureDescriptor {
-        label: None,
-        size: wgpu::Extent3d {
-            width: taps.len() as u32,
-            height: 1,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8Unorm,
-        usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC,
-        view_formats: &[],
-    });
-    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(SHADER.into()),
-    });
-    let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-        label: None,
-        layout: None,
-        module: &module,
-        entry_point: Some("main"),
-        compilation_options: Default::default(),
-        cache: None,
-    });
+    let dirs = taps_buffer(device, taps);
+    let out = out_texture(device, taps.len() as u32);
+    let pipeline = pipeline(device);
     let out_view = out.create_view(&Default::default());
     let entries = [
         wgpu::BindGroupEntry {
@@ -86,6 +54,53 @@ pub(super) fn sample(r: &Renderer, cube: &wgpu::Texture, taps: &[(Vec3, f32)]) -
         .chunks_exact(4)
         .map(|c| [c[0], c[1], c[2], c[3]])
         .collect()
+}
+
+/// Each tap as a `vec4` (direction, lod) in a storage buffer.
+fn taps_buffer(device: &wgpu::Device, taps: &[(Vec3, f32)]) -> wgpu::Buffer {
+    let words: Vec<f32> = taps.iter().flat_map(|(d, l)| [d.x, d.y, d.z, *l]).collect();
+    wgpu::util::DeviceExt::create_buffer_init(
+        device,
+        &wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&words),
+            usage: wgpu::BufferUsages::STORAGE,
+        },
+    )
+}
+
+/// The `width × 1` RGBA8 texture the taps are stored into, copyable back.
+fn out_texture(device: &wgpu::Device, width: u32) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: wgpu::Extent3d {
+            width,
+            height: 1,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    })
+}
+
+/// The compute pipeline running [`SHADER`], its layout derived from the shader.
+fn pipeline(device: &wgpu::Device) -> wgpu::ComputePipeline {
+    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: None,
+        source: wgpu::ShaderSource::Wgsl(SHADER.into()),
+    });
+    device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        label: None,
+        layout: None,
+        module: &module,
+        entry_point: Some("main"),
+        compilation_options: Default::default(),
+        cache: None,
+    })
 }
 
 const SHADER: &str = "
