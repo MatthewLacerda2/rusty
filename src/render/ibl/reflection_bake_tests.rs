@@ -51,7 +51,6 @@ fn add_wall(scene: &mut Scene, name: &str, pos: Vec3, scale: Vec3, emissive: [f3
 /// A box of six coloured static walls around the origin (the room the probe captures).
 fn colored_room() -> Scene {
     let mut scene = Scene::new();
-    let big = Vec3::new(20.0, 20.0, 20.0);
     let walls = [
         ("PosX", Vec3::X * 6.0, [9.0, 0.0, 0.0]),
         ("NegX", Vec3::NEG_X * 6.0, [0.0, 9.0, 0.0]),
@@ -61,7 +60,10 @@ fn colored_room() -> Scene {
         ("NegZ", Vec3::NEG_Z * 6.0, [0.0, 9.0, 9.0]),
     ];
     for (name, pos, emissive) in walls {
-        add_wall(&mut scene, name, pos, big, emissive);
+        // 20 x 20 and half a unit thick, so the origin is outside every wall and
+        // sees its front face: back faces are culled (#1615).
+        let thin = Vec3::splat(20.0) - pos.normalize().abs() * 19.5;
+        add_wall(&mut scene, name, pos, thin, emissive);
     }
     scene
 }

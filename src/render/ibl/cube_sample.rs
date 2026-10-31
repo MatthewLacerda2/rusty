@@ -4,7 +4,8 @@
 //! captured cubemap: the world DIRECTION each output texel points down, and the COLOUR
 //! the captured environment shows along an arbitrary direction. Both must agree with the
 //! exact per-face orientation `capture_static_cubemap` rendered with (#243) — the faces
-//! carry the empirically-tuned flipped cameras, so a hand-rolled axis basis would desync.
+//! carry `face_camera`'s exact lenses (its up vectors included), so a hand-rolled axis
+//! basis would desync.
 //!
 //! So this module derives everything from the same `face_camera` view-projection the
 //! capture used: [`FaceProjections`] inverts it for texel->direction (which

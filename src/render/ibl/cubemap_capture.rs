@@ -44,18 +44,19 @@ impl CubemapFace {
     ];
 
     /// The (yaw, pitch) in degrees that aims [`Camera`] down this face's axis, so the
-    /// `PosX` face looks toward +X, etc. The view basis [`Camera::build_view_projection`]
-    /// derives from `look_at_rh` flips the apparent axis relative to [`Camera::forward`]'s
-    /// `forward = (cosY·cosP, sinP, sinY·cosP)`, so each face aims down the *opposite*
-    /// yaw/pitch (verified against the rendered face colours, #243).
+    /// `PosX` face looks toward +X, etc.: [`Camera::forward`] is
+    /// `(cosY·cosP, sinP, sinY·cosP)`. An earlier table aimed each face down the
+    /// opposite axis, tuned against a test room whose camera sat inside every wall
+    /// and saw the far side of the one behind it (#243); with back faces culled
+    /// (#1615) the room was rebuilt and the table aims where its names say.
     fn yaw_pitch(self) -> (f32, f32) {
         match self {
-            CubemapFace::PosX => (180.0, 0.0),
-            CubemapFace::NegX => (0.0, 0.0),
-            CubemapFace::PosY => (0.0, -90.0),
-            CubemapFace::NegY => (0.0, 90.0),
-            CubemapFace::PosZ => (-90.0, 0.0),
-            CubemapFace::NegZ => (90.0, 0.0),
+            CubemapFace::PosX => (0.0, 0.0),
+            CubemapFace::NegX => (180.0, 0.0),
+            CubemapFace::PosY => (0.0, 90.0),
+            CubemapFace::NegY => (0.0, -90.0),
+            CubemapFace::PosZ => (90.0, 0.0),
+            CubemapFace::NegZ => (-90.0, 0.0),
         }
     }
 }
