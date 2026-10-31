@@ -67,17 +67,7 @@ pub fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
 /// the library when the world guard drops) — the same path the editor Add menu uses.
 pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bool {
     match kind {
-        // Unity's empty Mesh Filter draws nothing; rusty's Mesh is the Filter and
-        // Renderer in one, so it arrives as the menu's default Box. A Mesh-shaped
-        // collider follows the entity's Mesh again, so its shared mesh goes (#1657).
-        ComponentKind::Mesh => {
-            if let Some(mut collider) = world.collider_mut(id) {
-                if collider.shared_mesh.is_some() {
-                    collider.shared_mesh = None;
-                }
-            }
-            world.set_mesh(id, primitive_mesh_component(Primitive::Box))
-        }
+        ComponentKind::Mesh => add_box_mesh(world, id),
         ComponentKind::Light => world.set_light(id, Some(default_light())),
         ComponentKind::Animator => world.set_animator(id, Some(default_animator())),
         ComponentKind::Collider => world.set_collider(id, Some(default_collider())),
@@ -153,6 +143,18 @@ fn set_default_ui(world: &mut World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::Shape => world.set_shape(id, Some(ShapeComponent::default())),
         _ => false,
     }
+}
+
+/// Unity's empty Mesh Filter draws nothing; rusty's Mesh is the Filter and Renderer
+/// in one, so it arrives as the menu's default Box. A Mesh-shaped collider follows
+/// the entity's Mesh again, so its shared mesh goes (#1657).
+fn add_box_mesh(world: &mut World, id: u32) -> bool {
+    if let Some(mut collider) = world.collider_mut(id) {
+        if collider.shared_mesh.is_some() {
+            collider.shared_mesh = None;
+        }
+    }
+    world.set_mesh(id, primitive_mesh_component(Primitive::Box))
 }
 
 /// Detach `kind` from entity `id` (raw, no cascade). Returns `false` when the entity is

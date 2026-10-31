@@ -25,7 +25,7 @@
 //! the default asset the same way the editor Add menu does. Removing a Mesh also
 //! drops the Material reference ([`remove_with_cascade`], #1657): in Unity the
 //! materials live on the renderer. A Mesh-shaped collider keeps the removed Mesh as
-//! its `shared_mesh`, and adding a Mesh clears it again ([`set_default`]).
+//! its `shared_mesh`, and adding a Mesh clears it again (the Add verbs).
 
 mod dispatch;
 
