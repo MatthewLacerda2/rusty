@@ -26,7 +26,7 @@ fn gpu_vertex_waves_builds_its_depth_pipelines() {
         let id = r.surface_shaders.pipeline_id(&r.device, Some(&name));
         r.surface_shaders.cut(id).is_some()
     });
-    for ext in ["wgsl", "params.json"] {
+    for ext in ["wgsl", "params.json", "recipe.json"] {
         let _ = std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{name}.{ext}"));
     }
     assert_ne!(
