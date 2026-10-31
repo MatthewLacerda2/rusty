@@ -77,6 +77,9 @@ struct DirectionalLight {
 
 struct LightingUniforms {
     ambient: AmbientLight,
+    // The procedural sky's settings (#1620), right after `ambient` so the sky pass
+    // reads both through a prefix of this struct.
+    sky: ProceduralSky,
     // Up to four suns (#434); slot 0 is the one casting the cascaded shadows.
     dir_lights: array<DirectionalLight, 4>,
     num_dir_lights: u32,
@@ -396,40 +399,64 @@ fn equirect_uv(dir: vec3<f32>) -> vec2<f32> {
 }
 
 // --- The procedural sky (#256) ------------------------------------------------
+// The scene's procedural sky settings (#1620, `scene::SkySettings`). Mirrors the
+// Rust `ProceduralSkyUniform`. A colour's `w` is 1 when the scene sets it; 0 derives
+// it from the ambient colour as the sky always has.
+struct ProceduralSky {
+    zenith: vec4<f32>,
+    horizon: vec4<f32>,
+    ground: vec4<f32>,
+    // x: cloud coverage (0 clear, 0.5 the default layer, 1 overcast), y: opacity.
+    clouds: vec4<f32>,
+};
+
 // The colour of the procedural sky along `dir`, before fog: a ground -> horizon ->
-// sky gradient tinted from `sky_color` (the scene's ambient colour) plus a cheap,
-// static cloud layer. ONE function, two callers: the sky pass draws it when no
-// panorama is bound (`sky_gradient.wgsl`), and the sky reflection cube bakes it for
-// the forward pass to reflect in the same case (#718, #1553), so a metal surface
-// mirrors the sky that is actually on screen. It must stay **affine in
-// `sky_color`** (`a * sky_color + b`, `a` one scalar per direction): the cube bakes
-// the two terms once and applies the tint per sample (`sky/prefilter.wgsl`). Its
-// clouds are `sky_fbm` (`sky/noise.wgsl`).
+// zenith gradient plus a cheap, static cloud layer, shaped by `sky` and tinted from
+// `ambient` (the scene's ambient colour) wherever `sky` leaves a colour unset. ONE
+// function, two callers: the sky pass draws it when no panorama is bound
+// (`sky_gradient.wgsl`), and the sky reflection cube bakes it for the forward pass
+// to reflect in the same case (#718, #1553), so a metal surface mirrors the sky that
+// is actually on screen. It must stay **affine in `ambient`** for a fixed `sky`
+// (`a * ambient + b`, `a` one scalar per direction): every colour is either set (a
+// constant) or a scalar multiple of the zenith plus a constant, so it holds, and the
+// cube bakes the two terms once per `sky` and applies the ambient colour per sample
+// (`sky/prefilter.wgsl`). Its clouds are `sky_fbm` (`sky/noise.wgsl`).
 
-fn procedural_sky(sky_color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
-    // Ground is the darker quarter of the sky tint, exactly as the forward pass's
-    // hemisphere ambient; the horizon a desaturated lift toward white (the classic
-    // default-skybox glow).
-    let ground_color = sky_color * 0.25;
-    let horizon_color = mix(sky_color, vec3<f32>(1.0), 0.6);
+// How far `coverage` shifts the FBM before the cloud mask's ramp (0.45..0.80) carves
+// it: exactly 0 at the default 0.5 (the layer the sky always drew), -0.55 at 0 so
+// even the FBM's maximum (31/32) stays under the ramp and nothing is carved, +0.8 at
+// 1 so even its minimum (0) clears it and every direction is cloud.
+fn cloud_shift(coverage: f32) -> f32 {
+    let c = coverage - 0.5;
+    return c * select(1.1, 1.6, c > 0.0);
+}
 
-    // Blend ground -> horizon below the horizon line, horizon -> sky above it. The
+fn procedural_sky(sky: ProceduralSky, ambient: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    // Unset, the zenith is the ambient colour, the horizon a desaturated lift toward
+    // white (the classic default-skybox glow), and the ground the darker quarter of
+    // the zenith, as the forward pass's hemisphere ambient.
+    let zenith = select(ambient, sky.zenith.rgb, sky.zenith.w > 0.5);
+    let horizon_color = select(mix(zenith, vec3<f32>(1.0), 0.6), sky.horizon.rgb, sky.horizon.w > 0.5);
+    let ground_color = select(zenith * 0.25, sky.ground.rgb, sky.ground.w > 0.5);
+
+    // Blend ground -> horizon below the horizon line, horizon -> zenith above it. The
     // `pow` tightens each band so the horizon glow stays near y = 0.
     let up = clamp(dir.y, 0.0, 1.0);
     let down = clamp(-dir.y, 0.0, 1.0);
-    var color = mix(horizon_color, sky_color, pow(up, 0.5));
+    var color = mix(horizon_color, zenith, pow(up, 0.5));
     color = mix(color, ground_color, pow(down, 0.35));
 
     // Cloud layer, sky hemisphere only. Project the view ray onto a flat sky dome so
     // cells bunch up toward the horizon, then carve soft cloud shapes out of the FBM
-    // and tint them a hair brighter than the sky. Coverage fades out near the horizon
-    // (so clouds don't bleed into the glow) and is absent below it.
+    // and tint them a hair brighter than the zenith. Coverage fades out near the
+    // horizon (so clouds don't bleed into the glow) and is absent below it.
     if (dir.y > 0.0) {
         let dome = dir.xz / max(dir.y, 0.15);
-        let coverage = smoothstep(0.45, 0.80, sky_fbm(dome * 1.6));
+        let fbm = sky_fbm(dome * 1.6) + cloud_shift(sky.clouds.x);
+        let coverage = smoothstep(0.45, 0.80, fbm);
         let band = smoothstep(0.05, 0.35, up);
-        let cloud_color = mix(sky_color, vec3<f32>(1.0), 0.85);
-        color = mix(color, cloud_color, coverage * band * 0.6);
+        let cloud_color = mix(zenith, vec3<f32>(1.0), 0.85);
+        color = mix(color, cloud_color, coverage * band * sky.clouds.y);
     }
     return color;
 }

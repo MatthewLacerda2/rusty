@@ -66,6 +66,10 @@ pub struct SceneData {
     /// Distance + height fog (#437); off when absent.
     #[serde(default)]
     pub fog: crate::scene::FogSettings,
+    /// The procedural sky's look (#1620). Left out while every knob is at its
+    /// default.
+    #[serde(default, skip_serializing_if = "crate::scene::SkySettings::is_default")]
+    pub sky: crate::scene::SkySettings,
     /// Project layer names; the stock registry ("Default" + 31 unnamed slots) when
     /// absent.
     #[serde(default)]
@@ -115,6 +119,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         ambient_intensity: scene.ambient_intensity,
         nav_settings: scene.nav_settings.clone(),
         fog: scene.fog,
+        sky: scene.sky,
         layers: scene.layers.clone(),
         collision_matrix: scene.collision_matrix.clone(),
         materials: scene.materials.clone(),
@@ -183,6 +188,8 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     scene.ambient_intensity = data.ambient_intensity;
     scene.nav_settings = data.nav_settings;
     scene.fog = data.fog;
+    // Held to its ranges once, here, as a setter would hold it.
+    scene.sky = crate::scene::authoring::environment::held_sky(data.sky);
     data.layers.normalize();
     scene.layers = data.layers;
     scene.collision_matrix = data.collision_matrix;

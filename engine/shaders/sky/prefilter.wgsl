@@ -12,12 +12,13 @@
 // - the panorama (`params.p.z == 1`): sampled at the mip whose texel matches the
 //   sample's solid angle (filtered importance sampling), so a few taps blur
 //   without sparkle;
-// - the procedural sky: `common::procedural_sky` is affine in its tint, so the cube
-//   stores its two terms (rgb: the sky at tint 0, a: what tint 1 adds) and the
-//   forward pass applies the ambient colour when it samples. The tint (a scripted day
-//   cycle) never rebakes it.
+// - the procedural sky: for fixed sky settings (`params.sky`, #1620)
+//   `common::procedural_sky` is affine in the ambient colour, so the cube stores its
+//   two terms (rgb: the sky at ambient 0, a: what ambient 1 adds) and the forward
+//   pass applies the ambient colour when it samples. The ambient colour (a scripted
+//   day cycle) never rebakes it; a change to the sky settings does, once.
 
-#import common::{PI, equirect_uv, procedural_sky}
+#import common::{PI, ProceduralSky, equirect_uv, procedural_sky}
 #import ibl::ggx::{ggx_light, tangent_frame}
 
 struct Params {
@@ -25,6 +26,8 @@ struct Params {
     // w: the importance sample count, `render::ibl::reflection_prefilter`'s
     // `SAMPLE_COUNT`, so a probe and the sky blur rough metal alike.
     p: vec4<f32>,
+    // The procedural sky's settings (#1620), as the sky pass reads them.
+    sky: ProceduralSky,
 };
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -47,10 +50,11 @@ fn face_direction(face: u32, uv: vec2<f32>) -> vec3<f32> {
     }
 }
 
-// The procedural sky's two terms along `dir`: rgb at tint 0, a the tint's weight.
+// The procedural sky's two terms along `dir`: rgb at ambient 0, a the ambient's
+// weight.
 fn procedural_terms(dir: vec3<f32>) -> vec4<f32> {
-    let base = procedural_sky(vec3<f32>(0.0), dir);
-    let full = procedural_sky(vec3<f32>(1.0), dir);
+    let base = procedural_sky(params.sky, vec3<f32>(0.0), dir);
+    let full = procedural_sky(params.sky, vec3<f32>(1.0), dir);
     return vec4<f32>(base, full.x - base.x);
 }
 

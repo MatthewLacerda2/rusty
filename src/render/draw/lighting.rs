@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use crate::render::gpu::uniforms::MAX_DIRECTIONAL_LIGHTS;
+use crate::render::gpu::uniforms::{ProceduralSkyUniform, MAX_DIRECTIONAL_LIGHTS};
 use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::render::{AmbientLightUniform, DirectionalLightUniform, LightingUniform};
 use crate::scene::{LightType, Scene};
@@ -14,6 +14,7 @@ use crate::scene::{LightType, Scene};
 pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
     LightingUniform {
         ambient: scene_ambient(scene),
+        sky: ProceduralSkyUniform::from_settings(&scene.sky),
         dir_lights: [bytemuck::Zeroable::zeroed(); MAX_DIRECTIONAL_LIGHTS],
         num_dir_lights: 0,
         sky_textured: 0.0,

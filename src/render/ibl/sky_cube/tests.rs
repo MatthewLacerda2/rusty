@@ -1,11 +1,20 @@
 //! What a frame bakes into the sky reflection cubes (#1553), GPU-free.
 
-use super::{plan, Bake};
+use super::{bake_slot, plan, Bake};
 
 #[test]
-fn the_procedural_sky_is_baked_once() {
+fn the_procedural_sky_is_baked_once_per_settings() {
     assert_eq!(plan(false, None), Bake::Procedural);
     assert_eq!(plan(true, None), Bake::Nothing);
+}
+
+/// The first bake fills the bound slot; a later one the other, keeping the sky
+/// bound last (#1620).
+#[test]
+fn a_new_sky_is_baked_beside_the_bound_one() {
+    assert_eq!(bake_slot(0, true), 0);
+    assert_eq!(bake_slot(0, false), 1);
+    assert_eq!(bake_slot(1, false), 0);
 }
 
 #[test]

@@ -8,25 +8,28 @@
 // live in `common::procedural_sky`, shared with the forward pass's reflections (#718).
 //
 // It shares group(0) with the forward pass: camera at binding 0, the SAME lighting
-// uniform at binding 1. The sky/ground tints are derived from `lighting.ambient.color`
-// — the very term the surface shader uses for hemisphere ambient — so the background
-// and the lighting always agree (no second source of colour to drift out of sync).
+// uniform at binding 1. Its look is the scene's sky settings (`lighting.sky`, #1620);
+// a colour they leave unset is derived from `lighting.ambient.color`, the very term
+// the surface shader uses for hemisphere ambient, so by default the background and
+// the lighting always agree.
 
-#import common::{CameraUniforms, VertexInput, procedural_sky, sky_fog}
+#import common::{CameraUniforms, ProceduralSky, VertexInput, procedural_sky, sky_fog}
 #import sky::motion::{SkyTargets, sky_targets}
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
 
 // A prefix of the forward pass's `LightingUniforms`: we only need the leading
-// `ambient` term, and a uniform binding may declare a struct smaller than the bound
-// buffer. Mirrors `AmbientLight` in shader.wgsl byte-for-byte.
+// `ambient` term and the procedural sky's settings (#1620), and a uniform binding
+// may declare a struct smaller than the bound buffer. Mirrors `AmbientLight` in
+// `common.wgsl` byte-for-byte.
 struct AmbientLight {
     color: vec3<f32>,
     intensity: f32,
 };
 struct SkyLighting {
     ambient: AmbientLight,
+    sky: ProceduralSky,
 };
 @group(0) @binding(1)
 var<uniform> lighting: SkyLighting;
@@ -51,9 +54,10 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 @fragment
 fn fs_main(in: VertexOutput) -> SkyTargets {
     let dir = normalize(in.view_dir);
-    // Sky tint from the SAME ambient term the surface shader reads; the gradient and
-    // clouds live in `common::procedural_sky`, which the forward pass reflects (#718).
-    let color = procedural_sky(lighting.ambient.color, dir);
+    // The scene's sky settings, tinted from the SAME ambient term the surface shader
+    // reads wherever they leave a colour unset; the gradient and clouds live in
+    // `common::procedural_sky`, which the forward pass reflects (#718).
+    let color = procedural_sky(lighting.sky, lighting.ambient.color, dir);
 
     // Blend toward the scene fog at the horizon (#437), as the panorama sky does.
     let fogged = vec4<f32>(sky_fog(camera.fog, color, dir, camera.camera_pos), 1.0);

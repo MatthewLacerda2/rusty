@@ -64,7 +64,7 @@ fn gpu_a_sky_change_bakes_once_and_a_still_sky_never() {
 }
 
 /// An IEEE half to f32 (normal and zero halves: all a bake writes here).
-fn half(bits: u16) -> f32 {
+pub(super) fn half(bits: u16) -> f32 {
     let exp = i32::from((bits >> 10) & 0x1f);
     let mantissa = f32::from(bits & 0x3ff) / 1024.0;
     let sign = if bits & 0x8000 == 0 { 1.0 } else { -1.0 };

@@ -3,6 +3,7 @@
 
 use super::SKY_FACE;
 use crate::render::gpu::shaders::ShaderRegistry;
+use crate::render::gpu::uniforms::ProceduralSkyUniform;
 use crate::render::ibl::reflection_prefilter;
 use crate::render::timing::{GpuPass, GpuTimer};
 use crate::render::GpuTexture;
@@ -80,6 +81,15 @@ impl Cube {
     }
 }
 
+/// One mip's params buffer as the shader reads it: [`params`], then the procedural
+/// sky's settings (#1620; ignored for a panorama).
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct Params {
+    p: [f32; 4],
+    sky: ProceduralSkyUniform,
+}
+
 /// The bake pipeline, one params buffer per mip, and the black texel the
 /// procedural bake binds in the panorama's place.
 pub(super) struct Filter {
@@ -104,7 +114,7 @@ impl Filter {
             .map(|_| {
                 device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("Sky Reflection Params"),
-                    size: 16,
+                    size: std::mem::size_of::<Params>() as u64,
                     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
                 })
@@ -134,14 +144,14 @@ impl Filter {
         }
     }
 
-    /// Capture and prefilter `panorama` (`None`: the procedural sky's terms) into
-    /// every mip of `cube`, in one timed compute pass, and submit it.
+    /// Capture and prefilter `panorama` (`None`: the procedural sky's terms, shaped
+    /// by `sky`) into every mip of `cube`, in one timed compute pass, and submit it.
     pub(super) fn bake(
         &self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         timer: &GpuTimer,
         cube: &Cube,
-        panorama: Option<&GpuTexture>,
+        (panorama, sky): (Option<&GpuTexture>, &ProceduralSkyUniform),
     ) {
         let (source, sampler) = match panorama {
             Some(p) => (&p.view, &p.sampler),
@@ -150,9 +160,12 @@ impl Filter {
         let groups: Vec<_> = (0..mip_count())
             .map(|level| {
                 let size = (SKY_FACE >> level).max(1);
-                let params = params(level, panorama.is_some());
+                let params = Params {
+                    p: params(level, panorama.is_some()),
+                    sky: *sky,
+                };
                 let buffer = &self.params[level as usize];
-                queue.write_buffer(buffer, 0, bytemuck::cast_slice(&params));
+                queue.write_buffer(buffer, 0, bytemuck::bytes_of(&params));
                 let group = self.group(
                     device,
                     buffer,
