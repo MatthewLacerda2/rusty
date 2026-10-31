@@ -9,13 +9,6 @@
 pub(super) const WAIVERS: &[(&str, &str, &str)] = &[
     (
         "mesh",
-        "add_menu",
-        "Mesh is assigned by dragging an asset from the content grid / the render \
-         inspector, not picked from the Add Component menu — a blank mesh slot is \
-         meaningless. Authoring stays content-driven (CLAUDE.md: glTF/OBJ sources).",
-    ),
-    (
-        "mesh",
         "api",
         "Mesh geometry is content (glTF/OBJ), not a scriptable scalar surface; \
          swapping meshes at runtime is out of the script API's scope. Material \

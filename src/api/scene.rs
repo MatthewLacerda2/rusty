@@ -139,9 +139,7 @@ fn register_components<'scope>(
         "AddComponent",
         scope.create_function(|_, (id, kind): (EntityArg, String)| {
             let id = id.live("Scene", "AddComponent")?;
-            let parsed = ComponentKind::parse(&kind).ok_or_else(|| {
-                mlua::Error::RuntimeError(format!("unknown component '{}'", kind))
-            })?;
+            let parsed = ComponentKind::parse_or_list(&kind).map_err(mlua::Error::RuntimeError)?;
             Ok(authoring::add_component(
                 &mut scene.borrow_mut(),
                 id,
@@ -155,9 +153,7 @@ fn register_components<'scope>(
         "RemoveComponent",
         scope.create_function(|_, (id, kind): (EntityArg, String)| {
             let id = id.live("Scene", "RemoveComponent")?;
-            let parsed = ComponentKind::parse(&kind).ok_or_else(|| {
-                mlua::Error::RuntimeError(format!("unknown component '{}'", kind))
-            })?;
+            let parsed = ComponentKind::parse_or_list(&kind).map_err(mlua::Error::RuntimeError)?;
             Ok(authoring::remove_component(
                 &mut scene.borrow_mut(),
                 id,

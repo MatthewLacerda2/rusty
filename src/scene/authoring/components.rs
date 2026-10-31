@@ -40,6 +40,7 @@ component_kinds! {
     /// ([`add_script`](super::add_script), `Scene.AddScript`).
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum ComponentKind {
+        Mesh,
         Light,
         Animator,
         Collider,
@@ -109,6 +110,7 @@ impl ComponentKind {
     /// names the menu uses (e.g. `RigidBody`, `Texture`, `NavMeshAgent`).
     pub fn parse(name: &str) -> Option<Self> {
         match name.to_lowercase().as_str() {
+            "mesh" | "meshfilter" | "meshrenderer" => Some(Self::Mesh),
             "light" => Some(Self::Light),
             "animator" => Some(Self::Animator),
             "collider" => Some(Self::Collider),
@@ -143,6 +145,16 @@ impl ComponentKind {
             _ => None,
         }
     }
+
+    /// [`parse`](Self::parse), with an unknown name an error that lists every kind
+    /// (by the name `parse` takes first): the message `Scene.AddComponent` and
+    /// `Scene.RemoveComponent` raise.
+    pub fn parse_or_list(name: &str) -> Result<Self, String> {
+        Self::parse(name).ok_or_else(|| {
+            let kinds: Vec<String> = Self::ALL.iter().map(|k| format!("{k:?}")).collect();
+            format!("unknown component '{name}' (kinds: {})", kinds.join(", "))
+        })
+    }
 }
 
 /// Attach a first-class component of `kind` to entity `id` with the inspector's
@@ -172,7 +184,7 @@ pub fn remove_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scene::authoring::create_entity;
+    use crate::scene::authoring::{create_entity, Primitive};
 
     #[test]
     fn add_remove_component_with_cascades() {
@@ -226,5 +238,42 @@ mod tests {
             Some(ComponentKind::Audio)
         );
         assert_eq!(ComponentKind::parse("nope"), None);
+    }
+
+    #[test]
+    fn an_unknown_kind_lists_the_kinds() {
+        let err = ComponentKind::parse_or_list("Meshh").unwrap_err();
+        assert!(err.starts_with("unknown component 'Meshh' (kinds: Mesh, Light,"));
+        assert!(err.contains("Texture") && err.ends_with("Shape)"), "{err}");
+        assert_eq!(
+            ComponentKind::parse_or_list("MeshRenderer"),
+            Ok(ComponentKind::Mesh)
+        );
+    }
+
+    #[test]
+    fn removing_a_mesh_keeps_the_entity_and_its_collider() {
+        let mut scene = Scene::new();
+        let id = create_entity(&mut scene, "Blockout", Some(Primitive::Box));
+        add_component(&mut scene, id, ComponentKind::Collider);
+        add_component(&mut scene, id, ComponentKind::Texture);
+        assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
+        let w = &scene.world;
+        assert!(!w.has_mesh(id) && w.has_collider(id), "collider stays");
+        assert!(!w.has_material(id), "the renderer's material goes with it");
+        // Removing again is a no-op success; a missing entity is not.
+        assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
+        assert!(!remove_component(&mut scene, 9999, ComponentKind::Mesh));
+    }
+
+    #[test]
+    fn adding_a_mesh_attaches_the_default_box() {
+        let mut scene = Scene::new();
+        let id = create_entity(&mut scene, "Empty", None);
+        assert!(add_component(&mut scene, id, ComponentKind::Mesh));
+        let mesh = scene.world.mesh(id).expect("a mesh");
+        assert_eq!(mesh.primitive_type, "Box");
+        assert!(!mesh.vertices.is_empty());
+        assert!(!scene.world.has_material(id), "a Mesh adds no Material");
     }
 }

@@ -1,4 +1,4 @@
-//! Tests for the component dependency mechanism (`dependency.rs`, #359).
+//! Tests for the component dependency mechanism (`dependency`, #359).
 
 use super::*;
 use crate::scene::authoring::create_entity;

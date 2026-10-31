@@ -3,7 +3,7 @@
 //! lives in `has_kind`'s match arms. This reads those arms as the kind → field map.
 
 /// The file holding `authoring::has_kind`, whose arms map a kind to its guard.
-pub(super) const HAS_KIND: &str = "src/scene/authoring/dependency.rs";
+pub(super) const HAS_KIND: &str = "src/scene/authoring/dependency/dispatch.rs";
 
 /// The Add menu source plus, for every `ComponentKind::<Kind>` it names, the
 /// `.has_<field>(id)` guard `has_kind` resolves that kind to — so an entry in the
