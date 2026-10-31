@@ -102,7 +102,7 @@ pub fn path(out: &Path) -> std::io::Result<PathBuf> {
         ),
     };
     let key = paths::to_slash(key);
-    Ok(locks.join(format!("{:016x}.lock", hash::fnv1a64(key.as_bytes()))))
+    Ok(locks.join(format!("{:016x}.lock", hash::content(key.as_bytes()))))
 }
 
 /// The project root whose import cache holds `cache`, if one does.

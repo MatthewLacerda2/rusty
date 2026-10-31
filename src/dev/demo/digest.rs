@@ -19,14 +19,14 @@ pub fn due(t: u64) -> bool {
     (t + 1).is_multiple_of(EVERY)
 }
 
-/// FNV-1a, 64-bit, fed field by field (the same function as `core::hash`).
-struct Fnv(u64);
+/// The fields, gathered into one buffer for [`crate::core::hash::content`]: one
+/// xxh3 pass, not a byte-at-a-time hash run at opt-level 0 (#1326).
+#[derive(Default)]
+struct Fields(Vec<u8>);
 
-impl Fnv {
+impl Fields {
     fn bytes(&mut self, bytes: &[u8]) {
-        for b in bytes {
-            self.0 = (self.0 ^ u64::from(*b)).wrapping_mul(0x0000_0100_0000_01b3);
-        }
+        self.0.extend_from_slice(bytes);
     }
 
     fn u64(&mut self, x: u64) {
@@ -42,7 +42,7 @@ impl Fnv {
 
 /// The world's state as one hex string.
 pub fn of(world: &GameWorld) -> String {
-    let mut h = Fnv(0xcbf2_9ce4_8422_2325);
+    let mut h = Fields::default();
     let scene = world.scene().borrow();
     let ecs = &scene.world;
     for &id in ecs.ids() {
@@ -65,15 +65,16 @@ pub fn of(world: &GameWorld) -> String {
     h.u64(world.play_frame());
     h.u64(world.resources.time.borrow().time.to_bits());
     h.u64(world.script_manager().random_state());
-    format!("{:016x}", h.0)
+    format!("{:016x}", crate::core::hash::content(&h.0))
 }
 
 #[cfg(test)]
 mod tests {
     #[test]
-    fn the_streamed_hash_is_fnv1a() {
-        let mut h = super::Fnv(0xcbf2_9ce4_8422_2325);
-        h.bytes(b"a");
-        assert_eq!(h.0, crate::core::hash::fnv1a64(b"a"));
+    fn the_fields_are_laid_out_little_endian() {
+        let mut h = super::Fields::default();
+        h.u64(1);
+        h.floats(&[1.0]);
+        assert_eq!(h.0, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80, 0x3f]);
     }
 }

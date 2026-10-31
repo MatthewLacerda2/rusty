@@ -13,7 +13,7 @@ use super::{cache, cache_file, fit, format_of, open, reader, shrink, TextureKind
 use crate::asset::convert::{self, Seen};
 use crate::asset::{is_image_path, sidecar};
 use crate::core::fs::written::Stale;
-use crate::core::hash::fnv1a64;
+use crate::core::hash::content;
 
 /// Make the compressed cache of the image at `source` current, encoding it on
 /// every core when it is missing or stale. Returns whether it encoded; `false` too
@@ -56,7 +56,7 @@ fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, Strin
     // may have just made this cache. The stamp is made from the bytes encoded.
     let _lock = convert::lock_cache(&out);
     let bytes = std::fs::read(source).map_err(|e| named(&e))?;
-    let stamp = cache::stamp(fnv1a64(&bytes), &settings);
+    let stamp = cache::stamp(content(&bytes), &settings);
     if cache::is_current(&out, stamp) {
         return Ok(false);
     }

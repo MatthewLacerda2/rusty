@@ -30,7 +30,7 @@ fn a_path_that_is_not_utf8_is_refused() {
 fn a_file_is_read_with_its_digest() {
     let file = crate::test_temp::dir().join("skin.png");
     std::fs::write(&file, b"red").unwrap();
-    let digest = crate::core::hash::fnv1a64(b"red");
+    let digest = crate::core::hash::content(b"red");
     assert_eq!(Dependency::look(&file).unwrap().seen(), Seen::Read(digest));
 }
 
@@ -40,10 +40,10 @@ fn a_file_the_engine_rewrites_is_read_again_at_the_same_length() {
     std::fs::write(&file, b"red").unwrap();
     assert_eq!(
         Dependency::look(&file).unwrap().seen(),
-        Seen::Read(crate::core::hash::fnv1a64(b"red"))
+        Seen::Read(crate::core::hash::content(b"red"))
     );
     // Same length: only the write log tells the memo the file changed (#1219).
     crate::core::fs::written::write(&file, b"tan").unwrap();
-    let digest = crate::core::hash::fnv1a64(b"tan");
+    let digest = crate::core::hash::content(b"tan");
     assert_eq!(Dependency::look(&file).unwrap().seen(), Seen::Read(digest));
 }
