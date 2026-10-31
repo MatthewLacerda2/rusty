@@ -112,13 +112,15 @@ off the link. It is poll-only: there is no callback. A one-way link (every gener
 is never crossed backwards, so a drop is never climbed back up.
 
 ```lua
-function Update()
-  if NavMeshAgent.IsOnOffMeshLink(self.id) then
-    local link = NavMeshAgent.GetCurrentOffMeshLink(self.id)
+local M = {}
+function M.Update(id, dt)
+  if NavMeshAgent.IsOnOffMeshLink(id) then
+    local link = NavMeshAgent.GetCurrentOffMeshLink(id)
     -- play the climb for link.type, move toward link.endPos, then:
-    NavMeshAgent.CompleteOffMeshLink(self.id)
+    NavMeshAgent.CompleteOffMeshLink(id)
   end
 end
+return M
 ```
 
 ### Local avoidance (#463)

@@ -155,8 +155,8 @@ impl Renderer {
             return false;
         }
         // During a static-cubemap capture, gather only static geometry — dynamic
-        // actors must not bake into a probe/reflection (#243), mirroring the
-        // shadow pass's `want_static` filter.
+        // actors must not bake into a probe/reflection (#243), as the static shadow
+        // sweeps take static casters only (`passes::shadows::casters::sweep`).
         if self.capture.static_only && !scene.world.is_static(id) {
             return false;
         }

@@ -20,7 +20,7 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.SetLifetime` | `(id, min, max?)` | — (seconds, clamped ≥ 0) |
 | `Particles.SetSpeed` | `(id, min, max?)` | — (a range with a NaN or infinite end is ignored, as for every range here) |
 | `Particles.SetSize` | `(id, min, max?)` | — (start size, clamped ≥ 0) |
-| `Particles.SetColor` | `(id, r, g, b, a?)` | — (start tint; `a` defaults to 1; a NaN or infinite channel is ignored) |
+| `Particles.SetColor` | `(id, r, g, b, a?)` | — (start tint; `a` defaults to 1; a NaN or infinite channel leaves the tint as it was) |
 | `Particles.SetSubEmitter` | `(id, trigger, target?)` | `bool` (false for an unknown trigger) |
 | `Particles.SetRenderMode` | `(id, mode)` | `bool` (false for an unknown mode) |
 | `Particles.GetRenderMode` | `(id)` | mode name, or `nil` without an emitter |
@@ -79,7 +79,9 @@ Particles.Burst(muzzle_flash) -- stays on the gun while the player turns
 ```
 
 **Sub-emitters.** `trigger` is `"birth"`, `"death"` or `"collision"`; `target` is
-another entity with an emitter (usually an inactive child), or `nil` to clear.
+another entity with an emitter (usually a child whose own emission is off,
+`Particles.SetActive(target, false)`), or `nil` to clear. The target entity must be
+active in the hierarchy: an inactive one never fires.
 When one of this emitter's particles is born, dies or hits a collider (the
 emitter's collision response must not be `None`), the target fires its
 `burst_count` at that particle's position, inheriting the fraction of its velocity

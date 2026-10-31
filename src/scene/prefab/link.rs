@@ -1,4 +1,4 @@
-//! src/scene/prefab_link.rs — linked prefab instances: live link operations (#216).
+//! src/scene/prefab/link.rs — linked prefab instances: live link operations (#216).
 //!
 //! The verbs that act on an already-stamped **linked** instance (one whose entities
 //! carry a [`PrefabLink`](crate::components::PrefabLink)): list its per-instance

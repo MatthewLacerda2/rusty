@@ -6,10 +6,11 @@
 //! per-draw uniforms at a 256-byte stride, joint matrices, instances, and the material
 //! records the uniforms index (#1616) — written with a `write_buffer` each, behind
 //! **one** bind group whose dynamic offset picks a batch's uniform. The material array
-//! is written only when its bytes differ from the last upload, so a scene whose
-//! materials hold still uploads them once. Nothing is keyed by entity, so two scenes rendered in one frame
-//! (#355) cannot evict each other: each render simply rewrites the arrays before its
-//! own submit.
+//! is written only when its bytes differ from the last upload, so a camera whose
+//! visible materials hold still does not rewrite it; the buffers are the renderer's,
+//! so cameras that see different materials rewrite it in turn. Nothing is keyed by
+//! entity, so two scenes rendered in one frame (#355) cannot evict each other: each
+//! render simply rewrites the arrays before its own submit.
 //!
 //! The joint matrices are one storage array (#455), not a fixed 64-matrix uniform: a
 //! skinned draw's palette is its run of the array, as long as its skin, and the draw's

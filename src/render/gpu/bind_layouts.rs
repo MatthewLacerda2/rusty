@@ -16,8 +16,9 @@ use super::layout_entries::{
 /// sRGB (11) and raw (12) views and its sampler (13), and the baked lightmap pages (14)
 /// with their sampler (15, #438) and direction pages (16, #810). Binding 6 is the shadow module's (see `shader.wgsl`).
 /// The cube array holds the resident probes' baked, prefiltered cubemaps, one per layer
-/// (#245, #1206); a draw's instance names its probe, and the shader samples that layer
-/// (parallax-corrected, roughness->mip), or the sky's cube when it has none.
+/// (#245, #1206); a draw's instance names the two probes it blends (#1584), and the
+/// shader samples their layers (parallax-corrected, roughness->mip) and the sky's
+/// cube for the weight they leave.
 pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     use wgpu::TextureViewDimension::{Cube, CubeArray, D2Array};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -122,11 +123,12 @@ fn material_sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-/// Group 2 (per-entity material): albedo (0) and its sampler (1), metallic map (2),
-/// roughness map (3), normal map (4), emissive map (5), and the material's runtime
-/// shader params (6, #399) — a fixed `array<vec4<f32>, 16>` uniform only a surface
-/// variant with runtime params reads — then one texture per extra shader slot (7 =
-/// `mask`, #400), which only a variant with a block sampling it reads. Every
+/// Group 2 (one per distinct material map set, #470): albedo (0) and its sampler
+/// (1), metallic map (2), roughness map (3), normal map (4), emissive map (5), and
+/// the material's runtime shader params (6, #399) — a fixed `array<vec4<f32>, 16>`
+/// uniform only a surface variant with runtime params reads — then one texture per
+/// extra shader slot (7 = `mask`, #400), which only a variant with a block sampling
+/// it reads. Every
 /// texture but albedo has its own sampler at `textures::sampler_binding` (16 past
 /// it), the wrap and filter of its import settings (#1323). This is the layout the
 /// forward pass's group(2) is built against (#202, #207).

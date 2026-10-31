@@ -1,4 +1,4 @@
-//! src/editor/inspector/components/settings.rs — the Scene Settings inspector panel.
+//! src/editor/inspector/components/settings/ — the Scene Settings inspector panel.
 //!
 //! Shown when nothing is selected: the project-level scalars (skybox, ambient
 //! light, routed through `authoring::environment` like `Lighting.Set*`, #1612), the

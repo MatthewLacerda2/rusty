@@ -152,14 +152,11 @@ def judge(
         if not any(changes.drift_ran(r, jobs) for r in ci):
             return False, [
                 f"`ci` passed on {sha[:7]}, but it never ran the doc-drift tests.",
-                "Every change here is Markdown, so CI skipped its build steps —"
-                " and one of them is under `docs/api/`, which"
-                " `tests/api_doc_drift.rs` and `tests/callback_doc_drift.rs`"
-                " parse. CLAUDE.md treats that directory as code; CI's filter does"
-                " not yet (#525).",
-                "Run `cargo test --features dev --test api_doc_drift --test"
-                " callback_doc_drift` and push any non-Markdown change alongside"
-                " it, or land #525 first.",
+                "Every change here is Markdown, and one is a doc the tests read"
+                f" ({', '.join(changes.CODE_DOCS)}), which CI's `code` filter counts as code"
+                " (#525), so its build steps should have run.",
+                "Re-run `ci` on this head; locally, `make test` runs the"
+                " drift tests (one `integration` binary, `autotests = false`).",
                 *lines,
             ]
     elif changes.markdown_only(files):

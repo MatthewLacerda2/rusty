@@ -41,10 +41,10 @@ A Markdown-only pull request passes that test honestly: `build-test` and `lint`
 still *run*, with their steps skipped, and report success (#218 is why the jobs
 run rather than skip). Nothing compiled, by design, and the verdict says so.
 
-**Except the scripting-API reference, `docs/api/`.** Two hard-gate tests parse it,
-so CLAUDE.md treats a pull request touching it as code. CI's `code` filter does not (#525):
-a pull request whose changes are all Markdown skips every step, drift tests
-included. So when such a pull request touches that directory, the pass additionally
-needs the `build-test` step that runs the dev-feature tests to have concluded
-success ([`changes.drift_ran`]) — which today it cannot, and the refusal says why.
+**Except the Markdown code reads ([`changes.CODE_DOCS`]):** `docs/api/`, which the
+API-doc drift, layout and example tests parse, and the two files `session-mcp` and the
+build embed. CLAUDE.md treats a pull request touching one as code, and since #525 so
+does CI's `code` filter, so its build steps run. The pass still asks for proof: when
+every change is Markdown and one is a code doc, the `build-test` step that runs the
+dev-feature tests must have concluded success ([`changes.drift_ran`]).
 """

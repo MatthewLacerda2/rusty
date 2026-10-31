@@ -410,4 +410,4 @@ Material.SetShader(enemy, "enemy_toon")  -- the enemy's material now renders wit
 > **Faithfulness:** the read-site is the engine's `ShaderRegistry` — the same loader
 > the shipped shaders use. The module is validated through that identical `naga_oil`
 > compose path **at bake**, so a baked variant is, by construction, one the engine can
-> load. See `docs/api-faithfulness.md`.
+> load.

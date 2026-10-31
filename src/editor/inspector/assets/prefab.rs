@@ -1,4 +1,4 @@
-//! src/editor/inspectors/prefab.rs — `.prefab` asset inspector (#215).
+//! src/editor/inspector/assets/prefab.rs — `.prefab` asset inspector (#215).
 //!
 //! Mirrors the model inspector: a metadata card plus an "Instantiate into Scene"
 //! button. Instantiate routes through the shared `scene::prefab` verbs (load +

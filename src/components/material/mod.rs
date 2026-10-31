@@ -1,4 +1,4 @@
-//! src/components/material.rs — Material asset + the entity's reference to it.
+//! src/components/material/mod.rs — Material asset + the entity's reference to it.
 //!
 //! A *material* is an authored/imported asset (glTF 2.0 metallic-roughness data):
 //! its values live ONCE in the per-World material library (`Scene.materials`), and

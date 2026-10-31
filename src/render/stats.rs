@@ -115,11 +115,13 @@ pub struct RenderCounters {
     /// Views whose grading LUT was rebaked this frame (#1440): a grading knob or
     /// the tonemap changed, or the view is new. `0` on every frame the grade holds.
     pub grade_lut_bakes: u32,
-    /// Sky reflection cubes baked this frame (#1553): a new panorama, or the first
-    /// frame showing the procedural sky. `0` on every frame the sky holds.
+    /// Sky reflection cubes baked this frame (#1553): a new panorama, or procedural
+    /// sky settings no cube holds (#1620: the first procedural frame, or a settings
+    /// change). `0` on every frame the sky holds.
     pub sky_reflection_bakes: u32,
     /// Opaque copies made this frame (#1523), Unity's *Opaque Texture*: one per
-    /// camera whose visible translucents refract or absorb, `0` on every other.
+    /// camera whose visible translucents refract or absorb, or trace SSR on a camera
+    /// running it (#1570); `0` on every other.
     pub opaque_copies: u32,
     /// GPU bytes of the image textures the renderer holds by path (material maps,
     /// UI images, particle textures, render textures) and the uncompressed copies

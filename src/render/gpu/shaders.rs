@@ -1,4 +1,4 @@
-//! src/render/shaders.rs — runtime WGSL loader backed by naga_oil.
+//! src/render/gpu/shaders.rs — runtime WGSL loader backed by naga_oil.
 //!
 //! [`ShaderRegistry`] reads `.wgsl` files from disk at runtime (not via
 //! `include_str!`) and pre-processes them through a `naga_oil` [`Composer`]

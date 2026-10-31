@@ -14,7 +14,8 @@
 //! compressed copy is made current first and shipped beside it (#1574), so the
 //! player never encodes a texture nor writes one into its install. Every baked
 //! shader stale against the engine's shaders is re-baked from its recipe the same
-//! way (#1638, `shadergen::rebake::refresh_all`), so the player composes none.
+//! way (#1638, `shadergen::rebake::refresh_all`), so the player composes none; one
+//! that fails is warned of and shipped stale, and the player re-composes it.
 //!
 //! What is copied: `project.rusty` (the build settings, and the mark that makes
 //! the import cache project-relative), the seed manifest, everything under

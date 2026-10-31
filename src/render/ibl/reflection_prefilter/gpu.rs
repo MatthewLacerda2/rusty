@@ -2,10 +2,10 @@
 //! as a texture array, every rough mip convolved in one compute pass
 //! (`ibl/probe_prefilter.wgsl`), and the chain read back for the KTX2 encode.
 //!
-//! The CPU [`prefilter`](super::prefilter) stays the reference: the shader is it
+//! The CPU `cpu::prefilter` (test-only) stays the reference: the shader is it
 //! texel for texel (the same face matrices, nearest-texel lookup and sample count),
 //! and a GPU test holds the two within a written tolerance. At a probe's 512-texel
-//! default the CPU pass is ≈ 50 M samples on one core; here it is one dispatch.
+//! default the CPU pass is ≈ 50 M samples on one core; here it is one compute pass.
 
 use super::{mip_count, PrefilteredCubemap, SAMPLE_COUNT};
 use crate::render::gpu::shaders::ShaderRegistry;

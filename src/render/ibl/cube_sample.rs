@@ -1,4 +1,4 @@
-//! src/render/cube_sample.rs — CPU-side cubemap direction <-> texel mapping (#245).
+//! src/render/ibl/cube_sample.rs — CPU-side cubemap direction <-> texel mapping (#245).
 //!
 //! The CPU GGX prefilter (`reflection_prefilter::cpu`, the reference the bake's GPU
 //! one is held to, #1602) needs two pure operations over a

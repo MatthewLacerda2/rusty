@@ -28,7 +28,8 @@ render the 3D scene at fewer pixels and keep the HUD native, set
 surface renders the scene at the 1× pixel count, and the UI stays sharp.
 
 Settings persist through the `video` `Storage` namespace
-(loaded at startup, flushed on Stop / quit), so the app relaunches as last set. In
+(loaded at startup, written back when the app quits; Stop does not store them), so
+the app relaunches as last set. In
 the headless harness there is no window/surface, so the setters are inert.
 
 **Determinism.** Like `Graphics`, every `Video` write is **one-way** into

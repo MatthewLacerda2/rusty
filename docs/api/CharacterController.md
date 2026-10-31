@@ -50,7 +50,7 @@ then (`0, 1, 0` when airborne). Getters return a neutral default (`false`, zeros
 | `CharacterController.GetMinMoveDistance` / `SetMinMoveDistance` | `(id)` / `(id, metres)` | moves shorter than this do nothing (≥ 0) |
 
 A NaN or infinite value (`math.huge`) takes the setter's floor: `0`, or `0.0001` for
-the radius and skin width.
+the radius and skin width. `SetCenter` with a NaN or infinite part keeps the old centre.
 
 Defaults are Unity's: height `2`, radius `0.5`, centre `0, 0, 0`, step offset `0.3`,
 slope limit `45`, skin width `0.08`, min move distance `0.001`.

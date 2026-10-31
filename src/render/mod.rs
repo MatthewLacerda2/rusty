@@ -140,15 +140,16 @@ pub struct Renderer {
     pub camera_lighting_layout: wgpu::BindGroupLayout,
     pub entity_bones_layout: wgpu::BindGroupLayout,
     pub texture_layout: wgpu::BindGroupLayout,
-    /// Expanded group(2) layout (albedo + sampler + metallic + roughness maps) the
-    /// forward pass binds a per-entity material bind group against (#202).
+    /// Expanded group(2) layout (the material maps, their samplers and the shader
+    /// slots, `gpu::bind_layouts`) each cached material bind group is built against (#202).
     pub material_layout: wgpu::BindGroupLayout,
 
     // Buffers and Bind Groups (Global)
     camera_buffer: wgpu::Buffer,
     lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
-    /// Rebuild the group-0 bind group only when the skybox it binds changed, not every
+    /// Rebuild the group-0 bind group only when something it binds changed (the sky
+    /// cube, the probe array, a regrown light/decal buffer, the lightmap pages), not every
     /// camera every frame — its camera/lighting buffers are persistent (#210).
     global_bind_group_dirty: bool,
     /// Group 0 kept for the procedural sky slot not bound (#1620).
@@ -189,10 +190,11 @@ pub struct Renderer {
     pub white_texture: Rc<GpuTexture>,
     /// Draws every uploaded image's mip chain (#1322).
     pub(crate) mip_generator: gpu::textures::MipGenerator,
-    /// A group(2) material bind group whose three texture slots all point at
-    /// `default_texture` — used by the editor-grid and gizmo passes, which never
-    /// sample the maps (they render unlit / use the default checker) but still must
-    /// supply a bind group matching the expanded `material_layout` (#202).
+    /// A group(2) material bind group whose five map slots point at
+    /// `default_texture` (its shader slots at `white_texture`) — used by the
+    /// editor-grid and gizmo passes, which never sample the maps (they render unlit /
+    /// use the default checker) but still must supply a bind group matching the
+    /// expanded `material_layout` (#202).
     pub default_material_bind_group: wgpu::BindGroup,
 
     grid_vertex_buffer: Option<wgpu::Buffer>,
@@ -208,7 +210,7 @@ pub struct Renderer {
     pub skybox_texture: Option<Rc<GpuTexture>>,
     pub skybox_path: String,
     /// The reflection probes the frame shades with (#1206): the nearest baked probes'
-    /// cubes in one cube array at group-0 binding 4, and the slot each draw reads.
+    /// cubes in one cube array at group-0 binding 4, and the slots each draw blends.
     reflection_probes: reflection_probes::ProbeArray,
     /// The sky's prefiltered reflection cubes at group-0 binding 2 (#1553).
     sky_reflection: sky_cube::SkyReflection,
@@ -217,7 +219,8 @@ pub struct Renderer {
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
     /// The forward pass's group 3 with the white no-AO fallback: every pass that
-    /// draws without SSAO (the transparent pass, a frame with SSAO off) binds this.
+    /// draws without SSAO (the transparent pass, SSAO off, a stacked DepthOnly camera)
+    /// binds this.
     pub shadow_bind_group: wgpu::BindGroup,
     /// The opaque copy's pass, stand-in and sampler (#1523): every group 3 binds the
     /// stand-in but a transparent pass whose camera copied

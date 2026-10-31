@@ -80,7 +80,8 @@ so the same level always yields the same layout):
   baked **nav surface**'s walkable XZ extent (raised by a few units of headroom so probes
   cover the air actors move through), intersected with the static-geometry AABB. When no
   nav surface has been baked, it **falls back to the static-geometry AABB** alone.
-  `probeSpacing` (default `4.0`) is the grid cell size in world units.
+  `probeSpacing` (default `4.0`) is the grid cell size in world units; a smaller one
+  (or NaN) is held to `0.5`.
 - **Reflection probes** — **one per room** (#1584). The floor plan comes from the baked
   **nav surface** (each cell's lowest walkable floor and the underside above it), or,
   with none, from the static colliders' bounds. It is cut into rooms where it narrows

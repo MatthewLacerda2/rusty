@@ -1,4 +1,4 @@
-//! src/editor/viewport_pick.rs — screen→world ray + click-to-select (#183).
+//! src/editor/viewport/pick.rs — screen→world ray + click-to-select (#183).
 //!
 //! Maps a pointer position inside the Scene viewport to a world-space ray using the
 //! editor camera's view-projection (the same matrix the renderer draws with), then

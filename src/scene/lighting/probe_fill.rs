@@ -1,4 +1,4 @@
-//! src/scene/probe_fill.rs — Analytic SH fill for light probes (testing stand-in).
+//! src/scene/lighting/probe_fill.rs — Analytic SH fill for light probes (testing stand-in).
 //!
 //! This is the deterministic, render-free stand-in for the real probe bake (#241).
 //! It projects the scene's environment — the flat skybox/ambient term plus the

@@ -35,7 +35,7 @@ wallbangs, grenades, and multi-floor maps with jump spots, drops and ladders. ru
   and values. Entering Play runs on a *clone*, and Stop restores your edits, so
   edit-mode is always what gets saved.
 - **Scriptable against one stable API.** Gameplay calls a single set of namespaces —
-  `Transform`, `Input`, `Time`, `Physics`, `Scene`, `Camera`, `Nav`,
+  `Transform`, `Input`, `Time`, `Physics`, `Scene`, `Camera`, `Navigation`,
   `Animator`, `Material`. See [`docs/api/`](docs/api/index.md).
 - **A real 3D engine underneath:** rendering, physics (rapier3d), navigation/navmesh,
   shadows, a skybox, and a post-processing chain.
@@ -100,7 +100,7 @@ to a shader only once it is baked again (`Shader.Bake`).
 
 The headline feature: the entire simulation runs **headlessly** — no window, no GPU —
 because the sim knows nothing about rendering. So a coding agent can play your game
-and report back instead of you opening the app every time. Four pieces, all speaking
+and report back instead of you opening the app every time. Five pieces, all speaking
 the same API as gameplay, all compiled out of a shipped build (the `dev` feature):
 
 - **Harness** — steps the game at full speed for as many ticks as you want, then dumps
@@ -237,10 +237,12 @@ between two spawns (a ramp at each end, translucent water you walk through), a r
 jacuzzi you jump into, and crates for cover. The Player starts at one end, and Enemy_1
 starts behind a crate at the other and chases it down one ramp and up the other.
 Seeding also bakes the scene's checker texture (`assets/textures/`) and an
-example surface shader, `default_rim`, with its recipe (`assets/shaders/`). Files you
-edited are never overwritten, and a default scene you delete stays deleted, as Unity
-never recreates a template's `SampleScene` (#1618). To get the current default scene
-back, use File ▸ Reset Scene and save it.
+example surface shader, `default_rim`, with its recipe (`assets/shaders/`). A default
+scene you never edited follows the engine's newer one on a later launch; one you
+edited is kept. The shader is re-baked from its recipe whenever the engine's shaders
+change (#1638), so edit its recipe, not its `.wgsl`. A default scene you delete
+stays deleted, as Unity never recreates a template's `SampleScene` (#1618). To get
+the current default scene back, use File ▸ Reset Scene and save it.
 
 The editor opens on the scene this machine last had open for the project (remembered
 in `cache/last_scene`, never in `project.rusty`), then on the build's startup scene,

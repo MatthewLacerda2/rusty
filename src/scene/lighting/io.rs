@@ -1,4 +1,4 @@
-//! src/scene/lighting_io.rs — the `<scene>.lighting.json` SH sidecar.
+//! src/scene/lighting/io.rs — the `<scene>.lighting.json` SH sidecar.
 //!
 //! Mirrors the scene ↔ sidecar split: the scene document stores probe POSITIONS +
 //! grid layout (human-diffable references/values); the heavy baked SH lives here, in

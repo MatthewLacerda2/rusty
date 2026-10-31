@@ -1,4 +1,4 @@
-//! src/editor/viewport.rs — the Unity-style Scene/Game viewport panel (#183).
+//! src/editor/viewport/ — the Unity-style Scene/Game viewport panel (#183).
 //!
 //! The 3D scene is rendered to an offscreen texture (one per tab, the editor
 //! frontend's `viewport_views`) and shown here inside an `egui::Image` in the central

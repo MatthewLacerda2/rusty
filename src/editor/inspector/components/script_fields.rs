@@ -1,4 +1,4 @@
-//! src/editor/inspector_script_fields.rs — schema-driven script inspector (#84).
+//! src/editor/inspector/components/script_fields.rs — schema-driven script inspector (#84).
 //!
 //! Renders a typed egui control per field declared in a Lua script's optional
 //! `fields` schema (parsed by `scripting::schema`) — sliders for `[Range]`,

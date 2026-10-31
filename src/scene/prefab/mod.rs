@@ -3,8 +3,9 @@
 //! A *prefab* is a saved **GameObject subtree** — a root entity plus its whole child
 //! hierarchy, every component configured, every asset reference intact — kept in its
 //! own `.prefab` asset so it can be stamped into any scene as an independent copy. v1
-//! is **unpacked**: each instance is a plain copy with no live link back to the asset
-//! (linked instances + overrides are the deferred follow-up #216). Like `SceneData`,
+//! is **unpacked**: each instance is a plain copy with no live link back to the asset;
+//! a **linked** instance (#216, [`instantiate_prefab_linked`]) keeps one, its edits
+//! kept as overrides (#1527). Like `SceneData`,
 //! a `PrefabData` is references-only: component VALUES + the material-library slice,
 //! never GPU buffers — meshes rehydrate from `primitive_type`/`asset_ref`.
 //!

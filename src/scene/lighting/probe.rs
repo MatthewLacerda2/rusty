@@ -1,4 +1,4 @@
-//! src/scene/probe.rs — Light-probe data model + trilinear sampling.
+//! src/scene/lighting/probe.rs — Light-probe data model + trilinear sampling.
 //!
 //! A light probe captures the bounced/ambient light arriving at a point as an L2
 //! SH irradiance signal (see `sh.rs`). Probes are a SCENE-LEVEL DATASET, not a

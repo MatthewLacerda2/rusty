@@ -89,7 +89,7 @@ every file and row.
   io layout or `PostFx::run`. A `view` of `None` binds one shared black texel, so the
   function must draw nothing when it reads black (bloom's dirt, the lens flare), and
   an effect that is off skips the fetch on a slot's on flag, as bloom and the flare
-  do (`p.w`), so it costs nothing per pixel. It samples with the chain's own samplers (`s_color`, `s_skybox`). The `dummy`
+  do (`p.w`), so per pixel it costs a uniform branch, not a texture read. It samples with the chain's own samplers (`s_color`, `s_skybox`). The `dummy`
   declares one, never provided.
 - **Gate** — its `PostEffect::gate`: the player option, when it is player-facing.
   It asks through `EffectCx::runs(EFFECT.gate, on)`; no shared `match` names it. No

@@ -1,4 +1,4 @@
-// assets/shaders/shadow_atlas.wgsl — the point/spot shadow atlas's tile blits (#694).
+// engine/shaders/shadow_atlas.wgsl — the point/spot shadow atlas's tile blits (#694).
 //
 // WebGPU copies depth only as whole subresources and clears only whole attachments,
 // so an atlas tile (a sub-rectangle) is copied and cleared by drawing: one

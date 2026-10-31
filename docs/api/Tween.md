@@ -129,7 +129,9 @@ that order.
 entity is **deactivated**, **destroyed**, or unloaded by `Scene.Load` (a
 `Scene.DontDestroyOnLoad` survivor keeps its tweens), or when the tweened
 component is removed. They are runtime state, **not scene data**: every Play
-starts with none, and Stop restores the edit snapshot. `Timer.Cancel` and
+starts with none, and Stop restores the edit snapshot. Started in edit mode, a tween
+never moves (the timer phase runs only in Play) and Play clears it, but its `from`
+is still written at once, as an edit. `Timer.Cancel` and
 `Timer.IsPending` also accept a tween handle (one handle space); `Tween.Kill`
 touches only tweens.
 

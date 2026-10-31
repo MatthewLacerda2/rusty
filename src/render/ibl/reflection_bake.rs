@@ -1,12 +1,13 @@
-//! src/render/reflection_bake.rs — Reflection-probe bake driver (#245).
+//! src/render/ibl/reflection_bake.rs — Reflection-probe bake driver (#245).
 //!
 //! The specular sibling of the light-probe bake (`probe/bake.rs`). For each reflection
 //! probe it captures the STATIC scene to a 6-face cubemap from the probe position
-//! (`capture_static_cubemap`, #243), GGX-prefilters it into a roughness mip chain
-//! (`reflection_prefilter`, on the GPU since #1602), encodes the result to KTX2 (`ktx2_encode`), writes that file
-//! next to the scene, and stores its path on the probe (the `cubemap_path` field from
-//! #244). Each frame loads it through the probe array's cubemap cache
-//! (`Renderer::cached_cubemap`), and the forward pass reflects it.
+//! (`capture_reflection_cubemap`, #243, #1584), GGX-prefilters it into a roughness mip
+//! chain (`reflection_prefilter`, on the GPU since #1602), encodes the result to KTX2
+//! (`ktx2_encode`), writes that file next to the scene, and stores its path on the
+//! probe (the `cubemap_path` field from #244). The probe array copies it in while the
+//! probe is near the camera (`Renderer::update_reflection_probes`), and the forward
+//! pass reflects it.
 //!
 //! Each probe bakes at its own resolution, or the scene's default
 //! (`LightingSettings::reflections`), through its own lens: its clip planes and

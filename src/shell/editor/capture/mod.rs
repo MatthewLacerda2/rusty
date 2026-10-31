@@ -1,9 +1,9 @@
-//! src/shell/editor/capture.rs — the whole editor, offscreen, to a PNG (#731).
+//! src/shell/editor/capture/ — the whole editor, offscreen, to a PNG (#731).
 //!
 //! [`screenshot`](crate::dev::screenshot) shows what the *game* looks like; this shows what
 //! the *editor* looks like — the egui panels around the scene viewport — with no window,
-//! on lavapipe. It exists so an agent that changes the editor can attach before/after
-//! captures to its PR and the operator can review the change from a phone (#725).
+//! on lavapipe. It exists so an agent that changes the editor can look at it before and
+//! after (#725); the PR carries a `Looked at` line, never the PNG (`docs/testing.md`).
 //!
 //! **The same frame the editor draws, minus the window.** Each frame runs
 //! [`EditorUi::draw`] exactly as the [`EditorFrontend`](super::EditorFrontend) does,

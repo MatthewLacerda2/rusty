@@ -12,8 +12,7 @@ when there is none:
   on, it twists about the axis between `min` and `max` degrees, swings up to the
   **swing limit** (Unity's *swing 1*) about the **swing axis**, and up to the
   **swing 2 limit** about the axis perpendicular to both — a shoulder that swings
-  far forward but little sideways. A scene saved before #675 has no swing 2 limit
-  and gets the swing limit: a round cone.
+  far forward but little sideways.
 
 The **anchor** (the pivot), the **axis** and the **swing axis** are in the
 entity's local space; only the swing axis's part perpendicular to the axis counts.

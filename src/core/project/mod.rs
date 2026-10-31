@@ -15,7 +15,7 @@
 //!   assets/              the game: scenes, scripts, prefabs, models, textures,
 //!                        audio, materials, authored shaders (Unity's Assets/)
 //!   project.rusty        marks the folder as a project: the engine commit it was
-//!                        last opened with, and the build settings (#853)
+//!                        last opened with, and the project settings (#853)
 //!   .seeded              the seed manifest (#746)
 //!   cache/               anything the engine can regenerate (Unity's Library/),
 //!                        and the editor's last open scene (`boot`, #1618)
@@ -128,7 +128,7 @@ pub struct Opened {
     /// The project's settings, as `project.rusty` holds them (the defaults when it
     /// has none): the build settings the player and `play` boot (the startup
     /// scene), the default player graphics options (#1438), the quality presets
-    /// (#1522) and the decal budgets (#1517).
+    /// (#1522), the decal budgets (#1517) and the demos kept (#1581).
     pub settings: ProjectSettings,
 }
 

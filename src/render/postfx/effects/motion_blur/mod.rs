@@ -1,4 +1,4 @@
-//! src/render/postfx/motion_blur/ — per-object motion blur (#1436): the
+//! src/render/postfx/effects/motion_blur/ — per-object motion blur (#1436): the
 //! reconstruction filter over a view's velocity target (#1435), in
 //! `postfx/motion_blur.wgsl`.
 //!

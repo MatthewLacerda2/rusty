@@ -42,9 +42,10 @@ the session in-process — no subprocess, no async runtime, no extra dependency.
 <!-- docrefs: allow MCP's JSON-RPC method names, not repo paths -->
 **Tools** (`tools/list`, `tools/call`):
 
-- `eval` — evaluate one line of the rusty Lua API against the live edit-mode world
-  and return the result. This is the full control surface: create/edit/inspect
-  entities, author assets, save scenes, step the sim, etc. Argument: `line` (string).
+- `eval` — evaluate one line of the rusty Lua API against the live world, in edit
+  mode or Play, and return the result. This is the full control surface:
+  create/edit/inspect entities, author assets, save scenes, step the sim, etc.
+  Argument: `line` (string).
 - `snapshot` — return a JSON snapshot of the live world (entities, components,
   transforms, play state). A convenience wrapper for `Debug.Snapshot()`; no arguments.
 
@@ -112,7 +113,7 @@ JSON-RPC** — engine logs go to stderr or the in-memory console, never stdout.
 # embed (own headless world):
 cargo run --bin session-mcp --features dev                 # boot the project's boot scene
 cargo run --bin session-mcp --features dev -- --empty      # start from an empty scene
-cargo run --bin session-mcp --features dev -- <scene.json> # boot a specific scene
+cargo run --bin session-mcp --features dev -- <scene>      # boot a specific scene
 cargo run --bin session-mcp --features dev -- --project <dir> [<scene>|--empty]
 
 # attach (drive a running window):
@@ -159,8 +160,8 @@ Or run it straight from source (no separate build step):
 claude mcp add rusty -- cargo run --quiet --bin session-mcp --features dev -- --project /path/to/project
 ```
 
-Either way, Claude Code launches the bridge as an MCP server and gains the `eval` and
-`snapshot` tools plus the scripting-API resource — the same engine an editor user
+Either way, Claude Code launches the bridge as an MCP server and gains the `eval`,
+`snapshot` and `bench_*` tools plus both resources — the same engine an editor user
 would drive, minus the window.
 
 ### Attaching to a window you can watch

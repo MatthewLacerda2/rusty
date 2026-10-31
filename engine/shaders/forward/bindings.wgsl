@@ -287,7 +287,8 @@ var t_shadow: texture_depth_2d_array;
 @group(3) @binding(2)
 var s_shadow: sampler_comparison;
 // Screen-space ambient occlusion (#436), one texel per pixel; a 1x1 white texture
-// wherever the SSAO pass did not run (off, Low tier, the transparent pass).
+// wherever the SSAO pass did not run (off, a stacked DepthOnly camera, the
+// transparent pass).
 @group(3) @binding(3)
 var t_ao: texture_2d<f32>;
 // The point/spot shadow atlas (#468) and its tiles; a light's `shadow` indexes them.

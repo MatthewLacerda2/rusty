@@ -11,9 +11,10 @@
 //!   slices of `N × N` side by side, `N² × N` pixels (`256×16`, `1024×32`).
 //!
 //! The renderer uploads a [`Lut`] as a 3D texture, caches it per path and re-reads
-//! the file when it is written (`render::postfx::grade::user`). A parse is a few
-//! milliseconds even at 65³, so no converted copy is kept on disk: like a `.png`
-//! texture, the source is what loads, in the editor and in a shipped game.
+//! the file when it is written (`render::postfx::effects::grading::color_lookup::user`).
+//! A parse is a few milliseconds even at 65³, so no converted copy is kept on disk:
+//! like a `.png` texture, the source is what loads, in the editor and in a shipped
+//! game.
 
 mod cube;
 mod strip;

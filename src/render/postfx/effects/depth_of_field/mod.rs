@@ -1,4 +1,4 @@
-//! src/render/postfx/depth_of_field/ — depth of field (#1445), Unity URP's Gaussian
+//! src/render/postfx/effects/depth_of_field/ — depth of field (#1445), Unity URP's Gaussian
 //! and Bokeh modes, in `postfx/depth_of_field.wgsl`.
 //!
 //! Runs first in the chain, on the HDR scene, before motion blur (Unity's order):

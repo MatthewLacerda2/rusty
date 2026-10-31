@@ -1,4 +1,4 @@
-//! src/scene/authoring/particles.rs — Shared particle-emitter-authoring ops.
+//! src/scene/authoring/particles/ — Shared particle-emitter-authoring ops.
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `ParticleEmitterComponent` field by field: emission (`active` / `emit_mode` /

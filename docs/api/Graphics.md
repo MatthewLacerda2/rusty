@@ -89,7 +89,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetMotionBlurMaxLength` / `SetMotionBlurMaxLength` | `()` / `(value)` | `number`: Unity's *Clamp*, the longest streak as a fraction of the view's height (clamped 0–0.2, **default `0.05`**) |
 | `Graphics.GetMotionBlurQuality` / `SetMotionBlurQuality` | `()` / `(name)` | which tap count it runs at (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
 | `Graphics.GetMotionBlurSamples` / `SetMotionBlurSamples` | `()` / `(n)` | `number`: the `Custom` taps (clamped 2–32; the clamp is in the shared authoring op) |
-| `Graphics.GetOption` / `SetOption` | `(name)` / `(name, bool)` | `bool`: the player's graphics option (see *Player options*; **default `true`**) |
+| `Graphics.GetOption` / `SetOption` | `(name)` / `(name, bool)` | `bool`: the player's graphics option (see *Player options*; **default**: the project's default for it, `true` unless `SetDefaultOption` changed it) |
 | `Graphics.GetOptionNames` | `()` | array of every option name, alphabetical (a menu's order) |
 | `Graphics.GetPostParam` / `SetPostParam` | `(name)` / `(name, value)` | a custom effect's runtime param: `number`, or an array for a vector param (the effect's baked default until set; the block's catalog default with no active volume, where a set raises an error) |
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `string`: the running quality preset's name (one of the project's, case-insensitive; an unknown one raises an error listing them; `nil` when the project has none; see *Quality presets*) |
@@ -130,8 +130,9 @@ chromatic aberration, screen-space reflections, bloom's add, the lens flare's ad
 exposure on the HDR colour, then the grading LUT (white balance, Lift / Gamma / Gain, the color
 adjustments, the tonemapper, the display gamma and the Color Lookup, baked into one
 table), then the vignette and film grain on the display colour; then the custom
-effects and FXAA. An effect that is off (or at a zero strength) costs nothing and
-leaves the image byte-identical.
+effects and FXAA. An effect that is off costs nothing and leaves the image
+byte-identical; one left on at a zero strength draws the same image, but may still
+run its passes (bloom at intensity `0` still runs its bright pass and blur).
 
 **Tweening.** Every numeric knob of an effect tweens by its path inside the effect's
 settings, `Tween.To(volume, "Graphics.<effect>.<knob>", to, seconds)` on the volume
