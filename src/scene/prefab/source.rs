@@ -103,3 +103,7 @@ pub fn rekey(world: &mut World, ids: &[u32], prefab: &PrefabData) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "source_tests.rs"]
+mod source_tests;
