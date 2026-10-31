@@ -5,7 +5,11 @@ scene has, in order, with the scene's own settings, and the result **written** �
 separate save. It bakes the lightmaps (`Lighting.BakeLightmaps`, below), then the light
 and reflection probes (`Lighting.Bake`), so walls and actors are always lit by the same
 bake. The editor's **"Generate Lighting"** button (the scene inspector) is this exact
-path. The two individual verbs stay for a script that wants only one of them.
+path. The call returns when the bake is done (Unity's `Lightmapping.Bake`); the button
+bakes the same probes a step a frame — one reflection probe or a few light probes —
+so the editor and the MCP keep answering (Unity's `BakeAsync`, #1602). Both say each
+bounce pass and reflection probe in the console (`Baking reflection probe 3 of 12`).
+The two individual verbs stay for a script that wants only one of them.
 
 | Function | Signature | Returns |
 |---|---|---|

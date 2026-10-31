@@ -72,23 +72,3 @@ fn gpu_one_texel_capture_is_its_own_chain() {
     assert_eq!(gpu.level_count(), 1);
     assert_eq!(gpu.mips[0], capture.faces);
 }
-
-#[test]
-fn gpu_scratch_timing() {
-    let Some(r) = crate::render::test_gpu::headless_or_skip(8, 8) else {
-        return;
-    };
-    let capture = capture(512);
-    #[allow(clippy::disallowed_methods)]
-    let t = std::time::Instant::now();
-    let _ = r.prefilter_gpu(&capture);
-    eprintln!("TIME gpu first {:?}", t.elapsed());
-    #[allow(clippy::disallowed_methods)]
-    let t = std::time::Instant::now();
-    let _ = r.prefilter_gpu(&capture);
-    eprintln!("TIME gpu warm {:?}", t.elapsed());
-    #[allow(clippy::disallowed_methods)]
-    let t = std::time::Instant::now();
-    let _ = prefilter(&capture);
-    eprintln!("TIME cpu {:?}", t.elapsed());
-}

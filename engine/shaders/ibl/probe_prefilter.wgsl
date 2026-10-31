@@ -4,7 +4,7 @@
 // convolved around it for roughness `mip / (mips - 1)` with the sampling the sky cube
 // shares (`ibl::ggx`).
 //
-// It is `render::ibl::reflection_prefilter::prefilter` texel for texel, which stays
+// It is `render::ibl::reflection_prefilter::cpu::prefilter` texel for texel, which stays
 // the reference its tests pin: the same face matrices (the capture's own cameras, so
 // the faces' flipped orientation needs no second convention), the same nearest-texel
 // lookup of the base faces and the same N·L weighting. The result is sRGB-encoded into
@@ -52,7 +52,7 @@ fn capture(dir: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(0.0);
 }
 
-// GGX split-sum convolution around `n`, as `reflection_prefilter::convolve`.
+// GGX split-sum convolution around `n`, as `reflection_prefilter::cpu::convolve`.
 fn convolve(n: vec3<f32>, roughness: f32) -> vec3<f32> {
     let frame = tangent_frame(n);
     let a = roughness * roughness;

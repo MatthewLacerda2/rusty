@@ -30,7 +30,7 @@ fn ggx_light(i: u32, samples: u32, a2: f32, frame: mat3x3<f32>) -> vec4<f32> {
     let phi = 2.0 * PI * xi.x;
     let cos_theta = sqrt((1.0 - xi.y) / (1.0 + (a2 - 1.0) * xi.y));
     let sin_theta = sqrt(max(1.0 - cos_theta * cos_theta, 0.0));
-    let h = normalize(frame * vec3<f32>(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta));
     let n = frame[2];
+    let h = normalize(frame[0] * sin_theta * cos(phi) + frame[1] * sin_theta * sin(phi) + n * cos_theta);
     return vec4<f32>(normalize(2.0 * dot(n, h) * h - n), cos_theta);
 }

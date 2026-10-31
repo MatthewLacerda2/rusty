@@ -77,7 +77,7 @@ fn mirror_lod(size: f32) -> f32 {
     return clamp(0.5 * log2(cube_texel / panorama_texel()), 0.0, last);
 }
 
-// GGX split-sum convolution around `n`, as `reflection_prefilter::convolve`.
+// GGX split-sum convolution around `n`, as `reflection_prefilter::cpu::convolve`.
 fn convolve(n: vec3<f32>, roughness: f32) -> vec4<f32> {
     let frame = tangent_frame(n);
     let a = roughness * roughness;
