@@ -75,6 +75,9 @@ impl SeedManifest {
     /// line when a file is refreshed or kept; `hint` says how to take the new default.
     pub fn seed(&mut self, dest: &Path, bundled: &[u8], hint: &str) -> SeedOutcome {
         let key = paths::to_slash(dest);
+        // FNV-1a, not `hash::content` (#1326): `.seeded` is committed in game repos,
+        // so a new hash would make every seeded file look user-edited and bundled
+        // scripts would stop refreshing (#746). These files are small; speed is moot.
         let want = fnv1a64(bundled);
         let outcome = match std::fs::read(dest) {
             Err(_) => SeedOutcome::Written,

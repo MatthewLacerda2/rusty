@@ -3,7 +3,7 @@
 //! Surface blocks vary the **look** of the forward pass while keeping the full PBR
 //! lighting verbatim (so the assembled module
 //! binds against the forward pipeline unchanged — same `VertexInput`, same
-//! `LightingUniforms`/`EntityUniforms`/group(2) maps, same entry points).
+//! `LightingUniforms`/`DrawUniforms`/`MaterialData`/group(2) maps, same entry points).
 //! Each block's `helper` is a pure function
 //! `fn srf_<id>(c: vec3<f32>, in: VertexOutput, <params…>) -> vec3<f32>` that
 //! transforms the lit color; the assembler folds the chosen blocks (in recipe order) after the

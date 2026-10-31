@@ -37,10 +37,14 @@ fn an_unreadable_texture_has_no_average() {
 }
 
 #[test]
-fn the_content_tag_is_fnv1a_folded_to_32_bits() {
-    assert_eq!(fnv1a(b""), 0x4fd0_bfc1);
-    assert_eq!(fnv1a(b"a"), 0x2962_30c0);
-    assert_eq!(fnv1a(b"rusty"), 0xef78_44d0);
+fn the_content_tag_is_the_content_hash_folded_to_32_bits() {
+    // XXH3_64bits("") = 0x2d06_8005_38d3_94c2; its halves xored.
+    assert_eq!(content_tag(b""), 0x15d5_14c7);
+    let fold = |h: u64| (h ^ (h >> 32)) as u32;
+    assert_eq!(
+        content_tag(b"rusty"),
+        fold(crate::core::hash::content(b"rusty"))
+    );
 }
 
 #[test]

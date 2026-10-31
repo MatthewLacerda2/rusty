@@ -12,12 +12,12 @@ use std::path::Path;
 
 use super::encode::{full_chain_len, BlockFormat, Compressed};
 use super::{TextureSettings, ENCODER_VERSION};
-use crate::core::hash::fnv1a64;
+use crate::core::hash::content;
 
 const MAGIC: &[u8; 4] = b"RBCT";
 
 /// A digest of everything the blocks depend on: the source's bytes (`source`,
-/// their `fnv1a64`), the settings that shape them (not wrap or filter, which only
+/// their `core::hash::content`), the settings that shape them (not wrap or filter, which only
 /// the sampler reads; *sRGB* only where it is read) and the encoder's version.
 pub(super) fn stamp(source: u64, settings: &TextureSettings) -> u64 {
     let made_by = format!(
@@ -28,7 +28,7 @@ pub(super) fn stamp(source: u64, settings: &TextureSettings) -> u64 {
         settings.max_size,
         settings.generate_mipmaps,
     );
-    fnv1a64(made_by.as_bytes())
+    content(made_by.as_bytes())
 }
 
 /// What a cache's head holds: its format, base size and level count.

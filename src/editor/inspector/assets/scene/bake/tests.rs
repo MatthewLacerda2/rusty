@@ -70,7 +70,7 @@ fn only_the_open_scenes_card_bakes_and_the_bake_writes_the_open_file() {
     let mut console = ConsoleLogs::new();
     start(&mut editor, &mut scene, &mut console);
     let active = editor.dev.lightmap_bake.as_ref().expect("started");
-    assert_eq!(active.job.scene_path(), open);
+    assert_eq!(active.scene_path(), open);
     assert!(!std::fs::read_to_string(&other)
         .unwrap()
         .contains("lightmap"));
@@ -99,4 +99,46 @@ fn pathdiff(abs: &std::path::Path, from: &std::path::Path) -> String {
     out.join(abs.strip_prefix("/").unwrap_or(abs))
         .to_string_lossy()
         .into_owned()
+}
+
+/// The probe step runs a step a frame (#1602): a frame comes back with the bake
+/// still running and its progress in the console, and the last one writes the lighting.
+#[test]
+fn gpu_the_probe_step_runs_across_frames() {
+    let path = crate::test_temp::dir().join("bake_steps.scene");
+    let path = path.to_string_lossy().into_owned();
+    let mut editor = EditorUi::new(Default::default());
+    editor.set_current_scene_path(Some(path.clone()));
+    let mut scene = Scene::new();
+    scene.lighting_settings.reflections.resolution = 16;
+    for x in [0.0, 4.0] {
+        let at = glam::Vec3::new(x, 1.0, 0.0);
+        scene.reflection_probes.add(at, glam::Vec3::splat(2.0));
+    }
+    scene.save_to_file(&path).unwrap();
+    let mut console = ConsoleLogs::new();
+    start(&mut editor, &mut scene, &mut console);
+    let nav = NavigationGraph::new(-8.0, 8.0, -8.0, 8.0, 1.0);
+    let ctx = egui::Context::default();
+    let mut frames_baking = 0;
+    for _ in 0..2000 {
+        poll(&mut editor, &ctx, &mut scene, &mut console, &nav);
+        let Some(active) = &editor.dev.lightmap_bake else {
+            break;
+        };
+        frames_baking += usize::from(matches!(active.step, super::Step::Probes { .. }));
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    assert!(editor.dev.lightmap_bake.is_none(), "{:?}", console.messages);
+    let said = |text: &str| console.messages.iter().any(|(l, _)| l.contains(text));
+    if !said("Baking reflection probe 1 of 2") {
+        return; // no adapter: the probe step skipped
+    }
+    assert!(frames_baking >= 2, "a frame per probe, saw {frames_baking}");
+    assert!(
+        said("Baking reflection probe 2 of 2"),
+        "{:?}",
+        console.messages
+    );
+    assert!(said("Generated lighting"), "{:?}", console.messages);
 }

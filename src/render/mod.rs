@@ -49,11 +49,11 @@ pub use stats::RenderCounters;
 pub use timing::{ClockProbe, GpuPass, GpuTimes};
 pub use view::{PixelSize, RenderView};
 
-// GPU uniform memory layouts live in `gpu/uniforms.rs` (split out to keep files under
+// GPU uniform memory layouts live in `gpu/uniforms/` (split out to keep files under
 // the size cap); re-imported here so the render module body still names them directly.
 pub(crate) use gpu::uniforms::{
-    AmbientLightUniform, CameraUniform, DirectionalLightUniform, EntityUniform, InstanceData,
-    LightingUniform,
+    AmbientLightUniform, CameraUniform, DirectionalLightUniform, DrawUniform, InstanceData,
+    LightingUniform, MaterialData,
 };
 
 // Stores GPU Buffer handlers for meshes
@@ -156,7 +156,7 @@ pub struct Renderer {
     /// The baked lightmap pages group 0 binds (#438), rebound when the scene's change.
     pub(crate) lightmaps: gpu::lightmaps::Lightmaps,
     /// The packed per-frame draw data every solid draw binds as group 1 (#470): per-draw
-    /// uniforms, bone palettes and instances, rewritten per camera.
+    /// uniforms, bone palettes, instances and material records, rewritten per camera.
     draw_buffers: gpu::draw_buffers::DrawBuffers,
     /// One group-2 material bind group per distinct set of resolved maps (#470).
     materials: gpu::material_cache::MaterialCache,
@@ -210,6 +210,8 @@ pub struct Renderer {
     reflection_probes: reflection_probes::ProbeArray,
     /// The sky's prefiltered reflection cubes at group-0 binding 2 (#1553).
     sky_reflection: sky_cube::SkyReflection,
+    /// The reflection-probe bake's GPU prefilter (#1602), built on the first bake.
+    probe_prefilter: std::sync::OnceLock<ibl::reflection_prefilter::gpu::ProbePrefilter>,
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
     /// The forward pass's group 3 with the white no-AO fallback: every pass that

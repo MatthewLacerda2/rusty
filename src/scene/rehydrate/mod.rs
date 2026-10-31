@@ -164,7 +164,19 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
 /// vertices are dropped and re-imported from it (see `rehydrate_meshes`). Returns
 /// an empty-geometry component if the import fails.
 pub fn asset_mesh_component(reference: &str) -> crate::scene::MeshComponent {
-    let rebuilt = rehydrate_asset_mesh(&Some(reference.to_string()));
+    built(
+        reference,
+        rehydrate_asset_mesh(&Some(reference.to_string())),
+    )
+}
+
+/// [`asset_mesh_component`] from `sub`, the sub-mesh `reference` names, which
+/// its caller already imported: no second parse of the file.
+pub fn asset_mesh_component_of(reference: &str, sub: &SubMesh) -> crate::scene::MeshComponent {
+    built(reference, RehydratedMesh::from_sub_mesh(sub))
+}
+
+fn built(reference: &str, rebuilt: RehydratedMesh) -> crate::scene::MeshComponent {
     let mut mesh = crate::scene::MeshComponent {
         asset_ref: Some(reference.to_string()),
         ..crate::scene::MeshComponent::new("Asset", Vec::new(), Vec::new())

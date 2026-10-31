@@ -91,6 +91,9 @@ that stopped before the demo's end (`stopped at tick N of M`) unless a scenario
 stepped it there. **A scenario on a demo should only observe** (screenshots,
 reads, `Harness.Bench`): a call that changes the world runs on top of the
 recorded acts, and the replay diverges from there.
+The digests are xxh3 (`core::hash::content`) since #1326: a demo recorded
+before that no longer verifies, and is simply recorded again (*No backward
+compatibility*).
 
 What a demo holds (`dev::demo`, the format in `dev/demo/format.rs`): the scene,
 the engine commit, the seed, the project settings, the save data (`Storage`, the
@@ -118,6 +121,10 @@ Script and asset changes on disk wait for Stop (the editor's watch holds them
 through Play), so they never reach a Play session. `play --size` and `--scene`
 are refused with `--demo`: the replay plays the scene and the Game view size the
 demo recorded (the sim lays the UI out on it, and every frame renders at it).
+
+**Open one in the editor.** `Editor.OpenDemo(path)` ([`api/Editor.md`](api/Editor.md),
+*The demo timeline*) plays a demo on the Game view with a timeline: play/pause,
+scrub by tick (the same seek as `Harness.SeekDemo`) and the index's marks on the bar.
 
 **Bit for bit is checked, not promised.** Every 120 ticks, and once right before
 Stop (or when a `play` run ends), the demo stores a digest of the world: every

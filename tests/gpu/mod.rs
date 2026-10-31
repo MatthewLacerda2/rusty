@@ -41,6 +41,8 @@ mod custom_postfx_screenshot;
 mod directional_lightmap_screenshot;
 #[cfg(feature = "editor")]
 mod editor_capture;
+#[cfg(feature = "editor")]
+mod editor_capture_demo;
 mod emissive_factor_screenshot;
 mod environment_brdf;
 mod fog;

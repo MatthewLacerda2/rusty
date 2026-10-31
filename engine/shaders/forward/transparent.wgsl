@@ -8,7 +8,7 @@
 
 #define_import_path forward::transparent
 
-#import forward::bindings::{camera, entity, s_opaque, t_opaque}
+#import forward::bindings::{camera, material, s_opaque, t_opaque}
 #import common::{PI, fog_factor}
 #import lighting::ssr_march
 #import lighting::ssr_surface
@@ -24,21 +24,22 @@
 // `world`, `N` and `pixel` are the fragment's world position, shading normal and
 // framebuffer position.
 fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec4<f32> {
+    let m = material();
     let fog = fog_factor(camera.fog, world, camera.camera_pos);
-    if (entity.premultiply_diffuse == 0u && entity.uses_opaque == 0u) {
+    if (m.premultiply_diffuse == 0u && m.uses_opaque == 0u) {
         return vec4<f32>(mix(lit, camera.fog.color, fog), alpha);
     }
     var opacity = alpha;
     var color = lit;
-    if (entity.premultiply_diffuse == 1u) {
+    if (m.premultiply_diffuse == 1u) {
         let reflected = max(env_brdf.r, max(env_brdf.g, env_brdf.b));
         opacity = alpha + (1.0 - alpha) * saturate(reflected);
-    } else if (entity.blend_mode == 0u) {
+    } else if (m.blend_mode == 0u) {
         // Straight alpha over the copy: premultiply here, the blend no longer does.
         color = lit * alpha;
     }
     color = mix(color, camera.fog.color * opacity, fog);
-    if (entity.uses_opaque == 0u) {
+    if (m.uses_opaque == 0u) {
         return vec4<f32>(color, opacity);
     }
     return vec4<f32>(color + (1.0 - opacity) * behind(world, N, pixel), 1.0);
@@ -58,7 +59,7 @@ fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: ve
     // A pixel too rough to reflect (HDRP's *Minimum Smoothness*) marches nothing,
     // as the SSR pass discards a surface that `ssr_surface::reflects` refuses.
     let fade = ssr_surface::smoothness_fade(roughness);
-    if (entity.receive_ssr == 0u || camera.stack.z < 1.0 || fade <= 0.0) {
+    if (material().receive_ssr == 0u || camera.stack.z < 1.0 || fade <= 0.0) {
         return reflection;
     }
     let f = ssr_march::Frame(camera.view_proj, camera.camera_pos, vec3<f32>(0.0), vec4<f32>(0.0, 0.0, 0.0, 1.0));
@@ -72,9 +73,11 @@ fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: ve
 // The diffuse light a thin translucent surface lets through from a light behind it
 // (#1523): HDRP's thin *Translucent* type, a back-face Lambert term scaled by the
 // transmission colour times its amount. `N` faces the viewer, so a light behind the
-// surface has `dot(N, L) < 0`; `radiance` is the light shadowed at the back face.
-fn transmitted(N: vec3<f32>, L: vec3<f32>, radiance: vec3<f32>, albedo: vec3<f32>) -> vec3<f32> {
-    return entity.transmission.rgb * albedo / PI * radiance * saturate(dot(-N, L));
+// surface has `dot(N, L) < 0`; `radiance` is the light shadowed at the back face;
+// `transmission` the material's colour times amount (`material().transmission.rgb`,
+// read once by the caller, outside its light loop).
+fn transmitted(N: vec3<f32>, L: vec3<f32>, radiance: vec3<f32>, albedo: vec3<f32>, transmission: vec3<f32>) -> vec3<f32> {
+    return transmission * albedo / PI * radiance * saturate(dot(-N, L));
 }
 
 // Where the opaque copy holds no surface (the sky): `opaque_copy.wgsl`'s
@@ -96,15 +99,16 @@ const SKY_DISTANCE: f32 = 60000.0;
 // colour; seen against the sky it absorbs over the material's `thickness`
 // (`absorption.w`), whatever its refraction model.
 fn behind(world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
+    let m = material();
     let size = vec2<f32>(textureDimensions(t_opaque));
     let eye_to_surface = distance(camera.camera_pos, world);
     var uv = pixel / size;
-    if (entity.refraction_model != 0u) {
+    if (m.refraction_model != 0u) {
         let V = normalize(camera.camera_pos - world);
         // Both faces are drawn: bend through the face toward the viewer.
         let Nf = faceForward(N, -V, N);
-        let R = refract(-V, Nf, 1.0 / entity.ior);
-        let dist = entity.thickness / max(dot(R, -Nf), 1e-5);
+        let R = refract(-V, Nf, 1.0 / m.ior);
+        let dist = m.thickness / max(dot(R, -Nf), 1e-5);
         let clip = camera.view_proj * vec4<f32>(world + R * dist, 1.0);
         if (clip.w > 1e-4) {
             let hit = vec2<f32>(clip.x / clip.w * 0.5 + 0.5, 0.5 - clip.y / clip.w * 0.5);
@@ -116,7 +120,7 @@ fn behind(world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
     let scene = textureSampleLevel(t_opaque, s_opaque, uv, 0.0);
     var depth = max(scene.a - eye_to_surface, 0.0);
     if (scene.a >= SKY_DISTANCE) {
-        depth = entity.absorption.w;
+        depth = m.absorption.w;
     }
-    return scene.rgb * exp(-entity.absorption.rgb * depth);
+    return scene.rgb * exp(-m.absorption.rgb * depth);
 }

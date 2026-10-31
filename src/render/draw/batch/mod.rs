@@ -16,12 +16,13 @@
 //! Pure CPU logic, no GPU state, so the grouping rules are unit-tested without an
 //! adapter.
 
+mod records;
 pub(crate) mod sort;
 
 use std::ops::Range;
 
-use crate::render::gpu::uniforms::ENTITY_UNIFORM_WORDS;
-use crate::render::{EntityUniform, InstanceData, MeshId};
+use crate::render::gpu::uniforms::MATERIAL_DATA_WORDS;
+use crate::render::{InstanceData, MaterialData, MeshId};
 
 /// What two solids must share to be drawn by one instanced call.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -37,16 +38,18 @@ pub(crate) struct BatchKey {
     pub indices: IndexRun,
     /// The group-2 material bind group (the resolved texture maps), by cache index.
     pub material: usize,
-    /// The per-draw uniform's words (tint, PBR scalars, map and cutout flags, and the
-    /// skinned palette's `bone_base`), compared bit-for-bit — so each skinned entity,
-    /// with a palette of its own, is a draw of its own.
-    pub uniform: [u32; ENTITY_UNIFORM_WORDS],
+    /// The material record's words (tint, PBR scalars, map and cutout flags, the
+    /// surface and mapping terms, #1616), compared bit-for-bit.
+    pub record: [u32; MATERIAL_DATA_WORDS],
+    /// Where the draw's joint palette starts (#455): each skinned entity, with a
+    /// palette of its own, is a draw of its own.
+    pub bone_base: u32,
 }
 
 impl BatchKey {
-    /// The per-draw uniform this key carries.
-    pub(crate) fn uniform(&self) -> EntityUniform {
-        bytemuck::pod_read_unaligned(bytemuck::cast_slice(&self.uniform))
+    /// The material record this key carries.
+    pub(crate) fn record(&self) -> MaterialData {
+        MaterialData::from_words(&self.record)
     }
 
     /// Whether the SSAO depth prepass draws this batch, so its depth is in the prepass
@@ -56,7 +59,7 @@ impl BatchKey {
     /// keeps is its shader's: `fs_prepass` / `fs_prepass_cut` clip Cutout texels, cut
     /// and move the UVs as `fs_main` does (`shadergen::assemble::depth`).
     pub(crate) fn in_prepass(&self) -> bool {
-        self.uniform().is_lit != 0
+        self.record().is_lit != 0
     }
 }
 
@@ -157,11 +160,6 @@ impl FrameDraws {
             self.instances.push(item.instance);
         }
         batches
-    }
-
-    /// Every batch's per-draw uniform, in `uniform_slot` order.
-    pub(crate) fn uniforms(&self) -> Vec<EntityUniform> {
-        self.batches().map(|b| b.key.uniform()).collect()
     }
 
     /// Opaque then transparent batches — the draw calls this camera issues.

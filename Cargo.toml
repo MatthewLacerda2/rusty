@@ -119,6 +119,9 @@ hecs = { version = "0.10.5" }
 # The sim's hash maps (#764): FxHash has no per-process seed, so a map iterates in the
 # same order every run. Already in the tree through mlua and type-map: same version.
 rustc-hash = "2.1.2"
+# Content fingerprints (#1326): xxh3 runs at opt-level 2 as a dependency, ~40x the
+# opt-level-0 FNV the editor ran, and its output is fixed by its spec on every platform.
+xxhash-rust = { version = "0.8.19", default-features = false, features = ["xxh3"] }
 rapier3d = { version = "0.36.0" }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "tga"] }
 ktx2 = { version = "0.3.0" }
@@ -139,12 +142,12 @@ log = "0.4.22"
 pollster = "0.4.0"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.120"
-# Font parsing, metrics and glyph outlines for UI `Text` (#419). Direct, not through
-# egui: egui is editor-only (#431) and the player needs text. Already in the tree through winit's sctk-adwaita on Linux: same version.
-ab_glyph = "0.2.32"
-# Its OpenType parser, read directly for GPOS pair kerning (ab_glyph reads only the
-# legacy `kern` table). Already in the tree through ab_glyph: same version.
-ttf-parser = "0.25.1"
+# Font parsing, metrics and glyph outlines for UI `Text` (#419, #1328), and its shaping
+# (ligatures, marks, kerning). Direct, not through egui: egui is editor-only (#431) and
+# the player needs text. Both are already in the editor build through epaint: same
+# versions and features.
+skrifa = { version = "0.44.0", default-features = false, features = ["std", "autohint_shaping"] }
+harfrust = "0.12.0"
 # Gamepads (#471): buttons, sticks, triggers and rumble, polled once by the shell.
 # Needs libudev on Linux (already in CI's apt list for winit).
 gilrs = "0.11.2"

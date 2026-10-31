@@ -16,7 +16,7 @@ use crate::render::{RenderView, Renderer};
 pub(crate) fn writers(translucents: &[DrawBatch]) -> impl Iterator<Item = &DrawBatch> {
     translucents
         .iter()
-        .filter(|b| b.key.uniform().surface.depth_postpass == 1)
+        .filter(|b| b.key.record().surface.depth_postpass == 1)
 }
 
 impl Renderer {

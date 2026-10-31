@@ -253,6 +253,18 @@ one name and never drift.
   the link: the v1 independent copy. Use it when you want a one-off that must not track
   later source edits.
 
+- **`Scene.Instantiate(modelPath, [name], [x, y, z])`** — a bare model path (no
+  `::`) spawns the **whole model** as Unity's model prefab, the same verb as the model
+  inspector's *Instantiate into Scene*: a root named `name` (the file name without its
+  extension when omitted) at `(x, y, z)`, and under it one child per glTF node with
+  that node's local transform, each mesh node carrying its sub-object as below. An
+  empty node is an empty child; a `_LOD<n>` set of sibling nodes is one LODGroup (an
+  Alt+D copy, `Crate_LOD0.001`, is a group of its own); what a skeleton's joint holds
+  (a mesh on the joint, a gun under `Hand`) hangs from that bone's entity, so it
+  follows the animation. Returns the root's id. A Scale Factor or source change after
+  the spawn rescales the meshes but does **not** move the parts yet (#1637): set the
+  Scale Factor before instantiating (`Assets.SetModelImportSettings`).
+
 - **`Scene.Instantiate(assetRef, [name], [x, y, z])`** — spawns one entity from an
   importable model sub-object reference (`path::sub_object`, the `reference` field
   `Assets.Manifest()` hands back), placed at `(x, y, z)` (the origin when omitted) and

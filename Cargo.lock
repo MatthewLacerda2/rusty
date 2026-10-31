@@ -3197,7 +3197,6 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 name = "rusty"
 version = "0.1.0"
 dependencies = [
- "ab_glyph",
  "arboard",
  "bevy_mikktspace",
  "block_compression",
@@ -3210,6 +3209,7 @@ dependencies = [
  "gilrs",
  "glam 0.33.12",
  "gltf",
+ "harfrust",
  "hecs",
  "image",
  "kira",
@@ -3231,13 +3231,14 @@ dependencies = [
  "scorsese-zimmer",
  "serde",
  "serde_json",
+ "skrifa",
  "smithay-clipboard",
  "symphonia",
  "tobj",
- "ttf-parser",
  "ufbx",
  "wgpu",
  "winit",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -4953,6 +4954,12 @@ name = "xml-rs"
 version = "0.8.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "550a2b930b62486a393c52d5c3b84bff264b28aa437ed64694d31e93b1757af7"
 
 [[package]]
 name = "yoke"
