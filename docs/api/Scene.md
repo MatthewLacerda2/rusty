@@ -69,8 +69,9 @@ function, or a table holding one): the error says the call itself ran.
 
 **`primitive`** (optional) is one of the GameObject menu's primitives,
 case-insensitive: `Box`, `Sphere`, `Plane`, `Cylinder`, `Capsule` (meshes) or
-`PointLight`, `DirectionalLight`, `SpotLight`. The Capsule is Unity's: radius 0.5,
-full height 2, along Y. The Plane is 15 × 15 on XZ, one quad; for vertices a
+`PointLight`, `DirectionalLight`, `SpotLight`. The sizes are Unity's: the Box is
+1 × 1 × 1, the Sphere diameter 1, the Cylinder diameter 1 and height 2 along Y
+(−1..1), and the Capsule radius 0.5, full height 2, along Y. The Plane is 15 × 15 on XZ, one quad; for vertices a
 vertex shader can move (`vertex_waves`, [`Shader.md`](Shader.md)), cut it into a grid
 with `Component.Set(id, "Mesh", { subdivisions = 64 })`: 1–256 quads per side,
 `(n + 1)²` vertices, the same size and UVs, saved with the scene (the Inspector's
