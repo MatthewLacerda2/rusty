@@ -7,7 +7,11 @@
 //! is re-baked on disk from its recipe first ([`rebake::refresh`]). A shipped player
 //! never writes into its install (a signed `.app`, a read-only directory): it
 //! re-composes the stale module from its recipe **in memory** and loads that, leaving
-//! the files as shipped; rusty has no export step that could re-bake at build time.
+//! the files as shipped. An export (`dev::export`) re-bakes every stale module before
+//! it copies ([`rebake::refresh_all`]), so an exported game's modules load as they
+//! are; the in-memory re-compose is the fallback for a project the player runs
+//! without an export (a project folder copied by hand, or one exported against
+//! older engine shaders than the player ships beside).
 
 use std::path::Path;
 

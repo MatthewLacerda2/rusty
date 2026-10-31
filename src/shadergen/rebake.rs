@@ -25,7 +25,10 @@
 //! from the recipe in place and logs one line naming it. So a renamed engine binding
 //! (#1616) reaches every baked shader at its next load. A shipped player never
 //! writes into its install: it re-composes a stale module in memory instead
-//! ([`super::baked`]).
+//! ([`super::baked`]). An export (`dev::export`, Unity's Build) re-bakes every stale
+//! module under the project's shaders first ([`refresh_all`]), so a shipped game's
+//! modules are current and the player's in-memory re-compose is only the fallback
+//! for a project run without one.
 //!
 //! What it leaves alone:
 //! - a module with no `<name>.recipe.json` beside it (hand-written, or baked before
@@ -139,6 +142,32 @@ pub(super) enum Plan {
 /// engine shaders than the ones this engine has; see the module doc.
 pub fn refresh(wgsl: &Path) -> Refresh {
     refresh_against(wgsl, engine_shader_dir())
+}
+
+/// [`refresh`] every `.wgsl` module under `dir`, its folders visited by name, and
+/// return the ones re-baked: what an export runs before it copies (`dev::export`),
+/// so a shipped game holds modules current with the engine it ships beside. A
+/// module that fails to re-bake is logged ([`refresh`]) and left as it is.
+pub fn refresh_all(dir: &Path) -> Vec<PathBuf> {
+    let mut modules = Vec::new();
+    wgsl_under(dir, &mut modules);
+    modules.sort();
+    modules.retain(|wgsl| refresh(wgsl) == Refresh::Rebaked);
+    modules
+}
+
+/// Every `.wgsl` file under `dir` (none when it cannot be read).
+fn wgsl_under(dir: &Path, found: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for path in entries.flatten().map(|e| e.path()) {
+        if path.is_dir() {
+            wgsl_under(&path, found);
+        } else if path.extension().is_some_and(|e| e == "wgsl") {
+            found.push(path);
+        }
+    }
 }
 
 /// [`refresh`] against the engine shaders under `engine_shaders`.
