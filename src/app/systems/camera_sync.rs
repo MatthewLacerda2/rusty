@@ -11,11 +11,19 @@
 //! [`Camera`]: crate::scene::Camera
 
 use crate::scene::camera::sync_pose_from_scene;
-use crate::scene::sync_lens_from_scene;
+use crate::scene::{game_camera_from_scene, sync_lens_from_scene, Camera};
 
 use crate::app::GameWorld;
 
 impl GameWorld {
+    /// The camera the screen shows (#1619): the scene's main camera entity, else the
+    /// free view camera. The player, the editor's Game view and every headless
+    /// capture render from it, so what a script set through `Camera.*` is what each
+    /// of them shows.
+    pub fn main_view(&self) -> Camera {
+        game_camera_from_scene(&self.resources.camera.borrow(), &self.world.scene.borrow())
+    }
+
     /// Sync the render camera's pose, lens and culling mask from the scene's main
     /// camera.
     pub(crate) fn sync_render_camera(&mut self) {

@@ -27,10 +27,11 @@ pub struct ScreenStack {
 /// In play mode the scene's active screen [`CameraComponent`](crate::scene::CameraComponent)
 /// entities drive rendering, sorted by `render_order` ascending so later cameras
 /// composite over earlier ones — the Unity world-cam + viewmodel-cam + UI-cam stack.
-/// Every camera renders from **its own entity's transform** (#430), the base one
-/// included: it is the main view, `scene::game_camera_from_scene`, which `Camera.*`
-/// moves (#1619), so the harness shows what the player and the Game view show. A
-/// viewmodel camera parented to the player's head follows
+/// The first (base) camera keeps `base`'s pose: the caller owns the main view. The
+/// player, the Game view and the headless harness and screenshots all pass
+/// `scene::game_camera_from_scene` (`GameWorld::main_view`), that same entity's pose,
+/// which `Camera.*` moves (#1619). Every later camera renders from **its own entity's
+/// transform** (#430) — a viewmodel camera parented to the player's head follows
 /// it, a split view looks elsewhere. Each carries its own lens, projection, mask and
 /// clear flags. Render-texture cameras are not on the screen stack (see
 /// [`texture_cameras`]).
@@ -47,8 +48,11 @@ pub fn build_camera_stack(base: &Camera, scene: &Scene, is_playing: bool) -> Scr
             .collect(),
         false => Vec::new(),
     };
-    if stack.is_empty() {
-        stack.push((None, base.clone()));
+    match stack.first_mut() {
+        Some((_, first)) => {
+            (first.position, first.yaw, first.pitch) = (base.position, base.yaw, base.pitch)
+        }
+        None => stack.push((None, base.clone())),
     }
     let (entities, cameras) = stack.into_iter().unzip();
     ScreenStack {
