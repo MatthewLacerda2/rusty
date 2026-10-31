@@ -60,8 +60,8 @@ impl Frontend for PlayerFrontend {
         // the frame to draw the in-game UI on (#418).
         view.set_ui_output(Some(shell.renderer.surface_ui_view(frame)));
 
+        let camera = game.main_view();
         let scene = game.scene().borrow();
-        let camera = crate::scene::game_camera_from_scene(&game.camera().borrow(), &scene);
         // No debug overlays in a shipped game: editor mode off.
         let textures = std::rc::Rc::clone(game.resources.screen.borrow().textures());
         shell.renderer.set_ui_textures(textures);

@@ -70,8 +70,8 @@ pub const TEXTURES_DIR: &str = "assets/textures";
 /// Where a project keeps its generated and authored shaders.
 pub const SHADERS_DIR: &str = "assets/shaders";
 /// Where generated assets live: provider output (#384) and converted model sources
-/// (#1024). Whether a game's repo versions these files is still open (#866), so
-/// every writer names this one folder and follows whatever is decided for it.
+/// (#1024). Whether a game's repo versions them is the game's own `.gitignore`'s
+/// call: the engine ignores nothing here (#866). Every writer names this one folder.
 pub const GENERATED_DIR: &str = "assets/generated";
 
 /// The folders [`create_skeleton`] makes, relative to the root.

@@ -25,19 +25,17 @@ use crate::scene::Scene;
 
 impl PhysicsWorld {
     /// Write every bone carried by a dynamic body back to its body's pose, parents
-    /// before children. A scene without dynamic bones costs one set build.
+    /// before children. Starts from the dynamic bodies and asks each whether it is
+    /// a bone, so a scene without a ragdoll never reads a skeleton (#1617).
     pub fn pose_bones(&self, scene: &mut Scene) {
-        let bones = scene.bone_ids();
-        let mut owners: Vec<(usize, u32)> = self
-            .plan
-            .keys()
-            .filter(|id| bones.contains(id))
-            .filter(|id| {
-                self.id_to_body
-                    .get(id)
-                    .and_then(|&h| self.bodies.get(h))
-                    .is_some_and(|b| b.is_dynamic())
-            })
+        let dynamic = self.plan.keys().filter(|id| {
+            self.id_to_body
+                .get(id)
+                .and_then(|&h| self.bodies.get(h))
+                .is_some_and(|b| b.is_dynamic())
+        });
+        let mut owners: Vec<(usize, u32)> = dynamic
+            .filter(|&&id| scene.is_bone(id))
             .map(|&id| (depth(scene, id), id))
             .collect();
         owners.sort_unstable();
@@ -76,3 +74,7 @@ impl PhysicsWorld {
 fn depth(scene: &Scene, id: u32) -> usize {
     scene.world.ancestors(id).count()
 }
+
+#[cfg(test)]
+#[path = "ragdoll_cost_tests.rs"]
+mod cost_tests;

@@ -62,9 +62,10 @@ pub fn register<'scope>(
     lua.globals().set("Audio", table).map_err(|e| e.to_string())
 }
 
-/// The listener — the active camera — as the spatial math wants it (position + right).
-pub fn listener(camera: &RefCell<Camera>) -> Listener {
-    let cam = camera.borrow();
+/// The listener — the main view, `scene`'s camera entity when it has one (#1619) — as
+/// the spatial math wants it (position + right).
+pub fn listener(camera: &RefCell<Camera>, scene: &Scene) -> Listener {
+    let cam = crate::scene::game_camera_from_scene(&camera.borrow(), scene);
     Listener::new(cam.position, cam.right())
 }
 
@@ -260,11 +261,14 @@ fn register_spatial<'scope>(
         "GetSpatial",
         scope.create_function(|_, id: EntityArg| {
             let id = id.read();
-            let Some((src, pos)) = emitter(&scene.borrow(), id) else {
+            let scene = &scene.borrow();
+            let Some((src, pos)) = emitter(scene, id) else {
                 // No source: report silent + centred + not playing + clear.
                 return Ok((0.0_f32, 0.0_f32, false, 0.0_f32));
             };
-            let info = audio.borrow().voice_info(id, &src, pos, &listener(camera));
+            let info = audio
+                .borrow()
+                .voice_info(id, &src, pos, &listener(camera, scene));
             let spatial = info.spatial;
             Ok((spatial.gain, spatial.pan, info.playing, info.occlusion))
         }),
