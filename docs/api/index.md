@@ -38,9 +38,9 @@ joint's connected body, `UI.SetSelected(nil)`, `Scene.SetParent(child, nil)`), t
 
 > **Faithfulness:** every setter here is expected to be *observed* by a downstream
 > system — a renderer/sim read or a `SceneData` round-trip. When you add a setter,
-> name its read-site (or add a round-trip test) in the same change and record it in
-> [`api-faithfulness.md`](../api-faithfulness.md), so the surface never grows a
-> write-only no-op that silently fails headless authoring (issue #178).
+> prove it in the same change with a test that reads the value back through that
+> system (or a round-trip), so the surface never grows a write-only no-op that
+> silently fails headless authoring (issue #178).
 
 > **Examples run** (#937): every ```` ```lua ```` block in `docs/api/` is run by
 > `tests/doc_examples/` in a fresh headless edit-mode session and must not raise, so

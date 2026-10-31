@@ -40,9 +40,8 @@ not the engine calling third-party APIs: tooling that reaches an external servic
 - **README.md** — what the engine is and what you can do with it.
 - **docs/** — `linting.md` (the gate), `testing.md`, `api/` (the Lua API game scripts
   use: `api/index.md`, then one file per namespace), `ui.md` (the in-game UI model), `providers.md` (bringing a provider key, and the budget),
-  `mcp.md` (the `session-mcp` bridge an agent drives the engine through),
-  `game-agent.md` (the guide `session-mcp` serves a game project) and
-  `api-faithfulness.md` (each API setter and the read-site that proves it). The Rust API reference is generated: `cargo doc --no-deps`.
+  `mcp.md` (the `session-mcp` bridge an agent drives the engine through) and
+  `game-agent.md` (the guide `session-mcp` serves a game project). The Rust API reference is generated: `cargo doc --no-deps`.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 - **Nested CLAUDE.md files** carry one area's rules and load only when you read files

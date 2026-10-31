@@ -248,7 +248,7 @@ embeds `src/core/project/game_claude.md`, so a Markdown-only edit to one of them
 can break `main` on its own. CI's `code` filter lists all three explicitly (#525,
 #569, #1313; `merging/verdict/changes.py`'s `CODE_DOCS` is the queue's copy), so a
 pull request touching one runs the tests like any code change, and it is
-serialized like code. `docs/api-faithfulness.md` is not covered: nothing parses it, so a Markdown-only PR touching it merges freely.
+serialized like code.
 
 ## Verify the run happened on the head commit
 

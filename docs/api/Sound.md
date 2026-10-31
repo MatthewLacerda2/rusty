@@ -110,7 +110,7 @@ Audio.PlayAt(clip, muzzle.x, muzzle.y, muzzle.z, 0.9)
 > **Faithfulness:** the read-site is the engine's own audio decoder — a baked `.wav`
 > is decoded by the same `ClipCache` path an imported clip is. A re-bake to a path
 > already played plays the new file from the next `Audio.Play*`, and a path played
-> before it was baked plays once it is (#1208). See `docs/api-faithfulness.md`.
+> before it was baked plays once it is (#1208).
 
 ### Songs (#358)
 
