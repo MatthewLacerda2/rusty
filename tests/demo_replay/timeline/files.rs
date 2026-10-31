@@ -9,7 +9,7 @@ use rusty::core::application::DemoRequest;
 use rusty::core::settings::video::VideoSettings;
 use rusty::core::settings::GraphicsSettings;
 
-use super::timeline::{demo_of_a_saved_scene, editor_world};
+use super::{demo_of_a_saved_scene, editor_world};
 
 /// Compact, so a flush (which writes pretty JSON) would change its bytes.
 const SAVED: &str = r#"{"game":{"coins":7}}"#;

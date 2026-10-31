@@ -2,6 +2,9 @@
 //! scrubs both ways bit for bit, shows its marks, and closing gives the editor its
 //! scene and recorder back.
 
+mod close;
+mod files;
+
 use std::path::PathBuf;
 
 use rusty::core::application::DemoRequest;

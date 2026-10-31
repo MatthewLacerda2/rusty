@@ -8,7 +8,7 @@ use rusty::dev::demo::{self, Destination};
 use rusty::dev::harness::Harness;
 use rusty::dev::scenario;
 
-use super::timeline::{demo_of_a_saved_scene, editor_world};
+use super::{demo_of_a_saved_scene, editor_world};
 
 fn ask(game: &mut GameWorld, request: DemoRequest) {
     game.resources
