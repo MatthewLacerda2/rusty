@@ -3,10 +3,10 @@
 //! recorded `dt`, the digests checked on the way), and draws nothing.
 //!
 //! Seeking back restarts the replay from the demo's start state: Play is left,
-//! and the world is put back as [`prepare`](super::prepare) found it (the scene,
-//! the camera, the clock, the Game view size, the input, the UI's event state, the
-//! navmesh, no quit asked), then prepared again from the file, read before
-//! anything is torn down.
+//! and the world is put back as [`prepare`](super::prepare) found it (its scene
+//! by [`Origin`], which the editor's close shares, then the camera, the clock and
+//! the Game view size), then prepared again from the file, read before anything
+//! is torn down.
 //! It is the same world, not a new one: a scenario's API is bound to the world's
 //! own cells for the whole run, so a fresh world would leave it reading the old
 //! one.
@@ -14,18 +14,16 @@
 use std::path::{Path, PathBuf};
 
 use super::super::read::Demo;
-use super::{install, Replayer};
+use super::{install, Origin, Replayer};
 use crate::app::GameWorld;
-use crate::core::input::InputState;
 use crate::dev::harness::tick_unless_quit;
-use crate::navigation::NavigationGraph;
-use crate::scene::{Camera, SceneSnapshot};
+use crate::scene::Camera;
 use crate::time::Time;
 
 /// What the world was when the replay was prepared: where a seek back restarts.
 pub struct Start {
     path: PathBuf,
-    scene: SceneSnapshot,
+    scene: Origin,
     scene_path: Option<String>,
     camera: Camera,
     time: Time,
@@ -37,7 +35,7 @@ impl Start {
     pub(super) fn of(world: &GameWorld, path: &Path) -> Self {
         Self {
             path: path.to_path_buf(),
-            scene: SceneSnapshot::capture(&world.scene().borrow()),
+            scene: Origin::of(world),
             scene_path: world.script_manager().scene_path_cell().borrow().clone(),
             camera: world.camera().borrow().clone(),
             time: world.time().borrow().clone(),
@@ -51,21 +49,12 @@ impl Start {
 
     /// Put `world` back as it was, Play left first.
     fn restore(self, world: &mut GameWorld) {
-        world.set_playing(false);
-        world.poll_transition();
-        // A demo that ended on `Application.Quit()` starts again unquit.
-        world.take_quit_request();
-        let mut scene = world.scene().borrow_mut();
-        self.scene.restore(&mut scene);
-        *world.nav().borrow_mut() = NavigationGraph::from_scene(&scene);
-        drop(scene);
+        self.scene.restore(world);
         *world.script_manager().scene_path_cell().borrow_mut() = self.scene_path;
         *world.camera().borrow_mut() = self.camera;
         *world.time().borrow_mut() = self.time;
         // A tick past the start may have resized the Game view.
         (world.resources.screen.borrow_mut()).restore_game_view(self.game_view);
-        *world.input().borrow_mut() = InputState::new();
-        *world.resources.event_system.borrow_mut() = Default::default();
         world.set_playing(true);
     }
 }

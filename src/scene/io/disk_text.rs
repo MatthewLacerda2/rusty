@@ -17,7 +17,7 @@ use super::parse_scene_text;
 use crate::scene::Scene;
 
 /// The last `(path, text)` the engine read or wrote for this scene.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct DiskText(RefCell<Option<(String, String)>>);
 
 impl DiskText {
@@ -49,6 +49,18 @@ impl Scene {
     /// it did not change outside the engine.
     pub fn is_disk_text(&self, path: &str, text: &str) -> bool {
         self.disk_text.is(path, text)
+    }
+
+    /// The record as it stands, for a host that lends the World to another scene
+    /// and puts this one back (`dev::demo::Origin`, #1598).
+    pub fn disk_text(&self) -> DiskText {
+        self.disk_text.clone()
+    }
+
+    /// Take back `record`, held by [`disk_text`](Self::disk_text): the scene put back
+    /// is the one that read or wrote it.
+    pub fn restore_disk_text(&mut self, record: DiskText) {
+        self.disk_text = record;
     }
 
     /// The World was rebuilt to stand for `path` without reading it (Reset Scene,

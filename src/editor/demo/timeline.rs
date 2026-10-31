@@ -59,7 +59,7 @@ pub fn draw(ui: &mut Ui, view: &mut DemoView, t: &Theme) {
         {
             view.set_paused(!view.paused);
         }
-        let readout = format!("{} / {}", view.current, view.ticks.saturating_sub(1));
+        let readout = format!("{} / {}", view.shown(), view.ticks.saturating_sub(1));
         let reserve = 90.0 + ui.spacing().item_spacing.x * 2.0 + 28.0;
         let width = (ui.available_width() - reserve).max(40.0);
         bar(ui, view, t, width);
@@ -70,14 +70,15 @@ pub fn draw(ui: &mut Ui, view: &mut DemoView, t: &Theme) {
     });
 }
 
-/// The scrub bar: a click or drag asks for the tick under the pointer.
+/// The scrub bar: a click or drag asks for the tick under the pointer
+/// ([`DemoView::scrub`]); a drag back is sought when it ends.
 fn bar(ui: &mut Ui, view: &mut DemoView, t: &Theme, width: f32) {
     let (rect, response) =
         ui.allocate_exact_size(egui::vec2(width, HEIGHT), Sense::click_and_drag());
     let track = Rect::from_center_size(rect.center(), egui::vec2(rect.width(), 6.0));
     let painter = ui.painter_at(rect);
     painter.rect_filled(track, 3.0, t.outline);
-    let head = x_of(view.current, rect.left(), rect.right(), view.ticks);
+    let head = x_of(view.shown(), rect.left(), rect.right(), view.ticks);
     painter.rect_filled(
         Rect::from_min_max(track.min, egui::pos2(head, track.max.y)),
         3.0,
@@ -106,14 +107,12 @@ fn bar(ui: &mut Ui, view: &mut DemoView, t: &Theme, width: f32) {
             );
         }
     }
-    if let (true, Some(pos)) = (
+    match (
         response.is_pointer_button_down_on(),
         response.interact_pointer_pos(),
     ) {
-        let tick = tick_at(pos.x, rect.left(), rect.right(), view.ticks);
-        if tick != view.current {
-            view.seek = Some(tick);
-        }
+        (true, Some(pos)) => view.scrub(tick_at(pos.x, rect.left(), rect.right(), view.ticks)),
+        _ => view.release(),
     }
 }
 

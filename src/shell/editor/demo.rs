@@ -1,9 +1,10 @@
 //! The editor playing a demo on its timeline (#1598): `Editor.OpenDemo(path)` takes
 //! the editor's world, replays the demo on it, and the Game view's timeline plays,
 //! pauses and scrubs it (`dev::demo::seek`). Closing, by the timeline's button, by
-//! Stop or by quitting, puts back the edit scene, the recorder and what the replay
-//! overwrote: the save data, settings, seed and clock (`dev::demo::lend`), so
-//! nothing of the demo reaches `saved/`.
+//! Stop or by quitting, puts back the edit scene as the same scene, with no input
+//! held (`dev::demo::Origin`, shared with a seek back), the recorder, and what the
+//! replay overwrote: the save data, settings, seed and clock (`dev::demo::lend`),
+//! so nothing of the demo reaches `saved/`.
 //!
 //! Playback is read-only: the replay writes the recorded input over the live one
 //! every tick, and the Game view hears none of the editor's (`game_has_input`). The
@@ -11,10 +12,9 @@
 
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::application::DemoRequest;
-use crate::dev::demo::{self, Demo, Replayer};
+use crate::dev::demo::{self, Demo, Origin, Replayer};
 use crate::editor::demo::DemoView;
 use crate::editor::EditorUi;
-use crate::scene::SceneSnapshot;
 
 impl EditorUi {
     /// Whether a demo is open (the Game view takes no editor input then).
@@ -122,10 +122,7 @@ impl EditorUi {
             return Err(format!("{path} holds no ticks"));
         }
         let scene_file = demo.header.scene.clone();
-        let return_to = (
-            SceneSnapshot::capture(&game.world.scene.borrow()),
-            self.current_scene_path(),
-        );
+        let return_to = (Origin::of(game), self.current_scene_path());
         let mut console = game.resources.console.borrow_mut();
         let loaded = self.open_scene(
             &mut game.world.scene.borrow_mut(),
@@ -147,7 +144,10 @@ impl EditorUi {
         game.set_playing(true);
         self.dev.demo = Some(view);
         self.viewport_tab = crate::editor::ViewportTab::Game;
-        demo::seek(game, 0).map_err(|err| format!("the replay did not start: {err}"))?;
+        if let Err(err) = demo::seek(game, 0) {
+            self.close_demo(game);
+            return Err(format!("the replay did not start: {err}"));
+        }
         game.take_quit_request();
         self.sync_demo(game);
         Ok(())
@@ -170,16 +170,9 @@ impl EditorUi {
         transition
     }
 
-    /// The edit scene the demo found, back as it was.
-    fn put_back(
-        &mut self,
-        game: &mut GameWorld,
-        (snapshot, path): (SceneSnapshot, Option<String>),
-    ) {
-        let mut scene = game.world.scene.borrow_mut();
-        snapshot.restore(&mut scene);
-        *game.resources.nav.borrow_mut() = crate::navigation::NavigationGraph::from_scene(&scene);
-        drop(scene);
+    /// The edit scene the demo found, back as it was and as the same scene.
+    fn put_back(&mut self, game: &mut GameWorld, (origin, path): (Origin, Option<String>)) {
+        origin.restore(game);
         self.set_current_scene_path(path);
         self.selected_entity_id = None;
         self.selected_asset_path = None;

@@ -31,9 +31,11 @@ pub fn capture_demo(
             .borrow_mut()
             .request_demo(request);
         ui.advance_demo(game, 0.0);
+        // Only the timeline's own refusals: a replay that diverges or a script
+        // error in it is still a demo to look at.
         let refused = (game.console().borrow().messages.iter())
             .skip(console_before)
-            .find(|(_, level)| *level == LogLevel::Error)
+            .find(|(text, level)| *level == LogLevel::Error && is_refusal(text))
             .map(|(text, _)| text.clone());
         if let Some(reason) = refused {
             return Err(reason);
@@ -42,5 +44,16 @@ pub fn capture_demo(
     if !ui.demo_open() {
         return Err(format!("{} did not open", demo.display()));
     }
+    let at = game.resources.application.borrow().demo_tick();
+    if at.map(|(current, _)| current) != Some(tick) {
+        return Err(format!("the replay stands at {at:?}, not tick {tick}"));
+    }
     capture_with(&mut CaptureHost::new(), game, &mut ui, path, opts)
+}
+
+/// A console line the timeline writes when it refuses to open or seek.
+fn is_refusal(text: &str) -> bool {
+    ["Editor.OpenDemo:", "Editor.SeekDemo:", "Editor demo:"]
+        .iter()
+        .any(|prefix| text.starts_with(prefix))
 }
