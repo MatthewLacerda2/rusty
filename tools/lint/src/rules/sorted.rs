@@ -146,7 +146,9 @@ fn key(line: &str) -> Option<String> {
         let end = rest[start..]
             .find(|c| !word(c))
             .map_or(rest.len(), |e| start + e);
-        if !KEYWORDS.contains(&&rest[start..end]) {
+        // `self-path` (a Markdown entry named for a rule) is a name, not the keyword.
+        let hyphenated = rest[end..].starts_with('-');
+        if hyphenated || !KEYWORDS.contains(&&rest[start..end]) {
             return Some(rest[start..].trim_end().to_string());
         }
         rest = &rest[end..];
