@@ -14,7 +14,7 @@ mod index;
 mod index_edges;
 mod play_bin;
 #[cfg(feature = "editor")]
-mod timeline;
+pub mod timeline;
 #[cfg(feature = "editor")]
 mod timeline_files;
 mod timing;

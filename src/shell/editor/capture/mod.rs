@@ -18,6 +18,11 @@
 //! frame shows the settled UI. The sim is never stepped.
 //!
 //! No adapter → `Ok(false)`, the same skip contract as every headless capture.
+//! [`capture_demo`] captures the editor with a demo open on the Game view's
+//! timeline (#1598).
+
+mod demo;
+mod paint;
 
 use std::{cell::RefCell, path::Path, rc::Rc};
 
@@ -29,6 +34,8 @@ use crate::navigation::NavigationGraph;
 use crate::render::{readback, OFFSCREEN_FORMAT};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
+pub use demo::capture_demo;
+pub(super) use paint::paint;
 
 /// Default capture size: the 16:9 layout #725's captures used.
 pub const DEFAULT_WIDTH: u32 = 1600;
@@ -57,6 +64,8 @@ pub struct EditorCaptureOptions {
     pub playing: bool,
     /// Which viewport tab is showing.
     pub tab: ViewportTab,
+    /// Hold the pointer here, in window pixels, every frame: a hover shows.
+    pub pointer: Option<(f32, f32)>,
 }
 
 impl Default for EditorCaptureOptions {
@@ -70,6 +79,7 @@ impl Default for EditorCaptureOptions {
             frame_selected: false,
             playing: false,
             tab: ViewportTab::Scene,
+            pointer: None,
         }
     }
 }
@@ -109,8 +119,19 @@ pub fn capture_into(
     path: impl AsRef<Path>,
     opts: &EditorCaptureOptions,
 ) -> Result<bool, String> {
-    let (width, height) = (opts.width.max(1), opts.height.max(1));
     let ui = &mut initial_ui(game, opts)?;
+    capture_with(host, game, ui, path, opts)
+}
+
+/// Draw `ui`'s frames over `game` and write the last to `path`.
+fn capture_with(
+    host: &mut CaptureHost,
+    game: &GameWorld,
+    ui: &mut EditorUi,
+    path: impl AsRef<Path>,
+    opts: &EditorCaptureOptions,
+) -> Result<bool, String> {
+    let (width, height) = (opts.width.max(1), opts.height.max(1));
     let Some(renderer) = host.renderer(width, height) else {
         crate::dev::capture::no_adapter("capture the editor")?;
         return Ok(false);
@@ -124,7 +145,13 @@ pub fn capture_into(
     let mut texture_id = None;
     let mut output = None;
     for frame in 0..opts.frames.max(1) {
-        ctx.begin_pass(raw_input(width, height, frame));
+        let mut input = raw_input(width, height, frame);
+        if let Some((x, y)) = opts.pointer {
+            input
+                .events
+                .push(egui::Event::PointerMoved(egui::pos2(x, y)));
+        }
+        ctx.begin_pass(input);
         let size = draw_ui(ui, &ctx, game, opts.playing, texture_id);
         render_viewport(host, &mut egui_renderer, game, ui, size, &mut texture_id);
         output = Some(ctx.end_pass());
@@ -216,12 +243,17 @@ fn render_viewport(
     size: egui::Vec2,
     texture_id: &mut Option<egui::TextureId>,
 ) {
-    let (px, py) = (size.x.round() as u32, size.y.round() as u32);
+    let scene_tab = ui.viewport_tab == ViewportTab::Scene;
+    let (px, py) = match ui.demo_size() {
+        Some(size) if !scene_tab => size, // the demo's own, letterboxed (#1598)
+        _ => (size.x.round() as u32, size.y.round() as u32),
+    };
     if px == 0 || py == 0 {
         return;
     }
-    game.resources.screen.borrow_mut().set_game_view(px, py);
-    let scene_tab = ui.viewport_tab == ViewportTab::Scene;
+    if ui.demo_size().is_none() {
+        game.resources.screen.borrow_mut().set_game_view(px, py);
+    }
     // The settings first: the Game view's scene renders at the render scale (#1498).
     let Some(renderer) = host.renderer(px, py) else {
         return;
@@ -240,61 +272,4 @@ fn render_viewport(
     renderer.set_ui_textures(Rc::clone(&ui.ui_textures));
     renderer.render(view, &scene, &camera, &target, scene_tab);
     super::viewport::rebind_egui_texture(egui_renderer, &renderer.device, texture_id, view);
-}
-
-/// Tessellate `output` and paint it over a cleared `width × height` offscreen target.
-pub(super) fn paint(
-    renderer: &crate::render::Renderer,
-    egui_renderer: &mut egui_wgpu::Renderer,
-    ctx: &egui::Context,
-    output: egui::FullOutput,
-    width: u32,
-    height: u32,
-) -> wgpu::Texture {
-    let (device, queue) = (&renderer.device, &renderer.queue);
-    let target = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Editor Capture Target"),
-        size: wgpu::Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: OFFSCREEN_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        view_formats: &[],
-    });
-    let target_view = target.create_view(&Default::default());
-    let jobs = ctx.tessellate(output.shapes, output.pixels_per_point);
-    let screen = egui_wgpu::ScreenDescriptor {
-        size_in_pixels: [width, height],
-        pixels_per_point: output.pixels_per_point,
-    };
-    let mut encoder = device.create_command_encoder(&Default::default());
-    egui_renderer.update_buffers(device, queue, &mut encoder, &jobs, &screen);
-    {
-        let mut pass = encoder
-            .begin_render_pass(&wgpu::RenderPassDescriptor {
-                multiview_mask: None,
-                label: Some("Editor Capture Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    depth_slice: None,
-                    view: &target_view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            })
-            .forget_lifetime();
-        egui_renderer.render(&mut pass, &jobs, &screen);
-    }
-    queue.submit(std::iter::once(encoder.finish()));
-    target
 }

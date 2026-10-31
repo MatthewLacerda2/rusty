@@ -88,6 +88,13 @@ impl DemoView {
     }
 }
 
+impl crate::editor::EditorUi {
+    /// The Game view size an open demo replays on; `None` with none open.
+    pub fn demo_size(&self) -> Option<(u32, u32)> {
+        self.dev.demo.as_ref().map(|demo| demo.size)
+    }
+}
+
 /// Playback's clock: wall time spent against each tick's recorded `dt`, so a demo
 /// plays at the speed it was recorded whatever the display's rate.
 pub struct Pace {

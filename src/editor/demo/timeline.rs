@@ -76,7 +76,7 @@ fn bar(ui: &mut Ui, view: &mut DemoView, t: &Theme, width: f32) {
         ui.allocate_exact_size(egui::vec2(width, HEIGHT), Sense::click_and_drag());
     let track = Rect::from_center_size(rect.center(), egui::vec2(rect.width(), 6.0));
     let painter = ui.painter_at(rect);
-    painter.rect_filled(track, 3.0, t.bg_tier0);
+    painter.rect_filled(track, 3.0, t.outline);
     let head = x_of(view.current, rect.left(), rect.right(), view.ticks);
     painter.rect_filled(
         Rect::from_min_max(track.min, egui::pos2(head, track.max.y)),

@@ -173,15 +173,22 @@ fn draw_image(
         ui.painter().rect_filled(rect, 0.0, t.bg_tier0);
         return response;
     };
-    let image = egui::Image::new((id, size)).sense(egui::Sense::click_and_drag());
     let Some((width, height)) = fit else {
+        let image = egui::Image::new((id, size)).sense(egui::Sense::click_and_drag());
         return ui.add(image.maintain_aspect_ratio(false));
     };
     // Letterboxed: the panel black, the image centred at the size's aspect ratio.
     let (panel, _) = ui.allocate_exact_size(size, egui::Sense::hover());
-    ui.painter().rect_filled(panel, 0.0, egui::Color32::BLACK);
     let rect = egui::Rect::from_center_size(panel.center(), letterbox(size, (width, height)));
-    ui.put(rect, image.maintain_aspect_ratio(false))
+    let painter = ui.painter();
+    painter.rect_filled(panel, 0.0, egui::Color32::BLACK);
+    let uv = egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0));
+    painter.image(id, rect, uv, egui::Color32::WHITE);
+    ui.interact(
+        rect,
+        ui.id().with("letterboxed"),
+        egui::Sense::click_and_drag(),
+    )
 }
 
 /// The largest size of `width:height`'s aspect ratio that fits in `panel`.

@@ -118,7 +118,7 @@ impl EditorFrontend {
     /// The size of the Game view an open demo replays on; `None` with none open.
     fn demo_size(&self) -> Option<(u32, u32)> {
         #[cfg(feature = "dev")]
-        return self.editor_ui.dev.demo.as_ref().map(|demo| demo.size);
+        return self.editor_ui.demo_size();
         #[cfg(not(feature = "dev"))]
         None
     }
