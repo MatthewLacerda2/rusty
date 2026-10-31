@@ -64,7 +64,7 @@ impl Renderer {
     /// [`CONVERGENCE_EPSILON`] energy, whichever comes first; then every probe gains
     /// the direct light of the scene's `Baked` lights (#809). With no probes it is a
     /// no-op. Returns a [`BounceReport`] describing the termination. The solve is
-    /// [`BounceSolve`] run to its end; the editor steps the same one across frames.
+    /// `probe::solve::BounceSolve` run to its end; the editor steps the same one across frames.
     pub fn bake_probes_multibounce(&mut self, scene: &mut Scene, resolution: u32) -> BounceReport {
         let mut solve = BounceSolve::new(scene, resolution);
         loop {
