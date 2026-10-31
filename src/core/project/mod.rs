@@ -17,7 +17,8 @@
 //!   project.rusty        marks the folder as a project: the engine commit it was
 //!                        last opened with, and the build settings (#853)
 //!   .seeded              the seed manifest (#746)
-//!   cache/               anything the engine can regenerate (Unity's Library/)
+//!   cache/               anything the engine can regenerate (Unity's Library/),
+//!                        and the editor's last open scene (`boot`, #1618)
 //!   saved/               the player's save data (Unreal's Saved/)
 //!   CLAUDE.md            the game's instructions for an agent (#1313)
 //!   .mcp.json            registers the engine's MCP with Claude Code
@@ -33,6 +34,7 @@
 
 mod agent;
 pub mod bench;
+mod boot;
 mod engine;
 mod file;
 mod locate;
@@ -41,6 +43,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use agent::{CLAUDE_FILE, MCP_FILE};
+pub use boot::{boot_scene, remember_scene, scene_to_remember, BootPlan, LAST_SCENE_PATH};
 #[cfg(test)]
 pub(crate) use engine::commit::pin as pin_engine;
 pub use engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
@@ -67,8 +70,8 @@ pub const TEXTURES_DIR: &str = "assets/textures";
 /// Where a project keeps its generated and authored shaders.
 pub const SHADERS_DIR: &str = "assets/shaders";
 /// Where generated assets live: provider output (#384) and converted model sources
-/// (#1024). Whether a game's repo versions these files is still open (#866), so
-/// every writer names this one folder and follows whatever is decided for it.
+/// (#1024). Whether a game's repo versions them is the game's own `.gitignore`'s
+/// call: the engine ignores nothing here (#866). Every writer names this one folder.
 pub const GENERATED_DIR: &str = "assets/generated";
 
 /// The folders [`create_skeleton`] makes, relative to the root.

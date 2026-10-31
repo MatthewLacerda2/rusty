@@ -29,7 +29,7 @@ pub fn register_events<'scope>(
     let table = &global_table(lua, "UI")?;
     let (scene, input, events) = (ctx.scene, ctx.input, ctx.event_system);
     let (screen, video, camera, physics) = (ctx.screen, ctx.video, ctx.camera, ctx.physics);
-    let view = move || ui_view(screen, video, camera);
+    let view = move || ui_view(screen, video, camera, &scene.borrow());
     let f = scope.create_function(move |_, id: EntityArg| {
         events.borrow_mut().set_selected(id.get());
         Ok(())
@@ -92,8 +92,9 @@ fn register_find<'scope>(
                 "UI.FindSelectable: unknown direction '{dir}' (Up, Down, Left, Right)"
             )));
         };
-        let world = &scene.borrow().world;
-        let layout = UiLayout::compute_in(world, &ui_view(screen, video, camera));
+        let scene = &scene.borrow();
+        let layout = UiLayout::compute_in(&scene.world, &ui_view(screen, video, camera, scene));
+        let world = &scene.world;
         Ok(find_selectable(world, &layout, id.read(), dir))
     });
     put(table, "FindSelectable", f)

@@ -89,3 +89,29 @@ fn the_embedded_seeds_are_exactly_the_engine_folders_scripts() {
         "add it to bundled::UI_SCRIPTS"
     );
 }
+
+#[test]
+fn a_deleted_default_scene_takes_its_assets_with_it() {
+    use super::super::manifest::SeedOutcome;
+    use std::cell::Cell;
+    let root = crate::test_temp::dir().join("seed_default_scene");
+    std::fs::remove_dir_all(&root).ok();
+    let (manifest, dest) = (root.join(".seeded"), root.join("default.scene"));
+    let assets = Cell::new(0);
+    let seed = || super::seed_default_scene_at(&manifest, &dest, || assets.set(assets.get() + 1));
+    assert_eq!(seed(), Some(SeedOutcome::Written));
+    assert_eq!(seed(), Some(SeedOutcome::UpToDate));
+    assert_eq!(
+        assets.get(),
+        2,
+        "a live default scene keeps its assets seeded"
+    );
+    std::fs::remove_file(&dest).unwrap();
+    assert_eq!(seed(), Some(SeedOutcome::Deleted));
+    assert_eq!(
+        assets.get(),
+        2,
+        "a deleted default scene seeds no assets (#1618)"
+    );
+    assert!(!dest.exists());
+}

@@ -15,6 +15,12 @@ impl EditorUi {
         self.scene_path.borrow().clone()
     }
 
+    /// [`current_scene_path`](Self::current_scene_path) lent to `f` without a copy,
+    /// for a read every frame (the editor remembering its open scene, #1618).
+    pub fn with_current_scene_path<R>(&self, f: impl FnOnce(Option<&str>) -> R) -> R {
+        f(self.scene_path.borrow().as_deref())
+    }
+
     /// Make `path` the scene file the editor (and `Scene.Save()`) writes back to.
     pub fn set_current_scene_path(&mut self, path: Option<String>) {
         *self.scene_path.borrow_mut() = path;

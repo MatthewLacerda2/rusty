@@ -78,11 +78,11 @@ jobs:
               - 'src/core/project/game_claude.md'
 
   # The Linux build+test. Kept as its own job (not folded into the OS matrix
-  # below) so the `build-test` status-check name — referenced by the branch
-  # ruleset as a required check — is preserved exactly. The job ALWAYS runs on a
-  # non-draft PR so the required check reports `success` (never
-  # `skipped`); the build/test steps are guarded on `code`, so a Markdown-only PR
-  # is a fast no-op success (issue #218).
+  # below) so the `build-test` name `mergeable.py` and `ci-gate`'s `needs:` read
+  # is preserved exactly (the ruleset requires `ci-gate`, not this job). The job
+  # ALWAYS runs on a non-draft PR so it reports `success` (never `skipped`); the
+  # build/test steps are guarded on `code`, so a Markdown-only PR is a fast no-op
+  # success (issue #218).
   #
   # The events each gating job runs on are listed explicitly (#480). A bare
   # `github.event.pull_request.draft == false` also matches `push` and `schedule`
@@ -322,14 +322,21 @@ jobs:
           # Policy lives in deny.toml.
           command: check advisories bans sources licenses
 
-  # The single required status check for ci.yml (issue #229). Branch protection
-  # requires THIS job, not build-test / build-test-cross / deny by name. It always
+  # The single required status check for ci.yml (issue #229). `main`'s ruleset,
+  # kept as code in `.github/rulesets/main.json` (#491; `make ruleset` checks it is
+  # live), requires THIS job from GitHub Actions, not build-test / build-test-cross
+  # / deny by name, and not strict (the queue may merge a head behind a
+  # Markdown-only `main`, #587). Renaming it, giving it a `name:` or putting a
+  # `paths` filter on the workflow would leave every PR waiting on a check that
+  # never reports; `tests/ruleset/test_reporting.py` refuses all three. The ruleset
+  # cannot tell a draft's run (gate green, nothing built) from a ready run of the
+  # same commit, so `make mergeable` still judges every merge. It always
   # runs and collapses those gating jobs into one result: it passes when each either
   # succeeded or was legitimately skipped (e.g. build-test-cross on a Markdown-only
   # PR) and fails only on a real failure or cancellation. That permanently retires the
   # skipped-required-check deadlock (#218/#228) — a skipped gating job can no longer
   # leave a required check stuck "Expected" and wedge a docs-only PR. When a gating
-  # job is added or removed, update this `needs:` list; branch protection never needs
+  # job is added or removed, update this `needs:` list; the ruleset never needs
   # touching again. (lint.yml exposes the analogous `lint-gate`.)
   #
   # `changes` is in `needs:` and must SUCCEED (#480): every gating job depends on

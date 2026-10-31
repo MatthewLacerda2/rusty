@@ -13,9 +13,10 @@ impl Scene {
     /// Rebuild every skinned mesh's `pose_palette` from its bones' current
     /// transforms: `bone_in_mesh_space * inverse_bind` per joint, the same
     /// convention as the bind palette. A mesh whose skeleton is not bound keeps
-    /// rendering its bind pose.
+    /// rendering its bind pose. Visits the skinned entities only
+    /// ([`Scene::skinned_ids`]), never the scene's static meshes.
     pub fn build_skin_palettes(&mut self) {
-        for owner in self.world.ids_with_mesh() {
+        for owner in self.skinned_ids() {
             let Some(palette) = self.skin_palette(owner) else {
                 continue;
             };

@@ -63,8 +63,9 @@ pub fn capture(
     capture_into(&mut CaptureHost::new(), scene, camera, path, width, height)
 }
 
-/// Convenience: screenshot the harness's live `GameWorld` (its scene + camera) through
-/// `host`, so a scenario's shots all share one renderer.
+/// Convenience: screenshot the harness's live `GameWorld` (its scene, from its
+/// [`GameWorld::main_view`], as the player shows it) through `host`, so a scenario's
+/// shots all share one renderer.
 pub fn capture_world_into(
     host: &mut CaptureHost,
     world: &GameWorld,
@@ -73,8 +74,9 @@ pub fn capture_world_into(
     height: u32,
 ) -> Result<bool, String> {
     share_world(host, world, width, height);
+    let camera = world.main_view();
     let scene = world.scene().borrow();
-    capture_into(host, &scene, &world.camera().borrow(), path, width, height)
+    capture_into(host, &scene, &camera, path, width, height)
 }
 
 /// Hand `world`'s texture-size table (#1221) and its graphics cell — the quality
