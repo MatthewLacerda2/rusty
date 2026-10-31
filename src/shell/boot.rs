@@ -14,6 +14,7 @@ use super::{settings, Shell};
 use crate::app::GameWorld;
 use crate::core::input::keymap::{Keymap, KEYBINDINGS_KEY, KEYBINDINGS_NAMESPACE};
 use crate::core::input::InputState;
+use crate::core::project::BootPlan;
 use crate::core::settings::video::VideoSettings;
 use crate::navigation::NavigationGraph;
 use crate::render::{PixelSize, Renderer};
@@ -106,28 +107,21 @@ pub fn pixel_size(size: winit::dpi::PhysicalSize<u32>) -> PixelSize {
     PixelSize::new(size.width, size.height)
 }
 
-/// Build the simulation around the scene at `scene_path`: shared engine state, baked
-/// nav, and the persistent store bound to its file. A scene that fails to load is
-/// logged to the console and leaves an empty, Untitled scene; one whose lighting
-/// sidecar alone fails is loaded, with a warning.
-pub fn load_game(scene_path: &str) -> GameWorld {
+/// Build the simulation around the first of `plan`'s scenes that loads
+/// (`app::load_boot_scene`, #1618): shared engine state, baked nav, and the
+/// persistent store bound to its file. Every scene that fails to load is logged to
+/// the console, and when none loads (or the plan is empty) the game holds an
+/// empty, Untitled scene; one whose lighting sidecar alone fails is loaded, with a
+/// warning.
+pub fn load_game(plan: &BootPlan) -> GameWorld {
     let scene = Rc::new(RefCell::new(Scene::new()));
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    let loaded = {
-        let mut c = console.borrow_mut();
-        c.info(format!("Loading scene from {scene_path}..."));
-        match scene.borrow_mut().load_from_file(scene_path) {
-            Ok(()) => true,
-            Err(err) if err.replaced_world() => {
-                c.warn(format!("Scene {scene_path}: {err}"));
-                true
-            }
-            Err(err) => {
-                c.error(format!("Failed to load scene {scene_path}: {err}"));
-                false
-            }
-        }
-    };
+    let loaded = crate::app::load_boot_scene(
+        &mut scene.borrow_mut(),
+        &mut console.borrow_mut(),
+        plan,
+        true,
+    );
     // Baked over the scene's own bounds (#452) — the same path the headless harness takes.
     let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
     let input = Rc::new(RefCell::new(InputState::new()));
@@ -148,8 +142,8 @@ pub fn load_game(scene_path: &str) -> GameWorld {
     // The current scene file only when the World is that file's: a startup scene
     // that doesn't parse leaves the editor on Untitled (Unity's way), so a Save can't
     // write an empty scene over a recoverable file (#1374).
-    if loaded {
-        *game.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.to_string());
+    if let Some(path) = loaded {
+        *game.script_manager().scene_path_cell().borrow_mut() = Some(path);
     }
 
     // Bind the persistent store to its file and load it once — this boundary read is

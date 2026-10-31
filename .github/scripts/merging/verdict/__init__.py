@@ -10,11 +10,14 @@ a reason otherwise. It is the last thing the merge routine does before
 ran" are not the same claim. Ported from scorsese (#486), whose incidents the
 reasoning below cites as scorsese#N.
 
-**On rusty it is the only thing standing between a red pull request and
-`main`.** `main` has no required status checks (#491 is the human task that
-would add them), so GitHub will merge a pull request whose CI is red, running,
-or absent. Every answer here that is not an explicit pass is a refusal, and an
-absent check is never read as a green one.
+**GitHub's own check is coarser than this one.** `main`'s ruleset
+(`.github/rulesets/main.json`, #491; `make ruleset` says whether it is live)
+requires `ci-gate` and `lint-gate` to pass on the head, which stops a red or
+unbuilt pull request — but a draft's run leaves both gates green with nothing
+built, and on 2026-10-30 #1603's `ready_for_review` run listed no `ci-gate` for
+14 minutes, while the draft's green one stood on the same commit. Every answer
+here that is not an explicit pass is a refusal, and an absent check is never
+read as a green one.
 
 ## Two workflows, and why neither's green is the other's
 

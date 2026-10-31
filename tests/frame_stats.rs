@@ -19,6 +19,8 @@ fn a_run_records_stage_system_and_world_stats() {
     let fixed = stats.get("fixed_update_ms").expect("stage timing recorded");
     assert_eq!(fixed.samples, 30);
     assert!(stats.get("entities").is_some_and(|s| s.max > 0.0));
+    let bone_counts = ["skeletons", "bones"].map(|k| stats.get(k).is_some());
+    assert_eq!(bone_counts, [true, true], "the skeleton counters (#1617)");
     assert!(
         stats.systems.contains_key("step_physics"),
         "{:?}",

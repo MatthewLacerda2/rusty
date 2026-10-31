@@ -209,7 +209,7 @@ pub fn register<'scope>(
     joint::register(lua, scope, ctx.scene)?;
     layers::register(lua, scope, ctx.scene)?;
     light::register(lua, scope, ctx.scene)?;
-    lighting::register(lua)?;
+    lighting::register(lua, scope, ctx.scene)?;
     line::register(lua, scope, ctx.scene)?;
     lod_group::register(lua, scope, ctx.scene)?;
     material::register(lua, scope, ctx.scene)?;

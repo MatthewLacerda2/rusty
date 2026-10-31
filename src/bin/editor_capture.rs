@@ -16,6 +16,9 @@
 //!   --play              draw the Play-mode chrome (the sim is not stepped)
 //!   --game              show the Game tab instead of the Scene tab
 //!   --size <W>x<H>      capture size (default 1600x900)
+//!   --demo <file>       open this demo on the Game view's timeline (#1598)
+//!   --demo-tick <n>     replay the demo to tick n first (default 0)
+//!   --pointer <X>,<Y>   hold the pointer here, in pixels (a hover label shows)
 //!   --picker [<page>]   the project picker the editor starts on (#854), over a
 //!                       sample recent list; <page> is `new`, `open` or
 //!                       `mismatch` (the different-engine prompt)
@@ -40,7 +43,7 @@ fn main() {
     rusty::logging::init();
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let project = rusty::core::project::take_flag(&mut args).unwrap_or_else(|e| fail(&e));
-    let (out, scene, opts, page) = parse(&args).unwrap_or_else(|e| fail(&e));
+    let (out, source, opts, page) = parse(&args).unwrap_or_else(|e| fail(&e));
     // `--out` is named from the launch directory; opening the project moves it.
     let out = std::path::absolute(&out).map_or(out, |p| p.to_string_lossy().into_owned());
     if let Some(page) = page {
@@ -51,12 +54,17 @@ fn main() {
     }
     let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
     opened.unwrap_or_else(|e| fail(&e));
-    let written = match scene {
-        Some(path) => {
+    let written = match (source.demo, source.scene) {
+        (Some(demo), _) => {
+            let mut world = capture::default_world();
+            let demo = std::path::Path::new(&demo);
+            capture::capture_demo(&mut world, &out, &opts, demo, source.tick)
+        }
+        (None, Some(path)) => {
             let session = Session::new(&path).unwrap_or_else(|e| fail(&e));
             capture::capture(session.world(), &out, &opts)
         }
-        None => capture::capture(&capture::default_world(), &out, &opts),
+        (None, None) => capture::capture(&capture::default_world(), &out, &opts),
     };
     report(written, &out);
 }
@@ -73,11 +81,21 @@ fn report(written: Result<bool, String>, out: &str) {
 }
 
 /// What the command line asked for: `(out, scene, options, picker page)`.
-type Parsed = (String, Option<String>, EditorCaptureOptions, Option<String>);
+type Parsed = (String, Source, EditorCaptureOptions, Option<String>);
+
+/// What the editor opens on: a scene file (or the built-in default), or a demo at
+/// a tick.
+#[derive(Default)]
+struct Source {
+    scene: Option<String>,
+    demo: Option<String>,
+    tick: u64,
+}
 
 fn parse(args: &[String]) -> Result<Parsed, String> {
     let mut out = "editor-capture.png".to_string();
-    let (mut scene, mut opts, mut picker) = (None, EditorCaptureOptions::default(), None);
+    let (mut source, mut opts, mut picker) =
+        (Source::default(), EditorCaptureOptions::default(), None);
     let mut it = args.iter().peekable();
     while let Some(flag) = it.next() {
         if flag == "--picker" {
@@ -88,7 +106,13 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
         let mut value = || it.next().cloned().ok_or(format!("{flag} needs a value"));
         match flag.as_str() {
             "--out" => out = value()?,
-            "--scene" => scene = Some(value()?),
+            "--scene" => source.scene = Some(value()?),
+            "--demo" => {
+                source.demo = Some(value()?);
+                (opts.tab, opts.playing) = (ViewportTab::Game, true);
+            }
+            "--demo-tick" => source.tick = value()?.parse().map_err(|e| format!("{flag}: {e}"))?,
+            "--pointer" => opts.pointer = Some(parse_point(&value()?)?),
             "--select" => opts.select = Some(value()?),
             "--select-asset" => opts.select_asset = Some(value()?),
             "--frame" => opts.frame_selected = true,
@@ -98,7 +122,15 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             other => return Err(format!("unknown argument {other}")),
         }
     }
-    Ok((out, scene, opts, picker))
+    Ok((out, source, opts, picker))
+}
+
+/// `X,Y` in pixels.
+fn parse_point(text: &str) -> Result<(f32, f32), String> {
+    let bad = || format!("--pointer wants X,Y, got {text:?}");
+    let (x, y) = text.split_once(',').ok_or_else(bad)?;
+    let (x, y) = (x.trim().parse(), y.trim().parse());
+    Ok((x.map_err(|_| bad())?, y.map_err(|_| bad())?))
 }
 
 fn fail(msg: &str) -> ! {

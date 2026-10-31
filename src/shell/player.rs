@@ -10,9 +10,10 @@ use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
 use crate::app::GameWorld;
 use crate::core::application::{BuildSettings, WindowMode};
-use crate::core::project::ProjectSettings;
+use crate::core::project::{Access, ProjectSettings};
 use crate::core::settings::video::VideoSettings;
 use crate::render::RenderView;
+use std::path::Path;
 
 /// The player's frontend state: the one full-window render view.
 #[derive(Default)]
@@ -59,8 +60,8 @@ impl Frontend for PlayerFrontend {
         // the frame to draw the in-game UI on (#418).
         view.set_ui_output(Some(shell.renderer.surface_ui_view(frame)));
 
+        let camera = game.main_view();
         let scene = game.scene().borrow();
-        let camera = crate::scene::game_camera_from_scene(&game.camera().borrow(), &scene);
         // No debug overlays in a shipped game: editor mode off.
         let textures = std::rc::Rc::clone(game.resources.screen.borrow().textures());
         shell.renderer.set_ui_textures(textures);
@@ -93,7 +94,13 @@ pub fn launch(settings: ProjectSettings) {
         build.product_name, build.startup_scene
     );
 
-    let mut game = boot::load_game(&build.startup_scene);
+    // A run reads no editor record, so the root is moot (`boot_scene`, #1618).
+    let plan = crate::core::project::boot_scene(Path::new(""), &build.startup_scene, Access::Run);
+    let plan = plan.unwrap_or_else(|err| {
+        eprintln!("[Player] cannot start: {err}");
+        std::process::exit(1);
+    });
+    let mut game = boot::load_game(&plan);
     // Unbound: a shipped game reads its settings but never rewrites them. The
     // graphics defaults are what a first launch's options fall back to (#1438).
     game.resources.application.borrow_mut().run_with(settings);

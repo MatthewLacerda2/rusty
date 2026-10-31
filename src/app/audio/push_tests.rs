@@ -73,7 +73,7 @@ fn the_frame_mix_matches_the_spatial_read_back() {
     place_camera(&game, Vec3::new(2.0, 0.0, 5.0));
     game.push_audio(0.0);
     let (src, pos) = crate::api::audio::emitter(&game.scene().borrow(), id).unwrap();
-    let listener = crate::api::audio::listener(&game.resources.camera);
+    let listener = crate::api::audio::listener(&game.resources.camera, &game.world.scene.borrow());
     let read = game
         .resources
         .audio
