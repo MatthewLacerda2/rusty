@@ -252,14 +252,27 @@ covered: nothing parses it, so a Markdown-only PR touching it merges freely.
     make mergeable PR=N
 
 Exit 0 means CI genuinely ran on the head commit and passed; anything else prints
-why. It is the last thing before any merge, the queue asks it too, and **on rusty
-it is the only check there is**: `main`'s one ruleset rule is *deletion* — no
-required status checks (#491, a human task), no merge queue — so GitHub will
-happily merge a red or entirely unbuilt pull request. Confirm before trusting
-otherwise:
+why. It is the last thing before any merge, and the queue asks it too.
 
-    gh api repos/:owner/:repo/rulesets --jq '.[].id' \
-      | xargs -I{} gh api repos/:owner/:repo/rulesets/{} --jq '.name, [.rules[].type]'
+**GitHub enforces the coarse half** (#491). `main`'s ruleset is code,
+`.github/rulesets/main.json`: besides refusing deletion and force-pushes, it
+requires `ci-gate` and `lint-gate` to pass on the pull request's head, from
+GitHub Actions only, and not strict (a head behind a Markdown-only `main`
+merges, #587). So GitHub itself refuses a red pull request, or one whose
+gates never reported. `make ruleset` says whether the live ruleset matches the
+file (read-only; exit 1 names each drift), and `make ruleset ARGS=--apply`
+writes the file to GitHub. Applying changes how the queue merges, so the
+orchestrator does it between merges, never a coder; a change to the rules is a
+pull request on the file first.
+
+**The ruleset does not replace `make mergeable`.** A required check is
+satisfied by the newest check run of that name on the head commit, and a
+draft's run leaves both gates green with nothing built. When a draft is
+readied without a push, its `ready_for_review` run lists no gate until its
+gated jobs finish: on 2026-10-30 #1603's `ci-gate` from the draft run was the
+only one on the commit for 14 minutes, and GitHub would have merged it. Nor
+does the ruleset read the description (closing keywords, `planning` issues,
+open blockers). Everything below is still asked on every merge.
 
 What it asks, so its answers read plainly (`.github/scripts/mergeable.py` has the
 incidents behind each):
