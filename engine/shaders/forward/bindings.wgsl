@@ -80,7 +80,7 @@ struct MaterialData {
 };
 
 // One instance of an instanced draw (#470), indexed by `instance_index`. Mirrors
-// `InstanceData` (src/render/gpu/uniforms.rs) byte-for-byte. Only per-copy data lives
+// `InstanceData` (src/render/gpu/uniforms/mod.rs) byte-for-byte. Only per-copy data lives
 // here — the world matrix and the light-probe SH (#240: when `use_sh == 1` the ambient
 // term is reconstructed from `sh`, xyz = RGB radiance). Material flags stay in the
 // draw's `MaterialData`, so texture sampling never depends on an instance value.

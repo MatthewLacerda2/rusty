@@ -18,7 +18,7 @@
 //! append a 16-byte run at the end, keeping the size a multiple of 16), mirror it in
 //! `MaterialData` in `engine/shaders/forward/bindings.wgsl` at the same offset, set it
 //! in `render::draw::uniforms::material_data`, add its row to
-//! `uniform_layout_tests::entity`, and read it in WGSL as `material().<field>`. The
+//! `uniform_layout_tests::draw`, and read it in WGSL as `material().<field>`. The
 //! per-draw uniform and its 256-byte stride are untouched; the record has no fixed cap
 //! (a storage array's element is as large as its struct).
 
@@ -103,21 +103,10 @@ impl MaterialData {
     pub(crate) fn flat(tint: [f32; 4]) -> Self {
         Self {
             color_tint: tint,
-            use_texture: 0,
-            is_lit: 0,
-            metallic: 0.0,
             roughness: 0.5,
-            use_metallic_map: 0,
-            use_roughness_map: 0,
-            use_normal_map: 0,
-            use_emissive_map: 0,
-            emissive: [0.0; 4],
-            use_cutout: 0,
-            alpha_cutoff: 0.0,
-            receive_decals: 0,
-            _pad: 0,
             surface: SurfaceUniform::default(),
             mapping: MappingUniform::default(),
+            ..bytemuck::Zeroable::zeroed()
         }
     }
 }

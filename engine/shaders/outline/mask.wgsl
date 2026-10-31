@@ -35,13 +35,14 @@ fn vs_mask(model: VertexInput, @builtin(instance_index) instance: u32) -> MaskVe
 // translucent or not.
 @fragment
 fn fs_mask(in: MaskVertex) -> @location(0) vec4<f32> {
-    if (material().use_cutout == 1u) {
-        var alpha = material().color_tint.a;
-        if (material().use_texture == 1u) {
+    let m = material();
+    if (m.use_cutout == 1u) {
+        var alpha = m.color_tint.a;
+        if (m.use_texture == 1u) {
             let maps = mapping::coords(in.tex_coords, in.world_position, normalize(in.world_normal));
             alpha *= mapping::sample(t_diffuse, s_diffuse, maps).a;
         }
-        if (alpha < material().alpha_cutoff) {
+        if (alpha < m.alpha_cutoff) {
             discard;
         }
     }

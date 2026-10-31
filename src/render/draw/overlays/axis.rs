@@ -3,12 +3,17 @@
 
 use glam::Mat4;
 
+use super::OverlayDraws;
 use crate::render::draw::resources::AxisResource;
 use crate::render::Renderer;
 use crate::scene::Scene;
 
 impl Renderer {
-    pub(crate) fn precreate_axis_arrows(&self, scene: &Scene) -> Vec<AxisResource> {
+    pub(crate) fn precreate_axis_arrows(
+        &self,
+        scene: &Scene,
+        draws: &mut OverlayDraws,
+    ) -> Vec<AxisResource> {
         let mut axis_arrow_resources = Vec::new();
         let Some(selected_id) = scene.selected_entity_id else {
             return axis_arrow_resources;
@@ -25,22 +30,9 @@ impl Renderer {
             [0.1, 0.4, 1.0, 1.0], // Z: Blue
         ];
 
-        for (i, color) in colors.iter().enumerate() {
-            axis_arrow_resources.push(self.build_axis_arrow(i, arrow_model_matrix, *color));
+        for (i, color) in colors.into_iter().enumerate() {
+            axis_arrow_resources.push((i, draws.push(arrow_model_matrix, color)));
         }
         axis_arrow_resources
-    }
-
-    /// Build one axis-arrow's uniform buffer + bind group (bound against the shared
-    /// identity bone palette).
-    fn build_axis_arrow(
-        &self,
-        i: usize,
-        arrow_model_matrix: Mat4,
-        color: [f32; 4],
-    ) -> AxisResource {
-        let (entity_buf, bind_group) =
-            self.overlay_bindings("Axis Arrow", arrow_model_matrix, color);
-        (i, entity_buf, bind_group)
     }
 }

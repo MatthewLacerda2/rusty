@@ -38,8 +38,8 @@ struct Mapping {
     _pad: u32,
 };
 
-// The draw's own terms.
-fn entity_mapping() -> Mapping {
+// The draw's own terms, from its material record.
+fn material_mapping() -> Mapping {
     let m = material();
     return Mapping(m.uv_st, m.uv_mapping, m.world_scale, m.blend_sharpness, 0u);
 }
@@ -51,7 +51,7 @@ fn tile_with(m: Mapping, uv: vec2<f32>) -> vec2<f32> {
 // The coordinates at a point with mesh UV `uv`, world `position` and geometric
 // world `normal`, under the draw's own terms (`coords_with`).
 fn coords(uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>) -> MapCoords {
-    return coords_with(entity_mapping(), uv, position, normal);
+    return coords_with(material_mapping(), uv, position, normal);
 }
 
 // `coords` under terms `m`. UV0 does no projection maths; Planar projects once
@@ -120,7 +120,8 @@ fn mask(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords, packed: u32) -> f
 // each projection's sample is reoriented onto its world axis with the whiteout
 // blend (Golus), and Planar is Triplanar with all the weight on the Y projection.
 fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tangent: vec4<f32>) -> vec3<f32> {
-    if (material().uv_mapping == UV0) {
+    let mapping = material().uv_mapping;
+    if (mapping == UV0) {
         let T = normalize(tangent.xyz);
         let B = cross(n, T) * tangent.w;
         let sampled = unpack_normal(textureSample(t, s, c.uv));
@@ -130,7 +131,7 @@ fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tan
     var tx = vec3<f32>(0.0, 0.0, 1.0);
     var tz = vec3<f32>(0.0, 0.0, 1.0);
     var w = vec3<f32>(0.0, 1.0, 0.0);
-    if (material().uv_mapping == TRIPLANAR) {
+    if (mapping == TRIPLANAR) {
         tx = unpack_normal(textureSample(t, s, c.x));
         tz = unpack_normal(textureSample(t, s, c.z));
         w = c.weights;

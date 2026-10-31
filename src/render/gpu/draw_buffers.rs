@@ -120,15 +120,13 @@ impl DrawBuffers {
             instances,
             materials,
         } = frame;
-        let mut uniform_bytes = vec![0u8; uniforms.len() * UNIFORM_STRIDE];
-        for (chunk, u) in uniform_bytes.chunks_mut(UNIFORM_STRIDE).zip(uniforms) {
-            chunk[..std::mem::size_of::<DrawUniform>()].copy_from_slice(bytemuck::bytes_of(u));
-        }
+        let uniform_bytes = uniform_array_bytes(uniforms);
         let bone_bytes = joint_array_bytes(joints);
         let material_bytes: &[u8] = bytemuck::cast_slice(materials);
         // Equal bytes are an equal length, so a skipped write never misses a growth.
         let materials_grew = material_bytes != self.last_materials.as_slice() && {
-            self.last_materials = material_bytes.to_vec();
+            self.last_materials.clear();
+            self.last_materials.extend_from_slice(material_bytes);
             self.materials.upload(device, queue, material_bytes)
         };
 
@@ -211,6 +209,17 @@ pub(crate) fn group1(
             },
         ],
     })
+}
+
+/// `uniforms` at [`UNIFORM_STRIDE`], the layout a dynamic offset of
+/// [`DrawBuffers::offsets`] slides across; editor overlays (#1616) and the shadow
+/// casters' draws pack theirs through this too.
+pub(crate) fn uniform_array_bytes(uniforms: &[DrawUniform]) -> Vec<u8> {
+    let mut bytes = vec![0u8; uniforms.len() * UNIFORM_STRIDE];
+    for (chunk, u) in bytes.chunks_mut(UNIFORM_STRIDE).zip(uniforms) {
+        chunk[..std::mem::size_of::<DrawUniform>()].copy_from_slice(bytemuck::bytes_of(u));
+    }
+    bytes
 }
 
 /// The joint storage array as uploaded: the shared identity at element 0, then

@@ -7,6 +7,7 @@
 use super::batch::sort::{back_to_front, view_depth};
 use super::batch::{BatchKey, DrawItem, FrameDraws};
 use super::materials::entity_params;
+use super::overlays::{OverlayBindings, OverlayDraws};
 use crate::components::MaterialAsset;
 use crate::render::gpu::draw_buffers::{push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
@@ -34,23 +35,25 @@ pub(crate) struct SolidResources {
     /// `None` when it rings none.
     pub outline_bounds: Option<OutlineBounds>,
 }
-// The overlay resources keep only the buffers they own (the per-overlay entity
-// uniform + any vertex buffer) plus their bind group; the joint array they bind is
-// the renderer's one shared identity matrix, so no per-overlay palette is allocated
-// (#210). The selection outline is not an overlay: it is its own pass over the
-// solids' own draws (`passes::outline`, #1175).
-pub(crate) type GridResource = (wgpu::Buffer, wgpu::BindGroup);
-pub(crate) type AabbResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup);
-pub(crate) type AxisResource = (usize, wgpu::Buffer, wgpu::BindGroup);
-// One probe gizmo line draw (#284): its world-space line-list vertex buffer, the flat
-// overlay uniform it owns, its group-1 bind group, and the vertex count to draw.
-pub(crate) type ProbeResource = (wgpu::Buffer, wgpu::Buffer, wgpu::BindGroup, u32);
+// Each overlay keeps only what it owns (any vertex buffer) and its slot of the pass's
+// one overlay group 1 ([`OverlayBindings`], #1616): its uniform there places it and
+// names its tint's record, and the joints and instance it binds are the renderer's
+// shared identities (#210). The selection outline is not an overlay: it is its own
+// pass over the solids' own draws (`passes::outline`, #1175).
+pub(crate) type GridResource = u32;
+pub(crate) type AabbResource = (wgpu::Buffer, u32);
+pub(crate) type AxisResource = (usize, u32);
+// One probe gizmo line draw (#284): its world-space line-list vertex buffer, its
+// slot, and the vertex count to draw.
+pub(crate) type ProbeResource = (wgpu::Buffer, u32, u32);
 
 /// The editor-only overlay resources for one handles pass (grid, collider AABBs,
 /// axis arrows, probe gizmos), drawn after post-FX (#1224). Bundled so the pass
 /// takes a single value instead of four (#93).
 #[derive(Default)]
 pub(crate) struct Overlays {
+    /// The group 1 every overlay binds at its slot; `None` when there is none.
+    pub bindings: Option<OverlayBindings>,
     pub grid: Option<GridResource>,
     pub aabb: Vec<AabbResource>,
     pub axis: Vec<AxisResource>,
@@ -69,11 +72,17 @@ impl Renderer {
     /// Pre-create the editor overlay resources for one handles pass. Only an editor
     /// camera draws one (`draw::camera`'s `handles` stage).
     pub(crate) fn precreate_overlays(&self, scene: &Scene) -> Overlays {
+        let mut draws = OverlayDraws::default();
+        let grid = self.precreate_grid(&mut draws);
+        let aabb = self.precreate_aabb(scene, &mut draws);
+        let axis = self.precreate_axis_arrows(scene, &mut draws);
+        let probes = self.precreate_probes(scene, &mut draws);
         Overlays {
-            grid: self.precreate_grid(),
-            aabb: self.precreate_aabb(scene),
-            axis: self.precreate_axis_arrows(scene),
-            probes: self.precreate_probes(scene),
+            bindings: self.overlay_bindings(&draws),
+            grid,
+            aabb,
+            axis,
+            probes,
         }
     }
 

@@ -100,16 +100,19 @@ impl ShadowRenderer {
             global_group(device, &global_layout, light_space_buffer, time_buffer);
 
         // Every caster as one storage array, indexed per instance (#470) — and read by
-        // the clip's fragment for its alpha test (#648) — and the joint matrices its
-        // skinned casters are posed with (#599).
+        // the clip's fragment for its alpha test (#648) — the joint matrices its
+        // skinned casters are posed with (#599), and the material records a clipped
+        // draw reads through `material()` with the per-draw uniform naming its record
+        // (#1616), at the forward pass's own bindings.
+        let both = wgpu::ShaderStages::VERTEX_FRAGMENT;
+        let draw_size = std::mem::size_of::<crate::render::DrawUniform>() as u64;
         let entity_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shadow Caster Layout"),
             entries: &[
-                storage_entry(
-                    CASTERS_BINDING,
-                    wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ),
+                storage_entry(CASTERS_BINDING, both),
                 storage_entry(JOINTS_BINDING, wgpu::ShaderStages::VERTEX),
+                dynamic_uniform_entry(DRAW_BINDING, both, draw_size),
+                storage_entry(MATERIALS_BINDING, both),
             ],
         });
 
@@ -148,12 +151,15 @@ impl ShadowRenderer {
 }
 
 /// Where `shader.wgsl`'s shadow stage reads the cascade's matrix and the game time
-/// (group 0), its casters and their joints (group 1) — beside the forward pass's
+/// (group 0), its casters, their joints and the material records with the per-draw
+/// uniform naming one (group 1, the last two the forward pass's own) — beside the forward pass's
 /// bindings, sharing `camera` and `bones` (#648).
 const LIGHT_BINDING: u32 = 6;
 const TIME_BINDING: u32 = 0;
 pub(super) const CASTERS_BINDING: u32 = 3;
 pub(super) const JOINTS_BINDING: u32 = 1;
+pub(super) const DRAW_BINDING: u32 = 0;
+pub(super) const MATERIALS_BINDING: u32 = 4;
 
 /// The shadow stage's group 0: the cascade's light-space matrix (dynamic offset,
 /// one per cascade) and the game time.
