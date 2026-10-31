@@ -49,9 +49,10 @@ fn play_mode_sorts_by_render_order_and_layers_lens() {
     assert_eq!(stack[0].clear_flags, ClearFlags::Skybox);
     assert_eq!(stack[1].culling_mask, 0b10);
     assert_eq!(stack[1].clear_flags, ClearFlags::DepthOnly);
-    // The base pass keeps the caller's pose; the overlay renders from its own entity.
-    assert_eq!(stack[0].position, base.position);
-    assert_eq!(stack[0].yaw, base.yaw);
+    // Every pass renders from its own entity, the base one included: it is the main
+    // view the player and the Game view show (#1619), not the caller's free camera.
+    assert_eq!(stack[0].position, Vec3::new(-9.0, 0.0, 0.0));
+    assert_eq!(stack[0].yaw, -90.0);
     assert_eq!(stack[1].position, Vec3::new(7.0, 0.0, 0.0));
     assert_eq!(stack[1].fov, 60.0);
 }

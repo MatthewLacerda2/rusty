@@ -1,10 +1,10 @@
 //! src/api/camera.rs — `Camera` namespace.
 //!
-//! Get/Set for position, yaw, pitch and fov over the shared `scene::Camera` the
-//! simulation drives, plus `GetForward`/`GetRight` basis vectors so a controller
+//! Get/Set for position, yaw, pitch and fov of the main view, plus `GetForward`/`GetRight` basis vectors so a controller
 //! script can move and aim relative to where the camera looks, and the world ↔
-//! screen projections (`WorldToScreen`, `ScreenToWorldRay`, #429). Those drive the
-//! view camera; the per-entity functions (`component`) tune a camera *entity's*
+//! screen projections (`WorldToScreen`, `ScreenToWorldRay`, #429). The pose is the
+//! main camera entity's Transform when the scene has one, else the free view camera
+//! (`scene::camera::view`, #1619); the per-entity functions (`component`) tune a camera *entity's*
 //! projection and render-texture target (#430), lens and stacking (`lens`, #1341).
 
 pub mod component;
@@ -17,8 +17,8 @@ use mlua::Lua;
 
 use super::{put, ApiScopedCtx, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::scene::camera::MAX_PITCH;
-use crate::scene::Camera;
+use crate::scene::camera::{set_view_orientation, set_view_position};
+use crate::scene::{game_camera_from_scene, Camera, Scene};
 
 /// Register the `Camera` namespace onto `lua`.
 pub fn register<'scope>(
@@ -27,11 +27,9 @@ pub fn register<'scope>(
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
-    let camera = ctx.camera;
-
-    register_position(scope, &table, camera)?;
-    register_orientation(scope, &table, camera)?;
-    register_fov(scope, &table, camera)?;
+    register_position(scope, &table, ctx)?;
+    register_orientation(scope, &table, ctx)?;
+    register_fov(scope, &table, ctx.camera)?;
     register_projection(scope, &table, ctx)?;
     component::register(scope, &table, ctx.scene)?;
 
@@ -40,26 +38,33 @@ pub fn register<'scope>(
         .map_err(|e| e.to_string())
 }
 
+/// The main view as it stands: the main camera entity's pose, else the free camera.
+fn view(camera: &RefCell<Camera>, scene: &RefCell<Scene>) -> Camera {
+    game_camera_from_scene(&camera.borrow(), &scene.borrow())
+}
+
 /// `GetPosition` / `SetPosition` plus the `GetForward` / `GetRight` basis vectors.
 fn register_position<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
-    camera: &'scope RefCell<Camera>,
+    ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
+    let (camera, scene) = (ctx.camera, ctx.scene);
     put(
         table,
         "GetPosition",
-        scope.create_function(|_, ()| {
-            let cam = camera.borrow();
-            Ok((cam.position.x, cam.position.y, cam.position.z))
+        scope.create_function(move |_, ()| {
+            let p = view(camera, scene).position;
+            Ok((p.x, p.y, p.z))
         }),
     )?;
 
     put(
         table,
         "SetPosition",
-        scope.create_function(|_, (x, y, z): (f32, f32, f32)| {
-            camera.borrow_mut().position = Vec3::new(x, y, z);
+        scope.create_function(move |_, (x, y, z): (f32, f32, f32)| {
+            let at = Vec3::new(x, y, z);
+            set_view_position(&mut camera.borrow_mut(), &mut scene.borrow_mut(), at);
             Ok(())
         }),
     )?;
@@ -70,8 +75,8 @@ fn register_position<'scope>(
     put(
         table,
         "GetForward",
-        scope.create_function(|_, ()| {
-            let f = camera.borrow().forward();
+        scope.create_function(move |_, ()| {
+            let f = view(camera, scene).forward();
             Ok((f.x, f.y, f.z))
         }),
     )?;
@@ -79,29 +84,41 @@ fn register_position<'scope>(
     put(
         table,
         "GetRight",
-        scope.create_function(|_, ()| {
-            let r = camera.borrow().right();
+        scope.create_function(move |_, ()| {
+            let r = view(camera, scene).right();
             Ok((r.x, r.y, r.z))
         }),
     )
 }
 
-/// `GetYaw` / `SetYaw` and `GetPitch` / `SetPitch` (pitch clamped to ±89°).
+/// `GetYaw` / `SetYaw` and `GetPitch` / `SetPitch` (pitch clamped to ±89°). Each
+/// setter keeps the other angle the view has now.
 fn register_orientation<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
-    camera: &'scope RefCell<Camera>,
+    ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
+    let (camera, scene) = (ctx.camera, ctx.scene);
+    let turn = move |yaw: Option<f32>, pitch: Option<f32>| {
+        let now = view(camera, scene);
+        let (yaw, pitch) = (yaw.unwrap_or(now.yaw), pitch.unwrap_or(now.pitch));
+        set_view_orientation(
+            &mut camera.borrow_mut(),
+            &mut scene.borrow_mut(),
+            yaw,
+            pitch,
+        );
+    };
     put(
         table,
         "GetYaw",
-        scope.create_function(|_, ()| Ok(camera.borrow().yaw)),
+        scope.create_function(move |_, ()| Ok(view(camera, scene).yaw)),
     )?;
     put(
         table,
         "SetYaw",
-        scope.create_function(|_, yaw: f32| {
-            camera.borrow_mut().yaw = yaw;
+        scope.create_function(move |_, yaw: f32| {
+            turn(Some(yaw), None);
             Ok(())
         }),
     )?;
@@ -109,13 +126,13 @@ fn register_orientation<'scope>(
     put(
         table,
         "GetPitch",
-        scope.create_function(|_, ()| Ok(camera.borrow().pitch)),
+        scope.create_function(move |_, ()| Ok(view(camera, scene).pitch)),
     )?;
     put(
         table,
         "SetPitch",
-        scope.create_function(|_, pitch: f32| {
-            camera.borrow_mut().pitch = pitch.clamp(-MAX_PITCH, MAX_PITCH);
+        scope.create_function(move |_, pitch: f32| {
+            turn(None, Some(pitch));
             Ok(())
         }),
     )
@@ -159,7 +176,7 @@ fn register_projection<'scope>(
         scope.create_function(move |_, (x, y, z, canvas): (f32, f32, f32, EntityArg)| {
             let canvas = canvas.get();
             let screen = px();
-            let p = camera.borrow().world_to_screen(Vec3::new(x, y, z), screen);
+            let p = view(camera, scene).world_to_screen(Vec3::new(x, y, z), screen);
             let on_screen = p.is_on_screen(screen);
             let scale = canvas
                 .and_then(|id| {
@@ -178,7 +195,7 @@ fn register_projection<'scope>(
         table,
         "ScreenToWorldRay",
         scope.create_function(move |_, (x, y): (f32, f32)| {
-            let (o, d) = camera.borrow().screen_ray(Vec2::new(x, y), px());
+            let (o, d) = view(camera, scene).screen_ray(Vec2::new(x, y), px());
             Ok((o.x, o.y, o.z, d.x, d.y, d.z))
         }),
     )

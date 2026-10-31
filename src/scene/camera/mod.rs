@@ -10,10 +10,12 @@ use glam::{Mat4, Vec3};
 mod lens;
 mod main;
 mod projection;
+mod view;
 
 pub use lens::{held_fov, held_lens, Lens, MAX_LENS_EXTENT};
 pub use main::{active_cameras, camera_volume, main_camera, render_order, screen_cameras};
 pub use projection::ScreenPoint;
+pub use view::{look_rotation, set_view_orientation, set_view_position, sync_pose_from_scene};
 
 use crate::components::Projection;
 use crate::scene::{layer_in_mask, ClearFlags, Scene};
@@ -148,12 +150,12 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
     }
 }
 
-/// Build a [`Camera`] positioned at the scene's [`main_camera`] entity — the
-/// player's-eye view the editor's **Game** tab shows while authoring (#183). Position
-/// and orientation come from the camera entity's world transform (so the Game tab
-/// tracks where the gameplay camera actually sits, not the free-fly cam), and the lens
-/// from its component. Falls back to `base` (the free-fly camera) when no active camera
-/// entity exists, so the tab still renders something sensible.
+/// The main view: a [`Camera`] at the scene's [`main_camera`] entity, the one answer
+/// every path shares (#1619) — the player, the editor's **Game** tab (#183), the
+/// headless harness's screen stack and the `Camera.*` getters. Position and
+/// orientation come from the entity's world transform, the lens from its component.
+/// Falls back to `base` (the free view camera) when no active screen camera entity
+/// exists.
 pub fn game_camera_from_scene(base: &Camera, scene: &Scene) -> Camera {
     main_camera(scene)
         .and_then(|id| camera_for_entity(base, scene, id))

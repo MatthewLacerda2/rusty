@@ -12,6 +12,18 @@
 | `Camera.WorldToScreen` | `(x, y, z [, canvas])` | `sx, sy, depth, onScreen` — see below |
 | `Camera.ScreenToWorldRay` | `(x, y)` | `ox, oy, oz, dx, dy, dz` — the ray's origin (on the near plane) and unit direction |
 
+**Which pose these move (#1619).** Following Unity, where `Camera.main` is a
+GameObject: when the scene has a **main camera** — the active screen camera entity
+with the lowest render order, the one the player and the editor's Game view show —
+the main view *is* that entity's Transform. `SetPosition` / `SetYaw` / `SetPitch`
+write its **world** position and rotation (rotation rebuilt from yaw and pitch, so
+any roll is dropped; each setter keeps the other angle), and every getter,
+`WorldToScreen` and `ScreenToWorldRay` read it, so moving the entity with
+`Transform.*` moves them too. That holds in edit mode as well: the authored camera
+moves. The window, the Game view and headless screenshots all render from this one
+pose. Yaw reads back in `-180..180`. With **no** camera entity, these drive the
+free view camera instead.
+
 **World ↔ screen (#429).** Screen points are **UI screen pixels** — bottom-left
 origin, y-up, the frame of `UI.GetRect(id).screen` and the UI pointer (Unity's
 screen space; `Input.GetMousePosition` is top-left, so flip `y`). The screen is the
@@ -36,7 +48,7 @@ For markers that follow an entity every tick, prefer a world anchor
 
 ### Camera entities: projection and render textures (#430)
 
-The functions above drive the **view** camera. These take an entity id and tune that
+The functions above drive the **main view**. These take an entity id and tune that
 entity's `CameraComponent` — the same fields as the inspector's Camera card. Getters
 return `nil` without a camera; setters are then no-ops.
 
