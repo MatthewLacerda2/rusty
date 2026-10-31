@@ -161,7 +161,11 @@ fn register_clouds<'scope>(
     type Read = fn(&crate::scene::SkySettings) -> f32;
     type Write = fn(&mut crate::scene::SkySettings, f32);
     let knobs: [(&str, Read, Write); 2] = [
-        ("Coverage", |s| s.cloud_coverage, env_ops::set_cloud_coverage),
+        (
+            "Coverage",
+            |s| s.cloud_coverage,
+            env_ops::set_cloud_coverage,
+        ),
         ("Opacity", |s| s.cloud_opacity, env_ops::set_cloud_opacity),
     ];
     for (name, read, write) in knobs {

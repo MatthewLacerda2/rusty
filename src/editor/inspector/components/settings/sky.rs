@@ -9,7 +9,11 @@ use crate::scene::authoring::environment as env_ops;
 use crate::scene::{Scene, SkySettings};
 
 /// A colour's label, what it reads when unset, and its op.
-type ColorRow = (&'static str, &'static str, fn(&mut SkySettings, Option<glam::Vec3>));
+type ColorRow = (
+    &'static str,
+    &'static str,
+    fn(&mut SkySettings, Option<glam::Vec3>),
+);
 
 /// The procedural sky section, collapsed by default like Fog.
 pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
@@ -19,9 +23,18 @@ pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) 
     let mut changed = false;
     egui::CollapsingHeader::new(format!("{}  Procedural Sky", icon::CLOUD_SUN)).show(ui, |ui| {
         let rows: [(ColorRow, Option<glam::Vec3>); 3] = [
-            (("Zenith", "follows Ambient Color", env_ops::set_sky_zenith), before.zenith),
-            (("Horizon", "follows Zenith", env_ops::set_sky_horizon), before.horizon),
-            (("Ground", "follows Zenith", env_ops::set_sky_ground), before.ground),
+            (
+                ("Zenith", "follows Ambient Color", env_ops::set_sky_zenith),
+                before.zenith,
+            ),
+            (
+                ("Horizon", "follows Zenith", env_ops::set_sky_horizon),
+                before.horizon,
+            ),
+            (
+                ("Ground", "follows Zenith", env_ops::set_sky_ground),
+                before.ground,
+            ),
         ];
         for (((label, unset, op), current), shown) in rows.into_iter().zip(resolved) {
             changed |= color_row(ui, sky, (label, unset, op), (current, shown));
@@ -66,8 +79,16 @@ fn color_row(
 fn cloud_sliders(ui: &mut egui::Ui, sky: &mut SkySettings, before: &SkySettings) -> bool {
     type Op = fn(&mut SkySettings, f32);
     let sliders: [(&str, f32, Op); 2] = [
-        ("Cloud Coverage", before.cloud_coverage, env_ops::set_cloud_coverage),
-        ("Cloud Opacity", before.cloud_opacity, env_ops::set_cloud_opacity),
+        (
+            "Cloud Coverage",
+            before.cloud_coverage,
+            env_ops::set_cloud_coverage,
+        ),
+        (
+            "Cloud Opacity",
+            before.cloud_opacity,
+            env_ops::set_cloud_opacity,
+        ),
     ];
     let mut changed = false;
     for (label, mut value, op) in sliders {

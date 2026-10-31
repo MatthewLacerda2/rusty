@@ -51,6 +51,10 @@ fn sky_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(lua_sky, op_scene.sky);
     assert_eq!(lua_sky.zenith, Some(Vec3::new(0.0, 0.4, 0.9)));
     assert_eq!(lua_sky.ground, None);
-    assert_eq!(read, (None, 0.4, 1.0, false, 0.25), "a partial colour errors");
+    assert_eq!(
+        read,
+        (None, 0.4, 1.0, false, 0.25),
+        "a partial colour errors"
+    );
     Ok(())
 }

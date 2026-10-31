@@ -53,7 +53,8 @@ impl Renderer {
         // panorama, or procedural sky settings no cube holds (#1620).
         let gpu = (&self.device, &self.queue);
         let panorama = self.skybox_texture.as_deref();
-        let settings = crate::render::gpu::uniforms::ProceduralSkyUniform::from_settings(&scene.sky);
+        let settings =
+            crate::render::gpu::uniforms::ProceduralSkyUniform::from_settings(&scene.sky);
         let source = (panorama, &settings);
         let sky = self.sky_reflection.prepare(gpu, &self.gpu_timer, source);
         self.frame_counters.sky_reflection_bakes += u32::from(sky.baked);
