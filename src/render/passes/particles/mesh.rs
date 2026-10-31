@@ -16,8 +16,8 @@ use crate::components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderM
 use crate::render::draw::batch::sort::view_depth;
 use crate::render::draw::batch::{BatchKey, DrawItem};
 use crate::render::draw::materials::material_maps;
-use crate::render::draw::uniforms::{material_uniform, probe_sh_at};
-use crate::render::{EntityUniform, InstanceData, Renderer};
+use crate::render::draw::uniforms::{material_data, probe_sh_at};
+use crate::render::{InstanceData, MaterialData, Renderer};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::serialize::asset_mesh_component;
 use crate::scene::{Camera, MeshComponent, Scene};
@@ -115,9 +115,9 @@ impl Renderer {
         let shader = material.and_then(|m| m.shader.as_deref());
         let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
         // Debris flies through decal boxes; it never takes their stamp (#638).
-        let uniform = EntityUniform {
+        let record = MaterialData {
             receive_decals: 0,
-            ..self.with_map_channels(material_uniform(true, material), material)
+            ..self.with_map_channels(material_data(true, material), material)
         };
         let key = BatchKey {
             pipeline,
@@ -125,7 +125,8 @@ impl Renderer {
             // The emitter names one material: the whole mesh is one run.
             indices: (0..num_indices).into(),
             material: self.material_index(entry, pipeline, None),
-            uniform: uniform.words(),
+            record: record.words(),
+            bone_base: 0,
         };
         let glass = material.is_some_and(MaterialAsset::is_transparent);
         Some((key, glass))

@@ -266,7 +266,7 @@ impl Renderer {
                 continue;
             }
             let primed = solid_pass.primed() && in_prepass;
-            let blend = TransparentBlend::of(&batch.key.uniform().surface);
+            let blend = TransparentBlend::of(&batch.key.record().surface);
             let pipeline = (batch.key.pipeline, primed, blend);
             if bound != Some(pipeline) {
                 let shaders = &self.surface_shaders;

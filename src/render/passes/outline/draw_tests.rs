@@ -57,7 +57,7 @@ fn assert_outlines_forward(scene: &Scene, draws: &FrameDraws, ids: &[u32]) -> Ve
                 "{id}: indices"
             );
             assert_eq!(outline.material, forward.key.material, "{id}: material");
-            forward.key.uniform().bone_base
+            forward.key.bone_base
         })
         .collect()
 }

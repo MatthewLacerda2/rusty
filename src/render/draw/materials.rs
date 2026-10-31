@@ -14,7 +14,7 @@ use crate::asset::MapRef;
 use crate::components::MaterialAsset;
 use crate::render::gpu::material_cache::{ParamOwner, MATERIAL_TEXTURES};
 use crate::render::gpu::textures::TextureKind;
-use crate::render::{EntityUniform, GpuTexture, Renderer};
+use crate::render::{GpuTexture, MaterialData, Renderer};
 use crate::scene::shader_overrides::ParamValues;
 use crate::scene::{Scene, SceneId};
 use crate::shadergen::textures;
@@ -98,42 +98,42 @@ impl Renderer {
             .unwrap_or_else(|| Rc::clone(&self.default_texture))
     }
 
-    /// Entity `id`'s solid uniform for `material`
-    /// ([`super::uniforms::solid_entity_uniform`]), its map channels set by what
+    /// Entity `id`'s material record for `material`
+    /// ([`super::uniforms::solid_material_data`]), its map channels set by what
     /// is resident ([`Self::with_map_channels`]).
-    pub(crate) fn solid_uniform(
+    pub(crate) fn solid_material(
         &self,
         scene: &Scene,
         id: u32,
         material: Option<&MaterialAsset>,
-    ) -> EntityUniform {
-        let uniform = super::uniforms::solid_entity_uniform(scene, id, material);
-        self.with_map_channels(uniform, material)
+    ) -> MaterialData {
+        let record = super::uniforms::solid_material_data(scene, id, material);
+        self.with_map_channels(record, material)
     }
 
-    /// `uniform` with its metallic and roughness flags set to 2 where the map is
+    /// `record` with its metallic and roughness flags set to 2 where the map is
     /// resident and of Texture Type `SingleChannel` (#1574), BC4 or not yet: the
     /// shader then reads its red channel instead of glTF's packed blue and green,
     /// so the look does not change when the compressed copy lands.
     pub(crate) fn with_map_channels(
         &self,
-        mut uniform: EntityUniform,
+        mut record: MaterialData,
         material: Option<&MaterialAsset>,
-    ) -> EntityUniform {
+    ) -> MaterialData {
         let Some(m) = material else {
-            return uniform;
+            return record;
         };
         let single = |map: &Option<MapRef>| {
             let texture = map.as_ref().and_then(|p| self.gpu_textures.get(p));
             texture.is_some_and(|t| t.single_channel)
         };
         if single(&m.metallic_map) {
-            uniform.use_metallic_map = 2;
+            record.use_metallic_map = 2;
         }
         if single(&m.roughness_map) {
-            uniform.use_roughness_map = 2;
+            record.use_roughness_map = 2;
         }
-        uniform
+        record
     }
 
     /// The cache key a map path resolves to: the path when its texture is resident,

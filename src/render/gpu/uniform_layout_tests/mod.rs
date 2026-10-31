@@ -12,7 +12,7 @@ use crate::render::ibl::reflection_probes::ReflectionProbeUniform;
 use crate::render::passes::shadows::atlas::ShadowTile;
 use crate::shadergen::compose;
 
-mod entity;
+mod draw;
 mod postfx;
 
 const PROBE: &str = "#import postfx::params::PostParams\n\
