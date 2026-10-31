@@ -11,6 +11,8 @@
 #[cfg(feature = "dev")]
 pub mod capture;
 mod cursor_release;
+#[cfg(feature = "dev")]
+mod demo;
 mod game_focus;
 mod icon;
 mod paint;
@@ -210,7 +212,18 @@ impl Frontend for EditorFrontend {
 
     /// The game hears input only while playing with the Game view focused.
     fn game_has_input(&self, game: &GameWorld) -> bool {
+        #[cfg(feature = "dev")]
+        if self.editor_ui.demo_open() {
+            return false; // a demo plays read-only (#1598)
+        }
         game.play_requested() && self.game_focused
+    }
+
+    #[cfg(feature = "dev")]
+    fn advance(&mut self, game: &mut GameWorld, dt: f32) -> PlayTransition {
+        let ui = &mut self.editor_ui;
+        ui.advance_demo(game, dt)
+            .unwrap_or_else(|| super::frame::advance_sim(game, dt))
     }
 
     fn game_view(&self, shell: &Shell) -> GameViewRect {

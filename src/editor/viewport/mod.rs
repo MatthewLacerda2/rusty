@@ -74,6 +74,10 @@ pub fn draw(
         .frame(egui::Frame::NONE.fill(t.bg_tier0))
         .show(ui, |ui| {
             draw_tab_strip(ui, &mut tab, &mut overlay, t);
+            #[cfg(feature = "dev")]
+            if let (ViewportTab::Game, Some(demo)) = (tab, editor.dev.demo.as_mut()) {
+                crate::editor::demo::timeline::draw(ui, demo, &t);
+            }
             let response = draw_image(ui, texture, t);
             if tab == ViewportTab::Scene {
                 navigate(editor, &response, scene);

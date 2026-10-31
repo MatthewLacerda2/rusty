@@ -108,6 +108,12 @@ pub trait Frontend {
         input::GameViewRect::full_window(config.width, config.height)
     }
 
+    /// Advance the sim one rendered frame. The editor plays a demo on its timeline
+    /// here (#1598); every other frontend runs the live sim.
+    fn advance(&mut self, game: &mut GameWorld, delta_time: f32) -> PlayTransition {
+        frame::advance_sim(game, delta_time)
+    }
+
     /// The sim entered or left Play this frame (the editor focuses the Game view).
     fn on_play_transition(&mut self, _game: &mut GameWorld, _transition: PlayTransition) {}
 
@@ -202,7 +208,7 @@ fn run_frame<F: Frontend>(
     // Like raw mouse motion, pads keep reporting while the window is unfocused.
     let pads_live = shell.window_focused && frontend.game_has_input(game);
     pump_pads(shell, game, pads_live);
-    let transition = frame::advance_sim(game, delta_time);
+    let transition = frontend.advance(game, delta_time);
     if let Some(clipboard) = shell.clipboard.as_mut() {
         input::clipboard::apply_request(clipboard, &mut game.input().borrow_mut());
     }

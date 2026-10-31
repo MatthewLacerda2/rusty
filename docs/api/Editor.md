@@ -13,6 +13,11 @@ Unity's `EditorApplication` doesn't exist in a player: there `EnterPlay` and
 | `Editor.EnterPlay` | `()` | `true` when it asked to enter Play; `false` (a no-op) when already playing or already asked to (by a script, or the Play button this frame), or in a standalone run |
 | `Editor.ExitPlay` | `()` | `true` when it asked to leave Play; `false` (a no-op) in edit mode or when already asked to, or in a standalone run |
 | `Editor.IsPlaying` | `()` | `true` while the world is in Play |
+| `Editor.OpenDemo` | `(path)` | `true` when it asked the editor to open the demo at `path` on the Game view's timeline; `false` (a no-op, warned) outside the editor window |
+| `Editor.SeekDemo` | `(tick)` | `true` when it asked the open demo's replay to go to `tick`; `false` outside the editor window |
+| `Editor.PauseDemo` | `([paused])` | `true` when it asked to pause (default) or, with `false`, play the open demo; `false` outside the editor window |
+| `Editor.DemoTick` | `()` | the open demo's current tick, or `nil` with none open |
+| `Editor.DemoLength` | `()` | how many ticks the open demo holds, or `nil` with none open |
 
 **The same transition as the Play/Stop button.** A call only *requests* it; the
 engine takes the request at the next frame boundary, exactly as it takes the button.
@@ -53,3 +58,26 @@ paused frame, which takes a Play/Stop request and runs the steps `Time.Step` que
 logs (a script's `Awake`/`Start`/`Update`, a Lua init failure) comes back with the
 reply, as engine warnings do: `Editor.EnterPlay()` answers `true` for the request,
 and the warnings say whether the scripts it started ran.
+
+## The demo timeline
+
+A demo (`saved/demos/*.demo`, [`docs/testing.md`](../testing.md) *Demos*) opens in
+the **editor window** and plays on the Game view with a timeline: play/pause, a scrub
+bar with the index's `Debug.Mark`s on it, the tick readout and a close button. The
+calls above are those controls (Unity's Profiler/Timeline scrubbing a capture), and
+take effect at the next frame, like `EnterPlay`; only the editor window has a
+timeline, so a headless session or a standalone run refuses them.
+
+- `Editor.OpenDemo(path)` loads the demo's scene, replays it on the editor's world
+  and stops on tick 0. Refused while Play is on (stop it first) and for a demo with
+  no ticks or whose scene file is gone; the reason goes to the console. The edit
+  scene you had (unsaved edits included) comes back on close.
+- The replay plays at 60 ticks a second and holds on the last tick. Scrubbing back
+  replays from the start (`Harness.SeekDemo`'s rule), so a drag over a long demo
+  costs more the further back it goes.
+- **Read-only.** The Game view takes none of the editor's input; the replay's recorded
+  input is the only input. Edits made by hand in the Inspector or hierarchy during
+  playback are not blocked and make the replay diverge, as in any Play.
+- Closing, by the timeline's button or by Stop, leaves the replay, puts the edit
+  scene back and resumes recording Play sessions. There is no `CloseDemo`: it is
+  `Editor.ExitPlay()`.
