@@ -186,7 +186,9 @@ during Play goes back on Stop, as every scene edit does.
   nothing draws the renderer's fallback texture, as it would from the scene file.
 - **The ambient colour** is linear RGB, each channel clamped to `≥ 0`; a colour with
   a NaN or infinite channel is refused and changes nothing. **The intensity** scales
-  it, clamped to `≥ 0` (the editor's slider stops at `5`, a script may go past it).
-  Together they are the flat hemispherical ambient a surface takes where no baked
-  probe or lightmap reaches, and the tint of the procedural sky. An active **Ambient**
+  it, clamped to `≥ 0` (NaN or `math.huge` reads as 0; the editor's slider stops at
+  `5`, a script may go past it). Together they are the flat hemispherical ambient a
+  surface takes where no baked probe or lightmap reaches. The procedural sky is
+  tinted by the colour alone: the intensity dims or brightens what the ambient lights,
+  never the sky itself, as Unity's `ambientIntensity` leaves the skybox. An active **Ambient**
   light entity, when the scene has one, overrides both (see [`Light`](Light.md)).
