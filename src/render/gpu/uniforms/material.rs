@@ -79,7 +79,7 @@ pub(crate) struct MaterialData {
 // The stride is a dynamic-offset alignment, not a cap the record has to fit; a storage
 // array's elements sit at their struct's 16-byte-rounded size.
 const _: () = assert!(std::mem::size_of::<DrawUniform>() <= 256);
-const _: () = assert!(std::mem::size_of::<MaterialData>() % 16 == 0);
+const _: () = assert!(std::mem::size_of::<MaterialData>().is_multiple_of(16));
 
 /// How many 32-bit words a [`MaterialData`] holds.
 pub(crate) const MATERIAL_DATA_WORDS: usize = std::mem::size_of::<MaterialData>() / 4;
