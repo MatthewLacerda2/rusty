@@ -107,13 +107,14 @@ pub fn pixel_size(size: winit::dpi::PhysicalSize<u32>) -> PixelSize {
 }
 
 /// Build the simulation around the scene at `scene_path`: shared engine state, baked
-/// nav, and the persistent store bound to its file. A scene that fails to load is
-/// logged to the console and leaves an empty, Untitled scene; one whose lighting
-/// sidecar alone fails is loaded, with a warning.
+/// nav, and the persistent store bound to its file. An empty `scene_path` boots an
+/// empty, Untitled scene (`core::project::boot_scene` found none to open). A scene
+/// that fails to load is logged to the console and leaves an empty, Untitled scene;
+/// one whose lighting sidecar alone fails is loaded, with a warning.
 pub fn load_game(scene_path: &str) -> GameWorld {
     let scene = Rc::new(RefCell::new(Scene::new()));
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    let loaded = {
+    let loaded = !scene_path.is_empty() && {
         let mut c = console.borrow_mut();
         c.info(format!("Loading scene from {scene_path}..."));
         match scene.borrow_mut().load_from_file(scene_path) {

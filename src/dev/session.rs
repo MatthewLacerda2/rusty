@@ -29,6 +29,7 @@ use serde_json::json;
 use super::console;
 use crate::app::GameWorld;
 use crate::core::input::InputState;
+use crate::core::project::Access;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
@@ -147,18 +148,30 @@ impl Session {
 ///     directory this prints to stderr and exits 2.
 ///   - `--empty`         — start from a blank scene (returns an empty boot path).
 ///   - `<scene-path>`    — boot that specific scene (relative to the project root).
-///   - none              — boot (and seed) the bundled default scene.
+///   - none              — seed the bundled default scene (a new project gets it
+///     once, #1618) and boot the project's boot scene
+///     (`core::project::boot_scene`: the editor's last scene, then the startup
+///     scene, then an empty one).
 ///
 /// `--project` may sit anywhere; it is taken out first and the rest is read as the
 /// scene argument.
 pub fn boot_scene_from_args(args: &[String]) -> String {
     let mut rest = args.to_vec();
-    crate::core::project::open_from_args(&mut rest, crate::core::project::Access::Edit);
+    let opened = crate::core::project::open_from_args(&mut rest, Access::Edit);
     match rest.first().map(String::as_str) {
         Some("--empty") => String::new(),
         Some(path) => path.to_string(),
-        None => crate::scene::seed_default_scene(),
+        None => seeded_boot_scene(&opened),
     }
+}
+
+/// Seed the default scene into the open project, then pick the scene it boots on,
+/// as the editor does (`shell::editor::start`): `session`, `session-mcp` and a
+/// `bench_open` switch all open a project here.
+pub(crate) fn seeded_boot_scene(opened: &crate::core::project::Opened) -> String {
+    crate::scene::seed_default_scene();
+    let startup = &opened.settings.build.startup_scene;
+    crate::core::project::boot_scene(&opened.root, startup, Access::Edit)
 }
 
 /// One framed response line for an evaluated command.

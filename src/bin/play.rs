@@ -78,7 +78,9 @@ fn main() {
             exit(2);
         }
     };
-    let scene = scene.unwrap_or_else(|| opened.settings.build.startup_scene.clone());
+    let startup = &opened.settings.build.startup_scene;
+    let scene = scene
+        .unwrap_or_else(|| rusty::core::project::boot_scene(&opened.root, startup, Access::Run));
 
     let run = scenario::Run {
         size,

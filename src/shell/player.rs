@@ -10,7 +10,7 @@ use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
 use crate::app::GameWorld;
 use crate::core::application::{BuildSettings, WindowMode};
-use crate::core::project::ProjectSettings;
+use crate::core::project::{Access, ProjectSettings};
 use crate::core::settings::video::VideoSettings;
 use crate::render::RenderView;
 
@@ -93,7 +93,9 @@ pub fn launch(settings: ProjectSettings) {
         build.product_name, build.startup_scene
     );
 
-    let mut game = boot::load_game(&build.startup_scene);
+    let root = crate::core::project::root();
+    let scene = crate::core::project::boot_scene(&root, &build.startup_scene, Access::Run);
+    let mut game = boot::load_game(&scene);
     // Unbound: a shipped game reads its settings but never rewrites them. The
     // graphics defaults are what a first launch's options fall back to (#1438).
     game.resources.application.borrow_mut().run_with(settings);
