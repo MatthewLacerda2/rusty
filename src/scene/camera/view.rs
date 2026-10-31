@@ -3,14 +3,16 @@
 //! Following Unity, where `Camera.main` is a GameObject: when the scene has a
 //! [`main_camera`] entity, the main view *is* that entity's world transform, on every
 //! path (the player, the editor's Game view, the headless harness and screenshots).
-//! `Camera.SetPosition` / `SetYaw` / `SetPitch` move that entity, and the view
+//! `Camera.SetPosition` / `SetYaw` / `SetPitch` move that entity, `Camera.SetFov` sets
+//! its lens, and the view
 //! [`Camera`] resource mirrors its pose for the sim's other readers (the audio
 //! listener, world-space UI). Without a camera entity, the resource is the free view
 //! camera and `Camera.*` drives it alone.
 
 use glam::{Quat, Vec3};
 
-use super::{game_camera_from_scene, main_camera, Camera, MAX_PITCH};
+use super::{game_camera_from_scene, held_fov, main_camera, Camera, MAX_PITCH};
+use crate::scene::authoring::rendering::camera as camera_ops;
 use crate::scene::Scene;
 
 /// Copy the main camera entity's pose onto the view `camera`; without one, the free
@@ -38,6 +40,16 @@ pub fn set_view_orientation(camera: &mut Camera, scene: &mut Scene, yaw: f32, pi
         scene
             .world
             .set_world_rotation(id, look_rotation(yaw, pitch));
+    }
+}
+
+/// Set the main view's vertical field of view (degrees, held to the lens bounds):
+/// the main camera entity's `fieldOfView` when there is one (Unity's
+/// `Camera.main.fieldOfView`), and the view `camera` either way.
+pub fn set_view_fov(camera: &mut Camera, scene: &mut Scene, fov: f32) {
+    camera.fov = held_fov(fov);
+    if let Some(mut c) = main_camera(scene).and_then(|id| scene.world.camera_mut(id)) {
+        camera_ops::set_fov(&mut c, fov);
     }
 }
 

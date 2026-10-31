@@ -15,7 +15,9 @@ mod view;
 pub use lens::{held_fov, held_lens, Lens, MAX_LENS_EXTENT};
 pub use main::{active_cameras, camera_volume, main_camera, render_order, screen_cameras};
 pub use projection::ScreenPoint;
-pub use view::{look_rotation, set_view_orientation, set_view_position, sync_pose_from_scene};
+pub use view::{
+    look_rotation, set_view_fov, set_view_orientation, set_view_position, sync_pose_from_scene,
+};
 
 use crate::components::Projection;
 use crate::scene::{layer_in_mask, ClearFlags, Scene};
@@ -198,7 +200,19 @@ mod lens_tests;
 fn yaw_pitch_from_matrix(world: Mat4) -> (f32, f32) {
     // glTF/engine convention: an entity looks down its local -Z.
     let forward = (-world.col(2).truncate()).normalize_or_zero();
-    let yaw = forward.z.atan2(forward.x).to_degrees();
     let pitch = forward.y.clamp(-1.0, 1.0).asin().to_degrees();
+    // Looking (nearly) straight up or down, the forward's horizontal part is noise,
+    // so the heading comes from the up axis: it leans the way the camera faces when
+    // looking down, and away from it when looking up (#1619).
+    let heading = if forward.x.hypot(forward.z) < VERTICAL_EPSILON {
+        world.col(1).truncate() * -forward.y.signum()
+    } else {
+        forward
+    };
+    let yaw = heading.z.atan2(heading.x).to_degrees();
     (yaw, pitch)
 }
+
+/// The horizontal length of a unit forward below which it counts as vertical: about
+/// half a degree off straight up or down.
+const VERTICAL_EPSILON: f32 = 0.01;

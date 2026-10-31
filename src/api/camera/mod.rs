@@ -3,8 +3,8 @@
 //! Get/Set for position, yaw, pitch and fov of the main view, plus `GetForward`/`GetRight` basis vectors so a controller
 //! script can move and aim relative to where the camera looks, and the world ↔
 //! screen projections (`WorldToScreen`, `ScreenToWorldRay`, #429). The pose is the
-//! main camera entity's Transform when the scene has one, else the free view camera
-//! (`scene::camera::view`, #1619); the per-entity functions (`component`) tune a camera *entity's*
+//! main camera entity's Transform and the fov its lens when the scene has one, else
+//! the free view camera's (`scene::camera::view`, #1619); the per-entity functions (`component`) tune a camera *entity's*
 //! projection and render-texture target (#430), lens and stacking (`lens`, #1341).
 
 pub mod component;
@@ -17,7 +17,7 @@ use mlua::Lua;
 
 use super::{put, ApiScopedCtx, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::scene::camera::{set_view_orientation, set_view_position};
+use crate::scene::camera::{set_view_fov, set_view_orientation, set_view_position};
 use crate::scene::{game_camera_from_scene, Camera, Scene};
 
 /// Register the `Camera` namespace onto `lua`.
@@ -29,7 +29,7 @@ pub fn register<'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
     register_position(scope, &table, ctx)?;
     register_orientation(scope, &table, ctx)?;
-    register_fov(scope, &table, ctx.camera)?;
+    register_fov(scope, &table, ctx)?;
     register_projection(scope, &table, ctx)?;
     component::register(scope, &table, ctx.scene)?;
 
@@ -138,22 +138,24 @@ fn register_orientation<'scope>(
     )
 }
 
-/// `GetFov` / `SetFov` (fov clamped to 1..179°, the entity ops' bounds).
+/// `GetFov` / `SetFov` (fov clamped to 1..179°, the entity ops' bounds): the main
+/// camera entity's lens when there is one, else the free camera's.
 fn register_fov<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
-    camera: &'scope RefCell<Camera>,
+    ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
+    let (camera, scene) = (ctx.camera, ctx.scene);
     put(
         table,
         "GetFov",
-        scope.create_function(|_, ()| Ok(camera.borrow().fov)),
+        scope.create_function(move |_, ()| Ok(view(camera, scene).fov)),
     )?;
     put(
         table,
         "SetFov",
-        scope.create_function(|_, fov: f32| {
-            camera.borrow_mut().fov = crate::scene::camera::held_fov(fov);
+        scope.create_function(move |_, fov: f32| {
+            set_view_fov(&mut camera.borrow_mut(), &mut scene.borrow_mut(), fov);
             Ok(())
         }),
     )

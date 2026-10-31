@@ -8,7 +8,7 @@
 | `Camera.GetRight` | `()` | `x, y, z` (unit right vector) |
 | `Camera.GetYaw` / `SetYaw` | `()` / `(yaw)` | degrees |
 | `Camera.GetPitch` / `SetPitch` | `()` / `(pitch)` | degrees (clamped ±89) |
-| `Camera.GetFov` / `SetFov` | `()` / `(fov)` | degrees (clamped 1–179); the view camera's — a camera entity's is `SetFieldOfView` |
+| `Camera.GetFov` / `SetFov` | `()` / `(fov)` | degrees (clamped 1–179); the main camera entity's field of view when there is one (same as `SetFieldOfView` on it), else the free view camera's |
 | `Camera.WorldToScreen` | `(x, y, z [, canvas])` | `sx, sy, depth, onScreen` — see below |
 | `Camera.ScreenToWorldRay` | `(x, y)` | `ox, oy, oz, dx, dy, dz` — the ray's origin (on the near plane) and unit direction |
 
@@ -19,10 +19,18 @@ the main view *is* that entity's Transform. `SetPosition` / `SetYaw` / `SetPitch
 write its **world** position and rotation (rotation rebuilt from yaw and pitch, so
 any roll is dropped; each setter keeps the other angle), and every getter,
 `WorldToScreen` and `ScreenToWorldRay` read it, so moving the entity with
-`Transform.*` moves them too. That holds in edit mode as well: the authored camera
-moves. The window, the Game view and headless screenshots all render from this one
-pose. Yaw reads back in `-180..180`. With **no** camera entity, these drive the
-free view camera instead.
+`Transform.*` moves them too. `GetFov` / `SetFov` read and write that entity's
+field of view (Unity's `Camera.main.fieldOfView`), and the projections use its
+whole lens. The window, the Game view, headless screenshots, world-space UI
+(`UI.GetRect`, `UI.Raycast`, `UI.Click`), the audio listener and `Debug.Snapshot`
+all see this one view, in the same frame it moves. Yaw reads back in `-180..180`.
+With **no** camera entity, these drive the free view camera instead.
+
+**In edit mode this moves the authored camera.** Outside Play, `Camera.Set*` (fov
+included) changes the main camera entity itself, and that change is **saved with
+the scene**, as moving `Camera.main` in a Unity editor script would be. During Play,
+Stop restores the authored pose as usual. To frame a debug shot without touching
+the scene, enter Play first or move a camera you then delete.
 
 **World ↔ screen (#429).** Screen points are **UI screen pixels** — bottom-left
 origin, y-up, the frame of `UI.GetRect(id).screen` and the UI pointer (Unity's

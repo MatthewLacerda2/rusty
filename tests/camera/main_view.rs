@@ -78,7 +78,7 @@ fn moving_the_camera_entity_moves_what_camera_reads() {
     eval(&format!("Transform.SetPosition({cam}, 1, 2, 3)"));
     let read = eval("string.format('%.1f %.1f %.1f', Camera.GetPosition())");
     assert_eq!(read, "1.0 2.0 3.0");
-    // The resource catches up on the next tick, for the audio listener.
+    // The resource mirrors it from the next tick on.
     run(&mut game, 1);
     let at = game.camera().borrow().position;
     assert!(at.abs_diff_eq(Vec3::new(1.0, 2.0, 3.0), 1e-4), "{at:?}");

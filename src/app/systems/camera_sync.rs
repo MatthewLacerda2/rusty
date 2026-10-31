@@ -3,10 +3,11 @@
 //! The render [`Camera`] resource carries the main view's position/orientation (the
 //! main camera entity's when there is one, #1619; else the free camera `Camera.*`
 //! drives) plus its lens and culling mask. Each frame this copies that pose and the
-//! active `CameraComponent`'s fov/near/far/culling-mask into the resource, so the
-//! audio listener and world-space UI follow the main view and per-camera clip planes
-//! and the Unity-style culling mask (#92) take effect without the renderer reaching
-//! into the scene.
+//! active `CameraComponent`'s fov/near/far/culling-mask into the resource, so
+//! per-camera clip planes and the Unity-style culling mask (#92) take effect without
+//! the renderer reaching into the scene. Readers that must see a move the same
+//! frame (world-space UI, the audio listener, snapshots) read [`GameWorld::main_view`]
+//! or `game_camera_from_scene` instead of this mirror.
 //!
 //! [`Camera`]: crate::scene::Camera
 

@@ -69,3 +69,22 @@ fn the_view_camera_mirrors_the_entity_and_keeps_its_own_without_one() {
     set_view_orientation(&mut free, &mut empty, 20.0, -5.0);
     assert_pose(&free, Vec3::ONE, 20.0, -5.0);
 }
+
+#[test]
+fn a_vertical_camera_keeps_its_heading_when_tilted() {
+    // A top-down camera (pitch -90, yaw 30) has no horizontal forward: its heading
+    // comes from the up axis, so tilting it keeps the yaw instead of snapping.
+    for pitch in [-90.0_f32, 90.0] {
+        let (mut scene, id) = scene_with_camera();
+        let rotation = Quat::from_rotation_y((-90.0 - 30.0_f32).to_radians())
+            * Quat::from_rotation_x(pitch.to_radians());
+        scene.world.transform_mut(id).expect("t").rotation = rotation;
+        let mut camera = Camera::new(Vec3::ZERO, 0.0, 0.0);
+        let view = game_camera_from_scene(&camera, &scene);
+        assert!((view.yaw - 30.0).abs() < 1e-2, "yaw {}", view.yaw);
+
+        set_view_orientation(&mut camera, &mut scene, view.yaw, -60.0);
+        let tilted = game_camera_from_scene(&camera, &scene);
+        assert_pose(&tilted, Vec3::ZERO, view.yaw, -60.0);
+    }
+}
