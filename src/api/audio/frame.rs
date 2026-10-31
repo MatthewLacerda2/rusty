@@ -25,15 +25,15 @@ pub fn push_frame(
     camera: &RefCell<Camera>,
     seconds: f64,
 ) {
+    let scene = scene.borrow();
     let env = {
         let time = time.borrow();
         MixEnv {
-            listener: listener(camera),
+            listener: listener(camera, &scene),
             time_scale: time.time_scale,
             paused: time.paused,
         }
     };
-    let scene = scene.borrow();
     let mut audio = audio.borrow_mut();
     audio.apply_mix(&env, |id| emitter(&scene, id));
     audio.advance_output(seconds, env.paused);

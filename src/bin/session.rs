@@ -4,7 +4,7 @@
 //!
 //! Usage:
 //! ```text
-//!   cargo run --bin session --features dev               # boot the default scene
+//!   cargo run --bin session --features dev               # the project's boot scene (#1618)
 //!   cargo run --bin session --features dev -- <scene>    # boot a specific scene
 //!   cargo run --bin session --features dev -- --empty    # start from empty scene
 //!   cargo run --bin session --features dev -- --project <dir> [<scene>|--empty]
@@ -28,10 +28,12 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     // `--project <dir>` chdirs first; then `--empty` starts blank, an explicit path
-    // boots that scene, and no argument boots (and seeds) the bundled default scene.
+    // boots that scene, and no argument boots the project's boot scene
+    // (`core::project::boot_scene`: the editor's last scene, then the startup scene,
+    // then an empty one, #1618).
     let boot_scene = session::boot_scene_from_args(&args);
 
-    let mut sess = match Session::new(&boot_scene) {
+    let mut sess = match Session::boot(&boot_scene) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("session: failed to start: {}", e);

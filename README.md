@@ -230,15 +230,22 @@ The engine's own content (shaders, the bundled scripts) is not part of a project
 it ships with the engine (`engine/`), and the scripts and starter materials are
 seeded into each project from the binary.
 
-The first launch seeds a **default scene** into `assets/scenes/default.scene`: a
+A new project's first launch seeds a **default scene** into
+`assets/scenes/default.scene`, once: a
 greybox of fy_pool_day, built from boxes and planes — a walled yard with a sunken pool
 between two spawns (a ramp at each end, translucent water you walk through), a raised
 jacuzzi you jump into, and crates for cover. The Player starts at one end, and Enemy_1
 starts behind a crate at the other and chases it down one ramp and up the other.
 Seeding also bakes the scene's checker texture (`assets/textures/`) and an
 example surface shader, `default_rim`, with its recipe (`assets/shaders/`). Files you
-edited are never overwritten. To get the current default scene back, delete
-`assets/scenes/default.scene` (or use File ▸ Reset Scene).
+edited are never overwritten, and a default scene you delete stays deleted, as Unity
+never recreates a template's `SampleScene` (#1618). To get the current default scene
+back, use File ▸ Reset Scene and save it.
+
+The editor opens on the scene this machine last had open for the project (remembered
+in `cache/last_scene`, never in `project.rusty`), then on the build's startup scene,
+then on an empty Untitled scene; `session` and `session-mcp` boot the same way. The
+player and `play` boot the startup scene.
 
 ## Shipping a build
 

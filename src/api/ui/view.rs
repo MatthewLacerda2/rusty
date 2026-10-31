@@ -1,7 +1,8 @@
 //! src/api/ui/view.rs — the screen + camera the `UI` verbs compute against (#429).
 //!
 //! The same [`UiView`] the per-tick systems build (`app::systems::ui`): the sim's screen
-//! size and texture sizes and the active camera, so `UI.GetRect`, `UI.Raycast`, `UI.Click` and
+//! size and texture sizes and the main view (the camera entity's pose and lens when the
+//! scene has one, #1619), so `UI.GetRect`, `UI.Raycast`, `UI.Click` and
 //! `UI.List` see markers and world canvases exactly where they draw and hit.
 
 use std::cell::RefCell;
@@ -10,17 +11,18 @@ use glam::Vec2;
 
 use crate::core::settings::video::VideoSettings;
 use crate::physics::PhysicsWorld;
-use crate::scene::Camera;
+use crate::scene::{game_camera_from_scene, Camera, Scene};
 use crate::ui::events::{WALL_RANGE, WALL_TOLERANCE};
 use crate::ui::{ScreenSize, UiPointer, UiView};
 
-/// The view through the active camera on the sim's screen.
+/// The view through the main camera on the sim's screen.
 pub(super) fn ui_view(
     screen: &RefCell<ScreenSize>,
     video: &RefCell<VideoSettings>,
     camera: &RefCell<Camera>,
+    scene: &Scene,
 ) -> UiView {
-    let camera = camera.borrow().clone();
+    let camera = game_camera_from_scene(&camera.borrow(), scene);
     screen.borrow().view(&video.borrow(), Some(camera))
 }
 

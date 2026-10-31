@@ -41,6 +41,7 @@ pub use game::{GameWorld, PlayTransition};
 pub use probe::SystemProbe;
 pub use registry::{build, App};
 pub use resources::Resources;
+pub use scene_load::load_boot_scene;
 pub use schedule::Schedule;
 pub use stage::Stage;
 pub use tap::{TapPoint, TickTap};
