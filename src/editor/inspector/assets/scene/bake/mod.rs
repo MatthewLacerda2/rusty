@@ -205,24 +205,21 @@ fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
     });
 }
 
-/// The probe step's bar: `probe i of n` of the light probes' pass or the reflections.
+/// The probe step's bar: which pass or set on a line above, `i / n` in the bar, so
+/// the text fits the inspector's default width.
 fn draw_probe_progress(ui: &mut egui::Ui, stage: Stage) {
-    let (done, total, text) = match stage {
+    let (done, total, title) = match stage {
         Stage::Light {
             bounce,
             done,
             total,
-        } => (
-            done,
-            total,
-            format!("Light probes, bounce {bounce}: {done} / {total}"),
-        ),
-        Stage::Reflection { done, total } => {
-            (done, total, format!("Reflection probes: {done} / {total}"))
-        }
+        } => (done, total, format!("Light probes, bounce {bounce}")),
+        Stage::Reflection { done, total } => (done, total, "Reflection probes".to_string()),
         Stage::Done => (1, 1, "Saving…".to_string()),
     };
-    let bar = egui::ProgressBar::new(done as f32 / total.max(1) as f32).text(text);
+    ui.label(title);
+    let bar =
+        egui::ProgressBar::new(done as f32 / total.max(1) as f32).text(format!("{done} / {total}"));
     ui.add_sized([180.0, 20.0], bar);
 }
 
