@@ -59,19 +59,25 @@ pub fn lod_sets(asset: &ImportedAsset) -> Vec<LodSet> {
     }
     found
         .into_iter()
-        .map(|(base, mut members)| {
-            members.sort_by_key(|(level, _)| *level);
-            let mut levels: Vec<(u32, Vec<String>)> = Vec::new();
-            for (level, id) in members {
-                match levels.last_mut() {
-                    Some((l, ids)) if *l == level => ids.push(id),
-                    _ => levels.push((level, vec![id])),
-                }
-            }
-            let levels = levels.into_iter().map(|(_, ids)| ids).collect();
-            LodSet { base, levels }
+        .map(|(base, members)| LodSet {
+            base,
+            levels: by_level(members),
         })
         .collect()
+}
+
+/// `members` (each with its level) grouped one list per level, finest first;
+/// members of one level keep their order. Level numbers need not be contiguous.
+pub fn by_level<T>(mut members: Vec<(u32, T)>) -> Vec<Vec<T>> {
+    members.sort_by_key(|(level, _)| *level);
+    let mut levels: Vec<(u32, Vec<T>)> = Vec::new();
+    for (level, member) in members {
+        match levels.last_mut() {
+            Some((l, these)) if *l == level => these.push(member),
+            _ => levels.push((level, vec![member])),
+        }
+    }
+    levels.into_iter().map(|(_, these)| these).collect()
 }
 
 /// The set named `base` in `asset`, if any.

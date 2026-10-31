@@ -71,3 +71,21 @@ fn a_joint_mesh_and_a_held_child_hang_from_the_bone() {
     assert_eq!(hip.translation, Vec3::ZERO, "at the bone itself");
     assert_eq!(sword.translation, Vec3::Z, "its own offset from the bone");
 }
+
+#[test]
+fn a_bone_rest_is_relative_to_a_moved_skinned_node() {
+    // Body 3 m along Z and turned a quarter about Y, beside the armature.
+    let mut gltf: serde_json::Value = serde_json::from_str(RIG).unwrap();
+    gltf["nodes"][3]["translation"] = serde_json::json!([0.0, 0.0, 3.0]);
+    gltf["nodes"][3]["rotation"] = serde_json::json!([0.0, 0.70710677, 0.0, 0.70710677]);
+    let gltf = gltf::Gltf::from_slice(gltf.to_string().as_bytes()).unwrap();
+    let nodes = model_nodes(&gltf.document, &["Tri"]);
+    let rest = nodes[6].bone.as_ref().unwrap().rest;
+    let worlds = crate::asset::model_node::worlds(&nodes);
+    // Sword sits at Armature (5,0,0) + Hip (0,1,0) + its own (0,0,1).
+    let sword = worlds[6].transform_point3(Vec3::ZERO);
+    assert!(sword.abs_diff_eq(Vec3::new(5.0, 1.0, 1.0), 1e-5), "{sword}");
+    let body = worlds[1];
+    let hip = (body * rest).transform_point3(Vec3::ZERO);
+    assert!(hip.abs_diff_eq(Vec3::new(5.0, 1.0, 0.0), 1e-5), "{hip}");
+}

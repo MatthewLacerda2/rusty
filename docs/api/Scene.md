@@ -258,8 +258,9 @@ one name and never drift.
   empty node is an empty child; a `_LOD<n>` set of sibling nodes is one LODGroup (an
   Alt+D copy, `Crate_LOD0.001`, is a group of its own); what a skeleton's joint holds
   (a mesh on the joint, a gun under `Hand`) hangs from that bone's entity, so it
-  follows the animation. A later Scale Factor change moves the parts with the meshes.
-  Returns the root's id.
+  follows the animation. Returns the root's id. A Scale Factor or source change after
+  the spawn rescales the meshes but does **not** move the parts yet (#1637): set the
+  Scale Factor before instantiating (`Assets.SetModelImportSettings`).
 
 - **`Scene.Instantiate(assetRef, [name], [x, y, z])`** — spawns one entity from an
   importable model sub-object reference (`path::sub_object`, the `reference` field

@@ -7,7 +7,9 @@
 //! mesh's bone child (#453). What a joint holds hangs from the bone (Unity keeps a
 //! gun under `Hand`): a non-joint child of it, and a mesh on the joint itself, are
 //! kept with the skinned node as parent and the bone named ([`NodeBone`]), walked
-//! after the main tree so the skinned node is always earlier. A joint no kept
+//! after the main tree so the skinned node is always earlier. The bone's rest is
+//! its bind pose relative to the skinned node (as `skin` puts it in
+//! `SkinData::bind_global`), wherever the skinned node and the armature sit. A joint no kept
 //! mesh skins has no bone to spawn, so it is an ordinary node. A node reached
 //! twice (a malformed file whose hierarchy loops or shares a child) is kept the
 //! first time only.
@@ -23,21 +25,23 @@ pub fn model_nodes<'a>(document: &'a gltf::Document, mesh_ids: &'a [&'a str]) ->
     let mut walk = Walk {
         mesh_ids,
         bone: bones(document, &roots),
+        global: globals(document, &roots),
         seen: vec![false; document.nodes().len()],
         kept: vec![None; document.nodes().len()],
         held: Vec::new(),
         out: Vec::new(),
     };
     for root in &roots {
-        walk.node(root, None, None, Mat4::IDENTITY);
+        walk.node(root, None, None);
     }
     // What the bones hold, each under its skinned node, now walked.
     while !walk.held.is_empty() {
-        for (held, owner, name, rest) in std::mem::take(&mut walk.held) {
+        for (held, owner, name, joint) in std::mem::take(&mut walk.held) {
             let parent = walk.kept[owner];
+            let rest = walk.global[owner].inverse() * walk.global[joint];
             let bone = Some(NodeBone { name, rest });
             match held {
-                Held::Child(node) => walk.node(&node, parent, bone, Mat4::IDENTITY),
+                Held::Child(node) => walk.node(&node, parent, bone),
                 Held::Mesh(node) => {
                     let at_bone = ([0.0; 3], Quat::IDENTITY.to_array(), [1.0; 3]);
                     walk.push(&node, parent, bone, at_bone);
@@ -61,6 +65,25 @@ fn roots(document: &gltf::Document) -> Vec<gltf::Node<'_>> {
         node.children().for_each(|c| child[c.index()] = true);
     }
     document.nodes().filter(|n| !child[n.index()]).collect()
+}
+
+/// Every node's model-space transform, composed down from `roots` (a node
+/// reached twice keeps the first; one never reached stays at the identity).
+fn globals(document: &gltf::Document, roots: &[gltf::Node]) -> Vec<Mat4> {
+    let mut out = vec![None; document.nodes().len()];
+    let mut stack: Vec<(gltf::Node, Mat4)> =
+        roots.iter().map(|r| (r.clone(), Mat4::IDENTITY)).collect();
+    while let Some((node, parent)) = stack.pop() {
+        if out[node.index()].is_some() {
+            continue;
+        }
+        let global = parent * Mat4::from_cols_array_2d(&node.transform().matrix());
+        out[node.index()] = Some(global);
+        stack.extend(node.children().map(|c| (c, global)));
+    }
+    out.into_iter()
+        .map(|g| g.unwrap_or(Mat4::IDENTITY))
+        .collect()
 }
 
 /// For each node that spawns as a bone: the skinned node (reachable from `roots`,
@@ -109,40 +132,36 @@ enum Held<'a> {
 struct Walk<'a> {
     mesh_ids: &'a [&'a str],
     bone: Vec<Option<(usize, String)>>,
+    /// Each glTF node's model-space transform.
+    global: Vec<Mat4>,
     seen: Vec<bool>,
     /// Each glTF node's index in `out`, once kept.
     kept: Vec<Option<usize>>,
-    /// What bones hold: the node, its skinned node, the bone and its rest.
-    held: Vec<(Held<'a>, usize, String, Mat4)>,
+    /// What bones hold: the node, its skinned node, the bone's name and its
+    /// joint node (all glTF indices).
+    held: Vec<(Held<'a>, usize, String, usize)>,
     out: Vec<ModelNode>,
 }
 
 impl<'a> Walk<'a> {
     /// Add `node` under the kept node `parent` (from its `bone` when it hangs from
-    /// one), then its subtree. `chain` is the rest pose of the bones above it when
-    /// it is a bone itself, relative to the skinned node.
-    fn node(
-        &mut self,
-        node: &gltf::Node<'a>,
-        parent: Option<usize>,
-        bone: Option<NodeBone>,
-        chain: Mat4,
-    ) {
+    /// one), then its subtree.
+    fn node(&mut self, node: &gltf::Node<'a>, parent: Option<usize>, bone: Option<NodeBone>) {
         if std::mem::replace(&mut self.seen[node.index()], true) {
             return;
         }
         if let Some((owner, name)) = self.bone[node.index()].clone() {
-            let rest = chain * Mat4::from_cols_array_2d(&node.transform().matrix());
+            let joint = node.index();
             if node.mesh().is_some() {
                 self.held
-                    .push((Held::Mesh(node.clone()), owner, name.clone(), rest));
+                    .push((Held::Mesh(node.clone()), owner, name.clone(), joint));
             }
             for child in node.children() {
                 match self.bone[child.index()].is_some() {
-                    true => self.node(&child, parent, None, rest),
+                    true => self.node(&child, parent, None),
                     false => self
                         .held
-                        .push((Held::Child(child), owner, name.clone(), rest)),
+                        .push((Held::Child(child), owner, name.clone(), joint)),
                 }
             }
             return;
@@ -151,7 +170,7 @@ impl<'a> Walk<'a> {
         let index = self.push(node, parent, bone, (t, r, s));
         self.kept[node.index()] = Some(index);
         for child in node.children() {
-            self.node(&child, Some(index), None, Mat4::IDENTITY);
+            self.node(&child, Some(index), None);
         }
     }
 

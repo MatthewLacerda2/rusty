@@ -238,7 +238,8 @@ fn the_bundled_suzanne_is_fitted_like_a_model() {
         &PreviewSubject::Shader("unused.wgsl".to_string()),
     );
     let asset = asset::import_and_sync_sidecar(Path::new(&suzanne_path())).unwrap();
-    let (min, max) = asset.model_bounds().unwrap();
+    // Spawned as its one sub-object, so fitted by that sub-mesh's own bounds.
+    let (min, max) = asset.sub_meshes[0].bounds().unwrap();
     let id = scene.world.ids_with_mesh()[0];
     let transform = scene.world.transform(id).unwrap();
     let scale = fit_scale(min, max);

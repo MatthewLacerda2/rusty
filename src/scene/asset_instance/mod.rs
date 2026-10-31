@@ -72,8 +72,8 @@ pub fn instantiate_asset(
 
 /// [`instantiate_asset`] for a file its caller already imported: `asset` is the
 /// file at `path`, and `sub` one of its sub-objects (or a `_LOD<n>` set's base).
-/// A model spawned whole goes through here, so its file is imported once, not
-/// once more per sub-object.
+/// The mesh is built from `asset` itself, so a model spawned whole through here
+/// parses its file once, not once more per node.
 pub fn instantiate_imported(
     scene: &mut Scene,
     path: &str,
@@ -85,7 +85,7 @@ pub fn instantiate_imported(
     let reference = asset::AssetRef::new(path, sub)
         .map_err(|e| e.to_string())?
         .to_string_ref();
-    if asset.sub_mesh(sub).is_none() {
+    let Some(sub_mesh) = asset.sub_mesh(sub) else {
         // A `_LOD<n>` set's base name addresses the whole set (#472).
         return match asset::lod::lod_set(asset, sub) {
             Some(set) => instantiate_lod_set(scene, path, asset, &set, name, position),
@@ -93,16 +93,17 @@ pub fn instantiate_imported(
                 "asset reference '{reference}' has no such sub-object"
             )),
         };
-    }
+    };
 
     let label = name.unwrap_or(sub);
     let id = scene.add_entity(label.to_string());
     if let Some(mut transform) = scene.world.transform_mut(id) {
         transform.position = position;
     }
-    scene
-        .world
-        .set_mesh(id, Some(crate::scene::asset_mesh_component(&reference)));
+    scene.world.set_mesh(
+        id,
+        Some(rehydrate::asset_mesh_component_of(&reference, sub_mesh)),
+    );
     // A skinned sub-object brings its skeleton as child bone entities (#453).
     scene.sync_skeleton(id);
 
@@ -220,9 +221,10 @@ pub fn set_lightmap_uv_settings(
 /// Set a model's Scale Factor (#1398) in its `.meta` sidecar and re-import every
 /// mesh in `scene` instanced from it, a skinned one with its new rig and its bones
 /// moved to the scaled rest pose; an LODGroup over those meshes has its size scaled
-/// by as much as its LOD0 meshes grew, and a whole-model instance has its node
-/// offsets scaled with them (#1083). The model is noted in the write log, so every
-/// other cache keyed by it (the particle meshes) re-reads it too. A NaN or unchanged
+/// by as much as its LOD0 meshes grew. A whole-model instance's node offsets do
+/// not move yet (#1637): set the factor before instantiating. The model is noted
+/// in the write log, so every other cache keyed by it (the particle meshes)
+/// re-reads it too. A NaN or unchanged
 /// factor changes nothing: no write, no re-import. The one verb the model inspector
 /// and `Assets.SetModelImportSettings` share. Returns how many meshes were re-imported.
 pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Result<usize, String> {
@@ -237,10 +239,6 @@ pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Resu
     let before = crate::scene::lod_instance::lod0_extents(scene);
     let ids = rehydrate::model_writes::reimport_noted(scene, path, Rig::Rebuild);
     crate::scene::lod_instance::rescale_groups_over(scene, &ids, &before);
-    if let Ok(asset) = asset::import_and_sync_sidecar(source) {
-        let ratio = asset::scale_factor::sanitize(scale, stored) / stored;
-        crate::scene::model_instance::rescale_node_offsets(scene, &asset.node_tree(), &ids, ratio);
-    }
     Ok(ids.len())
 }
 

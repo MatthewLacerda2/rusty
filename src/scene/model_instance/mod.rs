@@ -11,19 +11,18 @@
 //!
 //! The `_LOD<n>` nodes under one parent sharing a base (and Blender's `.001`
 //! duplicate suffix) become one LODGroup where the first of them sits (`lod`).
-//! A later Scale Factor change rescales every instance's node offsets with its
-//! meshes (`rescale`), as Unity updates a model's instances.
+//! A later Scale Factor change re-imports the meshes but does not move the parts
+//! yet: an instance keeps no link to its model, so it cannot be told apart from
+//! entities that merely share its names (#1637, models as prefab sources).
 
 mod lod;
-mod rescale;
 
 use glam::{Mat4, Vec3};
 
 use crate::asset::{ImportedAsset, ModelNode};
+use crate::components::TransformComponent;
 use crate::scene::asset_instance::instantiate_imported;
 use crate::scene::Scene;
-
-pub use rescale::rescale_node_offsets;
 
 /// Spawn the model at `path` (imported as `asset`) at `position`: a root entity
 /// named after the file, and its node tree under it. Returns the root's id.
@@ -66,7 +65,8 @@ pub fn instantiate_model(
 
 /// Where `node` hangs under its parent node's entity `parent`: the bone it names,
 /// or `parent` itself, with what sits between them and the node's own local
-/// transform (a bone the skeleton lacks leaves the node at the bone's rest pose).
+/// transform (a bone the skeleton lacks leaves the node at the bone's rest pose,
+/// relative to the skinned node).
 fn holder(scene: &Scene, node: &ModelNode, parent: u32) -> (u32, Mat4) {
     let Some(bone) = &node.bone else {
         return (parent, Mat4::IDENTITY);
@@ -112,11 +112,8 @@ fn place(scene: &mut Scene, id: u32, before: Mat4, node: &ModelNode) {
 
 /// Give `id` the local transform `m`, a product of the file's node matrices.
 pub(super) fn set_matrix(scene: &mut Scene, id: u32, m: Mat4) {
-    // lint: allow(world-space) `m` is built from the file's node matrices, no
-    // entity's world transform: the World has none of it.
-    let (scale, rotation, position) = m.to_scale_rotation_translation();
     if let Some(mut t) = scene.world.transform_mut(id) {
-        (t.position, t.rotation, t.scale) = (position, rotation, scale);
+        *t = TransformComponent::from_matrix(m);
     }
 }
 

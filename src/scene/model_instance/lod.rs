@@ -9,7 +9,7 @@
 
 use glam::Mat4;
 
-use crate::asset::lod::node_lod;
+use crate::asset::lod::{by_level, node_lod};
 use crate::asset::{ImportedAsset, ModelNode};
 use crate::scene::lod_instance::{lod0_size, set_levels};
 use crate::scene::Scene;
@@ -83,20 +83,17 @@ impl Lods {
 
     /// Give every group its `LODGroup`: levels finest first, sized by LOD0's meshes.
     pub(super) fn finish(self, scene: &mut Scene, asset: &ImportedAsset) {
-        for mut group in self.groups {
-            group.members.sort_by_key(|(level, _, _)| *level);
-            let mut levels: Vec<(u32, Vec<u32>)> = Vec::new();
-            for &(level, id, _) in &group.members {
-                match levels.last_mut() {
-                    Some((l, ids)) if *l == level => ids.push(id),
-                    _ => levels.push((level, vec![id])),
-                }
-            }
-            let finest = levels.first().map(|(l, _)| *l);
-            let lod0 = group.members.iter().filter(|(l, _, _)| Some(*l) == finest);
-            let size = lod0_size(asset, lod0.map(|(_, _, mesh)| mesh.as_str()));
-            let levels = levels.into_iter().map(|(_, ids)| ids).collect();
-            set_levels(scene, group.entity, levels, size);
+        for group in self.groups {
+            let members = group.members.into_iter();
+            let levels = by_level(
+                members
+                    .map(|(level, id, mesh)| (level, (id, mesh)))
+                    .collect(),
+            );
+            let lod0 = levels.first().into_iter().flatten();
+            let size = lod0_size(asset, lod0.map(|(_, mesh)| mesh.as_str()));
+            let ids = levels.iter().map(|l| l.iter().map(|(id, _)| *id).collect());
+            set_levels(scene, group.entity, ids.collect(), size);
         }
     }
 }

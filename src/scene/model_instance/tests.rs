@@ -101,27 +101,6 @@ fn a_lod_set_is_one_group_where_its_first_member_sits() {
 }
 
 #[test]
-fn a_later_scale_factor_moves_the_parts_of_a_spawned_model() {
-    let (mut scene, root) = spawn_file("rusty_1083_rescaled.gltf", KIT, Vec3::X);
-    let path = crate::test_temp::dir().join("rusty_1083_rescaled.gltf");
-    let path = path.to_string_lossy().into_owned();
-    let set = crate::scene::asset_instance::set_model_scale_factor(&mut scene, &path, 0.01);
-    assert_eq!(set, Ok(3), "Wall and both crate levels");
-    let kit = child(&scene, root, "Kit");
-    let at = |id: u32| scene.world.transform(id).unwrap().position;
-    assert_eq!(at(root), Vec3::X, "the root keeps its place");
-    assert!(at(kit).abs_diff_eq(Vec3::X * 0.1, 1e-6), "{}", at(kit));
-    let wall = scene.world.world_position(child(&scene, kit, "Wall"));
-    assert!(wall.abs_diff_eq(Vec3::new(1.1, 0.0, 0.05), 1e-5), "{wall}");
-    let group = child(&scene, kit, "Crate");
-    assert!(at(group).abs_diff_eq(Vec3::Y * 0.02, 1e-6));
-    let lod1 = scene
-        .world
-        .world_position(child(&scene, group, "Crate_LOD1"));
-    assert!(lod1.abs_diff_eq(Vec3::new(1.1, 0.03, 0.0), 1e-5), "{lod1}");
-}
-
-#[test]
 fn a_scale_factor_scales_the_node_offsets_with_the_meshes() {
     let path = crate::test_temp::dir().join("rusty_1083_scaled.gltf");
     std::fs::write(&path, KIT).unwrap();
