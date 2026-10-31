@@ -23,15 +23,26 @@ used by naming it on a UI graphic — `UI.SetShader(id, "hud_glitch")` (see
 
 **A baked module follows the engine** (#1638), as Unity recompiles a shader when
 its includes change. Its first line is a fingerprint of what it was composed from
-(the assembled module and the engine shader modules it can import). When the
-renderer loads it (or boot seeds the default scene's `default_rim`) and the
-engine's shaders have changed since the bake, it is **re-baked from its
-`<name>.recipe.json`** in place, with one console line naming it: re-baking by
-hand after an engine update is never needed. Editing the recipe re-bakes the
-module at its next load too. A `.wgsl` with no recipe beside it (hand-written, or
-baked before #1638) is left alone; if it no longer composes, the renderer logs
-that once and draws the standard shader. A hand edit to a baked module lasts until
-its recipe or the engine changes; delete the recipe to keep it for good.
+(the assembled module, its params and the engine shader modules it can import).
+When the renderer loads it (a surface, ui or post-FX module, or the editor's shader
+preview), or boot seeds the default scene's `default_rim`, and the engine's shaders
+have changed since the bake, it is **re-baked from its `<name>.recipe.json`** in
+place, with one console line naming it: re-baking by hand after an engine update is
+never needed. A shipped player never writes into its install: it re-composes a
+stale module from its recipe in memory and leaves the files as shipped.
+
+- **An edited recipe** takes effect at the module's next load (a restart, or the
+  next write to the module), not live; `Shader.Bake` applies one at once.
+- **No recipe, no re-bake.** A `.wgsl` with no recipe beside it (hand-written, or
+  baked by `Shader.Bake` before #1638) is left alone; if it no longer composes, the
+  renderer logs that once and draws the standard shader.
+- **A deleted module stays deleted**, even with its recipe left beside it.
+- **A hand edit to a baked module** lasts until its recipe or the engine changes,
+  when the re-bake replaces it; delete the recipe to keep it for good. That includes
+  the seeded `default_rim`, whose recipe was seeded with it: a hand edit to it is
+  replaced at the first engine update.
+- **A re-bake that fails** (its recipe names a block since removed, say) is logged
+  once, and the module is loaded as it is.
 
 This is authoring shaders that **fit the engine**, not a general-purpose shader
 compiler: the agent composes only from the curated block library — there is no

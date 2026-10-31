@@ -18,7 +18,7 @@
 //! that is missing, fails to compose, lacks `vs_main`/`fs_main` (a postfx module) or
 //! the motion, SSR or depth-postpass entries (#1435, #1526, #1523), or fails
 //! validation is logged **once** and draws with the standard pipeline. A module baked
-//! from a recipe is first re-baked when stale (`shadergen::rebake`, #1638).
+//! from a recipe is first brought up to date when stale (`shadergen::baked`, #1638).
 //!
 //! **Hot reload.** [`SurfaceShaders::refresh`] drains the write log
 //! (`core::fs::written`) once per render: a slot whose module or params file was
@@ -45,12 +45,15 @@ use crate::core::fs::written::{written_since, Stale};
 use crate::core::paths::native;
 use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
 use crate::shadergen::params::{resolve_module, sidecar_path, ParamLayout};
-use crate::shadergen::{compose, engine_shader_dir, DEFAULT_OUT_DIR};
+use crate::shadergen::{baked, compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// The pipeline id of the renderer's standard forward shader.
 pub(crate) const STANDARD: usize = 0;
 
 pub(crate) use pass::SolidPass;
+
+/// A built slot: its pipelines and the runtime params its module declares.
+type Built = (SurfacePipelines, ParamLayout);
 
 /// One authored surface shader's pipelines.
 pub(crate) struct SurfacePipelines {
@@ -208,9 +211,7 @@ impl SurfaceShaders {
         let module = resolve_module(&dirs, &self.slots[i].name);
         self.builds += 1;
         let built = match &module {
-            Some(path) => self
-                .build(device, path)
-                .and_then(|pipelines| Ok((pipelines, ParamLayout::read_beside(path)?))),
+            Some(path) => self.build(device, path),
             None => Err(format!(
                 "no `{}.wgsl` in {}",
                 self.slots[i].name,
@@ -235,11 +236,10 @@ impl SurfaceShaders {
 
     /// Compose `path` against `common`, check it is a surface module, and build its
     /// pipelines under a validation error scope, so wgpu refuses instead of panicking.
-    fn build(&self, device: &wgpu::Device, path: &Path) -> Result<SurfacePipelines, String> {
-        crate::shadergen::rebake::refresh(path); // re-baked first when stale (#1638)
-        let source = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    fn build(&self, device: &wgpu::Device, path: &Path) -> Result<Built, String> {
+        let baked = baked::load(path)?; // re-baked first when stale (#1638)
         let mut composer = compose::composer_with_common(engine_shader_dir())?;
-        let module = compose::compose(&mut composer, &source, &path.to_string_lossy())?;
+        let module = compose::compose(&mut composer, &baked.source, &path.to_string_lossy())?;
         let has = |entry: &str, stage| {
             module
                 .entry_points
@@ -269,7 +269,7 @@ impl SurfaceShaders {
         let pipelines = super::surface_pipelines(device, &shader, self.format, layouts, cuts);
         match pollster::block_on(scope.pop()) {
             Some(e) => Err(e.to_string()),
-            None => Ok(pipelines),
+            None => Ok((pipelines, baked.layout(path)?)),
         }
     }
 }

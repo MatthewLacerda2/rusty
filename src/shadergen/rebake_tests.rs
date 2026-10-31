@@ -4,26 +4,30 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use super::{fingerprint, recipe_path, refresh_against, Refresh};
+use super::{engine_hash, fingerprint, recipe_path, refresh_against, Refresh};
 use crate::shadergen::compose::MODULES;
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use crate::shadergen::{bake_recipe, validate::validate};
 
 /// A fresh `<tag>` dir holding a copy of the engine shaders a surface bake reads.
-fn engine_copy(tag: &str) -> (PathBuf, String) {
-    let root = crate::test_temp::dir().join(format!("rusty_1638_{tag}"));
+pub(super) fn engine_copy(tag: &str) -> (PathBuf, String) {
+    let root = crate::test_temp::dir().join(format!("rusty_1638_{tag}_{}", std::process::id()));
     std::fs::remove_dir_all(&root).ok();
-    let engine = root.join("engine");
+    (root.clone(), copy_engine(&root.join("engine")))
+}
+
+/// A copy of the engine shaders at `engine` (its hash is cached per directory, so a
+/// changed engine is a second copy, not an edit of the first).
+pub(super) fn copy_engine(engine: &Path) -> String {
     for name in MODULES.iter().chain(&["shader.wgsl"]) {
         let to = engine.join(name);
         std::fs::create_dir_all(to.parent().unwrap()).unwrap();
         std::fs::copy(format!("engine/shaders/{name}"), to).unwrap();
     }
-    let engine = engine.to_str().unwrap().to_owned();
-    (root, engine)
+    engine.to_str().unwrap().to_owned()
 }
 
-fn rim() -> ShaderRecipe {
+pub(super) fn rim() -> ShaderRecipe {
     ShaderRecipe {
         pass: PassKind::Surface,
         name: "rim".into(),
@@ -47,6 +51,7 @@ fn a_changed_engine_module_re_bakes_the_module_once() {
     assert_eq!(refresh_against(&wgsl, &engine), Refresh::Current);
 
     let before = read(&wgsl);
+    let engine = copy_engine(&root.join("engine_v2"));
     let common = Path::new(&engine).join("common.wgsl");
     std::fs::write(&common, read(&common) + "\n// a changed engine module\n").unwrap();
     assert_eq!(refresh_against(&wgsl, &engine), Refresh::Rebaked);
@@ -74,6 +79,17 @@ fn a_module_that_no_longer_composes_is_re_baked_and_composes_again() {
     assert!(validate(&engine, stranded).is_err());
     assert_eq!(refresh_against(&wgsl, &engine), Refresh::Rebaked);
     validate(&engine, &read(&wgsl)).expect("the re-baked module composes");
+    std::fs::remove_dir_all(&root).ok();
+}
+
+#[test]
+fn a_deleted_module_stays_deleted_beside_its_recipe() {
+    let (root, engine) = engine_copy("deleted");
+    let out = root.join("out");
+    let wgsl = PathBuf::from(bake_recipe(&rim(), &engine, out.to_str().unwrap()).unwrap());
+    std::fs::remove_file(&wgsl).unwrap();
+    assert_eq!(refresh_against(&wgsl, &engine), Refresh::Unbaked);
+    assert!(!wgsl.exists(), "not brought back");
     std::fs::remove_dir_all(&root).ok();
 }
 
@@ -112,11 +128,11 @@ fn a_recipe_that_cannot_be_re_baked_leaves_the_module_and_says_why() {
 }
 
 #[test]
-fn the_fingerprint_moves_with_the_module_and_ignores_line_endings() {
-    let (root, engine) = engine_copy("hash");
-    let a = fingerprint("fn a() {}\n", &engine).unwrap();
-    assert_eq!(a, fingerprint("fn a() {}\r\n", &engine).unwrap());
-    assert_ne!(a, fingerprint("fn b() {}\n", &engine).unwrap());
-    assert!(fingerprint("", "no/such/engine").is_err());
-    std::fs::remove_dir_all(&root).ok();
+fn the_fingerprint_moves_with_module_params_and_engine_and_ignores_line_endings() {
+    let a = fingerprint("fn a() {}\n", "{}", 1);
+    assert_eq!(a, fingerprint("fn a() {}\r\n", "{}", 1));
+    assert_ne!(a, fingerprint("fn b() {}\n", "{}", 1));
+    assert_ne!(a, fingerprint("fn a() {}\n", "{\"x\":1}", 1));
+    assert_ne!(a, fingerprint("fn a() {}\n", "{}", 2));
+    assert!(engine_hash("no/such/engine").is_err());
 }

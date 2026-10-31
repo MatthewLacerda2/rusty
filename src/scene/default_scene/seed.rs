@@ -20,7 +20,7 @@ use super::looks::{checker_recipe, shader_recipe, FLOOR, SHADER_NAME};
 use crate::core::paths::native;
 use crate::scene::authoring::material::{bake_maps, MAPS_DIR};
 use crate::scene::MaterialAsset;
-use crate::shadergen::rebake::refresh;
+use crate::shadergen::rebake::{refresh, WRITES};
 use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// Seed the default texture and shader into `assets/`. A failure is logged
@@ -54,12 +54,15 @@ fn seed_checker(dir: &Path) -> Result<(), String> {
     staging.publish(&[&file])
 }
 
-/// Bake the default shader when missing; re-bake it when stale (a failed re-bake is
-/// logged by `refresh`, and the scene draws the standard shader until it composes).
+/// Bake the default shader when missing; re-bake it when stale in a build that may
+/// write (a failed re-bake is logged by `refresh`, and the scene draws the standard
+/// shader until it composes; a shipped player re-composes it in memory at load).
 fn seed_shader(dir: &Path) -> Result<(), String> {
     let wgsl = dir.join(format!("{SHADER_NAME}.wgsl"));
     if wgsl.exists() {
-        refresh(&wgsl);
+        if WRITES {
+            refresh(&wgsl);
+        }
         return Ok(());
     }
     let out = dir.to_string_lossy();

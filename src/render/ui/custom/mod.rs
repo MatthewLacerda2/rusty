@@ -37,6 +37,7 @@ use super::pipeline::{self, UiPass};
 use crate::components::UiBlend;
 use crate::core::fs::written::written_since;
 use crate::render::gpu::layout_entries::dynamic_uniform_entry;
+use crate::shadergen::baked::{self, Baked};
 use crate::shadergen::params::{self, ParamLayout};
 use crate::shadergen::{compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
@@ -49,15 +50,14 @@ struct Variant {
     screen: HashMap<(wgpu::TextureFormat, UiBlend), wgpu::RenderPipeline>,
 }
 
-/// What a variant was built from — its module's path, source and params sidecar —
-/// or `None` when no module answers to its name.
-type Source = Option<(PathBuf, String, Option<String>)>;
+/// What a variant was built from — its module's path, source and params sidecar,
+/// brought up to date when stale (#1638) — or `None` when no module answers to it.
+type Source = Option<(PathBuf, Baked)>;
 
 fn source(name: &str) -> Source {
     let path = params::resolve_module(&[DEFAULT_OUT_DIR, engine_shader_dir()], name)?;
-    crate::shadergen::rebake::refresh(&path); // re-baked first when stale (#1638)
-    let sidecar = std::fs::read_to_string(params::sidecar_path(&path)).ok();
-    Some((path.clone(), std::fs::read_to_string(path).ok()?, sidecar))
+    let baked = baked::load(&path).ok()?;
+    Some((path, baked))
 }
 
 /// The variant cache and the layouts its pipelines share. One per `UiRenderer`.
@@ -138,11 +138,11 @@ impl UiShaders {
     /// panicking.
     fn build(&self, device: &wgpu::Device, name: &str, source: &Source) -> Result<Variant, String> {
         let engine = engine_shader_dir();
-        let (path, wgsl, _) = source
+        let (path, baked) = source
             .as_ref()
             .ok_or_else(|| format!("no `{name}.wgsl` in {DEFAULT_OUT_DIR} or {engine}"))?;
         let mut composer = compose::composer_with_common(engine)?;
-        let module = compose::compose(&mut composer, wgsl, &path.to_string_lossy())?;
+        let module = compose::compose(&mut composer, &baked.source, &path.to_string_lossy())?;
         for entry in ["vs_main", "fs_main", "vs_world", "fs_world"] {
             if !module.entry_points.iter().any(|e| e.name == entry) {
                 return Err(format!(
@@ -150,7 +150,7 @@ impl UiShaders {
                 ));
             }
         }
-        let params = ParamLayout::read_beside(path)?;
+        let params = baked.layout(path)?;
         let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("UI Variant Shader"),

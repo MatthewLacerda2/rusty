@@ -168,15 +168,14 @@ impl EffectCache {
     /// here instead of panicking the device.
     fn load(&mut self, device: &wgpu::Device, name: &str) -> Result<Effect, String> {
         let path = format!("{}/{name}.wgsl", self.dir);
-        // Stale against the engine's shaders: re-baked from its recipe first (#1638).
-        crate::shadergen::rebake::refresh(std::path::Path::new(&path));
-        let layout = ParamLayout::read_beside(std::path::Path::new(&path))?;
-        let source = std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
+        // Stale against the engine's shaders: brought up to date first (#1638).
+        let baked = crate::shadergen::baked::load(std::path::Path::new(&path))?;
+        let layout = baked.layout(std::path::Path::new(&path))?;
         let composer = match &mut self.composer {
             Some(c) => c,
             slot => slot.insert(compose::composer_with_common(engine_shader_dir())?),
         };
-        let module = compose::compose(composer, &source, &path)
+        let module = compose::compose(composer, &baked.source, &path)
             .map_err(|e| format!("{path} failed to compose: {e}"))?;
         for entry in ["vs_fullscreen", "fs_main"] {
             if !module.entry_points.iter().any(|e| e.name == entry) {

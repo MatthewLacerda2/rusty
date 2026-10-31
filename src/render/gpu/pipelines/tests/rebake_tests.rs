@@ -16,12 +16,12 @@ const STRANDED: &str = "// rusty engine fingerprint: 0000000000000000\n\
 
 #[test]
 fn gpu_a_stale_baked_shader_is_re_baked_and_drawn_a_bare_one_falls_back() {
-    let dir = crate::test_temp::dir().join(format!("rusty_1638_gpu_{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let dir_str = dir.to_str().unwrap().to_owned();
     let Some(mut renderer) = headless_or_skip(32, 32) else {
         return;
     };
+    let dir = crate::test_temp::dir().join(format!("rusty_1638_gpu_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let dir_str = dir.to_str().unwrap().to_owned();
     renderer.surface_shaders.set_dirs(vec![dir_str.clone()]);
     let recipe = ShaderRecipe {
         pass: PassKind::Surface,
