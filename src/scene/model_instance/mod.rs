@@ -19,6 +19,10 @@ use crate::scene::asset_instance::instantiate_imported;
 use crate::scene::lod_instance::instantiate_lod_set;
 use crate::scene::Scene;
 
+/// A spawned LOD set: its first member node's index, and each member mesh's
+/// renderer.
+type Group = (usize, Vec<(String, u32)>);
+
 /// Spawn the model at `path` (imported as `asset`) at `position`: a root entity
 /// named after the file, and its node tree under it. Returns the root's id.
 pub fn instantiate_model(
@@ -34,8 +38,7 @@ pub fn instantiate_model(
     let nodes = asset.node_tree();
     let worlds = crate::asset::model_node::worlds(&nodes);
     let sets = lod_sets(asset);
-    // Per set: the first member node's index, and each member mesh's renderer.
-    let mut groups: Vec<Option<(usize, Vec<(String, u32)>)>> = vec![None; sets.len()];
+    let mut groups: Vec<Option<Group>> = vec![None; sets.len()];
     let mut spawned: Vec<u32> = Vec::with_capacity(nodes.len());
     for (i, node) in nodes.iter().enumerate() {
         let parent = node
@@ -134,6 +137,8 @@ fn set_local(scene: &mut Scene, id: u32, node: &ModelNode) {
 
 /// Give `id` the local transform `m`.
 fn place(scene: &mut Scene, id: u32, m: Mat4) {
+    // lint: allow(world-space) `m` is relative between two nodes of the file, no entity's
+    // world transform: the World has none of it yet.
     let (scale, rotation, position) = m.to_scale_rotation_translation();
     if let Some(mut t) = scene.world.transform_mut(id) {
         t.position = position;

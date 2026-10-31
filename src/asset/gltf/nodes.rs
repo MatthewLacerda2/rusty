@@ -82,6 +82,7 @@ impl Walk<'_> {
                 let (t, r, s) = node.transform().decomposed();
                 (s.into(), glam::Quat::from_array(r), t.into())
             }
+            // lint: allow(world-space) a node's transform in the file, before any entity exists.
             false => local.to_scale_rotation_translation(),
         };
         let index = self.out.len();
