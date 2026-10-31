@@ -104,6 +104,7 @@ mod tests {
                 sub("Lamp_LOD0", Some("Lamp")),
             ],
             materials: Vec::new(),
+            nodes: Vec::new(),
         };
         let sets = lod_sets(&asset);
         assert_eq!(sets.len(), 2);

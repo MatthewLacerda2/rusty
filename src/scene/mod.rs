@@ -17,6 +17,7 @@
 //!   rehydrate — rebuild a mesh's geometry + rig from its on-disk reference; `model_writes` reloads re-written models
 //!   settings  — project/scene-wide settings: fog, layers, collision matrix, shader overrides
 //!   lod_instance, world_cache — LOD-set instantiation; the world-space read cache
+//!   model_instance — a whole model as its node tree, one child per node (#1083)
 //!   skeleton  — bones as GameObjects: spawn, save-strip, palette build (#453)
 //!   nav_settings — the per-scene navmesh bake settings (`navigation` reads them)
 //!   io        — save/load, path + extension, default-scene seeding
@@ -38,6 +39,7 @@ pub mod io;
 pub mod lighting;
 pub mod lod_instance;
 mod material_lookup;
+pub mod model_instance;
 pub mod nav_settings;
 pub mod prefab;
 pub mod rehydrate;

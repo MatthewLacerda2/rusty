@@ -118,3 +118,18 @@ fn a_cube_without_normals_is_shaded_flat() {
     crate::asset::flat_normals_tests::assert_flat(&asset.sub_meshes[0]);
     assert_eq!(asset.sub_meshes[0].vertices.len(), 24);
 }
+
+#[test]
+fn the_bone_stays_up_in_the_world_with_the_node_transforms_applied() {
+    // `basis` conjugates node transforms as well as vertices, so honouring the nodes
+    // (#1083) keeps a Z-up file upright: the bone's world offset is still +Y.
+    let asset = import();
+    let at = asset
+        .nodes
+        .iter()
+        .position(|n| n.mesh.as_deref() == Some("Cube"));
+    let world = asset.node_worlds()[at.expect("a node places the cube")];
+    let skin = asset.sub_meshes[0].skin.as_ref().unwrap();
+    let up = world.transform_vector3(skin.bind_global[0].w_axis.truncate());
+    assert!((up - Vec3::Y).length() < 1e-4, "bone at {up} in the world");
+}

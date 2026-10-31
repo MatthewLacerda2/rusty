@@ -35,6 +35,7 @@ pub mod lut;
 pub mod manifest;
 pub mod material_range;
 pub mod mesh_data;
+pub mod model_node;
 pub mod obj_import;
 pub mod reference;
 pub mod scale_factor;
@@ -52,6 +53,7 @@ pub use lut::Lut;
 pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
 pub use material_range::MaterialRange;
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
+pub use model_node::ModelNode;
 pub use reference::{AssetRef, REF_SEPARATOR};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
 

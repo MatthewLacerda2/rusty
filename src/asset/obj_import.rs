@@ -59,6 +59,7 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
     Ok(ImportedAsset {
         sub_meshes,
         materials,
+        nodes: Vec::new(),
     })
 }
 

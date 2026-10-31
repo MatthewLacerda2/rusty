@@ -161,7 +161,7 @@ fn spawn_suzanne(scene: &mut Scene) -> u32 {
         return fallback(scene);
     };
     let path = suzanne_path();
-    let ids = spawn_fitted(scene, &asset.sub_meshes, |scene, origin| {
+    let ids = spawn_fitted(scene, sub.bounds(), |scene, origin| {
         authoring::instantiate_imported(scene, &path, &asset, &sub.id, Some("PreviewMesh"), origin)
             .into_iter()
             .collect()
@@ -169,23 +169,23 @@ fn spawn_suzanne(scene: &mut Scene) -> u32 {
     ids.first().copied().unwrap_or_else(|| fallback(scene))
 }
 
-/// Instantiate every sub-object of `path`, fitted to the frame and carrying its own
-/// imported materials. Unlike the model inspector's "Instantiate into Scene", which
+/// Instantiate the model at `path` as its node tree (#1083), fitted to the frame and
+/// carrying its own imported materials. Unlike the model inspector's "Instantiate into Scene", which
 /// spawns at the file's own size, the preview rescales it (see [`fit_scale`]).
 fn spawn_model(scene: &mut Scene, path: &str) {
     let Ok(asset) = asset::import_and_sync_sidecar(Path::new(path)) else {
         return;
     };
-    spawn_fitted(scene, &asset.sub_meshes, |scene, origin| {
-        authoring::instantiate_model(scene, path, &asset, origin)
+    spawn_fitted(scene, asset.model_bounds(), |scene, origin| {
+        vec![authoring::instantiate_model(scene, path, &asset, origin)]
     });
 }
 
-/// Centre and fit: `spawn` instantiates the subject whose sub-meshes are `subs` at
-/// the origin it is handed, and every entity it returns is scaled by
-/// [`fit_scale`], so the subject lands centred on the world origin at the fitted
-/// size. All entities share one offset and one scale, so a multi-part model keeps
-/// its internal layout. Returns `spawn`'s ids.
+/// Centre and fit: `spawn` instantiates the subject whose bounds (spawned at the
+/// origin) are `bounds` at the origin it is handed, and every entity it returns is
+/// scaled by [`fit_scale`], so the subject lands centred on the world origin at the
+/// fitted size. A whole model is one root, so its parts keep their layout. Returns
+/// `spawn`'s ids.
 ///
 /// The preview camera always orbits the **world origin**, so a subject whose vertices
 /// were authored somewhere else renders as empty sky — the mesh is in the scene, just
@@ -195,10 +195,10 @@ fn spawn_model(scene: &mut Scene, path: &str) {
 /// is already looking, for the Inspector tab and `Debug.Preview` alike.
 fn spawn_fitted(
     scene: &mut Scene,
-    subs: &[asset::SubMesh],
+    bounds: Option<(Vec3, Vec3)>,
     spawn: impl FnOnce(&mut Scene, Vec3) -> Vec<u32>,
 ) -> Vec<u32> {
-    let (centre, scale) = union_bounds(subs).map_or((Vec3::ZERO, 1.0), |(min, max)| {
+    let (centre, scale) = bounds.map_or((Vec3::ZERO, 1.0), |(min, max)| {
         ((min + max) * 0.5, fit_scale(min, max))
     });
     let ids = spawn(scene, -centre * scale);
@@ -229,13 +229,6 @@ fn fit_scale(min: Vec3, max: Vec3) -> f32 {
     } else {
         1.0
     }
-}
-
-/// The union of `subs`' local bounds, `None` when none has geometry.
-fn union_bounds(subs: &[asset::SubMesh]) -> Option<(Vec3, Vec3)> {
-    subs.iter()
-        .filter_map(asset::SubMesh::bounds)
-        .reduce(|(a0, a1), (b0, b1)| (a0.min(b0), a1.max(b1)))
 }
 
 /// Insert `material` under a scene-local key and reference it from `id`. The

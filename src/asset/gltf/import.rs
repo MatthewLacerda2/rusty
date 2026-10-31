@@ -14,7 +14,7 @@
 //! `TRIANGLE_STRIP`, `TRIANGLE_FAN`) becomes a plain triangle list, and
 //! non-surface modes (`POINTS`/`LINES`/`LINE_*`) are skipped with a warning.
 
-use super::{anim, material, skin};
+use super::{anim, material, nodes, skin};
 use crate::asset::material_range::push_range;
 use crate::asset::mesh_data::{ImportedAsset, MeshVertex, SkinData, SubMesh};
 use crate::asset::ImportError;
@@ -44,7 +44,7 @@ pub fn import_from(path: &Path, source: Option<&str>) -> Result<ImportedAsset, I
         .collect();
     let skins = skin::skins_by_mesh(&document, &buffers);
 
-    let sub_meshes = document
+    let sub_meshes: Vec<SubMesh> = document
         .meshes()
         .map(|mesh| {
             let mut sub = sub_mesh_from_gltf(
@@ -58,9 +58,12 @@ pub fn import_from(path: &Path, source: Option<&str>) -> Result<ImportedAsset, I
         })
         .collect();
 
+    let ids: Vec<&str> = sub_meshes.iter().map(|s| s.id.as_str()).collect();
+    let nodes = nodes::model_nodes(&document, &ids);
     Ok(ImportedAsset {
         sub_meshes,
         materials,
+        nodes,
     })
 }
 

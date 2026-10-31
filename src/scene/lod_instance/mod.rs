@@ -7,14 +7,14 @@
 //! [`instantiate_imported`] verb, so it gets its mesh, material and collider exactly as
 //! a lone sub-object would), each level listing its children as renderers.
 //!
-//! Two entry points, one per caller shape: [`instantiate_lod_set`] behind
-//! `Scene.Instantiate("file.glb::Crate")` — the base name addresses the whole set —
-//! and [`instantiate_model`] for the editor's and preview's "whole file" spawn,
-//! which groups each set and spawns every other sub-object on its own.
+//! Two callers: `Scene.Instantiate("file.glb::Crate")`, where the base name
+//! addresses the whole set, and the whole-model spawn
+//! (`scene::model_instance::instantiate_model`), which puts each set where its
+//! first member node sits.
 
 use glam::Vec3;
 
-use crate::asset::lod::{lod_sets, LodSet};
+use crate::asset::lod::LodSet;
 use crate::asset::ImportedAsset;
 use crate::components::rendering::lod_group::default_thresholds;
 use crate::components::{LodGroupComponent, LodLevel};
@@ -58,35 +58,6 @@ pub fn instantiate_lod_set(
     // Children spawned before they were parented: their collider AABBs are stale.
     scene.update_all_colliders();
     Ok(group)
-}
-
-/// Spawn every sub-object of the file at `path` at `position`: each LOD set as one
-/// LODGroup, every other sub-object as its own entity. Returns the new top-level ids
-/// in file order (sets where their first member sits).
-pub fn instantiate_model(
-    scene: &mut Scene,
-    path: &str,
-    asset: &ImportedAsset,
-    position: Vec3,
-) -> Vec<u32> {
-    let sets = lod_sets(asset);
-    let mut spawned_sets = vec![false; sets.len()];
-    let mut ids = Vec::new();
-    for sub in &asset.sub_meshes {
-        let member = sets
-            .iter()
-            .position(|s| s.levels.iter().flatten().any(|id| *id == sub.id));
-        let id = match member {
-            Some(i) if spawned_sets[i] => continue,
-            Some(i) => {
-                spawned_sets[i] = true;
-                instantiate_lod_set(scene, path, asset, &sets[i], None, position)
-            }
-            None => instantiate_imported(scene, path, asset, &sub.id, Some(&sub.id), position),
-        };
-        ids.extend(id.ok());
-    }
-    ids
 }
 
 /// Every LODGroup in `scene` with the largest extent of its LOD0 meshes' combined

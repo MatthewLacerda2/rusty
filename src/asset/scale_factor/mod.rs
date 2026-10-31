@@ -31,13 +31,17 @@ pub fn sanitize(requested: f32, current: f32) -> f32 {
     }
 }
 
-/// Scale every sub-mesh of `asset` by `s`. A factor of 1 leaves it untouched.
+/// Scale every sub-mesh of `asset`, and its node offsets, by `s`. A factor of 1 leaves it untouched.
 pub fn apply(asset: &mut ImportedAsset, s: f32) {
     if s == 1.0 {
         return;
     }
     for sub in &mut asset.sub_meshes {
         scale_sub_mesh(sub, s);
+    }
+    // A node places its mesh in its parent's space: its offset scales with it.
+    for node in &mut asset.nodes {
+        node.translation *= s;
     }
 }
 

@@ -28,8 +28,10 @@ threshold to `0` to never cull.
 **Importing LODs.** A glTF whose objects are named `Crate_LOD0`, `Crate_LOD1`, … (the
 Unity / Blender convention, case-insensitive; the glTF **node** name — Blender's
 object name — or else the mesh name) is one prop at several levels. Instantiating
-the whole file (the editor's *Instantiate into Scene*) spawns each such set as one
-entity named `Crate` carrying an `LODGroup`, with one child per level;
+the whole file (the editor's *Instantiate into Scene*, which spawns the file as a
+root with one child per glTF node) spawns each such set as one entity named `Crate`
+carrying an `LODGroup` where its first member node sits, with one child per level, each
+at its own node's offset;
 `Scene.Instantiate("props.glb::Crate")` spawns just that set. The levels start at
 `0.5`, `0.25`, … with the coarsest shown down to 1%, and the size is LOD0's largest
 extent. The renderer references follow the group through prefab save / stamp.

@@ -193,7 +193,7 @@ pub use crate::scene::prefab::link::{
 // split); re-exported here so the editor's model inspector and the `Scene.Instantiate`
 // asset branch both spawn imported sub-objects through this one shared entry point.
 pub use crate::scene::asset_instance::{instantiate_asset, instantiate_imported};
-pub use crate::scene::lod_instance::instantiate_model;
+pub use crate::scene::model_instance::instantiate_model;
 
 // The per-field material-mutation ops (#287) live in `material`; the editor card and
 // the Lua `Material.*` API are siblings over them, so the field write + validation

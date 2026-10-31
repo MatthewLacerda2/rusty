@@ -10,7 +10,7 @@
 //! `Scene.Instantiate` asset branch (one entity by reference). The shared piece is
 //! [`instantiate_asset`], and [`instantiate_imported`] behind it for a caller that
 //! already holds the imported file: the editor spawns every sub-object of a file
-//! through it (`scene::lod_instance::instantiate_model`).
+//! through it (`scene::model_instance::instantiate_model`, one entity per node).
 //!
 //! Like every other mesh, an instanced asset stores only its REFERENCE on disk:
 //! [`asset_mesh_component`](crate::scene::asset_mesh_component) keeps the
