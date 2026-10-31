@@ -7,8 +7,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use rusty::scene::Scene;
+use rusty::scripting::ConsoleLogs;
 
-use crate::play::{playing, run};
+use crate::play::{playing, run, world};
 
 #[test]
 fn get_name_reads_and_set_name_renames() {
@@ -61,20 +62,21 @@ fn get_name_reads_and_set_name_renames() {
     assert_eq!(eval("return Scene.GetName(99999) == nil"), "true");
 }
 
+/// In edit mode (the editor console's runtime, #1339) a rename sticks, so saving
+/// the scene writes it.
 #[test]
 fn a_rename_is_saved_with_the_scene() {
     let mut s = Scene::new();
     let id = s.add_entity("Crate".to_string());
     let scene = Rc::new(RefCell::new(s));
-    let game = playing(scene.clone(), 1.0);
-    game.script_manager()
-        .eval(&format!("Scene.SetName({id}, 'Crate_3')"))
-        .expect("evaluates");
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
+    let mut game = world(scene.clone(), 1.0, console);
+    game.init_edit_runtime().unwrap();
+    let line = format!("return Scene.SetName({id}, 'Crate_3')");
+    assert_eq!(game.script_manager().eval(&line).unwrap(), "true");
     let dir = crate::temp::dir();
-    let path = dir
-        .join("rusty_scene_name.scene")
-        .to_string_lossy()
-        .into_owned();
+    let path = dir.join("rusty_scene_name.scene");
+    let path = path.to_string_lossy().into_owned();
     scene.borrow().save_to_file(&path).unwrap();
     let mut loaded = Scene::new();
     loaded.load_from_file(&path).unwrap();
