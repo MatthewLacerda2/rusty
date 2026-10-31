@@ -168,6 +168,8 @@ impl EffectCache {
     /// here instead of panicking the device.
     fn load(&mut self, device: &wgpu::Device, name: &str) -> Result<Effect, String> {
         let path = format!("{}/{name}.wgsl", self.dir);
+        // Stale against the engine's shaders: re-baked from its recipe first (#1638).
+        crate::shadergen::rebake::refresh(std::path::Path::new(&path));
         let layout = ParamLayout::read_beside(std::path::Path::new(&path))?;
         let source = std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
         let composer = match &mut self.composer {

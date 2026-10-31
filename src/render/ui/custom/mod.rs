@@ -55,6 +55,7 @@ type Source = Option<(PathBuf, String, Option<String>)>;
 
 fn source(name: &str) -> Source {
     let path = params::resolve_module(&[DEFAULT_OUT_DIR, engine_shader_dir()], name)?;
+    crate::shadergen::rebake::refresh(&path); // re-baked first when stale (#1638)
     let sidecar = std::fs::read_to_string(params::sidecar_path(&path)).ok();
     Some((path.clone(), std::fs::read_to_string(path).ok()?, sidecar))
 }

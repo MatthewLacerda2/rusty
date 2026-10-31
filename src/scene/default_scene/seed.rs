@@ -2,14 +2,16 @@
 //! into the open project (#667).
 //!
 //! The scene names `assets/textures/checker_base_color.png` and the
-//! `default_rim` surface shader; this writes them, each only when missing, so a
-//! hand-edited or re-baked copy is never overwritten (as for the seeded scripts).
-//! The shader's recipe is written beside it as `default_rim.recipe.json`, so it can be
+//! `default_rim` surface shader. The texture is written only when missing, so a
+//! hand-edited copy is never overwritten (as for the seeded scripts). The shader is
+//! baked when missing and re-baked from its recipe when stale (`shadergen::rebake`,
+//! #1638); its recipe sits beside it as `default_rim.recipe.json`, so it can be
 //! opened, edited and fed back to `Shader.Bake`.
 //!
-//! Every file is baked into a private staging directory and **renamed** into place.
-//! Tests and tools seed from many threads and processes at once; a rename is atomic,
-//! so a reader sees the whole file or none of it, never a half-written PNG.
+//! Every file is written whole and **renamed** into place (the texture through a
+//! private staging directory, the shader by the bake itself). Tests and tools seed
+//! from many threads and processes at once; a rename is atomic, so a reader sees the
+//! whole file or none of it, never a half-written PNG.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -18,6 +20,7 @@ use super::looks::{checker_recipe, shader_recipe, FLOOR, SHADER_NAME};
 use crate::core::paths::native;
 use crate::scene::authoring::material::{bake_maps, MAPS_DIR};
 use crate::scene::MaterialAsset;
+use crate::shadergen::rebake::refresh;
 use crate::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 /// Seed the default texture and shader into `assets/`. A failure is logged
@@ -51,21 +54,17 @@ fn seed_checker(dir: &Path) -> Result<(), String> {
     staging.publish(&[&file])
 }
 
+/// Bake the default shader when missing; re-bake it when stale (a failed re-bake is
+/// logged by `refresh`, and the scene draws the standard shader until it composes).
 fn seed_shader(dir: &Path) -> Result<(), String> {
-    let wgsl = format!("{SHADER_NAME}.wgsl");
-    if dir.join(&wgsl).exists() {
+    let wgsl = dir.join(format!("{SHADER_NAME}.wgsl"));
+    if wgsl.exists() {
+        refresh(&wgsl);
         return Ok(());
     }
-    let staging = Staging::new(dir)?;
-    let recipe = shader_recipe();
-    let out = staging.0.to_string_lossy();
-    bake_recipe(&recipe, engine_shader_dir(), &out).map_err(|e| e.to_string())?;
-    let json_name = format!("{SHADER_NAME}.recipe.json");
-    // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
-    std::fs::write(staging.0.join(&json_name), recipe.to_json()?).map_err(|e| e.to_string())?;
-    // The module last: the renderer keys on `<name>.wgsl`, so its params are there first.
-    let params = format!("{SHADER_NAME}.params.json");
-    staging.publish(&[&json_name, &params, &wgsl])
+    let out = dir.to_string_lossy();
+    bake_recipe(&shader_recipe(), engine_shader_dir(), &out).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// A unique directory beside the destination (same filesystem, so `rename` is

@@ -32,7 +32,10 @@
 //!   engine's `ShaderRegistry` and every authored-shader loader compile through it.
 //! - [`validate`] — module string → composed naga module through [`compose`], the
 //!   same path the engine loads it by; the gate that stops bad shaders.
-//! - [`bake`] — assemble + validate, then write `<dir>/<name>.wgsl`.
+//! - [`bake`] — assemble + validate, then write `<dir>/<name>.wgsl` (with its params
+//!   and recipe beside it).
+//! - [`rebake`] — a baked module's engine fingerprint, and the re-bake from its
+//!   recipe when the engine's shaders change (#1638).
 //! - [`params`] — a surface shader's runtime params (#399): which block params a
 //!   material sets from scripts, their uniform slots, and the `<name>.params.json`
 //!   sidecar that records them.
@@ -51,6 +54,7 @@ pub mod blocks;
 pub mod compose;
 pub mod params;
 pub mod post_params;
+pub mod rebake;
 pub mod recipe;
 pub mod textures;
 pub mod validate;

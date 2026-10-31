@@ -17,7 +17,8 @@
 //! **Lazy, fail-safe.** A slot is built the first frame a material names it. A module
 //! that is missing, fails to compose, lacks `vs_main`/`fs_main` (a postfx module) or
 //! the motion, SSR or depth-postpass entries (#1435, #1526, #1523), or fails
-//! validation is logged **once** and draws with the standard pipeline.
+//! validation is logged **once** and draws with the standard pipeline. A module baked
+//! from a recipe is first re-baked when stale (`shadergen::rebake`, #1638).
 //!
 //! **Hot reload.** [`SurfaceShaders::refresh`] drains the write log
 //! (`core::fs::written`) once per render: a slot whose module or params file was
@@ -235,6 +236,7 @@ impl SurfaceShaders {
     /// Compose `path` against `common`, check it is a surface module, and build its
     /// pipelines under a validation error scope, so wgpu refuses instead of panicking.
     fn build(&self, device: &wgpu::Device, path: &Path) -> Result<SurfacePipelines, String> {
+        crate::shadergen::rebake::refresh(path); // re-baked first when stale (#1638)
         let source = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
         let mut composer = compose::composer_with_common(engine_shader_dir())?;
         let module = compose::compose(&mut composer, &source, &path.to_string_lossy())?;
@@ -273,28 +275,26 @@ impl SurfaceShaders {
 }
 
 #[cfg(test)]
-#[path = "../tests/surface_tests.rs"]
-mod surface_tests;
-
-#[cfg(test)]
-#[path = "../tests/params_tests.rs"]
-mod params_tests;
-
-#[cfg(test)]
-#[path = "../tests/mask_tests.rs"]
-pub(crate) mod mask_tests;
-
+#[path = "../tests/cut_depth_tests.rs"]
+pub(crate) mod cut_depth_tests;
 #[cfg(test)]
 #[path = "../tests/gameplay_blocks_tests.rs"]
 mod gameplay_blocks_tests;
-
 #[cfg(test)]
-#[path = "../tests/cut_depth_tests.rs"]
-pub(crate) mod cut_depth_tests;
-
+#[path = "../tests/mask_tests.rs"]
+pub(crate) mod mask_tests;
+#[cfg(test)]
+#[path = "../tests/params_tests.rs"]
+mod params_tests;
 #[cfg(test)]
 #[path = "../tests/priming/scroll_tests.rs"]
 mod priming_scroll_tests;
 #[cfg(test)]
 #[path = "../tests/priming/walls_tests.rs"]
 mod priming_tests;
+#[cfg(test)]
+#[path = "../tests/rebake_tests.rs"]
+mod rebake_tests;
+#[cfg(test)]
+#[path = "../tests/surface_tests.rs"]
+mod surface_tests;
