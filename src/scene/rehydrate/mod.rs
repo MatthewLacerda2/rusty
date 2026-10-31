@@ -7,6 +7,7 @@
 
 pub mod model_writes;
 mod reimport;
+mod reimport_shared;
 
 pub use reimport::{reimport_model, reimport_model_ids, reimport_written, Rig};
 
@@ -14,7 +15,7 @@ use glam::{Mat4, Vec3};
 
 use crate::asset::{self, MeshRevision, MeshVertex, SubMesh};
 use crate::components::mesh::Vertex;
-use crate::components::Entity;
+use crate::components::{ColliderComponent, Entity};
 use crate::scene::authoring::{subdivided_geometry, Primitive};
 
 /// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
@@ -147,14 +148,11 @@ fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
 /// entity has no Mesh of its own.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
-        if let Some(warning) = crate::scene::authoring::rendering::mesh::hold_subdivisions(mesh) {
-            log::warn!("[Scene] entity {}: {warning}", entity.id);
-        }
+        hold_subdivisions(entity.id, mesh);
         let rebuilt = rehydrate_one(mesh);
         install(mesh, rebuilt);
-        let bounds = bounds_of(mesh.vertices.iter().map(|v| v.position));
-        if let (Some(bounds), Some(collider)) = (bounds, &mut entity.collider) {
-            reimport::refit(collider, bounds);
+        if let Some(collider) = &mut entity.collider {
+            refit_to(collider, mesh.vertices.iter().map(|v| v.position));
         }
         return;
     }
@@ -165,10 +163,30 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
         return;
     };
     let mut mesh = shared.reference();
+    hold_subdivisions(entity.id, &mut mesh);
+    shared.subdivisions = mesh.subdivisions;
     let rebuilt = rehydrate_one(&mesh);
     install(&mut mesh, rebuilt);
     shared.take_geometry(&mesh);
     if let Some(bounds) = bounds_of(shared.positions.iter().copied()) {
+        reimport::refit(collider, bounds);
+    }
+}
+
+/// Clamp `mesh`'s subdivisions to what its primitive takes, warning when it had to.
+fn hold_subdivisions(id: u32, mesh: &mut crate::scene::MeshComponent) {
+    if let Some(warning) = crate::scene::authoring::rendering::mesh::hold_subdivisions(mesh) {
+        log::warn!("[Scene] entity {id}: {warning}");
+    }
+}
+
+/// Size a mesh collider's box to the box around `positions` (none: left as it is),
+/// as Unity's `MeshCollider` follows its mesh. Any other shape is left as authored.
+pub(crate) fn refit_to(
+    collider: &mut ColliderComponent,
+    positions: impl Iterator<Item = [f32; 3]>,
+) {
+    if let Some(bounds) = bounds_of(positions) {
         reimport::refit(collider, bounds);
     }
 }
@@ -233,6 +251,8 @@ pub fn asset_ref_file(reference: &str) -> Option<String> {
     asset::AssetRef::parse(reference).ok().map(|r| r.path)
 }
 
+#[cfg(test)]
+mod reimport_shared_tests;
 #[cfg(test)]
 mod shared_tests;
 #[cfg(test)]

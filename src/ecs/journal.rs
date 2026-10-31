@@ -4,7 +4,8 @@
 //! While the journal is recording, the first write to an entity (a column
 //! borrowed mutably, attached, detached or overwritten; the entity placed or
 //! despawned) records that entity's state *before* the write, once: its document
-//! with the mesh's geometry left out ([`MeshComponent::without_geometry`]) and its
+//! with the mesh's geometry left out ([`MeshComponent::without_geometry`]), and a
+//! collider's shared mesh's too ([`ColliderComponent::without_geometry`]), and its
 //! slot in the insertion order. An entity that did not exist yet records `None`.
 //! Nothing else is copied, so a gesture costs what it touched, not the scene.
 //!
@@ -15,7 +16,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::components::{Entity, MeshComponent};
+use crate::components::{ColliderComponent, Entity, MeshComponent};
 
 use super::bundle::Core;
 use super::world::World;
@@ -66,7 +67,11 @@ impl World {
     /// Entity `id`'s state as the journal records it: `None` for a dead id.
     pub fn record(&self, id: u32) -> Option<Recorded> {
         let seq = self.component::<Core>(id)?.seq;
-        let doc = self.document(id, MeshComponent::without_geometry)?;
+        let doc = self.document(
+            id,
+            MeshComponent::without_geometry,
+            ColliderComponent::without_geometry,
+        )?;
         Some(Recorded { doc, seq })
     }
 

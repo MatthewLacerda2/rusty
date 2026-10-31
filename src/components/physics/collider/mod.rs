@@ -97,6 +97,21 @@ pub struct ColliderComponent {
 }
 
 impl ColliderComponent {
+    /// This collider with its shared mesh's geometry left out
+    /// ([`SharedMesh::without_geometry`]): what an undo record and a prefab diff copy.
+    /// Every field is named, so a new one must be placed here.
+    pub fn without_geometry(&self) -> Self {
+        Self {
+            active: self.active,
+            shape: self.shape.clone(),
+            is_trigger: self.is_trigger,
+            material: self.material.clone(),
+            shared_mesh: self.shared_mesh.as_ref().map(SharedMesh::without_geometry),
+            aabb_min: self.aabb_min,
+            aabb_max: self.aabb_max,
+        }
+    }
+
     /// Build a mesh collider baked from an imported mesh's rest-pose bounds (#77).
     /// `convex` chooses a convex hull over a triangle mesh. The world AABB is left
     /// zeroed; the scene recomputes it via [`Self::calculate_world_aabb`] on load.

@@ -60,7 +60,8 @@ pub fn reimport_written(scene: &mut Scene, stale: &Stale) -> usize {
 }
 
 /// Re-import every mesh whose reference's file `names` accepts, importing each such
-/// file once. Returns the ids of the entities whose mesh was rebuilt.
+/// file once, and every Mesh-shaped collider's shared mesh (#1657) the same way.
+/// Returns the ids of the entities whose mesh was rebuilt.
 fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bool) -> Vec<u32> {
     let mut imported: BTreeMap<String, Option<Imported>> = BTreeMap::new();
     let mut rebuilt = Vec::new();
@@ -90,6 +91,8 @@ fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bo
             rebuilt.push(id);
         }
     }
+    let shared = super::reimport_shared::reimport_shared(scene, rig, &mut names, &mut imported);
+    rebuilt.extend(shared);
     rebuilt
 }
 

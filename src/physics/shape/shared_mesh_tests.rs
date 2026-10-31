@@ -121,11 +121,10 @@ fn adding_a_mesh_back_drops_the_shared_one() {
     remove_component(&mut scene, id, ComponentKind::Mesh);
     add_component(&mut scene, id, ComponentKind::Mesh);
     let collider = scene.world.collider(id).expect("collider stays");
-    assert_eq!(
-        collider.shared_mesh, None,
-        "the collider follows the Mesh again"
-    );
+    assert_eq!(collider.shared_mesh, None, "it follows the Mesh again");
     assert!(x_extent(&scene, id).is_some_and(|(lo, hi)| lo > -0.6 && hi < 0.6));
+    let refit = collider.aabb_max.x < 0.6 && collider.aabb_min.x > -0.6;
+    assert!(refit, "the box is the Box's, not the slab's");
 }
 
 #[test]

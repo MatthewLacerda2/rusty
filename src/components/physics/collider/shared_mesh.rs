@@ -5,8 +5,10 @@
 //! (`Scene.RemoveComponent(id, "Mesh")`: a blockout box kept as an invisible
 //! collider), the collider keeps the Mesh's reference and rest-pose geometry here, so
 //! physics and the navmesh still read it. Like a Mesh, only the reference is saved;
-//! the geometry is rebuilt from it on load (`scene::rehydrate`). The entity's own
-//! Mesh, when it has one, wins.
+//! the geometry is rebuilt from it on load (`scene::rehydrate`), on a live re-import
+//! of its model, and on an undo, whose record leaves it out as it leaves out a
+//! Mesh's ([`SharedMesh::without_geometry`]). The entity's own Mesh, when it has
+//! one, wins.
 
 use serde::{Deserialize, Serialize};
 
@@ -63,5 +65,31 @@ impl SharedMesh {
     pub fn take_geometry(&mut self, mesh: &MeshComponent) {
         self.positions = mesh.vertices.iter().map(|v| v.position).collect();
         self.indices = mesh.indices.clone();
+    }
+
+    /// The reference alone, its geometry left empty: what an undo record and a
+    /// prefab diff keep, as [`MeshComponent::without_geometry`] does for a Mesh.
+    pub fn without_geometry(&self) -> Self {
+        Self {
+            primitive_type: self.primitive_type.clone(),
+            asset_ref: self.asset_ref.clone(),
+            subdivisions: self.subdivisions,
+            positions: Vec::new(),
+            indices: Vec::new(),
+        }
+    }
+
+    /// Whether `other`'s geometry is this one's: the same primitive or asset, cut
+    /// the same way ([`MeshComponent::same_source`]).
+    pub fn same_source(&self, other: &Self) -> bool {
+        self.primitive_type == other.primitive_type
+            && self.asset_ref == other.asset_ref
+            && self.subdivisions == other.subdivisions
+    }
+
+    /// Move `from`'s geometry onto this one ([`MeshComponent::adopt_geometry`]).
+    pub fn adopt_geometry(&mut self, from: &mut Self) {
+        self.positions = std::mem::take(&mut from.positions);
+        self.indices = std::mem::take(&mut from.indices);
     }
 }
