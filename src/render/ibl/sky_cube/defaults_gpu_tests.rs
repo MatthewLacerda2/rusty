@@ -1,96 +1,117 @@
-//! The default procedural sky against today's (#1620): the settings' defaults
-//! (`cloud_shift(0.5)`, opacity 0.6, the derived colours) must draw the sky `main`
-//! drew before they existed.
+//! The default procedural sky against today's (#1620): `procedural_sky` fed the
+//! Rust defaults (`SkySettings::default`, so `cloud_shift(0.5)`, opacity 0.6 and the
+//! derived colours) must draw what it drew before the settings existed. Both run in
+//! one compute probe on one adapter, so the clouds' `sin` hash, which drivers round
+//! differently (Metal vs lavapipe), cancels out.
 
 use glam::Vec3;
 
-use super::gpu_tests::half;
-use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
-use crate::scene::{Camera, Scene};
+use crate::render::gpu::uniforms::ProceduralSkyUniform;
+use crate::scene::SkySettings;
 
-/// The blurred mip the test reads (8×8 a face): low enough that an adapter's
-/// rounding averages out, sharp enough that the clouds still move it.
-const LEVEL: u32 = 4;
+/// `procedural_sky` as `main` drew it at 01cfc8b, before the settings: frozen here as
+/// the reference, never edited to follow a change.
+const TODAY: &str = "
+fn today_sky(sky_color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    let ground_color = sky_color * 0.25;
+    let horizon_color = mix(sky_color, vec3<f32>(1.0), 0.6);
+    let up = clamp(dir.y, 0.0, 1.0);
+    let down = clamp(-dir.y, 0.0, 1.0);
+    var color = mix(horizon_color, sky_color, pow(up, 0.5));
+    color = mix(color, ground_color, pow(down, 0.35));
+    if (dir.y > 0.0) {
+        let dome = dir.xz / max(dir.y, 0.15);
+        let coverage = smoothstep(0.45, 0.80, sky_fbm(dome * 1.6));
+        let band = smoothstep(0.05, 0.35, up);
+        let cloud_color = mix(sky_color, vec3<f32>(1.0), 0.85);
+        color = mix(color, cloud_color, coverage * band * 0.6);
+    }
+    return color;
+}
+";
 
-/// Each face's mean (+X, -X, +Y, -Y, +Z, -Z) at [`LEVEL`] of the default sky's cube:
-/// the base term (rgb, grey) and the ambient weight (a). Taken on lavapipe with
-/// `main`'s shaders at 01cfc8b (before the settings), the cube that had no settings.
-const TODAY: [[f32; 2]; 6] = [
-    [0.24927, 0.49021],
-    [0.22787, 0.51199],
-    [0.17551, 0.81300],
-    [0.09415, 0.28105],
-    [0.22067, 0.51921],
-    [0.24931, 0.49049],
-];
+/// What the probe reads, imported ahead of the `SKY` it declares.
+const IMPORTS: &str = "
+#import common::{ProceduralSky, procedural_sky}
+#import sky::noise::sky_fbm
+";
 
-/// How far a face's mean may drift from [`TODAY`]: adapter rounding (the clouds'
-/// hash is a `sin`, which drivers round differently), and under half of what a
-/// 0.05 change to either cloud default moves (asserted below). Lavapipe matches
-/// `TODAY` exactly.
-const TOLERANCE: f32 = 1.5e-3;
+/// Per invocation (128): a direction spread over the sphere, biased up where the
+/// clouds are, and one of four ambient colours; writes the sky under `SKY` (the
+/// settings under test), then today's.
+const PROBE: &str = "
+@group(0) @binding(0) var<storage, read_write> out: array<vec4<f32>>;
+@compute @workgroup_size(1)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+    let i = id.y * 64u + id.x;
+    let y = 1.0 - f32(i) / 127.0 * 1.3;
+    let r = sqrt(max(1.0 - y * y, 0.0));
+    let phi = f32(i) * 2.39996;
+    let dir = vec3<f32>(r * cos(phi), y, r * sin(phi));
+    var ambients = array<vec3<f32>, 4>(
+        vec3<f32>(0.0), vec3<f32>(1.0), vec3<f32>(0.4, 0.5, 0.6), vec3<f32>(0.9, 0.3, 0.1)
+    );
+    let ambient = ambients[i % 4u];
+    out[2u * i] = vec4<f32>(procedural_sky(SKY, ambient, dir), 0.0);
+    out[2u * i + 1u] = vec4<f32>(today_sky(ambient, dir), 0.0);
+}
+";
 
-/// Render one frame of `scene` and return the bound procedural cube's face means
-/// at [`LEVEL`]: `[base, weight]` (the base's three channels must agree).
-fn face_means(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> [[f32; 2]; 6] {
-    let cam = Camera::new(Vec3::ZERO, -90.0, 0.0);
-    let out = view.color_target_view().unwrap();
-    r.render(view, scene, &cam, &out, false);
-    let sky = &r.sky_reflection;
-    let cube = &sky.procedural[sky.current].cube;
-    let size = super::SKY_FACE >> LEVEL;
-    std::array::from_fn(|face| {
-        let level = (&cube.texture, LEVEL, face as u32);
-        let bytes =
-            crate::render::readback::read_mip_bytes(&r.device, &r.queue, level, (size, size), 8);
-        let mut sum = [0.0f32; 4];
-        for texel in bytes.chunks_exact(8) {
-            for (c, s) in sum.iter_mut().enumerate() {
-                *s += half(u16::from_le_bytes([texel[2 * c], texel[2 * c + 1]]));
-            }
-        }
-        let [r, g, b, a] = sum.map(|s| s / (size * size) as f32);
-        assert!((r - g).abs() < 1e-4 && (r - b).abs() < 1e-4, "grey base");
-        [r, a]
-    })
+/// `settings` as a WGSL `ProceduralSky` literal, exactly as the uniform carries it.
+fn literal(settings: &SkySettings) -> String {
+    let u = ProceduralSkyUniform::from_settings(settings);
+    let v = |c: [f32; 4]| format!("vec4<f32>({:?}, {:?}, {:?}, {:?})", c[0], c[1], c[2], c[3]);
+    let fields = [u.zenith, u.horizon, u.ground, u.clouds].map(v).join(", ");
+    format!("ProceduralSky({fields})")
 }
 
-/// The largest per-face drift of `got` from [`TODAY`].
-fn drift(got: &[[f32; 2]; 6]) -> f32 {
-    got.iter()
-        .flatten()
-        .zip(TODAY.iter().flatten())
-        .map(|(g, w)| (g - w).abs())
+/// The largest gap, over every sample, between the sky under `settings` and today's.
+fn gap(r: &crate::render::Renderer, settings: &SkySettings) -> f32 {
+    let base = crate::shadergen::engine_shader_dir();
+    let mut composer = crate::shadergen::compose::composer_with_common(base).unwrap();
+    let source = format!(
+        "{IMPORTS}const SKY = {};\n{TODAY}{PROBE}",
+        literal(settings)
+    );
+    let module = crate::shadergen::compose::compose(&mut composer, &source, "sky_probe").unwrap();
+    let source = wgpu::ShaderSource::Naga(std::borrow::Cow::Owned(module));
+    let out = crate::render::test_gpu::run_probe(&r.device, &r.queue, source);
+    out.chunks_exact(2)
+        .map(|p| {
+            (Vec3::from_slice(&p[0][..3]) - Vec3::from_slice(&p[1][..3]))
+                .abs()
+                .max_element()
+        })
         .fold(0.0, f32::max)
 }
 
 #[test]
 fn gpu_the_default_sky_is_todays() {
-    let Some(mut r) = crate::render::test_gpu::headless_or_skip(8, 8) else {
+    let Some(r) = crate::render::test_gpu::headless_or_skip(8, 8) else {
         return;
     };
-    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 8, 8);
-    let mut scene = Scene::new();
-    let got = face_means(&mut r, &mut view, &scene);
+    // Float noise only: the expressions match term for term.
+    let tolerance = 1e-5;
+    let default = SkySettings::default();
+    let got = gap(&r, &default);
     assert!(
-        drift(&got) <= TOLERANCE,
-        "default sky {got:?} vs today's {TODAY:?}"
+        got <= tolerance,
+        "the default sky drifts {got} from today's"
     );
 
-    // The tolerance still sees a small change to a default.
-    scene.sky.cloud_coverage += 0.05;
-    let moved = face_means(&mut r, &mut view, &scene);
-    assert!(
-        drift(&moved) > 4.0 * TOLERANCE,
-        "coverage +0.05 moved {}",
-        drift(&moved)
-    );
-    scene.sky.cloud_coverage -= 0.05;
-    scene.sky.cloud_opacity += 0.05;
-    let moved = face_means(&mut r, &mut view, &scene);
-    assert!(
-        drift(&moved) > 2.0 * TOLERANCE,
-        "opacity +0.05 moved {}",
-        drift(&moved)
-    );
+    // The probe still sees a small change to any default.
+    let changes: [(&str, fn(&mut SkySettings)); 3] = [
+        ("coverage", |s| s.cloud_coverage += 0.02),
+        ("opacity", |s| s.cloud_opacity += 0.02),
+        ("ground", |s| s.ground = Some(Vec3::ZERO)),
+    ];
+    for (name, change) in changes {
+        let mut sky = default;
+        change(&mut sky);
+        let moved = gap(&r, &sky);
+        assert!(
+            moved > 100.0 * tolerance,
+            "{name} moved the sky only {moved}"
+        );
+    }
 }
