@@ -115,3 +115,12 @@ fn checks_a_markdown_file_whose_name_is_not_utf8() {
     let found = markdown_findings(&repo.0);
     assert_eq!(lines(&found), [(3, RULE)], "{found:?}");
 }
+
+#[test]
+fn reads_a_hyphenated_keyword_word_as_a_name() {
+    // `self-path` sorts under `s`, not as `path` after the keyword `self` (#1654).
+    let ok = "<!-- sorted: rules -->\n- **`sanitize`**\n- **`self-path`**\n- **`skip`**\n";
+    assert!(check("docs/x.md", ok).is_empty());
+    let bad = "<!-- sorted: rules -->\n- **`self-path`**\n- **`sanitize`**\n";
+    assert_eq!(lines(&check("docs/x.md", bad)), [(3, RULE)]);
+}
