@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The merge check refuses a pull request nothing actually checked.
 
-`main` has no required checks (#491), so this is the whole defence: a check
-that only asked "did anything go red" would agree with GitHub about a draft's
+The ruleset's required checks (#491) accept a draft's green gate on the same
+commit, so this is the defence that matters: a check that only asked "did anything go red" would agree with GitHub about a draft's
 run — gate green, nothing compiled. `judge` is tested by import because it is
 pure and the interesting states are ones GitHub produces on its own schedule.
 """

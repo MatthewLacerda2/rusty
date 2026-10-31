@@ -1,7 +1,7 @@
 # CLAUDE.md — the merge and batch tooling
 
 This file loads when you work under `.github/scripts/`: the Python behind `make queue`,
-`make mergeable`, `make blockers`, `make reclaim`, `make checks`, `make board`,
+`make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make board`,
 `make coder`, `make review-level` and `make mutants-remote`, and the CI helpers
 beside them. The root `CLAUDE.md` keeps the
 project-wide rules (merging is serialized, gates vs. signals, issues and labels); the
