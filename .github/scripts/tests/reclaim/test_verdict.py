@@ -65,14 +65,14 @@ class SupervisorLock(unittest.TestCase):
         self.assertEqual(action, "protect")
         self.assertIn("pid 42, which is not running: a stale lock", why)
 
-    def test_facts_ask_whether_the_pid_lives_only_for_a_supervisor_lock(self):
+    def test_stale_is_only_ever_a_supervisor_lock(self):
         from tests.reclaim.fixtures import FakeMachine
         machine, asked = FakeMachine(), []
         machine.alive = lambda pid: asked.append(pid) or False
         self.assertEqual(machine.facts(self.queue, Path("/x"), []).stale, 42)
         other = Worktree(Path("/w/agent"), "h", locked="claude agent (pid 1)")
         self.assertIsNone(machine.facts(other, Path("/x"), []).stale)
-        self.assertEqual(asked, [42])
+        self.assertEqual(asked, [42, 1])  # the agent's pid is asked too (#1658), but is not `stale`
 
 
 class Cwds(unittest.TestCase):
