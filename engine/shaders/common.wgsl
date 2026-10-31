@@ -3,6 +3,7 @@
 // Every name here is part of what a baked shader may import, so none ever moves out;
 // a helper only common itself calls may live in a module of its own (`sky/noise.wgsl`).
 
+#import lighting::ambient::AmbientLight
 #import lighting::reflection_probe::ReflectionProbe
 #import sky::noise::sky_fbm
 
@@ -62,11 +63,6 @@ struct CameraUniforms {
 // The forward lighting uniform (group 0, binding 1) and its light records. Shared
 // so every pass that shades against the scene lights — the forward pass and lit
 // particles (#440) — reads the one layout. Mirrors the Rust `LightingUniform`.
-struct AmbientLight {
-    color: vec3<f32>,
-    intensity: f32,
-};
-
 struct DirectionalLight {
     direction: vec3<f32>,
     color: vec3<f32>,

@@ -13,6 +13,7 @@
 // the surface shader uses for hemisphere ambient, so by default the background and
 // the lighting always agree.
 
+#import lighting::ambient::AmbientLight
 #import common::{CameraUniforms, ProceduralSky, VertexInput, procedural_sky, sky_fog}
 #import sky::motion::{SkyTargets, sky_targets}
 
@@ -21,12 +22,8 @@ var<uniform> camera: CameraUniforms;
 
 // A prefix of the forward pass's `LightingUniforms`: we only need the leading
 // `ambient` term and the procedural sky's settings (#1620), and a uniform binding
-// may declare a struct smaller than the bound buffer. Mirrors `AmbientLight` in
-// `common.wgsl` byte-for-byte.
-struct AmbientLight {
-    color: vec3<f32>,
-    intensity: f32,
-};
+// may declare a struct smaller than the bound buffer. `AmbientLight` is the shared
+// `lighting::ambient` one, so the prefix can't drift from it.
 struct SkyLighting {
     ambient: AmbientLight,
     sky: ProceduralSky,

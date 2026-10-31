@@ -4,7 +4,7 @@
 
 pub(crate) mod batch;
 mod camera;
-mod lighting;
+pub(crate) mod lighting;
 pub(crate) mod materials;
 mod overlays;
 mod pass;

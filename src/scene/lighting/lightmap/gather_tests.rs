@@ -14,7 +14,7 @@ fn an_open_floor_bakes_to_the_sky_gradient() {
     let scene = BakeScene {
         meshes: vec![floor()],
         lights: vec![],
-        sky: Vec3::ONE,
+        sky: Vec3::ONE.into(),
     };
     let s = BakeSettings {
         samples: 256,
@@ -38,7 +38,7 @@ fn a_mesh_without_lightmap_uvs_gets_no_lightmap_but_still_occludes() {
     let scene = BakeScene {
         meshes: vec![floor(), roof],
         lights: vec![],
-        sky: Vec3::ONE,
+        sky: Vec3::ONE.into(),
     };
     let maps = bake(&scene, &settings());
     assert_eq!(maps.len(), 1, "only the floor is lightmapped");

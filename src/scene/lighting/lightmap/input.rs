@@ -94,9 +94,10 @@ pub struct BakeLight {
 pub struct BakeScene {
     pub meshes: Vec<BakeMesh>,
     pub lights: Vec<BakeLight>,
-    /// The ambient sky colour times intensity: what a ray escaping upward sees. Below
-    /// the horizon it fades to a quarter, the forward shader's hemisphere gradient.
-    pub sky: Vec3,
+    /// What a ray escaping the scene sees along its direction: the drawn ambient
+    /// (`Scene::drawn_ambient`), the very function the forward shader shades an
+    /// unbaked surface with (#1647).
+    pub sky: crate::scene::AmbientRadiance,
 }
 
 impl BakeScene {
@@ -108,7 +109,7 @@ impl BakeScene {
     pub fn gather(scene: &Scene, map_average: &dyn Fn(&MapRef) -> Option<Vec3>) -> Self {
         let map_average = once_per_path(map_average);
         let mut out = BakeScene {
-            sky: scene.ambient_color * scene.ambient_intensity,
+            sky: scene.drawn_ambient().radiance(),
             ..Default::default()
         };
         for id in scene.world.ids_with_mesh() {
@@ -153,8 +154,8 @@ impl BakeScene {
         out
     }
 
-    /// The active lights that take part in the bake, plus an `Ambient` light's sky
-    /// (it replaces the scene ambient, as it does in the renderer).
+    /// The active lights that take part in the bake (an `Ambient` light is in the
+    /// sky already, through `Scene::drawn_ambient`).
     fn gather_lights(&mut self, scene: &Scene) {
         for id in scene.world.ids_with_light() {
             if !scene.world.is_active_in_hierarchy(id) {
@@ -169,10 +170,8 @@ impl BakeScene {
                 .try_normalize()
                 .unwrap_or(Vec3::NEG_Y);
             let shape = match light.light_type {
-                LightType::Ambient => {
-                    self.sky = light.color * light.intensity;
-                    continue;
-                }
+                // The sky is `Scene::drawn_ambient`'s, which an Ambient light sets.
+                LightType::Ambient => continue,
                 LightType::Directional => LightShape::Directional { direction: forward },
                 LightType::Point => LightShape::Point {
                     position,

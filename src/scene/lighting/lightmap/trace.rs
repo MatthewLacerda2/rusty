@@ -155,10 +155,9 @@ impl Tracer<'_> {
         (e, dir)
     }
 
-    /// What a ray escaping along `dir` sees: the forward shader's ambient gradient.
+    /// What a ray escaping along `dir` sees: the forward shader's ambient.
     fn sky(&self, dir: Vec3) -> Vec3 {
-        let ground = self.scene.sky * 0.25;
-        ground.lerp(self.scene.sky, dir.y * 0.5 + 0.5)
+        self.scene.sky.at(dir)
     }
 }
 

@@ -58,6 +58,12 @@ pub struct SceneData {
     pub ambient_color: Vec3,
     #[serde(default = "default_ambient_intensity")]
     pub ambient_intensity: f32,
+    /// The ambient source and the gradient's colours (#1647); `Color` when absent.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::scene::AmbientSettings::is_default"
+    )]
+    pub ambient: crate::scene::AmbientSettings,
     /// Per-scene navmesh bake settings (#276). A scene that omits the block loads
     /// with the historical bake constants — and the per-field serde defaults inside `NavMeshSettings` mean a partial block (only
     /// some knobs authored) fills the rest in too.
@@ -117,6 +123,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         skybox_path: scene.skybox_path.clone(),
         ambient_color: scene.ambient_color,
         ambient_intensity: scene.ambient_intensity,
+        ambient: scene.ambient,
         nav_settings: scene.nav_settings.clone(),
         fog: scene.fog,
         sky: scene.sky,
@@ -196,6 +203,7 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     scene.skybox_path = data.skybox_path;
     scene.ambient_color = data.ambient_color;
     scene.ambient_intensity = data.ambient_intensity;
+    scene.ambient = crate::scene::authoring::environment::held_ambient(data.ambient);
     scene.nav_settings = data.nav_settings;
     scene.fog = data.fog;
     // Held to its ranges once, here, as a setter would hold it.
