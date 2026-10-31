@@ -28,12 +28,13 @@ fn xs(t: &TextComponent) -> Vec<f32> {
 
 #[test]
 fn letter_spacing_and_faux_bold_widen_a_cluster_once_and_keep_its_mark_on_it() {
-    let plain = xs(&text("q\u{301}x"));
+    // ä + U+0301: the font attaches the acute by a GPOS anchor (a real offset).
+    let plain = xs(&text("\u{e4}\u{301}x"));
     let spaced = xs(&TextComponent {
         letter_spacing: 0.25,
-        ..text("q\u{301}x")
+        ..text("\u{e4}\u{301}x")
     });
-    let bold = xs(&text("<b>q\u{301}</b>x"));
+    let bold = xs(&text("<b>\u{e4}\u{301}</b>x"));
     for run in [&spaced, &bold] {
         assert_eq!(run.len(), 3);
         assert!(
@@ -106,7 +107,11 @@ fn an_accent_on_a_space_is_drawn_and_a_mark_carries_its_lines_baseline() {
     assert_eq!(layout_text(&text(" \u{301}"), WIDE).glyphs.len(), 1);
     assert_eq!(layout_text(&text("a \u{308}"), WIDE).glyphs.len(), 2);
     // Faux italic shears about `baseline` (the renderer's test covers the shear).
-    let g = layout_text(&text("<i>q\u{301}</i>\nq\u{301}"), WIDE).glyphs;
-    assert!(g[1].faux_italic && g[0].baseline == g[1].baseline);
+    let g = layout_text(&text("<i>\u{e4}\u{301}</i>\nq\u{301}"), WIDE).glyphs;
+    assert!(
+        g[1].faux_italic && g[1].origin.y > g[0].origin.y,
+        "a raised mark"
+    );
+    assert_eq!(g[0].baseline, g[1].baseline);
     assert!(g[2].baseline < g[0].baseline && g[2].baseline == g[3].baseline);
 }
