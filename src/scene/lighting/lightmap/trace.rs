@@ -156,9 +156,12 @@ impl Tracer<'_> {
         (e, dir)
     }
 
-    /// What a ray escaping along `dir` sees: the ambient's radiance from there.
+    /// What a ray escaping along `dir` sees: the ambient's radiance from there,
+    /// clamped at zero per ray. A trilight's `incoming` can ring below zero toward
+    /// the poles; summed unclamped, an escaping ray would subtract bounce light and
+    /// its direction, breaking `|indirect_dir| <= luminance(indirect)` (#810).
     fn sky(&self, dir: Vec3) -> Vec3 {
-        self.scene.sky.incoming(dir)
+        self.scene.sky.incoming(dir).max(Vec3::ZERO)
     }
 }
 

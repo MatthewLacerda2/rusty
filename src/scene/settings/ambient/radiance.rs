@@ -9,7 +9,8 @@
 //! projects. They differ because a bake cosine-averages the radiance over a
 //! hemisphere; `incoming` is built so that average is `at` again, which is what makes
 //! an open baked or probe-lit surface match an unbaked one (the invariant
-//! `ambient::tests` holds for the trace and the probe fill).
+//! `lightmap::ambient_tests` holds for the trace, and `probe_fill`'s tests for the
+//! probe fill).
 
 use glam::Vec3;
 
@@ -75,8 +76,10 @@ impl AmbientRadiance {
     /// is `|y|`, whose L0–L2 projection is `½ + ⅝·P₂(y)`: the match is exact up to
     /// that L2 cut, the accuracy of Unity's own ambient probe, and for a gradient
     /// whose equator far outshines both poles the radiance can ring below zero
-    /// toward the poles, as an L2 probe does (the lightmap encoder and `Sh9::eval`
-    /// clamp what reaches a surface at zero).
+    /// toward the poles, as an L2 probe does. The value is left unclamped, so the
+    /// probe fill projects the exact bands; the lightmap trace clamps each escaping
+    /// ray at zero (`Tracer::sky`), and `Sh9::eval` clamps what a probe gives a
+    /// surface.
     pub fn incoming(&self, dir: Vec3) -> Vec3 {
         let (sky, equator, ground) = self.poles();
         // f(y) = equator + odd·y + kink·|y|.

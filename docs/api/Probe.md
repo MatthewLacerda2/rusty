@@ -48,6 +48,9 @@ sidecar the runtime loads.
 `BakeAnalytic` is the headless, render-free stand-in: it ignores occlusion and bounce
 (every probe sees the same analytic sky+sun, with a gentle height gradient so the
 field varies in space) and stays deterministic, so it runs anywhere with no GPU. Use
-it for quick, reproducible fills; use `Bake` for the real lighting. Sampling is
+it for quick, reproducible fills; use `Bake` for the real lighting. Its sky is the
+scene's ambient by direction, `Gradient` included; `Bake` captures the drawn sky
+instead, which follows only the `Color` ambient colour, so a `Gradient` doesn't
+reach `Bake`'s probes yet (#1668). Sampling is
 **trilinear** over a grid, falling back to the nearest probe for free-placed probes or
 points outside the grid.
