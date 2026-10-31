@@ -67,9 +67,15 @@ fn write_obj(name: &str, contents: &str) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// The spawned position of the scene's single mesh entity.
+/// The entity the fit moves and scales for mesh `id`: its model's root (#1083),
+/// or the mesh itself when it was spawned alone.
+fn subject(scene: &Scene, id: u32) -> u32 {
+    scene.world.ancestors(id).last().unwrap_or(id)
+}
+
+/// The spawned position of the scene's single mesh entity's subject.
 fn mesh_position(scene: &Scene) -> Vec3 {
-    let id = scene.world.ids_with_mesh()[0];
+    let id = subject(scene, scene.world.ids_with_mesh()[0]);
     scene.world.transform(id).unwrap().position
 }
 
@@ -165,25 +171,21 @@ fn an_off_origin_model_is_recentred_where_the_camera_looks() {
 
 #[test]
 fn a_multi_part_model_shares_one_offset_so_its_layout_survives() {
-    // Every sub-object is moved by the *union* centre, not its own: recentring each
-    // part independently would stack them all at the origin and silently rearrange
-    // the model. Also the only path that unions two sets of bounds together.
+    // The model is moved by the *union* centre, not each part by its own: recentring
+    // each part independently would stack them all at the origin and silently
+    // rearrange the model. Also the only path that unions two sets of bounds together.
     let path = write_obj("preview_scene_test_two_part.obj", TWO_PART_OBJ);
     let scene = build_preview_scene(PreviewMesh::Sphere, &PreviewSubject::Model(path));
 
-    let positions: Vec<Vec3> = scene
-        .world
-        .ids_with_mesh()
-        .into_iter()
-        .map(|id| scene.world.transform(id).unwrap().position)
-        .collect();
-    assert_eq!(positions.len(), 2, "both sub-objects spawn");
+    let meshes = scene.world.ids_with_mesh();
+    assert_eq!(meshes.len(), 2, "both sub-objects spawn");
+    let root = subject(&scene, meshes[0]);
+    assert_eq!(root, subject(&scene, meshes[1]), "under one root");
     let scale = fit_scale(Vec3::new(8.0, -1.0, -1.0), Vec3::new(12.0, 1.0, 1.0));
+    let position = scene.world.transform(root).unwrap().position;
     assert!(
-        positions
-            .iter()
-            .all(|p| (*p - Vec3::new(-10.0, 0.0, 0.0) * scale).length() < 1e-3),
-        "both parts share the union offset, got {positions:?}"
+        (position - Vec3::new(-10.0, 0.0, 0.0) * scale).length() < 1e-3,
+        "the root carries the union offset, got {position:?}"
     );
 }
 
@@ -193,7 +195,7 @@ fn a_centimetre_model_is_scaled_up_to_fill_the_frame() {
     // across: at the fixed camera distance it was a sub-pixel speck (#1280).
     let path = write_obj("preview_scene_test_tiny.obj", TINY_QUAD_OBJ);
     let scene = build_preview_scene(PreviewMesh::Sphere, &PreviewSubject::Model(path));
-    let id = scene.world.ids_with_mesh()[0];
+    let id = subject(&scene, scene.world.ids_with_mesh()[0]);
     let scale = scene.world.transform(id).unwrap().scale;
     let radius = Vec3::new(0.02, 0.0, 0.02).length() * 0.5 * scale.x;
     assert!((radius - FIT_RADIUS).abs() < 1e-4, "fitted radius {radius}");
@@ -236,7 +238,8 @@ fn the_bundled_suzanne_is_fitted_like_a_model() {
         &PreviewSubject::Shader("unused.wgsl".to_string()),
     );
     let asset = asset::import_and_sync_sidecar(Path::new(&suzanne_path())).unwrap();
-    let (min, max) = union_bounds(&asset.sub_meshes).unwrap();
+    // Spawned as its one sub-object, so fitted by that sub-mesh's own bounds.
+    let (min, max) = asset.sub_meshes[0].bounds().unwrap();
     let id = scene.world.ids_with_mesh()[0];
     let transform = scene.world.transform(id).unwrap();
     let scale = fit_scale(min, max);

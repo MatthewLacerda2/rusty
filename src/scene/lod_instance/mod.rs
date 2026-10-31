@@ -7,14 +7,13 @@
 //! [`instantiate_imported`] verb, so it gets its mesh, material and collider exactly as
 //! a lone sub-object would), each level listing its children as renderers.
 //!
-//! Two entry points, one per caller shape: [`instantiate_lod_set`] behind
-//! `Scene.Instantiate("file.glb::Crate")` — the base name addresses the whole set —
-//! and [`instantiate_model`] for the editor's and preview's "whole file" spawn,
-//! which groups each set and spawns every other sub-object on its own.
+//! `Scene.Instantiate("file.glb::Crate")` spawns a set here, the base name
+//! addressing it whole. The whole-model spawn (`scene::model_instance`) groups
+//! its LOD nodes itself, per node, and shares `set_levels` and `lod0_size`.
 
 use glam::Vec3;
 
-use crate::asset::lod::{lod_sets, LodSet};
+use crate::asset::lod::LodSet;
 use crate::asset::ImportedAsset;
 use crate::components::rendering::lod_group::default_thresholds;
 use crate::components::{LodGroupComponent, LodLevel};
@@ -37,56 +36,22 @@ pub fn instantiate_lod_set(
     if let Some(mut t) = scene.world.transform_mut(group) {
         t.position = position;
     }
-    let heights = default_thresholds(set.levels.len());
     let mut levels = Vec::with_capacity(set.levels.len());
-    for (subs, screen_height) in set.levels.iter().zip(heights) {
+    for subs in &set.levels {
         let mut renderers = Vec::with_capacity(subs.len());
         for sub in subs {
             let child = instantiate_imported(scene, path, asset, sub, Some(sub), Vec3::ZERO)?;
             scene.set_parent(child, Some(group))?;
             renderers.push(child);
         }
-        levels.push(LodLevel {
-            screen_height,
-            renderers,
-        });
+        levels.push(renderers);
     }
-    let size = lod0_size(asset, set);
-    scene
-        .world
-        .set_lod_group(group, Some(LodGroupComponent { levels, size }));
+    let lod0 = set.levels.first().into_iter().flatten();
+    let size = lod0_size(asset, lod0.map(String::as_str));
+    set_levels(scene, group, levels, size);
     // Children spawned before they were parented: their collider AABBs are stale.
     scene.update_all_colliders();
     Ok(group)
-}
-
-/// Spawn every sub-object of the file at `path` at `position`: each LOD set as one
-/// LODGroup, every other sub-object as its own entity. Returns the new top-level ids
-/// in file order (sets where their first member sits).
-pub fn instantiate_model(
-    scene: &mut Scene,
-    path: &str,
-    asset: &ImportedAsset,
-    position: Vec3,
-) -> Vec<u32> {
-    let sets = lod_sets(asset);
-    let mut spawned_sets = vec![false; sets.len()];
-    let mut ids = Vec::new();
-    for sub in &asset.sub_meshes {
-        let member = sets
-            .iter()
-            .position(|s| s.levels.iter().flatten().any(|id| *id == sub.id));
-        let id = match member {
-            Some(i) if spawned_sets[i] => continue,
-            Some(i) => {
-                spawned_sets[i] = true;
-                instantiate_lod_set(scene, path, asset, &sets[i], None, position)
-            }
-            None => instantiate_imported(scene, path, asset, &sub.id, Some(&sub.id), position),
-        };
-        ids.extend(id.ok());
-    }
-    ids
 }
 
 /// Every LODGroup in `scene` with the largest extent of its LOD0 meshes' combined
@@ -143,11 +108,27 @@ fn mesh_extent(scene: &Scene, id: u32) -> Option<f32> {
     bounds.map(|(lo, hi)| (hi - lo).max_element())
 }
 
-/// The largest extent of LOD0's combined bounds — the height the renderer measures
-/// on screen — floored so a flat or empty level still has a size.
-fn lod0_size(asset: &ImportedAsset, set: &LodSet) -> f32 {
-    let bounds = set.levels.first().into_iter().flatten();
-    let bounds = bounds.filter_map(|id| asset.sub_mesh(id).and_then(|s| s.bounds()));
+/// Give `group` an `LODGroup` over `levels` (each level's renderers, finest
+/// first) at the default thresholds and `size`.
+pub(crate) fn set_levels(scene: &mut Scene, group: u32, levels: Vec<Vec<u32>>, size: f32) {
+    let heights = default_thresholds(levels.len());
+    let levels = levels.into_iter().zip(heights);
+    let levels = levels
+        .map(|(renderers, screen_height)| LodLevel {
+            screen_height,
+            renderers,
+        })
+        .collect();
+    scene
+        .world
+        .set_lod_group(group, Some(LodGroupComponent { levels, size }));
+}
+
+/// The largest extent of the LOD0 sub-meshes `lod0`'s combined bounds — the
+/// height the renderer measures on screen — floored so a flat or empty level
+/// still has a size.
+pub(crate) fn lod0_size<'a>(asset: &ImportedAsset, lod0: impl Iterator<Item = &'a str>) -> f32 {
+    let bounds = lod0.filter_map(|id| asset.sub_mesh(id).and_then(|s| s.bounds()));
     let union = bounds.reduce(|(a0, a1), (b0, b1)| (a0.min(b0), a1.max(b1)));
     union.map_or(1.0, |(lo, hi)| (hi - lo).max_element().max(MIN_SIZE))
 }

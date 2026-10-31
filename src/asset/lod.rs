@@ -30,6 +30,20 @@ fn lod_suffix(name: &str) -> Option<(&str, u32)> {
     }
 }
 
+/// A whole-model spawn's reading of a **node** name (#1083): its base, level and
+/// Blender's duplicate suffix (`Crate_LOD0.001` → `Crate`, 0, `.001`), so each
+/// Alt+D copy of a set is a set of its own. Nodes sharing a parent, a base and a
+/// suffix are one LODGroup, as Unity groups by GameObject name.
+pub fn node_lod(name: &str) -> Option<(&str, u32, &str)> {
+    let dup = name.rfind('.').filter(|&at| {
+        let digits = &name[at + 1..];
+        !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit())
+    });
+    let (stem, suffix) = name.split_at(dup.unwrap_or(name.len()));
+    let (base, level) = lod_suffix(stem)?;
+    Some((base, level, suffix))
+}
+
 /// Every LOD set in `asset`, in the file order of each set's first sub-object.
 pub fn lod_sets(asset: &ImportedAsset) -> Vec<LodSet> {
     let mut found: Vec<(String, Vec<(u32, String)>)> = Vec::new();
@@ -45,19 +59,25 @@ pub fn lod_sets(asset: &ImportedAsset) -> Vec<LodSet> {
     }
     found
         .into_iter()
-        .map(|(base, mut members)| {
-            members.sort_by_key(|(level, _)| *level);
-            let mut levels: Vec<(u32, Vec<String>)> = Vec::new();
-            for (level, id) in members {
-                match levels.last_mut() {
-                    Some((l, ids)) if *l == level => ids.push(id),
-                    _ => levels.push((level, vec![id])),
-                }
-            }
-            let levels = levels.into_iter().map(|(_, ids)| ids).collect();
-            LodSet { base, levels }
+        .map(|(base, members)| LodSet {
+            base,
+            levels: by_level(members),
         })
         .collect()
+}
+
+/// `members` (each with its level) grouped one list per level, finest first;
+/// members of one level keep their order. Level numbers need not be contiguous.
+pub fn by_level<T>(mut members: Vec<(u32, T)>) -> Vec<Vec<T>> {
+    members.sort_by_key(|(level, _)| *level);
+    let mut levels: Vec<(u32, Vec<T>)> = Vec::new();
+    for (level, member) in members {
+        match levels.last_mut() {
+            Some((l, these)) if *l == level => these.push(member),
+            _ => levels.push((level, vec![member])),
+        }
+    }
+    levels.into_iter().map(|(_, these)| these).collect()
 }
 
 /// The set named `base` in `asset`, if any.
@@ -94,6 +114,14 @@ mod tests {
     }
 
     #[test]
+    fn a_node_name_keeps_its_duplicate_suffix_apart() {
+        assert_eq!(node_lod("Crate_LOD0"), Some(("Crate", 0, "")));
+        assert_eq!(node_lod("Crate_LOD1.001"), Some(("Crate", 1, ".001")));
+        assert_eq!(node_lod("Crate.001"), None);
+        assert_eq!(node_lod("Crate_LOD1."), None);
+    }
+
+    #[test]
     fn sets_group_by_base_order_levels_and_prefer_node_names() {
         let asset = ImportedAsset {
             sub_meshes: vec![
@@ -104,6 +132,7 @@ mod tests {
                 sub("Lamp_LOD0", Some("Lamp")),
             ],
             materials: Vec::new(),
+            nodes: Vec::new(),
         };
         let sets = lod_sets(&asset);
         assert_eq!(sets.len(), 2);
