@@ -91,7 +91,8 @@ impl SystemProbe for TimingProbe {
     }
 }
 
-/// The world counters: entities, rigid bodies, nav agents, live particles, scripts.
+/// The world counters: entities, rigid bodies, nav agents, live particles, scripts,
+/// skeletons and their bones (#1617).
 fn record_world(stats: &mut FrameStats, world: &World, res: &Resources) {
     let scene = world.scene.borrow();
     let w = &scene.world;
@@ -100,11 +101,21 @@ fn record_world(stats: &mut FrameStats, world: &World, res: &Resources) {
         .into_iter()
         .filter_map(|id| w.particles(id).map(|p| p.live_count()))
         .sum();
+    let skinned = scene.skinned_ids();
+    let bones: usize = skinned
+        .iter()
+        .filter_map(|&id| {
+            w.mesh(id)
+                .map(|m| m.skeleton.bones.iter().flatten().count())
+        })
+        .sum();
     stats.record("entities", w.len() as f64);
     stats.record("rigid_bodies", w.ids_with_rigidbody().len() as f64);
     stats.record("nav_agents", w.ids_with_nav_agent().len() as f64);
     stats.record("particles", particles as f64);
     stats.record("scripts", res.script_manager.live_script_count() as f64);
+    stats.record("skeletons", skinned.len() as f64);
+    stats.record("bones", bones as f64);
 }
 
 /// Install a [`TimingProbe`] on `world`, writing into the script runtime's stats cell
