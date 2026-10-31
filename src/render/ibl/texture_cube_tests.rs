@@ -51,7 +51,7 @@ fn add_box(scene: &mut Scene, name: &str, pos: Vec3, scale: Vec3, emissive: [f32
 
 /// A closed black room, 16 units across, with a glowing patch along each of
 /// [`PATCHES`] five units out.
-fn patched_room() -> Scene {
+pub(super) fn patched_room() -> Scene {
     let mut scene = Scene::new();
     for (i, axis) in [
         Vec3::X,

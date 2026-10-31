@@ -205,9 +205,11 @@ impl ParticleEmitterComponent {
         self.runtime.particles.len()
     }
 
-    /// A live particle's current world size: start size × the size curve.
+    /// A live particle's current world size: start size × the size curve, never
+    /// below zero (Unity's floor): a negative size would mirror a mesh particle,
+    /// which then draws inside out with its back faces culled (#1615).
     pub fn size_of(&self, p: &Particle) -> f32 {
-        p.size * self.size_over_life.evaluate(p.life_t())
+        (p.size * self.size_over_life.evaluate(p.life_t())).max(0.0)
     }
 
     /// A live particle's current RGBA: start colour × the colour gradient.

@@ -63,6 +63,10 @@ pub use depth::{CUT_PREPASS, CUT_SHADOW};
 const SURFACE_RETURN: &str =
     "return transparent::composite(lighting_color, base_color.a, env_brdf, in.world_position, N, in.clip_position.xy);";
 
+/// Opens the block the colour blocks run in: `in` shadowed by a copy carrying the
+/// shading's facing-corrected geometric normal (`surface_color`'s `geometric`).
+const FACED_IN: &str = "{\n        var in = in;\n        in.world_normal = geometric;\n        ";
+
 /// Assemble `recipe` into a complete WGSL module. `surface_base` is the pass's base
 /// shader (`bake::base_source`: the forward shader for surface, `ui.wgsl` for ui). Returns an
 /// error if a selected block is unknown for the pass, or the surface base lacks
@@ -137,12 +141,16 @@ fn assemble_surface(
 
     // The blocks restyle the colour after step 5 recorded its reflection for SSR, so
     // the record is scaled as they scale the colour, right before it (#1526).
+    // They read the vertex output through a copy whose normal is the one the
+    // surface is shaded with, turned toward the viewer on a two-sided face seen from
+    // behind (#1615): a rim seen from behind is the rim of the face the viewer sees.
     let folded = chain(resolved, "lighting_color", layout, Stage::Color);
-    let mut new_return = String::new();
+    let mut new_return = String::from(FACED_IN);
     for fold in reflection_folds(resolved, layout) {
-        let _ = write!(new_return, "{fold}\n    ");
+        let _ = write!(new_return, "{fold}\n        ");
     }
     new_return.push_str(&SURFACE_RETURN.replace("lighting_color", &folded));
+    new_return.push_str("\n    }");
 
     let header = format!(
         "// {name}.wgsl — authored surface variant (#272), assembled from {n} block(s).\n\

@@ -49,12 +49,7 @@ impl OutlinePasses {
             bind_group_layouts: &[Some(&edge_layout)],
             immediate_size: 0,
         });
-        let mask = FacedPipeline::new(|facing| {
-            let (shader, layout) = (mask_shader.clone(), forward_layout.clone());
-            LazyPipeline::new(device, move |device| {
-                mask_pipeline(device, &shader, &layout, facing)
-            })
-        });
+        let mask = FacedPipeline::lazy(device, &mask_shader, forward_layout, mask_pipeline);
         let fullscreen = |fs: &'static str, format, blend| {
             let (shader, layout) = (edge_shader.clone(), edge_pipeline_layout.clone());
             LazyPipeline::new(device, move |device| {

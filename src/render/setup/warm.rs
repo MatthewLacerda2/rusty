@@ -9,10 +9,12 @@ use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::Renderer;
 
 impl Renderer {
-    /// Build every lazy pipeline now: the translucent, motion-vector (#1435), primed (#1499), motion-blur (#1436), depth-of-field (#1445), particle, ribbon, world-canvas,
-    /// mirrored-shadow and data-mip ones always, the debug-line and selection-outline (mask and edge) ones only
-    /// with `editor_overlays` (a shipped game draws neither).
-    pub(crate) fn warm_pipelines(&self, editor_overlays: bool) {
+    /// Build every pipeline [`Self::lazy_pipelines`] lists, the editor's overlays
+    /// only with `editor_overlays` (a shipped game draws none), and have each
+    /// authored surface shader build its facing pipelines with it from now on: its
+    /// slot is built on its first draw, after the renderer starts (#1615).
+    pub(crate) fn warm_pipelines(&mut self, editor_overlays: bool) {
+        self.surface_shaders.warm();
         for pipeline in self.lazy_pipelines(editor_overlays) {
             pipeline.get();
         }
@@ -38,6 +40,8 @@ impl Renderer {
         all.extend(self.shadow_renderer.lazy_pipelines());
         all.push(self.mip_generator.lazy_pipeline());
         all.push(self.opaque_copy.lazy_pipeline());
+        // The authored surface shaders built so far: their facing pipelines (#1615).
+        all.extend(self.surface_shaders.lazy_pipelines());
         if editor_overlays {
             all.push(&self.line_pipeline);
             all.extend(self.outline.lazy_pipelines());

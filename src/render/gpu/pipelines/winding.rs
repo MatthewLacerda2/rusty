@@ -96,6 +96,35 @@ impl FacedPipeline {
         Self(Facing::ALL.map(make))
     }
 
+    /// The set `build` makes from `shader` and `layout`, each one built at first use
+    /// from its own clones of them: what a pass whose pipelines differ only by
+    /// facing writes instead of a clone-then-build closure per facing.
+    pub(crate) fn lazy<B>(
+        device: &wgpu::Device,
+        shader: &wgpu::ShaderModule,
+        layout: &wgpu::PipelineLayout,
+        build: B,
+    ) -> Self
+    where
+        B: Fn(
+                &wgpu::Device,
+                &wgpu::ShaderModule,
+                &wgpu::PipelineLayout,
+                Facing,
+            ) -> wgpu::RenderPipeline
+            + Clone
+            + Send
+            + Sync
+            + 'static,
+    {
+        Self::new(|facing| {
+            let (shader, layout, build) = (shader.clone(), layout.clone(), build.clone());
+            LazyPipeline::new(device, move |device| {
+                build(device, &shader, &layout, facing)
+            })
+        })
+    }
+
     /// The set, with the usual [`Facing::Ccw`] one built now: for a pass every
     /// frame draws (the opaque pass, its prepass).
     pub(crate) fn eager(make: impl Fn(Facing) -> LazyPipeline) -> Self {

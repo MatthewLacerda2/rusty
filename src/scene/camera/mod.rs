@@ -177,6 +177,9 @@ pub fn camera_for_entity(base: &Camera, scene: &Scene, id: u32) -> Option<Camera
     let world = scene.world.local_to_world(id);
     let (yaw, pitch) = yaw_pitch_from_matrix(world);
     let mut cam = base.clone();
+    // An entity's camera is upright: a cube face's up (`Camera::up`) is the
+    // capture's own and never reaches it (#1615).
+    cam.up = Vec3::Y;
     cam.position = world.col(3).truncate();
     cam.yaw = yaw;
     cam.pitch = pitch;

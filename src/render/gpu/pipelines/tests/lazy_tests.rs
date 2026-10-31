@@ -77,7 +77,7 @@ fn gpu_optional_forward_pipelines_build_on_first_draw() {
 /// shipped game (no editor overlays) leaves only the line and outline ones lazy.
 #[test]
 fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
-    let Some(renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let every = renderer.lazy_pipelines(true);

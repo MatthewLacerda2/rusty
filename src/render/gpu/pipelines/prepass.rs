@@ -1,6 +1,6 @@
 //! The SSAO depth prepass's pipelines (#436), one per [`Facing`] (#1615).
 
-use super::{FacedPipeline, Facing, LazyPipeline};
+use super::{FacedPipeline, Facing};
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::DEPTH_FORMAT;
 
@@ -16,12 +16,11 @@ pub(super) fn prepass_set(
     layout: &wgpu::PipelineLayout,
     fragment: &'static str,
 ) -> FacedPipeline {
-    FacedPipeline::eager(|facing| {
-        let (shader, layout) = (shader.clone(), layout.clone());
-        LazyPipeline::new(device, move |device| {
-            make_prepass(device, &shader, &layout, fragment, facing)
-        })
-    })
+    let set = FacedPipeline::lazy(device, shader, layout, move |d, s, l, f| {
+        make_prepass(d, s, l, fragment, f)
+    });
+    set.get(Facing::Ccw);
+    set
 }
 
 /// One [`prepass_set`] pipeline.

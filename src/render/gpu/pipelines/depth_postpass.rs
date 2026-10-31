@@ -23,11 +23,8 @@ impl DepthPostpassPipelines {
         layout: &wgpu::PipelineLayout,
     ) -> Self {
         let make = |velocity: bool| {
-            FacedPipeline::new(|facing| {
-                let (shader, layout) = (shader.clone(), layout.clone());
-                LazyPipeline::new(device, move |device| {
-                    build(device, &shader, &layout, velocity, facing)
-                })
+            FacedPipeline::lazy(device, shader, layout, move |d, s, l, f| {
+                build(d, s, l, velocity, f)
             })
         };
         Self {

@@ -131,6 +131,43 @@ impl Renderer {
         self.gpu_timer.end_frame(&self.device, &self.queue);
     }
 
+    /// Render one face of a static cubemap capture (#243, #1615): `camera` alone,
+    /// through its own lens — no scene camera stack, no render-texture cameras, no
+    /// UI, no post-FX (the HDR image is only brought to display) — so a probe or
+    /// reflection capture is the same in every scene, whatever its cameras.
+    /// Shadows keep the scene's main camera's settings: they are how the scene is
+    /// lit, not how the camera sees it.
+    pub(crate) fn render_capture_face(
+        &mut self,
+        view: &mut RenderView,
+        scene: &Scene,
+        camera: &Camera,
+        output: &wgpu::TextureView,
+    ) {
+        self.gpu_timer.begin_frame();
+        self.prepare_frame(view, scene, camera);
+        let shadows = borrow_post_source(scene, crate::scene::camera::main_camera(scene))
+            .source()
+            .volume
+            .map(|vc| vc.shadows)
+            .unwrap_or_default();
+        let lod = LodSelection::for_camera(scene, camera);
+        self.run_shadow_passes(scene, camera, view.aspect(), &shadows, &lod);
+        let pass = StackPass {
+            stack: std::slice::from_ref(camera),
+            entities: &[None],
+            base_id: None,
+            post: Default::default(),
+            output,
+            editor_mode: false,
+            full_post_fx: false,
+            motion_frames: 1,
+        };
+        self.draw_stack(view, scene, pass);
+        self.finish_counters(view);
+        self.gpu_timer.end_frame(&self.device, &self.queue);
+    }
+
     /// Upload/refresh per-frame GPU assets (meshes, textures, skybox) shared by every
     /// camera in the stack, and mark re-baked surface shaders for a rebuild (#396).
     fn upload_scene_assets(&mut self, scene: &Scene) {

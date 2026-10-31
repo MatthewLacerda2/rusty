@@ -281,9 +281,13 @@ mod vertex_waves_tests;
 mod priming_backend_tests;
 
 #[cfg(test)]
-#[path = "tests/render_face_tests.rs"]
+#[path = "tests/render_face/face_tests.rs"]
 mod render_face_tests;
 
 #[cfg(test)]
-#[path = "tests/render_face_normal_tests.rs"]
+#[path = "tests/render_face/normal_tests.rs"]
 mod render_face_normal_tests;
+
+#[cfg(test)]
+#[path = "tests/render_face/surface_tests.rs"]
+mod render_face_surface_tests;

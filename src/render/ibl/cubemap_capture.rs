@@ -123,7 +123,7 @@ impl Renderer {
         let faces = CubemapFace::ALL.map(|face| {
             let mut camera = face_camera(position, face);
             (camera.near, camera.far) = (lens.near, lens.far);
-            self.render(&mut render_view, scene, &camera, &output, false);
+            self.render_capture_face(&mut render_view, scene, &camera, &output);
             let mut face = crate::render::readback::read_texture_rgba8(
                 &self.device,
                 &self.queue,
@@ -213,3 +213,7 @@ mod cubemap_capture_tests;
 #[cfg(test)]
 #[path = "texture_cube_tests.rs"]
 mod texture_cube_tests;
+
+#[cfg(test)]
+#[path = "capture_camera_tests.rs"]
+mod capture_camera_tests;
