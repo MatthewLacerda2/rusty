@@ -106,10 +106,10 @@ fn stamp_prefab(
     let mut bone_parents = Vec::new();
     let mut bone_refs = Vec::new();
     // A model's entities are keyed by node path too (#1637, `source`).
-    let model = link_source.is_some_and(source::is_model_source);
-    let nodes = model
-        .then(|| source::node_paths(prefab))
-        .unwrap_or_default();
+    let nodes = match link_source.is_some_and(source::is_model_source) {
+        true => source::node_paths(prefab),
+        false => BTreeMap::new(),
+    };
     for entity in &prefab.entities {
         let local_id = entity.id;
         let mut entity = entity.clone();

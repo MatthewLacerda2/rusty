@@ -10,7 +10,7 @@
 //!
 //! It reuses the existing serde-value machinery rather than inventing a parallel
 //! serializer: [`apply_overrides`] is the same setter the live propagation uses (now
-//! aimed at a raw source entity), [`read_prefab_file`] / [`write_prefab_file`] are the
+//! aimed at a raw source entity), [`read_writable`] / [`write_prefab_file`] are the
 //! one `.prefab` reader/writer, and clearing the instance's overrides afterwards reuses
 //! [`revert_instance_overrides`] / `link::propagate` so the instance re-baselines
 //! against the now-updated source. A model source is read-only (#1637,
