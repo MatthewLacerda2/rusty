@@ -221,7 +221,6 @@ pub const LAYERS: &[Layer] = &[
             "render",
             "scene",
             "scripting",
-            "time",
         ],
     )
     .uses(&[
