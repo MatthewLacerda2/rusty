@@ -1,7 +1,7 @@
 //! Tests for the component dependency mechanism (`dependency`, #359).
 
 use super::*;
-use crate::scene::authoring::create_entity;
+use crate::scene::authoring::{create_entity, default_post_processing};
 use crate::scene::Scene;
 
 #[test]
