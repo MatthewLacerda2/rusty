@@ -83,7 +83,8 @@ impl BounceSolve {
     }
 
     /// Where it is: the pass (from 1), the probes that pass has captured, and the
-    /// probe count.
+    /// probe count. The editor's bar reads it, a dev-only stepper's.
+    #[cfg(feature = "dev")]
     pub fn progress(&self) -> (u32, usize, usize) {
         (self.bounce, self.pass.len(), self.positions.len())
     }

@@ -187,54 +187,33 @@ pub(crate) fn read_cube_mips_rgba8(
     texture: &wgpu::Texture,
     sizes: &[u32],
 ) -> Vec<[Vec<u8>; 6]> {
-    let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-    let pitch = |size: u32| (size * 4).div_ceil(align) * align;
     let offsets: Vec<u64> = sizes
         .iter()
         .scan(0u64, |at, &size| {
             let offset = *at;
-            *at += u64::from(pitch(size) * size) * 6;
+            *at += u64::from(padded_row(size) * size) * 6;
             Some(offset)
         })
         .collect();
-    let total: u64 = sizes.iter().map(|&s| u64::from(pitch(s) * s) * 6).sum();
+    let total: u64 = sizes
+        .iter()
+        .map(|&s| u64::from(padded_row(s) * s) * 6)
+        .sum();
     let buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Cube Readback Buffer"),
         size: total,
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     });
-    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Cube Readback Copy"),
-    });
-    for (mip_level, (&size, &offset)) in (0..).zip(sizes.iter().zip(&offsets)) {
-        encoder.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                texture,
-                mip_level,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyBufferInfo {
-                buffer: &buffer,
-                layout: wgpu::TexelCopyBufferLayout {
-                    offset,
-                    bytes_per_row: Some(pitch(size)),
-                    rows_per_image: Some(size),
-                },
-            },
-            wgpu::Extent3d {
-                width: size,
-                height: size,
-                depth_or_array_layers: 6,
-            },
-        );
-    }
-    queue.submit(std::iter::once(encoder.finish()));
+    submit_cube_copy(device, queue, (texture, &buffer), sizes, &offsets);
     let mut levels = Vec::with_capacity(sizes.len());
     map(device, &buffer, |bytes| {
         for (&size, &offset) in sizes.iter().zip(&offsets) {
-            let (pitch, row, rows) = (pitch(size) as usize, (size * 4) as usize, size as usize);
+            let (pitch, row, rows) = (
+                padded_row(size) as usize,
+                (size * 4) as usize,
+                size as usize,
+            );
             levels.push(std::array::from_fn(|layer| {
                 let start = offset as usize + layer * pitch * rows;
                 bytes[start..start + pitch * rows]
@@ -246,6 +225,50 @@ pub(crate) fn read_cube_mips_rgba8(
         }
     });
     levels
+}
+
+/// Encode and submit the copy of every level of a six-layer RGBA8 `texture` into
+/// `buffer`, level `i` (`sizes[i]` square) at `offsets[i]` with padded rows.
+fn submit_cube_copy(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    (texture, buffer): (&wgpu::Texture, &wgpu::Buffer),
+    sizes: &[u32],
+    offsets: &[u64],
+) {
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("Cube Readback Copy"),
+    });
+    for (mip_level, (&size, &offset)) in (0..).zip(sizes.iter().zip(offsets)) {
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture,
+                mip_level,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset,
+                    bytes_per_row: Some(padded_row(size)),
+                    rows_per_image: Some(size),
+                },
+            },
+            wgpu::Extent3d {
+                width: size,
+                height: size,
+                depth_or_array_layers: 6,
+            },
+        );
+    }
+    queue.submit(std::iter::once(encoder.finish()));
+}
+
+/// An RGBA8 row of `size` texels padded to [`wgpu::COPY_BYTES_PER_ROW_ALIGNMENT`].
+fn padded_row(size: u32) -> u32 {
+    let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+    (size * 4).div_ceil(align) * align
 }
 
 /// Write packed RGBA8 `pixels` to `path` as a PNG, creating the parent directory if
