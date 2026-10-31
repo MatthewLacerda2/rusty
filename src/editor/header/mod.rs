@@ -6,6 +6,7 @@ mod edit_menu;
 mod scene_io;
 mod transport;
 
+#[cfg(feature = "dev")]
 pub(crate) use edit_menu::repl_input_id;
 pub use edit_menu::typing_holds_step;
 
