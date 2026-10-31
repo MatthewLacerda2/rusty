@@ -128,7 +128,17 @@ pub fn is_image_path(path: impl AsRef<Path>) -> bool {
 /// Always parses: what builds a scene goes through [`imported`] instead, which
 /// parses each file once and shares the result (#857).
 pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
-    import_with(path, &settings_of(path))
+    import_with(path, &read_target(path)?, &settings_of(path))
+}
+
+/// The file a parse of `path` reads: `path` itself, or for a converted source
+/// (`.fbx`, `.blend`) its cached glTF, brought up to date first
+/// ([`convert::cached_gltf`]).
+fn read_target(path: &Path) -> Result<std::path::PathBuf, ImportError> {
+    match convert::converter_for(path) {
+        Some(_) => convert::cached_gltf(path),
+        None => Ok(path.to_path_buf()),
+    }
 }
 
 /// The import settings `path`'s sidecar records, the defaults (with a warning)
@@ -143,9 +153,14 @@ fn settings_of(path: &Path) -> ImportSettings {
     })
 }
 
-/// [`import_file`] with `settings` already read.
-fn import_with(path: &Path, settings: &ImportSettings) -> Result<ImportedAsset, ImportError> {
-    let mut asset = parse_file(path)?;
+/// [`import_file`] with the file it reads ([`read_target`]) and `settings`
+/// already known.
+fn import_with(
+    path: &Path,
+    read: &Path,
+    settings: &ImportSettings,
+) -> Result<ImportedAsset, ImportError> {
+    let mut asset = parse_file(path, read)?;
     scale_factor::apply(&mut asset, scale_factor::sanitize(settings.scale, 1.0));
     if settings.lightmap_uvs.generate {
         for sub in &mut asset.sub_meshes {
@@ -155,14 +170,15 @@ fn import_with(path: &Path, settings: &ImportSettings) -> Result<ImportedAsset, 
     Ok(asset)
 }
 
-/// Parse a source file into sub-meshes + materials by its extension, as authored.
-fn parse_file(path: &Path) -> Result<ImportedAsset, ImportError> {
+/// Parse a source file into sub-meshes + materials by its extension, as authored,
+/// reading `read` ([`read_target`]).
+fn parse_file(path: &Path, read: &Path) -> Result<ImportedAsset, ImportError> {
     match paths::extension(path).as_str() {
-        "gltf" | "glb" => gltf::import::import(path),
-        "obj" => obj_import::import(path),
+        "gltf" | "glb" => gltf::import::import(read),
+        "obj" => obj_import::import(read),
         _ if convert::converter_for(path).is_some() => {
             let source = path.to_string_lossy();
-            gltf::import::import_from(&convert::cached_gltf(path)?, Some(&source))
+            gltf::import::import_from(read, Some(&source))
         }
         other => Err(ImportError::UnsupportedFormat(other.to_string())),
     }

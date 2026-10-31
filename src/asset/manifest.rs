@@ -20,7 +20,7 @@ use glam::Vec3;
 
 use crate::core::paths;
 
-use super::{imported, is_model_path, AssetRef, ImportError, SubMesh};
+use super::{import_file, is_model_path, AssetRef, ImportError, SubMesh};
 
 /// One addressable sub-object within a source file, with the footprint an agent
 /// needs to place it without overlap.
@@ -118,7 +118,8 @@ pub fn build_manifest(root: &Path) -> AssetManifest {
 /// Import one file into its [`AssetEntry`], or `None` if it can't be imported. A
 /// file whose path can't be referenced (#1295) is skipped with a warning naming why.
 fn entry_for(path: &str) -> Option<AssetEntry> {
-    let asset = imported(Path::new(path)).ok()?;
+    // A plain import: listing the project must not fill the import cache (#857).
+    let asset = import_file(Path::new(path)).ok()?;
     let sub_objects = asset
         .sub_meshes
         .iter()

@@ -151,11 +151,16 @@ pub fn save(source: &Path, settings: &ImportSettings) -> Result<(), ImportError>
 }
 
 /// Import the file, then write/refresh its sidecar's cached sub-object map,
-/// preserving any existing settings. Returns the file's shared import
+/// preserving any existing settings; a sidecar already current is not re-written. Returns the file's shared import
 /// ([`super::imported`], #857) for the caller.
 pub fn import_and_sync_sidecar(source: &Path) -> Result<super::Imported, ImportError> {
     let asset = super::imported(source)?;
-    let settings = load(source)?.with_sub_objects(&asset);
-    save(source, &settings)?;
+    let stored = load(source)?;
+    let settings = stored.clone().with_sub_objects(&asset);
+    // Unchanged, it is not written again: every instantiate syncs, and a write
+    // is a change other caches follow (#857).
+    if settings != stored || !meta_path(source).is_file() {
+        save(source, &settings)?;
+    }
     Ok(asset)
 }
