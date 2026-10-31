@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use super::{fixture_project, Harness};
-use crate::app::GameWorld;
+use crate::app::{GameWorld, ProjectSource};
 use crate::core::input::InputState;
 use crate::core::project::ProjectSettings;
 use crate::navigation::NavigationGraph;
@@ -70,17 +70,11 @@ impl Harness {
         {
             let world = harness.world.borrow();
             *world.script_manager().scene_path_cell().borrow_mut() = Some(scene_path.into());
-            // Unbound, as in the player: a run reads the settings, never writes them.
-            let mut app = world.resources.application.borrow_mut();
-            let options = settings.graphics_options;
-            app.run_with(settings);
-            // No saved player choices in a harness (its store is pathless): the
-            // project's default options (#1438) and initial quality preset (#1522)
-            // are what it plays with.
-            let cell = world.script_manager().graphics_cell();
-            let mut graphics = cell.borrow_mut();
-            graphics.options = options;
-            graphics.quality = app.quality_values();
+            // Unbound, as in the player: a run reads the settings, never writes
+            // them. No saved player choices in a harness (its store is pathless):
+            // the project's default options (#1438) and initial quality preset
+            // (#1522) are what it plays with.
+            world.open_project(ProjectSource::ReadOnly(settings));
         }
         Ok(harness)
     }

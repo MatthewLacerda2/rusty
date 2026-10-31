@@ -113,6 +113,8 @@ mod play_project;
 #[cfg(feature = "dev")]
 mod player_controller;
 #[cfg(feature = "dev")]
+mod project_open;
+#[cfg(feature = "dev")]
 mod provider_keys;
 #[cfg(feature = "dev")]
 mod reparent_bounds;
