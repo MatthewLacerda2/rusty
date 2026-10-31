@@ -69,8 +69,8 @@ assets/generated/<kind>-<sha256 of the brief>.<ext>.json
 A *brief* is everything a generation asks for: the prompt, the voice, the model,
 the duration, the seed. It lives in the document that uses the asset, so it is
 versioned with the project. Any file in the folder can be made again from its brief
-(at a cost). Whether a game's own repo versions the folder or ignores it is still
-open (#866): today nothing ignores it.
+(at a cost). Whether a game's own repo versions the folder is up to its own `.gitignore`:
+the engine ignores nothing there (#866, closed without a change).
 
 - **Nothing is paid for twice.** Asking for a brief whose file is already there
   returns that file and makes no call. Editing a prompt back to an earlier wording
