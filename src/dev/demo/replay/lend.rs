@@ -81,7 +81,7 @@ impl Host {
 /// The host's own state, held while a replay plays.
 pub struct Lent(Host);
 
-/// Take from `world` what a replay overwrites ([`Host::take`]).
+/// Take from `world` what a replay overwrites: its `Host` state.
 pub fn lend(world: &mut GameWorld) -> Lent {
     Lent(Host::take(world))
 }
