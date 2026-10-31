@@ -80,60 +80,67 @@ fn advance(
     log: &mut ConsoleLogs,
     nav: &NavigationGraph,
 ) -> Option<bool> {
-    let fail = |log: &mut ConsoleLogs, e: String| {
-        log.error(format!("Generate Lighting failed: {e}"));
-        Some(false)
+    let Step::Lightmaps(job) = step else {
+        return advance_probes(step, scene, log);
     };
-    match step {
-        Step::Lightmaps(job) => {
-            let lightmaps = match job.poll(scene)? {
-                BakeOutcome::Baked(n) => n,
-                BakeOutcome::Cancelled => {
-                    log.info("Generate Lighting cancelled; kept the old lighting".into());
-                    return Some(false);
-                }
-                BakeOutcome::Failed(e) => return fail(log, e),
+    let lightmaps = match job.poll(scene)? {
+        BakeOutcome::Baked(n) => n,
+        BakeOutcome::Cancelled => {
+            log.info("Generate Lighting cancelled; kept the old lighting".into());
+            return Some(false);
+        }
+        BakeOutcome::Failed(e) => return fail(log, e),
+    };
+    let path = job.scene_path().to_string();
+    match start_probes(scene, &path, Some(nav)) {
+        Ok(job) => {
+            *step = Step::Probes {
+                job: Box::new(job),
+                lightmaps,
+                path,
             };
-            let path = job.scene_path().to_string();
-            match start_probes(scene, &path, Some(nav)) {
-                Ok(job) => {
-                    *step = Step::Probes {
-                        job: Box::new(job),
-                        lightmaps,
-                        path,
-                    };
-                    None
-                }
-                Err(e) => fail(log, e),
-            }
+            None
         }
-        Step::Probes {
-            job,
-            lightmaps,
-            path,
-        } => {
-            let mut say = |line| log.info(line);
-            match job.step(scene, &mut say).and_then(|done| match done {
-                true => job.commit(scene).map(|()| true),
-                false => Ok(false),
-            }) {
-                Ok(false) => None,
-                Err(e) if e == PROBES_CHANGED => {
-                    log.warn(dropped(step, "the probes changed during the bake"));
-                    // The lightmaps were applied but never written.
-                    Some(true)
-                }
-                Ok(true) => match finish(scene, path, *lightmaps, job.report()) {
-                    Ok(report) => {
-                        log.info(report.summary());
-                        Some(report.saved == LightingSave::NeedsSceneSave)
-                    }
-                    Err(e) => fail(log, e),
-                },
-                Err(e) => fail(log, e),
-            }
-        }
+        Err(e) => fail(log, e),
     }
+}
+
+/// One probe step; at the end, commit the probes and write the lighting.
+fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> Option<bool> {
+    let Step::Probes {
+        job,
+        lightmaps,
+        path,
+    } = step
+    else {
+        return None;
+    };
+    let mut say = |line| log.info(line);
+    let stepped = job.step(scene, &mut say).and_then(|done| match done {
+        true => job.commit(scene).map(|()| true),
+        false => Ok(false),
+    });
+    match stepped {
+        Ok(false) => None,
+        Ok(true) => match finish(scene, path, *lightmaps, job.report()) {
+            Ok(report) => {
+                log.info(report.summary());
+                Some(report.saved == LightingSave::NeedsSceneSave)
+            }
+            Err(e) => fail(log, e),
+        },
+        Err(e) if e == PROBES_CHANGED => {
+            log.warn(dropped(step, "the probes changed during the bake"));
+            // The lightmaps were applied but never written.
+            Some(true)
+        }
+        Err(e) => fail(log, e),
+    }
+}
+
+fn fail(log: &mut ConsoleLogs, e: String) -> Option<bool> {
+    log.error(format!("Generate Lighting failed: {e}"));
+    Some(false)
 }
 
 /// The console line for a bake dropped because `why`, saying what reached the scene.

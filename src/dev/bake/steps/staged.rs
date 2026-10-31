@@ -99,6 +99,7 @@ impl StagedCubemaps {
             // Noted first, so the editor's follow never reads the engine's own write
             // as an outside edit.
             crate::core::fs::written::note_written(&path);
+            // lint: allow(atomic-write) publishes a cube staged whole beside its name at bake time
             std::fs::rename(staged, target)
                 .map_err(|e| format!("Failed to write reflection cubemap {path}: {e}"))?;
             scene.reflection_probes.set_cubemap(i, path);

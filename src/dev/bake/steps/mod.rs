@@ -14,8 +14,8 @@
 //! **A bake works on a snapshot and applies only when it completes** (Unity's shape).
 //! Placement happens when the job starts; then both probe sets are copied, the bakes
 //! read the copies, and their results are staged without touching the scene: the light
-//! probes' SH in the solve, the cubemaps in `<name>.baking` files. [`commit`]
-//! (LightingBake::commit) applies both in one step. If either probe set changed since
+//! probes' SH in the solve, the cubemaps in `<name>.baking` files.
+//! [`LightingBake::commit`] applies both in one step. If either probe set changed since
 //! the start (one added, removed or moved, a reflection probe's resolution, clip
 //! planes or shadows), a step or the commit refuses with [`PROBES_CHANGED`] and
 //! nothing is applied; the staged files go with the job. The captures still render the
