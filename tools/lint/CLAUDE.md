@@ -2,7 +2,7 @@
 
 This file loads when you work under `tools/lint/`: the binary behind `make size`,
 `make rules`, `make layers`, `make determinism`, `make direction`, `make components` and
-`make parity`. The root `CLAUDE.md` says what each gate protects and why a convention
+`make parity`, and the `make dead-pub` signal. The root `CLAUDE.md` says what each gate protects and why a convention
 a machine can check is a gate; `docs/linting.md` is the reference for every rule. This
 file is what a coder changing the tool must keep.
 

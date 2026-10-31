@@ -14,8 +14,13 @@
 //! Submodules:
 //!   scene     — the `Scene` aggregate (the `ecs::World` + scene-level state)
 //!   serialize — World <-> SceneData
+//!   authoring — the shared edit verbs the editor, the API and loads all go through
+//!   asset_instance, prefab — instantiate one imported sub-object; prefabs
+//!   camera, decal, lighting — the active view, decal records, baked lighting
+//!   identity, material_lookup — a live scene's identity; material slot lookups
 //!   rehydrate — rebuild a mesh's geometry + rig from its on-disk reference; `model_writes` reloads re-written models
-//!   settings  — project/scene-wide settings: fog, layers, collision matrix, shader overrides
+//!   settings  — project/scene-wide settings: fog, layers, collision matrix, shader
+//!               overrides, sky, ambient
 //!   lod_instance, world_cache — LOD-set instantiation; the world-space read cache
 //!   model_instance — a whole model as its node tree, one child per node (#1083)
 //!   skeleton  — bones as GameObjects: spawn, save-strip, palette build (#453)

@@ -15,7 +15,8 @@ diff a save in a PR). A value may be a scalar **or** a structured table.
 
 **Determinism.** Reads resolve from an in-memory snapshot loaded once at a boundary
 (startup); writes mutate that snapshot and are persisted only at boundaries (Stop /
-quit), never inside `FixedUpdate`. The headless harness runs the store **pathless**,
+quit), never inside `FixedUpdate`. Unlike the scene, a write made during Play is
+kept when Play stops (save data, as Unity's `PlayerPrefs`). The headless harness runs the store **pathless**,
 so it never reads a developer's real save and replays stay reproducible.
 
 ### Keybindings — rebindable controls

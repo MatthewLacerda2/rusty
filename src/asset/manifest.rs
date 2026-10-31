@@ -135,7 +135,7 @@ fn entry_for(path: &str) -> Option<AssetEntry> {
 }
 
 /// Recursively gather model-file paths under `dir` (forward-slashed). Unreadable
-/// directories are silently skipped, mirroring the content browser's tolerance.
+/// directories are silently skipped.
 fn collect_model_paths(dir: &Path, out: &mut Vec<String>) {
     walk(dir, &mut |path| {
         let as_str = paths::to_slash(path);

@@ -23,7 +23,7 @@ overflow, auto-size, rich text — is in [`docs/ui.md`](../ui.md). A custom ui s
 | `Text.GetWrap` / `SetWrap` | `(id)` / `(id, bool)` | break lines at word boundaries to fit the rect's width |
 | `Text.GetOverflow` / `SetOverflow` | `(id)` / `(id, name)` | `"Overflow"` (spill), `"Truncate"` (drop what does not fit) or `"Ellipsis"` (truncate, ending with `…`) |
 | `Text.GetLineSpacing` / `SetLineSpacing` | `(id)` / `(id, multiplier)` | line pitch multiplier (1 = the font's own; ≥ 0) |
-| `Text.GetLetterSpacing` / `SetLetterSpacing` | `(id)` / `(id, ems)` | extra advance per character, in ems (negative tightens) |
+| `Text.GetLetterSpacing` / `SetLetterSpacing` | `(id)` / `(id, ems)` | extra advance per character, in ems (negative tightens); a ligature, or a letter with its marks, counts as one character |
 | `Text.GetAutoSize` / `SetAutoSize` | `(id)` / `(id, enabled[, min, max])` | `enabled, min, max` — pick the largest size in `[min, max]` that fits the rect (omitted bounds keep theirs) |
 | `Text.GetRichText` / `SetRichText` | `(id)` / `(id, bool)` | parse the tag subset (off draws tags literally — for echoing user input) |
 | `Text.GetRaycastTarget` / `SetRaycastTarget` | `(id)` / `(id, bool)` | whether the pointer can hit it (read by #420) |
@@ -31,7 +31,7 @@ overflow, auto-size, rich text — is in [`docs/ui.md`](../ui.md). A custom ui s
 | `Text.GetShadow` / `SetShadow` | `(id)` / `(id, dx, dy, r, g, b, a)` | `dx, dy, r, g, b, a` — drop-shadow offset in reference units (0, 0 = none) |
 | `Text.GetGlow` / `SetGlow` | `(id)` / `(id, size, r, g, b, a)` | `size, r, g, b, a` — glow reach past the edge in ems (0 = none): the neon look |
 | `Text.GetBlend` / `SetBlend` | `(id)` / `(id, name)` | `"Normal"`, `"Additive"`, `"Multiply"` or `"Screen"` (#425) |
-| `Text.GetPreferredSize` | `(id)` | `width, height` it wants: the widest line unwrapped, and the block height wrapped at the element's current rect width (Unity's `preferredWidth` / `preferredHeight`) |
+| `Text.GetPreferredSize` | `(id)` | `width, height` it wants: the widest line unwrapped, and the block height wrapped at the element's current rect width (unwrapped with `Wrap` off; Unity's `preferredWidth` / `preferredHeight`) |
 | `Text.MeasureString` | `(id, string)` | `width, height` of `string` on one unwrapped block in the entity's font and size — plain text at its `font_size`, trailing spaces counted (`\n` still breaks; `0, 0` without a Text). Where an input field puts its caret. |
 | `Text.GetLayout` | `(id)` | `{ width, height, lines, font_size, truncated }` as drawn in the current rect (`font_size` is auto-size's pick), or `nil` when the entity has no Text or no rect |
 

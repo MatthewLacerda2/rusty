@@ -1,4 +1,4 @@
-//! src/ui/events/focus.rs — keyboard focus: selection and navigation (#420).
+//! src/ui/events/focus/mod.rs — keyboard focus: selection and navigation (#420).
 //!
 //! The focused ("selected") entity is what the keyboard and gamepad drive. Input
 //! becomes **logical actions** first (`actions`: [`nav_actions`] and the held

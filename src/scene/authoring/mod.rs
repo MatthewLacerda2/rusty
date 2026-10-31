@@ -6,7 +6,7 @@
 //! and the primitive-mesh geometry shared with serialization's rehydrate path.
 //!
 //! BOTH callers route through here so editor and API can never drift: the editor
-//! (`hierarchy.rs` create, `inspector_add.rs` add-menu) and the API surface
+//! (`hierarchy.rs` create, `inspector/components/add/` add-menu) and the API surface
 //! (`api::scene`), which the console REPL and headless session drive against the
 //! live edit world. Parenting/destroy/save have their own canonical `Scene` entry
 //! points (`set_parent` / `destroy_entity` / `save_to_file`); the structural API

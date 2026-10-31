@@ -1,4 +1,4 @@
-//! src/render/reflection_prefilter.rs — GGX specular prefilter for reflection probes (#245).
+//! src/render/ibl/reflection_prefilter.rs — GGX specular prefilter for reflection probes (#245).
 //!
 //! Turns a captured static cubemap (LDR RGBA8, mip0) into a prefiltered mip chain where
 //! mip N stores the environment convolved for roughness `N / (mips-1)` — the standard
@@ -54,8 +54,9 @@ impl PrefilteredCubemap {
 /// The fractional mip level a `roughness` in [0, 1] selects from a `level_count`-deep
 /// chain: `roughness * (level_count - 1)`, so roughness 0 reads the sharp base level and
 /// roughness 1 the roughest. This MIRRORS the forward shader's `textureSampleLevel`
-/// argument (`shader.wgsl`, env-reflection block), so the headless mapping and the GPU
-/// agree — the unit-testable form of the shader's mip selection (#245).
+/// argument (`forward::lighting::probe_reflection`, past the probe's `mip_base` in the
+/// array), so the headless mapping and the GPU agree — the unit-testable form of the
+/// shader's mip selection (#245).
 pub fn roughness_to_mip(roughness: f32, level_count: u32) -> f32 {
     roughness.clamp(0.0, 1.0) * (level_count.max(1) - 1) as f32
 }

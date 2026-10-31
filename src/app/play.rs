@@ -65,8 +65,8 @@ impl GameWorld {
     }
 
     /// Run the one-shot `Startup` stage now that the Play session is fully set
-    /// up. No built-in module registers Startup systems yet; this is the wired
-    /// hook modules will register into (Unity's `Start`).
+    /// up: the hook modules register into (Unity's `Start`); the audio module's
+    /// play-on-start is one.
     pub(super) fn run_startup_stage(&mut self) {
         self.resources.frame_dt = 0.0;
         let schedule = std::mem::take(&mut self.resources.schedule);
@@ -76,20 +76,20 @@ impl GameWorld {
 }
 
 /// Register the play-mode systems into the schedule, in the exact order the old
-/// hand-wired loop ran them. All are sim systems, so they live in `FixedUpdate`.
+/// hand-wired loop ran them. The sim systems live in `FixedUpdate`.
 /// The graph evaluator (#316) sits after the scripts (so parameters set this tick
 /// are seen) and right before `animate` (so a fired transition is sampled the
 /// same tick). `late_update_scripts` (#324) runs after physics, animation and
 /// particles have resolved this tick's state, so scripts can react to settled
-/// transforms. Trails (#441) record right after it, so they sample where
-/// `LateUpdate` left each entity. `apply_destroys` (#323) is the tick's tail: it drains the
-/// deferred-destroy queue (firing `OnDisable`/`OnDestroy`) after every other
-/// system has seen the entity; decals age right after it (#639), so a destroyed
-/// owner's decals go the same tick. The scene-load phase (#432) follows it, so a
-/// `Scene.Load` swaps the World only once the whole tick is done with it, right
-/// before `advance_frame`. The skin palette build (#453) runs in `Render`, after
-/// every stage that may move a bone. The post-animation writers, in order:
-/// `animate` writes the clip pose; `pose_ragdolls` (#466) puts each simulated
+/// transforms. Trails (#441) record after it and the post-animation writers below,
+/// so they sample where `LateUpdate` left each entity. `apply_destroys` (#323) is
+/// the tick's tail: it drains the deferred-destroy queue (firing `OnDisable` /
+/// `OnDestroy`) after every other system has seen the entity; decals age right
+/// after it (#639), so a destroyed owner's decals go the same tick. The scene-load
+/// phase (#432) follows it, so a `Scene.Load` swaps the World only once the whole
+/// tick is done with it, right before `advance_frame`. The skin palette build (#453)
+/// runs in `Render`, after every stage that may move a bone. The post-animation
+/// writers, in order: `animate` writes the clip pose; `pose_ragdolls` (#466) puts each simulated
 /// ragdoll bone back where physics left it; `OnAnimationEvent` (#459) then
 /// fires for the events this tick's playheads crossed; `LateUpdate` scripts set this tick's
 /// targets; `solve_ik` (#461) post-processes the final pose, skipping any bone a

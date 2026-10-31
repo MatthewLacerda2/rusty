@@ -1,7 +1,7 @@
-//! src/api/graphics.rs — `Graphics` namespace.
+//! src/api/graphics/mod.rs — `Graphics` namespace.
 //!
 //! Live get/set over the engine's EXISTING post-FX and quality knobs, so a script
-//! can drive its own settings logic in Lua. Two backing stores:
+//! can drive its own settings logic in Lua. What it reaches:
 //!
 //! * The post effects (`effects`, #1467): one registrar per effect, over the main
 //!   camera's active `PostProcessingComponent` or, for motion blur and FXAA, its

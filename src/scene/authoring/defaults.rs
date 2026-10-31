@@ -1,4 +1,4 @@
-//! src/scene/authoring_defaults.rs — Default component values for authoring.
+//! src/scene/authoring/defaults.rs — Default component values for authoring.
 //!
 //! The single source of truth for the values the inspector's "Add Component" menu
 //! and the hierarchy toolbar's light primitives use. Split out of

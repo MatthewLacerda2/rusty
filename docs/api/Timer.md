@@ -8,7 +8,8 @@ suggest) so it is one more entry in the one API surface: scripts, the console
 REPL and bot-players reach it identically.
 
 Every timer and coroutine is **owned by an entity** (`id`) and gets an integer
-**handle**. Starting one on a missing or inactive entity is an error.
+**handle**. Starting one on a missing or inactive entity (itself or through an
+inactive parent) is an error.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -53,11 +54,13 @@ therefore resumes in the next tick's timer phase — rusty has one fixed tick, n
 Unity's separate render frame and physics step.
 
 **Lifetime.** Timers and coroutines stop — for good, not paused — when their
-entity is **deactivated** or **destroyed** (Unity stops coroutines on
-deactivate; rusty applies the same rule to invokes). Re-enabling the entity does
+entity is **deactivated** (itself or through a parent) or **destroyed** (Unity
+stops coroutines on deactivate; rusty applies the same rule to invokes). Re-enabling the entity does
 not revive them: restart them from `OnEnable`. A new VM (every Play) starts with
 none, and they are **not scene data**: Stop restores the edit snapshot, which has
-no pending timers.
+no pending timers. Started in edit mode (a console line), one is accepted but never
+fires or resumes (a coroutine still runs up to its first yield): the timer phase is
+part of Play's tick, and entering Play clears it.
 
 **Errors.** An error inside an invoked function is logged like an `Update` error
 (`[Lua Error] Invoke on entity N failed: …`); a repeating invoke keeps repeating.

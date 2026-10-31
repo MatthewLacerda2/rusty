@@ -11,14 +11,13 @@
 //! 2. The **mask** pass draws those same draws again into a one-channel mask at the
 //!    view's size, through `outline/mask.wgsl`, which places vertices with the
 //!    forward pass's own `vertex_to_world`. The world matrix and mirroring (#1142),
-//!    the skinned pose and LOD level (#1160) and anything else the forward vertex
-//!    stage reads are the forward pass's by construction. The fragment honours the
-//!    material's cutout (`use_cutout`, `alpha_cutoff`) where the material reads its
-//!    maps (`forward::mapping`: tiled UV0 or a world projection, #1573), as the depth
-//!    prepass does (the shadow clip still reads the mesh's own UVs, #1594); a surface
-//!    shader's blocks are not run, so
-//!    its cut blocks (`dissolve`, #648) and UV blocks (`uv_scroll`) are not followed:
-//!    a dissolving solid rings whole, a scrolled cutout rings its unscrolled texels.
+//!    the skinned pose and LOD level (#1160) are the forward pass's by construction.
+//!    The fragment honours the material's cutout (`use_cutout`, `alpha_cutoff`)
+//!    where the material reads its maps (`forward::mapping`: tiled UV0 or a world
+//!    projection, #1573), as the depth prepass does; a surface shader's blocks are
+//!    not run, so its vertex blocks (`vertex_waves`, #1524), cut blocks (`dissolve`,
+//!    #648) and UV blocks (`uv_scroll`) are not followed: a waving solid rings its
+//!    unmoved mesh, a dissolving one rings whole, a scrolled cutout its unscrolled texels.
 //! 3. Two fullscreen passes (`outline/edge.wgsl`), scissored to the selection's
 //!    bounds on screen ([`OutlineBounds`]), colour each pixel outside the mask that
 //!    has a mask pixel within [`OUTLINE_PX`] (times the view's pixel scale): a row

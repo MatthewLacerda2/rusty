@@ -1,4 +1,4 @@
-//! src/render/transparent.rs — the alpha-blended transparent solids pass (#242).
+//! src/render/passes/transparent/mod.rs — the alpha-blended transparent solids pass (#242).
 //!
 //! Drawn after opaque solids + decals, before particles/post-FX. The draw list is the
 //! Transparent-material entities for one camera, already sorted back-to-front by the

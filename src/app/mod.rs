@@ -5,7 +5,7 @@
 //! headless play possible.
 //!
 //! The per-frame tick is no longer a hand-wired call sequence. Modules self-register
-//! their systems into ordered stages via `register(&mut App)` (see `app::app`), and
+//! their systems into ordered stages via `register(&mut App)` (see `app::registry`), and
 //! the resulting [`Schedule`] runs them each frame in
 //! `FixedUpdate → Update → LateUpdate → Render` order, `Startup` once on Play. Order
 //! within a stage is registration order.

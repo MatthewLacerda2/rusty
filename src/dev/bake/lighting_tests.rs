@@ -1,5 +1,5 @@
 //! Tests for the one-button lighting bake orchestration (#246). Sibling of
-//! `lighting_bake.rs`; shares its 300-line source cap.
+//! `lighting.rs`; shares its 300-line source cap.
 //!
 //! These cover the PLACEMENT + ORCHESTRATION contract, which runs adapter-free: the
 //! GPU bakes skip gracefully when no adapter is present (`ran_*` = false), but the

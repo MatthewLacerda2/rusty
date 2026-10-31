@@ -55,6 +55,12 @@ CLAUDE.md        the game's rules: yours
 Every path the game stores is **relative to the project root**, `/`-separated
 (`assets/scripts/enemy.lua`).
 
+- **Some files are the engine's.** Every boot seeds the bundled scripts, the
+  starter materials and, in a new project, `assets/scenes/default.scene`: a copy
+  you never edited follows the engine's newer default, an edited one is kept, and a
+  deleted default scene stays deleted (`.seeded`, at the root, records which is
+  which). `assets/scripts/ui/` and `assets/prefabs/ui/` are the UI widget kit's and
+  are **rewritten on every boot**: never edit them (`docs/ui.md`).
 - **One model format inside: glTF.** `.obj` loads for static meshes; `.fbx` and
   `.blend` are converted to a cached glTF at import (`.blend` needs Blender 5 or
   later installed).
@@ -110,9 +116,11 @@ The tools describe themselves; what they don't say:
   and `snapshot`, then `Editor.ExitPlay()` to get the authored scene back and
   `Time.Resume()` last, so the next Play runs live (`docs/api/Editor.md`). Globals
   set before a switch are gone after it;
-- every edit-mode `eval` is one Undo step: `Editor.Undo()` takes back the last one
-  (the operator's Ctrl+Z does the same), without reloading the scene and losing
-  other unsaved work (`docs/api/Editor.md`);
+- every edit-mode `eval` that changes something is one Undo step: `Editor.Undo()`
+  takes back the last one (the operator's Ctrl+Z does the same), without reloading
+  the scene and losing other unsaved work. The history is cleared when Play starts
+  and when a scene loads, so an edit made before a play-test can't be undone after
+  it (`docs/api/Editor.md`);
 - when the engine warned during a call, the result carries a second text block
   starting `engine warnings:`. Read it: a skipped asset or a dropped collider shows
   up there first;

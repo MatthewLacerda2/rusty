@@ -87,7 +87,8 @@ impl Facing {
 }
 
 /// One pass's pipeline per [`Facing`], each built on its first draw (#985): a
-/// scene with no mirrored or double-sided mesh never builds the other two.
+/// headless renderer whose scene has no mirrored, back- or double-sided mesh never
+/// builds the other two (a windowed one warms them, `Renderer::warm_pipelines`).
 pub(crate) struct FacedPipeline([LazyPipeline; 3]);
 
 impl FacedPipeline {

@@ -1,4 +1,4 @@
-// assets/shaders/particles.wgsl — the sprite particle pass (#13, #440).
+// engine/shaders/particles.wgsl — the sprite particle pass (#13, #440).
 //
 // Each particle is one instance; the vertex shader expands it into a quad whose
 // orientation depends on its render mode:

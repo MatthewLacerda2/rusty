@@ -39,7 +39,9 @@ not the engine calling third-party APIs: tooling that reaches an external servic
 ## Start here
 - **README.md** — what the engine is and what you can do with it.
 - **docs/** — `linting.md` (the gate), `testing.md`, `api/` (the Lua API game scripts
-  use: `api/index.md`, then one file per namespace), `ui.md` (the in-game UI model), `providers.md` (bringing a provider key, and the budget). The Rust API reference is generated: `cargo doc --no-deps`.
+  use: `api/index.md`, then one file per namespace), `ui.md` (the in-game UI model), `providers.md` (bringing a provider key, and the budget),
+  `mcp.md` (the `session-mcp` bridge an agent drives the engine through) and
+  `game-agent.md` (the guide `session-mcp` serves a game project). The Rust API reference is generated: `cargo doc --no-deps`.
 - **auxmd.md** *(gitignored)* — the operator's short-term scratchpad; read it if a
   session points you there.
 - **Nested CLAUDE.md files** carry one area's rules and load only when you read files
@@ -154,9 +156,10 @@ is wrong.
   rewritten, so no push rewrites history (the queue's own push only leases the head it
   took, a compare-and-swap), and a conflict is resolved once. PRs are
   squash-merged, so the branch's own history never reaches `main`. The only exception
-  is a PR that touches **only** Markdown — CI is skipped for Markdown-only PRs, so they
-  needn't be serialized and can merge freely. **Except the Markdown code reads:**
-  `docs/api/` (the API-doc drift tests parse it), `docs/game-agent.md` (served by
+  is a PR that touches **only** Markdown — CI skips its build and test steps for
+  Markdown-only PRs (only the `docrefs` check still runs), so they needn't be
+  serialized and can merge freely. **Except the Markdown code reads:**
+  `docs/api/` (the API-doc drift, layout and example tests parse it), `docs/game-agent.md` (served by
   `session-mcp`) and `src/core/project/game_claude.md` (embedded by the build). A
   Markdown-only PR skips exactly the tests that read them, so CI's `code` filter counts
   them as code and a PR touching them is serialized like code.
@@ -390,7 +393,10 @@ per-bone overrides and what hangs from a bone.
    into ordered stages (`Startup` once, then each frame
    `FixedUpdate → Update → LateUpdate → Render`). Order within a stage is the order
    modules `register` them. `FixedUpdate` is the deterministic, fixed-dt stage the
-   headless harness steps.
+   headless harness steps, and today it holds the whole sim: the scripts' `Update`
+   and `LateUpdate` callbacks run inside it as phases, between physics, animation
+   and the rest, in `app::play::register`'s order. The `Update` stage is empty, and
+   `LateUpdate` holds only UI sway.
 4. **Scene & serialization** — one active scene as a serde `SceneData` document
    (references + values, no GPU buffers). Save/load replaces the World; a
    clone-on-Play / restore-on-Stop snapshot makes edit-mode authoritative, mirroring

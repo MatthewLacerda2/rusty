@@ -10,6 +10,7 @@
 //!
 //! Submodules:
 //!   session         — long-lived edit-mode host + command channel (the keystone, #177)
+//!   console         — the console: log sink + the live Lua REPL
 //!   command_channel — windowed socket command channel: drive a live playtest (#282)
 //!   mcp             — MCP stdio server over the same evaluator (Blender-MCP-style, #288)
 //!   demo        — every Play session recorded, replayed headless bit for bit (#1581)
@@ -21,7 +22,7 @@
 //!   screenshot  — offscreen render -> PNG (the GPU "eyes"); skips if no adapter
 //!   preview     — headless asset preview -> PNG (eyes on *assets*, #353)
 //!   snapshot    — world -> JSON observation
-//!   generate_lighting — Generate Lighting: lightmaps, then probes, then written (#832)
+//!   bake        — the bakes; Generate Lighting: lightmaps, then probes, then written (#832)
 //!   lua_surface — `Debug.*` and the `*.Bake` verbs, installed onto the Lua surface (#737)
 //!   stats       — frame stats: the schedule timing probe + render counters (#433)
 //!   bench       — the stress scene and report behind `make bench` (#835)

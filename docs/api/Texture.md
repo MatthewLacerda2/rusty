@@ -42,8 +42,9 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 Every slot bakes 8 bits per channel except `data`, which bakes a **16-bit** PNG
 (#1491): a height field used as displacement or a terrain heightmap keeps 65536
 levels instead of terracing into 256 steps. The 16 bits are the file's: the renderer
-loads it as a material map like any other PNG, but samples every map at 8 bits per
-channel today, so the extra precision serves what reads the file itself (an
+loads it as a material map like any other PNG, but uploads every map at 8 bits per
+channel at most today (and block-compressed below that once the import cache has
+made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the extra precision serves what reads the file itself (an
 `image` node, a terrain or displacement bake), not what the GPU draws.
 
 `orm` is only another name for the glTF metallic-roughness packing, not an

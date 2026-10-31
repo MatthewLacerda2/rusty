@@ -279,7 +279,7 @@ impl ImportedAsset {
     }
 
     /// The ids of every sub-object, in file order — the sub-object map surfaced in
-    /// the sidecar and the Content Browser.
+    /// the sidecar and the model inspector.
     pub fn sub_mesh_ids(&self) -> Vec<String> {
         self.sub_meshes.iter().map(|m| m.id.clone()).collect()
     }

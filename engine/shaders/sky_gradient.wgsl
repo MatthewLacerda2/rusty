@@ -1,4 +1,4 @@
-// assets/shaders/sky_gradient.wgsl — procedural fallback skybox (#256).
+// engine/shaders/sky_gradient.wgsl — procedural fallback skybox (#256).
 //
 // Drawn by the skybox pass when a camera would otherwise clear to the flat editor
 // backdrop (no panorama texture bound). It paints a vertical sky -> horizon -> ground

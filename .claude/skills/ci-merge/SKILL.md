@@ -216,7 +216,8 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   log's tail, when the supervisor it started exits in its first few seconds; one
   still running but never seen holding its lock is reported as *unconfirmed*
   (exit 0): read `queue.log` before trusting it. Stop a supervisor with `make
-  queue-stop`, or `kill <pid>` (its worktree lock is released either way).
+  queue-stop` (the watch exits **6** between pull requests and the supervisor
+  passes it through), or `kill <pid>` (its worktree lock is released either way).
 - By hand, the same loop is: `git merge origin/main` in the branch's worktree,
   `cargo check` both feature sets and `make size`, a plain `git push`, wait,
   `make mergeable PR=N`, squash-merge. Prefer the queue. Never rebase a pushed
@@ -233,7 +234,7 @@ The queue does not change that; it only changes who waits.
 
 ### The Markdown exception, and the file it does not cover
 
-CI's `changes` filter is `code: - '!**/*.md'`. A pull request touching only
+CI's `changes` filter starts `code: - '!**/*.md'`. A pull request touching only
 Markdown skips the heavy *steps*, but the gating jobs still **run** and report
 `success` — a job whose steps all skip still succeeds. That is deliberate, and the
 workflow comments say why: a ruleset reads a *skipped* required check as
@@ -241,11 +242,13 @@ unsatisfied, not as a pass, so skipping the job outright would wedge a docs-only
 pull request. So a docs-only pull request needs no serialization and merges
 freely.
 
-**`docs/api/` is not one of those.** Two hard-gate tests parse it, so
-a Markdown-only edit to it can break `main` on its own. CI's `code` filter lists it
-explicitly (#525, #569), so a pull request touching it runs the drift tests like any code
-change, and it is serialized like code. `docs/api-faithfulness.md` is not
-covered: nothing parses it, so a Markdown-only PR touching it merges freely.
+**Three Markdown paths are code, not docs.** Hard-gate tests parse `docs/api/` (the drift, layout and
+doc-example tests), `session-mcp` serves `docs/game-agent.md`, and the build
+embeds `src/core/project/game_claude.md`, so a Markdown-only edit to one of them
+can break `main` on its own. CI's `code` filter lists all three explicitly (#525,
+#569, #1313; `merging/verdict/changes.py`'s `CODE_DOCS` is the queue's copy), so a
+pull request touching one runs the tests like any code change, and it is
+serialized like code.
 
 ## Verify the run happened on the head commit
 
@@ -285,8 +288,8 @@ incidents behind each):
   description neither closes #N nor says `Refs #N`. Since #966 (`carried.py`) also:
   a closing keyword anywhere but on a line of its own (quoted back); an issue it
   closes with an open recorded blocker (`blocked_by`, read at merge time); an
-  issue-less pull request whose diff touches anything but Markdown, or `docs/api/`,
-  unless labelled `bug` or Dependabot's; and an image (`png`, `jpg`, `hdr`, `exr`,
+  issue-less pull request whose diff touches anything but Markdown, or one of the
+  Markdown files code reads (`CODE_DOCS`, above), unless labelled `bug` or Dependabot's; and an image (`png`, `jpg`, `hdr`, `exr`,
   `ktx2`) the diff adds outside `IMAGES_ALLOWED`. Each is fixed by editing the
   description, a label or a relationship (a stray image by a deleting commit). A
   description with no **Gates** line passes with a warning.
@@ -310,11 +313,11 @@ incidents behind each):
   edit the workflow), versus a pull request readied moments after a push that lost
   its run (force one with an empty commit). An invalid workflow *does* produce a
   run, a `startup_failure`.
-- **A Markdown-only change to `docs/api/` is refused** unless
-  `build-test`'s dev-feature test step really ran. CI's `code` filter includes that
-  directory since #525, so on a fresh run it does; the check stays as the guard.
+- **A Markdown-only change to one of `CODE_DOCS` is refused** unless
+  `build-test`'s dev-feature test step really ran. CI's `code` filter includes them
+  (#525, #1313), so on a fresh run it does; the check stays as the guard.
 
-It ignores what is not a gate: `main-health` (a `workflow_run` on `main`), `docs`,
+It ignores what is not a gate: `main-health` (a `workflow_run` on `main`),
 the coverage, mutation and Windows (#1395) workflows, none of which runs on a pull request
 (#750). A job inside a gated run but outside its gate's `needs:` decides nothing:
 a `ci` run still in progress counts as settled once `ci-gate` has concluded
@@ -350,8 +353,7 @@ description.
 Expect conflicts wherever every feature appends in an order that matters:
 `Entity`'s `Option<…Component>` fields, `ComponentKind`'s variant list,
 `app/registry.rs`'s ordered `register` calls, the Add Component menu,
-`docs/api/index.md`'s namespace list, `scripting/callbacks.rs`, and the burn-down
-baselines where both sides *removed* lines. Lists under a `sorted` marker (#911:
+`docs/api/index.md`'s namespace list and `scripting/callbacks.rs`. Lists under a `sorted` marker (#911:
 `api/mod.rs`, the Lua surface, the lint rules) mostly merge clean; when two
 entries do meet, keep both, in order.
 
@@ -417,8 +419,11 @@ its lists from `src/` and `coverage-baseline.txt` (`.github/scripts/coverage-ign
 the lists were typed by hand, `audio`, `procgen`, `shadergen` and `preview` each
 leaked into all of them.) A new *floor* is one line in the baseline.
 
-There is no version constant to bump here — rusty has no format version and no
-bake version. What plays that role is the **determinism guard**: a wall-clock read
+rusty has no format version and no bake version to bump. The only version stamps
+are the import cache's: a converter's `version` (`asset::convert::converter`; a
+test holds its bump, `asset::convert::fingerprint`) and
+`asset::texture_import::ENCODER_VERSION`, each bumped when its output changes so
+cached files are re-made. Beyond those, what plays a version's role is the **determinism guard**: a wall-clock read
 or an unseeded RNG anywhere in the sim modules (CLAUDE.md, *Determinism*)
 breaks replay for every harness run, and the gate refuses it rather than letting it
 land quietly.

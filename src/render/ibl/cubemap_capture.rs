@@ -1,4 +1,4 @@
-//! src/render/cubemap_capture.rs — Static-scene cubemap capture from a point (#243).
+//! src/render/ibl/cubemap_capture.rs — Static-scene cubemap capture from a point (#243).
 //!
 //! A reusable render primitive: given a world position, render the STATIC scene into
 //! a 6-face cubemap (offscreen, LDR RGBA8), reusing the forward lit pass. This is the
@@ -6,11 +6,11 @@
 //!
 //! Only `is_static` entities (plus the skybox — the distant environment) are drawn;
 //! dynamic actors are excluded so they never bake into a probe/reflection. The static
-//! filter mirrors the shadow pass's `want_static` pattern (`shadows.rs`): the forward
-//! solid-gather honours the renderer's [`CaptureMode::static_only`], toggled on here for the
-//! six faces and restored after.
+//! filter mirrors the shadow pass's static sweep (`passes::shadows::casters::sweep`):
+//! the forward solid-gather honours the renderer's [`CaptureMode::static_only`],
+//! toggled on here for the six faces and restored after.
 //!
-//! Output is a function of (static scene, position, resolution) — no wall-clock/RNG,
+//! Output is a function of (static scene, position, resolution, lens) — no wall-clock/RNG,
 //! so it is exempt from (and clean under) the determinism guard. Pure render layer.
 
 use glam::Vec3;

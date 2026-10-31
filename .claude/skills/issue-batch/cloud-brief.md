@@ -78,6 +78,14 @@ nothing to wait for.
   Dust2-sized level (memory held, work per frame, the first frame after a load or
   bake) and a malformed input file (truncated, a value out of range, a NaN):
   they are what independent reviews send back most.
+- **Before readying, find every doc that restates what you changed** (#1650).
+  A fact is told in several places: a module doc, a `docs/api/` page,
+  `Debug.md`'s rows, `docs/testing.md`, a CLAUDE.md list, a skill,
+  `game_claude.md`. The gates catch a name that no longer exists, never a
+  sentence that is no longer true. So for each behaviour you altered, grep those
+  for its symbols and wording, and fix what now says otherwise. An absolute claim
+  you write ("never", "always", "costs nothing", "every frame", "atomic") needs a
+  test that holds it, or a softer word.
 - **Once ready, the branch is the merge queue's. Never push to it again**, not
   to update it from `main` and not to fix your own red CI: a red or conflicting ready PR comes
   back to the orchestrator as a hand-back, and it briefs a fix. Anything you
@@ -175,7 +183,7 @@ a coder real time.
   passed and macOS failed twice on 2026-10-28 (#1515's Metal frames, #1525;
   #1520's aarch64 bake bits). Never commit a golden hash taken on one platform
   (`docs/testing.md`).
-- **Windows runs only when asked** (#1395): a branch that touches paths, separators,
+- **Windows runs on a branch only when asked** (#1395; it runs nightly on `main`): a branch that touches paths, separators,
   process spawning or other platform code dispatches `gh workflow run windows.yml --ref
   <branch>` and quotes the run in its PR. Nothing else runs Windows on a PR.
 - Never fall back to `cargo test`: CI runs nextest, and its per-test process

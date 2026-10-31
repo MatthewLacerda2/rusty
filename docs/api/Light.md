@@ -6,8 +6,11 @@ Every setter maps onto a field the renderer reads when it packs the lighting
 uniform, so a change takes effect on the next frame. A light has no per-component
 "active" flag: it is gated by whether its owning entity is active in the hierarchy (`Scene.IsActiveInHierarchy`), so
 this surface exposes the light's own data and nothing more. Getters return a
-neutral default (`(1,1,1)` colour, `0` scalars, `"None"` type) when the entity has
-no light.
+neutral default (`(1,1,1)` colour, `0` scalars, `"None"` type and mode) when the
+entity has no light. A spotlight's cone half-angles have no verb here: write
+`inner_cone` / `outer_cone` with `Component.Set(id, "Light", {...})`
+([`Component`](Component.md)). `SetType(id, "Spot")` on a light whose cones are both
+`0` gives it 30° / 45°.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -66,13 +69,14 @@ Mesh card and saved with the scene and its prefabs.
 
 | `cast_shadows` | What it does |
 |---|---|
-| `"On"` *(default)* | casts from its front faces |
+| `"On"` *(default)* | casts from the faces its material draws (its Render Face, [`Material`](Material.md): the front faces by default) |
 | `"Off"` | casts nothing: not in the cascades, the atlas, or their static bakes, and blocks no baked light |
 | `"TwoSided"` | casts from both faces: a one-sided card or `Plane` shadows whichever way it faces the light |
 | `"ShadowsOnly"` | casts as `"On"`, but no camera draws it: an invisible shadow stand-in |
 
 Every shadow path reads it on its next frame, a static mesh's cached shadow bake
-included. How a mesh *receives* shadows is not a switch yet.
+included. Whether a surface *receives* shadows is its material's switch,
+`Material.SetReceiveShadows` ([`Material`](Material.md)).
 
 The bakes (the lightmap and the light probes, [`Lighting`](Lighting.md)) follow one
 rule, Unity's: *casting* decides whether a mesh blocks light, *being seen* decides

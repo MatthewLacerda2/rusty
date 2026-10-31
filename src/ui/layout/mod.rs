@@ -1,4 +1,4 @@
-//! src/ui/layout.rs — the UI layout pass: canvases + rect transforms → rectangles (#417).
+//! src/ui/layout/mod.rs — the UI layout pass: canvases + rect transforms → rectangles (#417).
 //!
 //! Pure and GPU-free: [`UiLayout::compute_in`] reads the ECS world and a [`UiView`]
 //! (the screen size, the camera and the textures' native sizes, `native`) and

@@ -12,9 +12,9 @@
 //!   - `FindChild(id, path)` — a descendant by name path (`"Viewport/Content"`),
 //!     one level per segment, the first match in hierarchy order; `nil` if absent.
 //!   - `GetName(id)` / `SetName(id, name)` — Unity's read/write `gameObject.name`
-//!     (#1611): the same `World::set_name` the inspector's name field writes, so a
-//!     rename is saved with the scene. Empty and duplicate names are allowed, as in
-//!     Unity.
+//!     (#1611): the same `World::set_name` the inspector's name field writes, so an
+//!     edit-mode rename is saved with the scene (one made in Play reverts at Stop).
+//!     Empty and duplicate names are allowed, as in Unity.
 //!   - `SetActive(id, bool)` / `IsActive(id)` — Unity's `SetActive` / `activeSelf`:
 //!     the entity's own flag (an inactive ancestor still hides it).
 //!     `IsActiveInHierarchy(id)` — Unity's `activeInHierarchy`: it and every

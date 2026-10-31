@@ -2,7 +2,7 @@
 //!
 //! The dev-layer bridge between the script-side `Reflection.Bake()` action and the
 //! render-layer bake (`Renderer::bake_reflections`), the specular sibling of
-//! `probe_bake.rs`. It spins up a headless `Renderer` (no window surface),
+//! `probe.rs`. It spins up a headless `Renderer` (no window surface),
 //! captures and GGX-prefilters each probe at its resolution, writes the KTX2 cubemaps
 //! next to the scene, and points each probe at its file. Like the light-probe bake it skips
 //! gracefully when no GPU/software adapter is present — it NEVER panics, so an unattended

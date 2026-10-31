@@ -151,7 +151,7 @@ ported faithfully:
   resolved widths, since wrapped text and nested grids are taller when narrower — and
   places them top-down. **The scene's RectTransforms are never rewritten**: a group
   overrides the child's rect in the computed layout only, so the pass stays a pure
-  function of (scene, screen size), recomputed whole each tick with no dirty flags to go
+  function of (scene, screen size, texture sizes), recomputed whole each tick with no dirty flags to go
   stale, and scripts and saved scenes keep the authored values. (Unity marks driven
   properties instead; there is no second source of truth here to drive.) `UI.GetRect` and
   `Debug.Snapshot`'s `ui_rect` report the placed rect.
@@ -243,7 +243,7 @@ entity's laid-out rect (after rotation and scale). Adding one also adds a
 | `wrap` | Break lines at word boundaries to fit the rect's width (a word wider than the rect breaks between characters). Off: only `\n` breaks. |
 | `overflow` | `Overflow` spills past the rect. `Truncate` keeps only the lines that fit its height entirely (and, unwrapped, cuts characters past its right edge). `Ellipsis` truncates and ends the last kept line with `…` (`...` if the font lacks it). |
 | `line_spacing` | Line pitch multiplier (1 = the font's ascent + descent + line gap). |
-| `letter_spacing` | Extra advance per character, in ems. |
+| `letter_spacing` | Extra advance per character, in ems (once per cluster: see *Shaping*). |
 | `auto_size`, `auto_size_min`, `auto_size_max` | Pick the largest size in `[min, max]` at which the whole text fits the rect (the minimum when none does; `overflow` then applies). A fixed-step binary search, so the pick is a pure function of the inputs. |
 | `rich_text` | Parse the tag subset. Off draws tags literally (echoing user input). |
 | `raycast_target` | Whether the pointer can hit it (see *Interaction*). |
@@ -517,7 +517,7 @@ The pointer is in **UI screen pixels** — bottom-left origin, y-up, the frame o
 `UI.GetRect(id).screen` (`Input.GetMousePosition` is top-left, so `y` flips). The
 **top-most** hit wins: canvases by `sort_order`, then the reverse of hierarchy
 pre-order (the last-drawn graphic is on top). A graphic is hit when it is an
-`Image` or `Text` with `raycast_target`, it and every ancestor are `active`, no
+`Image`, `Shape` or `Text` with `raycast_target`, it and every ancestor are `active`, no
 `CanvasGroup` on it or above it has `blocks_raycasts = false`, the point is inside
 every `RectMask` on its chain (padding applied, the same clip drawing uses) and
 inside the rect of every `Mask` above it (Unity's rule: the mask's rect, not its
@@ -556,7 +556,7 @@ a `RectTransform`.
 |---|---|
 | `interactable` | Whether it accepts input. A `CanvasGroup` with `interactable = false` above it disables it too. |
 | `transition` | How its state shows: `ColorTint`, `SpriteSwap` or `None`. |
-| `target_graphic` | The entity whose Image (and Text) shows the state; none is its own entity. |
+| `target_graphic` | The entity whose Image, Shape and Text show the state; none is its own entity. |
 | `colors`, `fade_duration` | `ColorTint`: a colour per state, multiplied into the target's colour, fading linearly over `fade_duration` seconds of **unscaled** time (a menu under `Time.SetTimeScale(0)` still animates). |
 | `sprites` | `SpriteSwap`: a texture per state, shown instead of the target Image's; `Normal` shows the Image's own. |
 | `navigation` | How keyboard focus leaves it: `Automatic`, `Explicit` or `None` (never focused by navigation). |
@@ -822,7 +822,7 @@ hides the marker. Markers apply on screen-space canvases seen through a camera (
 prefab save keeps it when the target is inside the prefab and drops it otherwise.
 Damage numbers are markers spawned on hit and tweened.
 
-The layout is still a pure function — of (scene, screen size, **camera**): the sim
+The layout is still a pure function — of (scene, screen size, texture sizes, **camera**): the sim
 lays out through its active camera each tick, and `UI.GetRect` does the same on
 demand.
 
@@ -854,10 +854,13 @@ Everything below has an API equivalent — the editor writes through the same
 
 ## Determinism
 
-The layout is a pure function of (scene, **screen size**, camera), so the screen size is a
-**sim input**, like the seed and the player's inputs (the camera is sim state already). The windowed platform writes the game
+The layout is a pure function of (scene, **screen size**, **texture sizes**, camera), so the
+screen size is a **sim input**, like the seed and the player's inputs (the camera is sim state
+already). The windowed platform writes the game
 view's pixel size into the `ScreenSize` resource every frame; a headless run never writes
-it, and the `Video` resolution stands in. Same (seed, inputs, dt, screen size) ⇒ same
+it, and the `Video` resolution stands in. The native texture sizes an `Image` measures by
+are read from the files before each tick (see *Layout groups*), so they are an input too.
+Same (seed, inputs, dt, screen size, texture files) ⇒ same
 layout — and the same hits and UI callbacks. `src/ui` sits under the determinism and
 direction guards: no wall clock, no unseeded RNG, and no `render` / `editor` / `wgpu` / `egui` imports.
 

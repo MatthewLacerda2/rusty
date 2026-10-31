@@ -171,5 +171,5 @@ Decals are binned into the same clusters as the point and spot lights; a surface
 pays only for the decals whose box reaches its cluster, and decals draw nothing of
 their own. Their maps live in one 32-layer texture array at 512² per map (any
 size is resized); past 32 distinct maps in one frame, the extras draw without
-their texture (`decal_maps_dropped` in `Debug.FrameStats`). `decals_visible` and
+their texture (`decal_maps_dropped` in `Debug.Stats()`). `decals_visible` and
 `decal_cluster_refs` count the decals and the (cluster, decal) pairs each frame.

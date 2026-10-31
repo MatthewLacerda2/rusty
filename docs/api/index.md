@@ -30,16 +30,17 @@ raises `"Scene.SetActive: no entity (nil id)"`, naming the verb. A dead (but
 non-`nil`) id on a write stays a no-op. Where `nil` means "none" on purpose (a
 joint's connected body, `UI.SetSelected(nil)`, `Scene.SetParent(child, nil)`), the page says so.
 
-> **Maintenance:** this file is currently **hand-written** and must be kept in
-> sync with `src/scripting/mod.rs` and the bindings in `src/api/`. A generator
-> that emits it from self-describing bindings (with a CI drift check) is a tracked
-> follow-up — see the PR for issue #28.
+> **Maintenance:** `docs/api/` is **hand-written** and must be kept in sync with
+> the bindings: `src/api/` (registered by `api::register`) and the dev-only
+> namespaces in `src/dev/lua_surface/`. `tests/api_doc_drift.rs` (#280) fails CI
+> when a namespace or function exists on one side only; it checks names, not
+> signatures or what a page says a call does.
 
 > **Faithfulness:** every setter here is expected to be *observed* by a downstream
 > system — a renderer/sim read or a `SceneData` round-trip. When you add a setter,
-> name its read-site (or add a round-trip test) in the same change and record it in
-> [`api-faithfulness.md`](../api-faithfulness.md), so the surface never grows a
-> write-only no-op that silently fails headless authoring (issue #178).
+> prove it in the same change with a test that reads the value back through that
+> system (or a round-trip), so the surface never grows a write-only no-op that
+> silently fails headless authoring (issue #178).
 
 > **Examples run** (#937): every ```` ```lua ```` block in `docs/api/` is run by
 > `tests/doc_examples/` in a fresh headless edit-mode session and must not raise, so
@@ -302,8 +303,10 @@ headless replays stay byte-identical):
 One file per namespace, in reference order:
 
 <!-- Not sorted (#911): `scripting::api_doc::assemble` joins the pages in the order
-this list links them, and that assembled reference is what the dev MCP resource
-serves an agent. A new entry goes where it reads best. -->
+this file first links them (so a page linked from a section above, like Editor,
+comes before this list's order), then any unlinked page alphabetically, and that
+assembled reference is what the dev MCP resource serves an agent. A new entry goes
+where it reads best. -->
 
 - [`Transform`](Transform.md)
 - [`Material`](Material.md)

@@ -1,4 +1,4 @@
-//! src/editor/inspector_prefab.rs — the linked-prefab-instance override card (#263).
+//! src/editor/inspector/components/prefab.rs — the linked-prefab-instance override card (#263).
 //!
 //! The editor half of prefab instances (#216 / #260 / #268): for an entity that carries
 //! a [`crate::components::PrefabLink`], it surfaces — Unity-style — which fields diverge from

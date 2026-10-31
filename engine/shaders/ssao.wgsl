@@ -1,4 +1,4 @@
-// assets/shaders/ssao.wgsl — screen-space ambient occlusion (#436).
+// engine/shaders/ssao.wgsl — screen-space ambient occlusion (#436).
 //
 // Fullscreen passes over the view's depth (the SSAO prepass), run before the forward
 // pass (#1578, HDRP's shape):

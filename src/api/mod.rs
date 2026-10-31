@@ -1,14 +1,11 @@
 //! src/api/mod.rs — Engine API facade
 //!
 //! The single stable API surface shared by Lua scripts, the console REPL and
-//! bot-players. Every namespace (`Transform`, `Input`, `Time`, `Physics`,
-//! `Scene`, `Component`, `Random`, `Timer`, `Tween`, `Camera`, `Light`, `Animator`, `Nav`, `Material`,
-//! `Assets`, `Texture`, `Shader`, `Sound`, `Particles`, `Layers`, `Graphics`, `Video`,
-//! `Storage`, `Canvas`, `RectTransform`, `UI`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
-//! `BackdropFilter`, `Text`, `Shape`, `Selectable`, `LayoutGroup`, `LayoutElement`,
-//! `Joint`, `LODGroup`, `Trail`, `Line`, `Application`) is registered from this tree onto the live Lua runtime. Layers above
-//! the sim add their own namespaces through [`extend`]: `dev` installs `Debug` and the
-//! GPU bake verbs that way (#737), so the sim surface never imports the platform layer.
+//! bot-players. Every namespace (one page each in `docs/api/`, which
+//! `tests/api_doc_drift.rs` holds to the live surface) is registered from this tree
+//! onto the live Lua runtime. Layers above the sim add their own through [`extend`]:
+//! `dev` installs `Debug`, `Editor`, the provider verbs and the GPU bake verbs that
+//! way (#737, `dev::lua_surface`), so the sim surface never imports the platform layer.
 //! `scripting` owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
 

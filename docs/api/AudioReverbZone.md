@@ -2,8 +2,8 @@
 
 Read and tune an entity's `ReverbZoneComponent` (#469, `src/api/reverb_zone.rs`) —
 Unity's `AudioReverbZone`. A zone is a **sphere** around the entity's world
-position that sets the reverb of the world mix while the listener (the active
-camera) is in it: full effect within `min_distance`, fading linearly to nothing at
+position that sets the reverb of the world mix while the listener (the main
+view, see [`Camera`](Camera.md)) is in it: full effect within `min_distance`, fading linearly to nothing at
 `max_distance` (a fresh zone: 10 m and 15 m, the `Room` preset). Use one for every
 space that should sound different — a concrete tunnel, a small room, a hall — and
 overlap them through doorways: where zones overlap, the listener hears their

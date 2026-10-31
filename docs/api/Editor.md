@@ -112,7 +112,10 @@ the **editor window** and plays on the Game view with a timeline: play/pause, a 
 bar with the index's `Debug.Mark`s on it, the tick readout and a close button. The
 calls above are those controls (Unity's Profiler/Timeline scrubbing a capture), and
 take effect at the next frame, like `EnterPlay`; only the editor window has a
-timeline, so a headless session or a standalone run refuses them.
+timeline, so a headless session or a standalone run refuses them. A `true` only
+means the request was taken: a `SeekDemo` or `PauseDemo` with no demo open, or a
+tick at or past the demo's length, is reported in the console at that frame and
+changes nothing.
 
 - `Editor.OpenDemo(path)` loads the demo's scene, replays it on the editor's world
   and stops on tick 0. Refused while Play is on (stop it first) and for a demo with

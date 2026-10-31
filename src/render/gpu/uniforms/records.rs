@@ -10,7 +10,7 @@ pub(crate) type RecordWords = [u32; MATERIAL_DATA_WORDS];
 
 /// Each distinct record once, sorted by its words: the array is the same whatever
 /// order the draws name their records in, so a camera that moves and reorders its
-/// draws uploads the same records while the materials hold still.
+/// draws uploads the same records while the materials it sees hold still.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct RecordTable(Vec<RecordWords>);
 
