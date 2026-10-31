@@ -128,7 +128,7 @@ fn the_bone_stays_up_in_the_world_with_the_node_transforms_applied() {
         .nodes
         .iter()
         .position(|n| n.mesh.as_deref() == Some("Cube"));
-    let world = asset.node_worlds()[at.expect("a node places the cube")];
+    let world = crate::asset::model_node::worlds(&asset.nodes)[at.expect("a node places the cube")];
     let skin = asset.sub_meshes[0].skin.as_ref().unwrap();
     let up = world.transform_vector3(skin.bind_global[0].w_axis.truncate());
     assert!((up - Vec3::Y).length() < 1e-4, "bone at {up} in the world");

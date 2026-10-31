@@ -209,9 +209,9 @@ fn sub_object_row(
 /// Import the source file and instantiate it as Unity's model prefab (#1083): a
 /// root named after the file and one child per node, each mesh node carrying a
 /// path-based `"Asset"` mesh reference (`path::sub_object`) — a `_LOD<n>` set as one
-/// LODGroup entity (#472). Routes through the shared `authoring::instantiate_model`
-/// / `instantiate_imported` verbs — the same path `Scene.Instantiate` drives — so
-/// editor and API never drift. The
+/// LODGroup entity (#472). Routes through the shared `authoring::instantiate_model`,
+/// the verb `Scene.Instantiate` of a bare model path drives too, so editor and
+/// API never drift. The
 /// geometry is re-imported on every scene load; no GPU buffers are persisted.
 fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let asset = match crate::asset::import_and_sync_sidecar(Path::new(path)) {

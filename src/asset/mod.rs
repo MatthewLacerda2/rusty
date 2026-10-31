@@ -53,7 +53,7 @@ pub use lut::Lut;
 pub use manifest::{build_manifest, AssetEntry, AssetManifest, SubObjectEntry};
 pub use material_range::MaterialRange;
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
-pub use model_node::ModelNode;
+pub use model_node::{ModelNode, NodeBone};
 pub use reference::{AssetRef, REF_SEPARATOR};
 pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
 

@@ -10,7 +10,7 @@ use crate::scene::Scene;
 /// A kit: an empty `Kit` node moved 10 m along X, holding a `Wall` turned a
 /// quarter about Y and a crate at two levels of detail, each level's node at its
 /// own height. Every mesh is one shared triangle.
-const KIT: &str = r#"{
+pub(super) const KIT: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
   "scenes": [ { "nodes": [ 0 ] } ],
@@ -37,8 +37,13 @@ const KIT: &str = r#"{
 "#;
 
 fn spawn(position: Vec3) -> (Scene, u32) {
-    let path = crate::test_temp::dir().join("rusty_1083_kit.gltf");
-    std::fs::write(&path, KIT).unwrap();
+    spawn_file("rusty_1083_kit.gltf", KIT, position)
+}
+
+/// Write `gltf` as `file` in the test folder and spawn it whole at `position`.
+pub(super) fn spawn_file(file: &str, gltf: &str, position: Vec3) -> (Scene, u32) {
+    let path = crate::test_temp::dir().join(file);
+    std::fs::write(&path, gltf).unwrap();
     let path = path.to_string_lossy().into_owned();
     let asset = crate::asset::import_and_sync_sidecar(std::path::Path::new(&path)).unwrap();
     let mut scene = Scene::new();
@@ -46,7 +51,7 @@ fn spawn(position: Vec3) -> (Scene, u32) {
     (scene, root)
 }
 
-fn child(scene: &Scene, parent: u32, name: &str) -> u32 {
+pub(super) fn child(scene: &Scene, parent: u32, name: &str) -> u32 {
     let named = |&id: &u32| scene.world.name(id).is_some_and(|n| *n == name);
     let found = scene.world.children(parent).into_iter().find(named);
     found.unwrap_or_else(|| panic!("no child {name}"))
@@ -93,6 +98,27 @@ fn a_lod_set_is_one_group_where_its_first_member_sits() {
     let height = |l: usize| scene.world.world_position(levels[l].renderers[0]).y;
     assert!((height(0) - 2.0).abs() < 1e-5, "LOD0 at its node");
     assert!((height(1) - 3.0).abs() < 1e-5, "LOD1 at its own node");
+}
+
+#[test]
+fn a_later_scale_factor_moves_the_parts_of_a_spawned_model() {
+    let (mut scene, root) = spawn_file("rusty_1083_rescaled.gltf", KIT, Vec3::X);
+    let path = crate::test_temp::dir().join("rusty_1083_rescaled.gltf");
+    let path = path.to_string_lossy().into_owned();
+    let set = crate::scene::asset_instance::set_model_scale_factor(&mut scene, &path, 0.01);
+    assert_eq!(set, Ok(3), "Wall and both crate levels");
+    let kit = child(&scene, root, "Kit");
+    let at = |id: u32| scene.world.transform(id).unwrap().position;
+    assert_eq!(at(root), Vec3::X, "the root keeps its place");
+    assert!(at(kit).abs_diff_eq(Vec3::X * 0.1, 1e-6), "{}", at(kit));
+    let wall = scene.world.world_position(child(&scene, kit, "Wall"));
+    assert!(wall.abs_diff_eq(Vec3::new(1.1, 0.0, 0.05), 1e-5), "{wall}");
+    let group = child(&scene, kit, "Crate");
+    assert!(at(group).abs_diff_eq(Vec3::Y * 0.02, 1e-6));
+    let lod1 = scene
+        .world
+        .world_position(child(&scene, group, "Crate_LOD1"));
+    assert!(lod1.abs_diff_eq(Vec3::new(1.1, 0.03, 0.0), 1e-5), "{lod1}");
 }
 
 #[test]

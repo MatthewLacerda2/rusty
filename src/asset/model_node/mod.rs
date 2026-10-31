@@ -21,11 +21,22 @@ pub struct ModelNode {
     pub name: String,
     /// The parent node's index in [`ImportedAsset::nodes`], `None` for a root.
     pub parent: Option<usize>,
+    /// The bone of the parent's skeleton this node hangs from (a gun held by
+    /// `Hand`), its transform then relative to that bone; `None` for a plain child.
+    pub bone: Option<NodeBone>,
     pub translation: Vec3,
     pub rotation: Quat,
     pub scale: Vec3,
     /// The id of the sub-mesh this node places, `None` for an empty node.
     pub mesh: Option<String>,
+}
+
+/// A bone a node hangs from: the joint's name, which its bone entity carries
+/// (#453), and the bone's rest pose relative to the skinned parent node.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NodeBone {
+    pub name: String,
+    pub rest: Mat4,
 }
 
 impl ModelNode {
@@ -34,6 +45,7 @@ impl ModelNode {
         ModelNode {
             name: mesh.to_string(),
             parent: None,
+            bone: None,
             translation: Vec3::ZERO,
             rotation: Quat::IDENTITY,
             scale: Vec3::ONE,
@@ -60,11 +72,6 @@ impl ImportedAsset {
         }
     }
 
-    /// Each node's model-space transform, in [`node_tree`](Self::node_tree) order.
-    pub fn node_worlds(&self) -> Vec<Mat4> {
-        worlds(&self.node_tree())
-    }
-
     /// The model's bounds with every mesh at its node's transform — what a whole
     /// model spawned at the origin covers — or `None` when no node places a mesh
     /// with geometry.
@@ -79,12 +86,14 @@ impl ImportedAsset {
     }
 }
 
-/// The model-space transform of every node in `nodes` (parents come first).
+/// The model-space transform of every node in `nodes` (parents come first), a
+/// node held by a bone placed at the bone's rest pose: the one way to get them.
 pub fn worlds(nodes: &[ModelNode]) -> Vec<Mat4> {
     let mut out: Vec<Mat4> = Vec::with_capacity(nodes.len());
     for node in nodes {
         let parent = node.parent.and_then(|p| out.get(p).copied());
-        out.push(parent.unwrap_or(Mat4::IDENTITY) * node.local());
+        let bone = node.bone.as_ref().map_or(Mat4::IDENTITY, |b| b.rest);
+        out.push(parent.unwrap_or(Mat4::IDENTITY) * bone * node.local());
     }
     out
 }

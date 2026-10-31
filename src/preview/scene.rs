@@ -47,8 +47,9 @@ crate::core::named_enum! {
 /// key the rebuild cache (`cache_key`).
 #[derive(Clone, Debug)]
 pub enum PreviewSubject {
-    /// A model source file (`gltf`/`glb`/`obj`) — every sub-object is instantiated
-    /// with its own materials, replacing the preview mesh entirely.
+    /// A model source file (`gltf`/`glb`/`obj`) — instantiated whole as its node
+    /// tree (#1083), each mesh with its own materials, replacing the preview mesh
+    /// entirely.
     Model(String),
     /// A texture file, applied as the preview mesh's base-color map on the default
     /// material — "how would this map look on a surface" (#352).

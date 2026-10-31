@@ -23,6 +23,7 @@ fn node(name: &str, parent: Option<usize>, translation: Vec3, mesh: Option<&str>
     ModelNode {
         name: name.to_string(),
         parent,
+        bone: None,
         translation,
         rotation: Quat::IDENTITY,
         scale: Vec3::ONE,

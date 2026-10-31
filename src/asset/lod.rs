@@ -30,6 +30,20 @@ fn lod_suffix(name: &str) -> Option<(&str, u32)> {
     }
 }
 
+/// A whole-model spawn's reading of a **node** name (#1083): its base, level and
+/// Blender's duplicate suffix (`Crate_LOD0.001` → `Crate`, 0, `.001`), so each
+/// Alt+D copy of a set is a set of its own. Nodes sharing a parent, a base and a
+/// suffix are one LODGroup, as Unity groups by GameObject name.
+pub fn node_lod(name: &str) -> Option<(&str, u32, &str)> {
+    let dup = name.rfind('.').filter(|&at| {
+        let digits = &name[at + 1..];
+        !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit())
+    });
+    let (stem, suffix) = name.split_at(dup.unwrap_or(name.len()));
+    let (base, level) = lod_suffix(stem)?;
+    Some((base, level, suffix))
+}
+
 /// Every LOD set in `asset`, in the file order of each set's first sub-object.
 pub fn lod_sets(asset: &ImportedAsset) -> Vec<LodSet> {
     let mut found: Vec<(String, Vec<(u32, String)>)> = Vec::new();
@@ -91,6 +105,14 @@ mod tests {
         assert_eq!(lod_suffix("_LOD1"), None);
         assert_eq!(lod_suffix("CrateLOD1"), None);
         assert_eq!(lod_suffix("LOD"), None);
+    }
+
+    #[test]
+    fn a_node_name_keeps_its_duplicate_suffix_apart() {
+        assert_eq!(node_lod("Crate_LOD0"), Some(("Crate", 0, "")));
+        assert_eq!(node_lod("Crate_LOD1.001"), Some(("Crate", 1, ".001")));
+        assert_eq!(node_lod("Crate.001"), None);
+        assert_eq!(node_lod("Crate_LOD1."), None);
     }
 
     #[test]

@@ -39,9 +39,13 @@ pub fn apply(asset: &mut ImportedAsset, s: f32) {
     for sub in &mut asset.sub_meshes {
         scale_sub_mesh(sub, s);
     }
-    // A node places its mesh in its parent's space: its offset scales with it.
+    // A node places its mesh in its parent's space: its offset scales with it,
+    // and so does the rest pose of the bone it hangs from.
     for node in &mut asset.nodes {
         node.translation *= s;
+        if let Some(bone) = &mut node.bone {
+            bone.rest = scale_translation(bone.rest, s);
+        }
     }
 }
 

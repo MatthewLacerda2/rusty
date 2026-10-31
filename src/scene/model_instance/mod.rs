@@ -6,22 +6,24 @@
 //! carries it (through the shared [`instantiate_imported`] verb, so it gets its
 //! material, collider and skeleton exactly as a lone sub-object would); an empty
 //! node is an empty child. So a building kit keeps its layout, a car its wheels,
-//! and every pivot its place.
+//! and every pivot its place. A node a joint holds (a gun in `Hand`) hangs from
+//! the skinned node's bone entity (#453), so it follows the animation.
 //!
-//! A `_LOD<n>` set (#472) becomes one LODGroup where its first member node sits,
-//! each level's renderer placed where its own node puts it relative to that one.
+//! The `_LOD<n>` nodes under one parent sharing a base (and Blender's `.001`
+//! duplicate suffix) become one LODGroup where the first of them sits (`lod`).
+//! A later Scale Factor change rescales every instance's node offsets with its
+//! meshes (`rescale`), as Unity updates a model's instances.
+
+mod lod;
+mod rescale;
 
 use glam::{Mat4, Vec3};
 
-use crate::asset::lod::{lod_sets, LodSet};
 use crate::asset::{ImportedAsset, ModelNode};
 use crate::scene::asset_instance::instantiate_imported;
-use crate::scene::lod_instance::instantiate_lod_set;
 use crate::scene::Scene;
 
-/// A spawned LOD set: its first member node's index, and each member mesh's
-/// renderer.
-type Group = (usize, Vec<(String, u32)>);
+pub use rescale::rescale_node_offsets;
 
 /// Spawn the model at `path` (imported as `asset`) at `position`: a root entity
 /// named after the file, and its node tree under it. Returns the root's id.
@@ -36,67 +38,43 @@ pub fn instantiate_model(
         t.position = position;
     }
     let nodes = asset.node_tree();
-    let worlds = crate::asset::model_node::worlds(&nodes);
-    let sets = lod_sets(asset);
-    let mut groups: Vec<Option<Group>> = vec![None; sets.len()];
+    let mut lods = lod::Lods::default();
     let mut spawned: Vec<u32> = Vec::with_capacity(nodes.len());
-    for (i, node) in nodes.iter().enumerate() {
-        let parent = node
-            .parent
-            .and_then(|p| spawned.get(p).copied())
-            .unwrap_or(root);
-        let mesh = node.mesh.as_deref();
-        let set = mesh.and_then(|m| sets.iter().position(|s| member(s, m)));
-        let id = match (set, mesh) {
-            (Some(k), Some(mesh)) => {
-                let (first, renderers) = groups[k].get_or_insert_with(|| {
-                    let group = spawn_group(scene, path, asset, &sets[k], node, parent);
-                    (i, group)
-                });
-                let renderer = renderers.iter().find(|(m, _)| m == mesh).map(|(_, r)| *r);
-                match renderer {
-                    Some(r) => {
-                        place(scene, r, worlds[*first].inverse() * worlds[i]);
-                        r
-                    }
-                    None => spawn_node(scene, path, asset, node, parent),
-                }
+    for node in nodes.iter() {
+        let parent = node.parent.and_then(|p| spawned.get(p).copied());
+        let (holder, held) = holder(scene, node, parent.unwrap_or(root));
+        let id = match lods.group_for(scene, node, holder, held) {
+            Some((group, at)) => {
+                let id = spawn_node(scene, path, asset, node, group);
+                set_matrix(scene, id, at);
+                lods.add(group, node, id);
+                id
             }
-            _ => spawn_node(scene, path, asset, node, parent),
+            None => {
+                let id = spawn_node(scene, path, asset, node, holder);
+                place(scene, id, held, node);
+                id
+            }
         };
         spawned.push(id);
     }
+    lods.finish(scene, asset);
     // Children spawned before they were parented: their collider AABBs are stale.
     scene.update_all_colliders();
     root
 }
 
-/// The LODGroup for `set`, spawned at `node` under `parent`: each member mesh
-/// with its renderer, in level order.
-fn spawn_group(
-    scene: &mut Scene,
-    path: &str,
-    asset: &ImportedAsset,
-    set: &LodSet,
-    node: &ModelNode,
-    parent: u32,
-) -> Vec<(String, u32)> {
-    let Ok(group) = instantiate_lod_set(scene, path, asset, set, None, Vec3::ZERO) else {
-        return Vec::new();
+/// Where `node` hangs under its parent node's entity `parent`: the bone it names,
+/// or `parent` itself, with what sits between them and the node's own local
+/// transform (a bone the skeleton lacks leaves the node at the bone's rest pose).
+fn holder(scene: &Scene, node: &ModelNode, parent: u32) -> (u32, Mat4) {
+    let Some(bone) = &node.bone else {
+        return (parent, Mat4::IDENTITY);
     };
-    set_local(scene, group, node);
-    let _ = scene.set_parent(group, Some(parent));
-    let renderers = scene.world.lod_group(group).map(|g| g.levels.clone());
-    let renderers = renderers
-        .unwrap_or_default()
-        .into_iter()
-        .flat_map(|l| l.renderers);
-    set.levels
-        .iter()
-        .flatten()
-        .cloned()
-        .zip(renderers)
-        .collect()
+    match scene.find_bone(parent, &bone.name) {
+        Some(entity) => (entity, Mat4::IDENTITY),
+        None => (parent, bone.rest),
+    }
 }
 
 /// One node as an entity under `parent`: its mesh when it places one, else empty.
@@ -117,33 +95,28 @@ fn spawn_node(
         Some(Ok(id)) => id,
         _ => scene.add_entity(node.name.clone()),
     };
-    set_local(scene, id, node);
     let _ = scene.set_parent(id, Some(parent));
     id
 }
 
-fn member(set: &LodSet, mesh: &str) -> bool {
-    set.levels.iter().flatten().any(|id| id == mesh)
-}
-
-/// Give `id` `node`'s local transform as authored.
-fn set_local(scene: &mut Scene, id: u32, node: &ModelNode) {
+/// Give `id` the local transform `before · node.local()`: `node`'s as authored
+/// when nothing sits before it, so a node's own TRS is never re-split.
+fn place(scene: &mut Scene, id: u32, before: Mat4, node: &ModelNode) {
+    if before != Mat4::IDENTITY {
+        return set_matrix(scene, id, before * node.local());
+    }
     if let Some(mut t) = scene.world.transform_mut(id) {
-        t.position = node.translation;
-        t.rotation = node.rotation;
-        t.scale = node.scale;
+        (t.position, t.rotation, t.scale) = (node.translation, node.rotation, node.scale);
     }
 }
 
-/// Give `id` the local transform `m`.
-fn place(scene: &mut Scene, id: u32, m: Mat4) {
-    // lint: allow(world-space) `m` is relative between two nodes of the file, no entity's
-    // world transform: the World has none of it yet.
+/// Give `id` the local transform `m`, a product of the file's node matrices.
+pub(super) fn set_matrix(scene: &mut Scene, id: u32, m: Mat4) {
+    // lint: allow(world-space) `m` is built from the file's node matrices, no
+    // entity's world transform: the World has none of it.
     let (scale, rotation, position) = m.to_scale_rotation_translation();
     if let Some(mut t) = scene.world.transform_mut(id) {
-        t.position = position;
-        t.rotation = rotation;
-        t.scale = scale;
+        (t.position, t.rotation, t.scale) = (position, rotation, scale);
     }
 }
 
@@ -153,5 +126,9 @@ fn file_stem(path: &str) -> String {
     stem.map_or_else(|| path.to_string(), |s| s.to_string_lossy().into_owned())
 }
 
+#[cfg(test)]
+mod bone_tests;
+#[cfg(test)]
+mod lod_tests;
 #[cfg(test)]
 mod tests;
