@@ -12,10 +12,10 @@ use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, material, Primitive};
 use crate::scene::{Camera, Scene};
 
-const RES: u32 = 48;
+pub(super) const RES: u32 = 48;
 
 /// The frame `cam` sees, as RGBA8.
-fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
+pub(super) fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     r.render(&mut view, scene, cam, &out, false);
@@ -24,7 +24,7 @@ fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
 }
 
 /// The mean of `px`'s colour channels.
-fn mean(px: &[u8]) -> f32 {
+pub(super) fn mean(px: &[u8]) -> f32 {
     let rgb = px.chunks(4).flat_map(|p| &p[..3]);
     rgb.map(|&c| f32::from(c)).sum::<f32>() / (px.len() / 4 * 3) as f32
 }
@@ -36,7 +36,7 @@ fn diff(a: &[u8], b: &[u8]) -> f32 {
 }
 
 /// Entity `id`'s own material, to edit.
-fn asset(scene: &mut Scene, id: u32) -> &mut MaterialAsset {
+pub(super) fn asset(scene: &mut Scene, id: u32) -> &mut MaterialAsset {
     let key = material::ensure_material_key(scene, id).unwrap();
     scene.materials.get_mut(&key).unwrap()
 }
@@ -85,7 +85,7 @@ fn gpu_a_refracting_ball_shows_no_back_faces() {
 
 /// A `Plane` (its front faces +Y) under or over a sun shining `up` or down, seen
 /// from below or, with `above`, from above; drawing `face`.
-fn card(face: RenderFace, above: bool, up: bool) -> (Scene, Camera) {
+pub(super) fn card(face: RenderFace, above: bool, up: bool) -> (Scene, Camera) {
     let mut scene = Scene::new();
     (scene.skybox_path, scene.ambient_intensity) = (String::new(), 0.0);
     let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));

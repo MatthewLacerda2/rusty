@@ -5,7 +5,8 @@
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
-#import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, facing_normal, flat_ambient, fold_decals, lightmap_direction_rebalance}
+#import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, flat_ambient, fold_decals, lightmap_direction_rebalance}
+#import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
 // resources are `forward/bindings.wgsl`, its lighting helpers `forward/lighting.wgsl`.
@@ -303,8 +304,9 @@ fn fs_velocity_ssr(in: VelocityVertex) -> VelocitySsrTargets {
 fn surface_color(in: VertexOutput) -> vec4<f32> {
     let m = material();
     // The geometric normal, turned toward the viewer on a face seen from behind when
-    // the material draws back faces (#1615, `facing_normal`). First, before any branch.
-    let geometric = facing_normal(in.world_normal, in.world_position, m.two_sided == 1u);
+    // the material draws back faces (#1615, `seen_from_behind`). First, before any branch.
+    let behind = seen_from_behind(in.world_normal, in.world_position, m.two_sided == 1u);
+    let geometric = facing_normal(in.world_normal, behind);
     // Where every map below is read (#1573): UV0 tiled, or projected from world space.
     let maps = mapping::coords(in.tex_coords, in.world_position, geometric);
     var base_color = m.color_tint;
@@ -331,7 +333,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // frame or, under a world mapping, reoriented per projection (`mapping::sample_normal`).
     var N = geometric;
     if (m.use_normal_map == 1u) {
-        N = mapping::sample_normal(t_normal, s_normal, maps, N, in.world_tangent);
+        N = mapping::sample_normal(t_normal, s_normal, maps, N, facing_tangent(in.world_tangent, behind));
     }
     let V = normalize(camera.camera_pos - in.world_position);
 

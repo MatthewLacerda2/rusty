@@ -7,7 +7,7 @@
 //!
 //! Pure.
 
-use super::surface::{choice, SurfaceField, SurfaceKind, SurfaceValue};
+use super::surface::{always, choice, SurfaceField, SurfaceKind, SurfaceValue};
 use crate::components::RenderFace;
 
 /// The render-face row: shown on every material, opaque or not.
@@ -16,7 +16,7 @@ pub static FACE_FIELDS: &[SurfaceField] = &[SurfaceField {
     api: "RenderFace",
     label: "Render Face",
     kind: SurfaceKind::Choice(|| RenderFace::ALL.map(RenderFace::name).to_vec()),
-    shown: |_| true,
+    shown: always,
     get: |m| SurfaceValue::Text(m.render_face.name().to_owned()),
     put: |m, v| m.render_face = choice(v, RenderFace::parse),
 }];

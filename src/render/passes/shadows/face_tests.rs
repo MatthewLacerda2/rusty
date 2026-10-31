@@ -1,10 +1,12 @@
 //! A material's Render Face (#1615) in the shadow casters, as Unity's ShadowCaster
 //! pass culls by `_Cull`: a one-sided card casts from the faces its material draws.
 //! `Front` casts only while its front faces the light, `Back` only while its back
-//! does, and `Both` either way, as a `TwoSided` caster (#1571). Skips with no adapter.
+//! does, and `Both` either way, as a `TwoSided` caster (#1571). A static card's
+//! cached bake follows its face. The GPU tests skip with no adapter.
 
 use super::casting_tests::card;
 use super::mirror_tests::sun_yard;
+use super::statics_key;
 use crate::components::{RenderFace, ShadowCasting};
 use crate::render::gpu::pipelines::surface::cut_depth_tests::ground_halves;
 use crate::render::Renderer;
@@ -47,4 +49,29 @@ fn gpu_a_card_casts_from_the_faces_its_material_draws() {
         "Back casts from its back face"
     );
     assert!(casts(both_up) && casts(both_down), "Both casts either way");
+}
+
+/// A static card's shadow bake is keyed by its slots' faces: switching `Front` ↔
+/// `Both` (or `Back`) re-bakes it, as a material edit moves no static revision.
+#[test]
+fn a_static_cards_render_face_moves_the_bake_key() {
+    let mut scene = sun_yard();
+    let id = card(&mut scene, ShadowCasting::On, false, false);
+    scene.world.set_static(id, true);
+    let key = material::ensure_material_key(&mut scene, id).unwrap();
+    let mut key_as = |face| {
+        scene.materials.get_mut(&key).unwrap().render_face = face;
+        statics_key(&scene)
+    };
+    let front = key_as(RenderFace::Front);
+    let both = key_as(RenderFace::Both);
+    let back = key_as(RenderFace::Back);
+    assert_ne!(both, front, "Both casts from its back faces too");
+    assert_ne!(back, front);
+    assert_ne!(back, both);
+    assert_eq!(
+        key_as(RenderFace::Front),
+        front,
+        "back to Front, back to its key"
+    );
 }

@@ -135,7 +135,7 @@ fn transparent(m: &MaterialAsset) -> bool {
     m.is_transparent()
 }
 
-fn always(_: &MaterialAsset) -> bool {
+pub(super) fn always(_: &MaterialAsset) -> bool {
     true
 }
 

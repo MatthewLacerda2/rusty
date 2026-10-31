@@ -73,3 +73,31 @@ fn zero_direction_is_black() {
         glam::Vec3::ZERO
     );
 }
+
+/// `direction` lays every face out as a `texture_cube` does (#1615): the D3D / Vulkan /
+/// wgpu table `sky/prefilter.wgsl`'s `face_direction` writes, with `(s, t)` the
+/// texel's coords, `t` growing down the rows. A face mirrored in-plane, or turned,
+/// fails at the corners.
+#[test]
+fn direction_follows_the_texture_cube_layout() {
+    let hardware = |face: CubemapFace, s: f32, t: f32| match face {
+        CubemapFace::PosX => glam::Vec3::new(1.0, -t, -s),
+        CubemapFace::NegX => glam::Vec3::new(-1.0, -t, s),
+        CubemapFace::PosY => glam::Vec3::new(s, 1.0, t),
+        CubemapFace::NegY => glam::Vec3::new(s, -1.0, -t),
+        CubemapFace::PosZ => glam::Vec3::new(s, -t, 1.0),
+        CubemapFace::NegZ => glam::Vec3::new(-s, -t, -1.0),
+    };
+    let proj = FaceProjections::new();
+    for face in CubemapFace::ALL {
+        for (s, t) in [(-0.8, -0.6), (0.7, -0.5), (-0.4, 0.9), (0.6, 0.3)] {
+            // NDC v is up, the texel's t down.
+            let got = proj.direction(face, s, -t);
+            let want = hardware(face, s, t).normalize();
+            assert!(
+                got.distance(want) < 1e-4,
+                "{face:?} ({s}, {t}): {got} vs {want}"
+            );
+        }
+    }
+}

@@ -40,9 +40,9 @@ impl ScreenPoint {
 }
 
 impl Camera {
-    /// The world → view matrix (the view looks down its local -Z, y up).
+    /// The world → view matrix (the view looks down its local -Z, [`Camera::up`] up).
     pub fn view_matrix(&self) -> Mat4 {
-        look_at_mat4(self.position, self.position + self.forward(), Vec3::Y)
+        look_at_mat4(self.position, self.position + self.forward(), self.up)
     }
 
     /// The camera's own frame → world: local +X is right, +Y up, -Z forward.

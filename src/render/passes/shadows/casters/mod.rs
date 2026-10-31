@@ -199,7 +199,8 @@ impl ShadowRenderer {
             if !sweep.takes(scene.world.is_static(id) && !moving) {
                 continue;
             }
-            let runs = slot_runs(frame, id, gpu_mesh.runs(&mesh, material.as_deref()));
+            let material = material.as_deref();
+            let runs = slot_runs(frame, id, material, gpu_mesh.runs(&mesh, material));
             let world = scene.world.local_to_world(id);
             // A skinned caster is bounded by its posed skeleton (#833); one whose pose
             // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.

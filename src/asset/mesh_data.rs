@@ -186,7 +186,8 @@ pub struct MaterialData {
     pub emissive_map: Option<MapRef>,
     /// glTF `emissiveFactor` (linear RGB, default `[0,0,0]`).
     pub emissive: [f32; 3],
-    /// glTF `doubleSided` (#1615): both faces draw. `false` by default, as in glTF.
+    /// glTF `doubleSided` (#1615): both faces draw. `false` by default, as in glTF,
+    /// and always for a `.blend`'s conversion (`gltf::material`, Unity's way).
     pub double_sided: bool,
 }
 

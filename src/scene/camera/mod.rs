@@ -47,6 +47,10 @@ pub struct Camera {
     pub clear_flags: ClearFlags,
     /// Perspective (through `fov`) or orthographic (#430).
     pub projection: Projection,
+    /// The view's up vector: +Y for every camera a person or script drives, which
+    /// aims by yaw and pitch. A cube-capture face sets its own (#1615), so a face
+    /// looking straight up or down has a basis that isn't left to rounding.
+    pub up: Vec3,
     /// Whether a scene `CameraComponent` set the lens on the last sync, so the
     /// fallback knows to hand the free camera its own fov back (#997).
     scene_lens: bool,
@@ -72,6 +76,7 @@ impl Camera {
             culling_mask: u32::MAX,
             clear_flags: ClearFlags::Skybox,
             projection: Projection::Perspective,
+            up: Vec3::Y,
             scene_lens: false,
         }
     }
@@ -89,7 +94,7 @@ impl Camera {
     }
 
     pub fn right(&self) -> Vec3 {
-        self.forward().cross(Vec3::Y).normalize()
+        self.forward().cross(self.up).normalize()
     }
 
     pub fn build_view_projection(&self, aspect: f32) -> Mat4 {

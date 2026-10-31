@@ -6,23 +6,24 @@ use std::ops::Range;
 
 use super::super::clips::CasterClip;
 use super::{CasterBatch, CasterData, CasterFrame, CasterKey};
-use crate::components::RenderFace;
+use crate::components::{MaterialComponent, RenderFace};
 
 /// How one material slot casts: its clip (`None` casts plainly) and its material's
 /// render face (#1615).
 pub(super) type SlotCast<'f> = (Option<&'f CasterClip>, RenderFace);
 
-/// Entity `id`'s `(slot, run)` draws, joined by how each slot casts.
+/// Entity `id`'s `(slot, run)` draws, joined by how each slot casts. `material` is
+/// its material component, borrowed once by the caller for every slot.
 pub(super) fn slot_runs<'f>(
     frame: &CasterFrame<'f>,
     id: u32,
+    material: Option<&MaterialComponent>,
     runs: Vec<(usize, Range<u32>)>,
 ) -> Vec<(Range<u32>, SlotCast<'f>)> {
-    let face = |slot| {
-        frame
-            .scene
-            .material_entry_at(id, slot)
-            .map(|(_, m)| m.render_face)
+    let slots = material.map_or(&[][..], |m| &m.materials[..]);
+    let face = |slot: usize| {
+        let key = slots.get(slot)?;
+        frame.scene.materials.get(key).map(|m| m.render_face)
     };
     join_alike(runs, |slot| {
         (frame.clips.get(&(id, slot)), face(slot).unwrap_or_default())

@@ -283,3 +283,7 @@ mod priming_backend_tests;
 #[cfg(test)]
 #[path = "tests/render_face_tests.rs"]
 mod render_face_tests;
+
+#[cfg(test)]
+#[path = "tests/render_face_normal_tests.rs"]
+mod render_face_normal_tests;
