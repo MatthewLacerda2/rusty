@@ -2,10 +2,9 @@
 //! `Renderer::render` (behavior unchanged).
 
 use glam::Mat4;
-use wgpu::util::DeviceExt;
 
 use crate::render::draw::resources::AxisResource;
-use crate::render::{EntityUniform, Renderer};
+use crate::render::Renderer;
 use crate::scene::Scene;
 
 impl Renderer {
@@ -40,35 +39,8 @@ impl Renderer {
         arrow_model_matrix: Mat4,
         color: [f32; 4],
     ) -> AxisResource {
-        let entity_uniform = EntityUniform {
-            model_matrix: arrow_model_matrix.to_cols_array(),
-            color_tint: color,
-            use_texture: 0,
-            is_lit: 0,
-            metallic: 0.0,
-            roughness: 0.5,
-            use_metallic_map: 0,
-            use_roughness_map: 0,
-            use_normal_map: 0,
-            use_emissive_map: 0,
-            emissive: [0.0; 4],
-            use_cutout: 0,
-            alpha_cutoff: 0.0,
-            bone_base: 0,
-            receive_decals: 0,
-            surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
-            mapping: crate::render::gpu::uniforms::MappingUniform::default(),
-        };
-
-        let entity_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Axis Arrow Uniform"),
-                contents: bytemuck::bytes_of(&entity_uniform),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let bind_group =
-            self.entity_bind_group("Axis Arrow", &entity_buf, self.shared_bones_buffer());
+        let (entity_buf, bind_group) =
+            self.overlay_bindings("Axis Arrow", arrow_model_matrix, color);
         (i, entity_buf, bind_group)
     }
 }

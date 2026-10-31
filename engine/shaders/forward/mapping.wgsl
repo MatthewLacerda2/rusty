@@ -5,12 +5,12 @@
 // prepass and the selection mask) goes through `sample`, the normal map through
 // `sample_normal`, so all maps of a material agree on where they are read.
 //
-// Every branch here is on `entity` (a per-draw uniform), so the implicit-LOD
-// samples sit in uniform control flow.
+// Every branch here is on `material()` (the draw's record, indexed by a per-draw
+// uniform), so the implicit-LOD samples sit in uniform control flow.
 
 #define_import_path forward::mapping
 
-#import forward::bindings::entity
+#import forward::bindings::material
 #import forward::maps::{map_factor, unpack_normal}
 
 const UV0: u32 = 0u;
@@ -28,7 +28,7 @@ struct MapCoords {
 };
 
 // A material's mapping terms: `render::gpu::uniforms::MappingUniform` byte-for-byte.
-// The forward draws read theirs from `entity`; a shadow caster carries its own per
+// The forward draws read theirs from `material()`; a shadow caster carries its own per
 // instance (#1594), so the `*_with` functions take them explicitly.
 struct Mapping {
     uv_st: vec4<f32>,
@@ -40,7 +40,8 @@ struct Mapping {
 
 // The draw's own terms.
 fn entity_mapping() -> Mapping {
-    return Mapping(entity.uv_st, entity.uv_mapping, entity.world_scale, entity.blend_sharpness, 0u);
+    let m = material();
+    return Mapping(m.uv_st, m.uv_mapping, m.world_scale, m.blend_sharpness, 0u);
 }
 
 fn tile_with(m: Mapping, uv: vec2<f32>) -> vec2<f32> {
@@ -94,7 +95,7 @@ fn sample_any(t: texture_2d<f32>, s: sampler, m: Mapping, uv: vec2<f32>, positio
 
 // Map `t` at `c`.
 fn sample(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
-    if (entity.uv_mapping != TRIPLANAR) {
+    if (material().uv_mapping != TRIPLANAR) {
         return textureSample(t, s, c.uv);
     }
     return textureSample(t, s, c.x) * c.weights.x
@@ -119,7 +120,7 @@ fn mask(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords, packed: u32) -> f
 // each projection's sample is reoriented onto its world axis with the whiteout
 // blend (Golus), and Planar is Triplanar with all the weight on the Y projection.
 fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tangent: vec4<f32>) -> vec3<f32> {
-    if (entity.uv_mapping == UV0) {
+    if (material().uv_mapping == UV0) {
         let T = normalize(tangent.xyz);
         let B = cross(n, T) * tangent.w;
         let sampled = unpack_normal(textureSample(t, s, c.uv));
@@ -129,7 +130,7 @@ fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tan
     var tx = vec3<f32>(0.0, 0.0, 1.0);
     var tz = vec3<f32>(0.0, 0.0, 1.0);
     var w = vec3<f32>(0.0, 1.0, 0.0);
-    if (entity.uv_mapping == TRIPLANAR) {
+    if (material().uv_mapping == TRIPLANAR) {
         tx = unpack_normal(textureSample(t, s, c.x));
         tz = unpack_normal(textureSample(t, s, c.z));
         w = c.weights;

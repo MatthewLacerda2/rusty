@@ -1,6 +1,6 @@
 //! Emissive-factor visual test (#222). Proves the renderer READS a material's flat
-//! `emissive` factor and adds it to the lit colour through the per-entity material
-//! uniform (`EntityUniform`/`EntityUniforms`), not just stores it on the CPU.
+//! `emissive` factor and adds it to the lit colour through the draw's material
+//! record (`MaterialData`, both sides), not just stores it on the CPU.
 //!
 //! The signal is light-independent by construction: the scene has **zero ambient and
 //! no lights**, so the only thing that can brighten the surface is the emissive term

@@ -22,7 +22,7 @@ use wgpu::util::DeviceExt;
 use super::aabb_wireframe;
 use crate::components::mesh::Vertex;
 use crate::render::draw::resources::ProbeResource;
-use crate::render::{EntityUniform, Renderer};
+use crate::render::Renderer;
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
 
@@ -65,15 +65,7 @@ impl Renderer {
                 contents: bytemuck::cast_slice(verts),
                 usage: wgpu::BufferUsages::VERTEX,
             });
-        let entity_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Probe Gizmo Uniform"),
-                contents: bytemuck::bytes_of(&flat_overlay_uniform(tint)),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let bind_group =
-            self.entity_bind_group("Probe Gizmo", &entity_buf, self.shared_bones_buffer());
+        let (entity_buf, bind_group) = self.overlay_bindings("Probe Gizmo", Mat4::IDENTITY, tint);
         (vertex_buffer, entity_buf, bind_group, verts.len() as u32)
     }
 
@@ -91,31 +83,6 @@ impl Renderer {
             render_pass.set_bind_group(1, bind_group, &[0]);
             render_pass.draw(0..*count, 0..1);
         }
-    }
-}
-
-/// A flat, unlit overlay uniform: identity model matrix (gizmo vertices are authored in
-/// world space), the given `tint`, no textures/SH/cutout. The shared shape every line
-/// overlay draws with.
-fn flat_overlay_uniform(tint: [f32; 4]) -> EntityUniform {
-    EntityUniform {
-        model_matrix: Mat4::IDENTITY.to_cols_array(),
-        color_tint: tint,
-        use_texture: 0,
-        is_lit: 0,
-        metallic: 0.0,
-        roughness: 0.5,
-        use_metallic_map: 0,
-        use_roughness_map: 0,
-        use_normal_map: 0,
-        use_emissive_map: 0,
-        emissive: [0.0; 4],
-        use_cutout: 0,
-        alpha_cutoff: 0.0,
-        bone_base: 0,
-        receive_decals: 0,
-        surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
-        mapping: crate::render::gpu::uniforms::MappingUniform::default(),
     }
 }
 

@@ -8,7 +8,7 @@ use super::batch::sort::{back_to_front, view_depth};
 use super::batch::{BatchKey, DrawItem, FrameDraws};
 use super::materials::entity_params;
 use crate::components::MaterialAsset;
-use crate::render::gpu::draw_buffers::{group1, push_palette, FrameUpload, JointMatrix};
+use crate::render::gpu::draw_buffers::{push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
 use crate::render::motion::{track, MotionHistory};
 use crate::render::passes::outline::{outlined, OutlineBounds};
@@ -167,14 +167,16 @@ impl Renderer {
         back_to_front(&mut transparent);
         let transparent = transparent.into_iter().map(|(item, _)| item).collect();
         let draws = FrameDraws::build(opaque, transparent, self.instancing);
+        let (uniforms, materials) = draws.pack();
         self.draw_buffers.upload(
             &self.device,
             &self.queue,
             &self.entity_bones_layout,
             FrameUpload {
-                uniforms: &draws.uniforms(),
+                uniforms: &uniforms,
                 joints,
                 instances: &draws.instances,
+                materials: &materials,
             },
         );
         draws
@@ -249,8 +251,7 @@ impl Renderer {
             let entry = scene.material_entry_at(id, slot);
             let material = entry.map(|(_, asset)| asset);
             let transparent = material.is_some_and(MaterialAsset::is_transparent);
-            let mut uniform = self.solid_uniform(scene, id, material);
-            uniform.bone_base = bone_base;
+            let record = self.solid_material(scene, id, material);
             let shader = material.and_then(|m| m.shader.as_deref());
             let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
             let key = BatchKey {
@@ -258,7 +259,8 @@ impl Renderer {
                 mesh: mesh_id.clone(),
                 indices: indices.into(),
                 material: self.material_index(entry, pipeline, entity_params(scene, id, slot)),
-                uniform: uniform.words(),
+                record: record.words(),
+                bone_base,
             };
             let item = DrawItem {
                 key,
@@ -269,23 +271,6 @@ impl Renderer {
             items.push((item, origin, transparent));
         }
         items
-    }
-
-    /// Create an overlay's group-1 bind group: its own uniform buffer, a bones buffer,
-    /// and the shared one-element identity instance array — an overlay is one draw of
-    /// instance 0, its transform carried in the uniform. Bound at offset `[0]`.
-    pub(crate) fn entity_bind_group(
-        &self,
-        label: &str,
-        entity_buf: &wgpu::Buffer,
-        bones_buf: &wgpu::Buffer,
-    ) -> wgpu::BindGroup {
-        group1(
-            &self.device,
-            &self.entity_bones_layout,
-            label,
-            [entity_buf, bones_buf, self.draw_buffers.identity_instance()],
-        )
     }
 }
 

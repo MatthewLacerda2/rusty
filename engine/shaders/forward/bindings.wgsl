@@ -7,37 +7,47 @@
 
 #import common::{CameraUniforms, Decal, LightingUniforms, LocalLight, ShadowTile, VertexInput, blend_joints}
 
-struct EntityUniforms {
+// One draw's own data (#1616), mirroring `DrawUniform`
+// (src/render/gpu/uniforms/material.rs) byte-for-byte: its transform on top of each
+// instance's (identity for instanced solids), where its joint 0 sits in `bones`
+// (#455; 0 is the shared identity), and its record in `materials`.
+struct DrawUniforms {
     model_matrix: mat4x4<f32>,
+    bone_base: u32,
+    material: u32,
+    draw_pad_a: u32,
+    draw_pad_b: u32,
+};
+
+// One material record (#1616), mirroring `MaterialData`
+// (src/render/gpu/uniforms/material.rs) byte-for-byte, its `SurfaceUniform` and
+// `MappingUniform` written out flat. Read through `material()`. A new field takes a
+// pad word or a 16-byte run at the end; that file's doc says how.
+struct MaterialData {
     color_tint: vec4<f32>,
     use_texture: u32,
     is_lit: u32,
     metallic: f32,
     roughness: f32,
-    // Mirrors `EntityUniform` (src/render/mod.rs) byte-for-byte (#202, #207): map
-    // flags. metallic/roughness scale their scalar by the sampled channel (glTF's
-    // blue/green at 1, red at 2: a one-channel BC4 upload, #1574); normal
-    // perturbs the shading normal; emissive modulates the emissive factor. Four u32s
-    // fill the run so the `vec4` that follows is 16-byte aligned.
+    // Map flags (#202, #207). metallic/roughness scale their scalar by the sampled
+    // channel (glTF's blue/green at 1, red at 2: a one-channel BC4 upload, #1574);
+    // normal perturbs the shading normal; emissive modulates the emissive factor.
     use_metallic_map: u32,
     use_roughness_map: u32,
     use_normal_map: u32,
     use_emissive_map: u32,
     // Flat emissive factor (#222): rgb glow added after lighting in `fs_main`; the
-    // 4th lane is unused. `vec4` to match the Rust `[f32; 4]` byte-for-byte.
+    // 4th lane is unused.
     emissive: vec4<f32>,
     // Cutout alpha-test (#242): `use_cutout == 1` discards fragments whose final
     // alpha is below `alpha_cutoff`.
     use_cutout: u32,
     alpha_cutoff: f32,
-    // Where this draw's joint 0 sits in `bones` (#455); 0 is the shared identity.
-    // Mirrors `EntityUniform` (src/render/gpu/uniforms.rs) byte-for-byte.
-    bone_base: u32,
-    // 1 when this draw folds in its cluster's decals (#638).
+    // 1 when the surface folds in its cluster's decals (#638).
     receive_decals: u32,
-    // The transparent-surface terms (#1523), mirroring `SurfaceUniform`
-    // (src/render/gpu/uniforms.rs) byte-for-byte. `blend_mode`: 0 Alpha,
-    // 1 Premultiply, 2 Additive, 3 Multiply.
+    material_pad: u32,
+    // The transparent-surface terms (#1523). `blend_mode`: 0 Alpha, 1 Premultiply,
+    // 2 Additive, 3 Multiply.
     blend_mode: u32,
     // 1 when preserve specular applies: diffuse * alpha here, specular whole.
     premultiply_diffuse: u32,
@@ -59,8 +69,7 @@ struct EntityUniforms {
     surface_pad_a: u32,
     surface_pad_b: u32,
     surface_pad_c: u32,
-    // Where the maps are read (#1573), mirroring `MappingUniform`
-    // (src/render/gpu/uniforms.rs) byte-for-byte: xy the tiling, zw the offset.
+    // Where the maps are read (#1573): xy the tiling, zw the offset.
     uv_st: vec4<f32>,
     // 0 UV0, 1 planar (world XZ), 2 triplanar (`forward/mapping.wgsl`).
     uv_mapping: u32,
@@ -74,7 +83,7 @@ struct EntityUniforms {
 // `InstanceData` (src/render/gpu/uniforms.rs) byte-for-byte. Only per-copy data lives
 // here — the world matrix and the light-probe SH (#240: when `use_sh == 1` the ambient
 // term is reconstructed from `sh`, xyz = RGB radiance). Material flags stay in the
-// per-draw `EntityUniforms`, so texture sampling never depends on an instance value.
+// draw's `MaterialData`, so texture sampling never depends on an instance value.
 struct InstanceData {
     model_matrix: mat4x4<f32>,
     // Last frame's world matrix, read only when `motion == 1` (#1435).
@@ -157,27 +166,39 @@ var s_lightmaps: sampler;
 var t_lightmap_dirs: texture_2d_array<f32>;
 
 @group(1) @binding(0)
-var<uniform> entity: EntityUniforms;
+var<uniform> draw: DrawUniforms;
 
 // Every skinned draw's joint matrices back to back (#455), sized per skin — no joint
-// cap. A draw reads its run from `entity.bone_base`; element 0 is the identity.
+// cap. A draw reads its run from `draw.bone_base`; element 0 is the identity.
 @group(1) @binding(1)
 var<storage, read> bones: array<mat4x4<f32>>;
 
 @group(1) @binding(2)
 var<storage, read> instances: array<InstanceData>;
 
+// The frame's distinct material records (#1616), one per material look in use; a
+// draw reads its own through `material()`. Binding 3 is the shadow casters'
+// (`shader.wgsl`).
+@group(1) @binding(4)
+var<storage, read> materials: array<MaterialData>;
+
+// The draw's material record. Its index is the draw's uniform, so whatever a shader
+// branches on here is uniform across the draw.
+fn material() -> MaterialData {
+    return materials[draw.material];
+}
+
 // Where `model`'s vertex goes in world space: its skin (the draw's run of `bones`,
 // #455) under the draw's transform (identity for instanced solids) over the
 // instance's own. The forward pass and the selection outline (#1175) both place a
 // vertex through this, so the outline cannot sit anywhere the solid does not.
 fn vertex_to_world(model: VertexInput, instance: u32) -> mat4x4<f32> {
-    let joints = model.joint_indices + vec4<u32>(entity.bone_base);
+    let joints = model.joint_indices + vec4<u32>(draw.bone_base);
     let bone_transform = blend_joints(
         bones[joints.x], bones[joints.y], bones[joints.z], bones[joints.w],
         model.joint_weights,
     );
-    return entity.model_matrix * instances[instance].model_matrix * bone_transform;
+    return draw.model_matrix * instances[instance].model_matrix * bone_transform;
 }
 
 // `normal` (object space) to world space under `to_world` (#1596): by the
@@ -218,7 +239,7 @@ fn vertex_to_world_prev(model: VertexInput, instance: u32) -> mat4x4<f32> {
         bones[joints.x], bones[joints.y], bones[joints.z], bones[joints.w],
         model.joint_weights,
     );
-    return entity.model_matrix * instances[instance].prev_model_matrix * bone_transform;
+    return draw.model_matrix * instances[instance].prev_model_matrix * bone_transform;
 }
 
 // The material maps, each with its own sampler (#1323): wrap and filter are the

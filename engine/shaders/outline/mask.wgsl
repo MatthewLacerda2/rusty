@@ -7,7 +7,7 @@
 // it is, how it is posed, or which LOD it shows. `outline/edge.wgsl` rings it.
 
 #import common::VertexInput
-#import forward::bindings::{camera, entity, normal_to_world, s_diffuse, t_diffuse, vertex_to_world}
+#import forward::bindings::{camera, material, normal_to_world, s_diffuse, t_diffuse, vertex_to_world}
 #import forward::mapping
 
 struct MaskVertex {
@@ -35,13 +35,13 @@ fn vs_mask(model: VertexInput, @builtin(instance_index) instance: u32) -> MaskVe
 // translucent or not.
 @fragment
 fn fs_mask(in: MaskVertex) -> @location(0) vec4<f32> {
-    if (entity.use_cutout == 1u) {
-        var alpha = entity.color_tint.a;
-        if (entity.use_texture == 1u) {
+    if (material().use_cutout == 1u) {
+        var alpha = material().color_tint.a;
+        if (material().use_texture == 1u) {
             let maps = mapping::coords(in.tex_coords, in.world_position, normalize(in.world_normal));
             alpha *= mapping::sample(t_diffuse, s_diffuse, maps).a;
         }
-        if (alpha < entity.alpha_cutoff) {
+        if (alpha < material().alpha_cutoff) {
             discard;
         }
     }

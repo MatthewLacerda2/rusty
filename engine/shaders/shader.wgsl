@@ -1,7 +1,7 @@
 #import common::{DecalSurface, NO_SHADOW, PI, VertexInput, apply_fog, blend_joints, fog_factor, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
-#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, entity, instances, lighting, local_lights, normal_to_world, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
+#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, instances, lighting, local_lights, material, normal_to_world, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
@@ -85,12 +85,12 @@ fn world_vertex(model: VertexInput, to_world: mat4x4<f32>, world_pos: vec4<f32>)
 // cut fragments or move the UVs adds `fs_prepass_cut`, which opens like
 // `surface_color`, runs its cuts and then this (#648).
 fn prepass_clip(in: VertexOutput) {
-    var alpha = entity.color_tint.a;
-    if (entity.use_texture == 1u) {
+    var alpha = material().color_tint.a;
+    if (material().use_texture == 1u) {
         let maps = mapping::coords(in.tex_coords, in.world_position, normalize(in.world_normal));
         alpha *= mapping::sample(t_diffuse, s_diffuse, maps).a;
     }
-    if (entity.use_cutout == 1u && alpha < entity.alpha_cutoff) {
+    if (material().use_cutout == 1u && alpha < material().alpha_cutoff) {
         discard;
     }
 }
@@ -182,7 +182,7 @@ fn fs_shadow(in: VertexOutput) {
 // unfogged, as Unity draws its gizmos. Fog is a scene effect; a gizmo is not scene.
 @fragment
 fn fs_gizmo(in: VertexOutput) -> @location(0) vec4<f32> {
-    return entity.color_tint;
+    return material().color_tint;
 }
 
 @fragment
@@ -303,23 +303,23 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // Where every map below is read (#1573): UV0 tiled, or projected from world space.
     let maps = mapping::coords(in.tex_coords, in.world_position, normalize(in.world_normal));
     var base_color: vec4<f32>;
-    if (entity.use_texture == 1u) {
-        base_color = mapping::sample(t_diffuse, s_diffuse, maps) * entity.color_tint;
+    if (material().use_texture == 1u) {
+        base_color = mapping::sample(t_diffuse, s_diffuse, maps) * material().color_tint;
     } else {
-        base_color = entity.color_tint;
+        base_color = material().color_tint;
     }
 
     // Cutout alpha-test (#242): for a Cutout material, drop sub-threshold fragments
     // before any shading so the surface reads as hard-edged (foliage, grates). Opaque
     // and Transparent materials leave `use_cutout == 0` and skip this. Done before the
     // unlit early-out so an unlit cutout (a flat alpha-tested billboard) also clips.
-    if (entity.use_cutout == 1u && base_color.a < entity.alpha_cutoff) {
+    if (material().use_cutout == 1u && base_color.a < material().alpha_cutoff) {
         discard;
     }
 
     // Unlit rendering (e.g. path highlights, a light's own mesh). Still fogged: an
     // unlit sign down a smoky corridor fades like the wall it hangs on (#437).
-    if (entity.is_lit == 0u) {
+    if (material().is_lit == 0u) {
         return vec4<f32>(apply_fog(camera.fog, base_color.rgb, in.world_position, camera.camera_pos), base_color.a);
     }
 
@@ -327,38 +327,38 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // rebuilt by `maps::unpack_normal`), rotated into world space by the mesh's tangent
     // frame or, under a world mapping, reoriented per projection (`mapping::sample_normal`).
     var N = normalize(in.world_normal);
-    if (entity.use_normal_map == 1u) {
+    if (material().use_normal_map == 1u) {
         N = mapping::sample_normal(t_normal, s_normal, maps, N, in.world_tangent);
     }
     let V = normalize(camera.camera_pos - in.world_position);
 
     // glTF metallic-roughness packs metallic in BLUE, roughness in GREEN. Each scalar
     // multiplies its map channel when the flag is set, else acts alone (#202, #1574).
-    let surface_metallic = clamp(entity.metallic * mapping::mask(entity.use_metallic_map, t_metallic, s_metallic, maps, 2u), 0.0, 1.0);
-    let surface_roughness = clamp(entity.roughness * mapping::mask(entity.use_roughness_map, t_roughness, s_roughness, maps, 1u), 0.04, 1.0);
+    let surface_metallic = clamp(material().metallic * mapping::mask(material().use_metallic_map, t_metallic, s_metallic, maps, 2u), 0.0, 1.0);
+    let surface_roughness = clamp(material().roughness * mapping::mask(material().use_roughness_map, t_roughness, s_roughness, maps, 1u), 0.04, 1.0);
 
     // 0. Surface decals (#638): this cluster's decals change the material inputs
     // before any light is summed, so a decal is lit, shadowed and occluded like the
     // surface it lands on. The angle fade reads the geometric normal.
     let cluster = cluster_index(camera.clusters, camera.view_proj, in.world_position);
     var surface = DecalSurface(base_color.rgb, N, surface_metallic, surface_roughness, 1.0);
-    if (entity.receive_decals == 1u) {
+    if (material().receive_decals == 1u) {
         surface = fold_decals(surface, cluster, in.world_position, normalize(in.world_normal));
     }
     N = surface.normal;
     // A Multiply surface tints what is behind it toward white by its alpha (#1523,
     // URP's `ApplyAlphaModulate` on the albedo).
     var albedo = surface.albedo;
-    if (entity.blend_mode == 3u) {
+    if (material().blend_mode == 3u) {
         albedo = mix(vec3<f32>(1.0), albedo, base_color.a);
     }
     // Preserve specular (#1523, URP's `_ALPHAPREMULTIPLY_ON`): only the diffuse is
     // multiplied by alpha here, and the pipeline blends premultiplied, so reflections
     // and highlights are not faded with it. `albedo` still sets a metal's F0.
-    let diffuse_albedo = albedo * select(1.0, base_color.a, entity.premultiply_diffuse == 1u);
+    let diffuse_albedo = albedo * select(1.0, base_color.a, material().premultiply_diffuse == 1u);
     // Thin translucency (#1523) lights the side facing away from a light, so the
     // normal faces the viewer, as HDRP flips a double-sided translucent's normal.
-    let translucent = entity.transmission.w > 0.0;
+    let translucent = material().transmission.w > 0.0;
     if (translucent) {
         N = faceForward(N, -V, N);
     }
@@ -416,7 +416,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // looked up off that face (`-N`), where the surface casts none on itself.
     var shadow = 1.0;
     var back_shadow = 1.0;
-    if (entity.receive_shadows == 1u) {
+    if (material().receive_shadows == 1u) {
         shadow = calculate_shadow(in.world_position, N);
         if (translucent) {
             back_shadow = calculate_shadow(in.world_position, -N);
@@ -452,7 +452,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         let tile = local_shadow_tile(light, in.world_position);
         var lit = 1.0;
         var back_lit = 1.0;
-        if (tile != NO_SHADOW && entity.receive_shadows == 1u) {
+        if (tile != NO_SHADOW && material().receive_shadows == 1u) {
             lit = sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, N);
             if (translucent) {
                 back_lit = sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, -N);
@@ -495,8 +495,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // colour, independent of any light. The factor is modulated by the emissive map's
     // rgb when one is bound (`factor * map.rgb`, the glTF convention). The HDR target +
     // bloom bright-pass turn values >1.0 into a glow with no post-FX work here.
-    var emissive = entity.emissive.rgb;
-    if (entity.use_emissive_map == 1u) {
+    var emissive = material().emissive.rgb;
+    if (material().use_emissive_map == 1u) {
         emissive *= mapping::sample(t_emissive, s_emissive, maps).rgb;
     }
     lighting_color += emissive;

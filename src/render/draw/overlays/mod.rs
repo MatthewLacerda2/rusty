@@ -11,40 +11,59 @@ use wgpu::util::DeviceExt;
 
 use crate::components::mesh::Vertex;
 use crate::render::draw::resources::{AabbResource, AxisResource, GridResource};
-use crate::render::{EntityUniform, Renderer};
+use crate::render::gpu::draw_buffers::group1;
+use crate::render::{DrawUniform, MaterialData, Renderer};
 use crate::scene::Scene;
 
 impl Renderer {
+    /// An editor overlay's group 1: its own per-draw uniform buffer (`model_matrix`
+    /// placing it, record 0) over a one-record material array of `tint`
+    /// ([`MaterialData::flat`]), the shared identity bones, and the shared one-element
+    /// identity instance array — an overlay is one draw of instance 0, its transform
+    /// carried in the uniform. Bound at offset `[0]`. Returns the uniform buffer with
+    /// the group.
+    pub(crate) fn overlay_bindings(
+        &self,
+        label: &str,
+        model_matrix: glam::Mat4,
+        tint: [f32; 4],
+    ) -> (wgpu::Buffer, wgpu::BindGroup) {
+        let init = |contents: &[u8], usage| {
+            self.device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(label),
+                    contents,
+                    usage,
+                })
+        };
+        let draw = DrawUniform {
+            model_matrix: model_matrix.to_cols_array(),
+            bone_base: 0,
+            material: 0,
+            _pad: [0; 2],
+        };
+        let uniform = init(bytemuck::bytes_of(&draw), wgpu::BufferUsages::UNIFORM);
+        let record = MaterialData::flat(tint);
+        let material = init(bytemuck::bytes_of(&record), wgpu::BufferUsages::STORAGE);
+        let group = group1(
+            &self.device,
+            &self.entity_bones_layout,
+            label,
+            [
+                &uniform,
+                self.shared_bones_buffer(),
+                self.draw_buffers.identity_instance(),
+                &material,
+            ],
+        );
+        (uniform, group)
+    }
+
     pub(crate) fn precreate_grid(&self) -> Option<GridResource> {
         let _grid_buf = self.grid_vertex_buffer.as_ref()?;
-        let grid_uniform = EntityUniform {
-            model_matrix: Mat4::IDENTITY.to_cols_array(),
-            color_tint: [0.15, 0.15, 0.22, 1.0], // Neon slate blue grid
-            use_texture: 0,
-            is_lit: 0,
-            metallic: 0.0,
-            roughness: 0.5,
-            use_metallic_map: 0,
-            use_roughness_map: 0,
-            use_normal_map: 0,
-            use_emissive_map: 0,
-            emissive: [0.0; 4],
-            use_cutout: 0,
-            alpha_cutoff: 0.0,
-            bone_base: 0,
-            receive_decals: 0,
-            surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
-            mapping: crate::render::gpu::uniforms::MappingUniform::default(),
-        };
-        let grid_buf_unif = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Grid Unif"),
-                contents: bytemuck::bytes_of(&grid_uniform),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let grid_bind_group =
-            self.entity_bind_group("Grid", &grid_buf_unif, self.shared_bones_buffer());
+        // Neon slate blue grid.
+        let (grid_buf_unif, grid_bind_group) =
+            self.overlay_bindings("Grid", Mat4::IDENTITY, [0.15, 0.15, 0.22, 1.0]);
         Some((grid_buf_unif, grid_bind_group))
     }
 
@@ -93,38 +112,9 @@ impl Renderer {
     }
 
     /// Build an AABB wireframe's uniform buffer + bind group (bound against the
-    /// renderer's shared identity bone palette).
+    /// renderer's shared identity bone palette). Its vertices are already in world space.
     fn build_aabb_bindings(&self, tint_color: [f32; 4]) -> (wgpu::Buffer, wgpu::BindGroup) {
-        let entity_uniform = EntityUniform {
-            model_matrix: Mat4::IDENTITY.to_cols_array(), // Vertices are already in world space
-            color_tint: tint_color,
-            use_texture: 0,
-            is_lit: 0,
-            metallic: 0.0,
-            roughness: 0.5,
-            use_metallic_map: 0,
-            use_roughness_map: 0,
-            use_normal_map: 0,
-            use_emissive_map: 0,
-            emissive: [0.0; 4],
-            use_cutout: 0,
-            alpha_cutoff: 0.0,
-            bone_base: 0,
-            receive_decals: 0,
-            surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
-            mapping: crate::render::gpu::uniforms::MappingUniform::default(),
-        };
-
-        let entity_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: bytemuck::bytes_of(&entity_uniform),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let col_bind_group =
-            self.entity_bind_group("AABB", &entity_buf, self.shared_bones_buffer());
-        (entity_buf, col_bind_group)
+        self.overlay_bindings("AABB", Mat4::IDENTITY, tint_color)
     }
 
     /// Draw the editor overlays (floor grid, collider AABBs, selected-entity axis
