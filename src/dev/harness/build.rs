@@ -32,7 +32,8 @@ impl Harness {
         ));
         crate::scene::seed_workspace(&workspace, Some(&samples));
         // The default scene's texture and shader, seeded into the working directory
-        // only when missing; only screenshots read them.
+        // when missing (the shader also re-baked when stale, #1638); only
+        // screenshots read them.
         crate::scene::default_scene::seed_default_assets();
         let mut scene = Scene::new();
         crate::scene::default_scene::build(&mut scene, bot_script);

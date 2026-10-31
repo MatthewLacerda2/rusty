@@ -12,7 +12,7 @@ use super::gpu::pipelines::create_pipelines;
 use super::{RenderView, Renderer};
 use crate::scene::Camera;
 use crate::scene::Scene;
-use crate::shadergen::{compose, engine_shader_dir};
+use crate::shadergen::{baked, compose, engine_shader_dir};
 
 impl Renderer {
     /// Render `scene` with the forward pipeline temporarily rebuilt from
@@ -65,7 +65,8 @@ impl Renderer {
     /// than panicking on a missing file or a composition error (the non-panicking
     /// path the #272 authoring bake validates through, `shadergen::compose`).
     fn compose_preview_shader(&self, shader_path: &str) -> Option<wgpu::ShaderModule> {
-        let source = std::fs::read_to_string(shader_path).ok()?;
+        // A stale baked module is brought up to date first (#1638).
+        let source = baked::load(std::path::Path::new(shader_path)).ok()?.source;
         let mut composer = compose::composer_with_common(engine_shader_dir()).ok()?;
         let naga_module = compose::compose(&mut composer, &source, shader_path).ok()?;
         Some(

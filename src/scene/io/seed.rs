@@ -36,7 +36,8 @@ pub fn build_default_scene(scene: &mut Scene) -> String {
 /// manifest's [`seed_once`](SeedManifest::seed_once): a new project gets it, an
 /// unedited copy follows the engine's default, and a deleted one stays deleted
 /// (#1618), as Unity never recreates a template's `SampleScene`. Its texture and
-/// shader are seeded with it, each only if missing, and not at all once the scene
+/// shader are seeded with it, each only if missing (the shader also re-baked from
+/// its recipe when stale, #1638), and not at all once the scene
 /// is deleted (File ▸ Reset Scene still brings both back). Which scene then opens
 /// is `core::project::boot_scene`'s call, not this one's.
 pub fn seed_default_scene() {

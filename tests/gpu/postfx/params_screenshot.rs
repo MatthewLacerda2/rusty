@@ -40,7 +40,7 @@ fn scene() -> RefCell<Scene> {
 
 /// When the module and its params sidecar were last written: a bake rewrites both.
 fn written() -> impl PartialEq + std::fmt::Debug {
-    ["wgsl", "params.json"].map(|ext| {
+    ["wgsl", "params.json", "recipe.json"].map(|ext| {
         let path = format!("{DEFAULT_OUT_DIR}/{NAME}.{ext}");
         std::fs::metadata(path).and_then(|m| m.modified()).ok()
     })
@@ -82,8 +82,9 @@ fn a_script_set_intensity_moves_the_vignette_edge_without_a_rebake() {
     let half = corner_at(&mut host, &scene, 0.5).unwrap();
     let full = corner_at(&mut host, &scene, 1.0).unwrap();
     let after = written();
-    std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{NAME}.wgsl")).ok();
-    std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{NAME}.params.json")).ok();
+    for ext in ["wgsl", "params.json", "recipe.json"] {
+        std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{NAME}.{ext}")).ok();
+    }
 
     let grey = srgb8(0.5);
     assert!(
