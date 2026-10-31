@@ -50,7 +50,7 @@ impl EditorFrontend {
     }
 
     /// End the frame's recording: close the step unless a gesture holds it open.
-    fn close_edits(&self, game: &GameWorld) {
+    fn close_edits(&mut self, game: &GameWorld) {
         let (held, touched) = (self.held(), self.touched());
         let mut scene = game.scene().borrow_mut();
         scene.pause_edits();
@@ -77,9 +77,11 @@ impl EditorFrontend {
             || self.editor_ui.rect_drag.is_some()
     }
 
-    /// Whether someone acted on the editor this frame (a press, a key, text).
-    fn touched(&self) -> bool {
-        self.egui_ctx.input(|i| i.events.iter().any(is_user_input))
+    /// Whether someone acted on the editor this frame (a press, a key, text, an
+    /// Undo or Redo, whose shortcut egui consumed). Reading it resets the latter.
+    fn touched(&mut self) -> bool {
+        let stepped = std::mem::take(&mut self.editor_ui.history_stepped);
+        stepped || self.egui_ctx.input(|i| i.events.iter().any(is_user_input))
     }
 }
 

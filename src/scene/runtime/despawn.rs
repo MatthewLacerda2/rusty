@@ -78,6 +78,8 @@ impl Scene {
             !(self.playing && why == Despawn::EditMode),
             "an edit-mode despawn of {ids:?} in Play skips script teardown; use Scene::destroy"
         );
+        // Before the World forgets them: a recorded edit keeps their entries (#1631).
+        self.keep_dropped_lightmaps(ids);
         self.world.despawn_all(ids);
         for &id in ids {
             self.shader_overrides.clear(id, None);

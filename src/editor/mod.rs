@@ -122,8 +122,11 @@ pub struct EditorUi {
     /// Stable egui texture id for the offscreen preview target (#352), set by
     /// `main.rs` before `draw` runs — mirrors `Frontend::viewport_texture_id`.
     pub preview_texture_id: Option<egui::TextureId>,
-    /// The Material card's delete confirm and its one *Undo* step (#1576).
+    /// The Material card's delete confirm (#1576).
     pub material_delete: inspector::components::material::MaterialDelete,
+    /// An Undo or Redo was asked for this frame (a shortcut, the Edit menu): the
+    /// frame counts as touched, so its writes are a step of their own (#1631).
+    pub history_stepped: bool,
 
     /// The dev-only editor state: the REPL line and the background lightmap bake.
     #[cfg(feature = "dev")]
@@ -170,6 +173,7 @@ impl EditorUi {
             preview_request: None,
             preview_texture_id: None,
             material_delete: Default::default(),
+            history_stepped: false,
 
             #[cfg(feature = "dev")]
             dev: DevEditorState::default(),

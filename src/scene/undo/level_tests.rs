@@ -60,3 +60,12 @@ fn the_scene_level_is_every_saved_field_but_the_entities_selection_and_bake() {
     assert!(!saved.is_empty(), "SceneData's field names were read");
     assert_eq!(level, saved);
 }
+
+#[test]
+fn a_nan_probe_position_is_no_edit_on_an_idle_frame() {
+    let mut scene = crate::scene::Scene::new();
+    scene.probes.add_probe(glam::Vec3::NAN);
+    scene.begin_edits();
+    scene.pause_edits();
+    assert!(!scene.commit_edits(None), "NaN never equals itself");
+}

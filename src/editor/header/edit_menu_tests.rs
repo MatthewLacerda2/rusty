@@ -39,9 +39,9 @@ fn pass(ctx: &egui::Context, focus: Focus, input: egui::RawInput, then: impl FnO
     ctx.end_pass().textures_delta.clear();
 }
 
-/// Press Ctrl+Z with `focus` held; whether the scene's step was undone, and
-/// whether the focus would hold an editor step open.
-fn press_undo(focus: Focus) -> (bool, bool) {
+/// Press Ctrl+Z with `focus` held; whether the scene's step was undone, whether
+/// the focus would hold an editor step open, and whether the frame reads touched.
+fn press_undo(focus: Focus) -> (bool, bool, bool) {
     let mut scene = Scene::new();
     scene.begin_edits();
     create_entity(&mut scene, "Crate", None);
@@ -62,20 +62,20 @@ fn press_undo(focus: Focus) -> (bool, bool) {
         holds = typing_holds_step(&ctx);
         shortcuts(&mut editor, &ctx, &mut scene);
     });
-    (scene.undo_name().is_none(), holds)
+    (scene.undo_name().is_none(), holds, editor.history_stepped)
 }
 
 #[test]
 fn a_widget_keeping_focus_after_its_gesture_neither_blocks_undo_nor_holds_a_step() {
-    assert_eq!(press_undo(Focus::Widget), (true, false));
+    assert_eq!(press_undo(Focus::Widget), (true, false, true));
 }
 
 #[test]
 fn a_text_field_takes_ctrl_z_and_holds_the_step_while_typed_into() {
-    assert_eq!(press_undo(Focus::TextField), (false, true));
+    assert_eq!(press_undo(Focus::TextField), (false, true, false));
 }
 
 #[test]
 fn the_console_edits_its_own_text_but_holds_no_step_open() {
-    assert_eq!(press_undo(Focus::Console), (false, false));
+    assert_eq!(press_undo(Focus::Console), (false, false, false));
 }

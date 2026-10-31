@@ -88,3 +88,45 @@ fn a_change_landing_between_edits_never_joins_the_last_step() {
     assert_baked(&scene, id);
     assert_eq!(scene.undo(), None);
 }
+
+#[test]
+fn a_bake_landing_on_an_idle_frame_neither_joins_the_last_step_nor_clears_redo() {
+    let (mut scene, id) = scene_with_probes();
+    scene.begin_edits();
+    scene.world.set_name(id, "Renamed".into());
+    scene.commit_edits(None);
+    // Generate Lighting lands on a frame nobody touched, auto-placing a probe.
+    scene.begin_edits();
+    scene.unrecorded(|s| {
+        s.probes.add_probe(Vec3::Y);
+        bake(s, id);
+    });
+    scene.pause_edits();
+    assert!(!scene.commit_follow_up(), "the bake is no edit");
+    assert_eq!(scene.undo().as_deref(), Some("Edit Renamed"));
+    assert_eq!(scene.probes.probes.len(), 3, "the bake's probe stays");
+    assert_baked(&scene, id);
+    // An idle frame's own follow-up after an Undo keeps it redoable.
+    scene.begin_edits();
+    scene.ambient_intensity = 0.5;
+    scene.pause_edits();
+    assert!(scene.commit_follow_up());
+    assert_eq!(scene.redo_name(), Some("Edit Renamed"));
+}
+
+#[test]
+fn a_bake_landing_mid_drag_splits_the_drag_and_joins_neither_part() {
+    let (mut scene, _) = scene_with_probes();
+    let start = scene.ambient_intensity;
+    scene.begin_edits();
+    scene.ambient_intensity = 0.25;
+    scene.unrecorded(|s| s.probes.add_probe(Vec3::Z));
+    scene.ambient_intensity = 0.5;
+    scene.commit_edits(None);
+    scene.undo();
+    assert_eq!(scene.ambient_intensity, 0.25);
+    scene.undo();
+    assert_eq!(scene.ambient_intensity, start);
+    assert_eq!(scene.probes.probes.len(), 3, "the bake's probe stays");
+    assert_eq!(scene.undo(), None);
+}

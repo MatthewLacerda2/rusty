@@ -17,7 +17,7 @@ pub(super) struct PendingEdits {
     pub(super) prefab_action: Option<prefab::PrefabAction>,
     /// The Mesh card's *Generate Hitboxes* / *Build Ragdoll* buttons (#464, #466).
     pub(super) skin_tool: Option<SkinTool>,
-    /// The Material card's *Delete* / *Undo* (#1576).
+    /// The Material card's *Delete* (#1576).
     pub(super) material_action: Option<MaterialAction>,
 }
 

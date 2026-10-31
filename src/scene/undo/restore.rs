@@ -12,8 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::ecs::Recorded;
 use crate::scene::{Despawn, Scene};
 
-use super::level::SceneLevel;
-use super::Step;
+use super::{lightmaps, Step};
 
 /// Apply `step` to `scene` with the journal off, returning its inverse: the same
 /// objects' state as it was just before, under the same name.
@@ -26,9 +25,11 @@ pub(super) fn apply(scene: &mut Scene, step: Step) -> Step {
             .keys()
             .map(|&id| (id, scene.world.record(id)))
             .collect(),
-        level: step.level.as_ref().map(|_| SceneLevel::capture(scene)),
+        level: step.level.as_ref().map(|delta| delta.inverse(scene)),
+        lightmaps: lightmaps::entries_of(scene, step.entities.keys().copied()),
     };
     restore_entities(scene, step.entities);
+    lightmaps::put_back(scene, step.lightmaps);
     if let Some(level) = step.level {
         level.restore(scene);
     }
@@ -37,7 +38,8 @@ pub(super) fn apply(scene: &mut Scene, step: Step) -> Step {
 
 /// Despawn what the step created, through the scene's one door so its own
 /// references (the selection, lightmap entries, shader overrides, …) go too,
-/// then put back every recorded entity. An undone create's id stays retired: the
+/// then put back every recorded entity, binding the skeleton of each whose mesh
+/// was rebuilt (a rebuild leaves the bones unbound, as a load does). An undone create's id stays retired: the
 /// allocator never goes back (Unity never hands an undone object's id out
 /// again), and a Redo re-creates the entity under that same id.
 fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>) {
@@ -48,6 +50,7 @@ fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>
         .collect();
     scene.despawn_batch(&created, Despawn::EditMode);
     let world = &mut scene.world;
+    let mut rebuilt = Vec::new();
     for recorded in entities.into_values().flatten() {
         let Recorded { mut doc, seq } = recorded;
         let live = world.mesh_mut(doc.id);
@@ -55,9 +58,16 @@ fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>
             (Some(mesh), Some(mut live)) if mesh.same_source(&live) => {
                 mesh.adopt_geometry(&mut live);
             }
-            (Some(_), _) => crate::scene::rehydrate::rehydrate_entity_mesh(&mut doc),
+            (Some(_), _) => {
+                crate::scene::rehydrate::rehydrate_entity_mesh(&mut doc);
+                rebuilt.push(doc.id);
+            }
             (None, _) => {}
         }
         world.restore_entity(doc, seq);
+    }
+    // After every entity is back, so each skeleton finds its restored bones.
+    for owner in rebuilt {
+        scene.sync_skeleton(owner);
     }
 }

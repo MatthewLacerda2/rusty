@@ -53,6 +53,11 @@ impl World {
         self.journal.recording = false;
     }
 
+    /// Whether writes are being recorded now.
+    pub fn journal_recording(&self) -> bool {
+        self.journal.recording
+    }
+
     /// Take what was recorded (`None` when nothing was); recording is unchanged.
     pub fn journal_take(&mut self) -> Option<Journaled> {
         self.journal.taken.take()

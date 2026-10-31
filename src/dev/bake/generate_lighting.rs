@@ -57,8 +57,11 @@ pub fn generate_lighting(
     refuse_in_play(scene)?;
     let path = scene_path.ok_or(UNSAVED)?;
     let settings = scene.lighting_settings.lightmaps;
-    let lightmaps = bake_scene_lightmaps(scene, Some(path), &settings)?;
-    finish(scene, path, nav, lightmaps)
+    // A bake is no edit (#1631): the console line's Undo step leaves it out.
+    scene.unrecorded(|scene| {
+        let lightmaps = bake_scene_lightmaps(scene, Some(path), &settings)?;
+        finish(scene, path, nav, lightmaps)
+    })
 }
 
 /// The steps after the lightmaps (already applied to `scene`, `lightmaps` of them):

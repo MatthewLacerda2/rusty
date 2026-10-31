@@ -4,8 +4,8 @@
 //! probe sets and the bake's settings live on `Scene`, beside the World, and are
 //! written by plain field assignment from the inspector and the API alike. They
 //! are recorded as one more object: the stack keeps a copy as a baseline, and an
-//! edit that leaves the scene differing from it records the copy as the state
-//! before. One list of fields, so the copy, the comparison and the restore never
+//! edit that leaves the scene differing from it records the fields it changed, as
+//! they were before ([`LevelDelta`]). One list of fields, so the copy, the comparison and the restore never
 //! disagree about what the scene level is.
 //!
 //! **Bake outputs are not edits** (Unity's Undo never reverts a lighting bake):
@@ -23,10 +23,18 @@ use crate::scene::Scene;
 
 macro_rules! scene_level {
     ($($field:ident: $ty:ty => $same:ident, $put:ident;)*) => {
-        /// The scene-level state, as values: what a step puts back.
+        /// The scene-level state, as values: the open edit's baseline.
         #[derive(Clone, Debug)]
         pub(super) struct SceneLevel {
             $($field: $ty,)*
+        }
+
+        /// The fields one step changed, each as it was before: what it puts back.
+        /// Only those, so undoing a setting never reverts a field the step did
+        /// not touch (a bake's probes placed since, a later edit's fog).
+        #[derive(Debug)]
+        pub(super) struct LevelDelta {
+            $($field: Option<$ty>,)*
         }
 
         /// The `Scene` fields the scene level is made of, as `SceneData` names them.
@@ -44,9 +52,32 @@ macro_rules! scene_level {
                 true $(&& $same(&self.$field, &scene.$field))*
             }
 
-            /// Put these values back on `scene`.
+            /// The fields `scene` moved away from this baseline, as they were.
+            pub(super) fn delta(self, scene: &Scene) -> LevelDelta {
+                LevelDelta {
+                    $($field: (!$same(&self.$field, &scene.$field)).then_some(self.$field),)*
+                }
+            }
+        }
+
+        impl LevelDelta {
+            /// The same fields as `scene` holds them now: the step that redoes this.
+            pub(super) fn inverse(&self, scene: &Scene) -> Self {
+                Self { $($field: self.$field.as_ref().map(|_| scene.$field.clone()),)* }
+            }
+
+            /// Put these fields back on `scene`.
             pub(super) fn restore(self, scene: &mut Scene) {
-                $($put(self.$field, &mut scene.$field);)*
+                $(if let Some(value) = self.$field {
+                    $put(value, &mut scene.$field);
+                })*
+            }
+
+            /// Fold a later step's fields in; this step's older record of a field wins.
+            pub(super) fn absorb(&mut self, later: Self) {
+                $(if self.$field.is_none() {
+                    self.$field = later.$field;
+                })*
             }
         }
     };
@@ -93,7 +124,7 @@ fn same_probes(a: &ProbeVolume, b: &ProbeVolume) -> bool {
         && a.probes
             .iter()
             .zip(&b.probes)
-            .all(|(p, q)| p.position == q.position)
+            .all(|(p, q)| eq_or_bytes(&p.position, &q.position))
 }
 
 /// Put the probes back, keeping the live baked SH while the count is unchanged.

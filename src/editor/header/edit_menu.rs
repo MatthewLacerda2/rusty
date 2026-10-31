@@ -39,9 +39,9 @@ pub(super) fn shortcuts(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut 
     // logically, Shift or not.
     let redo = ctx.input_mut(|i| i.consume_shortcut(&REDO) || i.consume_shortcut(&REDO_Y));
     if redo {
-        editor.is_dirty |= scene.redo().is_some();
+        step(editor, scene, false);
     } else if ctx.input_mut(|i| i.consume_shortcut(&UNDO)) {
-        editor.is_dirty |= scene.undo().is_some();
+        step(editor, scene, true);
     }
 }
 
@@ -52,15 +52,24 @@ pub(super) fn edit_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
     ui.menu_button("Edit", |ui| {
         let undo = scene.undo_name().map(|n| format!("Undo {n}"));
         if item(ui, icon::ARROW_U_UP_LEFT, undo, "Undo", &UNDO, playing) {
-            editor.is_dirty |= scene.undo().is_some();
+            step(editor, scene, true);
             ui.close();
         }
         let redo = scene.redo_name().map(|n| format!("Redo {n}"));
         if item(ui, icon::ARROW_U_UP_RIGHT, redo, "Redo", &REDO, playing) {
-            editor.is_dirty |= scene.redo().is_some();
+            step(editor, scene, false);
             ui.close();
         }
     });
+}
+
+/// Undo (`back`) or Redo one step. The ask itself touches the frame: a shortcut
+/// is consumed before the frame's touch is read, and a write after the step must
+/// not fold into an older one (`shell::editor::undo`).
+fn step(editor: &mut EditorUi, scene: &mut Scene, back: bool) {
+    editor.history_stepped = true;
+    let stepped = if back { scene.undo() } else { scene.redo() };
+    editor.is_dirty |= stepped.is_some();
 }
 
 /// One menu entry: `label` when there is a step, `fallback` greyed out when not.

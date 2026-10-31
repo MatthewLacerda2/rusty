@@ -198,12 +198,22 @@ pub fn poll(
         log.warn("Generate Lighting dropped: the open scene changed".into());
         return;
     }
+    if !active.job.is_finished() {
+        return ctx.request_repaint_after(PROGRESS_REPAINT);
+    }
+    // A bake is no edit (#1631): it neither joins the open Undo step nor ends it.
+    scene.unrecorded(|scene| land(editor, scene, log, nav));
+}
+
+/// Apply the finished lightmap step, bake the probes and write the lighting.
+fn land(editor: &mut EditorUi, scene: &mut Scene, log: &mut ConsoleLogs, nav: &NavigationGraph) {
+    let Some(mut active) = editor.dev.lightmap_bake.take() else {
+        return;
+    };
     let Some(outcome) = active.job.poll(scene) else {
-        ctx.request_repaint_after(PROGRESS_REPAINT);
         return;
     };
     let path = active.job.scene_path().to_string();
-    editor.dev.lightmap_bake = None;
     let lightmaps = match outcome {
         BakeOutcome::Baked(n) => n,
         BakeOutcome::Cancelled => {

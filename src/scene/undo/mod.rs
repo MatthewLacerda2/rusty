@@ -22,6 +22,7 @@
 //! edit clears Redo. It keeps the last [`DEPTH`] steps.
 
 mod level;
+mod lightmaps;
 mod restore;
 
 use std::collections::{BTreeMap, VecDeque};
@@ -29,7 +30,7 @@ use std::collections::{BTreeMap, VecDeque};
 use crate::ecs::Recorded;
 use crate::scene::Scene;
 
-use level::SceneLevel;
+use level::{LevelDelta, SceneLevel};
 
 /// How many steps Undo keeps. Unity bounds its history by memory, not count; a
 /// step here holds only what one edit touched (documents without geometry), so
@@ -42,7 +43,9 @@ pub const DEPTH: usize = 200;
 struct Step {
     name: String,
     entities: BTreeMap<u32, Option<Recorded>>,
-    level: Option<SceneLevel>,
+    level: Option<LevelDelta>,
+    /// The lightmap entries of the step's destroyed entities (`lightmaps`).
+    lightmaps: lightmaps::Entries,
 }
 
 /// The scene's Undo and Redo stacks, and the open edit's scene-level baseline.
@@ -54,6 +57,8 @@ pub struct UndoStack {
     open: bool,
     /// The scene level as it stood when the open edit began.
     level: Option<SceneLevel>,
+    /// Lightmap entries the open edit's despawns dropped (`lightmaps`).
+    dropped: lightmaps::Entries,
 }
 
 impl Scene {
@@ -92,11 +97,11 @@ impl Scene {
     /// the editor changed in a frame no one touched it (a card folding last
     /// frame's Add into the material library) finishes that frame's gesture, as
     /// Unity folds it into the current group. With no step yet, it is its own.
+    /// It never clears Redo: it is no new edit, so an Undo stays redoable.
     pub fn commit_follow_up(&mut self) -> bool {
         let Some(step) = self.take_step(None) else {
             return false;
         };
-        self.history.redo.clear();
         let Some(last) = self.history.undo.back_mut() else {
             self.push_undo(step);
             return true;
@@ -105,10 +110,33 @@ impl Scene {
         for (id, before) in step.entities {
             last.entities.entry(id).or_insert(before);
         }
-        if last.level.is_none() {
-            last.level = step.level;
+        match (&mut last.level, step.level) {
+            (Some(older), Some(later)) => older.absorb(later),
+            (slot @ None, later) => *slot = later,
+            (Some(_), None) => {}
+        }
+        for (id, entry) in step.lightmaps {
+            last.lightmaps.entry(id).or_insert(entry);
         }
         true
+    }
+
+    /// Run `f` as no edit: what it writes (a lighting bake landing; Unity's Undo
+    /// never reverts a bake) is neither recorded nor folded into a step. An edit
+    /// open around it is closed first, as its own step, and reopened after, so
+    /// a drag the bake lands in becomes two steps and neither holds the bake.
+    pub fn unrecorded<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let (open, recording) = (self.history.open, self.world.journal_recording());
+        self.commit_edits(None);
+        self.world.journal_pause();
+        let out = f(self);
+        if open {
+            self.begin_edits();
+            if !recording {
+                self.pause_edits();
+            }
+        }
+        out
     }
 
     /// The open edit closed into a step: `None` when it changed nothing.
@@ -119,6 +147,7 @@ impl Scene {
             return None;
         }
         let before = journaled.map(|j| j.before).unwrap_or_default();
+        let mut dropped = std::mem::take(&mut self.history.dropped);
         let entities: BTreeMap<_, _> = before
             .into_iter()
             .filter(|(id, before)| changed(before.as_ref(), self.world.record(*id).as_ref()))
@@ -126,15 +155,18 @@ impl Scene {
         let level = self
             .level_changed()
             .then(|| self.history.level.take())
-            .flatten();
+            .flatten()
+            .map(|baseline| baseline.delta(self));
         if entities.is_empty() && level.is_none() {
             return None;
         }
         let name = name.map_or_else(|| self.step_name(&entities), str::to_string);
+        dropped.retain(|id, _| entities.contains_key(id));
         Some(Step {
             name,
             entities,
             level,
+            lightmaps: dropped,
         })
     }
 
@@ -247,6 +279,8 @@ fn changed(before: Option<&Recorded>, after: Option<&Recorded>) -> bool {
 
 #[cfg(test)]
 mod bake_tests;
+#[cfg(test)]
+mod destroy_tests;
 #[cfg(test)]
 mod ids_tests;
 #[cfg(test)]
