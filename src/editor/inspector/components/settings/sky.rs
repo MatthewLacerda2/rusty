@@ -18,7 +18,9 @@ type ColorRow = (
 /// The procedural sky section, collapsed by default like Fog.
 pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let before = scene.sky;
-    let resolved = before.resolved(scene.ambient_color);
+    // The colours drawn now, under the ambient the renderer uses (an Ambient light
+    // entity wins over the scene's colour).
+    let resolved = before.resolved(scene.drawn_ambient().0);
     let sky = &mut scene.sky;
     let mut changed = false;
     egui::CollapsingHeader::new(format!("{}  Procedural Sky", icon::CLOUD_SUN)).show(ui, |ui| {

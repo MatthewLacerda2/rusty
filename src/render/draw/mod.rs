@@ -59,6 +59,7 @@ impl Renderer {
         let sky = self.sky_reflection.prepare(gpu, &self.gpu_timer, source);
         self.frame_counters.sky_reflection_bakes += u32::from(sky.baked);
         self.global_bind_group_dirty |= sky.rebind;
+        self.spare_global_group.switched |= sky.switched;
         // Every decal and its maps, once for the whole frame (#638); each camera
         // bins them into its clusters.
         self.upload_decals(scene);

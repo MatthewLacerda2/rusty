@@ -210,6 +210,7 @@ impl Renderer {
             lighting_buffer: global.lighting_buffer,
             global_bind_group: global.global_bind_group,
             global_bind_group_dirty: false,
+            spare_global_group: Default::default(),
             clusters: global.clusters,
             lightmaps: global.lightmaps,
             draw_buffers,

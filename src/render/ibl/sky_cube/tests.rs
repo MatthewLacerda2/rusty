@@ -1,6 +1,6 @@
 //! What a frame bakes into the sky reflection cubes (#1553), GPU-free.
 
-use super::{bake_slot, plan, Bake};
+use super::{bake_slot, plan, procedural_step, Bake, Prepared};
 
 #[test]
 fn the_procedural_sky_is_baked_once_per_settings() {
@@ -17,11 +17,31 @@ fn a_new_sky_is_baked_beside_the_bound_one() {
     assert_eq!(bake_slot(1, false), 0);
 }
 
+/// Settings the other slot holds only switch group 0 to it, and bake nothing; the
+/// bound slot's settings change nothing; new settings bake beside the bound ones
+/// (#1620).
+#[test]
+fn settings_held_by_the_other_slot_only_rebind() {
+    let held = [Some('a'), Some('b')];
+    let step = |current, sky| procedural_step(&held, current, &sky);
+    let prepared = |baked, switched| Prepared {
+        baked,
+        rebind: false,
+        switched,
+    };
+    assert_eq!(step(0, 'b'), (1, prepared(false, true)));
+    assert_eq!(step(1, 'a'), (0, prepared(false, true)));
+    assert_eq!(step(0, 'a'), (0, prepared(false, false)));
+    assert_eq!(step(0, 'c'), (1, prepared(true, true)));
+    let first = procedural_step(&[None, None], 0, &'a');
+    assert_eq!(first, (0, prepared(true, false)), "the first bake");
+}
+
 #[test]
 fn a_panorama_is_baked_only_when_it_is_not_the_one_held() {
-    for procedural_baked in [false, true] {
-        assert_eq!(plan(procedural_baked, Some(false)), Bake::Panorama);
-        assert_eq!(plan(procedural_baked, Some(true)), Bake::Nothing);
+    for procedural_held in [false, true] {
+        assert_eq!(plan(procedural_held, Some(false)), Bake::Panorama);
+        assert_eq!(plan(procedural_held, Some(true)), Bake::Nothing);
     }
 }
 

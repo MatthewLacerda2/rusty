@@ -6,7 +6,8 @@
 //! reflects of it (the sky reflection cube, re-baked when they change, #1553) and
 //! what a reflection-probe bake captures.
 //!
-//! Each colour is optional: unset, it follows the scene's ambient colour as the sky
+//! Each colour is optional: unset, it follows the ambient colour drawn (the scene's,
+//! or an active Ambient light's: `Scene::drawn_ambient`) as the sky
 //! always has (the zenith *is* the ambient colour, the horizon that lifted toward
 //! white, the ground a quarter of the zenith), so the defaults draw today's sky
 //! exactly and a scripted ambient (a day cycle) still tints it every frame.
@@ -59,8 +60,10 @@ impl SkySettings {
     }
 
     /// The zenith, horizon and ground colours drawn under ambient colour `ambient`:
-    /// each set one, else derived as `common::procedural_sky` derives it. What the
-    /// Scene Settings panel starts a colour from when it is first set.
+    /// each set one, else derived as `common::procedural_sky` derives it. Passed
+    /// `Scene::drawn_ambient`'s colour (an Ambient light entity's when one is
+    /// active), it is the sky on screen: what the Scene Settings panel starts a
+    /// colour from when it is first set.
     pub fn resolved(&self, ambient: Vec3) -> [Vec3; 3] {
         let zenith = self.zenith.unwrap_or(ambient);
         let horizon = self.horizon.unwrap_or(zenith.lerp(Vec3::ONE, 0.6));

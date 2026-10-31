@@ -232,6 +232,7 @@ during Play goes back on Stop, as every scene edit does.
   clamp to `0`–`1`; NaN or `math.huge` changes nothing. The defaults draw the sky
   rusty has always drawn, and a scene at its defaults leaves the `sky` block out of
   its file. What a surface reflects follows: the sky's reflection cube is re-baked
-  once when a setting changes (never per frame), and reflection-probe bakes capture
+  once per change, so a script that changes a setting every frame re-bakes every
+  frame (the ambient colour never re-bakes it), and reflection-probe bakes capture
   the sky as drawn. The flat ambient a surface takes is still the ambient colour
   alone, not the sky's colours.
