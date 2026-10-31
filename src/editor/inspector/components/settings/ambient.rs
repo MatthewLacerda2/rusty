@@ -43,29 +43,40 @@ pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) 
         }
     });
     if before.mode == AmbientMode::Gradient {
-        let rows: [GradientRow; 3] = [
-            ("Sky Color:", before.sky, env_ops::set_ambient_sky_color),
-            (
-                "Equator Color:",
-                before.equator,
-                env_ops::set_ambient_equator_color,
-            ),
-            (
-                "Ground Color:",
-                before.ground,
-                env_ops::set_ambient_ground_color,
-            ),
-        ];
-        for (label, value, op) in rows {
-            ui.horizontal(|ui| {
-                ui.label(label);
-                let mut rgb = value.to_array();
-                if ui.color_edit_button_rgb(&mut rgb).changed() {
-                    op(&mut scene.ambient, Vec3::from_array(rgb));
-                    changed = true;
-                }
-            });
-        }
+        changed |= gradient_rows(ui, &mut scene.ambient, &before);
     }
     editor.is_dirty |= changed;
+}
+
+/// The gradient's sky, equator and ground colour pickers. Returns whether one changed.
+fn gradient_rows(
+    ui: &mut egui::Ui,
+    ambient: &mut AmbientSettings,
+    before: &AmbientSettings,
+) -> bool {
+    let rows: [GradientRow; 3] = [
+        ("Sky Color:", before.sky, env_ops::set_ambient_sky_color),
+        (
+            "Equator Color:",
+            before.equator,
+            env_ops::set_ambient_equator_color,
+        ),
+        (
+            "Ground Color:",
+            before.ground,
+            env_ops::set_ambient_ground_color,
+        ),
+    ];
+    let mut changed = false;
+    for (label, value, op) in rows {
+        ui.horizontal(|ui| {
+            ui.label(label);
+            let mut rgb = value.to_array();
+            if ui.color_edit_button_rgb(&mut rgb).changed() {
+                op(ambient, Vec3::from_array(rgb));
+                changed = true;
+            }
+        });
+    }
+    changed
 }
