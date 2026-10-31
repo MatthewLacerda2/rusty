@@ -119,6 +119,10 @@ through Play), so they never reach a Play session. `play --size` and `--scene`
 are refused with `--demo`: the replay plays the scene and the Game view size the
 demo recorded (the sim lays the UI out on it, and every frame renders at it).
 
+**Open one in the editor.** `Editor.OpenDemo(path)` ([`api/Editor.md`](api/Editor.md),
+*The demo timeline*) plays a demo on the Game view with a timeline: play/pause,
+scrub by tick (the same seek as `Harness.SeekDemo`) and the index's marks on the bar.
+
 **Bit for bit is checked, not promised.** Every 120 ticks, and once right before
 Stop (or when a `play` run ends), the demo stores a digest of the world: every
 entity's id, name, active flag and transform, every rigidbody's velocities, the

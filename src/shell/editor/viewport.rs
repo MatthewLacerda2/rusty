@@ -62,12 +62,19 @@ impl EditorFrontend {
         interaction: &ViewportInteraction,
         pixels_per_point: f32,
     ) {
-        let Some((px, py)) = target_size(interaction.size, pixels_per_point) else {
+        let Some(panel) = target_size(interaction.size, pixels_per_point) else {
             return;
         };
-        // The UI lays out on the game view's pixel size (#417) — a sim input.
-        game.resources.screen.borrow_mut().set_game_view(px, py);
         let scene_tab = interaction.tab == ViewportTab::Scene;
+        let (px, py) = match self.demo_size() {
+            // A demo replays on the size it recorded, drawn letterboxed (#1598).
+            Some(size) if !scene_tab => size,
+            _ => panel,
+        };
+        if self.demo_size().is_none() {
+            // The UI lays out on the game view's pixel size (#417) — a sim input.
+            game.resources.screen.borrow_mut().set_game_view(px, py);
+        }
         // Create-or-resize this tab's own view. A view's resize guard checks its own
         // size, so it never fights the other tab's or the preview's (#355). The Game
         // view is the screen: its scene renders at the render scale (#1498).
@@ -106,6 +113,14 @@ impl EditorFrontend {
             &mut self.viewport_texture_id,
             view,
         );
+    }
+
+    /// The size of the Game view an open demo replays on; `None` with none open.
+    fn demo_size(&self) -> Option<(u32, u32)> {
+        #[cfg(feature = "dev")]
+        return self.editor_ui.demo_size();
+        #[cfg(not(feature = "dev"))]
+        None
     }
 
     /// Render the Inspector Preview tab's isolated scene into its own offscreen target

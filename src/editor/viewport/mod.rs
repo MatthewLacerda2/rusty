@@ -74,7 +74,14 @@ pub fn draw(
         .frame(egui::Frame::NONE.fill(t.bg_tier0))
         .show(ui, |ui| {
             draw_tab_strip(ui, &mut tab, &mut overlay, t);
-            let response = draw_image(ui, texture, t);
+            #[cfg_attr(not(feature = "dev"), expect(unused_mut, reason = "a demo fits it"))]
+            let mut fit = None;
+            #[cfg(feature = "dev")]
+            if let (ViewportTab::Game, Some(demo)) = (tab, editor.dev.demo.as_mut()) {
+                crate::editor::demo::timeline::draw(ui, demo, &t);
+                fit = Some(demo.size);
+            }
+            let response = draw_image(ui, texture, t, fit);
             if tab == ViewportTab::Scene {
                 navigate(editor, &response, scene);
             } else {
@@ -152,24 +159,45 @@ fn navigation_help(ui: &mut egui::Ui) {
 }
 
 /// Draw the scene image filling the remaining space, sensing clicks + drags. Before
-/// the first offscreen frame exists, a neutral fill stands in.
+/// the first offscreen frame exists, a neutral fill stands in. With `fit` (an open
+/// demo's Game view size) the image is letterboxed at that aspect ratio.
 fn draw_image(
     ui: &mut egui::Ui,
     texture: Option<egui::TextureId>,
     t: crate::editor::theme::Theme,
+    fit: Option<(u32, u32)>,
 ) -> egui::Response {
     let size = ui.available_size();
-    match texture {
-        Some(id) => ui.add(
-            egui::Image::new((id, size))
-                .sense(egui::Sense::click_and_drag())
-                .maintain_aspect_ratio(false),
-        ),
-        None => {
-            let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
-            ui.painter().rect_filled(rect, 0.0, t.bg_tier0);
-            response
-        }
+    let Some(id) = texture else {
+        let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
+        ui.painter().rect_filled(rect, 0.0, t.bg_tier0);
+        return response;
+    };
+    let Some((width, height)) = fit else {
+        let image = egui::Image::new((id, size)).sense(egui::Sense::click_and_drag());
+        return ui.add(image.maintain_aspect_ratio(false));
+    };
+    // Letterboxed: the panel black, the image centred at the size's aspect ratio.
+    let (panel, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let rect = egui::Rect::from_center_size(panel.center(), letterbox(size, (width, height)));
+    let painter = ui.painter();
+    painter.rect_filled(panel, 0.0, egui::Color32::BLACK);
+    let uv = egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0));
+    painter.image(id, rect, uv, egui::Color32::WHITE);
+    ui.interact(
+        rect,
+        ui.id().with("letterboxed"),
+        egui::Sense::click_and_drag(),
+    )
+}
+
+/// The largest size of `width:height`'s aspect ratio that fits in `panel`.
+pub fn letterbox(panel: egui::Vec2, (width, height): (u32, u32)) -> egui::Vec2 {
+    let aspect = width.max(1) as f32 / height.max(1) as f32;
+    if panel.x / panel.y.max(f32::MIN_POSITIVE) > aspect {
+        egui::vec2(panel.y * aspect, panel.y)
+    } else {
+        egui::vec2(panel.x, panel.x / aspect)
     }
 }
 

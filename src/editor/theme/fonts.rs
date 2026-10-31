@@ -71,9 +71,10 @@ mod tests {
     fn inter_leaves_the_icon_codepoints_to_phosphor() {
         let icon = egui_phosphor::regular::FOLDER.chars().next().unwrap();
         for bytes in [super::INTER, super::INTER_SEMIBOLD] {
-            let face = ttf_parser::Face::parse(bytes, 0).unwrap();
-            assert!(face.glyph_index('A').is_some());
-            assert!(face.glyph_index(icon).is_none(), "Inter maps {icon:?}");
+            use skrifa::MetadataProvider;
+            let charmap = skrifa::FontRef::new(bytes).unwrap().charmap();
+            assert!(charmap.map('A').is_some());
+            assert!(charmap.map(icon).is_none(), "Inter maps {icon:?}");
         }
     }
 

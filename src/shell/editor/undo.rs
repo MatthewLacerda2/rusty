@@ -9,11 +9,38 @@
 
 use super::EditorFrontend;
 use crate::app::GameWorld;
+use crate::editor::ViewportInteraction;
+use crate::shell::Shell;
 
 impl EditorFrontend {
+    /// Draw the dashboard, recording what it edits.
+    pub(super) fn recorded_dashboard(
+        &mut self,
+        shell: &mut Shell,
+        game: &mut GameWorld,
+    ) -> ViewportInteraction {
+        self.record_edits(game);
+        let interaction = self.draw_dashboard(shell, game);
+        self.pause_edits(game);
+        interaction
+    }
+
+    /// Apply the viewport's pointer edits (picking, the gizmo, the rect tool),
+    /// recorded, then close the frame's step.
+    pub(super) fn recorded_viewport_interaction(
+        &mut self,
+        game: &GameWorld,
+        interaction: &ViewportInteraction,
+        pixels_per_point: f32,
+    ) {
+        self.record_edits(game);
+        self.handle_viewport_interaction(game, interaction, pixels_per_point);
+        self.close_edits(game);
+    }
+
     /// Record the writes that follow as the editor's edit: a full one when someone
     /// is acting on the editor, a cheap follow-up otherwise.
-    pub(super) fn record_edits(&self, game: &GameWorld) {
+    fn record_edits(&self, game: &GameWorld) {
         let mut scene = game.scene().borrow_mut();
         if self.held() || self.touched() {
             scene.begin_edits();
@@ -23,12 +50,12 @@ impl EditorFrontend {
     }
 
     /// Stop recording until the next [`Self::record_edits`].
-    pub(super) fn pause_edits(&self, game: &GameWorld) {
+    fn pause_edits(&self, game: &GameWorld) {
         game.scene().borrow_mut().pause_edits();
     }
 
     /// End the frame's recording: close the step unless a gesture holds it open.
-    pub(super) fn close_edits(&self, game: &GameWorld) {
+    fn close_edits(&self, game: &GameWorld) {
         let (held, touched) = (self.held(), self.touched());
         let mut scene = game.scene().borrow_mut();
         scene.pause_edits();

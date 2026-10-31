@@ -262,6 +262,10 @@ impl SubMesh {
 pub struct ImportedAsset {
     pub sub_meshes: Vec<SubMesh>,
     pub materials: Vec<MaterialData>,
+    /// The file's node hierarchy (#1083), parents before children, skeleton
+    /// joints left out (they spawn as the skinned mesh's bones, #453). Empty when
+    /// the source has none (`.obj`); [`node_tree`](Self::node_tree) fills the gap.
+    pub nodes: Vec<super::model_node::ModelNode>,
 }
 
 impl ImportedAsset {

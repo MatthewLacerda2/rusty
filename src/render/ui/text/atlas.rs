@@ -8,11 +8,10 @@
 
 use std::collections::HashMap;
 
-use ab_glyph::GlyphId;
 use glam::Vec2;
 
 use super::sdf::{glyph_field, GlyphField};
-use crate::ui::text::font;
+use crate::ui::text::font::{self, GlyphId};
 
 pub(crate) const WIDTH: u32 = 1024;
 pub(crate) const START_HEIGHT: u32 = 256;
@@ -34,7 +33,7 @@ pub(crate) struct GlyphAtlas {
     pub(crate) pixels: Vec<u8>,
     /// Changed since the last upload.
     pub(crate) dirty: bool,
-    glyphs: HashMap<u16, Option<AtlasGlyph>>,
+    glyphs: HashMap<GlyphId, Option<AtlasGlyph>>,
     /// Shelf packer: the cursor and the current shelf's height.
     cursor: (u32, u32),
     shelf: u32,
@@ -59,11 +58,11 @@ impl GlyphAtlas {
     /// `glyph`'s place, generating and packing it on first use. `None` for an empty
     /// glyph or a full atlas.
     pub(crate) fn glyph(&mut self, font: &font::FontData, glyph: GlyphId) -> Option<AtlasGlyph> {
-        if let Some(g) = self.glyphs.get(&glyph.0) {
+        if let Some(g) = self.glyphs.get(&glyph) {
             return *g;
         }
         let placed = glyph_field(font, glyph).and_then(|f| self.insert(&f));
-        self.glyphs.insert(glyph.0, placed);
+        self.glyphs.insert(glyph, placed);
         placed
     }
 

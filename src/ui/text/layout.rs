@@ -7,9 +7,9 @@
 //! corners and draws them from its SDF atlas; the sim reads [`preferred_size`] for
 //! layout. Same inputs, same glyphs — headless or windowed.
 
-use ab_glyph::GlyphId;
 use glam::{Vec2, Vec4};
 
+use super::font::GlyphId;
 use super::lines::{block_height, break_lines, clip, pitch, Line, EPS};
 use super::measure::Measurer;
 use crate::components::TextComponent;
@@ -24,8 +24,11 @@ pub struct PlacedGlyph {
     pub glyph: GlyphId,
     /// Index into [`TextLayout::faces`].
     pub face: usize,
-    /// Pen position on the baseline, rect-local reference units.
+    /// Pen position on the baseline (plus a mark's offset), rect-local reference units.
     pub origin: Vec2,
+    /// The y of the line's baseline: a synthesized italic shears about it, so a
+    /// raised mark leans with its base.
+    pub baseline: f32,
     /// Em size, reference units.
     pub size: f32,
     /// Display-space fill, straight alpha (rich-text colour folded in).
@@ -157,7 +160,8 @@ fn place(text: &TextComponent, lines: &[Line], rect: Vec2) -> TextLayout {
             glyphs.push(PlacedGlyph {
                 glyph: it.glyph,
                 face: it.face,
-                origin: Vec2::new(x0 + x, baseline),
+                origin: Vec2::new(x0 + x, baseline) + it.offset,
+                baseline,
                 size: it.size,
                 color: it.color,
                 faux_bold: it.faux_bold,

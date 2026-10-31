@@ -10,13 +10,14 @@ all-features = true
 [advisories]
 yanked = "warn"
 ignore = [
-  # `ttf-parser` is unmaintained. It is a direct dependency since #419 (GPOS
-  # kerning for UI `Text`) and also arrives through ab_glyph (ours, and winit →
-  # sctk-adwaita). It parses the project's own font assets, not untrusted input,
-  # and it is NOT a vulnerability. Since #333 egui no longer pulls it. Exit
-  # condition: drop this when the UI text stack moves to a maintained parser
-  # (e.g. `skrifa`/`read-fonts`, which egui 0.36 already uses) and winit's
-  # sctk-adwaita follows. Real RUSTSEC vulnerabilities still fail the deny job.
+  # `ttf-parser` is unmaintained. rusty no longer uses it: UI `Text` moved to
+  # `skrifa` + `harfrust` (#1328). It stays in the tree only through winit →
+  # sctk-adwaita → ab_glyph (Wayland client-side window decorations), which
+  # draws the window title with it. It parses system fonts there, not untrusted
+  # input, and it is NOT a vulnerability. Exit condition: drop this when
+  # sctk-adwaita moves off ab_glyph, or if winit's decoration feature is ever
+  # turned off (that changes Wayland window titles: the operator's call).
+  # Real RUSTSEC vulnerabilities still fail the deny job.
   "RUSTSEC-2026-0192",
 ]
 

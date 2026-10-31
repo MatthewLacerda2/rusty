@@ -54,6 +54,26 @@ fn the_assets_api_sets_and_reads_a_models_scale_factor() {
 }
 
 #[test]
+fn instantiating_a_bare_model_path_spawns_the_whole_model() {
+    // Unity's `Instantiate` of a model prefab: the editor button's node tree (#1083).
+    let path = quad_model("rusty_1083_api");
+    let scene = Rc::new(RefCell::new(Scene::new()));
+    let lua = format!("_G.root = Scene.Instantiate({path:?}, 'Kit', 1, 2, 3)");
+    let m = manager(&scene);
+    m.exec(&lua).unwrap();
+    let root: u32 = m.eval("_G.root").unwrap().parse().unwrap();
+    let scene = scene.borrow();
+    assert_eq!(*scene.world.name(root).unwrap(), "Kit");
+    assert_eq!(
+        scene.world.transform(root).unwrap().position,
+        Vec3::new(1.0, 2.0, 3.0)
+    );
+    let children = scene.world.children(root);
+    assert_eq!(children.len(), 1);
+    assert!(scene.world.mesh(children[0]).is_some(), "the quad's node");
+}
+
+#[test]
 fn the_assets_api_sets_and_reads_a_textures_import_settings() {
     let png = crate::test_temp::dir().join("brick.png");
     let m = manager(&Rc::new(RefCell::new(Scene::new())));

@@ -1,17 +1,17 @@
 //! src/render/ui/text/sdf.rs — one glyph's signed distance field (#419).
 //!
-//! The glyph is rasterized at [`SUPERSAMPLE`]× the atlas base size, thresholded to
-//! inside / outside, and run through an exact Euclidean distance transform
+//! The glyph's flattened outline (`FontData::outline`) is filled at
+//! [`SUPERSAMPLE`]× the atlas base size — non-zero winding, sampled at each cell's
+//! centre, so a cell is inside or outside — and run through an exact Euclidean distance transform
 //! (Felzenszwalb–Huttenlocher) both ways; each base-size texel averages the signed
 //! distances of its supersampled block. Distances are stored as
 //! `0.5 + d / (2 · SPREAD)` (inside positive), so the edge is 0.5 and the field
 //! reaches [`SPREAD`] base pixels past it — the room outline, glow and faux bold
 //! have to grow into. Pure CPU.
 
-use ab_glyph::{point, Font, GlyphId};
 use glam::Vec2;
 
-use crate::ui::text::font::FontData;
+use crate::ui::text::font::{FontData, GlyphId};
 
 /// The em size glyphs are generated at, in atlas pixels.
 pub(crate) const BASE_SIZE: f32 = 48.0;
@@ -34,56 +34,69 @@ pub(crate) struct GlyphField {
 
 /// The field of `glyph` in `font`, or `None` for an empty glyph (a space).
 pub(crate) fn glyph_field(font: &FontData, glyph: GlyphId) -> Option<GlyphField> {
-    let base = font.em_scale(BASE_SIZE);
-    let pad = SPREAD as i32;
-    let bounds = font
-        .font()
-        .outline_glyph(glyph.with_scale_and_position(base, point(0.0, 0.0)))?
-        .px_bounds();
-    // The base grid, y down: `(x0, y0)` is its top-left pixel relative to the pen.
-    let (x0, y0) = (
-        bounds.min.x.floor() as i32 - pad,
-        bounds.min.y.floor() as i32 - pad,
+    let s = SUPERSAMPLE as f32;
+    let segments = font.outline(glyph, BASE_SIZE * s)?;
+    let (lo, hi) = segments.iter().flatten().fold(
+        (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN)),
+        |(lo, hi), p| (lo.min(*p), hi.max(*p)),
     );
-    let w = (bounds.max.x.ceil() as i32 - bounds.min.x.floor() as i32 + 2 * pad) as usize;
-    let h = (bounds.max.y.ceil() as i32 - bounds.min.y.floor() as i32 + 2 * pad) as usize;
-    let inside = coverage(font, glyph, (x0, y0), (w, h))?;
+    if !(lo.is_finite() && hi.is_finite()) {
+        return None;
+    }
+    let pad = SPREAD as i32;
+    // The base grid, y up: `(x0, y0)` is its bottom-left corner relative to the pen.
+    let (x0, y0) = (
+        (lo.x / s).floor() as i32 - pad,
+        (lo.y / s).floor() as i32 - pad,
+    );
+    let (x1, y1) = (
+        (hi.x / s).ceil() as i32 + pad,
+        (hi.y / s).ceil() as i32 + pad,
+    );
+    let (w, h) = ((x1 - x0) as usize, (y1 - y0) as usize);
+    let corner = Vec2::new(x0 as f32, y1 as f32) * s;
+    let inside = fill(&segments, corner, w * SUPERSAMPLE, h * SUPERSAMPLE);
     let signed = signed_distance(&inside, w * SUPERSAMPLE, h * SUPERSAMPLE);
     let pixels = downsample(&signed, w, h);
     Some(GlyphField {
         width: w as u32,
         height: h as u32,
         pixels,
-        origin: Vec2::new(x0 as f32, -(y0 + h as i32) as f32),
+        origin: Vec2::new(x0 as f32, y0 as f32),
     })
 }
 
-/// The supersampled inside mask over the `(w, h)` base grid at `(x0, y0)`.
-fn coverage(
-    font: &FontData,
-    glyph: GlyphId,
-    (x0, y0): (i32, i32),
-    (w, h): (usize, usize),
-) -> Option<Vec<bool>> {
-    let s = SUPERSAMPLE as f32;
-    let scale = font.em_scale(BASE_SIZE * s);
-    let outline = font
-        .font()
-        .outline_glyph(glyph.with_scale_and_position(scale, point(0.0, 0.0)))?;
-    let min = outline.px_bounds().min;
-    let (sw, sh) = (w * SUPERSAMPLE, h * SUPERSAMPLE);
-    let mut inside = vec![false; sw * sh];
-    let (ox, oy) = (
-        min.x as i32 - x0 * SUPERSAMPLE as i32,
-        min.y as i32 - y0 * SUPERSAMPLE as i32,
-    );
-    outline.draw(|x, y, c| {
-        let (gx, gy) = (x as i32 + ox, y as i32 + oy);
-        if c >= 0.5 && gx >= 0 && gy >= 0 && (gx as usize) < sw && (gy as usize) < sh {
-            inside[gy as usize * sw + gx as usize] = true;
+/// The non-zero-winding inside mask of `segments` over a `(w, h)` cell grid whose
+/// top-left corner is `corner` (y up; rows top first), sampled at cell centres.
+fn fill(segments: &[[Vec2; 2]], corner: Vec2, w: usize, h: usize) -> Vec<bool> {
+    let mut inside = vec![false; w * h];
+    let mut crossings: Vec<(f32, i32)> = Vec::new();
+    for row in 0..h {
+        let y = corner.y - row as f32 - 0.5;
+        crossings.clear();
+        for [a, b] in segments {
+            let (up, down) = (a.y <= y && y < b.y, b.y <= y && y < a.y);
+            if up || down {
+                let x = a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x);
+                crossings.push((x, if up { 1 } else { -1 }));
+            }
         }
-    });
-    Some(inside)
+        crossings.sort_by(|p, q| p.0.total_cmp(&q.0));
+        let mut winding = 0;
+        for pair in crossings.windows(2) {
+            winding += pair[0].1;
+            if winding == 0 {
+                continue;
+            }
+            // Cells whose centre lies in [pair[0].x, pair[1].x).
+            let from = (pair[0].0 - corner.x - 0.5).ceil().max(0.0) as usize;
+            let to = ((pair[1].0 - corner.x - 0.5).ceil().max(0.0) as usize).min(w);
+            for cell in &mut inside[row * w + from.min(w)..row * w + to] {
+                *cell = true;
+            }
+        }
+    }
+    inside
 }
 
 /// Signed distance per supersampled cell, in supersampled cells: positive inside,

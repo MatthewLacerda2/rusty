@@ -81,11 +81,8 @@ pub const LAYERS: &[Layer] = &[
     )
     .uses(&["rapier3d"]),
     // The in-game UI's layout runs headless inside the sim (#417).
-    sim("ui", &["asset", "components", "core", "ecs", "scene"]).uses(&[
-        "ab_glyph",
-        "image",
-        "ttf_parser",
-    ]),
+    sim("ui", &["asset", "components", "core", "ecs", "scene"])
+        .uses(&["harfrust", "image", "skrifa"]),
     sim("physics", &["components", "core", "ecs", "scene", "time"]).uses(&["rapier3d"]),
     sim("navigation", &["components", "core", "physics", "scene"]),
     // `scripting` and `api` are one layer (see PEERS): scripting installs the Lua
@@ -157,9 +154,7 @@ pub const LAYERS: &[Layer] = &[
             "ui",
         ],
     )
-    .uses(&[
-        "ab_glyph", "bytemuck", "image", "ktx2", "naga_oil", "pollster", "wgpu",
-    ]),
+    .uses(&["bytemuck", "image", "ktx2", "naga_oil", "pollster", "wgpu"]),
     // The dev-only Lua namespaces (`Debug.*`, the provider ones) bind here because
     // `api` is sim and may not import `dev` (#737); the harness drives the VM too.
     platform(

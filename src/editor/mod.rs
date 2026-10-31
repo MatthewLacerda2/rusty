@@ -7,6 +7,8 @@
 pub mod bottom_panel;
 pub mod build_settings;
 #[cfg(feature = "dev")]
+pub mod demo;
+#[cfg(feature = "dev")]
 mod dev_state;
 pub mod header;
 pub mod hierarchy;

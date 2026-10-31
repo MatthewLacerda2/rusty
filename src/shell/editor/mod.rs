@@ -11,6 +11,8 @@
 #[cfg(feature = "dev")]
 pub mod capture;
 mod cursor_release;
+#[cfg(feature = "dev")]
+mod demo;
 mod game_focus;
 mod icon;
 mod last_scene;
@@ -27,8 +29,7 @@ pub use start::{launch, launch_picker};
 use winit::event::WindowEvent;
 use winit::keyboard::KeyCode;
 
-use super::frame::Host;
-use super::{Frontend, Shell};
+use super::{frame::Host, Frontend, Shell};
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::input::CursorState;
 use crate::editor::{EditorUi, ViewportInteraction, ViewportTab};
@@ -186,17 +187,6 @@ impl EditorFrontend {
         }
         self.editor_ui.speaker_mode = audio.speaker_mode();
     }
-
-    /// A different scene now sits in the World (its identity changed without the
-    /// editor opening it): as File ▸ Open does, drop the selection, which names an
-    /// entity of the old scene.
-    fn follow_scene_swap(&mut self, game: &GameWorld) {
-        let id = game.scene().borrow().id();
-        if self.scene_id.is_some_and(|last| last != id) {
-            self.editor_ui.selected_entity_id = None;
-        }
-        self.scene_id = Some(id);
-    }
 }
 
 impl Frontend for EditorFrontend {
@@ -215,7 +205,25 @@ impl Frontend for EditorFrontend {
 
     /// The game hears input only while playing with the Game view focused.
     fn game_has_input(&self, game: &GameWorld) -> bool {
+        #[cfg(feature = "dev")]
+        if self.editor_ui.demo_open() {
+            return false; // a demo plays read-only (#1598)
+        }
         game.play_requested() && self.game_focused
+    }
+
+    #[cfg(feature = "dev")]
+    fn advance(&mut self, game: &mut GameWorld, dt: f32) -> PlayTransition {
+        let ui = &mut self.editor_ui;
+        ui.advance_demo(game, dt)
+            .unwrap_or_else(|| super::frame::advance_sim(game, dt))
+    }
+
+    /// A demo open at quit is closed first, so the quit flush writes the editor's
+    /// own store and settings, never the demo's (#1598).
+    #[cfg(feature = "dev")]
+    fn before_exit(&mut self, game: &mut GameWorld) {
+        self.editor_ui.close_demo(game);
     }
 
     fn game_view(&self, shell: &Shell) -> GameViewRect {
@@ -265,9 +273,7 @@ impl Frontend for EditorFrontend {
 
         self.editor_ui.preview_texture_id = self.preview_texture_id;
         sync_ui_textures(&mut self.editor_ui, game);
-        self.record_edits(game);
-        let interaction = self.draw_dashboard(shell, game);
-        self.pause_edits(game);
+        let interaction = self.recorded_dashboard(shell, game);
         paint::drain_repl(&mut self.editor_ui, game);
 
         // Render the scene into the viewport target now (after the panel rect is
@@ -279,9 +285,7 @@ impl Frontend for EditorFrontend {
             .flatten()
             .map(|render| game_focus::game_view_rect(&interaction, ppp, render));
         self.render_viewport_scene(shell, game, &interaction, ppp);
-        self.record_edits(game);
-        self.handle_viewport_interaction(game, &interaction, ppp);
-        self.close_edits(game);
+        self.recorded_viewport_interaction(game, &interaction, ppp);
         // Only when the Inspector's Preview tab requested one this frame (#352).
         self.render_preview_scene(shell, ppp);
 
