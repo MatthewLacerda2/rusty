@@ -34,9 +34,17 @@ impl Scene {
     /// `exit_play`) calls this outside tests, so every reader sees the state
     /// change at the same moment.
     /// Entering Play forgets the Undo history: Stop restores Play's changes.
+    /// Leaving it drops what Play asked for and never got (a load or destroy a
+    /// paused Play left queued, #1298) and every `DontDestroyOnLoad` mark: the
+    /// scene state inventory's runtime class (`scene::state`, #1649).
     pub(crate) fn set_playing(&mut self, playing: bool) {
         if playing && !self.playing {
             self.clear_undo();
+        }
+        if !playing && self.playing {
+            self.pending_load = None;
+            self.pending_destroy.clear(); // the next Play must not destroy edit entities
+            self.persistent.clear();
         }
         self.playing = playing;
     }

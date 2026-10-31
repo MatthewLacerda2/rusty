@@ -56,7 +56,7 @@ pub struct Scene {
     /// This live scene's runtime identity (#355). Not scene *data* — it names the
     /// instance, so the renderer can key per-entity GPU caches by (scene, entity)
     /// and stop two scenes' entity ids from colliding. See [`SceneId`].
-    id: SceneId,
+    pub(in crate::scene) id: SceneId,
     pub world: World,
     pub selected_entity_id: Option<u32>,
     pub skybox_path: String,

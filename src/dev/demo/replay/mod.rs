@@ -25,6 +25,7 @@ use crate::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
 use crate::core::settings::{saved_quality, GraphicsSettings};
 use crate::scripting::HostCall;
 pub use cut::{cut, full_path, scenario as cut_scenario};
+use lend::Host;
 pub use lend::{lend, Lent};
 pub use origin::Origin;
 use seek::Start;
@@ -135,32 +136,27 @@ fn install(world: &mut GameWorld, demo: Demo, lua: Lua) {
     let start = Start::of(world, demo.path());
     let header = &demo.header;
     super::sources::warn_changes(world, header);
-    world.resources.script_manager.set_play_seed(header.seed);
+    // Written through the lent list, so it writes nothing `lend` does not take.
+    let mut host = Host::take(world);
+    host.seed = header.seed;
     // An `f32` widened to `f64` narrows back exactly.
-    let mut time = world.resources.time.borrow_mut();
-    time.time_scale = header.time_scale.0 as f32;
-    (time.paused, time.pending_steps) = (header.paused, header.pending_steps);
-    drop(time);
-    let storage_cell = world.resources.storage.clone();
-    let mut storage = storage_cell.borrow_mut();
-    storage.replace(header.storage.clone());
-    let video = storage.get_namespace(VIDEO_NAMESPACE);
-    *world.script_manager().video_cell().borrow_mut() = video
+    host.time.time_scale = header.time_scale.0 as f32;
+    (host.time.paused, host.time.pending_steps) = (header.paused, header.pending_steps);
+    host.storage.replace(header.storage.clone());
+    host.video = (host.storage.get_namespace(VIDEO_NAMESPACE))
         .map_or_else(VideoSettings::default, |blob| {
             VideoSettings::from_json(&blob)
         });
-    let mut app = world.resources.application.borrow_mut();
-    app.restore_quality(saved_quality(&storage));
-    let graphics = GraphicsSettings::load(&storage, app.graphics_defaults(), app.quality_presets());
-    *world.script_manager().graphics_cell().borrow_mut() = graphics;
-    drop((app, storage));
-    if let Some((width, height)) = header.size {
-        world
-            .resources
-            .screen
-            .borrow_mut()
-            .set_game_view(width, height);
-    }
+    host.quality = saved_quality(&host.storage);
+    let app = world.resources.application.borrow();
+    host.graphics = GraphicsSettings::load(
+        &host.storage,
+        app.graphics_defaults(),
+        app.quality_presets(),
+    );
+    drop(app);
+    host.game_view = header.size.or(host.game_view);
+    host.put(world);
     let before_play = header.before_play.iter().filter_map(host_call).collect();
     let verdict = Verdict {
         of: demo.ticks,
