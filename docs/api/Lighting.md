@@ -58,9 +58,12 @@ The two individual verbs stay for a script that wants only one of them.
   cubemaps are applied in one step when it finishes. Adding, removing or moving a probe
   (or changing a reflection probe's resolution, clip planes or shadows) while it runs
   drops the bake with a console line: the probes keep their old lighting and the
-  already-applied lightmaps are kept, with the scene marked unsaved. Opening another
-  scene or saving this one elsewhere drops it the same way.
-- **One bake at a time:** `Lighting.Generate()` and `Lighting.Bake()` error while the
+  already-applied lightmaps are kept, with the scene marked unsaved; a probe step that
+  fails for another reason (a cubemap that cannot be written) marks it unsaved too.
+  Saving this one elsewhere drops it the same way; opening another scene drops it with
+  nothing applied to the new one.
+- **One bake at a time:** `Lighting.Generate()`, `Lighting.Bake()`,
+  `Lighting.BakeLightmaps()`, `Probe.Bake()` and `Reflection.Bake()` error while the
   editor's Generate Lighting is running.
 
 ### Light and reflection probes
