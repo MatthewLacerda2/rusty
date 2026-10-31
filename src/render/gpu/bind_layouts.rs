@@ -54,23 +54,25 @@ pub(crate) fn create_scene_depth_layout(device: &wgpu::Device) -> wgpu::BindGrou
     })
 }
 
-/// Group 1 (#470): the per-draw material uniform (0) at a dynamic offset into the
-/// frame's packed uniforms, the joint-matrix array (1) the vertex shader indexes from
-/// the uniform's `bone_base` (#455), and the instance array (2) it indexes by
-/// `instance_index`. One bind group serves every solid draw; only the offset changes
-/// between batches.
+/// Group 1 (#470): the per-draw uniform (0) at a dynamic offset into the frame's
+/// packed uniforms, the joint-matrix array (1) the vertex shader indexes from the
+/// uniform's `bone_base` (#455), the instance array (2) it indexes by
+/// `instance_index`, and the material records (4) the uniform's `material` indexes
+/// (#1616; binding 3 is the shadow casters', in the same module). One bind group
+/// serves every solid draw; only the offset changes between batches.
 pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    use crate::render::EntityUniform;
+    use crate::render::DrawUniform;
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Entity & Bones Layout"),
         entries: &[
             dynamic_uniform_entry(
                 0,
                 wgpu::ShaderStages::VERTEX_FRAGMENT,
-                std::mem::size_of::<EntityUniform>() as u64,
+                std::mem::size_of::<DrawUniform>() as u64,
             ),
             storage_entry(1, wgpu::ShaderStages::VERTEX),
             storage_entry(2, wgpu::ShaderStages::VERTEX_FRAGMENT),
+            storage_entry(4, wgpu::ShaderStages::VERTEX_FRAGMENT),
         ],
     })
 }

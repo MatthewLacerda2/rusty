@@ -25,19 +25,34 @@ use crate::components::{MaterialAsset, RenderMode};
 use crate::render::draw::materials::entity_params;
 use crate::render::draw::uniforms::mapping_uniform;
 use crate::render::gpu::pipelines::surface::STANDARD;
-use crate::render::gpu::uniforms::MappingUniform;
+use crate::render::gpu::uniforms::{MappingUniform, RecordWords};
 use crate::render::Renderer;
 use crate::scene::Scene;
 
 /// A clipped caster's draw key: the surface pipeline whose cut it runs
-/// ([`STANDARD`] for a cutout alone) and its material group.
+/// ([`STANDARD`] for a cutout alone), its material group, and, for a variant, its
+/// material record's words (#1616), which its `vs_shadow` and cut read through
+/// `material()` as its forward draw does. A cutout alone reads its test per caster
+/// and never the record, so it carries none: Cutout materials that share a map but
+/// differ in tint stay one shadow draw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct Clip {
     pub pipeline: usize,
     pub material: usize,
+    pub record: Option<RecordWords>,
 }
 
 impl Clip {
+    /// A clip of `pipeline` over material group `material`, reading no record.
+    #[cfg(test)]
+    pub(crate) fn of(pipeline: usize, material: usize) -> Self {
+        Self {
+            pipeline,
+            material,
+            record: None,
+        }
+    }
+
     /// Whether the cut is a surface variant's, which moves at runtime.
     pub(crate) fn is_variant(self) -> bool {
         self.pipeline != STANDARD
@@ -104,8 +119,10 @@ impl Renderer {
         if !cuts && cutout.is_none() {
             return None;
         }
+        let record = cuts.then(|| self.solid_material(scene, id, Some(asset)).words());
         let clip = Clip {
             pipeline: if cuts { pipeline } else { STANDARD },
+            record,
             material: self.material_index(Some(entry), pipeline, entity_params(scene, id, slot)),
         };
         Some(CasterClip { clip, cutout })

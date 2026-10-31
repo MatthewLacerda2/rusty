@@ -1,6 +1,6 @@
-//! Per-entity forward-pass data builders: the tint/PBR/cutout `EntityUniform` a solid
-//! mesh's draw binds, and the `InstanceData` (world matrix + light-probe SH) it adds to
-//! that draw's instance array (#470).
+//! Per-entity forward-pass data builders: the tint/PBR/cutout `MaterialData` record a
+//! solid mesh's draw reads (#1616), and the `InstanceData` (world matrix + light-probe
+//! SH) it adds to that draw's instance array (#470).
 //! Split out of `draw_resources` to keep that file under the size cap; behaviour
 //! unchanged. Free functions (no GPU state), called from `sync_solid_resource`.
 
@@ -12,28 +12,28 @@ use crate::components::{MaterialAsset, RefractionModel, RenderMode};
 use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::uniforms::{MappingUniform, SurfaceUniform};
 use crate::render::postfx::effects::ssr;
-use crate::render::{EntityUniform, InstanceData};
+use crate::render::{InstanceData, MaterialData};
 use crate::scene::authoring::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 use crate::scene::Scene;
 
-/// Compute the per-draw uniform (tint, lit flag, PBR params, cutout) for a solid
+/// Compute the material record (tint, lit flag, PBR params, cutout) for a solid
 /// mesh. It carries no transform — that is per instance — so every entity sharing a
-/// material produces the same uniform and can share a draw call (#470). Tint is driven by components only — never by entity name. A game colours its
+/// material produces the same record and can share a draw call (#470). Tint is driven by components only — never by entity name. A game colours its
 /// entities via its referenced material's `base_color`; the engine carries no
 /// per-name colour assumptions. `material` is the entity's resolved library material
 /// (`None` when it references none).
-pub(crate) fn solid_entity_uniform(
+pub(crate) fn solid_material_data(
     scene: &Scene,
     id: u32,
     material: Option<&MaterialAsset>,
-) -> EntityUniform {
+) -> MaterialData {
     // A light's own gizmo mesh is drawn unlit.
-    material_uniform(!scene.world.has_light(id), material)
+    material_data(!scene.world.has_light(id), material)
 }
 
-/// The per-draw uniform for `material`, lit or not — shared by entity solids and
+/// The material record for `material`, lit or not — shared by entity solids and
 /// mesh particles (#440), which have no entity of their own.
-pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> EntityUniform {
+pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> MaterialData {
     let is_lit = u32::from(lit);
     let color_tint = material_color_tint(material);
 
@@ -63,8 +63,7 @@ pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> E
         None => [0.0, 0.0, 0.0, 0.0],
     };
 
-    EntityUniform {
-        model_matrix: Mat4::IDENTITY.to_cols_array(),
+    MaterialData {
         color_tint,
         use_texture,
         is_lit,
@@ -77,8 +76,8 @@ pub(crate) fn material_uniform(lit: bool, material: Option<&MaterialAsset>) -> E
         emissive,
         use_cutout,
         alpha_cutoff,
-        bone_base: 0,
         receive_decals,
+        _pad: 0,
         surface: surface_uniform(lit, material),
         mapping: material.map_or_else(MappingUniform::default, mapping_uniform),
     }

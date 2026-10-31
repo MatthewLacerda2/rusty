@@ -2,10 +2,12 @@
 //! (#470), and the resources every group-1 bind group is built from.
 //!
 //! This replaces the per-entity pool of #210 (one uniform buffer, bone buffer and two
-//! bind groups kept alive per entity). A camera's solids are now three packed arrays —
-//! per-draw uniforms at a 256-byte stride, joint matrices, and instances — written with
-//! three `write_buffer` calls, behind **one** bind group whose dynamic offset picks a
-//! batch's uniform. Nothing is keyed by entity, so two scenes rendered in one frame
+//! bind groups kept alive per entity). A camera's solids are now four packed arrays —
+//! per-draw uniforms at a 256-byte stride, joint matrices, instances, and the material
+//! records the uniforms index (#1616) — written with a `write_buffer` each, behind
+//! **one** bind group whose dynamic offset picks a batch's uniform. The material array
+//! is written only when its bytes differ from the last upload, so a scene whose
+//! materials hold still uploads them once. Nothing is keyed by entity, so two scenes rendered in one frame
 //! (#355) cannot evict each other: each render simply rewrites the arrays before its
 //! own submit.
 //!
@@ -17,12 +19,12 @@
 use wgpu::util::DeviceExt;
 
 use super::grow_buffer::GrowBuffer;
-use crate::render::{EntityUniform, InstanceData};
+use crate::render::{DrawUniform, InstanceData, MaterialData};
 
 /// Byte distance between per-draw uniforms: wgpu's default
 /// `min_uniform_buffer_offset_alignment`, which the renderer requests.
 pub(crate) const UNIFORM_STRIDE: usize = 256;
-const _: () = assert!(std::mem::size_of::<EntityUniform>() <= UNIFORM_STRIDE);
+const _: () = assert!(std::mem::size_of::<DrawUniform>() <= UNIFORM_STRIDE);
 
 /// The shared identity joint: element 0 of the frame's joint array, and the whole of
 /// the array overlays bind.
@@ -33,17 +35,22 @@ pub(crate) type JointMatrix = [f32; 16];
 
 /// One camera's draw data: `uniforms` in slot order, the skinned draws' `joints`
 /// back to back (a draw whose `bone_base` is `n` starts at `joints[n - 1]`; element 0
-/// of the uploaded array is the identity), and the packed `instances`.
+/// of the uploaded array is the identity), the packed `instances`, and the
+/// `materials` the uniforms index.
 pub(crate) struct FrameUpload<'a> {
-    pub uniforms: &'a [EntityUniform],
+    pub uniforms: &'a [DrawUniform],
     pub joints: &'a [JointMatrix],
     pub instances: &'a [InstanceData],
+    pub materials: &'a [MaterialData],
 }
 
 pub(crate) struct DrawBuffers {
     uniforms: GrowBuffer,
     bones: GrowBuffer,
     instances: GrowBuffer,
+    materials: GrowBuffer,
+    /// The material bytes last written, so an unchanged array is not rewritten.
+    last_materials: Vec<u8>,
     bind_group: wgpu::BindGroup,
     /// The identity joint alone, for overlays (they bind their own uniform).
     default_bones: wgpu::Buffer,
@@ -57,6 +64,7 @@ impl DrawBuffers {
         let uniforms = GrowBuffer::new(device, "Frame Draw Uniforms", U::UNIFORM);
         let bones = GrowBuffer::new(device, "Frame Joint Matrices", U::STORAGE);
         let instances = GrowBuffer::new(device, "Frame Instances", U::STORAGE);
+        let materials = GrowBuffer::new(device, "Frame Materials", U::STORAGE);
         let init = |label, contents: &[u8], usage| {
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(label),
@@ -78,12 +86,19 @@ impl DrawBuffers {
             device,
             layout,
             "Frame Draw Bind Group",
-            [uniforms.buffer(), bones.buffer(), instances.buffer()],
+            [
+                uniforms.buffer(),
+                bones.buffer(),
+                instances.buffer(),
+                materials.buffer(),
+            ],
         );
         Self {
             uniforms,
             bones,
             instances,
+            materials,
+            last_materials: Vec::new(),
             bind_group,
             default_bones,
             identity_instance,
@@ -103,18 +118,24 @@ impl DrawBuffers {
             uniforms,
             joints,
             instances,
+            materials,
         } = frame;
-        let mut uniform_bytes = vec![0u8; uniforms.len() * UNIFORM_STRIDE];
-        for (chunk, u) in uniform_bytes.chunks_mut(UNIFORM_STRIDE).zip(uniforms) {
-            chunk[..std::mem::size_of::<EntityUniform>()].copy_from_slice(bytemuck::bytes_of(u));
-        }
+        let uniform_bytes = uniform_array_bytes(uniforms);
         let bone_bytes = joint_array_bytes(joints);
+        let material_bytes: &[u8] = bytemuck::cast_slice(materials);
+        // Equal bytes are an equal length, so a skipped write never misses a growth.
+        let materials_grew = material_bytes != self.last_materials.as_slice() && {
+            self.last_materials.clear();
+            self.last_materials.extend_from_slice(material_bytes);
+            self.materials.upload(device, queue, material_bytes)
+        };
 
         let grew = [
             self.uniforms.upload(device, queue, &uniform_bytes),
             self.bones.upload(device, queue, &bone_bytes),
             self.instances
                 .upload(device, queue, bytemuck::cast_slice(instances)),
+            materials_grew,
         ];
         if grew.contains(&true) {
             self.bind_group = group1(
@@ -125,6 +146,7 @@ impl DrawBuffers {
                     self.uniforms.buffer(),
                     self.bones.buffer(),
                     self.instances.buffer(),
+                    self.materials.buffer(),
                 ],
             );
         }
@@ -149,14 +171,14 @@ impl DrawBuffers {
     }
 }
 
-/// A group-1 bind group over `[uniform, bones, instances]`. The uniform binds one
-/// element's width, so a dynamic offset can slide across the packed array; the joint
-/// and instance arrays bind whole, and the shader indexes them.
+/// A group-1 bind group over `[uniform, bones, instances, materials]`. The uniform
+/// binds one element's width, so a dynamic offset can slide across the packed array;
+/// the joint, instance and material arrays bind whole, and the shader indexes them.
 pub(crate) fn group1(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     label: &str,
-    [uniform, bones, instances]: [&wgpu::Buffer; 3],
+    [uniform, bones, instances, materials]: [&wgpu::Buffer; 4],
 ) -> wgpu::BindGroup {
     let sized = |buffer, size: usize| {
         wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -171,7 +193,7 @@ pub(crate) fn group1(
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: sized(uniform, std::mem::size_of::<EntityUniform>()),
+                resource: sized(uniform, std::mem::size_of::<DrawUniform>()),
             },
             wgpu::BindGroupEntry {
                 binding: 1,
@@ -181,8 +203,23 @@ pub(crate) fn group1(
                 binding: 2,
                 resource: instances.as_entire_binding(),
             },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: materials.as_entire_binding(),
+            },
         ],
     })
+}
+
+/// `uniforms` at [`UNIFORM_STRIDE`], the layout a dynamic offset of
+/// [`DrawBuffers::offsets`] slides across; editor overlays (#1616) and the shadow
+/// casters' draws pack theirs through this too.
+pub(crate) fn uniform_array_bytes(uniforms: &[DrawUniform]) -> Vec<u8> {
+    let mut bytes = vec![0u8; uniforms.len() * UNIFORM_STRIDE];
+    for (chunk, u) in bytes.chunks_mut(UNIFORM_STRIDE).zip(uniforms) {
+        chunk[..std::mem::size_of::<DrawUniform>()].copy_from_slice(bytemuck::bytes_of(u));
+    }
+    bytes
 }
 
 /// The joint storage array as uploaded: the shared identity at element 0, then

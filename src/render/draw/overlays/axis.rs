@@ -2,14 +2,18 @@
 //! `Renderer::render` (behavior unchanged).
 
 use glam::Mat4;
-use wgpu::util::DeviceExt;
 
+use super::OverlayDraws;
 use crate::render::draw::resources::AxisResource;
-use crate::render::{EntityUniform, Renderer};
+use crate::render::Renderer;
 use crate::scene::Scene;
 
 impl Renderer {
-    pub(crate) fn precreate_axis_arrows(&self, scene: &Scene) -> Vec<AxisResource> {
+    pub(crate) fn precreate_axis_arrows(
+        &self,
+        scene: &Scene,
+        draws: &mut OverlayDraws,
+    ) -> Vec<AxisResource> {
         let mut axis_arrow_resources = Vec::new();
         let Some(selected_id) = scene.selected_entity_id else {
             return axis_arrow_resources;
@@ -26,49 +30,9 @@ impl Renderer {
             [0.1, 0.4, 1.0, 1.0], // Z: Blue
         ];
 
-        for (i, color) in colors.iter().enumerate() {
-            axis_arrow_resources.push(self.build_axis_arrow(i, arrow_model_matrix, *color));
+        for (i, color) in colors.into_iter().enumerate() {
+            axis_arrow_resources.push((i, draws.push(arrow_model_matrix, color)));
         }
         axis_arrow_resources
-    }
-
-    /// Build one axis-arrow's uniform buffer + bind group (bound against the shared
-    /// identity bone palette).
-    fn build_axis_arrow(
-        &self,
-        i: usize,
-        arrow_model_matrix: Mat4,
-        color: [f32; 4],
-    ) -> AxisResource {
-        let entity_uniform = EntityUniform {
-            model_matrix: arrow_model_matrix.to_cols_array(),
-            color_tint: color,
-            use_texture: 0,
-            is_lit: 0,
-            metallic: 0.0,
-            roughness: 0.5,
-            use_metallic_map: 0,
-            use_roughness_map: 0,
-            use_normal_map: 0,
-            use_emissive_map: 0,
-            emissive: [0.0; 4],
-            use_cutout: 0,
-            alpha_cutoff: 0.0,
-            bone_base: 0,
-            receive_decals: 0,
-            surface: crate::render::gpu::uniforms::SurfaceUniform::default(),
-            mapping: crate::render::gpu::uniforms::MappingUniform::default(),
-        };
-
-        let entity_buf = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Axis Arrow Uniform"),
-                contents: bytemuck::bytes_of(&entity_uniform),
-                usage: wgpu::BufferUsages::UNIFORM,
-            });
-        let bind_group =
-            self.entity_bind_group("Axis Arrow", &entity_buf, self.shared_bones_buffer());
-        (i, entity_buf, bind_group)
     }
 }
