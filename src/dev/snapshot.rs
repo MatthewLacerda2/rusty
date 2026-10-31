@@ -13,11 +13,12 @@ use crate::app::GameWorld;
 /// Build the full world snapshot from the live world (frame + play-state envelope,
 /// camera, and every entity in the authoring-rich shape).
 pub fn snapshot(world: &GameWorld) -> Value {
+    let scene = world.scene().borrow();
     crate::api::snapshot::world_value(
-        &world.scene().borrow(),
-        &world.camera().borrow(),
+        &scene,
+        &world.main_view(),
         world.play_frame(),
-        world.scene().borrow().is_playing(),
-        &world.resources.ui_view(),
+        scene.is_playing(),
+        &world.resources.ui_view(&scene),
     )
 }

@@ -1,7 +1,8 @@
-//! src/editor/inspector_settings.rs — the Scene Settings inspector panel.
+//! src/editor/inspector/components/settings.rs — the Scene Settings inspector panel.
 //!
 //! Shown when nothing is selected: the project-level scalars (skybox, ambient
-//! light), the scene fog (#437, routed through `authoring::fog` like `Graphics.SetFog*`)
+//! light, routed through `authoring::environment` like `Lighting.Set*`, #1612), the
+//! scene fog (#437, routed through `authoring::fog` like `Graphics.SetFog*`)
 //! plus the **Tags & Layers** surface that renames the shared Layers
 //! registry (#90). Layer 0 is the fixed `"Default"`; slots 1..31 are user-named
 //! and persist with the scene.
@@ -11,6 +12,7 @@ use glam::Vec3;
 
 use crate::editor::theme;
 use crate::editor::EditorUi;
+use crate::scene::authoring::environment as env_ops;
 use crate::scene::authoring::fog as fog_ops;
 use crate::scene::{FogMode, FogSettings, Scene, LAYER_COUNT};
 
@@ -21,44 +23,8 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     ui.separator();
     ui.add_space(5.0);
 
-    // 1. Skybox Path
-    ui.horizontal(|ui| {
-        ui.label("Skybox:");
-        let response = ui.text_edit_singleline(&mut scene.skybox_path);
-        if response.changed() {
-            editor.is_dirty = true;
-        }
-    });
-    ui.colored_label(
-        t.text_secondary,
-        "Provide a path to a panoramic image\n(e.g. assets/textures/sky.png)",
-    );
-    ui.add_space(8.0);
-
-    // 2. Ambient Light Color
-    ui.label("Ambient Color:");
-    ui.horizontal(|ui| {
-        let mut color_arr = [
-            scene.ambient_color.x,
-            scene.ambient_color.y,
-            scene.ambient_color.z,
-        ];
-        if ui.color_edit_button_rgb(&mut color_arr).changed() {
-            scene.ambient_color = Vec3::new(color_arr[0], color_arr[1], color_arr[2]);
-            editor.is_dirty = true;
-        }
-    });
-    ui.add_space(8.0);
-
-    // 3. Ambient Light Intensity
-    ui.label("Ambient Intensity:");
-    let response = ui.add(
-        crate::editor::widgets::slider(&mut scene.ambient_intensity, 0.0..=5.0).text("intensity"),
-    );
-    if response.changed() {
-        editor.is_dirty = true;
-    }
-    ui.add_space(8.0);
+    // 1–3. Skybox and ambient light, through the shared environment ops.
+    draw_environment(editor, ui, scene);
 
     // 4. Fog — distance + height, applied to every world-space pass.
     draw_fog(editor, ui, scene);
@@ -79,6 +45,52 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
         t.text_secondary,
         "Select an entity from Hierarchy\nor click a project asset to inspect.",
     );
+}
+
+/// The skybox path and the ambient colour and intensity, each written through its
+/// `authoring::environment` op, the one `Lighting.Set*` calls (#1612).
+fn draw_environment(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
+    let t = theme::from_ui(ui);
+    // 1. Skybox Path
+    ui.horizontal(|ui| {
+        ui.label("Skybox:");
+        let mut path = scene.skybox_path.clone();
+        if ui.text_edit_singleline(&mut path).changed() {
+            env_ops::set_skybox(scene, &path);
+            editor.is_dirty = true;
+        }
+    });
+    ui.colored_label(
+        t.text_secondary,
+        "Provide a path to a panoramic image\n(e.g. assets/textures/sky.png)",
+    );
+    ui.add_space(8.0);
+
+    // 2. Ambient Light Color
+    ui.label("Ambient Color:");
+    ui.horizontal(|ui| {
+        let mut color_arr = [
+            scene.ambient_color.x,
+            scene.ambient_color.y,
+            scene.ambient_color.z,
+        ];
+        if ui.color_edit_button_rgb(&mut color_arr).changed() {
+            env_ops::set_ambient_color(scene, Vec3::from_array(color_arr));
+            editor.is_dirty = true;
+        }
+    });
+    ui.add_space(8.0);
+
+    // 3. Ambient Light Intensity
+    ui.label("Ambient Intensity:");
+    let mut intensity = scene.ambient_intensity;
+    let response =
+        ui.add(crate::editor::widgets::slider(&mut intensity, 0.0..=5.0).text("intensity"));
+    if response.changed() {
+        env_ops::set_ambient_intensity(scene, intensity);
+        editor.is_dirty = true;
+    }
+    ui.add_space(8.0);
 }
 
 /// The Tags & Layers surface: rename the project's 32 layer slots. Layer 0 is the

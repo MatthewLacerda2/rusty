@@ -64,7 +64,8 @@ tools, so an agent manages projects without the window. They share the picker's 
   engine upgrade, which the answer's `upgrade` reports (the line naming the `git log`
   of what changed; `null` otherwise, in both modes). In **embed** mode the bridge then drives that project: like Unity's *Open
   Project*, the current one closes (unsaved scene edits are lost) and a fresh session
-  boots on the new root's default scene, exactly as `--project <path>` would. In
+  boots on the new root's boot scene (the editor's last scene, then the startup
+  scene, then an empty one, #1618), exactly as `--project <path>` would. In
   **attach** mode the window can't change project from here, so the answer carries
   `relaunch`, the command that starts the editor on it.
 - `bench_forget` — take `path` off the recent list. The folder is left alone.
@@ -109,7 +110,7 @@ JSON-RPC** — engine logs go to stderr or the in-memory console, never stdout.
 
 ```
 # embed (own headless world):
-cargo run --bin session-mcp --features dev                 # boot the default scene
+cargo run --bin session-mcp --features dev                 # boot the project's boot scene
 cargo run --bin session-mcp --features dev -- --empty      # start from an empty scene
 cargo run --bin session-mcp --features dev -- <scene.json> # boot a specific scene
 cargo run --bin session-mcp --features dev -- --project <dir> [<scene>|--empty]

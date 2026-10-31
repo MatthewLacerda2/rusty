@@ -6,11 +6,13 @@
 //! (or the engine default), and a synced collider when the sidecar asks for one.
 //!
 //! Both callers route through here so editor and API can never drift: the editor's
-//! model inspector ("Instantiate into Scene", one entity per sub-object) and the
-//! `Scene.Instantiate` asset branch (one entity by reference). The shared piece is
-//! [`instantiate_asset`], and [`instantiate_imported`] behind it for a caller that
-//! already holds the imported file: the editor spawns every sub-object of a file
-//! through it (`scene::lod_instance::instantiate_model`).
+//! model inspector ("Instantiate into Scene") and the `Scene.Instantiate` asset
+//! branch. The shared piece is [`instantiate_asset`]: a `path::sub_object`
+//! reference spawns that one entity, and a bare model path the whole model as its
+//! node tree (#1083, `scene::model_instance::instantiate_model`, Unity's model
+//! prefab), as the editor's button does. [`instantiate_imported`] behind it serves
+//! a caller that already holds the imported file: the whole-model spawn places
+//! each node's mesh through it.
 //!
 //! Like every other mesh, an instanced asset stores only its REFERENCE on disk:
 //! [`asset_mesh_component`](crate::scene::asset_mesh_component) keeps the
@@ -42,12 +44,25 @@ use crate::scene::Scene;
 /// A sub-object name that is the base of a `_LOD<n>` set (`crate.glb::Crate` for
 /// `Crate_LOD0`, `Crate_LOD1`) spawns the whole set as one LODGroup entity instead
 /// (#472, `scene::lod_instance`); its id is the group's.
+///
+/// A bare model path (`kit.glb`, no `::`) spawns the whole model: a root named
+/// `name` or after the file, one child per node (#1083); its id is the root's.
 pub fn instantiate_asset(
     scene: &mut Scene,
     reference: &str,
     name: Option<&str>,
     position: Vec3,
 ) -> Result<u32, String> {
+    if !reference.contains(asset::REF_SEPARATOR) && asset::is_model_path(reference) {
+        let asset = asset::import_and_sync_sidecar(std::path::Path::new(reference))
+            .map_err(|e| e.to_string())?;
+        let root =
+            crate::scene::model_instance::instantiate_model(scene, reference, &asset, position);
+        if let Some(name) = name {
+            scene.world.set_name(root, name.to_string());
+        }
+        return Ok(root);
+    }
     let asset_ref = asset::AssetRef::parse(reference).map_err(|e| e.to_string())?;
     let asset = asset::import_and_sync_sidecar(std::path::Path::new(&asset_ref.path))
         .map_err(|e| e.to_string())?;
@@ -57,8 +72,8 @@ pub fn instantiate_asset(
 
 /// [`instantiate_asset`] for a file its caller already imported: `asset` is the
 /// file at `path`, and `sub` one of its sub-objects (or a `_LOD<n>` set's base).
-/// A model spawned whole goes through here, so its file is imported once, not
-/// once more per sub-object.
+/// The mesh is built from `asset` itself, so a model spawned whole through here
+/// parses its file once, not once more per node.
 pub fn instantiate_imported(
     scene: &mut Scene,
     path: &str,
@@ -70,7 +85,7 @@ pub fn instantiate_imported(
     let reference = asset::AssetRef::new(path, sub)
         .map_err(|e| e.to_string())?
         .to_string_ref();
-    if asset.sub_mesh(sub).is_none() {
+    let Some(sub_mesh) = asset.sub_mesh(sub) else {
         // A `_LOD<n>` set's base name addresses the whole set (#472).
         return match asset::lod::lod_set(asset, sub) {
             Some(set) => instantiate_lod_set(scene, path, asset, &set, name, position),
@@ -78,16 +93,17 @@ pub fn instantiate_imported(
                 "asset reference '{reference}' has no such sub-object"
             )),
         };
-    }
+    };
 
     let label = name.unwrap_or(sub);
     let id = scene.add_entity(label.to_string());
     if let Some(mut transform) = scene.world.transform_mut(id) {
         transform.position = position;
     }
-    scene
-        .world
-        .set_mesh(id, Some(crate::scene::asset_mesh_component(&reference)));
+    scene.world.set_mesh(
+        id,
+        Some(rehydrate::asset_mesh_component_of(&reference, sub_mesh)),
+    );
     // A skinned sub-object brings its skeleton as child bone entities (#453).
     scene.sync_skeleton(id);
 
@@ -205,8 +221,10 @@ pub fn set_lightmap_uv_settings(
 /// Set a model's Scale Factor (#1398) in its `.meta` sidecar and re-import every
 /// mesh in `scene` instanced from it, a skinned one with its new rig and its bones
 /// moved to the scaled rest pose; an LODGroup over those meshes has its size scaled
-/// by as much as its LOD0 meshes grew. The model is noted in the write log, so every
-/// other cache keyed by it (the particle meshes) re-reads it too. A NaN or unchanged
+/// by as much as its LOD0 meshes grew. A whole-model instance's node offsets do
+/// not move yet (#1637): set the factor before instantiating. The model is noted
+/// in the write log, so every other cache keyed by it (the particle meshes)
+/// re-reads it too. A NaN or unchanged
 /// factor changes nothing: no write, no re-import. The one verb the model inspector
 /// and `Assets.SetModelImportSettings` share. Returns how many meshes were re-imported.
 pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Result<usize, String> {

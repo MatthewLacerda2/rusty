@@ -29,6 +29,7 @@ use serde_json::json;
 use super::console;
 use crate::app::GameWorld;
 use crate::core::input::InputState;
+use crate::core::project::{Access, BootPlan};
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
@@ -49,26 +50,24 @@ impl Session {
     /// world and initialise the evaluator **without entering play**. `boot_scene`
     /// empty means start from an empty scene (the agent authors into it live).
     pub fn new(boot_scene: &str) -> Result<Self, String> {
+        Self::boot(&BootPlan::of(boot_scene))
+    }
+
+    /// [`new`](Self::new) on the first of `plan`'s scenes that loads
+    /// (`app::load_boot_scene`), an empty scene when none does (#1618).
+    pub fn boot(plan: &BootPlan) -> Result<Self, String> {
         crate::scene::seed_default_scripts();
 
         let scene = Rc::new(RefCell::new(Scene::new()));
         let input = Rc::new(RefCell::new(InputState::new()));
         let console = Rc::new(RefCell::new(ConsoleLogs::new()));
 
-        let loaded = !boot_scene.is_empty() && {
-            let mut c = console.borrow_mut();
-            match scene.borrow_mut().load_from_file(boot_scene) {
-                Ok(()) => true,
-                Err(err) if err.replaced_world() => {
-                    c.warn(format!("Scene {boot_scene}: {err}"));
-                    true
-                }
-                Err(err) => {
-                    c.error(format!("Failed to load scene {boot_scene}: {err}"));
-                    false
-                }
-            }
-        };
+        let loaded = crate::app::load_boot_scene(
+            &mut scene.borrow_mut(),
+            &mut console.borrow_mut(),
+            plan,
+            false,
+        );
         // Baked over the scene's own bounds (#452), as the windowed boot does.
         let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
 
@@ -78,12 +77,12 @@ impl Session {
         // argument-less save from the agent persists back to the loaded file —
         // just as the editor's Save writes to its current scene file. Only when it
         // loaded: an unparseable one stays untouched by an argument-less save (#1374).
-        if loaded {
+        if let Some(path) = loaded {
             *world
                 .resources
                 .script_manager
                 .scene_path_cell()
-                .borrow_mut() = Some(boot_scene.to_string());
+                .borrow_mut() = Some(path);
         }
         world.init_edit_runtime()?;
         // Frame stats for `Debug.Stats()` once the agent plays the world (#433).
@@ -145,20 +144,33 @@ impl Session {
 ///     its root becomes the working directory, so the scene and asset paths the
 ///     engine reads resolve against it. Without it, `./project`. On a bad
 ///     directory this prints to stderr and exits 2.
-///   - `--empty`         — start from a blank scene (returns an empty boot path).
+///   - `--empty`         — start from a blank scene (an empty plan).
 ///   - `<scene-path>`    — boot that specific scene (relative to the project root).
-///   - none              — boot (and seed) the bundled default scene.
+///   - none              — seed the bundled default scene (a new project gets it
+///     once, #1618) and boot the project's boot scene
+///     (`core::project::boot_scene`: the editor's last scene, then the startup
+///     scene, then an empty one).
 ///
 /// `--project` may sit anywhere; it is taken out first and the rest is read as the
 /// scene argument.
-pub fn boot_scene_from_args(args: &[String]) -> String {
+pub fn boot_scene_from_args(args: &[String]) -> BootPlan {
     let mut rest = args.to_vec();
-    crate::core::project::open_from_args(&mut rest, crate::core::project::Access::Edit);
+    let opened = crate::core::project::open_from_args(&mut rest, Access::Edit);
     match rest.first().map(String::as_str) {
-        Some("--empty") => String::new(),
-        Some(path) => path.to_string(),
-        None => crate::scene::seed_default_scene(),
+        Some("--empty") => BootPlan::default(),
+        Some(path) => BootPlan::of(path),
+        None => seeded_boot_scene(&opened),
     }
+}
+
+/// Seed the default scene into the open project, then plan the scene it boots on,
+/// as the editor does (`shell::editor::start`): `session`, `session-mcp` and a
+/// `bench_open` switch all open a project here. A `boot_scene` error (a Run's,
+/// never an Edit's) boots an empty scene.
+pub(crate) fn seeded_boot_scene(opened: &crate::core::project::Opened) -> BootPlan {
+    crate::scene::seed_default_scene();
+    let startup = &opened.settings.build.startup_scene;
+    crate::core::project::boot_scene(&opened.root, startup, Access::Edit).unwrap_or_default()
 }
 
 /// One framed response line for an evaluated command.

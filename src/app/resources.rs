@@ -211,10 +211,12 @@ impl Resources {
     }
 
     /// What the UI is computed against this tick: the screen, the textures'
-    /// native sizes and the active camera.
-    pub fn ui_view(&self) -> crate::ui::UiView {
+    /// native sizes and the main view through `scene`'s camera entity
+    /// (`scene::game_camera_from_scene`, #1619), so a camera moved this frame by
+    /// Transform, a parent or physics is seen where it is now.
+    pub fn ui_view(&self, scene: &crate::scene::Scene) -> crate::ui::UiView {
         let video = *self.script_manager.video_cell().borrow();
-        let camera = self.camera.borrow().clone();
+        let camera = crate::scene::game_camera_from_scene(&self.camera.borrow(), scene);
         self.screen.borrow().view(&video, Some(camera))
     }
 
