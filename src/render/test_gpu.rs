@@ -51,25 +51,6 @@ pub(crate) fn black_sky(scene: &mut crate::scene::Scene) {
     scene.skybox_path = path.to_string_lossy().into_owned();
 }
 
-#[cfg(test)]
-mod tests {
-    /// The one GPU test that refuses to skip, and only where asked to. Without it, a
-    /// CI runner that lost its software driver would put every GPU test back on the
-    /// silent `None` path and still report green — the state #489 fixed.
-    #[test]
-    fn gpu_adapter_present_when_required() {
-        if !crate::render::gpu_required() {
-            return;
-        }
-        assert!(
-            super::headless_or_skip(4, 4).is_some(),
-            "{}=1 but no GPU or software adapter was found: on Linux install Mesa's \
-             lavapipe (`mesa-vulkan-drivers`), or unset the variable to skip GPU tests",
-            super::REQUIRE_GPU_ENV
-        );
-    }
-}
-
 /// A compute probe: dispatch `source`'s `main` over 64 × 2 invocations and read
 /// back the 256 `vec4`s it writes to its one binding, a storage array (#1524): how
 /// a test runs a WGSL helper as written on the GPU.
@@ -123,4 +104,23 @@ pub(crate) fn run_probe(
     let _ = device.poll(wgpu::PollType::wait_indefinitely());
     let mapped = slice.get_mapped_range().expect("mapped");
     bytemuck::cast_slice(&mapped).to_vec()
+}
+
+#[cfg(test)]
+mod tests {
+    /// The one GPU test that refuses to skip, and only where asked to. Without it, a
+    /// CI runner that lost its software driver would put every GPU test back on the
+    /// silent `None` path and still report green — the state #489 fixed.
+    #[test]
+    fn gpu_adapter_present_when_required() {
+        if !crate::render::gpu_required() {
+            return;
+        }
+        assert!(
+            super::headless_or_skip(4, 4).is_some(),
+            "{}=1 but no GPU or software adapter was found: on Linux install Mesa's \
+             lavapipe (`mesa-vulkan-drivers`), or unset the variable to skip GPU tests",
+            super::REQUIRE_GPU_ENV
+        );
+    }
 }

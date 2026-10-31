@@ -85,6 +85,9 @@ fn gap(r: &crate::render::Renderer, settings: &SkySettings) -> f32 {
         .fold(0.0, f32::max)
 }
 
+/// A named nudge to one setting.
+type Change = (&'static str, fn(&mut SkySettings));
+
 #[test]
 fn gpu_the_default_sky_is_todays() {
     let Some(r) = crate::render::test_gpu::headless_or_skip(8, 8) else {
@@ -100,7 +103,7 @@ fn gpu_the_default_sky_is_todays() {
     );
 
     // The probe still sees a small change to any default.
-    let changes: [(&str, fn(&mut SkySettings)); 3] = [
+    let changes: [Change; 3] = [
         ("coverage", |s| s.cloud_coverage += 0.02),
         ("opacity", |s| s.cloud_opacity += 0.02),
         ("ground", |s| s.ground = Some(Vec3::ZERO)),
