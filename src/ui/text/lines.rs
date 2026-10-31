@@ -32,12 +32,12 @@ impl Line {
         Self { items, metrics }
     }
 
-    /// The pen position after each item, in order (kerning within the line only).
+    /// The pen position before each item, in order.
     pub fn pens(&self) -> impl Iterator<Item = (f32, &Item)> {
         let mut pen = 0.0;
-        self.items.iter().enumerate().map(move |(j, it)| {
-            let start = pen + if j > 0 { it.kern } else { 0.0 };
-            pen = start + it.advance;
+        self.items.iter().map(move |it| {
+            let start = pen;
+            pen += it.advance;
             (start, it)
         })
     }
@@ -65,9 +65,9 @@ pub fn break_lines(items: &[Item], max_width: Option<f32>, empty: LineMetrics) -
         let mut last_space: Option<usize> = None;
         let mut soft = false;
         for it in paragraph {
-            let right = end_pen(&line) + if line.is_empty() { 0.0 } else { it.kern } + it.advance;
+            let right = end_pen(&line) + it.advance;
             let over = max_width.is_some_and(|w| right > w + EPS);
-            if over && !it.is_space() && !line.is_empty() {
+            if over && !it.is_space() && !it.joins && !line.is_empty() {
                 let tail = match last_space.take() {
                     Some(b) => line.split_off(b + 1),
                     None => Vec::new(),
@@ -91,11 +91,7 @@ pub fn break_lines(items: &[Item], max_width: Option<f32>, empty: LineMetrics) -
 
 /// The pen position after the last of `items` (trailing whitespace included).
 fn end_pen(items: &[Item]) -> f32 {
-    items
-        .iter()
-        .enumerate()
-        .map(|(j, it)| if j > 0 { it.kern } else { 0.0 } + it.advance)
-        .sum()
+    items.iter().map(|it| it.advance).sum()
 }
 
 /// The block height of `lines` at `spacing`: the first ascent, each line-to-line

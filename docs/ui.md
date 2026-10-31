@@ -257,17 +257,21 @@ picked size), each closed by `</color>`, `</b>`, `</i>`, `</size>`, nesting free
 An unknown or malformed tag, or a close with nothing open, draws literally — nothing
 the author typed silently vanishes. There is no layout engine beyond that.
 
-**Fonts.** `.ttf` / `.otf` files referenced by path, parsed with `ab_glyph` and cached
+**Fonts.** `.ttf` / `.otf` files referenced by path, parsed with `skrifa` and cached
 for the process; a path that does not load falls back to the default with one
 warning. The bundled default is **Instrument Sans** (`engine/fonts/`), under the SIL
 Open Font License 1.1 — its license text ships beside it
 (`engine/fonts/InstrumentSans-OFL.txt`) and must travel with any build that includes
 the font. `cargo deny` checks crate licenses, not assets, so keep font licenses here.
 
-**Shaping: kerning only (Latin).** Glyphs map one-to-one from characters and pairs
-are kerned from the font's GPOS `kern` feature (what modern fonts ship), falling
-back to the legacy `kern` table. Ligatures, combining marks, right-to-left and CJK
-line breaking need full shaping — a later localization concern, not built here.
+**Shaping.** Text is shaped with `harfrust` (a pure-Rust HarfBuzz) in runs of one
+face and size: ligatures, contextual forms, combining marks and GPOS kerning come
+from the font, and the same font bytes and string always give the same glyphs. A
+right-to-left run shapes in visual order, but there is no bidirectional reordering
+across runs, and lines break only at whitespace and `\n` (no UAX #14, so CJK breaks
+between characters only when a word is wider than the rect). Letter spacing adds to
+every glyph, a ligature counting once. Bold and italic tags never split a run, so a
+pair kerns across them; a size tag or a real bold/italic face starts a new run.
 
 **Layout is CPU, in the sim's terms.** Measuring, wrapping, overflow and auto-size
 (`src/ui/text/`) never touch the GPU: headless layout is the window's, and
