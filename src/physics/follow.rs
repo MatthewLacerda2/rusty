@@ -21,7 +21,7 @@ impl PhysicsWorld {
     /// Re-place each collider on or under a bone at its live world pose and refit
     /// the query pipeline over the ones that moved. Walks the skeletons' subtrees
     /// ([`Scene::bone_subtrees`], ascending ids), never the scene's other
-    /// colliders, so a map's static geometry costs nothing here (#1617).
+    /// colliders, so a map's static colliders cost nothing here (#1617).
     pub fn follow_bones(&mut self, scene: &Scene) {
         let mut moved = Vec::new();
         for id in scene.bone_subtrees() {

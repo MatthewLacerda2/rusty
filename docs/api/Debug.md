@@ -94,7 +94,7 @@ end
 | `fixed_update_ms` / `update_ms` / `late_update_ms` / `render_stage_ms` | CPU ms per schedule stage. `render_stage_ms` is the `Render` *stage* (draw-data prep), not the GPU |
 | `systems.<name>` | CPU ms per registered system (`update_scripts`, `step_physics`, `tick_nav`, …) |
 | `entities` / `rigid_bodies` / `nav_agents` / `particles` / `scripts` | world counters: live entities, RigidBody components, NavMeshAgents, live particles, loaded script instances |
-| `skeletons` / `bones` | skinned meshes with a skeleton, and the bone GameObjects their skeletons are bound to, summed (#1617): what a scene's characters cost the bone systems (`animate`, `pose_ragdolls`, `follow_bones`, `build_skin_palettes`) each tick |
+| `skeletons` / `bones` | skinned meshes with a skeleton, and their bound bone slots summed per skeleton (#1617; a bone two skeletons list counts twice): what a scene's characters cost the bone systems (`animate`, `pose_ragdolls`, `follow_bones`, `build_skin_palettes`) each tick |
 | `draw_calls` | geometry draw calls: solids (mesh particles among them), transparents, shadow casters, the SSAO depth prepass, sprite-particle batches, UI batches (post-FX and skybox excluded; decals draw nothing of their own, #638). Copies of one mesh + material are **one instanced call** (#470), so this tracks distinct looks, not entity count |
 | `triangles` | triangles submitted by the solid, transparent, shadow and SSAO-prepass draws, every instance counted |
 | `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera stack |
