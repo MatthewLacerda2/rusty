@@ -13,11 +13,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::thread;
 
-use super::progress::BakeProgress;
+use super::super::progress::BakeProgress;
 
 /// Items in one batch: small enough that a cancel lands at once and the queue's
 /// tail stays short, large enough that the shared counter stays cold.
-pub(super) const BATCH: usize = 64;
+pub(in super::super) const BATCH: usize = 64;
 
 /// One chart's batches as they come back, and its result once the last one has.
 struct Slot<L, T> {
@@ -29,7 +29,7 @@ struct Slot<L, T> {
 /// Run `trace(chart, first, items)` over every batch of every chart on `threads`
 /// workers, then `finish(chart, results)` once per chart with its results in item
 /// order. `None` when `progress` was cancelled before every chart finished.
-pub(super) fn run<P, L, T>(
+pub(in super::super) fn run<P, L, T>(
     charts: &[&[P]],
     threads: usize,
     progress: &BakeProgress,
@@ -79,7 +79,7 @@ where
     let threads = threads.clamp(1, batches.len().max(1));
     thread::scope(|scope| {
         for _ in 1..threads {
-            scope.spawn(&work);
+            scope.spawn(work);
         }
         work();
     });

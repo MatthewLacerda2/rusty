@@ -5,7 +5,7 @@
 use glam::Vec3;
 
 use super::bake::bake_on;
-use super::pool::{run, BATCH};
+use super::bake::pool::{run, BATCH};
 use super::tests::{floor, quad, settings, sun, wall};
 use super::*;
 

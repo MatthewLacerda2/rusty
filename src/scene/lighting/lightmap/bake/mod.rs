@@ -12,13 +12,14 @@ use glam::Vec3;
 
 use super::filter::smooth;
 use super::input::BakeScene;
-use super::pool;
 use super::progress::BakeProgress;
 use super::raster::{dilate, lightmap_size, rasterize, world_per_uv, TexelPoint};
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
 use crate::core::color::luminance;
+
+pub(super) mod pool;
 
 /// Rings of empty texels dilation fills around each chart.
 const DILATE_PASSES: u32 = 3;
