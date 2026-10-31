@@ -30,7 +30,7 @@ pub(super) fn probed(name: &str, light: usize, reflection: usize) -> (Scene, Str
 fn gpu_each_step_bakes_a_reflection_probe_or_a_few_light_probes() {
     let (mut scene, path) = probed("steps", 6, 3);
     let params = LightingBakeParams::default();
-    let mut job = start_lighting(&mut scene, Some(&path), None, params);
+    let mut job = start_lighting(&mut scene, Some(&path), None, params).unwrap();
     if !job.report().ran_reflection_bake {
         return; // no adapter
     }
@@ -77,25 +77,21 @@ fn gpu_stepping_bakes_what_one_call_bakes() {
     r.bake_probes(&mut whole, crate::render::DEFAULT_BAKE_RESOLUTION);
     drop(r);
     let params = LightingBakeParams::default();
-    let mut job = start_lighting(&mut stepped, Some(&path), None, params);
+    let mut job = start_lighting(&mut stepped, Some(&path), None, params).unwrap();
     while !job.step(&mut stepped, &mut |_| {}).unwrap() {}
     job.commit(&mut stepped).unwrap();
     let sh = |s: &Scene| s.probes.probes.iter().map(|p| p.sh).collect::<Vec<_>>();
     assert_eq!(sh(&stepped), sh(&whole));
 }
 
-/// Reflection probes with nowhere to write: the step that reaches them refuses.
+/// Reflection probes with nowhere to write: the bake refuses before it starts, not
+/// after the light probes' whole solve.
 #[test]
-fn gpu_unsaved_reflections_refuse_when_reached() {
-    let (mut scene, _) = probed("unsaved", 0, 1);
+fn unsaved_reflections_refuse_up_front() {
+    let (mut scene, _) = probed("unsaved", 2, 1);
     let params = LightingBakeParams::default();
-    let mut job = start_lighting(&mut scene, None, None, params);
-    let err = loop {
-        match job.step(&mut scene, &mut |_| {}) {
-            Ok(false) => continue,
-            Ok(true) => panic!("baked with no scene path"),
-            Err(e) => break e,
-        }
+    let Err(err) = start_lighting(&mut scene, None, None, params) else {
+        panic!("started with no scene path");
     };
     assert!(err.contains("save the scene"), "{err}");
 }

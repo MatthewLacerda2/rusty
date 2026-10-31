@@ -11,7 +11,8 @@
 //! step then runs one step a frame (#1602, Unity's `BakeAsync`): the probes capture
 //! through the GPU, so they stay on the UI thread, but no frame waits on more than a
 //! reflection probe or a few light probes, and the editor and the MCP keep answering.
-//! The bar shows `probe i of n`, the console each pass and probe. Then [`poll`]
+//! The card shows the stage (the light probes' bounce, or the reflection probes) on
+//! a line above the bar and `i / n` in it; the console says each pass and probe. Then [`poll`]
 //! commits the probes and writes the lighting. A bake cancelled during the lightmaps
 //! writes nothing. The probe step bakes from a snapshot of the probes and applies them
 //! only at its end, so the scene stays editable while it runs; a probe added, removed

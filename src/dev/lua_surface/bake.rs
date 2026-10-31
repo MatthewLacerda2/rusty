@@ -5,14 +5,17 @@
 //! Each is an authoring action, so each is added here, onto the namespace table `api`
 //! registered, rather than in `api` itself (#737). The three GPU bakes return `true`
 //! when a bake ran and `false` when no adapter was available (skipped gracefully); the
-//! lightmap bake runs on the CPU and returns how many lightmaps it wrote.
+//! lightmap bake runs on the CPU and returns how many lightmaps it wrote. Each is
+//! refused while the editor's Generate Lighting runs (#1602): the two would bake the
+//! same probes and write the same files.
 
 use std::cell::RefCell;
 
 use mlua::Lua;
 
 use super::super::{
-    bake::lighting as lighting_bake, bake::lightmap as lightmap_bake, bake::probe as probe_bake,
+    bake::generate_lighting::refuse_while_baking, bake::lighting as lighting_bake,
+    bake::lightmap as lightmap_bake, bake::probe as probe_bake,
     bake::reflection as reflection_bake,
 };
 use super::generate::Overrides;
@@ -44,6 +47,7 @@ fn register_probe<'scope>(
         "Bake",
         scope.create_function(|_, ()| {
             let mut scene = scene.borrow_mut();
+            refuse_while_baking(&scene).map_err(mlua::Error::external)?;
             probe_bake::bake_scene_probes(&mut scene).map_err(mlua::Error::external)
         }),
     )
@@ -64,6 +68,7 @@ fn register_reflection<'scope>(
         scope.create_function(|_, ()| {
             let mut scene = scene.borrow_mut();
             let path = scene_path.borrow();
+            refuse_while_baking(&scene).map_err(mlua::Error::external)?;
             reflection_bake::bake_scene_reflections(&mut scene, path.as_deref())
                 .map_err(mlua::Error::external)
         }),
@@ -158,6 +163,7 @@ fn register_lightmaps<'scope>(
                 let settings = overrides.apply(scene.borrow().lighting_settings.lightmaps);
                 let path = scene_path.borrow();
                 let mut scene = scene.borrow_mut();
+                refuse_while_baking(&scene).map_err(mlua::Error::external)?;
                 lightmap_bake::bake_scene_lightmaps(&mut scene, path.as_deref(), &settings)
                     .map_err(mlua::Error::external)
             },

@@ -69,6 +69,18 @@ fn gpu_a_probe_removed_midway_drops_the_bake_and_says_what_was_applied() {
     assert!(scene.reflection_probes.probes[0].cubemap_path.is_empty());
 }
 
+/// A scene replaced mid-step (Open, a reload) took the applied lightmaps with it: the
+/// line says only that the bake was dropped.
+#[test]
+fn gpu_a_replaced_scene_drops_the_bake_without_claiming_lightmaps() {
+    let (mut editor, _, _) = probing("replaced");
+    let mut console = ConsoleLogs::new();
+    poll_once(&mut editor, &mut Scene::new(), &mut console);
+    assert!(editor.dev.lightmap_bake.is_none());
+    let line = last_warning(&console);
+    assert_eq!(line, "Generate Lighting dropped: the open scene changed");
+}
+
 /// Save As mid-step: the bake would write the old file as if it were current.
 #[test]
 fn gpu_saving_elsewhere_midway_drops_the_bake() {

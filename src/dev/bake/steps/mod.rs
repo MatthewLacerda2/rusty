@@ -68,12 +68,16 @@ pub struct LightingBake {
 
 impl LightingBake {
     /// Start baking `scene`'s placed probes (`report` holds the placement), writing
-    /// reflection cubemaps beside `scene_path`.
+    /// reflection cubemaps beside `scene_path`. Refuses up front, before any probe is
+    /// captured, when there are reflection probes and no saved scene to write beside.
     pub(super) fn start(
         scene: &Scene,
         scene_path: Option<&str>,
         mut report: LightingBakeReport,
-    ) -> Self {
+    ) -> Result<Self, String> {
+        if !scene.reflection_probes.is_empty() {
+            out_dir(scene_path)?;
+        }
         let any = !scene.probes.is_empty() || !scene.reflection_probes.is_empty();
         let renderer = any
             .then(|| pollster::block_on(Renderer::new_headless(64, 64)))
@@ -83,7 +87,7 @@ impl LightingBake {
         }
         report.ran_light_bake = scene.probes.is_empty() || renderer.is_some();
         report.ran_reflection_bake = scene.reflection_probes.is_empty() || renderer.is_some();
-        Self {
+        Ok(Self {
             light: BounceSolve::new(scene, DEFAULT_BAKE_RESOLUTION),
             light_done: renderer.is_none(),
             renderer,
@@ -91,13 +95,12 @@ impl LightingBake {
             reflections: ReflectionSnapshot::take(scene),
             staged: StagedCubemaps::default(),
             report,
-        }
+        })
     }
 
     /// One frame's share of the bake; `say` gets each progress line. Returns whether
-    /// the bake is done and ready to [`commit`](Self::commit). Errors when reflection
-    /// probes have no saved scene to write beside, a cubemap could not be written, or
-    /// the scene's probes changed since the start ([`PROBES_CHANGED`]).
+    /// the bake is done and ready to [`commit`](Self::commit). Errors when a cubemap
+    /// could not be written, or the scene's probes changed since the start ([`PROBES_CHANGED`]).
     pub fn step(&mut self, scene: &mut Scene, say: &mut dyn FnMut(String)) -> Result<bool, String> {
         self.refuse_changed(scene)?;
         if !self.light_done {

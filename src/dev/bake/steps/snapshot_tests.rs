@@ -11,7 +11,7 @@ use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
 
 fn start(scene: &mut Scene, path: &str) -> Option<LightingBake> {
-    let job = start_lighting(scene, Some(path), None, LightingBakeParams::default());
+    let job = start_lighting(scene, Some(path), None, LightingBakeParams::default()).unwrap();
     job.report().ran_reflection_bake.then_some(job) // None: no adapter
 }
 

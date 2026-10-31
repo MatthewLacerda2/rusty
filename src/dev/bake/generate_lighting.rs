@@ -79,12 +79,7 @@ pub fn start_probes(
     nav: Option<&NavigationGraph>,
 ) -> Result<LightingBake, String> {
     refuse_in_play(scene)?;
-    Ok(start_lighting(
-        scene,
-        Some(path),
-        nav,
-        LightingBakeParams::default(),
-    ))
+    start_lighting(scene, Some(path), nav, LightingBakeParams::default())
 }
 
 /// The last step, once lightmaps (`lightmaps` of them, already applied to `scene`)

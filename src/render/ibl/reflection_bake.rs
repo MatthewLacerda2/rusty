@@ -83,9 +83,10 @@ impl Renderer {
     }
 
     /// Bake reflection probe `i` of `scene` at its resolution into
-    /// `out_dir/reflection_probe_<i>.ktx2` and point the probe at it: one step of
-    /// [`Renderer::bake_reflections`], which the editor takes one frame at a time
-    /// (#1602). A probe index past the set bakes nothing.
+    /// `out_dir/reflection_probe_<i>.ktx2` and point the probe at it: one probe of
+    /// [`Renderer::bake_reflections`]. The editor's stepped bake does not come here: it
+    /// steps through `LightingBake::step`, which stages each cube and applies them all
+    /// at the end (#1602). A probe index past the set bakes nothing.
     pub fn bake_reflection_into(
         &mut self,
         scene: &mut Scene,

@@ -74,7 +74,7 @@ pub fn bake_lighting(
     say: &mut dyn FnMut(String),
 ) -> Result<LightingBakeReport, String> {
     super::generate_lighting::refuse_while_baking(scene)?;
-    let mut job = start_lighting(scene, scene_path, nav, params);
+    let mut job = start_lighting(scene, scene_path, nav, params)?;
     while !job.step(scene, say)? {}
     job.commit(scene)?;
     Ok(job.report())
@@ -82,12 +82,13 @@ pub fn bake_lighting(
 
 /// Auto-place (per the manual-vs-auto rule) and return the bake of both probe sets
 /// as a job to step ([`LightingBake::step`]): the editor takes one step a frame.
+/// Errors when reflection probes have no saved scene to write beside.
 pub fn start_lighting(
     scene: &mut Scene,
     scene_path: Option<&str>,
     nav: Option<&NavigationGraph>,
     params: LightingBakeParams,
-) -> LightingBake {
+) -> Result<LightingBake, String> {
     let report = LightingBakeReport {
         auto_placed_light: auto_place_light(scene, nav, params.probe_spacing),
         auto_placed_reflection: auto_place_reflection(scene, nav, &params.reflection),

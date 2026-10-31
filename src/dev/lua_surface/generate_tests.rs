@@ -106,3 +106,18 @@ fn bake_refuses_a_reflection_region_under_the_minimum() {
     let err = session().eval("return Lighting.Bake(nil, 0)").unwrap_err();
     assert!(err.to_string().contains("under the 2 m minimum"), "{err}");
 }
+
+/// One bake at a time (#1602): every bake verb waits while the editor's runs.
+#[test]
+fn every_bake_verb_is_refused_while_the_editors_runs() {
+    let s = session();
+    s.world().scene().borrow_mut().lighting_bake_running = true;
+    for verb in [
+        "Probe.Bake()",
+        "Reflection.Bake()",
+        "Lighting.BakeLightmaps()",
+    ] {
+        let err = s.eval(&format!("return {verb}")).unwrap_err();
+        assert!(err.contains("already running"), "{verb}: {err}");
+    }
+}

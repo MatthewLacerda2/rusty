@@ -1,7 +1,8 @@
 //! Generate Lighting's per-frame drive (#808, #1602): the lightmaps' worker polled
 //! and its lightmaps applied, then the probe step taken one step a frame, committed
 //! and the lighting written. A bake dropped midway says what reached the scene: the
-//! lightmaps once they landed, the probes never.
+//! lightmaps once they landed, the probes never. Any probe-stage failure leaves the
+//! applied lightmaps unwritten, so it marks the scene unsaved.
 
 use std::time::Duration;
 
@@ -53,11 +54,13 @@ fn drive(
         // Its result would land on another scene's entities, or be written into a
         // file the scene no longer is: drop it (dropping the job stops the worker and
         // deletes its staged cubemaps) rather than apply it.
-        let why = match active.scene != scene.id() {
-            true => "the open scene changed",
-            false => "the scene was saved elsewhere",
+        // A replaced scene took any applied lightmaps with it; only Save As keeps
+        // them on the scene in front of the user.
+        let line = match active.scene != scene.id() {
+            true => "Generate Lighting dropped: the open scene changed".to_string(),
+            false => dropped(&active.step, "the scene was saved elsewhere"),
         };
-        log.warn(dropped(&active.step, why));
+        log.warn(line);
         editor.dev.lightmap_bake = None;
         return;
     }
@@ -89,7 +92,7 @@ fn advance(
             log.info("Generate Lighting cancelled; kept the old lighting".into());
             return Some(false);
         }
-        BakeOutcome::Failed(e) => return fail(log, e),
+        BakeOutcome::Failed(e) => return fail(log, e, false),
     };
     let path = job.scene_path().to_string();
     match start_probes(scene, &path, Some(nav)) {
@@ -101,7 +104,7 @@ fn advance(
             };
             None
         }
-        Err(e) => fail(log, e),
+        Err(e) => fail(log, e, true), // the lightmaps were applied but never written
     }
 }
 
@@ -127,20 +130,22 @@ fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> 
                 log.info(report.summary());
                 Some(report.saved == LightingSave::NeedsSceneSave)
             }
-            Err(e) => fail(log, e),
+            Err(e) => fail(log, e, true),
         },
         Err(e) if e == PROBES_CHANGED => {
             log.warn(dropped(step, "the probes changed during the bake"));
             // The lightmaps were applied but never written.
             Some(true)
         }
-        Err(e) => fail(log, e),
+        Err(e) => fail(log, e, true),
     }
 }
 
-fn fail(log: &mut ConsoleLogs, e: String) -> Option<bool> {
+/// Say the bake failed; `needs_save` when the lightmaps were applied but never
+/// written.
+fn fail(log: &mut ConsoleLogs, e: String, needs_save: bool) -> Option<bool> {
     log.error(format!("Generate Lighting failed: {e}"));
-    Some(false)
+    Some(needs_save)
 }
 
 /// The console line for a bake dropped because `why`, saying what reached the scene.
