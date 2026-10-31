@@ -16,6 +16,7 @@ mod icon;
 mod last_scene;
 mod paint;
 mod start;
+mod undo;
 mod viewport;
 mod watch;
 
@@ -264,7 +265,9 @@ impl Frontend for EditorFrontend {
 
         self.editor_ui.preview_texture_id = self.preview_texture_id;
         sync_ui_textures(&mut self.editor_ui, game);
+        self.record_edits(game);
         let interaction = self.draw_dashboard(shell, game);
+        self.pause_edits(game);
         paint::drain_repl(&mut self.editor_ui, game);
 
         // Render the scene into the viewport target now (after the panel rect is
@@ -276,7 +279,9 @@ impl Frontend for EditorFrontend {
             .flatten()
             .map(|render| game_focus::game_view_rect(&interaction, ppp, render));
         self.render_viewport_scene(shell, game, &interaction, ppp);
+        self.record_edits(game);
         self.handle_viewport_interaction(game, &interaction, ppp);
+        self.close_edits(game);
         // Only when the Inspector's Preview tab requested one this frame (#352).
         self.render_preview_scene(shell, ppp);
 

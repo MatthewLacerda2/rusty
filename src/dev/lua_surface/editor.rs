@@ -1,5 +1,8 @@
 //! src/dev/lua_surface/editor.rs — `Editor` namespace (DEV-ONLY, #1360).
 //!
+//! `Editor.Undo()` / `Editor.Redo()` walk the edit-mode history (`scene::undo`, #1631),
+//! Unity's `Undo.PerformUndo` / `PerformRedo`; `UndoName` / `RedoName` read it.
+//!
 //! Unity's `EditorApplication.isPlaying`: `Editor.EnterPlay()` / `Editor.ExitPlay()`
 //! make the same transition the Play/Stop button makes, and `Editor.IsPlaying()` reads
 //! the play state. A call only *requests* the transition (on the shared
@@ -40,6 +43,27 @@ pub fn register<'scope>(
         &table,
         "IsPlaying",
         scope.create_function(move |_, ()| Ok(scene.borrow().is_playing())),
+    )?;
+    // Undo / Redo (#1631): the same history as Ctrl+Z / Ctrl+Shift+Z and Edit ▸ Undo.
+    put(
+        &table,
+        "Undo",
+        scope.create_function(move |_, ()| Ok(scene.borrow_mut().undo())),
+    )?;
+    put(
+        &table,
+        "Redo",
+        scope.create_function(move |_, ()| Ok(scene.borrow_mut().redo())),
+    )?;
+    put(
+        &table,
+        "UndoName",
+        scope.create_function(move |_, ()| Ok(scene.borrow().undo_name().map(str::to_string))),
+    )?;
+    put(
+        &table,
+        "RedoName",
+        scope.create_function(move |_, ()| Ok(scene.borrow().redo_name().map(str::to_string))),
     )?;
     lua.globals()
         .set("Editor", table)

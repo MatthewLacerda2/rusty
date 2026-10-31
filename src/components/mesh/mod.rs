@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::ops::Range;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+mod geometry;
 pub mod primitives;
 mod shadow_casting;
 mod skeleton;

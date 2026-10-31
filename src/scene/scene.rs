@@ -143,6 +143,8 @@ pub struct Scene {
     /// The text the engine last read or wrote at this scene's file (#1340), so the
     /// editor tells an outside change from its own write. Never serialized.
     pub(in crate::scene) disk_text: crate::scene::io::DiskText,
+    /// Edit mode's Undo / Redo history (#1631, `scene::undo`). Never serialized.
+    pub(in crate::scene) history: crate::scene::undo::UndoStack,
 }
 
 impl Default for Scene {
@@ -176,6 +178,7 @@ impl Default for Scene {
             meshes_read_at: 0,
             meshes_reimported: BTreeMap::new(),
             disk_text: Default::default(),
+            history: Default::default(),
         }
     }
 }

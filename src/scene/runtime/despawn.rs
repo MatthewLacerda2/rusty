@@ -33,7 +33,11 @@ impl Scene {
     /// Enter or leave Play. Only `GameWorld`'s transition (`enter_play` /
     /// `exit_play`) calls this outside tests, so every reader sees the state
     /// change at the same moment.
+    /// Entering Play forgets the Undo history: Stop restores Play's changes.
     pub(crate) fn set_playing(&mut self, playing: bool) {
+        if playing && !self.playing {
+            self.clear_undo();
+        }
         self.playing = playing;
     }
 

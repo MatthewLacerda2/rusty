@@ -1,7 +1,8 @@
 ## `Editor` — **dev builds only**
 
 Mirrors Unity's `EditorApplication.isPlaying` (#1360): enter and leave Play from a
-script, the console or an agent, so a play-test needs no one to press Play. Registered
+script, the console or an agent, so a play-test needs no one to press Play. And
+Unity's `Undo` (#1631): step the edit-mode history back and forth. Registered
 only under the `dev` Cargo feature, like [`Debug`](Debug.md); a shipped game (the
 `player` build) has no `Editor` namespace. A **standalone** run in a dev build (a
 dev-built `player`, the `play` harness) has no edit mode to switch to or from, as
@@ -13,6 +14,42 @@ Unity's `EditorApplication` doesn't exist in a player: there `EnterPlay` and
 | `Editor.EnterPlay` | `()` | `true` when it asked to enter Play; `false` (a no-op) when already playing or already asked to (by a script, or the Play button this frame), or in a standalone run |
 | `Editor.ExitPlay` | `()` | `true` when it asked to leave Play; `false` (a no-op) in edit mode or when already asked to, or in a standalone run |
 | `Editor.IsPlaying` | `()` | `true` while the world is in Play |
+| `Editor.Undo` | `()` | the name of the step it undid; `nil` when there was none, or in Play |
+| `Editor.Redo` | `()` | the name of the step it redid; `nil` when there was none, or in Play |
+| `Editor.UndoName` | `()` | the name of the step `Undo` would revert, or `nil` |
+| `Editor.RedoName` | `()` | the name of the step `Redo` would re-apply, or `nil` |
+
+### Undo and Redo
+
+Unity's `Undo` (#1631): the same history as **Ctrl+Z** / **Ctrl+Shift+Z** (Cmd on
+macOS; Ctrl+Y redoes too) and **Edit ▸ Undo / Redo**. Every edit-mode change is
+recorded, whoever made it: an Inspector field, the gizmo, the hierarchy, a menu, and
+every API call from the console, a script line or an agent.
+
+- **One command line is one step**, named after the line (its first 60 characters):
+  `Scene.SetName(5, "Door")` then `Editor.Undo()` puts the old name back. Lines sent
+  together are still one step each.
+- **A gesture by hand is one step**: a whole slider or gizmo drag, from press to
+  release, named after what it touched (`Edit Door`, `Create Cube`, `Destroy Cube`,
+  `Edit 3 objects`, `Scene Settings`).
+- **What comes back**: each touched entity whole (its components, name, parent,
+  place in the hierarchy and its id: a destroyed entity returns under the same id),
+  and the scene level (Scene Settings, ambient light, fog, layers, the material
+  library, probes, the bake's settings). Selection is not part of a step.
+- **Edit mode only.** Nothing is recorded in Play, the history is cleared when Play
+  starts (Stop already restores Play's changes) and when a scene is loaded, and in
+  Play `Undo` / `Redo` do nothing and return `nil`. A new edit clears Redo. The
+  history keeps the last 200 steps.
+- An undo is an edit: the scene has unsaved changes after it, as after any other.
+
+```lua
+Scene.SetName(5, "Door")
+Editor.UndoName()            -- 'Scene.SetName(5, "Door")'
+Editor.Undo()                -- the old name is back
+Editor.Redo()                -- "Door" again
+```
+
+### Play
 
 **The same transition as the Play/Stop button.** A call only *requests* it; the
 engine takes the request at the next frame boundary, exactly as it takes the button.
