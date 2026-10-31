@@ -29,7 +29,7 @@
 use std::path::{absolute, PathBuf};
 use std::process::exit;
 
-use rusty::core::project::Access;
+use rusty::core::project::{boot_scene, Access};
 use rusty::core::settings::video::parse_size;
 use rusty::dev::{demo, scenario};
 
@@ -70,15 +70,7 @@ fn main() {
     }
     let demo = demo.map(|d| from_here(&d));
     let audio = audio.map(|path| from_here(&path));
-    let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
-    let opened = match opened {
-        Ok(opened) => opened,
-        Err(e) => {
-            eprintln!("play: cannot open the project: {e}");
-            exit(2);
-        }
-    };
-    let scene = scene.unwrap_or_else(|| opened.settings.build.startup_scene.clone());
+    let opened = open_project(project);
 
     let run = scenario::Run {
         size,
@@ -86,10 +78,35 @@ fn main() {
     };
     let ran = match (&demo, &scenario_path) {
         (Some(demo), scenario_path) => demo::replay(demo, scenario_path.as_deref(), &out_dir, run),
-        (None, Some(path)) => scenario::run(path, &out_dir, &scene, opened.settings, run),
+        (None, Some(path)) => {
+            let scene = scene.unwrap_or_else(|| run_scene(&opened));
+            scenario::run(path, &out_dir, &scene, opened.settings, run)
+        }
         (None, None) => Err(USAGE.to_string()),
     };
     report(ran);
+}
+
+/// Open the project to run it; exits with status 2 when it can't be opened.
+fn open_project(project: Option<PathBuf>) -> rusty::core::project::Opened {
+    let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
+    opened.unwrap_or_else(|e| {
+        eprintln!("play: cannot open the project: {e}");
+        exit(2);
+    })
+}
+
+/// The scene a run of the project boots (`boot_scene`, #1618); exits with status 2
+/// when the project names none.
+fn run_scene(opened: &rusty::core::project::Opened) -> String {
+    let startup = &opened.settings.build.startup_scene;
+    match boot_scene(&opened.root, startup, Access::Run) {
+        Ok(plan) => plan.scenes.into_iter().next().unwrap_or_default(),
+        Err(e) => {
+            eprintln!("play: {e}; pass --scene <path> or set one");
+            exit(2);
+        }
+    }
 }
 
 /// Paths are named from the launch directory; opening the project moves it.
