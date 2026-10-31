@@ -13,6 +13,7 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
     DrawItem {
         key: BatchKey {
             pipeline: 0,
+            facing: Default::default(),
             mesh: MeshId(mesh.to_string()),
             indices: (0..36).into(),
             material: 0,

@@ -17,7 +17,7 @@ use crate::scene::{Camera, Scene};
 
 /// A 6 x 6 one-sided `Plane` at y = 3 casting by `mode`; `face_down` turns its
 /// front away from the light overhead, `cutout` gives it a solid Cutout material.
-fn card(scene: &mut Scene, mode: ShadowCasting, face_down: bool, cutout: bool) -> u32 {
+pub(super) fn card(scene: &mut Scene, mode: ShadowCasting, face_down: bool, cutout: bool) -> u32 {
     let plane = create_entity(scene, "Card", Some(Primitive::Plane));
     let mut t = scene.world.transform_mut(plane).unwrap();
     (t.position, t.scale) = (Vec3::Y * 3.0, Vec3::new(0.4, 1.0, 0.4));

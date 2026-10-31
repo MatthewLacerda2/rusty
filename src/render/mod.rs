@@ -118,7 +118,7 @@ pub struct Renderer {
     pub config: wgpu::SurfaceConfiguration,
 
     // Pipelines
-    render_pipeline: wgpu::RenderPipeline,
+    render_pipeline: gpu::pipelines::FacedPipeline,
     /// Forward pipelines also writing velocity (#1435) and SSR surface (#1526) targets.
     velocity_pipeline: gpu::pipelines::VelocityPipelines,
     /// The opaque ones over a view's primed depth (#1499).
@@ -220,7 +220,7 @@ pub struct Renderer {
     /// (`passes::transparent::opaque_copy`).
     pub(crate) opaque_copy: passes::transparent::OpaqueCopyPass,
     /// The SSAO depth prepass (#436): the forward vertex stage, depth only.
-    pub(crate) prepass_pipeline: wgpu::RenderPipeline,
+    pub(crate) prepass_pipeline: gpu::pipelines::FacedPipeline,
     /// The SSAO occlusion + blur passes and their no-AO fallback (#436).
     pub(crate) ssao: passes::ssao::SsaoRenderer,
     /// The grading-LUT bake every view's table is written through (#1440).

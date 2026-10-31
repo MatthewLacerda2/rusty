@@ -36,7 +36,7 @@ fn material_data_matches_wgsl_layout() {
     let own = members!(MaterialData, 0;
         color_tint, use_texture, is_lit, metallic, roughness, use_metallic_map,
         use_roughness_map, use_normal_map, use_emissive_map, emissive, use_cutout,
-        alpha_cutoff, receive_decals,
+        alpha_cutoff, receive_decals, two_sided,
     );
     let surface = members!(SurfaceUniform, surface;
         blend_mode, premultiply_diffuse, receive_shadows, refraction_model, ior,

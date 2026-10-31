@@ -41,7 +41,7 @@ pub(crate) struct GlobalBindings {
 /// The forward-lit, line, outline and skybox passes — everything that draws into
 /// the HDR offscreen target.
 pub(crate) struct ForwardPasses {
-    pub render_pipeline: wgpu::RenderPipeline,
+    pub render_pipeline: pipelines::FacedPipeline,
     pub velocity_pipeline: pipelines::VelocityPipelines,
     pub primed_pipelines: pipelines::PrimedPipelines,
     pub transparent_pipelines: pipelines::TransparentPipelines,
@@ -49,7 +49,7 @@ pub(crate) struct ForwardPasses {
     pub line_pipeline: pipelines::LazyPipeline,
     /// The selection outline's mask and edge pipelines (#1175).
     pub outline: crate::render::passes::outline::OutlinePasses,
-    pub prepass_pipeline: wgpu::RenderPipeline,
+    pub prepass_pipeline: pipelines::FacedPipeline,
     pub skybox_renderer: skybox::SkyboxRenderer,
 }
 

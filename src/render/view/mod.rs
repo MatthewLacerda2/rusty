@@ -75,7 +75,7 @@ pub struct RenderView {
     /// the wrong state if anything between the two returns early or unwinds, and it is
     /// invisible at the call site. Ownership by the view says the same thing
     /// declaratively — *this* view shades this way — and cannot leak to another.
-    forward_override: Option<wgpu::RenderPipeline>,
+    forward_override: Option<crate::render::gpu::pipelines::FacedPipeline>,
     /// The UI pass's format for the colour target (#418); see `create_color_target`.
     ui_format: Option<wgpu::TextureFormat>,
     /// A targetless view's UI output for the next render (#418) — see
@@ -99,8 +99,8 @@ impl RenderView {
     /// else the renderer's shared one.
     pub(crate) fn forward_pipeline<'a>(
         &'a self,
-        shared: &'a wgpu::RenderPipeline,
-    ) -> &'a wgpu::RenderPipeline {
+        shared: &'a crate::render::gpu::pipelines::FacedPipeline,
+    ) -> &'a crate::render::gpu::pipelines::FacedPipeline {
         self.forward_override.as_ref().unwrap_or(shared)
     }
 
@@ -111,7 +111,10 @@ impl RenderView {
 
     /// Draw this view's solids with `pipeline` instead of the shared forward pipeline.
     /// Pass `None` to go back to the shared one.
-    pub fn set_forward_override(&mut self, pipeline: Option<wgpu::RenderPipeline>) {
+    pub(crate) fn set_forward_override(
+        &mut self,
+        pipeline: Option<crate::render::gpu::pipelines::FacedPipeline>,
+    ) {
         self.forward_override = pipeline;
     }
 

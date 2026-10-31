@@ -142,10 +142,10 @@ impl ShadowRenderer {
         };
         (
             [
-                depth_pipeline(device, shader, &plain, None, Facing::Front),
-                depth_pipeline(device, shader, &clip, Some("fs_shadow"), Facing::Front),
+                depth_pipeline(device, shader, &plain, None, Facing::Ccw),
+                depth_pipeline(device, shader, &clip, Some("fs_shadow"), Facing::Ccw),
             ],
-            [twins(Facing::Mirrored), twins(Facing::Both)],
+            [twins(Facing::Cw), twins(Facing::Both)],
         )
     }
 }
@@ -241,7 +241,7 @@ pub(crate) fn lazy_depth_pipeline(
 /// stored is held off by the sloped bias here plus the receiver's normal offset and
 /// depth bias (`sample_cascade` / `sample_local_shadow`).
 ///
-/// A [`Facing::Mirrored`] pipeline draws casters whose world matrix has a negative
+/// A [`Facing::Cw`] pipeline draws casters whose world matrix has a negative
 /// determinant (#1134): mirroring reverses a mesh's winding, so it takes clockwise
 /// triangles as front and still stores the lit side. A [`Facing::Both`] one culls
 /// nothing, for a two-sided caster (#1571): both sides of a card or plane cast.
@@ -254,11 +254,11 @@ pub(crate) fn depth_pipeline(
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some(match (fragment, facing) {
-            (None, Facing::Front) => "Shadow Render Pipeline",
-            (None, Facing::Mirrored) => "Shadow Mirrored Pipeline",
+            (None, Facing::Ccw) => "Shadow Render Pipeline",
+            (None, Facing::Cw) => "Shadow Mirrored Pipeline",
             (None, Facing::Both) => "Shadow Two-Sided Pipeline",
-            (Some(_), Facing::Front) => "Shadow Clip Pipeline",
-            (Some(_), Facing::Mirrored) => "Shadow Mirrored Clip Pipeline",
+            (Some(_), Facing::Ccw) => "Shadow Clip Pipeline",
+            (Some(_), Facing::Cw) => "Shadow Mirrored Clip Pipeline",
             (Some(_), Facing::Both) => "Shadow Two-Sided Clip Pipeline",
         }),
         layout: Some(layout),

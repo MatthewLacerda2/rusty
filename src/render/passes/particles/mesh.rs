@@ -17,6 +17,7 @@ use crate::render::draw::batch::sort::view_depth;
 use crate::render::draw::batch::{BatchKey, DrawItem};
 use crate::render::draw::materials::material_maps;
 use crate::render::draw::uniforms::{material_data, probe_sh_at};
+use crate::render::gpu::pipelines::Facing;
 use crate::render::{InstanceData, MaterialData, Renderer};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::serialize::asset_mesh_component;
@@ -119,8 +120,11 @@ impl Renderer {
             receive_decals: 0,
             ..self.with_map_channels(material_data(true, material), material)
         };
+        // Particles are placed unmirrored: the material's face alone picks the cull.
+        let face = material.map(|m| m.render_face).unwrap_or_default();
         let key = BatchKey {
             pipeline,
+            facing: Facing::of(Mat4::IDENTITY, face),
             mesh,
             // The emitter names one material: the whole mesh is one run.
             indices: (0..num_indices).into(),

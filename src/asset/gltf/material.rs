@@ -40,6 +40,7 @@ pub(super) fn material_data(
             .and_then(|t| texture_path(&t.texture(), base_dir, source))
             .map(MapRef::from),
         emissive: material.emissive_factor(),
+        double_sided: material.double_sided(),
     }
 }
 

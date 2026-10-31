@@ -238,3 +238,6 @@ mod material_runs_tests;
 mod primitives_tests;
 #[cfg(test)]
 mod revision_tests;
+#[cfg(test)]
+#[path = "winding_tests.rs"]
+mod winding_tests;

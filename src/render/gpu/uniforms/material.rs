@@ -71,7 +71,9 @@ pub(crate) struct MaterialData {
     // `1` when the surface folds in the decals of its cluster (#638): a lit, non-
     // transparent surface whose material receives decals.
     pub receive_decals: u32,
-    pub _pad: u32,
+    // `1` when the material draws its back faces too (#1615, a render face of
+    // `Back` or `Both`): a face seen from behind is shaded with its normal flipped.
+    pub two_sided: u32,
     // How the surface composites, shadows and transmits (#1523).
     pub surface: SurfaceUniform,
     // Where the material's maps are read (#1573).

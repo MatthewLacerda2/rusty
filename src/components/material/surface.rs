@@ -23,6 +23,27 @@ crate::core::named_enum! {
 }
 
 crate::core::named_enum! {
+    /// Which faces of a mesh a material draws — URP Lit's *Render Face* (`_Cull`,
+    /// #1615), HDRP's *Double-Sided*. Every pass that draws the surface culls by it:
+    /// the forward and transparent passes, the depth prepass and postpass, the shadow
+    /// casters and the selection outline.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum RenderFace {
+        /// The faces turned toward the viewer; back faces are culled. The default,
+        /// for opaque, cutout and transparent alike, so a closed mesh never shows its
+        /// inside.
+        #[default]
+        Front = "Front",
+        /// Only the faces turned away (the inside of a dome or a sky sphere), shaded
+        /// with their normal flipped toward the viewer.
+        Back = "Back",
+        /// Both, each shaded from the side it is seen (foliage cards, a glass pane, a
+        /// plane seen from below).
+        Both = "Both",
+    }
+}
+
+crate::core::named_enum! {
     /// How a transparent surface's colour combines with the image behind it — URP
     /// Lit's *Blending Mode* (`BaseShaderGUI.SetupMaterialBlendModeInternal`). Read
     /// only by a `Transparent` material.

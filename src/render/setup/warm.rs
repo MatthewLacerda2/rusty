@@ -21,11 +21,14 @@ impl Renderer {
     /// Every pipeline built on first draw. A new [`LazyPipeline`] goes in this list,
     /// or the windowed renderer compiles it mid-frame.
     pub(crate) fn lazy_pipelines(&self, editor_overlays: bool) -> Vec<&LazyPipeline> {
-        let mut all = vec![&self.primed_pipelines.forward];
+        // The opaque pass and its prepass built their usual facing with the renderer;
+        // their mirrored and double-sided ones (#1615) wait like the rest.
+        let mut all: Vec<&LazyPipeline> = self.render_pipeline.twins().collect();
+        all.extend(self.prepass_pipeline.twins());
+        all.extend(self.primed_pipelines.lazies());
         all.extend(self.transparent_pipelines.lazies());
         all.extend(self.depth_postpass_pipelines.lazies());
         all.extend(self.velocity_pipeline.lazies());
-        all.extend(self.primed_pipelines.velocity.lazies());
         all.extend(self.post_passes.lazy_pipelines());
         all.extend(self.ssao.lazy_pipelines());
         all.extend(self.skybox_renderer.lazy_pipelines());

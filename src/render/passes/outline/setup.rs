@@ -7,13 +7,14 @@ use super::{EdgeUniform, MASK_FORMAT};
 use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{texture_entry, uniform_entry};
 use crate::render::gpu::mesh::vertex_layout;
-use crate::render::gpu::pipelines::LazyPipeline;
+use crate::render::gpu::pipelines::{FacedPipeline, Facing, LazyPipeline};
 use crate::render::gpu::shaders::ShaderRegistry;
 
 /// The selection outline's three pipelines and the layout of the last two.
 pub(crate) struct OutlinePasses {
-    /// The outlined draws into the mask, through the forward pipeline layout.
-    pub(crate) mask: LazyPipeline,
+    /// The outlined draws into the mask, through the forward pipeline layout, one
+    /// per facing, so a face the forward pass culls rings nothing (#1615).
+    pub(crate) mask: FacedPipeline,
     /// Each pixel's distance to the mask along its row (`fs_dilate_x`).
     pub(crate) dilate: LazyPipeline,
     /// The ring over the post-FX output, alpha-blended (`fs_edge`).
@@ -48,9 +49,11 @@ impl OutlinePasses {
             bind_group_layouts: &[Some(&edge_layout)],
             immediate_size: 0,
         });
-        let forward_layout = forward_layout.clone();
-        let mask = LazyPipeline::new(device, move |device| {
-            mask_pipeline(device, &mask_shader, &forward_layout)
+        let mask = FacedPipeline::new(|facing| {
+            let (shader, layout) = (mask_shader.clone(), forward_layout.clone());
+            LazyPipeline::new(device, move |device| {
+                mask_pipeline(device, &shader, &layout, facing)
+            })
         });
         let fullscreen = |fs: &'static str, format, blend| {
             let (shader, layout) = (edge_shader.clone(), edge_pipeline_layout.clone());
@@ -82,9 +85,9 @@ impl OutlinePasses {
         }
     }
 
-    /// All three pipelines, for `Renderer::lazy_pipelines`.
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
-        [&self.mask, &self.dilate, &self.edge]
+    /// Every pipeline, for `Renderer::lazy_pipelines`.
+    pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
+        self.mask.lazies().chain([&self.dilate, &self.edge])
     }
 
     /// A dilation or edge bind group: `uniform`, the `source` the pass reads along
@@ -119,12 +122,13 @@ impl OutlinePasses {
 /// The size of the edge pass's uniform buffer.
 pub(super) const EDGE_UNIFORM_SIZE: u64 = std::mem::size_of::<EdgeUniform>() as u64;
 
-/// The mask pipeline: the forward vertex layout and groups, every triangle (no
-/// culling, so mirroring cannot hide one), no depth test, into the one-channel mask.
+/// The mask pipeline: the forward vertex layout and groups, the triangles `facing`
+/// keeps (the forward draw's own, #1615), no depth test, into the one-channel mask.
 fn mask_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
     layout: &wgpu::PipelineLayout,
+    facing: Facing,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Selection Mask Pipeline"),
@@ -145,7 +149,7 @@ fn mask_pipeline(
                 write_mask: wgpu::ColorWrites::ALL,
             })],
         }),
-        primitive: wgpu::PrimitiveState::default(),
+        primitive: facing.primitive(wgpu::PrimitiveState::default()),
         depth_stencil: None,
         multisample: wgpu::MultisampleState::default(),
         multiview_mask: None,

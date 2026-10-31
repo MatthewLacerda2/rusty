@@ -9,7 +9,7 @@
 use glam::Vec3;
 
 use crate::components::material::entity_material_key;
-use crate::components::Playback;
+use crate::components::{Playback, RenderFace};
 use crate::scene::{
     AnimatorComponent, CameraComponent, ClearFlags, ColliderComponent, ColliderShape,
     CollisionDetection, LightComponent, LightType, MaterialAsset, MaterialComponent,
@@ -110,6 +110,12 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
         normal_map: data.normal_map.clone(),
         emissive: data.emissive,
         emissive_map: data.emissive_map.clone(),
+        // A double-sided glTF material draws both faces (#1615), as Unity's glTF
+        // importers set *Render Face* to Both.
+        render_face: match data.double_sided {
+            true => RenderFace::Both,
+            false => RenderFace::Front,
+        },
         // Imported glTF/OBJ materials default to Opaque (#242): the importer does not
         // yet read glTF `alphaMode`/`alphaCutoff`, so transparency is authored after
         // import via the inspector or the `Material` API.
@@ -201,8 +207,20 @@ mod tests {
             normal_map: Some("n.png".into()),
             emissive_map: Some("e.png".into()),
             emissive: [0.1, 0.2, 0.3],
+            double_sided: false,
         };
         let mat = material_asset_from_import(&data);
+        assert_eq!(mat.render_face, crate::components::RenderFace::Front);
+        let both = MaterialData {
+            double_sided: true,
+            ..data.clone()
+        };
+        let face = material_asset_from_import(&both).render_face;
+        assert_eq!(
+            face,
+            crate::components::RenderFace::Both,
+            "glTF doubleSided"
+        );
 
         // Base-color alpha is dropped; rgb carried through.
         assert_eq!(mat.base_color, [0.8, 0.4, 0.2]);

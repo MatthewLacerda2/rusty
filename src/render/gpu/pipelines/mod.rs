@@ -1,11 +1,9 @@
 //! Render-pipeline construction for the main forward renderer. The bind-group
 //! layouts these pipelines reference live in `bind_layouts` (behavior unchanged).
 
-use crate::render::gpu::mesh::vertex_layout;
-use crate::render::gpu::DEPTH_FORMAT;
-
 mod depth_postpass;
 mod lazy;
+mod prepass;
 pub(crate) mod priming;
 mod specs;
 pub(crate) mod surface;
@@ -15,7 +13,9 @@ pub(crate) mod winding;
 pub(crate) use depth_postpass::DepthPostpassPipelines;
 pub(crate) use lazy::LazyPipeline;
 pub(crate) use transparent::{TransparentBlend, TransparentPipelines};
+pub(crate) use winding::{FacedPipeline, Facing};
 
+use prepass::prepass_set;
 use specs::{
     forward_spec, line_spec, make_pipeline, primed_spec, primed_velocity_spec, transparent_spec,
     velocity_spec, PipelineSpec,
@@ -23,12 +23,13 @@ use specs::{
 
 pub(crate) use specs::velocity_target;
 
-/// The forward-target pipelines, all sharing one shader + vertex layout. The ones a
-/// frame may not draw (translucents, debug lines) are built on first use (#985); the
-/// opaque pass and its prepass are built up front.
+/// The forward-target pipelines, all sharing one shader + vertex layout, each pass
+/// one per [`Facing`] (#1615). The ones a frame may not draw (translucents, debug
+/// lines, a mirrored or double-sided mesh's) are built on first use (#985); the
+/// opaque pass and its prepass are built up front for the usual facing.
 pub(crate) struct ForwardPipelines {
     /// Opaque/cutout solids: REPLACE, depth write on.
-    pub forward: wgpu::RenderPipeline,
+    pub forward: FacedPipeline,
     /// The same, writing the view's velocity target too (#1435), and its SSR surface
     /// target (#1526): built the first time a view runs motion blur or SSR.
     pub velocity: VelocityPipelines,
@@ -40,7 +41,7 @@ pub(crate) struct ForwardPipelines {
     /// over the post-FX output (#1224), so built against the output format.
     pub line: LazyPipeline,
     /// The SSAO depth prepass (#436): the forward vertex stage, no colour target.
-    pub prepass: wgpu::RenderPipeline,
+    pub prepass: FacedPipeline,
     /// The opaque and velocity ones over a primed depth (#1499).
     pub primed: PrimedPipelines,
     /// Their layout, groups 0–3, which the selection mask (#1175) draws through too.
@@ -73,19 +74,15 @@ pub(crate) fn create_pipelines(
         material_layout,
         shadow_layout,
     );
-    let lazy = |layout, format, spec| lazy_pipeline(device, shader, format, layout, spec);
+    let set = SpecSet::new(device, shader, format, &render_layout);
     ForwardPipelines {
-        forward: make_pipeline(device, shader, format, &render_layout, &forward_spec()),
-        velocity: VelocityPipelines::new(|surface| {
-            lazy(&render_layout, format, velocity_spec(surface))
-        }),
-        transparent: TransparentPipelines::new(|blend| {
-            lazy(&render_layout, format, transparent_spec(blend))
-        }),
+        forward: FacedPipeline::eager(|f| set.lazy(forward_spec().facing(f))),
+        velocity: VelocityPipelines::new(|surface| set.faced(velocity_spec(surface))),
+        transparent: TransparentPipelines::new(|blend| set.faced(transparent_spec(blend))),
         depth_postpass: DepthPostpassPipelines::new(device, shader, &render_layout),
-        line: lazy(&line_layout, output_format, line_spec()),
-        prepass: make_prepass(device, shader, &render_layout, "fs_prepass"),
-        primed: PrimedPipelines::new(device, shader, format, &render_layout),
+        line: lazy_pipeline(device, shader, output_format, &line_layout, line_spec()),
+        prepass: prepass_set(device, shader, &render_layout, "fs_prepass"),
+        primed: PrimedPipelines::new(&set),
         layout: render_layout,
     }
 }
@@ -104,25 +101,56 @@ pub(crate) fn surface_pipelines(
 ) -> surface::SurfacePipelines {
     use crate::render::passes::shadows::{depth_pipeline, lazy_depth_pipeline};
     use crate::shadergen::assemble::{CUT_PREPASS, CUT_SHADOW};
-    use winding::Facing;
     let shadow = |facing| depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), facing);
     let lazy = |f| lazy_depth_pipeline(device, shader, shadow_layout, Some(CUT_SHADOW), f);
+    let set = SpecSet::new(device, shader, format, layout);
     surface::SurfacePipelines {
-        forward: make_pipeline(device, shader, format, layout, &forward_spec()),
-        velocity: VelocityPipelines::new(|surface| {
-            lazy_pipeline(device, shader, format, layout, velocity_spec(surface))
-        }),
-        primed: PrimedPipelines::new(device, shader, format, layout),
-        transparent: TransparentPipelines::new(|blend| {
-            lazy_pipeline(device, shader, format, layout, transparent_spec(blend))
-        }),
+        forward: FacedPipeline::eager(|f| set.lazy(forward_spec().facing(f))),
+        velocity: VelocityPipelines::new(|surface| set.faced(velocity_spec(surface))),
+        primed: PrimedPipelines::new(&set),
+        transparent: TransparentPipelines::new(|blend| set.faced(transparent_spec(blend))),
         depth_postpass: DepthPostpassPipelines::new(device, shader, layout),
         cut: cut.then(|| surface::CutPipelines {
-            prepass: make_prepass(device, shader, layout, CUT_PREPASS),
-            shadow: shadow(Facing::Front),
-            mirrored_shadow: shadow(Facing::Mirrored),
+            prepass: prepass_set(device, shader, layout, CUT_PREPASS),
+            shadow: shadow(Facing::Ccw),
+            mirrored_shadow: shadow(Facing::Cw),
             two_sided_shadow: lazy(Facing::Both),
         }),
+    }
+}
+
+/// What every forward-target pipeline of one shader shares: the device, the shader,
+/// the colour format and the layout, so a pass names only its spec.
+struct SpecSet<'a> {
+    device: &'a wgpu::Device,
+    shader: &'a wgpu::ShaderModule,
+    format: wgpu::TextureFormat,
+    layout: &'a wgpu::PipelineLayout,
+}
+
+impl<'a> SpecSet<'a> {
+    fn new(
+        device: &'a wgpu::Device,
+        shader: &'a wgpu::ShaderModule,
+        format: wgpu::TextureFormat,
+        layout: &'a wgpu::PipelineLayout,
+    ) -> Self {
+        Self {
+            device,
+            shader,
+            format,
+            layout,
+        }
+    }
+
+    /// `spec`'s pipeline, built on its first draw.
+    fn lazy(&self, spec: PipelineSpec) -> LazyPipeline {
+        lazy_pipeline(self.device, self.shader, self.format, self.layout, spec)
+    }
+
+    /// `spec`'s pipeline per [`Facing`], each built on its first draw.
+    fn faced(&self, spec: PipelineSpec) -> FacedPipeline {
+        FacedPipeline::new(|f| self.lazy(spec.facing(f)))
     }
 }
 
@@ -130,62 +158,55 @@ pub(crate) fn surface_pipelines(
 /// solids' depth, so these test it `LessEqual` and write none. Built the first time
 /// a view primes, since a view with AO off never does.
 pub(crate) struct PrimedPipelines {
-    pub forward: LazyPipeline,
+    pub forward: FacedPipeline,
     /// Writing motion vectors too (#1435), and the SSR surface (#1526).
     pub velocity: VelocityPipelines,
 }
 
 /// The opaque pipelines a view writing its velocity target draws with (#1435): one
 /// into the velocity target alone, one into the SSR surface target too (#1526), each
-/// built on first use.
+/// one per facing, built on first use.
 pub(crate) struct VelocityPipelines {
-    plain: LazyPipeline,
-    surface: LazyPipeline,
+    plain: FacedPipeline,
+    surface: FacedPipeline,
 }
 
 impl VelocityPipelines {
     /// The pair `make(surface)` builds.
-    fn new(make: impl Fn(bool) -> LazyPipeline) -> Self {
+    fn new(make: impl Fn(bool) -> FacedPipeline) -> Self {
         Self {
             plain: make(false),
             surface: make(true),
         }
     }
 
-    /// The one for a view that writes its SSR `surface` target, or not.
-    pub(crate) fn get(&self, surface: bool) -> &wgpu::RenderPipeline {
+    /// The one for a view that writes its SSR `surface` target, or not, keeping
+    /// `facing`'s triangles.
+    pub(crate) fn get(&self, surface: bool, facing: Facing) -> &wgpu::RenderPipeline {
         match surface {
-            false => self.plain.get(),
-            true => self.surface.get(),
+            false => self.plain.get(facing),
+            true => self.surface.get(facing),
         }
     }
 
-    /// Both, for warming.
-    pub(crate) fn lazies(&self) -> [&LazyPipeline; 2] {
-        [&self.plain, &self.surface]
+    /// Every one, for warming.
+    pub(crate) fn lazies(&self) -> impl Iterator<Item = &LazyPipeline> {
+        self.plain.lazies().chain(self.surface.lazies())
     }
 }
 
 impl PrimedPipelines {
-    /// `shader`'s primed pipelines into `format` through `layout`, not yet built.
-    fn new(
-        device: &wgpu::Device,
-        shader: &wgpu::ShaderModule,
-        format: wgpu::TextureFormat,
-        layout: &wgpu::PipelineLayout,
-    ) -> Self {
+    /// `set`'s primed pipelines, not yet built.
+    fn new(set: &SpecSet) -> Self {
         Self {
-            forward: lazy_pipeline(device, shader, format, layout, primed_spec()),
-            velocity: VelocityPipelines::new(|surface| {
-                lazy_pipeline(
-                    device,
-                    shader,
-                    format,
-                    layout,
-                    primed_velocity_spec(surface),
-                )
-            }),
+            forward: set.faced(primed_spec()),
+            velocity: VelocityPipelines::new(|surface| set.faced(primed_velocity_spec(surface))),
         }
+    }
+
+    /// Every one, for warming.
+    pub(crate) fn lazies(&self) -> impl Iterator<Item = &LazyPipeline> {
+        self.forward.lazies().chain(self.velocity.lazies())
     }
 }
 
@@ -243,46 +264,6 @@ fn create_pipeline_layouts(
     (render_pipeline_layout, line_pipeline_layout)
 }
 
-/// The SSAO depth prepass (#436): the solids' depth alone, through the forward vertex
-/// stage (skinning, instancing) and `fragment` — `fs_prepass` (cutout clip), or the
-/// `fs_prepass_cut` of a variant that cuts, moves its UVs or moves its vertices
-/// (#648, #1499, #1524). Same layout as the forward pass, so it records with the same
-/// bind groups.
-fn make_prepass(
-    device: &wgpu::Device,
-    shader: &wgpu::ShaderModule,
-    layout: &wgpu::PipelineLayout,
-    fragment: &str,
-) -> wgpu::RenderPipeline {
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("SSAO Depth Prepass Pipeline"),
-        layout: Some(layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
-            compilation_options: Default::default(),
-            buffers: &[Some(vertex_layout())],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some(fragment),
-            compilation_options: Default::default(),
-            targets: &[],
-        }),
-        primitive: wgpu::PrimitiveState::default(),
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: DEPTH_FORMAT,
-            depth_write_enabled: Some(true),
-            depth_compare: Some(wgpu::CompareFunction::Less),
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
-        multisample: wgpu::MultisampleState::default(),
-        multiview_mask: None,
-        cache: None,
-    })
-}
-
 #[cfg(test)]
 #[path = "tests/scrolled_cut_tests.rs"]
 mod scrolled_cut_tests;
@@ -298,3 +279,7 @@ mod vertex_waves_tests;
 #[cfg(test)]
 #[path = "tests/priming/backend_tests.rs"]
 mod priming_backend_tests;
+
+#[cfg(test)]
+#[path = "tests/render_face_tests.rs"]
+mod render_face_tests;

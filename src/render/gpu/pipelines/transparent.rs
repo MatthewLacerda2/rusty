@@ -4,7 +4,7 @@
 //! factors, and *Preserve Specular Lighting* lifts the alpha multiply from the blend
 //! into the shader (source factor `One`) under `Alpha` and `Additive`.
 
-use super::LazyPipeline;
+use super::{FacedPipeline, Facing, LazyPipeline};
 use crate::render::gpu::uniforms::SurfaceUniform;
 
 /// The blend state a translucent batch draws with.
@@ -83,30 +83,32 @@ impl TransparentBlend {
     }
 }
 
-/// One shader's translucent pipelines, one per [`TransparentBlend`], each built on
-/// its first draw.
-pub(crate) struct TransparentPipelines([LazyPipeline; 5]);
+/// One shader's translucent pipelines, one per [`TransparentBlend`] and [`Facing`]
+/// (#1615), each built on its first draw.
+pub(crate) struct TransparentPipelines([FacedPipeline; 5]);
 
 impl TransparentPipelines {
     /// The set `make(blend)` builds.
-    pub(super) fn new(make: impl Fn(TransparentBlend) -> LazyPipeline) -> Self {
+    pub(super) fn new(make: impl Fn(TransparentBlend) -> FacedPipeline) -> Self {
         Self(TransparentBlend::ALL.map(make))
     }
 
-    /// The pipeline for `blend`.
-    pub(crate) fn get(&self, blend: TransparentBlend) -> &wgpu::RenderPipeline {
-        self.0[blend as usize].get()
+    /// The pipeline for `blend`, keeping `facing`'s triangles.
+    pub(crate) fn get(&self, blend: TransparentBlend, facing: Facing) -> &wgpu::RenderPipeline {
+        self.0[blend as usize].get(facing)
     }
 
-    /// Whether `blend`'s pipeline has been built.
+    /// Whether any of `blend`'s pipelines has been built.
     #[cfg(test)]
     pub(crate) fn is_built(&self, blend: TransparentBlend) -> bool {
-        self.0[blend as usize].is_built()
+        Facing::ALL
+            .into_iter()
+            .any(|f| self.0[blend as usize].is_built(f))
     }
 
     /// Every one, for warming.
     pub(crate) fn lazies(&self) -> impl Iterator<Item = &LazyPipeline> {
-        self.0.iter()
+        self.0.iter().flat_map(FacedPipeline::lazies)
     }
 }
 

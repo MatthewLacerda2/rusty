@@ -267,10 +267,13 @@ impl Renderer {
             }
             let primed = solid_pass.primed() && in_prepass;
             let blend = TransparentBlend::of(&batch.key.record().surface);
-            let pipeline = (batch.key.pipeline, primed, blend);
+            let facing = batch.key.facing;
+            let pipeline = (batch.key.pipeline, primed, blend, facing);
             if bound != Some(pipeline) {
-                let shaders = &self.surface_shaders;
-                render_pass.set_pipeline(shaders.pick(solid_pass, pipeline.0, primed, blend));
+                let pick = self
+                    .surface_shaders
+                    .pick(solid_pass, pipeline.0, primed, blend, facing);
+                render_pass.set_pipeline(pick);
                 bound = Some(pipeline);
             }
             let offsets = DrawBuffers::offsets(batch.uniform_slot);

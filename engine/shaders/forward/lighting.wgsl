@@ -1,6 +1,7 @@
 // engine/shaders/forward/lighting.wgsl — the forward pass's lighting helpers (#1015):
 // decals, ambient occlusion, lightmaps, the PBR response, the sun's cascaded shadow,
-// probe SH, and the environment reflection. `fs_main` in `shader.wgsl` sums them.
+// probe SH, the flat ambient, the environment reflection, and which way a two-sided
+// face's normal turns (#1615). `fs_main` in `shader.wgsl` sums them.
 
 #define_import_path forward::lighting
 
@@ -274,4 +275,27 @@ fn sky_reflection(R: vec3<f32>, roughness: f32) -> vec3<f32> {
         return sky.rgb;
     }
     return sky.rgb + lighting.ambient.color * sky.a;
+}
+
+// `n` normalized, and flipped when `two_sided` and the triangle is seen from behind:
+// a material whose render face is `Back` or `Both` (#1615) is shaded from the side it
+// is seen, as URP flips a two-sided surface's normal. Which side is seen is read off
+// the triangle's own plane on screen (its position's derivatives, so the caller runs
+// this before any per-pixel branch), not `@builtin(front_facing)`: a mirrored mesh
+// (#1134) draws through the pipeline that keeps its clockwise triangles, where
+// `front_facing` would name the wrong side, and this needs no twin pipeline for it.
+fn facing_normal(n: vec3<f32>, p: vec3<f32>, two_sided: bool) -> vec3<f32> {
+    let face = cross(dpdx(p), dpdy(p));
+    let seen = select(-face, face, dot(face, camera.camera_pos - p) >= 0.0);
+    let unit = normalize(n);
+    return select(unit, -unit, two_sided && dot(unit, seen) < 0.0);
+}
+
+// The flat Hemispherical Sky-Ground ambient at normal `N`, as irradiance E / pi: the
+// sky colour above, a quarter of it (darker and cooler) below. What a surface no
+// lightmap or probe covers takes (`surface_color`'s step 1).
+fn flat_ambient(N: vec3<f32>) -> vec3<f32> {
+    let sky_color = lighting.ambient.color;
+    let ground_color = sky_color * 0.25;
+    return mix(ground_color, sky_color, N.y * 0.5 + 0.5) * lighting.ambient.intensity;
 }

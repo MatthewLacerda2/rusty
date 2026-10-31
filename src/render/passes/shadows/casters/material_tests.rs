@@ -84,7 +84,7 @@ fn gpu_cutouts_differing_only_in_tint_share_one_caster_batch() {
     let casters = leaves
         .map(|id| {
             let key = CasterKey {
-                facing: Facing::Front,
+                facing: Facing::Ccw,
                 clip: Some(clips[&(id, 0)].clip),
                 mesh: crate::render::MeshId("Plane".into()),
                 indices: (0..6).into(),

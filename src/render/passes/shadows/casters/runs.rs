@@ -4,19 +4,19 @@
 
 use std::ops::Range;
 
-use super::super::clips::CasterClip;
 use super::{CasterBatch, CasterData, CasterKey};
 
-/// A mesh's `(slot, run)` draws ([`GpuMesh::runs`]) paired with how each slot clips
-/// its shadow (`clip_of(slot)`), adjacent runs that clip alike joined into one: a mesh
-/// whose materials all cast plainly stays one draw.
+/// A mesh's `(slot, run)` draws ([`GpuMesh::runs`]) paired with how each slot casts
+/// its shadow (`clip_of(slot)`: its clip, and its render face, #1615), adjacent runs
+/// that cast alike joined into one: a mesh whose materials all cast plainly stays
+/// one draw.
 ///
 /// [`GpuMesh::runs`]: crate::render::GpuMesh::runs
-pub(super) fn join_alike<'c>(
+pub(super) fn join_alike<T: PartialEq>(
     runs: Vec<(usize, Range<u32>)>,
-    clip_of: impl Fn(usize) -> Option<&'c CasterClip>,
-) -> Vec<(Range<u32>, Option<&'c CasterClip>)> {
-    let mut out: Vec<(Range<u32>, Option<&'c CasterClip>)> = Vec::new();
+    clip_of: impl Fn(usize) -> T,
+) -> Vec<(Range<u32>, T)> {
+    let mut out: Vec<(Range<u32>, T)> = Vec::new();
     for (slot, indices) in runs {
         let clip = clip_of(slot);
         match out.last_mut() {
@@ -61,7 +61,7 @@ pub(super) fn batch_casters(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render::passes::shadows::clips::{Clip, Cutout};
+    use crate::render::passes::shadows::clips::{CasterClip, Clip, Cutout};
 
     fn cutout(material: usize) -> CasterClip {
         CasterClip {
@@ -76,7 +76,10 @@ mod tests {
 
     #[test]
     fn plain_runs_join_into_one_draw() {
-        let joined = join_alike(vec![(0, 0..3), (1, 3..6), (2, 6..9)], |_| None);
+        let joined = join_alike(
+            vec![(0, 0..3), (1, 3..6), (2, 6..9)],
+            |_| None::<&CasterClip>,
+        );
         assert_eq!(joined.len(), 1);
         assert_eq!(joined[0].0, 0..9);
     }
@@ -101,14 +104,14 @@ mod tests {
         use crate::render::MeshId;
         let leaf = cutout(4);
         let runs = || vec![(0, 0..3), (1, 3..6)];
-        let a = join_alike(runs(), |_| None);
+        let a = join_alike(runs(), |_| None::<&CasterClip>);
         let b = join_alike(runs(), |slot| (slot == 1).then_some(&leaf));
         let casters = a
             .into_iter()
             .chain(b)
             .map(|(indices, clip)| {
                 let key = CasterKey {
-                    facing: Facing::Front,
+                    facing: Facing::Ccw,
                     clip: clip.map(|c| c.clip),
                     mesh: MeshId("Quad".into()),
                     indices: indices.into(),

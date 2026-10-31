@@ -53,8 +53,8 @@ pub(crate) use pass::SolidPass;
 
 /// One authored surface shader's pipelines.
 pub(crate) struct SurfacePipelines {
-    /// Opaque/cutout solids, and the same into a view's velocity target (#1435).
-    pub forward: wgpu::RenderPipeline,
+    /// Opaque/cutout solids per facing (#1615), and into a velocity target (#1435).
+    pub forward: super::FacedPipeline,
     pub velocity: super::VelocityPipelines,
     /// The same two over a primed depth (#1499), built the first time a view primes.
     pub primed: super::PrimedPipelines,
@@ -70,8 +70,8 @@ pub(crate) struct SurfacePipelines {
 /// (#648, #1499, #1524); the shadow ones through the shadow pass's clip layout, one
 /// per [`Facing`](super::winding::Facing) (#1134; the two-sided one lazy, #1571).
 pub(crate) struct CutPipelines {
-    /// The SSAO prepass, through the forward layout.
-    pub prepass: wgpu::RenderPipeline,
+    /// The SSAO prepass, through the forward layout, one per facing (#1615).
+    pub prepass: super::FacedPipeline,
     pub shadow: wgpu::RenderPipeline,
     pub mirrored_shadow: wgpu::RenderPipeline,
     pub two_sided_shadow: super::LazyPipeline,
