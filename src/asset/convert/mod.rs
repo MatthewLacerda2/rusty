@@ -9,8 +9,8 @@
 //!
 //! **Where the cache lives.** Inside an open project (a working directory holding
 //! `project.rusty`), at [`IMPORT_CACHE_DIR`]`/<project-relative source path>.glb`,
-//! beside the project's other generated assets: whether that folder is versioned
-//! or ignored (#866) the cache follows, and a shipped game whose sources were
+//! beside the project's other generated assets: the game's own `.gitignore` decides
+//! whether it is versioned (the engine ignores nothing there, #866), and a shipped game whose sources were
 //! stripped still finds it. Anywhere else (a test, a file outside the project) the
 //! glTF is written to the system temp folder, so a conversion never writes into a
 //! tree that is not a project. Either way the cache is a function of the whole
