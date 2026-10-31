@@ -28,26 +28,33 @@ This is what a main-menu "Quit" button calls.
 **Build settings** live in the project root's tracked `project.rusty`, under `"build"`
 (a missing file or key means the defaults: the seeded `assets/scenes/default.scene`, `"rusty game"`,
 `Windowed`; a `project.rusty` the editor creates, as *New Project* does, names the product
-after the project's folder instead, Unity's default Product Name). In the editor the setters write that file, leaving the rest of it alone — they are the API twin of
-**File → Build Settings**. In the player and the harness the settings are read but
-never written back, so a setter only changes the running value. Saved `Video`
+after the project's folder instead, Unity's default Product Name). Every way of
+starting the engine on a project reads this file at boot, the same way (#1652), and
+splits on whether it authors the project or runs it:
+
+- **The editor and the headless session** (`session`, `session-mcp`, the agent's
+  path) bind the file: the setters write it, leaving the rest of it alone — they are
+  the API twin of **File → Build Settings**.
+- **The player and `play`** (and a demo replay, which plays under the settings it
+  was recorded with) read it but never write it back, so a setter only changes the
+  running value. Saved `Video`
 settings (a player's own fullscreen choice) win over `SetWindowMode`, which is only
 the first-launch default.
 
 **Graphics option defaults** live in the same file, under `"graphics_options"`: an
 object of option name → `bool` (`{ "motion_blur": false }`), every option it omits
 allowed. They are what a fresh install's player graphics options start as, and the
-same editor/player split applies: `Graphics.SetDefaultOption` and the Build
-Settings window's **Player graphics defaults** checkboxes write the file in the
-editor, and only the running value elsewhere. A player's saved choice
+same split applies: `Graphics.SetDefaultOption` and the Build Settings window's
+**Player graphics defaults** checkboxes write the file in the editor and the
+session, and only the running value in the player and `play`. A player's saved choice
 (`Graphics.SetOption`) wins over them; see [`Graphics.md`](Graphics.md), *Player
 options*. An unknown option name or a non-`bool` value is ignored with a warning in
 the console, since the file is the developer's to fix.
 
 **Quality presets** (#1522) live in the same file, under `"quality"`: the game's
 named presets, seeded with `Low`, `Medium` and `High` when the file is created, with
-the same editor/player split (`Graphics.SetQualityPreset` / `RemoveQualityPreset`
-write the file in the editor). See [`Graphics.md`](Graphics.md), *Quality presets*.
+the same split (`Graphics.SetQualityPreset` / `RemoveQualityPreset` write the file
+in the editor and the session). See [`Graphics.md`](Graphics.md), *Quality presets*.
 
 **Determinism.** `Quit` is a one-way request read by the platform layer after the
 tick; the build settings are read at boot. Neither is read by `FixedUpdate`.

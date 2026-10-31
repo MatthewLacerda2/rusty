@@ -33,6 +33,7 @@
 use std::io::{self, BufReader};
 use std::process::exit;
 
+use rusty::app::ProjectSource;
 use rusty::dev::mcp::{self, attach::SocketClient, embed::Embedded, EvalBackend};
 use rusty::dev::session::{self, Session};
 
@@ -76,7 +77,7 @@ fn boot_embedded(args: &[String]) -> Session {
     // (`core::project::boot_scene`: the editor's last scene, then the startup scene,
     // then an empty one, #1618).
     let boot_scene = session::boot_scene_from_args(args);
-    match Session::boot(&boot_scene) {
+    match Session::boot(&boot_scene, ProjectSource::project_file()) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("session-mcp: failed to start: {}", e);

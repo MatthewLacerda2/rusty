@@ -21,6 +21,7 @@
 use std::io::{self, BufReader};
 use std::process::exit;
 
+use rusty::app::ProjectSource;
 use rusty::dev::session::{self, Session};
 
 fn main() {
@@ -33,7 +34,7 @@ fn main() {
     // then an empty one, #1618).
     let boot_scene = session::boot_scene_from_args(&args);
 
-    let mut sess = match Session::boot(&boot_scene) {
+    let mut sess = match Session::boot(&boot_scene, ProjectSource::project_file()) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("session: failed to start: {}", e);

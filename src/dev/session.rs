@@ -13,7 +13,8 @@
 //! never tear down the session.
 //!
 //! Determinism: the session builds the world exactly like the windowed boot (same
-//! empty scene + boot-scene load + nav bake) but takes no wall-clock reads itself —
+//! empty scene + boot-scene load + nav bake + the project's settings, bound as the
+//! editor binds them, `GameWorld::open_project`) but takes no wall-clock reads itself —
 //! the loop only blocks on input. It does NOT force play mode: the agent enters it with
 //! `Editor.EnterPlay()` (#1360) and steps the sim explicitly with `Time.Pause()` +
 //! `Time.Step(n)`. Nothing advances on its own: after each command the channel runs
@@ -27,9 +28,9 @@ use std::rc::Rc;
 use serde_json::json;
 
 use super::console;
-use crate::app::GameWorld;
+use crate::app::{GameWorld, ProjectSource};
 use crate::core::input::InputState;
-use crate::core::project::{Access, BootPlan};
+use crate::core::project::{Access, BootPlan, ProjectSettings};
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
@@ -49,13 +50,19 @@ impl Session {
     /// engine cells, optionally load `boot_scene` and bake nav, then construct the
     /// world and initialise the evaluator **without entering play**. `boot_scene`
     /// empty means start from an empty scene (the agent authors into it live).
+    /// No project is opened: the engine's default settings, unbound (tests and
+    /// embedders).
     pub fn new(boot_scene: &str) -> Result<Self, String> {
-        Self::boot(&BootPlan::of(boot_scene))
+        let defaults = ProjectSource::ReadOnly(ProjectSettings::default());
+        Self::boot(&BootPlan::of(boot_scene), defaults)
     }
 
     /// [`new`](Self::new) on the first of `plan`'s scenes that loads
-    /// (`app::load_boot_scene`), an empty scene when none does (#1618).
-    pub fn boot(plan: &BootPlan) -> Result<Self, String> {
+    /// (`app::load_boot_scene`), an empty scene when none does (#1618), under the
+    /// `project`'s settings (#1652): `session` and `session-mcp` bind the open
+    /// project's file ([`ProjectSource::project_file`]), as the editor does, so
+    /// `Application`'s and `Graphics`' project setters write it.
+    pub fn boot(plan: &BootPlan, project: ProjectSource) -> Result<Self, String> {
         crate::scene::seed_default_scripts();
 
         let scene = Rc::new(RefCell::new(Scene::new()));
@@ -73,6 +80,7 @@ impl Session {
 
         super::lua_surface::install_api();
         let mut world = GameWorld::new(scene, input, nav, console);
+        world.open_project(project);
         // The boot scene is the `Scene.Save()` write-back target, so an
         // argument-less save from the agent persists back to the loaded file —
         // just as the editor's Save writes to its current scene file. Only when it

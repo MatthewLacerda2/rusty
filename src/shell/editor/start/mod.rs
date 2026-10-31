@@ -13,8 +13,9 @@ pub use picker::capture_picker;
 
 use super::{icon, EditorFrontend};
 use crate::app::GameWorld;
+use crate::app::ProjectSource;
 use crate::core::project::bench::recent;
-use crate::core::project::{Access, Opened, PROJECT_FILE};
+use crate::core::project::{Access, BootPlan, Opened};
 use crate::core::settings::video::VideoSettings;
 use crate::editor::project_picker::ProjectPicker;
 use crate::shell::{boot, Launch, Shell};
@@ -68,17 +69,7 @@ fn prepare(
     boot::seed_project_workspace();
     let startup = &opened.settings.build.startup_scene;
     let plan = crate::core::project::boot_scene(&opened.root, startup, Access::Edit);
-    let mut game = boot::load_game(&plan.unwrap_or_default());
-    // Editor scripting works outside Play, as in Unity (#1339): the console line
-    // and MCP `eval` drive the edit scene; Stop brings this runtime back.
-    let init = game.init_edit_runtime();
-    game.report_lua_init(init);
-    // Bound: the File → Build Settings window and `Application.Set*` write the file.
-    let bound = game.resources.application.borrow_mut().open(PROJECT_FILE);
-    if let Err(err) = bound {
-        game.console().borrow_mut().error(err);
-    }
-    game.apply_project_settings(); // edit mode runs on them too (#1517)
+    let game = world(&plan.unwrap_or_default(), ProjectSource::project_file());
     if let Some(warning) = opened.engine.warning() {
         game.console()
             .borrow_mut()
@@ -98,8 +89,45 @@ fn prepare(
     (game, launch)
 }
 
+/// The editor's world on `plan`'s scene, in edit mode, under `project`'s settings:
+/// the open project's file, bound, so the File → Build Settings window and
+/// `Application.Set*` write it, and edit mode runs on its budgets and presets too
+/// (#1517).
+fn world(plan: &BootPlan, project: ProjectSource) -> GameWorld {
+    let mut game = boot::load_game(plan);
+    // Editor scripting works outside Play, as in Unity (#1339): the console line
+    // and MCP `eval` drive the edit scene; Stop brings this runtime back.
+    let init = game.init_edit_runtime();
+    game.report_lua_init(init);
+    game.open_project(project);
+    game
+}
+
 /// Now, in Unix seconds (the shell is platform layer, so it may read the clock): when a project was opened, and what the picker dates by.
 fn unix_now() -> u64 {
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
     now.map_or(0, |d| d.as_secs())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::project_tests::{assert_runs_the_fixture, FIXTURE};
+
+    #[test]
+    fn the_editor_world_binds_the_projects_settings() {
+        let path = crate::test_temp::dir().join("project.rusty");
+        std::fs::write(&path, FIXTURE).unwrap();
+        let game = world(&BootPlan::default(), ProjectSource::Bound(path.clone()));
+        assert_runs_the_fixture(&game);
+        let mut app = game.resources.application.borrow_mut();
+        app.update(|b| b.product_name = "Arena".into()).unwrap();
+        let file = crate::core::project::ProjectFile::read(&path)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            file.build.product_name, "Arena",
+            "the editor writes the file"
+        );
+    }
 }
