@@ -256,7 +256,7 @@ fn relative_to_cwd(path: &Path) -> Option<PathBuf> {
 /// path, so two sources with one file name never share it.
 fn temp_path(path: &Path, suffix: &str) -> PathBuf {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
-    let digest = hash::fnv1a64(absolute.to_string_lossy().as_bytes());
+    let digest = hash::content(absolute.to_string_lossy().as_bytes());
     let name = path
         .file_name()
         .map_or_else(Default::default, |n| n.to_string_lossy());
