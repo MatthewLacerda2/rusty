@@ -66,6 +66,10 @@ pub struct SceneData {
     /// Distance + height fog (#437); off when absent.
     #[serde(default)]
     pub fog: crate::scene::FogSettings,
+    /// The procedural sky's look (#1620). Left out while every knob is at its
+    /// default.
+    #[serde(default, skip_serializing_if = "crate::scene::SkySettings::is_default")]
+    pub sky: crate::scene::SkySettings,
     /// Project layer names; the stock registry ("Default" + 31 unnamed slots) when
     /// absent.
     #[serde(default)]
@@ -115,6 +119,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         ambient_intensity: scene.ambient_intensity,
         nav_settings: scene.nav_settings.clone(),
         fog: scene.fog,
+        sky: scene.sky,
         layers: scene.layers.clone(),
         collision_matrix: scene.collision_matrix.clone(),
         materials: scene.materials.clone(),
@@ -149,17 +154,12 @@ pub fn apply_world_data(scene: &mut Scene, data: SceneData) {
     apply(scene, data, false);
 }
 
-/// `from_disk`: the document came from a file, so its values are held; a World
-/// snapshot's already were.
-fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
-    rehydrate_meshes(&mut data);
-    scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
-
-    // Start from the document's library, then fold in any material an entity still
-    // has staged (an Add-menu default restored from a snapshot before the inspector
-    // folded it in); an authored asset already under the key is kept (#997). Done
-    // before spawning so each entity's reference resolves.
-    scene.materials = data.materials;
+/// Start from the document's library, then fold in any material an entity still
+/// has staged (an Add-menu default restored from a snapshot before the inspector
+/// folded it in); an authored asset already under the key is kept (#997). Done
+/// before spawning so each entity's reference resolves.
+fn take_materials(scene: &mut Scene, data: &mut SceneData) {
+    scene.materials = std::mem::take(&mut data.materials);
     for entity in &mut data.entities {
         if let Some(pending) = entity.pending_material.take() {
             if let Some(reference) = &entity.material {
@@ -167,6 +167,15 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
             }
         }
     }
+}
+
+/// `from_disk`: the document came from a file, so its values are held; a World
+/// snapshot's already were.
+fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
+    rehydrate_meshes(&mut data);
+    scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
+
+    take_materials(scene, &mut data);
 
     let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
     let bone_refs = crate::scene::skeleton::take_bone_refs(&mut data.entities);
@@ -185,6 +194,8 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     scene.ambient_intensity = data.ambient_intensity;
     scene.nav_settings = data.nav_settings;
     scene.fog = data.fog;
+    // Held to its ranges once, here, as a setter would hold it.
+    scene.sky = crate::scene::authoring::environment::held_sky(data.sky);
     data.layers.normalize();
     scene.layers = data.layers;
     scene.collision_matrix = data.collision_matrix;

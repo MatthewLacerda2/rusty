@@ -179,8 +179,10 @@ tick the model's **Generate Lightmap UVs** (Unity's checkbox): rusty unwraps one
 ### Environment
 
 The scene's sky and ambient light (#1612), Unity's `RenderSettings.skybox`,
-`ambientLight` and `ambientIntensity`. They are the scene file's `skybox_path`,
-`ambient_color` and `ambient_intensity`, the same fields the editor's **Scene
+`ambientLight` and `ambientIntensity`, and the procedural sky's look (#1620),
+Unity's *Skybox/Procedural* tint and ground with HDRP's *Cloud Layer* coverage and
+opacity. They are the scene file's `skybox_path`, `ambient_color`,
+`ambient_intensity` and `sky` block, the same fields the editor's **Scene
 Settings** panel (the Inspector with nothing selected) edits, through the same
 write: **save the scene** to keep a change. Unlike the bakes they are in every build,
 so a game script can drive them too (a day cycle, a mood change); a change made
@@ -194,11 +196,21 @@ during Play goes back on Stop, as every scene edit does.
 | `Lighting.SetAmbientColor` | `(r, g, b)` | — |
 | `Lighting.GetAmbientIntensity` | `()` | number |
 | `Lighting.SetAmbientIntensity` | `(intensity)` | — |
+| `Lighting.GetSkyZenithColor` | `()` | `r, g, b`, or `nil` while it follows the ambient colour |
+| `Lighting.SetSkyZenithColor` | `([r, g, b])` | — |
+| `Lighting.GetSkyHorizonColor` | `()` | `r, g, b`, or `nil` while it follows the zenith |
+| `Lighting.SetSkyHorizonColor` | `([r, g, b])` | — |
+| `Lighting.GetSkyGroundColor` | `()` | `r, g, b`, or `nil` while it follows the zenith |
+| `Lighting.SetSkyGroundColor` | `([r, g, b])` | — |
+| `Lighting.GetCloudCoverage` | `()` | number, `0`–`1` |
+| `Lighting.SetCloudCoverage` | `(coverage)` | — |
+| `Lighting.GetCloudOpacity` | `()` | number, `0`–`1` |
+| `Lighting.SetCloudOpacity` | `(opacity)` | — |
 
 - **The skybox** is an equirectangular panorama image, its path written as the
   Scene Settings panel takes it (`"assets/textures/sky.png"`). The next frame loads it and re-captures the
   sky's reflection cube from it, so reflections follow. `""` (or `nil`) goes back to
-  the procedural sky, which is drawn from the ambient colour. A path that loads
+  the procedural sky (below). A path that loads
   nothing draws the renderer's fallback texture, as it would from the scene file.
 - **The ambient colour** is linear RGB, each channel clamped to `≥ 0`; a colour with
   a NaN or infinite channel is refused and changes nothing. **The intensity** scales
@@ -208,3 +220,19 @@ during Play goes back on Stop, as every scene edit does.
   tinted by the colour alone: the intensity dims or brightens what the ambient lights,
   never the sky itself, as Unity's `ambientIntensity` leaves the skybox. An active **Ambient**
   light entity, when the scene has one, overrides both (see [`Light`](Light.md)).
+- **The procedural sky** is drawn when no panorama is set: a ground → horizon →
+  zenith gradient under a cloud layer. Each colour is linear RGB (channels clamped
+  to `≥ 0`; a NaN or infinite channel is refused and changes nothing) and
+  **optional**: unset (the default, or a setter called with no arguments) the
+  zenith is the ambient colour, the horizon the zenith lifted 60% toward white,
+  and the ground a quarter of the zenith, so a scripted ambient colour still tints
+  them every frame. A set colour stays put whatever the ambient does.
+  **Cloud coverage** (default `0.5`) runs from `0`, a clear sky, to `1`, overcast;
+  **cloud opacity** (default `0.6`) from `0`, no clouds, to `1`, solid ones. Both
+  clamp to `0`–`1`; NaN or `math.huge` changes nothing. The defaults draw the sky
+  rusty has always drawn, and a scene at its defaults leaves the `sky` block out of
+  its file. What a surface reflects follows: the sky's reflection cube is re-baked
+  once per change, so a script that changes a setting every frame re-bakes every
+  frame (the ambient colour never re-bakes it), and reflection-probe bakes capture
+  the sky as drawn. The flat ambient a surface takes is still the ambient colour
+  alone, not the sky's colours.

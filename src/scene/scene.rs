@@ -70,6 +70,10 @@ pub struct Scene {
     /// Scene fog (#437): distance + height fog the renderer applies to every
     /// world-space pass. Serialized with the scene; off by default.
     pub fog: crate::scene::FogSettings,
+    /// The procedural sky's look (#1620): cloud coverage and opacity, and the
+    /// zenith, horizon and ground colours. Serialized with the scene; the defaults
+    /// draw the sky as it always was.
+    pub sky: crate::scene::SkySettings,
     /// The project's shared Layers registry (Unity's Tags & Layers). Serialized
     /// with the scene; the per-entity `layer` index points into it.
     pub layers: LayerRegistry,
@@ -163,6 +167,7 @@ impl Default for Scene {
             ambient_intensity: default_ambient_intensity(),
             nav_settings: NavMeshSettings::default(),
             fog: crate::scene::FogSettings::default(),
+            sky: crate::scene::SkySettings::default(),
             layers: LayerRegistry::default(),
             collision_matrix: CollisionMatrix::default(),
             materials: BTreeMap::new(),

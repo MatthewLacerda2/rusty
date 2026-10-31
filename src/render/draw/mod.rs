@@ -49,12 +49,17 @@ impl Renderer {
 
         // Build + write the camera-independent lighting uniform once.
         self.upload_lighting(scene);
-        // The sky's reflection cube (#1553), baked only when the sky changed.
+        // The sky's reflection cube (#1553), baked only when the sky changed: a new
+        // panorama, or procedural sky settings no cube holds (#1620).
         let gpu = (&self.device, &self.queue);
         let panorama = self.skybox_texture.as_deref();
-        let sky = self.sky_reflection.prepare(gpu, &self.gpu_timer, panorama);
+        let settings =
+            crate::render::gpu::uniforms::ProceduralSkyUniform::from_settings(&scene.sky);
+        let source = (panorama, &settings);
+        let sky = self.sky_reflection.prepare(gpu, &self.gpu_timer, source);
         self.frame_counters.sky_reflection_bakes += u32::from(sky.baked);
         self.global_bind_group_dirty |= sky.rebind;
+        self.spare_global_group.switched |= sky.switched;
         // Every decal and its maps, once for the whole frame (#638); each camera
         // bins them into its clusters.
         self.upload_decals(scene);

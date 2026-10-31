@@ -17,3 +17,4 @@ mod particles;
 mod physics;
 mod ribbons;
 mod scene_settings;
+mod sky;

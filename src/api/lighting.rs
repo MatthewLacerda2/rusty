@@ -1,8 +1,9 @@
 //! src/api/lighting.rs — `Lighting` namespace: the scene's environment and the
 //! one-button bakes.
 //!
-//! The environment (#1612) is Unity's `RenderSettings`: the skybox panorama and the
-//! ambient light, read and written through the same `authoring::environment` ops the
+//! The environment (#1612) is Unity's `RenderSettings`: the skybox panorama, the
+//! ambient light and the procedural sky's look (#1620: zenith, horizon and ground
+//! colours, cloud coverage and opacity), read and written through the same `authoring::environment` ops the
 //! Scene Settings panel calls, saved with the scene and present in every build.
 //!
 //! `Lighting.Bake()` is the "place well + bake right now" workflow (#246): in one call
@@ -39,6 +40,8 @@ pub fn register<'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
     register_skybox(scope, &table, scene)?;
     register_ambient(scope, &table, scene)?;
+    register_sky_colors(scope, &table, scene)?;
+    register_clouds(scope, &table, scene)?;
     lua.globals()
         .set("Lighting", table)
         .map_err(|e| e.to_string())
@@ -100,4 +103,85 @@ fn register_ambient<'scope>(
             Ok(())
         }),
     )
+}
+
+/// A sky colour setter: `(r, g, b)` sets it, no arguments (or `nil`) goes back to
+/// following the ambient colour.
+type SkyColorOp = fn(&mut crate::scene::SkySettings, Option<Vec3>);
+
+/// `{Get,Set}Sky{Zenith,Horizon,Ground}Color`: `r, g, b`, or `nil` while the colour
+/// follows the ambient one.
+fn register_sky_colors<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    type Read = fn(&crate::scene::SkySettings) -> Option<Vec3>;
+    let colors: [(&str, Read, SkyColorOp); 3] = [
+        ("Zenith", |s| s.zenith, env_ops::set_sky_zenith),
+        ("Horizon", |s| s.horizon, env_ops::set_sky_horizon),
+        ("Ground", |s| s.ground, env_ops::set_sky_ground),
+    ];
+    for (name, read, write) in colors {
+        put(
+            table,
+            &format!("GetSky{name}Color"),
+            scope.create_function(move |_, ()| {
+                let c = read(&scene.borrow().sky);
+                Ok((c.map(|c| c.x), c.map(|c| c.y), c.map(|c| c.z)))
+            }),
+        )?;
+        put(
+            table,
+            &format!("SetSky{name}Color"),
+            scope.create_function(move |_, rgb: (Option<f32>, Option<f32>, Option<f32>)| {
+                let color = match rgb {
+                    (Some(r), Some(g), Some(b)) => Some(Vec3::new(r, g, b)),
+                    (None, None, None) => None,
+                    _ => {
+                        return Err(mlua::Error::runtime(format!(
+                            "Lighting.SetSky{name}Color: give r, g, b, or nothing to follow"
+                        )))
+                    }
+                };
+                write(&mut scene.borrow_mut().sky, color);
+                Ok(())
+            }),
+        )?;
+    }
+    Ok(())
+}
+
+/// `{Get,Set}CloudCoverage` and `{Get,Set}CloudOpacity`, each `0..1`.
+fn register_clouds<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    type Read = fn(&crate::scene::SkySettings) -> f32;
+    type Write = fn(&mut crate::scene::SkySettings, f32);
+    let knobs: [(&str, Read, Write); 2] = [
+        (
+            "Coverage",
+            |s| s.cloud_coverage,
+            env_ops::set_cloud_coverage,
+        ),
+        ("Opacity", |s| s.cloud_opacity, env_ops::set_cloud_opacity),
+    ];
+    for (name, read, write) in knobs {
+        put(
+            table,
+            &format!("GetCloud{name}"),
+            scope.create_function(move |_, ()| Ok(read(&scene.borrow().sky))),
+        )?;
+        put(
+            table,
+            &format!("SetCloud{name}"),
+            scope.create_function(move |_, v: f32| {
+                write(&mut scene.borrow_mut().sky, v);
+                Ok(())
+            }),
+        )?;
+    }
+    Ok(())
 }

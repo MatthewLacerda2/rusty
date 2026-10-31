@@ -92,5 +92,6 @@ pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, Scene
 pub use settings::collision_matrix::CollisionMatrix;
 pub use settings::fog::{FogMode, FogSettings};
 pub use settings::layers::{layer_in_mask, LayerRegistry, LAYER_COUNT};
-pub use settings::{collision_matrix, fog, layers, shader_overrides};
+pub use settings::sky::SkySettings;
+pub use settings::{collision_matrix, fog, layers, shader_overrides, sky};
 pub use snapshot::SceneSnapshot;

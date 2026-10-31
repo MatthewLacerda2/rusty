@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use crate::render::gpu::uniforms::MAX_DIRECTIONAL_LIGHTS;
+use crate::render::gpu::uniforms::{ProceduralSkyUniform, MAX_DIRECTIONAL_LIGHTS};
 use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::render::{AmbientLightUniform, DirectionalLightUniform, LightingUniform};
 use crate::scene::{LightType, Scene};
@@ -14,6 +14,7 @@ use crate::scene::{LightType, Scene};
 pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
     LightingUniform {
         ambient: scene_ambient(scene),
+        sky: ProceduralSkyUniform::from_settings(&scene.sky),
         dir_lights: [bytemuck::Zeroable::zeroed(); MAX_DIRECTIONAL_LIGHTS],
         num_dir_lights: 0,
         sky_textured: 0.0,
@@ -22,22 +23,14 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
     }
 }
 
-/// The frame's ambient: the last active ambient light's, else the scene's own.
+/// The frame's ambient: `Scene::drawn_ambient`, the rule the Scene Settings panel
+/// shares.
 fn scene_ambient(scene: &Scene) -> AmbientLightUniform {
-    let mut ambient = AmbientLightUniform {
-        color: scene.ambient_color.to_array(),
-        intensity: scene.ambient_intensity,
-    };
-    for id in scene.world.ids_with_light() {
-        let light = scene.world.light(id).expect("id came from ids_with_light");
-        if light.light_type == LightType::Ambient && scene.world.is_active_in_hierarchy(id) {
-            ambient = AmbientLightUniform {
-                color: light.color.to_array(),
-                intensity: light.intensity,
-            };
-        }
+    let (color, intensity) = scene.drawn_ambient();
+    AmbientLightUniform {
+        color: color.to_array(),
+        intensity,
     }
-    ambient
 }
 
 /// Fill the directional slots from the active light entities (the ambient is

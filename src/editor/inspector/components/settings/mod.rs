@@ -2,10 +2,12 @@
 //!
 //! Shown when nothing is selected: the project-level scalars (skybox, ambient
 //! light, routed through `authoring::environment` like `Lighting.Set*`, #1612), the
-//! scene fog (#437, routed through `authoring::fog` like `Graphics.SetFog*`)
-//! plus the **Tags & Layers** surface that renames the shared Layers
+//! procedural sky (#1620, `sky`, through the same environment ops), the scene fog
+//! (#437, routed through `authoring::fog` like `Graphics.SetFog*`) plus the **Tags & Layers** surface that renames the shared Layers
 //! registry (#90). Layer 0 is the fixed `"Default"`; slots 1..31 are user-named
 //! and persist with the scene.
+
+mod sky;
 
 use egui_phosphor::regular as icon;
 use glam::Vec3;
@@ -25,6 +27,9 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
 
     // 1–3. Skybox and ambient light, through the shared environment ops.
     draw_environment(editor, ui, scene);
+
+    // The procedural sky's look, drawn when no panorama is set.
+    sky::draw(editor, ui, scene);
 
     // 4. Fog — distance + height, applied to every world-space pass.
     draw_fog(editor, ui, scene);
