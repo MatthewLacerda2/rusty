@@ -106,7 +106,8 @@ mod tests {
     fn an_obj_reads_its_mtllibs() {
         let obj = b"# x\nmtllib a b.mtl\n  mtllib  c.mtl \nmtllibx d.mtl\nmtllib\nv 0 0 0\n";
         let got = mtllibs(obj, Path::new("dir"));
-        let want = [Path::new("dir/a b.mtl"), Path::new("dir/c.mtl")];
+        let dir = Path::new("dir");
+        let want = [dir.join("a b.mtl"), dir.join("c.mtl")];
         assert_eq!(got, want);
     }
 
@@ -116,7 +117,8 @@ mod tests {
             {"byteLength":1,"uri":"m%20v.bin"},
             {"byteLength":1,"uri":"data:application/octet-stream;base64,AA=="},
             {"byteLength":1}]}"#;
-        assert_eq!(buffers(json, Path::new("d")), [Path::new("d/m v.bin")]);
+        let want = [Path::new("d").join("m v.bin")];
+        assert_eq!(buffers(json, Path::new("d")), want);
         assert!(buffers(b"not json", Path::new("d")).is_empty());
     }
 

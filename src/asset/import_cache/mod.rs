@@ -17,7 +17,7 @@
 //! - **Fresh**: an entry records every file its parse read: the one parsed (the
 //!   source, or for a converted `.fbx`/`.blend` its cached `.glb`, so a game
 //!   exported without its sources still hits) and the others it pulled in
-//!   ([`reads`]: an `.obj`'s `.mtl`, a `.gltf`'s `.bin`). Each lookup drains the
+//!   (`reads`: an `.obj`'s `.mtl`, a `.gltf`'s `.bin`). Each lookup drains the
 //!   write log (`core::fs::written`) through a [`Freshness`], as the renderer's
 //!   texture cache does, and drops every entry whose source or read files were
 //!   written; the sidecar is not followed, since its geometry settings are the
