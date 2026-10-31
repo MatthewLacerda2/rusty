@@ -183,17 +183,6 @@ impl EditorFrontend {
         }
         self.editor_ui.speaker_mode = audio.speaker_mode();
     }
-
-    /// A different scene now sits in the World (its identity changed without the
-    /// editor opening it): as File ▸ Open does, drop the selection, which names an
-    /// entity of the old scene.
-    fn follow_scene_swap(&mut self, game: &GameWorld) {
-        let id = game.scene().borrow().id();
-        if self.scene_id.is_some_and(|last| last != id) {
-            self.editor_ui.selected_entity_id = None;
-        }
-        self.scene_id = Some(id);
-    }
 }
 
 impl Frontend for EditorFrontend {
@@ -224,6 +213,13 @@ impl Frontend for EditorFrontend {
         let ui = &mut self.editor_ui;
         ui.advance_demo(game, dt)
             .unwrap_or_else(|| super::frame::advance_sim(game, dt))
+    }
+
+    /// A demo open at quit is closed first, so the quit flush writes the editor's
+    /// own store and settings, never the demo's (#1598).
+    #[cfg(feature = "dev")]
+    fn before_exit(&mut self, game: &mut GameWorld) {
+        self.editor_ui.close_demo(game);
     }
 
     fn game_view(&self, shell: &Shell) -> GameViewRect {

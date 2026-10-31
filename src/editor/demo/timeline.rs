@@ -5,6 +5,8 @@ use egui::{Align2, Color32, FontId, Rect, RichText, Sense, Stroke, Ui};
 use egui_phosphor::regular as icon;
 
 use super::DemoView;
+#[cfg(test)]
+use super::Pace;
 use crate::editor::theme::Theme;
 
 const HEIGHT: f32 = 26.0;
@@ -55,11 +57,7 @@ pub fn draw(ui: &mut Ui, view: &mut DemoView, t: &Theme) {
             .on_hover_text(hint)
             .clicked()
         {
-            // Play at the end starts over, as a media player does.
-            if view.paused && view.at_end() {
-                view.seek = Some(0);
-            }
-            view.paused = !view.paused;
+            view.set_paused(!view.paused);
         }
         let readout = format!("{} / {}", view.current, view.ticks.saturating_sub(1));
         let reserve = 90.0 + ui.spacing().item_spacing.x * 2.0 + 28.0;
@@ -98,7 +96,8 @@ fn bar(ui: &mut Ui, view: &mut DemoView, t: &Theme, width: f32) {
     painter.circle_filled(egui::pos2(head, rect.center().y), 5.0, Color32::WHITE);
     if let Some(pos) = response.hover_pos() {
         if let Some(label) = mark_near(&view.marks, pos.x, rect.left(), rect.right(), view.ticks) {
-            painter.text(
+            // Above the bar, outside its clip rect: the window's painter.
+            ui.painter().text(
                 egui::pos2(pos.x, rect.top()),
                 Align2::CENTER_BOTTOM,
                 label,

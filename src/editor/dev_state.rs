@@ -21,10 +21,10 @@ pub struct DevEditorState {
     /// Whether the floating Developer Console shows during Play. Off by default, as
     /// Unity's Console is a window you open; remembered per project (#1544).
     pub show_play_console: bool,
-    /// The Generate Lighting running in the background, if any (#808, #832). Its
-    /// settings are the scene's own (`Scene::lighting_settings`).
     /// The demo open on the Game view's timeline, if any (#1598).
     pub demo: Option<super::demo::DemoView>,
+    /// The Generate Lighting running in the background, if any (#808, #832). Its
+    /// settings are the scene's own (`Scene::lighting_settings`).
     pub lightmap_bake: Option<super::inspector::assets::scene::bake::ActiveBake>,
 }
 

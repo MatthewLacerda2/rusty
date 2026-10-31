@@ -10,8 +10,8 @@ use rusty::dev::harness::Harness;
 use rusty::dev::scenario;
 use rusty::editor::EditorUi;
 
-/// A demo of 60 ticks with one mark at tick 20, on a scene saved to disk.
-fn demo_of_a_saved_scene() -> (PathBuf, String) {
+/// A demo of 60 ticks, recorded at 60 Hz, with one mark at tick 20, on a scene saved to disk.
+pub fn demo_of_a_saved_scene() -> (PathBuf, String) {
     let dir = crate::temp::dir();
     let scene_file = dir.join("a.scene").to_string_lossy().into_owned();
     let path = dir.join("run.demo");
@@ -27,7 +27,7 @@ fn demo_of_a_saved_scene() -> (PathBuf, String) {
     (path, scene_file)
 }
 
-fn editor_world(dir: &str) -> (Harness, EditorUi) {
+pub fn editor_world(dir: &str) -> (Harness, EditorUi) {
     let harness = Harness::new(crate::temp::dir().join(dir), "");
     let ui = {
         let mut world = harness.world.borrow_mut();
@@ -76,7 +76,7 @@ fn a_demo_opens_scrubs_both_ways_and_closes() {
 }
 
 #[test]
-fn playing_runs_at_sixty_ticks_a_second_and_close_puts_the_editor_back() {
+fn playing_runs_at_the_recorded_speed_and_close_puts_the_editor_back() {
     let (path, _) = demo_of_a_saved_scene();
     let (harness, mut ui) = editor_world("editor");
     let mut game = harness.world.borrow_mut();
@@ -88,7 +88,7 @@ fn playing_runs_at_sixty_ticks_a_second_and_close_puts_the_editor_back() {
         .borrow_mut()
         .request_demo(DemoRequest::Pause(false));
     ui.advance_demo(&mut game, 0.0).unwrap();
-    // Whatever the frame rate.
+    // Whatever the frame rate: the recording's 60 Hz `dt`, not the display's.
     game.resources
         .application
         .borrow_mut()

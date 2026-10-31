@@ -142,6 +142,9 @@ where
     /// Quit boundary: persist the store however the loop is exiting (window close,
     /// `Application.Quit`). A no-op when the store is pathless.
     fn exiting(&mut self, _: &ActiveEventLoop) {
+        if let Some((_, frontend)) = self.running.as_mut() {
+            frontend.before_exit(&mut self.game);
+        }
         // Only once `settings::load` seeded the cells: before it they hold the
         // defaults, which would overwrite the player's saved settings.
         if self.running.is_some() {

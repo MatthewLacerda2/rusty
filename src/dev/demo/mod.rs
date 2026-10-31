@@ -51,7 +51,7 @@ pub use index::{find_in, Event, EventKind, IndexLine, Query, CAMERA_EVERY};
 pub use read::{Demo, DemoTick, DemoTicks};
 pub use record::Recorder;
 pub use replay::{
-    cut, cut_scenario, full_path, prepare, seek, Divergence, Replayer, Verdict, NO_DEMO,
+    cut, cut_scenario, full_path, lend, prepare, seek, Divergence, Lent, Replayer, Verdict, NO_DEMO,
 };
 
 use crate::app::GameWorld;

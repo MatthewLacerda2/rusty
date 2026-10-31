@@ -1,10 +1,13 @@
 //! The editor playing a demo on its timeline (#1598): `Editor.OpenDemo(path)` takes
 //! the editor's world, replays the demo on it, and the Game view's timeline plays,
-//! pauses and scrubs it (`dev::demo::seek`). Closing, by the timeline's button or by
-//! Stop, puts back the edit scene and the recorder.
+//! pauses and scrubs it (`dev::demo::seek`). Closing, by the timeline's button, by
+//! Stop or by quitting, puts back the edit scene, the recorder and what the replay
+//! overwrote: the save data, settings, seed and clock (`dev::demo::lend`), so
+//! nothing of the demo reaches `saved/`.
 //!
 //! Playback is read-only: the replay writes the recorded input over the live one
-//! every tick, and the Game view hears none of the editor's (`game_has_input`).
+//! every tick, and the Game view hears none of the editor's (`game_has_input`). The
+//! Game view keeps the size the demo recorded, drawn letterboxed in the panel.
 
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::application::DemoRequest;
@@ -12,10 +15,6 @@ use crate::dev::demo::{self, Demo, Replayer};
 use crate::editor::demo::DemoView;
 use crate::editor::EditorUi;
 use crate::scene::SceneSnapshot;
-use crate::time::FIXED_DELTA_TIME;
-
-/// Ticks one frame may owe after a stall, so a hitch does not become a fast-forward.
-const MAX_TICKS_PER_FRAME: u32 = 4;
 
 impl EditorUi {
     /// Whether a demo is open (the Game view takes no editor input then).
@@ -24,7 +23,8 @@ impl EditorUi {
     }
 
     /// One frame with the demo timeline in charge: the requests a script made, the
-    /// timeline's own, then the replay's ticks. `None` when no demo is open.
+    /// timeline's own, then the replay's ticks, spent against their recorded `dt`.
+    /// `None` when no demo is open.
     pub fn advance_demo(&mut self, game: &mut GameWorld, dt: f32) -> Option<PlayTransition> {
         // This window has a timeline: a script's `Editor.OpenDemo` is welcome.
         game.resources.application.borrow_mut().mark_demo_viewer();
@@ -39,19 +39,10 @@ impl EditorUi {
         }
         let mut seek = view.seek.take();
         if seek.is_none() && !view.paused {
-            view.budget += dt;
-        }
-        let owed = (view.budget / FIXED_DELTA_TIME) as u32;
-        let owed = owed.min(MAX_TICKS_PER_FRAME);
-        view.budget = if owed == MAX_TICKS_PER_FRAME {
-            0.0
-        } else {
-            view.budget - owed as f32 * FIXED_DELTA_TIME
-        };
-        let last = view.ticks.saturating_sub(1);
-        if seek.is_none() && owed > 0 {
+            let owed = view.pace.spend(view.current, dt);
             // The tick after the one it stands on; the end holds still.
-            seek = Some((view.current + owed as u64).min(last));
+            let last = view.ticks.saturating_sub(1);
+            seek = (owed > 0).then(|| (view.current + owed).min(last));
         }
         let mut transition = PlayTransition::None;
         match seek {
@@ -76,6 +67,9 @@ impl EditorUi {
             return;
         };
         view.current = done.unwrap_or(0).saturating_sub(1);
+        let video = *game.script_manager().video_cell().borrow();
+        let size = game.resources.screen.borrow().pixels(&video);
+        view.size = (size.x as u32, size.y as u32);
         if view.at_end() {
             view.paused = true;
         }
@@ -107,7 +101,7 @@ impl EditorUi {
                     .warn("Editor.SeekDemo: no demo is open".into()),
             },
             DemoRequest::Pause(paused) => match self.dev.demo.as_mut() {
-                Some(view) => view.paused = paused,
+                Some(view) => view.set_paused(paused),
                 None => game
                     .console()
                     .borrow_mut()
@@ -116,8 +110,9 @@ impl EditorUi {
         }
     }
 
-    /// Take the world for the demo at `path`: its scene loaded, the replay prepared,
-    /// Play entered and stopped on tick 0.
+    /// Take the world for the demo at `path`: its scene loaded, what the replay
+    /// overwrites lent (`demo::lend`), the replay prepared, Play entered and stopped
+    /// on tick 0.
     fn open_demo(&mut self, game: &mut GameWorld, path: &str) -> Result<(), String> {
         if game.world.scene.borrow().is_playing() || game.play_requested() {
             return Err("stop Play first".into());
@@ -126,28 +121,26 @@ impl EditorUi {
         if demo.ticks == 0 {
             return Err(format!("{path} holds no ticks"));
         }
-        if self.demo_open() {
-            self.close_demo(game);
-        }
         let scene_file = demo.header.scene.clone();
         let return_to = (
             SceneSnapshot::capture(&game.world.scene.borrow()),
             self.current_scene_path(),
         );
         let mut console = game.resources.console.borrow_mut();
-        self.open_scene(
+        let loaded = self.open_scene(
             &mut game.world.scene.borrow_mut(),
             &mut console,
             &scene_file,
             false,
         );
         drop(console);
-        if self.current_scene_path().as_deref() != Some(scene_file.as_str()) {
+        if !loaded {
             self.put_back(game, return_to);
             return Err(format!("the demo's scene {scene_file} did not load"));
         }
-        let view = DemoView::new(&demo, return_to);
+        let view = DemoView::new(&demo, return_to, demo::lend(game));
         if let Err(err) = demo::prepare(game, demo) {
+            view.lent.give_back(game);
             self.put_back(game, view.return_to);
             return Err(err);
         }
@@ -160,8 +153,10 @@ impl EditorUi {
         Ok(())
     }
 
-    /// Leave Play, drop the replay, and give the editor its scene and recorder back.
-    fn close_demo(&mut self, game: &mut GameWorld) -> PlayTransition {
+    /// Leave Play, drop the replay, and give the editor back its scene, its recorder
+    /// and everything the replay overwrote. The quit boundary calls it too, so a
+    /// demo open at quit flushes the editor's own store, not the demo's.
+    pub fn close_demo(&mut self, game: &mut GameWorld) -> PlayTransition {
         let Some(view) = self.dev.demo.take() else {
             return PlayTransition::None;
         };
@@ -170,6 +165,7 @@ impl EditorUi {
         game.take_tap();
         demo::record_project(game);
         self.put_back(game, view.return_to);
+        view.lent.give_back(game);
         game.resources.application.borrow_mut().set_demo_tick(None);
         transition
     }

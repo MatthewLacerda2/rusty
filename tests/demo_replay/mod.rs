@@ -15,6 +15,8 @@ mod index_edges;
 mod play_bin;
 #[cfg(feature = "editor")]
 mod timeline;
+#[cfg(feature = "editor")]
+mod timeline_files;
 mod timing;
 
 /// Walk, turn, a REPL line and API calls that move the world and draw from

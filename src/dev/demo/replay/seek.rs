@@ -4,8 +4,9 @@
 //!
 //! Seeking back restarts the replay from the demo's start state: Play is left,
 //! and the world is put back as [`prepare`](super::prepare) found it (the scene,
-//! the camera, the clock, the input, the UI's event state, the navmesh, no quit
-//! asked), then prepared again from the file, read before anything is torn down.
+//! the camera, the clock, the Game view size, the input, the UI's event state, the
+//! navmesh, no quit asked), then prepared again from the file, read before
+//! anything is torn down.
 //! It is the same world, not a new one: a scenario's API is bound to the world's
 //! own cells for the whole run, so a fresh world would leave it reading the old
 //! one.
@@ -28,6 +29,7 @@ pub struct Start {
     scene_path: Option<String>,
     camera: Camera,
     time: Time,
+    game_view: Option<(u32, u32)>,
 }
 
 impl Start {
@@ -39,6 +41,7 @@ impl Start {
             scene_path: world.script_manager().scene_path_cell().borrow().clone(),
             camera: world.camera().borrow().clone(),
             time: world.time().borrow().clone(),
+            game_view: world.resources.screen.borrow().game_view(),
         }
     }
 
@@ -59,6 +62,8 @@ impl Start {
         *world.script_manager().scene_path_cell().borrow_mut() = self.scene_path;
         *world.camera().borrow_mut() = self.camera;
         *world.time().borrow_mut() = self.time;
+        // A tick past the start may have resized the Game view.
+        (world.resources.screen.borrow_mut()).restore_game_view(self.game_view);
         *world.input().borrow_mut() = InputState::new();
         *world.resources.event_system.borrow_mut() = Default::default();
         world.set_playing(true);

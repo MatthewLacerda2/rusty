@@ -114,6 +114,10 @@ pub trait Frontend {
         frame::advance_sim(game, delta_time)
     }
 
+    /// The loop is exiting, before the quit boundary persists the store: put back
+    /// anything borrowed (the editor closes an open demo, #1598).
+    fn before_exit(&mut self, _game: &mut GameWorld) {}
+
     /// The sim entered or left Play this frame (the editor focuses the Game view).
     fn on_play_transition(&mut self, _game: &mut GameWorld, _transition: PlayTransition) {}
 
