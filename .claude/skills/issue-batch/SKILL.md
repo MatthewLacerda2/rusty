@@ -25,7 +25,7 @@ avoid:
 - `src/components/entity/mod.rs` (the document struct, its imports and
   `Entity::new`);
 - `src/scene/authoring/components.rs` (`ComponentKind`) and
-  `src/scene/authoring/dependency.rs` (`set_default`, `has_kind`, `clear_one`:
+  `src/scene/authoring/dependency/dispatch.rs` (`set_default`, `has_kind`, `clear_one`:
   two component branches together push these past clippy's 50-line cap; split
   by group, never trim);
 - `src/scene/serialize.rs`'s `apply` and `src/scene/undo/level.rs`'s list: every

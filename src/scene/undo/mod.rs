@@ -284,4 +284,6 @@ mod ids_tests;
 #[cfg(test)]
 mod level_tests;
 #[cfg(test)]
+mod shared_mesh_tests;
+#[cfg(test)]
 mod tests;

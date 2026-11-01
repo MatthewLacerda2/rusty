@@ -86,20 +86,27 @@ pub(in crate::physics) struct ColliderInputs {
 /// Snapshot an entity's active-collider inputs, or `None` if it has no active
 /// collider (or is dead). A CharacterController's capsule supersedes a Collider
 /// on the same entity (#451). A mesh collider also captures the rest-pose
-/// geometry it rebuilds from. Reads through the #344 accessor facade — shared
+/// geometry it rebuilds from: its entity's Mesh, else its own `shared_mesh`. Reads through the #344 accessor facade — shared
 /// guards only.
 pub(in crate::physics) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> {
     if let Some(inputs) = crate::physics::character::character_collider_inputs(world, id) {
         return Some(inputs);
     }
     let collider = world.collider(id).filter(|c| c.active)?;
+    // The entity's own Mesh wins; without one, the collider's shared mesh (#1657).
     let mesh_geom = if matches!(collider.shape, ColliderShape::Mesh { .. }) {
-        world.mesh(id).map(|m| {
-            (
-                m.vertices.iter().map(|v| v.position).collect::<Vec<_>>(),
-                m.indices.clone(),
-            )
-        })
+        world
+            .mesh(id)
+            .map(|m| {
+                (
+                    m.vertices.iter().map(|v| v.position).collect::<Vec<_>>(),
+                    m.indices.clone(),
+                )
+            })
+            .or_else(|| {
+                let shared = collider.shared_mesh.as_ref()?;
+                Some((shared.positions.clone(), shared.indices.clone()))
+            })
     } else {
         None
     };

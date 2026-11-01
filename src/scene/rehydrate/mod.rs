@@ -16,7 +16,7 @@ use glam::{Mat4, Vec3};
 
 use crate::asset::{self, MeshRevision, MeshVertex, SubMesh};
 use crate::components::mesh::Vertex;
-use crate::components::Entity;
+use crate::components::{ColliderComponent, ColliderShape, Entity};
 use crate::scene::authoring::{subdivided_geometry, Primitive};
 
 /// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
@@ -145,21 +145,61 @@ fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
 /// are never stored on disk, only rebuilt here.
 /// A mesh collider's saved box is refit to the rebuilt mesh, so an import setting
 /// changed since the save (the Scale Factor, #1398) reaches it.
+/// A Mesh-shaped collider's shared mesh (#1657) is rebuilt the same way when the
+/// entity has no Mesh of its own; another shape's is left without geometry.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
-        if let Some(warning) = crate::scene::authoring::rendering::mesh::hold_subdivisions(mesh) {
-            log::warn!("[Scene] entity {}: {warning}", entity.id);
-        }
+        hold_subdivisions(entity.id, mesh);
         let rebuilt = rehydrate_one(mesh);
         install(mesh, rebuilt);
-        let positions = mesh.vertices.iter().map(|v| Vec3::from_array(v.position));
-        let bounds = positions.fold(None, |b: Option<(Vec3, Vec3)>, p| {
-            Some(b.map_or((p, p), |(lo, hi)| (lo.min(p), hi.max(p))))
-        });
-        if let (Some(bounds), Some(collider)) = (bounds, &mut entity.collider) {
-            reimport::refit(collider, bounds);
+        if let Some(collider) = &mut entity.collider {
+            refit_to(collider, mesh.vertices.iter().map(|v| v.position));
         }
+        return;
     }
+    let Some(collider) = &mut entity.collider else {
+        return;
+    };
+    if !matches!(collider.shape, ColliderShape::Mesh { .. }) {
+        return;
+    }
+    let Some(shared) = &mut collider.shared_mesh else {
+        return;
+    };
+    let mut mesh = shared.reference();
+    hold_subdivisions(entity.id, &mut mesh);
+    shared.subdivisions = mesh.subdivisions;
+    let rebuilt = rehydrate_one(&mesh);
+    install(&mut mesh, rebuilt);
+    shared.take_geometry(&mesh);
+    if let Some(bounds) = bounds_of(shared.positions.iter().copied()) {
+        reimport::refit(collider, bounds);
+    }
+}
+
+/// Clamp `mesh`'s subdivisions to what its primitive takes, warning when it had to.
+fn hold_subdivisions(id: u32, mesh: &mut crate::scene::MeshComponent) {
+    if let Some(warning) = crate::scene::authoring::rendering::mesh::hold_subdivisions(mesh) {
+        log::warn!("[Scene] entity {id}: {warning}");
+    }
+}
+
+/// Size a mesh collider's box to the box around `positions` (none: left as it is),
+/// as Unity's `MeshCollider` follows its mesh. Any other shape is left as authored.
+pub(crate) fn refit_to(
+    collider: &mut ColliderComponent,
+    positions: impl Iterator<Item = [f32; 3]>,
+) {
+    if let Some(bounds) = bounds_of(positions) {
+        reimport::refit(collider, bounds);
+    }
+}
+
+/// The box around `positions`, or `None` for none.
+fn bounds_of(positions: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
+    positions.map(Vec3::from_array).fold(None, |b, p| {
+        Some(b.map_or((p, p), |(lo, hi): (Vec3, Vec3)| (lo.min(p), hi.max(p))))
+    })
 }
 
 /// Put `rebuilt`'s geometry and rig on `mesh`, unbound from any bones: a fresh

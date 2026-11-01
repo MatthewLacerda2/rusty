@@ -2,7 +2,7 @@
 
 use glam::Vec2;
 
-use super::super::table::{inspect, op, with};
+use super::super::table::{inspect, op, ro, with};
 use crate::components::{
     CharacterControllerComponent, ColliderComponent, JointComponent, RigidBodyComponent,
 };
@@ -26,6 +26,7 @@ inspect! {
         op!("shape", collider::set_shape),
         op!("is_trigger", collider::set_trigger),
         op!("material", collider::set_material),
+        ro!("shared_mesh", "kept from the Mesh removed off a Mesh-shaped collider"),
     ];
     JointComponent => joint, joint_mut, &[
         op!("kind", joint::set_kind),
