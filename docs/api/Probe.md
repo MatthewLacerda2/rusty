@@ -34,7 +34,15 @@ under a lightmap of the same surroundings render alike (#807).
 STATIC scene to a cubemap from the probe's position (dynamic actors excluded) and
 projects that rendered radiance into L2 irradiance SH — so probes pick up the actual
 coloured bounce off nearby static surfaces, directional and position-dependent (a probe
-by a red wall reads red; one across the room does not). The first pass captures direct
+by a red wall reads red; one across the room does not). Where a capture sees no
+static surface, a direction that escapes the scene, it takes the scene's **ambient**
+(`Lighting.SetAmbientMode`'s `Color` or `Gradient`, intensity applied), not the sky
+the camera draws: Unity bakes light probes against *Environment Lighting*, and the
+skybox reaches surfaces only through reflections (reflection probes still capture
+it, see [`Reflection`](Reflection.md)), and static surfaces reflect nothing into a
+light probe (Unity's light-probe bake carries no specular). So `Bake` and
+`BakeAnalytic` share the same ambient term, and a probe-lit object takes the ambient an unbaked or lightmapped
+surface beside it does (#1668). The first pass captures direct
 light only; each later pass re-lights the static scene with the previous pass's probe
 field, folding in one more indirect bounce, so colour bleeds further with each
 iteration. It runs **up to 5 bounces** and stops early once a pass adds negligible
@@ -49,8 +57,7 @@ sidecar the runtime loads.
 (every probe sees the same analytic sky+sun, with a gentle height gradient so the
 field varies in space) and stays deterministic, so it runs anywhere with no GPU. Use
 it for quick, reproducible fills; use `Bake` for the real lighting. Its sky is the
-scene's ambient by direction, `Gradient` included; `Bake` captures the drawn sky
-instead, which follows only the `Color` ambient colour, so a `Gradient` doesn't
-reach `Bake`'s probes yet (#1668). Sampling is
+scene's ambient by direction, `Gradient` included, the same ambient `Bake` sees
+where its captures escape the scene. Sampling is
 **trilinear** over a grid, falling back to the nearest probe for free-placed probes or
 points outside the grid.
