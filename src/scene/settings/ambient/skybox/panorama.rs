@@ -39,7 +39,8 @@ pub(super) fn radiance(path: &str) -> Option<Sh9> {
     let Texels::Image(image) = loaded.texels else {
         return None;
     };
-    let sh = project(&image.to_rgba8());
+    let rgba = image.to_rgba8();
+    let sh = project(rgba.width(), rgba.height(), rgba.as_raw());
     kept.retain(|(f, _, _)| *f != file);
     if kept.len() == KEPT {
         kept.remove(0);
@@ -48,25 +49,49 @@ pub(super) fn radiance(path: &str) -> Option<Sh9> {
     Some(sh)
 }
 
-/// The radiance SH of an equirect image, every texel weighed by its solid angle.
-pub(super) fn project(image: &image::RgbaImage) -> Sh9 {
-    let (w, h) = image.dimensions();
-    let mut sh = Sh9::zero();
+/// Rows the projection keeps at most: an L2 projection needs far fewer, and a
+/// block of texels sums cheaply where a basis evaluation per texel would not
+/// (a 4K panorama is eight million texels, projected in an unoptimised build).
+const ROWS: u32 = 128;
+
+/// The radiance SH of a `w` × `h` equirect image of RGBA8 texels, row-major, every
+/// texel weighed by its solid angle. Texels are summed in square blocks of up to
+/// `h / ROWS` a side, each block projected once from its centre.
+pub(super) fn project(w: u32, h: u32, rgba: &[u8]) -> Sh9 {
+    let side = (h / ROWS).max(1);
+    let (gw, gh) = (w.div_ceil(side), h.div_ceil(side));
     // A row's texels share its band of the sphere exactly: 2π/w of the
     // `cos θ` it spans, so a constant image projects to that constant.
     let row = |y: u32| {
         let band = |y: u32| (y as f32 / h as f32 * PI).cos();
         (band(y) - band(y + 1)) * 2.0 * PI / w as f32
     };
-    for (x, y, p) in image.enumerate_pixels() {
-        // `equirect_uv`: u = (φ + π) / 2π with φ = atan2(z, x), v = θ / π with
-        // θ = acos(y).
-        let theta = (y as f32 + 0.5) / h as f32 * PI;
-        let phi = (x as f32 + 0.5) / w as f32 * 2.0 * PI - PI;
+    // Per block: the solid-angle-weighted colour, and the solid angle.
+    let mut blocks = vec![(Vec3::ZERO, 0.0f32); (gw * gh) as usize];
+    for (i, p) in rgba.chunks_exact(4).enumerate() {
+        let (x, y) = (i as u32 % w, i as u32 / w);
+        let rgb = Vec3::new(p[0] as f32, p[1] as f32, p[2] as f32) / 255.0;
+        let block = &mut blocks[((y / side) * gw + x / side) as usize];
+        block.0 += rgb * row(y);
+        block.1 += row(y);
+    }
+    let mut sh = Sh9::zero();
+    for (i, (rgb, weight)) in blocks.into_iter().enumerate() {
+        let (bx, by) = (i as u32 % gw, i as u32 / gw);
+        // The block's centre, as `equirect_uv` maps it: u = (φ + π) / 2π with
+        // φ = atan2(z, x), v = θ / π with θ = acos(y).
+        let centre = |b: u32, n: u32| ((b * side) as f32 + ((b + 1) * side).min(n) as f32) * 0.5;
+        let theta = centre(by, h) / h as f32 * PI;
+        let phi = centre(bx, w) / w as f32 * 2.0 * PI - PI;
         let (st, ct) = theta.sin_cos();
         let dir = Vec3::new(st * phi.cos(), ct, st * phi.sin());
-        let rgb = Vec3::new(p[0] as f32, p[1] as f32, p[2] as f32) / 255.0;
-        sh.add_sample(dir, rgb, row(y));
+        if weight > 0.0 {
+            sh.add_sample(dir, rgb / weight, weight);
+        }
     }
     sh
 }
+
+#[cfg(test)]
+#[path = "panorama_tests.rs"]
+mod tests;

@@ -25,7 +25,7 @@ fn skybox_scene(path: &str) -> Scene {
 #[test]
 fn a_constant_panorama_lights_every_normal_alike() {
     let image = image::RgbaImage::from_pixel(128, 64, image::Rgba([51, 102, 204, 255]));
-    let sky = AmbientRadiance::Sky(panorama::project(&image));
+    let sky = AmbientRadiance::Sky(panorama::project(128, 64, image.as_raw()));
     let want = Vec3::new(0.2, 0.4, 0.8);
     for n in NORMALS {
         assert!(sky.at(n).abs_diff_eq(want, 2e-3), "{n}: {}", sky.at(n));

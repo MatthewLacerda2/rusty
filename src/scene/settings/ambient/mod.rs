@@ -9,7 +9,7 @@
 //! - **Gradient**: three colours, [`AmbientSettings`]'s `sky` (up-facing surfaces),
 //!   `equator` (sideways) and `ground` (down-facing), blended by the normal's `y`.
 //! - **Skybox** (#1675): the sky itself, the panorama or the procedural sky,
-//!   projected into L2 SH (Unity's ambient probe, [`skybox`]), so an HDRI lights
+//!   projected into L2 SH (Unity's ambient probe, `skybox`), so an HDRI lights
 //!   the scene it surrounds. rusty's default stays `Color` (Unity's is `Skybox`),
 //!   so a scene that never chose draws as it always has.
 //!
