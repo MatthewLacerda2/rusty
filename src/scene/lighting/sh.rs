@@ -109,6 +109,35 @@ impl Sh9 {
         out.max(Vec3::ZERO)
     }
 
+    /// The radiance SH itself along unit direction `dir`, no convolution and no
+    /// clamp: the projected signal read back, what a ray escaping toward `dir` sees.
+    pub fn eval_radiance(&self, dir: Vec3) -> Vec3 {
+        let basis = sh_basis(dir);
+        (0..SH_COEFFS).fold(Vec3::ZERO, |out, i| {
+            out + Vec3::from(self.coeffs[i]) * basis[i]
+        })
+    }
+
+    /// This radiance SH convolved with the cosine lobe and divided by π, so
+    /// [`Self::eval_radiance`] of the result is [`Self::eval`] / π unclamped: the
+    /// coefficients a shader reads to shade with `eval / π` as one dot product.
+    pub fn convolved_over_pi(&self) -> Sh9 {
+        let mut out = *self;
+        for (c, a) in out.coeffs.iter_mut().zip(COSINE_LOBE) {
+            *c = (Vec3::from(*c) * (a / std::f32::consts::PI)).to_array();
+        }
+        out
+    }
+
+    /// Every coefficient times `k`.
+    pub fn scaled(&self, k: f32) -> Sh9 {
+        let mut out = *self;
+        for c in &mut out.coeffs {
+            *c = (Vec3::from(*c) * k).to_array();
+        }
+        out
+    }
+
     /// Component-wise lerp between two probes (the trilinear interpolation kernel).
     pub fn lerp(a: &Sh9, b: &Sh9, t: f32) -> Sh9 {
         let mut out = Sh9::zero();

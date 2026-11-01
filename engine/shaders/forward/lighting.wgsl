@@ -7,6 +7,7 @@
 
 #import common::{DecalSurface, PI, apply_decal}
 #import lighting::ambient::ambient_radiance
+#import lighting::sh::sh_basis
 #import lighting::reflection_probe::{ReflectionProbe, parallax_correct}
 #import forward::proxy_volume::proxy_irradiance
 #import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, instances, lighting, s_decal, s_refl_cube, s_shadow, s_skybox, shadow, t_ao, t_decal_color, t_decal_data, t_refl_cube, t_shadow, t_skybox}
@@ -201,23 +202,12 @@ fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
 }
 
 // Reconstruct diffuse irradiance from the entity's L2 SH probe for a surface normal
-// (#240). Mirrors `Sh9::eval` in src/scene/sh.rs byte-for-byte: the same 9 real-SH
-// basis polynomials and the same cosine-lobe band factors (pi, 2pi/3, pi/4), so the
-// headless analytic path and the GPU agree. Result clamped to non-negative.
+// (#240). Mirrors `Sh9::eval` in src/scene/lighting/sh.rs: the same 9 real-SH
+// basis polynomials (`lighting::sh::sh_basis`) and the same cosine-lobe band factors
+// (pi, 2pi/3, pi/4), so the headless analytic path and the GPU agree. Result clamped
+// to non-negative.
 fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
-    let x = N.x;
-    let y = N.y;
-    let z = N.z;
-    var b: array<f32, 9>;
-    b[0] = 0.2820948;
-    b[1] = -0.4886025 * y;
-    b[2] = 0.4886025 * z;
-    b[3] = -0.4886025 * x;
-    b[4] = 1.0925484 * x * y;
-    b[5] = -1.0925484 * y * z;
-    b[6] = 0.31539157 * (3.0 * z * z - 1.0);
-    b[7] = -1.0925484 * x * z;
-    b[8] = 0.5462742 * (x * x - y * y);
+    let b = sh_basis(N);
     let a0 = PI;
     let a1 = 2.0 * PI / 3.0;
     let a2 = PI / 4.0;

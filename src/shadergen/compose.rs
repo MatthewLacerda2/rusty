@@ -22,6 +22,7 @@ pub use naga::Module;
 /// module names itself with `#define_import_path` (#1015).
 pub const MODULES: &[&str] = &[
     "fullscreen.wgsl",
+    "lighting/sh.wgsl",
     "color/srgb.wgsl",
     "sky/noise.wgsl",
     "fog/height.wgsl",

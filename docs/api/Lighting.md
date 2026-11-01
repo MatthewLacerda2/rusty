@@ -213,7 +213,7 @@ during Play goes back on Stop, as every scene edit does.
 | `Lighting.SetAmbientColor` | `(r, g, b)` | — |
 | `Lighting.GetAmbientIntensity` | `()` | number |
 | `Lighting.SetAmbientIntensity` | `(intensity)` | — |
-| `Lighting.GetAmbientMode` | `()` | `"Color"` or `"Gradient"` |
+| `Lighting.GetAmbientMode` | `()` | `"Color"`, `"Gradient"` or `"Skybox"` |
 | `Lighting.SetAmbientMode` | `(mode)` | — (an unknown name errors) |
 | `Lighting.GetAmbientSkyColor` | `()` | `r, g, b` |
 | `Lighting.SetAmbientSkyColor` | `(r, g, b)` | — |
@@ -253,20 +253,33 @@ during Play goes back on Stop, as every scene edit does.
   sideways ones and **ground** on down-facing ones, blended by how much a surface
   faces up or down. The intensity scales all three. The colours follow the ambient
   colour's rule (linear RGB, `≥ 0`, a NaN or infinite channel refused) and are kept
-  in `Color` mode; their defaults are the default ambient's hemisphere at its top,
+  in the other modes; their defaults are the default ambient's hemisphere at its top,
   middle and bottom, so switching the default scene to `"Gradient"` lights it the
-  same. A scene in `Color` mode with default colours leaves the `ambient` block out
-  of its file. Lightmaps and light probes, both Generate Lighting's (`Probe.Bake`)
+  same. `"Skybox"` (Unity's `AmbientMode.Skybox`, Unity's default; rusty's stays
+  `"Color"`) lights the scene from the sky itself: the panorama (`SetSkybox`) when
+  one is set, else the procedural sky below, projected into three SH bands
+  (Unity's *ambient probe*), so an HDRI's blue zenith and warm horizon light up-
+  and sideways-facing surfaces with their own colours. The intensity scales it; the
+  sky on screen stays as drawn. The projection is made once per change of the sky
+  (a different panorama path, the panorama file's bytes or its import settings, a
+  procedural setting) and never saved; a scripted ambient colour tinting the procedural sky re-projects
+  nothing. A panorama is read as the sky pass draws it (8-bit, no sRGB decode), and
+  one that cannot be read lights as the procedural sky does. A scene in `Color` mode
+  with default colours leaves the `ambient` block out of its file. Lightmaps and light probes, both Generate Lighting's (`Probe.Bake`)
   and the analytic fill (`Probe.BakeAnalytic`), bake from the same ambient, so an
   open lightmapped or probe-lit surface takes the light an unbaked one facing the
-  same way does: exactly in `Color` mode, and in `Gradient` up to a slight
-  smoothing at the horizon (the bakes carry three SH bands, as Unity's ambient
-  probe does). As in Unity, light probes and lightmaps bake against this ambient,
-  never against the sky the camera draws (#1668): the sky reaches surfaces only
-  through reflections (reflection probes capture it). So a scene with a panorama sky
-lights its probes and lightmaps from the flat ambient, not from the HDRI; Unity's
-Environment Lighting Source = Skybox, which bakes from the sky, is not built yet
-(#1675). But, as
+  same way does: exactly in `Color` mode, in `Skybox` mode while the sky's three
+  SH bands stay non-negative, and in `Gradient` up to a slight smoothing at the
+  horizon (the bakes carry three SH bands, as Unity's ambient probe does). A sky
+  with one dominant bright region (a sun-white top over a black ground) rings below
+  zero on the far side; the bakes clamp each ray at zero, so a baked surface turned
+  away from that region comes out slightly brighter than an unbaked one, which
+  clamps once (straight down under that sky: about `0.07` against `0`). As in Unity, light probes and lightmaps bake against this
+  ambient, never against the sky the camera draws (#1668): in `Color` and
+  `Gradient` the sky reaches surfaces only through reflections (reflection probes
+  capture it), so a panorama scene lights its probes and lightmaps from the flat
+  ambient, not from the HDRI; in `Skybox` the ambient *is* the sky's light, so the
+  HDRI lights unbaked, lightmapped and probe-lit surfaces alike (#1675). But, as
   in Unity, **a changed mode or colour reaches baked surfaces only at the next
   Generate Lighting**: dynamic objects and unbaked surfaces show it at once.
 - **The procedural sky** is drawn when no panorama is set: a ground → horizon →
@@ -283,6 +296,7 @@ Environment Lighting Source = Skybox, which bakes from the sky, is not built yet
   its file. What a surface reflects follows: the sky's reflection cube is re-baked
   once per change, so a script that changes a setting every frame re-bakes every
   frame (the ambient colour never re-bakes it), and reflection-probe bakes capture
-  the sky as drawn. The ambient a surface takes is still the ambient colour (or the
-  gradient's colours), not the sky's: the sky's colours light nothing, as Unity's
-  skybox lights nothing in *Color* or *Gradient* mode.
+  the sky as drawn. In `Color` and `Gradient` mode the ambient a surface takes is
+  the ambient colour (or the gradient's colours), not the sky's: the sky's colours
+  light nothing, as Unity's skybox lights nothing in those modes. In `Skybox` mode
+  they are the light (clouds included, by their average brightness).

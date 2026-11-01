@@ -1,5 +1,6 @@
 //! The Scene Settings panel's Environment Lighting (#1647): Unity's *Source*
-//! dropdown, `Color` or `Gradient`, the ambient colour, and the gradient's sky,
+//! dropdown, `Color`, `Gradient` or `Skybox` (#1675, the sky itself: nothing to
+//! pick but the sky), the ambient colour, and the gradient's sky,
 //! equator and ground colours, each written through its `authoring::environment`
 //! op, the one `Lighting.Set*` calls.
 
@@ -30,10 +31,11 @@ pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) 
                 }
             }
         });
-    // In Gradient mode the colour still tints the procedural sky, so it stays.
+    // In Gradient and Skybox mode the colour still tints the procedural sky, so it
+    // stays (in Skybox mode the sky it tints is the light).
     let label = match before.mode {
         AmbientMode::Color => "Ambient Color:",
-        AmbientMode::Gradient => "Ambient Color (tints the sky):",
+        AmbientMode::Gradient | AmbientMode::Skybox => "Ambient Color (tints the sky):",
     };
     ui.horizontal(|ui| {
         ui.label(label);

@@ -121,7 +121,7 @@ fn lighting_uniform_matches_wgsl_layout() {
             "gradient_sky",
             offset_of!(AmbientLightUniform, gradient_sky),
         ),
-        ("gradient", offset_of!(AmbientLightUniform, gradient)),
+        ("mode", offset_of!(AmbientLightUniform, mode)),
         (
             "gradient_equator",
             offset_of!(AmbientLightUniform, gradient_equator),
@@ -130,6 +130,7 @@ fn lighting_uniform_matches_wgsl_layout() {
             "gradient_ground",
             offset_of!(AmbientLightUniform, gradient_ground),
         ),
+        ("sky_sh", offset_of!(AmbientLightUniform, sky_sh)),
     ];
     assert_layout("AmbientLight", &ambient, size_of::<AmbientLightUniform>());
     let probe = [

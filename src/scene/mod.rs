@@ -96,6 +96,8 @@ pub use scene::{
     DEFAULT_AMBIENT_INTENSITY,
 };
 pub use serialize::{apply_scene_data, asset_mesh_component, to_scene_data, SceneData};
+#[cfg(test)]
+pub use settings::ambient::{panorama_fixture, procedural_sky_color};
 pub use settings::ambient::{AmbientMode, AmbientRadiance, AmbientSettings, DrawnAmbient};
 pub use settings::collision_matrix::CollisionMatrix;
 pub use settings::fog::{FogMode, FogSettings};

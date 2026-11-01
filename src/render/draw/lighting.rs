@@ -29,15 +29,27 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
 pub(crate) fn scene_ambient(scene: &Scene) -> AmbientLightUniform {
     let drawn = scene.drawn_ambient();
     let [sky, equator, ground] = drawn.gradient.unwrap_or([Vec3::ZERO; 3]);
+    let mode = match (drawn.skybox, drawn.gradient) {
+        (Some(_), _) => 2.0,
+        (None, Some(_)) => 1.0,
+        (None, None) => 0.0,
+    };
+    let mut sky_sh = [[0.0; 4]; 9];
+    if let crate::scene::AmbientRadiance::Sky(sh) = drawn.radiance() {
+        for (out, c) in sky_sh.iter_mut().zip(sh.convolved_over_pi().coeffs) {
+            *out = [c[0], c[1], c[2], 0.0];
+        }
+    }
     AmbientLightUniform {
         color: drawn.color.to_array(),
         intensity: drawn.intensity,
         gradient_sky: sky.to_array(),
-        gradient: f32::from(u8::from(drawn.gradient.is_some())),
+        mode,
         gradient_equator: equator.to_array(),
         _pad_equator: 0.0,
         gradient_ground: ground.to_array(),
         _pad_ground: 0.0,
+        sky_sh,
     }
 }
 

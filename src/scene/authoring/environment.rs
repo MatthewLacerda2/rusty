@@ -39,7 +39,8 @@ pub fn set_ambient_intensity(scene: &mut Scene, intensity: f32) {
 // `SkySettings`. A changed mode or colour shows on dynamic objects at once and on
 // baked lightmaps and probes after the next Generate Lighting, as in Unity.
 
-/// Set the ambient source: `Color` (one colour) or `Gradient` (three).
+/// Set the ambient source: `Color` (one colour), `Gradient` (three) or `Skybox`
+/// (the sky itself, #1675).
 pub fn set_ambient_mode(ambient: &mut AmbientSettings, mode: AmbientMode) {
     ambient.mode = mode;
 }

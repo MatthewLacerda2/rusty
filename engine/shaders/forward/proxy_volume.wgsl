@@ -18,6 +18,7 @@
 
 #import common::PI
 #import forward::bindings::{instances, proxy_volumes}
+#import lighting::sh::sh_basis
 
 const HEADER: u32 = 5u;
 const COEFFS: u32 = 4u;
@@ -61,10 +62,9 @@ fn proxy_irradiance(world_pos: vec3<f32>, N: vec3<f32>, instance: u32) -> vec4<f
         add_point(&acc, base, p, w3.x * w3.y * w3.z);
     }
     // `eval_sh`'s basis and cosine lobes, bands 0 and 1.
-    let band1 = 0.4886025 * 2.0 * PI / 3.0;
-    let e = acc[0] * (0.2820948 * PI)
-        + acc[1] * (-band1 * N.y)
-        + acc[2] * (band1 * N.z)
-        + acc[3] * (-band1 * N.x);
+    let b = sh_basis(N);
+    let band1 = 2.0 * PI / 3.0;
+    let e = acc[0] * (b[0] * PI)
+        + (acc[1] * b[1] + acc[2] * b[2] + acc[3] * b[3]) * band1;
     return vec4<f32>(max(e, vec3<f32>(0.0)), 1.0);
 }

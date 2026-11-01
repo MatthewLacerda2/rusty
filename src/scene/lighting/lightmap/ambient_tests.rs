@@ -12,7 +12,7 @@ use crate::core::color::luminance;
 use crate::scene::AmbientRadiance;
 
 /// The indirect light of one texel at the origin facing `normal`, in an empty scene.
-fn open_texel(sky: AmbientRadiance, normal: Vec3) -> Vec3 {
+pub(super) fn open_texel(sky: AmbientRadiance, normal: Vec3) -> Vec3 {
     open_light(sky, normal).indirect
 }
 

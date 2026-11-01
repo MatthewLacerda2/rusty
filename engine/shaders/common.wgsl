@@ -72,11 +72,14 @@ struct AmbientLight {
     color: vec3<f32>,
     intensity: f32,
     gradient_sky: vec3<f32>,
-    gradient: f32,
+    // 0: `color`'s hemisphere, 1: the trilight, 2: the sky's SH (`Skybox`, #1675).
+    mode: f32,
     gradient_equator: vec3<f32>,
     _pad_equator: f32,
     gradient_ground: vec3<f32>,
     _pad_ground: f32,
+    // `Skybox`'s L2 SH, intensity applied, convolved over pi; `w` unused.
+    sky_sh: array<vec4<f32>, 9>,
 };
 
 struct DirectionalLight {
