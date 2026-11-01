@@ -394,7 +394,11 @@
         "inner_cone": 0.0,
         "outer_cone": 0.0,
         "cast_shadows": false,
-        "mode": "Mixed"
+        "mode": "Mixed",
+        "area_size": [
+          1.0,
+          1.0
+        ]
       },
       "collider": null,
       "rigidbody": null,

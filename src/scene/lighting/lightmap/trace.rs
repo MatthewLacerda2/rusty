@@ -19,9 +19,10 @@
 
 use std::f32::consts::{PI, TAU};
 
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 
 use super::input::{BakeLight, BakeRun, BakeScene, LightShape};
+use super::lights::area::{strata, stratified};
 use super::rays::{Hit, Rays};
 use super::rng::Rng;
 use crate::core::color::luminance;
@@ -77,7 +78,7 @@ impl Tracer<'_> {
             inside += u32::from(backface);
         }
         let n = samples.max(1) as f32;
-        let (direct, direct_dir) = self.direct(origin, normal, true);
+        let (direct, direct_dir) = self.direct(origin, normal, true, samples, rng);
         TexelLight {
             indirect: sum / n,
             direct: direct / PI,
@@ -110,7 +111,7 @@ impl Tracer<'_> {
             let Some((point, hit_normal, m)) = self.surface(&hit, dir) else {
                 return (radiance, first, depth == 0); // back face: nothing comes through
             };
-            let lit = self.direct(point, hit_normal, false).0;
+            let lit = self.direct(point, hit_normal, false, 1, rng).0;
             radiance += throughput * (m.emissive + m.albedo * lit / PI);
             throughput *= m.albedo;
             (origin, normal) = (point, hit_normal);
@@ -138,19 +139,43 @@ impl Tracer<'_> {
     /// The direct irradiance at `point` facing `normal`, shadowed, and the
     /// luminance-weighted sum of the directions it arrived from. `baked_only` keeps
     /// just the `Baked` lights (a receiving texel's own direct light); a bounce hit
-    /// sees every baked-in light.
-    fn direct(&self, point: Vec3, normal: Vec3, baked_only: bool) -> (Vec3, Vec3) {
+    /// sees every baked-in light. An Area light that [reaches](super::lights::area::AreaShape::reaches)
+    /// `point` is integrated over `area_samples` or more stratified points drawn
+    /// from `rng` (#1674); one out of range or behind draws nothing, and no other
+    /// light draws at all, so a scene without one bakes exactly as before.
+    fn direct(
+        &self,
+        point: Vec3,
+        normal: Vec3,
+        baked_only: bool,
+        area_samples: u32,
+        rng: &mut Rng,
+    ) -> (Vec3, Vec3) {
         let (mut e, mut dir) = (Vec3::ZERO, Vec3::ZERO);
+        let mut add = |light: &BakeLight, u: Vec2, weight: f32| {
+            if let Some((to_light, distance, received)) = arrival(light, point, u) {
+                let cos = normal.dot(to_light);
+                if cos > 0.0 && !self.rays.occluded(point, to_light, T_MIN, distance) {
+                    let lit = received * cos * weight;
+                    e += lit;
+                    dir += to_light * luminance(lit);
+                }
+            }
+        };
         for light in &self.scene.lights {
             if baked_only && !light.bakes_direct {
                 continue;
             }
-            if let Some((to_light, distance, received)) = arrival(light, point) {
-                let cos = normal.dot(to_light);
-                if cos > 0.0 && !self.rays.occluded(point, to_light, T_MIN, distance) {
-                    e += received * cos;
-                    dir += to_light * luminance(received * cos);
+            match light.shape {
+                LightShape::Area(area) if area.reaches(point) => {
+                    let m = strata(area_samples);
+                    let weight = 1.0 / (m * m) as f32;
+                    for u in stratified(m, || rng.next_f32()) {
+                        add(light, u, weight);
+                    }
                 }
+                LightShape::Area(_) => {}
+                _ => add(light, Vec2::ZERO, 1.0),
             }
         }
         (e, dir)
@@ -167,9 +192,15 @@ impl Tracer<'_> {
 
 /// Unit direction to `light`, distance to it, and the radiance arriving at `point`
 /// (before the cosine), with the forward shader's falloff: `1 / (d² + 1)` inside
-/// `range`, and the spot's linear inner-to-outer cone fade. `None` out of reach.
-pub(super) fn arrival(light: &BakeLight, point: Vec3) -> Option<(Vec3, f32, Vec3)> {
+/// `range`, and the spot's linear inner-to-outer cone fade. An Area light is
+/// asked about its point at `u` in `[0, 1]²` (`area`'s model); the rest ignore
+/// `u`. `None` out of reach.
+pub(super) fn arrival(light: &BakeLight, point: Vec3, u: Vec2) -> Option<(Vec3, f32, Vec3)> {
     match light.shape {
+        LightShape::Area(area) => {
+            let (dir, d, scale) = area.arrival(point, u)?;
+            Some((dir, d, light.radiance * scale))
+        }
         LightShape::Directional { direction } => Some((-direction, f32::MAX, light.radiance)),
         LightShape::Point { position, range } => {
             let (dir, d) = toward(position, point, range)?;

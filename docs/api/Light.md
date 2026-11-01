@@ -2,8 +2,10 @@
 
 Read and tune an entity's `LightComponent` — colour, intensity, range, type and
 whether it casts shadows, and its mode.
-Every setter maps onto a field the renderer reads when it packs the lighting
-uniform, so a change takes effect on the next frame. A light has no per-component
+Every setter but `SetAreaSize` maps onto a field the renderer reads when it packs
+the lighting uniform, so a change takes effect on the next frame; an Area light is
+baked only, so its size (and any change to an Area light) shows after the next
+lightmap and probe bake. A light has no per-component
 "active" flag: it is gated by whether its owning entity is active in the hierarchy (`Scene.IsActiveInHierarchy`), so
 this surface exposes the light's own data and nothing more. Getters return a
 neutral default (`(1,1,1)` colour, `0` scalars, `"None"` type and mode) when the
@@ -18,12 +20,31 @@ entity has no light. A spotlight's cone half-angles have no verb here: write
 | `Light.SetColor` | `(id, r, g, b)` | — (each channel floored at 0, HDR above 1 allowed; a NaN or infinite channel makes it black) |
 | `Light.GetIntensity` / `SetIntensity` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
 | `Light.GetRange` / `SetRange` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
-| `Light.GetType` / `SetType` | `(id)` / `(id, name)` | `"Ambient"` / `"Directional"` / `"Point"` / `"Spot"` (Unity's names) |
-| `Light.GetCastShadows` / `SetCastShadows` | `(id)` / `(id, on)` | `boolean` (default `false`; point and spot lights only) |
-| `Light.GetMode` / `SetMode` | `(id)` / `(id, name)` | `"Realtime"` / `"Mixed"` / `"Baked"` |
+| `Light.GetType` / `SetType` | `(id)` / `(id, name)` | `"Ambient"` / `"Directional"` / `"Point"` / `"Spot"` / `"Area"` (Unity's names) |
+| `Light.GetCastShadows` / `SetCastShadows` | `(id)` / `(id, on)` | `boolean` (default `false`; point and spot lights, and an Area light's stand-in in a bake capture: the lightmap and probe bake shadow an Area light always) |
+| `Light.GetMode` / `SetMode` | `(id)` / `(id, name)` | `"Realtime"` / `"Mixed"` / `"Baked"` (an Area light reads `"Baked"` and refuses all but `"Baked"`, with a console warning) |
+| `Light.GetAreaSize` / `SetAreaSize` | `(id)` / `(id, width, height)` | `width, height` in world units (default `1, 1`; each side floored at `0.01`; a NaN or `math.huge` side refuses the whole size, keeping the current one; `0, 0` with no light) |
 
 `SetType` and `SetMode` are case-insensitive; an unrecognized name is ignored (the
 current value is kept).
+
+**Area lights** (#1674) are Unity's *Area (Rectangle)* light, and like Unity's
+built-in pipeline rusty bakes them only: an Area light acts as
+`Baked` whatever its stored mode (`GetMode` and `Component.Get` read `"Baked"`, and
+`SetMode` refuses the rest, warning in the console). The stored mode is kept, so a
+Mixed point light switched to Area and back is Mixed again. The
+emitter is a `width × height` rectangle (`SetAreaSize`) centred on the entity,
+spanning its local X and Y and shining from its front, local −Z, only. Intensity is
+per unit area: a 2 × 1 panel gives out twice what a 1 × 1 one of the same
+intensity does, and seen from far away it acts as a spot light of `intensity ×
+area` whose light fades as the cosine off the panel's facing. `range` cuts it off
+from its centre, like a point light's. The lightmap bake integrates the whole
+rectangle, so its shadows have soft edges that widen with the panel's size, and the
+light-probe bake adds its direct light (a fixed 8 × 8 grid of shadow rays per
+probe) for dynamic objects. It is never drawn live, so a surface without a lightmap
+and an object before the probes are baked get nothing from it. Transform scale
+does not resize it; `SetAreaSize` does. The editor draws its rectangle, its facing
+and its range. A Disc shape and realtime area lights are not there yet.
 
 **How many lights shade.** Point and spot lights are rendered with clustered
 forward lighting (#434): there is no fixed slot count. Each camera shades up to

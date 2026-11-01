@@ -33,9 +33,11 @@ const MARKER_HALF: f32 = 0.15;
 const REFLECTION_TINT: [f32; 4] = [1.0, 0.65, 0.1, 0.9];
 
 impl Renderer {
-    /// Pre-create the light- and reflection-probe gizmo resources for one editor pass.
+    /// Pre-create the light- and reflection-probe gizmo resources for one editor pass,
+    /// and the Area lights' (`lights`, #1674).
     /// Each entry owns its line-list vertex buffer and a slot of `draws` (its flat
-    /// tint), mirroring `precreate_aabb`. Empty when both probe sets are empty.
+    /// tint), mirroring `precreate_aabb`. Empty when there are no probes of either kind
+    /// and no active Area light.
     pub(crate) fn precreate_probes(
         &self,
         scene: &Scene,
@@ -55,10 +57,14 @@ impl Renderer {
             let marker_verts = probe_marker_verts(probe.position, MARKER_HALF);
             resources.push(self.build_probe_resource(draws, &marker_verts, REFLECTION_TINT));
         }
+        // Area lights (#1674), baked only, ride the same line path.
+        for (verts, tint) in super::lights::area_light_gizmos(scene) {
+            resources.push(self.build_probe_resource(draws, &verts, tint));
+        }
         resources
     }
 
-    /// Build one probe gizmo's GPU resources: a vertex buffer for its line-list geometry
+    /// Build one probe (or Area light) gizmo's GPU resources: a vertex buffer for its line-list geometry
     /// (already in world space) and its slot of `draws`, drawn flat in `tint`.
     fn build_probe_resource(
         &self,
@@ -69,7 +75,7 @@ impl Renderer {
         let vertex_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Probe Gizmo Vertices"),
+                label: Some("Probe & Area Light Gizmo Vertices"),
                 contents: bytemuck::cast_slice(verts),
                 usage: wgpu::BufferUsages::VERTEX,
             });

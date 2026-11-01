@@ -124,6 +124,7 @@ fn add_key_light(scene: &mut Scene) {
     scene.world.set_light(
         id,
         Some(LightComponent {
+            area_size: glam::Vec2::ONE,
             light_type: LightType::Directional,
             color: Vec3::new(1.0, 0.95, 0.85),
             intensity: 2.0,

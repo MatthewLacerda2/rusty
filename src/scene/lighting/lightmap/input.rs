@@ -1,14 +1,15 @@
 //! What the lightmap bake sees (#438): the static scene flattened to world-space
-//! triangles, the lights that take part in the bake, and the sky. Gathered once from a
+//! triangles, the lights that take part in the bake (`lights`), and the sky. Gathered once from a
 //! [`Scene`]; the tracer never touches the ECS, so the bake is a pure function of this.
 
 use std::cell::RefCell;
 
 use glam::{Vec2, Vec3};
 
+pub use super::lights::{BakeLight, LightShape};
 use crate::asset::MapRef;
 use crate::components::mesh::{clip_runs, material_runs};
-use crate::components::{LightType, MaterialAsset, MeshComponent, ShadowCasting};
+use crate::components::{MaterialAsset, MeshComponent, ShadowCasting};
 use crate::core::collections::Map;
 use crate::scene::Scene;
 
@@ -56,37 +57,6 @@ impl BakeMesh {
         let k = self.runs.partition_point(|r| r.end <= index);
         &self.runs[k.min(self.runs.len() - 1)]
     }
-}
-
-/// Where a baked light sits and how it falls off — the forward shader's models.
-#[derive(Clone, Copy, Debug)]
-pub enum LightShape {
-    /// Light travelling along `direction` (unit).
-    Directional {
-        direction: Vec3,
-    },
-    Point {
-        position: Vec3,
-        range: f32,
-    },
-    Spot {
-        position: Vec3,
-        direction: Vec3,
-        range: f32,
-        cos_inner: f32,
-        cos_outer: f32,
-    },
-}
-
-/// A light the bake includes: a `Mixed` one (bounce only) or a `Baked` one (direct and
-/// bounce). `Realtime` lights never get here.
-#[derive(Clone, Copy, Debug)]
-pub struct BakeLight {
-    pub shape: LightShape,
-    /// Colour times intensity.
-    pub radiance: Vec3,
-    /// Whether the receiving texel's own direct light is baked (`Baked`).
-    pub bakes_direct: bool,
 }
 
 /// Everything the bake reads.
@@ -152,47 +122,6 @@ impl BakeScene {
         }
         out.gather_lights(scene);
         out
-    }
-
-    /// The active lights that take part in the bake (an `Ambient` light is in the
-    /// sky already, through `Scene::drawn_ambient`).
-    fn gather_lights(&mut self, scene: &Scene) {
-        for id in scene.world.ids_with_light() {
-            if !scene.world.is_active_in_hierarchy(id) {
-                continue;
-            }
-            let light = scene.world.light(id).expect("id came from ids_with_light");
-            // World space: a light on a child bakes where it is drawn (#1196).
-            let position = scene.world.world_position(id);
-            let forward = scene
-                .world
-                .transform_direction(id, Vec3::NEG_Z)
-                .try_normalize()
-                .unwrap_or(Vec3::NEG_Y);
-            let shape = match light.light_type {
-                // The sky is `Scene::drawn_ambient`'s, which an Ambient light sets.
-                LightType::Ambient => continue,
-                LightType::Directional => LightShape::Directional { direction: forward },
-                LightType::Point => LightShape::Point {
-                    position,
-                    range: light.range,
-                },
-                LightType::Spotlight => LightShape::Spot {
-                    position,
-                    direction: forward,
-                    range: light.range,
-                    cos_inner: light.inner_cone.to_radians().cos(),
-                    cos_outer: light.outer_cone.to_radians().cos(),
-                },
-            };
-            if light.mode.bakes_indirect() {
-                self.lights.push(BakeLight {
-                    shape,
-                    radiance: light.color * light.intensity,
-                    bakes_direct: light.mode.bakes_direct(),
-                });
-            }
-        }
     }
 }
 
