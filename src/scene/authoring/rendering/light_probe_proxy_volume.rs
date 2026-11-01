@@ -22,7 +22,7 @@ pub fn set_bounds_mode(v: &mut Volume, mode: ProxyBoundsMode) {
     v.bounds_mode = mode;
 }
 
-/// The custom box's size, each side at least [`MIN_EXTENT`]; a non-finite size
+/// The custom box's size, each side at least 1 mm; a non-finite size
 /// keeps the current one.
 pub fn set_size(v: &mut Volume, size: Vec3) {
     v.size = finite3_or(size, v.size).abs().max(Vec3::splat(MIN_EXTENT));
