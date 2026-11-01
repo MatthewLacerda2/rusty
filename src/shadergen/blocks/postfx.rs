@@ -36,8 +36,8 @@
 //! Its helper is `fn uv_barrel(uv, amount, corner_radius) -> vec2<f32>`, sending a
 //! point outside the rounded screen to an off-frame sentinel. `phosphor_mask` is a
 //! colour block in **screen pixels**: its call passes the fragment position
-//! `in.pos.xy` instead of `uv`, so the RGB stripes are whole pixels at any
-//! resolution, and it multiplies by a gain that keeps each channel's mean (a stripe
+//! `in.pos.xy` instead of `uv`, so the RGB stripes are whole pixels of the scene target (output × render scale; the chain
+//! runs before the upscale, so at a render scale other than 1 they beat or wash out), and it multiplies by a gain that keeps each channel's mean (a stripe
 //! lit at 3×, the others at 0, mixed in by `strength`). Its `kind` is a choice param
 //! (`Param::choice`), baked as an index.
 //!
@@ -136,7 +136,8 @@ pub const BLOCKS: &[Block] = &[
         stage: Stage::Color,
         cut: None,
         reflection: Reflection::Kept,
-    },    Block {
+    },
+    Block {
         id: "barrel",
         desc: "CRT glass curvature: warp where the frame is sampled outward by amount; black past the curved screen, rounded corners.",
         params: &[

@@ -54,7 +54,7 @@ passes, bindings, or render features).
 | `Shader.Bake` | `(recipe [, out_dir])` | the written `<out_dir>/<name>.wgsl` path |
 | `Shader.Validate` | `(recipe)` | array of the composed module's entry-point names (dry-run; **writes nothing**) |
 | `Shader.ToJson` | `(recipe)` | the recipe's canonical JSON string |
-| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"` \| `"ui"`): `{ {id, desc, params = { {name, default, arity, runtime, choices?} }, textures = {slot…}, stage }, … }` — `stage` is `"color"`, `"uv"` or `"vertex"`; a **choice** param (`phosphor_mask`'s `kind`) lists the names it takes in `choices`, its `default` the first |
+| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"` \| `"ui"`): `{ {id, desc, params = { {name, default, arity, runtime, choices?} }, textures = {slot…}, stage }, … }` — `stage` is `"color"`, `"uv"` or `"vertex"`; a **choice** param (`phosphor_mask`'s `kind`) lists the names it takes in `choices`, its `default` the first choice's name (a string, not a number or array) |
 
 `recipe` is a table **or** its serialized JSON string (from `Shader.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. Its enum value `pass` is read in any case; a stored file holds the canonical spelling. `out_dir` defaults to `assets/shaders`. Use `Shader.Validate` to
@@ -92,12 +92,14 @@ end
 ```
 
 Each block has an `id` from the pass's catalog and an optional `params` map (a param
-is a scalar like `0.6` or a small float array like `{1,0.5,0.25}` for a color).
+is a scalar like `0.6`, a small float array like `{1,0.5,0.25}` for a color, or, for a
+**choice** param, one of its names as a string like `kind = "slot"`).
 Unsupplied params fall back to the block's defaults.
 
 **Params are checked, not guessed.** A param the block doesn't declare (`strenght`),
-an array where a number is expected, or a color with the wrong number of components
-is an **error** naming the block, its position (`blocks[i]`), the bad key and the
+an array where a number is expected, a color with the wrong number of components,
+or a choice param given anything but one of its names (`kind = "stripes"`, or a
+number; the error lists the choices) is an **error** naming the block, its position (`blocks[i]`), the bad key and the
 params the block declares. The one convenience: a single number for a vector param
 broadcasts to every lane (`color = 0.5` is mid-gray). Unknown keys on the recipe or a
 block entry (`param` for `params`) are errors too.
@@ -263,14 +265,14 @@ into the lit color; postfx blocks grade the sampled scene color.
   in the recipe. What falls past the curved screen, and past its rounded corners
   (`corner_radius` in uv), draws **black**, after every colour block);
   `phosphor_mask {kind = "aperture", scale = 1, strength* = 0.3}` (the RGB
-  phosphor pattern in **screen pixels**, so it stays pixel-fine at any resolution:
+  phosphor pattern in **screen pixels** of the scene target (output size × render scale), so it is pixel-fine at render scale 1 only: the chain runs before the upscale, so at any other scale the stripes beat against the output pixels or wash out:
   `kind` names it — `"aperture"` vertical R/G/B stripes, `"shadow"` the stripes
   staggered a pixel per row, `"slot"` stripes broken into staggered slots; `scale`
   is pixels per stripe; the lit stripe is brightened so each channel's mean
   display value stays where it was — short of clipping: where the picture is
   bright the lit stripe saturates at 1 and the area dims, so lower `strength`
   for a bright game. The chain runs before FXAA, which softens 1-pixel stripes;
-  a `scale` of 2 or more keeps them crisp). Pair them with `scanline` for the tube. Params
+  a `scale` of 2 or more keeps them crisp). Pair them with `scanline` for the tube. The volume's grain and chromatic aberration are applied before the authored chain, so `barrel` warps them too (grain magnifies toward the edges). Params
   marked `*` are **runtime**, driven per frame on the volume with
   `Graphics.SetPostParam` (see below): `scanline.strength*`,
   `damage_vignette.color*` and `.intensity*`, `sharpen.amount*`,

@@ -20,8 +20,15 @@ fn bake(name: &str, blocks: &str) {
     .expect("bake");
 }
 
-fn cleanup(name: &str) {
-    std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{name}.wgsl")).ok();
+/// Removes a baked module's files when dropped, so they go even if an assertion fails.
+struct Cleanup(String);
+
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        for ext in ["wgsl", "params.json", "recipe.json"] {
+            std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{}.{ext}", self.0)).ok();
+        }
+    }
 }
 
 /// A flat grey wall filling the view, seen through `effects`: a dim one, so the
@@ -54,6 +61,7 @@ fn mean(img: &image::RgbImage) -> [f64; 3] {
 #[test]
 fn barrel_then_tint_tints_inside_the_curve_and_blacks_the_corners() {
     let name = "t1679_barrel_tint";
+    let _cleanup = Cleanup(name.into());
     bake(
         name,
         r#"{"id":"barrel","params":{"amount":0.2,"corner_radius":0.1}},{"id":"tint","params":{"color":[1,0,0]}}"#,
@@ -86,7 +94,6 @@ fn barrel_then_tint_tints_inside_the_curve_and_blacks_the_corners() {
         img.get_pixel(w / 4, h / 2).0[0] > 100,
         "the picture reaches in from the edge"
     );
-    cleanup(name);
 }
 
 #[test]
@@ -98,6 +105,7 @@ fn phosphor_mask_stripes_a_flat_grey_and_keeps_its_mean() {
     let before = mean(&plain);
     for kind in ["aperture", "shadow", "slot"] {
         let name = format!("t1679_mask_{kind}");
+        let _cleanup = Cleanup(name.clone());
         bake(
             &name,
             &format!(r#"{{"id":"phosphor_mask","params":{{"kind":"{kind}"}}}}"#),
@@ -115,6 +123,5 @@ fn phosphor_mask_stripes_a_flat_grey_and_keeps_its_mean() {
                 after[c]
             );
         }
-        cleanup(&name);
     }
 }

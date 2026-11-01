@@ -12,8 +12,9 @@ use crate::shadergen::recipe::PassKind;
 
 /// `{ {id, desc, params = { {name, default, arity, runtime, choices?} }, textures = {slot…}, stage }, … }`
 /// for `pass`. A choice param (#1679) lists the names it takes in `choices`. `textures` lists the extra texture slots the block samples (#400) —
-/// the `shader_textures` keys a material using it should name. `stage` is `"color"`
-/// or `"uv"` (#401): a uv block moves the UVs before any map is sampled.
+/// the `shader_textures` keys a material using it should name. `stage` is `"color"`,
+/// `"uv"` or `"vertex"` (#401): a surface uv block moves the UVs before any map is
+/// sampled, and a postfx uv block (`barrel`, #1679) moves where the frame is sampled.
 pub fn blocks_table(lua: &Lua, pass: PassKind) -> mlua::Result<Table> {
     lua.create_sequence_from(
         catalog(pass)
