@@ -29,7 +29,7 @@ pub enum LightShape {
         cos_outer: f32,
     },
     /// An Area (Rectangle) light (#1674): see [`area`].
-    Area(super::area::AreaShape),
+    Area(AreaShape),
 }
 
 /// A light the bake includes: a `Mixed` one (bounce only) or a `Baked` one (direct and
