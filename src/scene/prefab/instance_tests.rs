@@ -70,3 +70,19 @@ fn a_children_cycle_cannot_hang_the_member_walk() {
     scene.world.add_child(gun, root);
     assert_eq!(instance_members(&scene, root), Some(vec![root, rig, gun]));
 }
+
+#[test]
+fn a_nested_instance_of_the_same_source_is_its_own() {
+    // Kit B placed under a part of kit A: same source, but B's root ends A's walk.
+    let (mut scene, [root, rig, _hand, gun, other]) = character();
+    let b_part = create_entity(&mut scene, "BPart", None);
+    scene.set_parent(other, Some(rig)).unwrap();
+    scene.set_parent(b_part, Some(other)).unwrap();
+    link(&mut scene, other, "hero.prefab", 0);
+    link(&mut scene, b_part, "hero.prefab", 1);
+    assert_eq!(instance_members(&scene, root), Some(vec![root, rig, gun]));
+    assert_eq!(instance_members(&scene, other), Some(vec![other, b_part]));
+    assert_eq!(instance_root(&scene, b_part), Some(other));
+    assert_eq!(instance_root(&scene, other), Some(other));
+    assert_eq!(instance_root(&scene, gun), Some(root));
+}

@@ -93,7 +93,8 @@ pub fn apply_instance_field_to_source(
 /// override stays (Unity's `PrefabUtility.RevertPropertyOverride`). `entity_id` may be
 /// any instance entity (root or child). `Ok(false)` when there is no override at
 /// `path`; errors if `entity_id` is not a linked instance entity, the source can't
-/// be read, or `entity_id` is a model part whose node the model lost (#1637). Either way nothing changes: the source is read before the override goes.
+/// be read, or `entity_id` is a model part whose node the model lost since the
+/// instance last took it (#1637; the next propagation removes it, #1665). Either way nothing changes: the source is read before the override goes.
 /// The editor's per-field revert button and `Scene.RevertPrefabField` (#998).
 pub fn revert_instance_field(
     scene: &mut Scene,
@@ -105,7 +106,7 @@ pub fn revert_instance_field(
     let prefab = read_source(&source)?;
     if let Some(node) = gone_node(&scene.world, entity_id, &prefab) {
         return Err(format!(
-            "{node} is gone from {source}: there is nothing to revert it to"
+            "{node} is gone from {source}: there is nothing to revert it to (a reimport removes it)"
         ));
     }
     let ids = instance_ids(scene, root)?;

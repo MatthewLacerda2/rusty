@@ -12,10 +12,11 @@
 //! material merge/rename + mesh rehydrate, so material refs re-resolve through the
 //! same rename map and geometry is rebuilt from the reference (never diffed).
 //!
-//! Scope (#216): a FLAT instance of a FLAT prefab. Added/removed/reparented child
-//! entities and nested prefabs are out of scope — propagation matches an instance
+//! Scope (#216): a `.prefab` instance is FLAT. Propagation matches an instance
 //! entity to a source entity purely by the link's `local_id`, and drops nothing /
-//! adds nothing structurally.
+//! adds nothing structurally. A model instance also takes its model's node tree
+//! (a node added or removed, `structure`, #1665). Nested prefabs are out of scope:
+//! an instance's walk stops at another instance's root (`instance`).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -27,7 +28,8 @@ use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::live::{entity_overrides, keep_root_placement, sync_overrides};
 use crate::scene::prefab::overrides::apply_overrides;
 use crate::scene::prefab::restamp::{instance_roots, propagate_roots};
-use crate::scene::prefab::source::{read_source, rekey, GONE};
+use crate::scene::prefab::source::{is_model_source, read_source, rekey};
+use crate::scene::prefab::structure::reshape;
 use crate::scene::prefab::{stamp_prefab, Merge};
 use crate::scene::serialize::rehydrate_entity_mesh;
 use crate::scene::{PrefabData, Scene};
@@ -135,19 +137,16 @@ pub(super) fn rebuild_instance(
     prefab: &PrefabData,
     keep: bool,
 ) -> Result<(), String> {
-    let ids = require_instance(scene, root_id)?;
+    let mut ids = require_instance(scene, root_id)?;
     rekey(&mut scene.world, &ids, prefab);
+    if is_model_source(source) {
+        ids = reshape(scene, root_id, &ids, source, prefab);
+    }
     let (baselines, added) = fresh_baselines(scene, source, prefab);
     let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
         if !keep {
-            // A part whose node the model lost keeps its edits: there is nothing to
-            // revert it to, and clearing them would only see them re-synced.
-            if let Some(mut link) = scene
-                .world
-                .prefab_link_mut(id)
-                .filter(|l| l.local_id != GONE)
-            {
+            if let Some(mut link) = scene.world.prefab_link_mut(id) {
                 link.overrides = Default::default();
             }
         }
@@ -168,9 +167,8 @@ pub(super) fn finish_rebuild(scene: &mut Scene) {
 }
 
 /// Drop every override on the instance and rebuild it straight from the fresh source
-/// baseline (the instance becomes a pristine copy of the current source). A model
-/// part whose node the model lost keeps its overrides, as it keeps its values
-/// (#1637): `list_instance_overrides` still lists them as `(gone)`.
+/// baseline (the instance becomes a pristine copy of the current source, a model
+/// instance its node tree too, #1665).
 pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     require_instance(scene, root_id)?;
     let source = link_source(scene, root_id)?;
@@ -180,9 +178,7 @@ pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), 
 }
 
 /// The live override paths of the instance, as `"<local_id>:<json-pointer>"`
-/// strings sorted for a stable read; a model part whose node left the model has no
-/// local id and reads `"<node path> (gone):<json-pointer>"` (#1637). Empty when the
-/// instance has no overrides.
+/// strings sorted for a stable read. Empty when the instance has no overrides.
 pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String>, String> {
     let ids = require_instance(scene, root_id)?;
     let mut out = Vec::new();
@@ -190,12 +186,8 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
         let Some(link) = scene.world.prefab_link(id) else {
             continue;
         };
-        let label = match (link.local_id, link.node.as_deref()) {
-            (GONE, Some(node)) => format!("{node} (gone)"),
-            (local_id, _) => local_id.to_string(),
-        };
         for key in entity_overrides(&scene.world, id).keys() {
-            out.push(format!("{label}:{key}"));
+            out.push(format!("{}:{key}", link.local_id));
         }
     }
     out.sort();

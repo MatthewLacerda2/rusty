@@ -20,8 +20,9 @@ use crate::scene::{PrefabData, Scene};
 /// moved node) from the file. It writes entities but is no edit: unrecorded, as a
 /// bake is, when an instance is there to rebuild. `refit` is handed the instances'
 /// static meshed parts, which the rebuild re-imports anyway, for it to skip; a
-/// skinned part is left to it, since its rig and bones are the refit's to move,
-/// and so is a part whose node the model lost, which the rebuild leaves alone.
+/// skinned part is left to it, since its rig and bones are the refit's to move.
+/// The rebuild then gives each instance the model's node tree: a node the model
+/// gained is spawned, one it lost is destroyed (`structure`, #1665).
 pub fn restamp_models<R>(
     scene: &mut Scene,
     names: impl Fn(&str) -> bool,

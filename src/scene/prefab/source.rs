@@ -20,8 +20,8 @@ use crate::ecs::World;
 use crate::scene::prefab::{is_prefab_path, read_prefab_file, PrefabData};
 
 /// The local id an entity of a model instance takes when its node is gone from the
-/// model's current import: no source entity has it, so propagation leaves the
-/// entity as it is (structural propagation is #1665).
+/// model's current import: no source entity has it, so propagation destroys the
+/// entity (`structure`, #1665).
 pub const GONE: u32 = u32::MAX;
 
 /// Whether `source` (a link's source path) is a model rather than a `.prefab`.

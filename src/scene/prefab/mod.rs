@@ -22,20 +22,24 @@ mod extract;
 pub mod instance;
 pub mod link;
 pub mod live;
+mod merge;
 pub mod overrides;
 mod pointer;
 pub mod restamp;
 pub mod source;
+mod structure;
 
 pub use extract::extract_prefab;
+use merge::{merge_materials, rename_entity_material, Merge};
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::components::{Entity, EntityRefs, MaterialAsset};
+use crate::components::{Entity, EntityRefs, MaterialAsset, PrefabLink};
 use crate::scene::serialize::rehydrate_entity_mesh;
+use crate::scene::skeleton::{take_bone_parents, take_bone_refs, BoneRef, Hung};
 use crate::scene::Scene;
 
 /// The one standardised prefab file extension (JSON inside) — a distinct extension
@@ -91,29 +95,6 @@ pub fn instantiate_prefab_linked(
     stamp_prefab(scene, prefab, parent, Some(source), merge).0
 }
 
-/// How a stamp merges a prefab's materials into the scene library.
-#[derive(Clone, Copy)]
-enum Merge {
-    /// A key the scene holds with other data is copied in as `"{key} (n)"`: a
-    /// `.prefab`'s bare names (`Wood`) can collide with another source's.
-    Uniquify,
-    /// A key the scene holds is the scene's: a model's keys are namespaced by its
-    /// path (`kit.glb::Wood`), so the scene's entry under one *is* that model's
-    /// material, edited or not, as a re-import never overwrites Unity's extracted
-    /// material (#1637). A propagation reads it, never replaces it.
-    KeepScene,
-}
-
-impl Merge {
-    /// The merge a stamp linked to `source` takes.
-    fn for_source(source: &str) -> Self {
-        match source::is_model_source(source) {
-            true => Merge::KeepScene,
-            false => Merge::Uniquify,
-        }
-    }
-}
-
 /// Stamp one fresh copy of `prefab` into `scene`. `link_source = Some(path)` makes it
 /// a linked instance (every entity gets a `PrefabLink`); `None` is the unpacked v1
 /// copy. Fresh sequential ids come from the allocator (local id `l` -> `base + l`),
@@ -137,29 +118,19 @@ fn stamp_prefab(
         false => BTreeMap::new(),
     };
     for entity in &prefab.entities {
-        let local_id = entity.id;
-        let mut entity = entity.clone();
-        entity.id += base;
-        entity.parent_id = entity.parent_id.map(|p| base + p);
-        entity.children = entity.children.iter().map(|c| base + c).collect();
-        entity.remap_refs(&|r| Some(base + r));
-        rename_entity_material(&mut entity, &renames);
-        rehydrate_entity_mesh(&mut entity);
-        if let Some(source) = link_source {
-            entity.prefab_link = Some(crate::components::PrefabLink {
-                source: source.to_string(),
-                local_id,
-                node: nodes.get(&local_id).cloned(),
-                ..Default::default()
-            });
+        let link = link_source.map(|source| PrefabLink {
+            source: source.to_string(),
+            local_id: entity.id,
+            node: nodes.get(&entity.id).cloned(),
+            ..Default::default()
+        });
+        let stamped = stamp_entity(entity, |l| base + l, &renames, link);
+        if stamped.entity.parent_id.is_none() {
+            new_root = stamped.entity.id;
         }
-        if entity.parent_id.is_none() {
-            new_root = entity.id;
-        }
-        let one = std::slice::from_mut(&mut entity);
-        bone_parents.extend(crate::scene::skeleton::take_bone_parents(one));
-        bone_refs.extend(crate::scene::skeleton::take_bone_refs(one));
-        scene.world.insert_entity(entity);
+        bone_parents.extend(stamped.hung);
+        bone_refs.extend(stamped.bone_refs);
+        scene.world.insert_entity(stamped.entity);
     }
     scene.hang_on_skeletons(bone_parents, bone_refs);
 
@@ -175,61 +146,42 @@ fn stamp_prefab(
     (new_root, added)
 }
 
-/// Rewrite an entity's material references through the merge rename map (a no-op when
-/// the key wasn't uniquified). Shared by stamping and baseline-building so an
-/// instance and its propagation baseline resolve the same library key.
-fn rename_entity_material(entity: &mut Entity, renames: &BTreeMap<String, String>) {
-    let slots = entity.material.iter_mut().flat_map(|m| &mut m.materials);
-    let particles = entity.particles.iter_mut();
-    let emitted = particles.filter_map(|p| p.render.material.as_mut());
-    for key in slots.chain(emitted) {
-        if let Some(renamed) = renames.get(key) {
-            *key = renamed.clone();
-        }
+/// One prefab entity made ready to insert ([`stamp_entity`]), with what it hangs
+/// from by bone name and the bones its references name, for
+/// [`Scene::hang_on_skeletons`] once every entity of the stamp is in.
+struct Stamped {
+    entity: Entity,
+    hung: Vec<Hung>,
+    bone_refs: Vec<BoneRef>,
+}
+
+/// The per-entity part of a stamp, shared by [`stamp_prefab`] and a model
+/// instance taking a node its model gained (`structure`, #1665): `entity`'s id,
+/// parent, children and component references moved through `id_of` (local id to
+/// scene id), its materials renamed through the merge's `renames`, its mesh
+/// rehydrated, `link` set, and its bone parent and bone references taken out.
+fn stamp_entity(
+    entity: &Entity,
+    id_of: impl Fn(u32) -> u32,
+    renames: &BTreeMap<String, String>,
+    link: Option<PrefabLink>,
+) -> Stamped {
+    let mut entity = entity.clone();
+    entity.id = id_of(entity.id);
+    entity.parent_id = entity.parent_id.map(&id_of);
+    entity.children = entity.children.iter().map(|&c| id_of(c)).collect();
+    entity.remap_refs(&|r| Some(id_of(r)));
+    rename_entity_material(&mut entity, renames);
+    rehydrate_entity_mesh(&mut entity);
+    entity.prefab_link = link;
+    let one = std::slice::from_mut(&mut entity);
+    let hung = take_bone_parents(one);
+    let bone_refs = take_bone_refs(one);
+    Stamped {
+        entity,
+        hung,
+        bone_refs,
     }
-}
-
-/// Merge a prefab's material slice into the scene library, returning the rename map
-/// (prefab key -> scene key) for keys that had to be uniquified, and the keys added.
-/// An identical existing entry is reused (no rename); a new key is inserted as-is
-/// (no rename); a *conflicting* key (same name, different data) is uniquified, or
-/// kept as the scene holds it under [`Merge::KeepScene`].
-fn merge_materials(
-    scene: &mut Scene,
-    materials: &BTreeMap<String, MaterialAsset>,
-    merge: Merge,
-) -> (BTreeMap<String, String>, Vec<String>) {
-    let mut renames = BTreeMap::new();
-    let mut added = Vec::new();
-    for (key, asset) in materials {
-        let key = match scene.materials.get(key) {
-            None => key.clone(),
-            Some(_) if matches!(merge, Merge::KeepScene) => continue,
-            Some(existing) if materials_equal(existing, asset) => continue,
-            Some(_) => {
-                let unique = uniquify(&scene.materials, key);
-                renames.insert(key.clone(), unique.clone());
-                unique
-            }
-        };
-        scene.materials.insert(key.clone(), asset.clone());
-        added.push(key);
-    }
-    (renames, added)
-}
-
-/// Pick a fresh `"{key} (n)"` name not already present in the library.
-fn uniquify(library: &BTreeMap<String, MaterialAsset>, key: &str) -> String {
-    (1..)
-        .map(|n| format!("{key} ({n})"))
-        .find(|candidate| !library.contains_key(candidate))
-        .expect("an unbounded counter always finds a free name")
-}
-
-/// Structural equality for the collision check. `MaterialAsset` is plain serde data,
-/// so a serialized comparison is the simplest faithful "is this the same material".
-fn materials_equal(a: &MaterialAsset, b: &MaterialAsset) -> bool {
-    serde_json::to_value(a).ok() == serde_json::to_value(b).ok()
 }
 
 /// Extract the subtree rooted at `root_id` and write it to `path` as pretty JSON.

@@ -5,7 +5,9 @@
 //! every descendant that links to the root's source. Bones are **transparent**
 //! (#453): a bone carries no link, but the instance's own entities may hang from one
 //! (a gun on a hand), so a walk passes through a bone in either direction. Any other
-//! entity not of the instance ends the walk on its side.
+//! entity not of the instance ends the walk on its side, and so does the root of
+//! another instance of the same source (a linked entity with `local_id == 0`): kit
+//! B placed under a part of kit A is B's, never A's (#1665).
 
 use crate::scene::Scene;
 
@@ -14,10 +16,8 @@ use crate::scene::Scene;
 pub fn instance_members(scene: &Scene, root_id: u32) -> Option<Vec<u32>> {
     let source = scene.world.prefab_link(root_id)?.source.clone();
     let shares = |id: u32| {
-        scene
-            .world
-            .prefab_link(id)
-            .is_some_and(|l| l.source == source)
+        let link = scene.world.prefab_link(id);
+        link.is_some_and(|l| l.source == source && (l.local_id != 0 || id == root_id))
     };
     let bones = scene.bone_ids();
     let members = scene
@@ -28,24 +28,33 @@ pub fn instance_members(scene: &Scene, root_id: u32) -> Option<Vec<u32>> {
     Some(members)
 }
 
-/// The root of the instance `id` belongs to: its topmost ancestor (or `id` itself)
-/// linking to the same source, reached through bones but nothing else. `None` when
+/// The root of the instance `id` belongs to: its nearest ancestor (or `id` itself)
+/// that is a root of the same source, reached through bones and that source's
+/// parts but nothing else; failing one, the topmost such part. `None` when
 /// `id` is not linked.
 pub fn instance_root(scene: &Scene, id: u32) -> Option<u32> {
     let source = scene.world.prefab_link(id)?.source.clone();
+    if scene.world.prefab_link(id)?.local_id == 0 {
+        return Some(id);
+    }
     let shares = |p: u32| {
-        scene
-            .world
-            .prefab_link(p)
-            .is_some_and(|l| l.source == source)
+        let link = scene.world.prefab_link(p);
+        link.is_some_and(|l| l.source == source)
     };
     let bones = scene.bone_ids();
-    let root = scene
-        .world
-        .ancestors(id)
-        .take_while(|&p| shares(p) || bones.contains(&p))
-        .filter(|&p| shares(p))
-        .last();
+    // Up through bones and parts to the first root of this source, which ends it.
+    let mut root = None;
+    for p in scene.world.ancestors(id) {
+        if !(shares(p) || bones.contains(&p)) {
+            break;
+        }
+        if shares(p) {
+            root = Some(p);
+            if scene.world.prefab_link(p).is_some_and(|l| l.local_id == 0) {
+                break;
+            }
+        }
+    }
     Some(root.unwrap_or(id))
 }
 

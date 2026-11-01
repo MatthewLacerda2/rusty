@@ -17,7 +17,9 @@
 //! a [`PrefabData`], and [`instantiate_model`] stamps that with a link to the file
 //! on every entity, keyed by node path (`scene::prefab::source`). So a Scale
 //! Factor change or a re-imported file reaches every instance (at once in the open
-//! scene, on load in the others), and a part moved by hand keeps its override.
+//! scene, on load in the others), a part moved by hand keeps its override, and a
+//! node added to or removed from the file is added to or removed from every
+//! instance (`scene::prefab::structure`, #1665).
 
 mod lod;
 
