@@ -1,7 +1,7 @@
 //! src/dev/bake/reflection.rs — Headless entry point for the reflection-probe bake (#245).
 //!
 //! The dev-layer bridge between the script-side `Reflection.Bake()` action and the
-//! render-layer bake (`Renderer::bake_reflection_into`, probe by probe), the specular sibling of
+//! render-layer bake (`Renderer::bake_reflections_observed`), the specular sibling of
 //! `probe.rs`. It spins up a headless `Renderer` (no window surface),
 //! captures and GGX-prefilters each probe at its resolution, writes the KTX2 cubemaps
 //! next to the scene, and points each probe at its file. Like the light-probe bake it skips
@@ -53,14 +53,11 @@ pub fn bake_scene_reflections(
             return Ok(false);
         }
     };
-    // `Renderer::bake_reflections`' loop, one probe at a time so `log` sees each (#1667).
-    let total = scene.reflection_probes.len();
-    for i in 0..total {
-        if let Some(p) = stage_progress(Stage::Reflection { done: i, total }) {
+    renderer.bake_reflections_observed(scene, &out_dir, &mut |done, total| {
+        if let Some(p) = stage_progress(Stage::Reflection { done, total }) {
             log.observe(p);
         }
-        renderer.bake_reflection_into(scene, i, &out_dir)?;
-    }
+    })?;
     log.finish();
     Ok(true)
 }

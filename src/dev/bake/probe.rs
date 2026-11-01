@@ -1,8 +1,8 @@
 //! src/dev/bake/probe.rs — Headless entry point for the multi-bounce probe bake (#241, #285).
 //!
 //! The dev-layer bridge between the script-side `Probe.Bake()` action and the
-//! render-layer multi-bounce solve (`BounceSolve`, the one `Renderer::bake_probes` runs),
-//! stepped here so a `BakeLog` hears each bounce (#1667). Like `screenshot.rs`, it spins up a
+//! render-layer bake (`Renderer::bake_probes_observed`, the multi-bounce solve's one
+//! run-to-end loop), whose observer feeds a `BakeLog` (#1667). Like `screenshot.rs`, it spins up a
 //! headless `Renderer` (no window surface) sized for one cubemap face, runs the bake,
 //! and skips gracefully when no GPU/software adapter is present — it NEVER panics, so
 //! an unattended/headless run with no adapter degrades to a no-op rather than a crash.
@@ -13,7 +13,6 @@
 
 use super::progress::{stage_progress, BakeLog};
 use super::steps::Stage;
-use crate::render::ibl::probe::solve::BounceSolve;
 use crate::render::{Renderer, DEFAULT_BAKE_RESOLUTION};
 use crate::scene::Scene;
 
@@ -21,7 +20,7 @@ use crate::scene::Scene;
 /// L2 SH in place. Returns `Ok(true)` when the bake ran, `Ok(false)` when no
 /// GPU/software adapter is available (skipped gracefully, same contract as the
 /// screenshot path). With no probes the bake is a successful no-op. Where each bounce
-/// is goes to `log` (#1667): the solve is `Renderer::bake_probes`' own, stepped here.
+/// is goes to `log` (#1667).
 pub fn bake_scene_probes(scene: &mut Scene, log: &mut BakeLog) -> Result<bool, String> {
     if scene.probes.is_empty() {
         return Ok(true);
@@ -34,9 +33,7 @@ pub fn bake_scene_probes(scene: &mut Scene, log: &mut BakeLog) -> Result<bool, S
             return Ok(false);
         }
     };
-    let mut solve = BounceSolve::new(scene, res);
-    loop {
-        let (bounce, done, total) = solve.progress();
+    renderer.bake_probes_observed(scene, res, &mut |bounce, done, total| {
         if let Some(p) = stage_progress(Stage::Light {
             bounce,
             done,
@@ -44,11 +41,7 @@ pub fn bake_scene_probes(scene: &mut Scene, log: &mut BakeLog) -> Result<bool, S
         }) {
             log.observe(p);
         }
-        if solve.step(&mut renderer, scene).is_some() {
-            break;
-        }
-    }
-    solve.commit(scene)?;
+    });
     log.finish();
     Ok(true)
 }

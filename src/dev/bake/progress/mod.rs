@@ -16,8 +16,9 @@
 //!
 //! Platform-side on purpose: the clock is read here, never in the sim. The lightmap
 //! bake only counts into its atomic `BakeProgress`; the probe bakes step on the
-//! caller's thread. Each [`Line`] says whether it is a milestone (a step change or the
-//! total), which the script verbs keep in the console as well; every line goes to
+//! caller's thread. Each [`Line`] says whether it is a milestone (the lightmap step's
+//! start or the total; a probe step's start is already in the console as the job's own
+//! `Baking …` line), which the script verbs keep in the console as well; every line goes to
 //! stderr, the one stream a `play` run or an MCP client shows while the call blocks
 //! (`session-mcp`'s stdout carries only JSON-RPC).
 
@@ -29,6 +30,8 @@ use crate::render::ibl::probe::bounce::MAX_BOUNCES;
 use crate::scripting::ConsoleLogs;
 
 mod format;
+#[cfg(test)]
+mod stage_tests;
 #[cfg(test)]
 mod tests;
 
@@ -57,7 +60,8 @@ pub struct Progress {
     pub meshes: Option<(u64, u64)>,
 }
 
-/// One line of the log; a milestone is a step change or the total time.
+/// One line of the log; a milestone, which the console keeps too, is the lightmap
+/// step's start or the total time.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Line {
     pub text: String,
@@ -130,6 +134,9 @@ impl<'a> BakeLog<'a> {
         let now = clock();
         self.started.get_or_insert(now);
         let changed = self.since.as_ref().is_none_or(|s| s.step != p.step);
+        // `Lighting.Bake()` / `Generate()` already say each probe step in the console
+        // (`LightingBake::step`'s own lines), so only the lightmaps' start is kept there.
+        let milestone = changed && p.step == Step::Lightmaps;
         if changed {
             self.since = Some(Since {
                 step: p.step,
@@ -149,7 +156,7 @@ impl<'a> BakeLog<'a> {
         let left = since.rate_from.and_then(|from| format::eta(from, now, &p));
         out(Line {
             text: format::progress(&p, left),
-            milestone: changed,
+            milestone,
         });
     }
 
@@ -171,7 +178,8 @@ impl<'a> BakeLog<'a> {
     }
 }
 
-/// Where a stepped probe bake is, as the log reads it; `None` once it is done.
+/// Where a stepped probe bake is, as the log reads it; `None` once it is done, and for
+/// a probe step with nothing to bake (no probes of its kind), which has nothing to say.
 pub fn stage_progress(stage: Stage) -> Option<Progress> {
     let (step, done, total) = match stage {
         Stage::Light {
@@ -189,6 +197,9 @@ pub fn stage_progress(stage: Stage) -> Option<Progress> {
         Stage::Reflection { done, total } => (Step::ReflectionProbes, done, total),
         Stage::Done => return None,
     };
+    if total == 0 {
+        return None;
+    }
     Some(Progress {
         step,
         done: done as u64,

@@ -70,8 +70,9 @@ fn a_step_prints_at_most_once_per_interval_but_every_step_change() {
         log.observe(reflections(0, 4)); // a new step prints at once
         log.finish();
     });
+    // A probe step's start is no milestone: the job says it in the console already.
     let milestones: Vec<bool> = lines.iter().map(|l| l.milestone).collect();
-    assert_eq!(milestones, [true, false, true, true]);
+    assert_eq!(milestones, [true, false, false, true]);
     assert_eq!(lines[3].text, format!("[Lighting] done in {} s", step + 1));
 }
 
@@ -94,7 +95,11 @@ fn a_bounce_is_its_own_step_and_its_eta_says_so() {
         lines[1].text,
         "[Lighting] light probes, bounce 1 of at most 5: 50% (60/120 probes), ~1 min 0 s left in this bounce"
     );
-    assert!(lines[2].milestone, "a new bounce prints at once");
+    assert_eq!(lines.len(), 3, "a new bounce prints at once");
+    assert!(
+        !lines[2].milestone,
+        "the job's own line says the bounce in the console"
+    );
 }
 
 #[test]

@@ -60,8 +60,10 @@ The two individual verbs stay for a script that wants only one of them.
   `[Lighting] lightmaps 41% (612/1501 meshes, 3.1M/7.6M texels), ~38 min left`, then
   `light probes, bounce 2 of at most 5: …, ~1 min left in this bounce` and
   `reflection probes 19% (3/16 probes), ~4 min left`, and `[Lighting] done in 1 h 4 min`.
-  The step lines and the total also go to the console (so `play`'s `console.log` and the
-  MCP reply keep them); the lines in between go to stderr only. `Lighting.Bake()`,
+  The lightmap step's first line and the total also go to the console (so `play`'s
+  `console.log` and the MCP reply keep them), beside the probe step's own `Baking …`
+  lines; the lines in between go to stderr only. A probe step with no probes of its
+  kind prints nothing. `Lighting.Bake()`,
   `Lighting.BakeLightmaps()`, `Probe.Bake()` and `Reflection.Bake()` log the same way. A
   log never changes what is baked: the lightmaps are byte-identical with or without one.
 - **The probes bake from a snapshot and apply at the end** (Unity's shape, #1602): the
