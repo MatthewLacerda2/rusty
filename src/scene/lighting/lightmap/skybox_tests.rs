@@ -37,3 +37,32 @@ fn an_open_texel_bakes_the_skys_light() {
     }
     assert!(ups[0].z > ups[0].x && ups[1].x > ups[1].z, "{ups:?}");
 }
+
+/// A white-above, black-below sky rings below zero under the horizon. The trace
+/// clamps each ray, so a down-facing texel bakes the cosine average of the clamped
+/// radiance, slightly brighter than the unbaked `at`, which clamps once: the bound
+/// `docs/api/Lighting.md` states.
+#[test]
+fn a_ringing_sky_bakes_a_face_turned_from_it_slightly_brighter() {
+    let mut scene = Scene::new();
+    scene.ambient.mode = AmbientMode::Skybox;
+    scene.skybox_path = panorama_fixture("ring.png", [255; 3], [0; 3], 0);
+    let sky = scene.drawn_ambient().radiance();
+    let dirs = crate::scene::lighting::probe_fill::fibonacci_sphere(20_000);
+    let down = Vec3::NEG_Y;
+    let clamped: Vec3 = dirs
+        .iter()
+        .map(|d| sky.incoming(*d).max(Vec3::ZERO) * down.dot(*d).max(0.0))
+        .sum::<Vec3>()
+        * (4.0 / dirs.len() as f32);
+    let (baked, at) = (open_texel(sky, down), sky.at(down));
+    assert!(at.max_element() < 1e-3, "the unbaked face is dark: {at}");
+    assert!(
+        (baked - clamped).abs().max_element() < 0.02,
+        "{baked} vs {clamped}"
+    );
+    assert!(
+        baked.min_element() > 0.04 && baked.max_element() < 0.12,
+        "{baked}"
+    );
+}

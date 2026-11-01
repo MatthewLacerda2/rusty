@@ -261,16 +261,20 @@ during Play goes back on Stop, as every scene edit does.
   (Unity's *ambient probe*), so an HDRI's blue zenith and warm horizon light up-
   and sideways-facing surfaces with their own colours. The intensity scales it; the
   sky on screen stays as drawn. The projection is made once per change of the sky
-  (a different panorama path, the panorama file's bytes, a procedural setting) and
-  never saved; a scripted ambient colour tinting the procedural sky re-projects
+  (a different panorama path, the panorama file's bytes or its import settings, a
+  procedural setting) and never saved; a scripted ambient colour tinting the procedural sky re-projects
   nothing. A panorama is read as the sky pass draws it (8-bit, no sRGB decode), and
   one that cannot be read lights as the procedural sky does. A scene in `Color` mode
   with default colours leaves the `ambient` block out of its file. Lightmaps and light probes, both Generate Lighting's (`Probe.Bake`)
   and the analytic fill (`Probe.BakeAnalytic`), bake from the same ambient, so an
   open lightmapped or probe-lit surface takes the light an unbaked one facing the
-  same way does: exactly in `Color` and `Skybox` mode, and in `Gradient` up to a
-  slight smoothing at the horizon (the bakes carry three SH bands, as Unity's
-  ambient probe does). As in Unity, light probes and lightmaps bake against this
+  same way does: exactly in `Color` mode, in `Skybox` mode while the sky's three
+  SH bands stay non-negative, and in `Gradient` up to a slight smoothing at the
+  horizon (the bakes carry three SH bands, as Unity's ambient probe does). A sky
+  with one dominant bright region (a sun-white top over a black ground) rings below
+  zero on the far side; the bakes clamp each ray at zero, so a baked surface turned
+  away from that region comes out slightly brighter than an unbaked one, which
+  clamps once (straight down under that sky: about `0.07` against `0`). As in Unity, light probes and lightmaps bake against this
   ambient, never against the sky the camera draws (#1668): in `Color` and
   `Gradient` the sky reaches surfaces only through reflections (reflection probes
   capture it), so a panorama scene lights its probes and lightmaps from the flat

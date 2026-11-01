@@ -56,12 +56,9 @@ pub(super) fn project(sky: &SkySettings, color: Vec3) -> Sh9 {
     sh
 }
 
-/// `common::procedural_sky` along unit `dir`, before fog.
-pub(in crate::scene::settings::ambient) fn sky_color(
-    sky: &SkySettings,
-    ambient: Vec3,
-    dir: Vec3,
-) -> Vec3 {
+/// `common::procedural_sky` along unit `dir`, before fog (a GPU test,
+/// `render::gpu::uniforms::procedural_sky_gpu_tests`, holds the gradient to it).
+pub fn sky_color(sky: &SkySettings, ambient: Vec3, dir: Vec3) -> Vec3 {
     let [zenith, horizon, ground] = sky.resolved(ambient);
     let up = dir.y.clamp(0.0, 1.0);
     let down = (-dir.y).clamp(0.0, 1.0);

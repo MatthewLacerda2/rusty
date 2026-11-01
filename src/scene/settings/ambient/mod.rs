@@ -24,7 +24,9 @@
 //! bake's escaping directions (`render::ibl::probe::capture`, #1668) all evaluate. The shader
 //! shades a surface with [`AmbientRadiance::at`]; the bakes take its `incoming`
 //! radiance, whose cosine average is `at` again, so an open baked or probe-lit
-//! surface matches an unbaked one (exactly in `Color` and `Skybox`, up to L2 in
+//! surface matches an unbaked one (exactly in `Color`; in `Skybox` while the sky's
+//! SH stays non-negative, a face turned from a dominant bright region baking
+//! slightly brighter, since the bakes clamp per ray and `at` once; up to L2 in
 //! `Gradient`). The procedural sky follows only the `Color` colour
 //! (`SkySettings::resolved`) whatever the mode; outside `Skybox` it is apart from
 //! the ambient, as Unity's skybox is, and no light-probe or lightmap bake sees it.
@@ -41,7 +43,7 @@ use serde::{Deserialize, Serialize};
 
 pub use radiance::AmbientRadiance;
 #[cfg(test)]
-pub use skybox::panorama_fixture;
+pub use skybox::{panorama_fixture, procedural_sky_color};
 
 use crate::scene::{LightType, Scene, Sh9, DEFAULT_AMBIENT_COLOR};
 

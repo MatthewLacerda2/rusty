@@ -89,7 +89,11 @@ impl AmbientRadiance {
     /// surface.
     ///
     /// The sky's SH is already a radiance, and its cosine average is its
-    /// convolution, `at` before `at`'s clamp: the match is exact.
+    /// convolution, `at` before `at`'s clamp: the match is exact while the SH stays
+    /// non-negative. A sky with one dominant bright region rings below zero on the
+    /// far side; the trace and the GPU probe capture clamp each ray or texel there,
+    /// so a baked face turned from that region is slightly brighter than `at`
+    /// (`lightmap::skybox_tests` holds the bound).
     pub fn incoming(&self, dir: Vec3) -> Vec3 {
         if let Self::Sky(sh) = self {
             return sh.eval_radiance(dir);

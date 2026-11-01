@@ -1,5 +1,8 @@
 //! A panorama's light (#1675): its equirect texels projected into L2 SH, memoised by
-//! the file's path and the digest of its bytes, so a changed file re-projects.
+//! the file's path, the digest of its bytes and the import settings the decode reads
+//! (the sidecar's Max Size and sRGB), so a changed file or sidecar re-projects. A
+//! file that fails to decode is remembered as such under the same key, so a broken
+//! panorama is decoded once, not on every frame.
 //!
 //! The texels are read as the sky pass draws them: decoded and fitted as the
 //! renderer's uncompressed upload, then taken raw (`load_panorama` samples the data
@@ -7,12 +10,13 @@
 //! direction `common::equirect_uv`'s inverse at its centre.
 
 use std::f32::consts::PI;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use glam::Vec3;
 
 use crate::asset::convert::{source_digest, Seen};
+use crate::asset::sidecar::TextureSettings;
 use crate::asset::texture_import::{self, Texels, TextureKind};
 use crate::asset::MapRef;
 use crate::scene::Sh9;
@@ -21,8 +25,12 @@ use crate::scene::Sh9;
 /// the editor without re-reading them.
 const KEPT: usize = 4;
 
-/// The projected panoramas, newest last: the file, its bytes' digest, its SH.
-static PROJECTED: Mutex<Vec<(PathBuf, u64, Sh9)>> = Mutex::new(Vec::new());
+/// What a projection is keyed by: the file, its bytes' digest, its import settings.
+type Key = (PathBuf, u64, TextureSettings);
+
+/// The projected panoramas, newest last: the key, and its SH (`None`: it failed to
+/// decode).
+static PROJECTED: Mutex<Vec<(Key, Option<Sh9>)>> = Mutex::new(Vec::new());
 
 /// The radiance SH of the panorama `path` names, `None` when it cannot be read.
 pub(super) fn radiance(path: &str) -> Option<Sh9> {
@@ -30,23 +38,40 @@ pub(super) fn radiance(path: &str) -> Option<Sh9> {
     let Seen::Read(digest) = source_digest(&file) else {
         return None;
     };
-    let mut kept = PROJECTED.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some((_, _, sh)) = kept.iter().find(|(f, d, _)| *f == file && *d == digest) {
-        return Some(*sh);
-    }
     let settings = crate::asset::sidecar::texture(&file);
-    let loaded = texture_import::load(&file, &settings, TextureKind::Colour, false)?;
+    let key = (file, digest, settings);
+    let mut kept = PROJECTED.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((_, sh)) = kept.iter().find(|(k, _)| *k == key) {
+        return *sh;
+    }
+    let sh = decode(&key.0, &settings);
+    kept.retain(|((f, _, _), _)| *f != key.0);
+    if kept.len() == KEPT {
+        kept.remove(0);
+    }
+    kept.push((key, sh));
+    sh
+}
+
+/// Decode `file` as the sky pass uploads it and project it; `None` when it fails.
+fn decode(file: &Path, settings: &TextureSettings) -> Option<Sh9> {
+    #[cfg(test)]
+    DECODES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let loaded = texture_import::load(file, settings, TextureKind::Colour, false)?;
     let Texels::Image(image) = loaded.texels else {
         return None;
     };
     let rgba = image.to_rgba8();
-    let sh = project(rgba.width(), rgba.height(), rgba.as_raw());
-    kept.retain(|(f, _, _)| *f != file);
-    if kept.len() == KEPT {
-        kept.remove(0);
-    }
-    kept.push((file, digest, sh));
-    Some(sh)
+    Some(project(rgba.width(), rgba.height(), rgba.as_raw()))
+}
+
+/// How many decodes this process ran: a test's handle on the memo.
+#[cfg(test)]
+static DECODES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+#[cfg(test)]
+pub(super) fn decodes() -> usize {
+    DECODES.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// Rows the projection keeps at most: an L2 projection needs far fewer, and a

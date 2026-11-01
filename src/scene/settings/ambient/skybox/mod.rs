@@ -36,3 +36,5 @@ mod tests;
 
 #[cfg(test)]
 pub use fixture::panorama_fixture;
+#[cfg(test)]
+pub use procedural::sky_color as procedural_sky_color;

@@ -14,6 +14,8 @@ mod sky;
 mod ambient_gpu_tests;
 #[cfg(test)]
 mod ambient_skybox_gpu_tests;
+#[cfg(test)]
+mod procedural_sky_gpu_tests;
 
 pub(crate) use material::{
     DrawUniform, MappingUniform, MaterialData, SurfaceUniform, MATERIAL_DATA_WORDS,
