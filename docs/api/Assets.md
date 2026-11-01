@@ -109,11 +109,11 @@ hand is scaled by as much. The size is an authored, saved value, as Unity's LODG
 size is, so another scene's groups keep theirs (Unity's *Recalculate Bounds* is the
 manual step there too).
 
-A whole model already spawned (`Scene.Instantiate(modelPath)`, one child per node) gets
-its meshes rescaled, but its **parts do not move yet**: each node child keeps the offset it
-was spawned with, so a kit scaled down by 100 has small parts at the old spacing. Set the
-Scale Factor **before** instantiating the model; moving the parts of existing instances
-waits on models becoming prefab sources (#1637). The same holds for a changed source file.
+A whole model already spawned (`Scene.Instantiate(modelPath)`, one child per node) is a
+linked instance of the model (#1637), so it is rebuilt from the scaled import: its parts'
+offsets scale with the meshes, in the open scene at once and in every other scene when it
+loads, and a part moved by hand keeps its own place (an override). A changed source file
+reaches it the same way.
 
 ```lua no-run
 Assets.SetModelImportSettings("project/models/crate_cm.glb", { scaleFactor = 0.01 })

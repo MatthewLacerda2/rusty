@@ -1,3 +1,10 @@
+scene.ambient.equator: tuple(3)
+scene.ambient.equator[]: f32
+scene.ambient.ground: tuple(3)
+scene.ambient.ground[]: f32
+scene.ambient.mode: enum Color|Gradient
+scene.ambient.sky: tuple(3)
+scene.ambient.sky[]: f32
 scene.ambient_color: tuple(3)
 scene.ambient_color[]: f32
 scene.ambient_intensity: f32
@@ -550,6 +557,8 @@ scene.entities[].post_processing.white_balance.temperature: f32
 scene.entities[].post_processing.white_balance.tint: f32
 scene.entities[].post_processing: option
 scene.entities[].prefab_link.local_id: u32
+scene.entities[].prefab_link.node: option
+scene.entities[].prefab_link.node: string
 scene.entities[].prefab_link.overrides.added_components: map
 scene.entities[].prefab_link.overrides.added_components{key}: string
 scene.entities[].prefab_link.overrides.added_components{}: any

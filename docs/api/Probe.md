@@ -3,7 +3,8 @@
 Place and query **light probes** — a scene-level dataset (not a component) that
 captures the bounced/ambient light arriving at a point as an L2 spherical-harmonics
 (SH) irradiance signal. Dynamic (non-`is_static`) objects sample the interpolated
-probe field in the shader instead of the flat hemispherical ambient term, so they
+probe field in the shader instead of the flat ambient term (the scene's `Color`
+hemisphere or `Gradient`, `Lighting.md`), so they
 pick up directional bounced light. Probe POSITIONS save into the `.scene` document;
 their baked SH saves into a `<scene>.lighting.json` sidecar (heavy, regenerable data
 kept out of the diffable scene file).
@@ -47,6 +48,9 @@ sidecar the runtime loads.
 `BakeAnalytic` is the headless, render-free stand-in: it ignores occlusion and bounce
 (every probe sees the same analytic sky+sun, with a gentle height gradient so the
 field varies in space) and stays deterministic, so it runs anywhere with no GPU. Use
-it for quick, reproducible fills; use `Bake` for the real lighting. Sampling is
+it for quick, reproducible fills; use `Bake` for the real lighting. Its sky is the
+scene's ambient by direction, `Gradient` included; `Bake` captures the drawn sky
+instead, which follows only the `Color` ambient colour, so a `Gradient` doesn't
+reach `Bake`'s probes yet (#1668). Sampling is
 **trilinear** over a grid, falling back to the nearest probe for free-placed probes or
 points outside the grid.

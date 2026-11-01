@@ -25,7 +25,7 @@ fn under(panel: BakeMesh, lights: Vec<BakeLight>) -> BakeScene {
     BakeScene {
         meshes: vec![floor(), panel],
         lights,
-        sky: Vec3::ZERO,
+        sky: Vec3::ZERO.into(),
     }
 }
 

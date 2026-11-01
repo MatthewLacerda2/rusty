@@ -6,6 +6,7 @@
 #define_import_path forward::lighting
 
 #import common::{DecalSurface, PI, apply_decal}
+#import lighting::ambient::ambient_radiance
 #import lighting::reflection_probe::{ReflectionProbe, parallax_correct}
 #import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, instances, lighting, s_decal, s_refl_cube, s_shadow, s_skybox, shadow, t_ao, t_decal_color, t_decal_data, t_refl_cube, t_shadow, t_skybox}
 
@@ -277,11 +278,9 @@ fn sky_reflection(R: vec3<f32>, roughness: f32) -> vec3<f32> {
     return sky.rgb + lighting.ambient.color * sky.a;
 }
 
-// The flat Hemispherical Sky-Ground ambient at normal `N`, as irradiance E / pi: the
-// sky colour above, a quarter of it (darker and cooler) below. What a surface no
+// The scene's ambient at normal `N`, as irradiance E / pi (`lighting::ambient::ambient_radiance`:
+// the `Color` hemisphere or the `Gradient` trilight, #1647). What a surface no
 // lightmap or probe covers takes (`surface_color`'s step 1).
 fn flat_ambient(N: vec3<f32>) -> vec3<f32> {
-    let sky_color = lighting.ambient.color;
-    let ground_color = sky_color * 0.25;
-    return mix(ground_color, sky_color, N.y * 0.5 + 0.5) * lighting.ambient.intensity;
+    return ambient_radiance(lighting.ambient, N);
 }

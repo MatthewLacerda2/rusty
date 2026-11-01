@@ -2,7 +2,8 @@
 //! one-button bakes.
 //!
 //! The environment (#1612) is Unity's `RenderSettings`: the skybox panorama, the
-//! ambient light and the procedural sky's look (#1620: zenith, horizon and ground
+//! ambient light (its colour and intensity, and #1647's source: `Color` or
+//! `Gradient` with sky, equator and ground colours) and the procedural sky's look (#1620: zenith, horizon and ground
 //! colours, cloud coverage and opacity), read and written through the same
 //! `authoring::environment` ops the Scene Settings panel calls, saved with the scene
 //! (a change made in Play reverts at Stop, like every scene value) and present in
@@ -42,6 +43,7 @@ pub fn register<'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
     register_skybox(scope, &table, scene)?;
     register_ambient(scope, &table, scene)?;
+    register_ambient_gradient(scope, &table, scene)?;
     register_sky_colors(scope, &table, scene)?;
     register_clouds(scope, &table, scene)?;
     lua.globals()
@@ -105,6 +107,61 @@ fn register_ambient<'scope>(
             Ok(())
         }),
     )
+}
+
+/// `{Get,Set}AmbientMode` (`"Color"` or `"Gradient"`) and
+/// `{Get,Set}Ambient{Sky,Equator,Ground}Color` (`r, g, b`): Unity's
+/// `RenderSettings.ambientMode` and its trilight colours.
+fn register_ambient_gradient<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    use crate::scene::{AmbientMode, AmbientSettings};
+    put(
+        table,
+        "GetAmbientMode",
+        scope.create_function(|_, ()| Ok(scene.borrow().ambient.mode.name())),
+    )?;
+    put(
+        table,
+        "SetAmbientMode",
+        scope.create_function(|_, name: String| {
+            let mode = AmbientMode::from_name(&name).ok_or_else(|| {
+                mlua::Error::runtime(format!(
+                    "Lighting.SetAmbientMode: unknown mode {name:?} (\"Color\" or \"Gradient\")"
+                ))
+            })?;
+            env_ops::set_ambient_mode(&mut scene.borrow_mut().ambient, mode);
+            Ok(())
+        }),
+    )?;
+    type Read = fn(&AmbientSettings) -> Vec3;
+    type Write = fn(&mut AmbientSettings, Vec3);
+    let colors: [(&str, Read, Write); 3] = [
+        ("Sky", |a| a.sky, env_ops::set_ambient_sky_color),
+        ("Equator", |a| a.equator, env_ops::set_ambient_equator_color),
+        ("Ground", |a| a.ground, env_ops::set_ambient_ground_color),
+    ];
+    for (name, read, write) in colors {
+        put(
+            table,
+            &format!("GetAmbient{name}Color"),
+            scope.create_function(move |_, ()| {
+                let c = read(&scene.borrow().ambient);
+                Ok((c.x, c.y, c.z))
+            }),
+        )?;
+        put(
+            table,
+            &format!("SetAmbient{name}Color"),
+            scope.create_function(move |_, (r, g, b): (f32, f32, f32)| {
+                write(&mut scene.borrow_mut().ambient, Vec3::new(r, g, b));
+                Ok(())
+            }),
+        )?;
+    }
+    Ok(())
 }
 
 /// A sky colour setter: `(r, g, b)` sets it, no arguments (or `nil`) goes back to

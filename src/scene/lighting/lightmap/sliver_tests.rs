@@ -80,7 +80,7 @@ fn floor_halves(grating: bool) -> (f32, f32) {
     let scene = BakeScene {
         meshes,
         lights: Vec::new(),
-        sky: Vec3::ONE,
+        sky: Vec3::ONE.into(),
     };
     let maps = bake(&scene, &settings());
     let map = maps.iter().find(|m| m.entity == 1).expect("floor baked");

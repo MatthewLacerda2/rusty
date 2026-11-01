@@ -72,6 +72,8 @@ pub const MARKS: &[Mark] = marks! {
     "ambient_color" => |s, _| s.ambient_color = Vec3::new(0.1, 0.2, 0.3),
         s.ambient_color == Vec3::new(0.1, 0.2, 0.3);
     "ambient_intensity" => |s, _| s.ambient_intensity = 1.25, s.ambient_intensity == 1.25;
+    "ambient" => |s, _| s.ambient.equator = Vec3::new(0.3, 0.2, 0.1),
+        s.ambient.equator == Vec3::new(0.3, 0.2, 0.1);
     "nav_settings" => |s, _| s.nav_settings.agent_radius = 0.75, s.nav_settings.agent_radius == 0.75;
     "fog" => |s, _| s.fog.density = 0.0125, s.fog.density == 0.0125;
     "sky" => |s, _| s.sky.cloud_coverage = 0.375, s.sky.cloud_coverage == 0.375;
