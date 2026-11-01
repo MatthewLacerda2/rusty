@@ -28,7 +28,7 @@ pub enum LightShape {
         cos_inner: f32,
         cos_outer: f32,
     },
-    /// An Area (Rectangle) light (#1674): see [`area`].
+    /// An Area (Rectangle) light (#1674): see [`AreaShape`].
     Area(AreaShape),
 }
 
