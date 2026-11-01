@@ -83,6 +83,17 @@ fn draw_local_light(
             *is_dirty = true;
         }
     });
+    draw_cast_shadows(ui, world, id, light, is_dirty);
+}
+
+/// The *Cast Shadows* toggle a point, spot or Area light shows.
+fn draw_cast_shadows(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    light: &LightComponent,
+    is_dirty: &mut bool,
+) {
     let mut shadows = light.cast_shadows;
     if ui.checkbox(&mut shadows, "Cast Shadows").changed() {
         if let Some(mut l) = world.light_mut(id) {
@@ -92,8 +103,9 @@ fn draw_local_light(
     }
 }
 
-/// An Area light's width, height and range (#1674). It casts no realtime shadow:
-/// its bake shadows it.
+/// An Area light's width, height, range and *Cast Shadows* (#1674). The lightmap
+/// bake always shadows it; the flag reaches the spot it stands in as in a bake
+/// capture (`clusters::lights::LocalLight::new`).
 fn draw_area(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -128,6 +140,7 @@ fn draw_area(
         }
         *is_dirty = true;
     }
+    draw_cast_shadows(ui, world, id, light, is_dirty);
 }
 
 /// The light-type selector combo box, offering every type under its one name. The

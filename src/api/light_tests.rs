@@ -109,11 +109,13 @@ fn area_light_is_baked_and_sized() {
         .unwrap();
         let (w, h): (f32, f32) = lua.load(format!("return Light.GetAreaSize({id})")).eval()?;
         assert_eq!((w, h), (1.2, 0.6));
+        let mode: String = lua.load(format!("return Light.GetMode({id})")).eval()?;
+        assert_eq!(mode, "Baked", "GetMode reports the mode the light acts on");
         Ok(())
     })
     .unwrap();
     assert_eq!(
-        scene.borrow().world.light(id).unwrap().mode,
+        scene.borrow().world.light(id).unwrap().effective_mode(),
         LightMode::Baked
     );
     let warned: Vec<_> = console.borrow().since(0).map(|(m, _)| m.clone()).collect();

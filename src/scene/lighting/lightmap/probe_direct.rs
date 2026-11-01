@@ -33,18 +33,21 @@ pub fn baked_direct_sh(scene: &BakeScene, positions: &[Vec3]) -> Vec<Sh9> {
         .map(|&p| {
             let mut sh = Sh9::zero();
             for light in scene.lights.iter().filter(|l| l.bakes_direct) {
-                // An Area light is integrated over a fixed grid of points (#1674).
-                let points: Vec<Vec2> = match light.shape {
-                    LightShape::Area(_) => area::grid().collect(),
-                    _ => vec![Vec2::ZERO],
-                };
-                let weight = 1.0 / points.len() as f32;
-                for u in points {
+                let mut add = |u: Vec2, weight: f32| {
                     if let Some((to_light, distance, received)) = arrival(light, p, u) {
                         if !rays.occluded(p, to_light, T_MIN, distance) {
                             sh.add_sample(to_light, received, weight);
                         }
                     }
+                };
+                match light.shape {
+                    // An Area light is integrated over a fixed grid of points (#1674).
+                    LightShape::Area(area) if area.reaches(p) => {
+                        let weight = 1.0 / (area::GRID * area::GRID) as f32;
+                        area::grid().for_each(|u| add(u, weight));
+                    }
+                    LightShape::Area(_) => {}
+                    _ => add(Vec2::ZERO, 1.0),
                 }
             }
             sh

@@ -5,7 +5,8 @@
 //! (#1674). Every setter maps onto a
 //! real field the renderer reads
 //! (`apply_scene_lights`), so a script tweak takes effect on the next frame's
-//! lighting uniform. There is no per-light "active" flag in the engine — a light
+//! lighting uniform; an Area light is baked only, so its size shows after the
+//! next bake. There is no per-light "active" flag in the engine — a light
 //! is gated by its owning entity's `active` (a `Scene` concern), so this surface
 //! deliberately exposes the light's own data and nothing more.
 
@@ -203,7 +204,8 @@ fn register_cast_shadows<'scope>(
 
 /// `GetMode` / `SetMode` over the light's Realtime / Mixed / Baked mode (#438), by
 /// name. Unknown names on `SetMode` are ignored (the current mode is kept); an Area
-/// light refuses anything but `Baked` with a console warning (#1674).
+/// light reads its effective `Baked` and refuses anything else with a console
+/// warning (#1674).
 fn register_mode<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -215,7 +217,10 @@ fn register_mode<'scope>(
         "GetMode",
         scope.create_function(|_, id: EntityArg| {
             let scene = scene.borrow();
-            let mode = scene.world.light(id.read()).map(|l| l.mode.name());
+            let mode = scene
+                .world
+                .light(id.read())
+                .map(|l| l.effective_mode().name());
             Ok(mode.unwrap_or("None").to_string())
         }),
     )?;

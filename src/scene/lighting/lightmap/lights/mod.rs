@@ -74,21 +74,7 @@ impl BakeScene {
                     cos_inner: light.inner_cone.to_radians().cos(),
                     cos_outer: light.outer_cone.to_radians().cos(),
                 },
-                LightType::Area => {
-                    let axis = |local| {
-                        scene
-                            .world
-                            .transform_direction(id, local)
-                            .normalize_or_zero()
-                    };
-                    LightShape::Area(AreaShape {
-                        center: position,
-                        right: axis(Vec3::X) * light.area_size.x,
-                        up: axis(Vec3::Y) * light.area_size.y,
-                        forward,
-                        range: light.range,
-                    })
-                }
+                LightType::Area => LightShape::Area(AreaShape::of(scene, id, &light)),
             };
             let mode = light.effective_mode();
             if mode.bakes_indirect() {

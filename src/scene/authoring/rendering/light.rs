@@ -40,16 +40,21 @@ pub const DEFAULT_CONES: (f32, f32) = (30.0, 45.0);
 /// Turning a light into a spot whose cones are both still zero seeds
 /// [`DEFAULT_CONES`], so the spot is visible at once whichever surface switched it
 /// (#997).
-/// Turning one into an Area light makes it `Baked` (#1674): Unity's built-in
-/// pipeline bakes area lights only.
+/// Turning one into an Area light leaves `mode` as it was: the light acts as
+/// `Baked` through [`LightComponent::effective_mode`] (#1674), so a Mixed point
+/// light switched to Area and back is Mixed again.
 pub fn set_type(l: &mut LightComponent, light_type: LightType) {
     l.light_type = light_type;
     if l.light_type == LightType::Spotlight && l.inner_cone == 0.0 && l.outer_cone == 0.0 {
         set_cones(l, DEFAULT_CONES.0, DEFAULT_CONES.1);
     }
-    if l.light_type == LightType::Area {
-        l.mode = LightMode::Baked;
-    }
+}
+
+/// What `Component.Get` reports of a Light where it differs from the stored
+/// value: the `mode` it acts on ([`LightComponent::effective_mode`]), so an Area
+/// light reads `Baked` and a table copied from it sets without a refusal.
+pub fn shown(l: &LightComponent, value: &mut serde_json::Value) {
+    value["mode"] = serde_json::json!(l.effective_mode().name());
 }
 
 /// Set how the light takes part in baked lighting (Realtime / Mixed / Baked, #438).
@@ -160,14 +165,36 @@ mod tests {
     fn area_lights_are_baked_and_sized() {
         let (mut scene, id) = scene_with_light();
         let mut e = scene.world.light_mut(id).unwrap();
+        set_mode(&mut e, LightMode::Mixed);
         set_type(&mut e, LightType::Area);
-        assert_eq!(e.mode, LightMode::Baked);
+        assert_eq!(e.effective_mode(), LightMode::Baked);
         assert!(!set_mode(&mut e, LightMode::Realtime), "refused");
-        assert_eq!(e.mode, LightMode::Baked);
+        set_type(&mut e, LightType::Point);
+        assert_eq!(
+            e.mode,
+            LightMode::Mixed,
+            "the stored mode survives the round trip"
+        );
+        set_type(&mut e, LightType::Area);
         set_area_size(&mut e, Vec2::new(1.2, 0.0));
         assert_eq!(e.area_size, Vec2::new(1.2, MIN_AREA_SIDE));
         set_area_size(&mut e, Vec2::new(2.0, f32::NAN));
         assert_eq!(e.area_size, Vec2::new(1.2, MIN_AREA_SIDE), "refused whole");
+    }
+
+    /// `Component.Get` reads an Area light's effective `Baked`, by the name serde
+    /// takes back, so a copied table sets without a refusal (#1674).
+    #[test]
+    fn get_reports_an_area_lights_effective_mode() {
+        let (mut scene, id) = scene_with_light();
+        let mut e = scene.world.light_mut(id).unwrap();
+        set_mode(&mut e, LightMode::Mixed);
+        set_type(&mut e, LightType::Area);
+        let mut value = serde_json::to_value(&*e).unwrap();
+        shown(&e, &mut value);
+        assert_eq!(value["mode"], "Baked");
+        let copy: LightComponent = serde_json::from_value(value).unwrap();
+        assert_eq!(copy.mode, LightMode::Baked);
     }
 
     #[test]

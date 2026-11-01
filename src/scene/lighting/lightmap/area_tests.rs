@@ -11,10 +11,10 @@ use super::tests::quad;
 use super::trace::Tracer;
 use super::*;
 
-const RADIANCE: f32 = 4.0;
+pub(super) const RADIANCE: f32 = 4.0;
 
 /// A `w × h` panel at height `y` over the origin, facing down.
-fn panel(w: f32, h: f32, y: f32, range: f32) -> BakeLight {
+pub(super) fn panel(w: f32, h: f32, y: f32, range: f32) -> BakeLight {
     BakeLight {
         shape: LightShape::Area(AreaShape {
             center: Vec3::new(0.0, y, 0.0),
@@ -29,14 +29,14 @@ fn panel(w: f32, h: f32, y: f32, range: f32) -> BakeLight {
 }
 
 /// The baked direct irradiance `E` at `p` facing `normal`.
-fn direct_at(scene: &BakeScene, p: Vec3, normal: Vec3) -> f32 {
+pub(super) fn direct_at(scene: &BakeScene, p: Vec3, normal: Vec3) -> f32 {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer { scene, rays: &rays };
     let mut rng = Rng::new(3, 0, 0);
     tracer.texel(p, normal, 1024, 1, &mut rng).direct.x * std::f32::consts::PI
 }
 
-fn lit(lights: Vec<BakeLight>, meshes: Vec<BakeMesh>) -> BakeScene {
+pub(super) fn lit(lights: Vec<BakeLight>, meshes: Vec<BakeMesh>) -> BakeScene {
     BakeScene {
         meshes,
         lights,

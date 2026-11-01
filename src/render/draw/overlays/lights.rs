@@ -7,6 +7,7 @@
 use glam::Vec3;
 
 use crate::components::mesh::Vertex;
+use crate::scene::lighting::lightmap::AreaShape;
 use crate::scene::{LightType, Scene};
 
 /// An Area light's gizmo tint: a pale yellow, brighter when selected.
@@ -25,23 +26,8 @@ pub(super) fn area_light_gizmos(scene: &Scene) -> Vec<(Vec<Vertex>, [f32; 4])> {
         if light.light_type != LightType::Area || !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
-        let dir = |local| {
-            scene
-                .world
-                .transform_direction(id, local)
-                .normalize_or_zero()
-        };
-        let (right, up) = (
-            dir(Vec3::X) * light.area_size.x,
-            dir(Vec3::Y) * light.area_size.y,
-        );
-        let verts = area_lines(
-            scene.world.world_position(id),
-            right,
-            up,
-            dir(Vec3::NEG_Z),
-            light.range,
-        );
+        let area = AreaShape::of(scene, id, &light);
+        let verts = area_lines(area.center, area.right, area.up, area.forward, area.range);
         let selected = scene.selected_entity_id == Some(id);
         out.push((
             verts,

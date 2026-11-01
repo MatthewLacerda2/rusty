@@ -22,7 +22,7 @@ use std::f32::consts::{PI, TAU};
 use glam::{Vec2, Vec3};
 
 use super::input::{BakeLight, BakeRun, BakeScene, LightShape};
-use super::lights::area::stratified;
+use super::lights::area::{strata, stratified};
 use super::rays::{Hit, Rays};
 use super::rng::Rng;
 use crate::core::color::luminance;
@@ -139,9 +139,10 @@ impl Tracer<'_> {
     /// The direct irradiance at `point` facing `normal`, shadowed, and the
     /// luminance-weighted sum of the directions it arrived from. `baked_only` keeps
     /// just the `Baked` lights (a receiving texel's own direct light); a bounce hit
-    /// sees every baked-in light. An Area light is integrated over `area_samples`
-    /// or more stratified points drawn from `rng` (#1674); no other light draws
-    /// from it, so a scene without one bakes exactly as before.
+    /// sees every baked-in light. An Area light that [reaches](super::lights::area::AreaShape::reaches)
+    /// `point` is integrated over `area_samples` or more stratified points drawn
+    /// from `rng` (#1674); one out of range or behind draws nothing, and no other
+    /// light draws at all, so a scene without one bakes exactly as before.
     fn direct(
         &self,
         point: Vec3,
@@ -151,24 +152,30 @@ impl Tracer<'_> {
         rng: &mut Rng,
     ) -> (Vec3, Vec3) {
         let (mut e, mut dir) = (Vec3::ZERO, Vec3::ZERO);
+        let mut add = |light: &BakeLight, u: Vec2, weight: f32| {
+            if let Some((to_light, distance, received)) = arrival(light, point, u) {
+                let cos = normal.dot(to_light);
+                if cos > 0.0 && !self.rays.occluded(point, to_light, T_MIN, distance) {
+                    let lit = received * cos * weight;
+                    e += lit;
+                    dir += to_light * luminance(lit);
+                }
+            }
+        };
         for light in &self.scene.lights {
             if baked_only && !light.bakes_direct {
                 continue;
             }
-            let points = match light.shape {
-                LightShape::Area(_) => stratified(area_samples, || rng.next_f32()),
-                _ => vec![Vec2::ZERO],
-            };
-            let weight = 1.0 / points.len() as f32;
-            for u in points {
-                if let Some((to_light, distance, received)) = arrival(light, point, u) {
-                    let cos = normal.dot(to_light);
-                    if cos > 0.0 && !self.rays.occluded(point, to_light, T_MIN, distance) {
-                        let lit = received * cos * weight;
-                        e += lit;
-                        dir += to_light * luminance(lit);
+            match light.shape {
+                LightShape::Area(area) if area.reaches(point) => {
+                    let m = strata(area_samples);
+                    let weight = 1.0 / (m * m) as f32;
+                    for u in stratified(m, || rng.next_f32()) {
+                        add(light, u, weight);
                     }
                 }
+                LightShape::Area(_) => {}
+                _ => add(light, Vec2::ZERO, 1.0),
             }
         }
         (e, dir)

@@ -51,6 +51,8 @@ pub use set::{LightmapEntry, LightmapSet};
 #[cfg(test)]
 mod ambient_tests;
 #[cfg(test)]
+mod area_reach_tests;
+#[cfg(test)]
 mod area_tests;
 #[cfg(test)]
 mod atlas_tests;

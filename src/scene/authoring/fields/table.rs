@@ -198,24 +198,22 @@ pub trait Inspect: Clone + Serialize + DeserializeOwned + 'static {
     fn update(world: &mut World, id: u32, f: &mut dyn FnMut(&mut Self)) -> bool;
 }
 
-/// Implement [`Inspect`] for each `Type => getter, mutable getter, field table`.
+/// Implement [`Inspect`] for each `Type => getter, mutable getter, field table`,
+/// optionally followed by `shown <fn(&Type, &mut Value)>`: what `read` reports
+/// where it differs from the stored value (a Light's `effective_mode`, #1674).
 macro_rules! inspect {
-    ($($ty:ty => $get:ident, $get_mut:ident, $fields:expr;)*) => {$(
+    ($($ty:ty => $get:ident, $get_mut:ident, $fields:expr $(, shown $shown:expr)?;)*) => {$(
         impl $crate::scene::authoring::fields::table::Inspect for $ty {
             const FIELDS: &'static [$crate::scene::authoring::fields::table::Field<Self>] = $fields;
-            fn read(
-                world: &$crate::ecs::World,
-                id: u32,
-            ) -> Option<Result<serde_json::Value, String>> {
-                world
-                    .$get(id)
-                    .map(|c| serde_json::to_value(&*c).map_err(|e| e.to_string()))
+            fn read(world: &$crate::ecs::World, id: u32) -> Option<Result<serde_json::Value, String>> {
+                world.$get(id).map(|c| {
+                    #[allow(unused_mut)]
+                    let mut value = serde_json::to_value(&*c).map_err(|e| e.to_string())?;
+                    $( ($shown)(&*c, &mut value); )?
+                    Ok(value)
+                })
             }
-            fn update(
-                world: &mut $crate::ecs::World,
-                id: u32,
-                f: &mut dyn FnMut(&mut Self),
-            ) -> bool {
+            fn update(world: &mut $crate::ecs::World, id: u32, f: &mut dyn FnMut(&mut Self)) -> bool {
                 world.$get_mut(id).map(|mut c| f(&mut c)).is_some()
             }
         }
