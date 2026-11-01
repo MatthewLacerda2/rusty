@@ -3,10 +3,12 @@
 
 use glam::Vec3;
 
-use super::area::AreaShape;
+pub(in crate::scene::lighting::lightmap) mod area;
+
 use super::input::BakeScene;
 use crate::components::LightType;
 use crate::scene::Scene;
+use area::AreaShape;
 
 /// Where a baked light sits and how it falls off — the forward shader's models.
 #[derive(Clone, Copy, Debug)]
@@ -26,7 +28,7 @@ pub enum LightShape {
         cos_inner: f32,
         cos_outer: f32,
     },
-    /// An Area (Rectangle) light (#1674): see [`super::area`].
+    /// An Area (Rectangle) light (#1674): see [`area`].
     Area(super::area::AreaShape),
 }
 

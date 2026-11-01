@@ -13,9 +13,9 @@
 
 use glam::{Vec2, Vec3};
 
-use super::area;
 use super::bake::triangles;
 use super::input::{BakeScene, LightShape};
+use super::lights::area;
 use super::rays::Rays;
 use super::trace::{arrival, T_MIN};
 use crate::scene::lighting::sh::Sh9;

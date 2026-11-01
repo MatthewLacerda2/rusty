@@ -3,8 +3,8 @@
 
 use glam::Vec3;
 
-use super::area::AreaShape;
 use super::bake::triangles;
+use super::lights::area::AreaShape;
 use super::rays::Rays;
 use super::rng::Rng;
 use super::tests::quad;

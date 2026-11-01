@@ -21,8 +21,8 @@ use std::f32::consts::{PI, TAU};
 
 use glam::{Vec2, Vec3};
 
-use super::area::stratified;
 use super::input::{BakeLight, BakeRun, BakeScene, LightShape};
+use super::lights::area::stratified;
 use super::rays::{Hit, Rays};
 use super::rng::Rng;
 use crate::core::color::luminance;
