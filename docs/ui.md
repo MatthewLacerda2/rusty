@@ -645,7 +645,8 @@ by editing its components or forks its behaviour by copying its script.
   `Canvas`. Every widget also ships as a prefab, `assets/prefabs/ui/<Kind>.prefab`
   (`Button.prefab`, `Scroll View.prefab`, …), for `Scene.Instantiate(path, parent)`.
 - **Where they live.** The scripts ship in `engine/scripts/ui/` and are seeded,
-  with the prefabs, on every boot into `assets/scripts/ui/` and
+  with the prefabs, every time a project is seeded (an edit-open, a `play` run,
+  `make export`; never in the shipped player) into `assets/scripts/ui/` and
   `assets/prefabs/ui/`. **Those two directories are engine-owned and rewritten**
   so they never go stale: to fork a widget, copy its script (or prefab) elsewhere
   and point the entity at the copy. Two of the scripts there are not widgets:
