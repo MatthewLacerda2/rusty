@@ -12,7 +12,11 @@ at all (a non-static object, see [`Probe`](Probe.md); a lightmapped static surfa
 reads its lightmap). Each grid point holds what the probe field gives at that
 point (the same interpolation the single sample uses), and a pixel inside the box
 blends its eight nearest points; a pixel outside the box (a mesh larger than a
-custom box) keeps the single sample. The grid is sampled again whenever the
+custom box, an arm swung past the bind-pose bounds) reads the box's nearest face,
+as Unity clamps, so there is no seam where the box ends. A volume that would not
+fit in a frame's storage binding (dozens of visible high-resolution ones at once)
+is left out of that frame, and its object keeps the single sample (the console
+says so once). The grid is sampled again whenever the
 object moves, its settings or mesh change, or the probes are re-baked (Unity's
 *Automatic* refresh), and never while all of those stand still. Only the settings
 below are saved, never the samples.

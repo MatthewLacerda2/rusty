@@ -233,7 +233,7 @@ fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
 }
 
 // The probe irradiance E at `world_pos` for normal `N`: the instance's one SH sample
-// (`eval_sh`), or, inside its Light Probe Proxy Volume, the volume's grid (#1672).
+// (`eval_sh`), or, with a Light Probe Proxy Volume, the volume's grid (#1672).
 fn probe_irradiance(world_pos: vec3<f32>, N: vec3<f32>, instance: u32) -> vec3<f32> {
     let proxy = proxy_irradiance(world_pos, N, instance);
     return select(eval_sh(N, instance), proxy.rgb, proxy.w > 0.5);

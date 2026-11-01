@@ -101,7 +101,11 @@ impl Renderer {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
         let (mut culled, mut lod_hidden, mut visible) = (0, 0, 0);
-        let mut proxies = self.proxy_volumes.frame();
+        let limits = self.device.limits();
+        let binding = limits.max_storage_buffer_binding_size;
+        let mut proxies = self
+            .proxy_volumes
+            .frame(binding.min(limits.max_buffer_size));
         let ringed = if outline {
             outlined(scene, lod)
         } else {

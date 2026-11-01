@@ -40,8 +40,11 @@ impl Renderer {
 
         self.upload_scene_assets(scene);
         // The Light Probe Proxy Volumes' view of the probe field (#1672), once per
-        // render rather than per camera: hashing a large field is not free.
-        self.proxy_volumes.begin_frame(scene);
+        // render rather than per camera: hashing a large field is not free. A bake's
+        // capture draws static geometry alone, which never reads a volume.
+        if !self.capture.static_only {
+            self.proxy_volumes.begin_frame(scene);
+        }
 
         // The baked reflection probes nearest the primary camera (#245, #1206); each
         // object then blends up to two of them and the sky (#1584).

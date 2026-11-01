@@ -32,7 +32,7 @@ fn add(scene: &mut Scene, position: Vec3, scale: Vec3, is_static: bool) -> u32 {
 
 /// The floor, the wall behind the locker, the lamp, the locker (its id), and a
 /// probe grid around it, baked.
-fn baked_room() -> Option<(Scene, u32)> {
+pub(super) fn baked_room() -> Option<(Scene, u32)> {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
     scene.ambient_intensity = 0.0;
@@ -73,7 +73,7 @@ fn baked_room() -> Option<(Scene, u32)> {
 
 /// Mean red level of the locker's top and foot, seen from the lamp's side (+X):
 /// the face whose top looks at the lamp.
-fn top_and_foot(scene: &Scene, name: &str) -> (f64, f64) {
+pub(super) fn top_and_foot(scene: &Scene, name: &str) -> (f64, f64) {
     let camera = Camera::new(Vec3::new(3.0, 1.0, 0.0), 180.0, 0.0);
     let path = crate::temp::dir().join(format!("rusty_gpu_1672_proxy_{name}.png"));
     assert!(capture(scene, &camera, &path, SIZE, SIZE).expect("capture"));

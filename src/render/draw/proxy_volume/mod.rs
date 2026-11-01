@@ -13,6 +13,10 @@
 //! changed ([`ProxyVolumes::push`]): Unity's *Automatic* refresh, every frame for a
 //! moving object, never for one standing still. Nothing here is saved: the scene
 //! keeps the component's values, never its samples.
+//!
+//! One camera's array is bound whole, so it never outgrows the device's storage
+//! binding: a volume that would not fit is left out of that frame (its object takes
+//! the single sample) and the console is told once ([`Frame::room`]).
 
 use std::collections::BTreeMap;
 
@@ -23,7 +27,7 @@ use crate::scene::lighting::probe::ProbeVolume;
 use crate::scene::Scene;
 
 /// vec4s before a volume's points: the world-to-box matrix's columns, then the
-/// grid's dimensions.
+/// grid's dimensions as ordinary floats (1.0–32.0).
 pub(crate) const HEADER: usize = 5;
 /// vec4s per point: the L1 SH, one RGB coefficient each.
 pub(crate) const COEFFS: usize = 4;
@@ -34,6 +38,8 @@ pub(crate) struct Frame {
     /// The probe field's [`fingerprint`]; `None` when no entity carries a volume,
     /// and the frame packs nothing.
     probes: Option<u64>,
+    /// The most vec4s `data` may hold: what one storage binding takes.
+    room: usize,
     pub data: Vec<[f32; 4]>,
 }
 
@@ -52,6 +58,10 @@ struct Key {
 pub(crate) struct ProxyVolumes {
     cache: BTreeMap<u32, (Key, Vec<[f32; 4]>)>,
     probes: Option<u64>,
+    /// The bytes [`fingerprint`] hashes, kept so a render does not reallocate them.
+    scratch: Vec<u8>,
+    /// Whether the console was told a frame's volumes outgrew the binding.
+    warned: bool,
 }
 
 impl ProxyVolumes {
@@ -60,21 +70,24 @@ impl ProxyVolumes {
     pub(crate) fn begin_frame(&mut self, scene: &Scene) {
         let ids = scene.world.ids_with_light_probe_proxy_volume();
         self.cache.retain(|id, _| ids.contains(id));
-        self.probes = (!ids.is_empty()).then(|| fingerprint(&scene.probes));
+        let scratch = &mut self.scratch;
+        self.probes = (!ids.is_empty()).then(|| fingerprint(&scene.probes, scratch));
     }
 
-    /// A camera's empty frame under this render's fingerprint; it packs nothing
-    /// before [`Self::begin_frame`] saw a volume.
-    pub(crate) fn frame(&self) -> Frame {
+    /// A camera's empty frame under this render's fingerprint, holding at most
+    /// `max_bytes` (the device's storage-binding limit); it packs nothing before
+    /// [`Self::begin_frame`] saw a volume.
+    pub(crate) fn frame(&self, max_bytes: u64) -> Frame {
         Frame {
             probes: self.probes,
+            room: room(max_bytes),
             data: Vec::new(),
         }
     }
 
     /// Append entity `id`'s volume to `frame` and return where it starts plus one,
     /// the instance's `proxy_volume`; `0` when it carries none, no probe covers the
-    /// scene, or its pose cannot be inverted. `model` is its world matrix and
+    /// scene, its pose cannot be inverted, or the frame has no room left for it. `model` is its world matrix and
     /// `bounds` its mesh's local bounds.
     pub(crate) fn push(
         &mut self,
@@ -111,6 +124,17 @@ impl ProxyVolumes {
         let Some((_, data)) = self.cache.get(&id) else {
             return 0;
         };
+        if frame.data.len() + data.len() > frame.room {
+            if !self.warned {
+                self.warned = true;
+                log::warn!(
+                    "[Render] Light Probe Proxy Volumes outgrow one storage binding \
+                     ({} bytes); the rest take one probe sample",
+                    frame.room * 16
+                );
+            }
+            return 0;
+        }
         let start = frame.data.len() as u32 + 1;
         frame.data.extend_from_slice(data);
         start
@@ -119,7 +143,7 @@ impl ProxyVolumes {
 
 /// `volume`'s `grid` under world matrix `model`, sampled from `probes`, in the
 /// layout the shader reads: the world-to-box matrix (the box `[0, 1]^3`), the
-/// dimensions (u32 bits), then each point's L1 SH (bands 1–3 zeroed at `Low`).
+/// dimensions (as floats), then each point's L1 SH (bands 1–3 zeroed at `Low`).
 /// `None` when no probe exists or `model` cannot be inverted (a zero scale).
 pub(crate) fn pack(
     volume: &Volume,
@@ -141,7 +165,7 @@ pub(crate) fn pack(
     };
     let mut out = Vec::with_capacity(HEADER + grid.len() * COEFFS);
     out.extend(to_box.to_cols_array_2d());
-    let [x, y, z] = grid.dims.map(f32::from_bits);
+    let [x, y, z] = grid.dims.map(|d| d as f32);
     out.push([x, y, z, 0.0]);
     for point in grid.points() {
         let sh = probes.sample(model.transform_point3(point))?;
@@ -153,31 +177,34 @@ pub(crate) fn pack(
     Some(out)
 }
 
+/// How many vec4s fit in a binding of `max_bytes`: the largest power of two
+/// within it, since the buffer grows by powers of two and is bound whole.
+pub(crate) fn room(max_bytes: u64) -> usize {
+    let pow2 = if max_bytes == 0 {
+        0
+    } else {
+        1u64 << (63 - max_bytes.leading_zeros())
+    };
+    usize::try_from(pow2 / 16).unwrap_or(usize::MAX)
+}
+
 /// A hash of everything a probe sample reads: each probe's position and SH, and
 /// the grid. A bake, a moved probe or a new grid changes it, so every volume is
-/// sampled again. Deterministic; each probe is folded into its own lane of four
-/// (FNV-1a), so the multiplies do not wait on each other across a large field.
-pub(crate) fn fingerprint(probes: &ProbeVolume) -> u64 {
-    const PRIME: u64 = 0x0100_0000_01b3;
-    let fold = |h: u64, v: f32| (h ^ u64::from(v.to_bits())).wrapping_mul(PRIME);
-    let mut lanes = [0xcbf2_9ce4_8422_2325_u64; 4];
-    for (i, p) in probes.probes.iter().enumerate() {
-        let lane = &mut lanes[i % 4];
-        let floats = p.position.to_array().into_iter();
-        *lane = floats
-            .chain(p.sh.coeffs.iter().flatten().copied())
-            .fold(*lane, fold);
+/// sampled again. The field's raw bytes go into `scratch` and through
+/// `core::hash::content` (xxh3), once per render.
+pub(crate) fn fingerprint(probes: &ProbeVolume, scratch: &mut Vec<u8>) -> u64 {
+    scratch.clear();
+    for p in &probes.probes {
+        scratch.extend_from_slice(bytemuck::bytes_of(&p.position));
+        scratch.extend_from_slice(bytemuck::cast_slice(&p.sh.coeffs));
     }
-    let grid = probes.grid.map_or([0.0; 9], |g| {
-        let [x, y, z] = g.counts.map(f32::from_bits);
-        let (o, s) = (g.origin, g.spacing);
-        [o.x, o.y, o.z, s.x, s.y, s.z, x, y, z]
-    });
-    let len = f32::from_bits(probes.probes.len() as u32);
-    let tail = grid.into_iter().chain([len]).fold(lanes[0], fold);
-    lanes[1..]
-        .iter()
-        .fold(tail, |h, &l| (h ^ l).wrapping_mul(PRIME))
+    if let Some(g) = probes.grid {
+        scratch.extend_from_slice(bytemuck::bytes_of(&g.origin));
+        scratch.extend_from_slice(bytemuck::bytes_of(&g.spacing));
+        scratch.extend_from_slice(bytemuck::cast_slice(&g.counts));
+    }
+    scratch.extend_from_slice(&(probes.probes.len() as u64).to_le_bytes());
+    crate::core::hash::content(scratch)
 }
 
 #[cfg(test)]

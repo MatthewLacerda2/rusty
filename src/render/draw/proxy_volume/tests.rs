@@ -7,7 +7,7 @@ use crate::components::{ProxyQuality, ProxyResolutionMode};
 
 /// A probe grid over `[-2, 2] x [0, 4] x [-2, 2]` whose light grows with height:
 /// SH band 0 is `y`, band 1's y term `-y` (light from above), band 2 is `1`.
-fn rising_probes() -> ProbeVolume {
+pub(super) fn rising_probes() -> ProbeVolume {
     let mut probes = ProbeVolume::new();
     probes.fill_grid(Vec3::new(-2.0, 0.0, -2.0), Vec3::new(2.0, 4.0, 2.0), 1.0);
     for p in &mut probes.probes {
@@ -21,7 +21,7 @@ fn rising_probes() -> ProbeVolume {
 }
 
 /// A 1 x 4 x 1 grid over a 2 m locker standing at the origin.
-fn locker() -> (Volume, ProxyGrid) {
+pub(super) fn locker() -> (Volume, ProxyGrid) {
     let v = Volume {
         resolution_mode: ProxyResolutionMode::Custom,
         grid_resolution: [1, 4, 1],
@@ -42,7 +42,7 @@ fn a_volume_packs_its_box_its_dims_and_each_point_s_l1_sample() {
     let foot = to_box.transform_point3(Vec3::new(0.7, 0.0, -0.3));
     let head = to_box.transform_point3(Vec3::new(1.3, 2.0, 0.3));
     assert!(foot.abs_diff_eq(Vec3::ZERO, 1e-5) && head.abs_diff_eq(Vec3::ONE, 1e-5));
-    assert_eq!(data[4].map(f32::to_bits), [1, 4, 1, 0]);
+    assert_eq!(data[4], [1.0, 4.0, 1.0, 0.0], "dims as ordinary floats");
     // Points at cell centres up the locker: 0.25, 0.75, 1.25, 1.75 m.
     let bands0: Vec<f32> = (0..4).map(|p| data[HEADER + p * COEFFS][0]).collect();
     assert_eq!(bands0, [0.25, 0.75, 1.25, 1.75]);
@@ -83,7 +83,7 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
     let mut volumes = ProxyVolumes::default();
     let at = |x: f32| (Mat4::from_translation(Vec3::X * x), bounds);
     volumes.begin_frame(&scene);
-    let mut frame = volumes.frame();
+    let mut frame = volumes.frame(u64::MAX);
     assert_eq!(
         volumes.push(&scene, bare, at(0.0), &mut frame),
         0,
@@ -99,7 +99,7 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
     // Poison the cache: a still object keeps it, anything it reads refreshes it.
     volumes.cache.get_mut(&id).unwrap().1[HEADER][0] = -1.0;
     volumes.begin_frame(&scene);
-    let mut frame = volumes.frame();
+    let mut frame = volumes.frame(u64::MAX);
     volumes.push(&scene, id, at(0.0), &mut frame);
     assert_eq!(
         sampled(&volumes),
@@ -111,7 +111,7 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
     volumes.cache.get_mut(&id).unwrap().1[HEADER][0] = -1.0;
     scene.probes.probes[0].sh.coeffs[0] = [5.0; 3];
     volumes.begin_frame(&scene);
-    let mut frame = volumes.frame();
+    let mut frame = volumes.frame(u64::MAX);
     volumes.push(&scene, id, at(0.5), &mut frame);
     assert_eq!(
         sampled(&volumes),
@@ -120,15 +120,17 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
     );
     scene.world.set_light_probe_proxy_volume(id, None);
     volumes.begin_frame(&scene);
-    let forgotten = volumes.cache.is_empty() && volumes.frame().probes.is_none();
+    let forgotten = volumes.cache.is_empty() && volumes.frame(u64::MAX).probes.is_none();
     assert!(forgotten, "removed: forgotten");
 }
 
 #[test]
 fn the_fingerprint_sees_any_probe_s_sh_position_or_the_grid() {
     let probes = rising_probes();
-    let base = fingerprint(&probes);
-    assert_eq!(base, fingerprint(&rising_probes()), "deterministic");
+    let mut scratch = Vec::new();
+    let mut hash = |p: &ProbeVolume| fingerprint(p, &mut scratch);
+    let base = hash(&probes);
+    assert_eq!(base, hash(&rising_probes()), "deterministic");
     let mut moved = rising_probes();
     moved.probes[7].position.x += 0.01;
     let mut rebaked = rising_probes();
@@ -136,6 +138,9 @@ fn the_fingerprint_sees_any_probe_s_sh_position_or_the_grid() {
     let mut regridded = rising_probes();
     regridded.grid.as_mut().unwrap().spacing.y = 2.0;
     for changed in [moved, rebaked, regridded] {
-        assert_ne!(fingerprint(&changed), base);
+        assert_ne!(hash(&changed), base);
     }
 }
+
+#[path = "room_tests.rs"]
+mod room;
