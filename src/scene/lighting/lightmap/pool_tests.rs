@@ -76,7 +76,7 @@ fn a_bake_is_byte_identical_on_one_worker_or_many() {
     let scene = BakeScene {
         meshes,
         lights: vec![sun(true)],
-        sky: Vec3::new(0.3, 0.4, 0.5),
+        sky: Vec3::new(0.3, 0.4, 0.5).into(),
     };
     // Dense enough that the floor and wall span several batches, the last partial.
     let s = BakeSettings {
