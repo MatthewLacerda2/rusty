@@ -12,7 +12,8 @@
 //!   (toon ramp, fresnel rim, emissive pulse, UV-scroll tint, …), moves the UVs, or
 //!   moves the vertices (`vertex_waves`, #1524).
 //! - **postfx** (`postfx`) — fullscreen effects over the tonemapped scene color (tint,
-//!   vignette, scanline, grayscale, …) — the self-contained family.
+//!   scanline, grayscale, …) — the self-contained family; `barrel` warps where the
+//!   frame is sampled (a uv stage, #1679).
 //! - **ui** (`ui`, #427) — restyle one UI graphic's premultiplied colour (scanlines,
 //!   glitch slices, hologram, dissolve, wipes); the rest of `ui.wgsl` is kept.
 //!
@@ -51,6 +52,10 @@ pub struct Param {
     /// Per-lane defaults for a vector param whose lanes differ (`vertex_waves`'
     /// `direction`, `{1, 0.3}`); empty broadcasts [`Param::default`].
     pub lanes: &'static [f32],
+    /// The names a **choice** param takes (`phosphor_mask`'s `kind`, #1679); empty for
+    /// a number. A recipe names one (`kind = "slot"`), the module bakes its index as an
+    /// `f32` const, and the default is index 0. A choice is always baked, scalar.
+    pub choices: &'static [&'static str],
 }
 
 impl Param {
@@ -62,6 +67,7 @@ impl Param {
             arity,
             runtime: false,
             lanes: &[],
+            choices: &[],
         }
     }
 
@@ -73,6 +79,15 @@ impl Param {
             arity,
             runtime: true,
             lanes: &[],
+            choices: &[],
+        }
+    }
+
+    /// A baked choice among `choices` (#1679): the first is the default.
+    pub const fn choice(name: &'static str, choices: &'static [&'static str]) -> Self {
+        Self {
+            choices,
+            ..Self::baked(name, 0.0, 1)
         }
     }
 
@@ -98,7 +113,10 @@ pub enum Stage {
     /// Transforms the surface's UVs **before** any map is sampled (#401), so the
     /// diffuse, normal, metallic/roughness and mask lookups all move together. Its
     /// helper is `fn uv_<id>(uv: vec2<f32>, in: VertexOutput, <params…>) -> vec2<f32>`
-    /// and its `call` wraps `{prev}`, the incoming UV. Surface only.
+    /// and its `call` wraps `{prev}`, the incoming UV. In a postfx module (#1679,
+    /// `barrel`) it moves where the frame is sampled, before anything samples it: the
+    /// helper is `fn uv_<id>(uv: vec2<f32>, <params…>) -> vec2<f32>`, and a UV it sends
+    /// off the frame (outside `[0, 1]`) draws black.
     Uv,
     /// Moves the vertex itself (#1524): its world position, normal and tangent, in
     /// every vertex stage that draws the mesh (forward, motion vectors, shadows). Its
@@ -128,7 +146,8 @@ pub struct Block {
     /// The expression the assembler substitutes into the fragment chain. Uses
     /// `{prev}` for the incoming color so blocks chain in recipe order, and
     /// `{args}` for the instance's param constants (`, a, b`, or empty); surface
-    /// blocks may also reference `in` (the `VertexOutput`), postfx blocks `uv`, ui
+    /// blocks may also reference `in` (the `VertexOutput`), postfx blocks `uv` and
+    /// `in` (the fullscreen `VsOut`: `in.pos` is the pixel, #1679), ui
     /// blocks `in` (the `VertexOut`) and `f` (the `UiFrag`).
     pub call: &'static str,
     /// The extra texture slots (#400, [`crate::shadergen::textures`]) the helper
@@ -186,110 +205,4 @@ pub fn find(pass: PassKind, id: &str) -> Option<&'static Block> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn every_block_has_unique_id_within_its_pass() {
-        for pass in PassKind::ALL {
-            let cat = catalog(pass);
-            for (i, b) in cat.iter().enumerate() {
-                assert!(
-                    cat.iter().skip(i + 1).all(|o| o.id != b.id),
-                    "duplicate block id {} in {}",
-                    b.id,
-                    pass.name()
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn per_lane_defaults_fill_their_arity() {
-        for pass in PassKind::ALL {
-            for b in catalog(pass) {
-                for p in b.params {
-                    assert_eq!(p.defaults().len(), p.arity, "{}.{}", b.id, p.name);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn postfx_strengths_are_runtime() {
-        // #671: the amount a script fades (a hurt vignette following health) is live.
-        let live = |id, name| {
-            find(PassKind::Postfx, id)
-                .and_then(|b| b.params.iter().find(|p| p.name == name))
-                .is_some_and(|p| p.runtime)
-        };
-        assert!(live("damage_vignette", "intensity"));
-        assert!(live("sharpen", "amount"));
-        assert!(live("radial_blur", "strength"));
-        assert!(!live("posterize", "levels"), "structural params stay baked");
-    }
-
-    #[test]
-    fn uv_and_vertex_stage_blocks_are_surface_only() {
-        for pass in [PassKind::Postfx, PassKind::Ui] {
-            assert!(catalog(pass).iter().all(|b| b.stage == Stage::Color));
-        }
-        for stage in [Stage::Uv, Stage::Vertex] {
-            assert!(catalog(PassKind::Surface).iter().any(|b| b.stage == stage));
-        }
-    }
-
-    #[test]
-    fn only_surface_blocks_cut_and_their_helper_defines_the_cut() {
-        for pass in [PassKind::Postfx, PassKind::Ui] {
-            assert!(catalog(pass).iter().all(|b| b.cut.is_none()));
-        }
-        for b in catalog(PassKind::Surface) {
-            if let Some(cut) = b.cut {
-                let name = cut.split('(').next().unwrap();
-                assert!(b.helper.contains(&format!("fn {name}(")), "{}", b.id);
-            }
-        }
-    }
-
-    #[test]
-    fn only_lit_surface_blocks_change_the_reflection_and_scale_through_their_helpers() {
-        for pass in [PassKind::Postfx, PassKind::Ui] {
-            assert!(catalog(pass)
-                .iter()
-                .all(|b| b.reflection == Reflection::Kept));
-        }
-        for b in catalog(PassKind::Surface) {
-            if let Reflection::Scaled(factor) = b.reflection {
-                let name = factor.split('(').next().unwrap();
-                assert!(b.helper.contains(&format!("fn {name}(")), "{}", b.id);
-            }
-        }
-    }
-
-    #[test]
-    fn block_textures_name_real_slots_and_only_surface_blocks_have_any() {
-        for b in catalog(PassKind::Surface) {
-            for t in b.textures {
-                assert!(crate::shadergen::textures::slot(t).is_ok(), "{}: {t}", b.id);
-            }
-        }
-        for pass in [PassKind::Postfx, PassKind::Ui] {
-            assert!(catalog(pass).iter().all(|b| b.textures.is_empty()));
-        }
-    }
-
-    #[test]
-    fn find_resolves_known_blocks_and_rejects_unknown() {
-        assert!(find(PassKind::Surface, "toon_ramp").is_some());
-        assert!(find(PassKind::Postfx, "scanline").is_some());
-        assert!(find(PassKind::Surface, "scanline").is_none());
-        // #1439: the volume owns these now, so a recipe naming one is refused.
-        for owned in ["vignette", "film_grain", "chromatic_aberration"] {
-            assert!(find(PassKind::Postfx, owned).is_none(), "{owned}");
-        }
-        assert!(find(PassKind::Postfx, "definitely_not_a_block").is_none());
-        assert!(find(PassKind::Ui, "glitch_slices").is_some());
-        assert!(find(PassKind::Postfx, "glitch_slices").is_none());
-    }
-}
+mod tests;

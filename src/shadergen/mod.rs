@@ -79,6 +79,8 @@ pub fn engine_shader_dir() -> &'static str {
 pub const DEFAULT_OUT_DIR: &str = crate::core::project::SHADERS_DIR;
 
 #[cfg(test)]
+mod crt_tests;
+#[cfg(test)]
 mod gameplay_tests;
 #[cfg(test)]
 mod instance_tests;

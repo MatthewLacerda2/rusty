@@ -21,6 +21,7 @@
 //!   the fullscreen-triangle `vs_fullscreen`, and an `fs_main` that samples the
 //!   tonemapped color then folds the chosen blocks. This matches the fullscreen-fragment
 //!   shape of the postfx pass; runtime params (#671) read the effect's group-1 uniform.
+//!   A uv-stage block (`barrel`, #1679) moves where the frame is sampled (`postfx`).
 //! - **ui** (#427, `ui`) — the UI shader (`ui.wgsl`) is the base, kept verbatim but
 //!   for `graphic()`, which folds the blocks over the graphic's shaded colour.
 //!
@@ -39,6 +40,7 @@
 
 mod depth;
 mod emit;
+mod postfx;
 pub(crate) mod ui;
 mod uv;
 mod vertex;
@@ -48,7 +50,7 @@ use std::fmt::Write as _;
 use emit::{chain, check_params, emit_helpers, emit_params, reflection_folds, Instance};
 
 use super::blocks::{find, Stage};
-use super::params::{ParamLayout, POSTFX_UNIFORM_DECL, UNIFORM_DECL};
+use super::params::{ParamLayout, UNIFORM_DECL};
 use super::recipe::{PassKind, ShaderRecipe};
 use super::textures;
 
@@ -85,7 +87,7 @@ pub fn assemble_with_params(
     let layout = ParamLayout::from_instances(recipe.pass, &resolved)?;
     let wgsl = match recipe.pass {
         PassKind::Surface => assemble_surface(recipe, &resolved, &layout, surface_base)?,
-        PassKind::Postfx => assemble_postfx(recipe, &resolved, &layout),
+        PassKind::Postfx => postfx::assemble(recipe, &resolved, &layout),
         PassKind::Ui => ui::assemble(recipe, &resolved, &layout, surface_base)?,
     };
     Ok((wgsl, layout))
@@ -177,82 +179,6 @@ fn hoist_imports(base: &str) -> (String, String) {
         .partition(|line| line.starts_with("#import"));
     (imports.concat(), rest.concat())
 }
-
-/// Assemble a self-contained postfx fullscreen module from the recipe.
-fn assemble_postfx(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamLayout) -> String {
-    let mut out = String::new();
-
-    let _ = writeln!(
-        out,
-        "// {name}.wgsl — authored postfx variant (#272), assembled from {n} block(s).\n\
-         // A fullscreen-triangle fragment program over the tonemapped scene color:\n\
-         // samples group(0) binding(1) then folds the chosen blocks. Matches the postfx\n\
-         // contract's fullscreen-fragment shape (vs_fullscreen + fs_main).",
-        name = recipe.name,
-        n = resolved.len()
-    );
-    out.push_str(POSTFX_SCAFFOLD);
-
-    out.push_str("\n// ---- authored postfx blocks ----\n");
-    if !layout.params.is_empty() {
-        out.push_str(POSTFX_UNIFORM_DECL);
-    }
-    emit_params(&mut out, resolved, layout);
-    emit_helpers(&mut out, resolved);
-
-    let folded = chain(resolved, "color", layout, Stage::Color);
-    let _ = write!(
-        out,
-        "\n@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    \
-         let uv = in.uv;\n    \
-         var color = textureSample(t_color, s_color, uv).rgb;\n    \
-         color = {folded};\n    \
-         return vec4<f32>(color, 1.0);\n}}\n"
-    );
-    out
-}
-
-/// The fixed postfx scaffolding: scene-color bindings and the fullscreen-triangle
-/// vertex stage (the `fullscreen` module's triangle, imported as the engine's
-/// composite does), matching the post chain's fullscreen contract
-/// (group(0) binding 0 = the post params, 1 = the colour so far, 2 = its sampler).
-/// `game_time()` is the sim's game time (#398), the surface blocks' `camera.time`.
-/// `source_tap(uv)` and `source_texel()` let a sampling block (#402) read this
-/// module's input at an offset and step by whole pixels; `textureSampleLevel` keeps
-/// a tap legal wherever a helper is called (no derivative uniformity rule).
-const POSTFX_SCAFFOLD: &str = r#"
-#import postfx::params::PostParams
-#import fullscreen
-
-@group(0) @binding(0) var<uniform> params: PostParams;
-@group(0) @binding(1) var t_color: texture_2d<f32>;
-@group(0) @binding(2) var s_color: sampler;
-
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-};
-
-@vertex
-fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
-    var out: VsOut;
-    out.uv = fullscreen::uv(vid);
-    out.pos = fullscreen::triangle_down(vid);
-    return out;
-}
-
-fn game_time() -> f32 {
-    return params.camera_pos.w;
-}
-
-fn source_texel() -> vec2<f32> {
-    return 1.0 / vec2<f32>(textureDimensions(t_color));
-}
-
-fn source_tap(uv: vec2<f32>) -> vec3<f32> {
-    return textureSampleLevel(t_color, s_color, uv, 0.0).rgb;
-}
-"#;
 
 #[cfg(test)]
 mod tests;

@@ -22,7 +22,8 @@
 //!   recipe with before baking).
 //! - `Shader.ToJson(recipe)` — serialize a recipe to canonical JSON.
 //! - `Shader.Blocks(pass)` — list the curated blocks for a pass with their
-//!   descriptions and params (name, default, arity, runtime) — introspection so the
+//!   descriptions and params (name, default, arity, runtime, and a choice param's
+//!   `choices`) — introspection so the
 //!   agent composes from the actual catalog, not guesswork (#411).
 //!
 //! `Shader` borrows no engine state — it reads a recipe and writes a file — so it
@@ -178,6 +179,27 @@ mod tests {
         assert_eq!(
             (default, arity, runtime),
             (block.params[1].default, 1, true)
+        );
+    }
+
+    #[test]
+    fn a_choice_param_lists_its_names_and_defaults_to_the_first() {
+        let lua = Lua::new();
+        register(&lua).unwrap();
+        let (default, names): (String, String) = lua
+            .load(
+                r#"for _, b in ipairs(Shader.Blocks("postfx")) do
+                     if b.id == "phosphor_mask" then
+                       local k = b.params[1]
+                       return k.default, table.concat(k.choices, ",")
+                     end
+                   end"#,
+            )
+            .eval()
+            .unwrap();
+        assert_eq!(
+            (default.as_str(), names.as_str()),
+            ("aperture", "aperture,shadow,slot")
         );
     }
 
