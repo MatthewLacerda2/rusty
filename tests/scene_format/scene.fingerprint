@@ -272,6 +272,17 @@ scene.entities[].light.mode: enum Realtime|Mixed|Baked
 scene.entities[].light.outer_cone: f32
 scene.entities[].light.range: f32
 scene.entities[].light: option
+scene.entities[].light_probe_proxy_volume.bounds_mode: enum AutomaticLocal|Custom
+scene.entities[].light_probe_proxy_volume.grid_resolution: tuple(3)
+scene.entities[].light_probe_proxy_volume.grid_resolution[]: u32
+scene.entities[].light_probe_proxy_volume.origin: tuple(3)
+scene.entities[].light_probe_proxy_volume.origin[]: f32
+scene.entities[].light_probe_proxy_volume.probe_density: f32
+scene.entities[].light_probe_proxy_volume.quality: enum Low|Normal
+scene.entities[].light_probe_proxy_volume.resolution_mode: enum Automatic|Custom
+scene.entities[].light_probe_proxy_volume.size: tuple(3)
+scene.entities[].light_probe_proxy_volume.size[]: f32
+scene.entities[].light_probe_proxy_volume: option
 scene.entities[].line.looping: bool
 scene.entities[].line.positions: seq
 scene.entities[].line.positions[]: tuple(3)
@@ -574,6 +585,8 @@ scene.entities[].prefab_link.overrides.modifications{key}: string
 scene.entities[].prefab_link.overrides.modifications{}: any
 scene.entities[].prefab_link.overrides.removed_components: seq
 scene.entities[].prefab_link.overrides.removed_components[]: string
+scene.entities[].prefab_link.overrides.removed_parts: seq
+scene.entities[].prefab_link.overrides.removed_parts[]: string
 scene.entities[].prefab_link.source: string
 scene.entities[].prefab_link: option
 scene.entities[].rect_mask.feather: f32

@@ -58,8 +58,9 @@ pub(crate) fn create_scene_depth_layout(device: &wgpu::Device) -> wgpu::BindGrou
 /// Group 1 (#470): the per-draw uniform (0) at a dynamic offset into the frame's
 /// packed uniforms, the joint-matrix array (1) the vertex shader indexes from the
 /// uniform's `bone_base` (#455), the instance array (2) it indexes by
-/// `instance_index`, and the material records (4) the uniform's `material` indexes
-/// (#1616; binding 3 is the shadow casters', in the same module). One bind group
+/// `instance_index`, the material records (4) the uniform's `material` indexes
+/// (#1616; binding 3 is the shadow casters', in the same module), and the Light Probe
+/// Proxy Volumes (5) an instance's `proxy_volume` indexes (#1672). One bind group
 /// serves every solid draw; only the offset changes between batches.
 pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     use crate::render::DrawUniform;
@@ -74,6 +75,7 @@ pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGro
             storage_entry(1, wgpu::ShaderStages::VERTEX),
             storage_entry(2, wgpu::ShaderStages::VERTEX_FRAGMENT),
             storage_entry(4, wgpu::ShaderStages::VERTEX_FRAGMENT),
+            storage_entry(5, wgpu::ShaderStages::FRAGMENT),
         ],
     })
 }

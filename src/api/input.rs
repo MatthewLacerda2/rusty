@@ -17,6 +17,17 @@ use super::{global_table, put, Reg};
 use crate::core::input::gamepad::{DeadZones, Rumble};
 use crate::core::input::InputState;
 
+/// Register the whole `Input` namespace: [`register_readable`], then
+/// [`register_writable`], which extends its table.
+pub fn register<'scope>(
+    lua: &Lua,
+    scope: &'scope mlua::Scope<'scope, '_>,
+    input: &'scope RefCell<InputState>,
+) -> Reg {
+    register_readable(lua, scope, input)?;
+    register_writable(lua, scope, input)
+}
+
 /// Register the readable half of `Input` and the cursor request onto `lua`,
 /// creating the `Input` global table.
 pub fn register_readable<'scope>(

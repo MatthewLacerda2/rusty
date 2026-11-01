@@ -93,6 +93,7 @@ pub(in crate::ecs) fn build_bundle(mut entity: Entity, seq: u64) -> hecs::Entity
         entity.joint,
         entity.character_controller,
         entity.lod_group,
+        entity.light_probe_proxy_volume,
         entity.trail,
         entity.line,
         entity.shape,

@@ -1,18 +1,18 @@
 //! src/scene/authoring/fields/kinds/render.rs — the rendering components' field tables:
 //! `Transform`, `Mesh`, `Material`, `Light`, `Camera`, `PostProcessing` and
-//! `LODGroup`.
+//! `LODGroup` and `LightProbeProxyVolume`.
 
 use super::super::table::{group, inspect, op, part, ro, unheld, with, Group};
 use super::super::value::Mask;
 use super::NO_OP;
 use crate::components::rendering::camera::RenderTarget;
 use crate::components::{
-    CameraComponent, LightComponent, LodGroupComponent, LodLevel, MaterialComponent, MeshComponent,
-    PostProcessingComponent, TransformComponent,
+    CameraComponent, LightComponent, LightProbeProxyVolumeComponent, LodGroupComponent, LodLevel,
+    MaterialComponent, MeshComponent, PostProcessingComponent, TransformComponent,
 };
 use crate::scene::authoring::{
-    rendering::camera, rendering::light, rendering::lod_group as lod, rendering::mesh,
-    rendering::post_processing as vc,
+    rendering::camera, rendering::light, rendering::light_probe_proxy_volume as lppv,
+    rendering::lod_group as lod, rendering::mesh, rendering::post_processing as vc,
 };
 
 const CONES: Group<LightComponent> =
@@ -75,6 +75,15 @@ inspect! {
     LodGroupComponent => lod_group, lod_group_mut, &[
         with!("levels", |g, v: Vec<LodLevel>| set_levels(g, v)),
         op!("size", lod::set_size),
+    ];
+    LightProbeProxyVolumeComponent => light_probe_proxy_volume, light_probe_proxy_volume_mut, &[
+        op!("bounds_mode", lppv::set_bounds_mode),
+        op!("size", lppv::set_size),
+        op!("origin", lppv::set_origin),
+        op!("resolution_mode", lppv::set_resolution_mode),
+        op!("probe_density", lppv::set_probe_density),
+        op!("grid_resolution", lppv::set_grid_resolution),
+        op!("quality", lppv::set_quality),
     ];
 }
 

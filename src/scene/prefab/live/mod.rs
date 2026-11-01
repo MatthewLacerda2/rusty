@@ -46,6 +46,8 @@ pub fn live_overrides(entity: &Entity) -> PrefabOverrides {
         Some(base) => diff(entity, base),
         None => link.overrides.clone(),
     };
+    // A removed part is no diff: it is recorded when made (`prefab::removed`).
+    out.removed_parts = link.overrides.removed_parts.clone();
     if link.local_id == 0 {
         out.modifications.retain(|path, _| !is_root_placement(path));
     }

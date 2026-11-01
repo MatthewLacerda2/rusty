@@ -230,6 +230,7 @@ fn draw_components(
     material::draw_material_card(ui, editor, world, id, materials, action);
     render::draw_light(ui, world, id, &mut editor.is_dirty);
     lod_group::draw_lod_group(ui, world, id, &mut editor.is_dirty);
+    render::draw_light_probe_proxy_volume(ui, world, id, &mut editor.is_dirty);
 
     gameplay::draw_script(ui, world, id, &mut editor.is_dirty);
     gameplay::draw_animator(ui, world, id, &mut editor.is_dirty);

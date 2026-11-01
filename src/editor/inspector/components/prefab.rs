@@ -17,6 +17,7 @@
 
 use egui_phosphor::regular as icon;
 
+use crate::components::PART_KEY;
 use crate::editor::inspector::components::card::component_card;
 use crate::editor::theme;
 use crate::scene::prefab::instance;
@@ -167,7 +168,9 @@ fn draw_override_row(
         ui.colored_label(blue, icon::CIRCLE);
         ui.label(field_label(path));
         let one = egui::Button::new(icon::ARROW_SQUARE_UP).small();
-        if apply.button(ui, one, "Apply this field to the source .prefab") {
+        // A removed part is recorded, not diffed: there is no value to apply.
+        let part = path.starts_with(PART_KEY);
+        if !part && apply.button(ui, one, "Apply this field to the source .prefab") {
             *action = Some(PrefabAction::ApplyFieldToSource {
                 entity,
                 path: path.to_string(),
@@ -188,9 +191,13 @@ fn draw_override_row(
 
 /// Turn an override key into a friendly inspector label: a json pointer
 /// (`/transform/position/0`) reads `transform / position / 0`, an added component
-/// (`+/light`) `light (added)` and a removed one (`-/light`) `light (removed)`.
-/// Purely cosmetic; the dispatched action keeps the raw key.
+/// (`+/light`) `light (added)`, a removed one (`-/light`) `light (removed)` and a
+/// removed part (`-part/Kit/Wall`) `Kit/Wall (removed part)`. Purely cosmetic;
+/// the dispatched action keeps the raw key.
 fn field_label(path: &str) -> String {
+    if let Some(node) = path.strip_prefix(PART_KEY) {
+        return format!("{node} (removed part)");
+    }
     if let Some(component) = path.strip_prefix("+/") {
         return format!("{component} (added)");
     }

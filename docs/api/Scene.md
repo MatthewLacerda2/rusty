@@ -93,7 +93,8 @@ case-insensitive: `Mesh` (aliases `MeshFilter`, `MeshRenderer`), `Light`, `Anima
 `TextMeshPro`, `TextMeshProUGUI`), `Shape`, `Selectable`, `LayoutGroup`, `LayoutElement` (alias
 `ContentSizeFitter`), `Joint` (aliases `FixedJoint`, `HingeJoint`,
 `CharacterJoint` — all add a default `Fixed` joint; set its kind with
-`Joint.SetKind`), `CharacterController` (alias `Character`), `LODGroup` (alias `LOD`), `Trail` (alias `TrailRenderer`),
+`Joint.SetKind`), `CharacterController` (alias `Character`), `LODGroup` (alias `LOD`),
+`LightProbeProxyVolume` (aliases `ProxyVolume`, `LPPV`), `Trail` (alias `TrailRenderer`),
 `Line` (alias `LineRenderer`).
 Each is added with the inspector's default values; adding an
 existing kind replaces it. An unknown kind is an error that lists the kinds.
@@ -288,12 +289,31 @@ one name and never drift.
   edit to one (`Material.SetColor`) shows on every instance of the model and survives
   a re-import, Play→Stop and a load, as Unity's extracted material does. The prefab verbs below work on it (`ListPrefabOverrides`,
   `RevertPrefabOverrides`, `ReimportPrefab`, `RevertPrefabField`) except the two
-  apply-to-source ones, which error: a model is read-only, as in Unity. A node added to
-  the file is not spawned into existing instances yet, and a node removed from it
-  leaves its entity as it was (#1665). glTF has no stable node ids, so a part is
-  matched to its node by path, and same-named sibling nodes by their order among
-  themselves (`Kit/Cube`, `Kit/Cube[1]`): reordering two of them in the file swaps
-  which part takes which node.
+  apply-to-source ones, which error: a model is read-only, as in Unity. The instance
+  takes the file's node tree too (#1665): a node added to the file is spawned under
+  its parent node's part, and a node removed (or renamed) takes its part away with
+  that part's overrides. What you added under a removed part (an entity of your own,
+  another model's instance) is kept: it moves to the nearest part left, staying where
+  it is in the world, as Unity keeps an orphaned added object; so does a part of the
+  instance you moved under it, with its overrides. A part **you** remove is not a
+  node the file gained: destroying one in edit mode (`Scene.DestroyEntity`, the
+  hierarchy's Destroy) records it on the instance as a **removed part** (Unity's
+  *Removed GameObject* override, listed as `"0:-part/<node path>"`), so a load, a
+  re-import or a Scale Factor change never stamps it back; `RevertPrefabField(rootId,
+  "-part/<node path>")` or `RevertPrefabOverrides` brings it back. A destroy during
+  Play records nothing, since Stop restores the scene anyway. Moving a part out
+  of its instance (`Scene.SetParent`, the inspector's parent field) **unpacks** it:
+  it keeps its values, loses its link, and is recorded as removed the same way, so
+  it is never stamped twice (Unity refuses that move without unpacking). Reverting
+  that removed part brings back a **new** linked copy from the model; the unpacked
+  one stays a plain entity beside it. Moving a part elsewhere inside its own
+  instance keeps it linked, and a part you moved under another goes with it: destroy
+  or unpack that one, and both are recorded removed. glTF has no stable node
+  ids, so a part is matched to its node by path, and same-named sibling nodes by
+  their order among themselves (`Kit/Cube`, `Kit/Cube[1]`): reordering two of them
+  in the file swaps which part takes which node, and removing the first of two from
+  the file destroys the **last** one's part (the survivor takes `Kit/Cube`, so
+  `Kit/Cube[1]` is the node that went), its overrides with it.
 
 - **`Scene.Instantiate(assetRef, [name], [x, y, z])`** — spawns one entity from an
   importable model sub-object reference (`path::sub_object`, the `reference` field
@@ -331,7 +351,7 @@ scene load, exactly like a primitive's `primitive_type` — no GPU buffers are i
 
 A linked instance's divergence from the source is its **diff** against the source as
 the instance last took it (when it was stamped, loaded or reimported), held the way
-Unity holds a prefab instance's overrides, in three kinds. It covers every present and
+Unity holds a prefab instance's overrides, in three kinds (a model instance adds a fourth, removed parts). It covers every present and
 future component with no per-component code. Each override has a **key**, the name
 `ListPrefabOverrides` lists it by and the field verbs take:
 
@@ -352,6 +372,9 @@ future component with no per-component code. Each override has a **key**, the na
   Light or a Collider added to an instance child keeps all its values.
 - **Removed components** (Unity's *removed components*), keyed `"-/<component>"`
   (`"-/camera"`): a source component the instance removed.
+- **Removed parts** (Unity's *removed GameObjects*), on a model instance's root
+  only, keyed `"-part/<node path>"` (`"-part/Kit/Wall"`): a part you destroyed or
+  moved out of the instance (above). It is recorded when you do it, not diffed.
 
 An entity id inside any of them (a Joint's `connected_body`, inside an added Joint
 too) follows its entity: it is remapped when the bones respawn on Stop or a load, and
@@ -382,18 +405,16 @@ get them.
 On-instance:
 
 - **`Scene.RevertPrefabOverrides(instanceRootId)`** — drop every override and rebuild
-  the instance straight from the current source (it becomes a pristine copy). A model
-  part whose node left the model keeps its overrides and values: there is nothing to
-  revert it to.
+  the instance straight from the current source (it becomes a pristine copy; a model
+  instance takes the model's node tree too).
 - **`Scene.ReimportPrefab(instanceRootId)`** — re-baseline from the source and re-apply
   the overrides on top: non-overridden fields pick up the latest source,
   overridden ones win. This is the same propagation that runs automatically on scene
   load.
 - **`Scene.ListPrefabOverrides(instanceRootId)`** — the read verb: the instance's
   overrides as `"localId:key"` strings, sorted (e.g. `"1:+/light"`, `"1:-/camera"`,
-  `"1:/scripts/#size"`, `"1:/transform/position/0"`). A model part whose node left
-  the model (#1665) has no local id and is named by its node path instead:
-  `"Kit/Wall (gone):/transform/position/0"`.
+  `"1:/scripts/#size"`, `"1:/transform/position/0"`, and on a model instance's
+  root a removed part, `"0:-part/Kit/Wall"`).
 
 Apply-to-source (the Unity "Apply → Prefab" direction):
 
@@ -421,12 +442,16 @@ Its per-field opposite:
   changed gives the whole list back to the source).
   The instance's other overrides are untouched. `entityId` may be any instance
   entity. Returns `false`, changing nothing, when there is no override at `key`, and
-  errors on a model part whose node left the model (it has nothing to revert to). The
+  errors on a model part whose node left the file since the instance last took it (it
+  has nothing to revert to; the next reimport removes it). The
   prefab card's per-field revert button.
 
 The verbs error if `instanceRootId` (or, for the field form, `entityId`) is not a
-**linked** instance entity. **Scope (#216):** a flat instance of a flat prefab —
-added/removed/reparented child entities and nested prefabs are out of scope (propagation
-matches entities by the link's source `local_id`, adding/removing nothing structurally).
+**linked** instance entity. **Scope (#216):** a `.prefab` instance is flat —
+added/removed/reparented child entities are out of scope there (propagation matches
+entities by the link's source `local_id`, adding/removing nothing structurally); a model
+instance takes its file's node tree (above). Nested prefabs are out of scope too, but an
+instance placed under another instance's part, even of the same source, stays its own
+instance: the verbs on one never reach the other.
 Saving an already-linked instance back out with `SavePrefab` bakes it down into a fresh
 flat prefab (no nested links).

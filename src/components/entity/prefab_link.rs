@@ -1,6 +1,6 @@
 //! src/components/entity/prefab_link.rs — an instance entity's link to its source
 //! (a `.prefab`, or an imported model: Unity's model prefab, #1637), and its
-//! overrides in Unity's three shapes (#216, #1527).
+//! overrides in Unity's shapes (#216, #1527, #1665).
 //!
 //! An instance's divergence from its source is held as Unity holds it:
 //! - **property modifications**, one per leaf, by JSON pointer into the entity
@@ -12,7 +12,9 @@
 //!   (an enum that switched variant, a map key the source lacks) is one entry holding
 //!   it whole; a key the instance dropped is `null`;
 //! - **added components** (Unity's `m_AddedComponents`), each held whole;
-//! - **removed components** (Unity's `m_RemovedComponents`), by name.
+//! - **removed components** (Unity's `m_RemovedComponents`), by name;
+//! - on a model instance's root, **removed parts** (Unity's
+//!   `m_RemovedGameObjects`), by node path (#1665).
 //!
 //! Every entity id the three hold is visited by [`visit_override_refs`](super::override_refs::visit_override_refs), the one walk
 //! (`override_refs`): a remap on stamp, load and Stop, the local↔scene conversion of an apply
@@ -29,6 +31,10 @@ use super::refs::{escape_token, EntityRefs, RefVisit};
 /// The last token of a list's size entry: `/scripts/#size` (Unity's `Array.size`).
 /// No list index and no field name the engine serializes is `#size`.
 pub const SIZE_TOKEN: &str = "#size";
+
+/// The key prefix of a removed part ([`PrefabOverrides::removed_parts`]):
+/// `-part/Kit/Wall`. No JSON pointer starts with `-`.
+pub const PART_KEY: &str = "-part/";
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
 /// (#216). Set on EVERY entity of a linked instance — not just the root — so that
@@ -53,8 +59,8 @@ pub struct PrefabLink {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub node: Option<String>,
     /// This entity's overrides as last stored: its diff against [`Self::baseline`]
-    /// in the three shapes of [`PrefabOverrides`]. Propagation rebuilds the entity
-    /// from the source, then re-applies them, so what the instance did not change
+    /// in the shapes of [`PrefabOverrides`] (a removed part is recorded, not
+    /// diffed). Propagation rebuilds the entity from the source, then re-applies them, so what the instance did not change
     /// tracks the source. The current set is `scene::prefab::live::live_overrides`;
     /// it is stored here before a propagation, a save and a Play snapshot.
     #[serde(default, skip_serializing_if = "PrefabOverrides::is_empty")]
@@ -69,7 +75,7 @@ pub struct PrefabLink {
     pub baseline: Option<std::sync::Arc<Value>>,
 }
 
-/// One instance entity's overrides, in Unity's three shapes (see the module docs).
+/// One instance entity's overrides, in Unity's shapes (see the module docs).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct PrefabOverrides {
     /// Property modifications: JSON pointer → value, a list's length at
@@ -83,6 +89,12 @@ pub struct PrefabOverrides {
     /// Source components the instance removed, by entity field name.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub removed_components: BTreeSet<String>,
+    /// Parts of a model instance the user removed (Unity's *Removed GameObject*
+    /// override, `m_RemovedGameObjects`), by node path, held on the instance root
+    /// only (#1665): propagation never stamps them back. Not a diff: the live set
+    /// carries it over (`scene::prefab::live`).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub removed_parts: BTreeSet<String>,
 }
 
 impl PrefabOverrides {
@@ -90,16 +102,18 @@ impl PrefabOverrides {
         self.modifications.is_empty()
             && self.added_components.is_empty()
             && self.removed_components.is_empty()
+            && self.removed_parts.is_empty()
     }
 
     /// Every override's key, the name the API and the inspector use for it: a
-    /// modification's pointer, `+/<component>` for an added component and
-    /// `-/<component>` for a removed one.
+    /// modification's pointer, `+/<component>` for an added component,
+    /// `-/<component>` for a removed one and `-part/<node path>` for a removed part.
     pub fn keys(&self) -> Vec<String> {
         let mods = self.modifications.keys().cloned();
         let added = self.added_components.keys().map(|c| format!("+/{c}"));
         let removed = self.removed_components.iter().map(|c| format!("-/{c}"));
-        mods.chain(added).chain(removed).collect()
+        let parts = self.removed_parts.iter().map(|p| format!("{PART_KEY}{p}"));
+        mods.chain(added).chain(removed).chain(parts).collect()
     }
 
     /// The override at `key` ([`Self::keys`]) with the ones that go with it, if there
@@ -113,6 +127,9 @@ impl PrefabOverrides {
         } else if let Some(c) = key.strip_prefix("-/") {
             self.removed_components.get(c)?;
             one.removed_components.insert(c.to_string());
+        } else if let Some(p) = key.strip_prefix(PART_KEY) {
+            self.removed_parts.get(p)?;
+            one.removed_parts.insert(p.to_string());
         } else {
             self.modifications.get(key)?;
             one.modifications = self
@@ -132,6 +149,8 @@ impl PrefabOverrides {
             self.added_components.remove(c).is_some()
         } else if let Some(c) = key.strip_prefix("-/") {
             self.removed_components.remove(c)
+        } else if let Some(p) = key.strip_prefix(PART_KEY) {
+            self.removed_parts.remove(p)
         } else if self.modifications.contains_key(key) {
             let gone: Vec<String> = self
                 .modifications

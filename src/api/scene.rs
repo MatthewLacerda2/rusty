@@ -220,7 +220,7 @@ fn register_parenting<'scope>(
             // `nil` unparents, Unity's `SetParent(null)`.
             scene
                 .borrow_mut()
-                .set_parent(id, parent.get())
+                .reparent(id, parent.get())
                 .map_err(mlua::Error::RuntimeError)
         }),
     )?;
@@ -232,7 +232,7 @@ fn register_parenting<'scope>(
             let id = id.live("Scene", "ClearParent")?;
             scene
                 .borrow_mut()
-                .set_parent(id, None)
+                .reparent(id, None)
                 .map_err(mlua::Error::RuntimeError)
         }),
     )

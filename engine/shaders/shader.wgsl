@@ -5,7 +5,7 @@
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
-#import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, eval_sh, flat_ambient, fold_decals, lightmap_direction_rebalance}
+#import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, flat_ambient, fold_decals, lightmap_direction_rebalance, probe_irradiance}
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
@@ -393,10 +393,11 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
             ambient_irradiance *= lightmap_direction_rebalance(dir, N, geometric);
         }
     } else if (instances[in.instance].use_sh == 1u) {
-        // `eval_sh` returns irradiance E; a Lambert surface reflects albedo / pi * E,
-        // the same response `calculate_pbr` gives a direct light and the E / pi the
+        // `probe_irradiance` returns irradiance E (its one SH sample, or its Light Probe
+        // Proxy Volume's grid inside one, #1672); a Lambert surface reflects albedo / pi
+        // * E, the same response `calculate_pbr` gives a direct light and the E / pi the
         // lightmap and flat ambient already hold (#807).
-        ambient_irradiance = eval_sh(N, in.instance) / PI;
+        ambient_irradiance = probe_irradiance(in.world_position, N, in.instance) / PI;
     } else {
         ambient_irradiance = flat_ambient(N);
     }

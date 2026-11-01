@@ -162,6 +162,8 @@ pub struct Renderer {
     /// The packed per-frame draw data every solid draw binds as group 1 (#470): per-draw
     /// uniforms, bone palettes, instances and material records, rewritten per camera.
     draw_buffers: gpu::draw_buffers::DrawBuffers,
+    /// Each Light Probe Proxy Volume's last grid samples (#1672).
+    proxy_volumes: draw::proxy_volume::ProxyVolumes,
     /// One group-2 material bind group per distinct set of resolved maps (#470).
     materials: gpu::material_cache::MaterialCache,
     /// The pipelines materials' authored surface shaders draw with, by name (#396).
