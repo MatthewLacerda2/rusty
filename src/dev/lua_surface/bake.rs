@@ -9,19 +9,16 @@
 //! refused while the editor's Generate Lighting runs (#1602): the two would bake the
 //! same probes and write the same files.
 
-use std::cell::RefCell;
-
 use mlua::Lua;
 
 use super::super::{
     bake::generate_lighting::refuse_while_baking, bake::lighting as lighting_bake,
-    bake::lightmap as lightmap_bake, bake::probe as probe_bake,
+    bake::lightmap as lightmap_bake, bake::probe as probe_bake, bake::progress::BakeLog,
     bake::reflection as reflection_bake,
 };
 use super::generate::Overrides;
 use crate::api::{global_table, put, ApiScopedCtx, Reg};
 use crate::scene::lighting::placement::MIN_REGION;
-use crate::scene::Scene;
 
 /// Add `Bake` to the `Probe`, `Reflection` and `Lighting` tables.
 pub(super) fn register<'scope>(
@@ -29,8 +26,8 @@ pub(super) fn register<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
-    register_probe(lua, scope, ctx.scene)?;
-    register_reflection(lua, scope, ctx.scene, ctx.scene_path)?;
+    register_probe(lua, scope, ctx)?;
+    register_reflection(lua, scope, ctx)?;
     register_lighting(lua, scope, ctx)?;
     register_lightmaps(lua, scope, ctx)
 }
@@ -40,15 +37,17 @@ pub(super) fn register<'scope>(
 fn register_probe<'scope>(
     lua: &Lua,
     scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
+    ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
+    let (scene, console) = (ctx.scene, ctx.console);
     put(
         &global_table(lua, "Probe")?,
         "Bake",
-        scope.create_function(|_, ()| {
+        scope.create_function(move |_, ()| {
             let mut scene = scene.borrow_mut();
             refuse_while_baking(&scene).map_err(mlua::Error::external)?;
-            probe_bake::bake_scene_probes(&mut scene).map_err(mlua::Error::external)
+            let mut log = BakeLog::to_console(console);
+            probe_bake::bake_scene_probes(&mut scene, &mut log).map_err(mlua::Error::external)
         }),
     )
 }
@@ -59,17 +58,18 @@ fn register_probe<'scope>(
 fn register_reflection<'scope>(
     lua: &Lua,
     scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    scene_path: &'scope RefCell<Option<String>>,
+    ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
+    let (scene, scene_path, console) = (ctx.scene, ctx.scene_path, ctx.console);
     put(
         &global_table(lua, "Reflection")?,
         "Bake",
-        scope.create_function(|_, ()| {
+        scope.create_function(move |_, ()| {
             let mut scene = scene.borrow_mut();
             let path = scene_path.borrow();
             refuse_while_baking(&scene).map_err(mlua::Error::external)?;
-            reflection_bake::bake_scene_reflections(&mut scene, path.as_deref())
+            let mut log = BakeLog::to_console(console);
+            reflection_bake::bake_scene_reflections(&mut scene, path.as_deref(), &mut log)
                 .map_err(mlua::Error::external)
         }),
     )
@@ -95,12 +95,14 @@ fn register_lighting<'scope>(
             let nav = nav.borrow();
             let params = bake_params(spacing, region)?;
             let mut say = |line| console.borrow_mut().info(line);
+            let mut log = BakeLog::to_console(console);
             let report = lighting_bake::bake_lighting(
                 &mut scene,
                 path.as_deref(),
                 Some(&nav),
                 params,
                 &mut say,
+                &mut log,
             )
             .map_err(mlua::Error::external)?;
             Ok(report.ran_light_bake || report.ran_reflection_bake)
@@ -146,7 +148,7 @@ fn register_lightmaps<'scope>(
         Option<u64>,
         Option<bool>,
     );
-    let (scene, scene_path) = (ctx.scene, ctx.scene_path);
+    let (scene, scene_path, console) = (ctx.scene, ctx.scene_path, ctx.console);
     let table = global_table(lua, "Lighting")?;
     put(
         &table,
@@ -164,8 +166,14 @@ fn register_lightmaps<'scope>(
                 let path = scene_path.borrow();
                 let mut scene = scene.borrow_mut();
                 refuse_while_baking(&scene).map_err(mlua::Error::external)?;
-                lightmap_bake::bake_scene_lightmaps(&mut scene, path.as_deref(), &settings)
-                    .map_err(mlua::Error::external)
+                let mut log = BakeLog::to_console(console);
+                let path = path.as_deref();
+                let baked = lightmap_bake::bake_scene_lightmaps_logged(
+                    &mut scene, path, &settings, &mut log,
+                )
+                .map_err(mlua::Error::external)?;
+                log.finish();
+                Ok(baked)
             },
         ),
     )?;

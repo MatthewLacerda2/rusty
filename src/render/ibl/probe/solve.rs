@@ -18,7 +18,7 @@
 
 use glam::Vec3;
 
-use super::bake::project_cubemap;
+use super::bake::project_light_probe;
 use super::bounce::{add_baked_direct, pass_converged, BounceReport, CONVERGENCE_EPSILON};
 use super::bounce::{write_field, MAX_BOUNCES};
 use crate::render::Renderer;
@@ -74,16 +74,18 @@ impl BounceSolve {
         }
         let p = self.positions[self.pass.len()];
         let capture = match self.bounce {
-            1 => renderer.capture_static_cubemap(scene, p, self.resolution),
+            1 => renderer.capture_light_probe(scene, p, self.resolution, false),
             _ => {
                 // The lit capture reads the last pass's field off the scene.
                 std::mem::swap(&mut scene.probes, &mut self.volume);
-                let capture = renderer.capture_static_cubemap_lit(scene, p, self.resolution);
+                let capture = renderer.capture_light_probe(scene, p, self.resolution, true);
                 std::mem::swap(&mut scene.probes, &mut self.volume);
                 capture
             }
         };
-        self.pass.push(project_cubemap(&capture));
+        // Where a capture escapes the scene it sees the ambient, not the sky (#1668).
+        let ambient = scene.drawn_ambient().radiance();
+        self.pass.push(project_light_probe(&capture, ambient));
         if self.pass.len() < self.positions.len() {
             return None;
         }
@@ -131,8 +133,7 @@ impl BounceSolve {
     }
 
     /// Where it is: the pass (from 1), the probes that pass has captured, and the
-    /// probe count. The editor's bar reads it, a dev-only stepper's.
-    #[cfg(feature = "dev")]
+    /// probe count. The editor's bar and the headless bake's log read it.
     pub fn progress(&self) -> (u32, usize, usize) {
         (self.bounce, self.pass.len(), self.positions.len())
     }

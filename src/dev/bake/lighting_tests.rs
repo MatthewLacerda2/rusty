@@ -10,6 +10,7 @@ use glam::Vec3;
 
 use super::{bake_lighting, LightingBakeParams};
 use crate::components::{ColliderComponent, ColliderShape};
+use crate::dev::bake::progress::BakeLog;
 use crate::scene::Scene;
 
 /// A static room box spanning ±10 in XZ, 6 tall, with a box collider so the placement
@@ -50,8 +51,15 @@ fn gpu_auto_places_both_sets_on_empty_scene() {
     };
     coarse.reflection.region = 40.0;
     scene.lighting_settings.reflections.resolution = 16;
-    let report = bake_lighting(&mut scene, Some(scene_path), None, coarse, &mut |_| {})
-        .expect("placement + adapter-free bake never errors with a scene path");
+    let report = bake_lighting(
+        &mut scene,
+        Some(scene_path),
+        None,
+        coarse,
+        &mut |_| {},
+        &mut BakeLog::off(),
+    )
+    .expect("placement + adapter-free bake never errors with a scene path");
 
     assert!(report.auto_placed_light, "light probes auto-placed");
     assert!(
@@ -88,6 +96,7 @@ fn gpu_manual_probes_are_kept_not_replaced() {
         None,
         LightingBakeParams::default(),
         &mut |_| {},
+        &mut BakeLog::off(),
     )
     .expect("rebake never errors with a scene path");
 
@@ -108,6 +117,7 @@ fn empty_scene_places_nothing_and_succeeds() {
         None,
         LightingBakeParams::default(),
         &mut |_| {},
+        &mut BakeLog::off(),
     )
     .expect("no-op bake");
     assert_eq!(report.light_probes, 0);

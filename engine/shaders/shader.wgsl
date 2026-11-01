@@ -468,7 +468,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         }
     }
 
-    // 5. Environment reflections (#244), always on (#718): like Unity's Lighting ->
+    // 5. Environment reflections (#244), always on (#718) but in a light-probe capture
+    // (#1668, `environment_reflection`): like Unity's Lighting ->
     // Environment Reflections, the sky / reflection-probe term applies whether or not
     // the camera runs SSR. Where SSR runs and hits, it replaces exactly this term
     // (postfx), so the record below stores what was added and under what weight.

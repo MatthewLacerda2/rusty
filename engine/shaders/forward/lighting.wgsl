@@ -249,7 +249,12 @@ fn probe_irradiance(world_pos: vec3<f32>, N: vec3<f32>, instance: u32) -> vec3<f
 // the same way, so a rough metal reflects a blurred sky: the panorama, or the
 // procedural sky's terms tinted with the ambient colour the sky pass draws it with
 // (#256). Every sample has an explicit level, so the per-instance branches are safe.
+// A light-probe capture turns it off (`lighting.env_reflection`, #1668), a uniform
+// branch: Unity's light-probe bake carries no specular.
 fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, roughness: f32, blend: u32) -> vec3<f32> {
+    if (lighting.env_reflection < 0.5) {
+        return vec3<f32>(0.0);
+    }
     let R = normalize(raw_r);
     let first = blend & 63u;
     let second = (blend >> 6u) & 63u;

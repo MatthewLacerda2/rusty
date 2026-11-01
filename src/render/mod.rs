@@ -41,8 +41,9 @@ pub use camera::{build_camera_stack, texture_cameras, ScreenStack, TextureCamera
 pub use frustum::{Frustum, SkinBounds};
 pub use gpu::mesh::MeshId;
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
-pub use ibl::probe::bake::{project_cubemap, DEFAULT_BAKE_RESOLUTION};
+pub use ibl::probe::bake::{project_cubemap, project_light_probe, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe::bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
+pub use ibl::probe::capture::ProbeCapture;
 pub use setup::headless::{gpu_required, OFFSCREEN_FORMAT, REQUIRE_GPU_ENV};
 pub use setup::SurfaceWindow;
 pub use stats::RenderCounters;

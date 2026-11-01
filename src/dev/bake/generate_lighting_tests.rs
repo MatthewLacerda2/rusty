@@ -6,6 +6,7 @@ use glam::Vec3;
 
 use super::{generate_lighting, GenerateReport, UNSAVED};
 use crate::components::{ColliderComponent, ColliderShape};
+use crate::dev::bake::progress::{BakeLog, Line};
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::{LightingSave, Scene};
 
@@ -38,7 +39,16 @@ fn saved_floor(name: &str) -> (Scene, String) {
 #[test]
 fn gpu_generate_bakes_lightmaps_then_probes_and_writes_the_scene() {
     let (mut scene, path) = saved_floor("writes");
-    let report = generate_lighting(&mut scene, Some(&path), None, &mut |_| {}).unwrap();
+    let (tick, lines) = (std::cell::Cell::new(0), std::cell::RefCell::new(Vec::new()));
+    let clock = || std::time::Duration::from_secs(tick.replace(tick.get() + 1));
+    let mut log = BakeLog::new(clock, |l: Line| lines.borrow_mut().push(l.text));
+    let report = generate_lighting(&mut scene, Some(&path), None, &mut |_| {}, &mut log);
+    drop(log);
+    let report = report.unwrap();
+    // The log heard the lightmap step first and the total last (#1667).
+    let lines = lines.into_inner();
+    assert!(lines[0].starts_with("[Lighting] lightmaps"), "{lines:?}");
+    assert!(lines.last().unwrap().starts_with("[Lighting] done in"));
     assert_eq!(report.lightmaps, 1);
     assert!(report.probes.auto_placed_light, "the probe step ran after");
     assert_eq!(report.saved, LightingSave::Written);
@@ -54,7 +64,14 @@ fn gpu_generate_bakes_lightmaps_then_probes_and_writes_the_scene() {
 fn gpu_generate_bakes_with_the_scenes_settings() {
     let (mut scene, path) = saved_floor("settings");
     scene.lighting_settings.lightmaps.directional = false;
-    generate_lighting(&mut scene, Some(&path), None, &mut |_| {}).unwrap();
+    generate_lighting(
+        &mut scene,
+        Some(&path),
+        None,
+        &mut |_| {},
+        &mut BakeLog::off(),
+    )
+    .unwrap();
     assert!(scene.lightmaps.directions.is_empty(), "directional was off");
 }
 
@@ -62,7 +79,7 @@ fn gpu_generate_bakes_with_the_scenes_settings() {
 fn an_unsaved_scene_cannot_generate() {
     let mut scene = Scene::new();
     assert_eq!(
-        generate_lighting(&mut scene, None, None, &mut |_| {}),
+        generate_lighting(&mut scene, None, None, &mut |_| {}, &mut BakeLog::off()),
         Err(UNSAVED.to_string())
     );
 }
@@ -89,7 +106,13 @@ fn generate_is_refused_in_play() {
     let (mut scene, path) = saved_floor("play");
     let before = std::fs::read(&path).unwrap();
     scene.set_playing(true);
-    let refused = generate_lighting(&mut scene, Some(&path), None, &mut |_| {});
+    let refused = generate_lighting(
+        &mut scene,
+        Some(&path),
+        None,
+        &mut |_| {},
+        &mut BakeLog::off(),
+    );
     assert_eq!(refused.unwrap_err(), crate::scene::LIGHTING_IN_PLAY);
     assert_eq!(
         std::fs::read(&path).unwrap(),
@@ -104,11 +127,23 @@ fn generate_is_refused_in_play() {
 fn a_script_bake_is_refused_while_the_editors_runs() {
     let (mut scene, path) = saved_floor("running");
     scene.lighting_bake_running = true;
-    let refused = generate_lighting(&mut scene, Some(&path), None, &mut |_| {});
+    let refused = generate_lighting(
+        &mut scene,
+        Some(&path),
+        None,
+        &mut |_| {},
+        &mut BakeLog::off(),
+    );
     assert_eq!(refused.unwrap_err(), super::BAKE_RUNNING);
     let params = super::super::lighting::LightingBakeParams::default();
-    let bake =
-        super::super::lighting::bake_lighting(&mut scene, Some(&path), None, params, &mut |_| {});
+    let bake = super::super::lighting::bake_lighting(
+        &mut scene,
+        Some(&path),
+        None,
+        params,
+        &mut |_| {},
+        &mut BakeLog::off(),
+    );
     assert_eq!(bake.unwrap_err(), super::BAKE_RUNNING);
     assert!(scene.probes.is_empty(), "nothing was placed");
 }
@@ -120,7 +155,14 @@ fn gpu_generate_inside_an_edit_is_no_part_of_its_step() {
     let (mut scene, path) = saved_floor("undo_1631");
     scene.begin_edits();
     scene.ambient_intensity = 0.25;
-    generate_lighting(&mut scene, Some(&path), None, &mut |_| {}).unwrap();
+    generate_lighting(
+        &mut scene,
+        Some(&path),
+        None,
+        &mut |_| {},
+        &mut BakeLog::off(),
+    )
+    .unwrap();
     scene.commit_edits(None);
     let (probes, lightmaps) = (scene.probes.probes.len(), scene.lightmaps.clone());
     assert!(probes > 0, "the bake placed probes");

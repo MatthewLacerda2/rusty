@@ -53,6 +53,19 @@ The two individual verbs stay for a script that wants only one of them.
   bar and **Cancel**; a cancelled run writes nothing and keeps the old lighting. When
   the lightmaps land they are applied (the probes are captured under them), then the
   probe step runs a step a frame and the console logs one summary line at the end.
+- **From a script it logs its progress** (#1667), as Unity's batch-mode bake does: the
+  verb blocks its caller until it returns, so a `play` scenario or a `session-mcp` call
+  cannot poll, and instead the bake prints a line to **stderr** at each step and every
+  5 s within one, with an ETA from the step's own rate, then the total time:
+  `[Lighting] lightmaps 41% (612/1501 meshes, 3.1M/7.6M texels), ~38 min left`, then
+  `light probes, bounce 2 of at most 5: …, ~1 min left in this bounce` and
+  `reflection probes 19% (3/16 probes), ~4 min left`, and `[Lighting] done in 1 h 4 min`.
+  The lightmap step's first line and the total also go to the console (so `play`'s
+  `console.log` and the MCP reply keep them), beside the probe step's own `Baking …`
+  lines; the lines in between go to stderr only. A probe step with no probes of its
+  kind prints nothing. `Lighting.Bake()`,
+  `Lighting.BakeLightmaps()`, `Probe.Bake()` and `Reflection.Bake()` log the same way. A
+  log never changes what is baked: the lightmaps are byte-identical with or without one.
 - **The probes bake from a snapshot and apply at the end** (Unity's shape, #1602): the
   light and reflection probes are copied when the probe step starts, and their SH and
   cubemaps are applied in one step when it finishes. Adding, removing or moving a probe
@@ -241,13 +254,17 @@ during Play goes back on Stop, as every scene edit does.
   in `Color` mode; their defaults are the default ambient's hemisphere at its top,
   middle and bottom, so switching the default scene to `"Gradient"` lights it the
   same. A scene in `Color` mode with default colours leaves the `ambient` block out
-  of its file. Lightmaps and the analytic probe fill (`Probe.BakeAnalytic`) bake
-  from the same ambient, so an open lightmapped or analytically probe-lit surface
-  takes the light an unbaked one facing the same way does: exactly in `Color` mode,
-  and in `Gradient` up to a slight smoothing at the horizon (the bakes carry three
-  SH bands, as Unity's ambient probe does). **Probes baked by Generate Lighting
-  (`Probe.Bake`) don't follow a `Gradient` yet:** they capture the sky, which takes
-  only the `Color` colour (#1668). But, as
+  of its file. Lightmaps and light probes, both Generate Lighting's (`Probe.Bake`)
+  and the analytic fill (`Probe.BakeAnalytic`), bake from the same ambient, so an
+  open lightmapped or probe-lit surface takes the light an unbaked one facing the
+  same way does: exactly in `Color` mode, and in `Gradient` up to a slight
+  smoothing at the horizon (the bakes carry three SH bands, as Unity's ambient
+  probe does). As in Unity, light probes and lightmaps bake against this ambient,
+  never against the sky the camera draws (#1668): the sky reaches surfaces only
+  through reflections (reflection probes capture it). So a scene with a panorama sky
+lights its probes and lightmaps from the flat ambient, not from the HDRI; Unity's
+Environment Lighting Source = Skybox, which bakes from the sky, is not built yet
+(#1675). But, as
   in Unity, **a changed mode or colour reaches baked surfaces only at the next
   Generate Lighting**: dynamic objects and unbaked surfaces show it at once.
 - **The procedural sky** is drawn when no panorama is set: a ground → horizon →

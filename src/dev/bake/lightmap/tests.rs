@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
+use crate::scene::lighting::lightmap::bake;
 
 /// A scene with a static floor Plane, a static Sphere stripped of its lightmap UV (an
 /// imported mesh without `TEXCOORD_1`) and a dynamic Box; returns it with the floor's

@@ -3,7 +3,7 @@
 //! The iteration that turns the single-capture probe bake (`bake.rs`) into a
 //! true multi-bounce GI bake. Each pass re-captures every probe and projects the
 //! captured radiance into SH; from bounce 2 on, the capture re-lights the STATIC
-//! scene with the *previous* pass's probe field (`capture_static_cubemap_lit`), so
+//! scene with the *previous* pass's probe field (`capture_light_probe`'s `bounce`), so
 //! every iteration folds in one more bounce of indirect light. The passes are
 //! accumulated in place on `scene.probes`, then a `<scene>.lighting.json` sidecar
 //! persists the converged result exactly as the single-bounce bake did.
@@ -67,8 +67,23 @@ impl Renderer {
     /// no-op. Returns a [`BounceReport`] describing the termination. The solve is
     /// `probe::solve::BounceSolve` run to its end; the editor steps the same one across frames.
     pub fn bake_probes_multibounce(&mut self, scene: &mut Scene, resolution: u32) -> BounceReport {
+        self.bake_probes_observed(scene, resolution, &mut |_, _, _| {})
+    }
+
+    /// [`bake_probes_multibounce`](Self::bake_probes_multibounce), telling `observe`
+    /// where the solve is before every probe it captures: `(bounce, done, total)`, as
+    /// `BounceSolve::progress` reads it. The one run-to-end loop: `Probe.Bake()` logs
+    /// through it (#1667).
+    pub fn bake_probes_observed(
+        &mut self,
+        scene: &mut Scene,
+        resolution: u32,
+        observe: &mut dyn FnMut(u32, usize, usize),
+    ) -> BounceReport {
         let mut solve = BounceSolve::new(scene, resolution);
         loop {
+            let (bounce, done, total) = solve.progress();
+            observe(bounce, done, total);
             if let Some(report) = solve.step(self, scene) {
                 // Nothing edits the scene inside this call, so its probes are the ones baked.
                 let committed = solve.commit(scene);

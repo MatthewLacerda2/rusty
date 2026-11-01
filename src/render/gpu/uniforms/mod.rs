@@ -134,7 +134,10 @@ pub(crate) struct LightingUniform {
     // holds its colour, else the procedural sky's terms the shader tints. The pad keeps
     // the probe array 16-byte aligned.
     pub sky_textured: f32,
-    pub _sky_pad: [f32; 2],
+    // `env_reflection` (#1668) 1.0 when surfaces reflect the sky and the reflection
+    // probes; 0.0 in a light-probe capture, which bakes no specular (as Unity's).
+    pub env_reflection: f32,
+    pub _sky_pad: f32,
     // The resident reflection probes (#1206): a draw's instance names the two it
     // blends (`InstanceData::reflection_probe`, #1584), and the shader box-projects
     // against each one's box and samples its cube's layer of the binding-4 cube array.
