@@ -8,6 +8,7 @@ mod lighting;
 pub(crate) mod materials;
 mod overlays;
 mod pass;
+pub(crate) mod proxy_volume;
 pub(crate) mod resources;
 mod solid_key;
 pub(crate) mod stack;

@@ -215,6 +215,7 @@ impl Renderer {
             clusters: global.clusters,
             lightmaps: global.lightmaps,
             draw_buffers,
+            proxy_volumes: Default::default(),
             materials: crate::render::gpu::material_cache::MaterialCache::new(textures.zero_params),
             surface_shaders,
             instancing: true,

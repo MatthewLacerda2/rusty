@@ -178,7 +178,10 @@ pub(crate) struct InstanceData {
     // the instance with the camera alone (no history, a mesh particle).
     pub prev_bone_base: u32,
     pub motion: u32,
-    pub _motion_pad: [u32; 2],
+    // The Light Probe Proxy Volume it reads (#1672): where it starts in the frame's
+    // proxy array (`draw::proxy_volume`), plus one; 0 for none.
+    pub proxy_volume: u32,
+    pub _motion_pad: u32,
     pub sh: [[f32; 4]; 9],
 }
 
@@ -195,7 +198,8 @@ impl InstanceData {
         lightmap_st: [0.0; 4],
         prev_bone_base: 0,
         motion: 0,
-        _motion_pad: [0; 2],
+        proxy_volume: 0,
+        _motion_pad: 0,
         sh: [[0.0; 4]; 9],
     };
 }

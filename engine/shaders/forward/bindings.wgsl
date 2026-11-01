@@ -106,7 +106,9 @@ struct InstanceData {
     // draw, a camera cut, a mesh particle) moves the vertex with the camera only.
     prev_bone_base: u32,
     motion: u32,
-    motion_pad_a: u32,
+    // The Light Probe Proxy Volume it reads its probe light from (#1672): where the
+    // volume starts in `proxy_volumes`, plus one; 0 for none.
+    proxy_volume: u32,
     motion_pad_b: u32,
     sh: array<vec4<f32>, 9>,
 };
@@ -177,6 +179,11 @@ var<storage, read> bones: array<mat4x4<f32>>;
 
 @group(1) @binding(2)
 var<storage, read> instances: array<InstanceData>;
+
+// The frame's Light Probe Proxy Volumes (#1672), back to back; an instance reads
+// its own from `proxy_volume` (layout: `forward/proxy_volume.wgsl`).
+@group(1) @binding(5)
+var<storage, read> proxy_volumes: array<vec4<f32>>;
 
 // The frame's distinct material records (#1616), one per material look in use; a
 // draw reads its own through `material()`. Binding 3 is the shadow casters'
