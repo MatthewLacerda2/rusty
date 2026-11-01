@@ -11,6 +11,7 @@ use rusty::components::{
     LightComponent, LightMode, LightProbeProxyVolumeComponent, LightType, ProxyResolutionMode,
 };
 use rusty::dev::bake::probe::bake_scene_probes;
+use rusty::dev::bake::progress::BakeLog;
 use rusty::dev::screenshot::capture;
 use rusty::scene::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::{Camera, Scene};
@@ -65,7 +66,7 @@ fn baked_room() -> Option<(Scene, u32)> {
     );
     let (min, max) = (Vec3::new(-0.8, 0.2, -0.45), Vec3::new(0.8, 2.2, 0.75));
     scene.probes.fill_grid(min, max, 0.6);
-    bake_scene_probes(&mut scene)
+    bake_scene_probes(&mut scene, &mut BakeLog::off())
         .unwrap()
         .then_some((scene, locker))
 }
