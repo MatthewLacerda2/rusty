@@ -146,7 +146,8 @@ pub(super) fn bake_on(
             Some((index, size, rasterize(mesh, size)))
         })
         .collect();
-    progress.set_total(charts.iter().map(|(_, _, p)| p.len() as u64).sum());
+    let texels = charts.iter().map(|(_, _, p)| p.len() as u64).sum();
+    progress.set_total(texels, charts.len() as u64);
     let (heads, points): (Vec<(usize, u32)>, Vec<Vec<TexelPoint>>) = charts
         .into_iter()
         .map(|(i, size, p)| ((i, size), p))
@@ -163,7 +164,9 @@ pub(super) fn bake_on(
     // The pool hands each chart its points back once traced, so they die with it.
     let finish = |c: usize, points: Vec<TexelPoint>, light: Vec<TexelLight>| {
         let (index, size) = heads[c];
-        lightmap(scene, index, size, points, light, settings)
+        let map = lightmap(scene, index, size, points, light, settings);
+        progress.mesh_done();
+        map
     };
     pool::run(points, threads, progress, trace, finish)
 }

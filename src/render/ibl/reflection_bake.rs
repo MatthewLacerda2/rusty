@@ -77,10 +77,24 @@ impl Renderer {
     /// `cubemap_path` at it. Returns the number of probes baked, or an error if a file
     /// could not be written. With no probes it is a successful no-op (0 baked).
     pub fn bake_reflections(&mut self, scene: &mut Scene, out_dir: &Path) -> Result<usize, String> {
-        for i in 0..scene.reflection_probes.len() {
+        self.bake_reflections_observed(scene, out_dir, &mut |_, _| {})
+    }
+
+    /// [`bake_reflections`](Self::bake_reflections), telling `observe` `(done, total)`
+    /// before each probe. The one run-to-end loop: `Reflection.Bake()` logs through it
+    /// (#1667).
+    pub fn bake_reflections_observed(
+        &mut self,
+        scene: &mut Scene,
+        out_dir: &Path,
+        observe: &mut dyn FnMut(usize, usize),
+    ) -> Result<usize, String> {
+        let total = scene.reflection_probes.len();
+        for i in 0..total {
+            observe(i, total);
             self.bake_reflection_into(scene, i, out_dir)?;
         }
-        Ok(scene.reflection_probes.len())
+        Ok(total)
     }
 
     /// Bake reflection probe `i` of `scene` at its resolution into

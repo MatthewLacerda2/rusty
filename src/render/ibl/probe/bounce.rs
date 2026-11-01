@@ -67,8 +67,23 @@ impl Renderer {
     /// no-op. Returns a [`BounceReport`] describing the termination. The solve is
     /// `probe::solve::BounceSolve` run to its end; the editor steps the same one across frames.
     pub fn bake_probes_multibounce(&mut self, scene: &mut Scene, resolution: u32) -> BounceReport {
+        self.bake_probes_observed(scene, resolution, &mut |_, _, _| {})
+    }
+
+    /// [`bake_probes_multibounce`](Self::bake_probes_multibounce), telling `observe`
+    /// where the solve is before every probe it captures: `(bounce, done, total)`, as
+    /// `BounceSolve::progress` reads it. The one run-to-end loop: `Probe.Bake()` logs
+    /// through it (#1667).
+    pub fn bake_probes_observed(
+        &mut self,
+        scene: &mut Scene,
+        resolution: u32,
+        observe: &mut dyn FnMut(u32, usize, usize),
+    ) -> BounceReport {
         let mut solve = BounceSolve::new(scene, resolution);
         loop {
+            let (bounce, done, total) = solve.progress();
+            observe(bounce, done, total);
             if let Some(report) = solve.step(self, scene) {
                 // Nothing edits the scene inside this call, so its probes are the ones baked.
                 let committed = solve.commit(scene);

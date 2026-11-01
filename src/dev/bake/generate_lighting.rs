@@ -12,8 +12,11 @@
 //! [`finish`]; `Lighting.Generate()` calls [`generate_lighting`], which runs the same
 //! steps in line (Unity's `Lightmapping.Bake`). Same path, so the two never drift.
 
-use crate::dev::bake::lighting::{start_lighting, LightingBakeParams, LightingBakeReport};
-use crate::dev::bake::lightmap::bake_scene_lightmaps;
+use crate::dev::bake::lighting::{
+    run_to_end, start_lighting, LightingBakeParams, LightingBakeReport,
+};
+use crate::dev::bake::lightmap::bake_scene_lightmaps_logged;
+use crate::dev::bake::progress::BakeLog;
 use crate::dev::bake::steps::LightingBake;
 use crate::navigation::NavigationGraph;
 use crate::scene::{save_lighting, LightingSave, Scene, LIGHTING_IN_PLAY};
@@ -51,12 +54,14 @@ impl GenerateReport {
 /// Bake lightmaps then probes with the scene's settings, and write the result.
 /// Errors when the scene was never saved, during Play (the bakes write the scene
 /// file, as a save does, #1340), or when a bake's own contract fails. The probes'
-/// progress lines go to `say`.
+/// progress lines go to `say`; where every step is, and the total time, to `log`
+/// (#1667).
 pub fn generate_lighting(
     scene: &mut Scene,
     scene_path: Option<&str>,
     nav: Option<&NavigationGraph>,
     say: &mut dyn FnMut(String),
+    log: &mut BakeLog,
 ) -> Result<GenerateReport, String> {
     refuse_in_play(scene)?;
     refuse_while_baking(scene)?;
@@ -64,11 +69,13 @@ pub fn generate_lighting(
     let settings = scene.lighting_settings.lightmaps;
     // A bake is no edit (#1631): the console line's Undo step leaves it out.
     scene.unrecorded(|scene| {
-        let lightmaps = bake_scene_lightmaps(scene, Some(path), &settings)?;
+        let lightmaps = bake_scene_lightmaps_logged(scene, Some(path), &settings, log)?;
         let mut probes = start_probes(scene, path, nav)?;
-        while !probes.step(scene, say)? {}
+        run_to_end(&mut probes, scene, say, log)?;
         probes.commit(scene)?;
-        finish(scene, path, lightmaps, probes.report())
+        let report = finish(scene, path, lightmaps, probes.report())?;
+        log.finish();
+        Ok(report)
     })
 }
 
