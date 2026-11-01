@@ -109,6 +109,19 @@ fn remove_component_round_trips_through_api() {
 }
 
 #[test]
+fn a_box_drops_its_mesh_and_keeps_its_collider() {
+    // #1657: a blockout box stays an invisible collider, same id.
+    let session = Session::new("").expect("session boots");
+    let id = ok(&session, "Scene.CreateEntity(\"b\", \"Box\")");
+    ok(&session, &format!("Scene.AddComponent({id}, \"Collider\")"));
+    let removed = ok(&session, &format!("Scene.RemoveComponent({id}, \"Mesh\")"));
+    assert_eq!(removed, "true");
+    let eid: u32 = id.parse().unwrap();
+    let scene = session.world().scene().borrow();
+    assert!(!scene.world.has_mesh(eid) && scene.world.has_collider(eid));
+}
+
+#[test]
 fn add_script_appends_a_script_with_its_fields() {
     let session = Session::new("").expect("session boots");
     let id = ok(&session, "Scene.CreateEntity(\"Bot\")");

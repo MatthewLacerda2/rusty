@@ -46,9 +46,10 @@ pub struct Session {
 impl Session {
     /// Build a session around a fresh world and bring the edit-mode runtime live.
     ///
-    /// Mirrors the windowed boot: seed the bundled scripts, create the shared
-    /// engine cells, optionally load `boot_scene` and bake nav, then construct the
-    /// world and initialise the evaluator **without entering play**. `boot_scene`
+    /// Mirrors the windowed boot: create the shared engine cells, optionally load
+    /// `boot_scene` and bake nav, then construct the world and initialise the
+    /// evaluator **without entering play**. It seeds nothing: an entry point that
+    /// opens a project seeds it first ([`boot_from_args`], `seeded_boot_scene`). `boot_scene`
     /// empty means start from an empty scene (the agent authors into it live).
     /// No project is opened: the engine's default settings, unbound. For tests,
     /// which want a world free of any project file; an entry point on a real
@@ -64,8 +65,6 @@ impl Session {
     /// `Application`'s and `Graphics`' project setters write it; `editor-capture`
     /// reads it ([`ProjectSource::read_only`]).
     pub fn boot(plan: &BootPlan, project: ProjectSource) -> Result<Self, String> {
-        crate::scene::seed_default_scripts();
-
         let scene = Rc::new(RefCell::new(Scene::new()));
         let input = Rc::new(RefCell::new(InputState::new()));
         let console = Rc::new(RefCell::new(ConsoleLogs::new()));
@@ -156,30 +155,44 @@ impl Session {
 ///     directory this prints to stderr and exits 2.
 ///   - `--empty`         — start from a blank scene (an empty plan).
 ///   - `<scene-path>`    — boot that specific scene (relative to the project root).
-///   - none              — seed the bundled default scene (a new project gets it
-///     once, #1618) and boot the project's boot scene
+///   - none              — boot the project's boot scene
 ///     (`core::project::boot_scene`: the editor's last scene, then the startup
 ///     scene, then an empty one).
 ///
-/// `--project` may sit anywhere; it is taken out first and the rest is read as the
-/// scene argument.
+/// Whichever form, the project is seeded first (`scene::seed_project`: the bundled
+/// scripts, the default scene, which a new project gets once, #1618, and the audio
+/// refresh). `--project` may sit anywhere; it is taken out first and the rest is
+/// read as the scene argument.
 pub fn boot_from_args(args: &[String]) -> (BootPlan, ProjectSource) {
     let mut rest = args.to_vec();
     let opened = crate::core::project::open_from_args(&mut rest, Access::Edit);
+    seed();
     let plan = match rest.first().map(String::as_str) {
         Some("--empty") => BootPlan::default(),
         Some(path) => BootPlan::of(path),
-        None => seeded_boot_scene(&opened),
+        None => boot_scene(&opened),
     };
     (plan, ProjectSource::bound(&opened))
 }
 
-/// Seed the default scene into the open project, then plan the scene it boots on,
-/// as the editor does (`shell::editor::start`): `session`, `session-mcp` and a
+/// Seed the open project (`scene::seed_project`: the bundled scripts, the default
+/// scene where due, the audio refresh), then plan the scene it boots on, as the
+/// editor does (`shell::editor::start`): `session`, `session-mcp` and a
 /// `bench_open` switch all open a project here. A `boot_scene` error (a Run's,
 /// never an Edit's) boots an empty scene.
 pub(crate) fn seeded_boot_scene(opened: &crate::core::project::Opened) -> BootPlan {
-    crate::scene::seed_default_scene();
+    seed();
+    boot_scene(opened)
+}
+
+/// Seed the open project (`scene::seed_project`) and print what its audio refresh
+/// did: every session boots on a project brought up to date, as the editor does.
+fn seed() {
+    crate::scene::print_refresh(&crate::scene::seed_project());
+}
+
+/// The scene `opened` boots on (`core::project::boot_scene`), or an empty one.
+fn boot_scene(opened: &crate::core::project::Opened) -> BootPlan {
     let startup = &opened.settings.build.startup_scene;
     crate::core::project::boot_scene(&opened.root, startup, Access::Edit).unwrap_or_default()
 }

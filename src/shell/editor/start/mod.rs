@@ -66,7 +66,9 @@ fn prepare(
     if let Err(err) = recent::record(&opened.root, unix_now()) {
         eprintln!("[Project] could not update the recent projects: {err}");
     }
-    boot::seed_project_workspace();
+    // The bundled scripts, the default scene where due, and the audio refresh
+    // (#1653: the player does none of it, so every authoring entry point does).
+    crate::scene::print_refresh(&crate::scene::seed_project());
     let startup = &opened.settings.build.startup_scene;
     let plan = crate::core::project::boot_scene(&opened.root, startup, Access::Edit);
     let game = world(&plan.unwrap_or_default(), ProjectSource::bound(opened));

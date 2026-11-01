@@ -59,9 +59,12 @@ Unity's `AssetDatabase.Refresh()`: import whatever arrived in the project's `ass
 the last look. Today that is audio: every `.mp3` anywhere under `assets/` is decoded
 once, its encoder delay and padding trimmed, written as a 16-bit PCM `.wav` beside it
 (same name, same channels and sample rate), and the `.mp3` is removed, so a built game
-carries WAV, never MP3. OGG is never converted. The editor runs the same refresh at
-boot and whenever its window regains focus, logging each conversion to the console;
-call it yourself after writing or copying an `.mp3` into the project.
+carries WAV, never MP3. OGG is never converted. The same refresh runs whenever a project
+is opened to author it (the editor, an agent session, a `play` run, `make export`) and
+whenever the editor's window regains focus; the shipped player, which boots read-only,
+never runs it. `make export` fails on an `.mp3` the refresh can't convert, and warns of one
+left because a `.wav` of its name already exists (that `.wav` ships; no `.mp3` does). Each
+conversion is logged; call it yourself after writing or copying an `.mp3` into the project.
 
 It also makes every image's compressed copy current (see `compression`, below) and
 returns how many it made in `compressed`; each image that fails (it does not decode,
@@ -106,11 +109,11 @@ hand is scaled by as much. The size is an authored, saved value, as Unity's LODG
 size is, so another scene's groups keep theirs (Unity's *Recalculate Bounds* is the
 manual step there too).
 
-A whole model already spawned (`Scene.Instantiate(modelPath)`, one child per node) gets
-its meshes rescaled, but its **parts do not move yet**: each node child keeps the offset it
-was spawned with, so a kit scaled down by 100 has small parts at the old spacing. Set the
-Scale Factor **before** instantiating the model; moving the parts of existing instances
-waits on models becoming prefab sources (#1637). The same holds for a changed source file.
+A whole model already spawned (`Scene.Instantiate(modelPath)`, one child per node) is a
+linked instance of the model (#1637), so it is rebuilt from the scaled import: its parts'
+offsets scale with the meshes, in the open scene at once and in every other scene when it
+loads, and a part moved by hand keeps its own place (an override). A changed source file
+reaches it the same way.
 
 ```lua no-run
 Assets.SetModelImportSettings("project/models/crate_cm.glb", { scaleFactor = 0.01 })

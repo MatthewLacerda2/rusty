@@ -82,7 +82,7 @@ error. Omit `primitive` (or pass an unknown name) to create a bare entity carryi
 only its mandatory `Transform` — the menu's **Create Empty**.
 
 **`kind`** is one of the Add Component menu's first-class components,
-case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
+case-insensitive: `Mesh` (aliases `MeshFilter`, `MeshRenderer`), `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent` (alias `NavAgent`), `NavMeshObstacle` (alias
 `NavObstacle`), `OffMeshLink` (alias `NavMeshLink`), `NavMeshModifierVolume` (alias
 `NavModifier`), `Camera`, `Particles` (alias `ParticleSystem`),
@@ -96,7 +96,20 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Joint.SetKind`), `CharacterController` (alias `Character`), `LODGroup` (alias `LOD`), `Trail` (alias `TrailRenderer`),
 `Line` (alias `LineRenderer`).
 Each is added with the inspector's default values; adding an
-existing kind replaces it. An unknown kind is an error. (Scripts attach by path, not as a defaulted kind: see
+existing kind replaces it. An unknown kind is an error that lists the kinds.
+`Mesh` is Unity's Mesh Filter and Mesh Renderer in one: adding it attaches the
+toolbar's `Box`, and, as adding an existing kind replaces it, adding it to an
+entity that already has a mesh replaces that mesh with the `Box`, an imported or
+skinned one included. Removing it keeps the entity, its id and its `Collider`, so
+a blockout box can stay an invisible collider (Unity's
+`Destroy(GetComponent<MeshRenderer>())`). A `Mesh`-shaped collider (the one an
+imported model gets) keeps the removed mesh as its own, Unity's
+`MeshCollider.sharedMesh`: the entity still collides and still reaches the navmesh,
+and the scene saves the mesh's reference on the collider (`shared_mesh`) and
+rebuilds it on load and when its model is re-imported (a changed Scale Factor or
+file; a sub-object that now imports empty keeps the old copy). Adding a `Mesh` back drops that copy, and the collider follows the new
+mesh, its box refit to it. As in Unity, where a renderer holds its materials, removing the
+`Mesh` drops the entity's `Material` reference too (the library asset stays). (Scripts attach by path, not as a defaulted kind: see
 `AddScript`.)
 
 **`AddScript(id, path, [fields])`** is the Add Component menu's script entries:
@@ -265,9 +278,22 @@ one name and never drift.
   empty node is an empty child; a `_LOD<n>` set of sibling nodes is one LODGroup (an
   Alt+D copy, `Crate_LOD0.001`, is a group of its own); what a skeleton's joint holds
   (a mesh on the joint, a gun under `Hand`) hangs from that bone's entity, so it
-  follows the animation. Returns the root's id. A Scale Factor or source change after
-  the spawn rescales the meshes but does **not** move the parts yet (#1637): set the
-  Scale Factor before instantiating (`Assets.SetModelImportSettings`).
+  follows the animation. Returns the root's id. The spawn is a **linked prefab
+  instance of the model** (#1637): every entity links to the model file, keyed by its
+  node path, so a Scale Factor change (`Assets.SetModelImportSettings`) or a re-written
+  file rebuilds the open scene's instances from the new import at once and every other
+  scene's on load, and an edit made to a part (a moved wall, a renamed node) is an
+  override that survives it. The model's materials (`kit.glb::Wood`, or the one
+  `kit.glb::#default` its unmaterialled nodes share) are the scene's once placed: an
+  edit to one (`Material.SetColor`) shows on every instance of the model and survives
+  a re-import, Play→Stop and a load, as Unity's extracted material does. The prefab verbs below work on it (`ListPrefabOverrides`,
+  `RevertPrefabOverrides`, `ReimportPrefab`, `RevertPrefabField`) except the two
+  apply-to-source ones, which error: a model is read-only, as in Unity. A node added to
+  the file is not spawned into existing instances yet, and a node removed from it
+  leaves its entity as it was (#1665). glTF has no stable node ids, so a part is
+  matched to its node by path, and same-named sibling nodes by their order among
+  themselves (`Kit/Cube`, `Kit/Cube[1]`): reordering two of them in the file swaps
+  which part takes which node.
 
 - **`Scene.Instantiate(assetRef, [name], [x, y, z])`** — spawns one entity from an
   importable model sub-object reference (`path::sub_object`, the `reference` field
@@ -356,14 +382,18 @@ get them.
 On-instance:
 
 - **`Scene.RevertPrefabOverrides(instanceRootId)`** — drop every override and rebuild
-  the instance straight from the current source (it becomes a pristine copy).
+  the instance straight from the current source (it becomes a pristine copy). A model
+  part whose node left the model keeps its overrides and values: there is nothing to
+  revert it to.
 - **`Scene.ReimportPrefab(instanceRootId)`** — re-baseline from the source and re-apply
   the overrides on top: non-overridden fields pick up the latest source,
   overridden ones win. This is the same propagation that runs automatically on scene
   load.
 - **`Scene.ListPrefabOverrides(instanceRootId)`** — the read verb: the instance's
   overrides as `"localId:key"` strings, sorted (e.g. `"1:+/light"`, `"1:-/camera"`,
-  `"1:/scripts/#size"`, `"1:/transform/position/0"`).
+  `"1:/scripts/#size"`, `"1:/transform/position/0"`). A model part whose node left
+  the model (#1665) has no local id and is named by its node path instead:
+  `"Kit/Wall (gone):/transform/position/0"`.
 
 Apply-to-source (the Unity "Apply → Prefab" direction):
 
@@ -390,7 +420,8 @@ Its per-field opposite:
   source's camera back, a reverted size entry or element of a list whose length
   changed gives the whole list back to the source).
   The instance's other overrides are untouched. `entityId` may be any instance
-  entity. Returns `false`, changing nothing, when there is no override at `key`. The
+  entity. Returns `false`, changing nothing, when there is no override at `key`, and
+  errors on a model part whose node left the model (it has nothing to revert to). The
   prefab card's per-field revert button.
 
 The verbs error if `instanceRootId` (or, for the field form, `entityId`) is not a

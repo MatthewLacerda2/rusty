@@ -70,8 +70,10 @@ pub(super) fn tree(
 }
 
 /// Whether an export leaves the file `rel` behind: a source a converter reads,
-/// or a backup or temp file Blender writes beside a `.blend` (`.blend1`, `.blend2`,
-/// …, and `.blend@`), which holds the same source.
+/// a backup or temp file Blender writes beside a `.blend` (`.blend1`, `.blend2`,
+/// …, and `.blend@`), which holds the same source, or an `.mp3`, audio's source
+/// format: the export's refresh made its `.wav`, which ships, and one the refresh
+/// skipped (its `.wav` already there, or it does not decode) ships neither way.
 pub(super) fn left_behind(rel: &Path) -> bool {
     let blender_leftover = rel
         .extension()
@@ -82,7 +84,7 @@ pub(super) fn left_behind(rel: &Path) -> bool {
                 .map(str::to_owned)
         })
         .is_some_and(|n| n == "@" || (!n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())));
-    converter_for(rel).is_some() || blender_leftover
+    converter_for(rel).is_some() || blender_leftover || paths::has_extension(rel, "mp3")
 }
 
 /// Copy the import cache of each source in `sources` (project-relative), under

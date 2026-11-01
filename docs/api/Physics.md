@@ -220,7 +220,7 @@ A collider's **shape** is a table with a `kind` and that kind's extents — what
 | `"Sphere"` | `radius` |
 | `"Cylinder"` | `radius, height` (along local Y) |
 | `"Capsule"` | `radius, height, axis` — `axis` is `"X"`, `"Y"` (default) or `"Z"`, case-insensitive |
-| `"Mesh"` | `convex` — read-only: baked from an imported mesh, never set from script |
+| `"Mesh"` | `convex` — read-only: baked from an imported mesh, never set from script. It builds from the entity's `Mesh`, or, once that is removed, from the copy the collider kept (`Scene.RemoveComponent`, Unity's `MeshCollider.sharedMesh`) |
 
 **Capsule** (Unity: `CapsuleCollider`) is the character and limb shape: a
 cylinder capped by two hemispheres. As in Unity, `height` is the **full**

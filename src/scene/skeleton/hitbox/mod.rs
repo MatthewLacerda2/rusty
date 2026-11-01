@@ -117,6 +117,7 @@ impl Scene {
                 shape: fit.shape.clone(),
                 is_trigger: false,
                 material: PhysicsMaterial::default(),
+                shared_mesh: None,
                 aabb_min: Vec3::ZERO,
                 aabb_max: Vec3::ZERO,
             }),

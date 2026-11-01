@@ -667,12 +667,13 @@ An axis can be satisfied in two ways:
 - **Closed** — the artifact exists (the field, Add Component entry, inspector card,
   or `src/api/<x>.rs` namespace + doc). #82 closed `animator add_menu` (Animator got
   its own Add Component entry, added/removed independently) and `light api` (the new
-  `src/api/light.rs` `Light` namespace).
+  `src/api/light.rs` `Light` namespace); #1657 closed `mesh add_menu` (a `Mesh`
+  kind, so `Scene.RemoveComponent(id, "Mesh")` keeps a box's collider).
 - **Waived** — a documented decision *not* to add a per-component artifact, because
   the axis is already served by a shared namespace or a content-driven workflow, and
   doing it standalone would fragment the one stable API surface. Waivers live in the
   `WAIVERS` table in `tools/lint/src/components/waivers.rs` as `(component, axis, rationale)`
-  rows: `mesh add_menu`/`mesh api` (mesh is content-grid/glTF-driven),
+  rows: `mesh api` (mesh is content-grid/glTF-driven),
   `collider api` + `rigidbody api` (→ `Physics`), `nav_agent api`
   (→ `NavMeshAgent`), `post_processing api` (→ `Graphics`).
 

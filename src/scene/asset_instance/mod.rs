@@ -172,9 +172,12 @@ fn import_material(
     } else {
         format!("{path}::{}", data.name)
     };
+    // A material already in the scene is the user's (a placed model's recolour,
+    // #997): a later spawn of the same file must not reset it.
     scene
         .materials
-        .insert(key.clone(), material_asset_from_import(data));
+        .entry(key.clone())
+        .or_insert_with(|| material_asset_from_import(data));
     Some(key)
 }
 
@@ -225,8 +228,9 @@ pub fn set_lightmap_uv_settings(
 /// Set a model's Scale Factor (#1398) in its `.meta` sidecar and re-import every
 /// mesh in `scene` instanced from it, a skinned one with its new rig and its bones
 /// moved to the scaled rest pose; an LODGroup over those meshes has its size scaled
-/// by as much as its LOD0 meshes grew. A whole-model instance's node offsets do
-/// not move yet (#1637): set the factor before instantiating. The model is noted
+/// by as much as its LOD0 meshes grew. A whole-model instance (a linked instance
+/// of the model, #1637) is rebuilt from the scaled import, so its parts' offsets
+/// scale too and a part moved by hand keeps its override. The model is noted
 /// in the write log, so every other cache keyed by it (the particle meshes)
 /// re-reads it too. A NaN or unchanged
 /// factor changes nothing: no write, no re-import. The one verb the model inspector
@@ -240,10 +244,23 @@ pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Resu
         return Ok(0);
     }
     asset::sidecar::set_scale(source, scale).map_err(|e| e.to_string())?;
-    let before = crate::scene::lod_instance::lod0_extents(scene);
-    let ids = rehydrate::model_writes::reimport_noted(scene, path, Rig::Rebuild);
-    crate::scene::lod_instance::rescale_groups_over(scene, &ids, &before);
-    Ok(ids.len())
+    // A whole-model instance is rebuilt from the scaled import, its parts' offsets
+    // with it (#1637), so the refit skips its static parts; a lone sub-object only
+    // re-imports its mesh.
+    let refit = |scene: &mut Scene, skip: &_| {
+        let before = crate::scene::lod_instance::lod0_extents(scene);
+        let ids = rehydrate::model_writes::reimport_noted_except(scene, path, Rig::Rebuild, skip);
+        crate::scene::lod_instance::rescale_groups_over(scene, &ids, &before);
+        ids.len() + skip.len()
+    };
+    // The same match the write-log follow uses, so a link naming the model by
+    // another spelling (absolute vs project-relative) is found too.
+    let model = crate::core::fs::written::Stale::new(vec![path.to_string()]);
+    Ok(crate::scene::prefab::restamp::restamp_models(
+        scene,
+        |s| model.matches(s),
+        refit,
+    ))
 }
 
 #[cfg(test)]

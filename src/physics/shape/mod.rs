@@ -20,4 +20,6 @@ mod mesh_tests;
 mod mirror_tests;
 #[cfg(test)]
 mod round_bounds_tests;
+#[cfg(test)]
+mod shared_mesh_tests;
 pub(super) mod triangles;

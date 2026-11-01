@@ -1,10 +1,16 @@
-//! src/shell/player.rs — the standalone player frontend (#431): a game with no editor.
+//! src/shell/player/ — the standalone player frontend (#431): a game with no editor.
 //!
 //! Boot: read the project's build settings, load the startup scene, enter Play at once
 //! (no edit snapshot — there is no edit mode to return to), apply the persisted video
 //! and keybinding settings, run. Each frame renders the active camera stack and the
 //! in-game UI straight onto the swapchain with no chrome, and the game gets all input. `Application.Quit()`
 //! closes the window; the loop's exit flushes `Storage` first.
+//!
+//! **The player boots read-only** (#1653), as Unity's player never writes into its
+//! data folder: no seeding and no asset refresh, which the editor's open
+//! (`scene::seed_project`) and the export (`dev::export`) do instead. What
+//! it writes goes under `saved/` (`Storage`, a dev build's demos), Unity's
+//! `persistentDataPath`; `read_only_tests` holds it on an export.
 
 use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
@@ -94,23 +100,28 @@ fn world(plan: &crate::core::project::BootPlan, settings: ProjectSettings) -> Ga
     game
 }
 
+/// The player's world on the open project's startup scene, read-only: everything
+/// [`launch`] does before it opens the window. Errs when no startup scene is set.
+fn boot(settings: ProjectSettings) -> Result<GameWorld, String> {
+    // A run reads no editor record, so the root is moot (`boot_scene`, #1618).
+    let startup = &settings.build.startup_scene;
+    let plan = crate::core::project::boot_scene(Path::new(""), startup, Access::Run)?;
+    Ok(world(&plan, settings))
+}
+
 /// Boot the standalone player on the open project's settings
 /// (`core::project::Opened`) and run until the game quits or the window closes.
 pub fn launch(settings: ProjectSettings) {
     let build = settings.build.clone();
-    boot::seed_project_workspace();
     println!(
         "[Player] Starting {} ({})...",
         build.product_name, build.startup_scene
     );
 
-    // A run reads no editor record, so the root is moot (`boot_scene`, #1618).
-    let plan = crate::core::project::boot_scene(Path::new(""), &build.startup_scene, Access::Run);
-    let plan = plan.unwrap_or_else(|err| {
+    let game = boot(settings).unwrap_or_else(|err| {
         eprintln!("[Player] cannot start: {err}");
         std::process::exit(1);
     });
-    let game = world(&plan, settings);
 
     let launch = Launch {
         video_defaults: video_defaults(&build),
@@ -122,6 +133,9 @@ pub fn launch(settings: ProjectSettings) {
     };
     super::run(game, launch);
 }
+
+#[cfg(all(test, feature = "dev"))]
+mod read_only_tests;
 
 #[cfg(test)]
 mod tests {

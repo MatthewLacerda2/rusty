@@ -4,12 +4,13 @@
 
 use egui_phosphor::regular as icon;
 
-use super::card::component_card;
+use super::card::{component_card, remove_component};
 use super::particles::widgets::combo;
 use crate::components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use crate::components::ShadowCasting;
 use crate::editor::widgets::DragRange;
 use crate::scene::authoring::rendering::mesh as mesh_ops;
+use crate::scene::authoring::ComponentKind;
 
 /// The skinned-mesh tools a Mesh card button asks for, deferred because they need
 /// the Scene.
@@ -68,8 +69,8 @@ pub fn draw_mesh(
         *is_dirty = true;
     }
     if remove {
-        world.set_mesh(id, None);
-        *is_dirty = true;
+        // The shared verb behind `Scene.RemoveComponent`: the Material goes too.
+        remove_component(world, id, ComponentKind::Mesh, is_dirty);
     }
 }
 

@@ -5,11 +5,14 @@
 //! recorded with a document is put back under its id, in its old slot of the
 //! insertion order. Its mesh takes the live geometry when the live mesh comes from
 //! the same primitive or asset (the common case: a move, a value, a rename), and is
-//! rebuilt from its reference otherwise, as a load rebuilds it.
+//! rebuilt from its reference otherwise, as a load rebuilds it. A Mesh-shaped
+//! collider's shared mesh (#1657), recorded without its geometry too, is put back
+//! the same way.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::ecs::Recorded;
+use crate::components::{ColliderComponent, ColliderShape, Entity};
+use crate::ecs::{Recorded, World};
 use crate::scene::{Despawn, Scene};
 
 use super::{side::Side, Step};
@@ -65,10 +68,31 @@ fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>
             }
             (None, _) => {}
         }
+        if doc.mesh.is_none() {
+            restore_shared_mesh(world, &mut doc);
+        }
         world.restore_entity(doc, seq);
     }
     // After every entity is back, so each skeleton finds its restored bones.
     for owner in rebuilt {
         scene.sync_skeleton(owner);
     }
+}
+
+/// Give `doc`'s collider's shared mesh (recorded without geometry) the live one's
+/// when it comes from the same source, and rebuild it from its reference otherwise.
+/// Only a Mesh-shaped collider's: another shape never reads it.
+fn restore_shared_mesh(world: &mut World, doc: &mut Entity) {
+    let mesh_shaped = |c: &&mut ColliderComponent| matches!(c.shape, ColliderShape::Mesh { .. });
+    let collider = doc.collider.as_mut().filter(mesh_shaped);
+    let Some(shared) = collider.and_then(|c| c.shared_mesh.as_mut()) else {
+        return;
+    };
+    if let Some(mut live) = world.collider_mut(doc.id) {
+        if let Some(live) = live.shared_mesh.as_mut().filter(|l| shared.same_source(l)) {
+            shared.adopt_geometry(live);
+            return;
+        }
+    }
+    crate::scene::rehydrate::rehydrate_entity_mesh(doc);
 }

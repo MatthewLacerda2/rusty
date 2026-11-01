@@ -1,11 +1,11 @@
 //! A model whose texture lies outside `assets/` fails the export, naming it; an
-//! image's compressed copy ships, and the player never re-makes it; an image that
+//! image's compressed copy ships, and a play-test on the export never re-makes it; an image that
 //! does not decode ships uncompressed, never failing the export (#1574).
 
 use super::{export, fixture, play, project, tree, CACHE};
 
 #[test]
-fn an_images_compressed_copy_ships_and_the_player_writes_none() {
+fn an_images_compressed_copy_ships_and_a_play_test_writes_none() {
     let game = project(&[], "");
     let textures = game.join("assets").join("textures");
     std::fs::create_dir_all(&textures).unwrap();
@@ -23,12 +23,25 @@ fn an_images_compressed_copy_ships_and_the_player_writes_none() {
     );
     let (ran, _) = play(&out, &[]);
     assert!(ran.status.success());
-    // The player's first launch seeds the starter content (an image among it);
-    // it compresses none of it, and leaves the shipped copy as it was.
+    // The export seeds the starter content (an image among it) and ships its
+    // compressed copy too (#1653). `play` is the headless play-test (the harness,
+    // which seeds as the editor does), not the read-only player
+    // (`shell::player::read_only_tests` holds that): a run on the export
+    // compresses no image anew and changes no shipped copy.
     let after = tree(&out);
-    assert_eq!(after.get(&cached), shipped.get(&cached));
-    let made: Vec<_> = after.keys().filter(|k| k.ends_with(".bctex")).collect();
-    assert_eq!(made, [&cached], "the player compressed nothing");
+    let compressed = |t: &std::collections::BTreeMap<String, Vec<u8>>| -> Vec<(String, Vec<u8>)> {
+        let copies = t.iter().filter(|(k, _)| k.ends_with(".bctex"));
+        copies.map(|(k, b)| (k.clone(), b.clone())).collect()
+    };
+    assert!(
+        compressed(&shipped).len() > 1,
+        "the seeded image ships compressed"
+    );
+    assert_eq!(
+        compressed(&after),
+        compressed(&shipped),
+        "the player compressed nothing"
+    );
 }
 
 #[test]
