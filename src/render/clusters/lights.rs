@@ -38,23 +38,37 @@ pub(crate) struct LocalLight {
 impl LocalLight {
     /// The light's record at world `position`, shining along world `forward`, or
     /// `None` for a type that is not a local light.
+    ///
+    /// An Area light (#1674) only ever gets here in a bake capture, being always
+    /// `Baked`: it is drawn as its far field, a spot at its centre of intensity
+    /// `intensity × area` whose 0°–90° cone fades as `cos θ`, a one-sided
+    /// Lambertian emitter's falloff. The lightmap and the probes' direct term
+    /// integrate the rectangle itself.
     pub(crate) fn new(position: Vec3, forward: Vec3, light: &LightComponent) -> Option<Self> {
-        let kind = match light.light_type {
-            LightType::Point => KIND_POINT,
-            LightType::Spotlight => KIND_SPOT,
+        let (kind, intensity, cones) = match light.light_type {
+            LightType::Point => (KIND_POINT, light.intensity, (0.0, 0.0)),
+            LightType::Spotlight => (
+                KIND_SPOT,
+                light.intensity,
+                (light.inner_cone, light.outer_cone),
+            ),
+            LightType::Area => {
+                let area = light.area_size.x * light.area_size.y;
+                (KIND_SPOT, light.intensity * area, (0.0, 90.0))
+            }
             LightType::Ambient | LightType::Directional => return None,
         };
         Some(Self {
             position: position.to_array(),
             range: light.range.max(0.0),
             color: light.color.to_array(),
-            intensity: light.intensity,
+            intensity,
             direction: forward.normalize().to_array(),
             kind,
-            inner_cone: light.inner_cone.to_radians().cos(),
-            outer_cone: light.outer_cone.to_radians().cos(),
+            inner_cone: f32::to_radians(cones.0).cos(),
+            outer_cone: f32::to_radians(cones.1).cos(),
             shadow: NO_SHADOW,
-            baked: f32::from(u8::from(light.mode.bakes_direct())),
+            baked: f32::from(u8::from(light.effective_mode().bakes_direct())),
         })
     }
 
@@ -83,7 +97,7 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
         .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .filter_map(|id| {
             let light = scene.world.light(id)?;
-            if !light.mode.renders_live(capture) {
+            if !light.effective_mode().renders_live(capture) {
                 return None;
             }
             // World space: a light on a child (a flashlight in a hand) lights

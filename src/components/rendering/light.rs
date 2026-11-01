@@ -1,9 +1,9 @@
 //! src/components/rendering/light.rs — Light component
 //!
-//! ambient/directional/point/spot. Unity: Light. Moved verbatim from the former
+//! ambient/directional/point/spot/area. Unity: Light. Moved verbatim from the former
 //! `core/scene.rs`; the per-light [`LightMode`] (#438) is Unity's Light Mode.
 
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 
 crate::core::named_enum! {
@@ -15,6 +15,10 @@ crate::core::named_enum! {
         Directional = "Directional",
         Point = "Point",
         Spotlight = "Spot",
+        /// A rectangle `area_size` wide and tall facing its local −Z (#1674),
+        /// Unity's Area (Rectangle) light. Baked only, as in Unity's built-in
+        /// pipeline: [`LightComponent::effective_mode`] is always `Baked`.
+        Area = "Area",
     }
 }
 
@@ -80,6 +84,28 @@ pub struct LightComponent {
     /// Realtime / Mixed / Baked (#438); `Mixed` when the file names none.
     #[serde(default)]
     pub mode: LightMode,
+    /// An Area light's width (local X) and height (local Y) in world units,
+    /// Unity's `areaSize` (#1674); other types ignore it. 1 × 1 when the file
+    /// names none, Unity's default.
+    #[serde(default = "unit_area")]
+    pub area_size: Vec2,
+}
+
+fn unit_area() -> Vec2 {
+    Vec2::ONE
+}
+
+impl LightComponent {
+    /// The mode the bake and the renderer act on: `mode`, except that an Area
+    /// light is always `Baked` (#1674; Unity's built-in pipeline bakes area lights
+    /// only), whatever a file or an older write left in `mode`.
+    pub fn effective_mode(&self) -> LightMode {
+        if self.light_type == LightType::Area {
+            LightMode::Baked
+        } else {
+            self.mode
+        }
+    }
 }
 
 #[cfg(test)]
@@ -117,5 +143,14 @@ mod tests {
             "range":5,"inner_cone":0,"outer_cone":0}"#;
         let l: LightComponent = serde_json::from_str(json).unwrap();
         assert_eq!(l.mode, LightMode::Mixed);
+        assert_eq!(l.area_size, Vec2::ONE, "Unity's default area size");
+    }
+
+    #[test]
+    fn an_area_light_is_always_baked() {
+        let json = r#"{"light_type":"Area","color":[1,1,1],"intensity":1,
+            "range":5,"inner_cone":0,"outer_cone":0,"mode":"Realtime"}"#;
+        let l: LightComponent = serde_json::from_str(json).unwrap();
+        assert_eq!(l.effective_mode(), LightMode::Baked);
     }
 }

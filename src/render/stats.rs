@@ -242,7 +242,9 @@ pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
         per_type[match light.light_type {
             LightType::Point => 0,
             // A `Baked` sun takes no slot (#809): counted, never dropped.
+            // Nor does an Area light, always `Baked` (#1674).
             LightType::Directional if !light.mode.renders_live(false) => 4,
+            LightType::Area => 4,
             LightType::Directional => 1,
             LightType::Spotlight => 2,
             LightType::Ambient => 3,

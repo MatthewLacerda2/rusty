@@ -18,12 +18,29 @@ entity has no light. A spotlight's cone half-angles have no verb here: write
 | `Light.SetColor` | `(id, r, g, b)` | — (each channel floored at 0, HDR above 1 allowed; a NaN or infinite channel makes it black) |
 | `Light.GetIntensity` / `SetIntensity` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
 | `Light.GetRange` / `SetRange` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
-| `Light.GetType` / `SetType` | `(id)` / `(id, name)` | `"Ambient"` / `"Directional"` / `"Point"` / `"Spot"` (Unity's names) |
+| `Light.GetType` / `SetType` | `(id)` / `(id, name)` | `"Ambient"` / `"Directional"` / `"Point"` / `"Spot"` / `"Area"` (Unity's names) |
 | `Light.GetCastShadows` / `SetCastShadows` | `(id)` / `(id, on)` | `boolean` (default `false`; point and spot lights only) |
-| `Light.GetMode` / `SetMode` | `(id)` / `(id, name)` | `"Realtime"` / `"Mixed"` / `"Baked"` |
+| `Light.GetMode` / `SetMode` | `(id)` / `(id, name)` | `"Realtime"` / `"Mixed"` / `"Baked"` (an Area light refuses all but `"Baked"`, with a console warning) |
+| `Light.GetAreaSize` / `SetAreaSize` | `(id)` / `(id, width, height)` | `width, height` in world units (default `1, 1`; each floored at `0.01`, NaN or `math.huge` takes the floor; `0, 0` with no light) |
 
 `SetType` and `SetMode` are case-insensitive; an unrecognized name is ignored (the
 current value is kept).
+
+**Area lights** (#1674) are Unity's *Area (Rectangle)* light, and like Unity's
+built-in pipeline rusty bakes them only: `SetType(id, "Area")` makes the light
+`Baked`, and it stays so (`SetMode` refuses the rest, warning in the console). The
+emitter is a `width × height` rectangle (`SetAreaSize`) centred on the entity,
+spanning its local X and Y and shining from its front, local −Z, only. Intensity is
+per unit area: a 2 × 1 panel gives out twice what a 1 × 1 one of the same
+intensity does, and seen from far away it acts as a spot light of `intensity ×
+area` whose light fades as the cosine off the panel's facing. `range` cuts it off
+from its centre, like a point light's. The lightmap bake integrates the whole
+rectangle, so its shadows have soft edges that widen with the panel's size, and the
+light-probe bake adds its direct light (a fixed 8 × 8 grid of shadow rays per
+probe) for dynamic objects. It is never drawn live, so a surface without a lightmap
+and an object before the probes are baked get nothing from it. Transform scale
+does not resize it; `SetAreaSize` does. The editor draws its rectangle, its facing
+and its range. A Disc shape and realtime area lights are not there yet.
 
 **How many lights shade.** Point and spot lights are rendered with clustered
 forward lighting (#434): there is no fixed slot count. Each camera shades up to

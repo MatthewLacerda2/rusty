@@ -8,12 +8,14 @@
 //! reads it back as `radiance · max(cos, 0)` (to L2 accuracy), the irradiance a
 //! realtime light gives, so a dynamic object lit through the probe matches the Lambert
 //! response the forward shader gives a live light. Same falloff and cones as the
-//! lightmap tracer (`trace::arrival`).
+//! lightmap tracer (`trace::arrival`). An Area light (#1674) is integrated over a
+//! fixed grid of points on its rectangle, one shadow ray each (`area::grid`).
 
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 
+use super::area;
 use super::bake::triangles;
-use super::input::BakeScene;
+use super::input::{BakeScene, LightShape};
 use super::rays::Rays;
 use super::trace::{arrival, T_MIN};
 use crate::scene::lighting::sh::Sh9;
@@ -31,9 +33,17 @@ pub fn baked_direct_sh(scene: &BakeScene, positions: &[Vec3]) -> Vec<Sh9> {
         .map(|&p| {
             let mut sh = Sh9::zero();
             for light in scene.lights.iter().filter(|l| l.bakes_direct) {
-                if let Some((to_light, distance, received)) = arrival(light, p) {
-                    if !rays.occluded(p, to_light, T_MIN, distance) {
-                        sh.add_sample(to_light, received, 1.0);
+                // An Area light is integrated over a fixed grid of points (#1674).
+                let points: Vec<Vec2> = match light.shape {
+                    LightShape::Area(_) => area::grid().collect(),
+                    _ => vec![Vec2::ZERO],
+                };
+                let weight = 1.0 / points.len() as f32;
+                for u in points {
+                    if let Some((to_light, distance, received)) = arrival(light, p, u) {
+                        if !rays.occluded(p, to_light, T_MIN, distance) {
+                            sh.add_sample(to_light, received, weight);
+                        }
                     }
                 }
             }

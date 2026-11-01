@@ -17,9 +17,10 @@ fn scene_with_light() -> (RefCell<Scene>, u32) {
 #[test]
 fn set_get_color_intensity_range_type() {
     let (scene, id) = scene_with_light();
+    let console = RefCell::new(ConsoleLogs::new());
     let lua = Lua::new();
     lua.scope(|scope| {
-        register(&lua, scope, &scene).unwrap();
+        register(&lua, scope, &scene, &console).unwrap();
 
         lua.load(format!("Light.SetColor({id}, 0.2, 0.4, 0.6)"))
             .exec()
@@ -58,9 +59,10 @@ fn set_get_color_intensity_range_type() {
 #[test]
 fn clamps_negatives_and_ignores_unknown_type() {
     let (scene, id) = scene_with_light();
+    let console = RefCell::new(ConsoleLogs::new());
     let lua = Lua::new();
     lua.scope(|scope| {
-        register(&lua, scope, &scene).unwrap();
+        register(&lua, scope, &scene, &console).unwrap();
 
         lua.load(format!("Light.SetIntensity({id}, -5.0)"))
             .exec()
@@ -88,5 +90,37 @@ fn clamps_negatives_and_ignores_unknown_type() {
         light.mode,
         LightMode::Mixed,
         "unknown mode kept the default"
+    );
+}
+
+/// An Area light: Baked, refusing the rest with a warning, and sized (#1674).
+#[test]
+fn area_light_is_baked_and_sized() {
+    let (scene, id) = scene_with_light();
+    let console = RefCell::new(ConsoleLogs::new());
+    let lua = Lua::new();
+    lua.scope(|scope| {
+        register(&lua, scope, &scene, &console).unwrap();
+        lua.load(format!(
+            "Light.SetType({id}, 'Area') Light.SetMode({id}, 'Mixed') \
+             Light.SetAreaSize({id}, 1.2, 0.6)"
+        ))
+        .exec()
+        .unwrap();
+        let (w, h): (f32, f32) = lua.load(format!("return Light.GetAreaSize({id})")).eval()?;
+        assert_eq!((w, h), (1.2, 0.6));
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(
+        scene.borrow().world.light(id).unwrap().mode,
+        LightMode::Baked
+    );
+    let warned: Vec<_> = console.borrow().since(0).map(|(m, _)| m.clone()).collect();
+    assert!(
+        warned
+            .iter()
+            .any(|m| m.contains("Area light is always Baked")),
+        "{warned:?}"
     );
 }

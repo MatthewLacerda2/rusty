@@ -30,9 +30,10 @@ fn light_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> 
     let via_lua = entity_with_light(&mut scene.borrow_mut(), "ViaLua");
     let via_op = entity_with_light(&mut scene.borrow_mut(), "ViaOp");
 
+    let console = RefCell::new(rusty::scripting::ConsoleLogs::new());
     let lua = Lua::new();
     lua.scope(|s| {
-        rusty::api::light::register(&lua, s, &scene).unwrap();
+        rusty::api::light::register(&lua, s, &scene, &console).unwrap();
         lua.load(format!(
             r#"
             Light.SetColor({via_lua}, 0.2, 0.4, 0.6)

@@ -5,6 +5,7 @@
 mod axis;
 mod batch;
 mod handles;
+mod lights;
 mod probes;
 
 use glam::{Mat4, Vec3};
@@ -110,7 +111,7 @@ impl Renderer {
                 render_pass.draw(0..self.axis_count, 0..1);
             }
         }
-        // D. Light- & reflection-probe gizmos (#284): visualization only.
+        // D. Light- & reflection-probe gizmos (#284) and Area lights (#1674).
         self.draw_probe_overlays(render_pass, bindings, &overlays.probes);
     }
 }

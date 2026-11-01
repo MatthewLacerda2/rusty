@@ -6,6 +6,8 @@
 //! lighting. The pieces:
 //!
 //! * `input` — the static scene flattened for the bake ([`BakeScene::gather`]);
+//! * `lights` — the lights it bakes, each one's [`LightShape`];
+//! * `area` — how an Area light's rectangle is sampled and falls off (#1674);
 //! * `rays` / `raster` / `trace` — ray queries (parry's `TriMesh`), texel → surface
 //!   point, and the per-texel estimate (the units it stores are explained in `trace`);
 //! * `filter` — the edge-aware Gaussian that smooths the baked bounce;
@@ -22,11 +24,13 @@
 //! The bake is a pure function of (scene, settings, seed): no clock, no unseeded RNG,
 //! and the result never depends on how many threads ran it.
 
+mod area;
 mod atlas;
 mod bake;
 mod encode;
 mod filter;
 mod input;
+mod lights;
 mod probe_direct;
 mod progress;
 mod raster;
@@ -35,6 +39,7 @@ mod rng;
 mod set;
 mod trace;
 
+pub use area::AreaShape;
 pub use atlas::{pack, LightmapAtlas, MAX_PAGE};
 pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
 pub use encode::{encode_directions, encode_texels};
@@ -46,6 +51,8 @@ pub use set::{LightmapEntry, LightmapSet};
 
 #[cfg(test)]
 mod ambient_tests;
+#[cfg(test)]
+mod area_tests;
 #[cfg(test)]
 mod atlas_tests;
 #[cfg(test)]

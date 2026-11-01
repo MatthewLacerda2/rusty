@@ -49,6 +49,10 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
             draw_local_light(ui, world, id, &light, is_dirty);
         }
 
+        if light.light_type == LightType::Area {
+            draw_area(ui, world, id, &light, is_dirty);
+        }
+
         if light.light_type == LightType::Spotlight {
             draw_spot_cones(ui, world, id, &light, is_dirty);
         }
@@ -83,6 +87,44 @@ fn draw_local_light(
     if ui.checkbox(&mut shadows, "Cast Shadows").changed() {
         if let Some(mut l) = world.light_mut(id) {
             light_ops::set_cast_shadows(&mut l, shadows);
+        }
+        *is_dirty = true;
+    }
+}
+
+/// An Area light's width, height and range (#1674). It casts no realtime shadow:
+/// its bake shadows it.
+fn draw_area(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    light: &LightComponent,
+    is_dirty: &mut bool,
+) {
+    let (mut w, mut h, mut range) = (light.area_size.x, light.area_size.y, light.range);
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        ui.label("Width:");
+        changed |= ui
+            .add(crate::editor::widgets::slider(&mut w, 0.01..=10.0))
+            .changed();
+    });
+    ui.horizontal(|ui| {
+        ui.label("Height:");
+        changed |= ui
+            .add(crate::editor::widgets::slider(&mut h, 0.01..=10.0))
+            .changed();
+    });
+    ui.horizontal(|ui| {
+        ui.label("Distance:");
+        changed |= ui
+            .add(crate::editor::widgets::slider(&mut range, 0.1..=100.0))
+            .changed();
+    });
+    if changed {
+        if let Some(mut l) = world.light_mut(id) {
+            light_ops::set_area_size(&mut l, glam::Vec2::new(w, h));
+            light_ops::set_range(&mut l, range);
         }
         *is_dirty = true;
     }
@@ -126,6 +168,11 @@ fn draw_light_mode(
     light: &LightComponent,
     is_dirty: &mut bool,
 ) {
+    if light.light_type == LightType::Area {
+        // Unity's built-in pipeline bakes area lights only (#1674).
+        ui.label("Mode: Baked (Area lights bake only)");
+        return;
+    }
     ui.horizontal(|ui| {
         ui.label("Mode:");
         egui::ComboBox::from_id_salt("LightModeSelector")

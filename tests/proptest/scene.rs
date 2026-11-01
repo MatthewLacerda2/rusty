@@ -56,6 +56,7 @@ proptest! {
                 scene.world.set_light(
                     id,
                     Some(LightComponent {
+                        area_size: glam::Vec2::ONE,
 intensity,
 ..rusty::scene::authoring::default_light()
 }),

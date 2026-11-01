@@ -25,6 +25,7 @@ pub(crate) fn light(
     range: f32,
 ) -> LightComponent {
     LightComponent {
+        area_size: glam::Vec2::ONE,
         light_type,
         color,
         intensity,

@@ -47,7 +47,12 @@ inspect! {
         part!("inner_cone", CONES),
         part!("outer_cone", CONES),
         op!("cast_shadows", light::set_cast_shadows),
-        op!("mode", light::set_mode),
+        with!("mode", |l, m: crate::components::LightMode| {
+            light::set_mode(l, m)
+                .then_some(())
+                .ok_or_else(|| format!("an Area light is always Baked, not {}", m.name()))?
+        }),
+        op!("area_size", light::set_area_size),
     ];
     CameraComponent => camera, camera_mut, &[
         ro!("active", NO_OP),
