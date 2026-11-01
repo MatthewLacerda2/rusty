@@ -557,6 +557,8 @@ scene.entities[].post_processing.white_balance.temperature: f32
 scene.entities[].post_processing.white_balance.tint: f32
 scene.entities[].post_processing: option
 scene.entities[].prefab_link.local_id: u32
+scene.entities[].prefab_link.node: option
+scene.entities[].prefab_link.node: string
 scene.entities[].prefab_link.overrides.added_components: map
 scene.entities[].prefab_link.overrides.added_components{key}: string
 scene.entities[].prefab_link.overrides.added_components{}: any
