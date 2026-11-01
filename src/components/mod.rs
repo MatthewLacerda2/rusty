@@ -63,6 +63,9 @@ pub use rendering::camera::{
     is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX,
 };
 pub use rendering::light::{LightComponent, LightMode, LightType};
+pub use rendering::light_probe_proxy_volume::{
+    LightProbeProxyVolumeComponent, ProxyBoundsMode, ProxyGrid, ProxyQuality, ProxyResolutionMode,
+};
 pub use rendering::lod_group::{LodGroupComponent, LodLevel};
 pub use rendering::post_processing::{
     AutoExposure, Bloom, ChromaticAberration, ColorAdjustments, ColorLookup, ColorWheel,

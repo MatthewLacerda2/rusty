@@ -92,6 +92,7 @@ impl Renderer {
                 self.shared_bones_buffer(),
                 self.draw_buffers.identity_instance(),
                 &records,
+                self.draw_buffers.proxies(),
             ],
         );
         Some(OverlayBindings { group })

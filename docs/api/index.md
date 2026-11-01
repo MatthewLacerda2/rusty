@@ -336,6 +336,7 @@ where it reads best. -->
 - [`Camera`](Camera.md)
 - [`Light`](Light.md)
 - [`LODGroup`](LODGroup.md)
+- [`LightProbeProxyVolume`](LightProbeProxyVolume.md)
 - [`Probe`](Probe.md)
 - [`Reflection`](Reflection.md)
 - [`Lighting`](Lighting.md)

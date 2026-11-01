@@ -161,6 +161,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_joint, "Joint"),
         (World::has_character_controller, "CharacterController"),
         (World::has_lod_group, "LODGroup"),
+        (World::has_light_probe_proxy_volume, "LightProbeProxyVolume"),
         (World::has_trail, "TrailRenderer"),
         (World::has_line, "LineRenderer"),
         (

@@ -64,6 +64,11 @@ pub const KINDS: &[Kind] = &[
         "character_controller",
     ),
     kind::<LodGroupComponent>("LODGroup", Some(K::LodGroup), "lod_group"),
+    kind::<LightProbeProxyVolumeComponent>(
+        "LightProbeProxyVolume",
+        Some(K::LightProbeProxyVolume),
+        "light_probe_proxy_volume",
+    ),
     kind::<TrailComponent>("Trail", Some(K::Trail), "trail"),
     kind::<LineComponent>("Line", Some(K::Line), "line"),
     kind::<ShapeComponent>("Shape", Some(K::Shape), "shape"),

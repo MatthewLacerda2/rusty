@@ -93,7 +93,8 @@ case-insensitive: `Mesh` (aliases `MeshFilter`, `MeshRenderer`), `Light`, `Anima
 `TextMeshPro`, `TextMeshProUGUI`), `Shape`, `Selectable`, `LayoutGroup`, `LayoutElement` (alias
 `ContentSizeFitter`), `Joint` (aliases `FixedJoint`, `HingeJoint`,
 `CharacterJoint` — all add a default `Fixed` joint; set its kind with
-`Joint.SetKind`), `CharacterController` (alias `Character`), `LODGroup` (alias `LOD`), `Trail` (alias `TrailRenderer`),
+`Joint.SetKind`), `CharacterController` (alias `Character`), `LODGroup` (alias `LOD`),
+`LightProbeProxyVolume` (aliases `ProxyVolume`, `LPPV`), `Trail` (alias `TrailRenderer`),
 `Line` (alias `LineRenderer`).
 Each is added with the inspector's default values; adding an
 existing kind replaces it. An unknown kind is an error that lists the kinds.
