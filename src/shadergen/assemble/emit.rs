@@ -22,7 +22,8 @@ pub type Instance<'a> = (&'static Block, &'a BlockSel);
 
 /// Refuse a param the block doesn't declare, or one whose shape doesn't fit its
 /// arity: a scalar param takes a number, a vector param takes exactly `arity`
-/// numbers or one number (broadcast to every lane). Errors name the block, its
+/// numbers or one number (broadcast to every lane), a choice param one of its
+/// names (#1679). Errors name the block, its
 /// recipe index, the bad key and the declared params.
 pub fn check_params(block: &Block, sel: &BlockSel, index: usize) -> Result<(), String> {
     for (key, value) in &sel.params {
@@ -38,14 +39,28 @@ pub fn check_params(block: &Block, sel: &BlockSel, index: usize) -> Result<(), S
                 }
             ));
         };
+        if !p.choices.is_empty() {
+            match value {
+                ParamValue::Name(n) if p.choices.contains(&n.as_str()) => continue,
+                _ => {
+                    return Err(format!(
+                        "{at}: param {key:?} expects one of {}",
+                        p.choices.join(", ")
+                    ))
+                }
+            }
+        }
         let fits = match value {
             ParamValue::Scalar(_) => true,
             ParamValue::Vector(v) => p.arity > 1 && v.len() == p.arity,
+            ParamValue::Name(_) => false,
         };
         if !fits && p.arity == 1 {
-            return Err(format!(
-                "{at}: param {key:?} expects a number, got an array"
-            ));
+            let got = match value {
+                ParamValue::Name(n) => format!("{n:?}"),
+                _ => "an array".to_string(),
+            };
+            return Err(format!("{at}: param {key:?} expects a number, got {got}"));
         }
         if !fits {
             return Err(format!(
@@ -118,6 +133,7 @@ fn literal(p: &Param, value: Option<&ParamValue>) -> String {
     let lanes = match value {
         Some(ParamValue::Vector(v)) => v.clone(),
         Some(ParamValue::Scalar(s)) => vec![*s; p.arity],
+        Some(ParamValue::Name(n)) => vec![choice_index(p, n)],
         None => p.defaults(),
     };
     let parts: Vec<String> = lanes.iter().map(|v| fmt_f32(*v)).collect();
@@ -125,6 +141,12 @@ fn literal(p: &Param, value: Option<&ParamValue>) -> String {
         return parts.join("");
     }
     format!("vec{}<f32>({})", p.arity, parts.join(", "))
+}
+
+/// A choice's index as the `f32` the module bakes; [`check_params`] has already
+/// refused a name that isn't one of `p`'s choices.
+fn choice_index(p: &Param, name: &str) -> f32 {
+    p.choices.iter().position(|c| *c == name).unwrap_or(0) as f32
 }
 
 /// Format an `f32` so it is always a valid WGSL float literal (has a decimal

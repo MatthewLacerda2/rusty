@@ -182,6 +182,27 @@ mod tests {
     }
 
     #[test]
+    fn a_choice_param_lists_its_names_and_defaults_to_the_first() {
+        let lua = Lua::new();
+        register(&lua).unwrap();
+        let (default, names): (String, String) = lua
+            .load(
+                r#"for _, b in ipairs(Shader.Blocks("postfx")) do
+                     if b.id == "phosphor_mask" then
+                       local k = b.params[1]
+                       return k.default, table.concat(k.choices, ",")
+                     end
+                   end"#,
+            )
+            .eval()
+            .unwrap();
+        assert_eq!(
+            (default.as_str(), names.as_str()),
+            ("aperture", "aperture,shadow,slot")
+        );
+    }
+
+    #[test]
     fn a_vector_default_comes_back_as_an_array_of_its_arity() {
         let lua = Lua::new();
         register(&lua).unwrap();

@@ -42,8 +42,8 @@ crate::core::named_enum! {
     }
 }
 
-/// A single parameter value a block consumes: a scalar or a small float vector
-/// (a color or a 2-vector). Kept deliberately narrow — shader block params are
+/// A single parameter value a block consumes: a scalar, a small float vector
+/// (a color or a 2-vector), or the name of a choice (`phosphor_mask`'s `kind`). Kept deliberately narrow — shader block params are
 /// tuning knobs, not arbitrary data — so the assembler can emit each as a WGSL
 /// literal with no ambiguity.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -53,6 +53,8 @@ pub enum ParamValue {
     Scalar(f32),
     /// A small float vector (e.g. an RGB tint `[r, g, b]` or a 2-vec).
     Vector(Vec<f32>),
+    /// One of a choice param's names (`"aperture"`, #1679); the module bakes its index.
+    Name(String),
 }
 
 /// One selected building block: its `id` in the curated library and the params

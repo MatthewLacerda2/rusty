@@ -54,7 +54,7 @@ passes, bindings, or render features).
 | `Shader.Bake` | `(recipe [, out_dir])` | the written `<out_dir>/<name>.wgsl` path |
 | `Shader.Validate` | `(recipe)` | array of the composed module's entry-point names (dry-run; **writes nothing**) |
 | `Shader.ToJson` | `(recipe)` | the recipe's canonical JSON string |
-| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"` \| `"ui"`): `{ {id, desc, params = { {name, default, arity, runtime} }, textures = {slot…}, stage }, … }` — `stage` is `"color"`, `"uv"` or `"vertex"` |
+| `Shader.Blocks` | `(pass)` | the curated blocks for `pass` (`"surface"` \| `"postfx"` \| `"ui"`): `{ {id, desc, params = { {name, default, arity, runtime, choices?} }, textures = {slot…}, stage }, … }` — `stage` is `"color"`, `"uv"` or `"vertex"`; a **choice** param (`phosphor_mask`'s `kind`) lists the names it takes in `choices`, its `default` the first |
 
 `recipe` is a table **or** its serialized JSON string (from `Shader.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. Its enum value `pass` is read in any case; a stored file holds the canonical spelling. `out_dir` defaults to `assets/shaders`. Use `Shader.Validate` to
@@ -186,7 +186,9 @@ What a block's helper can read (#398). Surface blocks get the forward contract:
   `mask` in their `textures` read it, and a module declares it only when one of
   its blocks does.
 
-Postfx blocks see the sampled color `c`, the fragment `uv`, and **`game_time()`** —
+Postfx blocks see the sampled color `c`, the fragment `uv` (moved by a uv-stage
+block such as `barrel`, so a scanline curves with the glass), the fragment's pixel
+position `in.pos.xy` (`phosphor_mask`), and **`game_time()`** —
 the same game clock (it reads the post params' `camera_pos.w`, bound at binding 0).
 **Sampling blocks** (#402) also read the module's input at other places:
 `source_tap(uv)` samples it (clamped at the screen edge) and `source_texel()` is
@@ -253,11 +255,24 @@ into the lit color; postfx blocks grade the sampled scene color.
   = 0}` (edges blend toward `color` — set it, e.g. `{0.8, 0, 0}` for damage red;
   `pulse_speed` is radians per game second, 0 holds it steady). Sampling:
   `sharpen {amount = 0.5}` (5-tap unsharp mask); `radial_blur {strength = 0.05,
-  center = 0.5}` (8 taps toward `center` in uv — speed/impact streaks). Params
+  center = 0.5}` (8 taps toward `center` in uv — speed/impact streaks). A CRT
+  look (#1679): `barrel {amount* = 0.08, corner_radius = 0.03}` (a **uv-stage**
+  block, the glass's curve — Unity's Lens Distortion at a positive intensity: it
+  moves where the frame is sampled, outward by `amount` toward the edges, *before*
+  anything samples it, so every block reads the curved picture whatever its place
+  in the recipe. What falls past the curved screen, and past its rounded corners
+  (`corner_radius` in uv), draws **black**, after every colour block);
+  `phosphor_mask {kind = "aperture", scale = 1, strength* = 0.3}` (the RGB
+  phosphor pattern in **screen pixels**, so it stays pixel-fine at any resolution:
+  `kind` names it — `"aperture"` vertical R/G/B stripes, `"shadow"` the stripes
+  staggered a pixel per row, `"slot"` stripes broken into staggered slots; `scale`
+  is pixels per stripe; the lit stripe is brightened so each channel's mean stays
+  where it was). Pair them with `scanline` for the tube. Params
   marked `*` are **runtime**, driven per frame on the volume with
   `Graphics.SetPostParam` (see below): `scanline.strength*`,
   `damage_vignette.color*` and `.intensity*`, `sharpen.amount*`,
-  `radial_blur.strength*`; the rest are baked. Exposure, saturation and contrast
+  `radial_blur.strength*`, `barrel.amount*`, `phosphor_mask.strength*`; the rest
+  are baked. Exposure, saturation and contrast
   are **not** blocks: the volume already grades them in HDR (`Graphics.SetExposure`,
   `SetSaturation`, `SetContrast`), so a recipe naming them is refused as an unknown
   block (#397). Nor are `vignette`, `film_grain` and `chromatic_aberration`: they
