@@ -25,12 +25,14 @@ pub mod live;
 mod merge;
 pub mod overrides;
 mod pointer;
+mod removed;
 pub mod restamp;
 pub mod source;
 mod structure;
 
 pub use extract::extract_prefab;
 use merge::{merge_materials, rename_entity_material, Merge};
+pub(crate) use removed::record_removed;
 
 use std::collections::BTreeMap;
 use std::path::Path;

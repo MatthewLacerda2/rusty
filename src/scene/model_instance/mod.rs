@@ -180,6 +180,8 @@ fn file_stem(path: &str) -> String {
 #[cfg(test)]
 mod bone_tests;
 #[cfg(test)]
+mod gone_play_tests;
+#[cfg(test)]
 mod gone_tests;
 #[cfg(test)]
 mod link_tests;
@@ -187,5 +189,7 @@ mod link_tests;
 mod lod_tests;
 #[cfg(test)]
 mod material_tests;
+#[cfg(test)]
+mod removed_tests;
 #[cfg(test)]
 mod tests;

@@ -121,35 +121,40 @@ pub(super) fn propagate_from(
     source: &str,
     prefab: &PrefabData,
 ) -> Result<(), String> {
-    rebuild_instance(scene, root_id, source, prefab, true)?;
+    rebuild_instance(scene, root_id, source, prefab, true, false)?;
     finish_rebuild(scene);
     Ok(())
 }
 
 /// Rebuild every entity of the instance at `root_id` from `prefab` (its `source` as
 /// already read), re-applying its overrides when `keep` and dropping them
-/// otherwise. Leaves out the whole-scene passes ([`finish_rebuild`]), which a caller
-/// rebuilding many instances runs once after them (`restamp::propagate_roots`).
+/// otherwise (a removed part's among them, so it comes back). `applying` says a
+/// document is being applied (`structure::reshape`). Leaves out the whole-scene
+/// passes ([`finish_rebuild`]), which a caller rebuilding many instances runs once
+/// after them (`restamp::propagate_roots`).
 pub(super) fn rebuild_instance(
     scene: &mut Scene,
     root_id: u32,
     source: &str,
     prefab: &PrefabData,
     keep: bool,
+    applying: bool,
 ) -> Result<(), String> {
     let mut ids = require_instance(scene, root_id)?;
-    rekey(&mut scene.world, &ids, prefab);
-    if is_model_source(source) {
-        ids = reshape(scene, root_id, &ids, source, prefab);
-    }
-    let (baselines, added) = fresh_baselines(scene, source, prefab);
-    let baselines = in_instance_space(scene, &ids, baselines);
-    for id in ids {
-        if !keep {
+    if !keep {
+        for &id in &ids {
             if let Some(mut link) = scene.world.prefab_link_mut(id) {
                 link.overrides = Default::default();
             }
         }
+    }
+    rekey(&mut scene.world, &ids, prefab);
+    if is_model_source(source) {
+        ids = reshape(scene, root_id, &ids, source, prefab, applying);
+    }
+    let (baselines, added) = fresh_baselines(scene, source, prefab);
+    let baselines = in_instance_space(scene, &ids, baselines);
+    for id in ids {
         rebuild_entity(scene, id, &baselines, keep);
     }
     // Only what a slot still names after the overrides stays: a material deleted
@@ -172,7 +177,14 @@ pub(super) fn finish_rebuild(scene: &mut Scene) {
 pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     require_instance(scene, root_id)?;
     let source = link_source(scene, root_id)?;
-    rebuild_instance(scene, root_id, &source, &read_source(&source)?, false)?;
+    rebuild_instance(
+        scene,
+        root_id,
+        &source,
+        &read_source(&source)?,
+        false,
+        false,
+    )?;
     finish_rebuild(scene);
     Ok(())
 }
@@ -204,10 +216,12 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
 /// the instance keeps its values and the overrides its links hold, and has no
 /// baseline (the document it came from carries none), so an edit made meanwhile is
 /// not tracked until the source is back. Each source is read once, however many
-/// instances it has: a level holding hundreds of one model builds it once.
+/// instances it has: a level holding hundreds of one model builds it once. It runs
+/// as a document is applied (`apply_scene_data`), so a part whose node the model
+/// lost goes at once, in Play too (`structure::reshape`).
 pub fn propagate_all_linked_instances(scene: &mut Scene) {
     let roots = instance_roots(scene, |_| true);
-    propagate_roots(scene, roots);
+    propagate_roots(scene, roots, true);
 }
 
 /// Rebuild one instance entity from its baseline, preserving live identity/structure

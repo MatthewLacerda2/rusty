@@ -293,10 +293,22 @@ one name and never drift.
   its parent node's part, and a node removed (or renamed) takes its part away with
   that part's overrides. What you added under a removed part (an entity of your own,
   another model's instance) is kept: it moves to the nearest part left, staying where
-  it is in the world, as Unity keeps an orphaned added object. glTF has no stable node ids, so a part is
-  matched to its node by path, and same-named sibling nodes by their order among
-  themselves (`Kit/Cube`, `Kit/Cube[1]`): reordering two of them in the file swaps
-  which part takes which node.
+  it is in the world, as Unity keeps an orphaned added object; so does a part of the
+  instance you moved under it, with its overrides. A part **you** remove is not a
+  node the file gained: destroying one (`Scene.DestroyEntity`, the hierarchy's
+  Destroy) records it on the instance as a **removed part** (Unity's *Removed
+  GameObject* override, listed as `"0:-part/<node path>"`), so a load, a re-import or
+  a Scale Factor change never stamps it back; `RevertPrefabField(rootId,
+  "-part/<node path>")` or `RevertPrefabOverrides` brings it back. Moving a part out
+  of its instance (`Scene.SetParent`, the inspector's parent field) **unpacks** it:
+  it keeps its values, loses its link, and is recorded as removed the same way, so
+  it is never stamped twice (Unity refuses that move without unpacking). Moving a
+  part elsewhere inside its own instance keeps it linked. glTF has no stable node
+  ids, so a part is matched to its node by path, and same-named sibling nodes by
+  their order among themselves (`Kit/Cube`, `Kit/Cube[1]`): reordering two of them
+  in the file swaps which part takes which node, and removing the first of two from
+  the file destroys the **last** one's part (the survivor takes `Kit/Cube`, so
+  `Kit/Cube[1]` is the node that went), its overrides with it.
 
 - **`Scene.Instantiate(assetRef, [name], [x, y, z])`** — spawns one entity from an
   importable model sub-object reference (`path::sub_object`, the `reference` field
@@ -334,7 +346,7 @@ scene load, exactly like a primitive's `primitive_type` — no GPU buffers are i
 
 A linked instance's divergence from the source is its **diff** against the source as
 the instance last took it (when it was stamped, loaded or reimported), held the way
-Unity holds a prefab instance's overrides, in three kinds. It covers every present and
+Unity holds a prefab instance's overrides, in three kinds (a model instance adds a fourth, removed parts). It covers every present and
 future component with no per-component code. Each override has a **key**, the name
 `ListPrefabOverrides` lists it by and the field verbs take:
 
@@ -355,6 +367,9 @@ future component with no per-component code. Each override has a **key**, the na
   Light or a Collider added to an instance child keeps all its values.
 - **Removed components** (Unity's *removed components*), keyed `"-/<component>"`
   (`"-/camera"`): a source component the instance removed.
+- **Removed parts** (Unity's *removed GameObjects*), on a model instance's root
+  only, keyed `"-part/<node path>"` (`"-part/Kit/Wall"`): a part you destroyed or
+  moved out of the instance (above). It is recorded when you do it, not diffed.
 
 An entity id inside any of them (a Joint's `connected_body`, inside an added Joint
 too) follows its entity: it is remapped when the bones respawn on Stop or a load, and
@@ -393,7 +408,8 @@ On-instance:
   load.
 - **`Scene.ListPrefabOverrides(instanceRootId)`** — the read verb: the instance's
   overrides as `"localId:key"` strings, sorted (e.g. `"1:+/light"`, `"1:-/camera"`,
-  `"1:/scripts/#size"`, `"1:/transform/position/0"`).
+  `"1:/scripts/#size"`, `"1:/transform/position/0"`, and on a model instance's
+  root a removed part, `"0:-part/Kit/Wall"`).
 
 Apply-to-source (the Unity "Apply → Prefab" direction):
 

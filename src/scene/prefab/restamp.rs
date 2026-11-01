@@ -18,11 +18,12 @@ use crate::scene::{PrefabData, Scene};
 /// rebuilt from the model as it imports now with those overrides on top. So a
 /// part keeps a hand edit and takes everything else (a Scale Factor's offsets, a
 /// moved node) from the file. It writes entities but is no edit: unrecorded, as a
-/// bake is, when an instance is there to rebuild. `refit` is handed the instances'
-/// static meshed parts, which the rebuild re-imports anyway, for it to skip; a
-/// skinned part is left to it, since its rig and bones are the refit's to move.
-/// The rebuild then gives each instance the model's node tree: a node the model
-/// gained is spawned, one it lost is destroyed (`structure`, #1665).
+/// bake is, when an instance is there to rebuild. The rebuild also gives each
+/// instance the model's node tree: a node the model gained is spawned, one it lost
+/// is destroyed (`structure`, #1665). `refit` is handed, for it to skip, the
+/// instances' static meshed parts, which the rebuild re-imports anyway, and every
+/// part whose node is gone, which the rebuild destroys; a skinned part still in the
+/// model is left to it, since its rig and bones are the refit's to move.
 pub fn restamp_models<R>(
     scene: &mut Scene,
     names: impl Fn(&str) -> bool,
@@ -40,9 +41,9 @@ pub fn restamp_models<R>(
                 continue;
             };
             sync_overrides(&mut scene.world, &ids);
-            // Only a part the rebuild will reach is skipped: one whose node the
-            // model still has. A gone part (or every part of a model that no longer
-            // reads) is left to `refit`, or it would keep stale geometry.
+            // Only a part the rebuild will reach is skipped: a static one it
+            // rebuilds, or a gone one it destroys. Every part of a model that no
+            // longer reads is left to `refit`, or it would keep stale geometry.
             let Some(Some(kept)) = link_source(scene, root)
                 .ok()
                 .map(|s| nodes.entry(s).or_insert_with_key(|s| node_set(s)).as_ref())
@@ -50,14 +51,17 @@ pub fn restamp_models<R>(
                 continue;
             };
             let rebuilt = |id: &u32| {
-                let static_mesh = scene.world.mesh(*id).is_some_and(|m| m.skin.is_none());
+                let Some(mesh) = scene.world.mesh(*id) else {
+                    return false;
+                };
                 let node = scene.world.prefab_link(*id).and_then(|l| l.node.clone());
-                static_mesh && node.is_some_and(|n| kept.contains(&n))
+                let gone = node.as_ref().is_some_and(|n| !kept.contains(n));
+                (mesh.skin.is_none() && node.is_some()) || gone
             };
             skip.extend(ids.iter().copied().filter(rebuilt));
         }
         let out = refit(scene, &skip);
-        propagate_roots(scene, roots);
+        propagate_roots(scene, roots, false);
         out
     })
 }
@@ -82,7 +86,8 @@ pub(super) fn instance_roots(scene: &Scene, pick: impl Fn(&str) -> bool) -> Vec<
 
 /// Propagate each of `roots`, reading each source once; a root whose source can't
 /// be read is skipped. The whole-scene passes run once, after the last instance.
-pub(super) fn propagate_roots(scene: &mut Scene, roots: Vec<u32>) {
+/// `applying` says a document is being applied (`structure::reshape`).
+pub(super) fn propagate_roots(scene: &mut Scene, roots: Vec<u32>, applying: bool) {
     let mut sources: BTreeMap<String, Option<PrefabData>> = BTreeMap::new();
     let mut rebuilt = false;
     for root in roots {
@@ -93,7 +98,7 @@ pub(super) fn propagate_roots(scene: &mut Scene, roots: Vec<u32>) {
             .entry(source.clone())
             .or_insert_with_key(|s| read_source(s).ok());
         if let Some(prefab) = prefab.as_ref() {
-            rebuilt |= rebuild_instance(scene, root, &source, prefab, true).is_ok();
+            rebuilt |= rebuild_instance(scene, root, &source, prefab, true, applying).is_ok();
         }
     }
     if rebuilt {

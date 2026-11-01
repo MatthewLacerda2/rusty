@@ -14,7 +14,7 @@ use crate::scene::{list_instance_overrides, reimport_instance, Scene};
 /// Spawn the kit as `file` and rename its `Wall` node to `Panel` in the file, so
 /// the placed `Wall` is gone from the model. Returns the scene, the root, the
 /// `Kit` entity, the Wall and the model's path.
-fn spawn_then_rename(file: &str) -> (Scene, u32, u32, u32, String) {
+pub(super) fn spawn_then_rename(file: &str) -> (Scene, u32, u32, u32, String) {
     let (scene, root) = spawn_file(file, KIT, Vec3::ZERO);
     let path = scene.world.prefab_link(root).unwrap().source.clone();
     let kit = child(&scene, root, "Kit");

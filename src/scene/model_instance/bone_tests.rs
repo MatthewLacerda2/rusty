@@ -94,3 +94,24 @@ fn a_node_added_under_a_joint_hangs_from_its_bone() {
         .prefab_link(scope)
         .is_some_and(|l| l.local_id != 0));
 }
+
+#[test]
+fn a_gone_skinned_part_takes_its_bones_hitboxes() {
+    use crate::components::ColliderComponent;
+    let (mut scene, root) = rig_in("rusty_1665_hitbox");
+    let body = child(&scene, root, "MeshNode");
+    let bone = scene.find_bone(body, "Joint1").unwrap();
+    let hitbox = scene.add_entity(crate::scene::skeleton::HITBOX_NAME.to_string());
+    scene.set_parent(hitbox, Some(bone)).unwrap();
+    let collider = ColliderComponent::from_mesh_bounds(true, -Vec3::ONE, Vec3::ONE);
+    scene.world.set_collider(hitbox, Some(collider));
+    let path = write_rig("rusty_1665_hitbox", false);
+    let gltf = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(&path, gltf.replace("\"MeshNode\"", "\"Body\"")).unwrap();
+    crate::scene::reimport_instance(&mut scene, root).unwrap();
+    assert!(!scene.world.contains(body));
+    assert!(
+        !scene.world.contains(hitbox),
+        "destroyed with its bone, not re-homed"
+    );
+}
