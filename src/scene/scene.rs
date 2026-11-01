@@ -62,6 +62,8 @@ pub struct Scene {
     pub skybox_path: String,
     pub ambient_color: Vec3,
     pub ambient_intensity: f32,
+    /// The ambient source, `Color` or `Gradient`, and the gradient's colours (#1647).
+    pub ambient: crate::scene::AmbientSettings,
     /// Per-scene navmesh bake tunables (#276): Unity's per-scene navmesh bake
     /// settings (agent radius, max slope, max step, grid spacing). The nav bake
     /// reads these off the active scene; serialized with the scene like the ambient
@@ -146,7 +148,7 @@ pub struct Scene {
     /// from a document: every note up to it is in them (#1242). Never serialized.
     pub meshes_read_at: u64,
     /// Models whose meshes the scene re-imported itself, each with the write-log
-    /// generation of the note it made (`model_writes::reimport_noted`, #1398): the
+    /// generation of the note it made (`model_writes::reimport_noted_except`, #1398): the
     /// follow skips a note it already read. Never serialized.
     pub meshes_reimported: BTreeMap<String, u64>,
     /// The text the engine last read or wrote at this scene's file (#1340), so the
@@ -165,6 +167,7 @@ impl Default for Scene {
             skybox_path: default_skybox_path(),
             ambient_color: default_ambient_color(),
             ambient_intensity: default_ambient_intensity(),
+            ambient: Default::default(),
             nav_settings: NavMeshSettings::default(),
             fog: crate::scene::FogSettings::default(),
             sky: crate::scene::SkySettings::default(),

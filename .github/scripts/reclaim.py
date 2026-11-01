@@ -89,6 +89,16 @@ runs from still protect it, an OPEN pull request holding the commit still
 keeps it, and GitHub not answering keeps it and says so. Every other name
 keeps the rules above.
 
+A harness lock does not outlive its owner (#1658): on 2026-10-31 sixteen
+`agent-*` worktrees stayed PROTECTED as locked by `claude agent agent-<id> (pid
+3440856 start …)`, a session that had ended and never unlocked them. The lock's
+PID is read back (`tenancy.agent_pid_of`); when no such process runs, the lock
+protects nothing, the worktree is judged as if unlocked (dirty, unpushed and
+open-PR checks still apply), and removing it `git worktree unlock`s first. A
+live PID still protects, and a reused one only errs toward keeping. The
+supervisor's dead lock keeps its rule: named stale, kept, since it may be
+restarted into it.
+
 `--dry-run` decides and prints the same, and deletes nothing.
 """
 
@@ -132,6 +142,7 @@ class Facts:
     current: bool = False
     busy: list[int] | None = field(default_factory=list)  # pids standing in it; None: unknown
     stale: int | None = None  # a lock left by a merge-queue supervisor that no longer runs: its pid
+    dead_agent: int | None = None  # a harness agent's lock whose pid no longer runs (#1658)
     reviewer: bool = False  # a reviewer's checkout: judged by what it holds (#1538)
     on_github: bool | None = False  # GitHub has its HEAD commit; None: GitHub didn't answer
 
@@ -204,7 +215,7 @@ def verdict(wt: Worktree, facts: Facts) -> tuple[str, str]:
     if wt.locked is not None and facts.stale is not None:
         return "protect", (f"{why}, but locked by merge-queue supervisor pid {facts.stale}, which is not running:"
                            f" a stale lock; `git worktree unlock {wt.path}` to let reclaim remove it")
-    if wt.locked is not None:
+    if wt.locked is not None and facts.dead_agent is None:
         return "protect", f"{why}, but locked ({wt.locked or 'no reason given'})"
     if facts.dirty:
         return "protect", f"{why}, but it has uncommitted changes"
@@ -338,6 +349,9 @@ class Machine:
         owner = tenancy.pid_of(wt.locked)
         if owner is not None and not self.alive(owner):
             facts.stale = owner
+        agent = tenancy.agent_pid_of(wt.locked)
+        if agent is not None and not self.alive(agent):
+            facts.dead_agent = agent
         if wt.branch is None:
             facts.on_main = self.is_ancestor(wt.path, wt.head, "origin/main")
             if not facts.on_main:  # a reviewer's checkout of a PR (#1510): any PR holding the commit counts
@@ -411,10 +425,13 @@ def main(argv: list[str], machine: Machine | None = None, here: Path | None = No
     cwds = machine.cwds()
     removed, deleted = 0, 0
     for wt in worktrees:
-        action, why = verdict(wt, machine.facts(wt, here, cwds))
+        facts = machine.facts(wt, here, cwds)
+        action, why = verdict(wt, facts)
         name = f"{wt.path.name} ({describe(wt)})"
         if action == "remove":
             if not dry:
+                if facts.dead_agent is not None:  # git will not remove a locked worktree (#1658)
+                    machine.run("git", "-C", str(main_checkout), "worktree", "unlock", str(wt.path))
                 machine.remove(main_checkout, wt.path)
             removed += 1
             print(f"{'would remove' if dry else 'removed'}: {name}: {why}")

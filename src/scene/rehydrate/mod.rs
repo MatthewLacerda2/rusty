@@ -8,7 +8,9 @@
 pub mod model_writes;
 mod reimport;
 
-pub use reimport::{reimport_model, reimport_model_ids, reimport_written, Rig};
+pub use reimport::{
+    reimport_model, reimport_model_except, reimport_model_ids, reimport_written, Rig,
+};
 
 use glam::{Mat4, Vec3};
 

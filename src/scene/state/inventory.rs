@@ -27,6 +27,7 @@ macro_rules! authored_fields {
                 skybox_path: String => eq, assign;
                 ambient_color: glam::Vec3 => eq_or_bytes, assign;
                 ambient_intensity: f32 => eq_or_bytes, assign;
+                ambient: crate::scene::AmbientSettings => eq_or_bytes, assign;
                 sky: crate::scene::SkySettings => eq_or_bytes, assign;
                 nav_settings: crate::scene::nav_settings::NavMeshSettings => eq_or_bytes, assign;
                 fog: crate::scene::FogSettings => eq_or_bytes, assign;

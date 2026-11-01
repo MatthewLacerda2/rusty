@@ -10,6 +10,9 @@ mod material;
 mod records;
 mod sky;
 
+#[cfg(test)]
+mod ambient_gpu_tests;
+
 pub(crate) use material::{
     DrawUniform, MappingUniform, MaterialData, SurfaceUniform, MATERIAL_DATA_WORDS,
 };
@@ -87,8 +90,18 @@ impl FogUniform {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct AmbientLightUniform {
+    /// The `Color` mode colour (`DrawnAmbient::color`), which the procedural sky
+    /// follows whatever the mode.
     pub color: [f32; 3],
     pub intensity: f32,
+    /// The `Gradient` mode's sky colour (#1647); read only when `gradient` is 1.
+    pub gradient_sky: [f32; 3],
+    /// 1.0 when the surfaces take the sky / equator / ground trilight.
+    pub gradient: f32,
+    pub gradient_equator: [f32; 3],
+    pub _pad_equator: f32,
+    pub gradient_ground: [f32; 3],
+    pub _pad_ground: f32,
 }
 
 #[repr(C)]

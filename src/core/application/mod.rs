@@ -38,8 +38,10 @@
 //! unbound instance ([`Application::new`]) never touches disk — the
 //! harness and tests stay reproducible. Unlike `Storage`, a setter on a *bound*
 //! instance writes the file straight away: build settings are authoring-time project
-//! config, edited rarely and deliberately, never from inside `FixedUpdate`. The player
-//! and `play` take the settings opening the project read
+//! config, edited rarely and deliberately, never from inside `FixedUpdate`. Every
+//! entry point fills it through `GameWorld::open_project` (#1652): the editor and the
+//! headless session bind the project file; the player and `play` take the settings
+//! opening the project read
 //! ([`Opened::settings`](crate::core::project::Opened::settings)) into an unbound instance,
 //! so a shipped game can never rewrite its own build settings.
 
@@ -141,8 +143,8 @@ impl Application {
         Self::default()
     }
 
-    /// Read the project file at `path` and bind it (the editor), so every setter writes
-    /// the settings back into it.
+    /// Read the project file at `path` and bind it (the editor, the session), so every
+    /// setter writes the settings back into it.
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<(), String> {
         let path = path.into();
         // Read once and parse that text, so the text kept for `reread` is the one
@@ -154,15 +156,15 @@ impl Application {
         };
         self.path = Some(path);
         let text = read?;
-        let file = match &text {
-            Some(text) => ProjectFile::from_json(text)?,
-            None => ProjectFile::default(),
-        };
+        let parsed = text.as_deref().map(ProjectFile::from_json);
+        // Kept even when it doesn't parse: `reread` then waits for the file to
+        // change instead of saying the same parse error again (#1652).
+        self.read_from = text;
+        let file = parsed.transpose()?.unwrap_or_default();
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
         self.quality = file.quality;
         self.decal_limits = file.decals;
         self.demos = file.demos;
-        self.read_from = text;
         Ok(())
     }
 

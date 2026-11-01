@@ -20,7 +20,7 @@ pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) 
     let before = scene.sky;
     // The colours drawn now, under the ambient the renderer uses (an Ambient light
     // entity wins over the scene's colour).
-    let resolved = before.resolved(scene.drawn_ambient().0);
+    let resolved = before.resolved(scene.drawn_ambient().color);
     let sky = &mut scene.sky;
     let mut changed = false;
     egui::CollapsingHeader::new(format!("{}  Procedural Sky", icon::CLOUD_SUN)).show(ui, |ui| {

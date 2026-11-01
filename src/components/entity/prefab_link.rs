@@ -1,5 +1,6 @@
-//! src/components/entity/prefab_link.rs — an instance entity's link to its `.prefab`,
-//! and its overrides in Unity's three shapes (#216, #1527).
+//! src/components/entity/prefab_link.rs — an instance entity's link to its source
+//! (a `.prefab`, or an imported model: Unity's model prefab, #1637), and its
+//! overrides in Unity's three shapes (#216, #1527).
 //!
 //! An instance's divergence from its source is held as Unity holds it:
 //! - **property modifications**, one per leaf, by JSON pointer into the entity
@@ -39,12 +40,18 @@ pub const SIZE_TOKEN: &str = "#size";
 /// link back to the asset.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct PrefabLink {
-    /// Path to the source `.prefab` asset (the same string for every entity of one
-    /// instance).
+    /// Path to the source: a `.prefab` asset, or a model file (#1637). The same
+    /// string for every entity of one instance.
     pub source: String,
     /// The corresponding source entity's LOCAL id (0-based; root = 0). This is the
     /// stable correlation key against `PrefabData::entities`, order-independent.
     pub local_id: u32,
+    /// The entity's node path inside its source when the source is a model
+    /// (#1637): `Kit/Wall`, a duplicate sibling name taking `[n]`. A model's local
+    /// ids follow its node order, which a re-import may change, so propagation
+    /// re-derives `local_id` from this key first. `None` for a `.prefab` source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node: Option<String>,
     /// This entity's overrides as last stored: its diff against [`Self::baseline`]
     /// in the three shapes of [`PrefabOverrides`]. Propagation rebuilds the entity
     /// from the source, then re-applies them, so what the instance did not change

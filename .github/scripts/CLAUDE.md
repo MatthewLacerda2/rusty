@@ -74,4 +74,6 @@ coder *changing* it must know.
   worktree is gone) and 8 (it crashed), each one `supervisor: … stopped.` line, never
   a traceback (#1450). It holds `git worktree lock` on its worktree for its life
   (`merging/watch/tenancy.py`), which `reclaim.py` reads back: keep the reason's
-  format (`merge-queue supervisor pid <pid>`) and `tenancy.pid_of` in step.
+  format (`merge-queue supervisor pid <pid>`) and `tenancy.pid_of` in step. It also reads the
+  harness's own lock on agent worktrees (`claude agent agent-<id> (pid <pid> start <ticks>)`,
+  `tenancy.agent_pid_of`, #1658): keep that parser in step with the harness's wording.

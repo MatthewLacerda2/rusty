@@ -3,7 +3,8 @@
 //! The editor half of prefab instances (#216 / #260 / #268): for an entity that carries
 //! a [`crate::components::PrefabLink`], it surfaces — Unity-style — which fields diverge from
 //! the linked source and lets the author Revert them on the instance, or Apply them
-//! back into the source `.prefab`. An edit is an override the moment it is made
+//! back into the source `.prefab` (greyed out, with the reason on hover, when the
+//! source is a model, which is read-only, #1637). An edit is an override the moment it is made
 //! (#1527), so there is nothing to record. Every button maps onto the SAME verbs the
 //! `Scene.*` API and console drive (`revert_instance_overrides` / `reimport_instance` / `apply_instance_to_source` /
 //! `apply_instance_field_to_source` / `revert_instance_field`), so there is no second
@@ -60,16 +61,42 @@ pub fn draw(
         let t = theme::from_ui(ui);
         ui.label(format!("Source: {source}"));
         ui.add_space(t.space_xs);
-        action = draw_object_buttons(ui, root);
-        draw_overrides_list(ui, world, id, &mut action);
+        let apply = Apply::of(&source);
+        action = draw_object_buttons(ui, root, apply);
+        draw_overrides_list(ui, world, id, apply, &mut action);
     });
     action
+}
+
+/// Whether the card's apply-to-source buttons can act: a model source is read-only
+/// (#1637), so Unity greys out Apply on a model prefab instance, and so does this.
+#[derive(Clone, Copy)]
+struct Apply(Option<&'static str>);
+
+impl Apply {
+    /// Why the buttons are off.
+    const MODEL: &'static str = "A model is read-only: its instance's overrides can't be applied to the file (save it as a prefab first)";
+
+    /// The apply state for an instance of `source`.
+    fn of(source: &str) -> Self {
+        Apply(crate::scene::prefab::source::is_model_source(source).then_some(Self::MODEL))
+    }
+
+    /// Add `button`, enabled with `hover` as its tooltip, or greyed out with the
+    /// reason it is off; returns whether it was clicked.
+    fn button(self, ui: &mut egui::Ui, button: egui::Button<'_>, hover: &str) -> bool {
+        let response = ui.add_enabled(self.0.is_none(), button);
+        match self.0 {
+            Some(reason) => response.on_disabled_hover_text(reason).clicked(),
+            None => response.on_hover_text(hover).clicked(),
+        }
+    }
 }
 
 /// The whole-object button block. Top row is instance-side (Revert all, Reimport from
 /// source); the bottom row is the apply-to-source direction
 /// (write every override back into the `.prefab`, then clear them on the instance).
-fn draw_object_buttons(ui: &mut egui::Ui, root: u32) -> Option<PrefabAction> {
+fn draw_object_buttons(ui: &mut egui::Ui, root: u32, apply: Apply) -> Option<PrefabAction> {
     let mut action = None;
     ui.horizontal(|ui| {
         if labeled(
@@ -89,7 +116,8 @@ fn draw_object_buttons(ui: &mut egui::Ui, root: u32) -> Option<PrefabAction> {
             action = Some(PrefabAction::Reimport(root));
         }
     });
-    if labeled(ui, icon::ARROW_SQUARE_UP, "Apply All to Source", "Write every override back into the source .prefab, then clear them (Scene.ApplyPrefabToSource)") {
+    let all = egui::Button::new(format!("{}  Apply All to Source", icon::ARROW_SQUARE_UP));
+    if apply.button(ui, all, "Write every override back into the source .prefab, then clear them (Scene.ApplyPrefabToSource)") {
         action = Some(PrefabAction::ApplyToSource(root));
     }
     action
@@ -110,6 +138,7 @@ fn draw_overrides_list(
     ui: &mut egui::Ui,
     world: &crate::ecs::World,
     id: u32,
+    apply: Apply,
     action: &mut Option<PrefabAction>,
 ) {
     let t = theme::from_ui(ui);
@@ -121,7 +150,7 @@ fn draw_overrides_list(
     }
     ui.label("Overridden fields:");
     for path in paths {
-        draw_override_row(ui, t.accent, id, &path, action);
+        draw_override_row(ui, t.accent, (id, &path), apply, action);
     }
 }
 
@@ -130,18 +159,15 @@ fn draw_overrides_list(
 fn draw_override_row(
     ui: &mut egui::Ui,
     blue: egui::Color32,
-    entity: u32,
-    path: &str,
+    (entity, path): (u32, &str),
+    apply: Apply,
     action: &mut Option<PrefabAction>,
 ) {
     ui.horizontal(|ui| {
         ui.colored_label(blue, icon::CIRCLE);
         ui.label(field_label(path));
-        if ui
-            .small_button(icon::ARROW_SQUARE_UP)
-            .on_hover_text("Apply this field to the source .prefab")
-            .clicked()
-        {
+        let one = egui::Button::new(icon::ARROW_SQUARE_UP).small();
+        if apply.button(ui, one, "Apply this field to the source .prefab") {
             *action = Some(PrefabAction::ApplyFieldToSource {
                 entity,
                 path: path.to_string(),

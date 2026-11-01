@@ -1,8 +1,9 @@
 //! src/scene/authoring/environment.rs — Shared scene-environment ops (#1612).
 //!
 //! The ONE place the engine writes the scene's environment scalars: the skybox
-//! panorama, the ambient light (Unity's `RenderSettings.skybox`, `ambientLight`
-//! and `ambientIntensity`) and the procedural sky's look (#1620, `SkySettings`). BOTH the editor's Scene Settings panel and the Lua
+//! panorama, the ambient light (Unity's `RenderSettings.skybox`, `ambientLight`,
+//! `ambientIntensity`, and `ambientMode` with its sky, equator and ground colours,
+//! #1647) and the procedural sky's look (#1620, `SkySettings`). BOTH the editor's Scene Settings panel and the Lua
 //! `Lighting.Set*` setters route through these, so panel and binding share one
 //! write and one clamp. The renderer picks a change up on its next frame: a new
 //! panorama is loaded and its sky reflection cube baked (#1553), the ambient
@@ -14,7 +15,7 @@
 use glam::Vec3;
 
 use super::sanitize::{clamped, finite3_or, finite_or, non_negative, optional_color_or};
-use crate::scene::{Scene, SkySettings};
+use crate::scene::{AmbientMode, AmbientSettings, Scene, SkySettings};
 
 /// Set the skybox panorama's path, as the scene file stores it; an empty path goes
 /// back to the procedural sky. A path that loads nothing draws the renderer's
@@ -32,6 +33,41 @@ pub fn set_ambient_color(scene: &mut Scene, color: Vec3) {
 /// Set the ambient intensity, clamped to `≥ 0`.
 pub fn set_ambient_intensity(scene: &mut Scene, intensity: f32) {
     scene.ambient_intensity = non_negative(intensity);
+}
+
+// The ambient source's ops take its `AmbientSettings`, as the sky's take its
+// `SkySettings`. A changed mode or colour shows on dynamic objects at once and on
+// baked lightmaps and probes after the next Generate Lighting, as in Unity.
+
+/// Set the ambient source: `Color` (one colour) or `Gradient` (three).
+pub fn set_ambient_mode(ambient: &mut AmbientSettings, mode: AmbientMode) {
+    ambient.mode = mode;
+}
+
+/// Set the gradient's sky colour (linear RGB, up-facing surfaces), each channel
+/// clamped to `≥ 0`. A NaN or infinite channel refuses the colour whole.
+pub fn set_ambient_sky_color(ambient: &mut AmbientSettings, color: Vec3) {
+    ambient.sky = finite3_or(color, ambient.sky).max(Vec3::ZERO);
+}
+
+/// Set the gradient's equator colour (sideways-facing surfaces), as the sky's.
+pub fn set_ambient_equator_color(ambient: &mut AmbientSettings, color: Vec3) {
+    ambient.equator = finite3_or(color, ambient.equator).max(Vec3::ZERO);
+}
+
+/// Set the gradient's ground colour (down-facing surfaces), as the sky's.
+pub fn set_ambient_ground_color(ambient: &mut AmbientSettings, color: Vec3) {
+    ambient.ground = finite3_or(color, ambient.ground).max(Vec3::ZERO);
+}
+
+/// `ambient` held to what the setters store: how a loaded scene file's block comes in.
+pub fn held_ambient(ambient: AmbientSettings) -> AmbientSettings {
+    let mut held = AmbientSettings::default();
+    set_ambient_mode(&mut held, ambient.mode);
+    set_ambient_sky_color(&mut held, ambient.sky);
+    set_ambient_equator_color(&mut held, ambient.equator);
+    set_ambient_ground_color(&mut held, ambient.ground);
+    held
 }
 
 // The procedural sky's ops take its `SkySettings`, as `fog`'s take its
@@ -120,6 +156,27 @@ mod tests {
         set_sky_horizon(sky, Some(Vec3::ONE));
         set_sky_ground(sky, None);
         assert_eq!((sky.ground, sky.horizon), (None, Some(Vec3::ONE)));
+    }
+
+    #[test]
+    fn ambient_ops_clamp_and_refuse_non_finite() {
+        let mut ambient = AmbientSettings::default();
+        set_ambient_mode(&mut ambient, AmbientMode::Gradient);
+        set_ambient_sky_color(&mut ambient, Vec3::new(-1.0, 0.5, 2.0));
+        set_ambient_equator_color(&mut ambient, Vec3::new(f32::NAN, 0.0, 0.0));
+        set_ambient_ground_color(&mut ambient, Vec3::new(0.0, f32::INFINITY, 0.0));
+        let default = AmbientSettings::default();
+        assert_eq!(ambient.mode, AmbientMode::Gradient);
+        assert_eq!(ambient.sky, Vec3::new(0.0, 0.5, 2.0));
+        assert_eq!(ambient.equator, default.equator, "NaN keeps it");
+        assert_eq!(ambient.ground, default.ground, "infinite keeps it");
+        let held = held_ambient(AmbientSettings {
+            ground: Vec3::splat(-3.0),
+            equator: Vec3::splat(f32::NAN),
+            ..default
+        });
+        assert_eq!((held.ground, held.equator), (Vec3::ZERO, default.equator));
+        assert!(held_ambient(default).is_default());
     }
 
     #[test]

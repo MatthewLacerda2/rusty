@@ -75,8 +75,8 @@ fn boot_embedded(args: &[String]) -> Session {
     // boots that scene, and no argument boots the project's boot scene
     // (`core::project::boot_scene`: the editor's last scene, then the startup scene,
     // then an empty one, #1618).
-    let boot_scene = session::boot_scene_from_args(args);
-    match Session::boot(&boot_scene) {
+    let (boot_scene, project) = session::boot_from_args(args);
+    match Session::boot(&boot_scene, project) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("session-mcp: failed to start: {}", e);

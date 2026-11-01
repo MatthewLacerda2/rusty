@@ -10,20 +10,23 @@
 //!
 //! It reuses the existing serde-value machinery rather than inventing a parallel
 //! serializer: [`apply_overrides`] is the same setter the live propagation uses (now
-//! aimed at a raw source entity), [`read_prefab_file`] / [`write_prefab_file`] are the
+//! aimed at a raw source entity), [`read_writable`] / [`write_prefab_file`] are the
 //! one `.prefab` reader/writer, and clearing the instance's overrides afterwards reuses
 //! [`revert_instance_overrides`] / `link::propagate` so the instance re-baselines
-//! against the now-updated source. Scope mirrors #216: a flat instance of a flat prefab,
+//! against the now-updated source. A model source is read-only (#1637,
+//! `source::read_writable`): applying to it errors, as Unity can't apply to a model
+//! prefab, while reverting a field works as on any instance. Scope mirrors #216: a flat instance of a flat prefab,
 //! matched to source entities purely by the link's `local_id`.
 
 use std::collections::BTreeMap;
 
 use crate::components::{visit_override_refs, PrefabOverrides};
 use crate::scene::prefab::instance::{self, instance_members};
-use crate::scene::prefab::link::propagate;
+use crate::scene::prefab::link::{propagate, propagate_from};
 use crate::scene::prefab::live::sync_overrides;
 use crate::scene::prefab::overrides::apply_overrides;
-use crate::scene::prefab::{read_prefab_file, write_prefab_file};
+use crate::scene::prefab::source::{gone_node, read_source, read_writable};
+use crate::scene::prefab::write_prefab_file;
 use crate::scene::{revert_instance_overrides, PrefabData, Scene};
 
 /// Apply every override on the instance rooted at `root_id` back into its
@@ -33,7 +36,7 @@ use crate::scene::{revert_instance_overrides, PrefabData, Scene};
 pub fn apply_instance_to_source(scene: &mut Scene, root_id: u32) -> Result<usize, String> {
     let ids = instance_ids(scene, root_id)?;
     let source = link_source(scene, root_id)?;
-    let mut prefab = read_prefab_file(&source)?;
+    let mut prefab = read_writable(&source)?;
     sync_overrides(&mut scene.world, &ids);
     let mut applied = 0;
     for id in ids {
@@ -75,7 +78,7 @@ pub fn apply_instance_field_to_source(
     let one = overrides_of(scene, entity_id)
         .only(path)
         .ok_or_else(|| format!("entity {entity_id} has no override at {path}"))?;
-    let mut prefab = read_prefab_file(&source)?;
+    let mut prefab = read_writable(&source)?;
     let one = to_local_refs(scene, root, &one);
     if !write_onto_source(&mut prefab, local_id, &one) {
         return Err(format!("source has no entity with local id {local_id}"));
@@ -89,8 +92,8 @@ pub fn apply_instance_field_to_source(
 /// then reimport the instance so that leaf tracks the source again while every other
 /// override stays (Unity's `PrefabUtility.RevertPropertyOverride`). `entity_id` may be
 /// any instance entity (root or child). `Ok(false)` when there is no override at
-/// `path`; errors if `entity_id` is not a linked instance entity or the source can't
-/// be read. Either way nothing changes: the source is read before the override goes.
+/// `path`; errors if `entity_id` is not a linked instance entity, the source can't
+/// be read, or `entity_id` is a model part whose node the model lost (#1637). Either way nothing changes: the source is read before the override goes.
 /// The editor's per-field revert button and `Scene.RevertPrefabField` (#998).
 pub fn revert_instance_field(
     scene: &mut Scene,
@@ -98,13 +101,19 @@ pub fn revert_instance_field(
     path: &str,
 ) -> Result<bool, String> {
     let root = instance_root(scene, entity_id)?;
-    read_prefab_file(&link_source(scene, root)?)?;
+    let source = link_source(scene, root)?;
+    let prefab = read_source(&source)?;
+    if let Some(node) = gone_node(&scene.world, entity_id, &prefab) {
+        return Err(format!(
+            "{node} is gone from {source}: there is nothing to revert it to"
+        ));
+    }
     let ids = instance_ids(scene, root)?;
     sync_overrides(&mut scene.world, &ids);
     if !drop_override(scene, entity_id, path) {
         return Ok(false);
     }
-    propagate(scene, root)?;
+    propagate_from(scene, root, &source, &prefab)?;
     Ok(true)
 }
 
