@@ -34,7 +34,9 @@ use crate::components::{
     BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
 };
 use crate::components::{CharacterControllerComponent, JointComponent};
-use crate::components::{LineComponent, LodGroupComponent, TrailComponent};
+use crate::components::{
+    LightProbeProxyVolumeComponent, LineComponent, LodGroupComponent, TrailComponent,
+};
 
 use super::world::{Ref, RefMut, World};
 
@@ -153,6 +155,7 @@ optional_component_accessors! {
     JointComponent => joint, joint_mut, has_joint, set_joint, take_joint, ids_with_joint;
     CharacterControllerComponent => character_controller, character_controller_mut, has_character_controller, set_character_controller, take_character_controller, ids_with_character_controller;
     LodGroupComponent => lod_group, lod_group_mut, has_lod_group, set_lod_group, take_lod_group, ids_with_lod_group;
+    LightProbeProxyVolumeComponent => light_probe_proxy_volume, light_probe_proxy_volume_mut, has_light_probe_proxy_volume, set_light_probe_proxy_volume, take_light_probe_proxy_volume, ids_with_light_probe_proxy_volume;
     TrailComponent => trail, trail_mut, has_trail, set_trail, take_trail, ids_with_trail;
     LineComponent => line, line_mut, has_line, set_line, take_line, ids_with_line;
     ShapeComponent => shape, shape_mut, has_shape, set_shape, take_shape, ids_with_shape;

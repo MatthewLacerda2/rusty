@@ -25,7 +25,8 @@ use super::{
     BackdropFilterComponent, MaskComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
 };
 use super::{CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent};
-use super::{NavMeshModifierVolumeComponent, ReverbZoneComponent, TrailComponent};
+use super::{LightProbeProxyVolumeComponent, NavMeshModifierVolumeComponent};
+use super::{ReverbZoneComponent, TrailComponent};
 
 mod override_refs;
 mod prefab_link;
@@ -129,6 +130,9 @@ pub struct Entity {
     /// Level-of-detail group over renderer entities (#472).
     #[serde(default)]
     pub lod_group: Option<LodGroupComponent>,
+    /// Lights the mesh from a grid of probe samples over its bounds (#1672).
+    #[serde(default)]
+    pub light_probe_proxy_volume: Option<LightProbeProxyVolumeComponent>,
     /// Ribbon along the entity's recent path (#441).
     #[serde(default)]
     pub trail: Option<TrailComponent>,
@@ -203,6 +207,7 @@ impl Entity {
             joint: None,
             character_controller: None,
             lod_group: None,
+            light_probe_proxy_volume: None,
             trail: None,
             line: None,
             shape: None,

@@ -278,6 +278,7 @@ impl World {
             joint: self.joint(id).map(|c| (*c).clone()),
             character_controller: self.character_controller(id).map(|c| (*c).clone()),
             lod_group: self.lod_group(id).map(|c| (*c).clone()),
+            light_probe_proxy_volume: self.light_probe_proxy_volume(id).map(|c| (*c).clone()),
             trail: self.trail(id).map(|c| (*c).clone()),
             line: self.line(id).map(|c| (*c).clone()),
             shape: self.shape(id).map(|c| (*c).clone()),

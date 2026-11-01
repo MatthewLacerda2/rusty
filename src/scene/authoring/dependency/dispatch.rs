@@ -5,7 +5,6 @@
 //! ([`set_default`]) and detach raw ([`clear_one`]). The compiler holds them
 //! exhaustive, so a new kind cannot be added without its three arms.
 
-use crate::components::ReverbZoneComponent;
 use crate::components::{BackdropFilterComponent, MaskComponent};
 use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
@@ -13,6 +12,7 @@ use crate::components::{
 };
 use crate::components::{CharacterControllerComponent, JointComponent, LineComponent};
 use crate::components::{LayoutElementComponent, LayoutGroupComponent, ShapeComponent};
+use crate::components::{LightProbeProxyVolumeComponent, ReverbZoneComponent};
 use crate::components::{LodGroupComponent, NavMeshObstacleComponent, TrailComponent};
 use crate::ecs::World;
 use crate::scene::authoring::components::ComponentKind;
@@ -57,6 +57,7 @@ pub fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::Joint => world.has_joint(id),
         ComponentKind::CharacterController => world.has_character_controller(id),
         ComponentKind::LodGroup => world.has_lod_group(id),
+        ComponentKind::LightProbeProxyVolume => world.has_light_probe_proxy_volume(id),
         ComponentKind::Trail => world.has_trail(id),
         ComponentKind::Line => world.has_line(id),
         ComponentKind::Shape => world.has_shape(id),
@@ -110,6 +111,9 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
             world.set_character_controller(id, Some(CharacterControllerComponent::default()))
         }
         ComponentKind::LodGroup => world.set_lod_group(id, Some(LodGroupComponent::default())),
+        ComponentKind::LightProbeProxyVolume => {
+            world.set_light_probe_proxy_volume(id, Some(LightProbeProxyVolumeComponent::default()))
+        }
         ComponentKind::Trail => world.set_trail(id, Some(TrailComponent::default())),
         ComponentKind::Line => world.set_line(id, Some(LineComponent::default())),
     }
@@ -201,6 +205,7 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::Joint => world.set_joint(id, None),
         ComponentKind::CharacterController => world.set_character_controller(id, None),
         ComponentKind::LodGroup => world.set_lod_group(id, None),
+        ComponentKind::LightProbeProxyVolume => world.set_light_probe_proxy_volume(id, None),
         ComponentKind::Trail => world.set_trail(id, None),
         ComponentKind::Line => world.set_line(id, None),
         ComponentKind::Shape => world.set_shape(id, None),

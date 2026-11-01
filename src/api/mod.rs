@@ -35,6 +35,7 @@ pub mod layers;
 pub mod layout_element;
 pub mod layout_group;
 pub mod light;
+pub mod light_probe_proxy_volume;
 pub mod lighting;
 pub mod line;
 pub mod lod_group;
@@ -208,6 +209,7 @@ pub fn register<'scope>(
     light::register(lua, scope, ctx.scene)?;
     lighting::register(lua, scope, ctx.scene)?;
     line::register(lua, scope, ctx.scene)?;
+    light_probe_proxy_volume::register(lua, scope, ctx.scene)?;
     lod_group::register(lua, scope, ctx.scene)?;
     material::register(lua, scope, ctx.scene)?;
     particle::register(lua, scope, ctx.scene)?;
