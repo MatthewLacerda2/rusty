@@ -53,6 +53,17 @@ The two individual verbs stay for a script that wants only one of them.
   bar and **Cancel**; a cancelled run writes nothing and keeps the old lighting. When
   the lightmaps land they are applied (the probes are captured under them), then the
   probe step runs a step a frame and the console logs one summary line at the end.
+- **From a script it logs its progress** (#1667), as Unity's batch-mode bake does: the
+  verb blocks its caller until it returns, so a `play` scenario or a `session-mcp` call
+  cannot poll, and instead the bake prints a line to **stderr** at each step and every
+  5 s within one, with an ETA from the step's own rate, then the total time:
+  `[Lighting] lightmaps 41% (612/1501 meshes, 3.1M/7.6M texels), ~38 min left`, then
+  `light probes, bounce 2 of at most 5: …, ~1 min left in this bounce` and
+  `reflection probes 19% (3/16 probes), ~4 min left`, and `[Lighting] done in 1 h 4 min`.
+  The step lines and the total also go to the console (so `play`'s `console.log` and the
+  MCP reply keep them); the lines in between go to stderr only. `Lighting.Bake()`,
+  `Lighting.BakeLightmaps()`, `Probe.Bake()` and `Reflection.Bake()` log the same way. A
+  log never changes what is baked: the lightmaps are byte-identical with or without one.
 - **The probes bake from a snapshot and apply at the end** (Unity's shape, #1602): the
   light and reflection probes are copied when the probe step starts, and their SH and
   cubemaps are applied in one step when it finishes. Adding, removing or moving a probe

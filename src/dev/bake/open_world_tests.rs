@@ -88,7 +88,10 @@ fn gpu_a_bake_after_a_lightmap_uv_reimport_lights_the_open_world() {
     );
     // Generate Lighting's probe step, drawing the scene through its own renderer.
     scene.probes.add_probe(Vec3::Y);
-    assert_eq!(bake_scene_probes(&mut scene), Ok(true));
+    assert_eq!(
+        bake_scene_probes(&mut scene, &mut crate::dev::bake::progress::BakeLog::off()),
+        Ok(true)
+    );
     let open = brightness(&mut editor, &scene, "open").unwrap();
 
     scene.save_to_file(&path).unwrap();

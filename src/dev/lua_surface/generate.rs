@@ -6,6 +6,7 @@
 use mlua::{Lua, Table};
 
 use super::super::bake::generate_lighting::generate_lighting;
+use super::super::bake::progress::BakeLog;
 use crate::api::{global_table, put, ApiScopedCtx, Reg};
 use crate::scene::lighting::lightmap::BakeSettings;
 use crate::scene::lighting::settings::ReflectionSettings;
@@ -62,7 +63,9 @@ pub(super) fn register<'scope>(
             let nav = nav.borrow();
             let mut scene = scene.borrow_mut();
             let mut say = |line| console.borrow_mut().info(line);
-            let report = generate_lighting(&mut scene, path.as_deref(), Some(&nav), &mut say)
+            let mut log = BakeLog::to_console(console);
+            let nav = Some(&*nav);
+            let report = generate_lighting(&mut scene, path.as_deref(), nav, &mut say, &mut log)
                 .map_err(mlua::Error::external)?;
             let out = lua.create_table()?;
             out.set("lightmaps", report.lightmaps)?;

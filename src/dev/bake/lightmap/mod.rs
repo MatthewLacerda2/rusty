@@ -16,7 +16,9 @@
 //!
 //! The bake splits in three so the editor can run the middle on a worker thread
 //! ([`job`], #808): [`gather_bake_input`] borrows the scene, `bake` needs only
-//! the owned [`BakeScene`], and [`apply_lightmaps`] writes the result back.
+//! the owned [`BakeScene`], and [`apply_lightmaps`] writes the result back. A script's
+//! bake runs the middle on a worker too, so its caller can log progress (`logged`,
+//! #1667).
 //!
 //! Allowed deps: scene (the bake and its data), image (PNG I/O).
 
@@ -25,13 +27,15 @@ use std::path::{Path, PathBuf};
 use glam::Vec3;
 
 use crate::asset::MapRef;
+use crate::dev::bake::progress::BakeLog;
 use crate::scene::lighting::lightmap::{
-    bake, encode_directions, encode_texels, pack, BakeScene, BakeSettings, Lightmap, LightmapEntry,
+    encode_directions, encode_texels, pack, BakeScene, BakeSettings, Lightmap, LightmapEntry,
     LightmapSet,
 };
 use crate::scene::Scene;
 
 pub mod job;
+mod logged;
 pub use job::{BakeOutcome, LightmapBakeJob};
 
 /// Suffix of the folder beside a scene file that holds its lightmaps.
@@ -51,9 +55,19 @@ pub fn bake_scene_lightmaps(
     scene_path: Option<&str>,
     settings: &BakeSettings,
 ) -> Result<usize, String> {
+    bake_scene_lightmaps_logged(scene, scene_path, settings, &mut BakeLog::off())
+}
+
+/// [`bake_scene_lightmaps`], reporting its progress into `log` as it goes (#1667).
+pub fn bake_scene_lightmaps_logged(
+    scene: &mut Scene,
+    scene_path: Option<&str>,
+    settings: &BakeSettings,
+    log: &mut BakeLog,
+) -> Result<usize, String> {
     let scene_path = scene_path.ok_or(UNSAVED)?;
     let input = gather_bake_input(scene);
-    let maps = bake(&input, settings);
+    let maps = logged::bake_logged(&input, settings, log);
     warn_missing_uvs(input.meshes.len(), maps.len());
     apply_lightmaps(scene, scene_path, &maps)
 }
@@ -192,6 +206,8 @@ fn texture_average(map: &MapRef) -> Option<Vec3> {
 
 #[cfg(test)]
 mod job_tests;
+#[cfg(test)]
+mod logged_tests;
 #[cfg(test)]
 mod survivor_tests;
 #[cfg(test)]
