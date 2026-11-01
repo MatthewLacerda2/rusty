@@ -5,7 +5,7 @@
 //! (`asset::imported`, #857), so a Dust2-sized level with hundreds of one prop
 //! parses and unwraps it once per edit, and not at all when nothing changed.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use glam::Vec3;
@@ -39,19 +39,32 @@ pub fn reimport_model(scene: &mut Scene, path: &str, rig: Rig) -> usize {
 
 /// [`reimport_model`], returning the ids of the entities whose mesh was rebuilt.
 pub fn reimport_model_ids(scene: &mut Scene, path: &str, rig: Rig) -> Vec<u32> {
-    reimport_where(scene, rig, |file| file == path)
+    reimport_model_except(scene, path, rig, &BTreeSet::new())
+}
+
+/// [`reimport_model_ids`] leaving out the entities in `skip` (a linked model
+/// instance's parts, which its rebuild re-imports, #1637).
+pub fn reimport_model_except(
+    scene: &mut Scene,
+    path: &str,
+    rig: Rig,
+    skip: &BTreeSet<u32>,
+) -> Vec<u32> {
+    reimport_where(scene, rig, skip, |file| file == path)
 }
 
 /// Re-import every mesh in `scene` whose model file `stale` names: the engine
 /// re-wrote it (#1242), and Unity updates every instance of a re-imported model.
 /// A skinned one takes the new rig too, its bones re-bound to it by name (#1265). Each
-/// distinct file is matched against `stale` once. Returns how many were rebuilt.
-pub fn reimport_written(scene: &mut Scene, stale: &Stale) -> usize {
+/// distinct file is matched against `stale` once. The entities in `skip` are left
+/// out (a linked model instance's parts, which its rebuild re-imports, #1637).
+/// Returns how many were rebuilt.
+pub fn reimport_written(scene: &mut Scene, stale: &Stale, skip: &BTreeSet<u32>) -> usize {
     if stale.is_empty() {
         return 0;
     }
     let mut named: BTreeMap<String, bool> = BTreeMap::new();
-    let rebuilt = reimport_where(scene, Rig::Rebuild, |file| {
+    let rebuilt = reimport_where(scene, Rig::Rebuild, skip, |file| {
         *named
             .entry(file.to_string())
             .or_insert_with_key(|file| stale.matches(file))
@@ -59,12 +72,21 @@ pub fn reimport_written(scene: &mut Scene, stale: &Stale) -> usize {
     rebuilt.len()
 }
 
-/// Re-import every mesh whose reference's file `names` accepts, importing each such
-/// file once. Returns the ids of the entities whose mesh was rebuilt.
-fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bool) -> Vec<u32> {
+/// Re-import every mesh outside `skip` whose reference's file `names` accepts,
+/// importing each such file once. Returns the ids of the entities whose mesh was
+/// rebuilt.
+fn reimport_where(
+    scene: &mut Scene,
+    rig: Rig,
+    skip: &BTreeSet<u32>,
+    mut names: impl FnMut(&str) -> bool,
+) -> Vec<u32> {
     let mut imported: BTreeMap<String, Option<Imported>> = BTreeMap::new();
     let mut rebuilt = Vec::new();
     for id in scene.world.ids_with_mesh() {
+        if skip.contains(&id) {
+            continue;
+        }
         let Some((reference, was_skinned)) = scene.world.mesh(id).and_then(|m| {
             let reference = AssetRef::parse(m.asset_ref.as_deref()?).ok()?;
             Some((reference, m.skin.is_some()))
