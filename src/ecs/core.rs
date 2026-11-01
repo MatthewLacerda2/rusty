@@ -15,7 +15,8 @@
 use std::collections::BTreeMap;
 
 use crate::components::{
-    AnimatorComponent, Entity, MaterialAsset, MeshComponent, ScriptComponent, TransformComponent,
+    AnimatorComponent, ColliderComponent, Entity, MaterialAsset, MeshComponent, ScriptComponent,
+    TransformComponent,
 };
 
 use super::access::{CompMut, CompRef};
@@ -214,20 +215,27 @@ impl World {
 
     /// Assemble one live entity's columns into a document (serialization).
     pub fn entity_document(&self, id: u32) -> Option<Entity> {
-        self.document(id, MeshComponent::clone)
+        self.document(id, MeshComponent::clone, ColliderComponent::clone)
     }
 
     /// [`World::entity_document`] with the mesh's reference and none of its
-    /// geometry ([`MeshComponent::reference_only`]): what a prefab diff reads.
+    /// geometry ([`MeshComponent::reference_only`]), and a collider's shared mesh
+    /// without its geometry either: what a prefab diff reads.
     pub fn reference_document(&self, id: u32) -> Option<Entity> {
-        self.document(id, MeshComponent::reference_only)
+        self.document(
+            id,
+            MeshComponent::reference_only,
+            ColliderComponent::without_geometry,
+        )
     }
 
-    /// The document of entity `id`, its mesh copied by `mesh`.
+    /// The document of entity `id`, its mesh copied by `mesh` and its collider by
+    /// `collider` (whose shared mesh may carry geometry, #1657).
     pub(super) fn document(
         &self,
         id: u32,
         mesh: fn(&MeshComponent) -> MeshComponent,
+        collider: fn(&ColliderComponent) -> ColliderComponent,
     ) -> Option<Entity> {
         let core = self.component::<Core>(id)?;
         let name = (*self.name(id)?).clone();
@@ -245,7 +253,7 @@ impl World {
             scripts: (*self.scripts(id)?).clone(),
             animator: self.animator(id).map(|c| (*c).clone()),
             light: self.light(id).map(|c| (*c).clone()),
-            collider: self.collider(id).map(|c| (*c).clone()),
+            collider: self.collider(id).map(|c| collider(&c)),
             rigidbody: self.rigidbody(id).map(|c| (*c).clone()),
             nav_agent: self.nav_agent(id).map(|c| (*c).clone()),
             nav_obstacle: self.nav_obstacle(id).map(|c| (*c).clone()),

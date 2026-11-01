@@ -48,7 +48,7 @@ field, folding in one more indirect bounce, so colour bleeds further with each
 iteration. It runs **up to 5 bounces** and stops early once a pass adds negligible
 energy (the field stops changing), whichever comes first. It needs a GPU or software
 adapter (e.g. lavapipe); with none it skips gracefully and returns `false` rather than
-erroring. It does error while the editor's Generate Lighting runs (see `Lighting.md`). It is **dev-only** (an authoring action driving a headless renderer), so it is
+erroring. It does error while the editor's Generate Lighting runs (see `Lighting.md`). It logs each bounce's progress to stderr as it goes (see `Lighting.md`, #1667). It is **dev-only** (an authoring action driving a headless renderer), so it is
 absent from ship builds. The bake is deterministic — the same scene bakes byte-identical
 SH. Save the scene afterward to persist the baked SH into the `<scene>.lighting.json`
 sidecar the runtime loads.

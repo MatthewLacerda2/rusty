@@ -13,7 +13,7 @@ every field added later, with nothing new to bind.
 | `Component.Fields` | `(name)` | one row per field, in the order `Set` writes them: `{ name, type, default, writable, read_only }`; `type` is a Lua type, `"optional <type>"` for a field that can hold nothing |
 
 **`name`** is any component name [`Scene.AddComponent`](Scene.md) takes (in any
-case, aliases too), plus `Transform` and `Mesh`. Each answers to one name first:
+case, aliases too), plus `Transform`. Each answers to one name first:
 `Transform`, `Mesh`, `Light`, `Animator`, `Collider`, `RigidBody`, `Material`,
 `NavMeshAgent`, `NavMeshObstacle`, `OffMeshLink`, `NavMeshModifierVolume`,
 `Camera`, `Particles`, `PostProcessing`, `AudioSource`, `AudioReverbZone`,

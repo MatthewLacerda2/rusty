@@ -166,6 +166,11 @@ scene.entities[].collider.shape<Mesh>.local_max[]: f32
 scene.entities[].collider.shape<Mesh>.local_min: tuple(3)
 scene.entities[].collider.shape<Mesh>.local_min[]: f32
 scene.entities[].collider.shape<Sphere>.radius: f32
+scene.entities[].collider.shared_mesh.asset_ref: option
+scene.entities[].collider.shared_mesh.asset_ref: string
+scene.entities[].collider.shared_mesh.primitive_type: string
+scene.entities[].collider.shared_mesh.subdivisions: u32
+scene.entities[].collider.shared_mesh: option
 scene.entities[].collider: option
 scene.entities[].id: u32
 scene.entities[].image.blend: enum Normal|Additive|Multiply|Screen

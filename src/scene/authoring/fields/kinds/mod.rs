@@ -24,7 +24,7 @@ const NO_OP: &str = "no inspector op writes it yet (#1368)";
 /// Every component, by the name `Component.*` answers to first.
 pub const KINDS: &[Kind] = &[
     kind::<TransformComponent>("Transform", None, "transform"),
-    kind::<MeshComponent>("Mesh", None, "mesh"),
+    kind::<MeshComponent>("Mesh", Some(K::Mesh), "mesh"),
     kind::<LightComponent>("Light", Some(K::Light), "light"),
     Kind {
         field_type: animator_field_type,

@@ -52,6 +52,7 @@ fn add_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) -> bool {
 /// Material stages its default library asset on the entity; the inspector folds it
 /// into `scene.materials` once the entity guard drops.
 const ENTRIES: &[(ComponentKind, &str, &str)] = &[
+    (ComponentKind::Mesh, icon::CUBE, "Mesh"),
     (ComponentKind::Light, "", "Light Component"),
     (ComponentKind::Animator, "", "Animator Component"),
     (ComponentKind::Collider, "", "Collider Component"),

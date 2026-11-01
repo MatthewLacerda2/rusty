@@ -13,8 +13,8 @@
 //! - `Fields(name)` — what an inspector lists: each field's name, the Lua type of
 //!   its default, the default, and whether it can be written.
 //!
-//! Component names are the ones `Scene.AddComponent` takes, plus `Transform` and
-//! `Mesh`; field names are as a saved scene spells them; enums travel by their
+//! Component names are the ones `Scene.AddComponent` takes, plus `Transform`;
+//! field names are as a saved scene spells them; enums travel by their
 //! serialized name (read in any case, through `core::naming::variant_case::decode`). An unknown
 //! component or field is an error naming the valid ones. `#[serde(skip)]` runtime
 //! state is never in a table: there is no field to name it by.
@@ -130,7 +130,8 @@ fn recall(table: &Table, id: u32, kind: &Kind) -> Option<serde_json::Map<String,
 
 /// `Component.Fields`: one `{ name, type, default, writable, read_only }` row per
 /// field, in the field table's order (the order `Set` writes them in). The defaults are the Add
-/// Component menu's (a fresh entity's, for `Transform`; `Mesh` has none).
+/// Component menu's (a fresh entity's, for `Transform`; the `Box` primitive, for
+/// `Mesh`).
 fn fields_table(lua: &Lua, kind: &Kind) -> mlua::Result<Table> {
     let defaults = defaults(kind).map_err(err)?;
     let rows = lua.create_table()?;

@@ -83,6 +83,6 @@ parallax-corrected, with roughness selecting the mip — instead of the global s
 needs a GPU or software adapter (e.g. lavapipe); with none it skips gracefully and
 returns `false` rather than erroring. It **errors** when the scene is unsaved (there is
 nowhere to write the cubemaps), when a cubemap file cannot be written, and while the
-editor's Generate Lighting runs (see `Lighting.md`). It is **dev-only** (an authoring action driving a headless
+editor's Generate Lighting runs (see `Lighting.md`). It logs its progress, probe by probe, to stderr as it goes (#1667). It is **dev-only** (an authoring action driving a headless
 renderer), so it is absent from ship builds. Save the scene afterward to persist each
 probe's `cubemap_path` into the `.scene` document.
