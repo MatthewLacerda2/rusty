@@ -49,7 +49,7 @@ impl Session {
     /// Mirrors the windowed boot: create the shared engine cells, optionally load
     /// `boot_scene` and bake nav, then construct the world and initialise the
     /// evaluator **without entering play**. It seeds nothing: an entry point that
-    /// opens a project seeds it first ([`boot_from_args`], [`seeded_boot_scene`]). `boot_scene`
+    /// opens a project seeds it first ([`boot_from_args`], `seeded_boot_scene`). `boot_scene`
     /// empty means start from an empty scene (the agent authors into it live).
     /// No project is opened: the engine's default settings, unbound. For tests,
     /// which want a world free of any project file; an entry point on a real
