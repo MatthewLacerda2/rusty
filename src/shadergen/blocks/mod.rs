@@ -146,7 +146,8 @@ pub struct Block {
     /// The expression the assembler substitutes into the fragment chain. Uses
     /// `{prev}` for the incoming color so blocks chain in recipe order, and
     /// `{args}` for the instance's param constants (`, a, b`, or empty); surface
-    /// blocks may also reference `in` (the `VertexOutput`), postfx blocks `uv`, ui
+    /// blocks may also reference `in` (the `VertexOutput`), postfx blocks `uv` and
+    /// `in` (the fullscreen `VsOut`: `in.pos` is the pixel, #1679), ui
     /// blocks `in` (the `VertexOut`) and `f` (the `UiFrag`).
     pub call: &'static str,
     /// The extra texture slots (#400, [`crate::shadergen::textures`]) the helper

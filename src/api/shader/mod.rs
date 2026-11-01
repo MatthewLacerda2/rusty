@@ -22,7 +22,8 @@
 //!   recipe with before baking).
 //! - `Shader.ToJson(recipe)` — serialize a recipe to canonical JSON.
 //! - `Shader.Blocks(pass)` — list the curated blocks for a pass with their
-//!   descriptions and params (name, default, arity, runtime) — introspection so the
+//!   descriptions and params (name, default, arity, runtime, and a choice param's
+//!   `choices`) — introspection so the
 //!   agent composes from the actual catalog, not guesswork (#411).
 //!
 //! `Shader` borrows no engine state — it reads a recipe and writes a file — so it

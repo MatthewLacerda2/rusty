@@ -266,8 +266,11 @@ into the lit color; postfx blocks grade the sampled scene color.
   phosphor pattern in **screen pixels**, so it stays pixel-fine at any resolution:
   `kind` names it — `"aperture"` vertical R/G/B stripes, `"shadow"` the stripes
   staggered a pixel per row, `"slot"` stripes broken into staggered slots; `scale`
-  is pixels per stripe; the lit stripe is brightened so each channel's mean stays
-  where it was). Pair them with `scanline` for the tube. Params
+  is pixels per stripe; the lit stripe is brightened so each channel's mean
+  display value stays where it was — short of clipping: where the picture is
+  bright the lit stripe saturates at 1 and the area dims, so lower `strength`
+  for a bright game. The chain runs before FXAA, which softens 1-pixel stripes;
+  a `scale` of 2 or more keeps them crisp). Pair them with `scanline` for the tube. Params
   marked `*` are **runtime**, driven per frame on the volume with
   `Graphics.SetPostParam` (see below): `scanline.strength*`,
   `damage_vignette.color*` and `.intensity*`, `sharpen.amount*`,
