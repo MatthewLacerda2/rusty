@@ -113,7 +113,7 @@ asset cache), determinism, the scripting sandbox (what a script may reach) or
 the merge path where the paths above did not catch it, raise `medium` to `high`
 and say why; never lower it. Then run the `code-review` skill on PR #<n> (pass
 the PR number in its arguments) at that level, without `--comment` and without
-`--fix`. Called without it, the
+`--fix`, and wait for it to finish before you answer. Called without it, the
 skill reviews the checkout's own local diff, which is not this PR: if what it
 reviewed is not `gh pr diff <n>`, discard its findings and review that diff
 yourself. You run in your own worktree: check out or fetch what you need
@@ -168,6 +168,13 @@ Paste every list whose trigger the PR hits.
   scope beyond the refactor; the layer table still true.
 
 ## Answering the findings
+
+**Wait for the whole report.** A reviewer that answers while its `code-review`
+pass still runs sends the rest as a late addendum (PR #1673, 2026-11-01: it came a
+minute after the re-brief, and the routine had to be cancelled and re-briefed).
+The template asks it to wait; if an addendum lands anyway after a re-brief whose
+routine hasn't fired, disable that routine (`RemoteTrigger` `update` with
+`{"enabled": false}`) and post one combined `Brief`.
 
 The reviewer can be wrong, so the orchestrator checks every finding against the
 code first, then:
