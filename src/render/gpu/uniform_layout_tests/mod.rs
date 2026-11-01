@@ -108,6 +108,10 @@ fn lighting_uniform_matches_wgsl_layout() {
             offset_of!(LightingUniform, num_dir_lights),
         ),
         ("sky_textured", offset_of!(LightingUniform, sky_textured)),
+        (
+            "env_reflection",
+            offset_of!(LightingUniform, env_reflection),
+        ),
         ("refl_probes", offset_of!(LightingUniform, refl_probes)),
     ];
     assert_layout("LightingUniforms", &pairs, size_of::<LightingUniform>());

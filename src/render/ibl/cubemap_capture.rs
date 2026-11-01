@@ -4,8 +4,10 @@
 //! a 6-face cubemap (offscreen, LDR RGBA8), reusing the forward lit pass. This is the
 //! shared spine both probe bakes and reflection bakes stand on.
 //!
-//! Only `is_static` entities (plus the skybox — the distant environment) are drawn;
-//! dynamic actors are excluded so they never bake into a probe/reflection. The static
+//! Only `is_static` entities (plus, for a reflection capture, the skybox — the distant
+//! environment) are drawn; dynamic actors are excluded so they never bake into a
+//! probe/reflection. A light probe's capture draws no sky and reflects nothing, and
+//! its bake adds the ambient where the view escapes (`probe::capture`, #1668). The static
 //! filter mirrors the shadow pass's static sweep (`passes::shadows::casters::sweep`):
 //! the forward solid-gather honours the renderer's [`CaptureMode::static_only`],
 //! toggled on here for the six faces and restored after.
@@ -46,7 +48,9 @@ impl CubemapCapture {
 impl Renderer {
     /// Render the STATIC scene into a 6-face cubemap centred on `position`, each face
     /// `resolution × resolution` LDR RGBA8 (#243). Reuses the forward lit pass with a
-    /// 90° FOV per face; only `is_static` entities and the skybox are drawn.
+    /// 90° FOV per face; only `is_static` entities and the skybox are drawn. A light
+    /// probe captures through [`Renderer::capture_light_probe`] instead, which draws
+    /// no sky (#1668).
     ///
     /// The faces render into a target of their own, `resolution²`, whatever the
     /// renderer's own size.
@@ -56,13 +60,8 @@ impl Renderer {
         position: Vec3,
         resolution: u32,
     ) -> CubemapCapture {
-        self.capture_static_cubemap_inner(
-            scene,
-            position,
-            resolution,
-            false,
-            CaptureLens::default(),
-        )
+        self.capture_static_cubemap_inner(scene, position, resolution, CaptureSky::Drawn)
+            .0
     }
 
     /// Like [`Renderer::capture_static_cubemap`], through a reflection probe's `lens`:
@@ -74,34 +73,22 @@ impl Renderer {
         resolution: u32,
         lens: CaptureLens,
     ) -> CubemapCapture {
-        self.capture_static_cubemap_inner(scene, position, resolution, false, lens)
-    }
-
-    /// Like [`Renderer::capture_static_cubemap`], but the static surfaces are *also*
-    /// lit by the scene's current probe field — one indirect bounce (#285). The
-    /// multi-bounce probe bake calls this for bounce ≥2 after writing the previous
-    /// bounce's SH into `scene.probes`, so each capture re-injects the last bounce's
-    /// indirect light. Bounce 1 (and reflection bakes) use the direct-only path.
-    pub fn capture_static_cubemap_lit(
-        &mut self,
-        scene: &Scene,
-        position: Vec3,
-        resolution: u32,
-    ) -> CubemapCapture {
-        self.capture_static_cubemap_inner(scene, position, resolution, true, CaptureLens::default())
+        let sky = CaptureSky::Reflection(lens);
+        self.capture_static_cubemap_inner(scene, position, resolution, sky)
+            .0
     }
 
     /// Shared capture spine: render the static scene into a 6-face cubemap from
-    /// `position`. `light_static_from_probes` decides whether the static surfaces
-    /// pick up the probe field (bounce ≥2) or stay direct-only (bounce 1).
-    fn capture_static_cubemap_inner(
+    /// `position`, the sky drawn or not as `sky` says. A light-probe capture also returns, per face, which
+    /// texels nothing covered (their depth is the cleared far plane): the directions
+    /// that escape the scene, where `probe::capture` adds the ambient.
+    pub(crate) fn capture_static_cubemap_inner(
         &mut self,
         scene: &Scene,
         position: Vec3,
         resolution: u32,
-        light_static_from_probes: bool,
-        lens: CaptureLens,
-    ) -> CubemapCapture {
+        sky: CaptureSky,
+    ) -> (CubemapCapture, [Vec<bool>; 6]) {
         let resolution = resolution.max(1);
         let target = self.make_face_target(resolution);
         let output = target.create_view(&wgpu::TextureViewDescriptor::default());
@@ -114,29 +101,48 @@ impl Renderer {
         // sample the probe field, and cast shadows as the lens says. The mode is
         // restored after the six faces.
         let prev = self.capture;
-        self.capture = CaptureMode {
-            static_only: true,
-            probe_bounce: light_static_from_probes,
-            shadows: lens.shadows,
-        };
+        self.capture = sky.mode();
+        let lens = sky.lens();
 
+        let mut open: [Vec<bool>; 6] = Default::default();
         let faces = CubemapFace::ALL.map(|face| {
             let mut camera = face_camera(position, face);
             (camera.near, camera.far) = (lens.near, lens.far);
             self.render_capture_face(&mut render_view, scene, &camera, &output);
-            let mut face = crate::render::readback::read_texture_rgba8(
+            let mut pixels = crate::render::readback::read_texture_rgba8(
                 &self.device,
                 &self.queue,
                 &target,
                 resolution,
                 resolution,
             );
-            mirror_rows(&mut face, resolution);
-            face
+            mirror_rows(&mut pixels, resolution);
+            if self.capture.ambient_sky {
+                open[face as usize] = self.read_open_texels(&render_view, resolution);
+            }
+            pixels
         });
 
         self.capture = prev;
-        CubemapCapture { resolution, faces }
+        (CubemapCapture { resolution, faces }, open)
+    }
+
+    /// Which texels of the face just drawn into `view` nothing covered: its depth is
+    /// still the far plane the scene pass cleared to. Mirrored as the colour is.
+    fn read_open_texels(&self, view: &RenderView, resolution: u32) -> Vec<bool> {
+        let size = (resolution, resolution);
+        let mut depth = crate::render::readback::read_texture_bytes(
+            &self.device,
+            &self.queue,
+            &view.depth_texture,
+            size,
+            4,
+        );
+        mirror_rows(&mut depth, resolution);
+        depth
+            .chunks_exact(4)
+            .map(|d| f32::from_le_bytes([d[0], d[1], d[2], d[3]]) >= 1.0)
+            .collect()
     }
 
     /// Build the per-face offscreen colour target (LDR RGBA8, copyable to CPU).
@@ -173,6 +179,10 @@ pub(crate) struct CaptureMode {
     pub probe_bounce: bool,
     /// Lights cast shadows; off for a reflection probe captured without (#1584).
     pub shadows: bool,
+    /// A light-probe capture (#1668): no sky is drawn and the background clears to
+    /// black, so the escaping directions carry nothing but what the CPU adds, the
+    /// ambient (Unity bakes light probes against Environment Lighting, not the skybox).
+    pub ambient_sky: bool,
 }
 
 impl Default for CaptureMode {
@@ -181,6 +191,38 @@ impl Default for CaptureMode {
             static_only: false,
             probe_bounce: false,
             shadows: true,
+            ambient_sky: false,
+        }
+    }
+}
+
+/// What a static capture sees where nothing covers the view.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum CaptureSky {
+    /// The skybox, through the scene camera's planes.
+    Drawn,
+    /// The skybox, through a reflection probe's lens (#1584).
+    Reflection(CaptureLens),
+    /// Nothing: a light probe's capture (#1668), the ambient added on the CPU.
+    /// `bounce` lights the static surfaces from the probe field too (#285).
+    Ambient { bounce: bool },
+}
+
+impl CaptureSky {
+    /// The capture mode its six faces draw with.
+    fn mode(self) -> CaptureMode {
+        CaptureMode {
+            static_only: true,
+            probe_bounce: matches!(self, Self::Ambient { bounce: true }),
+            shadows: self.lens().shadows,
+            ambient_sky: matches!(self, Self::Ambient { .. }),
+        }
+    }
+
+    fn lens(self) -> CaptureLens {
+        match self {
+            Self::Reflection(lens) => lens,
+            Self::Drawn | Self::Ambient { .. } => CaptureLens::default(),
         }
     }
 }

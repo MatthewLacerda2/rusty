@@ -52,8 +52,8 @@ impl LightMode {
 
     /// Whether the renderer's light loop draws this light (#809). In a frame,
     /// `Realtime` and `Mixed`: a `Baked` light reaches surfaces only through lightmaps
-    /// and probes. In a bake `capture` (the probe and reflection bakes'
-    /// `capture_static_cubemap`), the lights whose bounce is baked: `Mixed` and `Baked`.
+    /// and probes. In a bake `capture` (the light-probe and reflection captures over
+    /// `capture_static_cubemap`'s spine), the lights whose bounce is baked: `Mixed` and `Baked`.
     pub fn renders_live(self, capture: bool) -> bool {
         if capture {
             self.bakes_indirect()

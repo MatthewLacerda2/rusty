@@ -2,10 +2,12 @@
 //!
 //! The rendered-capture counterpart to the analytic stand-in (`scene::probe_fill`).
 //! For each probe we capture the STATIC scene to a 6-face cubemap from the probe's
-//! position (`Renderer::capture_static_cubemap`, #243), then project that captured
-//! radiance into an L2 irradiance SH (`scene::sh`, #240): every texel is decoded to
-//! linear RGB, aimed down its true world direction, and accumulated weighted by its
-//! cubemap solid angle (cosine-lobe convolution then happens on read-back in
+//! position (`Renderer::capture_light_probe`, on #243's capture), then project that
+//! captured radiance into an L2 irradiance SH (`scene::sh`, #240): every texel is
+//! decoded to linear RGB, aimed down its true world direction, and accumulated
+//! weighted by its cubemap solid angle. A texel nothing covered escapes the scene
+//! and takes the ambient's radiance along its direction instead of the sky
+//! (`probe::capture`, #1668) (cosine-lobe convolution then happens on read-back in
 //! `Sh9::eval`). The 27 floats per probe land in `Scene::probes`, ready for the
 //! `<scene>.lighting.json` sidecar the runtime already loads.
 //!
@@ -20,11 +22,12 @@
 
 use glam::Vec3;
 
+use super::capture::ProbeCapture;
 use crate::core::color::srgb_to_linear;
 use crate::render::ibl::cube_sample::{face_uv, FaceProjections};
 use crate::render::{CubemapCapture, CubemapFace, Renderer};
 use crate::scene::lighting::sh::Sh9;
-use crate::scene::Scene;
+use crate::scene::{AmbientRadiance, Scene};
 
 /// Default per-face capture resolution for a probe bake. Small is plenty: an L2 SH
 /// keeps only 3 bands, so a low-res cubemap already over-samples the signal, and the
@@ -33,12 +36,12 @@ pub const DEFAULT_BAKE_RESOLUTION: u32 = 32;
 
 impl Renderer {
     /// Bake one probe: capture the static scene from `position` and project the
-    /// captured radiance into an L2 irradiance SH. `resolution` is the per-face edge
+    /// captured radiance, the drawn ambient where it escapes, into an L2 irradiance SH. `resolution` is the per-face edge
     /// length (clamped to the renderer's offscreen size by the capture primitive).
     /// The direct-only bounce 1 of [`Renderer::bake_probes`] is this, per probe.
     pub fn bake_probe(&mut self, scene: &Scene, position: Vec3, resolution: u32) -> Sh9 {
-        let capture = self.capture_static_cubemap(scene, position, resolution);
-        project_cubemap(&capture)
+        let capture = self.capture_light_probe(scene, position, resolution, false);
+        project_light_probe(&capture, scene.drawn_ambient().radiance())
     }
 
     /// Bake every probe in `scene.probes` with the multi-bounce GI solve (#285),
@@ -58,34 +61,48 @@ impl Renderer {
 /// cubemap solid angle. The returned `Sh9` reads back as diffuse irradiance through
 /// the cosine-lobe convolution baked into `Sh9::eval`.
 pub fn project_cubemap(capture: &CubemapCapture) -> Sh9 {
+    project(capture, |_, _, _| Vec3::ZERO)
+}
+
+/// Project a light probe's capture (#1668): [`project_cubemap`], plus `ambient`'s
+/// radiance along every direction that escapes the scene, in linear light and
+/// clamped at zero per direction, as the lightmap trace's escaping rays are
+/// (`Tracer::sky`, #1662): a trilight's `incoming` can ring below zero toward the
+/// poles, and unclamped it would subtract light a covered texel brought in. Where
+/// `incoming` is non-negative everywhere an open probe projects the analytic fill's
+/// ambient term exactly. It is added to what the texel holds: black, unless a
+/// transparent surface drew over the background. Alpha-blended glass writes no
+/// depth, so a texel behind it counts as open and takes the full ambient on top of
+/// the glass's own colour (the glass attenuates nothing).
+pub fn project_light_probe(capture: &ProbeCapture, ambient: AmbientRadiance) -> Sh9 {
+    project(&capture.cube, |face, texel, dir| {
+        match capture.open[face as usize].get(texel) {
+            Some(true) => ambient.incoming(dir).max(Vec3::ZERO),
+            _ => Vec3::ZERO,
+        }
+    })
+}
+
+/// Sum every texel of every face, each aimed down its world direction, weighted by
+/// its solid angle, its decoded radiance plus `extra(face, texel index, direction)`.
+fn project(capture: &CubemapCapture, extra: impl Fn(CubemapFace, usize, Vec3) -> Vec3) -> Sh9 {
     let res = capture.resolution.max(1);
     let mut sh = Sh9::zero();
     let proj = FaceProjections::new();
     for face in CubemapFace::ALL {
-        accumulate_face(&mut sh, &proj, capture.face(face), face, res);
-    }
-    sh
-}
-
-/// Accumulate one face's texels into `sh`. Each texel contributes its decoded linear
-/// radiance aimed down `texel_dir`, weighted by the texel's solid angle.
-fn accumulate_face(
-    sh: &mut Sh9,
-    proj: &FaceProjections,
-    pixels: &[u8],
-    face: CubemapFace,
-    res: u32,
-) {
-    for py in 0..res {
-        for px in 0..res {
-            let (u, v) = face_uv(px, py, res);
-            let dir = proj.direction(face, u, v);
-            let weight = texel_solid_angle(u, v, res);
-            let idx = ((py * res + px) * 4) as usize;
-            let rgb = decode_linear(&pixels[idx..idx + 3]);
-            sh.add_sample(dir, rgb, weight);
+        let pixels = capture.face(face);
+        for py in 0..res {
+            for px in 0..res {
+                let (u, v) = face_uv(px, py, res);
+                let texel = (py * res + px) as usize;
+                let dir = proj.direction(face, u, v);
+                let rgb =
+                    decode_linear(&pixels[texel * 4..texel * 4 + 3]) + extra(face, texel, dir);
+                sh.add_sample(dir, rgb, texel_solid_angle(u, v, res));
+            }
         }
     }
+    sh
 }
 
 /// Differential solid angle of a cube texel at face coords `(u, v)`. A texel spans

@@ -18,7 +18,8 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
         dir_lights: [bytemuck::Zeroable::zeroed(); MAX_DIRECTIONAL_LIGHTS],
         num_dir_lights: 0,
         sky_textured: 0.0,
-        _sky_pad: [0.0; 2],
+        env_reflection: 1.0,
+        _sky_pad: 0.0,
         refl_probes: [Default::default(); MAX_REFLECTION_PROBES],
     }
 }
@@ -107,13 +108,18 @@ impl crate::render::Renderer {
     /// Builds the per-frame lighting uniform from the scene's lights,
     /// and the resident reflection probes' boxes (#1206). `sky_textured` is set only
     /// when a panorama is loaded (#718), else the shader reflects the procedural sky the
-    /// sky pass draws.
+    /// sky pass draws. A light-probe capture reflects nothing (#1668): Unity's
+    /// light-probe bake leaves specular out, so neither the sky nor a reflection probe
+    /// reaches a probe through a glossy static surface.
     fn build_lighting_uniform(&self, scene: &Scene) -> LightingUniform {
         let mut lighting_uniform = default_lighting_uniform(scene);
         apply_scene_lights(&mut lighting_uniform, scene, self.capture.static_only);
         lighting_uniform.refl_probes = *self.reflection_probes.uniforms();
         if self.skybox_texture.is_some() {
             lighting_uniform.sky_textured = 1.0;
+        }
+        if self.capture.ambient_sky {
+            lighting_uniform.env_reflection = 0.0;
         }
         lighting_uniform
     }
