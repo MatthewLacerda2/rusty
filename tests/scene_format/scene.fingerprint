@@ -260,12 +260,14 @@ scene.entities[].layout_group.spacing[]: f32
 scene.entities[].layout_group.start_corner: enum UpperLeft|UpperRight|LowerLeft|LowerRight
 scene.entities[].layout_group.start_vertical: bool
 scene.entities[].layout_group: option
+scene.entities[].light.area_size: tuple(2)
+scene.entities[].light.area_size[]: f32
 scene.entities[].light.cast_shadows: bool
 scene.entities[].light.color: tuple(3)
 scene.entities[].light.color[]: f32
 scene.entities[].light.inner_cone: f32
 scene.entities[].light.intensity: f32
-scene.entities[].light.light_type: enum Ambient|Directional|Point|Spot
+scene.entities[].light.light_type: enum Ambient|Directional|Point|Spot|Area
 scene.entities[].light.mode: enum Realtime|Mixed|Baked
 scene.entities[].light.outer_cone: f32
 scene.entities[].light.range: f32
