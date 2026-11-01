@@ -39,8 +39,9 @@ static surface, a direction that escapes the scene, it takes the scene's **ambie
 (`Lighting.SetAmbientMode`'s `Color` or `Gradient`, intensity applied), not the sky
 the camera draws: Unity bakes light probes against *Environment Lighting*, and the
 skybox reaches surfaces only through reflections (reflection probes still capture
-it, see [`Reflection`](Reflection.md)). So an open probe bakes the same SH as
-`BakeAnalytic`'s, and a probe-lit object takes the ambient an unbaked or lightmapped
+it, see [`Reflection`](Reflection.md)), and static surfaces reflect nothing into a
+light probe (Unity's light-probe bake carries no specular). So `Bake` and
+`BakeAnalytic` share the same ambient term, and a probe-lit object takes the ambient an unbaked or lightmapped
 surface beside it does (#1668). The first pass captures direct
 light only; each later pass re-lights the static scene with the previous pass's probe
 field, folding in one more indirect bounce, so colour bleeds further with each

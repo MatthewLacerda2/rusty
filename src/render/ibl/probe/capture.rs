@@ -8,9 +8,12 @@
 //! face, which texels nothing covered. The projection (`bake::project_light_probe`)
 //! gives those texels the ambient's radiance along their direction,
 //! `AmbientRadiance::incoming`, on the CPU: unclamped and before any tonemap or
-//! 8-bit encode, so an open probe's SH is the one `scene::lighting::probe_fill`
-//! projects, and a probe-lit object agrees with the lightmapped and unbaked
-//! surfaces beside it (#1647's decision 3). Reflection probes keep the sky.
+//! 8-bit encode, so an open probe's ambient term is the one
+//! `scene::lighting::probe_fill` projects (the fill adds a sun sample and a height
+//! scale on top), and a probe-lit object agrees with the lightmapped and unbaked
+//! surfaces beside it (#1647's decision 3). Static surfaces reflect nothing in it
+//! (`LightingUniform::env_reflection`), since Unity's light-probe bake carries no
+//! specular. Reflection probes keep the sky.
 
 use glam::Vec3;
 

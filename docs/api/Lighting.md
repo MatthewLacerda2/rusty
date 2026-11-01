@@ -248,7 +248,10 @@ during Play goes back on Stop, as every scene edit does.
   smoothing at the horizon (the bakes carry three SH bands, as Unity's ambient
   probe does). As in Unity, light probes and lightmaps bake against this ambient,
   never against the sky the camera draws (#1668): the sky reaches surfaces only
-  through reflections (reflection probes capture it). But, as
+  through reflections (reflection probes capture it). So a scene with a panorama sky
+lights its probes and lightmaps from the flat ambient, not from the HDRI; Unity's
+Environment Lighting Source = Skybox, which bakes from the sky, is not built yet
+(#1675). But, as
   in Unity, **a changed mode or colour reaches baked surfaces only at the next
   Generate Lighting**: dynamic objects and unbaked surfaces show it at once.
 - **The procedural sky** is drawn when no panorama is set: a ground → horizon →

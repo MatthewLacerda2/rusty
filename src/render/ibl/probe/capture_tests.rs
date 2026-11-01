@@ -7,9 +7,10 @@
 use glam::Vec3;
 
 use super::ProbeCapture;
+use crate::components::{MaterialAsset, MaterialComponent};
 use crate::render::{project_light_probe, CubemapCapture};
 use crate::scene::lighting::sh::Sh9;
-use crate::scene::{analytic_fill, AmbientMode, AmbientRadiance, Scene};
+use crate::scene::{analytic_fill, AmbientMode, AmbientRadiance, MeshComponent, Scene};
 
 const RES: u32 = 32;
 const NORMALS: [Vec3; 6] = [
@@ -22,13 +23,15 @@ const NORMALS: [Vec3; 6] = [
 ];
 
 /// An empty scene in `Color` mode, or `Gradient` with a blue sky over an orange
-/// ground, neither colour the procedural sky's.
+/// ground, neither colour the procedural sky's. The grey equator keeps the
+/// trilight's `incoming` non-negative, so the zero clamp leaves it as the fill's.
 fn scene(mode: AmbientMode) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_color = Vec3::new(0.4, 0.8, 1.2);
     scene.ambient_intensity = 1.5;
     scene.ambient.mode = mode;
     scene.ambient.sky = Vec3::new(0.1, 0.3, 1.2);
+    scene.ambient.equator = Vec3::splat(0.5);
     scene.ambient.ground = Vec3::new(1.2, 0.5, 0.1);
     scene
 }
@@ -73,6 +76,17 @@ fn an_open_capture_projects_the_ambient() {
         let sh = project_light_probe(&capture, ambient);
         assert_matches(&sh, &analytic(mode), mode.name());
     }
+    // A trilight ringing below zero (black equator) is clamped per direction, as the
+    // trace's escaping rays are: never darker than the unclamped fill, else brighter.
+    let mut ringing = scene(AmbientMode::Gradient);
+    ringing.ambient.equator = Vec3::ZERO;
+    let sh = project_light_probe(&capture, ringing.drawn_ambient().radiance());
+    ringing.probes.add_probe(Vec3::ZERO);
+    analytic_fill(&mut ringing);
+    let fill = ringing.probes.probes[0].sh;
+    let lift = NORMALS.map(|n| sh.eval(n.normalize()) - fill.eval(n.normalize()));
+    assert!(lift.iter().all(|d| d.min_element() > -1e-4), "{lift:?}");
+    assert!(lift.iter().any(|d| d.max_element() > 1e-2), "{lift:?}");
     // A covered (black) texel takes no ambient.
     let mut closed = capture;
     closed.open = std::array::from_fn(|_| vec![false; (res * res) as usize]);
@@ -93,5 +107,46 @@ fn gpu_an_empty_scene_bakes_the_analytic_fill() {
         let mut solved = probed(mode);
         renderer.bake_probes(&mut solved, RES);
         assert_matches(&solved.probes.probes[0].sh, &baked, "multi-bounce");
+    }
+}
+
+/// A probe inside a closed room of black, non-emissive static walls sees no open
+/// texel and bakes no light: neither the ambient (the depth test finds every
+/// direction covered) nor the sky reflected off the walls (#1668: a light-probe
+/// capture reflects nothing, and a black dielectric still has a 4% specular).
+#[test]
+fn gpu_a_closed_room_bakes_no_ambient() {
+    let Some(mut renderer) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+        return;
+    };
+    let mut scene = scene(AmbientMode::Gradient);
+    scene.materials.insert(
+        "black".to_string(),
+        MaterialAsset {
+            base_color: [0.0; 3],
+            ..MaterialAsset::default()
+        },
+    );
+    for axis in [Vec3::X, Vec3::Y, Vec3::Z] {
+        for side in [-1.0, 1.0] {
+            let id = scene.add_entity("Wall".to_string());
+            let (v, i) = crate::components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
+            scene
+                .world
+                .set_mesh(id, Some(MeshComponent::new("Box", v, i)));
+            scene.world.set_static(id, true);
+            let mat = MaterialComponent::new("black".to_string());
+            scene.world.set_material(id, Some(mat));
+            let mut t = scene.world.transform_mut(id).unwrap();
+            t.position = axis * 2.0 * side;
+            t.scale = Vec3::splat(5.0) - axis * 4.5;
+        }
+    }
+    let capture = renderer.capture_light_probe(&scene, Vec3::ZERO, RES, false);
+    let open = capture.open.iter().flatten().filter(|o| **o).count();
+    assert_eq!(open, 0, "texels open inside a closed room");
+    let sh = renderer.bake_probe(&scene, Vec3::ZERO, RES);
+    for n in NORMALS.map(Vec3::normalize) {
+        assert!(sh.eval(n).max_element() < 1e-2, "{n}: {}", sh.eval(n));
     }
 }

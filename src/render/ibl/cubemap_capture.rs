@@ -4,10 +4,10 @@
 //! a 6-face cubemap (offscreen, LDR RGBA8), reusing the forward lit pass. This is the
 //! shared spine both probe bakes and reflection bakes stand on.
 //!
-//! Only `is_static` entities (plus the skybox — the distant environment) are drawn;
-//! a light probe's capture draws no sky, and its bake adds the ambient instead
-//! (`probe::capture`, #1668);
-//! dynamic actors are excluded so they never bake into a probe/reflection. The static
+//! Only `is_static` entities (plus, for a reflection capture, the skybox — the distant
+//! environment) are drawn; dynamic actors are excluded so they never bake into a
+//! probe/reflection. A light probe's capture draws no sky and reflects nothing, and
+//! its bake adds the ambient where the view escapes (`probe::capture`, #1668). The static
 //! filter mirrors the shadow pass's static sweep (`passes::shadows::casters::sweep`):
 //! the forward solid-gather honours the renderer's [`CaptureMode::static_only`],
 //! toggled on here for the six faces and restored after.
@@ -48,7 +48,9 @@ impl CubemapCapture {
 impl Renderer {
     /// Render the STATIC scene into a 6-face cubemap centred on `position`, each face
     /// `resolution × resolution` LDR RGBA8 (#243). Reuses the forward lit pass with a
-    /// 90° FOV per face; only `is_static` entities and the skybox are drawn.
+    /// 90° FOV per face; only `is_static` entities and the skybox are drawn. A light
+    /// probe captures through [`Renderer::capture_light_probe`] instead, which draws
+    /// no sky (#1668).
     ///
     /// The faces render into a target of their own, `resolution²`, whatever the
     /// renderer's own size.
@@ -77,7 +79,7 @@ impl Renderer {
     }
 
     /// Shared capture spine: render the static scene into a 6-face cubemap from
-    /// `position`, as `sky` says. A light-probe capture also returns, per face, which
+    /// `position`, the sky drawn or not as `sky` says. A light-probe capture also returns, per face, which
     /// texels nothing covered (their depth is the cleared far plane): the directions
     /// that escape the scene, where `probe::capture` adds the ambient.
     pub(crate) fn capture_static_cubemap_inner(

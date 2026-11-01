@@ -65,14 +65,19 @@ pub fn project_cubemap(capture: &CubemapCapture) -> Sh9 {
 }
 
 /// Project a light probe's capture (#1668): [`project_cubemap`], plus `ambient`'s
-/// radiance along every direction that escapes the scene. It is added to what the
-/// texel holds (black, unless a transparent surface drew over the background), exact
-/// and unclamped like the analytic fill's, so `Sh9::eval` clamps the result as it
-/// does any probe.
+/// radiance along every direction that escapes the scene, in linear light and
+/// clamped at zero per direction, as the lightmap trace's escaping rays are
+/// (`Tracer::sky`, #1662): a trilight's `incoming` can ring below zero toward the
+/// poles, and unclamped it would subtract light a covered texel brought in. Where
+/// `incoming` is non-negative everywhere an open probe projects the analytic fill's
+/// ambient term exactly. It is added to what the texel holds: black, unless a
+/// transparent surface drew over the background. Alpha-blended glass writes no
+/// depth, so a texel behind it counts as open and takes the full ambient on top of
+/// the glass's own colour (the glass attenuates nothing).
 pub fn project_light_probe(capture: &ProbeCapture, ambient: AmbientRadiance) -> Sh9 {
     project(&capture.cube, |face, texel, dir| {
         match capture.open[face as usize].get(texel) {
-            Some(true) => ambient.incoming(dir),
+            Some(true) => ambient.incoming(dir).max(Vec3::ZERO),
             _ => Vec3::ZERO,
         }
     })

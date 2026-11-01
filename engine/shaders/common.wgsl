@@ -98,8 +98,10 @@ struct LightingUniforms {
     // 1.0 when a skybox panorama is bound at binding 2 (#718); 0.0 means the sky on
     // screen is the procedural gradient, which the env reflection then reflects too.
     sky_textured: f32,
-    _sky_pad_a: f32,
-    _sky_pad_b: f32,
+    // 1.0 when surfaces reflect the environment (sky and reflection probes); 0.0 in a
+    // light-probe capture (#1668), which bakes no specular, as Unity's does.
+    env_reflection: f32,
+    _sky_pad: f32,
     // The resident reflection probes (#1206); a draw's instance names the two it
     // blends (`InstanceData.reflection_probe`, packed indices + 1 and weights, #1584). Length is the Rust
     // `MAX_REFLECTION_PROBES`. Mirrors the Rust `LightingUniform` byte-for-byte.
