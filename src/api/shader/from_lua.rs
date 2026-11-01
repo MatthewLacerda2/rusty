@@ -19,7 +19,7 @@
 //! ```
 //!
 //! Each block table carries an `id` and an optional `params` map; a param is a
-//! scalar or a small float array.
+//! scalar, a small float array, or a choice param's name (`kind = "slot"`, #1679).
 
 use mlua::Value;
 
