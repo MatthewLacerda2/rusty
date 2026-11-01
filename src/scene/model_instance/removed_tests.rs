@@ -33,7 +33,7 @@ fn spawn_and_destroy(file: &str) -> (Scene, u32, u32, String) {
     (scene, root, kit, path)
 }
 
-fn reload(scene: &Scene) -> Scene {
+pub(super) fn reload(scene: &Scene) -> Scene {
     let mut loaded = Scene::new();
     apply_scene_data(&mut loaded, to_scene_data(scene));
     loaded

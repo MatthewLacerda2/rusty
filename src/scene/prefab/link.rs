@@ -28,7 +28,7 @@ use crate::scene::prefab::instance::instance_members;
 use crate::scene::prefab::live::{entity_overrides, keep_root_placement, sync_overrides};
 use crate::scene::prefab::overrides::apply_overrides;
 use crate::scene::prefab::restamp::{instance_roots, propagate_roots};
-use crate::scene::prefab::source::{is_model_source, read_source, rekey};
+use crate::scene::prefab::source::{is_model_source, read_source, rekey, GONE};
 use crate::scene::prefab::structure::reshape;
 use crate::scene::prefab::{stamp_prefab, Merge};
 use crate::scene::serialize::rehydrate_entity_mesh;
@@ -195,7 +195,9 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
     let ids = require_instance(scene, root_id)?;
     let mut out = Vec::new();
     for id in ids {
-        let Some(link) = scene.world.prefab_link(id) else {
+        // A part whose node the model lost is not the model's any more: it waits
+        // for Play's destroy phase, and has no local id to list it under.
+        let Some(link) = scene.world.prefab_link(id).filter(|l| l.local_id != GONE) else {
             continue;
         };
         for key in entity_overrides(&scene.world, id).keys() {

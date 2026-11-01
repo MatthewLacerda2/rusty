@@ -34,7 +34,7 @@ pub const SIZE_TOKEN: &str = "#size";
 
 /// The key prefix of a removed part ([`PrefabOverrides::removed_parts`]):
 /// `-part/Kit/Wall`. No JSON pointer starts with `-`.
-const PART_KEY: &str = "-part/";
+pub const PART_KEY: &str = "-part/";
 
 /// The live link from an instance entity back to the `.prefab` it was stamped from
 /// (#216). Set on EVERY entity of a linked instance — not just the root — so that

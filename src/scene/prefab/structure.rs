@@ -68,30 +68,37 @@ pub(super) fn reshape(
 
 /// Destroy every member of `gone` (its node the model lost), re-homing first
 /// what else hangs under one. A node's path names its parent's, so a lost node's
-/// member children are lost too: only the topmost lost part is destroyed, and its
-/// subtree goes with it, the bones of a skinned part and their generated hitboxes
-/// among it. Anything else reached (an entity the user added, a nested instance, a
-/// surviving member the user moved under the lost part) moves out whole, as Unity
-/// keeps an orphaned added object.
+/// member children are lost too: only the topmost lost parts are destroyed, and
+/// their subtrees go with them, the bones of a skinned part and their generated
+/// hitboxes among them. Anything else reached (an entity the user added, a nested
+/// instance, a surviving member the user moved under the lost part) moves out
+/// whole to the nearest ancestor not lost, as Unity keeps an orphaned added
+/// object. The topmost are picked only after every move: a lost part under a
+/// surviving member under another lost part has moved out with that member, and
+/// is topmost there.
 fn remove_gone(scene: &mut Scene, gone: &BTreeSet<u32>, applying: bool) {
     let bones = scene.bone_ids();
-    let tops = gone.iter().copied().filter(|&id| {
-        let mut up = scene.world.ancestors(id);
-        !up.any(|a| gone.contains(&a))
-    });
-    for top in tops.collect::<Vec<_>>() {
-        let Some(home) = scene.world.parent_id(top) else {
-            continue; // the root's node path is "": never gone
-        };
-        // Walk the lost subtree through lost parts and bones only.
-        let lost = |id: u32| gone.contains(&id) || bones.contains(&id);
-        let walk = scene.world.self_and_descendants_while(top, lost);
-        let kept: Vec<u32> = walk
+    let lost = |id: u32| gone.contains(&id) || bones.contains(&id);
+    for &part in gone {
+        let kept: Vec<u32> = scene
+            .world
+            .self_and_descendants_while(part, lost)
             .filter(|&id| !lost(id) && !scene.is_generated_hitbox(id))
             .collect();
+        // The root's node path is "": never gone, so a home exists.
+        let Some(home) = scene.world.ancestors(part).find(|&a| !lost(a)) else {
+            continue;
+        };
         for id in kept {
             rehome(scene, id, home);
         }
+    }
+    let tops: Vec<u32> = gone
+        .iter()
+        .copied()
+        .filter(|&id| !scene.world.ancestors(id).any(|a| gone.contains(&a)))
+        .collect();
+    for top in tops {
         match applying {
             true => {
                 let doomed = scene.destroy_set(top);

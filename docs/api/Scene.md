@@ -295,15 +295,19 @@ one name and never drift.
   another model's instance) is kept: it moves to the nearest part left, staying where
   it is in the world, as Unity keeps an orphaned added object; so does a part of the
   instance you moved under it, with its overrides. A part **you** remove is not a
-  node the file gained: destroying one (`Scene.DestroyEntity`, the hierarchy's
-  Destroy) records it on the instance as a **removed part** (Unity's *Removed
-  GameObject* override, listed as `"0:-part/<node path>"`), so a load, a re-import or
-  a Scale Factor change never stamps it back; `RevertPrefabField(rootId,
-  "-part/<node path>")` or `RevertPrefabOverrides` brings it back. Moving a part out
+  node the file gained: destroying one in edit mode (`Scene.DestroyEntity`, the
+  hierarchy's Destroy) records it on the instance as a **removed part** (Unity's
+  *Removed GameObject* override, listed as `"0:-part/<node path>"`), so a load, a
+  re-import or a Scale Factor change never stamps it back; `RevertPrefabField(rootId,
+  "-part/<node path>")` or `RevertPrefabOverrides` brings it back. A destroy during
+  Play records nothing, since Stop restores the scene anyway. Moving a part out
   of its instance (`Scene.SetParent`, the inspector's parent field) **unpacks** it:
   it keeps its values, loses its link, and is recorded as removed the same way, so
-  it is never stamped twice (Unity refuses that move without unpacking). Moving a
-  part elsewhere inside its own instance keeps it linked. glTF has no stable node
+  it is never stamped twice (Unity refuses that move without unpacking). Reverting
+  that removed part brings back a **new** linked copy from the model; the unpacked
+  one stays a plain entity beside it. Moving a part elsewhere inside its own
+  instance keeps it linked, and a part you moved under another goes with it: destroy
+  or unpack that one, and both are recorded removed. glTF has no stable node
   ids, so a part is matched to its node by path, and same-named sibling nodes by
   their order among themselves (`Kit/Cube`, `Kit/Cube[1]`): reordering two of them
   in the file swaps which part takes which node, and removing the first of two from

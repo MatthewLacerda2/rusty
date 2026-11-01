@@ -9,17 +9,28 @@
 //! another instance of the same source (a linked entity with `local_id == 0`): kit
 //! B placed under a part of kit A is B's, never A's (#1665).
 
+use std::collections::BTreeSet;
+
 use crate::scene::Scene;
 
 /// The ids of the linked instance rooted at `root_id`: the root, then its members in
 /// pre-order. `None` when `root_id` is not linked.
 pub fn instance_members(scene: &Scene, root_id: u32) -> Option<Vec<u32>> {
+    instance_members_with(scene, root_id, &scene.bone_ids())
+}
+
+/// [`instance_members`] with the scene's bones ([`Scene::bone_ids`]) already
+/// found: a caller asking about several entities scans the scene once.
+pub(super) fn instance_members_with(
+    scene: &Scene,
+    root_id: u32,
+    bones: &BTreeSet<u32>,
+) -> Option<Vec<u32>> {
     let source = scene.world.prefab_link(root_id)?.source.clone();
     let shares = |id: u32| {
         let link = scene.world.prefab_link(id);
         link.is_some_and(|l| l.source == source && (l.local_id != 0 || id == root_id))
     };
-    let bones = scene.bone_ids();
     let members = scene
         .world
         .self_and_descendants_while(root_id, |id| shares(id) || bones.contains(&id))
@@ -33,6 +44,11 @@ pub fn instance_members(scene: &Scene, root_id: u32) -> Option<Vec<u32>> {
 /// parts but nothing else; failing one, the topmost such part. `None` when
 /// `id` is not linked.
 pub fn instance_root(scene: &Scene, id: u32) -> Option<u32> {
+    instance_root_with(scene, id, &scene.bone_ids())
+}
+
+/// [`instance_root`] with the scene's bones already found ([`instance_members_with`]).
+pub(super) fn instance_root_with(scene: &Scene, id: u32, bones: &BTreeSet<u32>) -> Option<u32> {
     let source = scene.world.prefab_link(id)?.source.clone();
     if scene.world.prefab_link(id)?.local_id == 0 {
         return Some(id);
@@ -41,7 +57,6 @@ pub fn instance_root(scene: &Scene, id: u32) -> Option<u32> {
         let link = scene.world.prefab_link(p);
         link.is_some_and(|l| l.source == source)
     };
-    let bones = scene.bone_ids();
     // Up through bones and parts to the first root of this source, which ends it.
     let mut root = None;
     for p in scene.world.ancestors(id) {

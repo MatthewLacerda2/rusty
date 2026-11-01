@@ -190,6 +190,8 @@ mod lod_tests;
 #[cfg(test)]
 mod material_tests;
 #[cfg(test)]
+mod moved_part_tests;
+#[cfg(test)]
 mod removed_tests;
 #[cfg(test)]
 mod tests;

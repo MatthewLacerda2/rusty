@@ -32,7 +32,7 @@ mod prefab_link;
 mod refs;
 
 pub use override_refs::visit_override_refs;
-pub use prefab_link::{PrefabLink, PrefabOverrides, SIZE_TOKEN};
+pub use prefab_link::{PrefabLink, PrefabOverrides, PART_KEY, SIZE_TOKEN};
 pub(crate) use refs::with_ref_components;
 pub use refs::{escape_token, EntityRefs, RefVisit};
 

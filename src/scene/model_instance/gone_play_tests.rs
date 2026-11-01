@@ -29,8 +29,14 @@ fn a_play_mode_load_removes_a_gone_part() {
 fn a_play_mode_reimport_queues_a_gone_part() {
     let (mut scene, root, _, wall, _) = spawn_then_rename("rusty_1665_play_reimport.gltf");
     scene.set_playing(true);
+    scene.world.transform_mut(wall).unwrap().scale = Vec3::splat(2.0);
     reimport_instance(&mut scene, root).unwrap();
     assert!(scene.is_doomed(wall), "torn down at the destroy phase");
+    let listed = list_instance_overrides(&scene, root).unwrap();
+    assert!(
+        listed.is_empty(),
+        "a waiting gone part lists nothing: {listed:?}"
+    );
 }
 
 #[test]
