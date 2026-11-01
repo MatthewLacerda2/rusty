@@ -3,8 +3,9 @@
 //! A texel stores `E / π`: the irradiance reaching it, over π. The forward shader
 //! multiplies it by albedo, so a lightmapped surface ends up `albedo · E / π`, the
 //! same Lambert response a realtime light gives (`albedo / π · radiance · cos`). The
-//! sky is a radiance of `sky` above the horizon fading to a quarter below, so an open
-//! floor bakes to the flat ambient term an unlit one shows.
+//! sky is the ambient's radiance by direction (`AmbientRadiance::incoming`), built so
+//! its cosine-weighted average is the shader's flat ambient: an open surface bakes to
+//! the ambient an unbaked one shows, whichever way it faces (#1647).
 //!
 //! Each sample shoots a cosine-weighted ray; the mean of the radiance the rays bring
 //! back is exactly `E / π`. A ray that escapes returns the sky; one that hits a front
@@ -155,10 +156,12 @@ impl Tracer<'_> {
         (e, dir)
     }
 
-    /// What a ray escaping along `dir` sees: the forward shader's ambient gradient.
+    /// What a ray escaping along `dir` sees: the ambient's radiance from there,
+    /// clamped at zero per ray. A trilight's `incoming` can ring below zero toward
+    /// the poles; summed unclamped, an escaping ray would subtract bounce light and
+    /// its direction, breaking `|indirect_dir| <= luminance(indirect)` (#810).
     fn sky(&self, dir: Vec3) -> Vec3 {
-        let ground = self.scene.sky * 0.25;
-        ground.lerp(self.scene.sky, dir.y * 0.5 + 0.5)
+        self.scene.sky.incoming(dir).max(Vec3::ZERO)
     }
 }
 

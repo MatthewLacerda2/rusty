@@ -3,6 +3,7 @@
 // Every name here is part of what a baked shader may import, so none ever moves out;
 // a helper only common itself calls may live in a module of its own (`sky/noise.wgsl`).
 
+#import fog::height::fog_height_mean
 #import lighting::reflection_probe::ReflectionProbe
 #import sky::noise::sky_fbm
 
@@ -62,9 +63,20 @@ struct CameraUniforms {
 // The forward lighting uniform (group 0, binding 1) and its light records. Shared
 // so every pass that shades against the scene lights — the forward pass and lit
 // particles (#440) — reads the one layout. Mirrors the Rust `LightingUniform`.
+
+// The scene's ambient (#1647, `scene::DrawnAmbient`): `color` is the `Color` mode
+// colour, which the procedural sky follows whatever the mode; when `gradient` is 1
+// surfaces take the sky / equator / ground trilight instead. Mirrors the Rust
+// `AmbientLightUniform`; `lighting::ambient` evaluates it.
 struct AmbientLight {
     color: vec3<f32>,
     intensity: f32,
+    gradient_sky: vec3<f32>,
+    gradient: f32,
+    gradient_equator: vec3<f32>,
+    _pad_equator: f32,
+    gradient_ground: vec3<f32>,
+    _pad_ground: f32,
 };
 
 struct DirectionalLight {
@@ -332,23 +344,6 @@ fn blend_joints(
 // How far the sky counts as, for fog: past any level's far wall, so the sky is at
 // least as fogged as the farthest geometry in front of it.
 const FOG_SKY_DISTANCE: f32 = 1000.0;
-
-// Mean relative fog thickness along a ray whose heights run `a`..`b` above the base
-// height: full (1) below it, `e^(-k·h)` above it. Exact integral of that profile,
-// so a ray that dips under the base picks up the full layer for that stretch.
-fn fog_height_mean(k: f32, a: f32, b: f32) -> f32 {
-    let lo = min(a, b);
-    let hi = max(a, b);
-    if (k <= 0.0) {
-        return 1.0;
-    }
-    if (hi - lo < 1e-3) {
-        return exp(-k * max(lo, 0.0));
-    }
-    let below = min(hi, 0.0) - min(lo, 0.0);
-    let above = (exp(-k * max(lo, 0.0)) - exp(-k * max(hi, 0.0))) / k;
-    return (below + above) / (hi - lo);
-}
 
 // How fogged (0 clear .. 1 fully fog colour) a point is, seen from `eye`. The one
 // fog formula every pass uses, so surfaces, particles, decals and the sky agree.

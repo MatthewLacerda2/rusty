@@ -16,6 +16,7 @@
 // them. Every mode fogs per vertex (#437); alpha/additive blending is selected by
 // the pipeline, which picks the matching fragment entry point.
 
+#import lighting::ambient::ambient_average
 #import common::{CameraUniforms, Fog, LightingUniforms, LocalLight, cluster_index, fog_factor, local_light_radiance}
 
 struct ParticleGlobals {
@@ -125,8 +126,8 @@ fn sheet_uv(uv: vec2<f32>, sheet: vec4<f32>) -> vec2<f32> {
 // light counts as it would on a matte surface turned toward it (radiance / pi).
 // Point + spot falloff is the forward pass's (`local_light_radiance`).
 fn particle_light(world: vec3<f32>, light: vec4<f32>) -> vec3<f32> {
-    // Flat ambient: the forward pass's sky/ground gradient averaged over directions.
-    var total = lighting.ambient.color * lighting.ambient.intensity * 0.625;
+    // Flat ambient: the forward pass's ambient averaged over directions.
+    var total = ambient_average(lighting.ambient);
     if (light.w > 1.5) {
         total = light.rgb;
     }
