@@ -21,8 +21,11 @@ pub(super) fn create_depth(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: DEPTH_FORMAT,
-        // The SSAO prepass draws it and its passes sample it (#1578).
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        // The SSAO prepass draws it and its passes sample it (#1578); a light-probe
+        // capture reads it back to find the directions that escape the scene (#1668).
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+            | wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
     });
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());

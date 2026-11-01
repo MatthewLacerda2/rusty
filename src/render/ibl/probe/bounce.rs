@@ -3,7 +3,7 @@
 //! The iteration that turns the single-capture probe bake (`bake.rs`) into a
 //! true multi-bounce GI bake. Each pass re-captures every probe and projects the
 //! captured radiance into SH; from bounce 2 on, the capture re-lights the STATIC
-//! scene with the *previous* pass's probe field (`capture_static_cubemap_lit`), so
+//! scene with the *previous* pass's probe field (`capture_light_probe`'s `bounce`), so
 //! every iteration folds in one more bounce of indirect light. The passes are
 //! accumulated in place on `scene.probes`, then a `<scene>.lighting.json` sidecar
 //! persists the converged result exactly as the single-bounce bake did.

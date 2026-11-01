@@ -185,9 +185,19 @@ fn batch_solids(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
         r.precreate_solid_resources(scene, cam, &ctx.frustum, &ctx.lod, (outline, history));
 }
 
+/// A light-probe capture's clear (#1668): black, and no sky, so a direction that
+/// escapes the scene carries only the ambient its bake adds.
+const OPEN_CLEAR: PassClear = PassClear {
+    color: Some(wgpu::Color::BLACK),
+    flags: ClearFlags::SolidColor,
+};
+
 fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     let frame = ScenePassFrame {
-        clear: PassClear::for_pass(ctx.is_first, ctx.cam.clear_flags),
+        clear: match r.capture.ambient_sky {
+            true => OPEN_CLEAR,
+            false => PassClear::for_pass(ctx.is_first, ctx.cam.clear_flags),
+        },
         ssao: ctx
             .ssao
             .map(|plan| SsaoFrame::for_camera(plan, ctx.view_proj, ctx.cam)),
