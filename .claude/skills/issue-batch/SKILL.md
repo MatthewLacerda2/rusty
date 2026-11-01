@@ -132,6 +132,11 @@ So, before writing a brief:
 - before citing Unity, check that rusty has the machinery that makes Unity's way safe,
   and read Unity's source for the claim (a URP shader or C# file): #1479's brief got
   URP's contrast space wrong, and its coder "corrected" it to a second wrong one;
+- a decision that sets an edge behaviour Unity already has (what a removal, an
+  out-of-range lookup or a re-import does) names Unity's behaviour after checking
+  it: #1665's "stamp every node no member claims" brought deleted parts back
+  (Unity records a removed-GameObject override), and #1672's "fall back outside
+  the volume" seamed skinned meshes (Unity clamps); each cost a review round;
 - a brief that offers alternatives names the invariant each must keep: #1486's
   "fix the doc, or walk every node" was met by reordering bakes and losing #1485's
   freeing;
