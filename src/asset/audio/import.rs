@@ -1,8 +1,9 @@
 //! src/asset/audio/import.rs — MP3 arrives, WAV stays (#385).
 //!
-//! Two doors in: [`refresh`] sweeps a project tree for `.mp3` files (the editor runs
-//! it at boot and whenever its window regains focus, Unity's auto-refresh; scripts
-//! call it as `Assets.Refresh()`), and [`import_mp3_bytes`] takes a provider's
+//! Two doors in: [`refresh`] sweeps a project tree for `.mp3` files (every authoring
+//! open runs it, `scene::seed_project`, and the editor again whenever its window
+//! regains focus, Unity's auto-refresh; the shipped player never does, #1653;
+//! scripts call it as `Assets.Refresh()`), and [`import_mp3_bytes`] takes a provider's
 //! response body straight to a `.wav`. Both trim encoder delay and padding through
 //! the shared decoder. A scene that still names `foo.mp3` keeps working:
 //! [`resolve_clip_path`] sends it to the `foo.wav` that replaced it.

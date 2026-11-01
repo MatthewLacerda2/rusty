@@ -237,8 +237,8 @@ pub struct Kind {
     /// The name `Component.*` answers to first (any name `Scene.AddComponent`
     /// takes resolves too, through `add`).
     pub name: &'static str,
-    /// The Add Component kind, `None` for `Transform` and `Mesh`, which the menu
-    /// does not add.
+    /// The Add Component kind, `None` for `Transform`, which the menu does not
+    /// add (it is mandatory).
     pub add: Option<ComponentKind>,
     /// The component's key in a saved entity (`Entity`'s field name; the table test).
     #[cfg(test)]

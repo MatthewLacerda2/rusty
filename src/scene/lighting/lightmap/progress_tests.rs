@@ -37,9 +37,12 @@ fn a_watched_bake_is_byte_identical_to_an_unwatched_one() {
 fn progress_counts_every_texel_up_to_the_total() {
     let progress = BakeProgress::default();
     assert_eq!((progress.done(), progress.total()), (0, 0));
-    bake_with_progress(&scene(), &settings(), &progress).expect("not cancelled");
+    let maps = bake_with_progress(&scene(), &settings(), &progress).expect("not cancelled");
     assert!(progress.total() > 0);
     assert_eq!(progress.done(), progress.total());
+    // Every lightmap made counts its mesh once (#1667).
+    assert_eq!(progress.meshes_total(), maps.len() as u64);
+    assert_eq!(progress.meshes_done(), progress.meshes_total());
 }
 
 #[test]

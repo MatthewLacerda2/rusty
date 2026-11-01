@@ -82,7 +82,7 @@ error. Omit `primitive` (or pass an unknown name) to create a bare entity carryi
 only its mandatory `Transform` — the menu's **Create Empty**.
 
 **`kind`** is one of the Add Component menu's first-class components,
-case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
+case-insensitive: `Mesh` (aliases `MeshFilter`, `MeshRenderer`), `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent` (alias `NavAgent`), `NavMeshObstacle` (alias
 `NavObstacle`), `OffMeshLink` (alias `NavMeshLink`), `NavMeshModifierVolume` (alias
 `NavModifier`), `Camera`, `Particles` (alias `ParticleSystem`),
@@ -96,7 +96,20 @@ case-insensitive: `Light`, `Animator`, `Collider`, `RigidBody`,
 `Joint.SetKind`), `CharacterController` (alias `Character`), `LODGroup` (alias `LOD`), `Trail` (alias `TrailRenderer`),
 `Line` (alias `LineRenderer`).
 Each is added with the inspector's default values; adding an
-existing kind replaces it. An unknown kind is an error. (Scripts attach by path, not as a defaulted kind: see
+existing kind replaces it. An unknown kind is an error that lists the kinds.
+`Mesh` is Unity's Mesh Filter and Mesh Renderer in one: adding it attaches the
+toolbar's `Box`, and, as adding an existing kind replaces it, adding it to an
+entity that already has a mesh replaces that mesh with the `Box`, an imported or
+skinned one included. Removing it keeps the entity, its id and its `Collider`, so
+a blockout box can stay an invisible collider (Unity's
+`Destroy(GetComponent<MeshRenderer>())`). A `Mesh`-shaped collider (the one an
+imported model gets) keeps the removed mesh as its own, Unity's
+`MeshCollider.sharedMesh`: the entity still collides and still reaches the navmesh,
+and the scene saves the mesh's reference on the collider (`shared_mesh`) and
+rebuilds it on load and when its model is re-imported (a changed Scale Factor or
+file; a sub-object that now imports empty keeps the old copy). Adding a `Mesh` back drops that copy, and the collider follows the new
+mesh, its box refit to it. As in Unity, where a renderer holds its materials, removing the
+`Mesh` drops the entity's `Material` reference too (the library asset stays). (Scripts attach by path, not as a defaulted kind: see
 `AddScript`.)
 
 **`AddScript(id, path, [fields])`** is the Add Component menu's script entries:

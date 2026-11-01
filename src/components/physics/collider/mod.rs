@@ -1,14 +1,17 @@
 //! src/components/physics/collider/mod.rs — Collider component
 //!
 //! box/sphere/cylinder/capsule/mesh shapes, the inline physics material
-//! (`physics_material`), the shape under a world scale (`scaled`), and the
+//! (`physics_material`), the mesh it keeps once its Mesh is gone (`shared_mesh`),
+//! the shape under a world scale (`scaled`), and the
 //! cached world AABB. Unity: Collider.
 
 mod physics_material;
 mod scaled;
+mod shared_mesh;
 
 pub use physics_material::{CombineMode, PhysicsMaterial};
 pub use scaled::{capsule_dims, round_radius, ScaledShape};
+pub use shared_mesh::SharedMesh;
 
 use glam::Vec3;
 
@@ -80,6 +83,11 @@ pub struct ColliderComponent {
     /// saved before it, which load with the defaults.
     #[serde(default)]
     pub material: PhysicsMaterial,
+    /// The mesh a `Mesh` shape builds from once its entity has no Mesh (#1657):
+    /// Unity's `MeshCollider.sharedMesh`. Set when the Mesh is removed, cleared when
+    /// one is added; the entity's own Mesh wins while it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shared_mesh: Option<SharedMesh>,
     /// The world-space bounds, derived from the shape and the entity's world pose
     /// (`ecs::world_space::bounds`): never saved, and recomputed on every load.
     #[serde(skip)]
@@ -89,6 +97,21 @@ pub struct ColliderComponent {
 }
 
 impl ColliderComponent {
+    /// This collider with its shared mesh's geometry left out
+    /// ([`SharedMesh::without_geometry`]): what an undo record and a prefab diff copy.
+    /// Every field is named, so a new one must be placed here.
+    pub fn without_geometry(&self) -> Self {
+        Self {
+            active: self.active,
+            shape: self.shape.clone(),
+            is_trigger: self.is_trigger,
+            material: self.material,
+            shared_mesh: self.shared_mesh.as_ref().map(SharedMesh::without_geometry),
+            aabb_min: self.aabb_min,
+            aabb_max: self.aabb_max,
+        }
+    }
+
     /// Build a mesh collider baked from an imported mesh's rest-pose bounds (#77).
     /// `convex` chooses a convex hull over a triangle mesh. The world AABB is left
     /// zeroed; the scene recomputes it via [`Self::calculate_world_aabb`] on load.
@@ -102,6 +125,7 @@ impl ColliderComponent {
             },
             is_trigger: false,
             material: PhysicsMaterial::default(),
+            shared_mesh: None,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         }

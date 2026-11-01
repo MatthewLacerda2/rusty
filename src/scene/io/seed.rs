@@ -88,6 +88,32 @@ pub fn seed_default_scripts() {
     );
 }
 
+/// Bring the open project's engine-seeded files and its audio up to date, as one
+/// step every authoring entry point runs on the project it opens: the editor's
+/// open, the export (`dev::export`), the headless play-test
+/// (`Harness::in_user_workspace`) and the `session` bins. That is the bundled
+/// scripts, the starter materials and the UI widget kit
+/// ([`seed_default_scripts`]), `default.scene` where the seed manifest says it is
+/// due ([`seed_default_scene`]), and a `.wav` for each `.mp3` under `assets/`
+/// (`asset::audio::refresh`). The standalone player runs none of it: it boots
+/// read-only (#1653). The refresh's report is returned for the caller to print
+/// (`Refresh::lines`) or, the export, to refuse on.
+pub fn seed_project() -> crate::asset::audio::Refresh {
+    seed_default_scripts();
+    seed_default_scene();
+    crate::asset::audio::refresh(&native(crate::core::project::ASSETS_DIR))
+}
+
+/// Print a [`seed_project`] refresh, one line per MP3, to stderr: the `session`
+/// bins' stdout is their protocol, so no caller prints there. Every caller prints
+/// through here, so the lines read the same whichever entry point opened the
+/// project.
+pub fn print_refresh(report: &crate::asset::audio::Refresh) {
+    for (_, line) in report.lines() {
+        eprintln!("{line}");
+    }
+}
+
 /// Seed a workspace the caller owns at `root` (#782): the `.lua` files of `samples`
 /// (a project's scripts folder, e.g. the test-fixture project's), then the bundled
 /// scripts, the UI widget kit's scripts and the starter materials, each written over

@@ -159,7 +159,7 @@ pub(super) fn handle_window_event<F: Frontend>(
                 .renderer
                 .resize(boot::pixel_size(shell.window.inner_size()));
         }
-        WindowEvent::Focused(focused) => focus::changed(shell, game, *focused),
+        WindowEvent::Focused(focused) => focus::changed(shell, game, *focused, F::HOST),
         WindowEvent::ModifiersChanged(modifiers) => shell.modifiers = modifiers.state(),
         WindowEvent::KeyboardInput {
             event:

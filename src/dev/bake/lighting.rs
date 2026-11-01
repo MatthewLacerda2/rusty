@@ -24,6 +24,7 @@
 //! It reads `navigation` only for the walkable extent light probes fill and the
 //! floor plan reflection probes are placed on, handed to placement as plain data.
 
+use super::progress::{stage_progress, BakeLog};
 use super::steps::LightingBake;
 use crate::navigation::NavigationGraph;
 use crate::scene::lighting::placement::{self, ReflectionPlacement};
@@ -64,20 +65,40 @@ pub struct LightingBakeReport {
 /// report on success; errors only when a bake's own contract fails (e.g. reflections
 /// need a saved scene path to write the cubemaps beside). A missing GPU adapter is NOT
 /// an error — each bake skips gracefully and the report's `ran_*` flag is `false`.
-/// Runs [`start_lighting`]'s job to the end, its progress lines to `say`, and commits
-/// it. Refused while the editor's Generate Lighting runs.
+/// Runs [`start_lighting`]'s job to the end, its progress lines to `say` and `log`,
+/// and commits it. Refused while the editor's Generate Lighting runs.
 pub fn bake_lighting(
     scene: &mut Scene,
     scene_path: Option<&str>,
     nav: Option<&NavigationGraph>,
     params: LightingBakeParams,
     say: &mut dyn FnMut(String),
+    log: &mut BakeLog,
 ) -> Result<LightingBakeReport, String> {
     super::generate_lighting::refuse_while_baking(scene)?;
     let mut job = start_lighting(scene, scene_path, nav, params)?;
-    while !job.step(scene, say)? {}
+    run_to_end(&mut job, scene, say, log)?;
     job.commit(scene)?;
+    log.finish();
     Ok(job.report())
+}
+
+/// Step `job` until it is done, its progress lines to `say` and where it is to `log`
+/// after every step (#1667).
+pub(super) fn run_to_end(
+    job: &mut LightingBake,
+    scene: &mut Scene,
+    say: &mut dyn FnMut(String),
+    log: &mut BakeLog,
+) -> Result<(), String> {
+    loop {
+        if let Some(progress) = stage_progress(job.stage()) {
+            log.observe(progress);
+        }
+        if job.step(scene, say)? {
+            return Ok(());
+        }
+    }
 }
 
 /// Auto-place (per the manual-vs-auto rule) and return the bake of both probe sets

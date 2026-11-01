@@ -69,10 +69,10 @@ pub use camera::{
 };
 pub use identity::SceneId;
 pub use io::{
-    build_default_scene, bundled, load_from_file, load_parsed, parse_scene_text, read_scene_file,
-    save_lighting, save_to_file, seed_default_scene, seed_default_scripts, seed_workspace,
-    LightingSave, LoadError, DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR, LIGHTING_IN_PLAY,
-    SCENE_EXTENSION,
+    build_default_scene, bundled, load_from_file, load_parsed, parse_scene_text, print_refresh,
+    read_scene_file, save_lighting, save_to_file, seed_default_scene, seed_default_scripts,
+    seed_project, seed_workspace, LightingSave, LoadError, DEFAULT_SCENE_PATH,
+    DEFAULT_SCRIPTS_DEST_DIR, LIGHTING_IN_PLAY, SCENE_EXTENSION,
 };
 pub use lighting::io::{sidecar_path, LightingData};
 pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};

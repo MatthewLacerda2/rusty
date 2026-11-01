@@ -7,11 +7,14 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-/// Texels traced so far out of the bake's total, plus a cancel request.
+/// Texels traced so far out of the bake's total, the meshes finished out of theirs
+/// (#1667), plus a cancel request.
 #[derive(Debug, Default)]
 pub struct BakeProgress {
     done: AtomicU64,
     total: AtomicU64,
+    meshes_done: AtomicU64,
+    meshes_total: AtomicU64,
     cancelled: AtomicBool,
 }
 
@@ -26,6 +29,16 @@ impl BakeProgress {
         self.total.load(Ordering::Relaxed)
     }
 
+    /// Meshes whose lightmap is finished.
+    pub fn meshes_done(&self) -> u64 {
+        self.meshes_done.load(Ordering::Relaxed)
+    }
+
+    /// Meshes the bake makes a lightmap for; 0 until it has rasterized every mesh.
+    pub fn meshes_total(&self) -> u64 {
+        self.meshes_total.load(Ordering::Relaxed)
+    }
+
     /// Ask the bake to stop. It notices within a few texels per worker and returns
     /// nothing, so the caller keeps whatever lightmaps it had.
     pub fn cancel(&self) {
@@ -36,8 +49,14 @@ impl BakeProgress {
         self.cancelled.load(Ordering::Relaxed)
     }
 
-    pub(super) fn set_total(&self, total: u64) {
+    /// The texels and meshes the bake will trace, set once before the first texel.
+    pub(super) fn set_total(&self, total: u64, meshes: u64) {
+        self.meshes_total.store(meshes, Ordering::Relaxed);
         self.total.store(total, Ordering::Relaxed);
+    }
+
+    pub(super) fn mesh_done(&self) {
+        self.meshes_done.fetch_add(1, Ordering::Relaxed);
     }
 
     pub(super) fn advance(&self, texels: u64) {
