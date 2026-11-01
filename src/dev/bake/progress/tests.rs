@@ -111,7 +111,7 @@ fn no_eta_before_any_work_or_while_the_total_is_unknown() {
     // The rate starts when the total is known, so rasterizing never skews it.
     assert_eq!(
         lines[2].text,
-        "[Lighting] lightmaps 0% (0/3 meshes, 0/1000 texels)"
+        "[Lighting] lightmaps 0% (0/3 meshes, 0/1.0k texels)"
     );
 }
 
