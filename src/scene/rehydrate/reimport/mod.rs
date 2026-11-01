@@ -1,4 +1,4 @@
-//! src/scene/rehydrate/reimport.rs — re-import the meshes already in a scene when
+//! src/scene/rehydrate/reimport/mod.rs — re-import the meshes already in a scene when
 //! their model changed: an import setting (Generate Lightmap UVs, #831; the Scale
 //! Factor, #1398) or the file itself (#1242). Each model file is looked up once per
 //! call however many instances name it, through its shared import
@@ -17,6 +17,10 @@ use crate::core::fs::written::Stale;
 use crate::scene::prefab::diff::masked;
 use crate::scene::prefab::live::shift_baseline;
 use crate::scene::Scene;
+
+mod shared;
+#[cfg(test)]
+mod shared_tests;
 
 /// What a re-import does with a skinned mesh (one skinned before or after it).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -60,8 +64,10 @@ pub fn reimport_written(scene: &mut Scene, stale: &Stale) -> usize {
 }
 
 /// Re-import every mesh whose reference's file `names` accepts, importing each such
-/// file once, and every Mesh-shaped collider's shared mesh (#1657) the same way.
-/// Returns the ids of the entities whose mesh was rebuilt.
+/// file once, and every Mesh-shaped collider's shared mesh (#1657) the same way
+/// when `rig` rebuilds: a setting that keeps rigs (Generate Lightmap UVs) never
+/// moves a vertex, and a shared mesh holds only positions and triangles. Returns
+/// the ids of the entities whose Mesh was rebuilt; a shared mesh is not counted.
 fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bool) -> Vec<u32> {
     let mut imported: BTreeMap<String, Option<Imported>> = BTreeMap::new();
     let mut rebuilt = Vec::new();
@@ -91,8 +97,9 @@ fn reimport_where(scene: &mut Scene, rig: Rig, mut names: impl FnMut(&str) -> bo
             rebuilt.push(id);
         }
     }
-    let shared = super::reimport_shared::reimport_shared(scene, rig, &mut names, &mut imported);
-    rebuilt.extend(shared);
+    if rig == Rig::Rebuild {
+        shared::reimport_shared(scene, &mut names, &mut imported);
+    }
     rebuilt
 }
 

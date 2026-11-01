@@ -7,7 +7,6 @@
 
 pub mod model_writes;
 mod reimport;
-mod reimport_shared;
 
 pub use reimport::{reimport_model, reimport_model_ids, reimport_written, Rig};
 
@@ -15,7 +14,7 @@ use glam::{Mat4, Vec3};
 
 use crate::asset::{self, MeshRevision, MeshVertex, SubMesh};
 use crate::components::mesh::Vertex;
-use crate::components::{ColliderComponent, Entity};
+use crate::components::{ColliderComponent, ColliderShape, Entity};
 use crate::scene::authoring::{subdivided_geometry, Primitive};
 
 /// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
@@ -145,7 +144,7 @@ fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
 /// A mesh collider's saved box is refit to the rebuilt mesh, so an import setting
 /// changed since the save (the Scale Factor, #1398) reaches it.
 /// A Mesh-shaped collider's shared mesh (#1657) is rebuilt the same way when the
-/// entity has no Mesh of its own.
+/// entity has no Mesh of its own; another shape's is left without geometry.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
         hold_subdivisions(entity.id, mesh);
@@ -159,6 +158,9 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     let Some(collider) = &mut entity.collider else {
         return;
     };
+    if !matches!(collider.shape, ColliderShape::Mesh { .. }) {
+        return;
+    }
     let Some(shared) = &mut collider.shared_mesh else {
         return;
     };
@@ -251,8 +253,6 @@ pub fn asset_ref_file(reference: &str) -> Option<String> {
     asset::AssetRef::parse(reference).ok().map(|r| r.path)
 }
 
-#[cfg(test)]
-mod reimport_shared_tests;
 #[cfg(test)]
 mod shared_tests;
 #[cfg(test)]

@@ -11,7 +11,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::components::Entity;
+use crate::components::{ColliderComponent, ColliderShape, Entity};
 use crate::ecs::{Recorded, World};
 use crate::scene::{Despawn, Scene};
 
@@ -81,8 +81,11 @@ fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>
 
 /// Give `doc`'s collider's shared mesh (recorded without geometry) the live one's
 /// when it comes from the same source, and rebuild it from its reference otherwise.
+/// Only a Mesh-shaped collider's: another shape never reads it.
 fn restore_shared_mesh(world: &mut World, doc: &mut Entity) {
-    let Some(shared) = doc.collider.as_mut().and_then(|c| c.shared_mesh.as_mut()) else {
+    let mesh_shaped = |c: &&mut ColliderComponent| matches!(c.shape, ColliderShape::Mesh { .. });
+    let collider = doc.collider.as_mut().filter(mesh_shaped);
+    let Some(shared) = collider.and_then(|c| c.shared_mesh.as_mut()) else {
         return;
     };
     if let Some(mut live) = world.collider_mut(doc.id) {

@@ -39,7 +39,8 @@ fn a_scale_factor_change_reaches_a_part_without_its_mesh() {
     assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
     assert_eq!(shared_max(&scene, id), Vec3::new(1.0, 1.0, 0.0));
 
-    assert_eq!(set_model_scale_factor(&mut scene, &path, 0.5), Ok(1));
+    // It counts Meshes re-imported (`Assets.md`), and the part has none.
+    assert_eq!(set_model_scale_factor(&mut scene, &path, 0.5), Ok(0));
     assert!(shared_max(&scene, id).abs_diff_eq(Vec3::new(0.5, 0.5, 0.0), 1e-6));
     let (_, max) = mesh_box(&scene.world.collider(id).unwrap());
     assert!(
@@ -49,6 +50,31 @@ fn a_scale_factor_change_reaches_a_part_without_its_mesh() {
     assert!(
         scene.world.collider(id).unwrap().aabb_max.x < 0.6,
         "the world bounds follow"
+    );
+}
+
+#[test]
+fn a_re_import_with_no_geometry_keeps_the_old_shared_mesh() {
+    let path = quad_model("rusty_reimport_shared_empty");
+    let mut scene = Scene::new();
+    let id = instantiate_asset(&mut scene, &format!("{path}::Quad"), None, Vec3::ZERO);
+    let id = id.unwrap();
+    let collider = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ONE);
+    scene.world.set_collider(id, Some(collider));
+    assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
+    // The quad is now points: not a surface, so it imports no triangles.
+    let (json, bin) = crate::asset::fixtures::quad_mode_gltf(0, &[]);
+    let dir = std::path::Path::new(&path).parent().unwrap();
+    std::fs::write(dir.join("quad.bin"), bin).unwrap();
+    std::fs::write(&path, json).unwrap();
+
+    assert_eq!(set_model_scale_factor(&mut scene, &path, 0.5), Ok(0));
+    assert_eq!(shared_max(&scene, id), Vec3::new(1.0, 1.0, 0.0), "kept");
+    let (_, max) = mesh_box(&scene.world.collider(id).unwrap());
+    assert_eq!(
+        max,
+        Vec3::ONE,
+        "the box is left as it was, not refit to nothing"
     );
 }
 

@@ -107,7 +107,7 @@ imported model gets) keeps the removed mesh as its own, Unity's
 `MeshCollider.sharedMesh`: the entity still collides and still reaches the navmesh,
 and the scene saves the mesh's reference on the collider (`shared_mesh`) and
 rebuilds it on load and when its model is re-imported (a changed Scale Factor or
-file). Adding a `Mesh` back drops that copy, and the collider follows the new
+file; a sub-object that now imports empty keeps the old copy). Adding a `Mesh` back drops that copy, and the collider follows the new
 mesh, its box refit to it. As in Unity, where a renderer holds its materials, removing the
 `Mesh` drops the entity's `Material` reference too (the library asset stays). (Scripts attach by path, not as a defaulted kind: see
 `AddScript`.)
