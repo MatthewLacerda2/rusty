@@ -241,13 +241,14 @@ during Play goes back on Stop, as every scene edit does.
   in `Color` mode; their defaults are the default ambient's hemisphere at its top,
   middle and bottom, so switching the default scene to `"Gradient"` lights it the
   same. A scene in `Color` mode with default colours leaves the `ambient` block out
-  of its file. Lightmaps and the analytic probe fill (`Probe.BakeAnalytic`) bake
-  from the same ambient, so an open lightmapped or analytically probe-lit surface
-  takes the light an unbaked one facing the same way does: exactly in `Color` mode,
-  and in `Gradient` up to a slight smoothing at the horizon (the bakes carry three
-  SH bands, as Unity's ambient probe does). **Probes baked by Generate Lighting
-  (`Probe.Bake`) don't follow a `Gradient` yet:** they capture the sky, which takes
-  only the `Color` colour (#1668). But, as
+  of its file. Lightmaps and light probes, both Generate Lighting's (`Probe.Bake`)
+  and the analytic fill (`Probe.BakeAnalytic`), bake from the same ambient, so an
+  open lightmapped or probe-lit surface takes the light an unbaked one facing the
+  same way does: exactly in `Color` mode, and in `Gradient` up to a slight
+  smoothing at the horizon (the bakes carry three SH bands, as Unity's ambient
+  probe does). As in Unity, light probes and lightmaps bake against this ambient,
+  never against the sky the camera draws (#1668): the sky reaches surfaces only
+  through reflections (reflection probes capture it). But, as
   in Unity, **a changed mode or colour reaches baked surfaces only at the next
   Generate Lighting**: dynamic objects and unbaked surfaces show it at once.
 - **The procedural sky** is drawn when no panorama is set: a ground → horizon →
