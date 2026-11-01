@@ -46,20 +46,28 @@ struct Key {
     probes: u64,
 }
 
-/// Every volume's last samples, by entity, so a still object is not re-sampled.
+/// Every volume's last samples, by entity, so a still object is not re-sampled,
+/// and the probe field's fingerprint for this render.
 #[derive(Default)]
 pub(crate) struct ProxyVolumes {
     cache: BTreeMap<u32, (Key, Vec<[f32; 4]>)>,
+    probes: Option<u64>,
 }
 
 impl ProxyVolumes {
-    /// Start a camera's frame: forget the volumes no entity carries any more, and
+    /// Start a render: forget the volumes no entity carries any more, and
     /// fingerprint the probe field once when any remain.
-    pub(crate) fn begin(&mut self, scene: &Scene) -> Frame {
+    pub(crate) fn begin_frame(&mut self, scene: &Scene) {
         let ids = scene.world.ids_with_light_probe_proxy_volume();
         self.cache.retain(|id, _| ids.contains(id));
+        self.probes = (!ids.is_empty()).then(|| fingerprint(&scene.probes));
+    }
+
+    /// A camera's empty frame under this render's fingerprint; it packs nothing
+    /// before [`Self::begin_frame`] saw a volume.
+    pub(crate) fn frame(&self) -> Frame {
         Frame {
-            probes: (!ids.is_empty()).then(|| fingerprint(&scene.probes)),
+            probes: self.probes,
             data: Vec::new(),
         }
     }
@@ -147,23 +155,29 @@ pub(crate) fn pack(
 
 /// A hash of everything a probe sample reads: each probe's position and SH, and
 /// the grid. A bake, a moved probe or a new grid changes it, so every volume is
-/// sampled again (FNV-1a over the bits: deterministic, and cheap next to sampling).
+/// sampled again. Deterministic; each probe is folded into its own lane of four
+/// (FNV-1a), so the multiplies do not wait on each other across a large field.
 pub(crate) fn fingerprint(probes: &ProbeVolume) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    let mut eat = |v: f32| {
-        h ^= u64::from(v.to_bits());
-        h = h.wrapping_mul(0x0100_0000_01b3);
-    };
-    for p in &probes.probes {
-        p.position.to_array().into_iter().for_each(&mut eat);
-        p.sh.coeffs.iter().flatten().copied().for_each(&mut eat);
+    const PRIME: u64 = 0x0100_0000_01b3;
+    let fold = |h: u64, v: f32| (h ^ u64::from(v.to_bits())).wrapping_mul(PRIME);
+    let mut lanes = [0xcbf2_9ce4_8422_2325_u64; 4];
+    for (i, p) in probes.probes.iter().enumerate() {
+        let lane = &mut lanes[i % 4];
+        let floats = p.position.to_array().into_iter();
+        *lane = floats
+            .chain(p.sh.coeffs.iter().flatten().copied())
+            .fold(*lane, fold);
     }
-    if let Some(g) = &probes.grid {
-        g.origin.to_array().into_iter().for_each(&mut eat);
-        g.spacing.to_array().into_iter().for_each(&mut eat);
-        g.counts.iter().for_each(|&n| eat(f32::from_bits(n)));
-    }
-    h
+    let grid = probes.grid.map_or([0.0; 9], |g| {
+        let [x, y, z] = g.counts.map(f32::from_bits);
+        let (o, s) = (g.origin, g.spacing);
+        [o.x, o.y, o.z, s.x, s.y, s.z, x, y, z]
+    });
+    let len = f32::from_bits(probes.probes.len() as u32);
+    let tail = grid.into_iter().chain([len]).fold(lanes[0], fold);
+    lanes[1..]
+        .iter()
+        .fold(tail, |h, &l| (h ^ l).wrapping_mul(PRIME))
 }
 
 #[cfg(test)]

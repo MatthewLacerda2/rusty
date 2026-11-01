@@ -39,6 +39,9 @@ impl Renderer {
         view.resize(&self.device, size.width, size.height);
 
         self.upload_scene_assets(scene);
+        // The Light Probe Proxy Volumes' view of the probe field (#1672), once per
+        // render rather than per camera: hashing a large field is not free.
+        self.proxy_volumes.begin_frame(scene);
 
         // The baked reflection probes nearest the primary camera (#245, #1206); each
         // object then blends up to two of them and the sky (#1584).

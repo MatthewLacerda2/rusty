@@ -82,7 +82,8 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
     let bounds = (Vec3::new(-0.3, 0.0, -0.3), Vec3::new(0.3, 2.0, 0.3));
     let mut volumes = ProxyVolumes::default();
     let at = |x: f32| (Mat4::from_translation(Vec3::X * x), bounds);
-    let mut frame = volumes.begin(&scene);
+    volumes.begin_frame(&scene);
+    let mut frame = volumes.frame();
     assert_eq!(
         volumes.push(&scene, bare, at(0.0), &mut frame),
         0,
@@ -97,7 +98,8 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
     let sampled = |v: &ProxyVolumes| v.cache[&id].1[HEADER][0];
     // Poison the cache: a still object keeps it, anything it reads refreshes it.
     volumes.cache.get_mut(&id).unwrap().1[HEADER][0] = -1.0;
-    let mut frame = volumes.begin(&scene);
+    volumes.begin_frame(&scene);
+    let mut frame = volumes.frame();
     volumes.push(&scene, id, at(0.0), &mut frame);
     assert_eq!(
         sampled(&volumes),
@@ -108,7 +110,8 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
     assert_eq!(sampled(&volumes), 0.25, "moved: sampled again");
     volumes.cache.get_mut(&id).unwrap().1[HEADER][0] = -1.0;
     scene.probes.probes[0].sh.coeffs[0] = [5.0; 3];
-    let mut frame = volumes.begin(&scene);
+    volumes.begin_frame(&scene);
+    let mut frame = volumes.frame();
     volumes.push(&scene, id, at(0.5), &mut frame);
     assert_eq!(
         sampled(&volumes),
@@ -116,9 +119,23 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
         "a rebaked probe field: sampled again"
     );
     scene.world.set_light_probe_proxy_volume(id, None);
-    let frame = volumes.begin(&scene);
-    assert!(
-        volumes.cache.is_empty() && frame.probes.is_none(),
-        "removed: forgotten"
-    );
+    volumes.begin_frame(&scene);
+    let forgotten = volumes.cache.is_empty() && volumes.frame().probes.is_none();
+    assert!(forgotten, "removed: forgotten");
+}
+
+#[test]
+fn the_fingerprint_sees_any_probe_s_sh_position_or_the_grid() {
+    let probes = rising_probes();
+    let base = fingerprint(&probes);
+    assert_eq!(base, fingerprint(&rising_probes()), "deterministic");
+    let mut moved = rising_probes();
+    moved.probes[7].position.x += 0.01;
+    let mut rebaked = rising_probes();
+    rebaked.probes[42].sh.coeffs[8][2] = 3.0;
+    let mut regridded = rising_probes();
+    regridded.grid.as_mut().unwrap().spacing.y = 2.0;
+    for changed in [moved, rebaked, regridded] {
+        assert_ne!(fingerprint(&changed), base);
+    }
 }

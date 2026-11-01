@@ -101,7 +101,7 @@ impl Renderer {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
         let (mut culled, mut lod_hidden, mut visible) = (0, 0, 0);
-        let mut proxies = self.proxy_volumes.begin(scene);
+        let mut proxies = self.proxy_volumes.frame();
         let ringed = if outline {
             outlined(scene, lod)
         } else {
@@ -248,7 +248,8 @@ impl Renderer {
         // orders it by that centre's view depth (#1499).
         let centre = bounds.map_or(origin, |(min, max)| (min + max) * 0.5);
         instance.reflection_probe = self.reflection_probes.probe_for(centre);
-        if instance.use_sh == 1 {
+        // A capture draws static geometry for a bake: its probes are in flux.
+        if instance.use_sh == 1 && !self.capture.static_only {
             let at = (model_matrix, local_bounds);
             instance.proxy_volume = self.proxy_volumes.push(scene, id, at, proxies);
         }

@@ -2,7 +2,7 @@
 //! (#470), and the resources every group-1 bind group is built from.
 //!
 //! This replaces the per-entity pool of #210 (one uniform buffer, bone buffer and two
-//! bind groups kept alive per entity). A camera's solids are now four packed arrays —
+//! bind groups kept alive per entity). A camera's solids are now five packed arrays —
 //! per-draw uniforms at a 256-byte stride, joint matrices, instances, the material
 //! records the uniforms index (#1616) and the Light Probe Proxy Volumes the instances
 //! index (#1672) — written with a `write_buffer` each, behind
