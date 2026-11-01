@@ -238,15 +238,13 @@ impl World {
         collider: fn(&ColliderComponent) -> ColliderComponent,
     ) -> Option<Entity> {
         let core = self.component::<Core>(id)?;
-        let name = (*self.name(id)?).clone();
-        let transform = (*self.transform(id)?).clone();
         Some(Entity {
             id: core.id,
-            name,
+            name: (*self.name(id)?).clone(),
             active: core.active,
             is_static: core.is_static,
             layer: core.layer,
-            transform,
+            transform: (*self.transform(id)?).clone(),
             mesh: self.mesh(id).map(|c| mesh(&c)),
             material: self.material(id).map(|c| (*c).clone()),
             pending_material: self.component::<MaterialAsset>(id).map(|c| (*c).clone()),

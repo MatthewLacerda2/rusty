@@ -187,7 +187,7 @@ pub fn register<'scope>(
     ctx: &ApiScopedCtx<'scope>,
 ) -> Reg {
     // sorted: each registrar makes its own global table; the ones extending a table
-    // (`register_hitscan`, `register_scoped`, `register_events`, `register_writable`)
+    // (`register_hitscan`, `register_scoped`, `register_events`)
     // sort after the one that made it
     animator::register(lua, scope, ctx.scene, ctx.console)?;
     application::register(lua, scope, ctx.application)?;
@@ -202,8 +202,7 @@ pub fn register<'scope>(
     character_controller::register(lua, scope, ctx.scene, ctx.physics)?;
     decals::register(lua, scope, ctx.scene)?;
     graphics::register(lua, scope, ctx.scene, ctx.graphics, ctx.application)?;
-    input::register_readable(lua, scope, ctx.input)?;
-    input::register_writable(lua, scope, ctx.input)?;
+    input::register(lua, scope, ctx.input)?;
     joint::register(lua, scope, ctx.scene)?;
     layers::register(lua, scope, ctx.scene)?;
     light::register(lua, scope, ctx.scene)?;
@@ -234,8 +233,7 @@ pub fn register<'scope>(
     sound::register(lua)?;
     storage::register(lua, scope, ctx.storage)?;
     text::register(lua, scope, ctx.scene, ctx.screen, ctx.video)?;
-    // `Texture` (#270) borrows no engine state either — it reads a recipe and writes
-    // a PNG file — so it too registers as a plain static namespace.
+    // `Texture` (#270) reads a recipe and writes a PNG: a plain static namespace too.
     texture::register(lua)?;
     time::register(lua, scope, ctx.time)?;
     timer::register(lua, scope, ctx.scene, ctx.timers, ctx.console)?;
