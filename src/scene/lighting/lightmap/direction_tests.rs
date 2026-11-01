@@ -19,7 +19,7 @@ fn a_baked_sun_points_the_wall_at_the_sun() {
     let scene = BakeScene {
         meshes: vec![floor(), wall()],
         lights: vec![sun(true)],
-        sky: Vec3::ZERO,
+        sky: Vec3::ZERO.into(),
     };
     let d = mean_dir(&bake(&scene, &settings()), 2);
     assert!(d.normalize().dot(-Vec3::X) > 0.95, "toward the sun: {d}");
@@ -33,7 +33,7 @@ fn an_open_floor_under_the_sky_points_up_but_not_fully() {
     let scene = BakeScene {
         meshes: vec![floor()],
         lights: Vec::new(),
-        sky: Vec3::splat(0.5),
+        sky: Vec3::splat(0.5).into(),
     };
     let s = BakeSettings {
         samples: 256,
@@ -49,7 +49,7 @@ fn the_filter_smooths_directions_and_keeps_them_unit_bounded() {
     let scene = BakeScene {
         meshes: vec![floor(), wall()],
         lights: vec![sun(false)],
-        sky: Vec3::new(0.2, 0.3, 0.4),
+        sky: Vec3::new(0.2, 0.3, 0.4).into(),
     };
     let raw = bake(&scene, &settings());
     let smooth = bake(
@@ -78,7 +78,7 @@ fn turning_it_off_drops_directions_and_keeps_the_colour() {
     let scene = BakeScene {
         meshes: vec![floor(), wall()],
         lights: vec![sun(true)],
-        sky: Vec3::new(0.2, 0.3, 0.4),
+        sky: Vec3::new(0.2, 0.3, 0.4).into(),
     };
     let on = bake(&scene, &settings());
     let off_settings = BakeSettings {

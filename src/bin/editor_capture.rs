@@ -30,7 +30,8 @@
 
 use std::process::exit;
 
-use rusty::core::project::Access;
+use rusty::app::ProjectSource;
+use rusty::core::project::{Access, BootPlan};
 use rusty::core::settings::video::parse_size;
 use rusty::dev::session::Session;
 use rusty::editor::ViewportTab;
@@ -54,18 +55,22 @@ fn main() {
         return report(written, &out);
     }
     let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
-    opened.unwrap_or_else(|e| fail(&e));
+    let opened = opened.unwrap_or_else(|e| fail(&e));
+    // Read-only: a capture draws the project as its settings stand and never
+    // writes them (#1652). A demo then replays under its own header's settings.
+    let project = ProjectSource::read_only(&opened);
     let written = match (source.demo, source.scene) {
         (Some(demo), _) => {
-            let mut world = capture::default_world();
+            let mut world = capture::default_world(project);
             let demo = std::path::Path::new(&demo);
             capture::capture_demo(&mut world, &out, &opts, demo, source.tick)
         }
         (None, Some(path)) => {
-            let session = Session::new(&path).unwrap_or_else(|e| fail(&e));
+            let session = Session::boot(&BootPlan::of(&path), project);
+            let session = session.unwrap_or_else(|e| fail(&e));
             capture::capture(session.world(), &out, &opts)
         }
-        (None, None) => capture::capture(&capture::default_world(), &out, &opts),
+        (None, None) => capture::capture(&capture::default_world(project), &out, &opts),
     };
     report(written, &out);
 }

@@ -1,12 +1,14 @@
 //! src/editor/inspector/components/settings/ — the Scene Settings inspector panel.
 //!
 //! Shown when nothing is selected: the project-level scalars (skybox, ambient
-//! light, routed through `authoring::environment` like `Lighting.Set*`, #1612), the
+//! light, routed through `authoring::environment` like `Lighting.Set*`, #1612, and
+//! its Color / Gradient source, #1647, `ambient`), the
 //! procedural sky (#1620, `sky`, through the same environment ops), the scene fog
 //! (#437, routed through `authoring::fog` like `Graphics.SetFog*`) plus the **Tags & Layers** surface that renames the shared Layers
 //! registry (#90). Layer 0 is the fixed `"Default"`; slots 1..31 are user-named
 //! and persist with the scene.
 
+mod ambient;
 mod sky;
 
 use egui_phosphor::regular as icon;
@@ -71,19 +73,8 @@ fn draw_environment(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene)
     );
     ui.add_space(8.0);
 
-    // 2. Ambient Light Color
-    ui.label("Ambient Color:");
-    ui.horizontal(|ui| {
-        let mut color_arr = [
-            scene.ambient_color.x,
-            scene.ambient_color.y,
-            scene.ambient_color.z,
-        ];
-        if ui.color_edit_button_rgb(&mut color_arr).changed() {
-            env_ops::set_ambient_color(scene, Vec3::from_array(color_arr));
-            editor.is_dirty = true;
-        }
-    });
+    // 2. Environment Lighting: the source, then its colour or gradient.
+    ambient::draw(editor, ui, scene);
     ui.add_space(8.0);
 
     // 3. Ambient Light Intensity

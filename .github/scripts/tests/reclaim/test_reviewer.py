@@ -42,7 +42,9 @@ def machine(status: str = "", github: str = "up") -> reclaim.Machine:
         elif "rev-list" in argv:
             out = "1"  # fetched from a PR ref, so in no remote-tracking branch
         return subprocess.CompletedProcess(argv, code, out, err)
-    return reclaim.Machine(answer)
+    found = reclaim.Machine(answer)
+    found.alive = lambda pid: True  # a lock's owner runs: never the real process table (#1658)
+    return found
 
 
 def tree(name: str, head: str = "r1", branch: str | None = None, locked: str | None = None,

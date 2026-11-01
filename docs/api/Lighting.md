@@ -180,10 +180,11 @@ tick the model's **Generate Lightmap UVs** (Unity's checkbox): rusty unwraps one
 ### Environment
 
 The scene's sky and ambient light (#1612), Unity's `RenderSettings.skybox`,
-`ambientLight` and `ambientIntensity`, and the procedural sky's look (#1620),
+`ambientLight`, `ambientIntensity` and `ambientMode` with its sky, equator and ground
+colours (#1647), and the procedural sky's look (#1620),
 Unity's *Skybox/Procedural* tint and ground with HDRP's *Cloud Layer* coverage and
 opacity. They are the scene file's `skybox_path`, `ambient_color`,
-`ambient_intensity` and `sky` block, the same fields the editor's **Scene
+`ambient_intensity`, `ambient` and `sky` blocks, the same fields the editor's **Scene
 Settings** panel (the Inspector with nothing selected) edits, through the same
 write: **save the scene** to keep a change. Unlike the bakes they are in every build,
 so a game script can drive them too (a day cycle, a mood change); a change made
@@ -197,6 +198,14 @@ during Play goes back on Stop, as every scene edit does.
 | `Lighting.SetAmbientColor` | `(r, g, b)` | — |
 | `Lighting.GetAmbientIntensity` | `()` | number |
 | `Lighting.SetAmbientIntensity` | `(intensity)` | — |
+| `Lighting.GetAmbientMode` | `()` | `"Color"` or `"Gradient"` |
+| `Lighting.SetAmbientMode` | `(mode)` | — (an unknown name errors) |
+| `Lighting.GetAmbientSkyColor` | `()` | `r, g, b` |
+| `Lighting.SetAmbientSkyColor` | `(r, g, b)` | — |
+| `Lighting.GetAmbientEquatorColor` | `()` | `r, g, b` |
+| `Lighting.SetAmbientEquatorColor` | `(r, g, b)` | — |
+| `Lighting.GetAmbientGroundColor` | `()` | `r, g, b` |
+| `Lighting.SetAmbientGroundColor` | `(r, g, b)` | — |
 | `Lighting.GetSkyZenithColor` | `()` | `r, g, b`, or `nil` while it follows the ambient colour |
 | `Lighting.SetSkyZenithColor` | `([r, g, b])` | — |
 | `Lighting.GetSkyHorizonColor` | `()` | `r, g, b`, or `nil` while it follows the zenith |
@@ -220,7 +229,27 @@ during Play goes back on Stop, as every scene edit does.
   surface takes where no baked probe or lightmap reaches. The procedural sky is
   tinted by the colour alone: the intensity dims or brightens what the ambient lights,
   never the sky itself, as Unity's `ambientIntensity` leaves the skybox. An active **Ambient**
-  light entity, when the scene has one, overrides both (see [`Light`](Light.md)).
+  light entity, when the scene has one, overrides both (see [`Light`](Light.md)),
+  and the mode below with them: it always lights as `Color`.
+- **The ambient mode** is Unity's *Environment Lighting → Source*. `"Color"` (the
+  default) is the hemisphere above: the colour on up-facing surfaces, fading to a
+  quarter of it on down-facing ones. `"Gradient"` (Unity's `AmbientMode.Trilight`)
+  takes three colours instead: **sky** on up-facing surfaces, **equator** on
+  sideways ones and **ground** on down-facing ones, blended by how much a surface
+  faces up or down. The intensity scales all three. The colours follow the ambient
+  colour's rule (linear RGB, `≥ 0`, a NaN or infinite channel refused) and are kept
+  in `Color` mode; their defaults are the default ambient's hemisphere at its top,
+  middle and bottom, so switching the default scene to `"Gradient"` lights it the
+  same. A scene in `Color` mode with default colours leaves the `ambient` block out
+  of its file. Lightmaps and the analytic probe fill (`Probe.BakeAnalytic`) bake
+  from the same ambient, so an open lightmapped or analytically probe-lit surface
+  takes the light an unbaked one facing the same way does: exactly in `Color` mode,
+  and in `Gradient` up to a slight smoothing at the horizon (the bakes carry three
+  SH bands, as Unity's ambient probe does). **Probes baked by Generate Lighting
+  (`Probe.Bake`) don't follow a `Gradient` yet:** they capture the sky, which takes
+  only the `Color` colour (#1668). But, as
+  in Unity, **a changed mode or colour reaches baked surfaces only at the next
+  Generate Lighting**: dynamic objects and unbaked surfaces show it at once.
 - **The procedural sky** is drawn when no panorama is set: a ground → horizon →
   zenith gradient under a cloud layer. Each colour is linear RGB (channels clamped
   to `≥ 0`; a NaN or infinite channel is refused and changes nothing) and
@@ -235,5 +264,6 @@ during Play goes back on Stop, as every scene edit does.
   its file. What a surface reflects follows: the sky's reflection cube is re-baked
   once per change, so a script that changes a setting every frame re-bakes every
   frame (the ambient colour never re-bakes it), and reflection-probe bakes capture
-  the sky as drawn. The flat ambient a surface takes is still the ambient colour
-  alone, not the sky's colours.
+  the sky as drawn. The ambient a surface takes is still the ambient colour (or the
+  gradient's colours), not the sky's: the sky's colours light nothing, as Unity's
+  skybox lights nothing in *Color* or *Gradient* mode.

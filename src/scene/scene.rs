@@ -62,6 +62,8 @@ pub struct Scene {
     pub skybox_path: String,
     pub ambient_color: Vec3,
     pub ambient_intensity: f32,
+    /// The ambient source, `Color` or `Gradient`, and the gradient's colours (#1647).
+    pub ambient: crate::scene::AmbientSettings,
     /// Per-scene navmesh bake tunables (#276): Unity's per-scene navmesh bake
     /// settings (agent radius, max slope, max step, grid spacing). The nav bake
     /// reads these off the active scene; serialized with the scene like the ambient
@@ -165,6 +167,7 @@ impl Default for Scene {
             skybox_path: default_skybox_path(),
             ambient_color: default_ambient_color(),
             ambient_intensity: default_ambient_intensity(),
+            ambient: Default::default(),
             nav_settings: NavMeshSettings::default(),
             fog: crate::scene::FogSettings::default(),
             sky: crate::scene::SkySettings::default(),

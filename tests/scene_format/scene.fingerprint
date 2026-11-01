@@ -1,3 +1,10 @@
+scene.ambient.equator: tuple(3)
+scene.ambient.equator[]: f32
+scene.ambient.ground: tuple(3)
+scene.ambient.ground[]: f32
+scene.ambient.mode: enum Color|Gradient
+scene.ambient.sky: tuple(3)
+scene.ambient.sky[]: f32
 scene.ambient_color: tuple(3)
 scene.ambient_color[]: f32
 scene.ambient_intensity: f32

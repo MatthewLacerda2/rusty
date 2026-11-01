@@ -41,7 +41,10 @@ pub use game::{GameWorld, PlayTransition};
 pub use probe::SystemProbe;
 pub use registry::{build, App};
 pub use resources::Resources;
-pub use scene_load::load_boot_scene;
+/// The fixture project every entry point's test opens (#1652).
+#[cfg(test)]
+pub(crate) use scene_load::project_tests;
+pub use scene_load::{load_boot_scene, ProjectSource};
 pub use schedule::Schedule;
 pub use stage::Stage;
 pub use tap::{TapPoint, TickTap};
