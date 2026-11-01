@@ -51,19 +51,25 @@ fn directions() -> impl Iterator<Item = Vec3> {
 fn literal(scene: &Scene) -> String {
     let u = scene_ambient(scene);
     let v = |c: [f32; 3]| format!("vec3<f32>({:?}, {:?}, {:?})", c[0], c[1], c[2]);
+    let sh: Vec<String> = u
+        .sky_sh
+        .iter()
+        .map(|c| format!("vec4<f32>({:?}, {:?}, {:?}, 0.0)", c[0], c[1], c[2]))
+        .collect();
     format!(
-        "AmbientLight({}, {:?}, {}, {:?}, {}, 0.0, {}, 0.0)",
+        "AmbientLight({}, {:?}, {}, {:?}, {}, 0.0, {}, 0.0, array<vec4<f32>, 9>({}))",
         v(u.color),
         u.intensity,
         v(u.gradient_sky),
-        u.gradient,
+        u.mode,
         v(u.gradient_equator),
-        v(u.gradient_ground)
+        v(u.gradient_ground),
+        sh.join(", ")
     )
 }
 
 /// `(new, today)` per direction, as the GPU computes them for `scene`.
-fn probe(r: &crate::render::Renderer, scene: &Scene) -> Vec<(Vec3, Vec3)> {
+pub(super) fn probe(r: &crate::render::Renderer, scene: &Scene) -> Vec<(Vec3, Vec3)> {
     let base = crate::shadergen::engine_shader_dir();
     let mut composer = crate::shadergen::compose::composer_with_common(base).unwrap();
     let source = format!(
@@ -81,7 +87,7 @@ fn probe(r: &crate::render::Renderer, scene: &Scene) -> Vec<(Vec3, Vec3)> {
 }
 
 /// The largest gap between the GPU's ambient and the CPU's, over every direction.
-fn cpu_gap(scene: &Scene, gpu: &[(Vec3, Vec3)]) -> f32 {
+pub(super) fn cpu_gap(scene: &Scene, gpu: &[(Vec3, Vec3)]) -> f32 {
     let cpu = scene.drawn_ambient().radiance();
     directions()
         .zip(gpu)

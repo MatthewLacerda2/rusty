@@ -12,6 +12,8 @@ mod sky;
 
 #[cfg(test)]
 mod ambient_gpu_tests;
+#[cfg(test)]
+mod ambient_skybox_gpu_tests;
 
 pub(crate) use material::{
     DrawUniform, MappingUniform, MaterialData, SurfaceUniform, MATERIAL_DATA_WORDS,
@@ -94,14 +96,19 @@ pub(crate) struct AmbientLightUniform {
     /// follows whatever the mode.
     pub color: [f32; 3],
     pub intensity: f32,
-    /// The `Gradient` mode's sky colour (#1647); read only when `gradient` is 1.
+    /// The `Gradient` mode's sky colour (#1647); read only when `mode` is 1.
     pub gradient_sky: [f32; 3],
-    /// 1.0 when the surfaces take the sky / equator / ground trilight.
-    pub gradient: f32,
+    /// What surfaces take: 0.0 `color`'s hemisphere, 1.0 the sky / equator /
+    /// ground trilight, 2.0 the sky's SH (`Skybox`, #1675).
+    pub mode: f32,
     pub gradient_equator: [f32; 3],
     pub _pad_equator: f32,
     pub gradient_ground: [f32; 3],
     pub _pad_ground: f32,
+    /// `Skybox` mode's SH, intensity applied and already convolved over π
+    /// (`Sh9::convolved_over_pi`): `ambient_radiance` is one dot product with the
+    /// basis. Read only when `mode` is 2; `w` unused.
+    pub sky_sh: [[f32; 4]; 9],
 }
 
 #[repr(C)]

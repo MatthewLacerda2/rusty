@@ -39,8 +39,9 @@ projects that rendered radiance into L2 irradiance SH — so probes pick up the 
 coloured bounce off nearby static surfaces, directional and position-dependent (a probe
 by a red wall reads red; one across the room does not). Where a capture sees no
 static surface, a direction that escapes the scene, it takes the scene's **ambient**
-(`Lighting.SetAmbientMode`'s `Color` or `Gradient`, intensity applied), not the sky
-the camera draws: Unity bakes light probes against *Environment Lighting*, and the
+(`Lighting.SetAmbientMode`'s `Color`, `Gradient` or `Skybox`, intensity applied), not
+the sky the camera draws: Unity bakes light probes against *Environment Lighting*,
+and outside `Skybox` mode (where the ambient is the sky's own SH, #1675) the
 skybox reaches surfaces only through reflections (reflection probes still capture
 it, see [`Reflection`](Reflection.md)), and static surfaces reflect nothing into a
 light probe (Unity's light-probe bake carries no specular). So `Bake` and

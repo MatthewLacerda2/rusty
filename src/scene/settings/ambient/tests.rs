@@ -34,7 +34,8 @@ fn mode_names_round_trip() {
         AmbientMode::from_name("gradient"),
         Some(AmbientMode::Gradient)
     );
-    assert_eq!(AmbientMode::from_name("Skybox"), None);
+    assert_eq!(AmbientMode::from_name("skybox"), Some(AmbientMode::Skybox));
+    assert_eq!(AmbientMode::from_name("Trilight"), None);
 }
 
 #[test]

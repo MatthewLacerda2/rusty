@@ -2,8 +2,10 @@
 //! directions that escape it.
 //!
 //! Unity bakes light probes against *Environment Lighting* (the ambient source,
-//! Color or Gradient), never against the skybox the camera draws: the skybox
-//! reaches surfaces only through reflections. So a light-probe capture draws no
+//! Color, Gradient or Skybox), never against the skybox the camera draws: outside
+//! `Skybox` mode the skybox reaches surfaces only through reflections, and in it
+//! through the ambient's SH of it (#1675), the same light the shader and the
+//! lightmap trace read. So a light-probe capture draws no
 //! sky (`CaptureSky::Ambient`: the background clears to black) and keeps, per
 //! face, which texels nothing covered. The projection (`bake::project_light_probe`)
 //! gives those texels the ambient's radiance along their direction,
@@ -49,3 +51,6 @@ impl Renderer {
 #[cfg(test)]
 #[path = "capture_tests.rs"]
 mod probe_capture_tests;
+#[cfg(test)]
+#[path = "skybox_tests.rs"]
+mod probe_skybox_tests;

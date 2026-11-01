@@ -2,9 +2,10 @@
 //! one-button bakes.
 //!
 //! The environment (#1612) is Unity's `RenderSettings`: the skybox panorama, the
-//! ambient light (its colour and intensity, and #1647's source: `Color` or
-//! `Gradient` with sky, equator and ground colours) and the procedural sky's look (#1620: zenith, horizon and ground
-//! colours, cloud coverage and opacity), read and written through the same
+//! ambient light (its colour and intensity, and #1647's source: `Color`,
+//! `Gradient` with sky, equator and ground colours, or #1675's `Skybox`) and the
+//! procedural sky's look (#1620: zenith, horizon and ground colours, cloud coverage
+//! and opacity), read and written through the same
 //! `authoring::environment` ops the Scene Settings panel calls, saved with the scene
 //! (a change made in Play reverts at Stop, like every scene value) and present in
 //! every build.
@@ -109,7 +110,7 @@ fn register_ambient<'scope>(
     )
 }
 
-/// `{Get,Set}AmbientMode` (`"Color"` or `"Gradient"`) and
+/// `{Get,Set}AmbientMode` (`"Color"`, `"Gradient"` or `"Skybox"`) and
 /// `{Get,Set}Ambient{Sky,Equator,Ground}Color` (`r, g, b`): Unity's
 /// `RenderSettings.ambientMode` and its trilight colours.
 fn register_ambient_gradient<'scope>(
@@ -129,7 +130,7 @@ fn register_ambient_gradient<'scope>(
         scope.create_function(|_, name: String| {
             let mode = AmbientMode::from_name(&name).ok_or_else(|| {
                 mlua::Error::runtime(format!(
-                    "Lighting.SetAmbientMode: unknown mode {name:?} (\"Color\" or \"Gradient\")"
+                    "Lighting.SetAmbientMode: unknown mode {name:?} (\"Color\", \"Gradient\" or \"Skybox\")"
                 ))
             })?;
             env_ops::set_ambient_mode(&mut scene.borrow_mut().ambient, mode);

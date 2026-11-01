@@ -2,7 +2,7 @@
 //!
 //! Shown when nothing is selected: the project-level scalars (skybox, ambient
 //! light, routed through `authoring::environment` like `Lighting.Set*`, #1612, and
-//! its Color / Gradient source, #1647, `ambient`), the
+//! its Color / Gradient / Skybox source, #1647, #1675, `ambient`), the
 //! procedural sky (#1620, `sky`, through the same environment ops), the scene fog
 //! (#437, routed through `authoring::fog` like `Graphics.SetFog*`) plus the **Tags & Layers** surface that renames the shared Layers
 //! registry (#90). Layer 0 is the fixed `"Default"`; slots 1..31 are user-named

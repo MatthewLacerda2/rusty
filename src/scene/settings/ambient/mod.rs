@@ -2,13 +2,18 @@
 //! Unity's *Environment Lighting*, `RenderSettings.ambientMode` with its colours
 //! (#1647).
 //!
-//! Two sources, as Unity's `Color` and `Gradient` (`AmbientMode.Trilight`):
+//! Three sources, as Unity's `Color`, `Gradient` (`AmbientMode.Trilight`) and
+//! `Skybox`:
 //! - **Color**: one colour (`Scene::ambient_color`), drawn as a hemisphere, the
 //!   colour straight up fading to a quarter of it straight down.
 //! - **Gradient**: three colours, [`AmbientSettings`]'s `sky` (up-facing surfaces),
 //!   `equator` (sideways) and `ground` (down-facing), blended by the normal's `y`.
+//! - **Skybox** (#1675): the sky itself, the panorama or the procedural sky,
+//!   projected into L2 SH (Unity's ambient probe, [`skybox`]), so an HDRI lights
+//!   the scene it surrounds. rusty's default stays `Color` (Unity's is `Skybox`),
+//!   so a scene that never chose draws as it always has.
 //!
-//! `ambient_intensity` scales either, as Unity's *Intensity Multiplier*. An active
+//! `ambient_intensity` scales each, as Unity's *Intensity Multiplier*. An active
 //! Ambient light entity overrides the scene's source with its one colour, in
 //! `Color` semantics (rusty's own entity; Unity has none).
 //!
@@ -19,13 +24,15 @@
 //! bake's escaping directions (`render::ibl::probe::capture`, #1668) all evaluate. The shader
 //! shades a surface with [`AmbientRadiance::at`]; the bakes take its `incoming`
 //! radiance, whose cosine average is `at` again, so an open baked or probe-lit
-//! surface matches an unbaked one (exactly in `Color`, up to L2 in `Gradient`). The procedural sky follows
-//! only the `Color` colour (`SkySettings::resolved`), as Unity's skybox is apart
-//! from its ambient, and no light-probe or lightmap bake sees it.
+//! surface matches an unbaked one (exactly in `Color` and `Skybox`, up to L2 in
+//! `Gradient`). The procedural sky follows only the `Color` colour
+//! (`SkySettings::resolved`) whatever the mode; outside `Skybox` it is apart from
+//! the ambient, as Unity's skybox is, and no light-probe or lightmap bake sees it.
 //!
 //! Pure data. Every write goes through `scene::authoring::environment`.
 
 mod radiance;
+mod skybox;
 #[cfg(test)]
 mod tests;
 
@@ -33,8 +40,10 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 pub use radiance::AmbientRadiance;
+#[cfg(test)]
+pub use skybox::panorama_fixture;
 
-use crate::scene::{LightType, Scene, DEFAULT_AMBIENT_COLOR};
+use crate::scene::{LightType, Scene, Sh9, DEFAULT_AMBIENT_COLOR};
 
 /// Where the ambient light comes from: Unity's *Environment Lighting → Source*.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,21 +53,26 @@ pub enum AmbientMode {
     Color,
     /// Three colours: sky, equator and ground (Unity's `AmbientMode.Trilight`).
     Gradient,
+    /// The sky the scene draws, panorama or procedural, as L2 SH (Unity's
+    /// `AmbientMode.Skybox`).
+    Skybox,
 }
 
 impl AmbientMode {
     /// Every mode, in the Scene Settings dropdown's order.
-    pub const ALL: [Self; 2] = [Self::Color, Self::Gradient];
+    pub const ALL: [Self; 3] = [Self::Color, Self::Gradient, Self::Skybox];
 
     /// The mode's name, as `Lighting.GetAmbientMode` returns it.
     pub fn name(self) -> &'static str {
         match self {
             Self::Color => "Color",
             Self::Gradient => "Gradient",
+            Self::Skybox => "Skybox",
         }
     }
 
-    /// The mode a name means (`"Color"` or `"Gradient"`, case-insensitive).
+    /// The mode a name means (`"Color"`, `"Gradient"` or `"Skybox"`,
+    /// case-insensitive).
     pub fn from_name(name: &str) -> Option<Self> {
         Self::ALL
             .into_iter()
@@ -112,11 +126,17 @@ pub struct DrawnAmbient {
     /// The sky, equator and ground colours when the scene's `Gradient` mode is
     /// drawn; `None` draws `color`'s hemisphere.
     pub gradient: Option<[Vec3; 3]>,
+    /// The sky's radiance SH at intensity 1 when the scene's `Skybox` mode is
+    /// drawn (derived, never saved); it wins over `gradient`.
+    pub skybox: Option<Sh9>,
 }
 
 impl DrawnAmbient {
     /// The light arriving from each direction, intensity applied.
     pub fn radiance(&self) -> AmbientRadiance {
+        if let Some(sh) = self.skybox {
+            return AmbientRadiance::Sky(sh.scaled(self.intensity));
+        }
         match self.gradient {
             None => AmbientRadiance::Hemisphere(self.color * self.intensity),
             Some([sky, equator, ground]) => AmbientRadiance::Trilight {
@@ -131,19 +151,33 @@ impl DrawnAmbient {
 impl Scene {
     /// The ambient drawn: the last active Ambient light entity's colour and
     /// intensity, in `Color` semantics, else the scene's own source
-    /// (`ambient_color` or the gradient, by `ambient.mode`) and `ambient_intensity`.
+    /// (`ambient_color`, the gradient or the sky, by `ambient.mode`) and
+    /// `ambient_intensity`.
     pub fn drawn_ambient(&self) -> DrawnAmbient {
-        let gradient = match self.ambient.mode {
-            AmbientMode::Color => None,
-            AmbientMode::Gradient => {
-                Some([self.ambient.sky, self.ambient.equator, self.ambient.ground])
-            }
-        };
         let mut drawn = DrawnAmbient {
             color: self.ambient_color,
             intensity: self.ambient_intensity,
-            gradient,
+            gradient: None,
+            skybox: None,
         };
+        let has_light = self.world.ids_with_light().into_iter().any(|id| {
+            self.world
+                .light(id)
+                .is_some_and(|l| l.light_type == LightType::Ambient)
+                && self.world.is_active_in_hierarchy(id)
+        });
+        match self.ambient.mode {
+            AmbientMode::Color => {}
+            AmbientMode::Gradient => {
+                drawn.gradient =
+                    Some([self.ambient.sky, self.ambient.equator, self.ambient.ground]);
+            }
+            // An Ambient light overrides the sky, so it is projected only when none does.
+            AmbientMode::Skybox if !has_light => {
+                drawn.skybox = Some(skybox::sky_radiance(self, self.ambient_color));
+            }
+            AmbientMode::Skybox => {}
+        }
         for id in self.world.ids_with_light() {
             let light = self.world.light(id).expect("id came from ids_with_light");
             if light.light_type == LightType::Ambient && self.world.is_active_in_hierarchy(id) {
@@ -151,6 +185,7 @@ impl Scene {
                     color: light.color,
                     intensity: light.intensity,
                     gradient: None,
+                    skybox: None,
                 };
             }
         }
