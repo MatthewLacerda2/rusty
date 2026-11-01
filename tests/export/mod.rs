@@ -9,6 +9,7 @@ use std::process::{Command, Output};
 
 use serde_json::Value;
 
+mod audio;
 mod blend;
 mod fbx;
 mod scene;

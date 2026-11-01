@@ -1,6 +1,7 @@
-//! The player boots read-only (#1653): an exported game, booted and run for a few
-//! frames, leaves its folder byte-identical but for `saved/`, and the export
-//! carries what the player no longer makes (a seeded script, an `.mp3`'s `.wav`).
+//! The player boots read-only (#1653): an exported game, booted, run for a few
+//! frames and given the window focus, leaves its folder byte-identical but for
+//! `saved/` (no file or folder added, changed or removed), and the export carries
+//! what the player no longer makes (a seeded script, an `.mp3`'s `.wav`).
 //! Opening a project moves the working directory, so each half runs in a child
 //! process (`child`), as `tests/busy_replay` does.
 
@@ -104,24 +105,29 @@ fn child() {
     for _ in 0..5 {
         world.tick(1.0 / 60.0);
     }
+    // What the window gaining focus refreshes, in the player's frontend: nothing,
+    // whatever features this binary was built with.
+    crate::shell::focus::refresh_assets(&world, crate::shell::frame::Host::Player);
     // What the loop's exit does.
     world.resources.flush_storage();
 }
 
-/// Files by their `/`-separated relative path, with their bytes.
+/// Files by their `/`-separated relative path, with their bytes; a folder by its
+/// path and a trailing `/`, with none.
 type Files = BTreeMap<String, Vec<u8>>;
 
-/// Every file under `dir`.
+/// Every file and folder under `dir`.
 fn tree(dir: &Path) -> Files {
     let mut files = BTreeMap::new();
     let mut stack = vec![dir.to_path_buf()];
     while let Some(next) = stack.pop() {
         for entry in std::fs::read_dir(&next).unwrap().flatten() {
             let path = entry.path();
+            let rel = crate::core::paths::to_slash(path.strip_prefix(dir).unwrap());
             if path.is_dir() {
+                files.insert(format!("{rel}/"), Vec::new());
                 stack.push(path);
             } else {
-                let rel = crate::core::paths::to_slash(path.strip_prefix(dir).unwrap());
                 files.insert(rel, std::fs::read(&path).unwrap());
             }
         }

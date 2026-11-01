@@ -56,13 +56,14 @@ pub struct Exported {
 }
 
 /// Export the open project (the working directory, `core::project::open`) into
-/// `out`, which must pass [`check`]. A source that fails to convert fails the
-/// export, naming it, before anything is written; a texture a cache names outside
+/// `out`, which must pass [`check`]. A source that fails to convert (a model, or
+/// an `.mp3` the audio refresh can't turn into a `.wav`) fails the export, naming
+/// it, before anything is written; a texture a cache names outside
 /// what was copied fails it after, naming each, and the output is emptied again.
 pub fn export(out: &Path) -> Result<Exported, String> {
     let out = std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?;
     check(&crate::core::project::root(), &out)?;
-    seed_and_refresh_audio();
+    seed_and_refresh_audio()?;
     let sources = convertible_sources(Path::new(ASSETS_DIR));
     for source in &sources {
         cached_gltf(source).map_err(|e| format!("{}: {e}", source.display()))?;
@@ -92,22 +93,43 @@ pub fn export(out: &Path) -> Result<Exported, String> {
     }
 }
 
-/// Bring the open project's seeded files and its audio up to date, as the
-/// editor does on every open (`shell::boot::seed_project_workspace`), so the
-/// export ships them and the player, which boots read-only (#1653), neither
-/// seeds nor converts: the bundled scripts, the starter materials, the UI widget
-/// kit, `default.scene` where the seed manifest says it is due, the manifest
-/// itself, and a `.wav` for each `.mp3` (Unity converts audio at build time the
-/// same way). Each conversion and each skipped `.mp3` is printed.
-fn seed_and_refresh_audio() {
-    crate::scene::seed_default_scripts();
-    crate::scene::seed_default_scene();
-    let refresh = crate::asset::audio::refresh(Path::new(ASSETS_DIR));
-    for (warning, line) in refresh.lines() {
-        match warning {
-            true => eprintln!("{line}"),
-            false => println!("{line}"),
+/// Bring the open project's seeded files and its audio up to date
+/// (`scene::seed_project`, what the editor runs on every open), so the export
+/// ships them and the player, which boots read-only (#1653), neither seeds nor
+/// converts: the bundled scripts, the starter materials, the UI widget kit,
+/// `default.scene` where the seed manifest says it is due, the manifest itself,
+/// and a `.wav` for each `.mp3` (Unity converts audio at build time the same way).
+///
+/// No `.mp3` ships (`copy::left_behind`), so one the refresh could not convert
+/// fails the export, naming each, as a model source that fails to convert does.
+/// One left because a `.wav` of its name already exists is not converted, never
+/// overwriting somebody's file; it is warned of, naming both, since the editor
+/// plays the MP3 and the shipped game the `.wav`.
+fn seed_and_refresh_audio() -> Result<(), String> {
+    let refresh = crate::scene::seed_project();
+    let converted = refresh.lines().into_iter().filter(|(warning, _)| !warning);
+    for (_, line) in converted {
+        println!("{line}");
+    }
+    let mut failed = Vec::new();
+    for (mp3, why) in &refresh.skipped {
+        let wav = mp3.with_extension("wav");
+        match wav.is_file() {
+            true => eprintln!(
+                "[Export] {} is not shipped: {} already exists and ships in its place \
+                 (the editor plays the MP3, the game the WAV)",
+                mp3.display(),
+                wav.display()
+            ),
+            false => failed.push(format!("{}: {why}", mp3.display())),
         }
+    }
+    match failed.is_empty() {
+        true => Ok(()),
+        false => Err(format!(
+            "MP3s that could not be converted to WAV (no MP3 ships):\n  {}",
+            failed.join("\n  ")
+        )),
     }
 }
 

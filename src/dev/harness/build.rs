@@ -42,10 +42,11 @@ impl Harness {
 
     /// A harness on the open project (`core::project`, the working directory),
     /// playing the scene at `scene_path` — what an agent play-testing its game wants
-    /// (the `play` binary passes the project's startup scene, #1343). The bundled
-    /// scripts and the default scene are seeded through the seed manifest first, as
-    /// the editor's open and `make export` do (the standalone player, which runs an
-    /// export, boots read-only, #1653), so a fresh project's startup scene exists.
+    /// (the `play` binary passes the project's startup scene, #1343). The project is
+    /// seeded first (`scene::seed_project`: the bundled scripts, the default scene
+    /// through the seed manifest, the audio refresh), as the editor's open and
+    /// `make export` do (the standalone player, which runs an export, boots
+    /// read-only, #1653), so a fresh project's startup scene exists.
     /// A scene document that can't be read or parsed is an error: a play-test of
     /// nothing proves nothing. A bad lighting sidecar is not: it goes to the console,
     /// as the player's boot (`shell::boot::load_game`) logs it, and probes play unbaked.
@@ -57,8 +58,7 @@ impl Harness {
         scene_path: &str,
         settings: ProjectSettings,
     ) -> Result<Self, String> {
-        crate::scene::seed_default_scripts();
-        crate::scene::seed_default_scene();
+        crate::scene::print_refresh(&crate::scene::seed_project());
         crate::scene::io::read_scene_file(scene_path)?;
         let mut scene = Scene::new();
         // The document parsed just above, so what fails here is the sidecar.

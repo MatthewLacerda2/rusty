@@ -278,9 +278,11 @@ does (the bundled scripts, the default scene where due, a `.wav` for each `.mp3`
 and brings every converted model (`.fbx`, `.blend`) up to date in the import cache
 (`assets/generated/imported/`), then copies `project.rusty` and `assets/` into
 `OUT`, each model's import cache included, and leaves those sources behind, with
-Blender's backups of them (`.blend1`, …) and every `.mp3`. A source that fails to convert fails the
-export, naming it; so does a texture a model reads from outside `assets/`, and a
-symlinked folder under `assets/`. `cache/` and `saved/` are made empty rather than
+Blender's backups of them (`.blend1`, …) and every `.mp3`. A source that fails to
+convert (a model, or an `.mp3` that doesn't decode) fails the export, naming it; so
+does a texture a model reads from outside `assets/`, and a symlinked folder under
+`assets/`. An `.mp3` left because a `.wav` of its name already exists is warned of,
+and that `.wav` ships. `cache/` and `saved/` are made empty rather than
 copied. The player boots read-only (it seeds nothing and converts no audio), so it
 writes only under `saved/`, never into the rest of the install. `PROJECT`
 must be a project, and `OUT` a new or empty folder outside it. Files are copied in

@@ -8,7 +8,7 @@
 //!
 //! **The player boots read-only** (#1653), as Unity's player never writes into its
 //! data folder: no seeding and no asset refresh, which the editor's open
-//! (`boot::seed_project_workspace`) and the export (`dev::export`) do instead. What
+//! (`scene::seed_project`) and the export (`dev::export`) do instead. What
 //! it writes goes under `saved/` (`Storage`, a dev build's demos), Unity's
 //! `persistentDataPath`; `read_only_tests` holds it on an export.
 

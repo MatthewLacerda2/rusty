@@ -28,8 +28,8 @@ pub use lighting_block::{save_lighting, LightingSave};
 pub use load_error::LoadError;
 pub use manifest::{SeedManifest, SeedOutcome, SEED_MANIFEST_PATH};
 pub use seed::{
-    build_default_scene, seed_default_scene, seed_default_scripts, seed_workspace,
-    DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR,
+    build_default_scene, print_refresh, seed_default_scene, seed_default_scripts, seed_project,
+    seed_workspace, DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR,
 };
 
 use crate::scene::serialize::{apply_scene_data, to_scene_data, SceneData};

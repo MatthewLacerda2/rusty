@@ -59,10 +59,12 @@ Unity's `AssetDatabase.Refresh()`: import whatever arrived in the project's `ass
 the last look. Today that is audio: every `.mp3` anywhere under `assets/` is decoded
 once, its encoder delay and padding trimmed, written as a 16-bit PCM `.wav` beside it
 (same name, same channels and sample rate), and the `.mp3` is removed, so a built game
-carries WAV, never MP3. OGG is never converted. The editor runs the same refresh when it
-opens a project and whenever its window regains focus, and `make export` runs it before it
-copies (the shipped player, which boots read-only, never does), logging each conversion to the console;
-call it yourself after writing or copying an `.mp3` into the project.
+carries WAV, never MP3. OGG is never converted. The same refresh runs whenever a project
+is opened to author it (the editor, an agent session, a `play` run, `make export`) and
+whenever the editor's window regains focus; the shipped player, which boots read-only,
+never runs it. `make export` fails on an `.mp3` the refresh can't convert, and warns of one
+left because a `.wav` of its name already exists (that `.wav` ships; no `.mp3` does). Each
+conversion is logged; call it yourself after writing or copying an `.mp3` into the project.
 
 It also makes every image's compressed copy current (see `compression`, below) and
 returns how many it made in `compressed`; each image that fails (it does not decode,
