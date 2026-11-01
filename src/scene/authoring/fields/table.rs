@@ -207,9 +207,8 @@ macro_rules! inspect {
             const FIELDS: &'static [$crate::scene::authoring::fields::table::Field<Self>] = $fields;
             fn read(world: &$crate::ecs::World, id: u32) -> Option<Result<serde_json::Value, String>> {
                 world.$get(id).map(|c| {
-                    #[allow(unused_mut)]
-                    let mut value = serde_json::to_value(&*c).map_err(|e| e.to_string())?;
-                    $( ($shown)(&*c, &mut value); )?
+                    let value = serde_json::to_value(&*c).map_err(|e| e.to_string())?;
+                    $( let mut value = value; ($shown)(&*c, &mut value); )?
                     Ok(value)
                 })
             }
