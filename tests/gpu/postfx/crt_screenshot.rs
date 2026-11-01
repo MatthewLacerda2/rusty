@@ -1,7 +1,7 @@
 //! The CRT postfx blocks (#1679), pixel-tested on lavapipe: `barrel` warps where
 //! the frame is sampled, so a colour block after it still grades the picture inside
 //! the curve while the corners go black; `phosphor_mask` stripes a flat grey without
-//! changing its mean brightness.
+//! changing its mean brightness (short of clipping).
 
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
@@ -24,31 +24,28 @@ fn cleanup(name: &str) {
     std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{name}.wgsl")).ok();
 }
 
-/// A flat grey wall filling the view, seen through `effects`.
+/// A flat grey wall filling the view, seen through `effects`: a dim one, so the
+/// mask's lit stripe stays under 1 and doesn't clip.
 fn grey(effects: &[&str]) -> Scene {
-    let mut scene = wall_scene(2.0, [0.5, 0.5, 0.5]);
+    let mut scene = wall_scene(2.0, [0.2, 0.2, 0.2]);
     let id = scene.world.ids_with_post_processing()[0];
-    let volume = scene.world.post_processing_mut(id).unwrap();
-    volume.custom_effects.names = effects.iter().map(|s| s.to_string()).collect();
+    scene
+        .world
+        .post_processing_mut(id)
+        .unwrap()
+        .custom_effects
+        .names = effects.iter().map(|s| s.to_string()).collect();
     scene
 }
 
-/// 8-bit sRGB → linear, so a mean is a mean of light.
-fn linear(c: u8) -> f64 {
-    let s = f64::from(c) / 255.0;
-    match s <= 0.04045 {
-        true => s / 12.92,
-        false => ((s + 0.055) / 1.055).powf(2.4),
-    }
-}
-
-/// The mean linear value of each channel over the whole image.
+/// The mean display value of each channel over the whole image: the chain runs on
+/// display-referred colour, so that is the mean the mask keeps.
 fn mean(img: &image::RgbImage) -> [f64; 3] {
     let n = f64::from(img.width() * img.height());
     let mut sum = [0.0; 3];
     for p in img.pixels() {
         for (s, c) in sum.iter_mut().zip(p.0) {
-            *s += linear(c);
+            *s += f64::from(c) / 255.0;
         }
     }
     sum.map(|s| s / n)
@@ -103,7 +100,7 @@ fn phosphor_mask_stripes_a_flat_grey_and_keeps_its_mean() {
         let name = format!("t1679_mask_{kind}");
         bake(
             &name,
-            &format!(r#"{{"id":"phosphor_mask","params":{{"kind":"{kind}","strength":0.5}}}}"#),
+            &format!(r#"{{"id":"phosphor_mask","params":{{"kind":"{kind}"}}}}"#),
         );
         let img = shot(&mut host, &grey(&[&name]), &format!("pfx1679_{kind}")).unwrap();
         let (a, b) = (img.get_pixel(10, 10).0, img.get_pixel(11, 10).0);
