@@ -2,9 +2,10 @@
 //! (#470), and the resources every group-1 bind group is built from.
 //!
 //! This replaces the per-entity pool of #210 (one uniform buffer, bone buffer and two
-//! bind groups kept alive per entity). A camera's solids are now four packed arrays —
-//! per-draw uniforms at a 256-byte stride, joint matrices, instances, and the material
-//! records the uniforms index (#1616) — written with a `write_buffer` each, behind
+//! bind groups kept alive per entity). A camera's solids are now five packed arrays —
+//! per-draw uniforms at a 256-byte stride, joint matrices, instances, the material
+//! records the uniforms index (#1616) and the Light Probe Proxy Volumes the instances
+//! index (#1672) — written with a `write_buffer` each, behind
 //! **one** bind group whose dynamic offset picks a batch's uniform. The material array
 //! is written only when its bytes differ from the last upload, so a camera whose
 //! visible materials hold still does not rewrite it; the buffers are the renderer's,
@@ -37,12 +38,14 @@ pub(crate) type JointMatrix = [f32; 16];
 /// One camera's draw data: `uniforms` in slot order, the skinned draws' `joints`
 /// back to back (a draw whose `bone_base` is `n` starts at `joints[n - 1]`; element 0
 /// of the uploaded array is the identity), the packed `instances`, and the
-/// `materials` the uniforms index.
+/// `materials` the uniforms index, and the `proxies` the instances index
+/// (`draw::proxy_volume`).
 pub(crate) struct FrameUpload<'a> {
     pub uniforms: &'a [DrawUniform],
     pub joints: &'a [JointMatrix],
     pub instances: &'a [InstanceData],
     pub materials: &'a [MaterialData],
+    pub proxies: &'a [[f32; 4]],
 }
 
 pub(crate) struct DrawBuffers {
@@ -50,6 +53,7 @@ pub(crate) struct DrawBuffers {
     bones: GrowBuffer,
     instances: GrowBuffer,
     materials: GrowBuffer,
+    proxies: GrowBuffer,
     /// The material bytes last written, so an unchanged array is not rewritten.
     last_materials: Vec<u8>,
     bind_group: wgpu::BindGroup,
@@ -66,6 +70,7 @@ impl DrawBuffers {
         let bones = GrowBuffer::new(device, "Frame Joint Matrices", U::STORAGE);
         let instances = GrowBuffer::new(device, "Frame Instances", U::STORAGE);
         let materials = GrowBuffer::new(device, "Frame Materials", U::STORAGE);
+        let proxies = GrowBuffer::new(device, "Frame Proxy Volumes", U::STORAGE);
         let init = |label, contents: &[u8], usage| {
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(label),
@@ -92,6 +97,7 @@ impl DrawBuffers {
                 bones.buffer(),
                 instances.buffer(),
                 materials.buffer(),
+                proxies.buffer(),
             ],
         );
         Self {
@@ -99,6 +105,7 @@ impl DrawBuffers {
             bones,
             instances,
             materials,
+            proxies,
             last_materials: Vec::new(),
             bind_group,
             default_bones,
@@ -120,6 +127,7 @@ impl DrawBuffers {
             joints,
             instances,
             materials,
+            proxies,
         } = frame;
         let uniform_bytes = uniform_array_bytes(uniforms);
         let bone_bytes = joint_array_bytes(joints);
@@ -137,6 +145,8 @@ impl DrawBuffers {
             self.instances
                 .upload(device, queue, bytemuck::cast_slice(instances)),
             materials_grew,
+            self.proxies
+                .upload(device, queue, bytemuck::cast_slice(proxies)),
         ];
         if grew.contains(&true) {
             self.bind_group = group1(
@@ -148,6 +158,7 @@ impl DrawBuffers {
                     self.bones.buffer(),
                     self.instances.buffer(),
                     self.materials.buffer(),
+                    self.proxies.buffer(),
                 ],
             );
         }
@@ -170,16 +181,22 @@ impl DrawBuffers {
     pub(crate) fn identity_instance(&self) -> &wgpu::Buffer {
         &self.identity_instance
     }
+
+    /// The frame's proxy-volume array, which overlays bind and never read (their
+    /// instance names none).
+    pub(crate) fn proxies(&self) -> &wgpu::Buffer {
+        self.proxies.buffer()
+    }
 }
 
-/// A group-1 bind group over `[uniform, bones, instances, materials]`. The uniform
+/// A group-1 bind group over `[uniform, bones, instances, materials, proxies]`. The uniform
 /// binds one element's width, so a dynamic offset can slide across the packed array;
-/// the joint, instance and material arrays bind whole, and the shader indexes them.
+/// the joint, instance, material and proxy arrays bind whole, and the shader indexes them.
 pub(crate) fn group1(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     label: &str,
-    [uniform, bones, instances, materials]: [&wgpu::Buffer; 4],
+    [uniform, bones, instances, materials, proxies]: [&wgpu::Buffer; 5],
 ) -> wgpu::BindGroup {
     let sized = |buffer, size: usize| {
         wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -207,6 +224,10 @@ pub(crate) fn group1(
             wgpu::BindGroupEntry {
                 binding: 4,
                 resource: materials.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 5,
+                resource: proxies.as_entire_binding(),
             },
         ],
     })

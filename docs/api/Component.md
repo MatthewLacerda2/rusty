@@ -19,7 +19,7 @@ case, aliases too), plus `Transform`. Each answers to one name first:
 `Camera`, `Particles`, `PostProcessing`, `AudioSource`, `AudioReverbZone`,
 `Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
 `BackdropFilter`, `Text`, `Selectable`, `LayoutGroup`, `LayoutElement`, `Joint`,
-`CharacterController`, `LODGroup`, `Trail`, `Line`, `Shape`. Scripts are not a
+`CharacterController`, `LODGroup`, `LightProbeProxyVolume`, `Trail`, `Line`, `Shape`. Scripts are not a
 component here: they attach by path ([`Scene.AddScript`](Scene.md)) and are read
 with `Scene.GetScript`.
 

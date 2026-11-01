@@ -65,8 +65,9 @@ fn world_fields(scene: &Scene, id: u32) -> [Field; 14] {
     ]
 }
 
-/// Joints, character controllers, LOD groups and the ribbon renderers.
-fn rig_fields(scene: &Scene, id: u32) -> [Field; 5] {
+/// Joints, character controllers, LOD groups, Light Probe Proxy Volumes and the
+/// ribbon renderers.
+fn rig_fields(scene: &Scene, id: u32) -> [Field; 6] {
     let w = &scene.world;
     [
         ("joint", w.joint(id).map(|j| joint_value(&j))),
@@ -75,6 +76,11 @@ fn rig_fields(scene: &Scene, id: u32) -> [Field; 5] {
             w.character_controller(id).map(|c| cc_value(&c)),
         ),
         ("lod_group", w.lod_group(id).map(|g| lod_group_value(&g))),
+        (
+            "light_probe_proxy_volume",
+            w.light_probe_proxy_volume(id)
+                .and_then(|v| serde_json::to_value(&*v).ok()),
+        ),
         ("trail", w.trail(id).map(|t| trail_value(&t))),
         ("line", w.line(id).map(|l| line_value(&l))),
     ]

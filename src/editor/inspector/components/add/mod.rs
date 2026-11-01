@@ -90,6 +90,11 @@ const ENTRIES: &[(ComponentKind, &str, &str)] = &[
         "Post Processing Component",
     ),
     (ComponentKind::LodGroup, icon::STACK_SIMPLE, "LOD Group"),
+    (
+        ComponentKind::LightProbeProxyVolume,
+        icon::CUBE_TRANSPARENT,
+        "Light Probe Proxy Volume",
+    ),
     (ComponentKind::Audio, icon::SPEAKER_HIGH, "Audio Source"),
     (
         ComponentKind::ReverbZone,

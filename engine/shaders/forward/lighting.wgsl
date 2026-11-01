@@ -8,6 +8,7 @@
 #import common::{DecalSurface, PI, apply_decal}
 #import lighting::ambient::ambient_radiance
 #import lighting::reflection_probe::{ReflectionProbe, parallax_correct}
+#import forward::proxy_volume::proxy_irradiance
 #import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, instances, lighting, s_decal, s_refl_cube, s_shadow, s_skybox, shadow, t_ao, t_decal_color, t_decal_data, t_refl_cube, t_shadow, t_skybox}
 
 // Fold the decals binned into `cluster` into `s`, oldest first (FIFO, #638): each
@@ -229,6 +230,13 @@ fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
         out += instances[instance].sh[i].xyz * b[i] * lobe[i];
     }
     return max(out, vec3<f32>(0.0));
+}
+
+// The probe irradiance E at `world_pos` for normal `N`: the instance's one SH sample
+// (`eval_sh`), or, with a Light Probe Proxy Volume, the volume's grid (#1672).
+fn probe_irradiance(world_pos: vec3<f32>, N: vec3<f32>, instance: u32) -> vec3<f32> {
+    let proxy = proxy_irradiance(world_pos, N, instance);
+    return select(eval_sh(N, instance), proxy.rgb, proxy.w > 0.5);
 }
 
 // The environment a surface reflects along the mirror direction `R` (#244, #718). An

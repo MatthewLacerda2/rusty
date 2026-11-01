@@ -7,6 +7,7 @@
 use super::batch::sort::{back_to_front, view_depth};
 use super::batch::{DrawItem, FrameDraws};
 use super::overlays::{OverlayBindings, OverlayDraws};
+use super::proxy_volume;
 use crate::render::gpu::draw_buffers::{push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
 use crate::render::motion::{track, MotionHistory};
@@ -100,6 +101,11 @@ impl Renderer {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
         let (mut culled, mut lod_hidden, mut visible) = (0, 0, 0);
+        let limits = self.device.limits();
+        let binding = limits.max_storage_buffer_binding_size;
+        let mut proxies = self
+            .proxy_volumes
+            .frame(binding.min(limits.max_buffer_size));
         let ringed = if outline {
             outlined(scene, lod)
         } else {
@@ -123,7 +129,8 @@ impl Renderer {
             }
             let motion = history.as_deref_mut();
             let eye = (cam_pos, cam_fwd);
-            let items = self.solid_draw_items(scene, id, (bounds, eye), &mut joints, motion);
+            let frame = (&mut joints, &mut proxies);
+            let items = self.solid_draw_items(scene, id, (bounds, eye), frame, motion);
             visible += u32::from(!items.is_empty());
             for (mut item, world_pos, is_transparent) in items {
                 item.outline = ringed.contains(&id);
@@ -137,7 +144,7 @@ impl Renderer {
         let mesh_particles = self.push_mesh_particles(scene, cam, (&mut opaque, &mut transparent));
         let outline_bounds = self.outline_bounds(scene, &ringed);
         SolidResources {
-            draws: self.upload_solids(opaque, transparent, &joints),
+            draws: self.upload_solids(opaque, transparent, (&joints, &proxies.data)),
             culled,
             lod_hidden,
             visible,
@@ -169,7 +176,7 @@ impl Renderer {
         &mut self,
         opaque: Vec<DrawItem>,
         mut transparent: Vec<(DrawItem, f32)>,
-        joints: &[JointMatrix],
+        (joints, proxies): (&[JointMatrix], &[[f32; 4]]),
     ) -> FrameDraws {
         back_to_front(&mut transparent);
         let transparent = transparent.into_iter().map(|(item, _)| item).collect();
@@ -184,6 +191,7 @@ impl Renderer {
                 joints,
                 instances: &draws.instances,
                 materials: &materials,
+                proxies,
             },
         );
         draws
@@ -210,14 +218,15 @@ impl Renderer {
     /// a draw of its own. `bounds` are its world bounds when known
     /// ([`Self::world_bounds`]); its reflection probe is picked at their centre, and
     /// its view depth, from the camera `eye` (position, forward), is taken there.
-    /// With `history`, its instance carries its last-frame pose (#1435).
+    /// With `history`, its instance carries its last-frame pose (#1435). Its Light
+    /// Probe Proxy Volume, when it reads probes and has one, joins `proxies` (#1672).
     /// Empty if its mesh is not resident on the GPU yet.
     fn solid_draw_items(
         &mut self,
         scene: &Scene,
         id: u32,
         (bounds, eye): (Option<(glam::Vec3, glam::Vec3)>, (glam::Vec3, glam::Vec3)),
-        joints: &mut Vec<JointMatrix>,
+        (joints, proxies): (&mut Vec<JointMatrix>, &mut proxy_volume::Frame),
         history: Option<&mut MotionHistory>,
     ) -> Vec<(DrawItem, glam::Vec3, bool)> {
         let Some(mesh) = scene.world.mesh(id) else {
@@ -228,6 +237,7 @@ impl Renderer {
             return Vec::new();
         };
         let runs = gpu_mesh.runs(&mesh, scene.world.material(id).as_deref());
+        let local_bounds = gpu_mesh.local_aabb;
         let model_matrix = scene.world.local_to_world(id);
         let origin = model_matrix.w_axis.truncate();
         let mut instance = super::uniforms::solid_instance(
@@ -242,6 +252,11 @@ impl Renderer {
         // orders it by that centre's view depth (#1499).
         let centre = bounds.map_or(origin, |(min, max)| (min + max) * 0.5);
         instance.reflection_probe = self.reflection_probes.probe_for(centre);
+        // A capture draws static geometry for a bake: its probes are in flux.
+        if instance.use_sh == 1 && !self.capture.static_only {
+            let at = (model_matrix, local_bounds);
+            instance.proxy_volume = self.proxy_volumes.push(scene, id, at, proxies);
+        }
 
         // The active bone palette: the live animated pose when a clip plays (#80),
         // else the bind pose (#79). Primitives/static meshes leave it empty and bind
