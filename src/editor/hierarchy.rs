@@ -65,7 +65,7 @@ fn draw_collapsed(ui: &mut egui::Ui, t: crate::editor::theme::Theme, open: &mut 
 fn draw_actions(editor: &mut EditorUi, scene: &mut Scene, ui: &mut egui::Ui) {
     if let Some(selected_id) = editor.selected_entity_id {
         if ui.button(format!("{}  Destroy", icon::TRASH)).clicked() {
-            scene.destroy_entity(selected_id);
+            scene.destroy(selected_id);
             editor.selected_entity_id = None;
             editor.is_dirty = true;
         }

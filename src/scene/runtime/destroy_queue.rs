@@ -19,8 +19,11 @@ impl Scene {
     /// Destroy `id` and its subtree the way the mode allows (#1298): in Play,
     /// queue it ([`Scene::request_destroy`]) so its scripts are torn down; in
     /// edit mode, where no script runs, remove it at once
-    /// ([`Scene::destroy_entity`]).
+    /// ([`Scene::destroy_entity`]). A model instance's part it takes is recorded
+    /// as removed from its instance, so propagation never stamps it back (#1665,
+    /// `prefab::removed`).
     pub fn destroy(&mut self, id: u32) {
+        crate::scene::prefab::record_removed(self, id);
         if self.playing {
             self.request_destroy(id);
         } else {

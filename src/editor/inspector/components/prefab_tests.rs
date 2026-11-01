@@ -175,5 +175,6 @@ fn field_label_humanizes_a_json_pointer() {
     assert_eq!(field_label("/name"), "name");
     assert_eq!(field_label("+/light"), "light (added)");
     assert_eq!(field_label("-/camera"), "camera (removed)");
+    assert_eq!(field_label("-part/Kit/Wall"), "Kit/Wall (removed part)");
     assert_eq!(field_label(""), "");
 }
