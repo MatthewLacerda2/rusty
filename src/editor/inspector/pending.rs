@@ -38,7 +38,7 @@ impl PendingEdits {
         if let Some(new_parent) = self.parent_change {
             // A reparent moves the subtree in world space; the write queues its
             // collider bounds itself (#992, `ecs::world_space::bounds`).
-            if scene.set_parent(id, new_parent).is_ok() {
+            if scene.reparent(id, new_parent).is_ok() {
                 editor.is_dirty = true;
             }
         }

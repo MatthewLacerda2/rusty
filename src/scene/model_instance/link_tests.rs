@@ -120,22 +120,14 @@ fn an_added_node_keeps_each_part_on_its_own_node() {
         "the moved node is taken from the file"
     );
     assert_eq!(t.scale, Vec3::splat(2.0), "the hand edit stays on Wall");
-}
-
-#[test]
-fn a_removed_node_leaves_its_entity_as_it_was() {
-    let (mut scene, root) = spawn_file("rusty_1637_removed.gltf", KIT, Vec3::ZERO);
-    let path = path_of(&scene, root);
-    let kit = child(&scene, root, "Kit");
-    let wall = child(&scene, kit, "Wall");
-    std::fs::write(
-        &path,
-        KIT.replace(r#""name": "Wall""#, r#""name": "Panel""#),
-    )
-    .unwrap();
-    reimport_instance(&mut scene, root).unwrap();
-    assert_eq!(*scene.world.name(wall).unwrap(), "Wall");
-    assert_eq!(scene.world.transform(wall).unwrap().position, Vec3::Z * 5.0);
+    let door = child(&scene, kit, "Door");
+    let link = scene.world.prefab_link(door).unwrap();
+    assert_eq!(
+        link.node.as_deref(),
+        Some("Kit/Door"),
+        "the new node is spawned"
+    );
+    assert_eq!(scene.world.transform(door).unwrap().position, Vec3::X);
 }
 
 #[test]

@@ -583,6 +583,8 @@ scene.entities[].prefab_link.overrides.modifications{key}: string
 scene.entities[].prefab_link.overrides.modifications{}: any
 scene.entities[].prefab_link.overrides.removed_components: seq
 scene.entities[].prefab_link.overrides.removed_components[]: string
+scene.entities[].prefab_link.overrides.removed_parts: seq
+scene.entities[].prefab_link.overrides.removed_parts[]: string
 scene.entities[].prefab_link.source: string
 scene.entities[].prefab_link: option
 scene.entities[].rect_mask.feather: f32
