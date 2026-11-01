@@ -5,7 +5,7 @@
 
 use std::mem::{offset_of, size_of};
 
-use super::uniforms::{CameraUniform, LightingUniform};
+use super::uniforms::{AmbientLightUniform, CameraUniform, LightingUniform};
 use crate::render::clusters::LocalLight;
 use crate::render::decals::GpuDecal;
 use crate::render::ibl::reflection_probes::ReflectionProbeUniform;
@@ -101,6 +101,7 @@ fn camera_uniform_matches_wgsl_layout() {
 #[test]
 fn lighting_uniform_matches_wgsl_layout() {
     let pairs = [
+        ("sky", offset_of!(LightingUniform, sky)),
         ("dir_lights", offset_of!(LightingUniform, dir_lights)),
         (
             "num_dir_lights",
@@ -110,6 +111,23 @@ fn lighting_uniform_matches_wgsl_layout() {
         ("refl_probes", offset_of!(LightingUniform, refl_probes)),
     ];
     assert_layout("LightingUniforms", &pairs, size_of::<LightingUniform>());
+    let ambient = [
+        ("intensity", offset_of!(AmbientLightUniform, intensity)),
+        (
+            "gradient_sky",
+            offset_of!(AmbientLightUniform, gradient_sky),
+        ),
+        ("gradient", offset_of!(AmbientLightUniform, gradient)),
+        (
+            "gradient_equator",
+            offset_of!(AmbientLightUniform, gradient_equator),
+        ),
+        (
+            "gradient_ground",
+            offset_of!(AmbientLightUniform, gradient_ground),
+        ),
+    ];
+    assert_layout("AmbientLight", &ambient, size_of::<AmbientLightUniform>());
     let probe = [
         ("mip_base", offset_of!(ReflectionProbeUniform, mip_base)),
         ("box_min", offset_of!(ReflectionProbeUniform, box_min)),

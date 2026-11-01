@@ -25,11 +25,18 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
 
 /// The frame's ambient: `Scene::drawn_ambient`, the rule the Scene Settings panel
 /// shares.
-fn scene_ambient(scene: &Scene) -> AmbientLightUniform {
-    let (color, intensity) = scene.drawn_ambient();
+pub(crate) fn scene_ambient(scene: &Scene) -> AmbientLightUniform {
+    let drawn = scene.drawn_ambient();
+    let [sky, equator, ground] = drawn.gradient.unwrap_or([Vec3::ZERO; 3]);
     AmbientLightUniform {
-        color: color.to_array(),
-        intensity,
+        color: drawn.color.to_array(),
+        intensity: drawn.intensity,
+        gradient_sky: sky.to_array(),
+        gradient: f32::from(u8::from(drawn.gradient.is_some())),
+        gradient_equator: equator.to_array(),
+        _pad_equator: 0.0,
+        gradient_ground: ground.to_array(),
+        _pad_ground: 0.0,
     }
 }
 

@@ -23,7 +23,7 @@ fn scene(meshes: Vec<BakeMesh>, light: BakeLight) -> BakeScene {
     BakeScene {
         meshes,
         lights: vec![light],
-        sky: Vec3::ZERO,
+        sky: Vec3::ZERO.into(),
     }
 }
 

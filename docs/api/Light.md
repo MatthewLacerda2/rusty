@@ -38,7 +38,8 @@ means some corner of the view is over budget). `Baked` lights never take part. A
 light outside the view costs nothing. A light's **range** is a hard cut-off and also how far it reaches into
 the cluster grid, so a tight range is the cheap one. Up to **4** directional lights
 shade at once; the last active one is the sun that casts the cascaded shadows. Only
-the last active ambient light counts.
+the last active ambient light counts: it replaces the scene's ambient, a `Gradient`
+one included, with its single colour (`Lighting.md`, *Environment*).
 
 **Shadows.** The sun (slot 0 above) always casts its cascaded shadows. A point or
 spot light casts only when `SetCastShadows(id, true)` (off by default, as in Unity:

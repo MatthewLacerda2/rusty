@@ -10,7 +10,7 @@ fn scene() -> BakeScene {
     BakeScene {
         meshes: vec![floor(), wall()],
         lights: vec![sun(true)],
-        sky: Vec3::new(0.3, 0.4, 0.5),
+        sky: Vec3::new(0.3, 0.4, 0.5).into(),
     }
 }
 
