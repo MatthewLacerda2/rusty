@@ -156,7 +156,9 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   `texelsPerUnit` (default `8`) is the lightmap resolution per world unit (each mesh's
   lightmap is 4–512 texels square). The bounce is smoothed with a 3-texel edge-aware
   Gaussian (Unity's indirect filter) that never crosses a crease; baked direct light is
-  not filtered, so its shadows stay sharp. A texel buried inside other geometry (floor
+  not filtered, so a point, spot or directional light's shadows stay sharp; an Area
+  light's (#1674) are soft, its rectangle integrated over `samples` or more jittered
+  points per texel. A texel buried inside other geometry (floor
   under a crate) is filled from its neighbours rather than baked black. No GPU is needed;
   it runs headless.
 - **Directional** (#810, Unity's *Directional Mode*). By default the bake also stores,

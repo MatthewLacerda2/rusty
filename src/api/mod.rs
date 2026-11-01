@@ -205,7 +205,7 @@ pub fn register<'scope>(
     input::register(lua, scope, ctx.input)?;
     joint::register(lua, scope, ctx.scene)?;
     layers::register(lua, scope, ctx.scene)?;
-    light::register(lua, scope, ctx.scene)?;
+    light::register(lua, scope, ctx.scene, ctx.console)?;
     light_probe_proxy_volume::register(lua, scope, ctx.scene)?;
     lighting::register(lua, scope, ctx.scene)?;
     line::register(lua, scope, ctx.scene)?;

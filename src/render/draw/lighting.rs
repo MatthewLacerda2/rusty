@@ -76,7 +76,8 @@ pub(crate) fn apply_scene_lights(
             LightType::Ambient
             | LightType::Directional
             | LightType::Point
-            | LightType::Spotlight => {}
+            | LightType::Spotlight
+            | LightType::Area => {}
         }
     }
     if let Some(sun) = dirs.pop() {
