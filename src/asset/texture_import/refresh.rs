@@ -175,7 +175,11 @@ fn start() -> Sender<PathBuf> {
                         log::info!("[Import] compressed {path}");
                     }
                     Ok(false) => {}
-                    Err(e) => log::warn!("[Import] {e}"),
+                    Err(e) => {
+                        log::warn!("[Import] {e}");
+                        // The console only shows it on a frame (#1721).
+                        crate::core::wake::frame();
+                    }
                 }
             }
         });

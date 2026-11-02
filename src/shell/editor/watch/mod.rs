@@ -121,10 +121,14 @@ impl Watch {
 
     fn with(roots: &[&Path], backend: Backend) -> notify::Result<Self> {
         let (tx, events) = channel();
-        // The editor may be asleep (#1721): only a frame drains the channel.
+        // The editor may be asleep (#1721): only a frame drains the channel. A read is
+        // dropped here, as inotify reports every open: anything reading `assets/` (a
+        // search, the editor's own retry of a broken scene) must not wake it.
         let deliver = move |event: notify::Result<Event>| {
-            let _ = tx.send(event);
-            crate::core::wake::frame();
+            if matters(&event) {
+                let _ = tx.send(event);
+                crate::core::wake::frame();
+            }
         };
         let mut watcher: Box<dyn Watcher> = match backend {
             Backend::Native => Box::new(notify::recommended_watcher(deliver)?),
@@ -171,9 +175,6 @@ impl Watch {
                 files_under(&root.given, &mut found);
             }
             return self.pend(found);
-        }
-        if !changes(&event.kind) {
-            return;
         }
         let mut found = Vec::new();
         for path in &event.paths {
@@ -229,6 +230,14 @@ impl Watch {
 
 /// Whether an event of `kind` can change what a file holds: everything but a
 /// read-only open, read or close.
+/// Whether an event is worth a frame: a change, an error to report, or a lost-events
+/// notice ([`Watch::take`] rescans on one).
+fn matters(event: &notify::Result<Event>) -> bool {
+    event.as_ref().map_or(true, |e| {
+        e.need_rescan() || e.paths.is_empty() || changes(&e.kind)
+    })
+}
+
 fn changes(kind: &EventKind) -> bool {
     match kind {
         EventKind::Access(AccessKind::Close(AccessMode::Write)) => true,

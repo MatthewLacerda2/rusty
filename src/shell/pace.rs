@@ -83,6 +83,14 @@ impl Pacer {
         self.settling = SETTLE_FRAMES;
     }
 
+    /// [`Self::activity`], when `changed`: a scene swapped with no input, as a game's
+    /// `Application.Quit()` stopping Play does.
+    pub(super) fn settle_if(&mut self, changed: bool) {
+        if changed {
+            self.activity();
+        }
+    }
+
     /// A frame reached the screen.
     pub(super) fn drew(&mut self) {
         self.settling = self.settling.saturating_sub(1);

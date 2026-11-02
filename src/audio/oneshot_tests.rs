@@ -62,3 +62,14 @@ fn it_sounds_until_the_last_voice_is_reaped() {
     m.apply_mix(&MixEnv::default(), |_| None);
     assert!(!m.is_sounding(), "reaped: the editor may sleep again");
 }
+
+#[test]
+fn an_entity_voice_whose_clip_ended_no_longer_sounds() {
+    let (backend, rec) = RecordingBackend::new();
+    let mut m = AudioMaestro::with_backend(backend);
+    m.play_source(7, &AudioSourceComponent::default(), [0.0; 3], 0);
+    assert!(m.is_sounding());
+    rec.borrow_mut().live.clear();
+    assert!(m.is_source_playing(7), "its entry outlives the clip");
+    assert!(!m.is_sounding(), "or the editor would never sleep again");
+}

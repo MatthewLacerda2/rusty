@@ -227,6 +227,7 @@ fn run_frame<F: Frontend>(
         input::clipboard::apply_request(clipboard, &mut game.input().borrow_mut());
     }
     frontend.on_play_transition(game, transition);
+    shell.pacer.settle_if(transition != PlayTransition::None);
     shell.cursor.sync(frontend.cursor(game), &shell.window);
 
     match frame::quit_action(F::HOST, game.take_quit_request(), game.play_requested()) {
