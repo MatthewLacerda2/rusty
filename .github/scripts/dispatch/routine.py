@@ -37,6 +37,12 @@ ALLOWED_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "Skill", "Todo
 NAME_PREFIX = "rusty #"
 NAME_LENGTH = 60
 
+#: Whose routines show the cloud environment. The API lists only the account's 20
+#: newest and offers no paging that works, so on 2026-11-02 scorsese's filled the
+#: list and `make coder` refused here. Both projects use one `anthropic_cloud`
+#: environment, and both name a routine this way, so either answers.
+ENVIRONMENT_FROM = (NAME_PREFIX, "scorsese #")
+
 #: How far ahead the routine fires; the API refuses a time already past.
 LEAD = timedelta(minutes=2)
 
@@ -59,7 +65,7 @@ def name(number: int, title: str) -> str:
 
 def environment(routines: list[dict]) -> str | None:
     """The environment of the newest coder routine, or `None` when there is none."""
-    coders = [r for r in routines if str(r.get("name", "")).startswith(NAME_PREFIX)]
+    coders = [r for r in routines if str(r.get("name", "")).startswith(ENVIRONMENT_FROM)]
     for routine in sorted(coders, key=lambda r: r.get("created_at", ""), reverse=True):
         found = (((routine.get("job_config") or {}).get("ccr") or {}).get("environment_id"))
         if found:
