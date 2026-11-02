@@ -95,8 +95,14 @@ fn reverting_a_part_gone_since_the_last_reimport_says_so() {
 fn another_spelling_of_the_model_path_finds_its_instances() {
     let (mut scene, root) = spawn_file("rusty_1637_spelling.gltf", KIT, Vec3::ZERO);
     let path = scene.world.prefab_link(root).unwrap().source.clone();
-    let (dir, file) = path.rsplit_once('/').unwrap();
-    let other = format!("{dir}/./{file}");
+    // Natively spelled, so the extra `.` component reads the same way on Windows.
+    let path = std::path::Path::new(&path);
+    let other = path
+        .parent()
+        .unwrap()
+        .join(".")
+        .join(path.file_name().unwrap());
+    let other = other.to_string_lossy();
     let wall = child(&scene, child(&scene, root, "Kit"), "Wall");
     assert!(set_model_scale_factor(&mut scene, &other, 0.01).unwrap() > 0);
     let at = scene.world.transform(wall).unwrap().position;
