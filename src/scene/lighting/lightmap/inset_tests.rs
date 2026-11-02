@@ -12,9 +12,12 @@ use super::*;
 const S: u32 = 16;
 
 #[test]
-fn a_needle_is_traced_where_it_crosses_each_texel_not_far_along_it() {
-    // UV area ~1e-4 texels²: weights recovered by dividing by it would wander.
-    let uv = [(0.2, 0.5), (15.8, 0.5), (15.8, 0.50001)];
+fn a_lone_needle_owns_every_texel_it_crosses_traced_inside_it_and_its_texel() {
+    // Off the row of texel centres, so every texel is claimed by overlap; the sharp
+    // end at u = 0.2. UV area ~1e-4 texels²: weights recovered by dividing by it
+    // would wander.
+    let (v0, v1) = (0.6f32, 0.60001f32);
+    let uv = [(0.2, v0), (15.8, v0), (15.8, v1)];
     let mesh = BakeMesh {
         positions: uv.map(|(u, v)| Vec3::new(u, 0.0, v)).to_vec(),
         normals: vec![Vec3::Y; 3],
@@ -22,12 +25,21 @@ fn a_needle_is_traced_where_it_crosses_each_texel_not_far_along_it() {
         indices: vec![0, 1, 2],
         ..Default::default()
     };
-    let points = rasterize(&mesh, S);
-    assert!(!points.is_empty(), "the needle owns texels");
+    let mut points = rasterize(&mesh, S);
+    points.sort_by_key(|p| p.index);
+    let owned: Vec<_> = points.iter().map(|p| p.index).collect();
+    assert_eq!(
+        owned,
+        (0..S as usize).collect::<Vec<_>>(),
+        "row 0, all of it"
+    );
     for p in points {
-        let x = (p.index % S as usize) as f32;
-        let u = p.position.x;
+        let (x, u, v) = (p.index as f32, p.position.x, p.position.z);
         assert!((x..=x + 1.0).contains(&u), "texel {x} traced at u = {u}");
+        // The needle's far edge runs from (0.2, v0) to (15.8, v1); slack of ~2 float steps.
+        let top = v0 + (v1 - v0) * (u - 0.2) / 15.6;
+        let inside = (0.2..=15.8).contains(&u) && v >= v0 - 1.5e-7 && v <= top + 1.5e-7;
+        assert!(inside, "texel {x} traced off the needle at ({u}, {v})");
     }
 }
 

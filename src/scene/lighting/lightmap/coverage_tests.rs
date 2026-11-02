@@ -98,7 +98,7 @@ fn corner(y: f32, scale: f32) -> BakeMesh {
 }
 
 #[test]
-fn centre_texels_keep_their_centre_and_the_edge_ring_is_traced_inside_the_core() {
+fn centre_texels_keep_their_centre_and_the_edge_ring_is_traced_inset_from_every_edge() {
     // The hypotenuse u + v = S - 0.5 crosses the squares of the texels x + y = S - 1
     // but not their centres: each is traced in its texel, INSET off every edge.
     let edge = S as f32 - 0.5;
