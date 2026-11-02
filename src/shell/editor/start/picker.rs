@@ -13,6 +13,7 @@ use crate::core::project::{Access, Opened};
 use crate::editor::project_picker::ProjectPicker;
 use crate::render::Renderer;
 use crate::shell::editor::paint::{paint_pass, EGUI_RENDERER};
+use crate::shell::pace::Pace;
 use crate::shell::Prelude;
 
 /// The picker's egui and its state.
@@ -21,6 +22,8 @@ pub struct PickerStage {
     winit: egui_winit::State,
     renderer: egui_wgpu::Renderer,
     picker: ProjectPicker,
+    /// When egui wants its next frame; `None` when it doesn't.
+    repaint_at: Option<std::time::Instant>,
 }
 
 impl PickerStage {
@@ -42,6 +45,7 @@ impl PickerStage {
             winit,
             renderer,
             picker,
+            repaint_at: None,
         }
     }
 }
@@ -64,7 +68,8 @@ impl Prelude for PickerStage {
         self.ctx.begin_pass(input);
         let chosen = self.picker.draw(&self.ctx, super::unix_now());
         let ppp = window.scale_factor() as f32;
-        paint_pass(&self.ctx, &mut self.renderer, renderer, ppp, target);
+        let after = paint_pass(&self.ctx, &mut self.renderer, renderer, ppp, target);
+        self.repaint_at = std::time::Instant::now().checked_add(after);
         match crate::core::project::open(&chosen?, Access::Edit) {
             Ok(opened) => Some(opened),
             Err(err) => {
@@ -72,6 +77,13 @@ impl Prelude for PickerStage {
                     .fail(format!("Could not open the project: {err}"));
                 None
             }
+        }
+    }
+
+    /// Nothing moves on the picker: it draws when it is touched (#1721).
+    fn pace(&self) -> Pace {
+        Pace::OnDemand {
+            next: self.repaint_at,
         }
     }
 }

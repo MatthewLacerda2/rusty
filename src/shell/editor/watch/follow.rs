@@ -18,7 +18,8 @@
 //! - **"Unsaved" is computed, not a flag** (`Scene::has_unsaved_edits`), and only
 //!   picks the console line: info, or a warning that edits were discarded.
 //! - **A half-written file is retried.** A read or parse failure keeps the path
-//!   pending, so the next frame reads it again, until it loads or a newer note comes.
+//!   pending, so the next frame reads it again, until it loads or a newer note comes;
+//!   outside Play the writer's next write is what brings that frame (#1721).
 //!   The file is parsed before anything else, and text that already failed is not
 //!   parsed again, so a broken file left on disk costs one read a frame (#1374).
 //! - **Held through Play**, like every watch note: the log is read only in edit

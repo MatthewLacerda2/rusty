@@ -2,7 +2,7 @@
 //! every file under the roots (#1327).
 
 use super::{Watch, POLL};
-use notify::event::{CreateKind, EventKind, Flag, ModifyKind};
+use notify::event::{AccessKind, AccessMode, CreateKind, EventKind, Flag, ModifyKind};
 use notify::Event;
 use std::path::PathBuf;
 
@@ -19,6 +19,19 @@ fn pending(watch: &Watch, dir: &std::path::Path, name: &str) -> bool {
     let key = dir.join(crate::core::paths::native(name));
     let key = key.to_string_lossy().into_owned();
     watch.pending().contains(&key)
+}
+
+/// inotify reports every open: a search over `assets/` must not wake the editor (#1721).
+#[test]
+fn a_read_is_not_worth_a_frame_but_a_change_or_lost_events_are() {
+    use crate::shell::editor::watch::matters;
+    let on_file = |kind| Event::new(kind).add_path(PathBuf::from("a.png"));
+    let read = EventKind::Access(AccessKind::Open(AccessMode::Any));
+    assert!(!matters(&Ok(on_file(read))));
+    assert!(matters(&Ok(on_file(EventKind::Modify(ModifyKind::Any)))));
+    assert!(matters(&Ok(on_file(read).set_flag(Flag::Rescan))));
+    assert!(matters(&Ok(Event::new(read))), "no path: the watch rescans");
+    assert!(matters(&Err(notify::Error::generic("lost"))));
 }
 
 #[test]

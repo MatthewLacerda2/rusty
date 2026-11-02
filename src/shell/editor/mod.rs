@@ -18,6 +18,7 @@ mod icon;
 mod last_scene;
 mod paint;
 mod start;
+mod sync;
 mod undo;
 mod viewport;
 mod watch;
@@ -29,7 +30,7 @@ pub use start::{launch, launch_picker};
 use winit::event::WindowEvent;
 use winit::keyboard::KeyCode;
 
-use super::{frame::Host, Frontend, Shell};
+use super::{frame::Host, pace::Pace, Frontend, Shell};
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::input::CursorState;
 use crate::editor::{EditorUi, ViewportInteraction, ViewportTab};
@@ -73,6 +74,8 @@ pub struct EditorFrontend {
     follow: watch::follow::SceneFollow,
     /// The scene path last remembered for the next launch (`last_scene`, #1618).
     last_scene: Option<String>,
+    /// When egui wants its next frame; `None` when it doesn't (#1721).
+    repaint_at: Option<std::time::Instant>,
 }
 
 impl EditorFrontend {
@@ -114,6 +117,7 @@ impl EditorFrontend {
             watch: watch::Watch::editor(),
             follow: watch::follow::SceneFollow::new(),
             last_scene: None,
+            repaint_at: None,
         }
     }
 
@@ -157,36 +161,6 @@ impl EditorFrontend {
             .store_prefs(&mut game.resources.storage.borrow_mut());
         interaction
     }
-
-    /// The Config menu and `Graphics.SetQuality` (script) select through one
-    /// `Application`: select a preset picked in the menu, mirror the presets and the
-    /// running one back into it, then hand the shared cell to the renderer
-    /// (`settings::apply_graphics`), the player's graphics options beside the
-    /// preset's values (#1438, #1522).
-    fn sync_quality(&mut self, shell: &mut Shell, game: &GameWorld) {
-        let mut app = game.resources.application.borrow_mut();
-        if let Some(name) = self.editor_ui.quality_request.take() {
-            if let Err(err) = app.select_quality(&name) {
-                log::warn!("[Quality] {err}");
-            }
-            game.script_manager().graphics_cell().borrow_mut().quality = app.quality_values();
-        }
-        let names = app.quality_presets().names();
-        self.editor_ui.quality_presets = names.into_iter().map(str::to_string).collect();
-        self.editor_ui.quality_preset = app.quality().map(str::to_string);
-        drop(app);
-        super::settings::apply_graphics(shell, game);
-    }
-
-    /// Apply a speaker mode picked in Config, then mirror the maestro's mode (which
-    /// `Audio.SetSpeakerMode` may also have changed) back into the menu.
-    fn sync_speaker_mode(&mut self, game: &GameWorld) {
-        let mut audio = game.resources.audio.borrow_mut();
-        if let Some(mode) = self.editor_ui.speaker_mode_request.take() {
-            audio.set_speaker_mode(mode);
-        }
-        self.editor_ui.speaker_mode = audio.speaker_mode();
-    }
 }
 
 impl Frontend for EditorFrontend {
@@ -224,6 +198,23 @@ impl Frontend for EditorFrontend {
     #[cfg(feature = "dev")]
     fn before_exit(&mut self, game: &mut GameWorld) {
         self.editor_ui.close_demo(game);
+    }
+
+    /// Outside Play nothing moves on its own, so the editor draws on demand, as Unity's
+    /// Scene and Game views do (#1721). Play, an open demo and sound still playing keep
+    /// it going: they move on per frame, with nothing else to ask for one.
+    fn pace(&self, game: &GameWorld) -> Pace {
+        #[cfg(feature = "dev")]
+        if self.editor_ui.demo_open() {
+            return Pace::Continuous;
+        }
+        let playing = game.play_requested() || game.scene().borrow().is_playing();
+        if playing || game.resources.audio.borrow().is_sounding() {
+            return Pace::Continuous;
+        }
+        Pace::OnDemand {
+            next: self.repaint_at,
+        }
     }
 
     fn game_view(&self, shell: &Shell) -> GameViewRect {
