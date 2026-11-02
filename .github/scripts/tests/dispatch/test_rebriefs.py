@@ -53,6 +53,7 @@ class Tally(unittest.TestCase):
         counted = rebriefs.tally([FIRST, SUPERSEDED, NEWEST, ONCE], since="2026-10-30T11:00:00Z")
         self.assertEqual(counted.briefs, {7: 1, 8: 1})
         self.assertEqual((counted.rebriefs, counted.rounds["unstated"]), (1, 1))
+        self.assertEqual(counted.in_one, 1)  # #8 only: #7's one brief here is a re-brief
 
     def test_nothing_briefed_says_so(self):
         self.assertEqual(rebriefs.report(rebriefs.tally([CHAT])), "briefs all time: none")

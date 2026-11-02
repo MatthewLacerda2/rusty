@@ -1,6 +1,6 @@
 """How many briefs an issue takes, and why each re-brief happened (#1724).
 
-From 2026-10-29 to 2026-11-02 there were 113 briefs on 52 issues: 61 launches,
+From 2026-10-29 to 2026-11-02 there were 154 briefs on 74 issues: 80 launches,
 over half, were re-briefs, each one a cold session reading everything again,
 and nothing recorded why. So a re-brief now carries a `Round:` line
 (`issue-batch`, the re-brief template) naming its cause, and this module counts
@@ -61,6 +61,7 @@ def briefs_by_issue(comments: list[dict]) -> dict[int, list[dict]]:
 class Tally:
     briefs: dict[int, int] = field(default_factory=dict)  # issue -> briefs in the window
     rounds: dict[str, int] = field(default_factory=lambda: dict.fromkeys((*ROUNDS, UNSTATED), 0))
+    sent_back: set[int] = field(default_factory=set)  # issues with a re-brief in the window
 
     @property
     def total(self) -> int:
@@ -72,8 +73,12 @@ class Tally:
 
     @property
     def in_one(self) -> int:
-        """Issues whose only brief so far is the first: none was sent back."""
-        return sum(1 for count in self.briefs.values() if count == 1)
+        """Issues whose only brief so far is the first: none was sent back.
+
+        Asked of the re-briefs, not the count: under `since`, one re-brief of an
+        issue first briefed before the window is one brief in it, and not this.
+        """
+        return sum(1 for number in self.briefs if number not in self.sent_back)
 
 
 def tally(comments: list[dict], since: str = "") -> Tally:
@@ -86,6 +91,7 @@ def tally(comments: list[dict], since: str = "") -> Tally:
             counted.briefs[number] = counted.briefs.get(number, 0) + 1
             if position > 0:
                 counted.rounds[round_of(found.get("body", ""))] += 1
+                counted.sent_back.add(number)
     return counted
 
 
