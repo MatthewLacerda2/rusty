@@ -165,7 +165,9 @@ a coder real time.
   before trusting a green run: without the driver, GPU tests skip silently.
 - **A branch that changes what is drawn renders it and looks** (#1483): the
   renderer, `engine/shaders/`, materials, post effects, lighting, UI, editor
-  panels. Render a primitive scene that shows the change before (on `main`) and
+  panels. Lighting includes what a bake writes (lightmaps, probes, reflection
+  captures): its texels are what lit surfaces show, so a bake change is looked
+  at even when only stored values move (#1690's review). Render a primitive scene that shows the change before (on `main`) and
   after (on the branch): the feature off and on, and its knobs at the extremes
   where those are part of the issue. Open every image with `Read`, and fix what
   is plainly wrong (a black frame, a mirrored flare, a square bokeh) before
