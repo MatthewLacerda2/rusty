@@ -46,10 +46,10 @@ fn a_non_finite_uv_owns_nothing() {
 }
 
 /// Texel `u` of the floor's lightmap at world `x` (and `v` at `z`): its edges at
-/// x = 0 and z = 0 cross the first column and row left of their centres, so those
+/// x = 0 and z = 0 cross the first column and row right of their centres, so those
 /// texels are claimed by overlap, not by a centre.
 fn texel(x: f32) -> f32 {
-    0.3 + 3.6 * x
+    0.7 + 3.6 * x
 }
 
 #[test]
