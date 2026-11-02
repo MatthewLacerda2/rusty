@@ -158,7 +158,9 @@ Issue(s): #N. Your brief is the comment at <the brief's URL>; read it there, not
 ```
 
 A re-brief (a conflict, a fix, a new sibling) is a new `Brief` comment on the
-issue that says **add commits on top, merge `origin/main` in only if the PR
+issue with a `Round:` line under `Brief` naming why it happened, `Round: review |
+ci | conflict | other` (a review sent it back, CI went red, it conflicts, anything
+else; `make rebriefs` counts them), and that says **add commits on top, merge `origin/main` in only if the PR
 conflicts, never rebase** (the queue merges `main` in at merge time; a rebase's
 force-push was refused twice on 2026-10-28 and cost a `-v2` PR each, #1568), so
 no brief needs to authorise a force-push, and the PR turned back to draft. **Then `make coder ISSUE=N` again
@@ -336,7 +338,11 @@ compiling:
    process until it reconnects.
 
 **The report opens with `make checks SINCE=<batch start>`**: the unticked human
-checks and the `planning`+`human` issues. Then the result, what surprised you
+checks and the `planning`+`human` issues. Then `make rebriefs ARGS="--since <batch
+start>"` (#1724): briefs per issue, issues that took one brief, and re-briefs by `Round:`.
+Over half the launches of 2026-10-29 to 11-02 were re-briefs; a cause that
+dominates is what the next infrastructure issue attacks (CLAUDE.md, *Once is a
+case; twice is an issue*), and `unstated` means a re-brief left its line out. Then the result, what surprised you
 (not only what went wrong), and the lessons mapped to their changes. Two things
 are raised even mid-batch, while they can still be overruled: a change to the
 user's files outside the repo, and a decision reversed from what the issue said.
