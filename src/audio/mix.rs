@@ -266,6 +266,16 @@ impl AudioMaestro {
         self.entity_voices.get(&id).map(|live| live.mix)
     }
 
+    /// Whether anything is playing or being captured. The mix and the capture move on
+    /// per frame, so the editor keeps drawing until it ends (#1721). An entity voice
+    /// keeps its entry after its clip ends, so it is asked whether it still sounds.
+    pub fn is_sounding(&self) -> bool {
+        let mut voices = self.entity_voices.values();
+        voices.any(|live| self.backend.is_live(live.voice))
+            || !self.oneshots.is_empty()
+            || self.capture.is_some()
+    }
+
     /// How many `PlayAt` one-shots are still sounding.
     #[cfg(test)]
     pub fn live_oneshots(&self) -> usize {

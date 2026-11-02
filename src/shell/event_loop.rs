@@ -6,7 +6,8 @@
 //! `launch()` prepared. Every event after that is routed exactly as before: window
 //! events through the frontend and [`super::handle_window_event`], raw mouse motion
 //! to the frontend (the editor's Scene-view look, #745) and to the game while it has
-//! input, a redraw request each time the loop goes idle.
+//! input. Each time the loop runs out of events, [`super::pace`] decides whether to
+//! draw or to sleep; a window event or a [`crate::core::wake`] ring ends the sleep.
 
 use std::sync::Arc;
 
@@ -15,7 +16,7 @@ use winit::event::{DeviceEvent, DeviceId, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
-use super::{boot, input, settings, Frontend, Shell};
+use super::{boot, input, pace, settings, Frontend, Shell};
 use crate::app::GameWorld;
 use crate::core::settings::video::VideoSettings;
 use crate::render::Renderer;
@@ -78,6 +79,7 @@ where
 {
     let event_loop = EventLoop::new().expect("the OS refused an event loop");
     event_loop.set_control_flow(ControlFlow::Poll);
+    pace::install_wake(&event_loop);
     let mut app = App::new(game, launch);
     if let Err(err) = event_loop.run_app(&mut app) {
         eprintln!("[Engine] The event loop failed: {err}");
@@ -116,6 +118,18 @@ where
         }
         frontend.on_window_event(shell, &event);
         super::handle_window_event(&event, event_loop, shell, &mut self.game, frontend);
+        if !matches!(event, WindowEvent::RedrawRequested) {
+            shell.pacer.activity();
+            // Directly as well: macOS runs no `about_to_wait` during a live resize.
+            shell.window.request_redraw();
+        }
+    }
+
+    /// A [`crate::core::wake`] ring: another thread left work for a frame.
+    fn user_event(&mut self, _: &ActiveEventLoop, _: ()) {
+        if let Some((shell, _)) = self.running.as_mut() {
+            shell.pacer.activity();
+        }
     }
 
     fn device_event(&mut self, _: &ActiveEventLoop, _: DeviceId, event: DeviceEvent) {
@@ -133,9 +147,10 @@ where
         }
     }
 
-    fn about_to_wait(&mut self, _: &ActiveEventLoop) {
-        if let Some((shell, _)) = self.running.as_ref() {
-            shell.window.request_redraw();
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        if let Some((shell, frontend)) = self.running.as_ref() {
+            let pace = frontend.pace(&self.game);
+            pace::schedule(&shell.pacer, pace, &shell.window, event_loop);
         }
     }
 

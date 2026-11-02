@@ -195,6 +195,7 @@ impl Shell {
             window,
             renderer,
             clock: FrameClock::new(Instant::now()),
+            pacer: Default::default(),
             keymap: load_keymap(game),
             applied_video: VideoSettings::default(),
             cursor: super::input::CursorPolicy::default(),

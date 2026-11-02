@@ -16,6 +16,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
 use super::event_loop::App;
+use super::pace::{self, Pace, Pacer};
 use super::{boot, frame, Frontend, Launch, Shell};
 use crate::app::GameWorld;
 use crate::render::Renderer;
@@ -35,6 +36,11 @@ pub trait Prelude {
         renderer: &Renderer,
         target: &wgpu::TextureView,
     ) -> Option<Self::Output>;
+
+    /// How it wants its frames (#1721). Default: as fast as the loop goes.
+    fn pace(&self) -> Pace {
+        Pace::Continuous
+    }
 }
 
 /// Run a prelude on a window titled `title` (named `app_id`, as
@@ -57,6 +63,7 @@ pub fn run_after<P, K, B, F, M>(
 {
     let event_loop = EventLoop::new().expect("the OS refused an event loop");
     event_loop.set_control_flow(ControlFlow::Poll);
+    pace::install_wake(&event_loop);
     let mut app = Staged {
         stage: Stage::Waiting {
             title: title.to_string(),
@@ -96,6 +103,7 @@ struct Open<P, B> {
     renderer: Renderer,
     prelude: P,
     boot: B,
+    pacer: Pacer,
 }
 
 struct Staged<P, K, B, F, M> {
@@ -119,14 +127,17 @@ where
             window,
             renderer,
             prelude,
+            pacer,
             ..
         } = &mut **open;
         let Some(surface) = frame::acquire_frame(renderer) else {
+            pacer.skipped(std::time::Instant::now());
             return;
         };
         let target = surface.texture.create_view(&Default::default());
         let output = prelude.draw(window, renderer, &target);
         renderer.queue.present(surface);
+        pacer.drew();
         let Some(output) = output else {
             return;
         };
@@ -138,6 +149,7 @@ where
             renderer,
             prelude,
             boot,
+            ..
         } = *open;
         drop(prelude);
         let (game, launch) = boot(output);
@@ -173,6 +185,7 @@ where
                     renderer,
                     prelude,
                     boot,
+                    pacer: Pacer::default(),
                 }));
             }
             Stage::Running(mut app) => {
@@ -184,20 +197,25 @@ where
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
-        let (window, renderer, prelude) = match &mut self.stage {
+        let (window, renderer, prelude, pacer) = match &mut self.stage {
             Stage::Running(app) => return app.window_event(event_loop, id, event),
             Stage::Prelude(open) if id == open.window.id() => {
                 let Open {
                     window,
                     renderer,
                     prelude,
+                    pacer,
                     ..
                 } = &mut **open;
-                (window, renderer, prelude)
+                (window, renderer, prelude, pacer)
             }
             _ => return,
         };
         prelude.on_window_event(window, &event);
+        if !matches!(event, WindowEvent::RedrawRequested) {
+            pacer.activity();
+            window.request_redraw();
+        }
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => renderer.resize(boot::pixel_size(size)),
@@ -205,6 +223,14 @@ where
                 renderer.resize(boot::pixel_size(window.inner_size()))
             }
             WindowEvent::RedrawRequested => self.prelude_frame(),
+            _ => {}
+        }
+    }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: ()) {
+        match &mut self.stage {
+            Stage::Running(app) => app.user_event(event_loop, event),
+            Stage::Prelude(open) => open.pacer.activity(),
             _ => {}
         }
     }
@@ -218,7 +244,10 @@ where
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         match &mut self.stage {
             Stage::Running(app) => app.about_to_wait(event_loop),
-            Stage::Prelude(open) => open.window.request_redraw(),
+            Stage::Prelude(open) => {
+                let pace = open.prelude.pace();
+                pace::schedule(&open.pacer, pace, &open.window, event_loop);
+            }
             _ => {}
         }
     }

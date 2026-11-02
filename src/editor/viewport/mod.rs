@@ -209,6 +209,9 @@ fn navigate(
     scene: &crate::scene::Scene,
 ) {
     let nav = scene_nav::read(response, response.is_pointer_button_down_on());
+    if nav.keeps_moving() {
+        response.ctx.request_repaint();
+    }
     if nav.gesture.is_some() {
         // The Scene view takes the keyboard, so WASD never types into a field.
         response.request_focus();

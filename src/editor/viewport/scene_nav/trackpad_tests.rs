@@ -80,3 +80,15 @@ fn arrow_keys_turn_at_a_fixed_rate_and_swiping_while_looking_sets_fly_speed() {
     assert!(cam.fly_speed > start.fly_speed);
     assert_eq!((cam.yaw, cam.pitch), (start.yaw, start.pitch));
 }
+
+#[test]
+fn a_held_gesture_or_arrow_asks_for_the_next_frame_and_a_still_one_does_not() {
+    let frame = |gesture, turn| NavFrame {
+        gesture,
+        turn,
+        ..Default::default()
+    };
+    assert!(frame(Some(Gesture::Look), Vec2::ZERO).keeps_moving());
+    assert!(frame(None, Vec2::X).keeps_moving());
+    assert!(!frame(None, Vec2::ZERO).keeps_moving());
+}
