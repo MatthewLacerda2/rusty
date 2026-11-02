@@ -118,10 +118,8 @@ fn centre_covered_texels_keep_their_centre_and_the_edge_ring_sits_on_the_edge() 
 /// `a` with `b`'s one triangle after its own.
 fn join(mut a: BakeMesh, b: BakeMesh) -> BakeMesh {
     a.positions.extend(b.positions);
-    (
-        a.normals.extend(b.normals),
-        a.lightmap_uvs.extend(b.lightmap_uvs),
-    );
+    a.normals.extend(b.normals);
+    a.lightmap_uvs.extend(b.lightmap_uvs);
     a.indices.extend([3, 5, 4]);
     a
 }
