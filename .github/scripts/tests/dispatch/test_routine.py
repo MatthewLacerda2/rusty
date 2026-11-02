@@ -47,6 +47,9 @@ class Environment(unittest.TestCase):
         ]
         self.assertEqual(routine.environment(routines), "env_new")
 
+    def test_a_sibling_projects_routines_answer_when_they_fill_the_list(self):
+        self.assertEqual(routine.environment([made("scorsese #9 x", "env_shared", "2026-10-29T00:00:00Z")]), "env_shared")
+
     def test_none_without_a_coder_routine(self):
         self.assertIsNone(routine.environment([made("weekly report", "env_other", "2026-10-29T00:00:00Z")]))
         self.assertIsNone(routine.environment([]))

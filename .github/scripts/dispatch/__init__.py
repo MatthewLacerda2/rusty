@@ -8,8 +8,9 @@ mechanical, so they live here, one responsibility per module:
 - [`brief`]: the newest `Brief` comment on an issue;
 - [`routine`]: the one-off routine that starts a cloud coder on that brief;
 - [`remote`]: the claude.ai routines API, reached through `claude mcp serve`;
-- [`review_level`]: `high` or `medium` for a pull request, from its paths.
+- [`review_level`]: `high` or `medium` for a pull request, from its paths;
+- [`rebriefs`]: how many briefs issues take, and why each re-brief happened (#1724).
 
-`coder.py` (`make coder ISSUE=N`) and `review-level.py` (`make review-level
-PR=N`) are only the command lines.
+`coder.py` (`make coder ISSUE=N`), `review-level.py` (`make review-level
+PR=N`) and `rebriefs.py` (`make rebriefs`) are only the command lines.
 """

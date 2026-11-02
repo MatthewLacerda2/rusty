@@ -31,7 +31,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop blockers checks conflicts reclaim coder review-level mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -290,6 +290,12 @@ coder: ## Start the cloud coder on an issue's newest Brief. make coder ISSUE=156
 review-level: ## The independent review's level (high or medium) and why. make review-level PR=1570
 	@test -n "$(PR)" || { echo "review-level: which pull request? e.g. make review-level PR=1570" >&2; exit 1; }
 	@python3 .github/scripts/review-level.py $(PR)
+
+# Over half of a batch's launches were re-briefs, with no record of why (#1724).
+# Counts the `Brief` comments: briefs per issue, issues done in one, and
+# re-briefs by their `Round:` line. A report, never a gate: exits 0.
+rebriefs: ## Briefs per issue and re-briefs by Round. ARGS="--since 2026-10-29" sets the window
+	@python3 .github/scripts/rebriefs.py $(ARGS)
 
 # ---- signals (#750)---------------------------------------------------------
 
