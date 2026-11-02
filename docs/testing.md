@@ -547,7 +547,8 @@ platforms and adapters, so a golden would break on every one but the machine tha
 Pixel asserts read numbers off a frame and throw the frame away: a black frame or a
 flare mirrored the wrong way can pass all of them. So a branch that changes what is
 drawn (the renderer, `engine/shaders/`, materials, post effects, lighting, UI, editor
-panels) is also **looked at**: its coder renders a primitive scene before (on `main`)
+panels; lighting includes what a bake writes, since lit surfaces show its texels) is
+also **looked at**: its coder renders a primitive scene before (on `main`)
 and after (on the branch), the feature off and on and at the extremes of the knobs the
 issue is about, opens every image (an agent's `Read` shows a PNG), and fixes what is
 plainly wrong. The PR carries a **`Looked at`** line saying what scene, what was
@@ -808,7 +809,7 @@ request** (#750). Two ways in:
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
 | **On request** (`mutants-on-request.yml`) | `make mutants-remote SCOPE=...`, or a dispatch with a `scope` input | `diff` (the branch against `origin/main`) or path globs, turned into one `--in-diff` by `.github/scripts/mutants-scope.py`; one runner, a 2 h 45 budget; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one, edited in place by later runs (#912) |
-| **Full sweep** (`mutants-sweep.yml`, sharded) | weekly `schedule` (Saturdays) + `workflow_dispatch` (`force` re-sweeps a covered commit); `main` only, a dispatch on any other ref is refused red (#972); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506); one sweep at a time (#705) | the full `--file` sim scope over a 24-shard matrix (`--shard k/24`), each shard stopping itself at a 5 h 40 budget under GitHub's 6 h limit (#749) | `mutants-report` job: merged job summary (totals, unfinished shards, survivors) and the merged `mutants-report` artifact |
+| **Full sweep** (`mutants-sweep.yml`, sharded) | weekly `schedule` (Saturdays) + `workflow_dispatch` (`force` re-sweeps a covered commit); `main` only, a dispatch on any other ref is refused red (#972); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506); one sweep at a time (#705) | the full `--file` sim scope over a matrix `mutants-plan` sizes each run from the mutant count (`cargo mutants --list`, `.github/scripts/mutants-shards.py`: ≈ 4 h a shard at a measured `MINUTES_PER_MUTANT`, red past GitHub's 256-job ceiling, #1684), each shard stopping itself at a 5 h 40 budget under GitHub's 6 h limit (#749) | `mutants-report` job: merged job summary (totals, measured of planned, the run's measured minutes a mutant against the sizing figure, unfinished shards, survivors) and the merged `mutants-report` artifact |
 
 Why this shape: mutation is a signal, and a per-PR job held runners the merge
 queue was waiting on for a report that could not change whether anything merged.
