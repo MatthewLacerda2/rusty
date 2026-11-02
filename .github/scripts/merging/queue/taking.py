@@ -7,6 +7,7 @@ import functools
 import subprocess
 import time
 
+from merging.queue.conflict import record
 from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, refusal, stamping, update, waiting
 from merging.verdict import carried, closing, decide, github, protocol
 from merging.watch import handbacks
@@ -15,9 +16,11 @@ from merging.watch import handbacks
 def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, str]:
     """The dry run's report: what would happen, and the verdict on today's head."""
     number, head = pull["number"], pull["headRefOid"]
-    if notes:
+    if notes and not update.push_needed(head, fresh):
         # Dependabot's branch, behind `main` ([`dependabot.bot_head`]), or a head `main`
         # passed only by Markdown ([`update.advance`]): the note says what happens.
+        # A sorted-list resolution's note ([`update.resolved_merge`]) moves the head,
+        # so it is said beside the push below, never in place of it.
         moved, notes = notes[0].rstrip("."), notes[1:]
     elif update.push_needed(head, fresh):
         moved = f"would push {fresh[:7]} once it passes the local checks, then wait for CI on it"
@@ -73,7 +76,9 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         check = None
         if checks.needs_check(pull, opts):
             check = functools.partial(checks.verify, target=checks.target_dir(opts))
-        fresh, notes = update.advance(branch, head, opts.root, push=not opts.dry_run, check=check)
+        # A dry run's conflicts are previews, not conflicts the queue met: unrecorded.
+        log = None if opts.dry_run else functools.partial(record.note, record.path(opts.root), number, head)
+        fresh, notes = update.advance(branch, head, opts.root, push=not opts.dry_run, check=check, log=log)
     if fresh is None:
         # Moved since the take began: the watch takes its new head afresh
         # (#1568); named pull requests are never retaken, so there it is not merged.
@@ -86,7 +91,7 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         return dry(repo, pull, fresh, notes)
 
     if update.push_needed(head, fresh):
-        outcomes.say(f"#{number}: now at {fresh[:7]}; waiting for CI.")
+        outcomes.say(f"#{number}: now at {fresh[:7]}; waiting for CI.", *notes)
         stamping.stamp(repo, pull, fresh, opts.root)
     else:
         outcomes.say(f"#{number}: {notes[0] if notes else 'already on `main`; the run on record is a run on it.'}")

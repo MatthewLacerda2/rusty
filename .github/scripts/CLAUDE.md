@@ -1,7 +1,7 @@
 # CLAUDE.md — the merge and batch tooling
 
 This file loads when you work under `.github/scripts/`: the Python behind `make queue`,
-`make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make board`,
+`make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make conflicts`, `make board`,
 `make coder`, `make review-level`, `make rebriefs` and `make mutants-remote`, and the CI helpers
 beside them. The root `CLAUDE.md` keeps the
 project-wide rules (merging is serialized, gates vs. signals, issues and labels); the
@@ -15,7 +15,8 @@ coder *changing* it must know.
 - **`.github/scripts/merging/` is the merge path, one responsibility per module** (#926).
   `merging/verdict/` answers "may this pull request merge?" (`make mergeable`, and the
   queue before every merge); `merging/queue/` merges `main` in, checks, pushes, waits
-  and lands; `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how
+  and lands, and its `conflict/` resolves a conflict inside a `sorted` list and
+  records every conflict met (#1723); `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how
   it ends). `mergeable.py` and `merge-queue.py` are only the command lines. A new
   concern is a new module, not a longer one.
 - **`.github/scripts/dispatch/` is the batch's dispatch steps** (#1569): the brief,
@@ -49,6 +50,15 @@ coder *changing* it must know.
   command appears in `ci.yml`/`lint.yml` (`test_gate_mirror.py`, #964), and every
   suite job sets `RUSTY_REQUIRE_GPU=1` with the GPU caps kept equal
   (`test_gpu_config.py`, #978). A workflow edit that breaks either fails here.
+
+## The sorted-list resolver
+- **`merging/queue/conflict/lists.py` mirrors `tools/lint/src/rules/sorted.rs`** (#1723):
+  a list's extent, its keys and its note lines, in Python, since the scripts cannot call
+  `tools/lint`. Both read `tools/lint/src/rules/sorted_keys.tsv` in their tests, so a
+  change to the rule's key updates the mirror and the table in the same pull request.
+- **The record is a count, never a stop.** `merge-queue/conflicts.jsonl` (beside the
+  hand-back memory) is appended once per `(main, head)` pair; a record that cannot be
+  written loses a line, not a merge. A dry run records nothing.
 
 ## The watch
 - **It ends itself when its own code changes on `main`** (#967,

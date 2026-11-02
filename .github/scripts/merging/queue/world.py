@@ -8,15 +8,19 @@ import time
 from pathlib import Path
 
 from merging.queue import gitio, outcomes, pulls, stopping, taking
+from merging.queue.conflict import record
 from merging.watch import ending, freshness, handbacks, mainline, order
 
 
 def merge_tree_git(root: str, *args: str) -> tuple[int, str]:
     """[`watch.order.clashing`]'s `git`: status and output, `(-1, "")` when git
-    could not run at all (a pair it cannot answer fails open)."""
+    could not run at all (a pair it cannot answer fails open) or printed what is
+    not text: a binary file both sides changed, read by [`watch.mainline.verdicts`],
+    is one that cannot be read, so it is handed back by name rather than killing
+    the watch (#1723's review). [`gitio.git`] itself still raises for other callers."""
     try:
         done = gitio.git(*args, cwd=root)
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return -1, ""
     return done.returncode, done.stdout
 
@@ -47,7 +51,9 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
             order.clashing, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS
         ),
         main_conflicts=functools.partial(
-            mainline.conflicts, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS
+            mainline.conflicts, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS,
+            # A dry run's conflicts are previews, not conflicts the queue met: unrecorded.
+            record=None if opts.dry_run else functools.partial(record.note, record.path(opts.root)),
         ),
         stop_requested=lambda: consume(Path(opts.root, common, ending.STOP_FILE)),
         stale_code=lambda: freshness.changed(code, functools.partial(merge_tree_git, opts.root)),

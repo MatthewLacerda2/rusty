@@ -26,6 +26,7 @@ def fake_git(answers):
     calls = []
 
     def git(*args):
+        args = args[2:] if args[0] == "-c" else args
         calls.append(args)
         if args[0] == "rev-parse":
             return 0, MAIN + "\n"

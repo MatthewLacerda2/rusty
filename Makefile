@@ -31,7 +31,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop blockers checks reclaim coder review-level rebriefs mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -260,6 +260,12 @@ board: ## Stray branches, stale assignments, unlabelled issues, bugs with no Kin
 checks: ## Unticked human checks from PRs merged since then. make checks SINCE=12h or SINCE=2026-10-16
 	@test -n "$(SINCE)" || { echo "checks: since when? e.g. make checks SINCE=12h or SINCE=2026-10-16T18:00Z" >&2; exit 1; }
 	@python3 .github/scripts/human-checks.py '$(SINCE)'
+
+# The record of every conflict with `main` the queue met (#1723): how many, how
+# many the sorted-list rule resolved, and what share of the files it could have.
+conflicts: ## Conflicts with main the queue met since then. make conflicts SINCE=24h or SINCE=2026-11-02
+	@test -n "$(SINCE)" || { echo "conflicts: since when? e.g. make conflicts SINCE=24h or SINCE=2026-11-02" >&2; exit 1; }
+	@python3 .github/scripts/conflicts.py '$(SINCE)'
 
 # Each worktree's target/ holds GBs, and removing it by hand per merged branch
 # gets skipped under load (#913). Removes every worktree under .claude/worktrees/

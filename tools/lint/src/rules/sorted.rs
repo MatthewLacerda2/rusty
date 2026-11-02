@@ -19,6 +19,10 @@
 //! are not entries. A marker is itself a finding when it gives no reason, does not
 //! fit on one line, or governs no entries: nothing under it, or a first entry
 //! indented deeper than the marker.
+//!
+//! The merge queue reads lists the same way to resolve a conflict inside one
+//! (`.github/scripts/merging/queue/conflict/lists.py`, #1723): `sorted_keys.tsv`
+//! holds both readings of a key to one table.
 
 use super::finding::Finding;
 use super::scan::Scan;

@@ -1,0 +1,21 @@
+# The `sorted` rule's reading of a line, shared by its tests (sorted_tests.rs) and the
+# merge queue's Python mirror (.github/scripts/merging/queue/conflict/lists.py, #1723).
+# One row per line: the line, a tab, then its key, <note> or <none>. Lines starting
+# with "# " are comments. A change to the rule's key changes both readers and this table.
+mod a;	a;
+pub(crate) mod b;	b;
+pub use crate::render::Frame;	render::Frame;
+pub fn update(x: u8)	update(x: u8)
+mod self_path;	self_path;
+- [`self-path`](self-path.md)	self-path`](self-path.md)
+- [`Audio`](Audio.md)	Audio`](Audio.md)
+    "bevy",	bevy",
+| `Time` | the clock |	Time` | the clock |
+Ünïcode entry	Ünïcode entry
+// a note	<note>
+    // an indented note	<note>
+#[cfg(test)]	<note>
+<!-- a note -->	<note>
+---	<none>
+pub fn	<none>
+"",	<none>

@@ -124,3 +124,22 @@ fn reads_a_hyphenated_keyword_word_as_a_name() {
     let bad = "<!-- sorted: rules -->\n- **`self-path`**\n- **`sanitize`**\n";
     assert_eq!(lines(&check("docs/x.md", bad)), [(3, RULE)]);
 }
+
+/// The table the merge queue's Python mirror of [`super::key`] reads too (#1723):
+/// a change to the key that leaves the table behind fails here, one that leaves
+/// the mirror behind fails in `make scripts`.
+#[test]
+fn reads_the_shared_key_table_as_the_queue_does() {
+    let table = include_str!("sorted_keys.tsv");
+    let rows = table
+        .lines()
+        .filter(|l| !l.starts_with("# ") && !l.is_empty());
+    for row in rows {
+        let (line, want) = row.split_once('\t').expect("a row is `line<TAB>key`");
+        let got = match super::is_note(line) {
+            true => "<note>".to_string(),
+            false => super::key(line).unwrap_or_else(|| "<none>".into()),
+        };
+        assert_eq!(got, want, "{line:?}");
+    }
+}
