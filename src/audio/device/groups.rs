@@ -15,6 +15,7 @@ use kira::effect::filter::{FilterBuilder, FilterHandle, FilterMode};
 use kira::track::{TrackBuilder, TrackHandle};
 use kira::{AudioManager, Decibels, Mix, Tween};
 
+use super::gate::{Gated, Wake};
 use super::reverb::ReverbBus;
 use crate::components::ReverbParams;
 
@@ -38,6 +39,7 @@ struct GroupTrack {
     pub track: TrackHandle,
     low_pass: FilterHandle,
     high_pass: FilterHandle,
+    wake: Wake,
 }
 
 /// Every group's track plus the reverb bus they send to.
@@ -73,8 +75,10 @@ impl GroupTracks {
         let mut builder = TrackBuilder::new()
             .sound_capacity(VOICES_PER_GROUP)
             .with_send(self.reverb.id(), Decibels::SILENCE);
-        let low_pass = builder.add_effect(filter(FilterMode::LowPass, Filter::LOW_PASS_OPEN));
-        let high_pass = builder.add_effect(filter(FilterMode::HighPass, Filter::HIGH_PASS_OPEN));
+        let wake = Wake::default();
+        let gated = |mode, f| Gated(filter(mode, f), wake.clone());
+        let low_pass = builder.add_effect(gated(FilterMode::LowPass, Filter::LOW_PASS_OPEN));
+        let high_pass = builder.add_effect(gated(FilterMode::HighPass, Filter::HIGH_PASS_OPEN));
         let track = match parent {
             None => manager.add_sub_track(builder).ok(),
             Some(p) => self
@@ -90,6 +94,7 @@ impl GroupTracks {
             track,
             low_pass,
             high_pass,
+            wake,
         };
         self.tracks.insert(id, group);
     }
@@ -116,6 +121,7 @@ impl GroupTracks {
             mix.high_pass,
             mix.high_pass.cutoff <= HIGH_PASS_OFF,
         );
+        group.wake.ring();
     }
 
     /// Group `id`'s track, if it was built.

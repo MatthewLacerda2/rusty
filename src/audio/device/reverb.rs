@@ -19,6 +19,7 @@ use kira::info::Info;
 use kira::track::{SendTrackBuilder, SendTrackHandle, SendTrackId};
 use kira::{AudioManager, Frame, Mix, Tween};
 
+use super::gate::{is_silent, Gated, Wake};
 use super::groups::decibels;
 use crate::components::audio::reverb_zone::MAX_PRE_DELAY;
 use crate::components::ReverbParams;
@@ -44,6 +45,7 @@ pub struct ReverbBus {
     track: SendTrackHandle,
     reverb: ReverbHandle,
     pre_delay: Arc<AtomicU32>,
+    wake: Wake,
 }
 
 impl ReverbBus {
@@ -52,16 +54,19 @@ impl ReverbBus {
         let pre_delay = Arc::new(AtomicU32::new(params.pre_delay.to_bits()));
         let mut builder = SendTrackBuilder::new().volume(decibels(params.wet));
         builder.add_effect(PreDelay::new(Arc::clone(&pre_delay)));
-        let reverb = builder.add_effect(
+        let wake = Wake::default();
+        let reverb = builder.add_effect(Gated(
             ReverbBuilder::new()
                 .feedback(f64::from(feedback(params.decay_time)))
                 .damping(f64::from(params.damping))
                 .mix(Mix::WET),
-        );
+            wake.clone(),
+        ));
         Some(Self {
             track: manager.add_send_track(builder).ok()?,
             reverb,
             pre_delay,
+            wake,
         })
     }
 
@@ -80,6 +85,7 @@ impl ReverbBus {
         let feedback = f64::from(feedback(params.decay_time));
         self.reverb.set_feedback(feedback, tween);
         self.reverb.set_damping(f64::from(params.damping), tween);
+        self.wake.ring();
         self.pre_delay
             .store(params.pre_delay.to_bits(), Ordering::Relaxed);
     }
@@ -88,6 +94,9 @@ impl ReverbBus {
 /// A delay line whose time follows an atomic (seconds, as `f32` bits). The read
 /// point glides toward a new time at half a sample per sample, so a retune bends
 /// the pitch of the tail's input for a moment instead of clicking.
+///
+/// It isn't [`Gated`]: asleep, a retune would wait, and the next sound would be the one
+/// bent. With only silence in the line nothing can click, so it jumps to the new time.
 struct PreDelay {
     target: Arc<AtomicU32>,
     buffer: Vec<Frame>,
@@ -95,6 +104,8 @@ struct PreDelay {
     /// The current delay, in samples.
     delay: f32,
     sample_rate: f32,
+    /// How many silent samples in a row went into the line.
+    quiet: usize,
 }
 
 impl PreDelay {
@@ -105,6 +116,7 @@ impl PreDelay {
             write: 0,
             delay: 0.0,
             sample_rate: 0.0,
+            quiet: 0,
         }
     }
 
@@ -132,6 +144,7 @@ impl Effect for PreDelay {
         self.buffer = vec![Frame::ZERO; len];
         self.write = 0;
         self.delay = self.target_samples();
+        self.quiet = 0;
     }
 
     fn on_change_sample_rate(&mut self, sample_rate: u32) {
@@ -140,6 +153,14 @@ impl Effect for PreDelay {
 
     fn process(&mut self, input: &mut [Frame], _dt: f64, _info: &Info) {
         let target = self.target_samples();
+        let silent = is_silent(input);
+        if self.quiet >= self.buffer.len() {
+            self.delay = target;
+            if silent {
+                return;
+            }
+        }
+        self.quiet = if silent { self.quiet + input.len() } else { 0 };
         for frame in input {
             self.buffer[self.write] = *frame;
             self.delay += (target - self.delay).clamp(-0.5, 0.5);
