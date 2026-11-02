@@ -1,8 +1,10 @@
 //! From lightmap texels to surface points (#438): each receiving mesh's triangles are
-//! rasterized in lightmap-UV space, and every texel whose centre a triangle covers
-//! becomes a world-space point and normal to trace from. Texels no triangle covers
-//! stay empty; dilation fills the ones bordering a chart so filtering never reads
-//! black at a seam.
+//! rasterized in lightmap-UV space, and every texel a triangle covers becomes a
+//! world-space point and normal to trace from: at the texel's centre when the
+//! triangle covers it, else at the triangle's point nearest it, so even a chart
+//! thinner than a texel owns texels (#1687). Texels no triangle touches stay empty;
+//! dilation fills the ones bordering a chart so filtering never reads black at a
+//! seam.
 
 use glam::{Vec2, Vec3};
 
@@ -46,59 +48,153 @@ pub(super) fn world_per_uv(mesh: &BakeMesh) -> Option<f32> {
     (uv >= 1e-8 && world > 0.0).then(|| (world / uv).sqrt())
 }
 
-/// Every texel of a `size`² lightmap a triangle of `mesh` covers. A texel two
-/// triangles share goes to the first.
+/// One triangle of a mesh in lightmap texel space: its vertex indices, its UVs
+/// scaled to texels, and their signed doubled area.
+struct UvTri {
+    idx: [usize; 3],
+    uv: [Vec2; 3],
+    area: f32,
+}
+
+/// Every texel of a `size`² lightmap a triangle of `mesh` covers, in two passes.
+/// First every texel whose centre a triangle covers, traced at that centre. Then,
+/// conservatively (#1687), every texel still empty that a triangle overlaps, traced
+/// at the triangle's point nearest the texel centre: so a triangle narrower than a
+/// texel, and a chart made only of such triangles, still owns texels, each traced
+/// from its own surface. In either pass a texel two triangles share goes to the
+/// first in index order, and the first pass never yields to the second, so a
+/// centre-covered texel bakes exactly as it would without the second pass.
 pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
+    let tris = uv_triangles(mesh, size as f32);
     let mut taken = vec![false; (size * size) as usize];
     let mut out = Vec::new();
-    let scale = size as f32;
-    for t in mesh.indices.chunks_exact(3) {
-        let idx = [t[0], t[1], t[2]].map(|i| i as usize);
-        let uv = idx.map(|i| mesh.lightmap_uvs[i] * scale);
-        let area = (uv[1] - uv[0]).perp_dot(uv[2] - uv[0]);
-        if area.abs() < 1e-12 {
-            continue;
-        }
-        let lo = uv[0].min(uv[1]).min(uv[2]).floor().max(Vec2::ZERO);
-        let hi = uv[0].max(uv[1]).max(uv[2]).ceil().min(Vec2::splat(scale));
-        for y in lo.y as u32..hi.y as u32 {
-            for x in lo.x as u32..hi.x as u32 {
+    for conservative in [false, true] {
+        for t in &tris {
+            for (x, y) in texels_under(t, size) {
                 let index = (y * size + x) as usize;
                 if taken[index] {
                     continue;
                 }
                 let centre = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
-                let Some(w) = barycentric(uv, area, centre) else {
-                    continue;
+                let w = match conservative {
+                    false => barycentric(t.uv, t.area, centre),
+                    true => overlaps(t.uv, centre).then(|| nearest_weights(t, centre)),
                 };
+                let Some(w) = w else { continue };
                 taken[index] = true;
-                let position = w.x * mesh.positions[idx[0]]
-                    + w.y * mesh.positions[idx[1]]
-                    + w.z * mesh.positions[idx[2]];
-                let normal = (w.x * mesh.normals[idx[0]]
-                    + w.y * mesh.normals[idx[1]]
-                    + w.z * mesh.normals[idx[2]])
-                    .try_normalize()
-                    .unwrap_or(Vec3::Y);
-                out.push(TexelPoint {
-                    index,
-                    position,
-                    normal,
-                });
+                out.push(point(mesh, t, index, w));
             }
         }
     }
     out
 }
 
+/// `mesh`'s triangles in texel space, those without UV area (or with a non-finite
+/// UV) left out.
+fn uv_triangles(mesh: &BakeMesh, scale: f32) -> Vec<UvTri> {
+    mesh.indices
+        .chunks_exact(3)
+        .filter_map(|t| {
+            let idx = [t[0], t[1], t[2]].map(|i| i as usize);
+            let uv = idx.map(|i| mesh.lightmap_uvs[i] * scale);
+            let area = (uv[1] - uv[0]).perp_dot(uv[2] - uv[0]);
+            (area.is_finite() && area.abs() >= 1e-12).then_some(UvTri { idx, uv, area })
+        })
+        .collect()
+}
+
+/// The texels of a `size`² image that `t`'s bounding box overlaps, row by row.
+fn texels_under(t: &UvTri, size: u32) -> impl Iterator<Item = (u32, u32)> {
+    let scale = Vec2::splat(size as f32);
+    let lo = t.uv[0].min(t.uv[1]).min(t.uv[2]).floor().max(Vec2::ZERO);
+    let hi = t.uv[0].max(t.uv[1]).max(t.uv[2]).ceil().min(scale);
+    let (x0, x1) = (lo.x as u32, hi.x as u32);
+    (lo.y as u32..hi.y as u32).flat_map(move |y| (x0..x1).map(move |x| (x, y)))
+}
+
+/// The surface point of triangle `t` at barycentric weights `w`, for texel `index`.
+fn point(mesh: &BakeMesh, t: &UvTri, index: usize, w: Vec3) -> TexelPoint {
+    let [a, b, c] = t.idx;
+    let position = w.x * mesh.positions[a] + w.y * mesh.positions[b] + w.z * mesh.positions[c];
+    let normal = (w.x * mesh.normals[a] + w.y * mesh.normals[b] + w.z * mesh.normals[c])
+        .try_normalize()
+        .unwrap_or(Vec3::Y);
+    TexelPoint {
+        index,
+        position,
+        normal,
+    }
+}
+
 /// The barycentric weights of `p` in triangle `uv` (signed doubled area `area`), or
 /// `None` when it lies outside.
 fn barycentric(uv: [Vec2; 3], area: f32, p: Vec2) -> Option<Vec3> {
+    let w = weights(uv, area, p);
+    const EPS: f32 = -1e-5;
+    (w.x >= EPS && w.y >= EPS && w.z >= EPS).then_some(w)
+}
+
+/// The barycentric weights of `p` in triangle `uv`, inside or not.
+fn weights(uv: [Vec2; 3], area: f32, p: Vec2) -> Vec3 {
     let w0 = (uv[1] - p).perp_dot(uv[2] - p) / area;
     let w1 = (uv[2] - p).perp_dot(uv[0] - p) / area;
-    let w2 = 1.0 - w0 - w1;
-    const EPS: f32 = -1e-5;
-    (w0 >= EPS && w1 >= EPS && w2 >= EPS).then_some(Vec3::new(w0, w1, w2))
+    Vec3::new(w0, w1, 1.0 - w0 - w1)
+}
+
+/// Whether triangle `uv` overlaps the unit texel square centred on `centre` with
+/// some area (touching an edge or corner is not overlapping): the separating-axis
+/// test on the square's two axes and the triangle's three edge normals.
+fn overlaps(uv: [Vec2; 3], centre: Vec2) -> bool {
+    let axes = [
+        Vec2::X,
+        Vec2::Y,
+        uv[1] - uv[0],
+        uv[2] - uv[1],
+        uv[0] - uv[2],
+    ];
+    axes.iter().enumerate().all(|(k, &axis)| {
+        let n = if k < 2 { axis } else { axis.perp() };
+        let (lo, hi) = uv
+            .iter()
+            .map(|p| n.dot(*p - centre))
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), d| {
+                (lo.min(d), hi.max(d))
+            });
+        let reach = 0.5 * (n.x.abs() + n.y.abs());
+        lo < reach && hi > -reach
+    })
+}
+
+/// The barycentric weights of the point of triangle `t` nearest `p`, clamped onto
+/// the triangle so its surface point is never extrapolated off it.
+fn nearest_weights(t: &UvTri, p: Vec2) -> Vec3 {
+    if let Some(w) = barycentric(t.uv, t.area, p) {
+        return clamped(w);
+    }
+    let edges = [(0, 1), (1, 2), (2, 0)];
+    let nearest = edges
+        .map(|(i, j)| {
+            let (a, b) = (t.uv[i], t.uv[j]);
+            let ab = b - a;
+            let s = ((p - a).dot(ab) / ab.length_squared().max(1e-20)).clamp(0.0, 1.0);
+            a + ab * s
+        })
+        .into_iter()
+        .min_by(|a, b| a.distance_squared(p).total_cmp(&b.distance_squared(p)))
+        .unwrap_or(t.uv[0]);
+    clamped(weights(t.uv, t.area, nearest))
+}
+
+/// `w` with float error off the triangle removed: no weight below zero, and they
+/// sum to one.
+fn clamped(w: Vec3) -> Vec3 {
+    let w = w.max(Vec3::ZERO);
+    let sum = w.x + w.y + w.z;
+    if sum > 0.0 {
+        w / sum
+    } else {
+        Vec3::splat(1.0 / 3.0)
+    }
 }
 
 /// Fill each empty texel bordering filled ones with their average, `passes` rings

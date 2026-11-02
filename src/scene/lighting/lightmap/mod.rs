@@ -59,6 +59,8 @@ mod atlas_tests;
 #[cfg(test)]
 mod casting_tests;
 #[cfg(test)]
+mod coverage_tests;
+#[cfg(test)]
 mod direction_tests;
 #[cfg(test)]
 mod gather_tests;
