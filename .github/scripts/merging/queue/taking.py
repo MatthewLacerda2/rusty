@@ -16,9 +16,11 @@ from merging.watch import handbacks
 def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, str]:
     """The dry run's report: what would happen, and the verdict on today's head."""
     number, head = pull["number"], pull["headRefOid"]
-    if notes:
+    if notes and not update.push_needed(head, fresh):
         # Dependabot's branch, behind `main` ([`dependabot.bot_head`]), or a head `main`
         # passed only by Markdown ([`update.advance`]): the note says what happens.
+        # A sorted-list resolution's note ([`update.resolved_merge`]) moves the head,
+        # so it is said beside the push below, never in place of it.
         moved, notes = notes[0].rstrip("."), notes[1:]
     elif update.push_needed(head, fresh):
         moved = f"would push {fresh[:7]} once it passes the local checks, then wait for CI on it"

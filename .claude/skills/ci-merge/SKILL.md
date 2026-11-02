@@ -124,8 +124,9 @@ or seen three others taken ahead of it, goes first whatever it conflicts with
 (`watch: #N has waited …`). **A ready pull request that already conflicts with
 `main`** (`git merge-tree` against `origin/main`) is handed back at once, naming
 the files, instead of waiting its turn to find out, unless every conflicted file
-is one the take resolves by itself (a `sorted` list both sides only added to,
-next paragraph but one). The board lines keep coming
+is one the take resolves by itself (a `sorted` list both sides only added to;
+see **`make queue` resolves one kind by itself**, under
+*Updating a branch from `main`, and its conflicts*). The board lines keep coming
 during a take's CI wait, one listing per poll, and `--since <ISO time>` limits
 them to pull requests opened since then: the batch's own. `make queue PRS="a b c"` takes named
 pull requests instead, in the order given. Either way, the loop is one pull
@@ -363,9 +364,12 @@ entries do meet, keep both, in order.
 **`make queue` resolves one kind by itself** (#1723): when every conflicted hunk
 of every conflicted file lies inside a list under a `sorted` marker and both
 sides only added entries (no entry edited or removed, no comment or attribute
-line in the hunk, no key added twice with different text), it keeps both
-sides' entries in key order, commits the merge and pushes it like a clean one,
-then CI and the `sorted` gate judge it. The marker is the author saying in
+line in the hunk or directly above it, no key added twice with different text),
+it keeps both sides' entries in key order, commits the merge and pushes it like
+a clean one, then CI judges it. Both sides' lists being sorted makes the union
+sorted; the `sorted` gate checks it where it runs (`lint.yml` skips it on a
+Markdown-only pull request, and a marked file outside the rule's scan is
+resolved too). The marker is the author saying in
 writing that order is free there. One conflicted file outside the rule hands
 the whole merge back, so a branch is never half-resolved by machine.
 `Cargo.lock` never qualifies (below), and `app/registry.rs` carries no marker,
@@ -374,7 +378,8 @@ so it never does either. Everything else is handed back rather than resolved.
 **Every conflict the queue meets is recorded** (#1723), once per `(main, head)`
 pair, in `merge-queue/conflicts.jsonl` under the common git directory: the
 pull request, its conflicted files, whether the rule could resolve each, and
-whether it was resolved or handed back. The watch prints the totals for its own
+whether it was resolved or handed back, written once that is known (after the
+check and the push, not before). The watch prints the totals for its own
 run in its closing summary; `make conflicts SINCE=24h` prints them on demand.
 Read them before building any more conflict automation: they say how much
 conflict work a batch carries and how much of it this rule takes.

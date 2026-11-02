@@ -14,10 +14,13 @@ from merging.watch import ending, freshness, handbacks, mainline, order
 
 def merge_tree_git(root: str, *args: str) -> tuple[int, str]:
     """[`watch.order.clashing`]'s `git`: status and output, `(-1, "")` when git
-    could not run at all (a pair it cannot answer fails open)."""
+    could not run at all (a pair it cannot answer fails open) or printed what is
+    not text: a binary file both sides changed, read by [`watch.mainline.verdicts`],
+    is one that cannot be read, so it is handed back by name rather than killing
+    the watch (#1723's review). [`gitio.git`] itself still raises for other callers."""
     try:
         done = gitio.git(*args, cwd=root)
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return -1, ""
     return done.returncode, done.stdout
 

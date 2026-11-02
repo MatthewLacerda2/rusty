@@ -41,8 +41,8 @@ def path(root: str) -> Path:
 def read(path: Path) -> list[dict]:
     """The recorded conflicts; a missing file is none, an unreadable line is skipped."""
     try:
-        text = path.read_text()
-    except OSError:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
         return []
     found = []
     for line in text.splitlines():

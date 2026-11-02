@@ -27,6 +27,11 @@ class Record(unittest.TestCase):
         self.assertTrue(record.note(self.file, 1, "h", "m2", {"a.rs": False}, record.HANDED_BACK, NOW))
         self.assertEqual([e["main"] for e in record.read(self.file)], ["m", "m2"])
 
+    def test_a_record_that_is_not_text_reads_as_none(self):
+        self.file.parent.mkdir(parents=True)
+        self.file.write_bytes(b"\xff\xfe not utf-8\n")
+        self.assertEqual(record.read(self.file), [])
+
     def test_an_unwritable_record_is_no_line_never_a_stop(self):
         self.file.parent.parent.joinpath("merge-queue").write_text("a file where the folder goes")
         self.assertFalse(record.note(self.file, 1, "h", "m", {}, record.RESOLVED, NOW))

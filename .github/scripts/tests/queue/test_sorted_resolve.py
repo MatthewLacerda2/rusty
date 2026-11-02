@@ -58,6 +58,13 @@ class HandsBack(unittest.TestCase):
         self.assertIsNone(resolve.resolved(conflict("#[cfg(test)]\nmod c;\n", "", "mod b;\n")))
         self.assertIsNone(resolve.resolved(conflict("// c\nmod c;\n", "", "mod b;\n")))
 
+    def test_a_comment_or_attribute_line_directly_above_the_hunk(self):
+        # `#[cfg(test)]` would land on whichever entry sorts first, not on `mod p;`.
+        self.assertIsNone(resolve.resolved(conflict("mod p;\n", "", "mod b;\n", above="// sorted: x\nmod a;\n#[cfg(test)]\n")))
+        self.assertIsNone(resolve.resolved(conflict("mod p;\n", "", "mod b;\n", above="// sorted: x\nmod a;\n// p\n")))
+        # The list's own marker directly above is no annotation.
+        self.assertIsNotNone(resolve.resolved(conflict("mod c;\n", "", "mod b;\n", above="// sorted: x\n")))
+
     def test_a_hunk_with_no_base_section_or_broken_markers(self):
         self.assertIsNone(resolve.resolved("// sorted: x\nmod a;\n<<<<<<< HEAD\nmod c;\n=======\nmod b;\n>>>>>>> m\n"))
         self.assertIsNone(resolve.resolved("// sorted: x\nmod a;\n<<<<<<< HEAD\nmod c;\n||||||| b\n=======\nmod b;\n"))

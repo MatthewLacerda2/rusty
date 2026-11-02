@@ -23,7 +23,11 @@ RUST = "// sorted: names only\nmod a;\nmod m;\nmod z;\n"
 DOCS = "<!-- sorted: an index -->\n- [`A`](A.md)\n- [`Z`](Z.md)\n"
 
 
-class Taking(unittest.TestCase):
+class Fixture:
+    """`main` holding [`BASE`], a branch `b` on it, and the take over them."""
+
+    BASE = {"src/mods.rs": RUST, "docs/index.md": DOCS}
+
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -33,7 +37,7 @@ class Taking(unittest.TestCase):
         self.repo = Origin(tmp.name)
         self.log = Path(tmp.name, "conflicts.jsonl")
         # Both lists on `main`, then `b` rebuilt on top of them.
-        self.repo.commit({"src/mods.rs": RUST, "docs/index.md": DOCS}, "main")
+        self.repo.commit(self.BASE, "main")
         self.repo.git("checkout", "--quiet", "-B", "b", "main")
         self.repo.git("push", "--quiet", "--force", "origin", "main:refs/heads/b")  # a fixture's own branch
 
@@ -41,13 +45,15 @@ class Taking(unittest.TestCase):
         self.repo.head = self.repo.commit(files, "b")
         self.repo.git("checkout", "--quiet", "main")
 
-    def advance(self):
+    def advance(self, check=None):
         log = lambda main, paths, ended: record.note(self.log, 7, self.repo.head, main, paths, ended)
-        return update.advance("b", self.repo.head, self.repo.root, push=True, log=log)
+        return update.advance("b", self.repo.head, self.repo.root, push=True, check=check, log=log)
 
     def shown(self, path: str) -> str:
         return self.repo.git("show", f"origin/b:{path}")
 
+
+class Taking(Fixture, unittest.TestCase):
     def test_entries_both_sides_added_are_kept_in_order_and_pushed(self):
         self.branch({"src/mods.rs": RUST.replace("mod m;\n", "mod m;\nmod q;\n"),
                      "docs/index.md": DOCS.replace("- [`Z`", "- [`Sfx`](Sfx.md)\n- [`Z`")})

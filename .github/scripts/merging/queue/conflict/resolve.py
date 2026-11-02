@@ -3,8 +3,10 @@
 `ci-merge` states the resolution as a rule: lists under a `sorted` marker
 mostly merge clean, and when two entries do meet, keep both, in order. A
 `// sorted: <why order is free>` marker (#911) is the author saying in writing
-that no side matters there, and the `sorted` gate proves the result in CI. So
-the queue applies the rule where, and only where, it provably holds. A file is
+that no side matters there. Both sides' lists being sorted makes their union
+sorted, and the `sorted` gate checks it wherever it runs (`lint.yml` skips it
+on a Markdown-only pull request, and [`decide`] accepts a marked file outside
+the rule's scan). So the queue applies the rule where, and only where, it holds. A file is
 resolved when **every** hunk of it, read with `merge.conflictStyle=diff3`:
 
 - lies inside one list governed by a `sorted` marker, the list's extent as the
@@ -12,7 +14,9 @@ resolved when **every** hunk of it, read with `merge.conflictStyle=diff3`:
 - only adds on both sides: every base entry is still there, unchanged, so nothing
   was edited or removed;
 - adds entries, each one line at the list's depth with a key, plus any deeper
-  continuation lines. A comment or attribute line anywhere in the hunk is refused;
+  continuation lines. A comment or attribute line anywhere in the hunk, or
+  directly above it, is refused: `#[cfg(test)]` over a hunk adding `mod p;`
+  would land on whichever entry sorts first, not the one it was written for;
 - names no key twice with different text: the key skips keywords, so `mod b;`
   and `pub mod b;` are one key written two ways, and are refused (compared
   ignoring case, as the rule orders them); the same entry added by both counts once.
@@ -130,11 +134,19 @@ def resolved(text: str) -> str | None:
         at += 1
         if one is None or other is None or one[2] != other[2]:
             return None
+        if noted_above(ours, ours_spans[at - 1][0]) or noted_above(theirs, theirs_spans[at - 1][0]):
+            return None
         kept = union(part, one[2])
         if kept is None:
             return None
         merged.extend(kept)
     return "\n".join(merged)
+
+
+def noted_above(lines: list[str], start: int) -> bool:
+    """Whether the line directly above a hunk starting at `start` annotates the
+    entry below it: a comment or attribute, but not the list's own marker."""
+    return start > 0 and lists.is_note(lines[start - 1]) and lists.reason(lines[start - 1]) is None
 
 
 def decide(path: str, text: str | None) -> str | None:
@@ -144,10 +156,11 @@ def decide(path: str, text: str | None) -> str | None:
     return resolved(text)
 
 
-def settle(work: str, paths: list[str]) -> dict[str, bool]:
+def settle(work: str, paths: list[str], unreadable: list[str] = ()) -> dict[str, bool]:
     """Whether each conflicted path in the worktree `work` resolves; when every
-    one does, each is rewritten with its resolution (the caller stages them)."""
-    made = {path: decide(path, read(os.path.join(work, path))) for path in paths}
+    one does, each is rewritten with its resolution (the caller stages them).
+    A path in `unreadable` (git could not rewrite it with its base) does not."""
+    made = {path: None if path in unreadable else decide(path, read(os.path.join(work, path))) for path in paths}
     if paths and all(text is not None for text in made.values()):
         for path, text in made.items():
             with open(os.path.join(work, path), "w", encoding="utf-8", newline="") as out:

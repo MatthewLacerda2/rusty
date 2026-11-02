@@ -86,6 +86,12 @@ class Taking(unittest.TestCase):
         called.assert_not_called()
         self.assertIn("would push 1111111", why)
 
+    def test_a_dry_run_of_a_resolved_conflict_still_says_it_would_push(self):
+        resolved = "b's conflicts with `main` lay inside `sorted` lists; resolved by keeping both sides' entries, in order: a.rs."
+        (_, state, why), _, _, _ = self.take("--dry-run", advance=("1" * 40, [resolved]))
+        self.assertEqual(state, outcomes.DRY)
+        self.assertIn("would push 1111111", why)
+
     def test_a_conflict_is_handed_back_and_nothing_merges(self):
         (_, state, why), _, called, _ = self.take(advance=(None, ["b conflicts with `main`."]))
         self.assertEqual(state, outcomes.HANDED_BACK)
