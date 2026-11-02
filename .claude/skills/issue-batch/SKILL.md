@@ -75,22 +75,21 @@ build half the cores (`CARGO_BUILD_JOBS`) when another may overlap it. Never run
 share the scratchpad.
 
 **Launching a cloud coder: post the `Brief`, then `make coder ISSUE=N`** (#1569).
-It reads the newest `Brief` comment on #N, takes the model from its `Model:` line,
-and creates the one-off routine that starts the cloud session a minute or two
-later; it prints the routine's link, where its run links the session. Running it
-again for the same issue is the re-brief launch: a new routine whose prompt names
-the new `Brief`. `ARGS=--dry-run` prints the routine and
-creates nothing. Never assemble a `RemoteTrigger` body by hand; what the script
-keeps, and why (`.github/scripts/dispatch/routine.py` has the detail):
+It reads the newest `Brief` comment on #N and creates the one-off routine that
+starts the cloud session a minute or two later; it prints the routine's link,
+where its run links the session. Running it again for the same issue is the
+re-brief launch: a new routine whose prompt names the new `Brief`.
+`ARGS=--dry-run` prints the routine and creates nothing. Never assemble a
+`RemoteTrigger` body by hand; what the script keeps, and why
+(`.github/scripts/dispatch/routine.py` has the detail):
 
 - **Environment: `anthropic_cloud`**, never a `bridge` one (`archlinux:…` is this
   machine). That choice is what makes it remote. Not the `Agent` tool's
   `isolation: "remote"`, which fell back to a local worktree here (#504). The API
   cannot list environments, so the script takes the one the newest `rusty #…`
   routine ran in; `RUSTY_CLOUD_ENV` names it on an account with none yet.
-- **The model** from the brief's `Model:` line (*Which model*): a brief without
-  one naming Opus or Sonnet is refused, and so are a closed issue, a `planning`
-  or `human` one, and a brief by someone who cannot push.
+- **What it refuses:** a closed issue, a `planning` or `human` one, and a brief
+  by someone who cannot push.
 - `run_once_at` computed, `allowed_tools` with `ToolSearch` (the GitHub MCP tools
   load through it without being listed), and the prompt below.
 - **The prompt names the brief's URL**, the exact comment the script checked,
@@ -114,7 +113,6 @@ Branch: `N-short-slug`.
 Builds on: <what merged that it must build on, as "PR #N, Seam">.
 Siblings in flight: <branch/issue → the files it edits; stay out of them>.
 Decisions: <anything already settled, or "none">.
-Model: <Opus or Sonnet, by *Which model*>.
 ```
 
 Add to it when it applies: a shared file a merge left near the 300-line cap, the
@@ -295,22 +293,15 @@ and ignores one inside a fenced code block.
 
 ## Which model
 
-The model follows the shape of the task, not the area of the code (operator,
-2026-10-19). **Sonnet when the issue already says exactly what to do and a gate
-proves it was done; Opus when the work has to decide something.**
+**Opus, for every coder and every agent; nobody chooses** (operator, 2026-11-02,
+replacing a per-issue choice, #1726). `make coder` launches it and a subagent
+takes no model override. With 108 of 113 briefs already on Opus, choosing saved
+under 2% of launches' cost and asked for a decision on every issue, while a wrong
+call downwards cost review rounds (#1598).
 
-- **Sonnet:** a mechanical conflict resolution (two rows in one table, a moved file); a doc
-  fix the docrefs check proves; splitting an oversized file or regrouping a
-  directory; a lint rule whose issue names the case to flag and the case to pass;
-  the editor's egui panels, cards and inspectors.
-- **Opus:** everything else, in particular tests; read-only agents; the renderer
-  and shaders, determinism, physics and navigation; the merge-queue scripts; the
-  five kinds, the API surface or a stored format; a red `main`; a conflict in
-  code; writing issues and reviewing diffs.
-
-When the line is not crisp, err upwards. **One issue, one agent, one model**: a
-second model starts cold and pays again for everything the first read. Work split
-into independent pieces takes each piece's own model.
+**Haiku is for what a script can predict and check, which is a merge conflict and
+nothing else** (#1727). The queue calls it; an orchestrator never picks it. A doc
+fix does not qualify, since it means knowing what to read in the code.
 
 ## Hand-backs and human checks
 

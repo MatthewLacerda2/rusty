@@ -39,8 +39,7 @@ does **work the engine does itself**:
 - **a refactor**: code moved or reshaped across modules, whatever its size.
 
 **No review** for what is standard, mechanical, or proved by a gate alone:
-documentation; the editor's UI and egui (the work `issue-batch` gives Sonnet,
-*Which model*); a mechanical merge of `main`; a size-cap split; a new lint rule whose
+documentation; the editor's UI and egui; a mechanical merge of `main`; a size-cap split; a new lint rule whose
 issue already names its flag and pass cases; adopting a cargo crate the way its
 docs say, without reinventing anything; Dependabot bumps. When a PR is both, the
 trigger wins.
@@ -59,8 +58,7 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
   only after its report is in, by its own path, never by a pattern: a blanket
   `agent-*` cleanup removed a running reviewer's checkout and lost its report
   (2026-10-23). No model override: it runs on
-  the current model, Opus (read-only agents stay on Opus, `issue-batch`,
-  *Which model*).
+  the current model, Opus (`issue-batch`, *Which model*).
 - **Read-only, and no build.** It reads the PR, the repository and the issue,
   and runs read-only commands (`gh pr view`, `gh pr diff`, `gh issue view`,
   `git show`). It makes no edits, commits, pushes or comments, and it does not
