@@ -18,8 +18,9 @@ name: mutants-sweep
 on:
   # Saturdays, 04:41 UTC: off the hour, where GitHub's scheduler is least
   # backed up, clear of `ci.yml`'s nightly `deny` (03:07) and two days clear of
-  # `coverage.yml` (Mondays 05:23). The sweep takes most of a day five runners
-  # wide, and a weekend is when the fewest pull requests want them.
+  # `coverage.yml` (Mondays 05:23). The sweep holds seven runners for about a
+  # day and a half (`max-parallel` on `mutants` has the arithmetic), so it
+  # ends on Sunday, and a weekend is when the fewest pull requests want them.
   schedule:
     - cron: '41 4 * * 6'
   workflow_dispatch:
@@ -32,7 +33,7 @@ on:
         default: false
 
 # One sweep at a time, repo-wide (#705): a second sweep waits for the first
-# instead of taking five more runners. Workflow-level, so the group holds the
+# instead of taking seven more runners. Workflow-level, so the group holds the
 # whole run; a group on the `mutants` matrix would serialise its own shards.
 # GitHub keeps one pending run per group and a newer one replaces it, which is
 # right: it sweeps the newer commit.
@@ -60,8 +61,11 @@ jobs:
   # `mutants-report` saw every shard complete and wrote `sweep-complete` into
   # its artifact; a sweep with a cut-off shard left mutants unmeasured and does
   # not count. Fails open: if the lookup itself errors, the sweep runs (a wasted
-  # day beats a silent gap), and this job never fails on main, so a skipped sweep
-  # reads as `skipped` — not red — to main-health. `force` bypasses the lookup.
+  # weekend beats a silent gap), so a skipped sweep reads as `skipped` — not red
+  # — to main-health. `force` bypasses the lookup. On `main` this job goes red
+  # only when sizing fails (below): `cargo mutants --list` errors, the count is
+  # zero, or the matrix would pass GitHub's ceiling. main-health then files it
+  # on the board like any red run, with the reason in this job's summary.
   # Any ref but `main` is refused, red, before anything else (#972).
   #
   # When it sweeps, it also sizes the matrix (#1684): it counts the mutants
@@ -96,7 +100,7 @@ jobs:
             echo "$2" | tee -a "$GITHUB_STEP_SUMMARY"
           }
           # `main` only, `force` or not (#972): a dispatch on a branch would hold
-          # five runners for most of a day the batch's gates need (#705). Red, so
+          # seven runners for a day and a half the batch's gates need (#705). Red, so
           # the dispatcher sees the refusal; main-health files only main's runs.
           if [ "$REF" != refs/heads/main ]; then
             decide false "Mutation sweep refused: it sweeps \`main\` only, and this run is on \`$REF\`. Mutate a branch with \`mutants-on-request.yml\` (\`make mutants-remote SCOPE=diff\`)."
@@ -139,7 +143,12 @@ jobs:
           set -f   # the globs are for cargo-mutants, not the shell
           files=()
           for glob in $SWEEP_FILES; do files+=(--file "$glob"); done
-          cargo mutants --list "${files[@]}" > mutants-list.txt
+          if ! cargo mutants --list "${files[@]}" > mutants-list.txt 2> list-error.txt; then
+            { echo 'Sizing failed: `cargo mutants --list` exited non-zero:'; echo '```'
+              tail -n 20 list-error.txt; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "::error::cargo mutants --list failed, so the matrix could not be sized; see the job summary"
+            exit 1
+          fi
           if ! python3 .github/scripts/mutants-shards.py plan < mutants-list.txt > shards.json 2> sizing.txt; then
             cat sizing.txt | tee -a "$GITHUB_STEP_SUMMARY"
             echo "::error::$(cat sizing.txt)"
@@ -167,8 +176,13 @@ jobs:
   # draws a whole slow module; a single crate rebuilds fully per mutant
   # regardless, so `slice` sharding's build locality buys nothing.
   # `max-parallel` leaves most of the account's concurrent-job allowance free
-  # for pull requests; wall-clock time is irrelevant to a weekly report: at 5
-  # wide, ≈ 255 runner-hours is ≈ 51 h, inside the week.
+  # for pull requests, and is sized so the sweep ends before `coverage.yml`
+  # (Mondays 05:23, 48 h 42 after the Saturday 04:41 start) cold-builds on the
+  # same runners. Wall clock ≈ shards × 4 h (`TARGET_HOURS`) ÷ max-parallel:
+  # today 64 shards (3552 mutants), so 5 wide is ≈ 51 h (past Monday 05:23),
+  # 6 is ≈ 43 h (Sunday ≈ 23:20, 6 h spare), 7 is ≈ 37 h (Sunday ≈ 17:20,
+  # ≈ 12 h spare, room for the count to grow by a sixth). Re-check it when the
+  # shard count in `mutants-plan`'s summary climbs past ≈ 75.
   #
   # Skipped when `mutants-plan` finds a finished sweep of this very commit (#506).
   mutants:
@@ -188,7 +202,7 @@ jobs:
       RUSTY_REQUIRE_GPU: "1"
     strategy:
       fail-fast: false
-      max-parallel: 5
+      max-parallel: 7
       matrix:
         shard: ${{ fromJSON(needs.mutants-plan.outputs.shards) }}
     steps:

@@ -61,8 +61,8 @@ nothing to wait for.
 - For a proof run on a draft, dispatch the workflow on the branch instead of
   readying: `gh workflow run ci.yml --ref <branch>` (without `gh`, the GitHub MCP
   `actions_run_trigger` does the same). It runs the gates and nothing else.
-  Never dispatch `mutants-sweep.yml`: that is the full sweep, five runners for
-  most of a day the batch's gates need (#705).
+  Never dispatch `mutants-sweep.yml`: that is the full sweep, seven runners for
+  a day and a half the batch's gates need (#705).
 - **A branch that adds mechanism asks for a scoped mutation run** (#750), and
   readies **in the same step**: dispatch `mutants-on-request.yml` on your branch
   with input `scope` set to `diff` (or path globs like `src/physics/**`) —

@@ -100,6 +100,7 @@ class RequireGpu(unittest.TestCase):
         bare = "on: push\njobs:\n  cov:\n    steps:\n      - run: cargo llvm-cov nextest --no-report\n"
         self.assertEqual(unguarded(bare), ["cov"])
         self.assertEqual(unguarded(bare.replace("llvm-cov nextest", "test --locked")), ["cov"])
+        self.assertEqual(unguarded(bare.replace("llvm-cov nextest --no-report", "mutants --no-shuffle")), ["cov"])
 
     def test_passes_a_guarded_job_and_jobs_that_render_nothing(self):
         guarded = ('on: push\njobs:\n  t:\n    env:\n      RUSTY_REQUIRE_GPU: "1"\n'
@@ -107,6 +108,7 @@ class RequireGpu(unittest.TestCase):
         self.assertEqual(unguarded(guarded), [])
         docs = ("on: push\njobs:\n  d:\n    steps:\n      - run: cargo test --doc --locked\n"
                 "      - run: cargo test --manifest-path tools/lint/Cargo.toml\n"
+                "      - run: cargo mutants --list --file 'src/app/**/*.rs' > list.txt\n"
                 "      # cargo mutants, only in a comment\n")
         self.assertEqual(unguarded(docs), [])
         workflow_env = 'env:\n  RUSTY_REQUIRE_GPU: "1"\n' + guarded.replace("RUSTY_REQUIRE_GPU", "OTHER")
