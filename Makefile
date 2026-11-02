@@ -271,10 +271,10 @@ reclaim: ## Remove merged worktrees (and their target/) and finished local branc
 	@python3 .github/scripts/reclaim.py $(ARGS)
 
 # A batch's two dispatch steps, scripted (#1569). `coder` reads the newest
-# `Brief` comment on the issue, takes its `Model:` line, and creates the one-off
-# routine that starts the cloud coder (through `claude mcp serve`, so the
+# `Brief` comment on the issue and creates the one-off routine that starts the
+# cloud coder (through `claude mcp serve`, so the
 # claude.ai token stays inside claude); running it again is the re-brief launch.
-# It refuses a closed, `planning` or `human` issue and a brief with no model.
+# It refuses a closed, `planning` or `human` issue.
 # ARGS=--dry-run prints the routine and creates nothing. `review-level` prints
 # `high` or `medium` for an independent review, and the paths that decided it.
 coder: ## Start the cloud coder on an issue's newest Brief. make coder ISSUE=1569, ARGS=--dry-run creates nothing

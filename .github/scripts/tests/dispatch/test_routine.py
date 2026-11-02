@@ -54,7 +54,7 @@ class Environment(unittest.TestCase):
 
 class Body(unittest.TestCase):
     def setUp(self):
-        self.body = routine.body(42, "A title", BRIEF_URL, "claude-sonnet-5-5", "env_x", "o/r", NOW, event_id="e-1")
+        self.body = routine.body(42, "A title", BRIEF_URL, "env_x", "o/r", NOW, event_id="e-1")
         self.ccr = self.body["job_config"]["ccr"]
 
     def test_the_prompt_points_at_the_issue_and_its_checked_brief(self):
@@ -68,11 +68,11 @@ class Body(unittest.TestCase):
         for url in ("", "https://github.com/o/r/issues/43#issuecomment-1", "https://evil.example/o/r/issues/42",
                     "https://github.com/x/r/issues/42#issuecomment-1"):
             with self.subTest(url), self.assertRaises(ValueError):
-                routine.body(42, "t", url, "m", "e", "o/r", NOW)
+                routine.body(42, "t", url, "e", "o/r", NOW)
 
     def test_model_environment_repository_and_tools(self):
         context = self.ccr["session_context"]
-        self.assertEqual(context["model"], "claude-sonnet-5-5")
+        self.assertEqual(context["model"], "claude-opus-5-5")
         self.assertEqual(self.ccr["environment_id"], "env_x")
         self.assertEqual(context["sources"], [{"git_repository": {"url": "https://github.com/o/r"}}])
         self.assertIn("ToolSearch", context["allowed_tools"])
@@ -89,8 +89,8 @@ class Body(unittest.TestCase):
         self.assertIn(quoted, skill, "issue-batch's routine prompt drifted")
 
     def test_each_launch_gets_its_own_event_id(self):
-        one = routine.body(42, "t", BRIEF_URL, "m", "e", "o/r", NOW)["job_config"]["ccr"]["events"][0]["data"]
-        two = routine.body(42, "t", BRIEF_URL, "m", "e", "o/r", NOW)["job_config"]["ccr"]["events"][0]["data"]
+        one = routine.body(42, "t", BRIEF_URL, "e", "o/r", NOW)["job_config"]["ccr"]["events"][0]["data"]
+        two = routine.body(42, "t", BRIEF_URL, "e", "o/r", NOW)["job_config"]["ccr"]["events"][0]["data"]
         one, two = one["uuid"], two["uuid"]
         self.assertNotEqual(one, two)
 
