@@ -30,6 +30,7 @@ mod event_loop;
 mod focus;
 pub mod frame;
 pub mod input;
+pub mod pace;
 pub mod player;
 mod prelude;
 pub mod settings;
@@ -58,6 +59,8 @@ pub struct Shell {
     pub window: Arc<winit::window::Window>,
     pub renderer: Renderer,
     pub clock: FrameClock,
+    /// What the loop owes a trigger before it may sleep (#1721).
+    pub pacer: pace::Pacer,
     /// The physical→logical key remap, loaded once from `Storage` at boot.
     pub keymap: Keymap,
     /// Video settings currently in effect on the surface/window, so the per-frame
@@ -99,6 +102,11 @@ pub trait Frontend {
     /// now. The player: always. The editor: only in Play with the Game view focused.
     fn game_has_input(&self, _game: &GameWorld) -> bool {
         true
+    }
+
+    /// How it wants its frames. Default: as fast as the loop goes, as a game does.
+    fn pace(&self, _game: &GameWorld) -> pace::Pace {
+        pace::Pace::Continuous
     }
 
     /// Where the game view sits in the window, for mapping the pointer into
@@ -208,7 +216,9 @@ fn run_frame<F: Frontend>(
     game: &mut GameWorld,
     frontend: &mut F,
 ) {
-    let delta_time = shell.clock.tick(Instant::now());
+    let delta_time = frontend
+        .pace(game)
+        .frame_step(shell.clock.tick(Instant::now()));
     // Like raw mouse motion, pads keep reporting while the window is unfocused.
     let pads_live = shell.window_focused && frontend.game_has_input(game);
     pump_pads(shell, game, pads_live);
@@ -240,6 +250,7 @@ fn run_frame<F: Frontend>(
     settings::apply_pending(shell, game);
 
     let Some(surface) = frame::acquire_frame(&mut shell.renderer) else {
+        shell.pacer.skipped(Instant::now());
         return;
     };
     let target = surface
@@ -247,6 +258,7 @@ fn run_frame<F: Frontend>(
         .create_view(&wgpu::TextureViewDescriptor::default());
     frontend.draw(shell, game, &surface.texture, &target);
     shell.renderer.queue.present(surface);
+    shell.pacer.drew();
 }
 
 /// Write this frame's gamepad snapshot into the sim, before it ticks.

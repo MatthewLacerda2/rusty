@@ -2,6 +2,8 @@
 //! paint over the swapchain), the frame's edits settled, and the dev-only console
 //! REPL drain.
 
+use std::time::Duration;
+
 use super::EditorFrontend;
 use crate::app::GameWorld;
 use crate::editor::EditorUi;
@@ -23,26 +25,32 @@ impl EditorFrontend {
     /// End the egui frame and paint the whole dashboard as a load-pass over `target`.
     pub(super) fn paint(&mut self, shell: &Shell, target: &wgpu::TextureView) {
         let ppp = shell.window.scale_factor() as f32;
-        paint_pass(
+        let after = paint_pass(
             &self.egui_ctx,
             &mut self.egui_renderer,
             &shell.renderer,
             ppp,
             target,
         );
+        self.repaint_at = std::time::Instant::now().checked_add(after);
     }
 }
 
 /// End `ctx`'s pass and paint it as a load-pass over the swapchain `target`: the
-/// editor's dashboard and the project picker (#854) alike.
+/// editor's dashboard and the project picker (#854) alike. Returns how soon egui wants
+/// its next frame (a tooltip, an animation, a caret), [`Duration::MAX`] for never.
 pub(in crate::shell::editor) fn paint_pass(
     ctx: &egui::Context,
     egui_renderer: &mut egui_wgpu::Renderer,
     renderer: &Renderer,
     pixels_per_point: f32,
     target: &wgpu::TextureView,
-) {
+) -> Duration {
     let mut full_output = ctx.end_pass();
+    let repaint_after = full_output
+        .viewport_output
+        .get(&egui::ViewportId::ROOT)
+        .map_or(Duration::MAX, |root| root.repaint_delay);
     let paint_jobs = ctx.tessellate(full_output.shapes, full_output.pixels_per_point);
     let screen = egui_wgpu::ScreenDescriptor {
         size_in_pixels: [renderer.config.width, renderer.config.height],
@@ -87,6 +95,7 @@ pub(in crate::shell::editor) fn paint_pass(
     }
     // All applied; egui asserts no delta is dropped unhandled.
     full_output.textures_delta.clear();
+    repaint_after
 }
 
 /// Settle the frame's edits (the dashboard's, and the viewport's from the frame

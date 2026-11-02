@@ -49,3 +49,16 @@ fn the_band_rolls_off_linearly() {
     assert!((started - 0.5).abs() < 1e-5, "{started}");
     assert_eq!(shot_gain(60.0, FAR).0, 0.0, "silent beyond max_distance");
 }
+
+#[test]
+fn it_sounds_until_the_last_voice_is_reaped() {
+    let (backend, rec) = RecordingBackend::new();
+    let mut m = AudioMaestro::with_backend(backend);
+    assert!(!m.is_sounding(), "nothing played yet");
+    m.play_at(&Shot::new("shot.wav", [0.0, 0.0, 0.0]), 0, 0);
+    assert!(m.is_sounding());
+    let voice = rec.borrow().last_voice();
+    rec.borrow_mut().live.remove(&voice);
+    m.apply_mix(&MixEnv::default(), |_| None);
+    assert!(!m.is_sounding(), "reaped: the editor may sleep again");
+}

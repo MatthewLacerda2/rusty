@@ -121,11 +121,16 @@ impl Watch {
 
     fn with(roots: &[&Path], backend: Backend) -> notify::Result<Self> {
         let (tx, events) = channel();
+        // The editor may be asleep (#1721): only a frame drains the channel.
+        let deliver = move |event: notify::Result<Event>| {
+            let _ = tx.send(event);
+            crate::core::wake::frame();
+        };
         let mut watcher: Box<dyn Watcher> = match backend {
-            Backend::Native => Box::new(notify::recommended_watcher(tx)?),
+            Backend::Native => Box::new(notify::recommended_watcher(deliver)?),
             Backend::Poll(every) => {
                 let config = notify::Config::default().with_poll_interval(every);
-                Box::new(PollWatcher::new(tx, config)?)
+                Box::new(PollWatcher::new(deliver, config)?)
             }
         };
         for root in roots {

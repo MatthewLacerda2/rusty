@@ -35,6 +35,16 @@ fn watched(backend: Backend) -> (Watch, PathBuf) {
     (Watch::start(&[&dir], backend).unwrap(), file)
 }
 
+/// The editor sleeps outside Play (#1721): only a frame collects what the watch saw.
+#[test]
+fn a_file_change_wakes_a_sleeping_window() {
+    let (mut watch, file) = watched(Backend::Native);
+    let before = crate::core::wake::rings();
+    std::fs::write(&file, b"a longer blue").unwrap();
+    assert!(waits_for(&mut watch, &file));
+    assert!(crate::core::wake::rings() > before);
+}
+
 /// Change `file` outside the engine, then check the watch notes it only after Play.
 fn notes_an_outside_change_after_play(mut watch: Watch, file: &Path) -> bool {
     // The poller reads modification times to the second: move into the next one.
