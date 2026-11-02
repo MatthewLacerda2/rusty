@@ -29,9 +29,10 @@ NEXTEST = tomllib.loads((REPO / ".config" / "nextest.toml").read_text()) if toml
 BUDGET = REPO / "src" / "render" / "setup" / "budget.rs"
 
 #: A command that runs the engine's tests. `cargo test --doc` renders nothing,
-#: and `tools/lint` is its own crate with no renderer.
+#: `tools/lint` is its own crate with no renderer, and `cargo mutants --list`
+#: only counts mutants (the sweep's `mutants-plan`, #1684).
 SUITE = re.compile(r"cargo (nextest run|llvm-cov|mutants|test)\b")
-NOT_SUITE = re.compile(r"--doc\b|tools/lint/")
+NOT_SUITE = re.compile(r"--doc\b|tools/lint/|cargo mutants --list\b")
 
 
 def headless_cap() -> int:
