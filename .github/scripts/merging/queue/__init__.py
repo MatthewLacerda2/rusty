@@ -37,10 +37,13 @@ conflict, handed back as any refused merge is.
 
 ## The three things it must not do
 
-1. **It never resolves a conflict.** Empty conflict set, or it hands the branch
-   back naming the paths. rusty's conflict hot spots — `ComponentKind::ALL`'s
+1. **It never picks a side in a conflict.** Empty conflict set, or it hands the
+   branch back naming the paths. rusty's conflict hot spots — `ComponentKind::ALL`'s
    hard-coded length, `app/registry.rs`'s system order — are exactly the ones
-   where keeping both sides is wrong and no textual merge knows it.
+   where keeping both sides is wrong and no textual merge knows it. The one
+   exception keeps both sides where a `sorted` marker says in writing that order
+   is free, and both sides only added entries ([`conflict.resolve`], #1723);
+   `app/registry.rs` carries no marker.
 2. **It never merges on a local result.** A local check may only *refuse* a
    push, never grant a merge. `make gates` is the author's job before
    readying; CI is the cross-platform claim (the macOS runner), and the only

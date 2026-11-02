@@ -110,7 +110,9 @@ one watch runs at a time** (#928). The conflict-first order passes a pull
 request with one conflict over for every clean one, so past [`aging.AGE_MINUTES`]
 in line or [`aging.AGE_PASSES`] takes ahead of it, it goes first whatever it
 conflicts with ([`aging.Line`]). A ready head that conflicts with `origin/main`
-itself is handed back before any take, naming the files ([`mainline.conflicts`]).
+itself is handed back before any take, naming the files ([`mainline.conflicts`]),
+unless the take would resolve every one of them (a `sorted` list, #1723); the
+closing summary gives the totals of the conflicts recorded during the watch.
 The watch holds an `fcntl.flock` for its whole life ([`lock.hold`]), so a second
 one exits naming the first's PID. During a take's CI wait the board is still
 listed once a poll (the `tick` [`queue.waiting.wait_for`] calls), `--since`

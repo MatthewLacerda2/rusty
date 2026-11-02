@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from merging.queue import gitio, outcomes, pulls, stopping, taking
+from merging.queue.conflict import record
 from merging.watch import ending, freshness, handbacks, mainline, order
 
 
@@ -47,7 +48,9 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
             order.clashing, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS
         ),
         main_conflicts=functools.partial(
-            mainline.conflicts, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS
+            mainline.conflicts, git=functools.partial(merge_tree_git, opts.root), known={}, bots=pulls.BOTS,
+            # A dry run's conflicts are previews, not conflicts the queue met: unrecorded.
+            record=None if opts.dry_run else functools.partial(record.note, record.path(opts.root)),
         ),
         stop_requested=lambda: consume(Path(opts.root, common, ending.STOP_FILE)),
         stale_code=lambda: freshness.changed(code, functools.partial(merge_tree_git, opts.root)),

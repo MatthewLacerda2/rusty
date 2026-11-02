@@ -5,12 +5,13 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import ghrest
 
 from merging.queue import checks, gitio, outcomes, stopping, taking, world
+from merging.queue.conflict import record
 from merging.verdict import github
 from merging.watch import ending, lock, loop
 
@@ -136,6 +137,7 @@ def start(opts: argparse.Namespace, argv: list[str]) -> int:
     except github.Unreachable as down:
         outcomes.say(*stopping.unreachable(down))
         return ending.MACHINE_STATUS
+    began = datetime.now(timezone.utc).replace(microsecond=0)  # the record keeps whole seconds
     if opts.watch:
         results, why, status = loop.run(world.effects(repo, opts), opts)
     else:
@@ -144,6 +146,8 @@ def start(opts: argparse.Namespace, argv: list[str]) -> int:
     for line in outcomes.summary(results):
         outcomes.say(line)
     if opts.watch:
+        # How much conflict work this watch met, and what share the rule took (#1723).
+        outcomes.say(*record.totals(record.since(record.read(record.path(opts.root)), began)))
         outcomes.say(f"watch ended: {why}")
         outcomes.say(ending.resume(os.getcwd(), sys.argv[0], argv))
         return status
