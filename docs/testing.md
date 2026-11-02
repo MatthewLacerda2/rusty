@@ -547,7 +547,8 @@ platforms and adapters, so a golden would break on every one but the machine tha
 Pixel asserts read numbers off a frame and throw the frame away: a black frame or a
 flare mirrored the wrong way can pass all of them. So a branch that changes what is
 drawn (the renderer, `engine/shaders/`, materials, post effects, lighting, UI, editor
-panels) is also **looked at**: its coder renders a primitive scene before (on `main`)
+panels; lighting includes what a bake writes, since lit surfaces show its texels) is
+also **looked at**: its coder renders a primitive scene before (on `main`)
 and after (on the branch), the feature off and on and at the extremes of the knobs the
 issue is about, opens every image (an agent's `Read` shows a PNG), and fixes what is
 plainly wrong. The PR carries a **`Looked at`** line saying what scene, what was
