@@ -19,7 +19,7 @@ use kira::info::Info;
 use kira::track::{SendTrackBuilder, SendTrackHandle, SendTrackId};
 use kira::{AudioManager, Frame, Mix, Tween};
 
-use super::gate::{is_silent, Gated};
+use super::gate::{is_silent, Gated, Wake};
 use super::groups::decibels;
 use crate::components::audio::reverb_zone::MAX_PRE_DELAY;
 use crate::components::ReverbParams;
@@ -45,6 +45,7 @@ pub struct ReverbBus {
     track: SendTrackHandle,
     reverb: ReverbHandle,
     pre_delay: Arc<AtomicU32>,
+    wake: Wake,
 }
 
 impl ReverbBus {
@@ -53,16 +54,19 @@ impl ReverbBus {
         let pre_delay = Arc::new(AtomicU32::new(params.pre_delay.to_bits()));
         let mut builder = SendTrackBuilder::new().volume(decibels(params.wet));
         builder.add_effect(PreDelay::new(Arc::clone(&pre_delay)));
+        let wake = Wake::default();
         let reverb = builder.add_effect(Gated(
             ReverbBuilder::new()
                 .feedback(f64::from(feedback(params.decay_time)))
                 .damping(f64::from(params.damping))
                 .mix(Mix::WET),
+            wake.clone(),
         ));
         Some(Self {
             track: manager.add_send_track(builder).ok()?,
             reverb,
             pre_delay,
+            wake,
         })
     }
 
@@ -81,6 +85,7 @@ impl ReverbBus {
         let feedback = f64::from(feedback(params.decay_time));
         self.reverb.set_feedback(feedback, tween);
         self.reverb.set_damping(f64::from(params.damping), tween);
+        self.wake.ring();
         self.pre_delay
             .store(params.pre_delay.to_bits(), Ordering::Relaxed);
     }

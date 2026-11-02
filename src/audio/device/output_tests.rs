@@ -70,3 +70,25 @@ fn control_round_trips_every_mode() {
         assert_eq!(control.get(), mode);
     }
 }
+
+/// A mode switch with nothing playing is settled before the next sound: the compressor
+/// sleeping at TV's fully wet +9 dB would otherwise clip that sound's start (#1729).
+#[test]
+fn a_mode_switch_during_silence_is_settled_before_the_next_sound() {
+    let mut b = rig(&[0.5; 64]);
+    b.set_speaker_mode(SpeakerMode::Tv);
+    b.device().render(RATE as usize * 3);
+    b.set_speaker_mode(SpeakerMode::HomeTheater);
+    b.device().render(1024);
+    assert!(b.play(VoiceId(1), &flat("clip")));
+    let peak = b
+        .device()
+        .render(32)
+        .iter()
+        .map(|f| f.0.abs())
+        .fold(0.0, f32::max);
+    assert!(
+        (peak - 0.5).abs() < 1e-3,
+        "the first samples peaked at {peak}"
+    );
+}

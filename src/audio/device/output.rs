@@ -26,7 +26,7 @@ use kira::info::Info;
 use kira::track::MainTrackBuilder;
 use kira::{Decibels, Frame, Mix, Tween};
 
-use super::gate::Gated;
+use super::gate::{Gated, Wake};
 use crate::audio::SpeakerMode;
 
 /// How much of each channel headphones mode bleeds into the other.
@@ -114,11 +114,13 @@ impl EffectBuilder for Shaper {
 pub struct OutputStage {
     control: Arc<OutputControl>,
     compressor: CompressorHandle,
+    wake: Wake,
 }
 
 impl OutputStage {
     /// Build the stage onto kira's main track, starting at `mode`.
     pub fn build(main: &mut MainTrackBuilder, mode: SpeakerMode) -> Self {
+        let wake = Wake::default();
         let compressor = main.add_effect(Gated(
             CompressorBuilder::new()
                 .threshold(THRESHOLD_DB)
@@ -127,12 +129,14 @@ impl OutputStage {
                 .release_duration(RELEASE)
                 .makeup_gain(Decibels(MAKEUP_DB))
                 .mix(compressor_mix(mode)),
+            wake.clone(),
         ));
         let control = OutputControl::new(mode);
-        main.add_effect(Gated(Shaper(Arc::clone(&control))));
+        main.add_effect(Shaper(Arc::clone(&control)));
         Self {
             control,
             compressor,
+            wake,
         }
     }
 
@@ -141,6 +145,7 @@ impl OutputStage {
         self.control.set(mode);
         self.compressor
             .set_mix(compressor_mix(mode), Tween::default());
+        self.wake.ring();
     }
 }
 
