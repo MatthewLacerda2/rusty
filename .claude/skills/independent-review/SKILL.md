@@ -57,8 +57,7 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
   behind (three times in the 2026-10-20 batch). Remove a reviewer's worktree
   only after its report is in, by its own path, never by a pattern: a blanket
   `agent-*` cleanup removed a running reviewer's checkout and lost its report
-  (2026-10-23). No model override: it runs on
-  the current model, Opus (`issue-batch`, *Which model*).
+  (2026-10-23).
 - **Read-only, and no build.** It reads the PR, the repository and the issue,
   and runs read-only commands (`gh pr view`, `gh pr diff`, `gh issue view`,
   `git show`). It makes no edits, commits, pushes or comments, and it does not

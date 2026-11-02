@@ -291,18 +291,6 @@ a `Kind: #N` whose sub-issue parent is not N; and a `case` or `root` that has a
 sub-issue parent. It reads the line past list, quote, bold and backtick markup,
 and ignores one inside a fenced code block.
 
-## Which model
-
-**Opus, for every coder and every agent; nobody chooses** (operator, 2026-11-02,
-replacing a per-issue choice, #1726). `make coder` launches it and a subagent
-takes no model override. With 108 of 113 briefs already on Opus, choosing saved
-under 2% of launches' cost and asked for a decision on every issue, while a wrong
-call downwards cost review rounds (#1598).
-
-**Haiku is for what a script can predict and check, which is a merge conflict and
-nothing else** (#1727). The queue calls it; an orchestrator never picks it. A doc
-fix does not qualify, since it means knowing what to read in the code.
-
 ## Hand-backs and human checks
 
 **Save, ask, move on.** On ≈3 attempts or a decision that is genuinely the

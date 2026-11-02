@@ -67,7 +67,7 @@ def environment(routines: list[dict]) -> str | None:
     return None
 
 
-#: Every coder's model (`issue-batch`, *Which model*). A new model generation
+#: The model every coder runs on; nobody chooses one per issue (#1726). A new generation
 #: changes this line, nothing else.
 MODEL = "claude-opus-5-5"
 

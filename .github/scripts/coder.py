@@ -3,7 +3,7 @@
 
 `make coder ISSUE=N` is this. It reads the newest comment on #N whose first line
 is `Brief`, and creates a one-off routine that starts a cloud session on it a
-minute or two later, on Opus (`issue-batch`, *Which model*), with a prompt
+minute or two later, with a prompt
 that points the coder at `cloud-brief.md` and at the URL of the exact comment
 checked here, so a comment posted after the launch cannot stand in for it
 (`dispatch/routine.py` has the body and why each field is what it is). Running
