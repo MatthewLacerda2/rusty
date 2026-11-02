@@ -52,8 +52,9 @@ fn texel(x: f32) -> f32 {
     0.7 + 3.6 * x
 }
 
-#[test]
-fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
+/// A 4 m floor at y = 0 whose border at x = 0 meets a 2 m single-sided wall facing
+/// it, the wall's back to a sun at 45° behind it, under an open sky.
+fn floor_at_wall() -> BakeScene {
     let p = |x, z| Vec3::new(x, 0.0, z);
     let mut floor = quad(
         1,
@@ -65,7 +66,6 @@ fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
         .iter()
         .map(|q| Vec2::new(texel(q.x), texel(q.z)) / S as f32)
         .collect();
-    // A 2 m wall along x = 0 facing the floor, its back to a sun at 45° behind it.
     let w = |y, z| Vec3::new(0.0, y, z);
     let mut wall = quad(
         2,
@@ -73,7 +73,7 @@ fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
         Vec3::ONE,
     );
     wall.lightmap_uvs = vec![Vec2::ZERO; 4];
-    let scene = BakeScene {
+    BakeScene {
         meshes: vec![floor, wall],
         lights: vec![BakeLight {
             shape: LightShape::Directional {
@@ -83,14 +83,18 @@ fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
             bakes_direct: true,
         }],
         sky: Vec3::splat(0.5).into(),
-    };
+    }
+}
+
+#[test]
+fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
     let settings = BakeSettings {
         texels_per_unit: 4.0,
         samples: 64,
         max_resolution: S,
         ..super::tests::settings()
     };
-    let map = &bake(&scene, &settings)[0];
+    let map = &bake(&floor_at_wall(), &settings)[0];
     assert_eq!(map.size, S);
     // Mean of column `x` over the rows clear of the floor's other borders.
     let column = |x: usize| {
