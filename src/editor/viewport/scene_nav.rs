@@ -116,6 +116,14 @@ pub struct NavFrame {
     pub dt: f32,
 }
 
+impl NavFrame {
+    /// Whether the camera goes on moving with no new event: a held gesture, or a held
+    /// arrow key. The editor draws on demand outside Play (#1721), so this asks.
+    pub fn keeps_moving(&self) -> bool {
+        self.gesture.is_some() || self.turn != Vec2::ZERO
+    }
+}
+
 /// Apply one frame of navigation to the camera. Scroll zooms, except while looking,
 /// where it changes the fly speed (Unity's behaviour); a trackpad swipe looks or pans.
 pub fn apply(camera: &mut SceneCamera, f: &NavFrame) {

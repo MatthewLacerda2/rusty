@@ -53,6 +53,9 @@ pub fn note_written(path: &str) -> u64 {
     writes.0 += 1;
     let generation = writes.0;
     writes.1.insert(path.to_string(), generation);
+    drop(writes);
+    // A background job may be the writer, and the caches only read this on a frame.
+    crate::core::wake::frame();
     generation
 }
 
@@ -145,6 +148,13 @@ pub(crate) mod contract {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_note_wakes_a_sleeping_window() {
+        let before = crate::core::wake::rings();
+        note_written("rusty_wake_note");
+        assert!(crate::core::wake::rings() > before);
+    }
 
     #[test]
     fn a_write_is_reported_once_to_each_consumer() {

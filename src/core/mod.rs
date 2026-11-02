@@ -17,5 +17,6 @@ pub mod project;
 pub mod random;
 pub mod settings;
 pub mod storage;
+pub mod wake;
 
 pub(crate) use naming::named_enum::named_enum;

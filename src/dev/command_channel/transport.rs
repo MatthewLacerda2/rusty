@@ -149,6 +149,8 @@ fn spawn_handler<S: Stream>(stream: S, tx: Sender<Command>) {
             if tx.send((line, reply_tx)).is_err() {
                 break; // main loop gone (engine shutting down).
             }
+            // The editor may be asleep outside Play (#1721): only a frame drains it.
+            crate::core::wake::frame();
             let response = match reply_rx.recv() {
                 Ok(r) => r,
                 Err(_) => break,
