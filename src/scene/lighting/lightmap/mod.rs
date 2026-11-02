@@ -65,6 +65,8 @@ mod direction_tests;
 #[cfg(test)]
 mod gather_tests;
 #[cfg(test)]
+mod inset_tests;
+#[cfg(test)]
 mod pool_tests;
 #[cfg(test)]
 mod probe_direct_tests;

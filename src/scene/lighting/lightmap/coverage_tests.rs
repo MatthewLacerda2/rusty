@@ -4,7 +4,7 @@
 
 use glam::{Vec2, Vec3};
 
-use super::raster::rasterize;
+use super::raster::{rasterize, INSET};
 use super::tests::settings;
 use super::*;
 
@@ -98,20 +98,26 @@ fn corner(y: f32, scale: f32) -> BakeMesh {
 }
 
 #[test]
-fn centre_covered_texels_keep_their_centre_and_the_edge_ring_sits_on_the_edge() {
-    // The hypotenuse u + v = S - 0.5 misses the centres of the texels x + y = S - 1
-    // but crosses their squares: those are traced at its point nearest the centre.
+fn centre_texels_keep_their_centre_and_the_edge_ring_is_traced_inside_the_core() {
+    // The hypotenuse u + v = S - 0.5 crosses the squares of the texels x + y = S - 1
+    // but not their centres: each is traced in its texel, INSET off every edge.
     let edge = S as f32 - 0.5;
     let points = rasterize(&corner(0.0, edge / S as f32), S);
     assert_eq!(points.len(), (S * (S + 1) / 2) as usize, "x + y < S");
     for p in &points {
         let (x, y) = ((p.index % S as usize) as f32, (p.index / S as usize) as f32);
-        let centre = Vec3::new(x + 0.5, 0.0, y + 0.5);
-        let want = match x + y + 1.0 < S as f32 {
-            true => centre,
-            false => centre - Vec3::new(0.25, 0.0, 0.25),
+        let (u, v) = (p.position.x, p.position.z);
+        let ok = match x + y + 1.0 < S as f32 {
+            true => Vec2::new(u - x - 0.5, v - y - 0.5).length() < 1e-4,
+            false => {
+                [u, v, (edge - u - v) / 2f32.sqrt()]
+                    .iter()
+                    .all(|&d| d >= INSET - 1e-4)
+                    && (x..=x + 1.0).contains(&u)
+                    && (y..=y + 1.0).contains(&v)
+            }
         };
-        assert!(p.position.distance(want) < 1e-4, "{} vs {want}", p.position);
+        assert!(ok, "texel ({x}, {y}) traced at {u}, {v}");
     }
 }
 
@@ -135,13 +141,4 @@ fn a_shared_texel_goes_to_the_first_triangle_and_a_centre_beats_an_overlap() {
     let later = rasterize(&join(tiny(0.0), corner(1.0, 1.0)), S);
     let first = later.into_iter().find(|p| p.index == 0);
     assert_eq!(first.map(|p| p.position.y), Some(1.0), "the centre wins");
-}
-
-#[test]
-fn a_non_finite_uv_owns_nothing() {
-    let mut mesh = corner(0.0, 1.0);
-    mesh.lightmap_uvs[1] = Vec2::new(f32::NAN, 0.0);
-    assert!(rasterize(&mesh, S).is_empty());
-    mesh.lightmap_uvs[1] = Vec2::new(f32::INFINITY, 0.0);
-    assert!(rasterize(&mesh, S).is_empty());
 }

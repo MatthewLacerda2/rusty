@@ -1,8 +1,8 @@
 //! From lightmap texels to surface points (#438): each receiving mesh's triangles are
 //! rasterized in lightmap-UV space, and every texel a triangle covers becomes a
 //! world-space point and normal to trace from: at the texel's centre when the
-//! triangle covers it, else at the triangle's point nearest it, so even a chart
-//! thinner than a texel owns texels (#1687). Texels no triangle touches stay empty;
+//! triangle covers it, else at a point strictly inside the triangle within the
+//! texel, so even a chart thinner than a texel owns texels (#1687). Texels no triangle touches stay empty;
 //! dilation fills the ones bordering a chart so filtering never reads black at a
 //! seam.
 
@@ -58,27 +58,28 @@ struct UvTri {
 
 /// Every texel of a `size`² lightmap a triangle of `mesh` covers, in two passes.
 /// First every texel whose centre a triangle covers, traced at that centre. Then,
-/// conservatively (#1687), every texel still empty that a triangle overlaps, traced
-/// at the triangle's point nearest the texel centre: so a triangle narrower than a
-/// texel, and a chart made only of such triangles, still owns texels, each traced
-/// from its own surface. In either pass a texel two triangles share goes to the
-/// first in index order, and the first pass never yields to the second, so a
-/// centre-covered texel bakes exactly as it would without the second pass.
+/// conservatively (#1687), every texel still empty that a triangle's [`core`]
+/// overlaps with area, traced at the centroid of that overlap: so a triangle
+/// narrower than a texel, and a chart made only of such triangles, still owns
+/// texels, each traced from a point strictly inside its own surface, never on an
+/// edge where another surface may meet it. In either pass a texel two triangles
+/// share goes to the first in index order, and the first pass never yields to the
+/// second, so a centre-covered texel bakes exactly as it would without the second.
 pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
     let tris = uv_triangles(mesh, size as f32);
     let mut taken = vec![false; (size * size) as usize];
     let mut out = Vec::new();
     for conservative in [false, true] {
         for t in &tris {
+            let core = conservative.then(|| core(t));
             for (x, y) in texels_under(t, size) {
                 let index = (y * size + x) as usize;
                 if taken[index] {
                     continue;
                 }
-                let centre = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
-                let w = match conservative {
-                    false => barycentric(t.uv, t.area, centre),
-                    true => overlaps(t.uv, centre).then(|| nearest_weights(t, centre)),
+                let w = match &core {
+                    None => barycentric(t.uv, t.area, Vec2::new(x as f32 + 0.5, y as f32 + 0.5)),
+                    Some(core) => overlap_centroid(core, Vec2::new(x as f32, y as f32)),
                 };
                 let Some(w) = w else { continue };
                 taken[index] = true;
@@ -129,72 +130,86 @@ fn point(mesh: &BakeMesh, t: &UvTri, index: usize, w: Vec3) -> TexelPoint {
 /// The barycentric weights of `p` in triangle `uv` (signed doubled area `area`), or
 /// `None` when it lies outside.
 fn barycentric(uv: [Vec2; 3], area: f32, p: Vec2) -> Option<Vec3> {
-    let w = weights(uv, area, p);
+    let w0 = (uv[1] - p).perp_dot(uv[2] - p) / area;
+    let w1 = (uv[2] - p).perp_dot(uv[0] - p) / area;
+    let w = Vec3::new(w0, w1, 1.0 - w0 - w1);
     const EPS: f32 = -1e-5;
     (w.x >= EPS && w.y >= EPS && w.z >= EPS).then_some(w)
 }
 
-/// The barycentric weights of `p` in triangle `uv`, inside or not.
-fn weights(uv: [Vec2; 3], area: f32, p: Vec2) -> Vec3 {
-    let w0 = (uv[1] - p).perp_dot(uv[2] - p) / area;
-    let w1 = (uv[2] - p).perp_dot(uv[0] - p) / area;
-    Vec3::new(w0, w1, 1.0 - w0 - w1)
+/// How far in from its triangle's edges a texel claimed by overlap is traced, in
+/// texels, when the triangle is wide enough (#1687). A point on an edge sits on
+/// whatever surface meets the mesh there (a wall a floor stops at, the other face
+/// of a crease), so rays from it leak through that surface or start on its back.
+pub(super) const INSET: f32 = 0.125;
+
+/// A point in texel space and its barycentric weights in the triangle it lies in.
+#[derive(Clone, Copy)]
+struct Vert {
+    uv: Vec2,
+    w: Vec3,
 }
 
-/// Whether triangle `uv` overlaps the unit texel square centred on `centre` with
-/// some area (touching an edge or corner is not overlapping): the separating-axis
-/// test on the square's two axes and the triangle's three edge normals.
-fn overlaps(uv: [Vec2; 3], centre: Vec2) -> bool {
-    let axes = [
-        Vec2::X,
-        Vec2::Y,
-        uv[1] - uv[0],
-        uv[2] - uv[1],
-        uv[0] - uv[2],
-    ];
-    axes.iter().enumerate().all(|(k, &axis)| {
-        let n = if k < 2 { axis } else { axis.perp() };
-        let (lo, hi) = uv
-            .iter()
-            .map(|p| n.dot(*p - centre))
-            .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), d| {
-                (lo.min(d), hi.max(d))
-            });
-        let reach = 0.5 * (n.x.abs() + n.y.abs());
-        lo < reach && hi > -reach
+/// `t`'s core: `t` shrunk about its incentre so that every edge moves in by
+/// `min(INSET, r / 2)`, `r` its inradius. Every point of the core is that far off
+/// every edge of `t`, and a sliver keeps half its width, so its core still exists.
+fn core(t: &UvTri) -> [Vert; 3] {
+    let side = |i: usize, j: usize| t.uv[i].distance(t.uv[j]);
+    let sides = Vec3::new(side(1, 2), side(2, 0), side(0, 1));
+    let perimeter = sides.x + sides.y + sides.z;
+    let incentre = sides / perimeter;
+    let inradius = t.area.abs() / perimeter;
+    let keep = 1.0 - (INSET / inradius).min(0.5);
+    [Vec3::X, Vec3::Y, Vec3::Z].map(|corner| {
+        let w = incentre + keep * (corner - incentre);
+        let uv = w.x * t.uv[0] + w.y * t.uv[1] + w.z * t.uv[2];
+        Vert { uv, w }
     })
 }
 
-/// The barycentric weights of the point of triangle `t` nearest `p`, clamped onto
-/// the triangle so its surface point is never extrapolated off it.
-fn nearest_weights(t: &UvTri, p: Vec2) -> Vec3 {
-    if let Some(w) = barycentric(t.uv, t.area, p) {
-        return clamped(w);
+/// The barycentric weights of the centroid of `core` clipped to the texel whose
+/// lower corner is `lo`, or `None` when they share no area. The weights are carried
+/// through the clip, never recovered by dividing by the triangle's (maybe tiny) area.
+fn overlap_centroid(core: &[Vert; 3], lo: Vec2) -> Option<Vec3> {
+    let mut poly = core.to_vec();
+    for (axis, bound, keep_below) in [
+        (0, lo.x, false),
+        (0, lo.x + 1.0, true),
+        (1, lo.y, false),
+        (1, lo.y + 1.0, true),
+    ] {
+        let inside = |v: &Vert| (v.uv[axis] - bound) * if keep_below { -1.0 } else { 1.0 };
+        poly = clip(&poly, inside);
     }
-    let edges = [(0, 1), (1, 2), (2, 0)];
-    let nearest = edges
-        .map(|(i, j)| {
-            let (a, b) = (t.uv[i], t.uv[j]);
-            let ab = b - a;
-            let s = ((p - a).dot(ab) / ab.length_squared().max(1e-20)).clamp(0.0, 1.0);
-            a + ab * s
-        })
-        .into_iter()
-        .min_by(|a, b| a.distance_squared(p).total_cmp(&b.distance_squared(p)))
-        .unwrap_or(t.uv[0]);
-    clamped(weights(t.uv, t.area, nearest))
+    let (mut area, mut sum) = (0.0f32, Vec3::ZERO);
+    for pair in poly.get(1..)?.windows(2) {
+        let a = (pair[0].uv - poly[0].uv).perp_dot(pair[1].uv - poly[0].uv);
+        area += a;
+        sum += a * (poly[0].w + pair[0].w + pair[1].w) / 3.0;
+    }
+    // A sliver of float noise where the core only touches the texel is no overlap.
+    (area.abs() > 1e-9).then(|| sum / area)
 }
 
-/// `w` with float error off the triangle removed: no weight below zero, and they
-/// sum to one.
-fn clamped(w: Vec3) -> Vec3 {
-    let w = w.max(Vec3::ZERO);
-    let sum = w.x + w.y + w.z;
-    if sum > 0.0 {
-        w / sum
-    } else {
-        Vec3::splat(1.0 / 3.0)
+/// `poly` with the part where `inside` is negative cut away (one Sutherland–Hodgman
+/// step), each new vertex's weights interpolated with its position.
+fn clip(poly: &[Vert], inside: impl Fn(&Vert) -> f32) -> Vec<Vert> {
+    let mut out = Vec::with_capacity(poly.len() + 1);
+    for (k, a) in poly.iter().enumerate() {
+        let b = &poly[(k + 1) % poly.len()];
+        let (da, db) = (inside(a), inside(b));
+        if da >= 0.0 {
+            out.push(*a);
+        }
+        if (da >= 0.0) != (db >= 0.0) {
+            let s = da / (da - db);
+            out.push(Vert {
+                uv: a.uv.lerp(b.uv, s),
+                w: a.w.lerp(b.w, s),
+            });
+        }
     }
+    out
 }
 
 /// Fill each empty texel bordering filled ones with their average, `passes` rings
