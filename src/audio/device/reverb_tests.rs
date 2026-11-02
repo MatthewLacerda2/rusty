@@ -85,3 +85,44 @@ fn the_pre_delay_holds_the_tail_back() {
     let expected = (0.1 * RATE as f32) as i64;
     assert!((shift - expected).abs() <= 2, "shifted by {shift}");
 }
+
+/// Moving into a new zone with nothing playing bends nothing: the next sound's tail
+/// starts at the new pre-delay, not gliding towards it (#1729).
+#[test]
+fn a_retune_during_silence_takes_effect_on_the_next_sound() {
+    let params = ReverbParams {
+        pre_delay: 0.1,
+        wet: 1.0,
+        ..ReverbPreset::Hall.params().unwrap()
+    };
+    let settings = GroupSettings {
+        reverb_send: 1.0,
+        ..Default::default()
+    };
+    let mut b = rig(&[0.5; 64]);
+    b.set_group(GroupId(1), &GroupMix::new(&settings, 1.0));
+    b.device().render(RATE as usize * 3);
+    b.set_reverb(&params);
+    let burst = PlayParams {
+        group: GroupId(1),
+        ..flat("clip")
+    };
+    assert!(b.play(VoiceId(1), &burst));
+    let heard: Vec<f32> = b
+        .device()
+        .render(RATE as usize / 2)
+        .iter()
+        .map(|f| f.0)
+        .collect();
+    let after_burst = heard[64 + 128..].iter().position(|s| s.abs() > 1e-5);
+    let first = after_burst.expect("the tail sounds") + 64 + 128;
+    let expected = (0.1 * RATE as f32) as usize;
+    assert!(
+        first >= expected,
+        "the tail came at {first}, before {expected}"
+    );
+    assert!(
+        first < expected + RATE as usize / 10,
+        "the tail came at {first}"
+    );
+}

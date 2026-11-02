@@ -114,3 +114,17 @@ fn rate_resamples_and_pause_holds_the_playhead() {
     b.set_mix(VoiceId(1), &VoiceMix::FLAT);
     assert_eq!(b.device().render(1)[0].0, 0.75, "resumes where it stopped");
 }
+
+/// Every effect asleep after a long silence, a sound still starts on its first sample
+/// through the whole graph (#1729).
+#[test]
+fn a_sound_after_a_long_silence_is_heard_from_its_first_sample() {
+    let mut b = rig(&TONE);
+    b.device().render(RATE as usize * 3);
+    let params = PlayParams {
+        mix: VoiceMix::FLAT.with_master(0.5),
+        ..flat("clip")
+    };
+    assert!(b.play(VoiceId(1), &params));
+    assert_eq!(b.device().render(2), vec![(0.25, 0.25); 2]);
+}

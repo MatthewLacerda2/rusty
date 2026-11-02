@@ -15,6 +15,7 @@ use kira::effect::filter::{FilterBuilder, FilterHandle, FilterMode};
 use kira::track::{TrackBuilder, TrackHandle};
 use kira::{AudioManager, Decibels, Mix, Tween};
 
+use super::gate::Gated;
 use super::reverb::ReverbBus;
 use crate::components::ReverbParams;
 
@@ -73,8 +74,10 @@ impl GroupTracks {
         let mut builder = TrackBuilder::new()
             .sound_capacity(VOICES_PER_GROUP)
             .with_send(self.reverb.id(), Decibels::SILENCE);
-        let low_pass = builder.add_effect(filter(FilterMode::LowPass, Filter::LOW_PASS_OPEN));
-        let high_pass = builder.add_effect(filter(FilterMode::HighPass, Filter::HIGH_PASS_OPEN));
+        let low_pass =
+            builder.add_effect(Gated(filter(FilterMode::LowPass, Filter::LOW_PASS_OPEN)));
+        let high_pass =
+            builder.add_effect(Gated(filter(FilterMode::HighPass, Filter::HIGH_PASS_OPEN)));
         let track = match parent {
             None => manager.add_sub_track(builder).ok(),
             Some(p) => self
