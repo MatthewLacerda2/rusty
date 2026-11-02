@@ -13,7 +13,7 @@ from tests import load
 
 coder = load("coder.py")
 NOW = datetime(2026, 10, 29, 14, 3, tzinfo=timezone.utc)
-BRIEF = {"body": "Brief\n\nBranch: `9-x`.\nModel: Sonnet.", "created_at": "2026-10-29T10:00:00Z",
+BRIEF = {"body": "Brief\n\nBranch: `9-x`.", "created_at": "2026-10-29T10:00:00Z",
          "author_association": "OWNER", "html_url": "https://github.com/o/r/issues/9#issuecomment-501"}
 OLDER = {**BRIEF, "created_at": "2026-10-28T10:00:00Z", "html_url": "https://github.com/o/r/issues/9#issuecomment-400"}
 CHAT = {"body": "Thanks!", "created_at": "2026-10-29T11:00:00Z", "author_association": "NONE",
@@ -55,12 +55,12 @@ class Fake:
 
 
 class Launch(unittest.TestCase):
-    def test_creates_the_routine_on_the_briefs_model_and_prints_its_link(self):
+    def test_creates_the_routine_on_opus_and_prints_its_link(self):
         fake = Fake()
         code, out, _ = fake.run("9")
         self.assertEqual(code, 0)
         [body] = fake.created()
-        self.assertEqual(body["job_config"]["ccr"]["session_context"]["model"], "claude-sonnet-5-5")
+        self.assertEqual(body["job_config"]["ccr"]["session_context"]["model"], "claude-opus-5-5")
         self.assertEqual(body["job_config"]["ccr"]["environment_id"], "env_cloud")
         self.assertIn("https://claude.ai/code/routines/trig_new", out)
 
@@ -89,7 +89,6 @@ class Launch(unittest.TestCase):
 class Refuse(unittest.TestCase):
     def test_a_refusal_exits_1_and_starts_nothing(self):
         cases = {
-            "no `Model:` line": Fake(comments=[{**BRIEF, "body": "Brief\nBranch: x"}]),
             "planning": Fake(issue={"number": 9, "title": "t", "state": "open", "labels": [{"name": "planning"}]}),
             "no comment starting with": Fake(comments=[]),
         }

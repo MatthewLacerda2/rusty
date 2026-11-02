@@ -236,8 +236,7 @@ Beyond what changed, why, the effect and the decisions:
   (CLAUDE.md, *The closing-keyword trap*). The merge path refuses a keyword not
   alone on its line (#966), so write `Closes #N` on a line of its own.
 - Commit messages end with a `Co-Authored-By:` line naming the model you run
-  as, e.g. `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (a Sonnet
-  coder names Sonnet; the brief's `Model:` line says which, *Which model*).
+  as, e.g. `Co-Authored-By: Claude <model> <noreply@anthropic.com>`.
 - Push often: a dead container takes its uncommitted work with it.
 - Green gates and a branch that holds the latest `main` → mark the PR **ready for review**, and end.
 - **Do NOT merge, and do not review your own PR.** The independent review is the

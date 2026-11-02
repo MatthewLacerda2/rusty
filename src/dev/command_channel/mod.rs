@@ -11,7 +11,8 @@
 //! and per-connection handler threads (in `transport`) therefore **never touch the
 //! world**: they only move command strings to the main loop and read framed responses
 //! back. All evaluation happens on the main loop in [`CommandChannel::drain`], so sim
-//! ordering and determinism are unchanged.
+//! ordering and determinism are unchanged. The editor may be asleep outside Play
+//! (`shell::pace`, #1721), so a handler rings [`crate::core::wake`] with each command.
 //!
 //! ## Transport (cross-platform — see `transport`)
 //! - **unix:** a `UnixListener` at `$RUSTY_CMD_SOCK`, else `$XDG_RUNTIME_DIR/rusty.sock`,
@@ -240,5 +241,33 @@ mod tests {
 
         drop(channel);
         assert!(!path.exists(), "drop must remove the socket file");
+    }
+
+    /// The editor sleeps outside Play (#1721): a command must wake it, or its client
+    /// waits for a frame that nothing asks for.
+    #[cfg(unix)]
+    #[test]
+    fn a_command_wakes_a_sleeping_window() {
+        use std::io::Write;
+        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("rusty-cmd-wake-{}.sock", std::process::id()));
+        let console = RefCell::new(ConsoleLogs::new());
+        let channel =
+            CommandChannel::listen(&console, |tx| transport::bind_and_listen(tx, path.clone()))
+                .expect("bind the unix socket");
+        let before = crate::core::wake::rings();
+        let mut client = std::os::unix::net::UnixStream::connect(&path).expect("connect");
+        writeln!(client, "return 1").expect("send a command");
+        let (line, _reply) = channel.rx.recv().expect("the handler forwards it");
+        assert_eq!(line, "return 1");
+        // The ring comes right after the hand-off, on the handler's thread.
+        for _ in 0..200 {
+            if crate::core::wake::rings() > before {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        panic!("the command never woke the window");
     }
 }

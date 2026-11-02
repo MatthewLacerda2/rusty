@@ -185,3 +185,8 @@ Play/Step all drive the world on screen: `Editor.EnterPlay()` presses Play,
 `Time.Pause()`, `Editor.EnterPlay()`, `Time.Step(n)` / `Input.*` / `eval` /
 `snapshot`, `Editor.ExitPlay()`, `Time.Resume()` ([`api/Editor.md`](api/Editor.md)). Close and reopen the window freely — the next
 tool call reconnects, and you never have to `/mcp reconnect`.
+
+Outside Play the window draws **on demand** and sleeps otherwise, as Unity's Scene and
+Game views do. Each command wakes it, so an `eval` that moves an entity shows without
+touching the mouse, and its reply never waits on input. Game time doesn't run while it
+sleeps: outside Play, `Time.frameCount` counts the frames drawn, not the time passed.

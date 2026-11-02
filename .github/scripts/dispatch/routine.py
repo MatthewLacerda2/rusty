@@ -67,9 +67,14 @@ def environment(routines: list[dict]) -> str | None:
     return None
 
 
-def body(number: int, title: str, brief_url: str, model: str, environment_id: str, repository: str,
+#: The model every coder runs on; nobody chooses one per issue (#1726). A new generation
+#: changes this line, nothing else.
+MODEL = "claude-opus-5-5"
+
+
+def body(number: int, title: str, brief_url: str, environment_id: str, repository: str,
          now: datetime, event_id: str | None = None) -> dict:
-    """The `create` body for the coder of issue `number`, on `model`, pinned to `brief_url`."""
+    """The `create` body for the coder of issue `number`, on [`MODEL`], pinned to `brief_url`."""
     if not brief_url.startswith(f"https://github.com/{repository}/issues/{number}#issuecomment-"):
         raise ValueError(f"{brief_url!r} is not a comment on #{number}")
     prompt = PROMPT.format(number=number, brief=brief_url)
@@ -80,7 +85,7 @@ def body(number: int, title: str, brief_url: str, model: str, environment_id: st
         "job_config": {"ccr": {
             "environment_id": environment_id,
             "session_context": {
-                "model": model,
+                "model": MODEL,
                 "sources": [{"git_repository": {"url": f"https://github.com/{repository}"}}],
                 "allowed_tools": ALLOWED_TOOLS,
             },
