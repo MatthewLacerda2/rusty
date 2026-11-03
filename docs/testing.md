@@ -52,9 +52,12 @@ things follow:
 - The scenario VM is built from the gameplay VM's sandbox (#1408): no `os` or
   `io` (write results through `Harness.*`), and `math.random` draws from (and
   `math.randomseed` reseeds) the world's one seeded `Random`, so a scenario's
-  draws move the game's stream as `Random.*` calls do. Its `require` is Lua's
-  stock one, read relative to the working directory, not the project's
-  (the gameplay VM's project-relative `require` is not installed here).
+  draws move the game's stream as `Random.*` calls do. `require`, `dofile` and
+  `loadfile` are the gameplay VM's too (#1717): `require("lib.game")` searches
+  the project's `assets/scripts`, then the engine's bundled scripts, then
+  `package.path`; a relative `dofile` path is taken from the project root; a
+  file outside the project still loads but warns once in the console. So a game
+  script that `require`s its shared modules loads in a scenario as in Play.
 - A scenario is a test, so the paid provider verbs (`Sfx.Generate`, `Speech.*`)
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).

@@ -17,8 +17,9 @@
 //!
 //! The console REPL evaluates against this same VM, so it gets the same
 //! stdlib — one surface, three callers. The `play` harness's scenario VM is a
-//! separate VM built from the same [`sandboxed_vm`] (#1408): a play-test's
-//! results are a pure function of its scenario too.
+//! separate VM built from the same [`sandboxed_vm`] (#1408), with the same
+//! file access (#1717): a play-test's results are a pure function of its scenario
+//! too, and a game module loads there as in Play.
 
 use mlua::{Lua, LuaOptions, StdLib};
 
