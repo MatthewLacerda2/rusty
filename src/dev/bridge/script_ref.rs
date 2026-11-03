@@ -46,9 +46,8 @@ struct ScriptRef {
 
 impl ScriptRef {
     /// Run `f` on the pinned instance in the gameplay VM, or fail when it is no
-    /// longer the entity's live script of that name. `scoped` registers the API
-    /// first, for a call into the game script's code.
-    fn with<R>(&self, scoped: bool, f: impl FnOnce(&Lua, &Table) -> LuaResult<R>) -> LuaResult<R> {
+    /// longer the entity's live script of that name.
+    fn with<R>(&self, f: impl FnOnce(&Lua, &Table) -> LuaResult<R>) -> LuaResult<R> {
         let world = self.world.borrow();
         let manager = world.script_manager();
         let on_pinned = |glua: &Lua, t: &Table| {
@@ -57,11 +56,7 @@ impl ScriptRef {
                 .is_ok_and(|pinned| pinned.to_pointer() == t.to_pointer());
             same.then(|| f(glua, t)).transpose()
         };
-        let live = if scoped {
-            manager.with_script(self.id, &self.name, on_pinned)?
-        } else {
-            manager.with_script(self.id, &self.name, on_pinned)?
-        };
+        let live = manager.with_script(self.id, &self.name, on_pinned)?;
         live.flatten().ok_or_else(|| {
             mlua::Error::RuntimeError(format!(
                 "script '{}' on entity {} is gone",
@@ -86,7 +81,7 @@ impl ScriptRef {
                 self.name, self.id
             ))
         };
-        self.with(true, |glua, t| {
+        self.with(|glua, t| {
             let func: Function = glua.registry_value(func)?;
             let mut into_game = Copier::new(glua);
             let mut crossed = MultiValue::new();
@@ -120,11 +115,9 @@ impl ScriptRef {
 /// or for a function, a proxy that calls it (see the module doc).
 fn index(lua: &Lua, handle: AnyUserData, key: Value) -> LuaResult<Value> {
     let this = handle.borrow::<ScriptRef>()?;
-    let pinned_fn = this.with(false, |glua, t| {
-        match t.raw_get::<Value>(copy(&key, glua)?)? {
-            Value::Function(f) => glua.create_registry_value(f).map(Err),
-            other => copy(&other, lua).map(Ok),
-        }
+    let pinned_fn = this.with(|glua, t| match t.raw_get::<Value>(copy(&key, glua)?)? {
+        Value::Function(f) => glua.create_registry_value(f).map(Err),
+        other => copy(&other, lua).map(Ok),
     })?;
     let func = match pinned_fn {
         Ok(value) => return Ok(value),
@@ -148,9 +141,7 @@ impl UserData for ScriptRef {
         methods.add_meta_method(
             MetaMethod::NewIndex,
             |_, this, (key, value): (Value, Value)| {
-                this.with(false, |glua, t| {
-                    t.raw_set(copy(&key, glua)?, copy(&value, glua)?)
-                })
+                this.with(|glua, t| t.raw_set(copy(&key, glua)?, copy(&value, glua)?))
             },
         );
     }
