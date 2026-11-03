@@ -96,12 +96,28 @@ pub(crate) fn require_sim_vm(lua: &Lua, verb: &str) -> mlua::Result<()> {
 /// A throwaway VM for *reading* a script's returned table (its `fields` schema,
 /// its callbacks) without running it. `require` hands back an empty table, so a
 /// script that loads a helper module at its top level (#996) still evaluates
-/// here; nothing is read from disk.
+/// here; nothing is read from disk. Any other unknown global (the API surface,
+/// which this VM lacks) reads as a stub that indexes, calls and does arithmetic
+/// to another stub, so a chunk that reads the API at load (`local now =
+/// Time.time`) still yields its `fields` (#1709).
 pub(super) fn inspection_vm() -> Lua {
     let lua = Lua::new();
     let stub = lua.create_function(|lua, _: mlua::MultiValue| lua.create_table());
     if let Ok(stub) = stub {
         lua.globals().set("require", stub).ok();
     }
+    lua.load(STUB_GLOBALS).exec().ok();
     lua
 }
+
+/// Lays the stub [`inspection_vm`] hands back for an unknown global.
+const STUB_GLOBALS: &str = r#"
+local stub = {}
+local function give() return stub end
+local mt = { __index = give, __call = give, __newindex = function() end }
+for _, op in ipairs({ "add", "sub", "mul", "div", "mod", "pow", "unm", "idiv", "concat" }) do
+  mt["__" .. op] = give
+end
+setmetatable(stub, mt)
+setmetatable(_G, { __index = give })
+"#;

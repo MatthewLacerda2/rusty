@@ -43,6 +43,9 @@ pub struct ScriptManager {
     /// including failures — so the per-tick spawn scan (`load_new_scripts`)
     /// never retries (and re-logs) a script that failed to compile.
     pub(super) load_attempted: BTreeSet<(u32, usize)>,
+    /// Script paths whose `fields` schema could not be read this VM, so the
+    /// loader warns once per script, not once per instance (#1709).
+    pub(super) schema_warned: BTreeSet<String>,
     /// Every cell the `api::` surface borrows, shared with `Resources` and the
     /// platform layer; a second VM over the same world clones it (#1384).
     pub(super) cells: ApiCells,
@@ -71,6 +74,7 @@ impl ScriptManager {
             lua: None,
             entity_scripts: BTreeMap::new(),
             load_attempted: BTreeSet::new(),
+            schema_warned: BTreeSet::new(),
             cells: ApiCells::new(scene, input, nav, console, camera, time),
             workspace: PathBuf::new(),
             play_seed: DEFAULT_SEED,
@@ -134,6 +138,7 @@ impl ScriptManager {
         self.lua = Some(lua);
         self.entity_scripts.clear();
         self.load_attempted.clear();
+        self.schema_warned.clear();
         self.cells.timers.borrow_mut().clear();
 
         Ok(())
@@ -151,6 +156,7 @@ impl ScriptManager {
     pub fn shutdown(&mut self) {
         self.entity_scripts.clear();
         self.load_attempted.clear();
+        self.schema_warned.clear();
         self.cells.timers.borrow_mut().clear();
         self.lua = None;
     }
