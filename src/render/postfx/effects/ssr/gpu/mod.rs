@@ -5,5 +5,6 @@ mod blur;
 mod cover;
 mod energy;
 mod fixture;
+mod glossy;
 mod reflect;
 mod transparent;

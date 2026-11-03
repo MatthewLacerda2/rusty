@@ -84,13 +84,16 @@ fn world_at(uv: vec2<f32>, depth: f32, fwd: vec3<f32>) -> vec3<f32> {
     return a + (b - a) * ((depth - da) / (db - da));
 }
 
-// The tangent of the half-angle of the GGX lobe a surface of perceptual `roughness`
-// reflects into: half the lobe's half-vectors lie within `atan(alpha)` of the normal
-// (`alpha = roughness²`, GGX's median), and a reflection turns twice as far, so
-// `tan(2 atan(alpha))`. A mirror's is 0; roughness 0.4's about 0.33 (18°).
+// The tangent of the half-angle of the cone a surface of perceptual `roughness`
+// reflects into, Uludag's (GPU Pro 5, *Hi-Z Screen-Space Cone-Traced Reflections*):
+// GGX's `alpha = roughness²` as a Blinn-Phong power `2 / alpha² − 2`, and the cone
+// that holds its lobe down to 0.244 of its peak. A mirror's is 0; roughness 0.4's
+// about 0.19 (11°), 0.6's about 0.46 (25°).
 fn cone(roughness: f32) -> f32 {
-    let alpha = min(roughness * roughness, 0.9);
-    return 2.0 * alpha / (1.0 - alpha * alpha);
+    let alpha = max(roughness * roughness, 1e-3);
+    let power = 2.0 / (alpha * alpha) - 2.0;
+    let c = pow(0.244, 1.0 / (power + 1.0));
+    return sqrt(max(1.0 - c * c, 0.0)) / c;
 }
 
 @fragment

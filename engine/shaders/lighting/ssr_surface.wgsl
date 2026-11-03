@@ -34,16 +34,23 @@ const DIGIT: u32 = 15u;
 const F16_NORMAL: u32 = 1024u;
 
 // An octahedral component `e` in [-1, 1] and a roughness digit (0..14), as the `f16`
-// value an alpha holds.
+// value an alpha holds: the payload's bits read as a normal `f16`, `(1 + m/1024) ×
+// 2^(e − 15)`, built exactly in `f32` (`ldexp`; `pack2x16float` needs a capability
+// naga does not grant).
 fn pack_lane(e: f32, digit: u32) -> f32 {
     let q = u32(round(clamp(e * 0.5 + 0.5, 0.0, 1.0) * OCT_LEVELS));
-    return unpack2x16float(q * DIGIT + digit + F16_NORMAL).x;
+    let bits = q * DIGIT + digit + F16_NORMAL;
+    let mantissa = 1.0 + f32(bits & 1023u) / 1024.0;
+    return ldexp(mantissa, i32(bits >> 10u) - 15);
 }
 
-// `pack_lane`'s two parts, back: x the octahedral component, y the digit.
+// `pack_lane`'s two parts, back: x the octahedral component, y the digit. `frexp`
+// splits the value into a fraction in [0.5, 1) and its exponent, exactly.
 fn unpack_lane(a: f32) -> vec2<f32> {
-    let bits = pack2x16float(vec2<f32>(a, 0.0)) & 0xffffu;
-    let payload = max(bits, F16_NORMAL) - F16_NORMAL;
+    let split = frexp(max(a, ldexp(1.0, -14)));
+    let exponent = u32(split.exp + 14);
+    let mantissa = u32(round((split.fract * 2.0 - 1.0) * 1024.0));
+    let payload = ((exponent << 10u) | mantissa) - F16_NORMAL;
     return vec2<f32>(f32(payload / DIGIT) / OCT_LEVELS * 2.0 - 1.0, f32(payload % DIGIT));
 }
 
