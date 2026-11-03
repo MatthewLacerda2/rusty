@@ -7,13 +7,13 @@ use std::path::Path;
 
 use glam::Vec3;
 
-use super::{bake_scene_reflections, prune_stale, reflection_dir};
+use super::{prune_stale, reflection_dir};
 use crate::dev::bake::lighting::{start_lighting, LightingBakeParams};
-use crate::dev::bake::progress::BakeLog;
+use crate::dev::bake::steps::LightingBake;
 use crate::scene::Scene;
 
 /// A scene of `probes` reflection probes at a small resolution, each at its own spot.
-fn probed(probes: usize, x: f32) -> Scene {
+pub(super) fn probed(probes: usize, x: f32) -> Scene {
     let mut scene = Scene::new();
     for i in 0..probes {
         let at = Vec3::new(x + i as f32 * 4.0, 1.0, 0.0);
@@ -23,7 +23,7 @@ fn probed(probes: usize, x: f32) -> Scene {
     scene
 }
 
-fn fresh_dir(name: &str) -> std::path::PathBuf {
+pub(super) fn fresh_dir(name: &str) -> std::path::PathBuf {
     let dir = crate::test_temp::dir().join(format!("rusty_1692_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -77,25 +77,36 @@ fn gpu_two_scenes_in_one_folder_keep_their_own_cubes() {
     assert!(Path::new(&cube(&default, 0)).starts_with(reflection_dir(&default_path)));
     assert_ne!(cube(&kolvik, 0), cube(&default, 0));
 
-    // A rebake of the first scene with fewer probes: its extra cube goes, and the
-    // second scene's cubes stay.
+    // A rebake of the first scene with fewer probes, through Generate Lighting's
+    // commit as the editor and `Lighting.Generate()` run it: its extra cube goes, and
+    // the second scene's cubes stay.
     let before = std::fs::read(cube(&default, 2)).unwrap();
     kolvik.reflection_probes.remove(1);
-    assert!(bake_scene_reflections(&mut kolvik, Some(&kolvik_path), &mut BakeLog::off()).unwrap());
+    assert!(generate(&mut kolvik, &kolvik_path));
     assert!(!kolvik_dir.join("reflection_probe_1.ktx2").exists());
     assert!(kolvik_dir.join("reflection_probe_0.ktx2").exists());
     assert_eq!(std::fs::read(cube(&default, 2)).unwrap(), before);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Run Generate Lighting's probe bake to its end and commit it. False with no adapter.
-fn generate(scene: &mut Scene, path: &str) -> bool {
-    let params = LightingBakeParams::default();
-    let mut job = start_lighting(scene, Some(path), None, params).unwrap();
-    if scene.reflection_probes.is_empty() || !job.report().ran_reflection_bake {
+/// Run Generate Lighting's probe bake to its end and commit it. False when the
+/// reflection bake skipped (no adapter).
+pub(super) fn generate(scene: &mut Scene, path: &str) -> bool {
+    let Some(mut job) = finished(scene, path) else {
         return false;
-    }
-    while !job.step(scene, &mut |_| {}).unwrap() {}
+    };
     job.commit(scene).unwrap();
     true
+}
+
+/// Generate Lighting's probe bake stepped to its end, not committed. `None` when the
+/// reflection bake skipped (no adapter).
+pub(super) fn finished(scene: &mut Scene, path: &str) -> Option<LightingBake> {
+    let params = LightingBakeParams::default();
+    let mut job = start_lighting(scene, Some(path), None, params).unwrap();
+    if !job.report().ran_reflection_bake {
+        return None;
+    }
+    while !job.step(scene, &mut |_| {}).unwrap() {}
+    Some(job)
 }

@@ -67,8 +67,9 @@ pub struct LightingBake {
 
 impl LightingBake {
     /// Start baking `scene`'s placed probes (`report` holds the placement), writing
-    /// reflection cubemaps beside `scene_path`. Refuses up front, before any probe is
-    /// captured, when there are reflection probes and no saved scene to write beside.
+    /// reflection cubemaps into `scene_path`'s own `<scene>.reflections/` folder.
+    /// Refuses up front, before any probe is captured, when there are reflection probes
+    /// and no saved scene to write them for.
     pub(super) fn start(
         scene: &Scene,
         scene_path: Option<&str>,
@@ -111,10 +112,10 @@ impl LightingBake {
         let Some((probe, resolution)) = self.reflections.get(i) else {
             return Ok(true);
         };
-        let out_dir = out_dir(self.scene_path.as_deref())?;
         let Some(renderer) = self.renderer.as_mut() else {
             return Ok(true);
         };
+        let out_dir = out_dir(self.scene_path.as_deref())?;
         say(format!("Baking reflection probe {} of {total}", i + 1));
         let bytes = renderer.bake_reflection(scene, probe, *resolution);
         self.staged.write(&out_dir, &bytes)?;
@@ -122,8 +123,10 @@ impl LightingBake {
     }
 
     /// Apply a finished bake to `scene` in one step: the light probes' SH and every
-    /// reflection probe's cube. Errors, applying nothing, when the bake has not
-    /// finished or the scene's probes changed since it started.
+    /// reflection probe's cube. A reflection bake that ran then removes the cubes in
+    /// the scene's folder past its probe count, all of them when it had no probes; a
+    /// bake dropped before its commit removes nothing. Errors, applying nothing, when
+    /// the bake has not finished or the scene's probes changed since it started.
     pub fn commit(&mut self, scene: &mut Scene) -> Result<(), String> {
         self.refuse_changed(scene)?;
         if self.stage() != Stage::Done {
