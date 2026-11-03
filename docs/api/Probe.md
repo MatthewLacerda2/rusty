@@ -33,7 +33,9 @@ surface under the probe reflects `albedo / π · E`, the same Lambert response d
 lights and baked lightmaps give, so a dynamic object under probes and a static one
 under a lightmap of the same surroundings render alike (#807). A `Baked` lamp's direct light lands in
 the probes shaped by the scene's diffuse model (`diffuseModel` in `Lighting.md`, #1698):
-under `HalfLambert` it reads back as the same squared wrap a live lamp gives.
+under `HalfLambert` it reads back as the same squared wrap a live lamp gives, and so does
+`BakeAnalytic`'s sun. A probe holds the lamp as seen from its own position, so a probe-lit
+object keeps the wrap's back-side light that a lightmapped surface's shadow ray cuts.
 
 `Bake` is the real multi-bounce GI bake (#241, #285): for every probe it captures the
 STATIC scene to a cubemap from the probe's position (dynamic actors excluded) and

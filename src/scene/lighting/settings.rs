@@ -20,12 +20,17 @@ pub struct LightingSettings {
     pub reflections: ReflectionSettings,
     /// How a lamp's direct light falls off across a surface (#1698): realtime
     /// shading, the lightmap bake and the light-probe bake all read it, so one lamp
-    /// looks the same Baked or Realtime.
+    /// lights the side facing it the same Baked or Realtime. Left out of the file at
+    /// Lambert, so a scene saved before it existed round-trips unchanged.
+    #[serde(skip_serializing_if = "DiffuseModel::is_lambert")]
     pub diffuse_model: DiffuseModel,
 }
 
-/// The diffuse response to a lamp's direct light, scene-wide (#1698). Indirect light
-/// (bounce, sky, probes' captured surfaces) stays Lambert under either.
+/// The diffuse response to a lamp's direct light, scene-wide (#1698). It applies
+/// wherever a lamp lights a surface: realtime shading, lightmap texels, the surfaces
+/// a bake's bounce rays hit and those a probe capture renders, so global
+/// illumination gets brighter under [`DiffuseModel::HalfLambert`] too. Only the
+/// transfer between surfaces (a bounce lighting a texel) and the sky stay Lambert.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiffuseModel {
     /// The physical `max(N·L, 0)`, what every PBR engine shades with.
@@ -49,9 +54,16 @@ impl DiffuseModel {
         }
     }
 
-    /// The model called `name`, if any.
+    /// The model called `name`, in any case, if any.
     pub fn from_name(name: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|m| m.name() == name)
+        Self::ALL
+            .into_iter()
+            .find(|m| m.name().eq_ignore_ascii_case(name))
+    }
+
+    /// True for the default, [`DiffuseModel::Lambert`]: the scene file leaves it out.
+    pub fn is_lambert(&self) -> bool {
+        *self == Self::Lambert
     }
 
     /// The share of a lamp's radiance a surface receives at `cos` = N·L, the

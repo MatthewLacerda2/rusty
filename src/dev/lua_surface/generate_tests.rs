@@ -58,10 +58,13 @@ fn the_diffuse_model_reads_back_sets_and_refuses_an_unknown_name() {
         .eval("Lighting.SetSettings{ diffuseModel = 'Wrap', samples = 3 }")
         .unwrap_err();
     assert!(err.contains("unknown diffuseModel"), "{err}");
+    // A bad reflection field raises after the model is read: still nothing changes.
+    s.eval("Lighting.SetSettings{ diffuseModel = 'lambert', reflectionBudgetMB = 'x' }")
+        .unwrap_err();
     assert_eq!(
         model(),
         DiffuseModel::HalfLambert,
-        "a refused call changes nothing"
+        "refused calls change nothing"
     );
 }
 

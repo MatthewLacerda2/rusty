@@ -76,8 +76,9 @@ fn baked_shot(model: DiffuseModel, name: &str) -> image::RgbImage {
 /// Mean absolute difference per channel over the pixels `mask` lights clearly: the
 /// side facing the lamp, where Lambert is above zero, short of the terminator, whose
 /// last texels the lightmap's filtering blends with the shadowed side. Past the terminator the wrap's light
-/// reaches a live surface but not a baked one, whose shadow ray its own mesh blocks
-/// (`Lighting.md`, `diffuseModel`): that is a shadow, not the diffuse model.
+/// reaches a live surface whose lamp casts no shadows but not a baked one, whose shadow
+/// ray its own mesh blocks (`Lighting.md`, *Baked vs Realtime*): that is a shadow, not
+/// the diffuse model.
 fn diff(a: &image::RgbImage, b: &image::RgbImage, mask: &image::RgbImage) -> f64 {
     let (mut sum, mut n) = (0.0, 0);
     for ((p, q), m) in a.pixels().zip(b.pixels()).zip(mask.pixels()) {

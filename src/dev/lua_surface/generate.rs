@@ -102,15 +102,18 @@ pub(super) fn register<'scope>(
 }
 
 /// `SetSettings{…}`: the fields `t` names written into the scene's settings, each
-/// clamped; an unknown diffuse model refuses the whole call.
+/// clamped. Every field is read and checked before any is written, so a call that
+/// raises (an unknown diffuse model, a value of the wrong type) changes nothing.
 fn set_settings(scene: &mut crate::scene::Scene, t: &Table) -> mlua::Result<()> {
     let overrides = Overrides::from_table(t)?;
-    if let Some(model) = diffuse_model(t)? {
-        scene.lighting_settings.diffuse_model = model;
-    }
-    let s = &mut scene.lighting_settings.lightmaps;
-    *s = overrides.apply(*s);
-    set_reflections(t, &mut scene.lighting_settings.reflections)
+    let model = diffuse_model(t)?;
+    let mut reflections = scene.lighting_settings.reflections;
+    set_reflections(t, &mut reflections)?;
+    let settings = &mut scene.lighting_settings;
+    settings.diffuse_model = model.unwrap_or(settings.diffuse_model);
+    settings.lightmaps = overrides.apply(settings.lightmaps);
+    settings.reflections = reflections;
+    Ok(())
 }
 
 /// The diffuse model `t` names (#1698), if any; an unknown name is an error.

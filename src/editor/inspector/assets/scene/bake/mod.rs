@@ -94,12 +94,15 @@ pub fn draw(
         } else {
             "Open this scene to bake it"
         });
+    // The diffuse model is greyed out with the knobs: lightmaps and probes bake one
+    // after the other, and a change between them would save two models as one.
+    let settings = &mut scene.lighting_settings;
     let changed = ui
         .add_enabled_ui(idle, |ui| {
-            draw_settings(ui, &mut scene.lighting_settings.lightmaps)
+            draw_settings(ui, &mut settings.lightmaps)
+                | draw_diffuse_model(ui, &mut settings.diffuse_model)
         })
         .inner;
-    let changed = changed | draw_diffuse_model(ui, &mut scene.lighting_settings.diffuse_model);
     editor.is_dirty |= changed;
     if generate.clicked() {
         start(editor, scene, console);

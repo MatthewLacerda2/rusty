@@ -39,6 +39,14 @@ fn names_round_trip_and_an_unknown_one_is_none() {
     for m in DiffuseModel::ALL {
         assert_eq!(DiffuseModel::from_name(m.name()), Some(m));
     }
+    assert_eq!(
+        DiffuseModel::from_name("halflambert"),
+        Some(DiffuseModel::HalfLambert)
+    );
+    assert_eq!(
+        DiffuseModel::from_name("LAMBERT"),
+        Some(DiffuseModel::Lambert)
+    );
     assert_eq!(DiffuseModel::from_name("Wrap"), None);
 }
 
