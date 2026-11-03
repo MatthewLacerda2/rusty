@@ -4,7 +4,7 @@
 Must refuse: a code pull request with no such comment, one whose comment is by an
 account that cannot push, and a `No review:` with no reason. Must pass: an
 `Independent review` comment, a reasoned `No review:`, a Markdown-only pull
-request CI counts as non-code, and Dependabot's own branch.
+request CI counts as non-code, and Dependabot's cargo bump.
 """
 
 from __future__ import annotations
@@ -37,8 +37,13 @@ class Refuses(unittest.TestCase):
                 self.assertTrue(refused)
                 self.assertIn("cannot push", refused[1])
 
+    def test_a_record_still_to_come(self):
+        for body in ("Independent review pending", "Independent reviewer dispatched", "**Independent review** soon"):
+            with self.subTest(body=body):
+                self.assertTrue(reviewed.refusal(CODE, [said(body)]))
+
     def test_a_waiver_with_no_reason(self):
-        for body in ("No review:", "No review:   ", "**No review:**", "No review:\nbecause docs"):
+        for body in ("No review:", "No review:   ", "**No review:**", "**No review**:", "No review:\nbecause docs"):
             with self.subTest(body=body):
                 self.assertTrue(reviewed.refusal(CODE, [said(body)]))
 
@@ -51,16 +56,22 @@ class Refuses(unittest.TestCase):
         self.assertTrue(reviewed.refusal(pull("Cargo.lock"), [], bot=True))
         self.assertTrue(reviewed.refusal(pull("Cargo.lock", branch="dependabot/cargo/x"), [], bot=False))
 
+    def test_dependabots_actions_bump_edits_workflows(self):
+        bump = pull(".github/workflows/ci.yml", branch="dependabot/github_actions/actions/checkout-5")
+        self.assertTrue(reviewed.refusal(bump, [], bot=True))
+
 
 class Passes(unittest.TestCase):
     def test_an_independent_review_record(self):
         for body in ("Independent review", "## Independent review\n1. fixed", "**Independent review** (high): none",
-                     "\n\nIndependent review of #1753"):
+                     "Independent review (high: physics)", "**Independent review**: no findings",
+                     "Independent review — none", "\n\nIndependent review: #1753"):
             with self.subTest(body=body):
                 self.assertEqual(reviewed.refusal(CODE, [said(body)]), [])
 
     def test_a_reasoned_waiver(self):
-        for body in ("No review: data only", "**No review:** a dev tool", "no review: size-cap split"):
+        for body in ("No review: data only", "**No review:** a dev tool", "**No review**: a dev tool",
+                     "no review: size-cap split"):
             with self.subTest(body=body):
                 self.assertEqual(reviewed.refusal(CODE, [said(body, "COLLABORATOR")]), [])
 

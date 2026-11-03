@@ -1,7 +1,7 @@
 """The handed-back heads remembered across watches, and what re-admits each (#751, #869, #1279).
 
 Every hand-back remembers its head ([`MEMORY`]) and is passed over until that
-moves. Three things count as moving without a push:
+moves. Four things count as moving without a push:
 
 - **a new run attempt on the head** ([`RUNS_MEMORY`], [`rerun_heads`], #869): `gh
   run rerun --failed` after a runner outage or a flake;
@@ -13,8 +13,7 @@ moves. Three things count as moving without a push:
   restart, so even that did not help until a CI re-run;
 - **the issue it closes no longer blocking it** ([`ISSUES_MEMORY`], [`unblocked`],
   #1279): labelled `planning`/`human`, blocked or already closed, which no edit
-  of the pull request fixes. Those issues are asked again each listing.
-
+  of the pull request fixes. Those issues are asked again each listing;
 - **a comment recording its review decision** ([`REVIEWS_MEMORY`], [`reviewed`],
   #1764): a pull request queued before anyone wrote `Independent review` or
   `No review: <why>` on it. Its claim is kept too, so a label taken off and put

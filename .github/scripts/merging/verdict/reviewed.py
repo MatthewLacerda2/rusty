@@ -17,9 +17,18 @@ request that does not say what was decided ([`refusal`]), before any push:
   public, and anyone may comment.
 - **Not needed** ([`exempt`]) for what CI's `code` filter counts as non-code
   (Markdown, the docs tests parse aside: [`changes.inert`], held to `ci.yml` by
-  `test_workflow_hygiene.py`), and for Dependabot's own branches, which the
-  skill says need no review: its author *and* its `dependabot/` branch, so a
-  person's branch never qualifies.
+  `test_workflow_hygiene.py`), and for Dependabot's cargo bumps, which the
+  skill says need no review: its author *and* its `dependabot/cargo/` branch,
+  so a person's branch never qualifies, and its Actions bumps (workflows, a
+  trigger that wins) still need the record.
+
+Two limits, left to prose on purpose (PR #1767's review). **The outcomes are
+not read**: any `Independent review` comment counts, open must-fix findings or
+not, since a record lists findings in free prose and is routinely posted while
+the coder is still fixing; so `independent-review`, step 2, has the label taken
+off until they are answered. **A decision is not tied to a head**: a `No
+review: data only` stays valid after a later push; the orchestrator's read
+before labelling is the guard.
 
 Pure but for [`comments`], which reads them over REST (#970).
 """
@@ -33,14 +42,19 @@ from merging.verdict import changes, github
 
 
 # The first non-blank line of a review record: the skill's heading, as a
-# heading, bold or plain (`## Independent review`, `**Independent review**: …`).
-REVIEWED = re.compile(r"^[#*_\s]*Independent review\b", re.IGNORECASE)
+# heading, bold or plain (`## Independent review`, `**Independent review**: …`,
+# `Independent review (high: …)`). The words end the line or are followed by
+# `(`, `:` or a dash, so `Independent review pending` is not a record.
+REVIEWED = re.compile(r"^[#*_\s]*Independent review[*_]*[ \t]*(?:$|[(:—–-])", re.IGNORECASE)
 
-# The written exemption, its reason on the same line.
-WAIVED = re.compile(r"^[#*_\s]*No review:\**[ \t]*(.*?)\s*$", re.IGNORECASE)
+# The written exemption, its reason on the same line: `No review: why`,
+# `**No review:** why` or `**No review**: why`.
+WAIVED = re.compile(r"^[#*_\s]*No review(?:\*\*|__)?:[*_]*[ \t]*(.*?)\s*$", re.IGNORECASE)
 
-# Dependabot's head branches, beside its author ([`exempt`]).
-BOT_BRANCH = "dependabot/"
+# Dependabot's cargo branches, beside its author ([`exempt`]). Its GitHub Actions
+# bumps (`dependabot/github_actions/…`) edit `.github/workflows/`, which
+# `independent-review` reviews whoever wrote it, so they are not exempt.
+BOT_BRANCH = "dependabot/cargo/"
 
 
 def first_line(body: str) -> str:

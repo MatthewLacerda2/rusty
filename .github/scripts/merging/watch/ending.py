@@ -117,7 +117,9 @@ def handed_back(number: int, why: str, waits: str | None = None) -> str:
                " passed over until the issue no longer blocks it (or its description, labels or head change)")
     elif waits == outcomes.AWAITS_REVIEW:
         fix = ("Review it (`independent-review`) or waive it with `No review: <why>`; no push needed:"
-               " passed over until such a comment appears (or its description, labels or head change)")
+               " passed over until such a comment appears (or its description, labels or head change)."
+               " Take the `queue` label off while must-fix findings are open: any `Independent review`"
+               " comment puts it back in line, whatever the record says")
     else:
         fix = ("Push a fix, or re-run the failed jobs (`gh run rerun --failed`) when it was runners or a flake:"
                " passed over until its head moves or runs again")

@@ -225,8 +225,9 @@ Per pull request:
 1. **Read the description and the diff, then add the `queue` label** (#925).
    Check its decisions against the issue. Engine mechanism, a stored format,
    determinism, CI or the merge path, or a refactor gets the
-   `independent-review` skill first; anything else gets a `No review: <why>`
-   comment, since the queue takes neither without its record (`independent-review`,
+   `independent-review` skill first; any other code PR gets a `No review: <why>`
+   comment (a Markdown-only PR CI counts as non-code, and a Dependabot cargo
+   bump, need neither), since the queue takes neither without its record (`independent-review`,
    *Answering the findings*, step 2). What the read turns up goes back to the
    coder unlabelled; removing the label pulls a PR out of line. File its
    "follow-up" notes as issues now. If it dispatched a scoped mutation run, read

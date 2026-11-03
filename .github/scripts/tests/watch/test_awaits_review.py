@@ -2,7 +2,9 @@
 """#1764: a pull request with no review decision is handed back before any push,
 and comes back in line when a comment records one (or its labels change).
 
-The take is driven with `gh` and `git` patched out; the loop by the fake world.
+The take is driven with `gh` and `git` patched out where they are defined
+(`gitio.git`, as `test_taking.py` does), so it never fetches; the loop by the
+fake world.
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from merging.queue import cli, outcomes, pulls, taking, update
+from merging.queue import cli, gitio, outcomes, pulls, taking, update
 from merging.verdict import reviewed
 from merging.watch import ending, handbacks, loop
 from tests.queue.fixtures import READY, REVIEW
@@ -25,6 +27,7 @@ def take(*argv: str, comments=(), pull=PULL):
     with mock.patch.object(pulls, "look", return_value=pull), \
             mock.patch.object(taking.closing, "closed_by", return_value={}), \
             mock.patch.object(reviewed, "comments", return_value=list(comments)), \
+            mock.patch.object(gitio, "git"), \
             mock.patch.object(update, "advance", return_value=(None, ["stop here"])) as advanced, \
             mock.patch("builtins.print") as printed:
         result = taking.take("o/r", 1, cli.parse(["1", *argv]))
@@ -94,7 +97,9 @@ class Watched(unittest.TestCase):
         self.assertEqual(handbacks.reviewed([pr(1)], {1: "sha1"}, {1: "x"}, lambda n: True), [1])
 
     def test_the_line_says_what_clears_it(self):
-        self.assertIn("No review: <why>", ending.handed_back(1, "why", outcomes.AWAITS_REVIEW))
+        line = ending.handed_back(1, "why", outcomes.AWAITS_REVIEW)
+        self.assertIn("No review: <why>", line)
+        self.assertIn("Take the `queue` label off while must-fix findings are open", line)
 
 
 if __name__ == "__main__":
