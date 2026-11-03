@@ -5,10 +5,11 @@
 //! queued-spawn contract (#322). A spawn verb (`Scene.Instantiate`,
 //! `Scene.CreateEntity`, …) usually runs *mid-dispatch*, inside another
 //! script's callback — loading (and `Awake`-ing) the new script synchronously
-//! there would re-enter the Lua scope. Instead the spawned entity just sits in
-//! the scene until the head of the next tick's script phase, when the scan
-//! loads every script slot with no prior load attempt; `init_scripts` then
-//! runs `Awake` + `Start` before any `Update` of that tick.
+//! there would run its chunk and hooks in the middle of the dispatch loop over
+//! the manager's instances. Instead the spawned entity just sits in the scene
+//! until the head of the next tick's script phase, when the scan loads every
+//! script slot with no prior load attempt; `init_scripts` then runs `Awake` +
+//! `Start` before any `Update` of that tick.
 
 use mlua::Table;
 use std::collections::BTreeMap;

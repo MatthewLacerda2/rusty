@@ -119,15 +119,15 @@ fn register_scene(lua: &Lua, ctx: &ApiCtx) -> Reg {
 /// bot-players.
 pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // sorted: each registrar makes its own global table; the ones extending a table
-    // (`register_hitscan`, `register_scoped`, `register_events`)
+    // (`register_hitscan`, `register_reimport`, `register_events`)
     // sort after the one that made it
     animator::register(lua, ctx.scene, ctx.console)?;
     application::register(lua, ctx.application)?;
-    // `Assets` mostly borrows no engine state (it walks the project asset root on
-    // each call), so it stays a plain static registrar; only the import-setting
-    // setter that re-imports the scene's meshes (#831) is scoped.
+    // `Assets` mostly reads no engine cell (it walks the project asset root on each
+    // call); only the import-setting setters that re-import the scene's meshes
+    // (#831) reach the scene.
     assets::register(lua)?;
-    assets::register_scoped(lua, ctx.scene)?;
+    assets::register_reimport(lua, ctx.scene)?;
     audio::register(lua, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
     camera::register(lua, ctx)?;
     canvas::register(lua, ctx.scene, ctx.screen, ctx.video)?;

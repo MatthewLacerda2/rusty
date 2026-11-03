@@ -16,7 +16,7 @@ use std::rc::Rc;
 use mlua::{Function, Lua, MultiValue, Table, Value};
 
 use crate::scene::Scene;
-use crate::scripting::{ApiCells, HostCall, HostJournal, Plain};
+use crate::scripting::{HostCall, HostJournal, Plain};
 
 /// The `Harness` verbs that change the world without a tick: noted like an API
 /// call. Every other `Harness` verb reads the world, or steps it.
@@ -60,8 +60,8 @@ end
 /// How deep a table argument may nest; deeper is treated as a cycle.
 const MAX_DEPTH: usize = 32;
 
-/// Note every API call `lua` makes from now on in `journal`. Call it inside the
-/// scope that registered the API, after registering it.
+/// Note every API call `lua` makes from now on in `journal`. Call it once, after
+/// the API is installed on `lua` (`ApiCells::install`).
 pub fn journal_calls(lua: &Lua, journal: &Rc<RefCell<HostJournal>>) -> mlua::Result<()> {
     let notes = Rc::clone(journal);
     let note = lua.create_function(move |_, (function, args): (String, MultiValue)| {
@@ -156,15 +156,13 @@ fn to_lua(lua: &Lua, value: &Plain) -> mlua::Result<Value> {
     })
 }
 
-/// Make the call `function` (`Namespace.Function`) with `args` in `lua`, over the
-/// world's API `cells`: what a scenario did before this tick, again.
-pub fn invoke(lua: &Lua, cells: &ApiCells, function: &str, args: &[Plain]) -> Result<(), String> {
+/// Make the call `function` (`Namespace.Function`) with `args` in `lua`: what a
+/// scenario did before this tick, again. The replay's VM has the surface over the
+/// world's cells from `replay::replay_vm` (a restart builds a new one).
+pub fn invoke(lua: &Lua, function: &str, args: &[Plain]) -> Result<(), String> {
     let (namespace, name) = function
         .split_once('.')
         .ok_or_else(|| format!("{function} is not Namespace.Function"))?;
-    // The replay's VM has the surface from `replay::prepare`; the world's cells are
-    // attached again, as a restarted replay may stand on new ones.
-    cells.attach(lua);
     call(lua, (namespace, name), args).map_err(|e| format!("{function}: {e}"))
 }
 

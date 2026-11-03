@@ -94,10 +94,7 @@ impl Replayer {
                 let verb = &function["Harness.".len()..];
                 calls::invoke_harness(&self.lua, world.scene(), verb, &args).err()
             }
-            HostCall::Call { function, args } => {
-                let cells = world.script_manager().api_cells();
-                calls::invoke(&self.lua, &cells, &function, &args).err()
-            }
+            HostCall::Call { function, args } => calls::invoke(&self.lua, &function, &args).err(),
             HostCall::Taint(what) => {
                 let line = format!(
                     "[Demo] tainted from tick {t}: {what}; the replay may differ from here"

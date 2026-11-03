@@ -102,7 +102,7 @@ pub fn register(lua: &Lua) -> Reg {
 /// model inspector uses, re-importing the model's meshes in the scene, and returns
 /// how many it re-imported. `SetModelImportSettings(path, t)` does the same for the
 /// Scale Factor.
-pub fn register_scoped(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
+pub fn register_reimport(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = global_table(lua, "Assets")?;
     put(
         &table,
