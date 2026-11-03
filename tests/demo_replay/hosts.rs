@@ -67,3 +67,20 @@ fn a_harness_verb_that_changes_the_world_replays() {
         verdict.taints
     );
 }
+
+/// A `require` that falls through to `package.path` calls `package.searchpath`,
+/// which the journal must not note as a game act (#1717).
+#[test]
+fn a_fall_through_require_notes_no_host_call() {
+    let dir = crate::temp::dir().join("demo_require");
+    let code = r#"
+        Harness.Step(5)
+        Harness.Expect(not pcall(require, "no.such.module"), "the module is missing")
+        Harness.Step(5)
+    "#;
+    let demo = Demo::read(&record(&dir, code)).unwrap();
+    let before_play = serde_json::to_string(&demo.header.before_play).unwrap();
+    let host: Vec<_> = demo.ticks().flat_map(|t| t.host).collect();
+    assert!(host.is_empty(), "{host:?}");
+    assert!(!before_play.contains("package."), "{before_play}");
+}
