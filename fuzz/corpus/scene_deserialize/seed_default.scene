@@ -398,7 +398,8 @@
         "area_size": [
           1.0,
           1.0
-        ]
+        ],
+        "shadow_fade_distance": 0.0
       },
       "collider": null,
       "rigidbody": null,
