@@ -1,4 +1,4 @@
-//! src/api/light.rs — `Light` namespace.
+//! src/api/light/ — `Light` namespace.
 //!
 //! Get/Set over an entity's optional `LightComponent`: colour, intensity, range,
 //! light type, whether it casts shadows and how far its shadow reaches
