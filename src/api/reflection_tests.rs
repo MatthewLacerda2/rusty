@@ -99,3 +99,20 @@ fn a_set_with_a_bad_field_writes_nothing() {
         "the field before the bad one is untouched"
     );
 }
+
+#[test]
+fn added_probes_are_manual_and_set_can_change_it() {
+    let scene = empty_scene();
+    let lua = Lua::new();
+    lua.scope(|scope| {
+        register(&lua, scope, &scene).unwrap();
+        let manual: bool = lua
+            .load("Reflection.Add(0,0,0, 1,1,1) return Reflection.Get(0).manual")
+            .eval()?;
+        assert!(manual, "Add places by hand (#1737)");
+        lua.load("Reflection.Set(0, { manual = false })").exec()?;
+        Ok(())
+    })
+    .unwrap();
+    assert!(!scene.borrow().reflection_probes.probes[0].manual);
+}

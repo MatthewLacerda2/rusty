@@ -13,9 +13,10 @@
 //!     (`LightingData`), keyed by probe index — heavy, regenerable data kept out
 //!     of the human-diffable scene file.
 //!
-//! Interpolation is TRILINEAR over the grid (no tetrahedral gold-plating). A free
-//! probe (placed outside any grid) contributes a nearest-probe fallback so manual
-//! placement still works.
+//! Interpolation is TRILINEAR over the grid (no tetrahedral gold-plating). Outside
+//! a grid, or for a set with none (the automatic placement's, #1737, whose density
+//! follows the geometry), the [`BLEND_PROBES`] nearest probes are blended by inverse
+//! squared distance, so a moving object fades from one probe to the next.
 //!
 //! This module is pure data + math — deterministic, sim-reachable, no RNG/clock.
 
@@ -24,6 +25,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::scene::lighting::sh::Sh9;
 
+/// How many probes a point outside any grid blends: the four nearest, a
+/// tetrahedron's worth, as Unity's light-probe tetrahedra blend four.
+pub const BLEND_PROBES: usize = 4;
+/// A squared distance this small reads the probe it is on, unblended.
+const ON_PROBE: f32 = 1.0e-8;
+
 /// A single light probe: a world position plus the baked SH it carries. The SH is
 /// the heavy part; on disk the position lives in the scene and the SH in the
 /// sidecar (see [`save_lighting_sidecar`](crate::scene::lighting::io::save_lighting_sidecar)/
@@ -31,6 +38,11 @@ use crate::scene::lighting::sh::Sh9;
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Probe {
     pub position: Vec3,
+    /// Placed by hand (#1737): the automatic placement keeps it where it is and
+    /// plans around it, and replaces only the probes without it. `Probe.Add` and
+    /// `Probe.FillGrid` set it; a saved probe without the field reads as placed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub manual: bool,
     #[serde(skip)]
     pub sh: Sh9,
 }
@@ -39,6 +51,7 @@ impl Probe {
     pub fn new(position: Vec3) -> Self {
         Self {
             position,
+            manual: false,
             sh: Sh9::zero(),
         }
     }
@@ -114,6 +127,25 @@ impl ProbeVolume {
         }
     }
 
+    /// Mark probe `index` as placed by hand or not (no-op if out of range).
+    pub fn set_manual(&mut self, index: usize, manual: bool) {
+        if let Some(p) = self.probes.get_mut(index) {
+            p.manual = manual;
+        }
+    }
+
+    /// Replace the probes the automatic placement made with `placed` (#1737): the
+    /// manual ones stay, in order, and the new ones follow them. The grid stays only
+    /// when every probe it indexes was manual and kept.
+    pub fn replace_placed(&mut self, placed: impl IntoIterator<Item = Vec3>) {
+        let before = self.probes.len();
+        self.probes.retain(|p| p.manual);
+        if self.probes.len() != before {
+            self.grid = None;
+        }
+        self.probes.extend(placed.into_iter().map(Probe::new));
+    }
+
     /// Drop every probe and the grid.
     pub fn clear(&mut self) {
         self.probes.clear();
@@ -149,7 +181,8 @@ impl ProbeVolume {
 
     /// Sample the interpolated SH irradiance at a world position. Trilinear over the
     /// grid when one is present and the point falls inside it; otherwise (free probes,
-    /// or a point outside the grid) the nearest probe. `None` when there are no probes.
+    /// or a point outside the grid) the [`BLEND_PROBES`] nearest blended. `None` when
+    /// there are no probes.
     pub fn sample(&self, position: Vec3) -> Option<Sh9> {
         if self.probes.is_empty() {
             return None;
@@ -192,59 +225,31 @@ impl ProbeVolume {
         Some(Sh9::lerp(&c0, &c1, frac.z))
     }
 
-    /// Nearest-probe SH (used for free probes or out-of-grid points).
+    /// The [`BLEND_PROBES`] nearest probes' SH, weighted by inverse squared
+    /// distance (used for free probes or out-of-grid points). A point on a probe
+    /// reads that probe; ties keep the lower index, so the answer is deterministic.
     fn sample_nearest(&self, position: Vec3) -> Sh9 {
-        let mut best = (f32::INFINITY, Sh9::zero());
-        for p in &self.probes {
+        let mut near = [(f32::INFINITY, usize::MAX); BLEND_PROBES];
+        for (i, p) in self.probes.iter().enumerate() {
             let d = p.position.distance_squared(position);
-            if d < best.0 {
-                best = (d, p.sh);
+            if d < near[BLEND_PROBES - 1].0 {
+                near[BLEND_PROBES - 1] = (d, i);
+                near.sort_by(|a, b| a.0.total_cmp(&b.0));
             }
         }
-        best.1
+        let (mut sum, mut total) = (Sh9::zero(), 0.0);
+        for &(d, i) in near.iter().filter(|n| n.1 != usize::MAX) {
+            if d <= ON_PROBE {
+                return self.probes[i].sh;
+            }
+            let w = 1.0 / d;
+            sum = Sh9::lerp(&sum, &self.probes[i].sh, w / (total + w));
+            total += w;
+        }
+        sum
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn fill_grid_counts_and_positions() {
-        let mut vol = ProbeVolume::new();
-        vol.fill_grid(Vec3::ZERO, Vec3::new(2.0, 0.0, 2.0), 1.0);
-        // 3 along x, 1 along y, 3 along z = 9 probes.
-        assert_eq!(vol.probes.len(), 9);
-        let grid = vol.grid.unwrap();
-        assert_eq!(grid.counts, [3, 1, 3]);
-        assert_eq!(vol.probes[0].position, Vec3::ZERO);
-    }
-
-    #[test]
-    fn add_move_remove_probe() {
-        let mut vol = ProbeVolume::new();
-        let i = vol.add_probe(Vec3::X);
-        assert_eq!(vol.probes.len(), 1);
-        vol.move_probe(i, Vec3::Y);
-        assert_eq!(vol.probes[i].position, Vec3::Y);
-        vol.remove_probe(i);
-        assert!(vol.is_empty());
-    }
-
-    #[test]
-    fn sample_none_when_empty() {
-        let vol = ProbeVolume::new();
-        assert!(vol.sample(Vec3::ZERO).is_none());
-    }
-
-    #[test]
-    fn trilinear_blends_between_probes() {
-        let mut vol = ProbeVolume::new();
-        vol.fill_grid(Vec3::ZERO, Vec3::new(1.0, 0.0, 0.0), 1.0);
-        // Two probes along x. Set distinct DC terms.
-        vol.probes[0].sh.coeffs[0] = [0.0, 0.0, 0.0];
-        vol.probes[1].sh.coeffs[0] = [1.0, 0.0, 0.0];
-        let mid = vol.sample(Vec3::new(0.5, 0.0, 0.0)).unwrap();
-        assert!((mid.coeffs[0][0] - 0.5).abs() < 1.0e-5);
-    }
-}
+#[path = "probe_tests.rs"]
+mod tests;

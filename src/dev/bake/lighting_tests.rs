@@ -75,35 +75,77 @@ fn gpu_auto_places_both_sets_on_empty_scene() {
     assert_eq!(scene.reflection_probes.len(), report.reflection_probes);
 }
 
-/// Manually-authored probes are NOT clobbered: a scene that already carries a probe in
-/// each set is rebaked in place, with no auto-placement (the documented per-set rule).
+/// Manual probes survive a re-placement unchanged (#1737): every bake replaces
+/// only the placed probes, keeps the manual ones with their position, box and
+/// settings, and leaves the room a manual reflection probe covers to it.
 #[test]
-fn gpu_manual_probes_are_kept_not_replaced() {
+fn gpu_manual_probes_survive_a_replacement() {
     let dir = crate::test_temp::dir().join("rusty_lighting_bake_test");
     let _ = std::fs::create_dir_all(&dir);
     let scene_path = dir.join("manual.scene");
     let scene_path = scene_path.to_str().unwrap();
 
     let mut scene = room_scene();
-    scene.probes.add_probe(Vec3::new(1.0, 1.0, 1.0));
-    scene
-        .reflection_probes
-        .add(Vec3::new(2.0, 2.0, 2.0), Vec3::splat(3.0));
+    scene.lighting_settings.reflections.resolution = 16;
+    let light = scene.probes.add_probe(Vec3::new(1.0, 4.0, 1.0));
+    scene.probes.set_manual(light, true);
+    // A probe the placement made in an earlier bake: it is replaced.
+    scene.probes.add_probe(Vec3::new(-9.0, 4.0, -9.0));
+    let set = &mut scene.reflection_probes;
+    let mine = set.add(Vec3::new(5.0, 4.6, 5.0), Vec3::splat(3.0));
+    set.edit(mine, |p| (p.manual, p.intensity) = (true, 2.5));
+    let manual = set.probes[mine].clone();
 
-    let report = bake_lighting(
-        &mut scene,
-        Some(scene_path),
-        None,
-        LightingBakeParams::default(),
-        &mut |_| {},
-        &mut BakeLog::off(),
-    )
-    .expect("rebake never errors with a scene path");
-
-    assert!(!report.auto_placed_light, "manual light set kept");
-    assert!(!report.auto_placed_reflection, "manual reflection set kept");
-    assert_eq!(report.light_probes, 1);
-    assert_eq!(report.reflection_probes, 1);
+    let params = LightingBakeParams {
+        probe_spacing: 10.0,
+        ..Default::default()
+    };
+    let mut bake = |scene: &mut Scene| {
+        bake_lighting(
+            scene,
+            Some(scene_path),
+            None,
+            params,
+            &mut |_| {},
+            &mut BakeLog::off(),
+        )
+        .expect("rebake never errors with a scene path")
+    };
+    let first = bake(&mut scene);
+    let second = bake(&mut scene);
+    assert!(first.auto_placed_light && first.auto_placed_reflection);
+    assert_eq!(first, second, "a re-placement places the same");
+    assert_eq!(scene.probes.probes[0].position, Vec3::new(1.0, 4.0, 1.0));
+    assert!(scene.probes.probes[0].manual);
+    assert_eq!(scene.probes.probes.iter().filter(|p| p.manual).count(), 1);
+    assert!(
+        !(scene.probes.probes.iter()).any(|p| p.position == Vec3::new(-9.0, 4.0, -9.0)),
+        "the old placed probe is replaced"
+    );
+    let kept = &scene.reflection_probes.probes[0];
+    assert_eq!(
+        (
+            kept.position,
+            kept.box_min,
+            kept.box_max,
+            kept.intensity,
+            kept.manual
+        ),
+        (
+            manual.position,
+            manual.box_min,
+            manual.box_max,
+            manual.intensity,
+            true
+        ),
+    );
+    for p in &scene.reflection_probes.probes[1..] {
+        assert!(!p.manual);
+        assert!(
+            !manual.contains(p.position),
+            "the manual probe's room is its own"
+        );
+    }
 }
 
 /// An empty scene (no static geometry) places nothing and still succeeds — both bakes

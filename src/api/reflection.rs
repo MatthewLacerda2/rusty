@@ -53,9 +53,10 @@ fn register_placement<'scope>(
         "Add",
         scope.create_function(|_, (x, y, z, hx, hy, hz): AddArgs| {
             let mut scene = scene.borrow_mut();
-            let i = scene
-                .reflection_probes
-                .add(Vec3::new(x, y, z), Vec3::new(hx, hy, hz));
+            let set = &mut scene.reflection_probes;
+            let i = set.add(Vec3::new(x, y, z), Vec3::new(hx, hy, hz));
+            // Placed by hand: the bake's auto-placement keeps it (#1737).
+            set.edit(i, |p| p.manual = true);
             Ok(i as u32)
         }),
     )?;
@@ -199,6 +200,7 @@ fn read_fields(lua: &Lua, p: &ReflectionProbe) -> mlua::Result<Table> {
     t.set("farClip", p.far_clip)?;
     t.set("shadows", p.shadows)?;
     t.set("intensity", p.intensity)?;
+    t.set("manual", p.manual)?;
     Ok(t)
 }
 
@@ -226,6 +228,7 @@ fn write_fields(p: &mut ReflectionProbe, t: &Table) -> mlua::Result<()> {
     set(t, "nearClip", &mut p.near_clip)?;
     set(t, "farClip", &mut p.far_clip)?;
     set(t, "shadows", &mut p.shadows)?;
+    set(t, "manual", &mut p.manual)?;
     set(t, "intensity", &mut p.intensity)
 }
 

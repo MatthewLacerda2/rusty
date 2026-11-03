@@ -5,9 +5,10 @@
 use glam::{Vec2, Vec3};
 
 use super::floor::{FloorCell, FloorGrid, MAX_FLOOR_CELLS};
+use super::occupancy::{Occupancy, Solid, CELL};
 use super::room_probes::plan_rooms;
-use super::test_level::{block, grid_of_rooms};
-use super::{plan_reflection_probes, ReflectionPlacement, EYE_HEIGHT, MIN_REGION};
+use super::test_level::{block, grid_of_rooms, plan_static, roof};
+use super::{ReflectionPlacement, EYE_HEIGHT, MIN_REGION};
 use crate::scene::Scene;
 
 fn placed(scene: &Scene, region: f32, max_probes: usize) -> usize {
@@ -16,10 +17,10 @@ fn placed(scene: &Scene, region: f32, max_probes: usize) -> usize {
         max_probes,
         ..ReflectionPlacement::default()
     };
-    plan_reflection_probes(scene, None, &params).len()
+    plan_static(scene, &params).len()
 }
 
-/// A 20 × 20 m open floor.
+/// A 20 × 20 m floor under a roof 4 m up.
 fn floor() -> Scene {
     let mut scene = Scene::new();
     block(
@@ -27,6 +28,7 @@ fn floor() -> Scene {
         Vec3::new(-10.0, -0.2, -10.0),
         Vec3::new(10.0, 0.0, 10.0),
     );
+    roof(&mut scene, (-10.0, -10.0), (10.0, 10.0), 4.0);
     scene
 }
 
@@ -72,9 +74,9 @@ fn a_trigger_is_not_a_wall() {
         );
         let id = *scene.world.ids_with_collider().last().unwrap();
         scene.world.collider_mut(id).unwrap().is_trigger = trigger;
-        plan_reflection_probes(&scene, None, &params)
+        plan_static(&scene, &params)
     };
-    let open = plan_reflection_probes(&floor(), None, &params);
+    let open = plan_static(&floor(), &params);
     assert_eq!(walled(true), open);
     assert_ne!(walled(false), open, "a solid wall splits the floor");
 }
@@ -102,9 +104,12 @@ fn a_capture_point_on_a_stair_stands_over_its_own_step() {
         width: 9,
         depth: 3,
         cells,
+        upper: Vec::new(),
         inset: 0.0,
     };
-    let plans = plan_rooms(&grid, &[Some(0); 27], 1, 20.0, 50.0);
+    let slab = Solid::cuboid(Vec3::new(0.0, -1.0, 0.0), Vec3::new(9.0, 0.0, 3.0));
+    let occ = Occupancy::build(&[slab], CELL).unwrap();
+    let plans = plan_rooms((&grid, &occ), &[Some(0); 27], 1, 20.0, 50.0);
     let p = plans[0];
     assert_eq!(p.position.y, 3.0 + EYE_HEIGHT, "{p:?}");
     assert!(p.box_max.y > p.position.y, "the box holds it: {p:?}");
