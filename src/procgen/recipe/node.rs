@@ -33,12 +33,8 @@ impl Node {
         if accepts.accepts(self.inputs.len()) {
             return Ok(());
         }
-        let func = match &self.op {
-            OpKind::Math(p) => serde_json::to_value(p.func).ok(),
-            _ => None,
-        };
         Err(self.error(Fault::Arity {
-            func: func.and_then(|f| f.as_str().map(str::to_string)),
+            func: self.op.func(),
             given: self.inputs.len(),
             accepts,
         }))

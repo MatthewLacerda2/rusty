@@ -42,7 +42,7 @@ pub struct OpInfo {
     pub params: &'static [OpParam],
 }
 
-pub(super) const fn req(name: &'static str, ty: &'static str) -> OpParam {
+pub(crate) const fn req(name: &'static str, ty: &'static str) -> OpParam {
     OpParam {
         name,
         ty,
@@ -52,7 +52,7 @@ pub(super) const fn req(name: &'static str, ty: &'static str) -> OpParam {
     }
 }
 
-pub(super) const fn opt(name: &'static str, ty: &'static str, default: Lit) -> OpParam {
+pub(crate) const fn opt(name: &'static str, ty: &'static str, default: Lit) -> OpParam {
     OpParam {
         name,
         ty,
@@ -63,11 +63,11 @@ pub(super) const fn opt(name: &'static str, ty: &'static str, default: Lit) -> O
 }
 
 /// `p`, made socketable: it takes a link as well as a number.
-pub(super) const fn socket(p: OpParam) -> OpParam {
+pub(crate) const fn socket(p: OpParam) -> OpParam {
     OpParam { socket: true, ..p }
 }
 
-pub(super) const fn choice(name: &'static str, values: &'static [&'static str]) -> OpParam {
+pub(crate) const fn choice(name: &'static str, values: &'static [&'static str]) -> OpParam {
     OpParam {
         name,
         ty: "enum",
@@ -77,7 +77,7 @@ pub(super) const fn choice(name: &'static str, values: &'static [&'static str]) 
     }
 }
 
-pub(super) const fn op(
+pub(crate) const fn op(
     op: &'static str,
     category: &'static str,
     inputs: Arity,
@@ -90,3 +90,6 @@ pub(super) const fn op(
         params,
     }
 }
+
+/// A stochastic op's own seed, folded into the recipe seed (#1487).
+pub(crate) const SEED: OpParam = opt("seed", "integer", Lit::Integer(0));

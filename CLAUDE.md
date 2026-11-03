@@ -46,7 +46,8 @@ not the engine calling third-party APIs: tooling that reaches an external servic
   session points you there.
 - **Nested CLAUDE.md files** carry one area's rules and load only when you read files
   there: `.github/scripts/CLAUDE.md` (the merge and batch tooling), `tools/lint/CLAUDE.md`
-  (the lint tool) and `src/render/CLAUDE.md` (the renderer and `engine/shaders/`).
+  (the lint tool), `src/render/CLAUDE.md` (the renderer and `engine/shaders/`) and
+  `src/procgen/CLAUDE.md` (Snyder's texture ops).
   Project-wide rules stay in this file.
 
 **Three skills carry the working protocols** — `issue-batch`, `ci-merge` and
