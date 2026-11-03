@@ -305,7 +305,7 @@ Tween paths: `Graphics.ssr.step_length` (a count, as `steps`, does not tween).
 **Bloom** bleeds the scene's bright parts into their surroundings: a bright pass
 keeps the light above the **threshold** (by luminance), a gaussian blur spreads it at
 a fraction of the view's resolution its **quality** picks (the seeded presets'
-`Medium` level: a quarter on `Low`, half on `Medium` and `High`; `Custom` takes the
+`Medium` level: a quarter on `Low`, half on `Medium`, a third on `High`; `Custom` takes the
 `resolution_divisor` knob; see *Quality presets*), and the composite adds it back times
 the **intensity**, before the exposure. It reads the scene after depth of field and
 motion blur, so a moving highlight blooms along its streak. The player's `bloom`

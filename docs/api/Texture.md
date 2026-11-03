@@ -1,5 +1,8 @@
 ## `Texture`
 
+**Snyder**, rusty's procedural texture graph (Substance Designer / Blender's shader
+nodes, baked to PNG). Snyder is the tool's name; its API is this `Texture` namespace.
+
 Agent-composed **procedural texture authoring** (#270): build a *recipe* — a small
 DAG of curated ops — and **bake** it to a tiling `.png` a material map slot consumes.
 This is the texture leg of the authoring layer and the shared spine (recipe →
