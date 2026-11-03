@@ -2,7 +2,8 @@
 //! Each cascade is one layer of a depth-array texture. Static casters are baked into a
 //! cached static array per cascade, re-baked only when that cascade's light volume
 //! moves (#355); each frame the static layers are copied into the active array and the
-//! dynamic casters drawn over them. Casters are drawn instanced, one draw per mesh per
+//! dynamic casters drawn over them. A frame with no live directional light fits no
+//! cascade and records none of it (#1713). Casters are drawn instanced, one draw per mesh per
 //! cascade (#470, `casters`), skinned ones in their animated pose (#599). A caster
 //! whose surface clips fragments — a cutout, a dissolve — clips its shadow too (#648,
 //! `clips`).
@@ -254,6 +255,8 @@ mod cutout_tests;
 #[cfg(test)]
 pub(super) mod contact_tests;
 
+#[cfg(test)]
+mod live_sun_tests;
 #[cfg(test)]
 mod mapped_cutout_tests;
 #[cfg(test)]
