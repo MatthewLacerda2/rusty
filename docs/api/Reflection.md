@@ -77,7 +77,10 @@ to a cubemap from the probe's position (dynamic actors excluded) at its resoluti
 through its clip planes, with or without shadows, runs a GGX
 importance-sample prefilter to build a roughness mip chain (mip ↔ roughness — a mirror
 reads the sharp base level, a rough surface a blurrier one), encodes the result to a
-**KTX2** file written next to the scene (`reflection_probe_<i>.ktx2`), and points the
+**KTX2** file written to the scene's own folder (`<scene file>.reflections/reflection_probe_<i>.ktx2`,
+as Unity keeps a scene's baked probes in a folder named after it, so two scenes in one
+folder never overwrite each other's cubes; cubes there past the probe count are removed,
+nothing outside it is touched), and points the
 probe at it. Glossy surfaces inside the probe's box then reflect that baked cubemap,
 parallax-corrected, with roughness selecting the mip — instead of the global skybox. It
 needs a GPU or software adapter (e.g. lavapipe); with none it skips gracefully and
