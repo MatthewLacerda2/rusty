@@ -98,7 +98,7 @@ pub(crate) fn composite_source() -> String {
 
 #import fullscreen
 #import postfx::frame::{{Frag, fragment, t_color, s_color, t_lut}}
-#import postfx::grade::lut_coord
+#import postfx::grade::lut_sample
 {imports}
 // Every composite function's params, at the slots `effects::composite_layout` gave it.
 @group(0) @binding(9) var<uniform> fx: array<vec4<f32>, {len}>;
@@ -121,8 +121,8 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {{
     let f = fragment(in.uv, in.pos.xy);
     // The scene, focused and motion-blurred upstream when the view runs them.
     var c = textureSample(t_color, s_color, in.uv).rgb;
-{hdr}    // The grade + tonemap (HDR -> display): one trilinear fetch of the LUT.
-    c = textureSampleLevel(t_lut, s_color, lut_coord(c), 0.0).rgb;
+{hdr}    // The grade + tonemap (HDR -> display): one tetrahedral read of the LUT.
+    c = lut_sample(t_lut, c);
 {display}    return vec4<f32>(c, 1.0);
 }}
 ",

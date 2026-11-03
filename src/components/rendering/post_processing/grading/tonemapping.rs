@@ -11,8 +11,17 @@ crate::core::named_enum! {
     /// (`TonemappingMode.ACES`, #997).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum Tonemap {
-        /// Filmic ACES fit — the default, richer contrast in highlights.
+        /// Khronos PBR Neutral (#1701) — the default: colours below 0.76 pass 1:1
+        /// with their hue and saturation, highlights roll off to white along a
+        /// line that keeps the hue, so a warm lamp stays warm.
         #[default]
+        Neutral = "Neutral",
+        /// AgX (Blender 4, Godot 4.4) — a filmic log curve in a slightly inset
+        /// gamut: saturated highlights desaturate towards white without skewing.
+        AgX = "AgX",
+        /// Narkowicz's fit of the ACES RRT + sRGB ODT, at the original curve's
+        /// exposure (#1701) — rich contrast, but per channel, so saturated
+        /// highlights skew in hue (orange goes yellow).
         Aces = "ACES",
         /// Reinhard `c / (1 + c)` — cheap, soft rolloff.
         Reinhard = "Reinhard",
@@ -28,6 +37,8 @@ impl Tonemap {
             Tonemap::None => 0,
             Tonemap::Reinhard => 1,
             Tonemap::Aces => 2,
+            Tonemap::Neutral => 3,
+            Tonemap::AgX => 4,
         }
     }
 }
@@ -36,7 +47,7 @@ impl Tonemap {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Tonemapping {
-    /// The operator; ACES by default.
+    /// The operator; Neutral by default.
     pub mode: Tonemap,
     /// Display-gamma *tweak* around the neutral `1.0` (#415): the final image is
     /// `c^(1/gamma)` in linear space, then the sRGB render target does the real
@@ -47,7 +58,7 @@ pub struct Tonemapping {
 impl Default for Tonemapping {
     fn default() -> Self {
         Self {
-            mode: Tonemap::Aces,
+            mode: Tonemap::Neutral,
             display_gamma: 1.0,
         }
     }
