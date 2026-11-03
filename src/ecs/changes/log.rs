@@ -7,6 +7,10 @@
 //! ever stamped. Past [`cap`] entries (a consumer that reads, then stops, while
 //! another keeps reading) the older half is dropped; a cursor that had not read it
 //! answers "rebuild everything" next time, which is always correct.
+//!
+//! That bound is on `entries`. Beside them a recording log keeps `last`, 8 bytes per
+//! id up to the highest id it ever stamped (24 KiB for a 3000-entity level), until
+//! the World is cleared or rewound.
 
 /// One channel's log.
 #[derive(Debug, Default)]
@@ -23,6 +27,9 @@ pub(super) struct Log {
     high_water: u64,
     /// Per id, the revision of its newest entry (`0`: none), so a repeat is skipped.
     last: Vec<u64>,
+    /// Entries ever appended: a repeat no cursor has read past is not one, so with a
+    /// reader every tick its growth per tick is the distinct ids dirtied in it.
+    pub logged: u64,
     /// Whether whole-entity writes (place, overwrite, remove) stamp this channel:
     /// true for a component column, false for a derived channel stamped by hand.
     pub column: bool,
@@ -53,17 +60,23 @@ impl Log {
         if at >= self.last.len() {
             self.last.resize(at + 1, 0);
         }
-        let last = self.last[at];
-        if last > self.high_water && last > self.floor {
-            return; // still in the log and unread by every cursor
+        if self.pending(id) {
+            return;
         }
         self.last[at] = self.revision;
         self.entries.push((self.revision, id));
+        self.logged += 1;
         if self.entries.len() > cap(live) {
             let half = self.entries.len() / 2;
             self.floor = self.entries[half - 1].0;
             self.entries.drain(..half);
         }
+    }
+
+    /// Whether `id` has an entry still in the log that no cursor has read past.
+    pub fn pending(&self, id: u32) -> bool {
+        let last = self.last.get(id as usize).copied().unwrap_or(0);
+        self.recording && last > self.high_water && last > self.floor
     }
 
     /// A cursor opens here: recording starts, and it has read everything so far.
@@ -99,7 +112,7 @@ impl Log {
         self.high_water = self.revision;
     }
 
-    /// Entries held now (`Debug.Stats`'s churn counter).
+    /// Entries held now: what [`cap`] bounds.
     pub fn len(&self) -> usize {
         self.entries.len()
     }

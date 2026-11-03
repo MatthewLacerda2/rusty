@@ -2,15 +2,19 @@
 //! consumer last looked (#1705). Bevy's `Changed<T>` / `RemovedComponents<T>` and
 //! Unity's `transform.hasChanged`, as one log per channel read through cursors.
 //!
-//! **Channels.** Every component column is one (`T` is the column's type: a
-//! `ColliderComponent`, the `TransformComponent`, the `Core` flags). It is stamped
-//! at the World's write funnels: a column borrowed mutably (`component_mut`,
-//! `with_pair_mut`), attached, detached or taken (`set_component`,
-//! `take_component`), and every column of an entity placed, overwritten or
-//! removed. A mutable borrow counts as a change, as in Bevy: a write that changed
-//! nothing is over-reported, which is safe; a missed one would be the bug. A
-//! *derived* channel is a marker type stamped by hand where its fact can change;
-//! [`StaticSet`] is the first.
+//! **Channels** ([`Channel`], sealed). Every component column is one (`T` is the
+//! column's type: a `ColliderComponent`, the `TransformComponent`,
+//! `Vec<ScriptComponent>`, the `Core` flags). It is stamped at the World's write
+//! funnels, in the same call that notes the write for the edit journal
+//! (`stamp.rs`): a column borrowed mutably (`component_mut`, `with_pair_mut`),
+//! attached, detached or taken (`set_component`, `take_component`), and every
+//! column of an entity placed, overwritten or removed. A mutable borrow counts as
+//! a change, as in Bevy: a write that changed nothing is over-reported, which is
+//! safe; a missed one would be the bug. Two writes compare first because they are
+//! hot: a Transform landing its old value and a collider's derived world box stamp
+//! nothing. A *derived* channel is a marker stamped at the source of its fact, its
+//! descendants included, so a consumer never expands ids itself: [`WorldPose`],
+//! [`Activity`], [`Layer`] and [`StaticSet`].
 //!
 //! **Cursors.** A consumer opens a [`Cursor`] once ([`World::change_cursor`]) and
 //! asks [`World::changes`] each time it runs: [`Changes::Ids`], the ids stamped
@@ -22,19 +26,26 @@
 //! Any number of cursors read one channel, each at its own pace.
 //!
 //! **Cost.** A channel no cursor was ever opened on costs a write one test and,
-//! when another channel is being read, one lookup; nothing accumulates for it. A
-//! read channel's log is bounded (`log.rs`).
+//! when another channel is being read, one lookup; nothing accumulates for it, and
+//! a derived channel's subtree walk is not taken. A read channel's log is bounded
+//! (`log.rs`).
 //!
 //! **Determinism.** The log is sim state: ids come back ascending, channels are
 //! found by type and walked only in the order they were first opened, never by
 //! `TypeId`. A consumer computes, for the ids it is given, exactly what its full
 //! pass computes for them.
 
+mod channel;
+#[cfg(test)]
+mod derived_tests;
 mod log;
+#[cfg(test)]
+mod ops_tests;
 #[cfg(test)]
 mod play_tests;
 #[cfg(test)]
-mod static_tests;
+mod seam_tests;
+mod stamp;
 #[cfg(test)]
 mod tests;
 
@@ -43,16 +54,10 @@ use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+pub use channel::{Activity, Channel, Layer, StaticSet, WorldPose};
 use log::Log;
 
 use super::world::World;
-
-/// The derived channel stamped wherever the set of static entities active in the
-/// hierarchy may have changed, with the entities whose membership may have moved:
-/// a flag flipped, a static entity (or an ancestor of one) activated, deactivated
-/// or re-parented, a static entity placed or removed. Its revision is
-/// [`World::static_revision`].
-pub struct StaticSet;
 
 /// A consumer's place in one channel's log. Opened by [`World::change_cursor`].
 pub struct Cursor<T> {
@@ -89,8 +94,19 @@ pub(in crate::ecs) struct ChangeLogs {
     logs: Vec<Log>,
     /// Channel -> index into `logs`. Looked up, never iterated.
     index: BTreeMap<TypeId, usize>,
-    /// Debug names, parallel to `logs`.
+    /// [`Channel::NAME`]s, parallel to `logs`.
     names: Vec<&'static str>,
+}
+
+/// One opened channel's counters ([`World::change_stats`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChangeStat {
+    pub name: &'static str,
+    /// Entries the log holds now (bounded, `log.rs`).
+    pub held: usize,
+    /// Entries ever appended; per tick, with a reader every tick, the distinct ids
+    /// dirtied in it.
+    pub logged: u64,
 }
 
 impl Default for ChangeLogs {
@@ -101,24 +117,26 @@ impl Default for ChangeLogs {
             index: BTreeMap::new(),
             names: Vec::new(),
         };
-        logs.slot::<StaticSet>(false); // index `STATIC`; its revision is `static_revision`, read unopened
+        logs.slot::<StaticSet>(); // index `STATIC`; its revision is `static_revision`, read unopened
         logs
     }
 }
 
 impl ChangeLogs {
-    fn slot<T: 'static>(&mut self, column: bool) -> &mut Log {
+    fn slot<T: Channel>(&mut self) -> &mut Log {
         let next = self.logs.len();
         let at = *self.index.entry(TypeId::of::<T>()).or_insert(next);
         if at == next {
-            self.logs.push(Log::new(column));
-            self.names.push(std::any::type_name::<T>());
+            self.logs.push(Log::new(T::COLUMN));
+            self.names.push(T::NAME);
         }
         &mut self.logs[at]
     }
 
-    fn get<T: 'static>(&self) -> Option<&Log> {
-        self.index.get(&TypeId::of::<T>()).map(|&at| &self.logs[at])
+    /// `T`'s index in `logs`: it exists once a cursor was opened on `T` (always, for
+    /// [`StaticSet`]).
+    fn find<T: Channel>(&self) -> Option<usize> {
+        self.index.get(&TypeId::of::<T>()).copied()
     }
 
     /// The World was replaced or rewound: every cursor reads `Rebuild` next.
@@ -129,49 +147,9 @@ impl ChangeLogs {
 }
 
 impl World {
-    /// `id` changed on column `T`.
-    pub(in crate::ecs) fn stamp<T: 'static>(&mut self, id: u32) {
-        if self.changes.logs.len() == 1 {
-            return; // only `StaticSet` exists: no column was ever opened
-        }
-        let live = self.order.len();
-        let changes = &mut self.changes;
-        if let Some(&at) = changes.index.get(&TypeId::of::<T>()) {
-            changes.logs[at].stamp(id, live);
-        }
-    }
-
-    /// `id` changed on every column at once (placed, overwritten, removed).
-    pub(in crate::ecs) fn stamp_columns(&mut self, id: u32) {
-        if self.changes.logs.len() == 1 {
-            return;
-        }
-        let live = self.order.len();
-        for log in self.changes.logs.iter_mut().filter(|l| l.column) {
-            log.stamp(id, live);
-        }
-    }
-
-    /// `id`'s membership of the static set may have changed ([`StaticSet`]).
-    pub(in crate::ecs) fn stamp_static(&mut self, id: u32) {
-        let live = self.order.len();
-        self.changes.logs[STATIC].stamp(id, live);
-    }
-
-    /// Stamp every static entity in `id`'s subtree: an activation or a re-parent
-    /// there changes whether they are active in the hierarchy.
-    pub(in crate::ecs) fn stamp_static_below(&mut self, id: u32) {
-        let statics: Vec<u32> = self
-            .self_and_descendants(id)
-            .filter(|&e| self.is_static(e))
-            .collect();
-        statics.into_iter().for_each(|e| self.stamp_static(e));
-    }
-
     /// Open a cursor on channel `T`: it has read everything up to now.
-    pub fn change_cursor<T: 'static>(&mut self) -> Cursor<T> {
-        let column = TypeId::of::<T>() != TypeId::of::<StaticSet>();
-        let seen = self.changes.slot::<T>(column).open();
+    pub fn change_cursor<T: Channel>(&mut self) -> Cursor<T> {
+        let seen = self.changes.slot::<T>().open();
         Cursor {
             epoch: self.changes.epoch,
             seen,
@@ -180,9 +158,9 @@ impl World {
     }
 
     /// What changed on `T` since `cursor`'s last read; the cursor then has read it all.
-    pub fn changes<T: 'static>(&mut self, cursor: &mut Cursor<T>) -> Changes {
+    pub fn changes<T: Channel>(&mut self, cursor: &mut Cursor<T>) -> Changes {
         let epoch = self.changes.epoch;
-        let log = self.changes.slot::<T>(true);
+        let log = self.changes.slot::<T>();
         let ids = (cursor.epoch == epoch)
             .then(|| log.since(cursor.seen))
             .flatten();
@@ -196,14 +174,24 @@ impl World {
 
     /// Channel `T`'s revision: it moves on every stamp, opened or not (`0` for a
     /// channel never opened, other than [`StaticSet`]).
-    pub fn change_revision<T: 'static>(&self) -> u64 {
-        self.changes.get::<T>().map_or(0, |l| l.revision)
+    pub fn change_revision<T: Channel>(&self) -> u64 {
+        self.changes
+            .find::<T>()
+            .map_or(0, |at| self.changes.logs[at].revision)
     }
 
-    /// Each opened channel's name and the entries its log holds, in opening order:
-    /// how much churn a game makes, per channel.
-    pub fn change_stats(&self) -> Vec<(&'static str, usize)> {
-        let sizes = self.changes.logs.iter().map(Log::len);
-        self.changes.names.iter().copied().zip(sizes).collect()
+    /// Each opened channel's counters, in opening order: how much churn a game makes,
+    /// per channel (`Debug.Stats`'s `changes_<name>`). [`StaticSet`] is always listed.
+    pub fn change_stats(&self) -> Vec<ChangeStat> {
+        let logs = self.changes.logs.iter();
+        let names = self.changes.names.iter().copied();
+        names
+            .zip(logs)
+            .map(|(name, log)| ChangeStat {
+                name,
+                held: log.len(),
+                logged: log.logged,
+            })
+            .collect()
     }
 }

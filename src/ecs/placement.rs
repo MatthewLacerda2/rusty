@@ -22,17 +22,12 @@ impl World {
     /// order (the caller keeps `order` sorted by `seq`).
     fn place_at(&mut self, entity: Entity, seq: u64, slot: usize) {
         let id = entity.id;
-        self.note(id);
         self.next_seq = self.next_seq.max(seq + 1);
-        let is_static = entity.is_static;
+        self.touch_entity(id, entity.is_static);
         let mut builder = build_bundle(entity, seq);
         let handle = self.inner.spawn(builder.build());
         self.handles.insert(id, handle);
         self.order.insert(slot, id);
-        if is_static {
-            self.stamp_static(id);
-        }
-        self.stamp_columns(id);
         self.moved(id); // a carried document (a re-rooted load survivor) brings a stale box
     }
 
@@ -40,7 +35,9 @@ impl World {
     /// its old place in the insertion order, so a scene saved after an Undo of a
     /// destroy writes its entities in the order it did before (#1631). A live id
     /// is overwritten in place instead.
+    /// Either way an Undo rewinds the World under every cursor: each reads `Rebuild`.
     pub fn restore_entity(&mut self, entity: Entity, seq: u64) {
+        self.changes.new_epoch();
         if self.contains(entity.id) {
             self.overwrite(entity);
             return;
@@ -50,7 +47,6 @@ impl World {
         self.next_id = self.next_id.max(entity.id + 1);
         self.place_at(entity, seq, slot);
         self.invalidate_caches(); // a child may already name this id as its parent
-        self.changes.new_epoch(); // an Undo rewinds the World under every cursor
     }
 
     /// Overwrite a LIVE entity's whole column set with an `Entity` document in one
@@ -68,16 +64,15 @@ impl World {
             Ok(core) => core.seq,
             Err(_) => return false,
         };
-        self.note(id);
-        self.stamp_static_below(id); // before and after: the flag and parent may differ
+        self.stamp_hierarchy_below(id); // before and after: the flag and parent may differ
+        self.touch_entity(id, entity.is_static);
         let _ = self.inner.despawn(old_handle);
         let mut builder = build_bundle(entity, seq);
         let new_handle = self.inner.spawn(builder.build());
         self.handles.insert(id, new_handle);
         self.moved(id);
         self.invalidate_caches(); // its transform, parent and flag may all differ
-        self.stamp_static_below(id);
-        self.stamp_columns(id);
+        self.stamp_hierarchy_below(id);
         true
     }
 }

@@ -96,9 +96,7 @@ fn a_channel_never_opened_holds_nothing() {
         nudge(&mut w, id, i as f32 + 1.0);
     }
     let stats = w.change_stats();
-    assert!(stats
-        .iter()
-        .all(|(name, _)| !name.contains("TransformComponent")));
+    assert!(stats.iter().all(|s| s.name != "transform"), "{stats:?}");
     assert_eq!(w.change_revision::<TransformComponent>(), 0);
 }
 
@@ -117,7 +115,7 @@ fn the_log_stays_bounded_at_dust2_scale_while_a_cursor_keeps_up() {
             Changes::Ids(got) => assert_eq!(got.len(), N, "tick {tick}"),
             Changes::Rebuild => panic!("a cursor read every tick fell behind at {tick}"),
         }
-        let held = w.change_stats().iter().map(|&(_, n)| n).max();
+        let held = w.change_stats().iter().map(|s| s.held).max();
         assert!(held.unwrap_or(0) <= cap, "tick {tick}: {held:?} > {cap}");
     }
     assert_eq!(
@@ -136,6 +134,6 @@ fn with_no_reader_ever_a_channel_holds_one_entry_per_id() {
             nudge(&mut w, id, tick as f32 + 1.0);
         }
     }
-    let held: Vec<usize> = w.change_stats().iter().map(|&(_, n)| n).collect();
+    let held: Vec<usize> = w.change_stats().iter().map(|s| s.held).collect();
     assert!(held.iter().all(|&n| n <= ids.len()), "{held:?}");
 }
