@@ -126,10 +126,17 @@ impl Replayer {
 /// replay. Call before the world's first tick; the project settings go in when
 /// the harness is built.
 pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
-    let lua = crate::scripting::sandboxed_vm()?;
-    world.script_manager().api_cells().install(&lua)?;
+    let lua = replay_vm(world)?;
     install(world, demo, lua);
     Ok(())
+}
+
+/// The replay's own VM, with the API over `world`'s cells installed once (#1709):
+/// the scenario calls the demo recorded are made again in it.
+pub(super) fn replay_vm(world: &GameWorld) -> Result<Lua, String> {
+    let lua = crate::scripting::sandboxed_vm()?;
+    world.script_manager().api_cells().install(&lua)?;
+    Ok(lua)
 }
 
 /// [`prepare`], with what can fail done: `lua` is the replay's own VM.
