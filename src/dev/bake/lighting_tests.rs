@@ -85,22 +85,12 @@ fn gpu_manual_probes_survive_a_replacement() {
     let scene_path = dir.join("manual.scene");
     let scene_path = scene_path.to_str().unwrap();
 
-    let mut scene = room_scene();
-    scene.lighting_settings.reflections.resolution = 16;
-    let light = scene.probes.add_probe(Vec3::new(1.0, 4.0, 1.0));
-    scene.probes.set_manual(light, true);
-    // A probe the placement made in an earlier bake: it is replaced.
-    scene.probes.add_probe(Vec3::new(-9.0, 4.0, -9.0));
-    let set = &mut scene.reflection_probes;
-    let mine = set.add(Vec3::new(5.0, 4.6, 5.0), Vec3::splat(3.0));
-    set.edit(mine, |p| (p.manual, p.intensity) = (true, 2.5));
-    let manual = set.probes[mine].clone();
-
+    let (mut scene, manual) = with_manual_probes();
     let params = LightingBakeParams {
         probe_spacing: 10.0,
         ..Default::default()
     };
-    let mut bake = |scene: &mut Scene| {
+    let bake = |scene: &mut Scene| {
         bake_lighting(
             scene,
             Some(scene_path),
@@ -115,11 +105,34 @@ fn gpu_manual_probes_survive_a_replacement() {
     let second = bake(&mut scene);
     assert!(first.auto_placed_light && first.auto_placed_reflection);
     assert_eq!(first, second, "a re-placement places the same");
+    assert_manual_kept(&scene, &manual);
+}
+
+/// The room with a manual light probe, a placed one, and a manual reflection
+/// probe (returned as it was before any bake).
+fn with_manual_probes() -> (Scene, crate::scene::ReflectionProbe) {
+    let mut scene = room_scene();
+    scene.lighting_settings.reflections.resolution = 16;
+    let light = scene.probes.add_probe(Vec3::new(1.0, 4.0, 1.0));
+    scene.probes.set_manual(light, true);
+    // A probe the placement made in an earlier bake: it is replaced.
+    scene.probes.add_probe(Vec3::new(-9.0, 4.0, -9.0));
+    let set = &mut scene.reflection_probes;
+    let mine = set.add(Vec3::new(5.0, 4.6, 5.0), Vec3::splat(3.0));
+    set.edit(mine, |p| (p.manual, p.intensity) = (true, 2.5));
+    let manual = set.probes[mine].clone();
+    (scene, manual)
+}
+
+/// The manual probes are as they were, the placed one is gone, and no placed
+/// reflection probe stands in the manual one's box.
+fn assert_manual_kept(scene: &Scene, manual: &crate::scene::ReflectionProbe) {
     assert_eq!(scene.probes.probes[0].position, Vec3::new(1.0, 4.0, 1.0));
     assert!(scene.probes.probes[0].manual);
     assert_eq!(scene.probes.probes.iter().filter(|p| p.manual).count(), 1);
+    let old = Vec3::new(-9.0, 4.0, -9.0);
     assert!(
-        !(scene.probes.probes.iter()).any(|p| p.position == Vec3::new(-9.0, 4.0, -9.0)),
+        !scene.probes.probes.iter().any(|p| p.position == old),
         "the old placed probe is replaced"
     );
     let kept = &scene.reflection_probes.probes[0];

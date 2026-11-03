@@ -26,14 +26,14 @@ pub fn register<'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_placement(scope, &table, scene)?;
+    register_manual(scope, &table, scene)?;
     register_fill(scope, &table, scene)?;
     register_query(scope, &table, scene)?;
 
     lua.globals().set("Probe", table).map_err(|e| e.to_string())
 }
 
-/// `Add` / `SetManual` / `IsManual` / `Move` / `Remove` / `Clear` / `Count` over
-/// single probes.
+/// `Add` / `Move` / `Remove` / `Clear` / `Count` over single probes.
 fn register_placement<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
@@ -48,28 +48,6 @@ fn register_placement<'scope>(
             // Placed by hand: the bake's auto-placement keeps it (#1737).
             scene.probes.set_manual(i, true);
             Ok(i as u32)
-        }),
-    )?;
-
-    put(
-        table,
-        "SetManual",
-        scope.create_function(|_, (index, manual): (u32, bool)| {
-            scene.borrow_mut().probes.set_manual(index as usize, manual);
-            Ok(())
-        }),
-    )?;
-
-    put(
-        table,
-        "IsManual",
-        scope.create_function(|_, index: u32| {
-            let scene = scene.borrow();
-            Ok(scene
-                .probes
-                .probes
-                .get(index as usize)
-                .is_some_and(|p| p.manual))
         }),
     )?;
 
@@ -106,6 +84,35 @@ fn register_placement<'scope>(
         table,
         "Count",
         scope.create_function(|_, ()| Ok(scene.borrow().probes.probes.len() as u32)),
+    )
+}
+
+/// `SetManual` / `IsManual`: whether a bake's auto-placement keeps a probe (#1737).
+fn register_manual<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "SetManual",
+        scope.create_function(|_, (index, manual): (u32, bool)| {
+            scene.borrow_mut().probes.set_manual(index as usize, manual);
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "IsManual",
+        scope.create_function(|_, index: u32| {
+            let scene = scene.borrow();
+            Ok(scene
+                .probes
+                .probes
+                .get(index as usize)
+                .is_some_and(|p| p.manual))
+        }),
     )
 }
 

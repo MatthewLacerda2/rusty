@@ -12,11 +12,11 @@
 //! or, with none handed over, the colliders' world boxes. A convex solid is filled
 //! between its lowest and highest surface in each column; a mesh collider marks
 //! only its surface. Clearance is a search of the cells around a point, out to
-//! [`REACH`]: every question placement asks is about the space near a probe, so
+//! `REACH`: every question placement asks is about the space near a probe, so
 //! no distance field over the whole level is kept.
 //!
 //! Memory is one bit a cell. A Dust2-sized level (≈ 200 × 200 × 40 m) takes
-//! 12.8 M cells at [`CELL`] = 0.5 m (≈ 1.6 MB); a level past [`MAX_CELLS`]
+//! 12.8 M cells at `CELL` = 0.5 m (≈ 1.6 MB); a level past `MAX_CELLS`
 //! (≈ 32 MB) is gridded coarser.
 //!
 //! Pure data + math — deterministic, scan order, no RNG/clock.
@@ -48,7 +48,7 @@ pub struct Occupancy {
 }
 
 impl Occupancy {
-    /// The grid of `solids` at `cell` (coarser past [`MAX_CELLS`]), one open cell
+    /// The grid of `solids` at `cell` (coarser past `MAX_CELLS`), one open cell
     /// of margin around them. `None` with nothing solid.
     pub fn build(solids: &[Solid], cell: f32) -> Option<Self> {
         Self::build_capped(solids, cell, MAX_CELLS)
@@ -101,7 +101,7 @@ impl Occupancy {
             && (c.x as usize) < nx
             && (c.y as usize) < ny
             && (c.z as usize) < nz;
-        inside.then(|| [c.x as usize, c.y as usize, c.z as usize])
+        inside.then_some([c.x as usize, c.y as usize, c.z as usize])
     }
 
     /// Whether cell `[x, y, z]` is solid; off the grid is open.
@@ -121,7 +121,7 @@ impl Occupancy {
     }
 
     /// About how far `p` is from the nearest solid, world units, to a cell: 0
-    /// inside one, at most [`REACH`]. Searches the cells around `p` shell by
+    /// inside one, at most `REACH`. Searches the cells around `p` shell by
     /// shell, nearest first.
     pub fn clearance(&self, p: Vec3) -> f32 {
         let q = ((p - self.origin) / self.cell).floor();
