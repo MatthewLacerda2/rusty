@@ -16,11 +16,13 @@ pub(super) fn probed(name: &str, light: usize, reflection: usize) -> (Scene, Str
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let mut scene = Scene::new();
     for i in 0..light {
-        scene.probes.add_probe(Vec3::new(i as f32, 1.0, 0.0));
+        let i = scene.probes.add_probe(Vec3::new(i as f32, 1.0, 0.0));
+        scene.probes.set_manual(i, true);
     }
     for i in 0..reflection {
         let at = Vec3::new(i as f32 * 4.0, 1.0, 0.0);
-        scene.reflection_probes.add(at, Vec3::splat(2.0));
+        let i = scene.reflection_probes.add(at, Vec3::splat(2.0));
+        scene.reflection_probes.edit(i, |p| p.manual = true);
     }
     scene.lighting_settings.reflections.resolution = 16;
     (scene, path)
