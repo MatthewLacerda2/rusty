@@ -56,8 +56,10 @@ fn with_pair_mut_stamps_each_column_only_when_held() {
 #[test]
 fn the_despawn_walk_names_only_the_columns_each_holder_has() {
     let (mut w, plain, full) = pair();
-    let mut joint = JointComponent::default();
-    joint.connected_body = Some(plain);
+    let joint = JointComponent {
+        connected_body: Some(plain),
+        ..JointComponent::default()
+    };
     w.set_component(full, Some(joint));
     let mut joints = w.change_cursor::<JointComponent>();
     let mut lods = w.change_cursor::<LodGroupComponent>();
