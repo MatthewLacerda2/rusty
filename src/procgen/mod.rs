@@ -18,7 +18,9 @@
 //! - [`runner`] — DAG → [`image_buf::Image`] in dependency order.
 //! - [`bake`] — buffer → PNG with per-slot glTF encoding/packing.
 //! - `bake_set` — a recipe's named `outputs` → one PNG per slot, one evaluation (#403).
-//! - [`ops`] — the op-set grouped by category, plus the per-node dispatcher.
+//! - [`catalog`] — the op registry: one file per op (params, catalog row, run),
+//!   one row each (#1751). Adding an op: `src/procgen/CLAUDE.md`.
+//! - [`ops`] — the ops' math, grouped by category, and the per-node entry point.
 //! - [`bands`] — row bands run in parallel; byte-identical at any band count (#1490).
 //! - [`hash`] — dependency-free deterministic value hashing for stochastic ops.
 //! - [`image_buf`] — the linear-RGBA buffer the runner works in (wrapping domain).
@@ -31,6 +33,7 @@
 pub mod bake;
 mod bake_set;
 pub mod bands;
+pub mod catalog;
 pub mod hash;
 pub mod image_buf;
 pub mod ops;
