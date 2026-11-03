@@ -27,11 +27,11 @@ impl std::fmt::Display for Arity {
     }
 }
 
-pub(super) const fn arity(min: u8, max: u8) -> Arity {
+pub(crate) const fn arity(min: u8, max: u8) -> Arity {
     Arity { min, max }
 }
 
 /// A generator: no inputs.
-pub(super) const SOURCE: Arity = arity(0, 0);
+pub(crate) const SOURCE: Arity = arity(0, 0);
 /// A single-input op.
-pub(super) const ONE: Arity = arity(1, 1);
+pub(crate) const ONE: Arity = arity(1, 1);

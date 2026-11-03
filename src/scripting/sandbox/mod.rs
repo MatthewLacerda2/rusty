@@ -1,4 +1,5 @@
-//! The deterministic Lua sandbox (#443): the gameplay VM's standard library.
+//! The deterministic Lua sandbox (#443): the standard library of the gameplay VM
+//! and of the `play` harness's scenario VM (#1408).
 //!
 //! The sim is a pure function of (seed, inputs, fixed dt), and scripts run inside
 //! it, so the stdlib must not hand them a nondeterministic source:
@@ -17,8 +18,10 @@
 //!
 //! The console REPL evaluates against this same VM, so it gets the same
 //! stdlib — one surface, three callers. The `play` harness's scenario VM is a
-//! separate VM built from the same [`sandboxed_vm`] (#1408): a play-test's
-//! results are a pure function of its scenario too.
+//! separate VM built from the same [`sandboxed_vm`] (#1408), with the same
+//! file access (#1717): a play-test's results are a pure function of its scenario
+//! too, and a game module's `require` / `dofile` resolve there as in Play. Its
+//! `print` is Lua's own, to stdout, not the gameplay VM's `console.log`.
 
 use mlua::{Lua, LuaOptions, StdLib};
 
