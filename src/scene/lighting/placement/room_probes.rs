@@ -10,14 +10,16 @@
 //! tile's centroid that keeps clear of geometry, so it is never inside a wall, at
 //! [`EYE_HEIGHT`] (kept under that cell's own ceiling, and the box raised to hold
 //! it). A room most of whose tiles see the sky is open air: one probe over all of
-//! it, without box projection.
+//! it, without box projection, at an importance under the room probes', since its
+//! box holds every room inside its footprint.
 
 use glam::{Vec2, Vec3};
 
 use super::enclosure::{ceiling_over, clearest, clutter, cluttered_region, open_to_sky};
 use super::floor::FloorGrid;
 use super::occupancy::Occupancy;
-use super::{ReflectionPlan, MIN_REGION};
+use super::{ReflectionPlan, MIN_REGION, OPEN_AIR_IMPORTANCE};
+use crate::scene::ReflectionProbe;
 
 /// How high over the floor a probe captures from: a standing actor's eyes.
 pub const EYE_HEIGHT: f32 = 1.6;
@@ -54,6 +56,7 @@ pub fn plan_rooms(
         match open * 2 > tiles.len() {
             true => plans.push(ReflectionPlan {
                 box_projection: false,
+                importance: OPEN_AIR_IMPORTANCE,
                 ..plan_tile(site, room_cells, sky)
             }),
             false => plans.extend(tiles),
@@ -140,6 +143,7 @@ fn plan_tile((grid, occ): (&FloorGrid, &Occupancy), cells: &[usize], sky: f32) -
         box_min: Vec3::new(lo.x, floor, lo.y),
         box_max: Vec3::new(hi.x, ceiling.max(position.y + CEILING_GAP), hi.y),
         box_projection: true,
+        importance: ReflectionProbe::default().importance,
     }
 }
 

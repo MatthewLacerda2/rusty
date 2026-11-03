@@ -121,7 +121,9 @@ two pictures of the level (#1737):
   **fitted to the room's walls, floor and ceiling** (lowered to the first solid
   straight above the capture point). A room where most of its probes' upward rays
   (straight up and a ring at 30°) reach the sky is **open air**: it gets **one probe
-  without box projection**, not a box under an invented ceiling.
+  without box projection**, not a box under an invented ceiling, at importance `0`:
+  its box spans the room's whole footprint, so the room probes inside it (importance
+  `1`) draw over it.
   A room wider than its region is split into probes no wider than it: the region is
   `reflectionRegion` (default `12.0`, at least `2.0`: a smaller one is
   an error) for an empty room, narrowed by its **clutter** (the solid fraction of the

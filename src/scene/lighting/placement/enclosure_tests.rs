@@ -27,6 +27,11 @@ fn an_open_courtyard_gets_one_probe_without_box_projection() {
     let plans = plan_static(&scene, &ReflectionPlacement::default());
     assert_eq!(plans.len(), 1, "{plans:?}");
     assert!(!plans[0].box_projection);
+    assert_eq!(
+        plans[0].importance,
+        super::OPEN_AIR_IMPORTANCE,
+        "room probes draw over it"
+    );
 }
 
 /// A closed 12 × 12 m room under a roof, with `crates` 1.5 m crates in a row.

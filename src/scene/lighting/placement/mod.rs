@@ -61,7 +61,14 @@ pub struct ReflectionPlan {
     pub box_max: Vec3,
     /// Unity's *Box Projection*: off for a room open to the sky (#1737).
     pub box_projection: bool,
+    /// Unity's *Importance*: [`OPEN_AIR_IMPORTANCE`] for a room open to the sky,
+    /// whose box spans its whole footprint and so holds the rooms inside it, which
+    /// must draw over it; the probe default otherwise.
+    pub importance: i32,
 }
+
+/// The importance of an open-air room's probe: under every room probe's (1).
+pub const OPEN_AIR_IMPORTANCE: i32 = 0;
 
 /// Vertical headroom added above the placement bounds so probes also cover the air an
 /// actor's head/torso occupies, not only the floor it stands on. World units.

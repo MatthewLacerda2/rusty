@@ -222,6 +222,7 @@ fn auto_place_reflection(
         scene.reflection_probes.edit(index, |p| {
             (p.box_min, p.box_max) = (plan.box_min, plan.box_max);
             p.box_projection = plan.box_projection;
+            p.importance = plan.importance;
         });
     }
     !plans.is_empty()
