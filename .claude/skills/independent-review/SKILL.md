@@ -193,7 +193,13 @@ code first, then:
    became of it: fixed (with the commit), dropped (in a word), sent to the user,
    or filed as an issue when it lies outside the branch and passes *Issues are
    for what matters*. No findings is said too. It is the record that the review
-   happened. It reports, it never instructs: "sent back to the coder", never "fix
+   happened. **The merge queue reads it** (#1764,
+   `.github/scripts/merging/verdict/reviewed.py`): it hands back, before any
+   push, a code PR with no comment whose first line is `Independent review…`
+   or `No review: <why>` (the written exemption for a PR under *No review*,
+   its reason on the same line). Only a comment by someone who can push counts;
+   a Markdown-only PR that CI counts as non-code, and Dependabot's own
+   branches, need neither. It reports, it never instructs: "sent back to the coder", never "fix
    in this branch" or where the new `Brief` is. A readied session still
    subscribed to the PR reads an instruction there as work, and races the fresh
    session (2026-10-26, #1447).
@@ -225,7 +231,9 @@ links the fix.
   and the raise-to-`high` rule out of the prompt.
 - Letting `code-review` run without the PR number: it then reviews the
   checkout's local diff, some other change entirely.
-- Labelling `queue` before the `Independent review` comment exists.
+- Labelling `queue` before the `Independent review` (or `No review:`) comment
+  exists. The queue hands such a PR back now (#1764), so it costs a hand-back,
+  not a merge; it is no longer only prose that guards it.
 - A reviewer that checks the PR out into a named branch (`pr1316`,
   `pr1403rev`, …): the worktree goes, the branch stays in the shared
   repository. The Post Processing batch (#1446, 2026-10-26) ended with 39 local
