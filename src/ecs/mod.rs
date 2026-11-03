@@ -26,6 +26,7 @@ mod activity_tests;
 #[cfg(test)]
 mod ancestors_tests;
 mod bundle;
+pub mod changes;
 pub mod core;
 mod descendants;
 #[cfg(test)]
@@ -46,6 +47,7 @@ pub mod world;
 mod world_space;
 
 pub use access::{CompMut, CompRef};
+pub use changes::{Changes, Cursor, StaticSet};
 pub use descendants::{Descendants, HierarchyPath};
 pub use journal::{Journaled, Recorded};
 pub use world::World;

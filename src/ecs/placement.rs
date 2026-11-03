@@ -24,11 +24,15 @@ impl World {
         let id = entity.id;
         self.note(id);
         self.next_seq = self.next_seq.max(seq + 1);
-        self.static_revision += u64::from(entity.is_static);
+        let is_static = entity.is_static;
         let mut builder = build_bundle(entity, seq);
         let handle = self.inner.spawn(builder.build());
         self.handles.insert(id, handle);
         self.order.insert(slot, id);
+        if is_static {
+            self.stamp_static(id);
+        }
+        self.stamp_columns(id);
         self.moved(id); // a carried document (a re-rooted load survivor) brings a stale box
     }
 
@@ -46,6 +50,7 @@ impl World {
         self.next_id = self.next_id.max(entity.id + 1);
         self.place_at(entity, seq, slot);
         self.invalidate_caches(); // a child may already name this id as its parent
+        self.changes.new_epoch(); // an Undo rewinds the World under every cursor
     }
 
     /// Overwrite a LIVE entity's whole column set with an `Entity` document in one
@@ -64,13 +69,15 @@ impl World {
             Err(_) => return false,
         };
         self.note(id);
+        self.stamp_static_below(id); // before and after: the flag and parent may differ
         let _ = self.inner.despawn(old_handle);
         let mut builder = build_bundle(entity, seq);
         let new_handle = self.inner.spawn(builder.build());
         self.handles.insert(id, new_handle);
         self.moved(id);
         self.invalidate_caches(); // its transform, parent and flag may all differ
-        self.static_revision += 1;
+        self.stamp_static_below(id);
+        self.stamp_columns(id);
         true
     }
 }
