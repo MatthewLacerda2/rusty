@@ -32,6 +32,8 @@
 
 mod log;
 #[cfg(test)]
+mod play_tests;
+#[cfg(test)]
 mod static_tests;
 #[cfg(test)]
 mod tests;
