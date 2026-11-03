@@ -81,7 +81,7 @@ pub struct PostFx {
 
     /// HDR scene colour the main pass draws into.
     pub scene_hdr: PfxTarget,
-    /// Bloom's ping-pong buffers (bright pass / blur), at reduced resolution.
+    /// Bloom's mip chain (#1700), starting at its reduced resolution.
     pub(crate) bloom: effects::bloom::BloomTargets,
     /// Full-resolution LDR image the composite writes when FXAA is on, so the FXAA
     /// pass has a finished, tonemapped, gamma-encoded frame to sample.

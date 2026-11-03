@@ -206,7 +206,7 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
         layout: &passes.layout,
         entries: &[
             entry(0, t.params.as_entire_binding()),
-            entry(1, wgpu::BindingResource::TextureView(&pfx.bloom.b.view)),
+            entry(1, wgpu::BindingResource::TextureView(pfx.bloom.view())),
             entry(2, wgpu::BindingResource::Sampler(&pfx.sampler)),
         ],
     });

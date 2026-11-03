@@ -63,7 +63,7 @@ impl PostFx {
             let bg = self.io_bind_group(
                 device,
                 &self.ldr.view,
-                &self.bloom.b.view,
+                self.bloom.view(),
                 ctx.depth_view,
                 ctx.skybox,
             );
@@ -96,7 +96,7 @@ impl PostFx {
         let io = self.io_bind_group(
             device,
             self.scene_color(),
-            &self.bloom.b.view,
+            self.bloom.view(),
             ctx.depth_view,
             ctx.skybox,
         );
