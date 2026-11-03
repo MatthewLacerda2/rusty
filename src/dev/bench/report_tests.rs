@@ -45,6 +45,7 @@ fn the_table_shows_the_change_against_the_last_run() {
                 },
             ),
         ],
+        ..Report::default()
     };
     let first = run(4.0).render(None);
     assert!(first.contains("no previous report"), "{first}");
@@ -60,11 +61,13 @@ fn the_table_shows_the_change_against_the_last_run() {
     let only_now = Report {
         frames: 1,
         metrics: vec![("tick_nav".to_string(), Summary::of(&[0.5]))],
+        warnings: vec!["the CPU clock moved".to_string()],
     };
     let line = only_now.render(Some(&run(4.0)));
     assert!(line
         .lines()
         .any(|l| l.starts_with("tick_nav") && l.trim_end().ends_with("0.500")));
+    assert!(line.contains("warning: the CPU clock moved"), "{line}");
 }
 
 #[test]
@@ -78,6 +81,7 @@ fn a_report_round_trips_through_json() {
                 p95: 2.0,
             },
         )],
+        warnings: vec!["noisy".to_string()],
     };
     let json = serde_json::to_string(&report).unwrap();
     assert_eq!(serde_json::from_str::<Report>(&json).unwrap(), report);

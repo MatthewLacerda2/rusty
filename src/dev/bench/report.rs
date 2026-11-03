@@ -36,6 +36,10 @@ pub struct Report {
     pub frames: u32,
     /// `(metric, summary)` in the order rows print — stable, so reports diff.
     pub metrics: Vec<(String, Summary)>,
+    /// Why some rows should be read with care (a CPU clock that moved, #1719),
+    /// printed under the table.
+    #[serde(default)]
+    pub warnings: Vec<String>,
 }
 
 /// Per-frame samples, kept in the order metrics were first seen.
@@ -58,6 +62,11 @@ impl Samples {
             .push(value);
     }
 
+    /// Every frame's value of `metric`, in order (empty when never pushed).
+    pub fn values(&self, metric: &str) -> &[f64] {
+        self.values.get(metric).map_or(&[], Vec::as_slice)
+    }
+
     /// Count one measured frame.
     pub fn end_frame(&mut self) {
         self.frames += 1;
@@ -72,6 +81,7 @@ impl Samples {
         Report {
             frames: self.frames,
             metrics,
+            warnings: Vec::new(),
         }
     }
 }
@@ -99,6 +109,9 @@ impl Report {
                 num(s.avg),
                 num(s.p95)
             );
+        }
+        for warning in &self.warnings {
+            let _ = writeln!(out, "warning: {warning}");
         }
         if previous.is_none() {
             out.push_str("(no previous report: the next run prints its change against this one)\n");
