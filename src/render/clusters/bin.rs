@@ -253,7 +253,7 @@ type Footprint = ([[u32; 2]; 2], [u32; 2]);
 /// The tiles and depth slices a view-space sphere may touch, or
 /// `None` when it lies wholly outside the frustum or has no reach.
 fn footprint(grid: &ClusterGrid, center: Vec3, radius: f32) -> Option<Footprint> {
-    if !(radius > 0.0) {
+    if radius.is_nan() || radius <= 0.0 {
         return None;
     }
     let depth = -center.z;
