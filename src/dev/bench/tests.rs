@@ -75,7 +75,8 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
     let report = measure(&mut h, 3);
     assert_eq!(report.frames, 3);
     let row = |k: &str| report.metrics.iter().find(|(m, _)| m == k).map(|r| r.1);
-    assert!(row("frame_ms").is_some() && row("update_scripts").is_some());
+    assert!(row("frame_ms").is_some() && row("cpu.update_scripts").is_some());
+    assert!(row("cpu_ms").is_some() && row("cpu_clock_pct").is_some_and(|s| s.avg > 0.0));
     // The clock hold and the frame share the harness's renderer: without one both
     // skip, which is only allowed where no GPU is required (#885).
     let rendered = h.renderer().is_some();
@@ -114,8 +115,12 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     };
     let stats = FrameStats::default();
     let mut samples = Samples::default();
-    sample(&mut samples, &stats, Some(&frame), Some(0.5));
-    sample(&mut samples, &stats, Some(&frame), None);
+    let half = Speeds {
+        gpu: Some(0.5),
+        ..Speeds::default()
+    };
+    sample(&mut samples, &stats, Some(&frame), half);
+    sample(&mut samples, &stats, Some(&frame), Speeds::default());
     let report = samples.report();
     let avg = |k: &str| report.metrics.iter().find(|(m, _)| m == k).unwrap().1.avg;
     assert_eq!(avg("gpu_ms"), 4.0);
@@ -124,4 +129,22 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     assert_eq!(avg("gpu.ui"), 0.0);
     assert_eq!(avg("gpu_raw_ms"), 8.0);
     assert_eq!(avg("gpu_clock_pct"), 50.0);
+}
+
+/// CPU rows mirror the GPU's (#1719): `cpu_ms` and `cpu.<system>` are scaled, `frame_ms`
+/// stays as measured, and a frame the CPU probe missed has no scaled rows.
+#[test]
+fn cpu_rows_are_scaled_by_the_cpu_clock_speed() {
+    let mut stats = FrameStats::default();
+    stats.record("frame_ms", 4.0);
+    stats.record_system("tick_nav", 2.0);
+    let mut samples = Samples::default();
+    let cpu = |cpu| Speeds { cpu, gpu: None };
+    sample(&mut samples, &stats, None, cpu(Some(0.5)));
+    sample(&mut samples, &stats, None, cpu(None));
+    assert_eq!(samples.values("frame_ms"), [4.0, 4.0]);
+    assert_eq!(samples.values("cpu_ms"), [2.0]);
+    assert_eq!(samples.values("cpu.tick_nav"), [1.0]);
+    assert_eq!(samples.values("cpu_clock_pct"), [50.0]);
+    assert!(samples.values("tick_nav").is_empty(), "no raw system rows");
 }

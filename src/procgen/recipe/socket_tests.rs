@@ -41,8 +41,8 @@ fn only_amount_like_numbers_are_socketable() {
 
 #[test]
 fn every_socket_param_reaches_the_runner_as_a_link() {
-    // `OpKind::sockets` has a `_ => vec![]` arm, so the compiler won't flag a socket
-    // param missing from it: this does.
+    // `Op::sockets` defaults to none, so the compiler won't flag an op that forgets
+    // a socket param in its override: this does.
     let want = Link {
         node: "m".into(),
         min: 0.25,

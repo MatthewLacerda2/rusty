@@ -84,8 +84,18 @@ impl ScriptManager {
     pub fn set_workspace_root(&mut self, root: impl Into<PathBuf>) {
         self.workspace = root.into();
         if let Some(lua) = &self.lua {
-            super::sandbox::install_file_access(lua, &self.workspace, &self.cells.console).ok();
+            self.install_file_access(lua).ok();
         }
+    }
+
+    /// Make `lua`'s `require`, `dofile` and `loadfile` read against this
+    /// manager's workspace, warning in its console on a file outside it (#1062).
+    /// The gameplay VM and the `play` harness's scenario VM both call it (#1717),
+    /// so a game module's `require` / `dofile` / `loadfile` resolve in a scenario
+    /// as in Play. Only file access is shared: a scenario's `print` is Lua's own,
+    /// to stdout, not the gameplay VM's `console.log`.
+    pub(crate) fn install_file_access(&self, lua: &Lua) -> Result<(), String> {
+        super::sandbox::install_file_access(lua, &self.workspace, &self.cells.console)
     }
 
     /// Where the script at `path` lives: `path` under the workspace root, or
@@ -102,7 +112,7 @@ impl ScriptManager {
         // Deterministic sandbox (#443): no `os`/`io`, `math.random` over the
         // seeded RNG — which restarts from its default seed with every fresh VM.
         let lua = super::sandbox::new_sim_vm()?;
-        super::sandbox::install_file_access(&lua, &self.workspace, &self.cells.console)?;
+        self.install_file_access(&lua)?;
         *self.cells.random.borrow_mut() = Random::new(self.play_seed);
         *self.cells.event_system.borrow_mut() = EventSystem::default();
 

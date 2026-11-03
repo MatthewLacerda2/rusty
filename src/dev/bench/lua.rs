@@ -32,8 +32,8 @@ pub fn register(lua: &Lua, harness: &Rc<RefCell<Harness>>, t: &Table) -> LuaResu
         })?,
     )?;
 
-    // Bench(frames) -> { frames, metrics = { <name> = { avg, p95 } } }. Steps and
-    // renders `frames` frames, prints the report and keeps it in the out dir.
+    // Bench(frames) -> { frames, metrics = { <name> = { avg, p95 } }, warnings = { <text> } }.
+    // Steps and renders `frames` frames, prints the report and keeps it in the out dir.
     let h = Rc::clone(harness);
     t.set(
         "Bench",
@@ -94,6 +94,10 @@ fn report_to_lua(lua: &Lua, report: &Report) -> LuaResult<Table> {
     let out = lua.create_table()?;
     out.set("frames", report.frames)?;
     out.set("metrics", metrics)?;
+    out.set(
+        "warnings",
+        lua.create_sequence_from(report.warnings.iter().cloned())?,
+    )?;
     Ok(out)
 }
 
