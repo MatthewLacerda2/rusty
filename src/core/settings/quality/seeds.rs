@@ -2,7 +2,8 @@
 //! each a bundle of every effect's three levels. `Medium`'s `Medium` level is the
 //! old Medium tier's numbers and `High`'s the old High tier's, so a volume at its
 //! default level costs what it did (motion blur's 32 taps are the old default
-//! camera's).
+//! camera's). Every row moves between its levels (#1716): a test fails on one whose
+//! three levels are equal, unless it names the row with a reason.
 
 use super::{levels, QualityValues, SsaoQuality, SsrQuality};
 
@@ -27,7 +28,7 @@ pub(super) fn low() -> QualityValues {
         ssao: levels(ssao(4, 2), ssao(6, 2), ssao(8, 2)),
         ssr: levels(march(16, 0.5), march(16, 0.5), march(32, 0.375)),
         bloom_resolution_divisor: levels(4, 4, 2),
-        depth_of_field_resolution_divisor: levels(2, 2, 2),
+        depth_of_field_resolution_divisor: levels(4, 2, 2),
         motion_blur_samples: levels(4, 8, 16),
         ui_blur_divisor: 4,
     }
@@ -51,7 +52,7 @@ pub(super) fn high() -> QualityValues {
     QualityValues {
         ssao: levels(ssao(8, 2), ssao(16, 1), ssao(32, 1)),
         ssr: levels(march(32, 0.375), march(64, 0.25), march(128, 0.2)),
-        bloom_resolution_divisor: levels(2, 2, 2),
+        bloom_resolution_divisor: levels(4, 3, 2),
         depth_of_field_resolution_divisor: levels(2, 1, 1),
         motion_blur_samples: levels(16, 32, 32),
         ui_blur_divisor: 2,
