@@ -24,7 +24,8 @@
 //! targets, with no fade-in, so a one-shot keeps its attack; a value that holds
 //! still is played exactly, so an open filter stays bit-transparent and a voice
 //! faded to zero gain is exact silence an effect can sleep over (#1729). Rate,
-//! pause and stop apply at once.
+//! pause and stop apply at once, and a voice resumed from a pause starts on its
+//! targets, like a new one.
 //!
 //! Pan is a **balance** law: the far channel fades linearly to silence, the near one
 //! stays at unity (`pan = -1` ⇒ right silent). A centred voice plays at unity on both
@@ -132,7 +133,9 @@ pub const SMOOTHING: f64 = 0.010;
 /// settled voice plays its values bit for bit (−120 dB on a unit gain).
 /// A step too small to move an `f32` lands too: near `1.0` that stalls about
 /// `3e-5` short (−90 dB), and would never arrive otherwise. So does a step out
-/// of a NaN, so one bad value lasts a sample, not the voice's life.
+/// of a NaN: a NaN target is played as long as the control holds it (about a game
+/// frame, until the next retune), and the glide recovers the sample its target
+/// does, never carrying the NaN for the voice's life.
 const SNAP: f32 = 1e-6;
 
 /// The parameters a voice glides (#1693). `low_pass` is the filter's one-pole
@@ -237,6 +240,10 @@ impl Sound for ClipSound {
         };
         let step = f64::from(c.speed.get()) * f64::from(self.clip.sample_rate()) * dt;
         if c.paused.load(Ordering::Relaxed) || c.stopped.load(Ordering::Relaxed) {
+            // The output resumes from silence anyway, so there is nothing to glide
+            // from: a voice retuned while paused resumes on its targets, as a new
+            // one starts, never from the values it was paused at.
+            self.glide = None;
             out.fill(Frame::ZERO);
             return;
         }

@@ -6,14 +6,21 @@ use super::*;
 use crate::audio::backend::{AudioBackend, PlayParams, VoiceId};
 use crate::audio::device::backend::backend_tests::{flat, rig};
 use crate::audio::device::capture::RATE;
+use crate::audio::device::decode::CachedClip;
 
 /// One game frame at 25 FPS, in device frames: how long a retune holds.
 const FRAME: usize = 1_920;
 
-/// Play `clip` looping at mix `a`, retune it to `b` and back every [`FRAME`] for
-/// ten frames, and return everything the device rendered.
+/// Play the mono `clip` looping at mix `a`, retune it to `b` and back every
+/// [`FRAME`] for ten frames, and return everything the device rendered.
 fn toggled(clip: &[f32], a: VoiceMix, b: VoiceMix) -> Vec<(f32, f32)> {
-    let mut backend = rig(clip);
+    toggled_clip(CachedClip::new(1, RATE, clip.to_vec()), a, b)
+}
+
+/// [`toggled`], for any clip.
+fn toggled_clip(clip: CachedClip, a: VoiceMix, b: VoiceMix) -> Vec<(f32, f32)> {
+    let mut backend = rig(&[]);
+    backend.cache().insert("clip", clip);
     let params = PlayParams {
         mix: a,
         looping: true,
@@ -57,6 +64,22 @@ fn a_pan_toggled_every_frame_never_jumps() {
         let jump = largest_jump(&out, 1, side);
         assert!(jump < 0.005, "a hard-left to hard-right pan glides: {jump}");
     }
+}
+
+#[test]
+fn a_spatial_blend_toggled_every_frame_never_jumps() {
+    // A stereo clip, all left: blend 0 keeps (1, 0), blend 1 downmixes to (½, ½).
+    let flat = VoiceMix::FLAT;
+    let spatial = VoiceMix {
+        spatial_blend: 1.0,
+        ..flat
+    };
+    let out = toggled_clip(CachedClip::new(2, RATE, vec![1.0, 0.0]), flat, spatial);
+    for side in [|f: &(f32, f32)| f.0, |f: &(f32, f32)| f.1] {
+        let jump = largest_jump(&out, 1, side);
+        assert!(jump < 0.005, "a 2D to 3D blend glides: {jump}");
+    }
+    assert!(out.iter().any(|f| f.1 > 0.49), "and still downmixes");
 }
 
 #[test]
@@ -115,5 +138,5 @@ fn a_glide_lands_on_its_target_and_recovers_from_a_nan() {
     assert_eq!(g.filter(), None, "a landed open filter is bypassed");
     g.toward(&at(f32::NAN), 0.002);
     g.toward(&at(0.5), 0.002);
-    assert_eq!(g, at(0.5), "a NaN lasts one sample");
+    assert_eq!(g, at(0.5), "the glide recovers the sample its target does");
 }
