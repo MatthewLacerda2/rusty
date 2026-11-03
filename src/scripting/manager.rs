@@ -4,7 +4,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use crate::api::ApiScopedCtx;
 use crate::core::input::InputState;
 use crate::core::random::{Random, DEFAULT_SEED};
 use crate::navigation::NavigationGraph;
@@ -94,10 +93,12 @@ impl ScriptManager {
         self.workspace.join(Path::new(path))
     }
 
-    /// Initializes a fresh Lua environment. API namespaces are NOT registered
-    /// here; they are registered per-evaluation inside `lua.scope(...)` in
-    /// `lifecycle.rs`, so closures capture `&RefCell<T>` references (no
-    /// `Rc::clone` in the `api/` tree).
+    /// Initializes a fresh Lua environment and installs the whole API surface on
+    /// it, once (#1709): the shared cells are attached as the VM's app data and
+    /// every namespace is registered as plain functions that reach them through
+    /// it (`api::ApiCell`), so no `api/` closure captures an `Rc`. The surface
+    /// then stays for the VM's life, and so does a script's change to one of its
+    /// tables.
     pub fn init_runtime(&mut self) -> Result<(), String> {
         // Deterministic sandbox (#443): no `os`/`io`, `math.random` over the
         // seeded RNG — which restarts from its default seed with every fresh VM.
@@ -106,9 +107,8 @@ impl ScriptManager {
         *self.cells.random.borrow_mut() = Random::new(self.play_seed);
         *self.cells.event_system.borrow_mut() = EventSystem::default();
 
-        // Override print to write to our console panel. This stays as a
-        // `lua.create_function` (static closure) because `print` is in the
-        // scripting layer, not the api/ tree — the Rc borrow here is fine.
+        // Override print to write to our console panel. `print` is the scripting
+        // layer's, not the api/ tree's, so it may hold its own `Rc`.
         let console_clone = Rc::clone(&self.cells.console);
         let print_fn = lua
             .create_function(move |_, msg: String| {
@@ -120,6 +120,7 @@ impl ScriptManager {
             .set("print", print_fn)
             .map_err(|e| e.to_string())?;
 
+        self.cells.install(&lua)?;
         self.lua = Some(lua);
         self.entity_scripts.clear();
         self.load_attempted.clear();
@@ -128,13 +129,12 @@ impl ScriptManager {
         Ok(())
     }
 
-    /// Build the scoped context from this manager's resource cells.
-    ///
-    /// The returned struct borrows through the `Rc` smart pointers, tying
-    /// references to the caller's lifetime. Used inside `lua.scope(...)` blocks in
-    /// `lifecycle.rs` so the borrow can't outlive the scope.
-    pub(super) fn make_ctx(&self) -> ApiScopedCtx<'_> {
-        self.cells.ctx()
+    /// Re-attach the cells to the live VM after a `set_*` injector swapped one, so
+    /// the surface's next call reaches the new cell.
+    pub(super) fn reattach_cells(&self) {
+        if let Some(lua) = &self.lua {
+            self.cells.attach(lua);
+        }
     }
 
     /// Stops and clears the script environment
@@ -150,14 +150,8 @@ impl ScriptManager {
     /// the lifecycle callbacks instead.
     #[cfg(test)]
     pub(super) fn exec(&self, code: &str) -> Result<(), String> {
-        use crate::api;
         let lua = self.lua.as_ref().ok_or("runtime not initialized")?;
-        let ctx = self.make_ctx();
-        lua.scope(|scope| {
-            api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
-            lua.load(code).exec()
-        })
-        .map_err(|e| e.to_string())
+        lua.load(code).exec().map_err(|e| e.to_string())
     }
 
     /// The seed every fresh VM's `Random` starts from.

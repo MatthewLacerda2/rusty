@@ -300,6 +300,11 @@ headless replays stay byte-identical):
 
 ## Namespaces
 
+Each namespace is a global table the VM gets once, when it starts (every Play, and
+the edit-mode runtime), so it lasts as long as the VM: a script may keep one of its
+functions (`local now = Time.time`) and call it in any later callback, and a field a
+script adds to or overwrites in the table stays until the next Play (#1709).
+
 One file per namespace, in reference order:
 
 <!-- Not sorted (#911): `scripting::api_doc::assemble` joins the pages in the order

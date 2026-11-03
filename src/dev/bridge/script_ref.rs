@@ -12,7 +12,7 @@
 //! gameplay VM (#1580), the way Unity's test runner calls a MonoBehaviour's public
 //! method: `ref.Refill(30)` with plain arguments, `ref:Refill(30)` with the
 //! instance itself as `self`. It runs at the current tick, between the
-//! scenario's steps, inside an API scope like a lifecycle hook's; arguments and
+//! scenario's steps, with the API a lifecycle hook has; arguments and
 //! returns are copied, so a function or userdata on either side is an error (a
 //! return that cannot cross fails after the call ran: its side effects stand), and a
 //! game script error comes back as the scenario's, with its traceback. The call is
@@ -58,7 +58,7 @@ impl ScriptRef {
             same.then(|| f(glua, t)).transpose()
         };
         let live = if scoped {
-            manager.with_script_in_api_scope(self.id, &self.name, on_pinned)?
+            manager.with_script(self.id, &self.name, on_pinned)?
         } else {
             manager.with_script(self.id, &self.name, on_pinned)?
         };

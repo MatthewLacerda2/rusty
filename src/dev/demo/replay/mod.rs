@@ -127,6 +127,7 @@ impl Replayer {
 /// the harness is built.
 pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
     let lua = crate::scripting::sandboxed_vm()?;
+    world.script_manager().api_cells().install(&lua)?;
     install(world, demo, lua);
     Ok(())
 }

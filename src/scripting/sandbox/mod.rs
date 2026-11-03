@@ -26,9 +26,9 @@ mod files;
 
 pub(super) use files::install as install_file_access;
 
-/// `math.random` / `math.randomseed` rewritten over `Random`. Looked up at call
-/// time, so a script caching `local random = math.random` still works: `Random`
-/// is re-registered for every evaluation. Lua 5.4's argument rules are kept —
+/// `math.random` / `math.randomseed` rewritten over `Random`. The shims run before
+/// the API is registered on the VM (once, #1709), so they look `Random` up at call
+/// time; a script caching `local random = math.random` still works. Lua 5.4's argument rules are kept —
 /// `math.random(m, n)` is an integer in `[m, n]` (inclusive, unlike `Random.Range`).
 const MATH_SHIMS: &str = r#"
 local tointeger, maxinteger, mininteger = math.tointeger, math.maxinteger, math.mininteger

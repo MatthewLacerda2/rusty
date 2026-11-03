@@ -18,6 +18,7 @@ mod late_update;
 mod lifecycle;
 mod manager;
 mod namespaces;
+mod once_per_vm;
 mod physics;
 mod point_queries;
 mod raycast;

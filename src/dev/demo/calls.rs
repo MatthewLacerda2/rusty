@@ -162,17 +162,20 @@ pub fn invoke(lua: &Lua, cells: &ApiCells, function: &str, args: &[Plain]) -> Re
     let (namespace, name) = function
         .split_once('.')
         .ok_or_else(|| format!("{function} is not Namespace.Function"))?;
-    let ctx = cells.ctx();
-    lua.scope(|scope| {
-        crate::api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
-        let f: Function = lua.globals().get::<Table>(namespace)?.get(name)?;
-        let args: MultiValue = args
-            .iter()
-            .map(|a| to_lua(lua, a))
-            .collect::<mlua::Result<_>>()?;
-        f.call::<MultiValue>(args).map(drop)
-    })
-    .map_err(|e| format!("{function}: {e}"))
+    // The replay's VM has the surface from `replay::prepare`; the world's cells are
+    // attached again, as a restarted replay may stand on new ones.
+    cells.attach(lua);
+    call(lua, (namespace, name), args).map_err(|e| format!("{function}: {e}"))
+}
+
+/// Call `namespace.name` in `lua` with `args`.
+fn call(lua: &Lua, (namespace, name): (&str, &str), args: &[Plain]) -> mlua::Result<()> {
+    let f: Function = lua.globals().get::<Table>(namespace)?.get(name)?;
+    let args: MultiValue = args
+        .iter()
+        .map(|a| to_lua(lua, a))
+        .collect::<mlua::Result<_>>()?;
+    f.call::<MultiValue>(args).map(drop)
 }
 
 /// Make the `Harness.<verb>` call (one of [`HARNESS_VERBS`]) with `args` on
