@@ -1,10 +1,12 @@
 //! CPU binning (#434): which lights, and which decals (#638), touch which clusters
-//! of one camera. Both are bounding spheres to the binner; they differ only in their
-//! [`Budget`].
+//! of one camera. Both are bounding spheres to the binner, a spotlight's trimmed by
+//! its cone (#1712); they differ only in their [`Budget`].
 
 use glam::Vec3;
 
+use super::cone::{Bounds, Cone};
 use super::grid::AabbCache;
+use super::lists::{fill_lists, Pair};
 use super::{ClusterGrid, LocalLight, CLUSTER_COUNT, GRID, MAX_CLUSTER_LIGHTS, MAX_VISIBLE_LIGHTS};
 
 /// One camera's binned spheres (lights or decals): per cluster an `[offset, count]`
@@ -16,7 +18,8 @@ pub(crate) struct Binned {
     pub indices: Vec<u32>,
     /// Spheres binned into at least one cluster.
     pub visible: u32,
-    /// Spheres outside the camera's view: never binned, so they cost nothing.
+    /// Spheres outside the camera's view, or lights that contribute nothing
+    /// (#1712): never binned, so they cost nothing.
     pub culled: u32,
     /// Spheres in view but past the per-camera budget (the least important).
     pub dropped: u32,
@@ -67,30 +70,35 @@ impl Budget<'_> {
     }
 }
 
-/// One cluster's entry for one sphere, and how much it matters there.
-#[derive(Clone, Copy, Default)]
-struct Pair {
-    cluster: u32,
-    item: u32,
-    score: f32,
-}
-
-/// A sphere in view space, with the clusters its bounding box may touch.
+/// A sphere in view space, with the clusters its bounding box may touch, and the
+/// cone in view space that trims it, for a spotlight.
 struct Candidate {
     item: u32,
     center: Vec3,
     radius: f32,
+    cone: Option<Cone>,
     tiles: [[u32; 2]; 2],
     slices: [u32; 2],
 }
 
 /// Bin `lights` into `grid`'s clusters: the [`MAX_VISIBLE_LIGHTS`] that contribute
-/// most to the view, at most [`MAX_CLUSTER_LIGHTS`] per cluster (#834). `cache`
+/// most to the view, at most [`MAX_CLUSTER_LIGHTS`] per cluster (#834). A light
+/// that contributes nothing (#1712) is left out, counted as culled; it keeps its
+/// place in the array, so its index (and its shadow tiles) still resolve. `cache`
 /// keeps the cluster boxes per lens.
 pub(crate) fn bin(grid: &ClusterGrid, lights: &[LocalLight], cache: &mut AabbCache) -> Binned {
-    let spheres: Vec<_> = lights.iter().map(LocalLight::sphere).collect();
+    let bounds: Vec<_> = lights
+        .iter()
+        .map(|l| match l.contributes() {
+            true => l.bounds(),
+            false => Bounds {
+                sphere: (Vec3::from(l.position), 0.0),
+                cone: None,
+            },
+        })
+        .collect();
     let brightness: Vec<_> = lights.iter().map(LocalLight::brightness).collect();
-    bin_spheres(grid, &spheres, &light_budget(&brightness), cache)
+    bin_bounds(grid, &bounds, &light_budget(&brightness), cache)
 }
 
 /// `lights`, each with whether it wants a shadow seen through `grid` (#873): it
@@ -101,10 +109,10 @@ pub(crate) fn shadow_requests(
     grid: &ClusterGrid,
     lights: &[(LocalLight, bool)],
 ) -> Vec<(LocalLight, bool)> {
-    let spheres: Vec<_> = lights.iter().map(|(l, _)| l.sphere()).collect();
+    let bounds: Vec<_> = lights.iter().map(|(l, _)| l.bounds()).collect();
     let brightness: Vec<_> = lights.iter().map(|(l, _)| l.brightness()).collect();
     let mut out: Vec<_> = lights.iter().map(|&(l, _)| (l, false)).collect();
-    for c in camera_cut(grid, &spheres, &light_budget(&brightness)).0 {
+    for c in camera_cut(grid, &bounds, &light_budget(&brightness)).0 {
         let i = c.item as usize;
         out[i].1 = lights[i].1;
     }
@@ -121,16 +129,32 @@ fn light_budget(brightness: &[f32]) -> Budget<'_> {
     }
 }
 
-/// Bin `spheres` (centre, radius) into `grid`'s clusters within `budget`. Each
-/// cluster lists its spheres in ascending index order; every cut is deterministic,
-/// the index breaking ties.
+/// Bin `spheres` (centre, radius) into `grid`'s clusters within `budget`: the
+/// decals' path (#638), [`bin_bounds`] with no cones.
 pub(crate) fn bin_spheres(
     grid: &ClusterGrid,
     spheres: &[(Vec3, f32)],
     budget: &Budget,
     cache: &mut AabbCache,
 ) -> Binned {
-    let (candidates, culled, dropped) = camera_cut(grid, spheres, budget);
+    let bounds: Vec<_> = spheres
+        .iter()
+        .map(|&sphere| Bounds { sphere, cone: None })
+        .collect();
+    bin_bounds(grid, &bounds, budget, cache)
+}
+
+/// Bin `bounds` into `grid`'s clusters within `budget`: a cluster lists one when
+/// its box meets the sphere and, for a cone, the cone may touch the box's bounding
+/// sphere (#1712). Each cluster lists its items in ascending index order; every cut
+/// is deterministic, the index breaking ties.
+fn bin_bounds(
+    grid: &ClusterGrid,
+    bounds: &[Bounds],
+    budget: &Budget,
+    cache: &mut AabbCache,
+) -> Binned {
+    let (candidates, culled, dropped) = camera_cut(grid, bounds, budget);
     let mut out = Binned {
         ranges: vec![[0, 0]; CLUSTER_COUNT],
         culled,
@@ -150,7 +174,8 @@ pub(crate) fn bin_spheres(
                     let cluster = i + GRID[0] * (j + GRID[1] * k);
                     let (lo, hi) = aabbs[cluster as usize];
                     let d2 = c.center.clamp(lo, hi).distance_squared(c.center);
-                    if d2 <= c.radius * c.radius {
+                    let in_cone = |cone: &Cone| cone.may_reach_box(lo, hi);
+                    if d2 <= c.radius * c.radius && c.cone.as_ref().is_none_or(in_cone) {
                         let score = budget.cluster_score(c.item, d2);
                         pairs.push(Pair {
                             cluster,
@@ -175,13 +200,13 @@ pub(crate) fn bin_spheres(
 /// order, with how many lay outside the view and how many the cut dropped.
 fn camera_cut(
     grid: &ClusterGrid,
-    spheres: &[(Vec3, f32)],
+    bounds: &[Bounds],
     budget: &Budget,
 ) -> (Vec<Candidate>, u32, u32) {
-    let mut candidates: Vec<Candidate> = (0..spheres.len() as u32)
-        .filter_map(|i| candidate(grid, i, spheres[i as usize]))
+    let mut candidates: Vec<Candidate> = (0..bounds.len() as u32)
+        .filter_map(|i| candidate(grid, i, bounds[i as usize]))
         .collect();
-    let culled = (spheres.len() - candidates.len()) as u32;
+    let culled = (bounds.len() - candidates.len()) as u32;
     let mut dropped = 0;
     if candidates.len() > budget.per_camera {
         let key = |c: &Candidate| budget.view_score(c);
@@ -193,71 +218,44 @@ fn camera_cut(
     (candidates, culled, dropped)
 }
 
-/// Counting-sort the pairs into per-cluster lists, each in ascending index order;
-/// stable, so a run already is. A cluster with more than `cap` keeps the `cap`
-/// that score highest there, the index breaking ties ([`cut_lists`]).
-fn fill_lists(out: &mut Binned, pairs: &[Pair], cap: usize) {
-    for p in pairs {
-        out.ranges[p.cluster as usize][1] += 1;
-    }
-    if out.ranges.iter().any(|r| r[1] as usize > cap) {
-        return cut_lists(out, pairs, cap);
-    }
-    let mut offset = 0;
-    for range in &mut out.ranges {
-        range[0] = offset;
-        offset += range[1];
-    }
-    let mut cursor: Vec<u32> = out.ranges.iter().map(|r| r[0]).collect();
-    out.indices = vec![0; pairs.len()];
-    for p in pairs {
-        let at = &mut cursor[p.cluster as usize];
-        out.indices[*at as usize] = p.item;
-        *at += 1;
-    }
-}
-
-/// [`fill_lists`] when some cluster is over `cap` (`ranges` holding the counts):
-/// sort the pairs by cluster, cut each list over `cap` to its top `cap` and count
-/// the rest in `cluster_dropped`.
-fn cut_lists(out: &mut Binned, pairs: &[Pair], cap: usize) {
-    let mut cursor = Vec::with_capacity(CLUSTER_COUNT);
-    let mut offset = 0;
-    for range in &out.ranges {
-        cursor.push(offset);
-        offset += range[1] as usize;
-    }
-    let mut sorted = vec![Pair::default(); pairs.len()];
-    for p in pairs {
-        let at = &mut cursor[p.cluster as usize];
-        sorted[*at] = *p;
-        *at += 1;
-    }
-    out.indices = Vec::with_capacity(pairs.len());
-    let mut start = 0;
-    for range in &mut out.ranges {
-        let list = &mut sorted[start..start + range[1] as usize];
-        start += list.len();
-        let keep = list.len().min(cap);
-        if keep < list.len() {
-            list.select_nth_unstable_by(keep, |a, b| {
-                b.score.total_cmp(&a.score).then(a.item.cmp(&b.item))
-            });
-            list[..keep].sort_unstable_by_key(|p| p.item);
-            out.cluster_dropped += (list.len() - keep) as u32;
-        }
-        *range = [out.indices.len() as u32, keep as u32];
-        out.indices.extend(list[..keep].iter().map(|p| p.item));
-    }
-}
-
 /// The sphere in view space and the tile/slice box it projects to, or `None` when
-/// it lies wholly outside the frustum (or has no reach).
-fn candidate(grid: &ClusterGrid, item: u32, (center, radius): (Vec3, f32)) -> Option<Candidate> {
-    if radius <= 0.0 {
+/// it lies wholly outside the frustum (or has no reach, a NaN radius included). A
+/// spot's box is also cut to its range sphere's (#1712), so it never visits a
+/// cluster the range sphere would not.
+fn candidate(grid: &ClusterGrid, item: u32, bounds: Bounds) -> Option<Candidate> {
+    let (center, radius) = bounds.sphere;
+    let center = grid.view.transform_point3(center);
+    let (mut tiles, mut slices) = footprint(grid, center, radius)?;
+    let cone = bounds.cone.map(|c| c.transformed(grid.view));
+    if let Some(cone) = &cone {
+        let (t, s) = footprint(grid, cone.apex, cone.range)?;
+        for axis in 0..2 {
+            tiles[axis] = [
+                tiles[axis][0].max(t[axis][0]),
+                tiles[axis][1].min(t[axis][1]),
+            ];
+        }
+        slices = [slices[0].max(s[0]), slices[1].min(s[1])];
+    }
+    Some(Candidate {
+        item,
+        center,
+        radius,
+        cone,
+        tiles,
+        slices,
+    })
+}
+
+/// A cluster range: the tiles across and up (`[first, last]` each) and the slices.
+type Footprint = ([[u32; 2]; 2], [u32; 2]);
+
+/// The tiles and depth slices a view-space sphere may touch, or
+/// `None` when it lies wholly outside the frustum or has no reach.
+fn footprint(grid: &ClusterGrid, center: Vec3, radius: f32) -> Option<Footprint> {
+    if !(radius > 0.0) {
         return None;
     }
-    let center = grid.view.transform_point3(center);
     let depth = -center.z;
     if depth + radius < grid.near || depth - radius > grid.far {
         return None;
@@ -275,14 +273,11 @@ fn candidate(grid: &ClusterGrid, item: u32, (center, radius): (Vec3, f32)) -> Op
     let tile =
         |ndc: f32, n: u32| (((ndc * 0.5 + 0.5) * n as f32).floor().max(0.0) as u32).min(n - 1);
     let slice = |d: f32| (grid.slice_of(d).floor().max(0.0) as u32).min(GRID[2] - 1);
-    Some(Candidate {
-        item,
-        center,
-        radius,
-        tiles: [
+    Some((
+        [
             [tile(lo.x, GRID[0]), tile(hi.x, GRID[0])],
             [tile(lo.y, GRID[1]), tile(hi.y, GRID[1])],
         ],
-        slices: [slice(depth - radius), slice((depth + radius).min(grid.far))],
-    })
+        [slice(depth - radius), slice((depth + radius).min(grid.far))],
+    ))
 }

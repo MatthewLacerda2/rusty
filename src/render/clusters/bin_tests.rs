@@ -37,7 +37,14 @@ fn lists_of(binned: &Binned, cluster: u32) -> &[u32] {
     &binned.indices[offset as usize..(offset + count) as usize]
 }
 
-/// Every sampled point within a light's range and inside the view finds that light
+/// Whether `l` lights `p` at all, `p` in its range: a spot only inside its cone.
+fn lights_at(l: &LocalLight, p: Vec3) -> bool {
+    let to = (p - Vec3::from(l.position)).normalize_or_zero();
+    l.kind != KIND_SPOT || to.dot(Vec3::from(l.direction)) >= l.outer_cone
+}
+
+/// Every sampled point a light reaches (in range, in its cone) inside the view
+/// finds that light
 /// in the cluster the shader picks for it — the binning is conservative.
 fn assert_conservative(cam: &Camera, lights: &[LocalLight]) {
     let aspect = 16.0 / 9.0;
@@ -53,7 +60,7 @@ fn assert_conservative(cam: &Camera, lights: &[LocalLight]) {
                 for z in 0..=steps {
                     let t = Vec3::new(x as f32, y as f32, z as f32) / steps as f32 * 2.0 - 1.0;
                     let p = c + t * r * 0.999;
-                    if p.distance(c) > r || !frustum.intersects_aabb(p, p) {
+                    if p.distance(c) > r || !lights_at(l, p) || !frustum.intersects_aabb(p, p) {
                         continue;
                     }
                     let cluster = grid.cluster_at(view_proj, p);
@@ -131,4 +138,24 @@ fn past_the_budget_the_nearest_lights_win_and_the_rest_are_dropped() {
         MAX_VISIBLE_LIGHTS - 1,
         "the farthest lights were the ones cut"
     );
+}
+
+#[test]
+fn lights_that_contribute_nothing_list_in_no_cluster() {
+    let at = Vec3::new(0.0, 0.0, -5.0);
+    let lit = light(LightType::Point, at, 3.0);
+    for bad in [0.0, -1.0, f32::NAN] {
+        let dark = LocalLight {
+            intensity: bad,
+            ..lit
+        };
+        let binned = bin_view(&[dark, lit]);
+        assert_eq!((binned.visible, binned.culled), (1, 1), "intensity {bad}");
+        assert!(binned.indices.iter().all(|&i| i == 1), "intensity {bad}");
+    }
+    let black = LocalLight {
+        color: [0.0; 3],
+        ..lit
+    };
+    assert!(bin_view(&[black]).indices.is_empty(), "a black light");
 }

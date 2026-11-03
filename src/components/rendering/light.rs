@@ -89,6 +89,13 @@ pub struct LightComponent {
     /// names none, Unity's default.
     #[serde(default = "unit_area")]
     pub area_size: Vec2,
+    /// How far from the camera (world units) a point or spot light's shadow
+    /// reaches, HDRP's *Shadow Fade Distance* (#1712): over its last tenth the
+    /// shadow fades out, and past it the light shades unshadowed, sampling no
+    /// shadow map. `0` (the default) means no fade, so the shadow reaches as far
+    /// as the light does.
+    #[serde(default)]
+    pub shadow_fade_distance: f32,
 }
 
 fn unit_area() -> Vec2 {

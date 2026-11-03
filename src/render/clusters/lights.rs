@@ -3,6 +3,8 @@
 
 use glam::Vec3;
 
+use super::cone::{Bounds, Cone, WIDEST_CULLED_CONE};
+
 use crate::components::LightComponent;
 use crate::scene::{LightType, Scene};
 
@@ -33,6 +35,10 @@ pub(crate) struct LocalLight {
     pub shadow: u32,
     /// 1.0 for a `Baked` light (#438): lightmapped surfaces skip its direct light.
     pub baked: f32,
+    /// The camera distance past which its shadow is not sampled (#1712,
+    /// `LightComponent::shadow_fade_distance`); `0` never fades.
+    pub shadow_fade: f32,
+    pub _pad: [f32; 3],
 }
 
 impl LocalLight {
@@ -69,6 +75,10 @@ impl LocalLight {
             outer_cone: f32::to_radians(cones.1).cos(),
             shadow: NO_SHADOW,
             baked: f32::from(u8::from(light.effective_mode().bakes_direct())),
+            shadow_fade: Some(light.shadow_fade_distance)
+                .filter(|d| d.is_finite() && *d > 0.0)
+                .unwrap_or(0.0),
+            _pad: [0.0; 3],
         })
     }
 
@@ -78,10 +88,65 @@ impl LocalLight {
         self.intensity * crate::core::color::luminance(self.color)
     }
 
-    /// The bounding sphere the binner tests: centre and range. A spotlight is
-    /// bounded by its whole range sphere, which is conservative.
+    /// Whether the light delivers anything (#1712): a positive brightness. A light
+    /// at intensity 0 (a blinking alarm in its off half), black, or with a NaN or
+    /// negative intensity is never binned, so no pixel loops over it.
+    pub(crate) fn contributes(&self) -> bool {
+        self.brightness() > 0.0
+    }
+
+    /// The light's range sphere: centre and range. What the shadow atlas ranks by;
+    /// the binner tests the tighter [`Self::bounds`].
     pub(crate) fn sphere(&self) -> (Vec3, f32) {
         (Vec3::from(self.position), self.range)
+    }
+
+    /// What the binner tests (#1712): a bounding sphere (centre, radius), and for a
+    /// spotlight its [`Cone`]. A point light's sphere is its range. A spot's is the
+    /// smallest sphere around its range-capped cone (or its range sphere, if
+    /// smaller), which a narrow beam fills far
+    /// better than its range sphere; a cone wider than [`WIDEST_CULLED_CONE`] (an
+    /// Area light's 90° stand-in among them) keeps its range sphere and no cone.
+    pub(crate) fn bounds(&self) -> Bounds {
+        let (at, range) = (Vec3::from(self.position), self.range);
+        let axis = Vec3::from(self.direction);
+        let cos = self.outer_cone;
+        let culled = self.kind == KIND_SPOT
+            && cos >= WIDEST_CULLED_CONE.to_radians().cos()
+            && cos <= 1.0
+            && axis.is_finite();
+        if !culled {
+            return Bounds {
+                sphere: (at, range),
+                cone: None,
+            };
+        }
+        let sin = (1.0 - cos * cos).max(0.0).sqrt();
+        // Up to 45° the sphere through the apex and the rim; past it, the one
+        // around the rim circle (which then holds the apex and the cap too).
+        let sphere = if cos >= std::f32::consts::FRAC_1_SQRT_2 {
+            let r = range / (2.0 * cos);
+            (at + axis * r, r)
+        } else {
+            (at + axis * range * cos, range * sin)
+        };
+        // Both spheres hold the cone; keep the smaller (the binner also tests the
+        // range sphere per cluster, `Cone::may_reach_box`).
+        let sphere = if sphere.1 < range {
+            sphere
+        } else {
+            (at, range)
+        };
+        Bounds {
+            sphere,
+            cone: Some(Cone {
+                apex: at,
+                axis,
+                range,
+                cos,
+                sin,
+            }),
+        }
     }
 }
 
