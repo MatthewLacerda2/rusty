@@ -2,7 +2,8 @@
 //!
 //! One depth texture holds every shadowed local light's maps as square tiles: one
 //! perspective view for a spotlight, six cube faces for a point light. Each frame
-//! [`plan`] picks the lights and their tiles (importance, size, packing), every
+//! [`plan`] ranks the candidate lights and sizes their tiles, [`slots`] places
+//! them and keeps each light's tiles from frame to frame (#1711), every
 //! tile's casters are drawn into its viewport through the cascades' own depth
 //! pipelines — so cutout and dissolve casters clip (#648) and skinned ones are posed
 //! (#599) here too — and each light's first tile index rides its `LocalLight`
@@ -21,6 +22,7 @@
 mod alloc;
 mod blit;
 mod cache;
+mod hysteresis;
 mod plan;
 mod slots;
 mod sweep;
@@ -224,3 +226,6 @@ mod contact_tests;
 #[cfg(test)]
 #[path = "persist_tests.rs"]
 mod persist_tests;
+#[cfg(test)]
+#[path = "settle_tests.rs"]
+mod settle_tests;

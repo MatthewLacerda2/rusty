@@ -10,10 +10,10 @@
 //!   longer casting, or cut by the camera's light budget (#873). When it comes
 //!   back, its tiles and their bakes are still there. A despawned light frees its
 //!   tiles at once, and a new scene starts the slots over.
-//! - **Hysteresis on size.** A light keeps its tile size while its wanted size
-//!   stays within [`BAND`] of the size's step, and changes only after being out of
-//!   that band for [`SETTLE_FRAMES`] frames in a row, so a camera walking across a
-//!   step re-bakes nothing.
+//! - **Hysteresis on size** ([`super::hysteresis`]): a light's settled size changes
+//!   only after its wanted size has been out of band for some frames in a row, so
+//!   a camera walking across a step re-bakes nothing. The budget may halve a
+//!   settled size under pressure; the tiles grow back when the pressure ends.
 //!
 //! Each frame the candidates are first **budgeted** in importance order by cell
 //! count alone: a light that does not fit is retried at half the size, down to
@@ -32,20 +32,15 @@ use std::collections::BTreeMap;
 use glam::{Mat4, Vec3};
 
 use super::alloc::{cells, CellGrid};
+use super::hysteresis::settle;
 use super::plan::{
-    candidates, faces, light_views, texel_at_one_metre, AtlasPlan, Candidate, Tile, CELLS,
-    MAX_TILE, MIN_TILE,
+    candidates, faces, light_views, texel_at_one_metre, AtlasPlan, Candidate, Tile, CELLS, MIN_TILE,
 };
 use crate::render::clusters::LocalLight;
 use crate::scene::SceneId;
 
 /// Rendered frames an idle light keeps its tiles: ten seconds at 60 fps.
 pub(super) const KEEP_FRAMES: u64 = 600;
-/// How far past its size's step a light's wanted size may stray, as a fraction of
-/// the step, before the size starts to change.
-pub(super) const BAND: f32 = 0.25;
-/// Frames in a row a light's wanted size must be out of [`BAND`] to change its tiles.
-pub(super) const SETTLE_FRAMES: u32 = 15;
 
 /// One frame's lights, as the plan reads them.
 pub(crate) struct Frame<'a> {
@@ -63,9 +58,11 @@ struct Slot {
     /// Each face's top-left corner, in texels.
     origins: Vec<[u32; 2]>,
     size: u32,
+    /// The size the hysteresis settled on, before the budget halved it.
+    settled: u32,
     /// The last frame the light was shown.
     seen: u64,
-    /// Frames in a row its wanted size was out of [`BAND`].
+    /// Frames in a row its wanted size was out of the settled size's band.
     off_band: u32,
 }
 
@@ -78,8 +75,17 @@ pub(crate) struct ShadowSlots {
     slots: BTreeMap<u32, Slot>,
 }
 
-/// A light the budget kept: its index in the frame, its id and its tile size.
-type Kept = (usize, u32, u32);
+/// A light the budget kept.
+#[derive(Clone, Copy)]
+struct Kept {
+    /// Its index in the frame's lights.
+    light: usize,
+    id: u32,
+    /// Its tile size this frame.
+    size: u32,
+    /// The size it settled at, before the budget halved it.
+    settled: u32,
+}
 
 impl ShadowSlots {
     /// Plan this frame's atlas for `frame`'s lights in `scene`; `alive` says whether
@@ -106,18 +112,23 @@ impl ShadowSlots {
 
         let ranked = candidates(frame.lights, frame.view_proj, frame.eye);
         let (kept, dropped) = self.budget(frame, &ranked);
-        for &(light, id, size) in &kept {
-            let faces = faces(&frame.lights[light].0) as usize;
-            match self.slots.get_mut(&id) {
-                Some(s) if s.size == size && s.origins.len() == faces => s.seen = now,
-                Some(_) => self.free(id),
+        for k in &kept {
+            let faces = faces(&frame.lights[k.light].0) as usize;
+            match self.slots.get_mut(&k.id) {
+                Some(s) if s.size == k.size && s.origins.len() == faces => {
+                    if s.settled != k.settled {
+                        s.off_band = 0;
+                    }
+                    (s.seen, s.settled) = (now, k.settled);
+                }
+                Some(_) => self.free(k.id),
                 None => {}
             }
         }
         dropped.iter().for_each(|&id| self.free(id));
-        for &(light, id, size) in &kept {
-            let faces = faces(&frame.lights[light].0);
-            if !self.slots.contains_key(&id) && !self.place_evicting(id, size, faces, now) {
+        for k in &kept {
+            let faces = faces(&frame.lights[k.light].0);
+            if !self.slots.contains_key(&k.id) && !self.place_evicting(k, faces, now) {
                 self.repack(frame, &kept, now);
                 break;
             }
@@ -133,7 +144,8 @@ impl ShadowSlots {
         for c in ranked {
             let id = frame.ids[c.light];
             let faces = faces(&frame.lights[c.light].0);
-            let mut size = self.settle(id, faces, c);
+            let settled = self.settle(id, faces, c);
+            let mut size = settled;
             while size > MIN_TILE && faces * cells(size) > free {
                 size /= 2;
             }
@@ -142,39 +154,39 @@ impl ShadowSlots {
                 continue;
             }
             free -= faces * cells(size);
-            kept.push((c.light, id, size));
+            kept.push(Kept {
+                light: c.light,
+                id,
+                size,
+                settled,
+            });
         }
         (kept, dropped)
     }
 
-    /// The size light `id` (with `faces` tiles) should have this frame: its tiles'
-    /// size while its want stays in [`BAND`] or has strayed for fewer than
-    /// [`SETTLE_FRAMES`] frames, else what its coverage asks for.
+    /// The size light `id` (with `faces` tiles) asks of the budget this frame: its
+    /// settled size, or what its coverage asks for once the hysteresis lets it go
+    /// ([`settle`]). A light not shown last frame starts counting over.
     fn settle(&mut self, id: u32, faces: u32, c: &Candidate) -> u32 {
+        let now = self.frame;
         let Some(slot) = self.slots.get_mut(&id) else {
             return c.size;
         };
         if slot.origins.len() as u32 != faces {
             return c.size;
         }
-        if in_band(slot.size, c.want) {
+        if slot.seen + 1 != now {
             slot.off_band = 0;
-            return slot.size;
         }
-        slot.off_band += 1;
-        if slot.off_band >= SETTLE_FRAMES {
-            c.size
-        } else {
-            slot.size
-        }
+        settle(slot.settled, &mut slot.off_band, c.want, c.size)
     }
 
-    /// Give light `id` `faces` free tiles of `size`, evicting idle lights' tiles
+    /// Give light `k` `faces` free tiles of its size, evicting idle lights' tiles
     /// (the longest idle first) until they fit. False when even that fails.
-    fn place_evicting(&mut self, id: u32, size: u32, faces: u32, now: u64) -> bool {
+    fn place_evicting(&mut self, k: &Kept, faces: u32, now: u64) -> bool {
         loop {
-            if let Some(origins) = self.try_place(size, faces) {
-                self.slots.insert(id, slot(origins, size, now));
+            if let Some(origins) = self.try_place(k.size, faces) {
+                self.slots.insert(k.id, slot(origins, k, now));
                 return true;
             }
             let idle = (self.slots.iter())
@@ -207,19 +219,21 @@ impl ShadowSlots {
     /// once idle lights are all evicted, so `kept` are the only slots.
     fn repack(&mut self, frame: &Frame, kept: &[Kept], now: u64) {
         let mut order: Vec<&Kept> = kept.iter().collect();
-        order.sort_by_key(|k| std::cmp::Reverse(k.2));
+        order.sort_by_key(|k| std::cmp::Reverse(k.size));
         let old = std::mem::take(&mut self.slots);
         self.grid = CellGrid::default();
-        for &&(light, id, size) in &order {
-            let faces = faces(&frame.lights[light].0);
-            let origins = (self.try_place(size, faces))
+        for k in order {
+            let faces = faces(&frame.lights[k.light].0);
+            let origins = (self.try_place(k.size, faces))
                 .expect("the budget leaves room for every kept light, packed largest first");
-            let off_band = old.get(&id).map_or(0, |s| s.off_band);
+            let off_band = (old.get(&k.id))
+                .filter(|s| s.settled == k.settled)
+                .map_or(0, |s| s.off_band);
             let s = Slot {
                 off_band,
-                ..slot(origins, size, now)
+                ..slot(origins, k, now)
             };
-            self.slots.insert(id, s);
+            self.slots.insert(k.id, s);
         }
     }
 
@@ -229,7 +243,10 @@ impl ShadowSlots {
             dropped,
             ..AtlasPlan::default()
         };
-        for &(light, id, size) in kept {
+        for &Kept {
+            light, id, size, ..
+        } in kept
+        {
             let slot = &self.slots[&id];
             let l = &frame.lights[light].0;
             out.shadows.push((light, out.tiles.len() as u32));
@@ -266,32 +283,15 @@ impl ShadowSlots {
     }
 }
 
-/// A fresh slot over `origins`, shown at frame `now`.
-fn slot(origins: Vec<[u32; 2]>, size: u32, now: u64) -> Slot {
+/// A fresh slot over `origins` for light `k`, shown at frame `now`.
+fn slot(origins: Vec<[u32; 2]>, k: &Kept, now: u64) -> Slot {
     Slot {
         origins,
-        size,
+        size: k.size,
+        settled: k.settled,
         seen: now,
         off_band: 0,
     }
-}
-
-/// Whether a light wanting `want` texels may keep tiles of `size`: `want` is within
-/// [`BAND`] of `size`'s step `[size, 2 × size)`, open-ended past either end of the
-/// tile sizes.
-fn in_band(size: u32, want: f32) -> bool {
-    let size_f = size as f32;
-    let lo = if size <= MIN_TILE {
-        0.0
-    } else {
-        size_f * (1.0 - BAND)
-    };
-    let hi = if size >= MAX_TILE {
-        f32::INFINITY
-    } else {
-        2.0 * size_f * (1.0 + BAND)
-    };
-    (lo..hi).contains(&want)
 }
 
 #[cfg(test)]

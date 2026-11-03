@@ -5,8 +5,9 @@
 use glam::Vec3;
 
 use super::cache::StaticTiles;
+use super::hysteresis::SETTLE_FRAMES;
 use super::plan::{AtlasPlan, MIN_TILE};
-use super::slots::{Frame, ShadowSlots, SETTLE_FRAMES};
+use super::slots::{Frame, ShadowSlots};
 use super::Tile;
 use crate::components::LightComponent;
 use crate::render::clusters::LocalLight;

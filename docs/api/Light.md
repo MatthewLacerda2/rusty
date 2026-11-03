@@ -78,7 +78,10 @@ a tile no dynamic caster reaches is not redrawn at all. A light **keeps its tile
 from frame to frame (#1711, HDRP's cached shadow atlas): one blinking to intensity
 0, leaving the view or losing the light budget keeps them for 600 rendered frames,
 so it comes back with its bake; a tile changes size only after the light's wanted
-size has been a quarter-step past its own for 15 frames in a row. A moving or
+size has been out of its band for 15 frames in a row (a quarter of a step past
+either end of its own step, `[0.75 × size, 2.25 × size)`, never past the largest
+tile, so a light the camera walks into always reaches it). A tile the atlas had to
+shrink to fit grows back as soon as the room is there. A moving or
 turning light re-bakes every frame it moves, and so does a light whose tiles the
 atlas has to repack (a new light that the free space could hold only once
 rearranged).
