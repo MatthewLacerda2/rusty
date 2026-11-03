@@ -32,11 +32,9 @@ fn fresh_dir(name: &str) -> std::path::PathBuf {
 
 #[test]
 fn each_scene_names_its_own_folder() {
-    assert_eq!(
-        reflection_dir("a/kolvik.scene"),
-        Path::new("a/kolvik.scene.reflections")
-    );
-    assert_ne!(reflection_dir("a/x.scene"), reflection_dir("a/y.scene"));
+    let kolvik = reflection_dir("kolvik.scene");
+    assert_eq!(kolvik, Path::new("kolvik.scene.reflections"));
+    assert_ne!(reflection_dir("x.scene"), reflection_dir("y.scene"));
 }
 
 #[test]
