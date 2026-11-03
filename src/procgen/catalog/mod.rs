@@ -20,12 +20,13 @@
 //! every row to the parser: its tag, its params, each default, each enum's values
 //! and which params take a link.
 
-mod color;
-mod filter;
-mod generators;
-mod math;
+// sorted: one module per family; an op's own enum is named through it (`catalog::<family>::<op>::<Enum>`)
+pub(crate) mod color;
+pub(crate) mod filter;
+pub(crate) mod generators;
+pub(crate) mod math;
 mod op;
-mod vector;
+pub(crate) mod vector;
 
 pub use op::{Cx, Op, Row};
 
@@ -37,52 +38,57 @@ use super::recipe::{Arity, Link, OpInfo, Param};
 /// Builds [`OpKind`], its re-exported params structs and [`OPS`] from the rows,
 /// in row order. A row is `Variant(path::Params)` for an op with params, or
 /// `Variant = path::Op` for one without (a unit struct; the variant carries
-/// nothing, so the recipe writes only its `op`). Attributes (`#[cfg(test)]`)
-/// carry through to every place the row lands.
+/// nothing, so the recipe writes only its `op`). A row may start with `///` docs,
+/// which land on its variant, then a `#[cfg(..)]`, which carries through to every
+/// place the row lands.
 macro_rules! catalog {
-    (@emit [$($(#[$pm:meta])* $pv:ident $pt:path;)*]
-        [$($(#[$um:meta])* $uv:ident $ut:path;)*]
-        [$($(#[$am:meta])* $at:path;)*]) => {
+    (@emit [$({$($pd:tt)*} {$($pc:tt)*} $pv:ident $pt:path;)*]
+        [$({$($ud:tt)*} {$($uc:tt)*} $uv:ident $ut:path;)*]
+        [$({$($ac:tt)*} $at:path;)*]) => {
         /// The curated op-set ("Blender-lite"), one variant per `catalog!` row.
         /// serde writes the variant's snake_case name as the node's `op` tag, and its
         /// params struct's fields beside it.
         #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
         #[serde(tag = "op", rename_all = "snake_case")]
         pub enum OpKind {
-            $($(#[$pm])* $pv($pt),)*
-            $($(#[$um])* $uv,)*
+            $($($pd)* $($pc)* $pv($pt),)*
+            $($($ud)* $($uc)* $uv,)*
         }
 
-        $($(#[$pm])* pub use $pt;)*
+        $($($pc)* pub use $pt;)*
 
         /// Every op's catalog row, in registry order: what `Texture.Ops()` lists.
-        pub const OPS: &[OpInfo] = &[$($(#[$am])* <$at as Row>::INFO,)*];
+        pub const OPS: &[OpInfo] = &[$($($ac)* <$at as Row>::INFO,)*];
 
         impl OpKind {
             /// The op's row in [`OPS`]: its tag, category, input [`Arity`] and params.
             pub fn info(&self) -> &'static OpInfo {
                 match self {
-                    $($(#[$pm])* OpKind::$pv(_) => &<$pt as Row>::INFO,)*
-                    $($(#[$um])* OpKind::$uv => &<$ut as Row>::INFO,)*
+                    $($($pc)* OpKind::$pv(_) => &<$pt as Row>::INFO,)*
+                    $($($uc)* OpKind::$uv => &<$ut as Row>::INFO,)*
                 }
             }
 
             /// The op's behaviour.
             fn op(&self) -> &dyn Op {
                 match self {
-                    $($(#[$pm])* OpKind::$pv(p) => p,)*
-                    $($(#[$um])* OpKind::$uv => &$ut,)*
+                    $($($pc)* OpKind::$pv(p) => p,)*
+                    $($($uc)* OpKind::$uv => &$ut,)*
                 }
             }
         }
     };
     (@emit [$($p:tt)*] [$($u:tt)*] [$($a:tt)*]
-        $(#[$m:meta])* $v:ident($t:path), $($rest:tt)*) => {
-        catalog!(@emit [$($p)* $(#[$m])* $v $t;] [$($u)*] [$($a)* $(#[$m])* $t;] $($rest)*);
+        $(#[doc = $d:literal])* $(#[cfg($c:meta)])? $v:ident($t:path), $($rest:tt)*) => {
+        catalog!(@emit
+            [$($p)* {$(#[doc = $d])*} {$(#[cfg($c)])?} $v $t;] [$($u)*]
+            [$($a)* {$(#[cfg($c)])?} $t;] $($rest)*);
     };
     (@emit [$($p:tt)*] [$($u:tt)*] [$($a:tt)*]
-        $(#[$m:meta])* $v:ident = $t:path, $($rest:tt)*) => {
-        catalog!(@emit [$($p)*] [$($u)* $(#[$m])* $v $t;] [$($a)* $(#[$m])* $t;] $($rest)*);
+        $(#[doc = $d:literal])* $(#[cfg($c:meta)])? $v:ident = $t:path, $($rest:tt)*) => {
+        catalog!(@emit
+            [$($p)*] [$($u)* {$(#[doc = $d])*} {$(#[cfg($c)])?} $v $t;]
+            [$($a)* {$(#[cfg($c)])?} $t;] $($rest)*);
     };
     ($($rows:tt)*) => {
         catalog!(@emit [] [] [] $($rows)*);
@@ -91,25 +97,30 @@ macro_rules! catalog {
 
 catalog! {
     // sorted: one row per op; registry order is only the order `Texture.Ops()` lists
+    /// Stretch RGB so the input's minimum maps to 0 and its maximum to 1, one range
+    /// across R, G and B (hue kept); alpha untouched, a flat input unchanged.
     AutoLevels = color::auto_levels::AutoLevels,
-    Blur(filter::blur::Blur),
+    Blur(filter::blurs::blur::Blur),
     Brick(generators::brick::Brick),
     BrightContrast(color::bright_contrast::BrightContrast),
     BumpToNormal(vector::bump_to_normal::BumpToNormal),
-    Cavity(filter::cavity::Cavity),
+    Cavity(filter::relief::cavity::Cavity),
     Checker(generators::checker::Checker),
     Clamp(math::clamp::Clamp),
     ColorRamp(color::color_ramp::ColorRamp),
+    /// Combine up to three single-channel inputs into one RGB image (alpha 1); a
+    /// channel without an input reads 0.
     CombineRgb = vector::combine_rgb::CombineRgb,
     Constant(generators::constant::Constant),
-    Curvature(filter::curvature::Curvature),
-    Distance(filter::distance::Distance),
+    Curvature(filter::relief::curvature::Curvature),
+    Distance(filter::mask::distance::Distance),
     #[cfg(test)]
     Dummy(color::dummy::Dummy),
     Gamma(color::gamma::Gamma),
     Gradient(generators::gradient::Gradient),
     HueSatValue(color::hue_sat_value::HueSatValue),
     Image(generators::image::ImageTexture),
+    /// Invert RGB (`1 - c`), alpha untouched.
     Invert = color::invert::Invert,
     Mapping(vector::mapping::Mapping),
     MapRange(math::map_range::MapRange),
@@ -117,6 +128,7 @@ catalog! {
     Mix(color::mix::Mix),
     Noise(generators::noise::Noise),
     NormalBlend(vector::normal_blend::NormalBlend),
+    /// Collapse RGB to luminance (Rec. 709), written to all of RGB.
     RgbToBw = math::rgb_to_bw::RgbToBw,
     SeparateRgb(vector::separate_rgb::SeparateRgb),
     Shape(generators::shape::Shape),

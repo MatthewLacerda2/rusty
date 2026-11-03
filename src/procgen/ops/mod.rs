@@ -25,8 +25,11 @@
 //! future material/shader leg all route through identical math. A socketable param
 //! reaches its op as a [`field::Field`], a number or a linked node's map (#1494).
 
+// sorted: one module per family's math; branches adding math land on different lines
 pub mod color;
 pub mod distance;
+#[cfg(test)]
+pub mod dummy;
 pub mod field;
 pub mod filter;
 pub mod generators;
@@ -86,3 +89,7 @@ mod arity_tests;
 mod aspect_tests;
 #[cfg(test)]
 mod link_tests;
+#[cfg(test)]
+mod seed_tests;
+#[cfg(test)]
+mod test_graph;
