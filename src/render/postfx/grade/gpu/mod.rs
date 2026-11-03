@@ -167,7 +167,7 @@ fn f16_value(v: f32) -> f32 {
 
 /// `v` as an IEEE half float, for the zero and positive normal values the tests
 /// write (the mantissa truncated).
-fn f16(v: f32) -> u16 {
+pub(in crate::render::postfx) fn f16(v: f32) -> u16 {
     if v == 0.0 {
         return 0;
     }

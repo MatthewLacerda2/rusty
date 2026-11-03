@@ -58,3 +58,20 @@ fn meter(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let gpu = (&r.device, &r.queue);
     meter.run(gpu, &r.post_passes.exposure, scene, &params);
 }
+
+/// The view's side of the readout: what a frontend publishes.
+impl crate::render::RenderView {
+    /// The automatic exposure this view last read back from the GPU, in EV (#1444):
+    /// `None` until an `Automatic` frame's readback has landed. A frontend publishes
+    /// the screen's as `Scene::screen_exposure`.
+    pub fn exposure_readout(&self) -> Option<f32> {
+        self.post_fx.exposure.readout()
+    }
+
+    /// [`Self::exposure_readout`] after waiting for the read in flight: exact
+    /// for the frame just drawn, for a headless capture that has already waited.
+    pub fn settled_exposure(&mut self, device: &wgpu::Device) -> Option<f32> {
+        self.post_fx.exposure.settle(device);
+        self.exposure_readout()
+    }
+}

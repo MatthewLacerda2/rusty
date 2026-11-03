@@ -2,8 +2,9 @@
 //! scene, Unity HDRP's *Automatic Histogram*.
 //!
 //! Each frame a view's volume is in `Automatic` mode, two compute passes
-//! (`postfx/exposure.wgsl`) build a 64-bin log-luminance histogram of a 64 × 64
-//! sample of the scene, average the bins inside the volume's percentile window and
+//! (`postfx/exposure.wgsl`) build a 64-bin log-luminance histogram of the scene
+//! downsampled to a quarter of its size (every pixel metered, by area) and weighted
+//! towards the centre (#1701), average the bins inside the volume's percentile window and
 //! ease the **adapted EV** towards the exposure that brings that average to middle
 //! grey, within the volume's limits. The adapted EV lives in a 16-byte buffer the
 //! composite reads as binding 8 ([`ExposureMeter::state`]), so the frame never waits
@@ -30,8 +31,8 @@ use crate::render::motion::HistoryKey;
 /// Histogram bins. Mirrors `BINS` in `postfx/exposure.wgsl`, and equals the
 /// histogram pass's workgroup size (8 × 8), one bin per invocation.
 const BINS: u64 = 64;
-/// Samples per side of the metered grid. Mirrors `GRID`.
-const GRID: u32 = 64;
+/// Pixels per side of the box one histogram sample averages. Mirrors `BLOCK`.
+const BLOCK: u32 = 4;
 /// The histogram pass's workgroup edge.
 const GROUP: u32 = 8;
 /// The adapted state's size: `vec4<f32>` (EV, target, held, unused).
@@ -188,13 +189,13 @@ impl ExposureMeter {
         self.readout
     }
 
-    /// Meter `scene` (the view's HDR target) and adapt, with `params`, then start
-    /// reading the result back when no earlier read is in flight.
+    /// Meter `scene` (the view's HDR target, `size` pixels) and adapt, with
+    /// `params`, then start reading the result back when no earlier read is in flight.
     pub fn run(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         passes: &ExposurePasses,
-        scene: &wgpu::TextureView,
+        (scene, size): (&wgpu::TextureView, [u32; 2]),
         params: &ExposureParams,
     ) {
         self.collect();
@@ -231,7 +232,9 @@ impl ExposureMeter {
             });
             pass.set_bind_group(0, &bind_group, &[]);
             pass.set_pipeline(&passes.histogram);
-            pass.dispatch_workgroups(GRID / GROUP, GRID / GROUP, 1);
+            // One invocation per block, rounded up at a ragged edge.
+            let groups = size.map(|n| n.div_ceil(BLOCK).div_ceil(GROUP).max(1));
+            pass.dispatch_workgroups(groups[0], groups[1], 1);
             pass.set_pipeline(&passes.reduce);
             pass.dispatch_workgroups(1, 1, 1);
         }
@@ -275,25 +278,11 @@ impl ExposureMeter {
     }
 }
 
-/// The view's side of the readout: what a frontend publishes.
-impl crate::render::RenderView {
-    /// The automatic exposure this view last read back from the GPU, in EV (#1444):
-    /// `None` until an `Automatic` frame's readback has landed. A frontend publishes
-    /// the screen's as `Scene::screen_exposure`.
-    pub fn exposure_readout(&self) -> Option<f32> {
-        self.post_fx.exposure.readout()
-    }
-
-    /// [`Self::exposure_readout`] after waiting for the read in flight: exact
-    /// for the frame just drawn, for a headless capture that has already waited.
-    pub fn settled_exposure(&mut self, device: &wgpu::Device) -> Option<f32> {
-        self.post_fx.exposure.settle(device);
-        self.exposure_readout()
-    }
-}
-
 #[cfg(test)]
 mod gpu_tests;
+
+#[cfg(test)]
+mod meter_gpu_tests;
 
 #[cfg(test)]
 mod stack_gpu_tests;

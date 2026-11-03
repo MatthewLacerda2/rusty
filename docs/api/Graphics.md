@@ -223,8 +223,11 @@ the metered one. A new volume starts `Fixed` at `0`.
 **Automatic exposure** (#1444) is Unity HDRP's *Automatic Histogram*: eye
 adaptation, so stepping from a dark corridor into daylight blinds you for a moment and
 a dark room becomes readable once you're in it. With the mode `"Automatic"`, each frame
-the renderer meters its view's HDR scene into a 64-bin log-luminance histogram (a fixed
-64 × 64 sample, on the GPU), averages the bins between the **low** and **high
+the renderer meters its view's HDR scene into a 64-bin log-luminance histogram (on the
+GPU, from the scene downsampled to a quarter of its size, so every pixel counts by its
+area and a small bright lamp doesn't flicker the exposure as the camera moves, and
+weighted towards the centre of the picture, a corner counting a quarter as much as the
+middle, as HDRP's *Center Weighted* metering does), averages the bins between the **low** and **high
 percentiles** (the darkest and brightest pixels ignored), and computes the exposure
 that brings that average to middle grey, plus the **compensation**, held to the
 **limits**. The applied exposure eases towards it at **speed up** EV per second while
