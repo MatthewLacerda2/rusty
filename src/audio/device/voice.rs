@@ -3,8 +3,9 @@
 //! Each voice is a [`ClipSound`] playing a cached clip into its mixer group's kira
 //! track. It reads its live mix (gain, pan, `spatial_blend`, rate, pause, stop) from
 //! a shared [`VoiceControl`] of atomics: the backend retunes the control each frame
-//! and the audio thread picks the values up on its next buffer (a few ms), so a
-//! moving source pans smoothly and the voice is never restarted.
+//! and the audio thread picks the values up on its next buffer (a few ms) and
+//! glides to them (below), so a moving source pans smoothly and the voice is
+//! never restarted.
 //!
 //! The stereo rule (Unity's practical behaviour):
 //!   * a **mono** clip is copied to both channels, then panned;
@@ -14,6 +15,16 @@
 //!   * a clip with more than two channels uses its first two as left/right.
 //!
 //! Occlusion (#467) closes the voice's own low-pass ([`LowPass`]) after the pan.
+//!
+//! **Parameters glide, per sample** (#1693). The game retunes a voice once per
+//! frame (every 25–40 ms at a low frame rate), so a gain, pan, blend or low-pass
+//! applied flat would jump at that rate: zipper noise. Each of the four instead
+//! follows its target through a one-pole smoother with a [`SMOOTHING`] time
+//! constant, as FMOD and Wwise ramp theirs. A voice's first sample plays at its
+//! targets, with no fade-in, so a one-shot keeps its attack; a value that holds
+//! still is played exactly, so an open filter stays bit-transparent and a voice
+//! faded to zero gain is exact silence an effect can sleep over (#1729). Rate,
+//! pause and stop apply at once.
 //!
 //! Pan is a **balance** law: the far channel fades linearly to silence, the near one
 //! stays at unity (`pan = -1` ⇒ right silent). A centred voice plays at unity on both
@@ -113,6 +124,50 @@ pub fn mix_frame(frame: &[f32], pan: f32, spatial_blend: f32) -> (f32, f32) {
     (l * left_gain, r * right_gain)
 }
 
+/// The time constant, in seconds, a voice's gain, pan, blend and low-pass follow
+/// their targets with (#1693): ~99% of a change lands within 5 × this.
+pub const SMOOTHING: f64 = 0.010;
+
+/// Within this of its target, a gliding parameter lands on it exactly, so a
+/// settled voice plays its values bit for bit (−120 dB on a unit gain).
+/// A step too small to move an `f32` lands too: near `1.0` that stalls about
+/// `3e-5` short (−90 dB), and would never arrive otherwise.
+const SNAP: f32 = 1e-6;
+
+/// The parameters a voice glides (#1693). `low_pass` is the filter's one-pole
+/// coefficient; `1.0` is open (the filter bypassed).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Glide {
+    gain: f32,
+    pan: f32,
+    blend: f32,
+    low_pass: f32,
+}
+
+impl Glide {
+    /// Move one sample toward `target`, by `k` of the remaining distance.
+    fn toward(&mut self, target: &Glide, k: f32) {
+        for (v, t) in [
+            (&mut self.gain, target.gain),
+            (&mut self.pan, target.pan),
+            (&mut self.blend, target.blend),
+            (&mut self.low_pass, target.low_pass),
+        ] {
+            let next = *v + k * (t - *v);
+            *v = if next == *v || (t - next).abs() <= SNAP {
+                t
+            } else {
+                next
+            };
+        }
+    }
+
+    /// The low-pass coefficient [`LowPass::process`] takes (`None`: open).
+    fn filter(&self) -> Option<f32> {
+        (self.low_pass < 1.0).then_some(self.low_pass)
+    }
+}
+
 /// One voice playing `clip`, looping or once, under its [`VoiceControl`].
 pub struct ClipSound {
     clip: CachedClip,
@@ -124,6 +179,9 @@ pub struct ClipSound {
     frame: Vec<f32>,
     /// The voice's own low-pass, after the pan (#467).
     filter: LowPass,
+    /// Where the gliding parameters stand; `None` until the first buffer, which
+    /// starts them at their targets.
+    glide: Option<Glide>,
 }
 
 impl ClipSound {
@@ -136,6 +194,7 @@ impl ClipSound {
             position: 0.0,
             frame,
             filter: LowPass::default(),
+            glide: None,
         }
     }
 
@@ -169,24 +228,32 @@ impl ClipSound {
 impl Sound for ClipSound {
     fn process(&mut self, out: &mut [Frame], dt: f64, _info: &Info) {
         let c = &self.control;
-        let (gain, pan, blend) = (c.gain.get(), c.pan.get(), c.spatial_blend.get());
+        let target = Glide {
+            gain: c.gain.get(),
+            pan: c.pan.get(),
+            blend: c.spatial_blend.get(),
+            low_pass: LowPass::coefficient(c.low_pass.get(), dt).unwrap_or(1.0),
+        };
         let step = f64::from(c.speed.get()) * f64::from(self.clip.sample_rate()) * dt;
-        let low_pass = LowPass::coefficient(c.low_pass.get(), dt);
         if c.paused.load(Ordering::Relaxed) || c.stopped.load(Ordering::Relaxed) {
             out.fill(Frame::ZERO);
             return;
         }
+        let k = (1.0 - (-dt / SMOOTHING).exp()) as f32;
+        let mut glide = *self.glide.get_or_insert(target);
         for frame in out.iter_mut() {
             if self.run_out() {
                 *frame = Frame::ZERO;
                 continue;
             }
+            glide.toward(&target, k);
             self.sample();
-            let mixed = mix_frame(&self.frame, pan, blend);
-            let (l, r) = self.filter.process(low_pass, mixed);
-            *frame = Frame::new(l * gain, r * gain);
+            let mixed = mix_frame(&self.frame, glide.pan, glide.blend);
+            let (l, r) = self.filter.process(glide.filter(), mixed);
+            *frame = Frame::new(l * glide.gain, r * glide.gain);
             self.position += step;
         }
+        self.glide = Some(glide);
         if self.looping && self.clip.frames() > 0 {
             self.position %= self.clip.frames() as f64;
         }
@@ -216,3 +283,7 @@ impl SoundData for ClipSoundData {
 #[cfg(test)]
 #[path = "voice_tests.rs"]
 mod voice_tests;
+
+#[cfg(test)]
+#[path = "glide_tests.rs"]
+mod glide_tests;

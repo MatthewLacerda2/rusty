@@ -95,7 +95,11 @@ listener and hands the device its gain (× master), pan, rate and pause state.
 `Audio.GetSpatial` and the device mix come from the **same** resolve call, so the
 read-back is what plays. A voice started mid-frame is resolved against the previous
 frame's listener, so its first samples are already spatialized. Pan changes are
-applied in place — a moving source never restarts.
+applied in place — a moving source never restarts. The device glides a voice's gain,
+pan, spatial blend and low-pass toward each frame's values per sample (a 10 ms time
+constant, #1693), so a mix retuned once a frame is heard without steps whatever the
+frame rate; a voice's first sample plays at its values, with no fade-in. Rate and
+pause apply at once.
 
 - **Pan law** — balance: the far channel fades linearly to silence, the near one stays
   at unity (`pan = -1` ⇒ right channel silent). A centred voice plays at full level on
