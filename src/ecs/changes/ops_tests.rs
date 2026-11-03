@@ -33,7 +33,7 @@ pub enum Edit {
     /// already names it, as a file listing the child first does.
     Adopt(bool),
     /// An Undo of a flipped `active` flag (`restore_entity` of a live id) …
-    UndoEdit,
+    UndoFlip,
     /// … and of a despawn (`restore_entity` of a dead one).
     UndoDespawn,
 }
@@ -49,7 +49,7 @@ fn edit() -> impl Strategy<Value = Edit> {
         1 => Just(Edit::Despawn),
         1 => (flag(), flag()).prop_map(|(s, a)| Edit::Overwrite(s, a)),
         1 => flag().prop_map(Edit::Adopt),
-        1 => Just(Edit::UndoEdit),
+        1 => Just(Edit::UndoFlip),
         1 => Just(Edit::UndoDespawn),
     ]
 }
@@ -118,10 +118,10 @@ pub fn apply(w: &mut World, op: &Op) {
             w.replace_entity(doc);
         }
         Edit::Adopt(a) => adopt(w, e, a),
-        Edit::UndoEdit | Edit::UndoDespawn => {
+        Edit::UndoFlip | Edit::UndoDespawn => {
             let before = w.record(e).expect("live");
             match edit {
-                Edit::UndoEdit => {
+                Edit::UndoFlip => {
                     w.set_active(e, !w.is_active_self(e));
                 }
                 _ => w.despawn(e),

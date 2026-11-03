@@ -16,7 +16,7 @@
 //! the ONLY place raw hecs column access happens; `access.rs` and `core.rs` build
 //! the typed surface on them. Each write goes through `World::touch`, which notes it
 //! for the journal and stamps the change log (`ecs::changes`) in one call; the one
-//! write that does neither is [`World::derived_mut`], for state derived from the
+//! write that does neither is `World::derived_mut`, for state derived from the
 //! rest. `Entity` stays the on-disk *document* shape:
 //! `bundle::build_bundle` turns one into a single `EntityBuilder` placement (one
 //! archetype move), and `core.rs`'s `entity_document` recomposes it.
