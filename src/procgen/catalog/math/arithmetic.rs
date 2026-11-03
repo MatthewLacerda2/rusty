@@ -1,4 +1,4 @@
-//! The `math` op: per-channel arithmetic against a constant or a second image.
+//! The `math` op (in `arithmetic.rs`, since `math/math.rs` would repeat its folder): per-channel arithmetic against a constant or a second image.
 
 use serde::{Deserialize, Serialize};
 

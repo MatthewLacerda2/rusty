@@ -43,7 +43,7 @@ macro_rules! catalog {
     (@emit [$($(#[$pm:meta])* $pv:ident $pt:path;)*]
         [$($(#[$um:meta])* $uv:ident $ut:path;)*]
         [$($(#[$am:meta])* $at:path;)*]) => {
-        /// The curated op-set ("Blender-lite"), one variant per [`catalog!`] row.
+        /// The curated op-set ("Blender-lite"), one variant per `catalog!` row.
         /// serde writes the variant's snake_case name as the node's `op` tag, and its
         /// params struct's fields beside it.
         #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -111,9 +111,9 @@ catalog! {
     HueSatValue(color::hue_sat_value::HueSatValue),
     Image(generators::image::ImageTexture),
     Invert = color::invert::Invert,
-    MapRange(math::map_range::MapRange),
     Mapping(vector::mapping::Mapping),
-    Math(math::math::Math),
+    MapRange(math::map_range::MapRange),
+    Math(math::arithmetic::Math),
     Mix(color::mix::Mix),
     Noise(generators::noise::Noise),
     NormalBlend(vector::normal_blend::NormalBlend),
