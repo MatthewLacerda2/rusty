@@ -57,7 +57,10 @@ things follow:
   the project's `assets/scripts`, then the engine's bundled scripts, then
   `package.path`; a relative `dofile` path is taken from the project root; a
   file outside the project still loads but warns once in the console. So a game
-  script that `require`s its shared modules loads in a scenario as in Play.
+  script's `require`s of its shared modules resolve in a scenario as in Play.
+  Only the file access is shared: the scenario VM's `print` is Lua's own and
+  writes to the `play` process's stdout, not to the console log a gameplay
+  script's `print` reaches.
 - A scenario is a test, so the paid provider verbs (`Sfx.Generate`, `Speech.*`)
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).

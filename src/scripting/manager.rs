@@ -91,7 +91,9 @@ impl ScriptManager {
     /// Make `lua`'s `require`, `dofile` and `loadfile` read against this
     /// manager's workspace, warning in its console on a file outside it (#1062).
     /// The gameplay VM and the `play` harness's scenario VM both call it (#1717),
-    /// so a game module loads in a scenario exactly as in Play.
+    /// so a game module's `require` / `dofile` / `loadfile` resolve in a scenario
+    /// as in Play. Only file access is shared: a scenario's `print` is Lua's own,
+    /// to stdout, not the gameplay VM's `console.log`.
     pub(crate) fn install_file_access(&self, lua: &Lua) -> Result<(), String> {
         super::sandbox::install_file_access(lua, &self.workspace, &self.cells.console)
     }
