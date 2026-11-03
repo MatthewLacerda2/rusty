@@ -11,16 +11,21 @@
 //!
 //! Static casters are cached per tile, as the cascades cache them per layer (#694,
 //! Unity URP's cached additional-light shadows): a second, static atlas keeps each
-//! tile's static casters, re-baked only when that tile goes stale ([`cache`]). Each
-//! frame every tile is copied from the static atlas into the active one and the
-//! dynamic casters are drawn over it ([`sweep`]). WebGPU copies depth only as whole
+//! tile's static casters, re-baked only when that tile goes stale ([`cache`]). The
+//! active atlas persists too: a tile whose bake moved or that a dynamic caster
+//! reaches (or reached last frame) is copied from the static atlas and the dynamic
+//! casters are drawn over it; any other tile already holds its statics and is left
+//! alone ([`sweep`]). WebGPU copies depth only as whole
 //! subresources, so the copy and a stale tile's clear are small draws ([`blit`]).
 
+mod alloc;
 mod blit;
 mod cache;
 mod plan;
+mod slots;
 mod sweep;
 pub(crate) use plan::{plan, Tile, ATLAS_SIZE, MAX_TILES};
+pub(crate) use slots::{Frame, ShadowSlots};
 
 use super::casters::CasterBuffer;
 use super::LIGHT_SPACE_STRIDE;
@@ -69,6 +74,12 @@ pub(crate) struct ShadowAtlas {
     static_view: wgpu::TextureView,
     /// Which tiles the static atlas holds, for which scene.
     static_tiles: StaticTiles,
+    /// Which tiles of the active atlas hold only their static copy (#1711).
+    clean_tiles: StaticTiles,
+    /// Whether the active atlas was never drawn: its first pass clears it.
+    fresh: bool,
+    /// Where each light's tiles live, frame after frame (#1711).
+    pub(crate) slots: ShadowSlots,
     blit: TileBlit,
     /// [`MAX_TILES`] `ShadowTile`s, fixed-size so the forward group never rebuilds.
     pub tiles: wgpu::Buffer,
@@ -123,6 +134,9 @@ impl ShadowAtlas {
             _static_texture: static_texture,
             static_view,
             static_tiles: StaticTiles::default(),
+            clean_tiles: StaticTiles::default(),
+            fresh: true,
+            slots: ShadowSlots::default(),
             blit,
             tiles,
             light_space,
@@ -133,22 +147,34 @@ impl ShadowAtlas {
         }
     }
 
-    /// Adopt this frame's tiles: upload what the depth pass and the shader read.
+    /// Adopt this frame's tiles: upload what the depth pass and the shader read,
+    /// each buffer in one write.
     pub(crate) fn update(&mut self, queue: &wgpu::Queue, tiles: Vec<Tile>) {
-        let gpu: Vec<ShadowTile> = tiles.iter().map(ShadowTile::new).collect();
-        queue.write_buffer(&self.tiles, 0, bytemuck::cast_slice(&gpu));
-        for (i, tile) in tiles.iter().enumerate() {
-            let matrix = tile.view_proj.to_cols_array();
-            let offset = i as u64 * LIGHT_SPACE_STRIDE;
-            queue.write_buffer(&self.light_space, offset, bytemuck::bytes_of(&matrix));
+        if !tiles.is_empty() {
+            let gpu: Vec<ShadowTile> = tiles.iter().map(ShadowTile::new).collect();
+            queue.write_buffer(&self.tiles, 0, bytemuck::cast_slice(&gpu));
+            queue.write_buffer(&self.light_space, 0, &light_space_bytes(&tiles));
         }
         self.frame_tiles = tiles;
     }
 
-    /// Forget every tile's static bake, so each re-bakes on its next frame.
+    /// Forget every tile's static bake, so each re-bakes on its next frame (and is
+    /// copied into the active atlas again).
     pub(super) fn invalidate(&mut self) {
         self.static_tiles.clear();
+        self.clean_tiles.clear();
     }
+}
+
+/// Every tile's light matrix at its dynamic-offset stride, for one upload.
+fn light_space_bytes(tiles: &[Tile]) -> Vec<u8> {
+    let stride = LIGHT_SPACE_STRIDE as usize;
+    let mut bytes = vec![0u8; stride * tiles.len()];
+    for (chunk, tile) in bytes.chunks_exact_mut(stride).zip(tiles) {
+        let matrix = tile.view_proj.to_cols_array();
+        chunk[..64].copy_from_slice(bytemuck::bytes_of(&matrix));
+    }
+    bytes
 }
 
 /// A 2048² depth atlas: drawn into, sampled, and copied out by the tests' readback.
@@ -188,7 +214,13 @@ mod plan_tests;
 mod static_tests;
 
 #[cfg(test)]
+#[path = "active_tests.rs"]
+mod active_tests;
+#[cfg(test)]
 #[path = "budget_tests.rs"]
 mod budget_tests;
 #[cfg(test)]
 mod contact_tests;
+#[cfg(test)]
+#[path = "persist_tests.rs"]
+mod persist_tests;
