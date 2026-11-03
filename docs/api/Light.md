@@ -73,8 +73,15 @@ still shades, unshadowed, and is counted in `Debug.Stats().shadow_lights_dropped
 `shadowed_lights`, `shadow_atlas_tiles` and `shadow_atlas_texels` show how full the
 atlas is. Static casters (objects flagged static) are cached per tile, as the sun's
 cascades cache them: a light that does not move redraws only the dynamic casters in
-its tiles each frame (`shadow_atlas_cached` / `shadow_atlas_rebaked` count it). A
-moving light, or one whose tile moves or changes size as the camera moves, re-bakes.
+its tiles each frame (`shadow_atlas_cached` / `shadow_atlas_rebaked` count it), and
+a tile no dynamic caster reaches is not redrawn at all. A light **keeps its tiles**
+from frame to frame (#1711, HDRP's cached shadow atlas): one blinking to intensity
+0, leaving the view or losing the light budget keeps them for 600 rendered frames,
+so it comes back with its bake; a tile changes size only after the light's wanted
+size has been a quarter-step past its own for 15 frames in a row. A moving or
+turning light re-bakes every frame it moves, and so does a light whose tiles the
+atlas has to repack (a new light that the free space could hold only once
+rearranged).
 The atlas holds sixteen 512² tiles, so one point light at full size takes
 six of them. Every caster shadows
 into the atlas as it does into the cascades: cutout and dissolving materials clip
