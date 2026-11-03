@@ -131,7 +131,8 @@ pub const SMOOTHING: f64 = 0.010;
 /// Within this of its target, a gliding parameter lands on it exactly, so a
 /// settled voice plays its values bit for bit (−120 dB on a unit gain).
 /// A step too small to move an `f32` lands too: near `1.0` that stalls about
-/// `3e-5` short (−90 dB), and would never arrive otherwise.
+/// `3e-5` short (−90 dB), and would never arrive otherwise. So does a step out
+/// of a NaN, so one bad value lasts a sample, not the voice's life.
 const SNAP: f32 = 1e-6;
 
 /// The parameters a voice glides (#1693). `low_pass` is the filter's one-pole
@@ -154,7 +155,7 @@ impl Glide {
             (&mut self.low_pass, target.low_pass),
         ] {
             let next = *v + k * (t - *v);
-            *v = if next == *v || (t - next).abs() <= SNAP {
+            *v = if next == *v || !next.is_finite() || (t - next).abs() <= SNAP {
                 t
             } else {
                 next

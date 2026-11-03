@@ -98,3 +98,22 @@ fn a_one_shot_starts_on_its_targets() {
         assert_eq!(*got, (l * mix.gain, r * mix.gain), "no fade-in");
     }
 }
+
+#[test]
+fn a_glide_lands_on_its_target_and_recovers_from_a_nan() {
+    let at = |v: f32| Glide {
+        gain: v,
+        pan: v,
+        blend: v,
+        low_pass: v,
+    };
+    let mut g = at(0.0);
+    for _ in 0..100_000 {
+        g.toward(&at(1.0), 0.002);
+    }
+    assert_eq!(g, at(1.0), "lands exactly, never stalls short");
+    assert_eq!(g.filter(), None, "a landed open filter is bypassed");
+    g.toward(&at(f32::NAN), 0.002);
+    g.toward(&at(0.5), 0.002);
+    assert_eq!(g, at(0.5), "a NaN lasts one sample");
+}
