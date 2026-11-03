@@ -11,7 +11,7 @@
 //! The cubemaps are written to the scene's own folder, `<scene file>.reflections/`
 //! ([`reflection_dir`], #1692), as its lightmaps go to `<scene file>.lightmaps/`, so two
 //! scenes in one folder never bake over each other's cubes. A bake removes the cubes
-//! its own folder holds past its probe count ([`prune_stale`]) and touches nothing
+//! its own folder holds past its probe count (`prune_stale`) and touches nothing
 //! outside it. Without a saved scene path there is nowhere to put them, so the bake
 //! reports an error the script surface surfaces — the one case it does not silently
 //! no-op.
