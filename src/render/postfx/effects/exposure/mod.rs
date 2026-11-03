@@ -200,28 +200,7 @@ impl ExposureMeter {
     ) {
         self.collect();
         queue.write_buffer(&self.params, 0, bytemuck::bytes_of(params));
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Auto Exposure"),
-            layout: &passes.layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: self.params.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(scene),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: self.histogram.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: self.state.as_entire_binding(),
-                },
-            ],
-        });
+        let bind_group = self.bind_group(device, passes, scene);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Auto Exposure"),
         });
@@ -250,6 +229,37 @@ impl ExposureMeter {
                 mapping.store(if res.is_ok() { MAPPED } else { IDLE }, Ordering::Release);
             });
         }
+    }
+
+    /// The passes' bind group over this meter's buffers and `scene`.
+    fn bind_group(
+        &self,
+        device: &wgpu::Device,
+        passes: &ExposurePasses,
+        scene: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Auto Exposure"),
+            layout: &passes.layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.params.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(scene),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.histogram.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.state.as_entire_binding(),
+                },
+            ],
+        })
     }
 
     /// Take a finished readback into [`ExposureMeter::readout`], never waiting.

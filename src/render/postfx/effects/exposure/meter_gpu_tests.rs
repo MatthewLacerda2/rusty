@@ -33,12 +33,9 @@ fn frame(offset: [f32; 2]) -> Vec<u16> {
         .collect()
 }
 
-#[test]
-fn gpu_one_tiny_bright_lamp_meters_the_same_across_sub_pixel_moves() {
-    let Some(r) = headless_or_skip(SIZE, SIZE) else {
-        return;
-    };
-    let scene = r.device.create_texture(&wgpu::TextureDescriptor {
+/// A `SIZE`² HDR scene the test writes.
+fn texture(device: &wgpu::Device) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Meter test"),
         size: wgpu::Extent3d {
             width: SIZE,
@@ -51,7 +48,28 @@ fn gpu_one_tiny_bright_lamp_meters_the_same_across_sub_pixel_moves() {
         format: HDR_FORMAT,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
-    });
+    })
+}
+
+fn write(queue: &wgpu::Queue, scene: &wgpu::Texture, texels: &[u16]) {
+    queue.write_texture(
+        scene.as_image_copy(),
+        bytemuck::cast_slice(texels),
+        wgpu::TexelCopyBufferLayout {
+            offset: 0,
+            bytes_per_row: Some(SIZE * 8),
+            rows_per_image: None,
+        },
+        scene.size(),
+    );
+}
+
+#[test]
+fn gpu_one_tiny_bright_lamp_meters_the_same_across_sub_pixel_moves() {
+    let Some(r) = headless_or_skip(SIZE, SIZE) else {
+        return;
+    };
+    let scene = texture(&r.device);
     let view = scene.create_view(&Default::default());
     let mut meter = ExposureMeter::new(&r.device);
     let snap = Step {
@@ -69,17 +87,7 @@ fn gpu_one_tiny_bright_lamp_meters_the_same_across_sub_pixel_moves() {
         };
         let evs: Vec<f32> = (0..8)
             .map(|k| {
-                let texels = frame([k as f32 / 8.0, k as f32 / 16.0]);
-                r.queue.write_texture(
-                    scene.as_image_copy(),
-                    bytemuck::cast_slice(&texels),
-                    wgpu::TexelCopyBufferLayout {
-                        offset: 0,
-                        bytes_per_row: Some(SIZE * 8),
-                        rows_per_image: None,
-                    },
-                    scene.size(),
-                );
+                write(&r.queue, &scene, &frame([k as f32 / 8.0, k as f32 / 16.0]));
                 let params = ExposureParams::new(&ae, snap);
                 meter.run(
                     (&r.device, &r.queue),
