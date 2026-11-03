@@ -57,11 +57,14 @@ the room outranks a dim one beside the camera. Ties go to the earlier entity, so
 the same scene always drops the same lights. Camera drops are counted in
 `Debug.Stats().lights_dropped`, cluster drops in `cluster_lights_dropped` (non-zero
 means some corner of the view is over budget). `Baked` lights never take part. A
-light outside the view costs nothing, and so does one whose intensity or colour is
-zero (a blinking alarm in its off half: #1712), which no cluster lists. A light's
-**range** is a hard cut-off and also how far it reaches into the cluster grid, so a
-tight range is the cheap one; a spotlight reaches only the clusters its cone
-touches, so a narrow beam costs less than a point light of the same range. Up to **4** directional lights
+light outside the view costs nothing. One whose intensity or colour is zero (a
+blinking alarm in its off half: #1712) is listed in no cluster, so no pixel shades
+it; it still counts towards the camera's budget of 64 (by its range, as any light
+does) and, if it casts shadows, it may still take atlas tiles and draw its
+casters. A light's **range** is a hard cut-off, what the camera's budget ranks it
+by, and how far it reaches into the cluster grid, so a tight range is the cheap
+one; a spotlight is listed only in the clusters its cone touches, so a narrow beam
+costs fewer pixels than a point light of the same range. Up to **4** directional lights
 shade at once; the last active one is the sun that casts the cascaded shadows. Only
 the last active ambient light counts: it replaces the scene's ambient, a `Gradient`
 one included, with its single colour (`Lighting.md`, *Environment*).

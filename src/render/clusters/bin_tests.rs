@@ -32,7 +32,8 @@ fn bin_view(lights: &[LocalLight]) -> Binned {
     bin(&grid, lights, &mut AabbCache::default())
 }
 
-fn lists_of(binned: &Binned, cluster: u32) -> &[u32] {
+/// Cluster `cluster`'s list of light indices.
+pub(super) fn lists_of(binned: &Binned, cluster: u32) -> &[u32] {
     let [offset, count] = binned.ranges[cluster as usize];
     &binned.indices[offset as usize..(offset + count) as usize]
 }

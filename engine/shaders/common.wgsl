@@ -88,9 +88,6 @@ struct DirectionalLight {
     intensity: f32,
     // 1.0 for a `Baked` light (#438): a lightmapped surface skips its direct light.
     baked: f32,
-    // Camera distance past which its shadow is not sampled (#1712); 0 never fades.
-    shadow_fade: f32,
-    _pad: vec2<f32>,
 };
 
 struct LightingUniforms {

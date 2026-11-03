@@ -9,9 +9,12 @@ use glam::{Mat4, Vec3};
 /// and the bounding shortcuts lose their margin.
 pub(crate) const WIDEST_CULLED_CONE: f32 = 80.0;
 
-/// What the binner tests for one light: a bounding sphere, and a cone that trims it.
+/// What the binner tests for one light: its range sphere, and for a spotlight
+/// the cone that trims which clusters list it.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Bounds {
+    /// Centre and radius: a light's range sphere. The per-camera cut ranks and
+    /// keeps by it, and a cluster's score measures its distance from the centre.
     pub sphere: (Vec3, f32),
     pub cone: Option<Cone>,
 }
@@ -29,13 +32,21 @@ pub(crate) struct Cone {
 }
 
 impl Cone {
-    /// Whether the cone may reach the box `lo..hi` (conservative): the box meets
-    /// the cone's range sphere and [`Self::may_touch`] passes its bounding sphere.
-    /// The range test matters for a wide cone, whose own bounding sphere bulges
-    /// past its range.
-    pub(crate) fn may_reach_box(&self, lo: Vec3, hi: Vec3) -> bool {
-        self.apex.clamp(lo, hi).distance_squared(self.apex) <= self.range * self.range
-            && self.may_touch((lo + hi) * 0.5, (hi - lo).length() * 0.5)
+    /// The smallest sphere around the range-capped cone (centre, radius), always
+    /// smaller than the range sphere for a cone no wider than
+    /// [`WIDEST_CULLED_CONE`]: up to 45° the sphere through the apex and the rim,
+    /// past it the one around the rim circle (which then holds the apex and the
+    /// cap too). It only narrows which clusters the binner visits.
+    pub(crate) fn bounding_sphere(&self) -> (Vec3, f32) {
+        if self.cos >= std::f32::consts::FRAC_1_SQRT_2 {
+            let r = self.range / (2.0 * self.cos);
+            (self.apex + self.axis * r, r)
+        } else {
+            (
+                self.apex + self.axis * self.range * self.cos,
+                self.range * self.sin,
+            )
+        }
     }
 
     /// The cone moved by the rigid `view` transform.

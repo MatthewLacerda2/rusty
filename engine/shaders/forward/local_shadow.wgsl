@@ -23,8 +23,11 @@ fn shadow_fade(light: LocalLight) -> f32 {
 // light), else its PCF shadow blended towards lit by the fade.
 fn local_shadow(light: LocalLight, world: vec3<f32>, N: vec3<f32>) -> f32 {
     let tile = local_shadow_tile(light, world);
+    if (tile == NO_SHADOW) {
+        return 1.0;
+    }
     let fade = shadow_fade(light);
-    if (tile == NO_SHADOW || fade <= 0.0) {
+    if (fade <= 0.0) {
         return 1.0;
     }
     let lit = sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, world, N);
