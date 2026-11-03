@@ -69,6 +69,19 @@ impl AnimationGraph {
         if duplicated {
             problems.push(format!("{label} has two children at the same position"));
         }
+        self.check_children(label, path, tree, depth, problems);
+    }
+
+    /// Each child holds exactly one of a clip and a tree; a nested tree is
+    /// checked in turn, one level deeper.
+    fn check_children(
+        &self,
+        label: &str,
+        path: &str,
+        tree: &BlendTree,
+        depth: usize,
+        problems: &mut Vec<String>,
+    ) {
         for (i, (motion, _)) in tree.children().enumerate() {
             let child = format!("{path}/children[{i}]");
             match (&motion.blend_tree, motion.clip.is_empty()) {

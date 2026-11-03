@@ -63,7 +63,7 @@ fn leaf_weights_multiply_down_the_tree_and_sum_to_one() {
             (total - 1.0).abs() < 1e-5,
             "({vx}, {vy}, {x}) sums to {total}"
         );
-        let weight = |clip| {
+        let weight = |clip: &str| {
             got.iter()
                 .find(|l| l.clip == clip)
                 .map_or(0.0, |l| l.weight)
