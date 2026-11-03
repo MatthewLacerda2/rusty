@@ -187,7 +187,8 @@ local p = Texture.Preview(recipe, "out/preview.png", 96)
 
 ### The op-set (curated "Blender-lite")
 
-Grouped like Blender's node menus; `op` is the tag string in each node.
+The subset of Blender's texture nodes a PBR material needs; `op` is the tag string in
+each node, and `category` sorts the ops into Blender's node menus.
 
 **Ask the engine, not this page.** `Texture.Ops()` returns the live catalog — the
 list below is a summary of it. Each entry has the `op` tag, its `category`
@@ -209,8 +210,8 @@ to 188/255, a light grey, while `"#808080"` is linear ≈ 0.216 and bakes back t
 so a colour picked from a reference goes in as hex. `Texture.ToJson` writes every colour
 as its linear array. A malformed hex is an error naming the param.
 
-**Seeds.** Every stochastic op (`noise`, `voronoi`, `brick`, `white_noise`, `tile`)
-takes an optional integer `seed` (default 0), folded into the recipe `seed`. Two nodes
+**Seeds.** Every stochastic op (each one listed below with `seed=0`) takes an
+optional integer `seed` (default 0), folded into the recipe `seed`. Two nodes
 that differ only in `seed` give independent patterns — the warp's X and Y noises, dirt
 and chips at the same scale — and 0 keeps the recipe seed, so a recipe without node
 seeds bakes as it always did.
@@ -223,101 +224,123 @@ for _, o in ipairs(Texture.Ops()) do
 end  -- rows number nil / cols number nil / mortar number 0.05
 ```
 
-- **Generators** (no inputs): `constant {color}`; `noise
-  {kind="perlin"|"fbm"|"ridged"|"turbulence", scale, octaves=1, lacunarity=2, gain=0.5,
-  seed=0}`
-  (`ridged` is `1 − |n|` squared — rock veins, scratches; `turbulence` is `|n|` —
-  smoke, grime; the fBM family stacks `octaves`, each `lacunarity`× the frequency and
-  `gain`× the amplitude of the last; `perlin` is one octave); `voronoi {scale,
-  output="distance"|"cells"|"f2"|"edges", metric="euclidean"|"manhattan"|"chebyshev",
-  randomness=1, seed=0}` (`f2` is the distance to the
-  second-nearest point, `edges` is F2 − F1 — ~0 on cell borders: cracks, dried mud,
-  cobble outlines; `metric` is how distance is measured: `euclidean` gives round cells,
-  `manhattan` (`|dx| + |dy|`) diamond-cut ones, `chebyshev` (`max(|dx|, |dy|)`) blocky,
-  straight-edged ones — stones, tiles, flagstones; `randomness` 0 is a regular grid, 1
-  full jitter); `gradient
-  {kind="linear"|"linear_tiling"|"radial"}`; `wave {kind="bands"|"rings", frequency}`;
-  `brick {rows, cols, mortar=0.05, output="mask"|"random"|"bevel", seed=0}` (`mortar` is the
-  gap as a fraction of one brick, reading 0 in every output; `mask` is 1 on brick
-  faces, `random` a seeded value per brick — feed a `color_ramp` for per-brick colour
-  or roughness variation — and `bevel` a ramp from 0 at the mortar to 1 on the brick's
-  centre line, a rounded-brick height for `bump_to_normal`); `shape
-  {kind="circle"|"rect"|"rounded_rect"|"line", size=[w,h], roundness=0.25,
-  softness=0}` (one shape centred in the tile, 1 inside and 0 outside: `circle` is the
-  ellipse filling `size`, `line` a horizontal stroke `w` long and `h` thick with round
-  caps — turn it with `mapping {rotation = 0.25}`; `roundness` 0–1 rounds a
-  `rounded_rect`'s corners; `softness > 0` ramps the edge from 0 to 1 that far inside,
-  a bevel profile for `bump_to_normal`); `checker {tiles, color_a, color_b}`;
-  `white_noise {seed=0}`; `image {path, encoding="srgb"|"linear"}` (an image file,
-  see *Image files* below).
-- **Color** (1 input; `mix` takes 2 or 3): `color_ramp {stops,
-  interpolation="linear"|"constant"|"ease"}` (as Blender's ColorRamp: `constant` holds
-  each stop's colour from its position up to the next stop — hard bands for toon,
-  stylized and posterized looks — and `ease` is a smoothstep between stops, soft into
-  and out of each colour); `mix {mode,
-  factor=1}` with `mode` ∈
-  `mix/add/multiply/screen/overlay/subtract/difference/lighten/darken/divide` —
-  inputs `{a, b, mask}`: the result is `a` blended toward `mode(a, b)` by `factor`,
-  and an optional third input `mask` makes that per pixel (`factor × mask.red`; black
-  keeps `a`, white takes the full blend). `lighten` is the per-channel max and `darken`
-  the min — the way to combine height fields (rivets over a panel, stones over mortar),
-  where `add` overshoots; `divide` is `a / b`, and a channel of `b` at (near) 0 leaves `a`;
-  `invert`; `bright_contrast {bright, contrast}` (contrast pivots at linear 0.5, like
-  Blender's node: right for data maps, but that is a light grey on screen, so for a
-  colour map use hex ramp stops or `auto_levels` → `color_ramp`); `hue_sat_value {hue,
-  sat, value}`; `gamma {gamma}`; `auto_levels` (stretches RGB so the input's minimum
-  maps to 0 and its maximum to 1 — one range across R, G and B, so a colour keeps its
-  hue, like Substance's Auto Levels; alpha untouched, a flat input unchanged). Noise
-  uses only part of the range (a 4-octave fBM spans about 0.35–0.64), so a ramp fed
-  straight from it shows only its middle; `auto_levels` before the `color_ramp` uses
-  the whole ramp, whatever the input's spread.
-- **Vector / normal**: `mapping {scale=[1,1], rotation=0, translation=[0,0],
-  tiling=true}` (bilinear, wrapped resample; `rotation` in turns; each transform
-  left out is the identity, so `mapping {rotation = 0.25}` only turns); `bump_to_normal
-  {strength}` (height → tangent-space normal); `combine_rgb` (1 to 3 grayscale
-  inputs → R, G, B; a channel without an input reads 0); `separate_rgb
-  {channel=0..3}`; `warp {strength}` (2 inputs: samples input 1 displaced by input 2's R/G, centred on 0.5 so mid-grey moves nothing; `strength` is in
-  tile units; feed input 2 a `combine_rgb` of two different noises — a grayscale one has
-  R = G and only pushes along the diagonal); `normal_blend {strength=1}` (2 inputs:
-  base, detail — two normal maps, as `bump_to_normal` writes them, combined by
-  Reoriented Normal Mapping: the base is turned by the detail's tilt, so scratches over a
-  panel follow the panel's bevel. `strength` scales the detail's tilt, 0 leaving the
-  base; a flat normal on either side returns the other. Never `mix` normal maps: adding
-  or averaging their RGB flattens them); `tile {count, jitter=0, rotation_jitter=0,
-  scale_jitter=0, seed=0}` (1 input: stamps the input once per cell of a `count`×`count` grid;
-  each cell is seeded from the recipe and node `seed` with an offset of up to ±`jitter`/2 cells,
-  a turn of up to ±`rotation_jitter`/2 turns and a scale in `1 ± scale_jitter/2`, each
-  jitter clamped to 0–1. The input is read as **one stamp** — the unit square, nothing
-  outside it — so give it empty margins (a `shape` smaller than the tile); a stamp
-  pushed over its cell's border is drawn into the neighbour cell, and overlapping
-  stamps keep the brighter value per channel. Rivets are `shape circle` → `tile`).
-- **Converter / math**: `math {func, value=0.5}` (1 or 2 inputs) with `func` ∈
-  `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt` — the right-hand side
-  is `value`, or with a second input wired, that input's matching channel per pixel
+One bullet per op, in alphabetical order; each names its `category` and the inputs it
+takes (none for a generator).
+
+A few notes hold for a whole family. The colour ops are pixel to pixel. Noise uses
+only part of the range (a 4-octave fBM spans about 0.35–0.64), so a ramp fed straight
+from it shows only its middle; `auto_levels` before the `color_ramp` uses the whole
+ramp, whatever the input's spread. The filters wrap, so a tiling input gives a tiling
+result; `cavity` and `curvature` read the input's red as height.
+
+<!-- sorted: one bullet per op, so two branches adding ops land on different lines -->
+- `auto_levels` (*color*, 1 input): stretches RGB so the input's minimum maps to 0 and
+  its maximum to 1 — one range across R, G and B, so a colour keeps its hue, like
+  Substance's Auto Levels; alpha untouched, a flat input unchanged.
+- `blur {radius, kind="gaussian"|"box"}` (*filter*, 1 input): separable; wraps, so it
+  stays tiling; `gaussian`, the default, is a round falloff with `σ = radius / 3`:
+  three box passes per axis matched to that variance, each `O(n)` whatever the
+  radius, so it costs about three boxes and its kernel stops a little short of
+  `radius` (about 10 px for 12); under about 2.5 px it is one exact 3-tap pass, so
+  even a 1-pixel blur softens; `box` is one flat window, a third of the cost, and
+  leaves square artefacts on soft masks and normals.
+- `brick {rows, cols, mortar=0.05, output="mask"|"random"|"bevel", seed=0}`
+  (*generator*): `mortar` is the gap as a fraction of one brick, reading 0 in every
+  output; `mask` is 1 on brick faces, `random` a seeded value per brick — feed a
+  `color_ramp` for per-brick colour or roughness variation — and `bevel` a ramp from
+  0 at the mortar to 1 on the brick's centre line, a rounded-brick height for
+  `bump_to_normal`.
+- `bright_contrast {bright, contrast}` (*color*, 1 input): contrast pivots at linear
+  0.5, like Blender's node: right for data maps, but that is a light grey on screen,
+  so for a colour map use hex ramp stops or `auto_levels` → `color_ramp`.
+- `bump_to_normal {strength}` (*vector*, 1 input): height → tangent-space normal.
+- `cavity {radius}` (*filter*, 1 input): height → `1 − max(blur(h) − h, 0)` with a
+  Gaussian blur: white on flat and raised ground, dark in crevices — multiply into
+  albedo for baked occlusion, `invert` it for a dirt mask.
+- `checker {tiles, color_a, color_b}` (*generator*).
+- `clamp {min, max}` (*math*, 1 input).
+- `color_ramp {stops, interpolation="linear"|"constant"|"ease"}` (*color*, 1 input):
+  as Blender's ColorRamp: `constant` holds each stop's colour from its position up to
+  the next stop — hard bands for toon, stylized and posterized looks — and `ease` is
+  a smoothstep between stops, soft into and out of each colour.
+- `combine_rgb` (*vector*, 1 to 3 inputs): grayscale inputs → R, G, B; a channel
+  without an input reads 0.
+- `constant {color}` (*generator*).
+- `curvature {radius, strength=1}` (*filter*, 1 input): height → `0.5 + strength × (h
+  − mean of h on a ring radius away)`: above mid-grey on convex edges — edge wear —
+  below in concave grooves — grime; `map_range` it into a hard mask.
+- `distance {radius}` (*filter*, 1 input): mask → bevel. The input's red above 0.5 is
+  inside, and each inside pixel reads its distance to the mask's edge divided by
+  `radius`, clamped to 1; outside reads 0. It rounds **any** mask — a Voronoi cell, a
+  thresholded noise, a stamp — the way `shape`'s `softness` and brick's `bevel` round
+  their own; feed it to `bump_to_normal`. Straight, it is a chamfer; through `math`
+  `func = "sqrt"` (a curve steepest at the rim and flat on top) it is a rounded,
+  convex edge. Avoid an `ease` `color_ramp` here: it is flat at the rim too, so the
+  edge reads as a pillow.
+- `gamma {gamma}` (*color*, 1 input).
+- `gradient {kind="linear"|"linear_tiling"|"radial"}` (*generator*).
+- `hue_sat_value {hue, sat, value}` (*color*, 1 input).
+- `image {path, encoding="srgb"|"linear"}` (*generator*): an image file, see *Image
+  files* below.
+- `invert` (*color*, 1 input).
+- `map_range {from_min, from_max, to_min, to_max}` (*math*, 1 input).
+- `mapping {scale=[1,1], rotation=0, translation=[0,0], tiling=true}` (*vector*, 1
+  input): bilinear, wrapped resample; `rotation` in turns; each transform left out is
+  the identity, so `mapping {rotation = 0.25}` only turns.
+- `math {func, value=0.5}` (*math*, 1 or 2 inputs) with `func` ∈
+  `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt`: the right-hand side is
+  `value`, or with a second input wired, that input's matching channel per pixel
   (`value` is then ignored, Blender's Math with both sockets linked). `abs`, `fract`
-  and `sqrt` have no right-hand side, so they take exactly 1 input; `map_range {from_min,
-  from_max, to_min, to_max}`; `clamp {min, max}`; `rgb_to_bw`.
-- **Filter**: `blur {radius, kind="gaussian"|"box"}` (separable; wraps, so it stays
-  tiling; `gaussian`, the default, is a round falloff with `σ = radius / 3`: three
-  box passes per axis matched to that variance, each `O(n)` whatever the radius, so
-  it costs about three boxes and its kernel stops a little short of `radius` (about
-  10 px for 12); under about 2.5 px it is one exact 3-tap pass, so even a 1-pixel blur
-  softens; `box` is one flat window, a third of the cost, and leaves square artefacts
-  on soft masks and normals);
-  `cavity {radius}` (height → `1 − max(blur(h) − h, 0)` with a Gaussian blur: white on flat and raised
-  ground, dark in crevices — multiply into albedo for baked occlusion, `invert` it
-  for a dirt mask); `curvature {radius, strength=1}` (height → `0.5 + strength × (h −
-  mean of h on a ring radius away)`: above mid-grey on convex edges — edge wear —
-  below in concave grooves — grime; `map_range` it into a hard mask). Both read the
-  input's red as height and wrap, so the masks tile. `distance {radius}` (mask → bevel:
-  the input's red above 0.5 is inside, and each inside pixel reads its distance to the
-  mask's edge divided by `radius`, clamped to 1; outside reads 0. It rounds **any**
-  mask — a Voronoi cell, a thresholded noise, a stamp — the way `shape`'s `softness`
-  and brick's `bevel` round their own; feed it to `bump_to_normal`. Straight, it is a
-  chamfer; through `math` `func = "sqrt"` (a curve steepest at the rim and flat on
-  top) it is a rounded, convex edge. Avoid an `ease` `color_ramp` here: it is flat at
-  the rim too, so the edge reads as a pillow. It wraps, so a tiling mask gives a
-  tiling bevel).
+  and `sqrt` have no right-hand side, so they take exactly 1 input.
+- `mix {mode, factor=1}` (*color*, 2 or 3 inputs) with `mode` ∈
+  `mix/add/multiply/screen/overlay/subtract/difference/lighten/darken/divide`: inputs
+  `{a, b, mask}`; the result is `a` blended toward `mode(a, b)` by `factor`, and an
+  optional third input `mask` makes that per pixel (`factor × mask.red`; black keeps
+  `a`, white takes the full blend). `lighten` is the per-channel max and `darken` the
+  min — the way to combine height fields (rivets over a panel, stones over mortar),
+  where `add` overshoots; `divide` is `a / b`, and a channel of `b` at (near) 0 leaves
+  `a`.
+- `noise {kind="perlin"|"fbm"|"ridged"|"turbulence", scale, octaves=1, lacunarity=2,
+  gain=0.5, seed=0}` (*generator*): `ridged` is `1 − |n|` squared — rock veins,
+  scratches; `turbulence` is `|n|` — smoke, grime; the fBM family stacks `octaves`,
+  each `lacunarity`× the frequency and `gain`× the amplitude of the last; `perlin` is
+  one octave.
+- `normal_blend {strength=1}` (*vector*, 2 inputs: base, detail): two normal maps, as
+  `bump_to_normal` writes them, combined by Reoriented Normal Mapping: the base is
+  turned by the detail's tilt, so scratches over a panel follow the panel's bevel.
+  `strength` scales the detail's tilt, 0 leaving the base; a flat normal on either
+  side returns the other. Never `mix` normal maps: adding or averaging their RGB
+  flattens them.
+- `rgb_to_bw` (*math*, 1 input).
+- `separate_rgb {channel=0..3}` (*vector*, 1 input).
+- `shape {kind="circle"|"rect"|"rounded_rect"|"line", size=[w,h], roundness=0.25,
+  softness=0}` (*generator*): one shape centred in the tile, 1 inside and 0 outside:
+  `circle` is the ellipse filling `size`, `line` a horizontal stroke `w` long and `h`
+  thick with round caps — turn it with `mapping {rotation = 0.25}`; `roundness` 0–1
+  rounds a `rounded_rect`'s corners; `softness > 0` ramps the edge from 0 to 1 that
+  far inside, a bevel profile for `bump_to_normal`.
+- `tile {count, jitter=0, rotation_jitter=0, scale_jitter=0, seed=0}` (*vector*, 1
+  input): stamps the input once per cell of a `count`×`count` grid; each cell is
+  seeded from the recipe and node `seed` with an offset of up to ±`jitter`/2 cells, a
+  turn of up to ±`rotation_jitter`/2 turns and a scale in `1 ± scale_jitter/2`, each
+  jitter clamped to 0–1. The input is read as **one stamp** — the unit square,
+  nothing outside it — so give it empty margins (a `shape` smaller than the tile); a
+  stamp pushed over its cell's border is drawn into the neighbour cell, and
+  overlapping stamps keep the brighter value per channel. Rivets are `shape circle` →
+  `tile`.
+- `voronoi {scale, output="distance"|"cells"|"f2"|"edges",
+  metric="euclidean"|"manhattan"|"chebyshev", randomness=1, seed=0}` (*generator*):
+  `f2` is the distance to the second-nearest point, `edges` is F2 − F1 — ~0 on cell
+  borders: cracks, dried mud, cobble outlines; `metric` is how distance is measured:
+  `euclidean` gives round cells, `manhattan` (`|dx| + |dy|`) diamond-cut ones,
+  `chebyshev` (`max(|dx|, |dy|)`) blocky, straight-edged ones — stones, tiles,
+  flagstones; `randomness` 0 is a regular grid, 1 full jitter.
+- `warp {strength}` (*vector*, 2 inputs): samples input 1 displaced by input 2's R/G,
+  centred on 0.5 so mid-grey moves nothing; `strength` is in tile units; feed input 2
+  a `combine_rgb` of two different noises — a grayscale one has R = G and only pushes
+  along the diagonal.
+- `wave {kind="bands"|"rings", frequency}` (*generator*).
+- `white_noise {seed=0}` (*generator*).
 
 ### Linked params — a node drives a value
 
@@ -340,20 +363,28 @@ number.
 
 **The params that link** (`socket = true` in `Texture.Ops()`, the list to trust):
 
-- `warp.strength`, `bump_to_normal.strength`, `curvature.strength`,
-  `normal_blend.strength`: read at each pixel;
-- `blur.radius`, `distance.radius`: read at each pixel. A blur's radius varies
-  smoothly: sharp where the link is dark, soft where it is bright, each pixel
-  averaging its own window in constant time whatever its width. A Gaussian is still
-  three passes, and spreads as far as the same radius as a number. A linked box is
-  not rounded to a whole pixel as a number's box is (a rounded radius would step
-  visibly across the map), so it matches the number only at whole-pixel radii;
-- `tile.jitter`, `tile.rotation_jitter`, `tile.scale_jitter`, `voronoi.randomness`:
-  read **once per cell**, at the cell's centre, wrapped, so each cell keeps one
-  stamp or one point and the result still tiles;
-- `shape.softness`, `noise.gain`: read at each pixel;
-- `hue_sat_value.hue`, `.sat`, `.value`, `bright_contrast.bright`, `.contrast`,
-  `gamma.gamma`: read at each pixel.
+<!-- sorted: one bullet per param, so two branches adding linkable params land on different lines -->
+- `blur.radius`: read at each pixel (see below).
+- `bright_contrast.bright`, `bright_contrast.contrast`: read at each pixel.
+- `bump_to_normal.strength`: read at each pixel.
+- `curvature.strength`: read at each pixel.
+- `distance.radius`: read at each pixel.
+- `gamma.gamma`: read at each pixel.
+- `hue_sat_value.hue`, `hue_sat_value.sat`, `hue_sat_value.value`: read at each pixel.
+- `noise.gain`: read at each pixel.
+- `normal_blend.strength`: read at each pixel.
+- `shape.softness`: read at each pixel.
+- `tile.jitter`, `tile.rotation_jitter`, `tile.scale_jitter`: read once per cell.
+- `voronoi.randomness`: read once per cell.
+- `warp.strength`: read at each pixel.
+
+A param read **once per cell** is read at the cell's centre, wrapped, so each cell
+keeps one stamp or one point and the result still tiles. A blur's radius varies
+smoothly: sharp where the link is dark, soft where it is bright, each pixel averaging
+its own window in constant time whatever its width. A Gaussian is still three
+passes, and spreads as far as the same radius as a number. A linked box is not
+rounded to a whole pixel as a number's box is (a rounded radius would step visibly
+across the map), so it matches the number only at whole-pixel radii.
 
 **What never links:** a whole count (`scale`, `octaves`, `lacunarity`, `rows`,
 `cols`, `tiles`, `count`, `frequency`). A count that changed from pixel to pixel
