@@ -11,7 +11,7 @@ use crate::scene::authoring::default_post_processing;
 const ORANGE: [f32; 3] = [1.0, 0.45, 0.1];
 
 /// How far the default tonemapper may turn the hue, in degrees. The LUT's
-/// trilinear fetch and the 8-bit output round; Neutral itself turns it by none.
+/// interpolation and the 8-bit output round; Neutral itself turns it by none.
 const BOUND: f32 = 3.0;
 
 /// The HSV hue of `c`, in degrees, for a red-to-yellow colour (red the largest).

@@ -563,7 +563,7 @@ scene.entities[].post_processing.ssr.quality: enum Low|Medium|High|Custom
 scene.entities[].post_processing.ssr.step_length: f32
 scene.entities[].post_processing.ssr.steps: u32
 scene.entities[].post_processing.tonemapping.display_gamma: f32
-scene.entities[].post_processing.tonemapping.mode: enum ACES|Reinhard|None
+scene.entities[].post_processing.tonemapping.mode: enum Neutral|AgX|ACES|Reinhard|None
 scene.entities[].post_processing.vignette.active: bool
 scene.entities[].post_processing.vignette.center: tuple(2)
 scene.entities[].post_processing.vignette.center[]: f32
