@@ -6,10 +6,12 @@
 //! agent had just invented.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::temp::lua_path as tmp;
 use glam::Vec3;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::audio::{AudioEventKind, AudioMaestro};
 use rusty::scene::Camera;
 use rusty::scene::Scene;
@@ -29,25 +31,28 @@ const GUNSHOT: &str = r#"{
 fn a_baked_one_shot_plays_through_the_audio_namespace() {
     let lua = Lua::new();
     let path = tmp("rusty_sound_e2e_gunshot.wav");
-    let scene = RefCell::new(Scene::new());
-    let audio = RefCell::new(AudioMaestro::default());
-    let time = RefCell::new(Time::default());
-    let camera = RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0));
+    let scene = Rc::new(RefCell::new(Scene::new()));
+    let audio = Rc::new(RefCell::new(AudioMaestro::default()));
+    let time = Rc::new(RefCell::new(Time::default()));
+    let camera = Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0)));
 
     rusty::api::sound::register(&lua).unwrap();
-    lua.scope(|s| {
-        rusty::api::audio::register(&lua, s, &scene, &audio, &time, &camera).unwrap();
-        let script = format!(
-            r#"
-            local clip = Sound.Bake({GUNSHOT}, "C2", "{path}", {{ duration = 0.12, seed = 9 }})
-            return Audio.PlayAt(clip, 1.0, 0.0, -3.0, 0.9)
-        "#
-        );
-        let played: bool = lua.load(&script).eval().unwrap();
-        assert!(played, "the maestro accepted the baked one-shot");
-        Ok(())
-    })
+    rusty::api::audio::register(
+        &lua,
+        bind(&lua, &scene),
+        bind(&lua, &audio),
+        bind(&lua, &time),
+        bind(&lua, &camera),
+    )
     .unwrap();
+    let script = format!(
+        r#"
+        local clip = Sound.Bake({GUNSHOT}, "C2", "{path}", {{ duration = 0.12, seed = 9 }})
+        return Audio.PlayAt(clip, 1.0, 0.0, -3.0, 0.9)
+    "#
+    );
+    let played: bool = lua.load(&script).eval().unwrap();
+    assert!(played, "the maestro accepted the baked one-shot");
 
     let maestro = audio.borrow();
     let event = maestro.events().last().expect("the play was logged");

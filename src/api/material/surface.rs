@@ -9,31 +9,26 @@
 //! and `DefineAsset` share. A value the field cannot take is a Lua error naming
 //! what it takes.
 
-use std::cell::RefCell;
-
 use mlua::{IntoLua, Value};
 
 use super::{put, with_material, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring::material::{
     self as mat_ops, material_fields, SurfaceField, SurfaceKind, SurfaceValue,
 };
 use crate::scene::Scene;
 
 /// Register a Set/Get pair per surface field onto the `Material` `table`.
-pub fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     for field in material_fields() {
         let set = format!("Set{}", field.api);
         let verb = set.clone();
-        let f = scope.create_function(move |_, (id, value): (EntityArg, Value)| {
+        let f = lua.create_function(move |lua, (id, value): (EntityArg, Value)| {
             let id = id.live("Material", &verb)?;
             let value = from_lua(field, &value).map_err(mlua::Error::RuntimeError)?;
             let mut result = Ok(());
-            with_material(scene, id, |m, key| {
+            with_material(&*scene.get(lua)?, id, |m, key| {
                 result = mat_ops::set_surface(m, key, field, value);
             });
             result.map_err(mlua::Error::RuntimeError)
@@ -42,7 +37,8 @@ pub fn register<'scope>(
 
         let get = format!("Get{}", field.api);
         let verb = get.clone();
-        let f = scope.create_function(move |lua, id: EntityArg| {
+        let f = lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Material", &verb)?;
             let scene = scene.borrow();
             let key = scene.world.material(id).map(|m| m.first().to_string());

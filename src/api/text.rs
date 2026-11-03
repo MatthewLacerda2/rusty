@@ -9,13 +9,12 @@
 //! Getters return a neutral default when the entity has no Text; setters are then
 //! no-ops. Enum values travel as their names (case-insensitive; unknown ignored).
 
-use std::cell::RefCell;
-
 use glam::{Vec2, Vec4};
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::TextComponent;
 use crate::components::{TextAlignment, TextOverflow};
 use crate::core::settings::video::VideoSettings;
@@ -23,7 +22,6 @@ use crate::scene::authoring::ui::text::{self as ops, FontSlot};
 use crate::scene::Scene;
 use crate::ui::ScreenSize;
 
-type Scoped<'s> = &'s RefCell<Scene>;
 type F32Get = fn(&TextComponent) -> f32;
 type F32Set = fn(&mut TextComponent, f32);
 type BoolGet = fn(&TextComponent) -> bool;
@@ -148,32 +146,23 @@ fn color(v: [f32; 6]) -> Vec4 {
 }
 
 /// Register the `Text` namespace onto `lua`.
-pub fn register<'scope>(
+pub fn register(
     lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: Scoped<'scope>,
-    screen: &'scope RefCell<ScreenSize>,
-    video: &'scope RefCell<VideoSettings>,
+    scene: ApiCell<Scene>,
+    screen: ApiCell<ScreenSize>,
+    video: ApiCell<VideoSettings>,
 ) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     for (suffix, get, set) in F32S {
-        getter(scope, &t, scene, &format!("Get{suffix}"), move |c| {
-            Ok(get(c))
+        getter(lua, &t, scene, &format!("Get{suffix}"), move |c| Ok(get(c)))?;
+        setter(lua, &t, scene, &format!("Set{suffix}"), move |c, v: f32| {
+            set(c, v)
         })?;
-        setter(
-            scope,
-            &t,
-            scene,
-            &format!("Set{suffix}"),
-            move |c, v: f32| set(c, v),
-        )?;
     }
     for (suffix, get, set) in BOOLS {
-        getter(scope, &t, scene, &format!("Get{suffix}"), move |c| {
-            Ok(get(c))
-        })?;
+        getter(lua, &t, scene, &format!("Get{suffix}"), move |c| Ok(get(c)))?;
         setter(
-            scope,
+            lua,
             &t,
             scene,
             &format!("Set{suffix}"),
@@ -181,20 +170,18 @@ pub fn register<'scope>(
         )?;
     }
     for (suffix, get, set) in STRS {
-        getter(scope, &t, scene, &format!("Get{suffix}"), move |c| {
-            Ok(get(c))
-        })?;
+        getter(lua, &t, scene, &format!("Get{suffix}"), move |c| Ok(get(c)))?;
         setter(
-            scope,
+            lua,
             &t,
             scene,
             &format!("Set{suffix}"),
             move |c, v: Option<String>| set(c, v),
         )?;
     }
-    super::text_effects::register(scope, &t, scene, &EFFECTS)?;
-    super::text_effects::register_auto_size(scope, &t, scene)?;
-    super::text_layout::register(scope, &t, scene, screen, video)?;
+    super::text_effects::register(lua, &t, scene, &EFFECTS)?;
+    super::text_effects::register_auto_size(lua, &t, scene)?;
+    super::text_layout::register(lua, &t, scene, screen, video)?;
     let blend = super::ui_look::BlendAccess {
         get: |s, id| s.world.text(id).map(|t| t.blend),
         set: |s, id, b| {
@@ -203,17 +190,17 @@ pub fn register<'scope>(
             }
         },
     };
-    super::ui_look::register_blend(scope, &t, scene, ("Text", blend))?;
+    super::ui_look::register_blend(lua, &t, scene, ("Text", blend))?;
     lua.globals().set("Text", t).map_err(|e| e.to_string())
 }
 
 /// `name(id)` → `get(text)`, or Lua's default (`nil` / `false` / `0`) without a Text.
-fn getter<'scope, R>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn getter<R>(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: Scoped<'scope>,
+    scene: ApiCell<Scene>,
     name: &str,
-    get: impl Fn(&TextComponent) -> mlua::Result<R> + 'scope,
+    get: impl Fn(&TextComponent) -> mlua::Result<R> + 'static,
 ) -> Reg
 where
     R: mlua::IntoLua + Default,
@@ -221,7 +208,8 @@ where
     put(
         table,
         name,
-        scope.create_function(move |_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             scene
                 .world
@@ -232,12 +220,12 @@ where
 }
 
 /// `name(id, value)` → `set(text, value)` when the entity has a Text.
-fn setter<'scope, V>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn setter<V>(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: Scoped<'scope>,
+    scene: ApiCell<Scene>,
     name: &str,
-    set: impl Fn(&mut TextComponent, V) + 'scope,
+    set: impl Fn(&mut TextComponent, V) + 'static,
 ) -> Reg
 where
     V: mlua::FromLua,
@@ -246,9 +234,9 @@ where
     put(
         table,
         name,
-        scope.create_function(move |_, (id, value): (EntityArg, V)| {
+        lua.create_function(move |lua, (id, value): (EntityArg, V)| {
             let id = id.live("Text", &verb)?;
-            if let Some(mut t) = scene.borrow_mut().world.text_mut(id) {
+            if let Some(mut t) = scene.get(lua)?.borrow_mut().world.text_mut(id) {
                 set(&mut t, value);
             }
             Ok(())

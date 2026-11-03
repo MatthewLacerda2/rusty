@@ -2,11 +2,12 @@
 
 use super::{label, with_api};
 use std::cell::RefCell;
+use std::rc::Rc;
 
 #[test]
 fn layout_reads_answer_from_the_elements_rect() {
     let (scene, id) = label();
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         let text = "a subtitle long enough to wrap inside four hundred units";
         lua.load(format!(

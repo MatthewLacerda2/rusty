@@ -9,10 +9,10 @@
 //! and honestly reports whether the mesh carries it. Reading the active state
 //! back (`GetCurrentNode`) lives with the layer surface in `layers.rs`.
 
-use std::cell::RefCell;
 use std::path::Path;
 
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::asset::animation_graph;
 use crate::scene::authoring::animator as animator_ops;
 use crate::scene::Scene;
@@ -23,28 +23,25 @@ use mlua::Value;
 use super::{layers, put, Reg};
 
 /// Register the graph-control functions onto the `Animator` table.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
+    scene: ApiCell<Scene>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
-    register_set_graph(scope, table, scene)?;
-    register_play_node(scope, table, scene, console)?;
-    register_play_animation(scope, table, scene)
+    register_set_graph(lua, table, scene)?;
+    register_play_node(lua, table, scene, console)?;
+    register_play_animation(lua, table, scene)
 }
 
 /// `SetGraph` / `SetGraphEnabled` — assign (or clear, with `""`) the graph asset
 /// path, and toggle auto-evaluation. Both route through the shared authoring ops.
-fn register_set_graph<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_set_graph(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetGraph",
-        scope.create_function(|_, (id, path): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, path): (EntityArg, String)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Animator", "SetGraph")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
@@ -57,7 +54,8 @@ fn register_set_graph<'scope>(
     put(
         table,
         "SetGraphEnabled",
-        scope.create_function(|_, (id, enabled): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, enabled): (EntityArg, bool)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Animator", "SetGraphEnabled")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
@@ -73,66 +71,67 @@ fn register_set_graph<'scope>(
 /// hard cut into the node's motion, adopting its loop flag and speed. `true` when
 /// the jump happened; `false` (with a console warning for a bad graph, unknown
 /// layer or unknown node) otherwise.
-fn register_play_node<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_play_node(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
+    scene: ApiCell<Scene>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
     put(
         table,
         "PlayNode",
-        scope.create_function(|_, (id, node, layer): (EntityArg, String, Option<Value>)| {
-            let id = id.live("Animator", "PlayNode")?;
-            let mut scene = scene.borrow_mut();
-            let Some(mut anim) = scene.world.animator_mut(id) else {
-                return Ok(false);
-            };
-            let Some(path) = anim.graph.clone() else {
-                return Ok(false);
-            };
-            let warn = |message: String| {
-                console
-                    .borrow_mut()
-                    .warn(format!("Animator.PlayNode: graph '{path}'{message}"));
-                Ok(false)
-            };
-            let graph = match animation_graph::load(Path::new(&path)) {
-                Ok(graph) => graph,
-                Err(err) => return warn(format!(": {err}")),
-            };
-            anim.sync_layers(&graph);
-            let index = match &layer {
-                None => 0,
-                Some(l) => match layers::lookup(&anim, l) {
-                    Some(index) => index,
-                    None => return warn(format!(" has no layer {}", layers::describe(l))),
-                },
-            };
-            let Some(target) = graph.machine(index).and_then(|m| m.node(&node)) else {
-                return warn(format!(" has no node '{node}'"));
-            };
-            match index {
-                0 => anim.enter_node(target, 0.0),
-                i => anim.layers[i - 1].playback.enter_node(target, 0.0),
-            }
-            Ok(true)
-        }),
+        lua.create_function(
+            move |lua, (id, node, layer): (EntityArg, String, Option<Value>)| {
+                let scene = &*scene.get(lua)?;
+                let console = &*console.get(lua)?;
+                let id = id.live("Animator", "PlayNode")?;
+                let mut scene = scene.borrow_mut();
+                let Some(mut anim) = scene.world.animator_mut(id) else {
+                    return Ok(false);
+                };
+                let Some(path) = anim.graph.clone() else {
+                    return Ok(false);
+                };
+                let warn = |message: String| {
+                    console
+                        .borrow_mut()
+                        .warn(format!("Animator.PlayNode: graph '{path}'{message}"));
+                    Ok(false)
+                };
+                let graph = match animation_graph::load(Path::new(&path)) {
+                    Ok(graph) => graph,
+                    Err(err) => return warn(format!(": {err}")),
+                };
+                anim.sync_layers(&graph);
+                let index = match &layer {
+                    None => 0,
+                    Some(l) => match layers::lookup(&anim, l) {
+                        Some(index) => index,
+                        None => return warn(format!(" has no layer {}", layers::describe(l))),
+                    },
+                };
+                let Some(target) = graph.machine(index).and_then(|m| m.node(&node)) else {
+                    return warn(format!(" has no node '{node}'"));
+                };
+                match index {
+                    0 => anim.enter_node(target, 0.0),
+                    i => anim.layers[i - 1].playback.enter_node(target, 0.0),
+                }
+                Ok(true)
+            },
+        ),
     )
 }
 
 /// `PlayAnimation` — play a clip by name directly, returning whether the entity's
 /// mesh actually carries a clip of that name (the honest, queryable sibling of the
 /// silently no-op'ing `Play`).
-fn register_play_animation<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_play_animation(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "PlayAnimation",
-        scope.create_function(|_, (id, name): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Animator", "PlayAnimation")?;
             let mut scene = scene.borrow_mut();
             let exists = scene

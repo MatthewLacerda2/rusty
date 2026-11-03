@@ -14,38 +14,30 @@
 //! touched from script. Every write is ONE-WAY into render-only state — it never
 //! feeds `FixedUpdate`, so the deterministic sim is unaffected.
 
-use std::cell::RefCell;
-
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::ApiCell;
 use crate::core::settings::video::VideoSettings;
 
 /// Register the `Video` namespace onto `lua`, backed by the shared settings cell.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    video: &'scope RefCell<VideoSettings>,
-) -> Reg {
+pub fn register(lua: &Lua, video: ApiCell<VideoSettings>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_resolution(scope, &table, video)?;
-    register_vsync(scope, &table, video)?;
-    register_fullscreen(scope, &table, video)?;
+    register_resolution(lua, &table, video)?;
+    register_vsync(lua, &table, video)?;
+    register_fullscreen(lua, &table, video)?;
 
     lua.globals().set("Video", table).map_err(|e| e.to_string())
 }
 
 /// Resolution get/set. `SetResolution(w, h)` clamps each axis to at least 1.
-fn register_resolution<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    video: &'scope RefCell<VideoSettings>,
-) -> Reg {
+fn register_resolution(lua: &mlua::Lua, table: &mlua::Table, video: ApiCell<VideoSettings>) -> Reg {
     put(
         table,
         "SetResolution",
-        scope.create_function(|_, (w, h): (u32, u32)| {
+        lua.create_function(move |lua, (w, h): (u32, u32)| {
+            let video = &*video.get(lua)?;
             let mut s = video.borrow_mut();
             s.width = w.max(1);
             s.height = h.max(1);
@@ -55,51 +47,43 @@ fn register_resolution<'scope>(
     put(
         table,
         "GetResolution",
-        scope.create_function(|_, ()| {
-            let (w, h) = video.borrow().resolution();
+        lua.create_function(move |lua, ()| {
+            let (w, h) = video.get(lua)?.borrow().resolution();
             Ok((w, h))
         }),
     )
 }
 
 /// Vsync on/off get/set.
-fn register_vsync<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    video: &'scope RefCell<VideoSettings>,
-) -> Reg {
+fn register_vsync(lua: &mlua::Lua, table: &mlua::Table, video: ApiCell<VideoSettings>) -> Reg {
     put(
         table,
         "SetVsync",
-        scope.create_function(|_, on: bool| {
-            video.borrow_mut().vsync = on;
+        lua.create_function(move |lua, on: bool| {
+            video.get(lua)?.borrow_mut().vsync = on;
             Ok(())
         }),
     )?;
     put(
         table,
         "GetVsync",
-        scope.create_function(|_, ()| Ok(video.borrow().vsync)),
+        lua.create_function(move |lua, ()| Ok(video.get(lua)?.borrow().vsync)),
     )
 }
 
 /// Fullscreen on/off get/set.
-fn register_fullscreen<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    video: &'scope RefCell<VideoSettings>,
-) -> Reg {
+fn register_fullscreen(lua: &mlua::Lua, table: &mlua::Table, video: ApiCell<VideoSettings>) -> Reg {
     put(
         table,
         "SetFullscreen",
-        scope.create_function(|_, on: bool| {
-            video.borrow_mut().fullscreen = on;
+        lua.create_function(move |lua, on: bool| {
+            video.get(lua)?.borrow_mut().fullscreen = on;
             Ok(())
         }),
     )?;
     put(
         table,
         "GetFullscreen",
-        scope.create_function(|_, ()| Ok(video.borrow().fullscreen)),
+        lua.create_function(move |lua, ()| Ok(video.get(lua)?.borrow().fullscreen)),
     )
 }

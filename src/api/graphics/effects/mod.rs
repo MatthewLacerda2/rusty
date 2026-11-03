@@ -5,9 +5,8 @@
 //! `scene::authoring` ops the Inspector calls; an effect's numeric knobs that are a
 //! pair on their own come from its knob table ([`knobs`]).
 
-use std::cell::RefCell;
-
 use super::super::Reg;
+use crate::api::ApiCell;
 use crate::scene::Scene;
 
 // sorted: one module per effect (or family of effects); none reads another
@@ -29,8 +28,7 @@ use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, whi
 use lens::{chromatic_aberration, film_grain, vignette};
 
 /// One effect's `Graphics.*` functions, registered onto the namespace's table.
-pub(crate) type Registrar =
-    for<'scope> fn(&'scope mlua::Scope<'scope, '_>, &mlua::Table, &'scope RefCell<Scene>) -> Reg;
+pub(crate) type Registrar = fn(&mlua::Lua, &mlua::Table, ApiCell<Scene>) -> Reg;
 
 /// Every effect's registrar, by the effect's name.
 pub(crate) const REGISTRARS: &[(&str, Registrar)] = &[
@@ -56,13 +54,9 @@ pub(crate) const REGISTRARS: &[(&str, Registrar)] = &[
 ];
 
 /// Register every effect's functions onto `table`.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     for (_, register) in REGISTRARS {
-        register(scope, table, scene)?;
+        register(lua, table, scene)?;
     }
     Ok(())
 }

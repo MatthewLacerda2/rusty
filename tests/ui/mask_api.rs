@@ -4,24 +4,22 @@
 //! and every field survives a scene save → load.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec4;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{BackdropFilterComponent, MaskComponent, RectMaskComponent};
 use rusty::scene::authoring::{add_component, ComponentKind};
 use rusty::scene::Scene;
 
 /// Run `f` with the three namespaces registered over `scene`.
-fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
+fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::rect_mask::register(&lua, scope, scene).unwrap();
-        rusty::api::mask::register(&lua, scope, scene).unwrap();
-        rusty::api::backdrop_filter::register(&lua, scope, scene).unwrap();
-        f(&lua);
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::rect_mask::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::api::mask::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::api::backdrop_filter::register(&lua, bind(&lua, scene)).unwrap();
+    f(&lua);
 }
 
 #[test]
@@ -34,7 +32,7 @@ fn setters_validate_and_getters_read_back() {
     }
     assert!(scene.world.has_rect_transform(id), "each requires a rect");
     let bare = scene.add_entity("Bare".to_string());
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "RectMask.SetFeather({id}, -4)

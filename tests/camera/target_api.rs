@@ -2,16 +2,18 @@
 //! through the Lua surface, onto the entity's `CameraComponent`.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{CameraComponent, Projection};
 use rusty::scene::Scene;
 
-fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
+fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    lua.scope(|scope| {
+    crate::lua::attempt(|| {
         let table = lua.create_table()?;
-        rusty::api::camera::component::register(scope, &table, scene).unwrap();
+        rusty::api::camera::component::register(&lua, &table, bind(&lua, scene)).unwrap();
         lua.globals().set("Camera", table)?;
         f(&lua);
         Ok(())
@@ -19,14 +21,14 @@ fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
     .unwrap();
 }
 
-fn scene_with_camera() -> (RefCell<Scene>, u32, u32) {
+fn scene_with_camera() -> (Rc<RefCell<Scene>>, u32, u32) {
     let mut scene = Scene::new();
     let cam = scene.add_entity("Cam".to_string());
     scene
         .world
         .set_camera(cam, Some(CameraComponent::default()));
     let bare = scene.add_entity("Bare".to_string());
-    (RefCell::new(scene), cam, bare)
+    (Rc::new(RefCell::new(scene)), cam, bare)
 }
 
 #[test]

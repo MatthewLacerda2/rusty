@@ -46,33 +46,32 @@ use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::RenderMode;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
 /// Register the `Material` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_scalars(scope, &table, scene)?;
-    register_maps(scope, &table, scene)?;
-    register_transparency(scope, &table, scene)?;
-    asset::register(scope, &table, scene)?;
-    library::register(scope, &table, scene)?;
-    slots::register(scope, &table, scene)?;
-    surface::register(scope, &table, scene)?;
-    shader::params::register(scope, &table, scene)?;
-    shader::textures::register(scope, &table, scene)?;
+    register_scalars(lua, &table, scene)?;
+    register_maps(lua, &table, scene)?;
+    register_transparency(lua, &table, scene)?;
+    asset::register(lua, &table, scene)?;
+    library::register(lua, &table, scene)?;
+    slots::register(lua, &table, scene)?;
+    surface::register(lua, &table, scene)?;
+    shader::params::register(lua, &table, scene)?;
+    shader::textures::register(lua, &table, scene)?;
     put(
         &table,
         "SetShader",
-        scope.create_function(|_, (id, name): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
             let id = id.live("Material", "SetShader")?;
-            with_material(scene, id, |m, key| mat_ops::set_shader(m, key, name));
+            with_material(&*scene.get(lua)?, id, |m, key| {
+                mat_ops::set_shader(m, key, name)
+            });
             Ok(())
         }),
     )?;
@@ -98,17 +97,15 @@ fn with_material(
 }
 
 /// The PBR factors: `SetMetallic` / `SetRoughness` / `SetColor` / `SetEmissive`.
-fn register_scalars<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_scalars(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetMetallic",
-        scope.create_function(|_, (id, val): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, val): (EntityArg, f32)| {
             let id = id.live("Material", "SetMetallic")?;
-            with_material(scene, id, |m, key| mat_ops::set_metallic(m, key, val));
+            with_material(&*scene.get(lua)?, id, |m, key| {
+                mat_ops::set_metallic(m, key, val)
+            });
             Ok(())
         }),
     )?;
@@ -116,9 +113,11 @@ fn register_scalars<'scope>(
     put(
         table,
         "SetRoughness",
-        scope.create_function(|_, (id, val): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, val): (EntityArg, f32)| {
             let id = id.live("Material", "SetRoughness")?;
-            with_material(scene, id, |m, key| mat_ops::set_roughness(m, key, val));
+            with_material(&*scene.get(lua)?, id, |m, key| {
+                mat_ops::set_roughness(m, key, val)
+            });
             Ok(())
         }),
     )?;
@@ -126,9 +125,11 @@ fn register_scalars<'scope>(
     put(
         table,
         "SetColor",
-        scope.create_function(|_, (id, rgb): (EntityArg, [f32; 3])| {
+        lua.create_function(move |lua, (id, rgb): (EntityArg, [f32; 3])| {
             let id = id.live("Material", "SetColor")?;
-            with_material(scene, id, |m, key| mat_ops::set_base_color(m, key, rgb));
+            with_material(&*scene.get(lua)?, id, |m, key| {
+                mat_ops::set_base_color(m, key, rgb)
+            });
             Ok(())
         }),
     )?;
@@ -136,9 +137,11 @@ fn register_scalars<'scope>(
     put(
         table,
         "SetEmissive",
-        scope.create_function(|_, (id, rgb): (EntityArg, [f32; 3])| {
+        lua.create_function(move |lua, (id, rgb): (EntityArg, [f32; 3])| {
             let id = id.live("Material", "SetEmissive")?;
-            with_material(scene, id, |m, key| mat_ops::set_emissive(m, key, rgb));
+            with_material(&*scene.get(lua)?, id, |m, key| {
+                mat_ops::set_emissive(m, key, rgb)
+            });
             Ok(())
         }),
     )
@@ -146,11 +149,7 @@ fn register_scalars<'scope>(
 
 /// Texture-map paths: `SetMetallicMap` / `SetRoughnessMap` / `SetTexture` /
 /// `SetNormalMap` / `SetEmissiveMap`.
-fn register_maps<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_maps(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type SetMap = fn(&mut mat_ops::MaterialLibrary, &str, String);
     let maps: [(&str, SetMap); 5] = [
         ("SetMetallicMap", |m, k, p| {
@@ -168,9 +167,9 @@ fn register_maps<'scope>(
         }),
     ];
     for (verb, set) in maps {
-        let f = scope.create_function(move |_, (id, path): (EntityArg, String)| {
+        let f = lua.create_function(move |lua, (id, path): (EntityArg, String)| {
             let id = id.live("Material", verb)?;
-            with_material(scene, id, |m, key| set(m, key, path));
+            with_material(&*scene.get(lua)?, id, |m, key| set(m, key, path));
             Ok(())
         });
         put(table, verb, f)?;
@@ -181,19 +180,17 @@ fn register_maps<'scope>(
 /// Transparency controls (#242): `SetRenderMode` / `SetAlpha` / `SetAlphaCutoff`.
 /// Mode is a string — "Opaque" (default), "Cutout", or "Transparent" (case-
 /// insensitive); `alpha`/`cutoff` are clamped to `[0, 1]`.
-fn register_transparency<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_transparency(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetRenderMode",
-        scope.create_function(|_, (id, mode): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, mode): (EntityArg, String)| {
             let id = id.live("Material", "SetRenderMode")?;
             // An unknown name degrades to the safe default, `Opaque`, rather than erroring.
             let mode = RenderMode::parse(&mode).unwrap_or_default();
-            with_material(scene, id, |m, key| mat_ops::set_render_mode(m, key, mode));
+            with_material(&*scene.get(lua)?, id, |m, key| {
+                mat_ops::set_render_mode(m, key, mode)
+            });
             Ok(())
         }),
     )?;
@@ -201,9 +198,11 @@ fn register_transparency<'scope>(
     put(
         table,
         "SetAlpha",
-        scope.create_function(|_, (id, val): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, val): (EntityArg, f32)| {
             let id = id.live("Material", "SetAlpha")?;
-            with_material(scene, id, |m, key| mat_ops::set_alpha(m, key, val));
+            with_material(&*scene.get(lua)?, id, |m, key| {
+                mat_ops::set_alpha(m, key, val)
+            });
             Ok(())
         }),
     )?;
@@ -211,9 +210,11 @@ fn register_transparency<'scope>(
     put(
         table,
         "SetAlphaCutoff",
-        scope.create_function(|_, (id, val): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, val): (EntityArg, f32)| {
             let id = id.live("Material", "SetAlphaCutoff")?;
-            with_material(scene, id, |m, key| mat_ops::set_alpha_cutoff(m, key, val));
+            with_material(&*scene.get(lua)?, id, |m, key| {
+                mat_ops::set_alpha_cutoff(m, key, val)
+            });
             Ok(())
         }),
     )

@@ -6,19 +6,20 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::scene::Scene;
 
-fn eval<T: mlua::FromLuaMulti>(scene: &RefCell<Scene>, script: &str) -> mlua::Result<T> {
+fn eval<T: mlua::FromLuaMulti>(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<T> {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::decals::register(&lua, scope, scene).unwrap();
+    crate::lua::attempt(|| {
+        rusty::api::decals::register(&lua, bind(&lua, scene)).unwrap();
         lua.load(script).eval()
     })
 }
 
 #[test]
 fn clear_with_persistent_false_keeps_the_trail() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let (kept, count, after): (u32, u32, u32) = eval(
         &scene,
         "local hole = Decals.Spawn(0,0,0, 0,1,0, { persist = true })
@@ -36,14 +37,14 @@ fn clear_with_persistent_false_keeps_the_trail() {
 
 #[test]
 fn an_unknown_clear_option_is_an_error() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let err = eval::<()>(&scene, "Decals.Clear({ persist = false })").unwrap_err();
     assert!(err.to_string().contains("expected persistent"), "{err}");
 }
 
 #[test]
 fn persist_and_persistent_take_a_boolean_only() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     for script in [
         "Decals.Spawn(0,0,0, 0,1,0, { persist = \"false\" })",
         "Decals.Spawn(0,0,0, 0,1,0, { persist = 0 })",

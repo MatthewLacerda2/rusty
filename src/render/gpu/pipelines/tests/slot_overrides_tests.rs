@@ -49,7 +49,7 @@ fn gpu_two_slots_with_their_own_flash_colours_keep_them_under_one_override() {
         half
     };
     assert!(half > 0);
-    let scene = std::cell::RefCell::new(scene);
+    let scene = std::rc::Rc::new(std::cell::RefCell::new(scene));
     lua(
         &scene,
         &format!(r#"Material.SetShaderParam({id}, "hit_flash.amount", 1)"#),

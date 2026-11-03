@@ -6,9 +6,11 @@ mod layout;
 mod setters;
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec2;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{CanvasComponent, RectTransformComponent, TextComponent};
 use rusty::core::settings::video::VideoSettings;
 use rusty::scene::Scene;
@@ -33,20 +35,22 @@ pub(super) fn label() -> (Scene, u32) {
 }
 
 /// Run `f` with `Text` registered over `scene` on a 1920×1080 headless screen.
-pub(super) fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
+pub(super) fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    let screen = RefCell::new(ScreenSize::default());
-    let video = RefCell::new(VideoSettings {
+    let screen = Rc::new(RefCell::new(ScreenSize::default()));
+    let video = Rc::new(RefCell::new(VideoSettings {
         width: 1920,
         height: 1080,
         ..VideoSettings::default()
-    });
-    lua.scope(|scope| {
-        rusty::api::text::register(&lua, scope, scene, &screen, &video).unwrap();
-        f(&lua);
-        Ok(())
-    })
+    }));
+    rusty::api::text::register(
+        &lua,
+        bind(&lua, scene),
+        bind(&lua, &screen),
+        bind(&lua, &video),
+    )
     .unwrap();
+    f(&lua);
 }
 
 #[test]

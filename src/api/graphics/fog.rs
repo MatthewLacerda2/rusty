@@ -2,45 +2,36 @@
 //! same `authoring::fog` ops the Scene Settings panel calls. Fog is scene-level, not
 //! per-volume, so these work whether or not the scene has a post-processing volume.
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 
 use super::super::{put, Reg};
+use crate::api::ApiCell;
 use crate::scene::authoring::fog as fog_ops;
 use crate::scene::{FogMode, FogSettings, Scene};
 
 /// Mode, colour, and the five scalar knobs.
-pub(super) fn register_fog<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    register_mode_color(scope, table, scene)?;
+pub(super) fn register_fog(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    register_mode_color(lua, table, scene)?;
     for (name, get, set) in SCALARS {
-        scalar(scope, table, scene, name, get, set)?;
+        scalar(lua, table, scene, name, get, set)?;
     }
     Ok(())
 }
 
 /// `{Get,Set}FogMode` (by name) and `{Get,Set}FogColor` (`r, g, b`).
-fn register_mode_color<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_mode_color(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetFogMode",
-        scope.create_function(|_, ()| Ok(scene.borrow().fog.mode.name())),
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().fog.mode.name())),
     )?;
     put(
         table,
         "SetFogMode",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| {
             // An unrecognised name keeps the current mode, like `SetTonemap`.
             if let Some(mode) = FogMode::parse(&name) {
-                fog_ops::set_mode(&mut scene.borrow_mut().fog, mode);
+                fog_ops::set_mode(&mut scene.get(lua)?.borrow_mut().fog, mode);
             }
             Ok(())
         }),
@@ -48,16 +39,16 @@ fn register_mode_color<'scope>(
     put(
         table,
         "GetFogColor",
-        scope.create_function(|_, ()| {
-            let c = scene.borrow().fog.color;
+        lua.create_function(move |lua, ()| {
+            let c = scene.get(lua)?.borrow().fog.color;
             Ok((c.x, c.y, c.z))
         }),
     )?;
     put(
         table,
         "SetFogColor",
-        scope.create_function(|_, (r, g, b): (f32, f32, f32)| {
-            fog_ops::set_color(&mut scene.borrow_mut().fog, Vec3::new(r, g, b));
+        lua.create_function(move |lua, (r, g, b): (f32, f32, f32)| {
+            fog_ops::set_color(&mut scene.get(lua)?.borrow_mut().fog, Vec3::new(r, g, b));
             Ok(())
         }),
     )?;
@@ -81,10 +72,10 @@ const SCALARS: [(&str, Get, Set); 5] = [
 ];
 
 /// Register `GetFog<name>` / `SetFog<name>` over one scalar field.
-fn scalar<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn scalar(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     name: &str,
     get: Get,
     set: Set,
@@ -92,13 +83,13 @@ fn scalar<'scope>(
     put(
         table,
         &format!("GetFog{name}"),
-        scope.create_function(move |_, ()| Ok(get(&scene.borrow().fog))),
+        lua.create_function(move |lua, ()| Ok(get(&scene.get(lua)?.borrow().fog))),
     )?;
     put(
         table,
         &format!("SetFog{name}"),
-        scope.create_function(move |_, v: f32| {
-            set(&mut scene.borrow_mut().fog, v);
+        lua.create_function(move |lua, v: f32| {
+            set(&mut scene.get(lua)?.borrow_mut().fog, v);
             Ok(())
         }),
     )

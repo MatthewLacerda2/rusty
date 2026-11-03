@@ -11,54 +11,53 @@ use std::cell::RefCell;
 use mlua::{Lua, Value};
 
 use super::{put, Reg};
+use crate::api::ApiCell;
 use crate::core::random::Random;
 
 /// Register the `Random` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    rng: &'scope RefCell<Random>,
-) -> Reg {
+pub fn register(lua: &Lua, rng: ApiCell<Random>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(
         &table,
         "Value",
-        scope.create_function(|_, ()| Ok(rng.borrow_mut().value())),
+        lua.create_function(move |lua, ()| Ok(rng.get(lua)?.borrow_mut().value())),
     )?;
     put(
         &table,
         "Range",
-        scope.create_function(|_, (min, max): (Value, Value)| range(rng, min, max)),
+        lua.create_function(move |lua, (min, max): (Value, Value)| {
+            range(&*rng.get(lua)?, min, max)
+        }),
     )?;
     put(
         &table,
         "InsideUnitSphere",
-        scope.create_function(|_, ()| {
-            let v = rng.borrow_mut().inside_unit_sphere();
+        lua.create_function(move |lua, ()| {
+            let v = rng.get(lua)?.borrow_mut().inside_unit_sphere();
             Ok((v.x, v.y, v.z))
         }),
     )?;
     put(
         &table,
         "OnUnitSphere",
-        scope.create_function(|_, ()| {
-            let v = rng.borrow_mut().on_unit_sphere();
+        lua.create_function(move |lua, ()| {
+            let v = rng.get(lua)?.borrow_mut().on_unit_sphere();
             Ok((v.x, v.y, v.z))
         }),
     )?;
     put(
         &table,
         "InsideUnitCircle",
-        scope.create_function(|_, ()| {
-            let v = rng.borrow_mut().inside_unit_circle();
+        lua.create_function(move |lua, ()| {
+            let v = rng.get(lua)?.borrow_mut().inside_unit_circle();
             Ok((v.x, v.y))
         }),
     )?;
     put(
         &table,
         "SetSeed",
-        scope.create_function(|_, seed: i64| {
-            rng.borrow_mut().set_seed(seed as u64);
+        lua.create_function(move |lua, seed: i64| {
+            rng.get(lua)?.borrow_mut().set_seed(seed as u64);
             Ok(())
         }),
     )?;

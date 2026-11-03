@@ -4,11 +4,12 @@ use glam::{Vec2, Vec4};
 
 use super::{label, with_api};
 use std::cell::RefCell;
+use std::rc::Rc;
 
 #[test]
 fn text_setters_validate_and_write_through() {
     let (scene, id) = label();
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "Text.SetText({id}, 'AMMO 30')

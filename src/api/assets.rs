@@ -17,12 +17,12 @@
 //! write an image's wrap, filter, mipmap, texture type, compression and max-size
 //! settings (#1574), the image inspector's card.
 
-use std::cell::RefCell;
 use std::path::Path;
 
 use mlua::{Lua, Table};
 
 use super::{global_table, put, Reg};
+use crate::api::ApiCell;
 use crate::asset::audio::{refresh, Refresh};
 use crate::asset::sidecar::{
     parse_max_size, Compression, FilterMode, TextureSettings, TextureType, WrapMode,
@@ -102,16 +102,13 @@ pub fn register(lua: &Lua) -> Reg {
 /// model inspector uses, re-importing the model's meshes in the scene, and returns
 /// how many it re-imported. `SetModelImportSettings(path, t)` does the same for the
 /// Scale Factor.
-pub fn register_scoped<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register_scoped(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = global_table(lua, "Assets")?;
     put(
         &table,
         "SetLightmapUVSettings",
-        scope.create_function(move |_, (path, t): (String, Table)| {
+        lua.create_function(move |lua, (path, t): (String, Table)| {
+            let scene = &*scene.get(lua)?;
             let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
             let mut s = stored.lightmap_uvs;
             s.generate = t.get::<Option<bool>>("generate")?.unwrap_or(s.generate);
@@ -125,7 +122,8 @@ pub fn register_scoped<'scope>(
     put(
         &table,
         "SetModelImportSettings",
-        scope.create_function(move |_, (path, t): (String, Table)| {
+        lua.create_function(move |lua, (path, t): (String, Table)| {
+            let scene = &*scene.get(lua)?;
             let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
             let scale = t.get::<Option<f32>>("scaleFactor")?.unwrap_or(stored.scale);
             let mut scene = scene.borrow_mut();

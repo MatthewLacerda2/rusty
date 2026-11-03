@@ -5,26 +5,22 @@
 //! "Mask")` / `RemoveComponent`. The setter routes through the shared
 //! `scene::authoring::ui::rect_mask` op the inspector card uses.
 
-use std::cell::RefCell;
-
 use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring::ui::rect_mask as mask_ops;
 use crate::scene::Scene;
 
 /// Register the `Mask` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(
         &table,
         "GetShowMaskGraphic",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene
                 .world
@@ -35,9 +31,9 @@ pub fn register<'scope>(
     put(
         &table,
         "SetShowMaskGraphic",
-        scope.create_function(|_, (id, show): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, show): (EntityArg, bool)| {
             let id = id.live("Mask", "SetShowMaskGraphic")?;
-            if let Some(mut m) = scene.borrow_mut().world.mask_mut(id) {
+            if let Some(mut m) = scene.get(lua)?.borrow_mut().world.mask_mut(id) {
                 mask_ops::set_show_mask_graphic(&mut m, show);
             }
             Ok(())

@@ -8,6 +8,7 @@
 //! primes, so there it checks that two unprimed frames match. Skips with no adapter.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::{Quat, Vec3};
 
@@ -42,7 +43,7 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3, rgb: [f32; 3]) -> u32 {
 
 /// Layered walls under an AO volume whose camera has motion blur `blur`, and the
 /// dissolving wall in front, drawn by `d`'s shader.
-fn walls(d: &Dissolve, blur: bool) -> (RefCell<Scene>, u32) {
+fn walls(d: &Dissolve, blur: bool) -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
@@ -91,7 +92,7 @@ fn walls(d: &Dissolve, blur: bool) -> (RefCell<Scene>, u32) {
         ..CameraComponent::default()
     };
     scene.world.set_camera(volume, Some(lens));
-    (RefCell::new(scene), cut)
+    (Rc::new(RefCell::new(scene)), cut)
 }
 
 /// One frame of `scene` at render scale `scale`, primed or not: pixels and counters.

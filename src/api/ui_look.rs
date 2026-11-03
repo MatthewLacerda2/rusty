@@ -8,13 +8,12 @@
 //! it. Writes route through the namespace's shared `scene::authoring` op, which
 //! sanitizes the gradient once (`ui_look::sanitize_gradient`).
 
-use std::cell::RefCell;
-
 use mlua::{Table, Value};
 
 use super::lua_json::{recipe_from_lua, to_lua};
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::{UiBlend, UiGradient};
 use crate::scene::Scene;
 
@@ -33,28 +32,28 @@ pub(super) struct GradientAccess {
 
 /// `Get/SetBlend` on `table`. The getter returns `"None"` without the component;
 /// an unknown name is ignored.
-pub(super) fn register_blend<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register_blend(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     (namespace, access): (&'static str, BlendAccess),
 ) -> Reg {
     let BlendAccess { get, set } = access;
     put(
         table,
         "GetBlend",
-        scope.create_function(move |_, id: EntityArg| {
-            let blend = get(&scene.borrow(), id.read());
+        lua.create_function(move |lua, id: EntityArg| {
+            let blend = get(&scene.get(lua)?.borrow(), id.read());
             Ok(blend.map_or("None", UiBlend::name).to_string())
         }),
     )?;
     put(
         table,
         "SetBlend",
-        scope.create_function(move |_, (id, name): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
             let id = id.live(namespace, "SetBlend")?;
             if let Some(blend) = UiBlend::parse(&name) {
-                set(&mut scene.borrow_mut(), id, blend);
+                set(&mut scene.get(lua)?.borrow_mut(), id, blend);
             }
             Ok(())
         }),
@@ -62,18 +61,18 @@ pub(super) fn register_blend<'scope>(
 }
 
 /// `Get/SetGradient` on `table`: see the module docs for the table's shape.
-pub(super) fn register_gradient<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register_gradient(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     (namespace, access): (&'static str, GradientAccess),
 ) -> Reg {
     let GradientAccess { get, set } = access;
     put(
         table,
         "GetGradient",
-        scope.create_function(move |lua, id: EntityArg| {
-            let Some(Some(g)) = get(&scene.borrow(), id.read()) else {
+        lua.create_function(move |lua, id: EntityArg| {
+            let Some(Some(g)) = get(&scene.get(lua)?.borrow(), id.read()) else {
                 return Ok(Value::Nil);
             };
             to_lua(lua, &g)
@@ -82,13 +81,13 @@ pub(super) fn register_gradient<'scope>(
     put(
         table,
         "SetGradient",
-        scope.create_function(move |_, (id, value): (EntityArg, Value)| {
+        lua.create_function(move |lua, (id, value): (EntityArg, Value)| {
             let id = id.live(namespace, "SetGradient")?;
             let g = match value {
                 Value::Nil => None,
                 v => Some(recipe_from_lua::<UiGradient>(&v).map_err(mlua::Error::RuntimeError)?),
             };
-            set(&mut scene.borrow_mut(), id, g);
+            set(&mut scene.get(lua)?.borrow_mut(), id, g);
             Ok(())
         }),
     )

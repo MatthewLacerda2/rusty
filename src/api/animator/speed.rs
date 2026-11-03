@@ -10,23 +10,19 @@
 //! the old speed on NaN or infinity; the binding also raises a Lua error, so a
 //! script learns its value was refused.
 
-use std::cell::RefCell;
-
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring::animator as animator_ops;
 use crate::scene::Scene;
 
 /// Register `SetSpeed` / `GetSpeed` onto the `Animator` table.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetSpeed",
-        scope.create_function(|_, (id, speed): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, speed): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Animator", "SetSpeed")?;
             if !speed.is_finite() {
                 return Err(mlua::Error::RuntimeError(format!(
@@ -44,8 +40,13 @@ pub(super) fn register<'scope>(
     put(
         table,
         "GetSpeed",
-        scope.create_function(|_, id: EntityArg| {
-            Ok(scene.borrow().world.animator(id.read()).map(|a| a.speed))
+        lua.create_function(move |lua, id: EntityArg| {
+            Ok(scene
+                .get(lua)?
+                .borrow()
+                .world
+                .animator(id.read())
+                .map(|a| a.speed))
         }),
     )
 }
