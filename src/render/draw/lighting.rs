@@ -7,6 +7,7 @@ use glam::Vec3;
 use crate::render::gpu::uniforms::{ProceduralSkyUniform, MAX_DIRECTIONAL_LIGHTS};
 use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::render::{AmbientLightUniform, DirectionalLightUniform, LightingUniform};
+use crate::scene::lighting::DiffuseModel;
 use crate::scene::{LightType, Scene};
 
 /// The base lighting uniform, with the scene's ambient, before its directional lights
@@ -19,7 +20,10 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
         num_dir_lights: 0,
         sky_textured: 0.0,
         env_reflection: 1.0,
-        _sky_pad: 0.0,
+        diffuse_wrap: match scene.lighting_settings.diffuse_model {
+            DiffuseModel::Lambert => 0.0,
+            DiffuseModel::HalfLambert => 1.0,
+        },
         refl_probes: [Default::default(); MAX_REFLECTION_PROBES],
     }
 }

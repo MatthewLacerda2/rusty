@@ -31,7 +31,9 @@ Probes are addressed by **index** (0-based, in placement order), not by entity i
 `SampleIrradiance` returns irradiance E (a uniform sky of radiance L reads πL). A
 surface under the probe reflects `albedo / π · E`, the same Lambert response direct
 lights and baked lightmaps give, so a dynamic object under probes and a static one
-under a lightmap of the same surroundings render alike (#807).
+under a lightmap of the same surroundings render alike (#807). A `Baked` lamp's direct light lands in
+the probes shaped by the scene's diffuse model (`diffuseModel` in `Lighting.md`, #1698):
+under `HalfLambert` it reads back as the same squared wrap a live lamp gives.
 
 `Bake` is the real multi-bounce GI bake (#241, #285): for every probe it captures the
 STATIC scene to a cubemap from the probe's position (dynamic actors excluded) and

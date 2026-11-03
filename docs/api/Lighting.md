@@ -14,8 +14,8 @@ The two individual verbs stay for a script that wants only one of them.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, saved }` |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, diffuseModel, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, diffuseModel?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
@@ -32,7 +32,15 @@ The two individual verbs stay for a script that wants only one of them.
   `reflectionResolution` (default `512`, a power of two in 16–2048) and
   `reflectionBudgetMB` (default `128`, `8`–`2048`) and `reflectionMaxProbes` (default
   `512`, `1`–`4096`, the most probes auto-placement makes), edited in the scene Inspector's
-  *Reflection Probes* section (see `Reflection.md`). A scene whose settings are all
+  *Reflection Probes* section (see `Reflection.md`). `diffuseModel` (#1698) is how a
+  lamp's direct light falls off across a surface, scene-wide: `"Lambert"` (the default,
+  the physical `max(N·L, 0)`) or `"HalfLambert"` (the retro squared wrap
+  `((N·L + 1) / 2)²`: a quarter of the light at the terminator and about a third more
+  diffuse overall). Realtime shading, the lightmap bake and the light-probe bake all
+  use it, so one lamp looks the same Baked or Realtime; live lights follow a change at
+  once, baked light at the next bake. Indirect light (bounce, sky) stays Lambert. An
+  unknown name is an error and changes nothing. The editor's card edits it under the
+  bake knobs. A scene whose settings are all
   at their defaults leaves the block out of its file. `Lighting.BakeLightmaps` takes the
   same settings for every argument it is not given.
 - **The result is written at once**, as Unity writes its lighting data asset: the

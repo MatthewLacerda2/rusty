@@ -1,7 +1,8 @@
 //! `Lighting.Generate()` and the scene's lighting settings (#832): the one verb
 //! behind the editor's Generate Lighting button, and `Lighting.GetSettings()` /
 //! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, and the
-//! reflection probes' default resolution, memory budget and probe ceiling, #1584).
+//! reflection probes' default resolution, memory budget and probe ceiling, #1584,
+//! and the scene's diffuse model, #1698).
 
 use mlua::{Lua, Table};
 
@@ -10,6 +11,7 @@ use super::super::bake::progress::BakeLog;
 use crate::api::{global_table, put, ApiScopedCtx, Reg};
 use crate::scene::lighting::lightmap::BakeSettings;
 use crate::scene::lighting::settings::ReflectionSettings;
+use crate::scene::lighting::DiffuseModel;
 
 /// The knobs a script may override, each optional; `None` keeps `base`'s.
 #[derive(Default)]
@@ -87,6 +89,7 @@ pub(super) fn register<'scope>(
             out.set("bounces", s.bounces)?;
             out.set("seed", s.seed)?;
             out.set("directional", s.directional)?;
+            out.set("diffuseModel", settings.diffuse_model.name())?;
             put_reflections(&out, &r)?;
             Ok(out)
         }),
@@ -96,12 +99,28 @@ pub(super) fn register<'scope>(
         "SetSettings",
         scope.create_function(move |_, t: Table| {
             let overrides = Overrides::from_table(&t)?;
+            let diffuse = diffuse_model(&t)?;
             let mut scene = scene.borrow_mut();
+            if let Some(model) = diffuse {
+                scene.lighting_settings.diffuse_model = model;
+            }
             let s = &mut scene.lighting_settings.lightmaps;
             *s = overrides.apply(*s);
             set_reflections(&t, &mut scene.lighting_settings.reflections)
         }),
     )
+}
+
+/// The diffuse model `t` names (#1698), if any; an unknown name is an error.
+fn diffuse_model(t: &Table) -> mlua::Result<Option<DiffuseModel>> {
+    let Some(name) = t.get::<Option<String>>("diffuseModel")? else {
+        return Ok(None);
+    };
+    DiffuseModel::from_name(&name).map(Some).ok_or_else(|| {
+        mlua::Error::runtime(format!(
+            "unknown diffuseModel '{name}' (Lambert or HalfLambert)"
+        ))
+    })
 }
 
 /// The reflection probes' defaults, as `GetSettings` returns them (#1584).
