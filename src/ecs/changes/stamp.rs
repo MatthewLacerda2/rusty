@@ -3,8 +3,9 @@
 //! A column write is [`World::touch`] (or [`World::touch_entity`] for a whole
 //! entity): one call that notes the write for the edit journal and stamps the
 //! log, so a raw write cannot do one and forget the other. The raw hecs writes
-//! live in `world.rs` and `placement.rs` only, behind `World::inner`, which is
-//! private to `ecs`; each of them goes through one of these two.
+//! live in `funnel.rs`, `placement.rs` and `World::remove_rows` / `clear`, each
+//! with the `ecs-write` lint's inline allow; a column write calls `touch` only
+//! once the entity is found to hold the column.
 //!
 //! A derived channel is stamped at the source of its fact, its subtree included:
 //! [`World::stamp_pose_below`] from `World::moved`, [`World::stamp_hierarchy_below`]

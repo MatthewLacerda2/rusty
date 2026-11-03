@@ -103,7 +103,8 @@ impl Log {
         Some(ids)
     }
 
-    /// The World was replaced: forget every entry, keep the revision moving.
+    /// The World was replaced: forget every entry, keep the revision moving. `last`
+    /// keeps its capacity, so the next stamps re-fill it without reallocating.
     pub fn reset(&mut self) {
         self.revision += 1;
         self.entries.clear();

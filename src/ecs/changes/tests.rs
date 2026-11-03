@@ -60,7 +60,7 @@ fn whole_entity_writes_stamp_every_column_channel() {
 }
 
 #[test]
-fn a_cleared_world_an_undo_restore_and_another_world_read_rebuild() {
+fn a_cleared_world_an_undo_step_and_another_world_read_rebuild() {
     let (mut w, _) = world_of(2);
     let mut cursor = w.change_cursor::<TransformComponent>();
     w.clear();
@@ -77,7 +77,13 @@ fn a_cleared_world_an_undo_restore_and_another_world_read_rebuild() {
     w.despawn(ids[1]);
     let _ = w.changes(&mut cursor);
     w.restore_entity(recorded.doc, recorded.seq);
-    assert_eq!(w.changes(&mut cursor), Changes::Rebuild, "an Undo");
+    assert_eq!(
+        w.changes(&mut cursor),
+        Changes::Ids(vec![ids[1]]),
+        "restored"
+    );
+    w.rewind_changes();
+    assert_eq!(w.changes(&mut cursor), Changes::Rebuild, "an Undo step");
 
     let (mut other, _) = world_of(1);
     assert_eq!(
@@ -97,7 +103,6 @@ fn a_channel_never_opened_holds_nothing() {
     }
     let stats = w.change_stats();
     assert!(stats.iter().all(|s| s.name != "transform"), "{stats:?}");
-    assert_eq!(w.change_revision::<TransformComponent>(), 0);
 }
 
 #[test]

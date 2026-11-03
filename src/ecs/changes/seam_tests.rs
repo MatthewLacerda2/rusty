@@ -1,7 +1,7 @@
 //! src/ecs/changes/seam_tests.rs — what the consumers of #1706–#1710 are briefed to
 //! rely on (#1705): a write that changed nothing names nothing, a move or re-parent
 //! names the whole subtree on `WorldPose`, a derived box is not a collider edit, and
-//! an Undo of a live entity rewinds every cursor.
+//! restoring a live entity names it like any overwrite.
 
 use crate::components::{ColliderComponent, TransformComponent};
 use crate::ecs::{Activity, Changes, World, WorldPose};
@@ -76,13 +76,16 @@ fn a_refreshed_collider_box_is_not_a_collider_edit() {
 }
 
 #[test]
-fn an_undo_of_a_live_entity_reads_rebuild() {
-    let (mut w, [root, ..]) = chain();
-    let mut cursor = w.change_cursor::<TransformComponent>();
+fn restoring_a_live_entity_names_it_and_its_subtree() {
+    let (mut w, [root, mid, leaf, _]) = chain();
+    let mut local = w.change_cursor::<TransformComponent>();
+    let mut poses = w.change_cursor::<WorldPose>();
     let before = w.record(root).expect("live");
     w.transform_mut(root).expect("live").position.x = 4.0;
-    w.restore_entity(before.doc, before.seq);
-    assert_eq!(w.changes(&mut cursor), Changes::Rebuild);
+    let _ = (w.changes(&mut local), w.changes(&mut poses));
+    w.restore_entity(before.doc, before.seq); // an Undo step's own rewind is `scene::undo`'s
+    assert_eq!(w.changes(&mut local), Changes::Ids(vec![root]));
+    assert_eq!(w.changes(&mut poses), Changes::Ids(vec![root, mid, leaf]));
 }
 
 #[test]

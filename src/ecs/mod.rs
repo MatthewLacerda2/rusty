@@ -34,6 +34,7 @@ mod descendants_tests;
 mod despawn;
 #[cfg(test)]
 mod despawn_tests;
+mod funnel;
 mod handles;
 pub mod journal;
 #[cfg(test)]

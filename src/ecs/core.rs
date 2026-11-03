@@ -102,7 +102,7 @@ impl World {
     /// static shadow bakes) goes stale (#1496). A cache that wants *which* entities
     /// moved opens a cursor on that channel.
     pub fn static_revision(&self) -> u64 {
-        self.change_revision::<super::changes::StaticSet>()
+        self.static_set_revision()
     }
 
     /// The entity's layer index (`0`, the default layer, for a dead id).

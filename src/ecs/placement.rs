@@ -25,6 +25,7 @@ impl World {
         self.next_seq = self.next_seq.max(seq + 1);
         self.touch_entity(id, entity.is_static);
         let mut builder = build_bundle(entity, seq);
+        // lint: allow(ecs-write) the funnel: `touch_entity` stamped the placement above
         let handle = self.inner.spawn(builder.build());
         self.handles.insert(id, handle);
         self.order.insert(slot, id);
@@ -35,9 +36,9 @@ impl World {
     /// its old place in the insertion order, so a scene saved after an Undo of a
     /// destroy writes its entities in the order it did before (#1631). A live id
     /// is overwritten in place instead.
-    /// Either way an Undo rewinds the World under every cursor: each reads `Rebuild`.
+    /// It stamps what any placement or overwrite stamps; the Undo that calls it
+    /// takes one [`World::rewind_changes`] for the whole step.
     pub fn restore_entity(&mut self, entity: Entity, seq: u64) {
-        self.changes.new_epoch();
         if self.contains(entity.id) {
             self.overwrite(entity);
             return;
@@ -66,8 +67,10 @@ impl World {
         };
         self.stamp_hierarchy_below(id); // before and after: the flag and parent may differ
         self.touch_entity(id, entity.is_static);
+        // lint: allow(ecs-write) the funnel: `touch_entity` stamped the overwrite above
         let _ = self.inner.despawn(old_handle);
         let mut builder = build_bundle(entity, seq);
+        // lint: allow(ecs-write) the same overwrite's respawn
         let new_handle = self.inner.spawn(builder.build());
         self.handles.insert(id, new_handle);
         self.moved(id);

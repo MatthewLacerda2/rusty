@@ -8,7 +8,8 @@
 //! funnels, in the same call that notes the write for the edit journal
 //! (`stamp.rs`): a column borrowed mutably (`component_mut`, `with_pair_mut`),
 //! attached, detached or taken (`set_component`, `take_component`), and every
-//! column of an entity placed, overwritten or removed. A mutable borrow counts as
+//! column of an entity placed, overwritten or removed. A write to a column the
+//! entity lacks stamps nothing (`ecs/funnel.rs`). A mutable borrow counts as
 //! a change, as in Bevy: a write that changed nothing is over-reported, which is
 //! safe; a missed one would be the bug. Two writes compare first because they are
 //! hot: a Transform landing its old value and a collider's derived world box stamp
@@ -20,8 +21,8 @@
 //! asks [`World::changes`] each time it runs: [`Changes::Ids`], the ids stamped
 //! since its last read, ascending, each once; or [`Changes::Rebuild`] when the
 //! cursor cannot be answered from the log (the World was cleared or replaced, a
-//! Play snapshot restored, an Undo restored an entity, or the log dropped what the
-//! cursor had not read yet). What an id holds *now* is the World's answer: a
+//! Play snapshot restored, an Undo or Redo stepped ([`World::rewind_changes`]), or
+//! the log dropped what the cursor had not read yet). What an id holds *now* is the World's answer: a
 //! consumer re-reads it, and an id that is gone or lost the column was removed.
 //! Any number of cursors read one channel, each at its own pace.
 //!
@@ -38,6 +39,8 @@
 mod channel;
 #[cfg(test)]
 mod derived_tests;
+#[cfg(test)]
+mod funnel_tests;
 mod log;
 #[cfg(test)]
 mod ops_tests;
@@ -96,6 +99,8 @@ pub(in crate::ecs) struct ChangeLogs {
     index: BTreeMap<TypeId, usize>,
     /// [`Channel::NAME`]s, parallel to `logs`.
     names: Vec<&'static str>,
+    /// Epochs taken since this World was made: what a test counts an Undo by.
+    rewinds: u64,
 }
 
 /// One opened channel's counters ([`World::change_stats`]).
@@ -116,6 +121,7 @@ impl Default for ChangeLogs {
             logs: Vec::new(),
             index: BTreeMap::new(),
             names: Vec::new(),
+            rewinds: 0,
         };
         logs.slot::<StaticSet>(); // index `STATIC`; its revision is `static_revision`, read unopened
         logs
@@ -142,11 +148,25 @@ impl ChangeLogs {
     /// The World was replaced or rewound: every cursor reads `Rebuild` next.
     pub(in crate::ecs) fn new_epoch(&mut self) {
         self.epoch = fresh_epoch();
+        self.rewinds += 1;
         self.logs.iter_mut().for_each(Log::reset);
     }
 }
 
 impl World {
+    /// The World was taken back to an earlier state as a whole (an Undo or Redo
+    /// step, `scene::undo`): every cursor reads [`Changes::Rebuild`] next. One per
+    /// step, not per entity: each costs every recording log a reset.
+    pub fn rewind_changes(&mut self) {
+        self.changes.new_epoch();
+    }
+
+    /// How many times the change logs were reset ([`World::rewind_changes`], a clear).
+    #[cfg(test)]
+    pub(crate) fn change_rewinds(&self) -> u64 {
+        self.changes.rewinds
+    }
+
     /// Open a cursor on channel `T`: it has read everything up to now.
     pub fn change_cursor<T: Channel>(&mut self) -> Cursor<T> {
         let seen = self.changes.slot::<T>().open();
@@ -172,12 +192,9 @@ impl World {
         ids.map_or(Changes::Rebuild, Changes::Ids)
     }
 
-    /// Channel `T`'s revision: it moves on every stamp, opened or not (`0` for a
-    /// channel never opened, other than [`StaticSet`]).
-    pub fn change_revision<T: Channel>(&self) -> u64 {
-        self.changes
-            .find::<T>()
-            .map_or(0, |at| self.changes.logs[at].revision)
+    /// [`StaticSet`]'s revision, which moves on every stamp: `World::static_revision`.
+    pub(in crate::ecs) fn static_set_revision(&self) -> u64 {
+        self.changes.logs[STATIC].revision
     }
 
     /// Each opened channel's counters, in opening order: how much churn a game makes,
