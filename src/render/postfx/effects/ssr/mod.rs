@@ -7,12 +7,16 @@
 //! It reads three per-view targets (#1526): the velocity target (#1435), for each
 //! pixel's depth, and the two SSR surface targets the opaque pass writes while SSR
 //! runs ([`surface`]): the shading normal, the weight a hit gets and the environment
-//! reflection it replaces. So only a smooth surface reflects, and a hit swaps the sky
-//! or probe reflection for what is on screen (never adding to it). The volume's
-//! `quality` sets the march ([`march`], #1521, #1522). A transparent surface that
-//! opts in traces its own reflection in the transparent pass ([`transparent`], #1570).
+//! reflection it replaces, with the roughness packed in. So a surface smoother than
+//! the volume's `min_smoothness` reflects, and a hit swaps the sky or probe
+//! reflection for what is on screen (never adding to it), read at its GGX lobe's
+//! width from a mip pyramid of the opaque image ([`pyramid`], #1736): glossy SSR, a
+//! rough floor showing a soft reflection. The volume's `quality` sets the march
+//! ([`march`], #1521, #1522). A transparent surface that opts in traces its own
+//! reflection in the transparent pass ([`transparent`], #1570).
 
 pub(crate) mod pass;
+pub(crate) mod pyramid;
 pub(crate) mod surface;
 pub(crate) mod transparent;
 
@@ -74,7 +78,10 @@ pub(crate) fn run(
     let params = post
         .volume
         .filter(|_| ssr_enabled(post, graphics, full))
-        .map(|vc| SsrParams::new(view_proj, eye, march(&vc.ssr, graphics)));
+        .map(|vc| {
+            let m = march(&vc.ssr, graphics);
+            SsrParams::new(view_proj, eye, m, vc.ssr.min_smoothness)
+        });
     let gpu = (&r.device, &r.queue);
     view.post_fx
         .run_ssr(gpu, &r.post_passes.ssr, params, &r.gpu_timer);

@@ -7,13 +7,18 @@
 // It reads three targets of the view's own: the velocity target (#1435) for each
 // pixel's depth along the view axis (`.z`; the sky at `SKY_DEPTH`), and the two SSR
 // surface targets (`lighting/ssr_surface.wgsl`) for its shading normal, the weight a
-// hit gets and the environment reflection the forward pass applied. So only a smooth
-// surface reflects.
+// hit gets, the environment reflection the forward pass applied and its roughness. A
+// surface smoother than the volume's *Minimum Smoothness* reflects, fading in over
+// `ssr_surface::SMOOTHNESS_FADE` (#1736), and reads its hit from the mip pyramid of
+// `t_color` at its GGX lobe's width (`ssr_march::trace`'s cone), so a rough surface
+// shows a soft reflection of what stands on it and a mirror a sharp one.
 //
 // An SSR hit **replaces** the environment reflection the forward pass applied, sky or
 // reflection probe alike, as HDRP's reflection hierarchy does: `pixel − applied +
-// weight × hit`, both already through the pixel's `ao` and fog. A miss leaves the
-// pixel as the forward pass lit it, so SSR never samples the sky itself (#1542).
+// weight × hit`, both already through the pixel's `ao` and fog, blended in by the
+// hit's confidence times the smoothness fade. A miss leaves the pixel as the forward
+// pass lit it, so SSR never samples the sky itself (#1542), and a weak hit falls back
+// to that same probe reflection continuously, with no seam.
 //
 // Running here, not in the post chain, is HDRP's order: the translucents, particles
 // and world canvases blend over the reflected image, so their coverage scales the
@@ -39,10 +44,13 @@ struct SsrParams {
     // x: the march's step count, y: its step length in world units, from the
     // volume's quality (`render::postfx::effects::ssr::march`)
     march: vec4<f32>,
+    // x: the volume's *Minimum Smoothness* (#1736)
+    surface: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> params: SsrParams;
-// A copy of the opaque image, which the pass draws over.
+// A copy of the opaque image, which the pass draws over, with its mip pyramid
+// (`render::postfx::effects::ssr::pyramid`), read through a trilinear sampler.
 @group(0) @binding(1) var t_color: texture_2d<f32>;
 @group(0) @binding(2) var s_color: sampler;
 @group(0) @binding(3) var t_velocity: texture_2d<f32>;
@@ -76,14 +84,24 @@ fn world_at(uv: vec2<f32>, depth: f32, fwd: vec3<f32>) -> vec3<f32> {
     return a + (b - a) * ((depth - da) / (db - da));
 }
 
+// The tangent of the half-angle of the GGX lobe a surface of perceptual `roughness`
+// reflects into: half the lobe's half-vectors lie within `atan(alpha)` of the normal
+// (`alpha = roughness²`, GGX's median), and a reflection turns twice as far, so
+// `tan(2 atan(alpha))`. A mirror's is 0; roughness 0.4's about 0.33 (18°).
+fn cone(roughness: f32) -> f32 {
+    let alpha = min(roughness * roughness, 0.9);
+    return 2.0 * alpha / (1.0 - alpha * alpha);
+}
+
 @fragment
 fn fs_ssr(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let px = vec2<i32>(pos.xy);
     let uv = pos.xy / vec2<f32>(textureDimensions(t_color));
     let s = ssr_surface::decode(textureLoad(t_weight, px, 0), textureLoad(t_applied, px, 0));
     let v = textureLoad(t_velocity, px, 0);
+    let fade = ssr_surface::smoothness_fade(s.roughness, params.surface.x);
     // Rough, unlit or the sky: left as it is.
-    if (!ssr_surface::reflects(s) || v.z >= ssr_march::SKY_DEPTH) {
+    if (!ssr_surface::reflects(s) || fade <= 0.0 || v.z >= ssr_march::SKY_DEPTH) {
         discard;
     }
     let fwd = view_forward();
@@ -91,10 +109,11 @@ fn fs_ssr(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let r = reflect(normalize(world - params.camera_pos.xyz), s.normal);
     let origin = world + s.normal * 0.02;
     let f = ssr_march::Frame(params.view_proj, params.camera_pos.xyz, fwd, vec4<f32>(0.0, 0.0, 1.0, 0.0));
-    let hit = ssr_march::trace(f, t_velocity, t_color, s_color, origin, r, i32(params.march.x), params.march.y);
-    if (hit.w <= 0.0) {
+    let hit = ssr_march::trace(f, t_velocity, t_color, s_color, origin, r, i32(params.march.x), params.march.y, cone(s.roughness));
+    let k = hit.w * fade;
+    if (k <= 0.0) {
         discard;
     }
     let c = textureLoad(t_color, px, 0);
-    return vec4<f32>(max(c.rgb + (s.weight * hit.rgb - s.applied) * hit.w, vec3<f32>(0.0)), c.a);
+    return vec4<f32>(max(c.rgb + (s.weight * hit.rgb - s.applied) * k, vec3<f32>(0.0)), c.a);
 }
