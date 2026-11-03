@@ -6,6 +6,7 @@
 use glam::Vec3;
 
 use super::cone::{Bounds, Cone};
+use super::footprint::{footprint, Footprint};
 use super::grid::AabbCache;
 use super::lists::{fill_lists, Pair};
 use super::{ClusterGrid, LocalLight, CLUSTER_COUNT, GRID, MAX_CLUSTER_LIGHTS, MAX_VISIBLE_LIGHTS};
@@ -168,13 +169,7 @@ fn bin_bounds(
     let mut pairs: Vec<Pair> = Vec::new();
     for c in &candidates {
         let before = pairs.len();
-        let cone = bounds[c.item as usize]
-            .cone
-            .map(|k| k.transformed(grid.view));
-        let reach = budget
-            .lists(c.item)
-            .then(|| listed_box(grid, c, cone.as_ref()));
-        let Some(Some((tiles, slices))) = reach else {
+        let Some((cone, (tiles, slices))) = reach(grid, c, &bounds[c.item as usize], budget) else {
             out.culled += 1;
             continue;
         };
@@ -184,7 +179,7 @@ fn bin_bounds(
                     let cluster = i + GRID[0] * (j + GRID[1] * k);
                     let (lo, hi) = aabbs[cluster as usize];
                     let d2 = c.center.clamp(lo, hi).distance_squared(c.center);
-                    let in_cone = |k: &Cone| k.may_touch((lo + hi) * 0.5, (hi - lo).length() * 0.5);
+                    let in_cone = |k: &Cone| k.may_touch_box(lo, hi);
                     if d2 <= c.radius * c.radius && cone.as_ref().is_none_or(in_cone) {
                         let score = budget.cluster_score(c.item, d2);
                         pairs.push(Pair {
@@ -242,6 +237,22 @@ fn candidate(grid: &ClusterGrid, item: u32, (center, radius): (Vec3, f32)) -> Op
     })
 }
 
+/// A kept candidate's cone in view space and the clusters it may list in, or
+/// `None` when it lists in none: a light that delivers nothing ([`Budget::lists`])
+/// or a cone that misses the view.
+fn reach(
+    grid: &ClusterGrid,
+    c: &Candidate,
+    bounds: &Bounds,
+    budget: &Budget,
+) -> Option<(Option<Cone>, Footprint)> {
+    if !budget.lists(c.item) {
+        return None;
+    }
+    let cone = bounds.cone.map(|k| k.transformed(grid.view));
+    Some((cone, listed_box(grid, c, cone.as_ref())?))
+}
+
 /// The clusters a kept candidate may list in: its sphere's box, cut for a spot to
 /// the box of its cone's bounding sphere (view space, #1712), so it never visits a
 /// cluster its range sphere would not. `None` when the cone's sphere misses the
@@ -257,39 +268,4 @@ fn listed_box(grid: &ClusterGrid, c: &Candidate, cone: Option<&Cone>) -> Option<
     let slices = cut(c.slices, s);
     let empty = tiles.iter().chain([&slices]).any(|r| r[0] > r[1]);
     (!empty).then_some((tiles, slices))
-}
-
-/// A cluster range: the tiles across and up (`[first, last]` each) and the slices.
-type Footprint = ([[u32; 2]; 2], [u32; 2]);
-
-/// The tiles and depth slices a view-space sphere may touch, or
-/// `None` when it lies wholly outside the frustum or has no reach.
-fn footprint(grid: &ClusterGrid, center: Vec3, radius: f32) -> Option<Footprint> {
-    if radius.is_nan() || radius <= 0.0 {
-        return None;
-    }
-    let depth = -center.z;
-    if depth + radius < grid.near || depth - radius > grid.far {
-        return None;
-    }
-    let (mut lo, mut hi) = (glam::Vec2::splat(f32::MAX), glam::Vec2::splat(f32::MIN));
-    for corner in 0..8 {
-        let sign = |bit: u32| if corner & bit == 0 { -1.0 } else { 1.0 };
-        let p = center + Vec3::new(sign(1), sign(2), sign(4)) * radius;
-        let ndc = grid.ndc(p);
-        (lo, hi) = (lo.min(ndc), hi.max(ndc));
-    }
-    if hi.x < -1.0 || hi.y < -1.0 || lo.x > 1.0 || lo.y > 1.0 {
-        return None;
-    }
-    let tile =
-        |ndc: f32, n: u32| (((ndc * 0.5 + 0.5) * n as f32).floor().max(0.0) as u32).min(n - 1);
-    let slice = |d: f32| (grid.slice_of(d).floor().max(0.0) as u32).min(GRID[2] - 1);
-    Some((
-        [
-            [tile(lo.x, GRID[0]), tile(hi.x, GRID[0])],
-            [tile(lo.y, GRID[1]), tile(hi.y, GRID[1])],
-        ],
-        [slice(depth - radius), slice((depth + radius).min(grid.far))],
-    ))
 }

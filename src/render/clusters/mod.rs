@@ -29,6 +29,7 @@
 
 mod bin;
 mod cone;
+mod footprint;
 mod gpu;
 mod grid;
 mod lights;

@@ -49,6 +49,12 @@ impl Cone {
         }
     }
 
+    /// Whether the cone may reach the box `lo..hi` (conservative): [`Self::may_touch`]
+    /// on the box's bounding sphere. The binner tests the range sphere itself.
+    pub(crate) fn may_touch_box(&self, lo: Vec3, hi: Vec3) -> bool {
+        self.may_touch((lo + hi) * 0.5, (hi - lo).length() * 0.5)
+    }
+
     /// The cone moved by the rigid `view` transform.
     pub(crate) fn transformed(&self, view: Mat4) -> Self {
         Self {
