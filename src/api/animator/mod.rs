@@ -42,7 +42,7 @@ pub fn register<'scope>(
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_play(scope, &table, scene, console)?;
+    register_play(scope, &table, scene)?;
     register_stop(scope, &table, scene)?;
     register_pause_resume(scope, &table, scene)?;
     register_set_looping(scope, &table, scene)?;
@@ -60,28 +60,21 @@ pub fn register<'scope>(
 }
 
 /// `Play` / `Crossfade` — start a clip (crossfade simplifies to a plain play).
+/// A normal play logs nothing, as Unity's does (#1718): a weapon restarting its
+/// fire clip 20 times a second would flood the console. A missing clip is a
+/// silent no-op; `PlayAnimation` is the call that reports one.
 fn register_play<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,
     scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
 ) -> Reg {
     put(
         table,
         "Play",
         scope.create_function(|_, (id, clip): (EntityArg, String)| {
             let id = id.live("Animator", "Play")?;
-            let mut scene = scene.borrow_mut();
-            let played = scene
-                .world
-                .animator_mut(id)
-                .map(|mut anim| anim.play(clip.clone()))
-                .is_some();
-            if played {
-                let name = scene.world.name(id).map(|n| n.clone()).unwrap_or_default();
-                console
-                    .borrow_mut()
-                    .info(format!("Entity {} playing animation: {}", name, clip));
+            if let Some(mut anim) = scene.borrow_mut().world.animator_mut(id) {
+                anim.play(clip);
             }
             Ok(())
         }),
