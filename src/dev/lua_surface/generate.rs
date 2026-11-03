@@ -97,18 +97,20 @@ pub(super) fn register<'scope>(
     put(
         &table,
         "SetSettings",
-        scope.create_function(move |_, t: Table| {
-            let overrides = Overrides::from_table(&t)?;
-            let diffuse = diffuse_model(&t)?;
-            let mut scene = scene.borrow_mut();
-            if let Some(model) = diffuse {
-                scene.lighting_settings.diffuse_model = model;
-            }
-            let s = &mut scene.lighting_settings.lightmaps;
-            *s = overrides.apply(*s);
-            set_reflections(&t, &mut scene.lighting_settings.reflections)
-        }),
+        scope.create_function(move |_, t: Table| set_settings(&mut scene.borrow_mut(), &t)),
     )
+}
+
+/// `SetSettings{…}`: the fields `t` names written into the scene's settings, each
+/// clamped; an unknown diffuse model refuses the whole call.
+fn set_settings(scene: &mut crate::scene::Scene, t: &Table) -> mlua::Result<()> {
+    let overrides = Overrides::from_table(t)?;
+    if let Some(model) = diffuse_model(t)? {
+        scene.lighting_settings.diffuse_model = model;
+    }
+    let s = &mut scene.lighting_settings.lightmaps;
+    *s = overrides.apply(*s);
+    set_reflections(t, &mut scene.lighting_settings.reflections)
 }
 
 /// The diffuse model `t` names (#1698), if any; an unknown name is an error.
