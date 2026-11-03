@@ -4,8 +4,8 @@
 
 use super::chain::{BloomParams, BloomTargets};
 use crate::components::Bloom;
-use crate::render::postfx::{PostFx, HDR_FORMAT};
-use crate::render::readback;
+use crate::render::postfx::{PfxTarget, PostFx, HDR_FORMAT};
+use crate::render::{readback, Renderer};
 
 const SIDE: u32 = 16;
 /// Half-float bits: +inf, a quiet NaN, −inf and 10.0.
@@ -19,25 +19,22 @@ fn finite_non_negative(bits: u16) -> bool {
     bits & 0x7c00 != 0x7c00 && (bits & 0x8000 == 0 || bits == 0x8000)
 }
 
-#[test]
-fn gpu_nan_and_inf_never_reach_the_result() {
-    let Some(r) = crate::render::test_gpu::headless_or_skip(SIDE, SIDE) else {
-        return;
-    };
-    let device = &r.device;
-    let scene = PostFx::target(device, SIDE, SIDE, "Bloom Test Scene", HDR_FORMAT);
+/// A black `SIDE`² HDR scene holding a NaN, a +inf, a −inf and a 10.0 texel, one
+/// near each corner.
+fn scene(r: &Renderer) -> PfxTarget {
+    let scene = PostFx::target(&r.device, SIDE, SIDE, "Bloom Test Scene", HDR_FORMAT);
     let mut texels = vec![0u16; (SIDE * SIDE * 4) as usize];
-    let mut put = |(x, y): (u32, u32), v: u16| {
+    let corners = [
+        ((3, 3), NAN),
+        ((12, 3), INF),
+        ((3, 12), NEG_INF),
+        ((12, 12), TEN),
+    ];
+    for ((x, y), v) in corners {
         let i = ((y * SIDE + x) * 4) as usize;
         texels[i..i + 3].fill(v);
         texels[i + 3] = 0x3c00;
-    };
-    (
-        put((3, 3), NAN),
-        put((12, 3), INF),
-        put((3, 12), NEG_INF),
-        put((12, 12), TEN),
-    );
+    }
     r.queue.write_texture(
         scene.texture.as_image_copy(),
         bytemuck::cast_slice(&texels),
@@ -48,6 +45,16 @@ fn gpu_nan_and_inf_never_reach_the_result() {
         },
         scene.texture.size(),
     );
+    scene
+}
+
+#[test]
+fn gpu_nan_and_inf_never_reach_the_result() {
+    let Some(r) = crate::render::test_gpu::headless_or_skip(SIDE, SIDE) else {
+        return;
+    };
+    let device = &r.device;
+    let scene = scene(&r);
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
         mag_filter: wgpu::FilterMode::Linear,
         min_filter: wgpu::FilterMode::Linear,
