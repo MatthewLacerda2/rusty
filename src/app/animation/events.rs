@@ -8,8 +8,10 @@
 //! still (speed 0) fires nothing. Which markers count:
 //! - only the **current** motion's: a motion being faded out by a crossfade is
 //!   silent (the one coming in fires from its first frame);
-//! - in a blend tree, only the **dominant** child's — the highest weight, the
-//!   first authored on a tie — so a walk/run blend plays one footstep, not two;
+//! - in a blend tree, only the **dominant** leaf clip's — the highest weight
+//!   over the whole tree, nested trees included (#1746), the first depth-first
+//!   on a tie — so a walk/run blend plays one footstep, not two, and a clip
+//!   reached by two paths never fires twice;
 //! - on an extra layer, only while its weight is above 0;
 //! - plus the automatic [`END_EVENT`] when a non-looping motion reaches its end
 //!   playing forwards: once per pass, since its playhead clamps there (#1362),
@@ -22,7 +24,7 @@
 
 use crate::components::{Bounds, Motion, Playback, Playhead, Step};
 
-use super::blend_tree::tree_weights;
+use super::blend_tree::{for_each_leaf, Leaf};
 use super::motion::MotionContext;
 
 /// The automatic event a non-looping clip (or blend tree) fires when its playhead
@@ -96,7 +98,7 @@ impl MotionContext<'_> {
     }
 
     /// The current motion's markers in playhead units: a clip node's events in
-    /// seconds; a blend tree's dominant child's, normalized by its clip length.
+    /// seconds; a blend tree's dominant leaf's, normalized by its clip length.
     fn marks(&self, playback: &Playback) -> Vec<(f32, &str)> {
         let Some(machine) = self.machine else {
             return Vec::new();
@@ -113,22 +115,20 @@ impl MotionContext<'_> {
                 let Some(tree) = machine.node(node).and_then(|n| n.blend_tree.as_ref()) else {
                     return Vec::new();
                 };
-                let weights = tree_weights(tree, self.parameters);
-                let dominant = weights.iter().enumerate().filter(|&(_, &w)| w > 0.0).fold(
-                    None,
-                    |best: Option<(usize, f32)>, (i, &w)| match best {
-                        Some((_, b)) if b >= w => best,
-                        _ => Some((i, w)),
-                    },
-                );
-                let Some((i, _)) = dominant else {
+                let mut dominant: Option<Leaf> = None;
+                for_each_leaf(tree, self.parameters, &mut |leaf| {
+                    if dominant.is_none_or(|d| leaf.weight > d.weight) {
+                        dominant = Some(leaf);
+                    }
+                });
+                let Some(leaf) = dominant else {
                     return Vec::new();
                 };
-                let length = self.clip(tree.clips()[i]).map_or(0.0, |c| c.duration);
+                let length = self.clip(leaf.clip).map_or(0.0, |c| c.duration);
                 if length <= 0.0 {
                     return Vec::new();
                 }
-                tree.child_events()[i]
+                leaf.events
                     .iter()
                     .map(|e| (e.time / length, e.name.as_str()))
                     .collect()

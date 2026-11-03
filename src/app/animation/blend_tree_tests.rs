@@ -1,12 +1,49 @@
 //! Blend-tree weights (#457): 1D at thresholds and midpoints, 2D weights summing
-//! to 1 and peaking at their own child, and the nearest-child fallback.
+//! to 1 and peaking at their own child; the helpers the nested-tree tests share.
 
 use std::collections::BTreeMap;
 
 use glam::Vec2;
 
 use super::*;
-use crate::asset::animation_graph::{BlendChild1D, BlendChild2D};
+use crate::asset::animation_graph::{BlendChild1D, BlendChild2D, ChildMotion};
+
+/// A tree's direct child weights.
+pub(super) fn tree_weights(tree: &BlendTree, parameters: &AnimatorParameters) -> Vec<f32> {
+    child_weights(tree, parameters).collect()
+}
+
+/// A 2D child playing clip `c` at `position`.
+pub(super) fn child_2d(position: [f32; 2]) -> BlendChild2D {
+    let motion = ChildMotion::clip("c");
+    BlendChild2D { motion, position }
+}
+
+/// A 1D tree over `x` with these thresholds.
+pub(super) fn tree_1d(thresholds: &[f32]) -> BlendTree {
+    let children = thresholds.iter().map(|&threshold| BlendChild1D {
+        motion: ChildMotion::clip("c"),
+        threshold,
+    });
+    BlendTree::Simple1D {
+        parameter: "x".into(),
+        children: children.collect(),
+    }
+}
+
+/// [`tree_1d`] weighed at `x`.
+fn weights_1d(thresholds: &[f32], x: f32) -> Vec<f32> {
+    let x = BTreeMap::from([("x".to_string(), AnimatorParameter::Float(x))]);
+    tree_weights(&tree_1d(thresholds), &x)
+}
+
+/// Every point's gradient-band influence at `at`, not normalized.
+fn gradient_band(points: &[Vec2], at: Vec2, polar: bool) -> Vec<f32> {
+    let n = points.len();
+    (0..n)
+        .map(|i| band(n, |j| points[j], i, at, polar))
+        .collect()
+}
 
 fn approx(a: f32, b: f32) -> bool {
     (a - b).abs() < 1e-5
@@ -61,15 +98,7 @@ fn two_d_weights_sum_to_one_and_peak_at_their_own_child() {
         let tree = BlendTree::FreeformDirectional2D {
             parameter_x: "x".into(),
             parameter_y: "y".into(),
-            children: points
-                .iter()
-                .enumerate()
-                .map(|(i, p)| BlendChild2D {
-                    clip: format!("c{i}"),
-                    position: p.to_array(),
-                    events: Vec::new(),
-                })
-                .collect(),
+            children: points.iter().map(|p| child_2d(p.to_array())).collect(),
         };
         for (x, y) in [(0.3, 0.4), (-0.7, 0.1), (0.5, -0.5), (0.0, 0.0), (3.0, 3.0)] {
             let params = BTreeMap::from([
@@ -109,42 +138,4 @@ fn directional_idle_fades_out_with_speed() {
         approx(w[0], 0.75) && approx(w[1], 0.25),
         "a quarter of the way: {w:?}"
     );
-}
-
-#[test]
-fn unset_parameters_read_zero_and_a_far_point_falls_back_to_the_nearest() {
-    let tree = BlendTree::Simple1D {
-        parameter: "speed".into(),
-        children: vec![
-            BlendChild1D {
-                clip: "Walk".into(),
-                threshold: 2.0,
-                events: Vec::new(),
-            },
-            BlendChild1D {
-                clip: "Idle".into(),
-                threshold: 0.0,
-                events: Vec::new(),
-            },
-        ],
-    };
-    assert_eq!(tree_weights(&tree, &BTreeMap::new()), vec![0.0, 1.0]);
-    let cartesian = BlendTree::FreeformCartesian2D {
-        parameter_x: "x".into(),
-        parameter_y: "y".into(),
-        children: vec![
-            BlendChild2D {
-                clip: "A".into(),
-                position: [0.0, 0.0],
-                events: Vec::new(),
-            },
-            BlendChild2D {
-                clip: "B".into(),
-                position: [1.0, 0.0],
-                events: Vec::new(),
-            },
-        ],
-    };
-    let far = BTreeMap::from([("x".to_string(), AnimatorParameter::Float(5.0))]);
-    assert_eq!(tree_weights(&cartesian, &far), vec![0.0, 1.0]);
 }

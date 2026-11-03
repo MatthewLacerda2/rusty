@@ -68,12 +68,13 @@ path + active state are saved with the entity.
 ### Blend trees (#457)
 
 A graph node can play a **blend tree** instead of one clip: several clips at
-once, weighted by one or two `Float` parameters. Scripts only set the
+once, weighted by one or two `Float` parameters. A child can itself be a
+blend tree (see *Nested trees* below). Scripts only set the
 parameters (`Animator.SetFloat(id, "speed", v)`); the weights follow each fixed
-step. The children play **phase-synced**: one shared normalized time, each child
+step. The clips play **phase-synced**: one shared normalized time, each clip
 sampled at that fraction of its own length, so a walk and a run blended together
 keep their feet in step. The tree's cycle length is the weight-averaged length
-of its children.
+of its clips.
 
 | Kind | Reads | Weights |
 |---|---|---|
@@ -96,7 +97,40 @@ The weights always sum to 1. A parameter that is unset reads 0.
 
 A node has a `clip` or a `blend_tree`, never both. The graph refuses to load
 when a tree reads a parameter that isn't a declared `Float`, has no children, or
-puts two children on the same point. Nested trees are not supported.
+puts two children on the same point.
+
+#### Nested trees (#1746)
+
+A child holds a `clip` **or** a `blend_tree`, exactly one, in any of the three
+kinds; a nested tree may read different parameters from its parent's (Unity's
+nested `BlendTree` children). Here each direction of a strafe tree is itself a
+walk→run tree by `speed`:
+
+```json
+{ "name": "Locomotion", "is_loop": true,
+  "blend_tree": { "FreeformDirectional2D": {
+    "parameter_x": "velX", "parameter_y": "velZ",
+    "children": [
+      { "position": [0, 1], "blend_tree": { "Simple1D": { "parameter": "speed",
+          "children": [ { "clip": "WalkFwd", "threshold": 2 },
+                        { "clip": "RunFwd",  "threshold": 6 } ] } } },
+      { "position": [0, -1], "clip": "WalkBack" },
+      { "position": [-1, 0], "clip": "StrafeLeft" },
+      { "position": [1, 0],  "clip": "StrafeRight" } ] } } }
+```
+
+- **Weights multiply down the tree**: a clip's weight is the product of the
+  weights on its path, so the clips' weights still sum to 1. A child at weight 0
+  is skipped with its whole subtree.
+- **One phase for every clip**: the whole tree shares one normalized time, and
+  its cycle length is the weight-averaged length of all its clips, at any depth.
+- **Loading checks every level**, naming the tree's path in the error
+  (`blend tree 'Locomotion/children[0]' reads 'speed', which is not a declared
+  Float parameter`): undeclared parameters, empty trees, duplicate points, a
+  child with both or neither of `clip` and `blend_tree`, and events on a child
+  holding a tree.
+- Trees nest at most **8 deep**, the node's own tree included. A tree holds its
+  children by value, so a graph cannot loop back on itself.
 
 ### Layers and avatar masks (#457)
 
@@ -150,8 +184,8 @@ on an attack clip's fire frame, a melee window opening and closing: gameplay
 lands on the frame the animation shows, not on a timer that drifts from it.
 
 glTF can't carry events, so they are authored on the **graph**: a clip node's
-`events`, and each blend-tree child's own (a blend-tree node carries none of its
-own). `time` is in the clip's own seconds, whatever the playback speed.
+`events`, and each blend-tree clip child's own (a blend-tree node, or a child
+holding a nested tree, carries none of its own). `time` is in the clip's own seconds, whatever the playback speed.
 
 ```json
 { "name": "Reload", "clip": "RifleReload",
@@ -196,9 +230,10 @@ starts:
 
 - During a crossfade, the motion being **faded out is silent**; the one coming
   in fires from its first frame: a transition hands the events over.
-- In a **blend tree**, only the **dominant child** fires — the highest weight,
-  the first authored on a tie — so a walk/run blend plays one set of footsteps,
-  not two. Put the same marker names on each child.
+- In a **blend tree**, only the **dominant clip** fires — the highest weight
+  over the whole tree, nested trees included, the first depth-first on a tie —
+  so a walk/run blend plays one set of footsteps, not two, and a clip reached
+  by two paths never fires twice. Put the same marker names on each child.
 - **Extra layers** fire too, while their weight is above 0 (an upper-body
   reload layer fires `MagIn`); a layer at weight 0 is silent.
 
