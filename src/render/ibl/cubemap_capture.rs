@@ -98,23 +98,25 @@ impl Renderer {
     }
 
     /// Like [`Renderer::capture_static_cubemap`], through a reflection probe's `lens`:
-    /// its clip planes, and shadows or none (#1584).
+    /// its clip planes, and shadows or none (#1584). It also returns, per face, the
+    /// texels nothing covered, where the sky is drawn: the bake projects its stored
+    /// irradiance with the ambient there instead, as a light probe's (#1697).
     pub fn capture_reflection_cubemap(
         &mut self,
         scene: &Scene,
         position: Vec3,
         resolution: u32,
         lens: CaptureLens,
-    ) -> CubemapCapture {
+    ) -> (CubemapCapture, [Vec<bool>; 6]) {
         let sky = CaptureSky::Reflection(lens);
         self.capture_static_cubemap_inner(scene, position, resolution, sky)
-            .0
     }
 
     /// Shared capture spine: render the static scene into a 6-face cubemap from
-    /// `position`, the sky drawn or not as `sky` says. A light-probe capture also returns, per face, which
-    /// texels nothing covered (their depth is the cleared far plane): the directions
-    /// that escape the scene, where `probe::capture` adds the ambient.
+    /// `position`, the sky drawn or not as `sky` says. A light-probe or reflection
+    /// capture also returns, per face, which texels nothing covered (their depth is
+    /// the cleared far plane): the directions that escape the scene, where the
+    /// projection adds the ambient (`probe::bake::project_light_probe`).
     pub(crate) fn capture_static_cubemap_inner(
         &mut self,
         scene: &Scene,
@@ -147,7 +149,7 @@ impl Renderer {
             let bytes = read_texture_bytes(&self.device, &self.queue, hdr, size, 8);
             let mut pixels = decode_half_texels(&bytes);
             mirror_rows(&mut pixels, resolution);
-            if self.capture.ambient_sky {
+            if sky.reads_open() {
                 open[face as usize] = self.read_open_texels(&render_view, resolution);
             }
             pixels
@@ -243,6 +245,12 @@ impl CaptureSky {
             shadows: self.lens().shadows,
             ambient_sky: matches!(self, Self::Ambient { .. }),
         }
+    }
+
+    /// Whether the capture reads which texels nothing covered: a light probe's and
+    /// a reflection probe's do (their bakes add the ambient there, #1668, #1697).
+    fn reads_open(self) -> bool {
+        !matches!(self, Self::Drawn)
     }
 
     fn lens(self) -> CaptureLens {

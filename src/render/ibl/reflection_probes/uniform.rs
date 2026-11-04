@@ -67,6 +67,31 @@ pub(crate) fn luminance_sh(sh: Sh9) -> [[f32; 4]; 3] {
     ]
 }
 
+/// The CPU mirror of the forward shader's `probe_normalisation`
+/// (`engine/shaders/forward/reflection.wgsl`, #1697), for the tests: the scale a
+/// probe storing `packed` ([`luminance_sh`]) gives a pixel whose baked diffuse along
+/// `n` has luminance `baked` (E / pi). `uniform_tests` holds its constants to the
+/// shader's.
+#[cfg(test)]
+pub(crate) fn normalisation(packed: [[f32; 4]; 3], n: glam::Vec3, baked: f32) -> f32 {
+    let flat = packed.as_flattened();
+    let sh = Sh9 {
+        coeffs: std::array::from_fn(|i| [flat[i]; 3]),
+    };
+    let stored = sh.eval_radiance(n).x;
+    let stored = stored.max(flat[0] * SH_C0 * STORED_FLOOR);
+    ((baked + NORMALISE_BIAS) / (stored + NORMALISE_BIAS)).clamp(0.0, 1.0)
+}
+
+/// The shader's constants `normalisation` mirrors.
+#[cfg(test)]
+pub(crate) const STORED_FLOOR: f32 = 0.25;
+#[cfg(test)]
+pub(crate) const NORMALISE_BIAS: f32 = 0.001;
+/// The constant SH basis function, `sh_basis`'s `b[0]`.
+#[cfg(test)]
+const SH_C0: f32 = 0.282_094_8;
+
 #[cfg(test)]
 #[path = "uniform_tests.rs"]
 mod uniform_tests;

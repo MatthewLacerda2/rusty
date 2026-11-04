@@ -29,23 +29,24 @@ fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, N: vec3<f32>, 
         return vec3<f32>(0.0);
     }
     let R = normalize(raw_r);
+    let b = sh_basis(N);
     let first = blend & 63u;
     let second = (blend >> 6u) & 63u;
     let first_weight = f32((blend >> 12u) & 1023u) / 1023.0;
     let second_weight = f32((blend >> 22u) & 1023u) / 1023.0;
     var out = vec3<f32>(0.0);
     if (first > 0u) {
-        out += probe_reflection(lighting.refl_probes[first - 1u], world_pos, R, N, roughness, baked) * first_weight;
+        out += probe_reflection(lighting.refl_probes[first - 1u], world_pos, R, b, roughness, baked) * first_weight;
     }
     if (second > 0u) {
-        out += probe_reflection(lighting.refl_probes[second - 1u], world_pos, R, N, roughness, baked) * second_weight;
+        out += probe_reflection(lighting.refl_probes[second - 1u], world_pos, R, b, roughness, baked) * second_weight;
     }
     let rest = select(1.0, max(1.0 - first_weight - second_weight, 0.0), first > 0u);
     if (rest > 0.002) {
         // The scene's fallback probe (#1697) takes what the sky took: it is always
         // resident, in slot 0, so this branch is uniform.
         if (lighting.refl_probes[0].params.z > 0.5) {
-            out += probe_reflection(lighting.refl_probes[0], world_pos, R, N, roughness, baked) * rest;
+            out += probe_reflection(lighting.refl_probes[0], world_pos, R, b, roughness, baked) * rest;
         } else {
             out += sky_reflection(R, roughness) * rest;
         }
@@ -54,34 +55,40 @@ fn environment_reflection(world_pos: vec3<f32>, raw_r: vec3<f32>, N: vec3<f32>, 
 }
 
 // One resident probe's reflection along `R`, normalised by the baked diffuse at the
-// pixel (`probe_normalisation`).
-fn probe_reflection(p: ReflectionProbe, world_pos: vec3<f32>, R: vec3<f32>, N: vec3<f32>, roughness: f32, baked: vec2<f32>) -> vec3<f32> {
+// pixel (`probe_normalisation`; `b` is the SH basis along the normal).
+fn probe_reflection(p: ReflectionProbe, world_pos: vec3<f32>, R: vec3<f32>, b: array<f32, 9>, roughness: f32, baked: vec2<f32>) -> vec3<f32> {
     let dir = select(R, parallax_correct(p, world_pos, R), p.params.y > 0.5);
     let lod = p.mip_base + roughness * (p.mip_count - 1.0);
     let cube = textureSampleLevel(t_refl_cube, s_refl_cube, dir, p.layer, lod).rgb;
-    return cube * p.params.x * probe_normalisation(p, N, baked);
+    return cube * p.params.x * probe_normalisation(p, b, baked);
 }
 
 // Probe normalisation (#1697; UE's lightmap mixing, Frostbite's and Call of Duty's
 // probe normalisation): a probe's cube shows its room under the light at its capture
 // point, so a pixel in a corner the lightmap holds dark would reflect the lit room at
 // full strength. Its reflection is scaled by the pixel's baked diffuse over the
-// irradiance the probe stored, both luminance as E / pi along `N`, held to
-// [0, NORMALISE_MAX]. `baked` is `baked_diffuse`'s: a pixel with no lightmap or light
-// probe, or a probe baked without the irradiance (`params.w`, also 0 in every bake
-// capture), scales by 1. The floor keeps a probe that stored no light from
-// dividing by zero: what it reflects is black anyway.
-const NORMALISE_MAX: f32 = 1.5;
-const NORMALISE_FLOOR: f32 = 1e-4;
-fn probe_normalisation(p: ReflectionProbe, N: vec3<f32>, baked: vec2<f32>) -> f32 {
+// irradiance the probe stored (`b` is `sh_basis(N)`), both luminance as E / pi along
+// `N`, held to [0, 1]: it removes leaks and never brightens, so a floor lit brighter
+// than the bounce light the probe saw keeps its reflection at 1x. `baked` is
+// `baked_diffuse`'s: a pixel with no lightmap or light probe, or a probe baked without
+// the irradiance (`params.w`, also 0 in every bake capture), scales by 1.
+// `stored` is floored at STORED_FLOOR of the probe's mean (its constant term): an L2
+// SH of one dominant lamp rings below zero for normals turned 104-145 degrees from
+// it, and that says nothing about what the cube shows along R. Both sides add
+// NORMALISE_BIAS, so where neither holds any light (a sky probe under zero ambient
+// over an unlit floor) the scale is 1, not 0 / 0. `uniform::normalisation` mirrors
+// this on the CPU for the tests, constants included.
+const STORED_FLOOR: f32 = 0.25;
+const NORMALISE_BIAS: f32 = 0.001;
+fn probe_normalisation(p: ReflectionProbe, b: array<f32, 9>, baked: vec2<f32>) -> f32 {
     if (p.params.w < 0.5 || baked.y < 0.5) {
         return 1.0;
     }
-    let b = sh_basis(N);
     let stored = dot(p.irradiance[0], vec4<f32>(b[0], b[1], b[2], b[3]))
         + dot(p.irradiance[1], vec4<f32>(b[4], b[5], b[6], b[7]))
         + p.irradiance[2].x * b[8];
-    return clamp(baked.x / max(stored, NORMALISE_FLOOR), 0.0, NORMALISE_MAX);
+    let floor = p.irradiance[0].x * b[0] * STORED_FLOOR;
+    return saturate((baked.x + NORMALISE_BIAS) / (max(stored, floor) + NORMALISE_BIAS));
 }
 
 // What `probe_normalisation` compares with: the luminance of the pixel's baked

@@ -36,7 +36,7 @@ mod frame;
 mod gpu;
 mod pack;
 pub(crate) mod slots;
-mod uniform;
+pub(crate) mod uniform;
 
 use std::collections::HashMap;
 

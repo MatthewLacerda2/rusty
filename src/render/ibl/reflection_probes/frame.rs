@@ -16,7 +16,8 @@ impl Renderer {
     /// [`SPARE_SLOTS`], stays within the scene's budget
     /// (`LightingSettings::reflections`, #1584): a cube that would put it past the
     /// budget is passed over, and nearer ones that fit are still taken, so one big
-    /// cube never empties the set; the nearest is always taken, whatever its size.
+    /// cube never empties the set; the nearest is always taken, whatever its size,
+    /// and so is the scene's fallback probe (#1697).
     /// A cube is judged by its KTX2 header ([`read_cube_shape`]), read once per path,
     /// and none is read at all once the array is full; only the cubes the array must
     /// copy in are read whole, and dropped once copied. Cubes that don't fit the
@@ -24,7 +25,7 @@ impl Renderer {
     /// depends on the camera's distance to each box; only ties are broken by scene
     /// index, and the residents are handed over in scene order, so two runs from one
     /// camera agree. The scene's fallback probe (#1697) is ranked first, so it is
-    /// always taken, and handed over first, so it is slot 0. A cube that fails to load is refused until it is re-written, and
+    /// resident wherever the camera is, and handed over first, so it is slot 0. A cube that fails to load is refused until it is re-written, and
     /// the frame's probes are chosen again without it, so no slot is bound to what it
     /// held before (#1609).
     pub(crate) fn update_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) {
@@ -37,7 +38,7 @@ impl Renderer {
     fn place_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) -> bool {
         let probes = &scene.reflection_probes.probes;
         let budget = scene.lighting_settings.reflections.budget_bytes();
-        let mut wanted = Vec::new();
+        let mut wanted: Vec<(usize, CubeShape)> = Vec::new();
         let (mut face, mut paths) = (0, Vec::new());
         for i in ranked(probes, camera_pos) {
             if wanted.len() == MAX_REFLECTION_PROBES {
@@ -45,7 +46,10 @@ impl Renderer {
             }
             let path = probes[i].cubemap_path.as_str();
             let cubes = paths.len() + usize::from(!paths.contains(&path)) + SPARE_SLOTS;
-            let over = |size: u32| !paths.is_empty() && array_bytes(face.max(size), cubes) > budget;
+            // Exempt from the budget until the nearest probe is taken: the fallback
+            // first, if any, never evicts the camera's own room's probe (#1697).
+            let exempt = wanted.iter().all(|&(j, _)| probes[j].fallback);
+            let over = |size: u32| !exempt && array_bytes(face.max(size), cubes) > budget;
             if over(0) {
                 continue; // full: no cube is read
             }
@@ -132,8 +136,9 @@ fn push_new<'a>(mut paths: Vec<&'a str>, path: &'a str) -> Vec<&'a str> {
     paths
 }
 
-/// The indices of the baked probes, the fallback first (#1697: the first is always
-/// taken, so it stays resident wherever the camera is), then nearest box to
+/// The indices of the baked probes, the fallback first (#1697: it and the nearest
+/// after it are taken whatever the budget, so it stays resident wherever the camera
+/// is), then nearest box to
 /// `camera_pos` first (zero inside it), ties to the lower scene index, so the order
 /// is the same every run.
 pub(super) fn ranked(probes: &[ReflectionProbe], camera_pos: Vec3) -> Vec<usize> {
@@ -161,3 +166,7 @@ mod budget_tests;
 #[cfg(test)]
 #[path = "refuse_tests.rs"]
 mod refuse_tests;
+
+#[cfg(test)]
+#[path = "fallback_tests.rs"]
+mod fallback_tests;

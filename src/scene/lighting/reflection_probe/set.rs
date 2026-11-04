@@ -54,9 +54,14 @@ impl ReflectionProbeSet {
         }
     }
 
-    /// Point probe `index` at a baked cubemap path (no-op if out of range).
+    /// Point probe `index` at a baked cubemap path (no-op if out of range). The
+    /// irradiance stored for its old cube is dropped (#1697): a new cube is not
+    /// normalised by the old one's light. A bake stores the new cube's after this.
     pub fn set_cubemap(&mut self, index: usize, path: String) {
         if let Some(p) = self.probes.get_mut(index) {
+            if p.cubemap_path != path {
+                p.irradiance = None;
+            }
             p.cubemap_path = path;
         }
     }
@@ -122,9 +127,11 @@ impl ReflectionProbeSet {
 
 /// `p`'s settings held to their ranges, its box corners in order, and a stored
 /// irradiance with a non-finite coefficient (a damaged file) dropped, so the probe
-/// scales by 1 rather than shading NaN.
+/// scales by 1 rather than shading NaN. The fallback stays manual (#1697), so no
+/// edit that unticks *Manual* lets a bake's auto-placement delete it.
 fn hold(p: &mut ReflectionProbe) {
     p.clamp_settings();
+    p.manual |= p.fallback;
     if p.irradiance
         .is_some_and(|sh| sh.coeffs.as_flattened().iter().any(|c| !c.is_finite()))
     {

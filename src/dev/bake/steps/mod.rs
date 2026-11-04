@@ -208,7 +208,7 @@ impl LightingBake {
             let live = scene.reflection_probes.probes.get(from).cloned();
             reflections.probes[i] = live.ok_or(PROBES_CHANGED)?;
         }
-        self.staged.commit(scene, &mut reflections)?;
+        self.staged.commit(&mut reflections)?;
         // A reflection bake that ran leaves only its own cubes in the scene's folder.
         if let (true, Some(path)) = (self.report.ran_reflection_bake, self.scene_path.as_deref()) {
             prune_stale(&reflection_dir(path), self.staged.len())?;

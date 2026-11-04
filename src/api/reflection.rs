@@ -251,6 +251,10 @@ fn write_fields(p: &mut ReflectionProbe, t: &Table) -> mlua::Result<()> {
         p.box_max = v;
     }
     if let Some(v) = t.get::<Option<String>>("cubemap")? {
+        // A new cube drops the old one's stored irradiance (#1697).
+        if v != p.cubemap_path {
+            p.irradiance = None;
+        }
         p.cubemap_path = v;
     }
     if let Some(v) = t.get::<Option<u32>>("resolution")? {

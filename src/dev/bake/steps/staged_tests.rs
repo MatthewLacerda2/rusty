@@ -6,7 +6,7 @@ use glam::Vec3;
 use super::staged::StagedCubemaps;
 use crate::render::ibl::reflection_bake::BakedCube;
 use crate::scene::lighting::sh::Sh9;
-use crate::scene::{ReflectionProbeSet, Scene};
+use crate::scene::ReflectionProbeSet;
 
 #[test]
 fn a_failed_move_touches_no_probe_and_a_retry_resumes() {
@@ -28,14 +28,10 @@ fn a_failed_move_touches_no_probe_and_a_retry_resumes() {
         set.add(Vec3::ZERO, Vec3::ONE);
     }
     let before = set.clone();
-    let scene = Scene::new();
-    assert!(
-        staged.commit(&scene, &mut set).is_err(),
-        "cube 1 is blocked"
-    );
+    assert!(staged.commit(&mut set).is_err(), "cube 1 is blocked");
     assert_eq!(set.probes, before.probes, "no probe points at a cube yet");
     std::fs::remove_dir_all(&blocked).unwrap();
-    staged.commit(&scene, &mut set).unwrap();
+    staged.commit(&mut set).unwrap();
     for (i, p) in set.probes.iter().enumerate() {
         let want = dir.join(format!("reflection_probe_{i}.ktx2"));
         assert_eq!(p.cubemap_path, want.to_string_lossy());

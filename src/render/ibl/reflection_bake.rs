@@ -25,18 +25,17 @@ use glam::Vec3;
 
 use crate::render::ibl::cubemap_capture::CaptureLens;
 use crate::render::ibl::ktx2_encode::encode_cubemap;
-use crate::render::ibl::probe::bake::project_cubemap;
+use crate::render::ibl::probe::bake::project_light_probe;
+use crate::render::ibl::probe::capture::ProbeCapture;
 use crate::render::ibl::reflection_prefilter::gpu::ProbePrefilter;
 use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
 use crate::render::{CubemapCapture, Renderer};
-use crate::scene::lighting::lightmap::{baked_direct_sh, BakeScene};
 use crate::scene::lighting::reflection_probe::clamp_resolution;
 use crate::scene::lighting::sh::Sh9;
-use crate::scene::{ReflectionProbe, ReflectionProbeSet, Scene};
+use crate::scene::{AmbientRadiance, ReflectionProbe, Scene};
 
-/// One baked reflection probe: its KTX2 cube, and the irradiance that cube gives at
-/// the probe, the cube's own L2 SH ([`project_cubemap`]) before the direct light of
-/// `Baked` lights is added ([`with_baked_direct`]).
+/// One baked reflection probe: its KTX2 cube, and the irradiance it stores beside it
+/// (#1697, [`stored_irradiance`]).
 pub struct BakedCube {
     pub bytes: Vec<u8>,
     pub irradiance: Sh9,
@@ -72,9 +71,10 @@ impl Renderer {
             far: probe.far_clip,
             shadows: probe.shadows,
         };
-        let capture = self.capture_reflection_cubemap(scene, probe.position, resolution, lens);
-        let irradiance = project_cubemap(&capture);
+        let (capture, open) =
+            self.capture_reflection_cubemap(scene, probe.position, resolution, lens);
         let prefiltered = self.prefilter_gpu(&capture);
+        let irradiance = stored_irradiance(capture, open, scene.drawn_ambient().radiance());
         // The mip a fully-rough surface samples (CPU mirror of the shader's selection),
         // logged so a bake's roughness range is visible when debugging a probe.
         log::debug!(
@@ -118,14 +118,9 @@ impl Renderer {
         observe: &mut dyn FnMut(usize, usize),
     ) -> Result<usize, String> {
         let total = scene.reflection_probes.len();
-        let mut cubes = Vec::with_capacity(total);
         for i in 0..total {
             observe(i, total);
-            cubes.push(self.bake_reflection_into(scene, i, out_dir)?);
-        }
-        let irradiance = with_baked_direct(scene, &scene.reflection_probes, &cubes);
-        for (i, sh) in irradiance.into_iter().enumerate() {
-            scene.reflection_probes.set_irradiance(i, sh);
+            self.bake_reflection_into(scene, i, out_dir)?;
         }
         Ok(total)
     }
@@ -134,17 +129,16 @@ impl Renderer {
     /// `out_dir/reflection_probe_<i>.ktx2` and point the probe at it: one probe of
     /// [`Renderer::bake_reflections`]. The editor's stepped bake does not come here: it
     /// steps through `LightingBake::step`, which stages each cube and applies them all
-    /// at the end (#1602). Returns the cube's own irradiance SH, which the caller
-    /// finishes with [`with_baked_direct`] and stores; the probe's stored one is left
-    /// as it was. A probe index past the set bakes nothing (`None`).
+    /// at the end (#1602). The probe stores the cube's irradiance (#1697). A probe
+    /// index past the set bakes nothing.
     fn bake_reflection_into(
         &mut self,
         scene: &mut Scene,
         i: usize,
         out_dir: &Path,
-    ) -> Result<Option<Sh9>, String> {
+    ) -> Result<(), String> {
         let Some(probe) = scene.reflection_probes.probes.get(i).cloned() else {
-            return Ok(None);
+            return Ok(());
         };
         let default = scene.lighting_settings.reflections.resolution;
         let resolution = clamp_resolution(probe.resolution.unwrap_or(default));
@@ -152,36 +146,35 @@ impl Renderer {
         let path = cube_file(out_dir, i);
         crate::core::fs::written::write(&path, &baked.bytes)
             .map_err(|e| format!("Failed to write reflection cubemap {}: {e}", path.display()))?;
-        scene
-            .reflection_probes
-            .set_cubemap(i, path.to_string_lossy().into_owned());
-        Ok(Some(baked.irradiance))
+        let set = &mut scene.reflection_probes;
+        set.set_cubemap(i, path.to_string_lossy().into_owned());
+        set.set_irradiance(i, Some(baked.irradiance));
+        Ok(())
     }
 }
 
-/// The irradiance each probe of `set` stores (#1697): `cubes[i]`, probe `i`'s cube
-/// SH (`None` for one not baked), plus the direct light of `scene`'s `Baked` lights
-/// at its position, shadowed by the static meshes and traced once for every probe
-/// (`baked_direct_sh`). A capture sees lit surfaces, never a light, so without it a
-/// probe beside a `Baked` lamp would store only the lamp's bounce, while the lightmap
-/// and the light probes it is compared with hold its direct light too: the light
-/// probe bake adds it the same way (`probe::bounce`).
-pub fn with_baked_direct(
-    scene: &Scene,
-    set: &ReflectionProbeSet,
-    cubes: &[Option<Sh9>],
-) -> Vec<Option<Sh9>> {
-    let positions: Vec<Vec3> = set.probes.iter().map(|p| p.position).collect();
-    let statics = BakeScene::gather(scene, &|_| None);
-    let direct = baked_direct_sh(&statics, &positions);
-    (cubes.iter().zip(direct))
-        .map(|(cube, direct)| {
-            cube.map(|mut sh| {
-                sh.accumulate(&direct);
-                sh
-            })
-        })
-        .collect()
+/// The irradiance a reflection probe stores beside its cube (#1697): what the
+/// lightmap and a light probe at its position measure, so the forward pass's ratio of
+/// the two compares like with like. A reflection capture draws the sky where nothing
+/// covers a texel (`open`), while the lightmap's escaping rays (`Tracer::sky`) and a
+/// light probe's capture take the scene's ambient there; so those texels are cleared
+/// and the projection adds `ambient` along them, as [`project_light_probe`] does for
+/// a light probe. Glass drawn over the sky is cleared with it: a light probe would
+/// keep it, but it holds a little of a texel the ambient fills anyway. The direct
+/// light of `Baked` lamps is left out: the capture sees what they light, never the
+/// lamps, so the stored value is the bounce light the cube shows, and does not
+/// depend on how near a lamp the probe was placed.
+pub fn stored_irradiance(
+    mut cube: CubemapCapture,
+    open: [Vec<bool>; 6],
+    ambient: AmbientRadiance,
+) -> Sh9 {
+    for (face, open) in cube.faces.iter_mut().zip(&open) {
+        for (texel, _) in face.iter_mut().zip(open).filter(|(_, &o)| o) {
+            *texel = Vec3::ZERO;
+        }
+    }
+    project_light_probe(&ProbeCapture { cube, open }, ambient)
 }
 
 #[cfg(test)]
