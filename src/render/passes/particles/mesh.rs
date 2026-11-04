@@ -70,7 +70,7 @@ impl Renderer {
                 let model = mesh_particle_matrix(p.position, emitter.size_of(p), p.orientation());
                 let (use_sh, sh) = probe_sh_at(scene, p.position);
                 let item = DrawItem {
-                    key: key.clone(),
+                    key,
                     instance: InstanceData {
                         model_matrix: model.to_cols_array(),
                         use_sh,
