@@ -37,14 +37,15 @@ use crate::scene::Scene;
 
 /// Hard cap on bounce iterations. Five passes capture direct light plus four
 /// indirect bounces — well past the point diffuse GI stops visibly changing for the
-/// LDR/SH precision the bake stores; the convergence clamp usually stops it sooner.
+/// SH precision the bake stores; the convergence test usually stops it sooner.
 pub const MAX_BOUNCES: u32 = 5;
 
 /// Early-out threshold on the energy a pass adds, measured as the max absolute
-/// per-coefficient SH delta across every probe (see `field_delta`). A fully white
-/// hemisphere projects to a DC coefficient on the order of a few units, so a pass
-/// that nudges no coefficient by even 1e-3 is below the LDR/8-bit capture's own
-/// noise floor — the next bounce cannot matter, so we stop.
+/// per-coefficient SH delta across every probe (see `field_delta`). An absolute
+/// bound: a fully white hemisphere projects to a DC coefficient of a few units, so a
+/// pass that nudges no coefficient by even 1e-3 cannot matter, and we stop. A bright
+/// field whose static surfaces read the probes (no lightmap) rarely gets that close,
+/// so it runs to [`MAX_BOUNCES`]; lightmapped surfaces don't change between passes.
 pub const CONVERGENCE_EPSILON: f32 = 1.0e-3;
 
 /// Outcome of a multi-bounce bake — the converged SH per probe is written in place on
@@ -149,3 +150,11 @@ mod probe_bounce_tests;
 #[cfg(test)]
 #[path = "modes_tests.rs"]
 mod probe_modes_tests;
+
+#[cfg(test)]
+#[path = "hdr_tests.rs"]
+mod probe_hdr_tests;
+
+#[cfg(test)]
+#[path = "hdr_finite_tests.rs"]
+mod probe_hdr_finite_tests;

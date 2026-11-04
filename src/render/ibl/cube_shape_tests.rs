@@ -11,7 +11,7 @@ fn shape(bytes: &[u8]) -> Option<CubeShape> {
 
 #[test]
 fn the_header_states_the_size_and_mips_of_a_cube_the_loader_accepts() {
-    let bytes = build_cubemap_ktx2(8, R8G8B8A8_SRGB, 6);
+    let bytes = build_cubemap_ktx2(8, R16G16B16A16_SFLOAT, 6);
     assert_eq!(shape(&bytes), Some(CubeShape { size: 8, mips: 1 }));
     assert!(parse_ktx2_cubemap_mips(&bytes).is_ok(), "the loader agrees");
 }
@@ -19,8 +19,8 @@ fn the_header_states_the_size_and_mips_of_a_cube_the_loader_accepts() {
 #[test]
 fn the_header_refuses_what_the_loader_refuses() {
     for bytes in [
-        build_cubemap_ktx2(1, R8G8B8A8_SRGB, 1),
-        build_cubemap_ktx2(1, R16G16B16A16_SFLOAT, 6),
+        build_cubemap_ktx2(1, R16G16B16A16_SFLOAT, 1),
+        build_cubemap_ktx2(1, R8G8B8A8_SRGB, 6),
         vec![0; 80],
     ] {
         assert_eq!(shape(&bytes), None);
@@ -42,7 +42,7 @@ fn gpu_a_cubemap_rebaked_at_a_cached_path_reloads() {
     follows_rebakes(
         &path.to_string_lossy(),
         |p, bake| {
-            let bytes = build_cubemap_ktx2(size(bake), R8G8B8A8_SRGB, 6);
+            let bytes = build_cubemap_ktx2(size(bake), R16G16B16A16_SFLOAT, 6);
             crate::core::fs::written::write(std::path::Path::new(p), &bytes).unwrap();
         },
         |p| {

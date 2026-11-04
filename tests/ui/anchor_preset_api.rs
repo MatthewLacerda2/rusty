@@ -3,6 +3,7 @@
 //! and an unknown name is an error.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Table;
 
@@ -17,7 +18,7 @@ fn rect(lua: &mlua::Lua, id: u32) -> [f32; 4] {
 #[test]
 fn a_preset_reanchors_in_place_and_set_position_snaps() {
     let (scene, _, child) = ui_scene();
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_ui_api(&scene, |lua| {
         let before = rect(lua, child);
         lua.load(format!(

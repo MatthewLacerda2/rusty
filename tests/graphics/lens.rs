@@ -3,8 +3,10 @@
 //! defaults without a volume.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{CameraComponent, ChromaticAberration, FilmGrain, Vignette};
 use rusty::scene::authoring::default_post_processing;
 use rusty::scene::Scene;
@@ -12,14 +14,16 @@ use rusty::scene::Scene;
 /// Run `script` against `scene` with the `Graphics` namespace registered.
 fn run(scene: Scene, script: &str) -> Scene {
     let lua = Lua::new();
-    let (scene, graphics, app) = (RefCell::new(scene), RefCell::default(), RefCell::default());
-    lua.scope(|s| {
-        rusty::api::graphics::register(&lua, s, &scene, &graphics, &app).unwrap();
-        lua.load(script).exec().unwrap();
-        Ok(())
-    })
+    let (scene, graphics, app) = (Rc::new(RefCell::new(scene)), Rc::default(), Rc::default());
+    rusty::api::graphics::register(
+        &lua,
+        bind(&lua, &scene),
+        bind(&lua, &graphics),
+        bind(&lua, &app),
+    )
     .unwrap();
-    scene.into_inner()
+    lua.load(script).exec().unwrap();
+    scene.take()
 }
 
 #[test]
@@ -70,24 +74,29 @@ fn lens_knobs_round_trip_and_clamp() {
 fn without_a_volume_the_getters_report_the_defaults() {
     let lua = Lua::new();
     let (scene, graphics, app) = (
-        RefCell::new(Scene::new()),
-        RefCell::default(),
-        RefCell::default(),
+        Rc::new(RefCell::new(Scene::new())),
+        Rc::default(),
+        Rc::default(),
     );
-    let got: (bool, f32, f32, f32, f32, f32, f32, f32) = lua
-        .scope(|s| {
-            rusty::api::graphics::register(&lua, s, &scene, &graphics, &app).unwrap();
-            lua.load(
-                r#"Graphics.SetVignetteActive(true)
+    let got: (bool, f32, f32, f32, f32, f32, f32, f32) = crate::lua::attempt(|| {
+        rusty::api::graphics::register(
+            &lua,
+            bind(&lua, &scene),
+            bind(&lua, &graphics),
+            bind(&lua, &app),
+        )
+        .unwrap();
+        lua.load(
+            r#"Graphics.SetVignetteActive(true)
                 local x, y = Graphics.GetVignetteCenter()
                 return Graphics.GetVignetteActive(), Graphics.GetVignetteIntensity(),
                     Graphics.GetVignetteSmoothness(), x, y,
                     Graphics.GetChromaticAberrationIntensity(),
                     Graphics.GetFilmGrainIntensity(), Graphics.GetFilmGrainResponse()"#,
-            )
-            .eval()
-        })
-        .unwrap();
+        )
+        .eval()
+    })
+    .unwrap();
     let (v, ca, g) = (
         Vignette::default(),
         ChromaticAberration::default(),

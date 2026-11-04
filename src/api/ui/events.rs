@@ -12,7 +12,7 @@
 use glam::Vec2;
 use mlua::{Lua, Table};
 
-use super::super::{global_table, put, ApiScopedCtx, Reg};
+use super::super::{global_table, put, ApiCell, ApiCtx, Reg};
 use super::view::{pointer, ui_view};
 use crate::api::entity_arg::EntityArg;
 use crate::ecs::World;
@@ -21,37 +21,31 @@ use crate::ui::space::{canvas_to_screen, rect_screen_bounds};
 use crate::ui::{EventSystem, UiLayout, UiRect, UiView};
 
 /// Add the event verbs to the `UI` table [`super::register`] created.
-pub fn register_events<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+pub fn register_events(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let table = &global_table(lua, "UI")?;
     let (scene, input, events) = (ctx.scene, ctx.input, ctx.event_system);
     let (screen, video, camera, physics) = (ctx.screen, ctx.video, ctx.camera, ctx.physics);
-    let view = move || ui_view(screen, video, camera, &scene.borrow());
-    let f = scope.create_function(move |_, id: EntityArg| {
-        events.borrow_mut().set_selected(id.get());
-        Ok(())
-    });
-    put(table, "SetSelected", f)?;
-    let f = scope.create_function(move |_, ()| Ok(events.borrow().selected()));
-    put(table, "GetSelected", f)?;
-    let f = scope.create_function(move |_, ()| Ok(events.borrow().is_pointer_over_ui()));
-    put(table, "IsPointerOverUI", f)?;
-    let f = scope.create_function(move |_, ()| Ok(events.borrow().is_pointer_consumed()));
-    put(table, "IsPointerConsumed", f)?;
-    let f = scope.create_function(move |_, (x, y): (f32, f32)| {
-        let (view, world) = (view(), &scene.borrow().world);
+    let view = move |lua: &Lua| -> mlua::Result<UiView> {
+        let (screen, video, camera) = (screen.get(lua)?, video.get(lua)?, camera.get(lua)?);
+        let scene = scene.get(lua)?;
+        let view = ui_view(&screen, &video, &camera, &scene.borrow());
+        Ok(view)
+    };
+    register_selection(lua, table, events)?;
+    let f = lua.create_function(move |lua, (x, y): (f32, f32)| {
+        let scene = &*scene.get(lua)?;
+        let (view, world) = (view(lua)?, &scene.borrow().world);
         let layout = UiLayout::compute_in(world, &view);
-        let at = pointer(&view, physics, Some(Vec2::new(x, y)));
+        let at = pointer(&view, &*physics.get(lua)?, Some(Vec2::new(x, y)));
         Ok(raycast_pointer(world, &layout, &at))
     });
     put(table, "Raycast", f)?;
-    register_find(scope, table, ctx)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
+    register_find(lua, table, ctx)?;
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let input = &*input.get(lua)?;
         let id = id.live("UI", "Click")?;
-        let (view, world) = (view(), &scene.borrow().world);
+        let scene = &*scene.get(lua)?;
+        let (view, world) = (view(lua)?, &scene.borrow().world);
         let layout = UiLayout::compute_in(world, &view);
         let Some(centre) = layout.get(id).and_then(|r| centre_px(&layout, r, &view)) else {
             return Ok(false);
@@ -59,7 +53,7 @@ pub fn register_events<'scope>(
         let mut input = input.borrow_mut();
         // A locked cursor clicks through the screen centre (world canvases only).
         let locked = input.cursor().locked;
-        let at = pointer(&view, physics, (!locked).then_some(centre));
+        let at = pointer(&view, &*physics.get(lua)?, (!locked).then_some(centre));
         let lands = raycast_pointer(world, &layout, &at).is_some_and(|h| is_under(world, h, id));
         if !locked {
             input.move_mouse(f64::from(centre.x), f64::from(view.screen.y - centre.y));
@@ -71,29 +65,52 @@ pub fn register_events<'scope>(
         Ok(lands)
     });
     put(table, "Click", f)?;
-    let f = scope.create_function(move |lua, ()| {
-        let (view, world) = (view(), &scene.borrow().world);
-        let layout = UiLayout::compute_in(world, &view);
-        list(lua, world, (&layout, &view), &events.borrow())
+    let f = lua.create_function(move |lua, ()| {
+        scene.with(lua, |scene| {
+            let (view, world) = (view(lua)?, &scene.borrow().world);
+            let layout = UiLayout::compute_in(world, &view);
+            list(lua, world, (&layout, &view), &events.get(lua)?.borrow())
+        })
     });
     put(table, "List", f)
 }
 
+/// The selection and pointer state: `SetSelected` / `GetSelected`,
+/// `IsPointerOverUI` and `IsPointerConsumed`.
+fn register_selection(lua: &Lua, table: &Table, events: ApiCell<EventSystem>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        events.get(lua)?.borrow_mut().set_selected(id.get());
+        Ok(())
+    });
+    put(table, "SetSelected", f)?;
+    let f = lua.create_function(move |lua, ()| Ok(events.get(lua)?.borrow().selected()));
+    put(table, "GetSelected", f)?;
+    let f = lua.create_function(move |lua, ()| Ok(events.get(lua)?.borrow().is_pointer_over_ui()));
+    put(table, "IsPointerOverUI", f)?;
+    let f = lua.create_function(move |lua, ()| Ok(events.get(lua)?.borrow().is_pointer_consumed()));
+    put(table, "IsPointerConsumed", f)
+}
+
 /// `FindSelectable(id, direction)` — where navigation from `id` would go.
-fn register_find<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+fn register_find(lua: &mlua::Lua, table: &Table, ctx: &ApiCtx) -> Reg {
     let (scene, screen, video, camera) = (ctx.scene, ctx.screen, ctx.video, ctx.camera);
-    let f = scope.create_function(move |_, (id, dir): (EntityArg, String)| {
+    let f = lua.create_function(move |lua, (id, dir): (EntityArg, String)| {
+        let scene = &*scene.get(lua)?;
         let Some(dir) = direction(&dir) else {
             return Err(mlua::Error::RuntimeError(format!(
                 "UI.FindSelectable: unknown direction '{dir}' (Up, Down, Left, Right)"
             )));
         };
         let scene = &scene.borrow();
-        let layout = UiLayout::compute_in(&scene.world, &ui_view(screen, video, camera, scene));
+        let layout = UiLayout::compute_in(
+            &scene.world,
+            &ui_view(
+                &*screen.get(lua)?,
+                &*video.get(lua)?,
+                &*camera.get(lua)?,
+                scene,
+            ),
+        );
         let world = &scene.world;
         Ok(find_selectable(world, &layout, id.read(), dir))
     });

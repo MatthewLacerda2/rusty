@@ -44,8 +44,9 @@ pub struct RenderCounters {
     /// Point/spot lights binned into at least one light cluster (#434), summed
     /// over the camera stack.
     pub lights_visible: u32,
-    /// Point/spot lights outside a camera's view, culled before binning so they
-    /// cost it nothing (#434), summed over the camera stack.
+    /// Point/spot lights listed in no cluster: outside a camera's view (#434), or
+    /// kept but contributing nothing or with a cone missing the view (#1712), so
+    /// no pixel shades them; summed over the camera stack.
     pub lights_culled: u32,
     /// Entries written to the cluster light lists (#434): how many (cluster,
     /// light) pairs the shaders may visit, summed over the camera stack.

@@ -10,24 +10,25 @@
 //!   - `GetActivePath()` — the current scene file, `nil` when there is none.
 //!   - `DontDestroyOnLoad(id)` — the entity and its children survive play-mode loads.
 
-use std::cell::RefCell;
 use std::path::Path;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::Scene;
 
 /// Register the scene-loading verbs onto the (already-created) `Scene` `table`.
-pub fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub fn register(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    scene_path: &'scope RefCell<Option<String>>,
+    scene: ApiCell<Scene>,
+    scene_path: ApiCell<Option<String>>,
 ) -> Reg {
     put(
         table,
         "Load",
-        scope.create_function(move |_, path: String| {
+        lua.create_function(move |lua, path: String| {
+            let scene = &*scene.get(lua)?;
             if !Path::new(&path).is_file() {
                 return Err(runtime(format!("Scene.Load: no scene file at '{path}'")));
             }
@@ -42,7 +43,7 @@ pub fn register<'scope>(
                 Err(e) if e.replaced_world() => Some(format!("Scene.Load: {path}: {e}")),
                 Err(e) => return Err(runtime(format!("Scene.Load: {e}"))),
             };
-            *scene_path.borrow_mut() = Some(path);
+            *scene_path.get(lua)?.borrow_mut() = Some(path);
             Ok(warning)
         }),
     )?;
@@ -50,21 +51,23 @@ pub fn register<'scope>(
     put(
         table,
         "GetActivePath",
-        scope.create_function(move |_, ()| Ok(scene_path.borrow().clone())),
+        lua.create_function(move |lua, ()| Ok(scene_path.get(lua)?.borrow().clone())),
     )?;
 
     // Only play has a load to survive; Unity refuses the call in edit mode too.
     put(
         table,
         "DontDestroyOnLoad",
-        scope.create_function(move |_, id: EntityArg| {
-            let id = id.live("Scene", "DontDestroyOnLoad")?;
-            if !scene.borrow().is_playing() {
-                return Err(runtime(
-                    "Scene.DontDestroyOnLoad only works during play".to_string(),
-                ));
-            }
-            Ok(scene.borrow_mut().dont_destroy_on_load(id))
+        lua.create_function(move |lua, id: EntityArg| {
+            scene.with(lua, |scene| {
+                let id = id.live("Scene", "DontDestroyOnLoad")?;
+                if !scene.borrow().is_playing() {
+                    return Err(runtime(
+                        "Scene.DontDestroyOnLoad only works during play".to_string(),
+                    ));
+                }
+                Ok(scene.borrow_mut().dont_destroy_on_load(id))
+            })
         }),
     )
 }

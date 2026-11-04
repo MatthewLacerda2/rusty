@@ -2,7 +2,8 @@
 //!
 //! One rapier body per plan owner (see `compound`), carrying one collider per
 //! attached collider entity, each at its pose relative to the owner. The plan is
-//! re-derived every tick; an owner whose collider set changed (reparent, a
+//! re-derived whenever the change log names an id whose collider membership or
+//! body carrier may have moved (`sync`, `watch`); an owner whose collider set changed (reparent, a
 //! collider or Rigidbody added/removed, an entity spawned or destroyed) has its
 //! body rebuilt, the others are left untouched so their contacts and sleep state
 //! survive.
@@ -17,17 +18,18 @@ use super::shape::build::{
     body_inputs, build_shape_for, ccd_enabled, collider_inputs, gravity_scale, interaction_groups,
     BodyClass,
 };
+use super::watch::{carriers, Owners};
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
 
 impl PhysicsWorld {
     /// Re-derive the body plan and rebuild exactly the owners whose collider set
-    /// changed since the last build. Iterates the sorted plans, so rebuild order
-    /// is deterministic.
-    pub(super) fn resync_topology(&mut self, scene: &Scene) {
+    /// changed since the last build; returns the owners built. Iterates the
+    /// sorted plans, so rebuild order is deterministic.
+    pub(super) fn resync_topology(&mut self, scene: &Scene) -> Vec<u32> {
         let next = plan(scene);
         if next == self.plan {
-            return;
+            return Vec::new();
         }
         let stale: Vec<u32> = self
             .plan
@@ -38,18 +40,23 @@ impl PhysicsWorld {
         for owner in stale {
             self.remove_owner(owner);
         }
+        let mut built = Vec::new();
         for (&owner, ids) in &next {
             if self.plan.get(&owner) != Some(ids) {
                 self.build_owner(scene, owner, ids);
+                built.push(owner);
             }
         }
+        self.tracked.remember_plan(&next);
         self.plan = next;
+        built
     }
 
     /// Build every body the scene implies (the initial build on entering Play).
     pub(super) fn build_bodies(&mut self, scene: &Scene) {
         self.plan = BodyPlan::new();
         self.resync_topology(scene);
+        self.tracked.carriers = carriers(scene);
     }
 
     /// Drop `owner`'s body and every collider attached to it.
@@ -57,6 +64,7 @@ impl PhysicsWorld {
         let Some(handle) = self.id_to_body.remove(&owner) else {
             return;
         };
+        self.body_to_id.remove(&handle);
         if let Some(body) = self.bodies.get(handle) {
             for collider in body.colliders() {
                 if let Some(id) = self.collider_to_id.remove(collider) {
@@ -112,6 +120,7 @@ impl PhysicsWorld {
             self.id_to_collider.insert(id, handle);
         }
         self.id_to_body.insert(owner, body_handle);
+        self.body_to_id.insert(body_handle, owner);
     }
 
     /// Build collider entity `id`'s rapier collider, positioned relative to its
@@ -158,8 +167,8 @@ impl PhysicsWorld {
     /// owner entity, each collider (the owner's own included) its own entity. A
     /// disabled body or collider generates no contacts, and [`super::query::is_live`]
     /// hides it from every query (#521).
-    pub(super) fn sync_enabled(&mut self, scene: &Scene) {
-        for (&owner, ids) in &self.plan {
+    pub(super) fn sync_enabled(&mut self, scene: &Scene, owners: &Owners) {
+        for (&owner, ids) in owners.pick(&self.plan) {
             if let Some(body) = self
                 .id_to_body
                 .get(&owner)

@@ -3,8 +3,10 @@
 //! count and tint included; without a volume the getters read the defaults.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::CameraComponent;
 use rusty::scene::authoring::default_post_processing;
 use rusty::scene::Scene;
@@ -13,14 +15,19 @@ use rusty::scene::Scene;
 /// script's error, if any.
 fn run(scene: Scene, script: &str) -> (Scene, Option<String>) {
     let lua = Lua::new();
-    let (scene, graphics, app) = (RefCell::new(scene), RefCell::default(), RefCell::default());
-    let err = lua
-        .scope(|s| {
-            rusty::api::graphics::register(&lua, s, &scene, &graphics, &app).unwrap();
-            Ok(lua.load(script).exec().err().map(|e| e.to_string()))
-        })
+    let (scene, graphics, app) = (Rc::new(RefCell::new(scene)), Rc::default(), Rc::default());
+    let err = crate::lua::attempt(|| {
+        rusty::api::graphics::register(
+            &lua,
+            bind(&lua, &scene),
+            bind(&lua, &graphics),
+            bind(&lua, &app),
+        )
         .unwrap();
-    (scene.into_inner(), err)
+        Ok(lua.load(script).exec().err().map(|e| e.to_string()))
+    })
+    .unwrap();
+    (scene.take(), err)
 }
 
 fn camera_with_volume() -> (Scene, u32) {

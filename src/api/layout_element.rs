@@ -8,29 +8,23 @@
 //! `scene::authoring::ui::layout::element` ops the inspector card uses. Getters return
 //! a neutral default without the component; setters are then no-ops.
 
-use std::cell::RefCell;
-
 use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::{LayoutAxisFit, LayoutElementComponent};
 use crate::scene::authoring::ui::layout::element::{self as ops, SizeKind};
 use crate::scene::Scene;
 
-type Cell<'s> = &'s RefCell<Scene>;
 type E = LayoutElementComponent;
 type Size = (Option<f32>, Option<f32>);
 
 /// Register the `LayoutElement` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: Cell<'scope>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     let ignore = |e: &E| e.ignore_layout;
-    pair(scope, &t, scene, "IgnoreLayout", ignore, |e, v: bool| {
+    pair(lua, &t, scene, "IgnoreLayout", ignore, |e, v: bool| {
         ops::set_ignore_layout(e, v)
     })?;
     for (suffix, kind) in [
@@ -40,7 +34,7 @@ pub fn register<'scope>(
     ] {
         let get = move |e: &E| ops::size(e, kind);
         let set = move |e: &mut E, (w, h): Size| ops::set_size(e, kind, w, h);
-        pair(scope, &t, scene, suffix, get, set)?;
+        pair(lua, &t, scene, suffix, get, set)?;
     }
     let fit = |e: &E| (e.horizontal_fit.name(), e.vertical_fit.name());
     let set_fit = |e: &mut E, (h, v): (String, String)| {
@@ -48,7 +42,7 @@ pub fn register<'scope>(
             ops::set_fit(e, h, v);
         }
     };
-    pair(scope, &t, scene, "Fit", fit, set_fit)?;
+    pair(lua, &t, scene, "Fit", fit, set_fit)?;
     lua.globals()
         .set("LayoutElement", t)
         .map_err(|e| e.to_string())
@@ -56,20 +50,21 @@ pub fn register<'scope>(
 
 /// Register `Get<suffix>(id)` → `get(element)` (Lua's defaults without one) and
 /// `Set<suffix>(id, …)` → `set(element, …)` (a no-op without one).
-fn pair<'scope, R, A>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn pair<R, A>(
+    lua: &mlua::Lua,
     t: &Table,
-    scene: Cell<'scope>,
+    scene: ApiCell<Scene>,
     suffix: &str,
-    get: impl Fn(&E) -> R + 'scope,
-    set: impl Fn(&mut E, A) + 'scope,
+    get: impl Fn(&E) -> R + 'static,
+    set: impl Fn(&mut E, A) + 'static,
 ) -> Reg
 where
     R: IntoLuaMulti + Default,
     A: FromLuaMulti,
 {
-    let f = scope.create_function(move |_, id: EntityArg| {
+    let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(scene
+            .get(lua)?
             .borrow()
             .world
             .layout_element(id.read())
@@ -78,10 +73,10 @@ where
     });
     put(t, &format!("Get{suffix}"), f)?;
     let verb = format!("Set{suffix}");
-    let f = scope.create_function(move |lua, (id, rest): (EntityArg, mlua::MultiValue)| {
+    let f = lua.create_function(move |lua, (id, rest): (EntityArg, mlua::MultiValue)| {
         let id = id.live("LayoutElement", &verb)?;
         let value = A::from_lua_multi(rest, lua)?;
-        if let Some(mut e) = scene.borrow_mut().world.layout_element_mut(id) {
+        if let Some(mut e) = scene.get(lua)?.borrow_mut().world.layout_element_mut(id) {
             set(&mut e, value);
         }
         Ok(())

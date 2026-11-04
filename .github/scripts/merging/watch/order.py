@@ -65,6 +65,23 @@ def ready(pulls: list[dict], memory: dict[int, str], done: set[int], bots: tuple
     ]
 
 
+def line(
+    pulls: list[dict],
+    issue_labels: dict[int, set[str]],
+    memory: dict[int, str],
+    done: set[int],
+    bots: tuple[str, ...],
+    clashes: set[frozenset[int]] = frozenset(),
+    aged: set[int] | frozenset[int] = frozenset(),
+) -> list[dict]:
+    """Every pull request the watch may take now, in the order it would take
+    them: [`pick`]'s choice first, then the rest by the same key. A merge train
+    walks it (#1785, `train.group.form`)."""
+    waiting = ready(pulls, memory, done, bots)
+    counts = conflict_counts([p.get("number") for p in waiting], clashes)
+    return sorted(waiting, key=lambda p: rank(p, issue_labels, bots, counts, aged))
+
+
 def pick(
     pulls: list[dict],
     issue_labels: dict[int, set[str]],
@@ -77,9 +94,8 @@ def pick(
     """The next pull request to take, or `None`. `clashes` holds the pairs of
     pull requests whose heads conflict ([`clashing`]); `aged`, those that have
     waited too long to be passed over again ([`aging.Line.aged`])."""
-    waiting = ready(pulls, memory, done, bots)
-    counts = conflict_counts([p.get("number") for p in waiting], clashes)
-    return min(waiting, key=lambda p: rank(p, issue_labels, bots, counts, aged)) if waiting else None
+    ranked = line(pulls, issue_labels, memory, done, bots, clashes, aged)
+    return ranked[0] if ranked else None
 
 
 def reordered(chosen: dict | None, by_label: dict | None, counts: dict[int, int]) -> str | None:

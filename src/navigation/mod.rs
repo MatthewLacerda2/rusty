@@ -29,6 +29,7 @@ mod links;
 mod obstacle;
 mod offmesh;
 mod path;
+mod reach;
 mod snap;
 mod surface;
 #[cfg(test)]

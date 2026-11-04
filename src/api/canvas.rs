@@ -8,13 +8,12 @@
 //! through the shared `scene::authoring::ui::layout::canvas` ops the inspector card uses.
 //! Getters return a neutral default when the entity has no canvas.
 
-use std::cell::RefCell;
-
 use glam::Vec2;
 use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::CanvasComponent;
 use crate::components::CanvasRenderMode;
 use crate::core::settings::video::VideoSettings;
@@ -23,22 +22,22 @@ use crate::scene::Scene;
 use crate::ui::ScreenSize;
 
 /// Register the `Canvas` namespace onto `lua`.
-pub fn register<'scope>(
+pub fn register(
     lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    screen: &'scope RefCell<ScreenSize>,
-    video: &'scope RefCell<VideoSettings>,
+    scene: ApiCell<Scene>,
+    screen: ApiCell<ScreenSize>,
+    video: ApiCell<VideoSettings>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
-    register_order_and_mode(scope, &table, scene)?;
-    register_scaler(scope, &table, scene)?;
-    register_world(scope, &table, scene)?;
+    register_order_and_mode(lua, &table, scene)?;
+    register_scaler(lua, &table, scene)?;
+    register_world(lua, &table, scene)?;
     put(
         &table,
         "GetScaleFactor",
-        scope.create_function(|_, id: EntityArg| {
-            let px = screen.borrow().pixels(&video.borrow());
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let px = screen.get(lua)?.borrow().pixels(&video.get(lua)?.borrow());
             let scene = scene.borrow();
             Ok(scene.world.canvas(id.read()).map(|c| c.scale_factor(px)))
         }),
@@ -50,15 +49,12 @@ pub fn register<'scope>(
 
 /// `GetSortOrder` / `SetSortOrder` and `GetRenderMode` / `SetRenderMode` (by name;
 /// an unknown name is ignored).
-fn register_order_and_mode<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_order_and_mode(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetSortOrder",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene
                 .world
@@ -70,9 +66,9 @@ fn register_order_and_mode<'scope>(
     put(
         table,
         "SetSortOrder",
-        scope.create_function(|_, (id, order): (EntityArg, i32)| {
+        lua.create_function(move |lua, (id, order): (EntityArg, i32)| {
             let id = id.live("Canvas", "SetSortOrder")?;
-            if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
+            if let Some(mut c) = scene.get(lua)?.borrow_mut().world.canvas_mut(id) {
                 canvas_ops::set_sort_order(&mut c, order);
             }
             Ok(())
@@ -81,7 +77,8 @@ fn register_order_and_mode<'scope>(
     put(
         table,
         "GetRenderMode",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let mode = scene.world.canvas(id.read()).map(|c| c.render_mode);
             Ok(mode.map_or("None", CanvasRenderMode::name).to_string())
@@ -90,10 +87,12 @@ fn register_order_and_mode<'scope>(
     put(
         table,
         "SetRenderMode",
-        scope.create_function(|_, (id, name): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
             let id = id.live("Canvas", "SetRenderMode")?;
             let mode = CanvasRenderMode::parse(&name);
-            if let (Some(mut c), Some(mode)) = (scene.borrow_mut().world.canvas_mut(id), mode) {
+            if let (Some(mut c), Some(mode)) =
+                (scene.get(lua)?.borrow_mut().world.canvas_mut(id), mode)
+            {
                 canvas_ops::set_render_mode(&mut c, mode);
             }
             Ok(())
@@ -103,15 +102,12 @@ fn register_order_and_mode<'scope>(
 
 /// The scaler: `Get/SetReferenceResolution` (each axis ≥ 1) and
 /// `Get/SetMatchWidthOrHeight` (clamped to `[0, 1]`).
-fn register_scaler<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_scaler(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetReferenceResolution",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let r = scene
                 .world
@@ -124,9 +120,9 @@ fn register_scaler<'scope>(
     put(
         table,
         "SetReferenceResolution",
-        scope.create_function(|_, (id, w, h): (EntityArg, f32, f32)| {
+        lua.create_function(move |lua, (id, w, h): (EntityArg, f32, f32)| {
             let id = id.live("Canvas", "SetReferenceResolution")?;
-            if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
+            if let Some(mut c) = scene.get(lua)?.borrow_mut().world.canvas_mut(id) {
                 canvas_ops::set_reference_resolution(&mut c, Vec2::new(w, h));
             }
             Ok(())
@@ -135,7 +131,8 @@ fn register_scaler<'scope>(
     put(
         table,
         "GetMatchWidthOrHeight",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let m = scene
                 .world
@@ -147,9 +144,9 @@ fn register_scaler<'scope>(
     put(
         table,
         "SetMatchWidthOrHeight",
-        scope.create_function(|_, (id, value): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, value): (EntityArg, f32)| {
             let id = id.live("Canvas", "SetMatchWidthOrHeight")?;
-            if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
+            if let Some(mut c) = scene.get(lua)?.borrow_mut().world.canvas_mut(id) {
                 canvas_ops::set_match_width_or_height(&mut c, value);
             }
             Ok(())
@@ -161,12 +158,8 @@ fn register_scaler<'scope>(
 type Scalar = (fn(&CanvasComponent) -> f32, fn(&mut CanvasComponent, f32));
 
 /// The world / camera canvas knobs: `Get/SetPixelsPerUnit`, `Get/SetPlaneDistance`,
-/// `Get/SetSway` (scalars) and `Get/SetTilt` (an `x, y` pair of degrees).
-fn register_world<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+/// `Get/SetSway` (scalars), then [`register_tilt`].
+fn register_world(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let scalars: [(&str, Scalar); 3] = [
         (
             "PixelsPerUnit",
@@ -179,8 +172,9 @@ fn register_world<'scope>(
         ("Sway", (|c| c.sway, canvas_ops::set_sway)),
     ];
     for (suffix, (get, set)) in scalars {
-        let f = scope.create_function(move |_, id: EntityArg| {
+        let f = lua.create_function(move |lua, id: EntityArg| {
             Ok(scene
+                .get(lua)?
                 .borrow()
                 .world
                 .canvas(id.read())
@@ -189,24 +183,34 @@ fn register_world<'scope>(
         });
         put(table, &format!("Get{suffix}"), f)?;
         let verb = format!("Set{suffix}");
-        let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+        let f = lua.create_function(move |lua, (id, v): (EntityArg, f32)| {
             let id = id.live("Canvas", &verb)?;
-            if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
+            if let Some(mut c) = scene.get(lua)?.borrow_mut().world.canvas_mut(id) {
                 set(&mut c, v);
             }
             Ok(())
         });
         put(table, &format!("Set{suffix}"), f)?;
     }
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let t = scene.borrow().world.canvas(id.read()).map(|c| c.tilt);
+    register_tilt(lua, table, scene)
+}
+
+/// `GetTilt` / `SetTilt`: a camera canvas's tilt, an `x, y` pair of degrees.
+fn register_tilt(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let t = scene
+            .get(lua)?
+            .borrow()
+            .world
+            .canvas(id.read())
+            .map(|c| c.tilt);
         let t = t.unwrap_or(Vec2::ZERO);
         Ok((t.x, t.y))
     });
     put(table, "GetTilt", f)?;
-    let f = scope.create_function(move |_, (id, x, y): (EntityArg, f32, f32)| {
+    let f = lua.create_function(move |lua, (id, x, y): (EntityArg, f32, f32)| {
         let id = id.live("Canvas", "SetTilt")?;
-        if let Some(mut c) = scene.borrow_mut().world.canvas_mut(id) {
+        if let Some(mut c) = scene.get(lua)?.borrow_mut().world.canvas_mut(id) {
             canvas_ops::set_tilt(&mut c, Vec2::new(x, y));
         }
         Ok(())

@@ -20,7 +20,7 @@ fn an_undone_create_drops_the_scenes_own_references() {
     scene.selected_entity_id = Some(id);
     scene.persistent.insert(id);
     scene.pending_destroy.push(id);
-    scene.lightmaps.entries.push(LightmapEntry {
+    scene.lightmaps.insert(LightmapEntry {
         entity: id,
         page: 0,
         scale_offset: [1.0, 1.0, 0.0, 0.0],
@@ -29,7 +29,7 @@ fn an_undone_create_drops_the_scenes_own_references() {
     assert!(!scene.world.contains(id));
     assert_eq!(scene.selected_entity_id, None);
     assert!(scene.persistent.is_empty() && scene.pending_destroy.is_empty());
-    assert!(scene.lightmaps.entries.is_empty());
+    assert!(scene.lightmaps.is_empty());
 }
 
 #[test]

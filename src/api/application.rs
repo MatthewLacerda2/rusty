@@ -18,26 +18,23 @@ use std::cell::RefCell;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::ApiCell;
 use crate::core::application::{Application, WindowMode};
 
 /// Register the `Application` namespace onto `lua`, backed by the shared cell.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    app: &'scope RefCell<Application>,
-) -> Reg {
+pub fn register(lua: &Lua, app: ApiCell<Application>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     put(
         &table,
         "Quit",
-        scope.create_function(|_, ()| {
-            app.borrow_mut().request_quit();
+        lua.create_function(move |lua, ()| {
+            app.get(lua)?.borrow_mut().request_quit();
             Ok(())
         }),
     )?;
-    register_names(scope, &table, app)?;
-    register_window_mode(scope, &table, app)?;
+    register_names(lua, &table, app)?;
+    register_window_mode(lua, &table, app)?;
 
     lua.globals()
         .set("Application", table)
@@ -55,60 +52,56 @@ fn edit(
 }
 
 /// `Get/SetProductName` and `Get/SetStartupScene`.
-fn register_names<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    app: &'scope RefCell<Application>,
-) -> Reg {
+fn register_names(lua: &mlua::Lua, table: &Table, app: ApiCell<Application>) -> Reg {
     put(
         table,
         "GetProductName",
-        scope.create_function(|_, ()| Ok(app.borrow().build().product_name.clone())),
+        lua.create_function(move |lua, ()| Ok(app.get(lua)?.borrow().build().product_name.clone())),
     )?;
     put(
         table,
         "SetProductName",
-        scope.create_function(|_, name: String| edit(app, |b| b.product_name = name)),
+        lua.create_function(move |lua, name: String| {
+            edit(&*app.get(lua)?, |b| b.product_name = name)
+        }),
     )?;
     put(
         table,
         "GetStartupScene",
-        scope.create_function(|_, ()| Ok(app.borrow().build().startup_scene.clone())),
+        lua.create_function(move |lua, ()| {
+            Ok(app.get(lua)?.borrow().build().startup_scene.clone())
+        }),
     )?;
     put(
         table,
         "SetStartupScene",
-        scope.create_function(|_, path: String| {
+        lua.create_function(move |lua, path: String| {
             if path.trim().is_empty() {
                 return Err(mlua::Error::RuntimeError(
                     "Application.SetStartupScene: the path is empty".to_string(),
                 ));
             }
-            edit(app, |b| b.startup_scene = path)
+            edit(&*app.get(lua)?, |b| b.startup_scene = path)
         }),
     )
 }
 
 /// `Get/SetWindowMode` — `"Windowed"` or `"Fullscreen"`. An unknown name is ignored
 /// and `SetWindowMode` returns `false`, like `Graphics.SetQuality`'s unknown tiers.
-fn register_window_mode<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    app: &'scope RefCell<Application>,
-) -> Reg {
+fn register_window_mode(lua: &mlua::Lua, table: &Table, app: ApiCell<Application>) -> Reg {
     put(
         table,
         "GetWindowMode",
-        scope.create_function(|_, ()| Ok(app.borrow().build().window_mode.name())),
+        lua.create_function(move |lua, ()| Ok(app.get(lua)?.borrow().build().window_mode.name())),
     )?;
     put(
         table,
         "SetWindowMode",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| {
             let Some(mode) = WindowMode::parse(&name) else {
                 return Ok(false);
             };
-            edit(app, |b| b.window_mode = mode)?;
+            edit(&*app.get(lua)?, |b| b.window_mode = mode)?;
             Ok(true)
         }),
     )

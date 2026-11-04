@@ -7,13 +7,12 @@
 //! `GetLossyScale` reads the world one back. `MoveTowards` steps the world position.
 //! A write moves the entity's subtree, colliders included (#1157).
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::transform::{euler_degrees, from_euler_degrees};
 use crate::ecs::World;
 use crate::scene::Scene;
@@ -26,22 +25,18 @@ type Write = fn(&mut World, u32, Vec3);
 type Map = fn(&World, u32, Vec3) -> Option<Vec3>;
 
 /// Register the `Transform` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     for (name, read, default) in READS {
-        getter(scope, &table, scene, name, *read, *default)?;
+        getter(lua, &table, scene, name, *read, *default)?;
     }
     for (name, write) in WRITES {
-        setter(scope, &table, scene, name, *write)?;
+        setter(lua, &table, scene, name, *write)?;
     }
     for (name, map) in MAPS {
-        mapper(scope, &table, scene, name, *map)?;
+        mapper(lua, &table, scene, name, *map)?;
     }
-    register_move_towards(scope, &table, scene)?;
+    register_move_towards(lua, &table, scene)?;
     lua.globals()
         .set("Transform", table)
         .map_err(|e| e.to_string())
@@ -112,46 +107,54 @@ const MAPS: &[(&str, Map)] = &[
     }),
 ];
 
-fn getter<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn getter(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     name: &str,
     read: Read,
     default: Vec3,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let v = read(&scene.borrow().world, id.read()).unwrap_or(default);
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let v = read(&scene.get(lua)?.borrow().world, id.read()).unwrap_or(default);
         Ok((v.x, v.y, v.z))
     });
     put(table, name, f)
 }
 
-fn setter<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn setter(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     name: &str,
     write: Write,
 ) -> Reg {
     let verb = name.to_string();
-    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+    let f = lua.create_function(move |lua, (id, x, y, z): (EntityArg, f32, f32, f32)| {
         let id = id.live("Transform", &verb)?;
-        write(&mut scene.borrow_mut().world, id, Vec3::new(x, y, z));
+        write(
+            &mut scene.get(lua)?.borrow_mut().world,
+            id,
+            Vec3::new(x, y, z),
+        );
         Ok(())
     });
     put(table, name, f)
 }
 
-fn mapper<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn mapper(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     name: &str,
     map: Map,
 ) -> Reg {
-    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
-        let v = map(&scene.borrow().world, id.read(), Vec3::new(x, y, z));
+    let f = lua.create_function(move |lua, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        let v = map(
+            &scene.get(lua)?.borrow().world,
+            id.read(),
+            Vec3::new(x, y, z),
+        );
         Ok(v.map_or((None, None, None), |v| (Some(v.x), Some(v.y), Some(v.z))))
     });
     put(table, name, f)
@@ -160,14 +163,11 @@ fn mapper<'scope>(
 /// `MoveTowards` — step the world position toward a world target, snapping when
 /// within `step`: glam's `move_towards` (Unity's `Vector3.MoveTowards`), which a
 /// negative `step` walks away from the target (#997).
-fn register_move_towards<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    let f = scope.create_function(
-        |_, (id, tx, ty, tz, step): (EntityArg, f32, f32, f32, f32)| {
+fn register_move_towards(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(
+        move |lua, (id, tx, ty, tz, step): (EntityArg, f32, f32, f32, f32)| {
             let id = id.live("Transform", "MoveTowards")?;
+            let scene = &*scene.get(lua)?;
             let world = &mut scene.borrow_mut().world;
             // A dead id reads the origin and the write is a no-op.
             let at = world

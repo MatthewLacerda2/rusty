@@ -52,20 +52,22 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
 // and screen-edge rules. The ray marches the opaque copy, the camera's opaque image
 // after SSR with each pixel's eye distance, from the surface's own depth and normal,
 // so it needs no prepass; a miss keeps the probe. Only a material with `receive_ssr`
-// on a camera that marches (`camera.stack.z`, the base camera of a view running SSR)
+// on a camera that marches (`camera.ssr.x`, the base camera of a view running SSR)
 // traces: both are uniform, so every other surface returns at once. `N` is the
-// shading normal, `roughness` the perceptual roughness.
+// shading normal, `roughness` the perceptual roughness. The copy has no mip pyramid,
+// so the hit is sharp: the camera's *Minimum Smoothness* here is never below the
+// sharp floor (`render::postfx::effects::ssr::transparent::SHARP_SMOOTHNESS`).
 fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<f32> {
     // A pixel too rough to reflect (HDRP's *Minimum Smoothness*) marches nothing,
-    // as the SSR pass discards a surface that `ssr_surface::reflects` refuses.
-    let fade = ssr_surface::smoothness_fade(roughness);
-    if (material().receive_ssr == 0u || camera.stack.z < 1.0 || fade <= 0.0) {
+    // as the SSR pass discards a surface its fade refuses.
+    let fade = ssr_surface::smoothness_fade(roughness, camera.ssr.z, camera.ssr.w);
+    if (material().receive_ssr == 0u || camera.ssr.x < 1.0 || fade <= 0.0) {
         return reflection;
     }
     let f = ssr_march::Frame(camera.view_proj, camera.camera_pos, vec3<f32>(0.0), vec4<f32>(0.0, 0.0, 0.0, 1.0));
     // Off the side the ray leaves from: both faces are drawn.
     let origin = world + faceForward(N, -R, N) * 0.02;
-    let hit = ssr_march::trace(f, t_opaque, t_opaque, s_opaque, origin, R, i32(camera.stack.z), camera.stack.w);
+    let hit = ssr_march::trace(f, t_opaque, t_opaque, s_opaque, origin, R, i32(camera.ssr.x), camera.ssr.y, 0.0);
     let k = hit.w * fade;
     return reflection + (weight * hit.rgb - reflection) * k;
 }

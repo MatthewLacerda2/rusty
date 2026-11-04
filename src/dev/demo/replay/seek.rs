@@ -95,7 +95,7 @@ pub fn seek(world: &mut GameWorld, tick: u64) -> Result<(), String> {
 fn restart(world: &mut GameWorld) -> Result<(), String> {
     let replayer = world.tap_mut::<Replayer>().ok_or(NO_DEMO)?;
     let demo = Demo::read(replayer.demo_path())?;
-    let lua = crate::scripting::sandboxed_vm()?;
+    let lua = super::replay_vm(world)?;
     let tap = world.take_tap().ok_or(NO_DEMO)?;
     let any: Box<dyn std::any::Any> = tap;
     let old = any.downcast::<Replayer>().map_err(|_| NO_DEMO)?;

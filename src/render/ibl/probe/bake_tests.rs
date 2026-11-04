@@ -119,15 +119,9 @@ fn gpu_bake_probes_fills_all_in_place() {
 #[test]
 fn project_red_face_is_red_and_directional() {
     let res = 8;
-    let mut faces: [Vec<u8>; 6] = Default::default();
-    for f in &mut faces {
-        *f = vec![0u8; (res * res * 4) as usize];
-    }
-    // Paint the PosX face buffer fully red (255 in the R channel, opaque).
-    for px in faces[CubemapFace::PosX as usize].chunks_mut(4) {
-        px[0] = 255;
-        px[3] = 255;
-    }
+    let mut faces: [Vec<Vec3>; 6] = std::array::from_fn(|_| vec![Vec3::ZERO; (res * res) as usize]);
+    // Paint the PosX face fully red.
+    faces[CubemapFace::PosX as usize] = vec![Vec3::X; (res * res) as usize];
     let capture = CubemapCapture {
         resolution: res,
         faces,

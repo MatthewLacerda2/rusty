@@ -8,37 +8,29 @@
 //! listing the runtime params there are). Values are numbers or arrays of numbers,
 //! exactly as `Material.SetShaderParam` takes them (#399).
 
-use std::cell::RefCell;
-
 use mlua::{IntoLua, Value};
 
 use super::super::material::shader::params::floats;
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring::ui::shader as ops;
 use crate::scene::Scene;
 
 /// Register the four verbs onto the `UI` `table`.
-pub fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    register_name(scope, table, scene)?;
-    register_params(scope, table, scene)
+pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    register_name(lua, table, scene)?;
+    register_params(lua, table, scene)
 }
 
 /// `SetShader` / `GetShader`.
-fn register_name<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_name(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetShader",
-        scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, Option<String>)| {
             let id = id.live("UI", "SetShader")?;
+            let scene = &*scene.get(lua)?;
             let world = &mut scene.borrow_mut().world;
             match ops::for_each_graphic(world, id, |slot| ops::set_shader(slot, name.clone())) {
                 0 => Err(no_graphic(id)),
@@ -49,25 +41,22 @@ fn register_name<'scope>(
     put(
         table,
         "GetShader",
-        scope.create_function(|_, id: EntityArg| {
-            let slot = ops::graphic_shader(&scene.borrow().world, id.read()).flatten();
+        lua.create_function(move |lua, id: EntityArg| {
+            let slot = ops::graphic_shader(&scene.get(lua)?.borrow().world, id.read()).flatten();
             Ok(slot.map(|s| s.name))
         }),
     )
 }
 
 /// `SetShaderParam` / `GetShaderParam`.
-fn register_params<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_params(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetShaderParam",
-        scope.create_function(|_, (id, name, value): (EntityArg, String, Value)| {
+        lua.create_function(move |lua, (id, name, value): (EntityArg, String, Value)| {
             let id = id.live("UI", "SetShaderParam")?;
             let value = floats(value)?;
+            let scene = &*scene.get(lua)?;
             let world = &mut scene.borrow_mut().world;
             let mut results = Vec::new();
             let graphics = ops::for_each_graphic(world, id, |slot| {
@@ -90,10 +79,10 @@ fn register_params<'scope>(
     put(
         table,
         "GetShaderParam",
-        scope.create_function(|lua, (id, name): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
             let id = id.read();
-            let slot =
-                ops::graphic_shader(&scene.borrow().world, id).ok_or_else(|| no_graphic(id))?;
+            let slot = ops::graphic_shader(&scene.get(lua)?.borrow().world, id)
+                .ok_or_else(|| no_graphic(id))?;
             let layout = ops::layout(&slot).map_err(err)?;
             let v = ops::param(&slot, &layout, &name).map_err(err)?;
             match v[..] {

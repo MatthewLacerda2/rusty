@@ -6,8 +6,9 @@
 //! overflow, so a corrupt file would panic it (#1609).
 //!
 //! A missing, unreadable or odd-format file must NOT panic: it is refused with a
-//! reason, and the probe array warns once and leaves it out. Only LDR RGBA8 (UNORM /
-//! SRGB) is accepted, matching the bake's output format. One rule decides what a cube
+//! reason, and the probe array warns once and leaves it out. Only half-float RGBA
+//! (`R16G16B16A16_SFLOAT`) is accepted, the bake's output format since #1696; an
+//! 8-bit cube baked before then is refused with a warning to re-bake it. One rule decides what a cube
 //! may be, [`cube_shape`] over the header and [`level_ranges`] over the level index;
 //! the header-only read ([`read_cube_shape`]) and the full parse
 //! ([`parse_ktx2_cubemap_mips`]) both apply it, as pure functions over bytes so they
@@ -15,10 +16,11 @@
 
 use ktx2::Format;
 
+use super::reflection_prefilter::TEXEL_BYTES;
 use super::reflection_probes::MAX_FACE;
 use crate::render::Renderer;
 
-/// A decoded LDR cubemap WITH its roughness mip chain (#245). `mips[0]` is the base level
+/// A decoded HDR cubemap WITH its roughness mip chain (#245, #1696): `Rgba16Float` texels. `mips[0]` is the base level
 /// (`size`); each later mip halves the edge length. Every level is the six faces packed
 /// back-to-back in KTX2 face order (+X, -X, +Y, -Y, +Z, -Z). This is what the forward
 /// pass uploads so `textureSampleLevel` can pick a mip from a surface's roughness.
@@ -44,7 +46,7 @@ impl CubemapMips {
     }
 }
 
-/// Parse a KTX2 blob into an LDR RGBA8 cubemap WITH its full roughness mip chain (#245),
+/// Parse a KTX2 blob into an `Rgba16Float` cubemap WITH its full roughness mip chain (#245),
 /// or why it is not one. Level 0 is the base; each later level halves the edge length
 /// (the prefilter's layout). The file must be what [`cube_shape`] and [`level_ranges`]
 /// accept, the rule [`read_cube_shape`] judges a header by, so the two never disagree
@@ -87,7 +89,7 @@ pub(crate) fn read_cube_shape(path: &str) -> Result<CubeShape, Refusal> {
 }
 
 /// The shape a KTX2 header's first 48 bytes state, when it is a cube the loader
-/// reads: an LDR RGBA8 square cube (six faces, no depth, at most one layer) no
+/// reads: an `R16G16B16A16_SFLOAT` square cube (six faces, no depth, at most one layer) no
 /// larger than [`MAX_FACE`], not supercompressed, with no more mip levels than its
 /// size has.
 pub(crate) fn cube_shape(header: &[u8; 48]) -> Result<CubeShape, Refusal> {
@@ -98,8 +100,10 @@ pub(crate) fn cube_shape(header: &[u8; 48]) -> Result<CubeShape, Refusal> {
     let size = word(20);
     let refusal = if header[..12] != MAGIC {
         Some("it is not a KTX2 file")
-    } else if !Format::new(word(12)).is_some_and(is_rgba8) {
-        Some("it is not RGBA8")
+    } else if Format::new(word(12)).is_some_and(is_rgba8) {
+        Some("it is an 8-bit cube from before HDR probes; re-bake it")
+    } else if Format::new(word(12)) != Some(Format::R16G16B16A16_SFLOAT) {
+        Some("it is not RGBA16F")
     } else if size == 0 || word(24) != size || word(28) != 0 {
         Some("its faces are not square")
     } else if size > MAX_FACE {
@@ -136,7 +140,8 @@ fn level_ranges(
         let at = |o: usize| u64::from_le_bytes(entry[o..o + 8].try_into().unwrap());
         let (offset, length) = (at(0), at(8));
         let edge = u64::from((shape.size >> i).max(1));
-        let faces = (edge.checked_mul(edge * 4 * 6)).ok_or("its faces are too large")?;
+        let faces =
+            (edge.checked_mul(edge * TEXEL_BYTES as u64 * 6)).ok_or("its faces are too large")?;
         let end = (offset.checked_add(faces)).filter(|&end| length >= faces && end <= len);
         let end = end.ok_or("a level lies past its end or is short of its faces")?;
         Ok(usize::try_from(offset).map_err(|_| "it is too large")?..end as usize)
@@ -148,7 +153,8 @@ fn level_ranges(
         .collect()
 }
 
-/// True for the LDR RGBA8 formats a reflection bake emits (UNORM or SRGB).
+/// True for the 8-bit RGBA formats reflection bakes wrote before #1696 (UNORM or
+/// SRGB): refused with their own reason, so the warning says to re-bake.
 fn is_rgba8(format: Format) -> bool {
     matches!(format, Format::R8G8B8A8_UNORM | Format::R8G8B8A8_SRGB)
 }
@@ -165,7 +171,7 @@ pub struct CubemapTexture {
 impl Renderer {
     /// Load a reflection-probe cubemap WITH its roughness mip chain from `path` (#245),
     /// into a mipped cube texture the probe array copies in. Refused when the file is
-    /// missing, is not a usable LDR RGBA8 cubemap, or is not the `expect`ed shape (size
+    /// missing, is not a usable half-float cubemap, or is not the `expect`ed shape (size
     /// and mip count) the frame planned for, which is decoded but never uploaded
     /// (#1245, #1609).
     pub(crate) fn load_cubemap_mips(
@@ -194,7 +200,7 @@ impl Renderer {
             mip_level_count: data.mips.len() as u32,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: wgpu::TextureFormat::Rgba16Float,
             // COPY_SRC: the probe array copies it into its layer (#1206).
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_DST
@@ -220,7 +226,7 @@ impl Renderer {
             bytes,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * size),
+                bytes_per_row: Some(TEXEL_BYTES as u32 * size),
                 rows_per_image: Some(size),
             },
             wgpu::Extent3d {

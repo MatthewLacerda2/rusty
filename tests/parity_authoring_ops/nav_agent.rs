@@ -1,9 +1,11 @@
 //! `NavMeshAgent.*` bindings vs `authoring::nav::agent`.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::NavMeshAgentComponent;
 use rusty::navigation::NavigationGraph;
 use rusty::scene::authoring::nav::agent as nav_ops;
@@ -18,32 +20,37 @@ fn entity_with_agent(scene: &mut Scene, name: &str) -> u32 {
     id
 }
 
+/// A 20×20 navigation graph, shared so the API can be bound to it.
+fn graph() -> Rc<RefCell<NavigationGraph>> {
+    Rc::new(RefCell::new(NavigationGraph::new(
+        0.0, 20.0, 0.0, 20.0, 1.0,
+    )))
+}
+
 #[test]
 fn nav_agent_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let via_lua = entity_with_agent(&mut scene.borrow_mut(), "ViaLua");
     let via_op = entity_with_agent(&mut scene.borrow_mut(), "ViaOp");
-    let nav = RefCell::new(NavigationGraph::new(0.0, 20.0, 0.0, 20.0, 1.0));
+    let nav = graph();
 
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::nav::register(&lua, s, &scene, &nav).unwrap();
-        lua.load(format!(
-            r#"
-            NavMeshAgent.SetActive({via_lua}, true)
-            NavMeshAgent.SetSpeed({via_lua}, 3.5)
-            NavMeshAgent.SetAcceleration({via_lua}, 8.0)
-            NavMeshAgent.SetStoppingDistance({via_lua}, 0.5)
-            NavMeshAgent.SetRadius({via_lua}, 0.4)
-            NavMeshAgent.SetTarget({via_lua}, 1.0, 0.0, 2.0)
-            NavMeshAgent.SetAvoidancePriority({via_lua}, 17)
-            NavMeshAgent.SetAvoidanceEnabled({via_lua}, false)
-        "#
-        ))
-        .exec()
-        .unwrap();
-        Ok(())
-    })?;
+    let (scene_cell, nav_cell) = (bind(&lua, &scene), bind(&lua, &nav));
+    rusty::api::nav::register(&lua, scene_cell, nav_cell).unwrap();
+    lua.load(format!(
+        r#"
+        NavMeshAgent.SetActive({via_lua}, true)
+        NavMeshAgent.SetSpeed({via_lua}, 3.5)
+        NavMeshAgent.SetAcceleration({via_lua}, 8.0)
+        NavMeshAgent.SetStoppingDistance({via_lua}, 0.5)
+        NavMeshAgent.SetRadius({via_lua}, 0.4)
+        NavMeshAgent.SetTarget({via_lua}, 1.0, 0.0, 2.0)
+        NavMeshAgent.SetAvoidancePriority({via_lua}, 17)
+        NavMeshAgent.SetAvoidanceEnabled({via_lua}, false)
+    "#
+    ))
+    .exec()
+    .unwrap();
 
     {
         let mut sc = scene.borrow_mut();
@@ -75,13 +82,13 @@ fn nav_agent_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Erro
 
 #[test]
 fn base_offset_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let via_lua = entity_with_agent(&mut scene.borrow_mut(), "ViaLua");
     let via_op = entity_with_agent(&mut scene.borrow_mut(), "ViaOp");
-    let nav = RefCell::new(NavigationGraph::new(0.0, 20.0, 0.0, 20.0, 1.0));
+    let nav = graph();
     let lua = Lua::new();
-    let read = lua.scope(|s| {
-        rusty::api::nav::register(&lua, s, &scene, &nav).unwrap();
+    let read = crate::lua::attempt(|| {
+        rusty::api::nav::register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
         let src = format!(
             "NavMeshAgent.SetBaseOffset({via_lua}, 1.0) return NavMeshAgent.GetBaseOffset({via_lua})"
         );
@@ -102,13 +109,13 @@ fn base_offset_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Er
 
 #[test]
 fn turning_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let via_lua = entity_with_agent(&mut scene.borrow_mut(), "ViaLua");
     let via_op = entity_with_agent(&mut scene.borrow_mut(), "ViaOp");
-    let nav = RefCell::new(NavigationGraph::new(0.0, 20.0, 0.0, 20.0, 1.0));
+    let nav = graph();
     let lua = Lua::new();
-    let read: (bool, f32, f32) = lua.scope(|s| {
-        rusty::api::nav::register(&lua, s, &scene, &nav).unwrap();
+    let read: (bool, f32, f32) = crate::lua::attempt(|| {
+        rusty::api::nav::register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
         lua.load(format!(
             "NavMeshAgent.SetUpdateRotation({via_lua}, false)
              NavMeshAgent.SetAngularSpeed({via_lua}, 90)

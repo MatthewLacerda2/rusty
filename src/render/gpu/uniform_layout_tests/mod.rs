@@ -91,11 +91,13 @@ fn camera_uniform_matches_wgsl_layout() {
         ("prev_view_proj", offset_of!(CameraUniform, prev_view_proj)),
         ("stack", offset_of!(CameraUniform, stack)),
         ("inv_view_proj", offset_of!(CameraUniform, inv_view_proj)),
+        ("ssr", offset_of!(CameraUniform, ssr)),
     ];
     assert_layout("CameraUniforms", &pairs, size_of::<CameraUniform>());
     // `time` rides in the vec3 pad (#398); the cluster block adds 48 bytes (#434),
-    // last frame's matrix 64 (#1435), the stack index 16 (#1436), the inverse 64 (#1523).
-    assert_eq!(size_of::<CameraUniform>(), 320);
+    // last frame's matrix 64 (#1435), the stack index 16 (#1436), the inverse 64 (#1523),
+    // the transparent SSR trace 16 (#1736).
+    assert_eq!(size_of::<CameraUniform>(), 336);
 }
 
 #[test]
@@ -158,6 +160,7 @@ fn local_light_matches_wgsl_layout() {
         ("kind", offset_of!(LocalLight, kind)),
         ("outer_cone", offset_of!(LocalLight, outer_cone)),
         ("shadow", offset_of!(LocalLight, shadow)),
+        ("shadow_fade", offset_of!(LocalLight, shadow_fade)),
     ];
     assert_layout("LocalLight", &pairs, size_of::<LocalLight>());
 }

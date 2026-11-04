@@ -3,14 +3,16 @@
 //! round-trips its getter in world space.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::{EulerRot, Quat, Vec3};
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::scene::Scene;
 
 /// A child at local `(1, 2, 3)` under a parent turned 90° about Y, scaled
 /// `(2, 3, -1)` (a mirror) and moved to `(5, 0, 0)`.
-pub(super) fn hierarchy() -> (RefCell<Scene>, u32, u32) {
+pub(super) fn hierarchy() -> (Rc<RefCell<Scene>>, u32, u32) {
     let mut scene = Scene::new();
     let parent = scene.add_entity("Parent".to_string());
     let child = scene.add_entity("Child".to_string());
@@ -26,22 +28,18 @@ pub(super) fn hierarchy() -> (RefCell<Scene>, u32, u32) {
         t.position = Vec3::new(1.0, 2.0, 3.0);
         t.rotation = Quat::from_rotation_x(0.3);
     }
-    (RefCell::new(scene), parent, child)
+    (Rc::new(RefCell::new(scene)), parent, child)
 }
 
 /// Run `body` with `Transform` bound over `scene`; `get(lua)` evaluates a vector.
-pub(super) fn with_lua(scene: &RefCell<Scene>, body: impl FnOnce(&dyn Fn(&str) -> Vec3)) {
+pub(super) fn with_lua(scene: &Rc<RefCell<Scene>>, body: impl FnOnce(&dyn Fn(&str) -> Vec3)) {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::transform::register(&lua, scope, scene).unwrap();
-        let get = |code: &str| -> Vec3 {
-            let (x, y, z): (f32, f32, f32) = lua.load(code).eval().unwrap();
-            Vec3::new(x, y, z)
-        };
-        body(&get);
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::transform::register(&lua, bind(&lua, scene)).unwrap();
+    let get = |code: &str| -> Vec3 {
+        let (x, y, z): (f32, f32, f32) = lua.load(code).eval().unwrap();
+        Vec3::new(x, y, z)
+    };
+    body(&get);
 }
 
 pub(super) fn near(a: Vec3, b: Vec3) -> bool {

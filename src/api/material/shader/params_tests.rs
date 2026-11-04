@@ -4,9 +4,11 @@
 //! the per-entity verbs alike.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
 
+use crate::api::bind;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
@@ -42,19 +44,19 @@ impl Drop for Baked {
 }
 
 /// A scene with one entity whose material names `shader`; returns (scene, id).
-pub(super) fn scene_with(shader: &str) -> (RefCell<Scene>, u32) {
+pub(super) fn scene_with(shader: &str) -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("E".into());
     let key = mat_ops::ensure_material_key(&mut scene, id).unwrap();
     mat_ops::set_shader(&mut scene.materials, &key, shader.to_string());
-    (RefCell::new(scene), id)
+    (Rc::new(RefCell::new(scene)), id)
 }
 
 /// Run `script` against the `Material` namespace, returning its error if any.
-pub(super) fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
+pub(super) fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     let lua = Lua::new();
-    lua.scope(|s| {
-        crate::api::material::register(&lua, s, scene).unwrap();
+    crate::api::attempt(|| {
+        crate::api::material::register(&lua, bind(&lua, scene)).unwrap();
         lua.load(script).exec()
     })
     .map_err(|e| e.to_string())

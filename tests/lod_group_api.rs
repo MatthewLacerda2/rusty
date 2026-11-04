@@ -4,21 +4,19 @@
 //! save → load, and its renderer slots are recognised as entity references.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::lua::eval;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{Entity, LodGroupComponent, LodLevel};
 use rusty::scene::authoring::{add_component, ComponentKind};
 use rusty::scene::Scene;
 
-fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
+fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::lod_group::register(&lua, scope, scene).unwrap();
-        f(&lua);
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::lod_group::register(&lua, bind(&lua, scene)).unwrap();
+    f(&lua);
 }
 
 #[test]
@@ -30,7 +28,7 @@ fn setters_write_through_and_getters_read_back() {
         id,
         ComponentKind::parse("LODGroup").unwrap()
     ));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "LODGroup.SetSize({id}, 2.5)

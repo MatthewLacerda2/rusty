@@ -79,6 +79,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             landed.add(number)
         elif state in fx.ends:
             done.add(number)
+        elif state == outcomes.REQUEUED:
+            pass  # a train's member back in line as it was (#1785): nothing to remember
         elif state in fx.skips:
             fx.sleep(opts.poll)
         elif state in fx.stops:
@@ -179,10 +181,25 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             said = order.reordered(chosen, order.pick(pulls, labels, memory, done, fx.bots), counts)
             if said:
                 fx.say(said)
-        fx.say(f"watch: taking #{number}.")
-        line.took(number)
-        stop = settle(number, fx.turn(number, tick), chosen.get("headRefOid", ""))
+        yard = getattr(fx, "trains", None)  # a merge train, when the watch runs them (#1785)
+        members, train, notes = yard.form(order.line(pulls, labels, memory, done, fx.bots, clashes, aged)) if yard else ([chosen], None, [])
+        for note in notes:
+            fx.say(note)
+        if train is None:
+            number = members[0]["number"]
+            fx.say(f"watch: taking #{number}.")
+            line.took(number)
+            rode, halt = [fx.turn(number, tick)], None
+        else:
+            fx.say(f"watch: taking {', '.join(f'#{n}' for n in train.numbers)} together.")
+            line.took(*train.numbers)  # one take: one pass for those behind it, none for its members
+            rode, halt = yard.ride(train, tick)
+        heads = {p["number"]: p.get("headRefOid", "") for p in members}
+        stops = [settle(r[0], r, heads.get(r[0], "")) for r in rode]  # every member, then the first stop
+        stop = next((s for s in stops if s), None)
         save()
+        if halt:
+            return results, *halt
         if stop:
             return results, stop, ending.status(handed, True)
         last = None  # the merge moved `main` and the listing; look afresh

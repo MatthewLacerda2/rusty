@@ -1,10 +1,11 @@
 //! Tests for the one-button lighting bake orchestration (#246). Sibling of
 //! `lighting.rs`; shares its 300-line source cap.
 //!
-//! These cover the PLACEMENT + ORCHESTRATION contract, which runs adapter-free: the
-//! GPU bakes skip gracefully when no adapter is present (`ran_*` = false), but the
-//! auto-placement that precedes them still populates both probe sets. The deep GPU
-//! bake behaviour is owned by `render::probe_bake_tests` / `render::reflection_bake_tests`.
+//! These cover the PLACEMENT + ORCHESTRATION contract. The GPU bakes skip gracefully
+//! when no adapter is present (`ran_*` = false); the report still counts what was
+//! planned, but nothing reaches the scene, which keeps its old lighting (#1737,
+//! `steps::staging_tests`). The deep GPU bake behaviour is owned by
+//! `render::probe_bake_tests` / `render::reflection_bake_tests`.
 
 use glam::Vec3;
 
@@ -32,9 +33,8 @@ fn room_scene() -> Scene {
     scene
 }
 
-/// On a static scene with no probes, the bake auto-places BOTH sets. The GPU bakes
-/// skip without an adapter, but placement has already populated the world — the
-/// "place well + bake right now" acceptance, minus the adapter-bound bake itself.
+/// On a static scene with no probes, the bake auto-places BOTH sets and, with an
+/// adapter, applies them: the "place well + bake right now" acceptance.
 #[test]
 fn gpu_auto_places_both_sets_on_empty_scene() {
     let dir = crate::test_temp::dir().join("rusty_lighting_bake_test");
@@ -71,39 +71,100 @@ fn gpu_auto_places_both_sets_on_empty_scene() {
         report.reflection_probes > 0,
         "subdivision produced reflection probes"
     );
+    if !report.ran_light_bake {
+        return; // no adapter: nothing was applied
+    }
     assert_eq!(scene.probes.probes.len(), report.light_probes);
     assert_eq!(scene.reflection_probes.len(), report.reflection_probes);
 }
 
-/// Manually-authored probes are NOT clobbered: a scene that already carries a probe in
-/// each set is rebaked in place, with no auto-placement (the documented per-set rule).
+/// Manual probes survive a re-placement unchanged (#1737): every bake replaces
+/// only the placed probes, keeps the manual ones with their position, box and
+/// settings, and leaves the room a manual reflection probe covers to it.
 #[test]
-fn gpu_manual_probes_are_kept_not_replaced() {
+fn gpu_manual_probes_survive_a_replacement() {
     let dir = crate::test_temp::dir().join("rusty_lighting_bake_test");
     let _ = std::fs::create_dir_all(&dir);
     let scene_path = dir.join("manual.scene");
     let scene_path = scene_path.to_str().unwrap();
 
+    let (mut scene, manual) = with_manual_probes();
+    let params = LightingBakeParams {
+        probe_spacing: 10.0,
+        ..Default::default()
+    };
+    let bake = |scene: &mut Scene| {
+        bake_lighting(
+            scene,
+            Some(scene_path),
+            None,
+            params,
+            &mut |_| {},
+            &mut BakeLog::off(),
+        )
+        .expect("rebake never errors with a scene path")
+    };
+    let first = bake(&mut scene);
+    let second = bake(&mut scene);
+    assert!(first.auto_placed_light && first.auto_placed_reflection);
+    assert_eq!(first, second, "a re-placement places the same");
+    if !first.ran_light_bake {
+        return; // no adapter: nothing was applied
+    }
+    assert_manual_kept(&scene, &manual);
+}
+
+/// The room with a manual light probe, a placed one, and a manual reflection
+/// probe (returned as it was before any bake).
+fn with_manual_probes() -> (Scene, crate::scene::ReflectionProbe) {
     let mut scene = room_scene();
-    scene.probes.add_probe(Vec3::new(1.0, 1.0, 1.0));
-    scene
-        .reflection_probes
-        .add(Vec3::new(2.0, 2.0, 2.0), Vec3::splat(3.0));
+    scene.lighting_settings.reflections.resolution = 16;
+    let light = scene.probes.add_probe(Vec3::new(1.0, 4.0, 1.0));
+    scene.probes.set_manual(light, true);
+    // A probe the placement made in an earlier bake: it is replaced.
+    scene.probes.add_probe(Vec3::new(-9.0, 4.0, -9.0));
+    let set = &mut scene.reflection_probes;
+    let mine = set.add(Vec3::new(5.0, 4.6, 5.0), Vec3::splat(3.0));
+    set.edit(mine, |p| (p.manual, p.intensity) = (true, 2.5));
+    let manual = set.probes[mine].clone();
+    (scene, manual)
+}
 
-    let report = bake_lighting(
-        &mut scene,
-        Some(scene_path),
-        None,
-        LightingBakeParams::default(),
-        &mut |_| {},
-        &mut BakeLog::off(),
-    )
-    .expect("rebake never errors with a scene path");
-
-    assert!(!report.auto_placed_light, "manual light set kept");
-    assert!(!report.auto_placed_reflection, "manual reflection set kept");
-    assert_eq!(report.light_probes, 1);
-    assert_eq!(report.reflection_probes, 1);
+/// The manual probes are as they were, the placed one is gone, and no placed
+/// reflection probe stands in the manual one's box.
+fn assert_manual_kept(scene: &Scene, manual: &crate::scene::ReflectionProbe) {
+    assert_eq!(scene.probes.probes[0].position, Vec3::new(1.0, 4.0, 1.0));
+    assert!(scene.probes.probes[0].manual);
+    assert_eq!(scene.probes.probes.iter().filter(|p| p.manual).count(), 1);
+    let old = Vec3::new(-9.0, 4.0, -9.0);
+    assert!(
+        !scene.probes.probes.iter().any(|p| p.position == old),
+        "the old placed probe is replaced"
+    );
+    let kept = &scene.reflection_probes.probes[0];
+    assert_eq!(
+        (
+            kept.position,
+            kept.box_min,
+            kept.box_max,
+            kept.intensity,
+            kept.manual
+        ),
+        (
+            manual.position,
+            manual.box_min,
+            manual.box_max,
+            manual.intensity,
+            true
+        ),
+    );
+    for p in &scene.reflection_probes.probes[1..] {
+        assert!(!p.manual);
+        assert!(
+            !manual.contains(p.position),
+            "the manual probe's room is its own"
+        );
+    }
 }
 
 /// An empty scene (no static geometry) places nothing and still succeeds — both bakes
