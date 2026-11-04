@@ -52,7 +52,9 @@ pub struct World {
     /// Every entity's `activeInHierarchy`, kept (`ecs::activity`).
     pub(super) activity: ActivityStore,
     /// Every channel's change log and the cursors' epoch (`ecs::changes`, #1705).
-    pub(super) changes: ChangeLogs,
+    /// In a `RefCell` so a reader holding `&World` (the renderer) can open and read a
+    /// cursor; every stamp takes `&mut World` and reaches it with `get_mut` (#1706).
+    pub(super) changes: std::cell::RefCell<ChangeLogs>,
     /// The edit-mode change journal the editor's Undo reads (`ecs::journal`, #1631).
     pub(super) journal: Journal,
     /// Who names whom, opened by the first despawn (`ecs::despawn`, #1708).
@@ -78,7 +80,7 @@ impl World {
             world_space: WorldStore::default(),
             bounds: BoundsQueue::default(),
             activity: ActivityStore::default(),
-            changes: ChangeLogs::default(),
+            changes: Default::default(),
             journal: Journal::default(),
             refs: None,
             awaited: BTreeMap::new(),
@@ -171,7 +173,7 @@ impl World {
         self.handles.clear();
         self.order.clear();
         self.journal = Journal::default();
-        self.changes.new_epoch();
+        self.changes.get_mut().new_epoch();
         self.next_id = 1;
         self.next_seq = 0;
         self.reset_caches();

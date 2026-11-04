@@ -13,7 +13,7 @@ pub(crate) mod resources;
 mod solid_key;
 pub(crate) mod stack;
 pub(crate) mod uniforms;
-mod visibility;
+pub(crate) mod visibility;
 
 #[cfg(test)]
 mod inactive_parent_tests;
@@ -60,8 +60,12 @@ impl Renderer {
             self.global_bind_group_dirty = true;
         }
 
-        // Build + write the camera-independent lighting uniform once.
+        // Build + write the camera-independent lighting uniform once (it starts the
+        // frame's counters).
         self.upload_lighting(scene);
+        // The retained objects, brought up to date once every renderer-side input
+        // their keys and instances read is settled (#1706).
+        self.extract_scene(scene);
         // The sky's reflection cube (#1553), baked only when the sky changed: a new
         // panorama, or procedural sky settings no cube holds (#1620).
         let gpu = (&self.device, &self.queue);
@@ -194,20 +198,16 @@ impl Renderer {
         self.grade_bake.luts.refresh();
         // And the lens dirt bloom lights (#1442), once its files are fresh.
         self.load_lens_dirt(scene);
-        self.upload_scene_meshes(scene);
-        self.surface_shaders.refresh();
+        if self.surface_shaders.refresh() {
+            self.retained.touch(); // a re-built slot may change its pipeline id
+        }
         // An entity whose last shader-param override was cleared draws with its
         // material's shared group again; free the buffer and group it owned (#670).
         let overrides = &scene.shader_overrides;
         self.materials
             .release_entities(scene.id(), |id| overrides.has(id));
-        // The material maps the shader samples (albedo #201, metallic/roughness #202),
-        // collected paths-only first to end the scene borrow before uploading.
-        // Every entity's, active or not: re-enabling one must not stall on uploads
-        // and mip generation (#1363).
-        for (path, kind) in material_map_paths(scene, |_| true) {
-            self.load_texture_as(&path, kind);
-        }
+        // The meshes and the material maps are uploaded by the extract, for the
+        // objects it re-derives (`render::scene`, #1706).
 
         // Update skybox texture if path changed, marking the global bind group dirty
         // so it is rebuilt once (next frame) rather than every camera every frame —
@@ -238,9 +238,8 @@ impl Renderer {
 
 /// The resolved material map paths (albedo, metallic, roughness, normal, emissive,
 /// then the extra shader texture slots, #400) the forward shader samples, of every
-/// entity `admit` passes, gathered as owned `MapRef`s so the scene borrow ends
-/// before the textures are uploaded (#202, #207), each with what its slot holds
-/// (#1322).
+/// entity `admit` passes, each with what its slot holds (#1322): which render
+/// textures a frame's materials name (`render_texture`).
 pub(crate) fn material_map_paths(
     scene: &Scene,
     admit: impl Fn(u32) -> bool,

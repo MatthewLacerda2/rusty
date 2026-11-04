@@ -21,10 +21,10 @@ impl World {
     pub(in crate::ecs) fn touch<T: Channel>(&mut self, id: u32) {
         const { assert!(T::COLUMN, "a derived channel is stamped at its source") };
         self.note(id);
-        if self.changes.logs.len() == 1 {
+        if self.changes.get_mut().logs.len() == 1 {
             return; // only `StaticSet` exists: no column was ever opened
         }
-        if let Some(at) = self.changes.find::<T>() {
+        if let Some(at) = self.changes.get_mut().find::<T>() {
             self.stamp_at(at, id);
         }
     }
@@ -39,16 +39,16 @@ impl World {
         if is_static {
             self.stamp_static(id);
         }
-        if self.changes.logs.len() == 1 {
+        if self.changes.get_mut().logs.len() == 1 {
             return;
         }
         let live = self.order.len();
-        for log in self.changes.logs.iter_mut().filter(|l| l.column) {
+        for log in self.changes.get_mut().logs.iter_mut().filter(|l| l.column) {
             log.stamp(id, live);
         }
         for at in [
-            self.changes.find::<Activity>(),
-            self.changes.find::<Layer>(),
+            self.changes.get_mut().find::<Activity>(),
+            self.changes.get_mut().find::<Layer>(),
         ] {
             at.into_iter().for_each(|at| self.stamp_at(at, id));
         }
@@ -56,7 +56,7 @@ impl World {
 
     fn stamp_at(&mut self, at: usize, id: u32) {
         let live = self.order.len();
-        self.changes.logs[at].stamp(id, live);
+        self.changes.get_mut().logs[at].stamp(id, live);
     }
 
     /// `id`'s membership of the static set may have changed ([`super::StaticSet`]).
@@ -66,7 +66,7 @@ impl World {
 
     /// `id`'s layer changed ([`Layer`]).
     pub(in crate::ecs) fn stamp_layer(&mut self, id: u32) {
-        if let Some(at) = self.changes.find::<Layer>() {
+        if let Some(at) = self.changes.get_mut().find::<Layer>() {
             self.stamp_at(at, id);
         }
     }
@@ -76,8 +76,8 @@ impl World {
     /// children): stamp the subtree on [`Activity`], and its static entities on
     /// [`super::StaticSet`].
     pub(in crate::ecs) fn stamp_hierarchy_below(&mut self, id: u32) {
-        let activity = self.changes.find::<Activity>();
-        if activity.is_none() && !self.changes.logs[STATIC].recording {
+        let activity = self.changes.get_mut().find::<Activity>();
+        if activity.is_none() && !self.changes.get_mut().logs[STATIC].recording {
             if self.self_and_descendants(id).any(|e| self.is_static(e)) {
                 self.stamp_static(id); // unrecorded: only the revision moves
             }
@@ -99,10 +99,10 @@ impl World {
     /// a subtree walk, so its subtree was stamped with it (an entity joining it
     /// since was moved, and walked, itself).
     pub(in crate::ecs) fn stamp_pose_below(&mut self, id: u32) {
-        let Some(at) = self.changes.find::<WorldPose>() else {
+        let Some(at) = self.changes.get_mut().find::<WorldPose>() else {
             return;
         };
-        if self.changes.logs[at].pending(id) {
+        if self.changes.get_mut().logs[at].pending(id) {
             return;
         }
         let below: Vec<u32> = self.self_and_descendants(id).collect();

@@ -58,13 +58,18 @@ impl Renderer {
         }
         self.gpu_textures
             .retain(|path, _| !is_render_texture(path.as_str()));
-        self.render_texture_ids.0.clear();
+        let before = std::mem::take(&mut self.render_texture_ids.0);
         for (path, slot) in &mut rts.slots {
             let (w, h) = slot.size;
             slot.view.resize(&self.device, w, h);
             self.gpu_textures
                 .insert(MapRef::new(path.clone()), Rc::clone(&slot.front));
             self.render_texture_ids.0.insert(path.clone(), slot.id);
+        }
+        // A material group binding an `rt:` map names its allocation: a new set
+        // re-keys every retained object (#1706).
+        if self.render_texture_ids.0 != before {
+            self.retained.touch();
         }
     }
 

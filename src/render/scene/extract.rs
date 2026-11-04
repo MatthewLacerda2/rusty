@@ -1,0 +1,131 @@
+//! src/render/scene/extract.rs — the one extract step a frame takes (#1706): bring
+//! the drawn scene's retained objects up to date from what changed, uploading the
+//! meshes and loading the maps of the objects it re-derives first, so their keys bind
+//! what is resident.
+
+use std::collections::BTreeSet;
+
+use super::inputs::{Dirty, Inputs, RendererInputs};
+use super::{ExtractStats, RenderScene};
+use crate::render::draw::materials::material_maps;
+use crate::render::Renderer;
+use crate::scene::Scene;
+
+impl Renderer {
+    /// Bring `scene`'s retained objects up to date. Once per frame, after everything
+    /// a key or instance reads on the renderer is settled (`prepare_frame`).
+    pub(crate) fn extract_scene(&mut self, scene: &Scene) {
+        let start = std::time::Instant::now();
+        let mut retained = self.retained.take(scene.id());
+        let last = self.update_objects(scene, &mut retained);
+        retained.last = last;
+        self.retained.put(scene.id(), retained);
+        self.frame_counters.render_extracted += last.extracted;
+        self.frame_counters.render_posed += last.posed;
+        self.frame_counters.render_extract_us += start.elapsed().as_micros() as u64;
+    }
+
+    /// The renderer-side inputs every object reads, as they are now.
+    fn renderer_inputs(&self) -> RendererInputs {
+        RendererInputs {
+            revision: self.retained.inputs,
+            lightmaps_resident: self.lightmaps.resident(),
+            lightmaps_directional: self.lightmaps.directional(),
+            static_only: self.capture.static_only,
+            probe_bounce: self.capture.probe_bounce,
+        }
+    }
+
+    fn update_objects(&mut self, scene: &Scene, rs: &mut RenderScene) -> ExtractStats {
+        let now = self.renderer_inputs();
+        let dirty = match &mut rs.inputs {
+            Some(inputs) => inputs.read(scene, now),
+            None => {
+                rs.inputs = Some(Inputs::open(scene, now));
+                Dirty::Rebuild
+            }
+        };
+        let stats = match dirty {
+            Dirty::Rebuild => self.rebuild_objects(scene, rs),
+            Dirty::Some { whole, posed } => self.update_some(scene, rs, whole, posed),
+        };
+        let inputs = rs.inputs.as_mut().expect("opened above");
+        inputs.uploads_seen = self.retained.meshes.uploads();
+        stats
+    }
+
+    /// Every mesh entity re-derived: the first frame, a load, an Undo, a renderer
+    /// input. The one walk of the World an extract takes.
+    fn rebuild_objects(&mut self, scene: &Scene, rs: &mut RenderScene) -> ExtractStats {
+        let ids = scene.world.ids_with_mesh();
+        self.upload_meshes_of(scene, &ids);
+        self.load_maps_of(scene, &ids);
+        rs.objects.clear();
+        rs.order.clear();
+        for &id in &ids {
+            let object = self.extract_object(scene, id);
+            rs.set(id, object);
+        }
+        ExtractStats {
+            extracted: ids.len() as u32,
+            posed: 0,
+            rebuilt: true,
+        }
+    }
+
+    fn update_some(
+        &mut self,
+        scene: &Scene,
+        rs: &mut RenderScene,
+        mut whole: BTreeSet<u32>,
+        posed: BTreeSet<u32>,
+    ) -> ExtractStats {
+        let changed: Vec<u32> = whole.iter().copied().collect();
+        self.upload_meshes_of(scene, &changed);
+        // A geometry re-uploaded since the last extract (by this scene, another or a
+        // mesh particle) re-shapes every object drawing it. Walked only then.
+        let seen = rs.inputs.as_ref().map_or(0, |i| i.uploads_seen);
+        if self.retained.meshes.uploads() > seen {
+            let meshes = &self.retained.meshes;
+            let reshaped = rs.objects.iter();
+            let reshaped = reshaped.filter(|(_, o)| meshes.uploaded_since(o.mesh, seen));
+            whole.extend(reshaped.map(|(&id, _)| id));
+        }
+        let whole: Vec<u32> = whole.into_iter().collect();
+        self.load_maps_of(scene, &whole);
+        for &id in &whole {
+            let object = self.extract_object(scene, id);
+            rs.set(id, object);
+        }
+        let mut moved = 0;
+        for id in posed
+            .into_iter()
+            .filter(|id| whole.binary_search(id).is_err())
+        {
+            if let Some(object) = rs.objects.get_mut(&id) {
+                self.pose_object(scene, id, object);
+                moved += 1;
+            }
+        }
+        ExtractStats {
+            extracted: whole.len() as u32,
+            posed: moved,
+            rebuilt: false,
+        }
+    }
+
+    /// Load every map the materials of `entities` sample (albedo #201, metallic and
+    /// roughness #202, the rest and the shader texture slots #400), each as what its
+    /// slot holds (#1322), before their keys are built. Inactive entities' too:
+    /// re-enabling one must not stall on uploads and mip generation (#1363).
+    fn load_maps_of(&mut self, scene: &Scene, entities: &[u32]) {
+        for &id in entities {
+            let maps = scene
+                .material_assets_of(id)
+                .flat_map(|m| material_maps(Some(m)));
+            for (path, kind) in maps {
+                self.load_texture_as(&path, kind);
+            }
+        }
+    }
+}

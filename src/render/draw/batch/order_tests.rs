@@ -3,7 +3,7 @@
 //! key order. No GPU.
 
 use super::sort::depth_bucket;
-use super::tests::item;
+use super::tests::{item, name};
 use super::{DrawItem, FrameDraws};
 
 /// `item` of mesh `mesh`, tagged `tag`, at view depth `depth`.
@@ -15,7 +15,7 @@ fn at(mesh: &str, tag: f32, depth: f32) -> DrawItem {
 }
 
 fn meshes(draws: &FrameDraws) -> Vec<&str> {
-    draws.opaque.iter().map(|b| b.key.mesh.0.as_str()).collect()
+    draws.opaque.iter().map(|b| name(b.key.mesh)).collect()
 }
 
 #[test]

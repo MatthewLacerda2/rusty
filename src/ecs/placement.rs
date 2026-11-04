@@ -22,6 +22,13 @@ use super::bundle::{build_bundle, Core};
 use super::world::World;
 
 impl World {
+    /// `id`'s insertion sequence: the order every `ids_with_*` walk yields it in
+    /// (`None` for a dead id). A cache holding entities in that order keys on it
+    /// (the retained render scene, #1706).
+    pub fn seq(&self, id: u32) -> Option<u64> {
+        self.component::<Core>(id).map(|c| c.seq)
+    }
+
     /// Spawn a hecs entity carrying every column of `entity`, at the back of the
     /// insertion order under a fresh sequence stamp.
     pub(super) fn place(&mut self, entity: Entity) {

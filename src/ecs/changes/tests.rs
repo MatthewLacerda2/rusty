@@ -85,7 +85,7 @@ fn a_cleared_world_an_undo_step_and_another_world_read_rebuild() {
     w.rewind_changes();
     assert_eq!(w.changes(&mut cursor), Changes::Rebuild, "an Undo step");
 
-    let (mut other, _) = world_of(1);
+    let (other, _) = world_of(1);
     assert_eq!(
         other.changes(&mut cursor),
         Changes::Rebuild,

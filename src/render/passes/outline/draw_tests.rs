@@ -25,7 +25,12 @@ fn forward_draws(r: &mut Renderer, scene: &Scene, centre: Vec3) -> FrameDraws {
 
 /// `draws` outlines exactly `ids`, each from the forward draw that drew it; returns
 /// each outline's bone palette base, in `ids` order.
-fn assert_outlines_forward(scene: &Scene, draws: &FrameDraws, ids: &[u32]) -> Vec<u32> {
+fn assert_outlines_forward(
+    r: &Renderer,
+    scene: &Scene,
+    draws: &FrameDraws,
+    ids: &[u32],
+) -> Vec<u32> {
     assert_eq!(
         draws.outline.len(),
         ids.len(),
@@ -46,7 +51,10 @@ fn assert_outlines_forward(scene: &Scene, draws: &FrameDraws, ids: &[u32]) -> Ve
                 .expect("the outline's instance is a forward draw's");
             let mesh = MeshId::from_mesh(&scene.world.mesh(id).unwrap());
             assert_eq!(
-                (&outline.mesh, &forward.key.mesh),
+                (
+                    r.retained.meshes.id(outline.mesh),
+                    r.retained.meshes.id(forward.key.mesh)
+                ),
                 (&mesh, &mesh),
                 "{id}: mesh"
             );
@@ -71,20 +79,20 @@ fn gpu_the_outline_draws_from_the_forward_draw() {
         let (scene, centre) = selected_child(mirrored);
         let child = scene.selected_entity_id.unwrap();
         let draws = forward_draws(&mut r, &scene, centre);
-        assert_outlines_forward(&scene, &draws, &[child]);
+        assert_outlines_forward(&r, &scene, &draws, &[child]);
     }
 
     let scene = posed_sphere(Vec3::X * 0.4);
     let soldier = scene.selected_entity_id.unwrap();
     let draws = forward_draws(&mut r, &scene, Vec3::ZERO);
-    let bases = assert_outlines_forward(&scene, &draws, &[soldier]);
+    let bases = assert_outlines_forward(&r, &scene, &draws, &[soldier]);
     assert_ne!(bases, [0], "a posed skin's outline binds its palette");
 
     // LOD1 shows: selecting the group rings its two renderers, not LOD0.
     let (mut scene, [group, _, body, hat]) = lod_switched();
     scene.selected_entity_id = Some(group);
     let draws = forward_draws(&mut r, &scene, Vec3::ZERO);
-    assert_outlines_forward(&scene, &draws, &[body, hat]);
+    assert_outlines_forward(&r, &scene, &draws, &[body, hat]);
 }
 
 #[test]
