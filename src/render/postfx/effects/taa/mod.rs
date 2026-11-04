@@ -147,6 +147,29 @@ impl TaaPasses {
         }
     }
 
+    /// The resolve's bind group: `h`'s params, this frame's `current` image, the
+    /// history frame `read` and the `velocity` target.
+    fn group(
+        &self,
+        device: &wgpu::Device,
+        h: &TaaHistory,
+        read: usize,
+        current: &wgpu::TextureView,
+        velocity: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("TAA Bind Group"),
+            layout: &self.layout,
+            entries: &[
+                entry(0, h.params.as_entire_binding()),
+                entry(1, wgpu::BindingResource::TextureView(current)),
+                entry(2, wgpu::BindingResource::TextureView(&h.frames[read].view)),
+                entry(3, wgpu::BindingResource::TextureView(velocity)),
+                entry(4, wgpu::BindingResource::Sampler(&self.sampler)),
+            ],
+        })
+    }
+
     /// The pipelines, for warming (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
         [&self.resolve, &self.upscale]
@@ -175,17 +198,8 @@ impl PostFx {
         let (read, write) = (h.latest, 1 - h.latest);
         let params = TaaParams::new(h.size, h.size, h.valid, h.pixels);
         queue.write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
-        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("TAA Bind Group"),
-            layout: &passes.layout,
-            entries: &[
-                entry(0, h.params.as_entire_binding()),
-                entry(1, wgpu::BindingResource::TextureView(self.focused_color())),
-                entry(2, wgpu::BindingResource::TextureView(&h.frames[read].view)),
-                entry(3, wgpu::BindingResource::TextureView(velocity)),
-                entry(4, wgpu::BindingResource::Sampler(&passes.sampler)),
-            ],
-        });
+        let current = self.focused_color();
+        let group = passes.group(device, h, read, current, velocity);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("TAA Encoder"),
         });

@@ -19,7 +19,6 @@
 //! landed, so a sample far from the pixel only nudges it.
 
 use super::{TaaHistory, TaaParams};
-use crate::render::gpu::bind_entry as entry;
 use crate::render::postfx::{PostFx, PostFxContext};
 use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
@@ -48,17 +47,7 @@ impl Renderer {
         let params = TaaParams::new(h.size, (scene.width, scene.height), h.valid, h.pixels);
         self.queue
             .write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
-        let group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("TAA Upscale Bind Group"),
-            layout: &passes.layout,
-            entries: &[
-                entry(0, h.params.as_entire_binding()),
-                entry(1, wgpu::BindingResource::TextureView(scaled)),
-                entry(2, wgpu::BindingResource::TextureView(&h.frames[read].view)),
-                entry(3, wgpu::BindingResource::TextureView(velocity)),
-                entry(4, wgpu::BindingResource::Sampler(&passes.sampler)),
-            ],
-        });
+        let group = passes.group(&self.device, h, read, scaled, velocity);
         let sky = self.sky_panorama();
         let ctx = PostFxContext {
             depth_view: &view.depth_view,
