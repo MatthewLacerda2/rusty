@@ -29,8 +29,10 @@ and so the saved cache, as it was.
 **Fail toward running.** Any error (an API failure, a field missing, a compare
 too long to read) answers no, and the push runs every gate as before.
 
-Writes `proved=true|false` and `run=<url>` to `$GITHUB_OUTPUT` when set, prints
-the reason, and always exits 0: a broken lookup must not turn `main` red.
+Writes `proved=true|false` to `$GITHUB_OUTPUT` when set, prints the reason
+(with the proving run's url), and exits 0 on every answer it reaches. What it
+cannot catch (no `gh`, a hung call) the workflow step absorbs: it runs with
+`continue-on-error` and a short timeout, and an empty output means a full run.
 Env: `GH_TOKEN`, `GITHUB_REPOSITORY`.
 """
 
@@ -116,7 +118,7 @@ def built(jobs: list[dict], workflow: str) -> bool:
     return True
 
 
-def proving_run(get: Get, repo: str, tree: str, workflow: str, run_id: str) -> str | None:
+def proving_run(get: Get, repo: str, tree: str, workflow: str) -> str | None:
     """The url of a successful run of `workflow` that built `tree`, if one is recent."""
     for page in range(1, PAGES + 1):
         answer = get(f"repos/{repo}/actions/workflows/{workflow}/runs?status=success"
@@ -125,7 +127,7 @@ def proving_run(get: Get, repo: str, tree: str, workflow: str, run_id: str) -> s
             raise LookupError("the runs list did not come")
         runs = answer["workflow_runs"]
         for run in runs:
-            if str(run["id"]) == run_id or (run.get("head_commit") or {}).get("tree_id") != tree:
+            if (run.get("head_commit") or {}).get("tree_id") != tree:
                 continue
             jobs = get(f"repos/{repo}/actions/runs/{run['id']}/jobs?filter=latest&per_page=100")
             if not isinstance(jobs, dict):
@@ -137,7 +139,7 @@ def proving_run(get: Get, repo: str, tree: str, workflow: str, run_id: str) -> s
     return None
 
 
-def verdict(get: Get, repo: str, workflow: str, sha: str, before: str, run_id: str = "") -> tuple[str | None, str]:
+def verdict(get: Get, repo: str, workflow: str, sha: str, before: str) -> tuple[str | None, str]:
     """(the proving run's url or `None`, why), failing toward running on any error."""
     try:
         why = key_change(get, repo, before, sha, workflow)
@@ -147,7 +149,7 @@ def verdict(get: Get, repo: str, workflow: str, sha: str, before: str, run_id: s
         if not isinstance(commit, dict):
             return None, "runs in full: the pushed commit could not be read"
         tree = commit["commit"]["tree"]["sha"]
-        url = proving_run(get, repo, tree, workflow, run_id)
+        url = proving_run(get, repo, tree, workflow)
     except (KeyError, TypeError, LookupError) as error:
         return None, f"runs in full: the lookup failed ({error!r})"
     if url is None:
@@ -160,16 +162,15 @@ def main() -> int:
     parser.add_argument("--workflow", required=True, choices=sorted(BUILT))
     parser.add_argument("--sha", required=True)
     parser.add_argument("--before", default="")
-    parser.add_argument("--run-id", default="", help="this run, never its own proof")
     args = parser.parse_args()
     repo = os.environ.get("GITHUB_REPOSITORY", "")
-    url, why = verdict(gh_get, repo, args.workflow, args.sha, args.before, args.run_id) if repo else (
+    url, why = verdict(gh_get, repo, args.workflow, args.sha, args.before) if repo else (
         None, "runs in full: GITHUB_REPOSITORY is not set")
     print(f"{args.workflow} on {args.sha} {why}")
     out = os.environ.get("GITHUB_OUTPUT")
     if out:
         with open(out, "a", encoding="utf-8") as sink:
-            sink.write(f"proved={'true' if url else 'false'}\nrun={url or ''}\n")
+            sink.write(f"proved={'true' if url else 'false'}\n")
     return 0
 
 

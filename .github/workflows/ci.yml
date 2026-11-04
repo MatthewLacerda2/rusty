@@ -66,7 +66,6 @@ jobs:
       pull-requests: read  # paths-filter reads a PR's changed files
     outputs:
       code: ${{ steps.proved.outputs.proved == 'true' && 'false' || steps.filter.outputs.code || 'true' }}
-      proved-by: ${{ steps.proved.outputs.run }}
     steps:
       # On `pull_request` paths-filter reads the changed files from the API and
       # needs no clone; on `push` it diffs `github.event.before..HEAD` in a local
@@ -93,15 +92,19 @@ jobs:
               - 'docs/game-agent.md'
               - 'src/core/project/game_claude.md'
       # Only a push asks, and only when it changes code: a Markdown-only merge
-      # already skips. The nightly and a dispatch always build.
+      # already skips. The nightly and a dispatch always build. A lookup that
+      # breaks (no `gh`, a hung call) must not fail `changes` and turn `main`
+      # red: the step may fail or time out, and its empty output means a full run.
       - name: Was this tree already proved?
         id: proved
         if: github.event_name == 'push' && steps.filter.outputs.code != 'false'
+        continue-on-error: true
+        timeout-minutes: 2
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           python3 .github/scripts/proved_tree.py --workflow ci.yml
-          --sha "${{ github.sha }}" --before "${{ github.event.before }}" --run-id "${{ github.run_id }}"
+          --sha "${{ github.sha }}" --before "${{ github.event.before }}"
 
   # The Linux build+test. Kept as its own job (not folded into the OS matrix
   # below) so the `build-test` name `mergeable.py` and `ci-gate`'s `needs:` read

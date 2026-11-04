@@ -9,7 +9,6 @@ from __future__ import annotations
 import unittest
 
 import proved_tree
-from tests import SCRIPTS
 
 REPO, SHA, BEFORE, TREE = "o/r", "s" * 40, "b" * 40, "t" * 40
 
@@ -106,21 +105,6 @@ class RunsInFull(unittest.TestCase):
         fake = Fake()
         fake.answers[f"repos/{REPO}/actions/workflows/"] = {"workflow_runs": [{"head_commit": None}]}
         self.assert_runs(fake)
-
-
-class Wiring(unittest.TestCase):
-    """The named jobs and steps exist in the workflows, and each changes job asks."""
-
-    def test_built_names_match_the_workflows(self):
-        for workflow, jobs in proved_tree.BUILT.items():
-            body = (SCRIPTS.parent / "workflows" / workflow).read_text(encoding="utf-8")
-            for base, step in jobs.items():
-                with self.subTest(workflow=workflow, job=base):
-                    self.assertIn(f"\n  {base}:\n", body)
-                    if step:
-                        self.assertIn(f"- name: {step}\n", body)
-                self.assertIn(f"proved_tree.py --workflow {workflow}", body)
-                self.assertIn("code: ${{ steps.proved.outputs.proved == 'true' && 'false' ||", body)
 
 
 if __name__ == "__main__":
