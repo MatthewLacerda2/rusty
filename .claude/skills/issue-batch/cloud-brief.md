@@ -239,7 +239,9 @@ Beyond what changed, why, the effect and the decisions:
   as, e.g. `Co-Authored-By: Claude <model> <noreply@anthropic.com>`.
 - Push often: a dead container takes its uncommitted work with it.
 - Green gates and a branch that holds the latest `main` → mark the PR **ready for review**, and end.
-- **Do NOT merge, and do not review your own PR.** The independent review is the
+- **Do NOT merge, and do not review your own PR**, nor write its
+  `Independent review` or `No review:` comment: the queue reads those as the
+  orchestrator's decision (#1764). The independent review is the
   orchestrator's (`independent-review`): it dispatches a reviewer that never saw
   your reasoning, which one you spawn cannot be. A brief that says the PR "gets an
   independent review" means the orchestrator will run one. PR #1184's coder ran its

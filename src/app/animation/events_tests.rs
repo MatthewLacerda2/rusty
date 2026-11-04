@@ -116,8 +116,8 @@ fn a_clip_being_faded_out_is_silent_and_the_incoming_one_fires() {
 fn a_blend_tree_fires_only_its_dominant_child() {
     let mut tree = tree_node("Loco", &[("A", 2.0), ("Run", 6.0)]);
     if let Some(BlendTree::Simple1D { children, .. }) = &mut tree.blend_tree {
-        children[0].events = marks(&[("walkStep", 0.5)]);
-        children[1].events = marks(&[("runStep", 1.0)]); // phase 0.5 of 2 s
+        children[0].motion.events = marks(&[("walkStep", 0.5)]);
+        children[1].motion.events = marks(&[("runStep", 1.0)]); // phase 0.5 of 2 s
     }
     let graph = graph_of(tree);
     let mut anim = rig(&graph).1;

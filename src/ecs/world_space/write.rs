@@ -4,10 +4,12 @@
 //! lands back in the world when the guard drops. Landing is where a write takes effect
 //! in world space, once, for every writer (a script's `Transform.Set*`, a tween, the
 //! editor, the physics write-back, IK, the Animator): when the value changed, the
-//! entity is queued as moved ([`World::moved`]), O(1): its subtree's matrices go dirty
+//! entity is queued as moved ([`World::moved`]), O(1) (with a `WorldPose` cursor open,
+//! its subtree is stamped there too, `ecs::changes`): its subtree's matrices go dirty
 //! before the next read and its colliders' AABBs are due a refresh (#1157). An
-//! unchanged value lands as a no-op, so a guard taken only to read moves nothing
-//! (a recording journal still notes the entity, `ecs::journal`).
+//! unchanged value lands as a no-op, so a guard taken only to read moves nothing and
+//! stamps no change channel (a recording journal still notes the entity,
+//! `ecs::journal`).
 
 use std::ops::{Deref, DerefMut};
 
@@ -61,15 +63,19 @@ impl World {
         })
     }
 
+    /// Compared before the column is borrowed mutably, which stamps it: a body that
+    /// physics writes back every tick without moving names nothing (#1705).
     fn land_transform(&mut self, id: u32, value: TransformComponent) {
-        let Some(mut stored) = self.component_mut::<TransformComponent>(id) else {
+        let Some(unchanged) = self.transform(id).map(|stored| same(&stored, &value)) else {
             return;
         };
-        if same(&stored, &value) {
+        if unchanged {
+            self.note(id);
             return;
         }
-        *stored = value;
-        drop(stored);
+        if let Some(mut stored) = self.component_mut::<TransformComponent>(id) {
+            *stored = value;
+        }
         self.moved(id);
     }
 }

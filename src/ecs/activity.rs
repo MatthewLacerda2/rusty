@@ -128,11 +128,10 @@ impl World {
         self.activity.invalidate_all();
     }
 
-    /// Every cached world matrix and activity answer forgotten (a `clear`), and every
-    /// static-geometry cache outside the World told so (`World::static_revision`).
+    /// Every cached world matrix and activity answer forgotten (a `clear`; the change
+    /// logs' new epoch moves `World::static_revision` too).
     pub(in crate::ecs) fn reset_caches(&mut self) {
         self.world_space.reset();
         self.activity.reset();
-        self.static_revision += 1;
     }
 }
