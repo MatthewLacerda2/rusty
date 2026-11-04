@@ -43,10 +43,7 @@ fn a_thousand_instances_of_one_script_read_it_once() {
     assert_eq!(m.eval("__made").unwrap(), "1000");
     for (i, &id) in ids.iter().enumerate() {
         assert_eq!(field(&m, id, "n"), (i + 1).to_string());
-        assert_eq!(
-            field(&m, id, "speed"),
-            if i % 2 == 0 { "9.0" } else { "3.0" }
-        );
+        assert_eq!(field(&m, id, "speed"), if i % 2 == 0 { "9" } else { "3" });
         assert_eq!(field(&m, id, "label"), "x");
     }
 }
