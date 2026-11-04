@@ -69,6 +69,24 @@ fn a_bad_strength_moves_nothing_or_caps() {
     }
     let still = run(&dwarp(0.1, 0.0), &img, &white);
     assert_eq!(run(&dwarp(0.1, f32::INFINITY), &img, &white), still);
+    assert_eq!(run(&dwarp(0.1, 1e38), &img, &white), still);
+}
+
+#[test]
+fn a_wild_map_caps_or_moves_nothing() {
+    let img = dot(3, 7);
+    let mut wild = Image::filled(32, [1.0; 4]);
+    wild.pixels_mut()[5] = [f32::INFINITY; 4];
+    wild.pixels_mut()[9] = [f32::NAN; 4];
+    wild.pixels_mut()[40] = [1e30; 4];
+    for strength in [0.0, 0.3, MAX_STRENGTH] {
+        let out = run(&dwarp(strength, 0.1), &img, &wild);
+        assert!(out.pixels().iter().flatten().all(|c| c.is_finite()));
+    }
+    // A red past 1 still caps the push at ±16 tiles.
+    let (huge, cap) = (Image::filled(32, [1e6; 4]), Image::filled(32, [1.0; 4]));
+    let at = |by: &Image| run(&dwarp(MAX_STRENGTH, 0.1), &img, by);
+    assert_eq!(at(&huge), at(&cap));
 }
 
 #[test]

@@ -114,3 +114,29 @@ fn bad_numbers_pass_through_or_cap() {
         .iter()
         .all(|p| p.iter().all(|c| c.is_finite())));
 }
+
+#[test]
+fn every_mode_reads_the_pixel_itself() {
+    let mut dot = Image::filled(64, [0.0, 0.0, 0.0, 1.0]);
+    dot.pixels_mut()[4] = [1.0; 4];
+    for n in [1, 8] {
+        let max = run(&sblur(0.05, n, SlopeMode::Max), &dot, &hill(64));
+        assert_eq!(max.row(0)[4][0], 1.0, "a bright dot stays lit at {n}");
+        let min = run(&sblur(0.05, n, SlopeMode::Min), &dot, &hill(64));
+        assert_eq!(min.row(0)[4][0], 0.0, "{n}");
+    }
+}
+
+#[test]
+fn a_hard_edge_reaches_as_far_at_every_resolution() {
+    // A step up over u ∈ [0.25, 0.75) on a ramp: what the smear moves, per tile.
+    let moved = |n| {
+        let step = Image::fill_uv(n, |u, _| [f32::from((0.25..0.75).contains(&u)); 4]);
+        let ramp = Image::fill_uv(n, |u, _| [u, 0.0, 0.0, 1.0]);
+        let out = run(&sblur(0.005, 8, SlopeMode::Blur), &ramp, &step);
+        let d = out.pixels().iter().zip(ramp.pixels());
+        d.map(|(p, q)| (p[0] - q[0]).abs()).sum::<f32>() / (n * n) as f32
+    };
+    let (a, b) = (moved(128), moved(1024));
+    assert!(a > 1e-3 && (a - b).abs() < 0.05 * a, "{a} vs {b}");
+}

@@ -287,9 +287,10 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   angle, which `mapping` cannot: brushed metal, rain streaks, scratches in several
   directions (one `directional_blur` of a `ridged` noise per direction). The samples
   are about a pixel apart, so a sub-pixel `length` still softens; `length` caps at one
-  tile, and 0 passes the input through. At most about 90 bilinear reads a pixel (two
-  passes past 64): at 2048² roughly 10 s of one core for a long streak, split across
-  cores by rows.
+  tile, and 0 passes the input through. It reads one bilinear sample per pixel of
+  streak up to 64, and about `2√(length × longer side)` past that (two passes): 90
+  for a one-tile streak at 2048², more above it. An estimate, not a measurement:
+  roughly 10 s of one core for that streak at 2048², split across cores by rows.
 - `directional_warp {strength, angle=0}` (*vector*, 2 inputs): pushes input 1 along
   `angle` (turns: 0 right, 0.25 down) by `strength × red` of input 2, in tiles, like
   Substance's *Directional Warp*: black moves nothing, white the full `strength`, and
@@ -378,13 +379,15 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   hard edge overshoots until the bake clamps it.
 - `slope_blur {intensity, samples=8, mode="blur"|"min"|"max"}` (*filter*, 2 inputs:
   image, slope): smears input 1 down the slopes of input 2's red, like Substance's
-  *Slope Blur*: each pixel reads `samples` points (1–64) along `intensity ×` the
-  slope's gradient (height per tile, so a reach in tiles), uphill of it, and keeps
-  their mean (`blur`), darkest (`min`) or brightest (`max`). Flat ground is left as it
-  is; a negative intensity smears up the slopes. Erosion, chipped paint edges, grime
+  *Slope Blur*: each pixel reads itself and `samples` points (1–64) beyond it along
+  `intensity ×` the slope's gradient (height per tile, so a reach in tiles), uphill of
+  it, and keeps their mean (`blur`), darkest (`min`) or brightest (`max`). The
+  gradient is taken over 1/64 of a tile, so a hard edge (a `shape` with `softness =
+  0`) reads as a slope of 64 over a band 1/64 tile wide at any resolution. Flat ground
+  is left as it is; a negative intensity smears up the slopes. Erosion, chipped paint edges, grime
   running off a shape: a noise through `slope_blur` on a `shape`'s height runs down its
-  sides. The reach caps at one tile. `samples + 4` reads a pixel: about 1–2 s of one
-  core at 2048² with 8 samples.
+  sides. The reach caps at one tile. `samples + 5` reads a pixel: an estimate of
+  about 1–2 s of one core at 2048² with 8 samples.
 - `tile {count, jitter=0, rotation_jitter=0, scale_jitter=0, seed=0}` (*vector*, 1
   input): stamps the input once per cell of a `count`×`count` grid; each cell is
   seeded from the recipe and node `seed` with an offset of up to ±`jitter`/2 cells, a

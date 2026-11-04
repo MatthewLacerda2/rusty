@@ -12,8 +12,8 @@ use crate::procgen::recipe::{arity, op, opt, req, Lit, OpInfo};
 /// white the full `strength`, as in Substance's node; a negative strength pushes
 /// the other way. It is the grayscale, one-direction counterpart of `warp`, which
 /// reads two channels around mid-grey. Both reads are bilinear and wrapped, so two
-/// tiling inputs give a tiling map at any angle. A NaN strength moves nothing; it
-/// caps at ±16 tiles.
+/// tiling inputs give a tiling map at any angle. A NaN strength moves nothing; the
+/// push caps at ±16 tiles, whatever the red.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DirectionalWarp {
     pub strength: f32,
@@ -50,10 +50,21 @@ pub fn directional_warp(img: &Image, by: &Image, strength: f32, angle: f32) -> I
     } else {
         strength.clamp(-MAX_STRENGTH, MAX_STRENGTH)
     };
-    let turn = if angle.is_finite() { angle } else { 0.0 };
+    // Folded to one turn first, so a huge angle can't overflow `× TAU` to NaN.
+    let turn = if angle.is_finite() {
+        angle.rem_euclid(1.0)
+    } else {
+        0.0
+    };
     let (sin, cos) = (turn * std::f32::consts::TAU).sin_cos();
     Image::fill_uv(img.size(), |u, v| {
         let d = strength * by.sample_bilinear_wrapped(u, v)[0];
+        // A red past 1 (or an infinite one) still caps; `0 × ∞` moves nothing.
+        let d = if d.is_finite() {
+            d.clamp(-MAX_STRENGTH, MAX_STRENGTH)
+        } else {
+            0.0
+        };
         // The content moves along the angle, so each pixel reads from behind it.
         img.sample_bilinear_wrapped(u - cos * d, v - sin * d)
     })

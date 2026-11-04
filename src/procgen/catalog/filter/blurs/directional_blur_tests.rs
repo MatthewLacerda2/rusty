@@ -73,8 +73,8 @@ fn a_bad_length_passes_through_or_caps_at_a_tile() {
     for length in [f32::INFINITY, 1e30] {
         assert_eq!(run(&dblur(length, 0.1), &img), tile, "{length}");
     }
-    assert_eq!(
-        run(&dblur(0.1, f32::NAN), &img),
-        run(&dblur(0.1, 0.0), &img)
-    );
+    let still = run(&dblur(0.1, 0.0), &img);
+    assert_eq!(run(&dblur(0.1, f32::NAN), &img), still);
+    // A huge angle folds to a whole number of turns, not `∞ × 0`.
+    assert_eq!(run(&dblur(0.1, 1e38), &img), still);
 }

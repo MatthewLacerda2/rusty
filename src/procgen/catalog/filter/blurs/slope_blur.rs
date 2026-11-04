@@ -2,18 +2,20 @@
 //! Designer's *Slope Blur*, #1739): erosion, chipped paint edges, grime running
 //! off a shape.
 //!
-//! At each pixel the slope map's gradient (its red, by central differences, in
-//! height per tile) points uphill. The op reads input 1 at `samples` points
-//! evenly along `intensity × gradient` from the pixel and keeps their mean, min or
-//! max, so each pixel takes what lies uphill of it: the image runs down the
-//! slopes, and flat ground (no gradient) is left as it is. A fixed sample count,
-//! bilinear reads and a reach in tile units keep a low-`resolution` preview
-//! reading like the final.
+//! At each pixel the slope map's gradient (its red, in height per tile) points
+//! uphill. It is a central difference over a fixed [`SPAN`] in tile units, read
+//! bilinearly, so a hard edge reads as the same slope at every resolution: one
+//! unit of height over `2 × SPAN` tiles, not over two pixels. The op reads input
+//! 1 at the pixel and at `samples` points evenly along `intensity × gradient`
+//! beyond it, and keeps their mean, min or max, so each pixel takes what lies
+//! uphill of it: the image runs down the slopes, and flat ground (no gradient)
+//! is left as it is. A fixed sample count, bilinear reads and a reach in tile
+//! units keep a low-`resolution` preview reading like the final.
 
 use serde::{Deserialize, Serialize};
 
 use crate::procgen::catalog::{Cx, Op, Row};
-use crate::procgen::image_buf::{Image, Rgba};
+use crate::procgen::image_buf::Image;
 use crate::procgen::recipe::{arity, choice, op, opt, req, Lit, OpInfo, OpParam};
 
 /// How the samples along the slope combine.
@@ -29,9 +31,9 @@ pub enum SlopeMode {
     Max,
 }
 
-/// Input 1 smeared down the slopes of input 2's red: `samples` reads (1 to 64)
-/// along `intensity × gradient` tiles, the gradient in height per tile, combined
-/// by `mode`. A negative intensity smears up the slopes. The reach caps at one
+/// Input 1 smeared down the slopes of input 2's red: the pixel itself and
+/// `samples` reads (1 to 64) along `intensity × gradient` tiles beyond it, the
+/// gradient in height per tile, combined by `mode`. A negative intensity smears up the slopes. The reach caps at one
 /// tile; a NaN intensity passes input 1 through. Wraps, so it tiles.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SlopeBlur {
@@ -70,6 +72,10 @@ const SAMPLES: u32 = 8;
 pub const MAX_SAMPLES: u32 = 64;
 /// The longest reach, in tiles.
 const MAX_REACH: f32 = 1.0;
+/// Half the span the gradient is taken over, in tiles: a pixel at 128², so from
+/// there up a hard edge reads the same slope, `1 / (2 × SPAN)`, over the same
+/// `2 × SPAN` tiles.
+pub const SPAN: f32 = 1.0 / 128.0;
 /// The largest intensity read: past it any slope already reaches [`MAX_REACH`],
 /// and a bound keeps `intensity × 0` a 0 (an infinite one would read NaN).
 pub const MAX_INTENSITY: f32 = 1e6;
@@ -88,19 +94,20 @@ pub fn slope_blur(img: &Image, slope: &Image, intensity: f32, n: u32, mode: Slop
     let (w, h) = (img.width() as f32, img.height() as f32);
     Image::fill_uv(img.size(), |u, v| {
         let (x, y) = ((u * w) as i64, (v * h) as i64);
-        let s = |dx, dy| slope.get_wrapped(x + dx, y + dy)[0];
+        let s = |du, dv| slope.sample_bilinear_wrapped(u + du, v + dv)[0];
         let grad = (
-            (s(1, 0) - s(-1, 0)) * w / 2.0,
-            (s(0, 1) - s(0, -1)) * h / 2.0,
+            (s(SPAN, 0.0) - s(-SPAN, 0.0)) / (2.0 * SPAN),
+            (s(0.0, SPAN) - s(0.0, -SPAN)) / (2.0 * SPAN),
         );
         let (du, dv) = reach(intensity, grad);
+        // The pixel itself, read exactly: all of flat ground, and the first sample.
+        let here = img.get_wrapped(x, y);
         if du == 0.0 && dv == 0.0 {
-            // Flat ground: every sample is this pixel, read exactly.
-            return img.get_wrapped(x, y);
+            return here;
         }
-        let mut acc = first(mode);
-        for i in 0..n {
-            let t = (i as f32 + 0.5) / n as f32;
+        let mut acc = here;
+        for i in 1..=n {
+            let t = i as f32 / n as f32;
             let p = img.sample_bilinear_wrapped(u + du * t, v + dv * t);
             for c in 0..4 {
                 acc[c] = match mode {
@@ -111,7 +118,7 @@ pub fn slope_blur(img: &Image, slope: &Image, intensity: f32, n: u32, mode: Slop
             }
         }
         match mode {
-            SlopeMode::Blur => acc.map(|a| a / n as f32),
+            SlopeMode::Blur => acc.map(|a| a / (n + 1) as f32),
             _ => acc,
         }
     })
@@ -128,15 +135,6 @@ fn reach(intensity: f32, (gu, gv): (f32, f32)) -> (f32, f32) {
         (du * MAX_REACH / len, dv * MAX_REACH / len)
     } else {
         (du, dv)
-    }
-}
-
-/// What `mode` folds its samples from.
-fn first(mode: SlopeMode) -> Rgba {
-    match mode {
-        SlopeMode::Blur => [0.0; 4],
-        SlopeMode::Min => [f32::INFINITY; 4],
-        SlopeMode::Max => [f32::NEG_INFINITY; 4],
     }
 }
 

@@ -48,7 +48,9 @@ impl Op for DirectionalBlur {
     }
 }
 
-/// The longest streak, in tiles: past one tile a line only re-reads the tile.
+/// The longest streak, in tiles. Along an axis a line closes after one tile and
+/// past it only re-reads the tile; at other angles it closes later (√2 tiles at
+/// 45°, longer off the diagonals), so this is a bound on cost, not a period.
 const MAX_LENGTH: f32 = 1.0;
 /// The most samples one pass reads; a longer streak runs as two.
 const ONE_PASS: usize = 64;
@@ -59,7 +61,12 @@ pub fn directional_blur(img: &Image, length: f32, angle: f32) -> Image {
         return img.clone();
     }
     let len = length.min(MAX_LENGTH);
-    let turn = if angle.is_finite() { angle } else { 0.0 };
+    // Folded to one turn first, so a huge angle can't overflow `× TAU` to NaN.
+    let turn = if angle.is_finite() {
+        angle.rem_euclid(1.0)
+    } else {
+        0.0
+    };
     let (sin, cos) = (turn * std::f32::consts::TAU).sin_cos();
     // Samples about a pixel apart, two at least so a sub-pixel streak still acts.
     let n = ((len * img.size().longer() as f32).ceil() as usize).max(2);
