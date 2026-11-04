@@ -124,12 +124,15 @@ fn a_moved_light_leaves_under_five_percent_after_the_ghost_frames() {
     assert!(HISTORY_WEIGHT.powi(GHOST_FRAMES as i32) < 0.05);
     assert!(HISTORY_WEIGHT.powi(GHOST_FRAMES as i32 - 1) >= 0.05);
     let p = plan(on()).unwrap();
-    assert_eq!(VolumetricParams::new(&p, 3, None).weight(), 1.0);
+    assert_eq!(
+        VolumetricParams::new(&p, (3, [[0.0; 4]; 2]), None).weight(),
+        1.0
+    );
     let built = Built {
         view_proj: glam::Mat4::IDENTITY,
         view_z: glam::Vec4::ZERO,
         volumetric: [1.0; 4],
     };
-    let w = VolumetricParams::new(&p, 3, Some(built)).weight();
+    let w = VolumetricParams::new(&p, (3, [[0.0; 4]; 2]), Some(built)).weight();
     assert!((w - (1.0 - HISTORY_WEIGHT)).abs() < 1e-6);
 }

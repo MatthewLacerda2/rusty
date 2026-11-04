@@ -37,6 +37,10 @@ struct Params {
     medium: vec4<f32>,
     // rgb the albedo, w how much of the ambient it scatters.
     albedo: vec4<f32>,
+    // The probe grid's box (`probes::AirProbes`): its corner, w 1 when the scene
+    // has probes (else the scene ambient); its size.
+    probes_min: vec4<f32>,
+    probes_size: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -59,6 +63,13 @@ struct Params {
 @group(0) @binding(14) var t_history: texture_3d<f32>;
 @group(0) @binding(15) var s_history: sampler;
 @group(0) @binding(16) var out_scatter: texture_storage_3d<rgba16float, write>;
+// The probe field's average radiance on a coarse grid around the camera, read
+// through `s_history` (linear, clamped to the nearest face).
+@group(0) @binding(17) var t_probes: texture_3d<f32>;
+
+// The most a froxel's light is stored as: below `Rgba16Float`'s 65504, as
+// `forward::transparent::MAX_HDR`, so every reader gets a finite value.
+const MAX_FROXEL: f32 = 60000.0;
 
 // Henyey-Greenstein's phase for scattering angle cosine `c`, per steradian.
 fn phase(g: f32, c: f32) -> f32 {
@@ -83,7 +94,9 @@ fn view_ray(uv: vec2<f32>) -> array<vec3<f32>, 2> {
 }
 
 // How lit `world` is by the sun's cascades: one comparison tap (the fog averages
-// over a froxel and over frames), 1 past the shadow distance or with no cascade.
+// over a froxel and over frames), 1 past the shadow distance or with no cascade,
+// faded to 1 over the distance's last 10% as `calculate_shadow` fades surfaces, so
+// shadowed air never ends at a plane that moves with the camera.
 fn sun_lit(world: vec3<f32>) -> f32 {
     let count = i32(shadow.params.x);
     let depth = dot(world - shadow.view_pos.xyz, shadow.view_dir.xyz);
@@ -101,7 +114,10 @@ fn sun_lit(world: vec3<f32>) -> f32 {
         return 1.0;
     }
     let bias = shadow.texels[c] / max(shadow.depth_ranges[c], 1e-6);
-    return textureSampleCompareLevel(t_shadow, s_shadow, uv, c, q.z - bias);
+    let lit = textureSampleCompareLevel(t_shadow, s_shadow, uv, c, q.z - bias);
+    let distance = shadow.params.y;
+    let fade = clamp((depth - distance * 0.9) / (distance * 0.1), 0.0, 1.0);
+    return mix(lit, 1.0, fade);
 }
 
 // The light `light` scatters at `world` toward `to_eye`, its inverse square floored
@@ -112,12 +128,23 @@ fn lamps(light: LocalLight, world: vec3<f32>, to_eye: vec3<f32>, g: f32, near: f
     return local_light_radiance(light, world, near) * phase(g, dot(travel, to_eye));
 }
 
+// The ambient light arriving at `world` from every direction, averaged: the probe
+// field's where the scene has probes (so a sealed room's air is as dark as its
+// probes), else the scene ambient.
+fn ambient(world: vec3<f32>) -> vec3<f32> {
+    if (params.probes_min.w < 0.5) {
+        return ambient_average(lighting.ambient);
+    }
+    let uvw = (world - params.probes_min.xyz) / params.probes_size.xyz;
+    return textureSampleLevel(t_probes, s_history, uvw, 0.0).rgb;
+}
+
 // The light scattered toward the eye at `world`, per unit of scattering coefficient;
 // `near` is half the froxel's depth.
 fn in_scatter(world: vec3<f32>, cluster: u32, near: f32) -> vec3<f32> {
     let g = params.medium.w;
     let to_eye = normalize(camera.camera_pos - world);
-    var light = ambient_average(lighting.ambient) * params.albedo.w;
+    var light = ambient(world) * params.albedo.w;
     for (var i = 0u; i < lighting.num_dir_lights; i = i + 1u) {
         let sun = lighting.dir_lights[i];
         if (sun.baked > 0.5) {
@@ -162,6 +189,10 @@ fn cs_scatter(@builtin(global_invocation_id) id: vec3<u32>) {
     if (!finite4(current)) {
         current = vec4<f32>(0.0, 0.0, 0.0, extinction);
     }
+    // Within half-float's range before it is stored: a thick medium at a bright
+    // lamp's core would otherwise store Inf, and the integration's `Inf - Inf`
+    // would leave a dark hole there.
+    current = vec4<f32>(min(current.rgb, vec3<f32>(MAX_FROXEL)), current.a);
     // Last frame's froxel at this point, when it was in last frame's grid.
     var out = current;
     if (params.jitter.w < 1.0) {
@@ -209,7 +240,7 @@ fn cs_integrate(@builtin(global_invocation_id) id: vec3<u32>) {
         if (!finite3(slice)) {
             slice = vec3<f32>(0.0);
         }
-        scattered += through * slice;
+        scattered = min(scattered + through * slice, vec3<f32>(MAX_FROXEL));
         through *= fade;
         textureStore(out_volume, vec3<u32>(id.xy, z), vec4<f32>(scattered, through));
     }

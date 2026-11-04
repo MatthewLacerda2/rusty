@@ -402,18 +402,25 @@ height fog (`Graphics.SetFogMode` and its siblings) still draws under it.
 Each frame, before the base camera draws, a compute pass lights a **froxel grid**
 over the view (the quality's froxels across, `9/16` of that up, its slices deep,
 exponential from half a metre to `depth_extent`): at a jittered point in each froxel
-the fog's density, lit by the ambient, the live suns (the first through its shadow
+the fog's density, lit by the ambient (the light probes' where the scene has them,
+read from a coarse 16×8×16 grid around the camera refilled only when the probes
+change or the camera crosses into another cell, so a sealed room's air is as dark
+as its probes; else the scene ambient), the live suns (the first through its shadow
 cascades), the clustered point and spot lights through their shadows, and the
 **`Baked` lamps unshadowed** (they reach surfaces only through the lightmaps, so a
 lightmapped level gets its halos from here; each camera keeps the 64 that matter most,
 32 per cluster, as for its live lights), each through Henyey-Greenstein's phase.
+An Area light gives no halo yet. A `Baked` lamp's light is in the probes too, so
+near probes it lights it also reaches the air as a soft, probe-wide glow under its
+halo.
 Each froxel keeps 85% of last frame's at the same world point, reprojected, so a
 light that moves leaves under 5% of its old glow after 19 frames; a cut (a scene
 load, Play or Stop, a camera switch), a resize or a change of grid starts over. A
 second pass integrates the grid front to back, and every pass that fogs reads it:
 opaque and transparent surfaces (decals with them), the sky (the whole volume) and
 particles (per vertex). A surface's colour becomes `colour × transmittance +
-in-scattered light`. SSR's reflections and SSIL's bounce are dimmed by the same
+in-scattered light`; an Additive surface is only dimmed and a Multiply one's tint
+fades toward white, since what is behind them already carries that air. SSR's reflections and SSIL's bounce are dimmed by the same
 fog the surface got, so neither adds light the fog took. World-space canvases and
 trails take only the distance fog.
 
@@ -428,7 +435,10 @@ preset runs 80, 120 or 160 froxels across with 48, 64 or 64 slices at its `Low`,
 `Medium` and `High` levels (the `Low` preset 64×32, 80×48 and 120×64; the `High`
 preset 120×64, 160×64 and 160×128), and `Custom` runs `resolution` × `slices`. Each
 froxel grid is 8 bytes a froxel: 160×90×64 is 7.4 MB, and a view running it holds two
-(this frame and its history) beside the renderer's one integrated grid. An M4 is
+(this frame and its history) beside the renderer's one integrated grid. That grid
+is sized for the camera that runs last, so a render-texture camera whose `Custom`
+grid differs from the screen's makes it reallocate twice a frame: give both the
+same grid. An M4 is
 expected to take 0.5–1 ms at 160×90×64, **not yet measured**
 (`Debug.Stats().gpu_passes.volumetric_fog` times it; `volumetric_froxels` counts the
 froxels lit). The player's `volumetric_fog` option gates it.

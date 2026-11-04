@@ -67,20 +67,14 @@ fn volumetric_fog(
     return volume_at(t, smp, vol, uv, froxel_slice(vol, depth));
 }
 
-// The sky's volumetric fog along view direction `dir` from `eye`: the whole volume,
-// as for any point past its far end.
-fn volumetric_sky(
-    t: texture_3d<f32>,
-    smp: sampler,
-    vol: vec4<f32>,
-    view_proj: mat4x4<f32>,
-    eye: vec3<f32>,
-    dir: vec3<f32>,
-) -> vec4<f32> {
+// The sky's volumetric fog at clip-space position `clip` (the sky fragment's own,
+// interpolated from its vertices): the whole volume, as for any point past its far
+// end. The fragment's screen position, not a point along its view direction, so an
+// orthographic camera's sky reads each column of the grid too.
+fn volumetric_sky(t: texture_3d<f32>, smp: sampler, vol: vec4<f32>, clip: vec4<f32>) -> vec4<f32> {
     if (vol.x < 0.5) {
         return NO_VOLUMETRIC;
     }
-    let clip = view_proj * vec4<f32>(eye + dir, 1.0);
     let ndc = clip.xy / max(clip.w, 1e-6);
     let uv = clamp(vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5), vec2<f32>(0.0), vec2<f32>(1.0));
     return volume_at(t, smp, vol, uv, vol.y + 1.0);

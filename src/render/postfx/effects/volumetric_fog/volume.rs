@@ -50,7 +50,9 @@ impl SharedVolume {
     }
 
     /// The volume sized for `grid`, made when it holds another; returns whether it
-    /// was replaced (group 0 names the old one).
+    /// was replaced (group 0 names the old one). Two cameras running different
+    /// grids (a render texture's `Custom` one beside the screen's) reallocate it
+    /// twice a frame; `Graphics.md` says so.
     pub(crate) fn fit(&mut self, device: &wgpu::Device, grid: [u32; 3]) -> bool {
         self.used = true;
         if self.grid == Some(grid) {
@@ -79,6 +81,12 @@ impl SharedVolume {
         true
     }
 
+    /// The texture, for a test to read back.
+    #[cfg(test)]
+    pub(crate) fn texture(&self) -> &wgpu::Texture {
+        &self.texture
+    }
+
     /// The grid it holds, `None` for the stand-in.
     #[cfg(test)]
     pub(crate) fn grid(&self) -> Option<[u32; 3]> {
@@ -103,7 +111,12 @@ pub(crate) fn froxel_grid(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D3,
         format: FROXEL_FORMAT,
-        usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+        // COPY_DST for the probe grid's upload, COPY_SRC so a test can read a
+        // grid back; neither costs memory.
+        usage: wgpu::TextureUsages::STORAGE_BINDING
+            | wgpu::TextureUsages::TEXTURE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
     })
 }

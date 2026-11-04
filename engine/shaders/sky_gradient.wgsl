@@ -15,23 +15,11 @@
 // the surfaces only: the sky never follows them (#1647, as Unity's skybox).
 
 #import common::{AmbientLight, CameraUniforms, ProceduralSky, VertexInput, procedural_sky, sky_fog}
-#import fog::volumetric::{through_volume, volumetric_sky}
+#import sky::air::through_air
 #import sky::motion::{SkyTargets, sky_targets}
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
-
-// The integrated volumetric fog (#1703): group 0's, as the forward pass binds it.
-@group(0) @binding(17)
-var t_fog_volume: texture_3d<f32>;
-@group(0) @binding(18)
-var s_fog_volume: sampler;
-
-// `color` behind the whole volumetric fog along `dir`, where the camera reads it.
-fn through_air(color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
-    let air = volumetric_sky(t_fog_volume, s_fog_volume, camera.volumetric, camera.view_proj, camera.camera_pos, dir);
-    return through_volume(color, air);
-}
 
 // A prefix of the forward pass's `LightingUniforms`: we only need the leading
 // `ambient` term and the procedural sky's settings (#1620), and a uniform binding
@@ -47,6 +35,8 @@ var<uniform> lighting: SkyLighting;
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) view_dir: vec3<f32>,
+    // The clip-space position again, for the volumetric fog's screen lookup.
+    @location(1) clip: vec4<f32>,
 };
 
 @vertex
@@ -58,6 +48,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     // far plane (depth 1.0) and only fills pixels no geometry has drawn over.
     let world_pos = model.position + camera.camera_pos;
     out.clip_position = (camera.view_proj * vec4<f32>(world_pos, 1.0)).xyww;
+    out.clip = out.clip_position;
     return out;
 }
 
@@ -72,6 +63,6 @@ fn fs_main(in: VertexOutput) -> SkyTargets {
     // Blend toward the scene fog at the horizon (#437), as the panorama sky does.
     // Then the volumetric fog's whole depth (#1703).
     let hazed = sky_fog(camera.fog, color, dir, camera.camera_pos);
-    let fogged = vec4<f32>(through_air(hazed, dir), 1.0);
+    let fogged = vec4<f32>(through_air(hazed, camera.volumetric, in.clip), 1.0);
     return sky_targets(camera, fogged, dir);
 }

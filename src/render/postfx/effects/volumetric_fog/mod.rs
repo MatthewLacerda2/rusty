@@ -8,7 +8,9 @@
 //!   quality's `resolution` across, `9/16` of it up, `slices` deep, exponential from
 //!   [`VOLUME_NEAR`] to the volume's `depth_extent`), the medium at a jittered point
 //!   in each froxel (`1 / mean_free_path` at `base_height`, falling to `1/e` at
-//!   `maximum_height`), lit by the ambient times `global_light_probe_dimmer`, the live
+//!   `maximum_height`), lit by the ambient times `global_light_probe_dimmer` (the
+//!   light probes' L0 on a coarse grid around the camera where the scene has
+//!   probes, [`probes::AirProbes`]; else the scene ambient), the live
 //!   suns (the first through its cascades), the clustered point and spot lights
 //!   through their shadow-atlas tiles, and the `Baked` lamps unshadowed
 //!   (`clusters::BakedLamps`: they are in no frame light list, and a lightmapped
@@ -17,8 +19,10 @@
 //! - **Integrate** (`cs_integrate`): front to back per column into the renderer's
 //!   one integrated volume ([`SharedVolume`]), which group 0 binds (17, 18): the
 //!   forward and transparent surfaces (decals fold into them), the sky and the
-//!   particles read it through `fog::volumetric`, so they agree. A surface's colour
-//!   becomes `colour × transmittance + in-scatter`, after the distance and height fog
+//!   particles read it through `fog::volumetric` (the skies through `sky::air`), so
+//!   they agree. A surface's colour becomes `colour × transmittance + in-scatter`
+//!   (an Additive surface is only dimmed, a Multiply one's tint fades toward white:
+//!   `forward::transparent::blended_air`), after the distance and height fog
 //!   (`scene::settings::fog`), which still draws.
 //!
 //! **One fog value downstream.** SSR's record and SSIL's realtime share read the
@@ -57,6 +61,7 @@
 
 mod params;
 mod pass;
+mod probes;
 mod run;
 mod targets;
 mod volume;

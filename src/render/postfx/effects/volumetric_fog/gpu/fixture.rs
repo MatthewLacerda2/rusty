@@ -75,6 +75,17 @@ pub(super) fn tinted(
 
 /// The dark room with volumetric fog `fog` on its camera's volume.
 pub(super) fn room(fog: VolumetricFog) -> Scene {
+    let mut scene = open(fog);
+    block(
+        &mut scene,
+        "back",
+        (Vec3::new(0.0, 3.0, -12.0), Vec3::new(20.0, 6.0, 0.2)),
+    );
+    scene
+}
+
+/// [`room`] without its back wall: the sky shows above the floor.
+pub(super) fn open(fog: VolumetricFog) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     scene.ambient_color = Vec3::ZERO;
@@ -89,11 +100,6 @@ pub(super) fn room(fog: VolumetricFog) -> Scene {
         &mut scene,
         "floor",
         (Vec3::new(0.0, -0.05, -6.0), Vec3::new(20.0, 0.1, 20.0)),
-    );
-    block(
-        &mut scene,
-        "back",
-        (Vec3::new(0.0, 3.0, -12.0), Vec3::new(20.0, 6.0, 0.2)),
     );
     scene
 }

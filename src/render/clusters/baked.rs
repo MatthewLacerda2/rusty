@@ -5,9 +5,11 @@
 //! shadowmask could bound it later, #1695).
 //!
 //! **Kept, not walked.** The list is rebuilt from the scene's lights only when a
-//! light, its world pose or its activity changed (`ecs::changes` cursors, as the
-//! retained scene keeps its objects, #1706) or another scene is drawn; a frame
-//! that changed none of them uploads nothing. Each camera bins it into its own
+//! `Baked` lamp (or an entity listed as one) changed its light, world pose or
+//! activity (`ecs::changes` cursors, as the retained scene keeps its objects,
+//! #1706) or another scene is drawn; a frame that changed none of them uploads
+//! nothing, and a live light moving or flickering every frame rebuilds nothing.
+//! Area lights are not lamps here: a panel gives no halo yet. Each camera bins it into its own
 //! clusters with the lights' budget ([`super::bin`]: the 64 that contribute most
 //! to the view, 32 per cluster), so a froxel loops over at most 32 of them however
 //! many the level holds.
@@ -19,7 +21,7 @@ use glam::Vec3;
 use super::bin::bin;
 use super::grid::AabbCache;
 use super::{ClusterGrid, LocalLight};
-use crate::components::LightComponent;
+use crate::components::{LightComponent, LightType};
 use crate::ecs::{Activity, Changes, Cursor, World, WorldPose};
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::scene::{Scene, SceneId};
@@ -104,13 +106,15 @@ impl BakedLamps {
             });
             return true;
         };
+        // Only an id that is or was a listed lamp: a live light moving or
+        // flickering every frame (a beacon, a flashlight) rebuilds nothing.
         let touches = |c: Changes, listed: &BTreeSet<u32>| match c {
             Changes::Rebuild => true,
             Changes::Ids(ids) => ids
                 .iter()
-                .any(|&id| listed.contains(&id) || world.light(id).is_some()),
+                .any(|&id| listed.contains(&id) || is_baked_lamp(world, id)),
         };
-        let light = !matches!(world.changes(&mut kept.light), Changes::Ids(ids) if ids.is_empty());
+        let light = touches(world.changes(&mut kept.light), &self.listed);
         let pose = touches(world.changes(&mut kept.pose), &self.listed);
         let active = touches(world.changes(&mut kept.activity), &self.listed);
         light | pose | active
@@ -136,16 +140,24 @@ impl BakedLamps {
     }
 }
 
-/// The active `Baked` point and spot lights of `scene` (`LightMode::renders_live`
-/// is false for them), in entity order.
+/// Whether `id` holds a `Baked` point or spot light (`LightMode::renders_live` is
+/// false for it), active or not. Area lights are left out: always `Baked`, they
+/// would enter as an unshadowed far-field stand-in of `intensity × area`, and a
+/// panel's light in the air is not a lamp's halo; a panel gives no halo yet.
+fn is_baked_lamp(world: &World, id: u32) -> bool {
+    world.light(id).is_some_and(|l| {
+        matches!(l.light_type, LightType::Point | LightType::Spotlight)
+            && !l.effective_mode().renders_live(false)
+    })
+}
+
+/// The active `Baked` point and spot lights of `scene`, in entity order.
 fn baked_ids(scene: &Scene) -> impl Iterator<Item = u32> + '_ {
     let world: &World = &scene.world;
-    world.ids_with_light().into_iter().filter(move |&id| {
-        world.is_active_in_hierarchy(id)
-            && world
-                .light(id)
-                .is_some_and(|l| !l.effective_mode().renders_live(false))
-    })
+    world
+        .ids_with_light()
+        .into_iter()
+        .filter(move |&id| world.is_active_in_hierarchy(id) && is_baked_lamp(world, id))
 }
 
 /// [`baked_ids`]' records, unshadowed.

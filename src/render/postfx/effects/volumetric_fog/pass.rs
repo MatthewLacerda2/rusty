@@ -1,7 +1,8 @@
 //! Volumetric fog's two compute pipelines (#1703), shared by every view and built
 //! on their first dispatch (warmed with the rest, `Renderer::lazy_computes`), their
-//! layouts, and the `Baked` lamps the froxels light with.
+//! layouts, and the `Baked` lamps and probe grid the froxels light with.
 
+use super::probes::AirProbes;
 use super::volume::FROXEL_FORMAT;
 use crate::render::clusters::BakedLamps;
 use crate::render::gpu::layout_entries::{
@@ -19,6 +20,7 @@ pub(crate) struct VolumetricFogPasses {
     /// What the history is sampled through: linear, clamped.
     pub(super) sampler: wgpu::Sampler,
     pub(crate) baked: BakedLamps,
+    pub(crate) probes: AirProbes,
 }
 
 /// `entry`, seen by the compute stage alone.
@@ -82,6 +84,7 @@ impl VolumetricFogPasses {
                 ..Default::default()
             }),
             baked: BakedLamps::new(device),
+            probes: AirProbes::new(device),
         }
     }
 
@@ -134,6 +137,7 @@ fn scatter_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
             compute(texture_entry(14, D3)),
             compute(sampler_entry(15)),
             grid_out(16),
+            compute(texture_entry(17, D3)),
         ],
     )
 }

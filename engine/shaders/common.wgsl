@@ -401,12 +401,6 @@ fn fog_factor(fog: Fog, world_pos: vec3<f32>, eye: vec3<f32>) -> f32 {
     return clamp(f, 0.0, 1.0);
 }
 
-// Fade a lit colour into the fog colour — opaque, transparent and alpha-blended
-// surfaces (the caller keeps its alpha).
-fn apply_fog(fog: Fog, color: vec3<f32>, world_pos: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
-    return mix(color, fog.color, fog_factor(fog, world_pos, eye));
-}
-
 // The sky's fog along view direction `dir`: as fogged as a point at
 // FOG_SKY_DISTANCE, faded out above the horizon so the zenith stays sky.
 fn sky_fog(fog: Fog, color: vec3<f32>, dir: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {

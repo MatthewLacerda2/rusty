@@ -11,7 +11,7 @@
 
 #import forward::bindings::{camera, material, s_fog_volume, s_opaque, t_fog_volume, t_opaque}
 #import common::{PI, fog_factor}
-#import fog::volumetric::{through_volume, volumetric_fog}
+#import fog::volumetric::volumetric_fog
 #import lighting::ssr_march
 #import lighting::ssr_surface
 
@@ -21,11 +21,12 @@ fn volumetric(world: vec3<f32>) -> vec4<f32> {
     return volumetric_fog(t_fog_volume, s_fog_volume, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
 }
 
-// `lit` behind both fogs: the distance and height fog, then the volumetric fog.
-// Opaque and unlit surfaces return through it.
+// `lit` behind both fogs: the distance and height fog, then the volumetric fog
+// as the material's blend takes it (`blended_air`; an opaque surface's is Alpha).
+// Unlit surfaces return through it.
 fn fogged(lit: vec3<f32>, world: vec3<f32>) -> vec3<f32> {
     let fog = fog_factor(camera.fog, world, camera.camera_pos);
-    return through_volume(mix(lit, camera.fog.color, fog), volumetric(world));
+    return blended_air(mix(lit, camera.fog.color, fog), volumetric(world), 1.0);
 }
 
 // How much of a surface's own light the fogs take, as one factor: the distance
@@ -38,6 +39,23 @@ fn surface_fog(world: vec3<f32>) -> f32 {
         return fog;
     }
     return 1.0 - (1.0 - fog) * volumetric(world).a;
+}
+
+// `color` behind the volumetric fog's `air`, for the blend the material draws with.
+// An Alpha or Premultiply surface replaces what is behind it by `coverage`, so it
+// takes the air's light in front of it, as much as it covers. An Additive surface
+// adds onto what is behind it, which already carries that air: it is only dimmed,
+// as additive particles are. A Multiply surface scales what is behind it: seen
+// through the air its tint fades toward white, so a white sheet stays invisible.
+fn blended_air(color: vec3<f32>, air: vec4<f32>, coverage: f32) -> vec3<f32> {
+    let mode = material().blend_mode;
+    if (mode == 2u) {
+        return color * air.a;
+    }
+    if (mode == 3u) {
+        return mix(vec3<f32>(1.0), color, air.a);
+    }
+    return color * air.a + air.rgb * coverage;
 }
 
 // `lit` fogged, with the alpha the pipeline blends with. Preserve specular (URP's
@@ -55,7 +73,7 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
     let fog = fog_factor(camera.fog, world, camera.camera_pos);
     let air = volumetric(world);
     if (m.premultiply_diffuse == 0u && m.uses_opaque == 0u) {
-        return vec4<f32>(through_volume(mix(lit, camera.fog.color, fog), air), alpha);
+        return vec4<f32>(blended_air(mix(lit, camera.fog.color, fog), air, 1.0), alpha);
     }
     var opacity = alpha;
     var color = lit;
@@ -69,7 +87,7 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
     color = mix(color, camera.fog.color * opacity, fog);
     // Premultiplied: the air's light in front of the surface, as much of it as the
     // surface covers (what is behind it already carries its own, further fog).
-    color = color * air.a + air.rgb * opacity;
+    color = blended_air(color, air, opacity);
     if (m.uses_opaque == 0u) {
         return vec4<f32>(color, opacity);
     }

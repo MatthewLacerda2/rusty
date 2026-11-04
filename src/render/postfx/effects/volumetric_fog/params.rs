@@ -18,6 +18,9 @@ pub(crate) struct VolumetricParams {
     jitter: [f32; 4],
     medium: [f32; 4],
     albedo: [f32; 4],
+    /// The probe grid's box (`probes::AirProbes`): its corner, w 1 when the scene
+    /// has probes; its size.
+    probes: [[f32; 4]; 2],
 }
 
 /// The grid a view's history was built in: its camera's view-projection, view
@@ -32,9 +35,16 @@ pub(crate) struct Built {
 impl VolumetricParams {
     /// This frame's uniform for `plan`, frame `index`, reprojecting from `prev`
     /// (`None`: no history).
-    pub(crate) fn new(plan: &VolumetricPlan, index: u32, prev: Option<Built>) -> Self {
+    pub(crate) fn new(
+        plan: &VolumetricPlan,
+        (index, probes): (u32, [[f32; 4]; 2]),
+        prev: Option<Built>,
+    ) -> Self {
         let [w, h, d] = plan.grid;
-        let jitter = [halton(index, 2), halton(index, 3), halton(index, 5)];
+        // From 1, as `taa::jitter::pixels`: `halton(0, b)` is 0, which would put a
+        // frame's first slice sample at the eye itself.
+        let i = index + 1;
+        let jitter = [halton(i, 2), halton(i, 3), halton(i, 5)];
         let weight = if prev.is_some() {
             1.0 - HISTORY_WEIGHT
         } else {
@@ -58,6 +68,7 @@ impl VolumetricParams {
                 plan.anisotropy,
             ],
             albedo: [plan.albedo[0], plan.albedo[1], plan.albedo[2], plan.ambient],
+            probes,
         }
     }
 

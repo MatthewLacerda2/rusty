@@ -38,6 +38,7 @@ pub const MODULES: &[&str] = &[
     "lighting/cascades.wgsl",
     "ibl/ggx.wgsl",
     "sky/motion.wgsl",
+    "sky/air.wgsl",
     "forward/bindings.wgsl",
     "forward/maps.wgsl",
     "forward/mapping.wgsl",

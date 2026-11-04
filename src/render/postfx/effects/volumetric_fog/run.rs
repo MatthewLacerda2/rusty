@@ -38,7 +38,13 @@ impl Renderer {
             *t = VolumetricTargets::new(device, plan.grid);
         }
         let prev = t.advance(key);
-        let params = VolumetricParams::new(&plan, t.index, prev);
+        let eye = glam::Vec3::from(ctx.uniform.camera_pos);
+        let probes = self.post_passes.volumetric_fog.probes.refresh(
+            ctx.scene,
+            (eye, plan.depth_extent),
+            &self.queue,
+        );
+        let params = VolumetricParams::new(&plan, (t.index, probes), prev);
         self.queue
             .write_buffer(&t.uniform, 0, bytemuck::bytes_of(&params));
         let built = Built {
@@ -111,7 +117,8 @@ impl Renderer {
     }
 
     /// `cs_scatter`'s group: the uniforms, this camera's lights and the `Baked`
-    /// lamps' bins, the shadow maps, last frame's grid and this frame's.
+    /// lamps' bins, the shadow maps, last frame's grid and this frame's, and the
+    /// probe grid.
     fn scatter_group(
         &self,
         t: &VolumetricTargets,
@@ -143,6 +150,7 @@ impl Renderer {
                 entry(14, TextureView(history)),
                 entry(15, Sampler(&passes.sampler)),
                 entry(16, TextureView(out)),
+                entry(17, TextureView(&passes.probes.view)),
             ],
         })
     }
