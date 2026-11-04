@@ -1,9 +1,11 @@
-//! RGBM: how a baked lightmap is stored (#438). An HDR texel fits an 8-bit RGBA PNG
+//! RGBM: how a baked lightmap's PNG fallback is stored (#438; the GPU reads BC6H
+//! since #1694, `pages`). An HDR texel fits an 8-bit RGBA PNG
 //! as `rgb * m * RGBM_RANGE`, Unity's lightmap encoding on platforms without float
 //! textures. No new dependency (the PNG encoder is already in), the file stays small,
-//! and an agent can open it. The shader's `decode_rgbm` mirrors [`decode_rgbm`].
+//! and an agent can open it.
 //!
-//! Values are linear (no sRGB curve); the renderer uploads the PNG as `Rgba8Unorm`.
+//! Values are linear (no sRGB curve). The renderer decodes the PNG on the CPU when
+//! it loads it (a GPU without BC compression, or a scene baked before #1694).
 //!
 //! A direction page (#810) is plain RGBA8, Unity's directional-lightmap layout: RGB the
 //! dominant incoming direction mapped from [-1, 1] to [0, 1], A its directionality.
@@ -25,8 +27,7 @@ pub fn encode_rgbm(c: Vec3) -> [u8; 4] {
     [byte(rgb.x), byte(rgb.y), byte(rgb.z), byte(m)]
 }
 
-/// Decode one RGBM texel back to linear HDR.
-#[cfg(test)]
+/// Decode one RGBM texel back to linear HDR: what a page's PNG fallback holds.
 pub fn decode_rgbm(px: [u8; 4]) -> Vec3 {
     let f = |b: u8| b as f32 / 255.0;
     Vec3::new(f(px[0]), f(px[1]), f(px[2])) * f(px[3]) * RGBM_RANGE
@@ -46,7 +47,6 @@ pub fn encode_direction(d: Vec3) -> [u8; 4] {
 }
 
 /// Decode one direction texel back to the direction scaled by its directionality.
-#[cfg(test)]
 pub fn decode_direction(px: [u8; 4]) -> Vec3 {
     let f = |b: u8| b as f32 / 255.0;
     let dir = Vec3::new(f(px[0]), f(px[1]), f(px[2])) * 2.0 - 1.0;

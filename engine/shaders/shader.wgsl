@@ -5,7 +5,7 @@
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
-#import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, flat_ambient, fold_decals, lightmap_direction_rebalance, probe_irradiance}
+#import forward::lighting::{ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, flat_ambient, fold_decals, lightmap_direction_rebalance, lightmap_level, probe_irradiance}
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
@@ -307,6 +307,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // the material draws back faces (#1615, `seen_from_behind`). First, before any branch.
     let behind = seen_from_behind(in.world_normal, in.world_position, m.two_sided == 1u);
     let geometric = facing_normal(in.world_normal, behind);
+    // The lightmap's mip level (#1694), from derivatives: before any branch too.
+    let lightmap_lod = lightmap_level(in.lightmap_uv);
     // Where every map below is read (#1573): UV0 tiled, or projected from world space.
     let maps = mapping::coords(in.tex_coords, in.world_position, geometric);
     var base_color = m.color_tint;
@@ -382,13 +384,12 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let lightmap_page = instances[in.instance].lightmap_page;
     if (lightmap_page > 0u) {
         // Baked lightmap (#438): bounce, sky, emission and `Baked` lights' direct light,
-        // stored RGBM as E / pi, so `* albedo` is the Lambert response a realtime light
-        // gives. `Level` sampling: the page is per instance, so this branch may diverge.
-        let lm = textureSampleLevel(t_lightmaps, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, 0.0);
-        ambient_irradiance = lm.rgb * lm.a * LIGHTMAP_RGBM_RANGE;
+        // stored linear (BC6H, #1694) as E / pi, so `* albedo` is the Lambert response a
+        // realtime light gives. Sampled at the level taken above: this branch may diverge.
+        ambient_irradiance = textureSampleLevel(t_lightmaps, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, lightmap_lod).rgb;
         if (instances[in.instance].lightmap_directional == 1u) {
             // The normal-mapped (and decal-perturbed) N reshapes the baked light.
-            let texel = textureSampleLevel(t_lightmap_dirs, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, 0.0);
+            let texel = textureSampleLevel(t_lightmap_dirs, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, lightmap_lod);
             let dir = decode_lightmap_direction(texel);
             ambient_irradiance *= lightmap_direction_rebalance(dir, N, geometric);
         }

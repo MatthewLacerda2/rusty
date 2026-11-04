@@ -2,16 +2,19 @@
 //! button: the window stays live while the CPU path tracer runs.
 //!
 //! [`LightmapBakeJob::start`] gathers the owned `BakeScene` on the caller's thread
-//! (it borrows the ECS) and hands it to a worker; [`LightmapBakeJob::poll`], called
-//! each frame, applies the finished result back on the caller's thread through the
-//! same [`apply_lightmaps`] the synchronous `Lighting.BakeLightmaps()` uses. A
-//! cancelled bake applies nothing, so the scene keeps its previous lightmaps.
+//! (it borrows the ECS) and hands it to a worker, which bakes and then encodes the
+//! pages (`encode_pages`: BC6H and every mip, #1694), so neither blocks a frame;
+//! [`LightmapBakeJob::poll`], called each frame, writes the finished pages and
+//! points the scene at them on the caller's thread, through the same
+//! [`apply_encoded`] the synchronous `Lighting.BakeLightmaps()` uses. A cancelled
+//! bake applies nothing, so the scene keeps its previous lightmaps.
 
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
-use super::{apply_lightmaps, gather_bake_input, warn_missing_uvs, UNSAVED};
-use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeSettings, Lightmap};
+use super::UNSAVED;
+use super::{apply_encoded, encode_pages, gather_bake_input, warn_missing_uvs, EncodedPages};
+use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeSettings};
 use crate::scene::Scene;
 
 /// How a finished bake ended, once [`LightmapBakeJob::poll`] has applied it.
@@ -28,7 +31,7 @@ pub enum BakeOutcome {
 /// A bake running on a worker thread.
 pub struct LightmapBakeJob {
     progress: Arc<BakeProgress>,
-    worker: Option<JoinHandle<Option<Vec<Lightmap>>>>,
+    worker: Option<JoinHandle<Option<EncodedPages>>>,
     scene_path: String,
     /// Static meshes the bake gathered, for the missing-lightmap-UV report (#831).
     static_meshes: usize,
@@ -49,7 +52,7 @@ impl LightmapBakeJob {
         let watch = Arc::clone(&progress);
         let worker = thread::Builder::new()
             .name("lightmap-bake".into())
-            .spawn(move || bake_with_progress(&input, &settings, &watch))
+            .spawn(move || bake_with_progress(&input, &settings, &watch).map(|m| encode_pages(&m)))
             .map_err(|e| format!("start the bake: {e}"))?;
         Ok(Self {
             progress,
@@ -102,9 +105,9 @@ impl LightmapBakeJob {
         }
         let joined = self.worker.take()?.join();
         Some(match joined {
-            Ok(Some(maps)) => {
-                warn_missing_uvs(self.static_meshes, maps.len());
-                match apply_lightmaps(scene, &self.scene_path, &maps) {
+            Ok(Some(pages)) => {
+                warn_missing_uvs(self.static_meshes, pages.maps);
+                match apply_encoded(scene, &self.scene_path, &pages) {
                     Ok(n) => BakeOutcome::Baked(n),
                     Err(e) => BakeOutcome::Failed(e),
                 }

@@ -14,7 +14,7 @@ use super::atlas::{max_map_edge, MAX_PAGE};
 use super::filter::smooth;
 use super::input::BakeScene;
 use super::progress::BakeProgress;
-use super::raster::{dilate, lightmap_size, rasterize, world_per_uv, TexelPoint};
+use super::raster::{dilate, fill_rest, lightmap_size, rasterize, world_per_uv, TexelPoint};
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
@@ -202,7 +202,8 @@ fn lightmap(
 
 /// One chart's traced texels as its `size`² lightmap and, for a directional bake,
 /// its direction map: the bounce (and its directions) smoothed, the direct light
-/// added, then both dilated past the chart's edge.
+/// added, then both dilated past the chart's edge and the rest of the map filled
+/// from its nearest chart (`raster::fill_rest`, for the mips, #1694).
 fn assemble(
     points: &[TexelPoint],
     light: &[TexelLight],
@@ -231,11 +232,14 @@ fn assemble(
         filled[point.index] = true;
     }
     if settings.directional {
-        dilate(&mut directions, &mut filled.clone(), size, DILATE_PASSES);
+        let mut ring = filled.clone();
+        dilate(&mut directions, &mut ring, size, DILATE_PASSES);
+        fill_rest(&mut directions, &ring, size);
     } else {
         directions.clear();
     }
     dilate(&mut texels, &mut filled, size, DILATE_PASSES);
+    fill_rest(&mut texels, &filled, size);
     (texels, directions)
 }
 

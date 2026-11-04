@@ -1,6 +1,7 @@
 //! The editor's background bake (#808): it applies what the synchronous bake would,
 //! reports progress, and a cancelled bake leaves the previous lightmaps alone.
 
+use std::path::Path;
 use std::time::Duration;
 
 use super::tests::{quick, scene, scene_path};

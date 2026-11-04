@@ -37,7 +37,3 @@ mod mesh_id_tests;
 
 #[cfg(test)]
 pub(crate) mod uniform_layout_tests;
-
-#[cfg(test)]
-#[path = "lightmaps_tests.rs"]
-mod lightmaps_tests;

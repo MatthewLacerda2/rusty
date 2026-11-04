@@ -5,7 +5,7 @@
 
 use glam::Mat4;
 
-use super::lightmaps::Lightmaps;
+use super::Lightmaps;
 use crate::render::draw::uniforms::solid_instance;
 use crate::render::test_gpu::headless_or_skip;
 use crate::scene::lighting::lightmap::LightmapEntry;
@@ -29,7 +29,7 @@ fn gpu_lightmaps_rebind_on_colour_pages_and_match_direction_shapes() {
     let (a, b) = (vec![page("a.png", 2)], vec![page("b.png", 2)]);
     let mismatched = vec![page("wide_dir.png", 4)];
     let matching = vec![page("b_dir.png", 2)];
-    let mut maps = Lightmaps::new(device);
+    let mut maps = Lightmaps::new(device, true);
 
     assert!(maps.bind(device, queue, &a, &[]));
     assert!(maps.resident() && !maps.directional(), "no direction pages");
@@ -67,7 +67,7 @@ fn gpu_lightmaps_follow_bakes_at_one_path() {
         return;
     };
     let (device, queue) = (&renderer.device, &renderer.queue);
-    let mut maps = Lightmaps::new(device);
+    let mut maps = Lightmaps::new(device, true);
     let edge = |bake| if bake == Bake::A { 2 } else { 4 };
     let path = crate::test_temp::dir().join("rebaked.png");
     follows_rebakes(
