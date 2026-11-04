@@ -11,8 +11,8 @@ use std::path::Path;
 
 use crate::asset::lightmap_page::{self, Page};
 use crate::scene::lighting::lightmap::{
-    colour_page, direction_page, encode_directions, encode_texels, pack, BakeProgress, Lightmap,
-    LightmapEntry, LightmapSet,
+    check_page_count, colour_page, direction_page, encode_directions, encode_texels, pack,
+    BakeProgress, Lightmap, LightmapEntry, LightmapSet, MAX_PAGES,
 };
 use crate::scene::Scene;
 
@@ -35,13 +35,16 @@ pub struct EncodedPages {
 /// `BakeSettings::page`, #1704) and encode them, every page on every core (the bands of a level are
 /// split over them, so the blocks never depend on the machine), counting each
 /// finished page into `progress`. `Ok(None)` when `progress` is cancelled first:
-/// it is asked before every level of every page.
+/// it is asked before every level of every page. `Err` before any page is drawn
+/// when the bake would make more than [`MAX_PAGES`] (`check_page_count`): the
+/// renderer could not load them, so the scene keeps its previous lightmaps.
 pub fn encode_pages(
     maps: &[Lightmap],
     max_page: u32,
     progress: &BakeProgress,
 ) -> Result<Option<EncodedPages>, String> {
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
+    check_page_count(maps, max_page, MAX_PAGES)?;
     let atlas = pack(maps, max_page);
     let size = atlas.page_size;
     progress.start_pages((atlas.pages.len() + atlas.directions.len()) as u64);

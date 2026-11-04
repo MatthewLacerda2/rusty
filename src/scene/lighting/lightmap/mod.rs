@@ -43,7 +43,8 @@ mod set;
 mod trace;
 
 pub use atlas::{
-    max_map_edge, pack, page_edge, LightmapAtlas, MAX_PAGE, MIN_PAGE, MIP_LEVELS, PAD,
+    check_page_count, max_map_edge, pack, page_count, page_edge, LightmapAtlas, MAX_PAGE,
+    MAX_PAGES, MIN_PAGE, MIP_LEVELS, PAD,
 };
 pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
 pub use encode::{decode_direction, decode_rgbm, encode_directions, encode_texels};

@@ -45,6 +45,11 @@ use super::bake::Lightmap;
 
 /// The largest atlas page edge, in texels: Unity's largest Max Lightmap Size.
 pub const MAX_PAGE: u32 = 4096;
+/// The most pages a bake may make (#1704): the layers of one texture array under
+/// `wgpu::Limits::default()`, which the renderer asks its device for
+/// (`render::gpu::lightmaps` checks the device's own limit at load, and a test
+/// holds the two equal).
+pub const MAX_PAGES: usize = 256;
 /// The mip levels a page's layout keeps apart (see the module doc): the base and
 /// two halvings.
 pub const MIP_LEVELS: u32 = 3;
@@ -83,21 +88,12 @@ pub struct LightmapAtlas {
 /// [`page_edge`]). No lightmaps, no pages. A map wider than [`max_map_edge`] of
 /// that page keeps only its top-left corner of that size.
 pub fn pack(maps: &[Lightmap], max_page: u32) -> LightmapAtlas {
-    let max_page = page_edge(max_page);
-    let sizes: Vec<u32> = maps
-        .iter()
-        .map(|m| m.size.min(max_map_edge(max_page)))
-        .collect();
-    let mut order: Vec<usize> = (0..maps.len()).collect();
-    order.sort_by(|&a, &b| sizes[b].cmp(&sizes[a]).then(a.cmp(&b)));
-    let mut page_size = MIN_PAGE;
-    let (corners, page_count) = loop {
-        let (corners, count) = place(&order, &sizes, page_size);
-        if count <= 1 || page_size >= max_page {
-            break (corners, count);
-        }
-        page_size *= 2;
-    };
+    let Layout {
+        page_size,
+        sizes,
+        corners,
+        page_count,
+    } = layout(maps, max_page);
     let mut pages = vec![vec![Vec3::ZERO; (page_size * page_size) as usize]; page_count];
     let directional = !maps.is_empty() && maps.iter().all(|m| !m.directions.is_empty());
     let mut directions = match directional {
@@ -126,6 +122,62 @@ pub fn pack(maps: &[Lightmap], max_page: u32) -> LightmapAtlas {
         pages,
         directions,
         placements,
+    }
+}
+
+/// The page edge and page count [`pack`] would make of `maps`, without drawing
+/// a texel: what [`check_page_count`] asks before a page is allocated.
+pub fn page_count(maps: &[Lightmap], max_page: u32) -> (u32, usize) {
+    let l = layout(maps, max_page);
+    (l.page_size, l.page_count)
+}
+
+/// Refuse a bake of `maps` at `max_page` that makes more than `limit` pages
+/// (the renderer's array holds [`MAX_PAGES`], #1704), naming the count, the limit
+/// and what to change. Checked before packing: past it, the pages would not load.
+pub fn check_page_count(maps: &[Lightmap], max_page: u32, limit: usize) -> Result<(), String> {
+    let (size, count) = page_count(maps, max_page);
+    if count <= limit {
+        return Ok(());
+    }
+    Err(format!(
+        "the bake needs {count} lightmap pages of {size}², more than the {limit} a lightmap \
+         texture array holds: raise Max Lightmap Size (now {size}), or lower texelsPerUnit or \
+         a mesh's Scale In Lightmap; the scene keeps its previous lightmaps"
+    ))
+}
+
+/// Where every cell goes, before any texel is drawn.
+struct Layout {
+    page_size: u32,
+    /// Each map's edge, held to the cap.
+    sizes: Vec<u32>,
+    corners: Vec<(u32, u32, u32)>,
+    page_count: usize,
+}
+
+/// The smallest page edge up to `max_page` that holds `maps` in one page (else
+/// `max_page`), and where each map's cell lands on it.
+fn layout(maps: &[Lightmap], max_page: u32) -> Layout {
+    let max_page = page_edge(max_page);
+    let sizes: Vec<u32> = maps
+        .iter()
+        .map(|m| m.size.min(max_map_edge(max_page)))
+        .collect();
+    let mut order: Vec<usize> = (0..maps.len()).collect();
+    order.sort_by(|&a, &b| sizes[b].cmp(&sizes[a]).then(a.cmp(&b)));
+    let mut page_size = MIN_PAGE;
+    loop {
+        let (corners, page_count) = place(&order, &sizes, page_size);
+        if page_count <= 1 || page_size >= max_page {
+            return Layout {
+                page_size,
+                sizes,
+                corners,
+                page_count,
+            };
+        }
+        page_size *= 2;
     }
 }
 

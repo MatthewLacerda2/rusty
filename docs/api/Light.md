@@ -155,4 +155,6 @@ whether it is drawn live:
   bounce from the light probes, whose bake adds the light's own direct light per
   probe (shadowed by static geometry). So a dynamic object lights from it only once
   probes are baked, softly, and it casts no realtime shadow; a static surface without
-  a lightmap (no second UV map) does not receive it at all.
+  a lightmap (no second UV map) does not receive it at all, while a static mesh at
+  Scale In Lightmap `0` ([`Lighting`](Lighting.md#generate-lighting)) takes it from the
+  probes, as a dynamic object does.

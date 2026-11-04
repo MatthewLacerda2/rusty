@@ -51,6 +51,7 @@ fn cast_shadows_round_trips_through_a_scene_and_a_prefab() {
         id
     });
     scene.world.mesh_mut(water).unwrap().cast_shadows = ShadowCasting::TwoSided;
+    scene.world.mesh_mut(water).unwrap().scale_in_lightmap = 3.0;
     let dir = crate::temp::dir();
     let path = dir
         .join("rusty_cast_shadows.scene")
@@ -62,6 +63,8 @@ fn cast_shadows_round_trips_through_a_scene_and_a_prefab() {
     let mode = |s: &Scene, id| s.world.mesh(id).map(|m| m.cast_shadows);
     assert_eq!(mode(&loaded, water), Some(ShadowCasting::TwoSided));
     assert_eq!(mode(&loaded, floor), Some(ShadowCasting::On));
+    let scale = |s: &Scene, id| s.world.mesh(id).map(|m| m.scale_in_lightmap);
+    assert_eq!(scale(&loaded, water), Some(3.0));
 
     let prefab = dir
         .join("rusty_cast_shadows.prefab")
@@ -71,6 +74,29 @@ fn cast_shadows_round_trips_through_a_scene_and_a_prefab() {
     let mut stamped = Scene::new();
     let root = instantiate_prefab(&mut stamped, &read_prefab_file(&prefab).unwrap(), None);
     assert_eq!(mode(&stamped, root), Some(ShadowCasting::TwoSided));
+    assert_eq!(scale(&stamped, root), Some(3.0));
+}
+
+#[test]
+fn an_out_of_range_scale_in_lightmap_is_held_by_a_scene_and_a_prefab_load() {
+    let mut scene = Scene::new();
+    let wall = scene.add_entity("Wall".to_string());
+    let mut mesh =
+        rusty::scene::authoring::primitive_mesh_component(rusty::scene::authoring::Primitive::Box)
+            .unwrap();
+    mesh.scale_in_lightmap = 9000.0; // as a hand edit would leave it
+    scene.world.set_mesh(wall, Some(mesh));
+    let path = |name: &str| crate::temp::dir().join(name).to_string_lossy().into_owned();
+    let (scene_file, prefab) = (path("rusty_1704.scene"), path("rusty_1704.prefab"));
+    scene.save_to_file(&scene_file).unwrap();
+    save_prefab(&scene, wall, &prefab).unwrap();
+    let scale = |s: &Scene, id| s.world.mesh(id).map(|m| m.scale_in_lightmap);
+    let mut loaded = Scene::new();
+    loaded.load_from_file(&scene_file).unwrap();
+    assert_eq!(scale(&loaded, wall), Some(64.0), "held at its top");
+    let mut stamped = Scene::new();
+    let root = instantiate_prefab(&mut stamped, &read_prefab_file(&prefab).unwrap(), None);
+    assert_eq!(scale(&stamped, root), Some(64.0));
 }
 
 #[test]

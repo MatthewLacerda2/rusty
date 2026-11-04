@@ -23,11 +23,12 @@ The two individual verbs stay for a script that wants only one of them.
 ### Generate Lighting
 
 - **Settings live with the scene** (Unity's Lighting Settings): texels per unit, samples,
-  bounces, seed and the directional mode are saved in the scene file's
+  bounces, seed, Max Lightmap Size and the directional mode are saved in the scene file's
   `lighting_settings` block, so a rebake never asks for them again.
   `Lighting.SetSettings{ samples = 256 }` changes only the fields it names (each clamped
   to the editor's range: `0.25`–`64` texels per unit, `1`–`4096` samples, `1`–`16`
-  bounces; a NaN or infinite density takes the default `8`); the editor's card edits the
+  bounces, Max Lightmap Size below; a NaN or infinite density takes the default `8`, and
+  a file's out-of-range value is held the same way when the scene loads); the editor's card edits the
   same fields under the button. The reflection probes' defaults sit beside them:
   `reflectionResolution` (default `512`, a power of two in 16–2048) and
   `reflectionBudgetMB` (default `256`, `8`–`2048`) and `reflectionMaxProbes` (default
@@ -252,12 +253,23 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   mesh's **Scale In Lightmap** (below). A mesh's lightmap follows its surface area at that
   density, from 4 texels square up to the largest map one atlas page holds with its
   ring: `maxLightmapSize − 8` (1016 at the default 1024, #1704). A map above half the page
-  leaves the rest of it to smaller maps.
+  leaves the rest of it to smaller maps. The bounce is smoothed with a 3-texel edge-aware
+  Gaussian (Unity's indirect filter) that never crosses a crease; baked direct light is
+  not filtered, so a point, spot or directional light's shadows stay sharp; an Area
+  light's (#1674) are soft, its rectangle integrated over `samples` or more jittered
+  points per texel. A texel buried inside other geometry (floor
+  under a crate) is filled from its neighbours rather than baked black. No GPU is needed;
+  it runs headless.
 - **Max Lightmap Size** (`maxLightmapSize`, Unity's setting; the editor's
   **"Max Lightmap Size"** under the Generate Lighting button). The atlas page's edge in
   texels, a power of two from `32` to `4096`, default `1024`; any other value is held to
-  the next power of two in that range. It caps both the page and, through it, the largest
-  lightmap a mesh can get.
+  the next power of two in that range, when set and when a scene file is loaded. It caps
+  both the page and, through it, the largest lightmap a mesh can get. A bake that would
+  take more than **256 pages** (the layers one GPU texture array holds) is refused before
+  it encodes, with a message naming the page count: raise Max Lightmap Size, or lower
+  `texelsPerUnit` or Scale In Lightmap. The scene keeps its previous lightmaps. A scene
+  file that already holds more pages than the GPU takes loads unlit by lightmaps, with a
+  warning, until it is rebaked.
 - **Scale In Lightmap** (Unity's *MeshRenderer* setting, #1704): a per-mesh multiplier
   on `texelsPerUnit`, the Mesh component's `scale_in_lightmap` field (default `1`, `0`–`64`),
   written with `Component.Set(id, "Mesh", { scale_in_lightmap = 2 })`
@@ -265,13 +277,8 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   card and saved with the scene and its prefabs (a file without it reads `1`). A hero
   prop takes more texels, clutter fewer, without changing the scene's density. At `0`
   the mesh gets **no lightmap** and reads the **light probes** at runtime, as in Unity,
-  while still blocking and bouncing light in the bake as its `cast_shadows` says. The bounce is smoothed with a 3-texel edge-aware
-  Gaussian (Unity's indirect filter) that never crosses a crease; baked direct light is
-  not filtered, so a point, spot or directional light's shadows stay sharp; an Area
-  light's (#1674) are soft, its rectangle integrated over `samples` or more jittered
-  points per texel. A texel buried inside other geometry (floor
-  under a crate) is filled from its neighbours rather than baked black. No GPU is needed;
-  it runs headless.
+  while still blocking and bouncing light in the bake as its `cast_shadows` says. A
+  value read from a file is held to the same range when the scene or prefab loads.
 - **Directional** (#810, Unity's *Directional Mode*). By default the bake also stores,
   per texel, the **dominant direction** its light arrives from and how strongly it leans
   that way (its *directionality*: 1 when it all comes from one side, 0 when it comes
@@ -300,7 +307,7 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   packed exactly like its colour page. The texture importer leaves that folder alone
   (`Assets.md`). Encoding takes time, about 2 s per million texels on four cores, after
   the trace: a 2048² page pair about 8 s, a 4096² pair about 30 s; a level whose biggest
-  meshes reach the default 1016 cap, about 90 s (#1704); the editor's Generate Lighting
+  meshes reach the default 1016 cap, about 90 s (#1704); a 4096² page pair takes about 43 MiB of GPU memory, but filling many of them takes a density whose trace stops a bake long before memory does; the editor's Generate Lighting
   encodes the pages and compresses their PNGs on its worker and only writes the finished
   files on the frame, so the window stays live. The scene stores the page list and, per entity, its page and
   scale/offset (Unity's lightmap index + scale/offset), so **save the scene** after

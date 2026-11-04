@@ -23,7 +23,8 @@
 //! pages under new names (their file name hashes the page), so the cache rarely
 //! meets a stale page; when the engine does re-write one (or writes one a page
 //! list failed on), the write log (`core::fs::written`, #1207) drops every array
-//! holding it and rebinds. A page that fails to load, or pages of different sizes,
+//! holding it and rebinds. A page that fails to load, pages of different sizes, or
+//! more or larger pages than the device's limits take (`upload::fits`, #1704),
 //! leave the scene unlit by lightmaps until the engine writes one of its pages.
 //!
 //! A directional bake (#810) adds its direction pages as a second array at binding 16,
@@ -40,7 +41,7 @@ use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
 use crate::core::fs::written::{written_since, Stale};
 use load::{Kind, Loaded};
-use upload::{create, upload, LightmapArray};
+use upload::{create, fits, upload, LightmapArray};
 
 /// A page list's array: uploaded (or failed), or still being read.
 enum Entry {
@@ -254,14 +255,16 @@ fn start(list: Vec<String>, kind: Kind, bc: bool) -> Receiver<Result<Loaded, Str
     inbox
 }
 
-/// Upload a finished load, or warn of why it failed.
+/// Upload a finished load, or warn of why it failed: unreadable, or more or larger
+/// pages than the device's limits take (`fits`, #1704).
 fn finish(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     list: &[String],
     result: Result<Loaded, String>,
 ) -> Option<Rc<LightmapArray>> {
-    match result {
+    let limits = device.limits();
+    match result.and_then(|l| fits(&limits, l.edge, l.layers.len()).map(|()| l)) {
         Ok(loaded) => Some(Rc::new(upload(device, queue, &loaded))),
         Err(e) => {
             log::warn!("[Lightmap] cannot load the pages {list:?}: {e}");
@@ -272,5 +275,7 @@ fn finish(
 
 #[cfg(test)]
 mod formats_tests;
+#[cfg(test)]
+mod limits_tests;
 #[cfg(test)]
 mod tests;
