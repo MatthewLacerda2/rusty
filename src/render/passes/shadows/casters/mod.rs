@@ -21,6 +21,10 @@
 //! it casts from the per-frame sweeps, with the base camera's verdict, so its shadow
 //! goes when it does.
 //!
+//! The casters are the retained scene's objects (`render::scene`, #1706): a sweep
+//! walks them, never the ECS, and reads per frame only what the frame decides (the
+//! LOD level, the small-object verdict) and a skinned caster's pose.
+//!
 //! Casters are gathered once per sweep and culled per light volume — a cascade (#435)
 //! or an atlas tile (#468) — so a prop inside two volumes is drawn into both. The
 //! cascades' and the atlas's static bakes and dynamic passes each own a [`CasterBuffer`]
@@ -36,7 +40,7 @@ mod sweep;
 use std::collections::HashMap;
 use std::ops::Range;
 
-use super::clips::{CasterClip, Clip};
+use super::clips::Clip;
 use super::ShadowRenderer;
 use crate::components::{RenderFace, ShadowCasting};
 use crate::render::draw::batch::IndexRun;
@@ -45,6 +49,7 @@ use crate::render::gpu::material_cache::MaterialCache;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
 use crate::render::gpu::pipelines::winding::Facing;
 use crate::render::lod::LodSelection;
+use crate::render::scene::{MeshHandle, MeshHandles, RenderScene};
 use crate::render::{GpuMesh, MeshId, SmallObjectCull};
 use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
@@ -72,7 +77,7 @@ pub(super) fn caster_facing(world: Mat4, two_sided: bool, face: RenderFace) -> F
 pub(super) struct CasterKey {
     pub facing: Facing,
     pub clip: Option<Clip>,
-    pub mesh: MeshId,
+    pub mesh: MeshHandle,
     /// The drawn index run, whole (#1285): material runs that clip differently are
     /// draws of their own, and two casters whose runs of one mesh are joined
     /// differently never share a draw.
@@ -100,21 +105,28 @@ pub(super) struct CasterFrame<'a> {
     pub device: &'a wgpu::Device,
     pub queue: &'a wgpu::Queue,
     pub scene: &'a Scene,
+    /// `scene`'s retained objects (#1706): every caster, with its slots' clips
+    /// (#648) and what its static bake reads.
+    pub objects: &'a RenderScene,
     pub gpu_meshes: &'a HashMap<MeshId, GpuMesh>,
-    /// The clipped casters (#648), and the material groups and variant pipelines
-    /// their draws bind.
-    pub clips: &'a HashMap<(u32, usize), CasterClip>,
+    pub meshes: &'a MeshHandles,
+    /// The material groups and variant pipelines the clipped casters' draws bind.
     pub materials: &'a MaterialCache,
     pub surfaces: &'a SurfaceShaders,
-    /// The scene's [`StaticsKey`](super::StaticsKey), digested once for the frame
-    /// and compared by both the cascades' and the atlas's static bakes (#1594).
+    /// The scene's [`StaticsKey`](super::StaticsKey), kept by the retained scene and
+    /// compared by both the cascades' and the atlas's static bakes (#1594).
     pub statics: super::StaticsKey,
     /// The renderer's GPU pass timer: every sweep is a `shadows` pass (#835).
     pub timer: &'a crate::render::timing::GpuTimer,
     /// The base camera's small-object cull (#1714): a shadow goes with its prop.
     pub small: SmallObjectCull,
-    /// The casters that cull as small, and their LOD groups, kept out of the bakes.
-    pub unbaked: super::UnbakedCasters,
+}
+
+impl CasterFrame<'_> {
+    /// The resident buffers of the mesh `handle` names.
+    fn gpu_mesh(&self, handle: MeshHandle) -> Option<&GpuMesh> {
+        self.gpu_meshes.get(self.meshes.id(handle))
+    }
 }
 
 impl ShadowRenderer {
@@ -165,49 +177,48 @@ impl ShadowRenderer {
     }
 
     /// Every active caster `sweep` takes — a caster a surface variant cuts counts as
-    /// dynamic (see `clips`) — that has a GPU mesh, and the joint
-    /// matrices its skinned casters' `bone_base`s index — one palette per caster per
-    /// sweep, however many cascades draw it.
+    /// dynamic (see `clips`) — that has a GPU mesh, from the retained scene's
+    /// objects (#1706), and the joint matrices its skinned casters' `bone_base`s
+    /// index — one palette per caster per sweep, however many cascades draw it. Only
+    /// what the frame decides is read here: the LOD level, the small-object verdict,
+    /// and a palette object's pose and posed bounds, which animation writes unstamped.
     fn collect_casters(
         &self,
         frame: &CasterFrame,
         lod: &LodSelection,
         sweep: Sweep,
     ) -> (Vec<Candidate>, Vec<JointMatrix>) {
-        let scene = frame.scene;
         let (mut casters, mut joints) = (Vec::new(), Vec::new());
-        for id in scene.world.ids_with_mesh() {
-            let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");
-            let mesh_id = MeshId::from_mesh(&mesh);
-            let Some(gpu_mesh) = frame.gpu_meshes.get(&mesh_id) else {
-                continue;
-            };
+        for (id, object) in frame.objects.objects() {
             // An inactive caster, one set to cast nothing (#1571), or a level of detail
             // this sweep does not draw (#472).
-            let off = !mesh.cast_shadows.casts();
-            if off || !scene.world.is_active_in_hierarchy(id) || lod.hides(id) {
+            let off = !object.cast.casts() || !object.active;
+            if !object.resident || off || lod.hides(id) {
                 continue;
             }
-            let material = scene.world.material(id);
-            let slots = material.as_ref().map_or(0, |m| m.materials.len());
-            let moving = frame.moving(id, slots);
             // One a camera may cull as small casts per frame, never from a bake (#1714).
-            let unbaked = frame.unbaked.contains(id, &mesh);
-            if !sweep.takes(scene.world.is_static(id) && !moving && !unbaked) {
+            let unbaked = frame
+                .objects
+                .unbaked
+                .holds(id, object.casting.culls_small());
+            if !sweep.takes(object.is_static && !object.moving && !unbaked) {
                 continue;
             }
-            let material = material.as_deref();
-            let runs = slot_runs(frame, id, material, gpu_mesh.runs(&mesh, material));
-            let world = scene.world.local_to_world(id);
+            let world = object.world;
             // A skinned caster is bounded by its posed skeleton (#833); one whose pose
             // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.
-            let bounds = gpu_mesh.world_bounds(&mesh, world);
-            let small = frame.culls_small(&mesh, gpu_mesh, bounds, world);
+            let mesh = object.palette.then(|| frame.scene.world.mesh(id)).flatten();
+            let bounds = match (&mesh, frame.gpu_mesh(object.mesh)) {
+                (Some(mesh), Some(gpu)) => gpu.world_bounds(mesh, world),
+                _ => object.bounds,
+            };
+            let small = frame.culls_small(object, bounds);
             // A culled caster never draws: no palette to upload for it.
-            let bone_base = (!small).then(|| push_palette(&mut joints, mesh.active_palette()));
+            let palette = mesh.as_ref().map_or(&[][..], |m| m.active_palette());
+            let bone_base = (!small).then(|| push_palette(&mut joints, palette));
             let bone_base = bone_base.unwrap_or(0);
-            let two_sided = mesh.cast_shadows == ShadowCasting::TwoSided;
-            for (indices, (clip, face)) in runs {
+            let two_sided = object.cast == ShadowCasting::TwoSided;
+            for (indices, (clip, face)) in slot_runs(object) {
                 let mut caster = CasterData::new(world, bone_base);
                 if let Some(cut) = clip.and_then(|c| c.cutout) {
                     caster = caster.cutout(cut);
@@ -217,7 +228,7 @@ impl ShadowRenderer {
                     key: CasterKey {
                         facing: caster_facing(world, two_sided, face),
                         clip: clip.map(|c| c.clip),
-                        mesh: mesh_id.clone(),
+                        mesh: object.mesh,
                         indices: indices.into(),
                     },
                     caster,
@@ -251,7 +262,7 @@ impl ShadowRenderer {
         render_pass.set_bind_group(0, global, &[offset]);
         let (mut bound, mut record) = (None, None);
         for batch in batches {
-            let Some(gpu_mesh) = frame.gpu_meshes.get(&batch.key.mesh) else {
+            let Some(gpu_mesh) = frame.gpu_mesh(batch.key.mesh) else {
                 continue;
             };
             let (clip, facing) = (batch.key.clip, batch.key.facing);

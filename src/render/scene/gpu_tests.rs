@@ -1,14 +1,15 @@
 //! src/render/scene/gpu_tests.rs — a renderer that kept its objects through a run
 //! of edits draws what a renderer built fresh on the final state draws (#1706):
 //! moving, skinned (posed every frame, unstamped), static, transparent and
-//! lightmap-entried solids, with material, layer, activity and override edits.
+//! lightmap-entried solids, with material, layer, activity and override edits, a
+//! two-sided, a Cutout and a mirrored static caster: their shadows included.
 
 use glam::{Mat4, Vec3};
 
 use super::fixture::{frame, yard, RES};
 use crate::asset::{JointTransform, SkinData};
 use crate::components::mesh::primitives::generate_sphere;
-use crate::components::{MaterialComponent, MeshComponent};
+use crate::components::{MaterialComponent, MeshComponent, RenderMode, ShadowCasting};
 use crate::scene::lighting::lightmap::LightmapEntry;
 use crate::scene::Scene;
 
@@ -60,6 +61,12 @@ fn step(scene: &mut Scene, ids: &[u32], soldier: u32, step: u32) {
             scene.world.set_layer(ids[4], 5);
         }
         4 => scene.shader_overrides.set(ids[5], "tint".into(), vec![0.5]),
+        5 => scene.world.mesh_mut(ids[1]).unwrap().cast_shadows = ShadowCasting::TwoSided,
+        6 => {
+            let red = scene.materials.get_mut("red").unwrap();
+            (red.render_mode, red.alpha_cutoff) = (RenderMode::Cutout, 0.5);
+            scene.world.transform_mut(ids[1]).unwrap().scale.x = -1.0; // mirrored
+        }
         _ => {}
     }
 }
@@ -74,8 +81,11 @@ fn gpu_a_kept_scene_draws_what_a_fresh_renderer_draws_after_every_edit() {
     let soldier = skinned(&mut scene, Vec3::new(1.0, 0.0, -2.0));
     frame(&mut kept, &scene);
     let mut shown = std::collections::HashSet::new();
-    for n in 1..=5 {
+    for n in 1..=7 {
         step(&mut scene, &ids, soldier, n);
+        // Its static bakes re-baked now, as a fresh renderer's are: the two then
+        // differ by nothing (whether a bake goes stale is `equivalence_tests`').
+        kept.shadow_renderer.invalidate_static_cache();
         let (pixels, counters) = frame(&mut kept, &scene);
         let mut fresh = crate::render::test_gpu::headless_or_skip(RES, RES).expect("one ran");
         let (expected, fresh_counters) = frame(&mut fresh, &scene);
@@ -83,10 +93,8 @@ fn gpu_a_kept_scene_draws_what_a_fresh_renderer_draws_after_every_edit() {
             counters.visible_entities, fresh_counters.visible_entities,
             "step {n}"
         );
-        // Shadow draws differ by design: the kept renderer's static cascades hold
-        // their cached bake, the fresh one bakes them now.
-        let solid = |c: crate::render::RenderCounters| c.draw_calls - c.shadow_draws;
-        assert_eq!(solid(counters), solid(fresh_counters), "step {n}");
+        let draws = |c: crate::render::RenderCounters| (c.draw_calls, c.shadow_draws);
+        assert_eq!(draws(counters), draws(fresh_counters), "step {n}");
         let differing = pixels
             .chunks(4)
             .zip(expected.chunks(4))

@@ -14,12 +14,18 @@ fn at(x: f32, bone_base: u32) -> CasterData {
     CasterData::new(Mat4::from_translation(Vec3::X * x), bone_base)
 }
 
-/// A plain caster key of mesh `m`, drawing indices `0..n`.
+/// A plain caster key of mesh `m`, drawing indices `0..n`; the test meshes' handles
+/// follow their names' order.
 fn mesh(m: &str, n: u32) -> CasterKey {
+    let names = ["Box", "Card", "Pillar", "Rig"];
+    let handle = names
+        .iter()
+        .position(|&name| name == m)
+        .expect("a test mesh");
     CasterKey {
         facing: Facing::Ccw,
         clip: None,
-        mesh: MeshId(m.to_string()),
+        mesh: crate::render::scene::MeshHandle(handle as u32),
         indices: (0..n).into(),
     }
 }

@@ -32,8 +32,11 @@
 //! The equivalence tests (`equivalence_tests.rs`) hold that an incrementally updated
 //! scene equals one built from scratch; a new input gets a case there.
 //!
-//! Part 2 of #1706 moves the shadow walks, the decals and a persistent material
-//! table onto these objects; they still walk the ECS themselves.
+//! **Shadows** (part 2): the cascades' and the atlas's sweeps gather their casters
+//! from the objects (`passes::shadows::casters`), each slot carrying its shadow
+//! clip, and the static bakes' key is the scene's [`RenderScene::statics_key`],
+//! folded from the objects. Part 3 moves the material table and the instances onto
+//! persistent GPU buffers.
 
 mod draw;
 #[cfg(test)]
@@ -48,6 +51,8 @@ mod handles;
 mod idle_tests;
 mod inputs;
 mod object;
+#[cfg(test)]
+mod shadow_ops;
 
 use std::collections::BTreeMap;
 
@@ -55,8 +60,9 @@ pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
 pub(crate) use object::RenderObject;
 
+use crate::render::passes::shadows::{casting_key, StaticsKey, UnbakedCasters};
 use crate::render::{GpuMesh, Renderer};
-use crate::scene::SceneId;
+use crate::scene::{Scene, SceneId};
 
 /// How many scenes' objects a renderer keeps: the main scene, a preview tab, a
 /// capture's. Past it the least recently drawn is dropped, and rebuilt if drawn again.
@@ -118,6 +124,13 @@ pub(crate) struct RenderScene {
     objects: BTreeMap<u32, RenderObject>,
     /// Ids by insertion sequence: `ids_with_mesh`'s order.
     order: BTreeMap<u64, u32>,
+    /// The renderers its `LODGroup`s keep out of the static bakes (#1714), re-read
+    /// only when a group or a mesh changed.
+    pub(crate) unbaked: UnbakedCasters,
+    /// Its static casters' digest (`passes::shadows::casting_key`), refolded from
+    /// the objects only after a static one was re-derived or `unbaked` changed;
+    /// `None` until then.
+    casting: Option<u64>,
 }
 
 impl RenderScene {
@@ -130,11 +143,44 @@ impl RenderScene {
     fn set(&mut self, id: u32, object: Option<RenderObject>) {
         if let Some(old) = self.objects.remove(&id) {
             self.order.remove(&old.seq);
+            self.forget_casting(old.is_static);
         }
         if let Some(object) = object {
+            self.forget_casting(object.is_static);
             self.order.insert(object.seq, id);
             self.objects.insert(id, object);
         }
+    }
+
+    /// A static object came or went: the digest is refolded.
+    fn forget_casting(&mut self, is_static: bool) {
+        if is_static {
+            self.casting = None;
+        }
+    }
+
+    /// `unbaked` re-read: the digest is refolded when it moved.
+    fn regroup(&mut self, unbaked: UnbakedCasters) {
+        if unbaked != self.unbaked {
+            self.unbaked = unbaked;
+            self.casting = None;
+        }
+    }
+
+    /// The digest, refolded if forgotten.
+    fn refold_casting(&mut self) {
+        if self.casting.is_none() {
+            let statics = self.objects().filter(|(_, o)| o.is_static);
+            let statics = statics.map(|(id, o)| (id, &o.casting));
+            self.casting = Some(casting_key(statics, &self.unbaked));
+        }
+    }
+
+    /// The static bakes' key for `scene` (whose objects these are) now: what a
+    /// cascade layer or an atlas tile keeps beside what it baked.
+    pub(crate) fn statics_key(&self, scene: &Scene) -> StaticsKey {
+        let casting = self.casting.expect("an extract folds the digest");
+        (scene.id(), scene.world.static_revision(), casting)
     }
 }
 

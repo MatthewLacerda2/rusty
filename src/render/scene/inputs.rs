@@ -32,7 +32,24 @@
 //!   camera), the proxy volume (`proxy_volumes`), the palette, `self.instancing`, and a
 //!   preview's forward pipeline (on the view).
 //!
-//! **Known gaps, for part 2** (the persistent material table):
+//! **What the shadow sweeps read** (`passes::shadows`, part 2 of #1706), off the
+//! objects but for what the frame decides:
+//! - **Kept, through the cursors above:** cast mode (`MeshComponent`), activity,
+//!   the static flag, the small-object limits, the world matrix and its sign (a
+//!   mirrored caster's facing), the resident runs and their slots' Render Faces,
+//!   each slot's clip (`SlotDraw::clip`: its surface pipeline's cut, its Cutout
+//!   test, its material group and record, so `forget_groups`' `Retained::touch`
+//!   re-derives it with the camera's key), whether a moving variant cuts any slot
+//!   (`RenderObject::moving`), and the static bake's digest terms
+//!   (`ObjectCasting`: cast mode, small-object cull, faces, Cutout tests).
+//! - **Kept, by a cursor of its own:** which renderers a `LODGroup` keeps out of
+//!   the bakes (`RenderScene::unbaked`), re-read when a `LodGroupComponent` or a
+//!   mesh changed. The digest (`RenderScene::statics_key`) is refolded from the
+//!   objects only when a static one was re-derived or `unbaked` moved.
+//! - **Per frame, on purpose:** the base camera's LOD level and small-object
+//!   verdict, and a palette object's palette and posed bounds (unstamped).
+//!
+//! **Known gaps, for part 3** (the persistent material table):
 //! - A material's shared param buffer (`ParamOwner::Material`) is keyed by library
 //!   name across scenes, and `write_params` runs only when an object is re-derived,
 //!   so scene A can draw with scene B's values for a same-named material whose
@@ -42,7 +59,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::components::{LightComponent, MaterialAsset, MaterialComponent, MeshComponent};
+use crate::components::{
+    LightComponent, LodGroupComponent, MaterialAsset, MaterialComponent, MeshComponent,
+};
 use crate::ecs::{Activity, Changes, Cursor, Layer, StaticSet, WorldPose};
 use crate::scene::lighting::lightmap::LightmapSet;
 use crate::scene::revision::{Revision, Revisioned};
@@ -80,6 +99,7 @@ pub(super) struct Inputs {
     activity: Cursor<Activity>,
     layer: Cursor<Layer>,
     statics: Cursor<StaticSet>,
+    lod_groups: Cursor<LodGroupComponent>,
     library: Kept<BTreeMap<String, MaterialAsset>>,
     overrides: ShaderOverrides,
     lightmaps: Kept<LightmapSet>,
@@ -89,6 +109,9 @@ pub(super) struct Inputs {
     pub uploads_seen: u64,
     /// The render-texture revision it has seen (`Retained::render_textures`).
     pub render_textures_seen: u64,
+    /// A `LODGroup` or a mesh changed in the last read: which renderers the groups
+    /// keep out of the static bakes is re-read (`UnbakedCasters`).
+    pub regroup: bool,
 }
 
 impl Inputs {
@@ -103,6 +126,7 @@ impl Inputs {
             activity: w.change_cursor(),
             layer: w.change_cursor(),
             statics: w.change_cursor(),
+            lod_groups: w.change_cursor(),
             library: Kept::of(&scene.materials),
             overrides: scene.shader_overrides.clone(),
             lightmaps: Kept::of(&scene.lightmaps),
@@ -110,6 +134,7 @@ impl Inputs {
             renderer,
             uploads_seen: 0,
             render_textures_seen: 0,
+            regroup: true,
         }
     }
 
@@ -123,7 +148,12 @@ impl Inputs {
             Changes::Rebuild => rebuild = true,
             Changes::Ids(ids) => into.extend(ids),
         };
-        take(w.changes(&mut self.mesh), &mut whole);
+        let meshes = w.changes(&mut self.mesh);
+        let groups = w.changes(&mut self.lod_groups);
+        let none = |c: &Changes| matches!(c, Changes::Ids(ids) if ids.is_empty());
+        self.regroup = !(none(&meshes) && none(&groups));
+        take(meshes, &mut whole);
+        take(groups, &mut BTreeSet::new());
         take(w.changes(&mut self.material), &mut whole);
         take(w.changes(&mut self.light), &mut whole);
         take(w.changes(&mut self.activity), &mut whole);
@@ -141,6 +171,7 @@ impl Inputs {
             self.overrides.clone_from(&scene.shader_overrides);
         }
         if rebuild {
+            self.regroup = true;
             return Dirty::Rebuild;
         }
         posed.retain(|id| !whole.contains(id));

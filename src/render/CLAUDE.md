@@ -30,8 +30,13 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   camera: read it in `scene/draw.rs`. `scene/inputs.rs` lists every input by which
   way it is held. Add a case to `scene/equivalence_tests.rs`, which holds that an
   incrementally kept scene equals one built from scratch.
-- The shadow walks (`passes::shadows`), the decals and the material table still read
-  the ECS themselves: part 2 of #1706 moves them onto the objects.
+- **The shadow sweeps gather from the objects too** (part 2 of #1706): a caster's
+  cast mode, clips and static-bake terms are kept on its `RenderObject`, and the
+  static bakes' key is `RenderScene::statics_key`, refolded only when a static object
+  was re-derived. A new input a shadow reads is kept or read per frame the same way,
+  and `passes::shadows::statics_key` (the from-scratch digest the tests compare)
+  folds it too. The material table and the per-camera instance array are still
+  rebuilt per frame: part 3.
 
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no

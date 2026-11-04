@@ -4,12 +4,13 @@
 
 use glam::{Mat4, Vec3};
 
-use crate::components::{MaterialAsset, RenderFace};
+use crate::components::{MaterialAsset, RenderFace, ShadowCasting};
 use crate::render::draw::batch::BatchKey;
 use crate::render::draw::materials::material_texture_paths;
 use crate::render::draw::uniforms::solid_instance;
 use crate::render::frustum::transform_aabb;
 use crate::render::gpu::pipelines::Facing;
+use crate::render::passes::shadows::{moves, slot_clip, CasterClip, ObjectCasting};
 use crate::render::render_texture::is_render_texture;
 use crate::render::{InstanceData, MeshId, Renderer, SmallLimits};
 use crate::scene::Scene;
@@ -17,13 +18,15 @@ use crate::scene::Scene;
 use super::handles::MeshHandle;
 
 /// One material slot's draw (#1285): its batch key with `bone_base` 0 (a skinned
-/// object's palette is placed per camera), whether it is transparent, and the face
-/// its material renders, so a pose that mirrors the object re-picks its facing.
+/// object's palette is placed per camera), whether it is transparent, the face
+/// its material renders, so a pose that mirrors the object re-picks its facing, and
+/// how it clips its shadow (#648; `None` casts plain depth).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SlotDraw {
     pub key: BatchKey,
     pub transparent: bool,
     pub face: RenderFace,
+    pub clip: Option<CasterClip>,
 }
 
 /// One mesh entity's retained draw state.
@@ -45,6 +48,15 @@ pub(crate) struct RenderObject {
     pub palette: bool,
     /// Active in the hierarchy, and not shadows-only (#1571): a camera may draw it.
     pub shown: bool,
+    /// Active in the hierarchy: it may cast.
+    pub active: bool,
+    /// Its mesh's `cast_shadows` (#1571).
+    pub cast: ShadowCasting,
+    /// A surface variant whose cut moves at runtime draws one of its material slots
+    /// (#648): it casts from the per-frame sweeps, even when static.
+    pub moving: bool,
+    /// What it adds to the static bake's key when static (`passes::shadows`).
+    pub casting: ObjectCasting,
     pub is_static: bool,
     pub layer: u8,
     pub small: SmallLimits,
@@ -84,6 +96,7 @@ impl Renderer {
         let runs = gpu.map_or_else(Vec::new, |g| g.runs(&mesh, world.material(id).as_deref()));
         let local_aabb = gpu.map_or((Vec3::ZERO, Vec3::ZERO), |g| g.local_aabb);
         let palette = mesh.is_skinned() || !mesh.active_palette().is_empty();
+        let active = world.is_active_in_hierarchy(id);
         let mut object = RenderObject {
             seq,
             mesh: handle,
@@ -92,7 +105,11 @@ impl Renderer {
             world: model,
             bounds: None,
             palette,
-            shown: world.is_active_in_hierarchy(id) && mesh.cast_shadows.is_visible(),
+            shown: active && mesh.cast_shadows.is_visible(),
+            active,
+            cast: mesh.cast_shadows,
+            moving: self.moves(scene, id),
+            casting: ObjectCasting::of(scene, id, &mesh),
             is_static: world.is_static(id),
             layer: world.layer(id),
             small: SmallLimits::of(&mesh),
@@ -107,14 +124,30 @@ impl Renderer {
             let (key, transparent) = self.slot_key(scene, id, (slot, indices), (model, handle));
             let maps = material_texture_paths(material).into_iter().flatten();
             object.reads_render_texture |= maps.into_iter().any(|m| is_render_texture(m.as_str()));
+            let clip = material.and_then(|m| slot_clip(&self.surface_shaders, &key, m));
             object.slots.push(SlotDraw {
                 key,
                 transparent,
                 face: material.map_or(RenderFace::Front, |m: &MaterialAsset| m.render_face),
+                clip,
             });
         }
         self.pose_object(scene, id, &mut object);
         Some(object)
+    }
+
+    /// Whether a surface variant whose cut moves cuts any of entity `id`'s material
+    /// slots, drawn or not, as the per-frame sweeps have always read it.
+    fn moves(&mut self, scene: &Scene, id: u32) -> bool {
+        let count = scene.world.material(id).map_or(0, |m| m.materials.len());
+        (0..count).any(|slot| {
+            let Some((_, asset)) = scene.material_entry_at(id, slot) else {
+                return false;
+            };
+            let shader = asset.shader.as_deref();
+            let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
+            moves(&self.surface_shaders, pipeline)
+        })
     }
 
     /// Re-place `object` (entity `id`) under its world matrix now: its bounds, its
