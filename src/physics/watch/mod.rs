@@ -171,7 +171,8 @@ pub(in crate::physics) struct Tracked {
     pub member_owner: Map<u32, u32>,
     /// The entities with a Rigidbody or a CharacterController at the last plan.
     pub carriers: BTreeSet<u32>,
-    /// Every `Joint` entity and the body each one names, at the last joint sync.
+    /// Every `Joint` entity, the body each one names and that body's owner, at the
+    /// last joint sync.
     pub joint_deps: BTreeSet<u32>,
     /// The collision matrix the colliders' groups were last derived from.
     pub matrix: Option<CollisionMatrix>,

@@ -22,9 +22,11 @@ it, and twist and hinge limits act on the mirror-image side.
 The **connected anchor** is in the connected entity's local space — world space with no
 connected body — and is used only with auto-configure off; auto-configure (the
 default) puts it wherever the anchor sits. **The pose the bodies are in when the
-joint is built is its rest pose** — at play-enter, or when its shape (kind, body,
-anchors, axes, limits, collision flag) changes during play; the limits are
-measured from it. **A joint to a bone** (a prop on a rope tied to `spine`, or one skeleton's bone
+joint is built is its rest pose** — at play-enter, when its shape (kind, body,
+anchors, axes, limits, collision flag) changes during play, or when it comes back
+after its body was deactivated; the limits are measured from it. With auto-configure
+off, a partner that moved meanwhile is pulled back to the saved anchors, and that pull
+counts toward a break force. **A joint to a bone** (a prop on a rope tied to `spine`, or one skeleton's bone
 jointed to another's) is saved by the bone's name, then its ancestors', and
 re-bound by name on load, on a prefab stamp or re-import, and when the model is
 re-imported; a bone the model no longer has hands the joint to its nearest
@@ -38,7 +40,8 @@ the world, as Unity's does.
 exist in the physics world, and a joint missing a body does nothing. A deactivated
 joint entity's joint is removed until it is active again, and so is one whose
 connected body is deactivated (the GameObject carrying that body's Rigidbody, or
-one above it). `enable_collision` (off
+one above it; for a static collider with no Rigidbody, its own GameObject or one above
+it). The other body moves freely in the meantime. `enable_collision` (off
 by default, as in Unity) lets the two joined bodies still collide.
 
 **Breaking.** A non-zero break force (newtons) or torque (newton-metres) breaks the
