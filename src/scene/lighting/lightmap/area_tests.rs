@@ -41,6 +41,7 @@ pub(super) fn lit(lights: Vec<BakeLight>, meshes: Vec<BakeMesh>) -> BakeScene {
         meshes,
         lights,
         sky: Vec3::ZERO.into(),
+        diffuse: Default::default(),
     }
 }
 

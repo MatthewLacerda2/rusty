@@ -2,7 +2,8 @@
 //!
 //! A texel stores `E / π`: the irradiance reaching it, over π. The forward shader
 //! multiplies it by albedo, so a lightmapped surface ends up `albedo · E / π`, the
-//! same Lambert response a realtime light gives (`albedo / π · radiance · cos`). The
+//! same response a realtime light gives (`albedo / π · radiance · cos`, the cosine
+//! reshaped by the scene's `DiffuseModel`, #1698, in both). The
 //! sky is the ambient's radiance by direction (`AmbientRadiance::incoming`), built so
 //! its cosine-weighted average is the shader's flat ambient: an open surface bakes to
 //! the ambient an unbaked one shows, whichever way it faces (#1647).
@@ -136,7 +137,8 @@ impl Tracer<'_> {
         Some((point + n * SURFACE_OFFSET, n, mesh.run_at(tri.first)))
     }
 
-    /// The direct irradiance at `point` facing `normal`, shadowed, and the
+    /// The direct irradiance at `point` facing `normal`, shadowed, each lamp weighted
+    /// by the scene's diffuse model (`DiffuseModel::response`, #1698), and the
     /// luminance-weighted sum of the directions it arrived from. `baked_only` keeps
     /// just the `Baked` lights (a receiving texel's own direct light); a bounce hit
     /// sees every baked-in light. An Area light that [reaches](super::lights::area::AreaShape::reaches)
@@ -154,9 +156,9 @@ impl Tracer<'_> {
         let (mut e, mut dir) = (Vec3::ZERO, Vec3::ZERO);
         let mut add = |light: &BakeLight, u: Vec2, weight: f32| {
             if let Some((to_light, distance, received)) = arrival(light, point, u) {
-                let cos = normal.dot(to_light);
-                if cos > 0.0 && !self.rays.occluded(point, to_light, T_MIN, distance) {
-                    let lit = received * cos * weight;
+                let response = self.scene.diffuse.response(normal.dot(to_light));
+                if response > 0.0 && !self.rays.occluded(point, to_light, T_MIN, distance) {
+                    let lit = received * response * weight;
                     e += lit;
                     dir += to_light * luminance(lit);
                 }

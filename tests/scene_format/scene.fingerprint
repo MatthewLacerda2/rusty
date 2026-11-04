@@ -773,6 +773,7 @@ scene.fog.mode: enum Off|Linear|Exponential|ExponentialSquared
 scene.fog.start: f32
 scene.layers.names: seq
 scene.layers.names[]: string
+scene.lighting_settings.diffuse_model: enum Lambert|HalfLambert
 scene.lighting_settings.lightmaps.bounces: u32
 scene.lighting_settings.lightmaps.directional: bool
 scene.lighting_settings.lightmaps.filter_radius: u32
