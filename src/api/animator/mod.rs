@@ -14,14 +14,16 @@
 //! `PlayAnimation`) lives in `graph.rs`, and the layer surface (#457:
 //! `SetLayerWeight`, `GetLayerWeight`, `GetCurrentNode`) in `layers.rs`, and the
 //! IK surface (#461: `Add*IK`, `RemoveIK`, `SetIK*`, `GetIKWeight`) in `ik.rs`,
-//! the playback-speed surface (#1342: `SetSpeed`, `GetSpeed`) in `speed.rs`, and the
-//! typed parameters (`SetBool`/`SetFloat`/`SetInt`/`SetTrigger`) in `parameters.rs` —
+//! the playback-speed surface (#1342: `SetSpeed`, `GetSpeed`) in `speed.rs`, the
+//! typed parameters (`SetBool`/`SetFloat`/`SetInt`/`SetTrigger`) in `parameters.rs`,
+//! and `Play`/`Crossfade` themselves in `play.rs` —
 //! one namespace, split to stay under the size cap.
 
 mod graph;
 mod ik;
 mod layers;
 mod parameters;
+mod play;
 mod speed;
 
 use mlua::Lua;
@@ -37,7 +39,7 @@ use crate::scripting::ConsoleLogs;
 pub fn register(lua: &Lua, scene: ApiCell<Scene>, console: ApiCell<ConsoleLogs>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_play(lua, &table, scene, console)?;
+    play::register(lua, &table, scene, console)?;
     register_stop(lua, &table, scene)?;
     register_pause_resume(lua, &table, scene)?;
     register_set_looping(lua, &table, scene)?;
@@ -51,53 +53,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, console: ApiCell<ConsoleLogs>)
     lua.globals()
         .set("Animator", table)
         .map_err(|e| e.to_string())
-}
-
-/// `Play` / `Crossfade` — start a clip (crossfade simplifies to a plain play).
-fn register_play(
-    lua: &mlua::Lua,
-    table: &mlua::Table,
-    scene: ApiCell<Scene>,
-    console: ApiCell<ConsoleLogs>,
-) -> Reg {
-    put(
-        table,
-        "Play",
-        lua.create_function(move |lua, (id, clip): (EntityArg, String)| {
-            scene.with(lua, |scene| {
-                let id = id.live("Animator", "Play")?;
-                let mut scene = scene.borrow_mut();
-                let played = scene
-                    .world
-                    .animator_mut(id)
-                    .map(|mut anim| anim.play(clip.clone()))
-                    .is_some();
-                if played {
-                    let name = scene.world.name(id).map(|n| n.clone()).unwrap_or_default();
-                    console
-                        .get(lua)?
-                        .borrow_mut()
-                        .info(format!("Entity {} playing animation: {}", name, clip));
-                }
-                Ok(())
-            })
-        }),
-    )?;
-
-    put(
-        table,
-        "Crossfade",
-        lua.create_function(move |lua, (id, clip, duration): (EntityArg, String, f32)| {
-            let scene = &*scene.get(lua)?;
-            let id = id.live("Animator", "Crossfade")?;
-            // Blend out of the current clip over `duration` seconds (#80).
-            let mut scene = scene.borrow_mut();
-            if let Some(mut anim) = scene.world.animator_mut(id) {
-                anim.crossfade(clip, duration);
-            }
-            Ok(())
-        }),
-    )
 }
 
 /// `GetBone` — the bone GameObject of the entity's skeleton named `name` (#453),
