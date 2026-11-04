@@ -10,6 +10,7 @@ use crate::ecs::World;
 use crate::physics::compound::{relative_pose, world_pose};
 use crate::physics::convert::to_pose;
 use crate::physics::shape::build::ColliderInputs;
+use crate::physics::watch::Owners;
 use crate::physics::world::PhysicsWorld;
 use crate::scene::Scene;
 
@@ -51,8 +52,8 @@ impl PhysicsWorld {
     /// Keep each CharacterController's collider the capsule its component
     /// describes: resized when its height or radius changed (a crouch), and
     /// upright at its centre however the entity has turned since the last tick.
-    pub(in crate::physics) fn sync_characters(&mut self, scene: &Scene) {
-        for (&owner, ids) in &self.plan {
+    pub(in crate::physics) fn sync_characters(&mut self, scene: &Scene, owners: &Owners) {
+        for (&owner, ids) in owners.pick(&self.plan) {
             for &id in ids {
                 let Some(cc) = scene.world.character_controller(id).map(|c| c.clone()) else {
                     continue;

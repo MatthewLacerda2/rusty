@@ -19,12 +19,13 @@
 //!   and start reporting overlaps; the mass sync after it re-spreads the body's
 //!   mass, since a trigger carries none.
 //!
-//! All walk the sorted plan and touch a collider only when it differs, so an
-//! unchanged scene costs comparisons, not rapier change-tracking.
+//! All walk the sorted plan, or the bodies the change log named (`watch`), and
+//! touch a collider only when it differs.
 
 use rapier3d::prelude::*;
 
 use super::shape::build::{interaction_groups, EntityBodyState};
+use super::watch::Owners;
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
 
@@ -45,8 +46,8 @@ pub(super) fn body_type(snap: &EntityBodyState) -> RigidBodyType {
 impl PhysicsWorld {
     /// Re-derive each built collider's groups from its entity's layer and the
     /// collision matrix.
-    pub(super) fn sync_layers(&mut self, scene: &Scene) {
-        for ids in self.plan.values() {
+    pub(super) fn sync_layers(&mut self, scene: &Scene, owners: &Owners) {
+        for (_, ids) in owners.pick(&self.plan) {
             for id in ids {
                 let Some(&handle) = self.id_to_collider.get(id) else {
                     continue;
@@ -68,8 +69,8 @@ impl PhysicsWorld {
     /// CharacterController's capsule supersedes the entity's Collider (#451) and
     /// is never a trigger, so it is left alone. Runs before
     /// [`Self::sync_masses`], which reads the flag.
-    pub(super) fn sync_sensors(&mut self, scene: &Scene) {
-        for ids in self.plan.values() {
+    pub(super) fn sync_sensors(&mut self, scene: &Scene, owners: &Owners) {
+        for (_, ids) in owners.pick(&self.plan) {
             for id in ids {
                 let Some(&handle) = self.id_to_collider.get(id) else {
                     continue;
@@ -93,8 +94,8 @@ impl PhysicsWorld {
     /// Spread each Rigidbody owner's `mass` over its body's solid colliders by
     /// volume; a trigger carries none. An owner whose colliders have no volume
     /// (a triangle mesh) keeps rapier's own mass.
-    pub(super) fn sync_masses(&mut self, scene: &Scene) {
-        for (&owner, ids) in &self.plan {
+    pub(super) fn sync_masses(&mut self, scene: &Scene, owners: &Owners) {
+        for (&owner, ids) in owners.pick(&self.plan) {
             let Some(mass) = scene.world.rigidbody(owner).map(|rb| rb.mass.max(MIN_MASS)) else {
                 continue;
             };

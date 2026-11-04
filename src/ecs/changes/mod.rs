@@ -43,7 +43,7 @@ mod derived_tests;
 mod funnel_tests;
 mod log;
 #[cfg(test)]
-mod ops_tests;
+pub(crate) mod ops_tests;
 #[cfg(test)]
 mod play_tests;
 #[cfg(test)]

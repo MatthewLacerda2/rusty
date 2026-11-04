@@ -32,6 +32,7 @@ mod plane;
 mod raster;
 mod region;
 mod state;
+mod still;
 mod sync;
 
 #[cfg(test)]
@@ -39,6 +40,7 @@ mod tests;
 
 pub use region::CellRect;
 pub use state::BakeState;
+pub(super) use still::StaticWatch;
 pub use sync::Rebake;
 
 use super::obstacle::ObstacleVolume;

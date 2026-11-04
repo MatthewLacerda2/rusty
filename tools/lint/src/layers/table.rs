@@ -84,7 +84,10 @@ pub const LAYERS: &[Layer] = &[
     sim("ui", &["asset", "components", "core", "ecs", "scene"])
         .uses(&["harfrust", "image", "skrifa"]),
     sim("physics", &["components", "core", "ecs", "scene", "time"]).uses(&["rapier3d"]),
-    sim("navigation", &["components", "core", "physics", "scene"]),
+    sim(
+        "navigation",
+        &["components", "core", "ecs", "physics", "scene"],
+    ),
     // `scripting` and `api` are one layer (see PEERS): scripting installs the Lua
     // surface, and the surface reads runtime state scripting owns.
     sim(
