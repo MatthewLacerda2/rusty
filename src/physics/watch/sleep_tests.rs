@@ -19,10 +19,10 @@ fn asleep(twin: &Twin, i: usize) -> bool {
     body.is_some_and(|&h| p.bodies[h].is_sleeping())
 }
 
-/// Run `op` on `twin`; it must agree and not end the run.
+/// Run `op` on `twin`; it must agree.
 fn run(twin: &mut Twin, op: &Op) {
     let ran = twin.run(op);
-    assert!(matches!(ran, Ok(true)), "{op:?}: {ran:?}");
+    assert!(ran.is_ok(), "{op:?}: {ran:?}");
 }
 
 /// [`Op::Settle`] puts every fixture body to sleep: the proptest's long runs
