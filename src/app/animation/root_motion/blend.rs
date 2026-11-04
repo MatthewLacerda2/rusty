@@ -10,7 +10,7 @@
 //! scaled by its weight.
 
 use crate::asset::mesh_data::SkinData;
-use crate::components::{Bounds, Motion, Playback, Playhead, RootMotion, Step};
+use crate::components::{Motion, Playback, Playhead, RootMotion, Step};
 
 use super::super::motion::MotionContext;
 use super::RootBone;
@@ -60,13 +60,13 @@ impl MotionContext<'_> {
         step: Step,
         outgoing: Option<&Outgoing>,
     ) -> Option<RootMotion> {
-        let current = (playback.motion(), playback.loop_clip, true);
+        let current = (playback.motion(), playback.loop_clip);
         let current = self.motion_root(skin, bone, current, step.span);
         let Some(out) = outgoing else {
             return current;
         };
         let span = (out.from, playback.previous_time);
-        let previous = self.motion_root(skin, bone, (out.motion(), out.looping, false), span);
+        let previous = self.motion_root(skin, bone, (out.motion(), out.looping), span);
         if current.is_none() && previous.is_none() {
             return None;
         }
@@ -74,25 +74,24 @@ impl MotionContext<'_> {
         Some(from.lerp(to, playback.crossfade_weight()))
     }
 
-    /// One motion's root motion over the playhead travel `span`, sampled the
-    /// way [`MotionContext::sample`] samples it: the current clip within its
-    /// bounds, an outgoing clip at its raw (end-held) time, a tree's leaves at
-    /// its bounded phase. `None` when it doesn't resolve or keys nothing on the
-    /// bone's chain.
+    /// One motion's root motion over the playhead travel `span` (never
+    /// wrapped): a clip within its bounds, a tree's leaves at its bounded phase.
+    /// An outgoing clip is measured the same way, so a looping walk fading out
+    /// keeps walking across its seam instead of stopping dead there; with root
+    /// motion on, the pose's travel is stripped anyway, so the end-held pose an
+    /// outgoing clip samples doesn't show. `None` when it doesn't resolve or
+    /// keys nothing on the bone's chain.
     fn motion_root(
         &self,
         skin: &SkinData,
         bone: &RootBone,
-        (motion, looping, current): (Motion<'_>, bool, bool),
+        (motion, looping): (Motion<'_>, bool),
         span: (f32, f32),
     ) -> Option<RootMotion> {
         match motion {
             Motion::Clip(name) => {
                 let clip = self.clip(name).filter(|c| bone.keyed_by(c))?;
-                let bounds = match current {
-                    true => Playhead::clip(clip.duration).bounds(looping),
-                    false => Bounds::Open,
-                };
+                let bounds = Playhead::clip(clip.duration).bounds(looping);
                 Some(bone.travel(skin, clip, bounds, 1.0, span))
             }
             Motion::Tree(node) => {

@@ -1,4 +1,4 @@
-//! src/app/systems/animate_tests.rs — root motion through the real play loop
+//! src/app/systems/animate/tests.rs — root motion through the real play loop
 //! (#1745): a lunge whose hips move 2 m moves the entity 2 m with the hips held under it, a wall stops a
 //! CharacterController's lunge, and a NavMeshAgent follows the lunge instead of
 //! its own speed.
@@ -18,9 +18,15 @@ use crate::scene::Scene;
 
 /// A rig entity playing the lunge (hips +2 m along +X over 1 s, once), its
 /// skeleton spawned, with root motion applied.
-fn lunging(scene: &mut Scene) -> u32 {
+pub(super) fn lunging(scene: &mut Scene) -> u32 {
+    playing(scene, 2.0)
+}
+
+/// A rig entity playing a one-second, once-through clip "Lunge" whose hips
+/// travel `metres` along +X, with root motion applied.
+pub(super) fn playing(scene: &mut Scene, metres: f32) -> u32 {
     let id = scene.add_entity("Guard".to_string());
-    let rig = mesh(vec![slide("Lunge", &[HIPS], 0.0, 2.0, 1.0)]);
+    let rig = mesh(vec![slide("Lunge", &[HIPS], 0.0, metres, 1.0)]);
     scene.world.set_mesh(id, Some(rig));
     scene.sync_skeletons();
     let anim = AnimatorComponent {
@@ -37,7 +43,7 @@ fn lunging(scene: &mut Scene) -> u32 {
 }
 
 /// A static box of `size` centred on `at`.
-fn add_box(scene: &mut Scene, at: Vec3, size: Vec3) {
+pub(super) fn add_box(scene: &mut Scene, at: Vec3, size: Vec3) {
     let id = scene.add_entity("Box".to_string());
     scene.world.transform_mut(id).unwrap().position = at;
     scene.world.set_static(id, true);
@@ -50,7 +56,7 @@ fn add_box(scene: &mut Scene, at: Vec3, size: Vec3) {
 
 /// Play `scene` for 1.5 s; the guard's world position each tick, and the
 /// hips' world position each tick.
-fn play(scene: Scene, guard: u32) -> Vec<(Vec3, Vec3)> {
+pub(super) fn play(scene: Scene, guard: u32) -> Vec<(Vec3, Vec3)> {
     let scene = Rc::new(RefCell::new(scene));
     let mut gw = world_with(Rc::clone(&scene));
     gw.set_playing(true);
@@ -117,31 +123,4 @@ fn a_nav_agent_follows_the_lunge_not_its_speed() {
         "the lunge moved it, not its speed: {end}"
     );
     assert!(end.y.abs() < 1e-3, "on the floor: {end}");
-}
-
-#[test]
-fn scripts_read_the_delta_and_turn_root_motion_off() {
-    let mut scene = Scene::new();
-    let guard = lunging(&mut scene);
-    let scene = Rc::new(RefCell::new(scene));
-    let mut gw = world_with(Rc::clone(&scene));
-    gw.set_playing(true);
-    gw.tick(DT);
-    let eval = |gw: &crate::app::GameWorld, line: &str| gw.script_manager().eval(line).unwrap();
-    let dx: f32 = eval(&gw, &format!("return (Animator.GetRootMotion({guard}))"))
-        .parse()
-        .unwrap();
-    assert!((dx - 2.0 * DT).abs() < 1e-4, "{dx}");
-    eval(&gw, &format!("Animator.SetApplyRootMotion({guard}, false)"));
-    let before = scene.borrow().world.world_position(guard);
-    gw.tick(DT);
-    assert_eq!(
-        scene.borrow().world.world_position(guard),
-        before,
-        "off: it stays"
-    );
-    let still: f32 = eval(&gw, &format!("return (Animator.GetRootMotion({guard}))"))
-        .parse()
-        .unwrap();
-    assert!(still > 0.0, "still measured while off");
 }

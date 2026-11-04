@@ -20,7 +20,7 @@ pub use ik::{IkChain, IkConstraint, IkTarget};
 pub use parameters::{AnimatorParameter, AnimatorParameters};
 pub use playback::{Motion, Playback, Step};
 pub use playhead::{Bounds, Playhead};
-pub use root_motion::RootMotion;
+pub use root_motion::{root_chain, RootMotion, RootMotionState};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AnimatorComponent {
@@ -73,10 +73,10 @@ pub struct AnimatorComponent {
     /// Empty means the skeleton's first root joint.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub root_bone: String,
-    /// The last step's root motion, world space (`Animator.GetRootMotion`).
-    /// Measured whether or not it is applied; runtime only, never saved.
+    /// The last step's root motion and what it moved (`Animator.GetRootMotion`);
+    /// runtime only, never saved.
     #[serde(skip)]
-    pub root_motion: RootMotion,
+    pub root_motion: RootMotionState,
 }
 
 /// One extra layer's runtime state (#457).
@@ -115,7 +115,7 @@ impl Default for AnimatorComponent {
             ik: Vec::new(),
             apply_root_motion: false,
             root_bone: String::new(),
-            root_motion: RootMotion::ZERO,
+            root_motion: RootMotionState::default(),
         }
     }
 }

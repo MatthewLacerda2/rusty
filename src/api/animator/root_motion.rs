@@ -78,7 +78,7 @@ fn register_get_root_motion(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell
         lua.create_function(move |lua, id: EntityArg| {
             let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
-            match scene.world.animator(id.read()).map(|a| a.root_motion) {
+            match scene.world.animator(id.read()).map(|a| a.root_motion.last) {
                 Some(m) => {
                     let p = m.position;
                     (p.x, p.y, p.z, m.yaw.to_degrees()).into_lua_multi(lua)

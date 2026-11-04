@@ -66,9 +66,9 @@ path + active state are saved with the entity.
 | `Animator.GetIKWeight` | `(id, name)` | Constraint `name`'s weight, or `nil` when there is none. |
 | `Animator.SetApplyRootMotion` | `(id, apply)` | Unity's *Apply Root Motion* (off by default): `true` makes the root bone's horizontal travel and yaw move the entity instead of the pose. Saved. See *Root motion*. |
 | `Animator.GetApplyRootMotion` | `(id)` | Whether root motion is applied, or `nil` when the entity has no animator. |
-| `Animator.SetRootBone` | `(id, bone)` | Name the bone root motion is read from (usually the hips); `""` (the default) is the skeleton's first root joint. A name the skeleton lacks measures nothing. Saved. |
+| `Animator.SetRootBone` | `(id, bone)` | Name the bone root motion is read from (usually the hips); `""` (the default) is the skeleton's first root joint. A name the skeleton lacks measures nothing and warns once in the console (an agent then moves itself). Saved. |
 | `Animator.GetRootBone` | `(id)` | The root bone's name as set (`""`: the first root joint), or `nil` without an animator. |
-| `Animator.GetRootMotion` | `(id)` | The last fixed step's root motion: `dx, dy, dz, yaw` — the world-space displacement in metres and the turn about the entity's up axis in degrees (counter-clockwise seen from above), Unity's `deltaPosition` / `deltaRotation`. Measured whether or not it is applied, so a script can move the entity itself; `0, 0, 0, 0` while stopped or paused, and `nil` without an animator. |
+| `Animator.GetRootMotion` | `(id)` | The last fixed step's root motion: `dx, dy, dz, yaw` — the world-space displacement in metres and the turn about the entity's up axis in degrees (counter-clockwise seen from above), Unity's `deltaPosition` / `deltaRotation`. Measured whether or not it is applied, so a script can move the entity itself; `0, 0, 0, 0` while stopped, paused or inactive, and `nil` without an animator. |
 
 ### Blend trees (#457)
 
@@ -274,11 +274,14 @@ the step's root motion:
   direction the bone faced when it began;
 - a blend tree's motion is its clips' motions blended by their weights (a walk
   and a run in step add up to the blended stride), a crossfade blends the
-  outgoing motion's into the incoming one's, and a layer whose mask covers the
+  outgoing motion's into the incoming one's (a looping clip fading out keeps
+  looping, so a walk fading to idle doesn't stop dead at its seam), and a layer whose mask covers the
   bone stacks its motion like its pose (override: blended in by weight;
   additive: added, scaled by weight);
 - speed, a node's speed and `Time` scale all scale it; a paused or stopped
-  animator has none.
+  animator has none;
+- a yaw is measured from the bone's bind facing, so a rig whose hips are bound
+  flipped (a Z-up export) still turns the entity.
 
 With root motion applied, the pose holds the root bone at its bind-pose
 horizontal position and facing (its height, tilt and the rest of the body play
@@ -286,12 +289,33 @@ as authored; vertical motion stays in the pose), and the entity carries the
 travel instead, in this order of preference:
 
 1. a **CharacterController** on the same entity takes it through `Move`, so a
-   wall stops it and steps lift it, as a script's move would;
+   wall stops it and steps lift it, as a script's move would. A step shorter
+   than its `min_move_distance` is carried into the next one rather than
+   dropped, so a slow creep (or slow motion) still creeps;
 2. else an active **NavMeshAgent** slides it along the navmesh. The agent still
    plans and steers (its `velocity` is the one it wants, for a script to feed a
    blend tree's `speed`), but it no longer moves itself: the animation does.
-   It still turns to face its heading unless `update_rotation` is off;
-3. else the **Transform** moves by it.
+   It still turns to face its heading unless `update_rotation` is off. Its
+   neighbours' avoidance sees the velocity it really moved at, as an agent
+   that doesn't dodge. On an **off-mesh link** the link decides: with
+   auto-traverse on, the link carries the agent at its speed and the clip's
+   travel is dropped; with it off (a script plays the vault), the clip's
+   travel moves the Transform directly, across the gap, until the script
+   calls `CompleteOffMeshLink`;
+3. else a **dynamic Rigidbody** takes it as velocity, as Unity's
+   `OnAnimatorMove` example drives one: its horizontal velocity becomes the
+   step's displacement over the step, its vertical velocity is kept (gravity
+   still pulls), and the turn becomes its spin about +Y. The physics step
+   moves it, so walls stop it; ground friction drags on it as on any sliding
+   body, so give a root-moved body a frictionless material for exact travel;
+4. else the **Transform** moves by it (a kinematic Rigidbody follows its
+   Transform).
+
+Root motion moves the entity only while the animator is **running** (playing,
+not paused) and its root bone **is in the skeleton**. Otherwise nothing is
+applied, and a NavMeshAgent moves itself at its own speed, so a stopped
+animator, an unskinned mesh or a misspelled `SetRootBone` never leaves an
+agent frozen. A bone the skeleton lacks warns once in the console.
 
 The motion applies to the Animator's own entity, after the animation step and
 before `LateUpdate`. Off (the default), the pose plays as authored and the

@@ -11,12 +11,14 @@ use super::tests::{run, total, DT};
 use crate::asset::animation_graph::{AnimationGraph, LayerBlending};
 use crate::components::{AnimatorComponent, MeshComponent, Motion};
 
-/// Walk: hips +2 m over 1 s; Run: +6 m over 2 s; Back: hips −1 m over 1 s.
+/// Walk: hips +2 m over 1 s; Run: +6 m over 2 s; Back: hips −1 m over 1 s;
+/// Idle: the hips held.
 fn rig() -> MeshComponent {
     mesh(vec![
         slide("Walk", &[HIPS], 0.0, 2.0, 1.0),
         slide("Run", &[HIPS], 0.0, 6.0, 2.0),
         slide("Back", &[HIPS], 0.0, -1.0, 1.0),
+        slide("Idle", &[HIPS], 0.0, 0.0, 1.0),
     ])
 }
 
@@ -48,6 +50,27 @@ fn a_crossfade_starting_mid_clip_hands_over_without_a_jump() {
         (steps[59].position.x - back).abs() < 1e-4,
         "ends as the back step"
     );
+}
+
+#[test]
+fn a_looping_walk_fading_out_keeps_walking_across_its_seam() {
+    let mesh = rig();
+    let mut anim = animator(Motion::Clip("Walk"), None, 0.0);
+    anim.base.loop_clip = true;
+    run(&mut anim, &mesh, 54); // t = 0.9: the fade crosses the walk's seam
+    anim.crossfade("Idle".to_string(), 0.5);
+    let steps = run(&mut anim, &mesh, 40);
+    let walk = 2.0 * DT;
+    for pair in steps.windows(2) {
+        let drop = pair[0].position.x - pair[1].position.x;
+        assert!(
+            drop <= walk * DT / 0.5 + 1e-4,
+            "no stop at the seam: {pair:?}"
+        );
+    }
+    // The walk's share fades linearly: half a fade's worth of its 2 m/s.
+    let travelled = total(&steps).position.x;
+    assert!((travelled - 0.5).abs() < 0.02, "{travelled}");
 }
 
 #[test]

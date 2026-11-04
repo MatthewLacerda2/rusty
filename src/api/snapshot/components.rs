@@ -202,8 +202,8 @@ pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
         "apply_root_motion": a.apply_root_motion,
         "root_bone": a.root_bone,
         "root_motion": {
-            "position": a.root_motion.position.to_array(),
-            "yaw": a.root_motion.yaw.to_degrees(),
+            "position": a.root_motion.last.position.to_array(),
+            "yaw": a.root_motion.last.yaw.to_degrees(),
         },
     })
 }
