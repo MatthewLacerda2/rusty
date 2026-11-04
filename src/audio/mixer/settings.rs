@@ -4,8 +4,12 @@
 //! a high-pass filter (cutoff + resonance) and a send level to the reverb bus. A
 //! [`GroupPatch`] is a partial set of those — what a snapshot or a `SetGroup*` call
 //! changes — so a snapshot that only muffles the world leaves the music slider alone.
+//! A group's effects (#1748, `effects/`) sit here too, so a snapshot blends their
+//! parameters as it blends the volume.
 
 use serde::{Deserialize, Serialize};
+
+use super::effects::{ChainPatch, EffectChain};
 
 /// A low-pass cutoff at or above this is "off" (Unity's default, 22 kHz).
 pub const LOW_PASS_OFF: f32 = 22_000.0;
@@ -72,6 +76,8 @@ pub struct GroupSettings {
     pub high_pass: Filter,
     /// Linear send level to the reverb bus in `[0, 1]` (`0` sends nothing).
     pub reverb_send: f32,
+    /// The effects run after the filters, in order (#1748).
+    pub effects: EffectChain,
 }
 
 impl Default for GroupSettings {
@@ -83,6 +89,7 @@ impl Default for GroupSettings {
             low_pass: Filter::LOW_PASS_OPEN,
             high_pass: Filter::HIGH_PASS_OPEN,
             reverb_send: 0.0,
+            effects: EffectChain::default(),
         }
     }
 }
@@ -97,6 +104,7 @@ impl GroupSettings {
             low_pass: self.low_pass.lerp(to.low_pass, t),
             high_pass: self.high_pass.lerp(to.high_pass, t),
             reverb_send: lerp(self.reverb_send, to.reverb_send, t),
+            effects: self.effects.lerp(&to.effects, t),
         }
     }
 }
@@ -109,6 +117,10 @@ pub struct GroupPatch {
     pub low_pass: Option<Filter>,
     pub high_pass: Option<Filter>,
     pub reverb_send: Option<f32>,
+    /// A whole new effect chain (`Audio.SetGroupEffects`).
+    pub effects: Option<EffectChain>,
+    /// Values changed on the effects already there (a snapshot's `effects`).
+    pub effect_params: Option<ChainPatch>,
 }
 
 impl GroupPatch {
@@ -116,6 +128,7 @@ impl GroupPatch {
     pub fn apply(&self, settings: &GroupSettings) -> GroupSettings {
         let low_pass = self.low_pass.unwrap_or(settings.low_pass);
         let high_pass = self.high_pass.unwrap_or(settings.high_pass);
+        let effects = self.effects.unwrap_or(settings.effects);
         GroupSettings {
             volume: self.volume.unwrap_or(settings.volume).clamp(0.0, 1.0),
             mute: self.mute.unwrap_or(settings.mute),
@@ -125,6 +138,7 @@ impl GroupPatch {
                 .reverb_send
                 .unwrap_or(settings.reverb_send)
                 .clamp(0.0, 1.0),
+            effects: self.effect_params.map_or(effects, |p| p.apply(&effects)),
         }
     }
 }
@@ -137,6 +151,7 @@ pub struct GroupMix {
     pub low_pass: Filter,
     pub high_pass: Filter,
     pub reverb_send: f32,
+    pub effects: EffectChain,
 }
 
 impl GroupMix {
@@ -152,6 +167,7 @@ impl GroupMix {
             low_pass: settings.low_pass,
             high_pass: settings.high_pass,
             reverb_send: settings.reverb_send,
+            effects: settings.effects,
         }
     }
 }

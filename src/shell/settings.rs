@@ -43,7 +43,8 @@ pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
         .unwrap_or(defaults);
     let mut app = game.resources.application.borrow_mut();
     app.restore_quality(saved_quality(&storage));
-    let graphics = GraphicsSettings::load(&storage, app.graphics_defaults(), app.quality_presets());
+    let defaults = (app.graphics_defaults(), app.render_scale_default());
+    let graphics = GraphicsSettings::load(&storage, defaults, app.quality_presets());
     drop(app);
     let speaker_mode = SpeakerMode::load(&storage);
     drop(storage);
@@ -56,16 +57,30 @@ pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
     *game.script_manager().video_cell().borrow_mut() = video;
     *game.script_manager().graphics_cell().borrow_mut() = graphics;
 
+    // Before the first tick, so `Awake` and `Start` read the real display (#1715).
+    report_display_scale(shell, game);
     apply_video(shell, video, &VideoSettings::default());
     apply_graphics(shell, game);
     shell.applied_video = video;
 }
 
-/// Hand the shared graphics cell (preset values + player options) to the renderer: the one
-/// place either frontend does it, every frame, and [`load`] at boot (#1438).
+/// Hand the shared graphics cell (preset values + player options + render scale) to the
+/// renderer: the one place either frontend does it, every frame, and [`load`] at boot
+/// (#1438). The render scale resolves on the display scale the screen resource holds
+/// (#1715), which each frontend reports first ([`report_display_scale`]).
 pub fn apply_graphics(shell: &mut Shell, game: &GameWorld) {
+    let display_scale = game.resources.screen.borrow().display_scale();
     let graphics = *game.script_manager().graphics_cell().borrow();
-    shell.renderer.apply_graphics(graphics);
+    shell.renderer.apply_graphics(graphics, display_scale);
+}
+
+/// Report the window's display scale (#1715) to the screen resource: a sim input,
+/// which `Video.GetDisplayScale` reads. At boot ([`load`]) and every frame before the
+/// graphics reach the renderer ([`apply_graphics`]), so a move to another monitor
+/// renders its first frame at a `"match_display"` render scale's new value.
+pub fn report_display_scale(shell: &Shell, game: &GameWorld) {
+    let scale = shell.window.scale_factor() as f32;
+    game.resources.screen.borrow_mut().set_display_scale(scale);
 }
 
 /// Apply any video-settings change a script wrote into the shared cell this frame.

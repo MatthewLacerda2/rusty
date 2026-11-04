@@ -47,6 +47,13 @@ pub struct MeshComponent {
     /// written, so `Component.Get` reads `On` too; a file without it reads `On`.
     #[serde(default)]
     pub cast_shadows: ShadowCasting,
+    /// Unity's *Scale In Lightmap* (#1704): a multiplier on the bake's texel
+    /// density for this mesh, in [`MeshComponent::SCALE_IN_LIGHTMAP`]. At 0 the
+    /// mesh gets no lightmap and reads light probes ([`MeshComponent::reads_probes`]),
+    /// while still blocking and bouncing light in the bake. Always written; a file
+    /// without it reads 1.
+    #[serde(default = "one_f32")]
+    pub scale_in_lightmap: f32,
     #[serde(skip)]
     pub vertices: Vec<Vertex>,
     #[serde(skip)]
@@ -83,6 +90,17 @@ pub struct MeshComponent {
     /// overrides (#453). Only the overrides are saved, and only when there are any.
     #[serde(default, skip_serializing_if = "BoneBinding::is_unmodified")]
     pub skeleton: BoneBinding,
+    /// Past this many metres from a camera (to its bounds' centre) the mesh is not
+    /// drawn (#1714): Unreal's *Max Draw Distance*. `0`, the default, is unlimited.
+    /// Saved only when set. `render::SmallObjectCull` reads it.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub max_draw_distance: f32,
+    /// Below this screen-relative height (`0..1`: its local bounds' largest extent
+    /// times its largest axis scale, over the view's height at its distance, the measure Unity's `LODGroup` picks its
+    /// levels and its *Culled* share by) the mesh is not drawn (#1714): Unreal's
+    /// min screen radius. `0`, the default, is off. Saved only when set.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub min_screen_size: f32,
     /// Which edit of the geometry this is; set a [`MeshRevision::next`] whenever
     /// `vertices` or `indices` change, so every renderer re-uploads them.
     #[serde(skip)]
@@ -93,11 +111,29 @@ fn one() -> u32 {
     1
 }
 
+fn one_f32() -> f32 {
+    1.0
+}
+
 fn is_one(n: &u32) -> bool {
     *n == 1
 }
 
+fn is_zero(v: &f32) -> bool {
+    *v == 0.0
+}
+
 impl MeshComponent {
+    /// The Scale In Lightmap values a mesh takes. Unity has no upper bound; past a
+    /// few the map reaches the page's cap anyway (`lightmap::max_map_edge`).
+    pub const SCALE_IN_LIGHTMAP: std::ops::RangeInclusive<f32> = 0.0..=64.0;
+
+    /// Whether a static mesh reads light probes instead of a lightmap: its Scale
+    /// In Lightmap is 0, so the bake gives it none (#1704).
+    pub fn reads_probes(&self) -> bool {
+        self.scale_in_lightmap <= 0.0
+    }
+
     /// A static mesh: `primitive_type` (see the field) over this geometry, with no
     /// asset reference, skin or clips, and a fresh revision so every renderer uploads it.
     /// Set the skinned and asset fields on top with `..MeshComponent::new(…)`.
@@ -111,6 +147,7 @@ impl MeshComponent {
             asset_ref: None,
             subdivisions: 1,
             cast_shadows: ShadowCasting::On,
+            scale_in_lightmap: 1.0,
             vertices,
             indices,
             ranges: Vec::new(),
@@ -119,6 +156,8 @@ impl MeshComponent {
             clips: Vec::new(),
             pose_palette: Vec::new(),
             skeleton: BoneBinding::default(),
+            max_draw_distance: 0.0,
+            min_screen_size: 0.0,
             revision: MeshRevision::next(),
         }
     }
@@ -152,6 +191,15 @@ impl MeshComponent {
         } else {
             &self.pose_palette
         }
+    }
+
+    /// Whether a camera may cull this mesh for its distance or its size on screen
+    /// (#1714): either of `max_draw_distance` and `min_screen_size` is set. Such a
+    /// mesh's shadow, and every renderer's of a `LODGroup` holding one, is drawn
+    /// every frame with the camera's verdict, never baked into a cached static
+    /// shadow (`render::passes::shadows::UnbakedCasters`).
+    pub fn culls_when_small(&self) -> bool {
+        self.max_draw_distance > 0.0 || self.min_screen_size > 0.0
     }
 
     /// Whether this mesh is skinned (carries an imported skeleton). Frustum culling

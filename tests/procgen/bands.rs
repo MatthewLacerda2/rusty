@@ -6,7 +6,8 @@ use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 /// The *worn, grimy painted metal* example (docs/api/Texture.md) plus a blur,
 /// warp, tile, mapping, bump, a distance bevel, a normal blend, the channel ops,
 /// two-image math, auto levels and the #1743 filters (occlusion, edges, highpass,
-/// sharpen, histogram scan, levels), so every banded path runs.
+/// sharpen, histogram scan, levels) and #1739's directional ops (directional blur
+/// and warp, slope blur), so every banded path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
   "nodes": [
@@ -43,7 +44,11 @@ const RECIPE: &str = r#"{
     { "id": "lv", "op": "levels", "in_low": 0.1, "gamma": 1.4, "inputs": ["hs"] },
     { "id": "more", "op": "combine_rgb", "inputs": ["ao", "ed", "lv"] },
     { "id": "lt2", "op": "mix", "mode": "multiply", "factor": 0.5, "inputs": ["lt", "more"] },
-    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt2", "soft"] }
+    { "id": "db", "op": "directional_blur", "length": 0.1, "angle": 0.125, "inputs": ["chips"] },
+    { "id": "dw", "op": "directional_warp", "strength": 0.05, "angle": 0.3, "inputs": ["db", "h"] },
+    { "id": "sb", "op": "slope_blur", "intensity": 0.01, "mode": "max", "inputs": ["dw", "bev"] },
+    { "id": "lt3", "op": "mix", "mode": "screen", "factor": 0.4, "inputs": ["lt2", "sb"] },
+    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt3", "soft"] }
   ],
   "output": "out"
 }"#;

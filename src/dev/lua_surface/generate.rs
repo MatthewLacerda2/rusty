@@ -1,6 +1,7 @@
 //! `Lighting.Generate()` and the scene's lighting settings (#832): the one verb
 //! behind the editor's Generate Lighting button, and `Lighting.GetSettings()` /
-//! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, and the
+//! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, its
+//! Max Lightmap Size included, #1704, and the
 //! reflection probes' default resolution, memory budget and probe ceiling, #1584,
 //! and the scene's diffuse model, #1698).
 
@@ -22,6 +23,8 @@ pub(super) struct Overrides {
     pub bounces: Option<u32>,
     pub seed: Option<u64>,
     pub directional: Option<bool>,
+    /// Max Lightmap Size, the atlas page edge (#1704).
+    pub max_lightmap_size: Option<u32>,
 }
 
 impl Overrides {
@@ -34,6 +37,7 @@ impl Overrides {
             bounces: self.bounces.unwrap_or(base.bounces),
             seed: self.seed.unwrap_or(base.seed),
             directional: self.directional.unwrap_or(base.directional),
+            max_lightmap_size: self.max_lightmap_size.unwrap_or(base.max_lightmap_size),
             ..base
         }
         .sanitized()
@@ -46,6 +50,7 @@ impl Overrides {
             bounces: t.get("bounces")?,
             seed: t.get("seed")?,
             directional: t.get("directional")?,
+            max_lightmap_size: t.get("maxLightmapSize")?,
         })
     }
 }
@@ -92,6 +97,7 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
             out.set("bounces", s.bounces)?;
             out.set("seed", s.seed)?;
             out.set("directional", s.directional)?;
+            out.set("maxLightmapSize", s.max_lightmap_size)?;
             out.set("diffuseModel", settings.diffuse_model.name())?;
             put_reflections(&out, &r)?;
             Ok(out)

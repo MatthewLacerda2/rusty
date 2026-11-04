@@ -17,6 +17,7 @@ impl MeshComponent {
             asset_ref: self.asset_ref.clone(),
             subdivisions: self.subdivisions,
             cast_shadows: self.cast_shadows,
+            scale_in_lightmap: self.scale_in_lightmap,
             vertices: Vec::new(),
             indices: Vec::new(),
             ranges: Vec::new(),
@@ -25,6 +26,8 @@ impl MeshComponent {
             clips: Vec::new(),
             pose_palette: Vec::new(),
             skeleton: self.skeleton.clone(),
+            max_draw_distance: self.max_draw_distance,
+            min_screen_size: self.min_screen_size,
             revision: self.revision,
         }
     }

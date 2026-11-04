@@ -28,7 +28,7 @@ pub(super) fn bake_logged(
     let run = |progress: &BakeProgress| {
         // Nobody cancels this one, so it always runs to the end.
         let maps = bake_with_progress(input, settings, progress).unwrap_or_default();
-        encode_pages(&maps, progress)?.ok_or_else(|| "never cancelled".to_string())
+        encode_pages(&maps, settings.page(), progress)?.ok_or_else(|| "never cancelled".to_string())
     };
     if !log.is_on() {
         return run(&progress);

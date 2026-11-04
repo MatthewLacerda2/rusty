@@ -147,11 +147,16 @@ impl EditorFrontend {
             &mut self.editor_ui,
             &self.egui_ctx,
             &mut game.resources.application.borrow_mut(),
-            &mut game.script_manager().graphics_cell().borrow_mut().options,
+            &mut game.script_manager().graphics_cell().borrow_mut(),
             &mut game.resources.console.borrow_mut(),
         );
         if paint::take_edits(&mut self.editor_ui, game) {
             shell.renderer.shadow_renderer.invalidate_static_cache();
+        }
+        if self.demo_size().is_none() {
+            // Before `sync_quality` resolves the render scale on it (#1715); an open
+            // demo replays the scale it recorded.
+            crate::shell::settings::report_display_scale(shell, game);
         }
         self.sync_quality(shell, game);
         self.sync_speaker_mode(game);

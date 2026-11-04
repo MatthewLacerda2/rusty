@@ -8,6 +8,7 @@ use super::batch::sort::{back_to_front, view_depth};
 use super::batch::{DrawItem, FrameDraws};
 use super::overlays::{OverlayBindings, OverlayDraws};
 use super::proxy_volume;
+use super::visibility::{CameraCulls, ViewCull};
 use crate::render::gpu::draw_buffers::{push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
 use crate::render::motion::{track, MotionHistory};
@@ -22,10 +23,8 @@ use crate::scene::Scene;
 #[derive(Default)]
 pub(crate) struct SolidResources {
     pub draws: FrameDraws,
-    /// Mesh entities the frustum cull skipped for this camera (#433's counters).
-    pub culled: u32,
-    /// Mesh entities hidden because their LOD level is not the one shown (#472).
-    pub lod_hidden: u32,
+    /// What this camera's culling skipped, and how (#433, #472, #1714).
+    pub culls: CameraCulls,
     /// Mesh entities drawn: one each, however many material runs it draws in (#1285).
     pub visible: u32,
     /// Mesh particles among the instances (#440) — counted as particles, not entities.
@@ -100,7 +99,7 @@ impl Renderer {
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
-        let (mut culled, mut lod_hidden, mut visible) = (0, 0, 0);
+        let (mut culls, mut visible) = (CameraCulls::default(), 0);
         let limits = self.device.limits();
         let binding = limits.max_storage_buffer_binding_size;
         let mut proxies = self
@@ -111,22 +110,16 @@ impl Renderer {
         } else {
             Vec::new()
         };
+        let view = ViewCull {
+            mask: cam.culling_mask,
+            lod,
+            frustum,
+            small: self.small_object_cull(cam),
+        };
         for id in scene.world.ids_with_mesh() {
-            if !self.camera_draws(scene, id, cam.culling_mask) {
+            let Some(bounds) = self.visible_bounds(scene, id, &view, &mut culls) else {
                 continue;
-            }
-            // A level of detail this camera does not show (#472).
-            if lod.hides(id) {
-                lod_hidden += 1;
-                continue;
-            }
-            // View-frustum cull (#330): skip the uniform sync, binds, and draw for any
-            // entity whose world-space AABB is fully outside what this camera can see.
-            let bounds = self.world_bounds(scene, id);
-            if bounds.is_some_and(|(min, max)| !frustum.intersects_aabb(min, max)) {
-                culled += 1;
-                continue;
-            }
+            };
             let motion = history.as_deref_mut();
             let eye = (cam_pos, cam_fwd);
             let frame = (&mut joints, &mut proxies);
@@ -145,29 +138,11 @@ impl Renderer {
         let outline_bounds = self.outline_bounds(scene, &ringed);
         SolidResources {
             draws: self.upload_solids(opaque, transparent, (&joints, &proxies.data)),
-            culled,
-            lod_hidden,
+            culls,
             visible,
             mesh_particles,
             outline_bounds,
         }
-    }
-
-    /// Whether a camera whose culling mask (#92) is `mask` draws mesh entity `id` at
-    /// all, before LOD and frustum culling.
-    fn camera_draws(&self, scene: &Scene, id: u32, mask: u32) -> bool {
-        // An inactive mesh, or a shadows-only one: it casts, no camera draws it (#1571).
-        let mode = scene.world.mesh(id).map(|m| m.cast_shadows);
-        if !scene.world.is_active_in_hierarchy(id) || mode.is_some_and(|m| !m.is_visible()) {
-            return false;
-        }
-        // During a static-cubemap capture, gather only static geometry — dynamic
-        // actors must not bake into a probe/reflection (#243), as the static shadow
-        // sweeps take static casters only (`passes::shadows::casters::sweep`).
-        if self.capture.static_only && !scene.world.is_static(id) {
-            return false;
-        }
-        crate::scene::layer_in_mask(scene.world.layer(id), mask)
     }
 
     /// Sort the translucent items back to front, batch both lists into instanced
@@ -195,19 +170,6 @@ impl Renderer {
             },
         );
         draws
-    }
-
-    /// The entity's world bounds `(min, max)`: its mesh's cached local AABB under the
-    /// entity's world matrix, or its animated bound when skinned (#833). The frustum
-    /// cull (#330) tests them and the draw picks its reflection probe at their centre
-    /// (#1206). `None` for an entity with no mesh, whose geometry is not resident on
-    /// the GPU yet, or whose pose cannot be bounded: it is never culled, since the
-    /// downstream sync produces no draw for a non-resident mesh anyway, and culling a
-    /// not-yet-uploaded mesh could wrongly hide it on its first frame.
-    fn world_bounds(&self, scene: &Scene, id: u32) -> Option<(glam::Vec3, glam::Vec3)> {
-        let mesh = scene.world.mesh(id)?;
-        let gpu_mesh = self.gpu_meshes.get(&MeshId::from_mesh(&mesh))?;
-        gpu_mesh.world_bounds(&mesh, scene.world.local_to_world(id))
     }
 
     /// One solid's draw items, one per material slot (#1285), each drawing its index
@@ -244,7 +206,7 @@ impl Renderer {
             scene,
             id,
             model_matrix,
-            self.capture.probe_bounce,
+            &self.capture,
             &self.lightmaps,
         );
         // Like Unity, the reflection probe is picked per object, at the centre of its

@@ -47,6 +47,7 @@ pub fn soldier() -> MeshComponent {
         asset_ref: None,
         subdivisions: 1,
         cast_shadows: Default::default(),
+        scale_in_lightmap: 1.0,
         vertices,
         indices,
         ranges: Vec::new(),
@@ -55,6 +56,8 @@ pub fn soldier() -> MeshComponent {
         clips: vec![walk()],
         pose_palette: Vec::new(),
         skeleton: Default::default(),
+        max_draw_distance: 0.0,
+        min_screen_size: 0.0,
         revision: Default::default(),
     }
 }

@@ -1,6 +1,6 @@
 //! A mesh's `cast_shadows` (#1571): set from Lua through `Component.Set`, read back
 //! with `Component.Get`, refused for a name it doesn't know, and saved with the scene
-//! and its prefabs.
+//! and its prefabs. Its neighbour `scale_in_lightmap` (#1704) the same way.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -51,6 +51,7 @@ fn cast_shadows_round_trips_through_a_scene_and_a_prefab() {
         id
     });
     scene.world.mesh_mut(water).unwrap().cast_shadows = ShadowCasting::TwoSided;
+    scene.world.mesh_mut(water).unwrap().scale_in_lightmap = 3.0;
     let dir = crate::temp::dir();
     let path = dir
         .join("rusty_cast_shadows.scene")
@@ -62,6 +63,8 @@ fn cast_shadows_round_trips_through_a_scene_and_a_prefab() {
     let mode = |s: &Scene, id| s.world.mesh(id).map(|m| m.cast_shadows);
     assert_eq!(mode(&loaded, water), Some(ShadowCasting::TwoSided));
     assert_eq!(mode(&loaded, floor), Some(ShadowCasting::On));
+    let scale = |s: &Scene, id| s.world.mesh(id).map(|m| m.scale_in_lightmap);
+    assert_eq!(scale(&loaded, water), Some(3.0));
 
     let prefab = dir
         .join("rusty_cast_shadows.prefab")
@@ -71,4 +74,50 @@ fn cast_shadows_round_trips_through_a_scene_and_a_prefab() {
     let mut stamped = Scene::new();
     let root = instantiate_prefab(&mut stamped, &read_prefab_file(&prefab).unwrap(), None);
     assert_eq!(mode(&stamped, root), Some(ShadowCasting::TwoSided));
+    assert_eq!(scale(&stamped, root), Some(3.0));
+}
+
+#[test]
+fn an_out_of_range_scale_in_lightmap_is_held_by_a_scene_and_a_prefab_load() {
+    let mut scene = Scene::new();
+    let wall = scene.add_entity("Wall".to_string());
+    let mut mesh =
+        rusty::scene::authoring::primitive_mesh_component(rusty::scene::authoring::Primitive::Box)
+            .unwrap();
+    mesh.scale_in_lightmap = 9000.0; // as a hand edit would leave it
+    scene.world.set_mesh(wall, Some(mesh));
+    let path = |name: &str| crate::temp::dir().join(name).to_string_lossy().into_owned();
+    let (scene_file, prefab) = (path("rusty_1704.scene"), path("rusty_1704.prefab"));
+    scene.save_to_file(&scene_file).unwrap();
+    save_prefab(&scene, wall, &prefab).unwrap();
+    let scale = |s: &Scene, id| s.world.mesh(id).map(|m| m.scale_in_lightmap);
+    let mut loaded = Scene::new();
+    loaded.load_from_file(&scene_file).unwrap();
+    assert_eq!(scale(&loaded, wall), Some(64.0), "held at its top");
+    let mut stamped = Scene::new();
+    let root = instantiate_prefab(&mut stamped, &read_prefab_file(&prefab).unwrap(), None);
+    assert_eq!(scale(&stamped, root), Some(64.0));
+}
+
+#[test]
+fn scale_in_lightmap_is_set_from_lua_and_held() {
+    let scene = Rc::new(RefCell::new(Scene::new()));
+    let mut game = playing(scene.clone(), 1.0);
+    run(&mut game, 1);
+    let read = game.script_manager().eval(
+        r#"wall = Scene.CreateEntity("Wall", "Box")
+        local before = Component.Get(wall, "Mesh").scale_in_lightmap
+        Component.Set(wall, "Mesh", { scale_in_lightmap = -3 })
+        local held = Component.Get(wall, "Mesh").scale_in_lightmap
+        Component.Set(wall, "Mesh", { scale_in_lightmap = 2.5 })
+        return before .. " " .. held .. " " .. Component.Get(wall, "Mesh").scale_in_lightmap"#,
+    );
+    assert_eq!(
+        read.unwrap(),
+        "1.0 0.0 2.5",
+        "a negative scale is held at 0"
+    );
+    let id = scene.borrow().world.ids()[0];
+    let stored = scene.borrow().world.mesh(id).map(|m| m.scale_in_lightmap);
+    assert_eq!(stored, Some(2.5), "written on the component");
 }

@@ -262,8 +262,12 @@ fn render_viewport(
     let Some(renderer) = host.renderer(px, py) else {
         return;
     };
-    renderer.apply_graphics(*game.script_manager().graphics_cell().borrow());
-    let scale = renderer.graphics(scene_tab).render_scale;
+    let display_scale = game.resources.screen.borrow().display_scale();
+    renderer.apply_graphics(
+        *game.script_manager().graphics_cell().borrow(),
+        display_scale,
+    );
+    let scale = renderer.render_scale(scene_tab);
     let Some((renderer, view)) = host.frame(px, py, scale) else {
         return;
     };

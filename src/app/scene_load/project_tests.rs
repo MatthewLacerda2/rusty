@@ -105,3 +105,21 @@ fn an_unparseable_project_file_is_said_once_and_leaves_the_defaults() {
     let levels: Vec<_> = console.messages.iter().map(|(_, l)| l.clone()).collect();
     assert_eq!(levels, [LogLevel::Error], "{:?}", console.messages);
 }
+
+/// A hand edit of the render-scale default (#1715) reaches the running scale at the
+/// next Play, as the presets' do: the value the renderer resolves, not only the
+/// one `Graphics.GetDefaultRenderScale` reads.
+#[test]
+fn a_hand_edited_render_scale_default_runs_at_the_next_play() {
+    use crate::core::settings::render_scale::RenderScaleDefault;
+    let path = fixture_file();
+    let game = world();
+    game.open_project(ProjectSource::Bound(path.clone()));
+    let edited = r#"{ "graphics": { "render_scale": "match_display" } }"#;
+    std::fs::write(&path, edited).unwrap();
+    game.apply_project_settings(); // entering Play rereads the file
+    let running = game.script_manager().graphics_cell().borrow().render_scale;
+    assert_eq!(running.default, RenderScaleDefault::MatchDisplay);
+    let app = game.resources.application.borrow();
+    assert_eq!(app.render_scale_default(), RenderScaleDefault::MatchDisplay);
+}

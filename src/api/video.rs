@@ -13,16 +13,27 @@
 //! surface (resolution / present mode) and the winit window (fullscreen). No GPU is
 //! touched from script. Every write is ONE-WAY into render-only state — it never
 //! feeds `FixedUpdate`, so the deterministic sim is unaffected.
+//!
+//! `GetDisplayScale` (#1715) reads the display's backing scale off the `ScreenSize`
+//! resource, a sim input like the Game view's size `UI.GetScreenSize` reads: 1
+//! headless, and recorded by a demo, so a replay never depends on the monitor.
 
 use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::ApiCell;
 use crate::core::settings::video::VideoSettings;
+use crate::ui::ScreenSize;
 
 /// Register the `Video` namespace onto `lua`, backed by the shared settings cell.
-pub fn register(lua: &Lua, video: ApiCell<VideoSettings>) -> Reg {
+pub fn register(lua: &Lua, video: ApiCell<VideoSettings>, screen: ApiCell<ScreenSize>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
+
+    put(
+        &table,
+        "GetDisplayScale",
+        lua.create_function(move |lua, ()| Ok(screen.get(lua)?.borrow().display_scale())),
+    )?;
 
     register_resolution(lua, &table, video)?;
     register_vsync(lua, &table, video)?;

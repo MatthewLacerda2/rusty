@@ -57,7 +57,7 @@ fn lens_api_and_shared_op_converge() {
         rusty::api::graphics::register(
             &lua,
             bind(&lua, &lua_scene),
-            bind(&lua, &graphics),
+            (bind(&lua, &graphics), rusty::api::ApiCell::default()),
             bind(&lua, &app),
         )
         .unwrap();

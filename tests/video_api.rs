@@ -19,7 +19,7 @@ use rusty::core::storage::Storage;
 fn resolution_writes_cell_and_clamps_zero() {
     let lua = Lua::new();
     let video = Rc::new(RefCell::new(VideoSettings::default()));
-    rusty::api::video::register(&lua, bind(&lua, &video)).unwrap();
+    rusty::api::video::register(&lua, bind(&lua, &video), rusty::api::ApiCell::default()).unwrap();
     lua.load("Video.SetResolution(1920, 1080)").exec().unwrap();
     assert_eq!(video.borrow().resolution(), (1920, 1080));
 
@@ -35,7 +35,7 @@ fn resolution_writes_cell_and_clamps_zero() {
 fn vsync_and_fullscreen_round_trip_through_cell() {
     let lua = Lua::new();
     let video = Rc::new(RefCell::new(VideoSettings::default()));
-    rusty::api::video::register(&lua, bind(&lua, &video)).unwrap();
+    rusty::api::video::register(&lua, bind(&lua, &video), rusty::api::ApiCell::default()).unwrap();
 
     assert!(video.borrow().vsync, "default vsync on");
     assert!(!video.borrow().fullscreen, "default windowed");

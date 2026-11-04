@@ -9,6 +9,8 @@
 #import forward::lighting::{ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, flat_ambient, fold_decals, lightmap_direction_rebalance, lightmap_level, probe_irradiance}
 #import forward::local_shadow::local_shadow
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
+#import forward::specular_aa
+#import forward::motion::{motion_texel}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
 // resources are `forward/bindings.wgsl`, its lighting helpers `forward/lighting.wgsl`.
@@ -248,19 +250,9 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
     return VelocityTargets(transparent::finite_hdr(surface_color(v)), velocity_texel(in));
 }
 
-// The velocity target's texel for `in`: its screen motion, its view depth and its
-// camera's place in the stack.
+// The velocity target's texel for `in` (`forward::motion::motion_texel`).
 fn velocity_texel(in: VelocityVertex) -> vec4<f32> {
-    // A surface behind the camera last frame (a projectile past the player's head)
-    // had no place on screen to move from: it writes no motion, not a huge streak.
-    var velocity = vec2<f32>(0.0);
-    if (in.clip_prev.w > 1e-4) {
-        velocity = in.clip_now.xy / in.clip_now.w - in.clip_prev.xy / in.clip_prev.w;
-    }
-    // Depth along this camera's view axis, not the straight-line distance: a plane
-    // facing the camera has one depth, so depth of field focuses on a plane (#1445).
-    let depth = dot(camera.clusters.view_z.xyz, in.world_position) + camera.clusters.view_z.w;
-    return vec4<f32>(velocity, depth, camera.stack.x);
+    return motion_texel(in.clip_now, in.clip_prev, in.world_position);
 }
 
 // ---- The transparent depth postpass (#1523) ----
@@ -311,6 +303,10 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let geometric = facing_normal(in.world_normal, behind);
     // The lightmap's mip level (#1694), from derivatives: before any branch too.
     let lightmap_lod = lightmap_level(in.lightmap_uv);
+    // What this pixel's spread of normals adds to the GGX lobe (#1702), before any
+    // branch too; `roughness` below is widened by it. Taken before the two-sided flip:
+    // a flip inside a pixel quad (a pane seen edge-on) is not a curved surface.
+    let specular_kernel = specular_aa::kernel(normalize(in.world_normal));
     // Where every map below is read (#1573): UV0 tiled, or projected from world space.
     let maps = mapping::coords(in.tex_coords, in.world_position, geometric);
     var base_color = m.color_tint;
@@ -372,7 +368,10 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         N = faceForward(N, -V, N);
     }
     let metallic = surface.metallic;
-    let roughness = surface.roughness;
+    // Geometric specular AA (#1702): every GGX read below (the lights, the environment
+    // reflection's mip, SSR's record) takes the widened roughness, so a highlight and
+    // its reflection agree.
+    let roughness = specular_aa::widen(surface.roughness, specular_kernel);
 
     let F0 = mix(vec3<f32>(0.04), albedo, metallic);
 

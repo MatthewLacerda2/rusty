@@ -1,6 +1,7 @@
 //! The Mesh card (Unity's *Mesh Filter* and *Mesh Renderer* together): the mesh's
-//! source, a `Plane`'s subdivisions (#1524), how it casts shadows (#1571), and a
-//! skinned mesh's hitbox and ragdoll tools.
+//! source, a `Plane`'s subdivisions (#1524), how it casts shadows (#1571), its
+//! Scale In Lightmap (#1704), when a camera culls it as too far or too small (#1714),
+//! and a skinned mesh's hitbox and ragdoll tools.
 
 use egui_phosphor::regular as icon;
 
@@ -38,6 +39,8 @@ pub fn draw_mesh(
     let mut remove = false;
     let mut subdivide = None;
     let mut casting = None;
+    let mut culling = None;
+    let mut lightmap_scale = None;
     component_card(ui, icon::CUBE, "Mesh Filter", Some(&mut remove), |ui| {
         if let Some(mesh) = world.mesh(id) {
             ui.label(format!("Type: {} primitive", mesh.primitive_type));
@@ -49,6 +52,8 @@ pub fn draw_mesh(
             if combo(ui, "Cast Shadows", &mut mode, &modes) {
                 casting = Some(mode);
             }
+            culling = draw_culling(ui, mesh.max_draw_distance, mesh.min_screen_size);
+            lightmap_scale = draw_scale_in_lightmap(ui, mesh.scale_in_lightmap);
             ui.label(format!(
                 "Geometry: {} verts | {} indices",
                 mesh.vertices.len(),
@@ -68,10 +73,61 @@ pub fn draw_mesh(
         mesh_ops::set_cast_shadows(&mut mesh, mode);
         *is_dirty = true;
     }
+    if let (Some((distance, size)), Some(mut mesh)) = (culling, world.mesh_mut(id)) {
+        mesh_ops::set_max_draw_distance(&mut mesh, distance);
+        mesh_ops::set_min_screen_size(&mut mesh, size);
+    }
+    if let (Some(scale), Some(mut mesh)) = (lightmap_scale, world.mesh_mut(id)) {
+        mesh_ops::set_scale_in_lightmap(&mut mesh, scale);
+        *is_dirty = true;
+    }
     if remove {
         // The shared verb behind `Scene.RemoveComponent`: the Material goes too.
         remove_component(world, id, ComponentKind::Mesh, is_dirty);
     }
+}
+
+/// The small-object cull (#1714): *Max Draw Distance* (metres, 0 unlimited) and *Min
+/// Screen Size* (screen-relative height, 0 off). Both values when either changed.
+/// Each drags at its own speed: a metre a point, and a thousandth of the screen,
+/// since useful sizes sit around 0.01–0.02.
+fn draw_culling(ui: &mut egui::Ui, distance: f32, size: f32) -> Option<(f32, f32)> {
+    let (mut d, mut s) = (distance, size);
+    let changed = drag_row(ui, "Max Draw Distance", &mut d, 1.0, 0.0..=f32::MAX)
+        | drag_row(ui, "Min Screen Size", &mut s, 0.001, 0.0..=1.0);
+    changed.then_some((d, s))
+}
+
+/// A labelled `f32` drag row held to `range`, moving `speed` per point dragged.
+fn drag_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: &mut f32,
+    speed: f64,
+    range: std::ops::RangeInclusive<f32>,
+) -> bool {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        ui.add(egui::DragValue::new(value).speed(speed).ranged(range))
+            .changed()
+    })
+    .inner
+}
+
+/// Unity's *Scale In Lightmap* (#1704): the new value when it changed.
+fn draw_scale_in_lightmap(ui: &mut egui::Ui, current: f32) -> Option<f32> {
+    let mut scale = current;
+    let range = crate::components::MeshComponent::SCALE_IN_LIGHTMAP;
+    let drag = egui::DragValue::new(&mut scale).ranged(range).speed(0.05);
+    let changed = ui
+        .horizontal(|ui| {
+            ui.label("Scale In Lightmap:").on_hover_text(
+                "Texel density multiplier for the bake; 0 leaves the mesh to light probes",
+            );
+            ui.add(drag).changed()
+        })
+        .inner;
+    (changed && scale != current).then_some(scale)
 }
 
 /// *Generate Hitboxes* and *Build Ragdoll*, deferred into `skin_tool`.

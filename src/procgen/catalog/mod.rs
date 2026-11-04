@@ -114,6 +114,8 @@ catalog! {
     CombineRgb = vector::combine_rgb::CombineRgb,
     Constant(generators::constant::Constant),
     Curvature(filter::relief::curvature::Curvature),
+    DirectionalBlur(filter::blurs::directional_blur::DirectionalBlur),
+    DirectionalWarp(vector::directional_warp::DirectionalWarp),
     Distance(filter::mask::distance::Distance),
     #[cfg(test)]
     Dummy(color::dummy::Dummy),
@@ -138,6 +140,7 @@ catalog! {
     SeparateRgb(vector::separate_rgb::SeparateRgb),
     Shape(generators::shape::Shape),
     Sharpen(filter::blurs::sharpen::Sharpen),
+    SlopeBlur(filter::blurs::slope_blur::SlopeBlur),
     Tile(vector::tile::Tile),
     Voronoi(generators::voronoi::Voronoi),
     Warp(vector::warp::Warp),

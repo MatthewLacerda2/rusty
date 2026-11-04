@@ -61,7 +61,7 @@ fn floor_under_a_baked_sun() -> (Scene, String, String) {
     scene.world.set_light(sun, Some(light));
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.2);
     let s = &mut scene.lighting_settings.lightmaps;
-    (s.texels_per_unit, s.samples, s.bounces, s.max_resolution) = (2.0, 8, 1, 16);
+    (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (2.0, 8, 1, 32);
     scene.save_to_file(&path).unwrap();
     (scene, model, path)
 }
