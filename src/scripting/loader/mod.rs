@@ -33,7 +33,7 @@ impl ScriptManager {
     /// methods. `script_index` is the slot in the entity's `scripts` vec, so an
     /// entity's many scripts (#83) each get their own keyed lifecycle table.
     /// Every attempt — success or failure — is recorded in `load_attempted`, so
-    /// the spawn scan never retries a slot.
+    /// the spawn queue's drain never retries a slot.
     pub fn load_entity_script(
         &mut self,
         entity_id: u32,
@@ -51,9 +51,8 @@ impl ScriptManager {
 
         // A fresh table per instance: the chunk's top level runs again.
         let table: Table = class
-            .chunk
-            .call(())
-            .map_err(|e| format!("Syntax error compiling {}: {}", script_path, e))?;
+            .run(lua)
+            .map_err(|e| format!("Error running {}: {}", script_path, e))?;
 
         // Merge the inspector-set field values (#84) over the schema defaults onto
         // the lifecycle table, so `self.<field>` inside the script reads the

@@ -22,8 +22,9 @@
 //!   outside Play the writer's next write is what brings that frame (#1721).
 //!   The file is parsed before anything else, and text that already failed is not
 //!   parsed again, so a broken file left on disk costs one read a frame (#1374).
-//! - **Held through Play**, like every watch note: the log is read only in edit
-//!   mode, so a change seen in Play applies after Stop, against the restored scene.
+//! - **Held through Play**, like every watch note but a script's: the log is read
+//!   only in edit mode, so a change seen in Play applies after Stop, against the
+//!   restored scene.
 
 use crate::app::GameWorld;
 use crate::core::fs::written::{written_since, Stale};

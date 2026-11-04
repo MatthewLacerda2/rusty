@@ -7,13 +7,12 @@ use mlua::Table;
 
 use super::lifecycle::{manager_with_entity, write_script};
 use crate::components::ScriptFieldValue;
-use crate::core::fs::written::note_written;
 use crate::scripting::manager::ScriptManager;
 
 const COUNTED: &str = "__made = (__made or 0) + 1\n\
                        return { fields = { speed = 3, label = 'x' }, n = __made }";
 
-fn field(m: &ScriptManager, id: u32, key: &str) -> String {
+pub(super) fn field(m: &ScriptManager, id: u32, key: &str) -> String {
     let lua = m.lua.as_ref().unwrap();
     let table: Table = lua
         .registry_value(&m.entity_scripts[&(id, 0)].table)
@@ -21,7 +20,11 @@ fn field(m: &ScriptManager, id: u32, key: &str) -> String {
     table.get::<mlua::Value>(key).unwrap().to_string().unwrap()
 }
 
-fn spawn(m: &mut ScriptManager, path: &str, values: &BTreeMap<String, ScriptFieldValue>) -> u32 {
+pub(super) fn spawn(
+    m: &mut ScriptManager,
+    path: &str,
+    values: &BTreeMap<String, ScriptFieldValue>,
+) -> u32 {
     let id = m.cells.scene.borrow_mut().add_entity("S".to_string());
     m.load_entity_script(id, 0, path, values).unwrap();
     id
@@ -49,25 +52,6 @@ fn a_thousand_instances_of_one_script_read_it_once() {
 }
 
 #[test]
-fn a_written_script_is_read_again_and_live_instances_keep_theirs() {
-    let (mut m, _) = manager_with_entity();
-    m.init_runtime().unwrap();
-    let path = write_script("class_rewritten", "return { v = 1 }");
-    let old = spawn(&mut m, &path, &BTreeMap::new());
-    std::fs::write(&path, "return { v = 2 }").unwrap();
-    // Not in the write log yet: the class stands.
-    let same = spawn(&mut m, &path, &BTreeMap::new());
-    assert_eq!(field(&m, same, "v"), "1");
-    note_written(&path);
-    let new = spawn(&mut m, &path, &BTreeMap::new());
-    assert_eq!(
-        (field(&m, old, "v"), field(&m, new, "v")),
-        ("1".into(), "2".into())
-    );
-    assert_eq!(m.classes.reads, 2);
-}
-
-#[test]
 fn a_script_that_does_not_compile_is_read_once_and_fails_every_instance() {
     let (mut m, _) = manager_with_entity();
     m.init_runtime().unwrap();
@@ -75,23 +59,36 @@ fn a_script_that_does_not_compile_is_read_once_and_fails_every_instance() {
     for _ in 0..3 {
         let id = m.cells.scene.borrow_mut().add_entity("S".to_string());
         let err = m.load_entity_script(id, 0, &path, &BTreeMap::new());
-        assert!(
-            err.unwrap_err().contains(&format!("{path}:1:")),
-            "named after its file"
-        );
+        let err = err.unwrap_err();
+        assert!(err.starts_with("Syntax error compiling"), "{err}");
+        assert!(err.contains(&format!("{path}:1:")), "named after its file");
     }
     assert_eq!(m.classes.reads, 1);
+}
+
+#[test]
+fn a_top_level_runtime_error_is_not_called_a_syntax_error() {
+    let (mut m, id) = manager_with_entity();
+    m.init_runtime().unwrap();
+    let path = write_script("class_throws", "error('boom')\nreturn {}");
+    let err = m.load_entity_script(id, 0, &path, &BTreeMap::new());
+    let err = err.unwrap_err();
+    assert!(err.starts_with(&format!("Error running {path}")), "{err}");
+    assert!(err.contains(&format!("{path}:1: boom")), "{err}");
 }
 
 #[test]
 fn a_missing_script_is_looked_for_again() {
     let (mut m, id) = manager_with_entity();
     m.init_runtime().unwrap();
-    let path = "/tmp/rusty_lifecycle_class_late.lua";
-    std::fs::remove_file(path).ok();
-    assert!(m.load_entity_script(id, 0, path, &BTreeMap::new()).is_err());
-    std::fs::write(path, "return { v = 7 }").unwrap();
-    m.load_entity_script(id, 0, path, &BTreeMap::new()).unwrap();
+    let path = crate::test_temp::dir().join("class_late.lua");
+    let path = path.to_string_lossy();
+    assert!(m
+        .load_entity_script(id, 0, &path, &BTreeMap::new())
+        .is_err());
+    std::fs::write(&*path, "return { v = 7 }").unwrap();
+    m.load_entity_script(id, 0, &path, &BTreeMap::new())
+        .unwrap();
     assert_eq!(field(&m, id, "v"), "7");
 }
 

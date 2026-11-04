@@ -125,12 +125,16 @@ attaches its list items' click script this way.
 
 A script file is read and compiled once per Play (#1710), as Unity compiles a
 MonoBehaviour class once: each instance re-runs the compiled file for a table of
-its own, so its top level still runs once per instance, and spawning a thousand
-copies reads the file once. A file that fails to compile is compiled once too, and
-every instance attached to it logs the error. A file the engine re-writes, or that
-the editor's file watch sees edited, is read again for instances made after that;
-live instances keep the version they were made from. A script error names the
-file and line (`assets/scripts/enemy.lua:12: …`).
+its own, so its top level still runs once per instance (a top-level
+`_ENV = setmetatable({}, …)` gives each instance its own globals), and spawning a
+thousand copies reads the file once. A file that fails to compile is compiled once
+too, and every instance attached to it logs the error. A file the engine re-writes,
+or that the editor's file watch sees edited (in Play too), is read again for
+instances made after that; live instances keep the version they were made from. A
+build with no file watch (`play`, the player, a headless session) sees an outside
+edit at the next Play. An error names the file and line
+(`assets/scripts/enemy.lua:12: …`): `Syntax error compiling` when the file does not
+compile, `Error running` when its top level fails.
 
 **Component dependencies (`RequireComponent`).** A first-class component may
 *declare that it requires another* — rusty's analog of Unity's

@@ -4,17 +4,23 @@
 //! allocating an instance; Defold and Luau cache a chunk per script asset the same
 //! way.
 //!
-//! A class holds the compiled chunk (a [`Function`] of this VM's Lua state, so the
-//! cache lives and dies with the VM: [`super::super::ScriptManager::init_runtime`]
-//! and `shutdown` clear it) and the `fields` schema, parsed once in the
-//! inspection VM, the same parse the inspector shows. An instance re-runs the chunk
-//! for a fresh table, so a script's top level runs once per instance, as before.
+//! A class holds the compiled chunk, as the bytecode [`Function::dump`] gives
+//! (the cache lives and dies with the VM: [`super::super::ScriptManager::init_runtime`]
+//! and `shutdown` clear it), and the `fields` schema, parsed once in the
+//! inspection VM, the same parse the inspector shows. An instance loads the
+//! bytecode into a closure of its own and runs it for a fresh table, so a script's
+//! top level runs once per instance, as before, and each instance has its own
+//! upvalues: a top-level `_ENV = …` stays private to its instance, as when every
+//! instance compiled the file. Undumping is a copy, not a compile. Only bytecode
+//! this cache dumped is ever loaded, and from Rust: the sandbox hands scripts no
+//! new way to load any.
 //!
 //! **Revisions.** A class is keyed by the resolved path and evicted when the write
 //! log (`core::fs::written`, #1207) names its file: an engine write, or in the
-//! editor an outside edit its file watch saw (#1327). Every Play starts a fresh
-//! VM, so it re-reads every script whatever the log says. Live instances keep the
-//! table they were made with; the next instance gets the new revision.
+//! editor an outside edit its file watch saw (#1327), which the watch lets through
+//! during Play for `.lua` files. Every Play starts a fresh VM, so it re-reads every
+//! script whatever the log says. Live instances keep the table they were made
+//! with; the next instance gets the new revision.
 //!
 //! **Failures.** A file that is missing or unreadable is not cached: the next
 //! spawn tries again (`core::fs::written`'s rule, a failed load is a miss). A file
@@ -24,22 +30,31 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use mlua::{Function, Lua};
+use mlua::{ChunkMode, Function, Lua, Table};
 
 use crate::core::fs::written::{written_since, Stale};
 use crate::scripting::schema::{read_fields, ScriptField};
 
 /// One script file at one revision.
 struct Class {
-    /// The compiled chunk, or the error compiling it gave.
-    chunk: Result<Function, String>,
+    /// The compiled chunk's bytecode, or the error compiling it gave.
+    chunk: Result<Rc<[u8]>, String>,
     fields: Rc<[ScriptField]>,
 }
 
-/// What an instance is made from: the chunk to call and the schema to apply.
+/// What an instance is made from: the chunk to run and the schema to apply.
 pub(in crate::scripting) struct Instantiate {
-    pub chunk: Function,
+    chunk: Rc<[u8]>,
     pub fields: Rc<[ScriptField]>,
+}
+
+impl Instantiate {
+    /// Run the chunk in a closure of its own (fresh upvalues, `_ENV` among them)
+    /// for this instance's table.
+    pub(in crate::scripting) fn run(&self, lua: &Lua) -> mlua::Result<Table> {
+        let chunk = lua.load(&*self.chunk).set_mode(ChunkMode::Binary);
+        chunk.into_function()?.call(())
+    }
 }
 
 /// One VM's classes, by resolved path.
@@ -80,17 +95,18 @@ impl ScriptClasses {
             self.classes.insert(key.clone(), class);
         }
         let class = &self.classes[&key];
-        let chunk = class.chunk.clone()?;
         Ok(Instantiate {
-            chunk,
+            chunk: class.chunk.clone()?,
             fields: Rc::clone(&class.fields),
         })
     }
 
-    /// Drop every class whose file the write log named since the last look.
+    /// Drop every class whose file the write log named since the last look. Only
+    /// `.lua` notes are kept, so a bake mid-fight costs no key a canonicalize.
     fn evict_written(&mut self) {
-        let (seen, written) = written_since(self.seen);
+        let (seen, mut written) = written_since(self.seen);
         self.seen = seen;
+        written.retain(|p| crate::core::paths::has_extension(p, "lua"));
         if written.is_empty() || self.classes.is_empty() {
             return;
         }
@@ -112,6 +128,7 @@ impl ScriptClasses {
         let code =
             std::fs::read_to_string(file).map_err(|e| format!("Failed to read script: {}", e))?;
         let chunk = compile(lua, script_path, &code)
+            .map(|f| Rc::from(f.dump(false)))
             .map_err(|e| format!("Syntax error compiling {}: {}", script_path, e));
         // A schema the inspection VM can't read leaves the fields unset: say so.
         let fields = match &chunk {
