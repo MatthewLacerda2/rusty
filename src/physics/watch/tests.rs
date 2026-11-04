@@ -21,10 +21,14 @@ pub struct Twin {
 }
 
 impl Twin {
+    /// Both copies take one real step first: rapier panics when a world whose
+    /// first step had `dt` 0 then loses a body (#1795). Drop the step once fixed.
     pub fn new() -> Self {
-        let (a, b) = (fixture(), fixture());
-        let (fast, mut full) = (PhysicsWorld::from_scene(&a), PhysicsWorld::from_scene(&b));
+        let (mut a, mut b) = (fixture(), fixture());
+        let (mut fast, mut full) = (PhysicsWorld::from_scene(&a), PhysicsWorld::from_scene(&b));
         full.tracked.always_full = true;
+        fast.step(&mut a, 1.0 / 60.0);
+        full.step(&mut b, 1.0 / 60.0);
         Self { a, b, fast, full }
     }
 
