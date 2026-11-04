@@ -20,30 +20,36 @@
 //!   that is realtime light, is kept at the gather's resolution as next frame's
 //!   source ([`targets`]).
 //!
-//! **Never twice over baked bounce.** The share is what the opaque pass wrote in its
-//! alpha while SSIL runs (`forward::lighting::with_ssil_share`): the pixel's light less
-//! its indirect term (lightmap, probes or flat ambient, and SSIL itself), its
-//! environment reflection and, on a lightmapped surface, its emission, over the
-//! whole. So the gather sees the light of `Realtime` and `Mixed` lights and of
-//! unbaked emission: a lightmapped scene with only `Baked` lights gathers nothing
-//! and brightens by nothing; a `Mixed` light's bounce overlaps the indirect light its
-//! bake stored (as in Godot, which adds SSIL over every bake). Unlit surfaces and
-//! the sky feed nothing. A transparent surface reads none (its group 3 is the no-AO
-//! one, as for `t_ao`), and an overlay camera reads none.
+//! **Never twice over baked bounce.** The opaque pass writes in its alpha, while
+//! SSIL runs, the share of its final (fogged, block-folded) colour that is
+//! `forward::lighting::ssil_realtime`: the direct light of every light the scene's
+//! lightmap bake didn't take in (`LightmapSet::lights`, Unity's
+//! `Light.bakingOutput`; uploaded as each light's `bounce_baked`) and emission no
+//! lightmap holds. Not the indirect term (lightmap, probes, flat ambient, SSIL
+//! itself), not the environment reflection. So a lightmapped scene whose lights were
+//! all baked gathers nothing; a light spawned after the bake bounces. Unlit
+//! surfaces and the sky feed nothing. A transparent surface reads none (its group 3
+//! is the no-AO one, as for `t_ao`), and an overlay camera reads none.
 //!
 //! **History.** A cut (a scene load, Play or Stop, a camera switch: `motion`'s
-//! `HistoryKey`), a resize, a quality change and the first frame it runs leave no
-//! history: that frame gathers nothing and the next one starts over. Bake captures
-//! and the shader preview, which keep no history of a view, never run it; a render
-//! texture's camera keeps its own view and runs it there.
+//! `HistoryKey`), a resize, a change of divisor and the first frame it runs leave no
+//! history: that frame gathers nothing and the next one starts over. A change of
+//! samples, radius or intensity keeps it. The accumulate rejects a texel's history
+//! where its distance from the eye moved or its normal turned (the normals it keeps
+//! beside each result). Bake captures and the shader preview, which keep no history
+//! of a view, never run it; a render texture's camera keeps its own view and runs it
+//! there when its `post_fx` is on.
 //!
 //! **Cost.** Off, nothing: no target, no pass, and the forward pass reads no
-//! bounce (`stack.z` is 0). On, per frame: the prepass when SSAO doesn't run
-//! one, `samples` taps of five depths and one colour per gather texel, a 49-tap blur,
-//! a 9-tap accumulate and the 4-tap upsample, plus the source's block average. Its
-//! targets are five `Rgba16Float` textures at the gather's resolution and one at the
-//! view's; no new binding. `Debug.Stats().gpu_passes.ssil` times every pass, and `ssil_samples`
-//! counts the gather's taps.
+//! bounce (`stack.z` is 0: a uniform branch, no texture read). On, per frame: the
+//! prepass when SSAO doesn't run one (which then primes the forward pass), per
+//! gather texel `samples` taps of five depths, one colour and three occlusion
+//! depths each, a 49-tap blur (each tap rebuilds its depth: the place to look if
+//! the budget is over), a 9-tap accumulate and the 4-tap upsample, plus the
+//! source's block average. Its targets are five `Rgba16Float` textures and two
+//! `Rgba8Unorm` normal targets at the gather's resolution and one `Rgba16Float` at
+//! the view's; no new binding. `Debug.Stats().gpu_passes.ssil` times every pass, and
+//! `ssil_samples` counts the gather's taps.
 
 mod pass;
 mod run;

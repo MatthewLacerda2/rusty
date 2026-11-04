@@ -298,34 +298,57 @@ frame, before the base camera's opaque pass, a half-resolution pass (at the seed
 point, sharing SSAO's depth prepass and sample pattern (it draws that prepass itself
 when SSAO is off). Each sample lands on the surface on screen there and reads **last
 frame's** light at that surface, reprojected through last frame's camera, weighted
-by how squarely the two surfaces face each other and by distance within `radius`.
+by how squarely the two surfaces face each other and by distance within `radius`. A
+sample counts only where its surface stands off this one's plane by more than SSAO's
+slope-scaled bias (so a flat floor never lights itself) and nothing on screen stands
+between the two: three depth taps along the segment between them, so a lit wall's
+top showing over a waist-high partition doesn't light the floor behind it.
 A depth-aware blur, a temporal accumulate (90% history, rejected where a surface's
-distance from the eye moved, clamped to the frame's own neighbourhood, so a light
-switched off is gone within two frames; no TAA needed) and a depth-aware upsample
-follow. The forward pass adds the result to the **indirect diffuse** only, through
-the same `albedo × 0.96 × (1 − metallic)` response and SSAO as the ambient term: a
-metal takes none, and a transparent surface or an overlay camera (a viewmodel)
-reads none.
+distance from the eye moved or its normal turned by more than about 25°, clamped to
+the frame's own neighbourhood, so a light switched off is gone within two frames; no
+TAA needed) and a depth-aware upsample follow. The forward pass adds the result to
+the **indirect diffuse** only, through the same `albedo × 0.96 × (1 − metallic)`
+response and SSAO as the ambient term: a metal takes none, and a transparent surface
+or an overlay camera (a viewmodel) reads none.
 
-**It never counts baked bounce twice.** What the gather reads is each pixel's light
-less its indirect term (its lightmap, light probe or flat ambient, and SSIL
-itself), its environment reflection and, on a lightmapped surface, its emission:
-the light of `Realtime` and `Mixed` lights and of unbaked emission. So a scene lit
-only by indirect light, a lightmapped one with only `Baked` lights included,
-brightens by **at most 0.5%** of its light with SSIL on (the test holds it; it
-measures 0), while a `Mixed` light's bounce adds to the indirect light its bake
-stored, as Godot adds SSIL over every bake. Unlit surfaces and the sky feed nothing.
-The source is the base camera's HDR colour right after its opaque pass, before
-SSR, translucents, overlay cameras, bloom, the grade and the UI.
+**It never gathers light a bake already bounced.** What the gather reads of each pixel
+is the share of its colour that is the direct light of lights **no lightmap bake took
+in**, plus emission no lightmap holds: not its indirect term (lightmap, light probe,
+flat ambient or SSIL itself), not its environment reflection. As Unity's
+`Light.bakingOutput`, a lightmap bake records the lights it took in (every active
+`Mixed` or `Baked` light, in the scene's lightmap set); their bounce is in the
+lightmap, so SSIL leaves them out, until the next bake. A light that moved since
+still reads as baked, as in Unity; a light spawned since (a script's muzzle flash,
+in the default `Mixed` mode) was never baked and bounces. So a lightmapped scene
+whose lights were all baked brightens by **at most 0.5%** of its light with SSIL on
+(the tests hold it for a `Baked` and a `Mixed` light; both measure 0), and so does a
+scene lit only by flat ambient. A scene with no lightmap bake has no record: its
+`Mixed` lights' bounce adds to what a light-probe bake stored for them. Unlit
+surfaces and the sky feed nothing. The share is taken of the **fogged** colour, as
+the fog takes it from the light, so fog is never gathered as light. An authored
+surface block that scales the colour per channel (`hit_flash`, `dissolve`, `tint`)
+scales the share with it, as it scales SSR's reflection; one that isn't such a
+scale (`toon_ramp`, `hologram`, `desaturate` above 0) feeds nothing, and the light one adds of its own
+(`fresnel_rim`, `emissive_boost`, `pulse_glow`) is not gathered.
+**The share is one number per pixel**, measured by the brightest channel: a pixel
+lit by both a baked red light and a realtime green one passes on its whole colour
+at the green's share, so some of the baked red bounces a second time. The source is
+the base camera's HDR colour right after its opaque pass, before SSR, translucents,
+overlay cameras, bloom, the grade and the UI.
 
-A cut (a scene load, Play or Stop, a camera switch), a resize or a quality change
-leaves it no history: that frame adds nothing, and the bounce builds back over the
-next frames. Bake captures and the shader preview never run it; a render texture's
-camera runs it in its own view. Under TAA's jitter (#1702) the gather's samples move
-by under a texel at half resolution, which the accumulate averages like its own
-noise. **Budget**: a target of 1.5 ms at 1080p, half resolution, on a base M-series
-GPU, **not yet measured** (`Debug.Stats().gpu_passes.ssil` times it; lavapipe has
-no timer). Its **quality** sets the samples and resolution (see *Quality presets*):
+A cut (a scene load, Play or Stop, a camera switch), a resize or a change of
+resolution divisor leaves it no history: that frame adds nothing, and the bounce
+builds back over the next frames. A change of sample count, `radius` or `intensity`
+keeps the history, which the accumulate blends over within a few frames, so a
+tweened knob never flashes. **A single headless frame shows no bounce**: render a
+few frames of the same view (four is plenty) before a screenshot is read. Bake
+captures and the shader preview never run it; a render texture's camera runs it in
+its own view when its `post_fx` is on. Under TAA's jitter (#1702) the gather's
+samples move by under a texel at half resolution, which the accumulate averages
+like its own noise. **Budget**: a target of 1.5 ms at 1080p, half resolution, on a
+base M-series GPU, **not yet measured** (`Debug.Stats().gpu_passes.ssil` times it;
+lavapipe has no timer). Its **quality** sets the samples and resolution (see
+*Quality presets*):
 the seeded `Medium` preset gathers 6, 8 or 12 samples at half resolution at its
 `Low`, `Medium` and `High` levels (the `Low` preset 4, 6 and 8; the `High` preset 8
 and 12 at half, 16 at full), and `Custom` gathers `samples` at `resolution_divisor`.
