@@ -29,7 +29,10 @@
 //!   propagates, so a rebuild never hides a new case. `sync_to_rapier` and
 //!   `break_joints` run outside the catch.
 
+use rapier3d::prelude::Collider;
+
 use super::watch::Owners;
+use super::writes::collider_to_write;
 use super::{PhysicsEvents, PhysicsWorld, Rebuilt};
 use crate::scene::Scene;
 
@@ -78,13 +81,14 @@ impl PhysicsWorld {
             };
             let pose = *body.next_position();
             for &handle in body.colliders() {
-                let Some(collider) = self.colliders.get_mut(handle) else {
+                let differs = |c: &Collider| {
+                    c.position_wrt_parent()
+                        .is_some_and(|&offset| *c.position() != pose * offset)
+                };
+                let Some(collider) = collider_to_write(&mut self.colliders, handle, differs) else {
                     continue;
                 };
-                let Some(&offset) = collider.position_wrt_parent() else {
-                    continue;
-                };
-                if *collider.position() != pose * offset {
+                if let Some(&offset) = collider.position_wrt_parent() {
                     collider.set_position(pose * offset);
                     moved.push(handle);
                 }

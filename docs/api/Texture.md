@@ -234,7 +234,8 @@ A few notes hold for a whole family. The colour ops are pixel to pixel. Noise us
 only part of the range (a 4-octave fBM spans about 0.35–0.64), so a ramp fed straight
 from it shows only its middle; `auto_levels` before the `color_ramp` uses the whole
 ramp, whatever the input's spread. The filters wrap, so a tiling input gives a tiling
-result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as height.
+result (but for `flood_gradient` on a band that loops the tile, below); `ambient_occlusion`, `cavity` and `curvature` read the input's red as height,
+and `flood_fill` reads it as a mask, its readers the islands it found.
 
 <!-- sorted: one bullet per op, so two branches adding ops land on different lines -->
 - `ambient_occlusion {radius, depth=0.1, quality=8}` (*filter*, 1 input): height →
@@ -280,6 +281,22 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
 - `curvature {radius, strength=1}` (*filter*, 1 input): height → `0.5 + strength × (h
   − mean of h on a ring radius away)`: above mid-grey on convex edges — edge wear —
   below in concave grooves — grime; `map_range` it into a hard mask.
+- `directional_blur {length, angle=0}` (*filter*, 1 input): a motion blur, like
+  Substance's *Directional Blur*: each pixel averages the input along a line `length`
+  tiles long, centred on it and turned `angle` turns from the horizontal (0 smears
+  left–right, 0.25 up–down, 0.125 along the diagonal). It wraps, so it tiles at **any**
+  angle, which `mapping` cannot: brushed metal, rain streaks, scratches in several
+  directions (one `directional_blur` of a `ridged` noise per direction). The samples
+  are about a pixel apart, so a sub-pixel `length` still softens; `length` caps at one
+  tile, and 0 passes the input through. It reads one bilinear sample per pixel of
+  streak up to 64, and about `2√(length × longer side)` past that (two passes): 90
+  for a one-tile streak at 2048², more above it. An estimate, not a measurement:
+  roughly 10 s of one core for that streak at 2048², split across cores by rows.
+- `directional_warp {strength, angle=0}` (*vector*, 2 inputs): pushes input 1 along
+  `angle` (turns: 0 right, 0.25 down) by `strength × red` of input 2, in tiles, like
+  Substance's *Directional Warp*: black moves nothing, white the full `strength`, and
+  a negative strength pushes the other way (capped at ±16 tiles). The one-direction,
+  grayscale counterpart of `warp`; wraps, so it tiles at any angle. Two reads a pixel.
 - `distance {radius}` (*filter*, 1 input): mask → bevel. The input's red above 0.5 is
   inside, and each inside pixel reads its distance to the mask's edge divided by
   `radius`, clamped to 1; outside reads 0. It rounds **any** mask — a Voronoi cell, a
@@ -295,6 +312,44 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   crack rims. A pixel the line only partly covers reads the share it covers, so a
   line thinner than a pixel at a low `resolution` fades rather than vanishing, and
   the map's mean holds across resolutions. A mask with no edge reads black.
+- `flood_bbox {output="size"|"center_x"|"center_y"}` (*filter*, 1 input:
+  `flood_fill`'s): one flat grey per island from its bounding box, like Substance's
+  *Flood Fill to BBox Size / Position*: `size` is the box's longer side in tiles,
+  `center_x` / `center_y` where its centre sits, in `[0, 1)`; 0 off the islands. To
+  select, scale or offset per piece. A box across the tile's edge is one box, its
+  centre wrapped into the tile; on an axis an island loops round (a band across the
+  tile) its size is 1 and its centre 0.5.
+- `flood_fill {threshold=0.5}` (*filter*, 1 input): mask → its islands, like
+  Substance's *Flood Fill*: the pixels whose red is above `threshold` (NaN is off),
+  joined through their 8 neighbours and wrapping both axes, so a stone across the
+  tile's edge or corner is one island (a checkerboard is one island too: its squares
+  touch at the corners). Its output is what the `flood_*` readers take: alpha 1 on an
+  island and 0 off it, which they relabel, so it survives any op that keeps alpha;
+  RGB is a colour per island that only the preview reads (`Texture.Preview` shows
+  each island tinted, the gaps black). A reader fed any other image reads its alpha
+  the same way, so an opaque image is one island, the whole tile. Each `flood_*`
+  node labels in one serial pass, about half a second of one core at 2048².
+- `flood_gradient {angle=0, angle_jitter=0, seed=0}` (*filter*, 1 input:
+  `flood_fill`'s): a 0→1 ramp across each island's bounding box, like Substance's
+  *Flood Fill to Gradient*: along `angle` (turns; 0 runs left to right, 0.25 top to
+  bottom), turned per island by up to ±`angle_jitter` turns; 0 off the islands.
+  Tilted stones, slanted planks; a box across the tile's edge ramps as one. Each
+  island's tilt is drawn like `flood_random`'s grey, so with `angle_jitter` above 0 a
+  rolled mask or another resolution reshuffles the tilts; at 0 the ramps move with
+  the mask. An island that loops round the tile on an axis (a band across it) ramps
+  from the tile's edge and jumps back at the wrap: a ramp along a loop cannot tile.
+- `flood_random {seed=0}` (*filter*, 1 input: `flood_fill`'s): one flat random grey
+  per island, uniform in `[0, 1)`, 0 off the islands, like Substance's *Flood Fill to
+  Random Grayscale*: per-stone colour (through a `color_ramp`), height or roughness.
+  An island's grey comes from the seed and its identity: the cell of a 1/128-tile
+  grid its centroid sits in, and its rank, in scan order, among the islands sharing
+  that cell (densely packed specks, a ring and the stone at its centre, bands that
+  loop the tile both ways), never from its number among all the islands. So every
+  island draws its own grey, and adding an island in another cell leaves the others'
+  greys alone. Moving the mask moves the centroids, so it reshuffles the greys, as in
+  Substance. Across resolutions most islands keep their grey (about 80% of Voronoi
+  stones from 128² to 1024²): one whose centroid sits near a grid line can land in
+  the next cell and draw another.
 - `gamma {gamma}` (*color*, 1 input).
 - `gradient {kind="linear"|"linear_tiling"|"radial"}` (*generator*).
 - `highpass {radius}` (*filter*, 1 input): `c − blur(c) + 0.5` per channel with a
@@ -320,7 +375,11 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
 - `map_range {from_min, from_max, to_min, to_max}` (*math*, 1 input).
 - `mapping {scale=[1,1], rotation=0, translation=[0,0], tiling=true}` (*vector*, 1
   input): bilinear, wrapped resample; `rotation` in turns; each transform left out is
-  the identity, so `mapping {rotation = 0.25}` only turns.
+  the identity, so `mapping {rotation = 0.25}` only turns. With `tiling` the rotation
+  snaps to a quarter turn (*Tiling*), so a stretched noise only ever lines up with the
+  axes: `rotation = 0.125` on a `scale = {1, 12}` stretch gives vertical lines, not
+  diagonal ones. For streaks at any angle, `directional_blur` a noise (or
+  `directional_warp` it).
 - `math {func, value=0.5}` (*math*, 1 or 2 inputs) with `func` ∈
   `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt`: the right-hand side is
   `value`, or with a second input wired, that input's matching channel per pixel
@@ -357,6 +416,17 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   `c + intensity × (c − blur(c))` with a Gaussian of `radius` (a tile fraction, about
   two pixels at 512²): crisps an `image` input or a blurred chain. Unclamped, so a
   hard edge overshoots until the bake clamps it.
+- `slope_blur {intensity, samples=8, mode="blur"|"min"|"max"}` (*filter*, 2 inputs:
+  image, slope): smears input 1 down the slopes of input 2's red, like Substance's
+  *Slope Blur*: each pixel reads itself and `samples` points (1–64) beyond it along
+  `intensity ×` the slope's gradient (height per tile, so a reach in tiles), uphill of
+  it, and keeps their mean (`blur`), darkest (`min`) or brightest (`max`). The
+  gradient is taken over 1/64 of a tile, so a hard edge (a `shape` with `softness =
+  0`) reads as a slope of 64 over a band 1/64 tile wide at any resolution. Flat ground
+  is left as it is; a negative intensity smears up the slopes. Erosion, chipped paint edges, grime
+  running off a shape: a noise through `slope_blur` on a `shape`'s height runs down its
+  sides. The reach caps at one tile. `samples + 5` reads a pixel: an estimate of
+  about 1–2 s of one core at 2048² with 8 samples.
 - `tile {count, jitter=0, rotation_jitter=0, scale_jitter=0, value_jitter=0,
   probability=1, output="stamp"|"random"|"index", blend="max"|"add"|"over", seed=0}`
   (*vector*, 1–3 inputs: the stamp, then an optional mask, then an optional size
@@ -528,6 +598,9 @@ the one generator that does **not** tile — it has a hard edge at the wrap; use
 a mask, or use `linear_tiling` (0→1→0) for a seamless ramp. `gradient radial` and
 `wave rings` meet the edge mirror-symmetrically: continuous across the seam, and so
 does `shape` (a shape larger than the tile is clipped at the edge, symmetrically).
+`flood_gradient` has a seam on one kind of island: one that loops round the tile on
+an axis (a band across it) has no edge there, so its ramp runs from the tile's edge
+and jumps back at the wrap; every other island ramps across the edge as one.
 `image` tiles exactly as well as its file does.
 
 ### Units
@@ -549,9 +622,14 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
 - `distance.radius` is in tiles: the distance from the edge that reads 1.
 - `cavity.radius` is a tile fraction like `blur.radius`; `curvature.radius` is a
   distance in tiles, sampled bilinearly (so sub-pixel radii stay smooth).
+- `directional_blur.length` and `directional_warp.strength` are in tiles; `angle`
+  on both is in turns, like `mapping.rotation`, but never snaps: they tile at any
+  angle. `slope_blur`'s reach is `intensity ×` the slope in height per tile, in tiles.
 - `ambient_occlusion.radius` and `.depth` are in tiles; `edge_detect.width` is the
   line's whole width in tiles; `highpass.radius` and `sharpen.radius` are tile
   fractions like `blur.radius`.
+- `flood_gradient.angle` and `.angle_jitter` are in turns; `flood_bbox` writes its
+  size and centre in tiles.
 - `white_noise` is the exception: its grain is one pixel by definition (on each axis).
 
 ### Non-square bakes — `size`

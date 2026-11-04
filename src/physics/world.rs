@@ -33,6 +33,7 @@ use super::live::body_type;
 use super::recover::Recovery;
 use super::shape::build::{gravity_scale, EntityBodyState};
 use super::watch::{Owners, Tracked};
+pub(super) use super::writes::{body_to_write, collider_to_write, state_differs};
 use super::PhysicsEvents;
 use crate::scene::Scene;
 
@@ -118,26 +119,32 @@ impl PhysicsWorld {
         world
     }
 
-    /// Push one entity's snapshot into its rapier body for this tick.
+    /// Push one entity's snapshot into its rapier body for this tick. A body
+    /// that already holds the snapshot is not borrowed at all ([`body_to_write`]).
     pub(super) fn apply_body_state(&mut self, handle: RigidBodyHandle, snap: &EntityBodyState) {
-        let body = &mut self.bodies[handle];
         let class = body_type(snap);
+        let pose = to_pose(snap.pos, snap.rot);
+        let scale = gravity_scale(snap.use_gravity);
+        let differs = |b: &RigidBody| state_differs(b, snap, class, pose, scale);
+        let Some(body) = body_to_write(&mut self.bodies, handle, differs) else {
+            return;
+        };
         if body.body_type() != class {
             // A Rigidbody switched class mid-play (`SetKinematic`, a ragdoll
             // handoff, #466): the body changes in place at the entity's current
             // pose, so its colliders, joints and contacts survive.
             body.set_body_type(class, true);
-            body.set_position(to_pose(snap.pos, snap.rot), true);
+            body.set_position(pose, true);
         }
-        // Re-apply the CCD mode on every sync of the body so `Physics.SetCollisionDetection`
-        // toggled mid-play takes effect (mirrors the `gravity_scale` re-apply).
+        // Write the CCD mode whenever it differs, so `Physics.SetCollisionDetection`
+        // toggled mid-play takes effect (mirrors the `gravity_scale` write).
         body.enable_ccd(snap.ccd_enabled);
         if snap.kinematic {
             // A pure mover (Unity's kinematic Rigidbody): it goes exactly where
             // its Transform says, through anything in the way.
-            body.set_next_kinematic_position(to_pose(snap.pos, snap.rot));
+            body.set_next_kinematic_position(pose);
         } else if snap.is_static {
-            body.set_position(to_pose(snap.pos, snap.rot), true);
+            body.set_position(pose, true);
         } else {
             // Dynamic: trust rapier for pose, but let scripts inject linear and
             // angular velocity (SetVelocity / SetAngularVelocity / AddForce mutate
@@ -145,7 +152,6 @@ impl PhysicsWorld {
             // it at runtime takes effect.
             body.set_linvel(snap.vel, true);
             body.set_angvel(snap.angular_velocity, true);
-            let scale = gravity_scale(snap.use_gravity);
             if body.gravity_scale() != scale {
                 // A full wake: rapier's setter only clears the sleep flag, so a
                 // body that slept while weightless would doze straight off again.

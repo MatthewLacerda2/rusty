@@ -59,7 +59,8 @@ pub fn reimport_model_except(
 
 /// Re-import every mesh in `scene` whose model file `stale` names: the engine
 /// re-wrote it (#1242), and Unity updates every instance of a re-imported model.
-/// A skinned one takes the new rig too, its bones re-bound to it by name (#1265). Each
+/// A skinned one takes the new rig too, its bones re-bound to it by name (#1265), and
+/// a model borrowing clips from a re-written one (#1747) re-imports with it. Each
 /// distinct file is matched against `stale` once. The entities in `skip` are left
 /// out (a linked model instance's parts, which its rebuild re-imports, #1637).
 /// Returns how many were rebuilt.
@@ -71,7 +72,7 @@ pub fn reimport_written(scene: &mut Scene, stale: &Stale, skip: &BTreeSet<u32>) 
     let rebuilt = reimport_where(scene, Rig::Rebuild, skip, |file| {
         *named
             .entry(file.to_string())
-            .or_insert_with_key(|file| stale.matches(file))
+            .or_insert_with_key(|file| asset::humanoid::clips_follow(file, stale))
     });
     rebuilt.len()
 }

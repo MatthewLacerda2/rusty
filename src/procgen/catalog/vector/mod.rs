@@ -5,6 +5,7 @@
 // sorted: one module per vector op; none reads another
 pub mod bump_to_normal;
 pub mod combine_rgb;
+pub mod directional_warp;
 pub mod mapping;
 pub mod normal_blend;
 pub mod separate_rgb;

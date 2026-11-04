@@ -11,8 +11,9 @@ its rows.
 
 - **Its file** — `catalog/<family>/<op>.rs`, the family being its menu category:
   `generators/` (no inputs), `color/`, `vector/`, `math/`, `filter/`. `filter/` is
-  clustered by what an op reads (`blurs/`, `mask/`, `relief/`, below), so a filter's
-  file is `catalog/filter/<cluster>/<op>.rs`. It holds:
+  clustered by what an op reads (`blurs/`, `flood/`, `mask/`, `relief/`, below), so a filter's
+  file is `catalog/filter/<cluster>/<op>.rs`, less a prefix every op of the cluster
+  shares (`flood/fill.rs` holds `flood_fill`: the `prefix-group` rule). It holds:
   - the **params struct** (serde `Serialize`/`Deserialize`; the recipe's fields,
     with `#[serde(default = "…")]` for an optional one and a private default fn in
     the same file). An op without params is a unit struct (`pub struct Invert;`).
@@ -75,17 +76,17 @@ and fails past 12; an allow for a folder under the cap is itself refused
 
 - `color/` (10 with `dummy`): `histogram_scan`, `levels` (#1743, landed): tone
   adjustments beside `auto_levels` and `gamma`.
-- `filter/blurs/`: `directional_blur`, `slope_blur` (#1739); `highpass`, `sharpen`
+- `filter/blurs/`: `directional_blur`, `slope_blur` (#1739, landed); `highpass`, `sharpen`
   (#1743, landed): a kernel's smear, or the difference from one.
-- `filter/flood/` (new, #1741): `flood_fill`, `flood_random`, `flood_gradient`,
-  `flood_bbox`; that branch makes the folder and its `pub mod flood;` line.
+- `filter/flood/` (#1741, landed): `flood_fill`, `flood_random`, `flood_gradient`,
+  `flood_bbox` (as `fill.rs`, …), their math in `ops/flood.rs` (the islands of a mask, on the torus).
 - `filter/mask/`: `edge_detect` (#1743, landed), beside `distance`.
 - `filter/relief/`: `ambient_occlusion` (#1743, landed), beside `cavity` and
   `curvature`. A filter's tests share `filter/test_probe.rs` (run one op on one
   image, roll it to show the op wraps).
 - `generators/` (10): the anisotropic noise (#1740) makes 11, under the cap; the
   rest of #1740 is params on existing generators.
-- `vector/` (7): `directional_warp` (#1739), beside `warp`; #1742 is params and
+- `vector/` (8): `directional_warp` (#1739, landed), beside `warp`; #1742 is params and
   inputs on `tile`.
 
 A two-input op with an optional mask and an output mode is `dummy`'s shape:

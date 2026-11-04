@@ -119,13 +119,16 @@ impl Image {
 
     /// Sample at a continuous domain point `(u, v)` (1.0 = one tile) with bilinear
     /// filtering between the four nearest pixel centers, wrapping at the edges — the
-    /// resampler a domain transform uses so it is neither blocky nor seamed.
+    /// resampler a domain transform uses so it is neither blocky nor seamed. Any
+    /// coordinate is safe: a huge one folds into the tile, a non-finite one reads 0.
     pub fn sample_bilinear_wrapped(&self, u: f32, v: f32) -> Rgba {
         let (w, h) = (self.size.width as f32, self.size.height as f32);
-        let (x, y) = (u * w - 0.5, v * h - 0.5);
+        let finite = |a: f32| if a.is_finite() { a } else { 0.0 };
+        let (x, y) = (finite(u * w - 0.5), finite(v * h - 0.5));
         let (x0, y0) = (x.floor(), y.floor());
         let (tx, ty) = (x - x0, y - y0);
-        let (xi, yi) = (x0 as i64, y0 as i64);
+        // Folded while still a float (exact for a whole number), so `+ 1` can't overflow.
+        let (xi, yi) = (x0.rem_euclid(w) as i64, y0.rem_euclid(h) as i64);
         let (p00, p10) = (self.get_wrapped(xi, yi), self.get_wrapped(xi + 1, yi));
         let (p01, p11) = (
             self.get_wrapped(xi, yi + 1),
@@ -240,6 +243,21 @@ mod tests {
         // ...and so does the wrap between (1,0) and (0,0).
         assert_eq!(img.sample_bilinear_wrapped(1.0, 0.25)[0], 0.5);
         assert_eq!(img.sample_bilinear_wrapped(0.0, 0.25)[0], 0.5);
+    }
+
+    #[test]
+    fn bilinear_sample_takes_any_coordinate() {
+        let img = Image::fill_uv(4, |u, v| [u, v, 0.0, 1.0]);
+        for c in [f32::NAN, f32::INFINITY, -f32::INFINITY, 1e30, -3e38] {
+            assert!(img
+                .sample_bilinear_wrapped(c, c)
+                .iter()
+                .all(|x| x.is_finite()));
+        }
+        assert_eq!(
+            img.sample_bilinear_wrapped(-1.875, 3.125),
+            img.get_wrapped(0, 0)
+        );
     }
 
     #[test]

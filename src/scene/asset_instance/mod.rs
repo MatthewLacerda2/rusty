@@ -202,6 +202,12 @@ fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, 
     )
 }
 
+mod humanoid;
+
+pub use humanoid::set_humanoid;
+
+#[cfg(test)]
+mod humanoid_tests;
 #[cfg(test)]
 mod multi_material_tests;
 #[cfg(test)]

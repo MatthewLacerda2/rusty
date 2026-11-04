@@ -21,10 +21,22 @@ fn past_the_budget_the_least_recently_used_goes() {
     let geometry = Geometry::of(&ImportSettings::default());
     // A budget of one besides the largest: two entries fit.
     for key in ["a", "b"] {
-        cache.insert(key.into(), geometry, Vec::new(), asset.clone(), size);
+        cache.insert(
+            key.into(),
+            geometry.clone(),
+            Vec::new(),
+            asset.clone(),
+            size,
+        );
     }
-    assert!(cache.hit("a", geometry).is_some(), "a is used last");
-    cache.insert("c".into(), geometry, Vec::new(), asset.clone(), size);
+    assert!(cache.hit("a", &geometry).is_some(), "a is used last");
+    cache.insert(
+        "c".into(),
+        geometry.clone(),
+        Vec::new(),
+        asset.clone(),
+        size,
+    );
     let held: Vec<_> = cache.by_path.keys().cloned().collect();
     assert_eq!(held, ["a", "c"], "b, least recently used, went");
     assert_eq!(cache.bytes, 2 * size);
@@ -39,12 +51,18 @@ fn a_lone_entry_over_the_budget_stays_beside_smaller_ones() {
     let small_size = approx_bytes(&small);
     assert!(small_size < size);
     let budget = small_size;
-    cache.insert("big".into(), geometry, Vec::new(), asset, budget);
+    cache.insert("big".into(), geometry.clone(), Vec::new(), asset, budget);
     assert!(size > budget, "big is over the budget on its own");
     for key in ["s1", "s2", "s1", "s2"] {
-        cache.insert(key.into(), geometry, Vec::new(), small.clone(), budget);
+        cache.insert(
+            key.into(),
+            geometry.clone(),
+            Vec::new(),
+            small.clone(),
+            budget,
+        );
         assert!(
-            cache.hit("big", geometry).is_some(),
+            cache.hit("big", &geometry).is_some(),
             "{key} did not evict big"
         );
     }

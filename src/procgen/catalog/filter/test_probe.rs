@@ -51,3 +51,13 @@ pub fn assert_close(a: &Image, b: &Image, tol: f32, what: &str) {
 pub fn mean(img: &Image, c: usize) -> f32 {
     img.pixels().iter().map(|p: &Rgba| p[c]).sum::<f32>() / img.pixels().len() as f32
 }
+
+/// A ridged noise at `n²`, 8 periods a tile, two octaves: thin veins running every
+/// way, which a directional op lines up (#1739).
+pub fn ridged(n: u32) -> Image {
+    let op: OpKind = serde_json::from_str(
+        r#"{ "op": "noise", "kind": "ridged", "scale": 8, "octaves": 2, "seed": 3 }"#,
+    )
+    .expect("noise parses");
+    eval_node(&op, &[], n.into(), 0, &Sources::new())
+}
