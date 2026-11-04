@@ -10,7 +10,9 @@ use crate::render::draw::materials::material_texture_paths;
 use crate::render::draw::uniforms::solid_instance;
 use crate::render::frustum::transform_aabb;
 use crate::render::gpu::pipelines::Facing;
-use crate::render::passes::shadows::{moves, slot_clip, CasterClip, ObjectCasting};
+use crate::render::passes::shadows::{
+    moves, shadow_runs, slot_clip, CasterClip, ObjectCasting, ShadowRun,
+};
 use crate::render::render_texture::is_render_texture;
 use crate::render::{InstanceData, MeshId, Renderer, SmallLimits};
 use crate::scene::Scene;
@@ -67,6 +69,10 @@ pub(crate) struct RenderObject {
     /// the proxy volume and the motion history.
     pub instance: InstanceData,
     pub slots: Vec<SlotDraw>,
+    /// Its slots' depth draws, adjacent slots that cast alike joined
+    /// (`passes::shadows::shadow_runs`): derived with the slots, so a shadow sweep
+    /// allocates nothing per caster.
+    pub shadow_runs: Vec<ShadowRun>,
 }
 
 impl RenderObject {
@@ -116,6 +122,7 @@ impl Renderer {
             reads_render_texture: false,
             instance: InstanceData::IDENTITY,
             slots: Vec::with_capacity(runs.len()),
+            shadow_runs: Vec::new(),
         };
         drop(mesh);
         for (slot, indices) in runs {
@@ -132,6 +139,7 @@ impl Renderer {
                 clip,
             });
         }
+        object.shadow_runs = shadow_runs(&object.slots);
         self.pose_object(scene, id, &mut object);
         Some(object)
     }

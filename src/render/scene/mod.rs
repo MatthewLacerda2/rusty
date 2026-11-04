@@ -58,7 +58,7 @@ use std::collections::BTreeMap;
 
 pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
-pub(crate) use object::RenderObject;
+pub(crate) use object::{RenderObject, SlotDraw};
 
 use crate::render::passes::shadows::{casting_key, StaticsKey, UnbakedCasters};
 use crate::render::{GpuMesh, Renderer};

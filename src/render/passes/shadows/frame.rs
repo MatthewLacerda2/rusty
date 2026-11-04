@@ -47,13 +47,14 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Shadow Encoder"),
             });
-        if self.retained.scene(scene.id()).is_none() {
-            self.extract_scene(scene); // swept with no frame prepared (a test)
-        }
         // Measured from the base camera, never the light (#1714); a capture culls
         // nothing.
         let small = self.small_object_cull(camera);
-        let objects = self.retained.scene(scene.id()).expect("extracted above");
+        // `prepare_frame`, which every caller runs first, extracted the scene.
+        let objects = self
+            .retained
+            .scene(scene.id())
+            .expect("prepare_frame extracts");
         let frame = CasterFrame {
             device: &self.device,
             queue: &self.queue,

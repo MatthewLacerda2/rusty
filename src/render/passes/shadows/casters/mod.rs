@@ -57,7 +57,8 @@ use buffer::{CasterData, CasterRecords, CasterUpload};
 use cull::Candidate;
 pub(crate) use cull::ShadowCulls;
 use glam::Mat4;
-use runs::{batch_casters, slot_runs};
+use runs::batch_casters;
+pub(crate) use runs::{shadow_runs, ShadowRun};
 pub(super) use sweep::Sweep;
 
 /// The facing a caster placed by `world` draws with: every triangle when it is
@@ -218,7 +219,7 @@ impl ShadowRenderer {
             let bone_base = (!small).then(|| push_palette(&mut joints, palette));
             let bone_base = bone_base.unwrap_or(0);
             let two_sided = object.cast == ShadowCasting::TwoSided;
-            for (indices, (clip, face)) in slot_runs(object) {
+            for (indices, (clip, face)) in &object.shadow_runs {
                 let mut caster = CasterData::new(world, bone_base);
                 if let Some(cut) = clip.and_then(|c| c.cutout) {
                     caster = caster.cutout(cut);

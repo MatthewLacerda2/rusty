@@ -31,6 +31,7 @@ use casters::{CasterBuffer, ShadowCulls};
 use clips::Clip;
 use glam::Mat4;
 
+pub(crate) use casters::{shadow_runs, ShadowRun};
 pub(crate) use clips::{moves, slot_clip, CasterClip};
 pub(crate) use setup::{depth_pipeline, lazy_depth_pipeline};
 #[cfg(test)]

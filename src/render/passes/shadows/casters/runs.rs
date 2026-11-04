@@ -7,19 +7,26 @@ use std::ops::Range;
 use super::super::clips::CasterClip;
 use super::{CasterBatch, CasterData, CasterKey};
 use crate::components::RenderFace;
-use crate::render::scene::RenderObject;
+use crate::render::scene::SlotDraw;
 
 /// How one material slot casts: its clip (`None` casts plainly) and its material's
 /// render face (#1615).
-pub(super) type SlotCast = (Option<CasterClip>, RenderFace);
+pub(crate) type SlotCast = (Option<CasterClip>, RenderFace);
 
-/// `object`'s slot draws ([`GpuMesh::runs`], kept on its retained slots), joined by
-/// how each slot casts.
+/// One depth draw of a caster: an index run and how it casts.
+pub(crate) type ShadowRun = (Range<u32>, SlotCast);
+
+/// An object's slot draws ([`GpuMesh::runs`], kept on its retained slots), joined by
+/// how each slot casts. Derived with the object and kept on it
+/// ([`RenderObject::shadow_runs`]), so a sweep allocates nothing per caster.
 ///
 /// [`GpuMesh::runs`]: crate::render::GpuMesh::runs
-pub(super) fn slot_runs(object: &RenderObject) -> Vec<(Range<u32>, SlotCast)> {
-    let runs = object.slots.iter();
-    join_alike(runs.map(|s| (s.key.indices.range(), (s.clip, s.face))))
+/// [`RenderObject::shadow_runs`]: crate::render::scene::RenderObject::shadow_runs
+pub(crate) fn shadow_runs(slots: &[SlotDraw]) -> Vec<ShadowRun> {
+    let casts = slots
+        .iter()
+        .map(|s| (s.key.indices.range(), (s.clip, s.face)));
+    join_alike(casts)
 }
 
 /// A mesh's runs paired with how each casts its shadow (its clip, and its render
