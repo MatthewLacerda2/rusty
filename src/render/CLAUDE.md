@@ -14,6 +14,25 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
 - The module root opts out of the clock ban because GPU timing is wall-clock (#757);
   the opt-out stays at the root, never in a file below it.
 
+## The retained scene
+- **A camera's mesh solids come from `render::scene`, not a walk of the ECS** (#1706). The
+  extract (`Renderer::extract_scene`, once per frame in `prepare_frame`) keeps one
+  `RenderObject` per mesh entity per scene, updated from the change log
+  (`ecs::changes`): a move re-places the object, any other change re-derives it, and a
+  frame that changed nothing walks no object. A camera only culls the objects and
+  adds what it decides itself. Batch keys name a mesh by its interned `MeshHandle`;
+  `Renderer::gpu_mesh_of` resolves one.
+- **A new per-object input is kept or read per camera, on purpose.** Kept: derive it
+  in `extract_object` or `pose_object`, and make sure whatever changes it re-derives
+  the object (a change channel, a scene value's revision read in `scene/inputs.rs`
+  (`scene::revision`), or
+  `Retained::touch` at the renderer-side write, for an input every key reads). Per
+  camera: read it in `scene/draw.rs`. `scene/inputs.rs` lists every input by which
+  way it is held. Add a case to `scene/equivalence_tests.rs`, which holds that an
+  incrementally kept scene equals one built from scratch.
+- The shadow walks (`passes::shadows`), the decals and the material table still read
+  the ECS themselves: part 2 of #1706 moves them onto the objects.
+
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no
   `#include`. Every shader composes through `shadergen::compose`, the one GPU-free

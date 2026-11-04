@@ -70,7 +70,7 @@ path + active state are saved with the entity.
 | `Animator.GetApplyRootMotion` | `(id)` | Whether root motion is applied, or `nil` when the entity has no animator. |
 | `Animator.SetRootBone` | `(id, bone)` | Name the bone root motion is read from (usually the hips); `""` (the default) is the skeleton's first root joint. A name the skeleton lacks measures nothing and warns once in the console (an agent then moves itself). Saved. |
 | `Animator.GetRootBone` | `(id)` | The root bone's name as set (`""`: the first root joint), or `nil` without an animator. |
-| `Animator.GetRootMotion` | `(id)` | The last fixed step's root motion: `dx, dy, dz, yaw` — the world-space displacement in metres and the turn about the entity's up axis in degrees (counter-clockwise seen from above), Unity's `deltaPosition` / `deltaRotation`. Measured whether or not it is applied, so a script can move the entity itself; `0, 0, 0, 0` while stopped, paused or inactive, and `nil` without an animator. |
+| `Animator.GetRootMotion` | `(id)` | The last fixed step's root motion: `dx, dy, dz, yaw` — the world-space displacement in metres and the turn about the model's up axis in degrees (counter-clockwise seen from above), Unity's `deltaPosition` / `deltaRotation`. Measured whether or not it is applied, so a script can move the entity itself; `0, 0, 0, 0` while stopped, paused or inactive, and `nil` without an animator. |
 
 ### Blend trees (#457)
 
@@ -267,8 +267,13 @@ and, when the skeleton's first root joint isn't the one that travels, name the
 bone with `SetRootBone`.
 
 Each fixed step the root bone's **horizontal** displacement and its **yaw** (the
-turn about the entity's up axis), measured in the skinned entity's space, are
-the step's root motion:
+turn about the up axis), measured in the model's own Y-up space, are the step's
+root motion. A Z-up Blender export (an `Armature` node turned and scaled 0.01
+above the mesh) is measured the same way, so it travels what its clip does, in
+metres, and turns about the model's up as the entity shows it (#1822). That holds
+for the whole model, whose `Armature` entity carries the turn and scale: a mesh
+spawned alone by its `path::sub_object` reference has no such parent, so it stands
+as the file's mesh does, lying down at 100×, and travels to match. Then:
 - a looping clip's wrap doesn't snap back: the travel is split at the seam and
   the pieces chained, so a looped walk keeps walking; a non-looping clip stops
   at its end;

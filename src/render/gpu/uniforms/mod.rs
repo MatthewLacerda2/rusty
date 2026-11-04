@@ -172,7 +172,7 @@ pub(crate) struct LightingUniform {
 /// stay in uniform control flow. The SH
 /// branch samples nothing, so it may vary per instance.
 #[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct InstanceData {
     pub model_matrix: [f32; 16],
     // Last frame's world matrix (#1435), read only when `motion == 1`.

@@ -45,7 +45,7 @@ impl Renderer {
     ) -> Vec<ProbeResource> {
         let mut resources = Vec::new();
         // Light probes: a marker per probe, tinted by its baked SH irradiance.
-        for probe in &scene.probes.probes {
+        for probe in scene.probes.probes() {
             let verts = probe_marker_verts(probe.position, MARKER_HALF);
             let tint = sh_marker_tint(&probe.sh);
             resources.push(self.build_probe_resource(draws, &verts, tint));

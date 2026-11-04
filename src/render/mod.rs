@@ -15,6 +15,7 @@ pub(crate) mod motion;
 mod preview;
 pub mod readback;
 pub(crate) mod render_texture;
+pub(crate) mod scene;
 mod setup;
 mod stats;
 #[cfg(test)]
@@ -38,8 +39,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub use camera::{build_camera_stack, texture_cameras, ScreenStack, TextureCamera};
-pub(crate) use frustum::SmallObjectCull;
 pub use frustum::{Frustum, SkinBounds};
+pub(crate) use frustum::{SmallLimits, SmallObjectCull};
 pub use gpu::mesh::MeshId;
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe::bake::{project_cubemap, project_light_probe, DEFAULT_BAKE_RESOLUTION};
@@ -269,6 +270,9 @@ pub struct Renderer {
     /// How the frame renders while a static cubemap is captured (#243, #285, #1584):
     /// the default outside a capture. See [`ibl::cubemap_capture::CaptureMode`].
     capture: ibl::cubemap_capture::CaptureMode,
+
+    /// The retained render scene (#1706): mesh handles and each drawn scene's objects.
+    pub(crate) retained: scene::Retained,
 
     /// What the last `render` call submitted (#433) — read by the dev layer's stats.
     pub frame_counters: RenderCounters,

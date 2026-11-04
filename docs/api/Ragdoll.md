@@ -18,8 +18,9 @@ puts a `Rigidbody` on every bone of `id`'s skinned mesh that has a
   knee bends back up to 130° and not forward, an elbow forward up to 140°), swing 1
   is about the bend direction (a spine bending sideways, an arm raised) and swing 2
   about the bone itself. A bone the preset doesn't name gets a ±30° ball joint, so
-  any rig ragdolls. The character must face **+Z** in its own space (the glTF
-  convention) for "forward" to be right.
+  any rig ragdolls. The character must face **+Z** in model space (the glTF
+  convention) for "forward" to be right; an `Armature` turned above the mesh (a
+  Z-up Blender export) is undone first (#1822).
 - **Mass** (`Ragdoll.Build(id, { mass = 70 })`, kilograms, the default) is split
   over the bodies by hitbox volume, so the chest outweighs a hand.
 - Joined bones never collide with each other (`enable_collision` off); the other

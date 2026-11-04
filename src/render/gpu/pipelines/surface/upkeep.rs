@@ -23,22 +23,26 @@ impl SurfacePipelines {
 impl SurfaceShaders {
     /// Mark every slot stale whose module or params file, in any of the dirs it
     /// resolves against, was written since the last look (re-baked, appeared, edited,
-    /// vanished).
-    pub(crate) fn refresh(&mut self) {
+    /// vanished). Returns whether any slot went stale: a retained draw key naming its
+    /// pipeline must be re-built, which is what re-builds the slot (#1706).
+    pub(crate) fn refresh(&mut self) -> bool {
         let (seen, paths) = written_since(self.seen);
         self.seen = seen;
         if paths.is_empty() {
-            return;
+            return false;
         }
         let written = Stale::new(paths);
         let dirs = &self.dirs;
+        let mut any = false;
         for slot in self.slots.iter_mut().filter(|s| !s.stale) {
             slot.stale = dirs.iter().any(|dir| {
                 let wgsl = native(dir).join(format!("{}.wgsl", slot.name));
                 written.matches(&wgsl.to_string_lossy())
                     || written.matches(&sidecar_path(&wgsl).to_string_lossy())
             });
+            any |= slot.stale;
         }
+        any
     }
 
     /// From now on build each slot's facing pipelines with it, and build those of

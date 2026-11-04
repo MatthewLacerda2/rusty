@@ -89,7 +89,7 @@ fn a_probe_lights_a_puff_by_the_sky_radiance_not_its_irradiance() {
     // A uniform radiance L projects onto the DC band alone: c0 = L · Y00 · 4π.
     let l = 0.5;
     let c0 = l * 0.282_094_8 * 4.0 * std::f32::consts::PI;
-    scene.probes.probes[probe].sh.coeffs[0] = [c0; 3];
+    scene.probes.probes_mut()[probe].sh.coeffs[0] = [c0; 3];
     let mut emitter = ParticleEmitterComponent::default();
     emitter.render.lit = true;
     let light = emitter_light(&scene, &emitter, Vec3::ZERO);

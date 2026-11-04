@@ -72,7 +72,7 @@ fn a_probe_lit_floor_matches_a_flat_ambient_one_of_the_same_sky() {
     };
     let mut probed = floor(false);
     let probe = probed.probes.add_probe(Vec3::new(0.0, 1.0, 0.0));
-    probed.probes.probes[probe].sh = uniform_sky_sh(SKY);
+    probed.probes.probes_mut()[probe].sh = uniform_sky_sh(SKY);
     let lit = centre_level(&probed, "probe").unwrap();
     eprintln!("[probe ambient] flat={flat:.2} probe={lit:.2}");
     assert!(flat > 20.0, "the flat ambient lights the floor: {flat:.2}");
