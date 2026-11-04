@@ -77,22 +77,25 @@ fn a_far_probe_is_left_out_of_the_blend() {
 }
 
 /// Re-placing keeps the manual probes, in order, and drops the placed ones; a
-/// grid whose probes were all manual stays.
+/// manual grid stays through any number of bakes (placed probes after it never
+/// shift its indices), and goes once one of its own probes is placed.
 #[test]
 fn replace_placed_keeps_manual_probes() {
     let mut vol = ProbeVolume::new();
     vol.fill_grid(Vec3::ZERO, Vec3::X, 1.0);
     (0..2).for_each(|i| vol.set_manual(i, true));
     vol.replace_placed([Vec3::Y]);
-    assert!(vol.grid.is_some(), "an all-manual grid stays");
     vol.replace_placed([Vec3::Z, Vec3::Y * 2.0]);
     let at: Vec<Vec3> = vol.probes.iter().map(|p| p.position).collect();
     assert_eq!(at, [Vec3::ZERO, Vec3::X, Vec3::Z, Vec3::Y * 2.0]);
+    assert!(vol.grid.is_some(), "a manual grid stays on the second bake");
+    assert!(!vol.probes[2].manual);
+    vol.set_manual(1, false);
+    vol.replace_placed([]);
     assert!(
         vol.grid.is_none(),
-        "a placed probe was dropped, so the grid goes"
+        "a grid probe was placed, so the grid goes"
     );
-    assert!(!vol.probes[2].manual);
 }
 
 /// The flag saves only when set, and a saved probe without it loads as placed.
@@ -111,4 +114,19 @@ fn the_manual_flag_round_trips_and_defaults_to_placed() {
         !reflection.manual,
         "an old reflection probe loads as placed"
     );
+}
+
+/// A probe moved after the set was sampled is found where it now is: an edit
+/// through the volume drops the nearest-probe index (#1737).
+#[test]
+fn a_moved_probe_is_sampled_where_it_now_is() {
+    let mut vol = ProbeVolume::new();
+    for i in 0..64 {
+        vol.add_probe(Vec3::new((i % 8) as f32, 0.0, (i / 8) as f32) * 4.0);
+    }
+    vol.probes[5].sh.coeffs[0] = [1.0; 3];
+    let at = Vec3::new(100.0, 0.0, 100.0);
+    assert_ne!(vol.sample(at).unwrap().coeffs[0], [1.0; 3]);
+    vol.move_probe(5, at);
+    assert_eq!(vol.sample(at).unwrap().coeffs[0], [1.0; 3]);
 }

@@ -17,17 +17,18 @@ Probes are addressed by **index** (0-based, in placement order), not by entity i
 (indices shift), so re-`FillGrid` after manual edits if you need trilinear sampling.
 
 A probe is **manual** or **placed** (#1737). `Add` and `FillGrid` make manual probes;
-`Lighting.Bake()` / Generate Lighting make placed ones. Every bake replaces the placed
-probes and keeps the manual ones where they are, placing no probe within half a step
-of one. `SetManual` turns either into the other; a saved probe without the flag
-loads as placed. `Clear` removes both kinds.
+`Lighting.Bake()` / Generate Lighting make placed ones. `Move` is a hand edit, so it
+makes the probe manual too: the next bake would otherwise put it back. Every bake
+replaces the placed probes and keeps the manual ones where they are, placing no probe
+within half a step of one. `SetManual` turns either into the other; a saved probe
+without the flag loads as placed. `Clear` removes both kinds.
 
 | Function | Signature | Returns |
 |---|---|---|
 | `Probe.Add` | `(x, y, z)` | the new probe's `index` (manual) |
 | `Probe.SetManual` | `(index, manual)` | — (manual probes survive a bake's re-placement) |
 | `Probe.IsManual` | `(index)` | `true` if the probe is manual (`false` out of range) |
-| `Probe.Move` | `(index, x, y, z)` | — |
+| `Probe.Move` | `(index, x, y, z)` | — (the probe becomes manual) |
 | `Probe.Remove` | `(index)` | — (drops the grid layout) |
 | `Probe.Clear` | `()` | — (removes every probe) |
 | `Probe.Count` | `()` | probe count |

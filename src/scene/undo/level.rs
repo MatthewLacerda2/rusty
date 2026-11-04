@@ -104,14 +104,15 @@ fn assign<T>(value: T, slot: &mut T) {
     *slot = value;
 }
 
-/// The probe set as placed: the grid and every position, not the baked SH.
+/// The probe set as placed: the grid, every position and whether it is manual
+/// (`Probe.SetManual` is an edit, #1737), not the baked SH.
 fn same_probes(a: &ProbeVolume, b: &ProbeVolume) -> bool {
     a.grid == b.grid
         && a.probes.len() == b.probes.len()
         && a.probes
             .iter()
             .zip(&b.probes)
-            .all(|(p, q)| eq_or_bytes(&p.position, &q.position))
+            .all(|(p, q)| eq_or_bytes(&p.position, &q.position) && p.manual == q.manual)
 }
 
 /// Put the probes back, keeping the live baked SH while the count is unchanged.

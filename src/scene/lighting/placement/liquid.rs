@@ -8,8 +8,9 @@
 //! inactive one, or a trigger), so nothing stands on it. A collider-less glass
 //! pane laid flat reads the same way; give a skylight a collider.
 //!
-//! Every floor cell under a liquid's surface is dropped from the plan, so the
-//! floor around the pool keeps its own probe and none captures from the water.
+//! The floor at the bottom of a liquid is dropped from the plan (the first one
+//! under its surface, when at least [`DEPTH`] down), so the floor around the pool
+//! keeps its own probe and none captures from the water. Floors further down stay.
 //!
 //! Pure data + math — deterministic, entity order.
 
@@ -21,6 +22,9 @@ use crate::scene::Scene;
 
 /// The most a liquid's surface may rise across its bounds, world units.
 const FLAT: f32 = 0.05;
+/// How far under a liquid's surface a floor must be to be its bottom, world units:
+/// shallower is a puddle or a decal over the floor, which an actor stands on.
+pub const DEPTH: f32 = 0.3;
 
 /// A liquid's surface: its XZ bounds and its height.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -63,24 +67,42 @@ pub fn liquids(scene: &Scene) -> Vec<Liquid> {
 }
 
 impl FloorGrid {
-    /// Drop every floor under one of `liquids`' surfaces (a cell's centre over
-    /// its bounds, its floor below the surface), the upper floors too.
+    /// Drop the floor under each of `liquids`' surfaces: in every cell whose centre
+    /// is over a liquid's bounds, the first floor below the surface (the pit's or
+    /// pool's bottom), when it is at least [`DEPTH`] below. A floor further down (the
+    /// ground storey under a rooftop pool) and one barely under (the deck under a
+    /// puddle or a grime decal) stay.
     pub fn drown(&mut self, liquids: &[Liquid]) {
-        let under = |centre: Vec2, floor: f32| {
-            (liquids.iter()).any(|l| {
-                floor < l.surface && centre.cmpge(l.min).all() && centre.cmple(l.max).all()
-            })
-        };
+        let mut drowned: Vec<(usize, f32)> = Vec::new();
         for i in 0..self.cells.len() {
             let centre = self.centre(i % self.width, i / self.width);
-            if self.cells[i].is_some_and(|c| under(centre, c.floor)) {
+            let over = |l: &&Liquid| centre.cmpge(l.min).all() && centre.cmple(l.max).all();
+            for l in liquids.iter().filter(over) {
+                let first = self
+                    .floors_of(i)
+                    .filter(|&f| f < l.surface)
+                    .reduce(f32::max);
+                if let Some(f) = first.filter(|&f| l.surface - f >= DEPTH) {
+                    drowned.push((i, f));
+                }
+            }
+        }
+        for &(i, f) in &drowned {
+            if self.cells[i].is_some_and(|c| c.floor == f) {
                 self.cells[i] = None;
             }
         }
-        let (width, origin, cell) = (self.width, self.origin, self.cell);
-        self.upper.retain(|&(i, floor)| {
-            let centre = origin + Vec2::new((i % width) as f32, (i / width) as f32) * cell;
-            !under(centre, floor)
+        drowned.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        self.upper.retain(|&(i, f)| {
+            let at = |d: &(usize, f32)| d.0.cmp(&i).then(d.1.total_cmp(&f));
+            drowned.binary_search_by(at).is_err()
         });
+    }
+
+    /// Every floor of cell `i`: its lowest, then its upper storeys.
+    fn floors_of(&self, i: usize) -> impl Iterator<Item = f32> + '_ {
+        let from = self.upper.partition_point(|u| u.0 < i);
+        let upper = self.upper[from..].iter().take_while(move |u| u.0 == i);
+        (self.cells[i].map(|c| c.floor).into_iter()).chain(upper.map(|u| u.1))
     }
 }

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use glam::Vec3;
 
 use crate::scene::lighting::reflection_probe::clamp_resolution;
-use crate::scene::{ReflectionProbe, Scene};
+use crate::scene::{ReflectionProbe, ReflectionProbeSet, Scene};
 
 /// The reflection probes a bake works on: copies taken at its start, each with the
 /// face size it bakes at (its own, or the scene's default then).
@@ -18,12 +18,18 @@ pub(super) struct ReflectionSnapshot {
 /// What a reflection probe's cube is baked from. A change to any of it, or to the
 /// count, makes the staged cubes stale; a change to anything else (its box, its
 /// intensity) does not, and survives the commit.
-type BakeInputs = (Vec3, u32, f32, f32, bool);
+/// Whether it is manual counts too: the bake re-places the placed ones (#1737).
+type BakeInputs = (Vec3, u32, f32, f32, bool, bool);
 
 impl ReflectionSnapshot {
     pub(super) fn take(scene: &Scene) -> Self {
         let default = scene.lighting_settings.reflections.resolution;
-        let probes = scene.reflection_probes.probes.iter();
+        Self::of(&scene.reflection_probes, default)
+    }
+
+    /// Copies of `set`'s probes, each baked at its own face size or `default`.
+    pub(super) fn of(set: &ReflectionProbeSet, default: u32) -> Self {
+        let probes = set.probes.iter();
         let probes = probes
             .map(|p| (p.clone(), clamp_resolution(p.resolution.unwrap_or(default))))
             .collect();
@@ -52,7 +58,14 @@ impl ReflectionSnapshot {
 }
 
 fn inputs((p, resolution): &(ReflectionProbe, u32)) -> BakeInputs {
-    (p.position, *resolution, p.near_clip, p.far_clip, p.shadows)
+    (
+        p.position,
+        *resolution,
+        p.near_clip,
+        p.far_clip,
+        p.shadows,
+        p.manual,
+    )
 }
 
 /// Cubemaps baked but not applied: each one at `<final>.baking`, moved over

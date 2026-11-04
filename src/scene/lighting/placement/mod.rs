@@ -119,6 +119,9 @@ mod tests;
 mod limits_tests;
 
 #[cfg(test)]
+#[path = "budget_tests.rs"]
+mod budget_tests;
+#[cfg(test)]
 #[path = "enclosure_tests.rs"]
 mod enclosure_tests;
 #[cfg(test)]

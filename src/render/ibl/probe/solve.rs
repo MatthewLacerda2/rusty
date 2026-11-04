@@ -48,13 +48,22 @@ impl BounceSolve {
     /// A solve of `scene`'s probes at `resolution` per face. With no probes it has
     /// already finished.
     pub fn new(scene: &Scene, resolution: u32) -> Self {
-        let positions: Vec<Vec3> = scene.probes.probes.iter().map(|p| p.position).collect();
+        Self::of(scene.probes.clone(), resolution)
+    }
+
+    /// A solve of `volume`'s probes, a set the scene does not hold yet: the probe
+    /// set a placement plans, applied once its bake finishes (#1737). Bake it with
+    /// [`step`](Self::step) and read the result with [`baked`](Self::baked);
+    /// [`changed`](Self::changed) and [`commit`](Self::commit) compare against
+    /// the scene's own set, so they are for a solve made by [`new`](Self::new).
+    pub fn of(volume: ProbeVolume, resolution: u32) -> Self {
+        let positions: Vec<Vec3> = volume.probes.iter().map(|p| p.position).collect();
         let report = positions.is_empty().then_some(BounceReport {
             bounces: 0,
             converged: true,
         });
         Self {
-            volume: scene.probes.clone(),
+            volume,
             pass: Vec::with_capacity(positions.len()),
             positions,
             resolution,
@@ -130,6 +139,11 @@ impl BounceSolve {
             probe.sh = sh;
         }
         Ok(())
+    }
+
+    /// The baked probe set, its SH the solve's field, once the solve has finished.
+    pub fn baked(&self) -> Option<&ProbeVolume> {
+        self.report.map(|_| &self.volume)
     }
 
     /// Where it is: the pass (from 1), the probes that pass has captured, and the

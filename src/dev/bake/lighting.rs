@@ -24,8 +24,9 @@
 //! `Reflection.Clear` still remove both kinds.
 //!
 //! It reads `navigation` only for the reachable floor plan (and, with nothing solid,
-//! the walkable extent), and `physics` only for the static colliders' triangles,
-//! both handed to placement as plain data.
+//! the walkable extent), `physics` only for the static colliders' triangles, and
+//! the lightmap gather for the static meshes' opaque triangles, all handed to
+//! placement as plain data.
 
 use super::progress::{stage_progress, BakeLog};
 use super::steps::LightingBake;
@@ -33,8 +34,10 @@ use glam::Vec3;
 
 use crate::navigation::NavigationGraph;
 use crate::physics::collider_world_triangles;
+use crate::scene::lighting::lightmap::{BakeMesh, BakeScene};
 use crate::scene::lighting::placement::{self, ReflectionPlacement, Site, Solid};
-use crate::scene::Scene;
+use crate::scene::lighting::probe::ProbeVolume;
+use crate::scene::{ReflectionProbeSet, Scene};
 
 /// Tunables for the one-button bake. Defaults give a sensible mid-size-level layout;
 /// the script verb exposes them as optional arguments.
@@ -107,24 +110,57 @@ pub(super) fn run_to_end(
     }
 }
 
-/// Auto-place (per the manual-vs-auto rule) and return the bake of both probe sets
-/// as a job to step ([`LightingBake::step`]): the editor takes one step a frame.
+/// Plan the probe sets (per the manual-vs-auto rule) and return the bake of them as
+/// a job to step ([`LightingBake::step`]): the editor takes one step a frame. The
+/// scene keeps its probes and their lighting until the job commits, as Unity's bake
+/// does: a bake that is refused, dropped or fails leaves the old lighting (#1737).
 /// Errors when reflection probes have no saved scene to write beside.
 pub fn start_lighting(
-    scene: &mut Scene,
+    scene: &Scene,
     scene_path: Option<&str>,
     nav: Option<&NavigationGraph>,
     params: LightingBakeParams,
 ) -> Result<LightingBake, String> {
+    let (planned, report) = plan_probes(scene, nav, params);
+    LightingBake::start(scene, scene_path, planned, report)
+}
+
+/// Plan both probe sets of `scene` (per the manual-vs-auto rule) without touching
+/// it: the sets a bake applies at its commit, and the placement's report.
+pub(super) fn plan_probes(
+    scene: &Scene,
+    nav: Option<&NavigationGraph>,
+    params: LightingBakeParams,
+) -> (PlannedProbes, LightingBakeReport) {
     let site = survey(scene, nav, params.reflection.cell);
+    let mut planned = PlannedProbes {
+        light: scene.probes.clone(),
+        reflections: scene.reflection_probes.clone(),
+        kept: Vec::new(),
+    };
+    let spacing = params.probe_spacing;
+    let site = site.as_ref();
+    let auto_placed_light = auto_place_light(&mut planned.light, scene, site, nav, spacing);
+    let auto_placed_reflection =
+        auto_place_reflection(&mut planned, scene, site, &params.reflection);
     let report = LightingBakeReport {
-        auto_placed_light: auto_place_light(scene, site.as_ref(), nav, params.probe_spacing),
-        auto_placed_reflection: auto_place_reflection(scene, site.as_ref(), &params.reflection),
-        light_probes: scene.probes.probes.len(),
-        reflection_probes: scene.reflection_probes.len(),
+        auto_placed_light,
+        auto_placed_reflection,
+        light_probes: planned.light.probes.len(),
+        reflection_probes: planned.reflections.len(),
         ..Default::default()
     };
-    LightingBake::start(scene, scene_path, report)
+    (planned, report)
+}
+
+/// The probe sets a bake plans at its start and applies at its commit (#1737).
+pub struct PlannedProbes {
+    pub light: ProbeVolume,
+    pub reflections: ReflectionProbeSet,
+    /// The scene index of each manual reflection probe kept, in order: they lead
+    /// `reflections`, and the commit takes them from the scene as it is then, so an
+    /// edit the bake does not read (an intensity) survives it.
+    pub kept: Vec<usize>,
 }
 
 /// The site both probe sets are planned on (#1737): the nav surface's reachable
@@ -148,36 +184,57 @@ fn actor_starts(scene: &Scene) -> Vec<Vec3> {
         .collect()
 }
 
-/// The static, active, solid colliders as world triangles, in entity order.
+/// What is solid in the static scene as world triangles: the active, solid
+/// colliders, then the opaque runs of the static meshes whose entity has none (a
+/// ceiling built as a render mesh alone still roofs its room). Transparent runs
+/// are left out, so a liquid or a pane of glass is not solid. In entity order.
 fn static_solids(scene: &Scene) -> Vec<Solid> {
     let world = &scene.world;
-    (world.ids_with_collider().into_iter())
-        .filter(|&id| world.is_static(id) && world.is_active_in_hierarchy(id))
-        .filter(|&id| {
-            world
+    let solid_collider = |id: u32| {
+        world.is_static(id)
+            && world.is_active_in_hierarchy(id)
+            && world
                 .collider(id)
                 .is_some_and(|c| c.active && !c.is_trigger)
-        })
+    };
+    let colliders = (world.ids_with_collider().into_iter())
+        .filter(|&id| solid_collider(id))
         .filter_map(|id| collider_world_triangles(scene, id))
         .map(|t| Solid {
             vertices: t.vertices,
             triangles: t.triangles,
             convex: t.convex,
-        })
+        });
+    let meshes = (BakeScene::gather(scene, &|_| None).meshes.into_iter())
+        .filter(|m| !solid_collider(m.entity))
+        .map(|m| Solid {
+            triangles: opaque_triangles(&m),
+            vertices: m.positions,
+            convex: false,
+        });
+    colliders.chain(meshes).collect()
+}
+
+/// The triangles of `mesh`'s opaque runs.
+fn opaque_triangles(mesh: &BakeMesh) -> Vec<[u32; 3]> {
+    (mesh.indices.chunks_exact(3).enumerate())
+        .filter(|(t, _)| mesh.run_at(*t as u32 * 3).occludes)
+        .map(|(_, t)| [t[0], t[1], t[2]])
         .collect()
 }
 
-/// Re-place the light probes the automatic placement made, keeping the manual
-/// ones (#1737); returns whether it placed any. From the site's occupancy grid,
-/// else (nothing solid to grid) a regular grid over the walkable extent when the
-/// set holds no manual probe.
+/// Re-place `volume`'s light probes the automatic placement made, keeping the
+/// manual ones (#1737); returns whether it placed any. From the site's occupancy
+/// grid, else (nothing solid to grid) a regular grid over the walkable extent when
+/// the set holds no manual probe.
 fn auto_place_light(
-    scene: &mut Scene,
+    volume: &mut ProbeVolume,
+    scene: &Scene,
     site: Option<&Site>,
     nav: Option<&NavigationGraph>,
     spacing: f32,
 ) -> bool {
-    let manual: Vec<Vec3> = (scene.probes.probes.iter())
+    let manual: Vec<Vec3> = (volume.probes.iter())
         .filter(|p| p.manual)
         .map(|p| p.position)
         .collect();
@@ -186,7 +243,7 @@ fn auto_place_light(
         None if manual.is_empty() => {
             let walkable = nav.and_then(NavigationGraph::walkable_aabb);
             if let Some(plan) = placement::plan_light_probes(scene, walkable, spacing) {
-                scene.probes.fill_grid(plan.min, plan.max, plan.spacing);
+                volume.fill_grid(plan.min, plan.max, plan.spacing);
                 return true;
             }
             Vec::new()
@@ -194,18 +251,24 @@ fn auto_place_light(
         None => Vec::new(),
     };
     let any = !placed.is_empty();
-    scene.probes.replace_placed(placed);
+    volume.replace_placed(placed);
     any
 }
 
-/// Re-place the reflection probes the automatic placement made, keeping the
-/// manual ones and the rooms they cover (#1737); returns whether it placed any.
+/// Re-place the planned reflection probes the automatic placement made, keeping
+/// the manual ones and the rooms they cover (#1737); returns whether it placed any.
 fn auto_place_reflection(
-    scene: &mut Scene,
+    planned: &mut PlannedProbes,
+    scene: &Scene,
     site: Option<&Site>,
     params: &ReflectionPlacement,
 ) -> bool {
-    scene.reflection_probes.probes.retain(|p| p.manual);
+    let set = &mut planned.reflections;
+    planned.kept = (set.probes.iter().enumerate())
+        .filter(|(_, p)| p.manual)
+        .map(|(i, _)| i)
+        .collect();
+    set.probes.retain(|p| p.manual);
     let Some(site) = site else {
         return false;
     };
@@ -213,13 +276,11 @@ fn auto_place_reflection(
         max_probes: scene.lighting_settings.reflections.max_probes as usize,
         ..*params
     };
-    let manual = scene.reflection_probes.probes.clone();
+    let manual = set.probes.clone();
     let plans = placement::plan_reflection_probes(scene, site, &params, &manual);
     for plan in &plans {
-        let index = scene
-            .reflection_probes
-            .add(plan.position, plan.box_max - plan.position);
-        scene.reflection_probes.edit(index, |p| {
+        let index = set.add(plan.position, plan.box_max - plan.position);
+        set.edit(index, |p| {
             (p.box_min, p.box_max) = (plan.box_min, plan.box_max);
             p.box_projection = plan.box_projection;
             p.importance = plan.importance;
@@ -231,3 +292,6 @@ fn auto_place_reflection(
 #[cfg(test)]
 #[path = "lighting_tests.rs"]
 mod lighting_tests;
+#[cfg(test)]
+#[path = "solids_tests.rs"]
+mod solids_tests;

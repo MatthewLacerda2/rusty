@@ -65,10 +65,10 @@ fn register_placement<'scope>(
         table,
         "Move",
         scope.create_function(|_, (index, x, y, z): (u32, f32, f32, f32)| {
-            scene
-                .borrow_mut()
-                .reflection_probes
-                .move_probe(index as usize, Vec3::new(x, y, z));
+            let mut scene = scene.borrow_mut();
+            let set = &mut scene.reflection_probes;
+            set.move_probe(index as usize, Vec3::new(x, y, z));
+            hand_edited(set, index);
             Ok(())
         }),
     )?;
@@ -110,11 +110,14 @@ fn register_config<'scope>(
         "SetBox",
         scope.create_function(
             |_, (index, min_x, min_y, min_z, max_x, max_y, max_z): BoxArgs| {
-                scene.borrow_mut().reflection_probes.set_box(
-                    index as usize,
+                let mut scene = scene.borrow_mut();
+                let set = &mut scene.reflection_probes;
+                let (min, max) = (
                     Vec3::new(min_x, min_y, min_z),
                     Vec3::new(max_x, max_y, max_z),
                 );
+                set.set_box(index as usize, min, max);
+                hand_edited(set, index);
                 Ok(())
             },
         ),
@@ -150,6 +153,8 @@ fn register_settings<'scope>(
                 return Ok(());
             };
             // Every field is read before any is written: a bad one changes nothing.
+            // A hand edit makes the probe manual (#1737), unless it says otherwise.
+            probe.manual = true;
             write_fields(&mut probe, &t)?;
             set.edit(index as usize, |p| *p = probe);
             Ok(())
@@ -166,6 +171,12 @@ fn register_settings<'scope>(
             }
         }),
     )
+}
+
+/// Mark probe `index` manual after a hand edit: the next bake keeps it as it was
+/// left (#1737). The bake's own writes never come through here.
+fn hand_edited(set: &mut crate::scene::ReflectionProbeSet, index: u32) {
+    set.edit(index as usize, |p| p.manual = true);
 }
 
 /// The `{ x, y, z }` table of `v`.

@@ -57,6 +57,8 @@ fn register_placement<'scope>(
         scope.create_function(|_, (index, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
             scene.probes.move_probe(index as usize, Vec3::new(x, y, z));
+            // A hand edit: the next bake keeps the probe where it was put (#1737).
+            scene.probes.set_manual(index as usize, true);
             Ok(())
         }),
     )?;
@@ -224,6 +226,10 @@ mod tests {
                 !lua.load("return Probe.IsManual(9)").eval::<bool>()?,
                 "out of range"
             );
+            let moved: bool = lua
+                .load("Probe.Move(0, 4, 4, 4) return Probe.IsManual(0)")
+                .eval()?;
+            assert!(moved, "a hand move makes it manual");
             lua.load("Probe.FillGrid(0,0,0, 1,0,0, 1)").exec()?;
             Ok(())
         })

@@ -15,7 +15,7 @@
 
 use glam::{Vec2, Vec3};
 
-use super::enclosure::{ceiling_over, clearest, clutter, cluttered_region, open_to_sky};
+use super::enclosure::{ceiling_over, clearest, cluttered_region, open_to_sky, room_clutter};
 use super::floor::FloorGrid;
 use super::occupancy::Occupancy;
 use super::{ReflectionPlan, MIN_REGION, OPEN_AIR_IMPORTANCE};
@@ -45,7 +45,7 @@ pub fn plan_rooms(
     }
     let mut plans = Vec::new();
     for room_cells in &cells {
-        let region = cluttered_region(region, room_clutter(site, room_cells), MIN_REGION);
+        let region = cluttered_region(region, room_clutter(grid, occ, room_cells), MIN_REGION);
         let tiles: Vec<ReflectionPlan> = (tiles(grid, room_cells, region.max(grid.cell)).iter())
             .map(|tile| plan_tile(site, tile, sky))
             .collect();
@@ -63,20 +63,6 @@ pub fn plan_rooms(
         }
     }
     plans
-}
-
-/// The clutter of a room's body layer over its bounding rectangle.
-fn room_clutter((grid, occ): (&FloorGrid, &Occupancy), cells: &[usize]) -> f32 {
-    let (mut lo, mut hi, mut floor) = (Vec2::splat(f32::MAX), Vec2::splat(f32::MIN), f32::MAX);
-    for &i in cells {
-        let c = grid.centre(i % grid.width, i / grid.width);
-        (lo, hi) = (lo.min(c), hi.max(c));
-        floor = floor.min(grid.cells[i].map_or(f32::MAX, |c| c.floor));
-    }
-    match floor < f32::MAX {
-        true => clutter(occ, lo, hi, floor),
-        false => 0.0,
-    }
 }
 
 /// `cells` cut into a grid of tiles at most `region` across, non-empty ones only,

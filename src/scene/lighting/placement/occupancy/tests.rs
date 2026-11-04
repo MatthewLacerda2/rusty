@@ -94,3 +94,14 @@ fn a_huge_level_is_gridded_coarser() {
     assert!(occ.dims.iter().product::<usize>() <= 100_000);
     assert!(occ.is_solid(Vec3::new(200.0, 2.0, 200.0)));
 }
+
+/// A box scaled so far its cell count overflows a `usize` is gridded coarser, not
+/// wrapped to a small count; one whose span overflows a float is no grid.
+#[test]
+fn a_huge_scaled_box_does_not_overflow_the_count() {
+    let huge = Solid::cuboid(Vec3::splat(-1.0e18), Vec3::splat(1.0e18));
+    let occ = Occupancy::build_capped(&[huge], CELL, 100_000).unwrap();
+    assert!(occ.dims.iter().product::<usize>() <= 100_000);
+    let beyond = Solid::cuboid(Vec3::splat(-3.0e38), Vec3::splat(3.0e38));
+    assert!(Occupancy::build_capped(&[beyond], CELL, 100_000).is_none());
+}

@@ -75,6 +75,8 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
             .body_returned
             .unwrap_or(false);
         if edited {
+            // A hand edit makes it manual (#1737), unless the edit was unticking it.
+            probe.manual |= probe.manual == scene.reflection_probes.probes[i].manual;
             scene.reflection_probes.edit(i, |p| *p = probe);
             changed = true;
         }

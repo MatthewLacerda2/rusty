@@ -3,10 +3,19 @@
 //! A bake marks every surface an agent could stand on as a span: the floor, but
 //! also wall tops, roof tops and the top of a crate. Most of those are islands no
 //! actor ever reaches. Probe placement wants only the reachable floor, so this
-//! answers it from the graph's own moves: the largest area joined by walking (the
-//! level's main floor), plus the areas holding any `starts` (where actors begin),
-//! plus everything those lead to through off-mesh links, followed one way (a drop
-//! off a ledge reaches the floor below; the floor does not reach the ledge).
+//! answers it from the graph's own moves: the areas joined by walking that hold any
+//! `starts` (where actors begin) or, when no start lands on the graph, the largest
+//! area that is not an elevated top (the level's main floor), plus everything those
+//! lead to through off-mesh links, followed one way (a drop off a ledge reaches the
+//! floor below; the floor does not reach the ledge).
+//!
+//! An area is an **elevated top** when it lies over at least [`COVERED`] of
+//! another area's spans: a roof over the room under it, an upper storey reached
+//! only by a ladder. A roof is larger than its room (its walls' tops widen it), so
+//! size alone picks the roof of an indoor level, and so does asking whether most
+//! of its spans are over floor: a 14 m roof on 2 m walls has two thirds of its
+//! spans over the walls. A yard has nothing beneath it. The rule misreads a main
+//! floor over an isolated basement as a top; an actor start settles it.
 //!
 //! Pure and deterministic: scan order, ties to the lower span index.
 
@@ -15,10 +24,13 @@ use std::collections::VecDeque;
 use glam::Vec3;
 
 use super::{NavigationGraph, SpanRef};
+use crate::core::collections::Map;
 
 /// The cardinal grid steps: a diagonal move needs both cardinals it cuts past
 /// (`neighbour`), so the cardinals alone join every area the diagonals do.
 const CARDINAL: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+/// The share of another area's spans an area must lie over to be an elevated top.
+pub const COVERED: f32 = 0.5;
 
 impl NavigationGraph {
     /// Per span (by index into [`Self::spans`]), whether an actor can reach it: see
@@ -26,12 +38,13 @@ impl NavigationGraph {
     pub fn reachable_spans(&self, starts: &[Vec3]) -> Vec<bool> {
         let (area, sizes) = self.walk_areas();
         let mut seed = vec![false; sizes.len()];
-        let largest = (0..sizes.len()).max_by(|&a, &b| sizes[a].cmp(&sizes[b]).then(b.cmp(&a)));
-        if let Some(l) = largest {
-            seed[l] = true;
-        }
         for s in starts.iter().filter_map(|&p| self.snap(p)) {
             seed[area[s.index as usize] as usize] = true;
+        }
+        if !seed.contains(&true) {
+            if let Some(main) = self.main_floor(&area, &sizes) {
+                seed[main] = true;
+            }
         }
         let mut reach = vec![false; self.spans.len()];
         let mut queue = VecDeque::new();
@@ -53,6 +66,33 @@ impl NavigationGraph {
             }
         }
         reach
+    }
+
+    /// The largest area that is not an elevated top (see the module docs), else the
+    /// largest; ties to the lower area. `None` with no area.
+    fn main_floor(&self, area: &[u32], sizes: &[usize]) -> Option<usize> {
+        // Per (upper area, lower area), how many of the lower one's spans it covers.
+        let mut covers: Map<(u32, u32), usize> = Map::default();
+        for gz in 0..self.height {
+            for gx in 0..self.width {
+                let column = self.span_range(gx, gz);
+                for low in column.clone() {
+                    let mut over: Vec<u32> = (low + 1..column.end).map(|u| area[u]).collect();
+                    over.sort_unstable();
+                    over.dedup();
+                    for up in over.into_iter().filter(|&u| u != area[low]) {
+                        *covers.entry((up, area[low])).or_default() += 1;
+                    }
+                }
+            }
+        }
+        let mut elevated = vec![false; sizes.len()];
+        for (&(up, low), &n) in &covers {
+            elevated[up as usize] |= n as f32 >= COVERED * sizes[low as usize] as f32;
+        }
+        let largest = |a: &usize, b: &usize| sizes[*a].cmp(&sizes[*b]).then(b.cmp(a));
+        let areas = 0..sizes.len();
+        (areas.clone().filter(|&a| !elevated[a]).max_by(largest)).or_else(|| areas.max_by(largest))
     }
 
     /// Each span's walking area (joined by grid steps alone, which go both ways),

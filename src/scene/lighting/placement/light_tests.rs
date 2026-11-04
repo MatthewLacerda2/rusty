@@ -54,3 +54,57 @@ fn a_dust2_sized_site_keeps_the_fine_cell() {
     assert!(reflections.len() >= 100, "a probe per room at least");
     assert!(!site.plan_light_probes(4.0, &[]).is_empty());
 }
+
+/// A closed room of 0.2 m walls in the yard: the yard's lattice reaches past its
+/// cells, but never through a wall into the room (#1737).
+#[test]
+fn no_light_probe_lands_behind_a_thin_wall() {
+    let mut scene = yard();
+    let (o, i, h) = (5.0, 4.8, 3.0);
+    block(&mut scene, Vec3::new(-o, 0.0, i), Vec3::new(o, h, o));
+    block(&mut scene, Vec3::new(-o, 0.0, -o), Vec3::new(o, h, -i));
+    block(&mut scene, Vec3::new(-o, 0.0, -i), Vec3::new(-i, h, i));
+    block(&mut scene, Vec3::new(i, 0.0, -i), Vec3::new(o, h, i));
+    block(&mut scene, Vec3::new(-o, h, -o), Vec3::new(o, h + 0.2, o));
+    let probes = site_on_nav(&scene).plan_light_probes(4.0, &[]);
+    assert!(!probes.is_empty());
+    let inside = |p: &&Vec3| p.x.abs() < i && p.z.abs() < i && p.y < h;
+    assert_eq!(
+        probes.iter().find(inside),
+        None,
+        "a probe in the closed room"
+    );
+}
+
+/// A 2 m walkway at 3 m over open ground: the ground's lattice points that share
+/// its keys sit inside its slab and are skipped, and the walkway keeps its own.
+#[test]
+fn a_walkway_keeps_its_probes_over_the_grounds_skipped_ones() {
+    let mut scene = crate::scene::Scene::new();
+    block(
+        &mut scene,
+        Vec3::new(0.0, -0.2, 0.0),
+        Vec3::new(12.0, 0.0, 12.0),
+    );
+    block(
+        &mut scene,
+        Vec3::new(0.0, 2.6, 7.0),
+        Vec3::new(12.0, 3.0, 9.0),
+    );
+    let occ = super::Occupancy::from_static_boxes(&scene, super::occupancy::CELL).unwrap();
+    let mut floor = super::FloorGrid::from_static(&scene, 1.0).unwrap();
+    for i in 0..floor.cells.len() {
+        let z = floor.centre(i % floor.width, i / floor.width).y;
+        if (7.0..9.0).contains(&z) && floor.cells[i].is_some() {
+            floor.upper.push((i, 3.0));
+        }
+    }
+    let probes = super::light::plan_light_set(&floor, &occ, 4.0, &[]);
+    let on_walkway = probes
+        .iter()
+        .filter(|p| (7.0..9.0).contains(&p.z) && p.y > 3.0);
+    assert!(
+        on_walkway.count() >= 3,
+        "the walkway has its probes: {probes:?}"
+    );
+}

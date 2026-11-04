@@ -11,23 +11,27 @@
 //! n`), to the console and so to the MCP log, so a long bake reads as progress rather
 //! than a hang.
 //!
-//! **A bake works on a snapshot and applies only when it completes** (Unity's shape).
-//! Placement happens when the job starts; then both probe sets are copied, the bakes
-//! read the copies, and their results are staged without touching the scene: the light
-//! probes' SH in the solve, the cubemaps in `<name>.baking` files.
-//! [`LightingBake::commit`] applies both in one step. If either probe set changed since
-//! the start (one added, removed or moved, a reflection probe's resolution, clip
-//! planes or shadows), a step or the commit refuses with [`PROBES_CHANGED`] and
-//! nothing is applied; the staged files go with the job. The captures still render the
-//! live scene's meshes and lights at each step.
+//! **A bake works on a plan and applies only when it completes** (Unity's shape).
+//! Placement plans both probe sets when the job starts, into copies the scene does
+//! not hold (#1737); the bakes read the copies, and their results are staged without
+//! touching the scene: the light probes' SH in the solve, the cubemaps in
+//! `<name>.baking` files. [`LightingBake::commit`] swaps the planned sets in, with
+//! their lighting, in one step; until then the scene keeps its probes and their old
+//! lighting, so a bake that is refused, dropped or fails changes nothing. If either of
+//! the scene's own probe sets changed since the start (one added, removed, moved or
+//! marked manual, a reflection probe's resolution, clip planes or shadows), a step or
+//! the commit refuses with [`PROBES_CHANGED`] and nothing is applied; the staged files
+//! go with the job. The captures still render the live scene's meshes and lights at
+//! each step.
 
 use std::path::{Path, PathBuf};
 
-use super::lighting::LightingBakeReport;
+use super::lighting::{LightingBakeReport, PlannedProbes};
 use crate::render::ibl::probe::solve::BounceSolve;
 pub use crate::render::ibl::probe::solve::PROBES_CHANGED;
 use crate::render::{Renderer, DEFAULT_BAKE_RESOLUTION};
-use crate::scene::Scene;
+use crate::scene::{ReflectionProbeSet, Scene};
+use glam::Vec3;
 use staged::{ReflectionSnapshot, StagedCubemaps};
 
 mod staged;
@@ -54,46 +58,92 @@ pub enum Stage {
 }
 
 /// A probe bake in progress: the headless renderer it captures with (`None`
-/// without an adapter, when both bakes skip, as `bake_scene_probes` does), the
-/// light-probe solve, and the reflection probes it bakes with the cubes staged so far.
+/// without an adapter, when both bakes skip and nothing is applied), the planned
+/// light probes' solve, the planned reflection probes with the cubes staged so far,
+/// and the scene's own sets as they were, to tell an edit made midway.
 pub struct LightingBake {
     renderer: Option<Renderer>,
     light: BounceSolve,
     light_done: bool,
     scene_path: Option<String>,
+    planned: ReflectionProbeSet,
+    kept: Vec<usize>,
     reflections: ReflectionSnapshot,
     staged: StagedCubemaps,
+    was: Baseline,
     report: LightingBakeReport,
 }
 
+/// The scene's probe sets when a bake started: an edit to them midway drops it.
+struct Baseline {
+    light: Vec<(Vec3, bool)>,
+    reflections: ReflectionSnapshot,
+}
+
+impl Baseline {
+    fn take(scene: &Scene) -> Self {
+        let light = scene.probes.probes.iter();
+        Self {
+            light: light.map(|p| (p.position, p.manual)).collect(),
+            reflections: ReflectionSnapshot::take(scene),
+        }
+    }
+
+    fn changed(&self, scene: &Scene) -> bool {
+        let light = scene.probes.probes.iter().map(|p| (p.position, p.manual));
+        !light.eq(self.light.iter().copied()) || self.reflections.changed(scene)
+    }
+}
+
 impl LightingBake {
-    /// Start baking `scene`'s placed probes (`report` holds the placement), writing
-    /// reflection cubemaps beside `scene_path`. Refuses up front, before any probe is
-    /// captured, when there are reflection probes and no saved scene to write beside.
+    /// Start baking the `planned` probe sets of `scene` (`report` holds the
+    /// placement), writing reflection cubemaps beside `scene_path`, on a headless
+    /// renderer. Refuses up front, before any probe is captured, when there are
+    /// reflection probes and no saved scene to write beside.
     pub(super) fn start(
         scene: &Scene,
         scene_path: Option<&str>,
-        mut report: LightingBakeReport,
+        planned: PlannedProbes,
+        report: LightingBakeReport,
     ) -> Result<Self, String> {
-        if !scene.reflection_probes.is_empty() {
+        if !planned.reflections.is_empty() {
             out_dir(scene_path)?;
         }
-        let any = !scene.probes.is_empty() || !scene.reflection_probes.is_empty();
+        let any = !planned.light.is_empty() || !planned.reflections.is_empty();
         let renderer = any
             .then(|| pollster::block_on(Renderer::new_headless(64, 64)))
             .flatten();
         if any && renderer.is_none() {
             log::warn!("[LightingBake] no GPU/software adapter available — skipping bake");
         }
-        report.ran_light_bake = scene.probes.is_empty() || renderer.is_some();
-        report.ran_reflection_bake = scene.reflection_probes.is_empty() || renderer.is_some();
+        Self::on(renderer, scene, scene_path, planned, report)
+    }
+
+    /// [`start`](Self::start) on `renderer`: `None` skips both bakes, and the
+    /// commit then applies nothing, so the scene keeps its old lighting.
+    fn on(
+        renderer: Option<Renderer>,
+        scene: &Scene,
+        scene_path: Option<&str>,
+        planned: PlannedProbes,
+        mut report: LightingBakeReport,
+    ) -> Result<Self, String> {
+        if !planned.reflections.is_empty() {
+            out_dir(scene_path)?;
+        }
+        report.ran_light_bake = planned.light.is_empty() || renderer.is_some();
+        report.ran_reflection_bake = planned.reflections.is_empty() || renderer.is_some();
+        let default = scene.lighting_settings.reflections.resolution;
         Ok(Self {
-            light: BounceSolve::new(scene, DEFAULT_BAKE_RESOLUTION),
+            light: BounceSolve::of(planned.light, DEFAULT_BAKE_RESOLUTION),
             light_done: renderer.is_none(),
             renderer,
             scene_path: scene_path.map(str::to_owned),
-            reflections: ReflectionSnapshot::take(scene),
+            reflections: ReflectionSnapshot::of(&planned.reflections, default),
+            planned: planned.reflections,
+            kept: planned.kept,
             staged: StagedCubemaps::default(),
+            was: Baseline::take(scene),
             report,
         })
     }
@@ -122,9 +172,11 @@ impl LightingBake {
         Ok(self.staged.len() >= total)
     }
 
-    /// Apply a finished bake to `scene` in one step: the light probes' SH and every
-    /// reflection probe's cube. Errors, applying nothing, when the bake has not
-    /// finished or the scene's probes changed since it started.
+    /// Apply a finished bake to `scene` in one step: the planned light probes with
+    /// their SH, and the planned reflection probes with their cubes, in place of the
+    /// scene's sets. Errors, applying nothing, when the bake has not finished or the
+    /// scene's probes changed since it started; without an adapter nothing was baked
+    /// and nothing is applied.
     pub fn commit(&mut self, scene: &mut Scene) -> Result<(), String> {
         self.refuse_changed(scene)?;
         if self.stage() != Stage::Done {
@@ -133,13 +185,26 @@ impl LightingBake {
         if self.renderer.is_none() {
             return Ok(()); // nothing baked
         }
-        self.light.commit(scene)?;
+        let light = self
+            .light
+            .baked()
+            .ok_or("the light-probe bake has not finished")?;
+        let mut reflections = self.planned.clone();
+        for (i, &from) in self.kept.iter().enumerate() {
+            // The manual probe as the scene holds it now: an edit the cube is not
+            // baked from (a box, an intensity) survives the commit.
+            let live = scene.reflection_probes.probes.get(from).cloned();
+            reflections.probes[i] = live.ok_or(PROBES_CHANGED)?;
+        }
+        scene.probes = light.clone();
+        scene.reflection_probes = reflections;
         self.staged.commit(scene)
     }
 
-    /// [`PROBES_CHANGED`] when either probe set is not the one this bake started on.
+    /// [`PROBES_CHANGED`] when either of the scene's probe sets is not the one this
+    /// bake started on.
     fn refuse_changed(&self, scene: &Scene) -> Result<(), String> {
-        match self.light.changed(scene) || self.reflections.changed(scene) {
+        match self.was.changed(scene) {
             true => Err(PROBES_CHANGED.into()),
             false => Ok(()),
         }
@@ -202,5 +267,9 @@ fn out_dir(scene_path: Option<&str>) -> Result<PathBuf, String> {
 
 #[cfg(test)]
 mod snapshot_tests;
+#[cfg(test)]
+mod staging_gpu_tests;
+#[cfg(test)]
+mod staging_tests;
 #[cfg(test)]
 mod tests;

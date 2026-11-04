@@ -58,6 +58,9 @@ impl Occupancy {
     fn build_capped(solids: &[Solid], cell: f32, max_cells: usize) -> Option<Self> {
         let (lo, hi) = (solids.iter().filter_map(Solid::bounds))
             .reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)))?;
+        if !(hi - lo).is_finite() {
+            return None; // corners so far apart their span overflows
+        }
         let mut cell = cell.max(0.05);
         let dims = |cell: f32| {
             ((hi - lo) / cell)
@@ -66,7 +69,8 @@ impl Occupancy {
                 .to_array()
                 .map(|n| n as usize + 2)
         };
-        while dims(cell).iter().product::<usize>() > max_cells {
+        let count = |d: [usize; 3]| d.iter().fold(1usize, |n, &d| n.saturating_mul(d));
+        while count(dims(cell)) > max_cells {
             cell *= 1.25;
         }
         let mut grid = Self {

@@ -1,10 +1,11 @@
 //! Tests for the one-button lighting bake orchestration (#246). Sibling of
 //! `lighting.rs`; shares its 300-line source cap.
 //!
-//! These cover the PLACEMENT + ORCHESTRATION contract, which runs adapter-free: the
-//! GPU bakes skip gracefully when no adapter is present (`ran_*` = false), but the
-//! auto-placement that precedes them still populates both probe sets. The deep GPU
-//! bake behaviour is owned by `render::probe_bake_tests` / `render::reflection_bake_tests`.
+//! These cover the PLACEMENT + ORCHESTRATION contract. The GPU bakes skip gracefully
+//! when no adapter is present (`ran_*` = false); the report still counts what was
+//! planned, but nothing reaches the scene, which keeps its old lighting (#1737,
+//! `steps::staging_tests`). The deep GPU bake behaviour is owned by
+//! `render::probe_bake_tests` / `render::reflection_bake_tests`.
 
 use glam::Vec3;
 
@@ -32,9 +33,8 @@ fn room_scene() -> Scene {
     scene
 }
 
-/// On a static scene with no probes, the bake auto-places BOTH sets. The GPU bakes
-/// skip without an adapter, but placement has already populated the world — the
-/// "place well + bake right now" acceptance, minus the adapter-bound bake itself.
+/// On a static scene with no probes, the bake auto-places BOTH sets and, with an
+/// adapter, applies them: the "place well + bake right now" acceptance.
 #[test]
 fn gpu_auto_places_both_sets_on_empty_scene() {
     let dir = crate::test_temp::dir().join("rusty_lighting_bake_test");
@@ -71,6 +71,9 @@ fn gpu_auto_places_both_sets_on_empty_scene() {
         report.reflection_probes > 0,
         "subdivision produced reflection probes"
     );
+    if !report.ran_light_bake {
+        return; // no adapter: nothing was applied
+    }
     assert_eq!(scene.probes.probes.len(), report.light_probes);
     assert_eq!(scene.reflection_probes.len(), report.reflection_probes);
 }
@@ -105,6 +108,9 @@ fn gpu_manual_probes_survive_a_replacement() {
     let second = bake(&mut scene);
     assert!(first.auto_placed_light && first.auto_placed_reflection);
     assert_eq!(first, second, "a re-placement places the same");
+    if !first.ran_light_bake {
+        return; // no adapter: nothing was applied
+    }
     assert_manual_kept(&scene, &manual);
 }
 

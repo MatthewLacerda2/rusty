@@ -4,9 +4,11 @@
 //! * **Where.** The air over the floor plan's floors (every storey, `upper`
 //!   included) from [`LOWEST`] to [`VERTICAL_HEADROOM`](super::VERTICAL_HEADROOM)
 //!   up, never past a cell's ceiling, never through a solid between the floor and
-//!   the probe. So nothing is placed inside a wall, above a ceiling, or over floor
-//!   no actor reaches (the floor plan holds only reachable floor when a nav
-//!   surface is baked).
+//!   the probe, and never out of sight of the floor cell it came from (the
+//!   lattice reaches a little past each cell, and a thin wall must not let it into
+//!   the next room). So nothing is placed inside a wall, above a ceiling, behind a
+//!   wall or over floor no actor reaches (the floor plan holds only reachable
+//!   floor when a nav surface is baked).
 //! * **How dense.** A lattice at half the spacing, anchored to the world in XZ
 //!   and to each floor in height. Its every other point (the coarse lattice at the
 //!   full spacing) is always kept; the points between are kept only near
@@ -17,6 +19,10 @@
 //!   inside a solid is dropped (Unity marks it invalid).
 //! * **Manual probes** stay where they are; a placed probe nearer one than half
 //!   its own step is left out.
+//!
+//! Every candidate is judged first and the survivors merged by lattice key after,
+//! the lowest floor's winning, so a valid point never loses its key to an invalid
+//! one from the floor below.
 //!
 //! The result has no regular grid, so it is sampled by blending the nearest
 //! probes (`ProbeVolume::sample`). Deterministic: lattice order, no RNG.
@@ -41,49 +47,53 @@ pub fn plan_light_set(
     manual: &[Vec3],
 ) -> Vec<Vec3> {
     let fine = spacing.max(1.0) * 0.5;
-    let mut points = lattice(floor, fine);
-    // One point per lattice key: the lowest floor's, in key order.
-    points.sort_by(|a, b| {
-        ((a.key.z, a.key.y, a.key.x).cmp(&(b.key.z, b.key.y, b.key.x)))
-            .then(a.floor.total_cmp(&b.floor))
+    // Each candidate is judged before the lattice keys are merged, so a valid
+    // point (a coarse one on a walkway) never loses its key to an invalid one
+    // from a lower floor (a ground point inside the walkway's slab).
+    let mut kept: Vec<(IVec3, f32, Vec3)> = (lattice(floor, fine).into_iter())
+        .filter_map(|p| judge(occ, &p, fine, spacing, manual).map(|at| (p.key, p.floor, at)))
+        .collect();
+    // One probe per lattice key: the lowest floor's, in key order.
+    kept.sort_by(|a, b| {
+        ((a.0.z, a.0.y, a.0.x).cmp(&(b.0.z, b.0.y, b.0.x))).then(a.1.total_cmp(&b.1))
     });
-    points.dedup_by_key(|p| p.key);
-    let mut out = Vec::new();
-    for Point {
-        key,
-        at,
-        floor,
-        level,
-    } in points
-    {
-        let coarse = key.x % 2 == 0 && key.z % 2 == 0 && level % 2 == 0;
-        if !coarse && !near_geometry(occ, at, fine) {
-            continue;
-        }
-        let Some(at) = offset(occ, at, fine * 0.5) else {
-            continue;
-        };
-        // A solid between the floor and the probe: it is above a ceiling.
-        let down = at.y - floor - occ.cell * 1.5;
-        if down > 0.0 && occ.ray(at, Vec3::NEG_Y, down).is_some() {
-            continue;
-        }
-        let step = if coarse { spacing } else { fine };
-        if manual.iter().any(|m| m.distance(at) < step * 0.5) {
-            continue;
-        }
-        out.push(at);
-    }
-    out
+    kept.dedup_by_key(|k| k.0);
+    kept.into_iter().map(|(_, _, at)| at).collect()
 }
 
-/// A candidate probe: its lattice key, where it is, the floor it stands over and
-/// its level over that floor (0 at [`LOWEST`]).
+/// Where candidate `p` places a probe, if anywhere: a coarse point always, a fine
+/// one only near geometry; pushed out of geometry; never above a ceiling, behind a
+/// wall from its own floor cell, or within half a step of a `manual` probe.
+fn judge(occ: &Occupancy, p: &Point, fine: f32, spacing: f32, manual: &[Vec3]) -> Option<Vec3> {
+    let coarse = p.key.x % 2 == 0 && p.key.z % 2 == 0 && p.level % 2 == 0;
+    if !coarse && !near_geometry(occ, p.at, fine) {
+        return None;
+    }
+    let at = offset(occ, p.at, fine * 0.5)?;
+    // The lattice reaches past its cell: through a thin wall it would light the
+    // next room or the outdoors from in here.
+    let sight = at - p.from;
+    if sight.length() > 1.0e-4 && occ.ray(p.from, sight.normalize(), sight.length()).is_some() {
+        return None;
+    }
+    // A solid between the floor and the probe: it is above a ceiling.
+    let down = at.y - p.floor - occ.cell * 1.5;
+    if down > 0.0 && occ.ray(at, Vec3::NEG_Y, down).is_some() {
+        return None;
+    }
+    let step = if coarse { spacing } else { fine };
+    (!manual.iter().any(|m| m.distance(at) < step * 0.5)).then_some(at)
+}
+
+/// A candidate probe: its lattice key, where it is, the floor it stands over, its
+/// level over that floor (0 at [`LOWEST`]), and the point at its height over the
+/// middle of the floor cell it came from, which it must see.
 struct Point {
     key: IVec3,
     at: Vec3,
     floor: f32,
     level: i32,
+    from: Vec3,
 }
 
 /// Every lattice point at `fine` over the floors of `floor`.
@@ -109,12 +119,13 @@ fn lattice(floor: &FloorGrid, fine: f32) -> Vec<Point> {
             for ix in lo.x as i32..hi.x as i32 {
                 let mut level = 0;
                 while y + LOWEST + level as f32 * fine <= top {
+                    let height = y + LOWEST + level as f32 * fine;
                     points.push(Point {
                         key: IVec3::new(ix, base + level, iz),
-                        at: Vec3::new(ix as f32, 0.0, iz as f32) * fine
-                            + Vec3::Y * (y + LOWEST + level as f32 * fine),
+                        at: Vec3::new(ix as f32 * fine, height, iz as f32 * fine),
                         floor: y,
                         level,
+                        from: Vec3::new(at.x, height, at.y),
                     });
                     level += 1;
                 }

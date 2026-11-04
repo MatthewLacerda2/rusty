@@ -116,3 +116,35 @@ fn added_probes_are_manual_and_set_can_change_it() {
     .unwrap();
     assert!(!scene.borrow().reflection_probes.probes[0].manual);
 }
+
+/// A hand edit makes a placed probe manual, so the next bake keeps it (#1737);
+/// `Set{ manual = false }` says otherwise.
+#[test]
+fn hand_edits_make_a_placed_probe_manual() {
+    let scene = empty_scene();
+    let lua = Lua::new();
+    for edit in [
+        "Reflection.Move(0, 1, 2, 3)",
+        "Reflection.SetBox(0, -1,-1,-1, 2,2,2)",
+        "Reflection.Set(0, { intensity = 2 })",
+    ] {
+        scene.borrow_mut().reflection_probes = Default::default();
+        scene
+            .borrow_mut()
+            .reflection_probes
+            .add(Vec3::ZERO, Vec3::ONE);
+        lua.scope(|scope| {
+            register(&lua, scope, &scene).unwrap();
+            lua.load(edit).exec()
+        })
+        .unwrap();
+        assert!(scene.borrow().reflection_probes.probes[0].manual, "{edit}");
+    }
+    lua.scope(|scope| {
+        register(&lua, scope, &scene).unwrap();
+        lua.load("Reflection.Set(0, { manual = false, intensity = 3 })")
+            .exec()
+    })
+    .unwrap();
+    assert!(!scene.borrow().reflection_probes.probes[0].manual);
+}
