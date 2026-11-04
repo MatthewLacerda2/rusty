@@ -124,8 +124,11 @@ fn sheet_uv(uv: vec2<f32>, sheet: vec4<f32>) -> vec2<f32> {
 
 // Light arriving at a point from the scene lights, with no surface normal: each
 // light counts as it would on a matte surface turned toward it (radiance / pi).
-// Point + spot falloff is the forward pass's (`local_light_radiance`).
-fn particle_light(world: vec3<f32>, light: vec4<f32>) -> vec3<f32> {
+// Point + spot falloff is the forward pass's, its inverse square floored at `near`,
+// half the sprite's size (#1699): lit per vertex, a corner grazing a lamp would
+// otherwise read hundreds of times the light the sprite's middle gets, and the
+// whole puff would flicker as it drifts past.
+fn particle_light(world: vec3<f32>, light: vec4<f32>, near: f32) -> vec3<f32> {
     // Flat ambient: the forward pass's ambient averaged over directions.
     var total = ambient_average(lighting.ambient);
     if (light.w > 1.5) {
@@ -138,7 +141,7 @@ fn particle_light(world: vec3<f32>, light: vec4<f32>) -> vec3<f32> {
     // Point and spot lights through this vertex's cluster (#434).
     let range = cluster_ranges[cluster_index(camera.clusters, camera.view_proj, world)];
     for (var i = 0u; i < range.y; i = i + 1u) {
-        total += local_light_radiance(local_lights[cluster_lights[range.x + i]], world) * inv_pi;
+        total += local_light_radiance(local_lights[cluster_lights[range.x + i]], world, near) * inv_pi;
     }
     return total;
 }
@@ -152,7 +155,7 @@ fn vs_main(@builtin(vertex_index) vid: u32, inst: InstanceInput) -> VsOut {
 
     var color = inst.color;
     if (inst.light.w > 0.5) {
-        color = vec4<f32>(color.rgb * particle_light(world, inst.light), color.a);
+        color = vec4<f32>(color.rgb * particle_light(world, inst.light, inst.size * 0.5), color.a);
     }
 
     var out: VsOut;

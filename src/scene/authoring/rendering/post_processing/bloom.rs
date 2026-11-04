@@ -1,13 +1,13 @@
-//! Bloom's ops: the switch, the two strengths and the lens dirt (#1442), its
-//! texture and its strength, each strength `≥ 0`; and its quality level and
-//! `Custom` resolution divisor (#1522).
+//! Bloom's ops: the switch, the two strengths, the scatter (#1700) and the lens
+//! dirt (#1442), its texture and its strength, each strength `≥ 0`; and its
+//! quality level and `Custom` resolution divisor (#1522).
 
 use super::{Effect, Knob};
 use crate::components::{Bloom, PostProcessingComponent};
 use crate::core::paths::stored;
 use crate::core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use crate::scene::authoring::fields::table::effect;
-use crate::scene::authoring::sanitize::non_negative;
+use crate::scene::authoring::sanitize::{non_negative, unit};
 
 /// Set whether bloom is active.
 pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
@@ -22,6 +22,11 @@ pub fn set_intensity(vc: &mut PostProcessingComponent, value: f32) {
 /// Set the bloom threshold, clamped to `≥ 0`.
 pub fn set_threshold(vc: &mut PostProcessingComponent, value: f32) {
     vc.bloom.threshold = non_negative(value);
+}
+
+/// Set how far the glow spreads, clamped to `0..=1`.
+pub fn set_scatter(vc: &mut PostProcessingComponent, value: f32) {
+    vc.bloom.scatter = unit(value);
 }
 
 /// Set the lens dirt texture as a [`stored`] path; `None` or a blank one clears
@@ -52,6 +57,7 @@ pub const EFFECT: Effect = Effect {
         set_active(c, v.active);
         set_intensity(c, v.intensity);
         set_threshold(c, v.threshold);
+        set_scatter(c, v.scatter);
         set_dirt_texture(c, v.dirt_texture);
         set_dirt_intensity(c, v.dirt_intensity);
         set_quality(c, v.quality);
@@ -69,6 +75,12 @@ pub const EFFECT: Effect = Effect {
             api: Some("BloomThreshold"),
             get: |vc| vc.bloom.threshold,
             set: set_threshold,
+        },
+        Knob {
+            field: "scatter",
+            api: Some("BloomScatter"),
+            get: |vc| vc.bloom.scatter,
+            set: set_scatter,
         },
         Knob {
             field: "dirt_intensity",

@@ -38,7 +38,7 @@ mod lists;
 pub(crate) use bin::{bin, shadow_requests};
 pub(crate) use gpu::ClusterBuffers;
 pub(crate) use grid::ClusterGrid;
-pub(crate) use lights::{local_lights, LocalLight, KIND_SPOT};
+pub(crate) use lights::{local_lights, LocalLight};
 
 /// Clusters across, up and deep. 16×9 tiles match a 16:9 screen with square-ish
 /// tiles; 24 exponential slices keep each slice's depth span proportional to its
@@ -70,11 +70,17 @@ mod cone_budget_tests;
 #[path = "cone_tests.rs"]
 mod cone_tests;
 #[cfg(test)]
+#[path = "falloff_gpu_tests.rs"]
+mod falloff_gpu_tests;
+#[cfg(test)]
 #[path = "gpu_tests.rs"]
 mod gpu_tests;
 #[cfg(test)]
 #[path = "lights_tests.rs"]
 mod lights_tests;
+#[cfg(test)]
+#[path = "score_tests.rs"]
+mod score_tests;
 #[cfg(test)]
 #[path = "spheres_tests.rs"]
 mod spheres_tests;

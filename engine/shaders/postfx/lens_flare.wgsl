@@ -1,7 +1,7 @@
 // engine/shaders/postfx/lens_flare.wgsl — the screen-space lens flare's pass
 // (`render::postfx::effects::lens_flare`, #1443), Unity URP's *Screen Space Lens
-// Flare*: `fs_flare` builds the ghosts, the halo and the streaks from bloom's blurred
-// bright pass at a quarter of the view's size or less, which the composite adds
+// Flare*: `fs_flare` builds the ghosts, the halo and the streaks from bloom's
+// prefiltered first mip (thresholded, not yet spread by its chain) at a quarter of the view's size or less, which the composite adds
 // (`postfx/effects/lens_flare.wgsl`, #1473). Without a bright pixel every tap reads
 // zero, so the add leaves the image as it was.
 
