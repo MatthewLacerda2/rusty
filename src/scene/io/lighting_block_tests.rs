@@ -21,7 +21,7 @@ fn lighting_is_written_and_unsaved_edits_stay_unsaved() {
     let set = &mut scene.lightmaps;
     set.pages
         .push("level.scene.lightmaps/lightmap_0.png".into());
-    set.entries.push(LightmapEntry {
+    set.insert(LightmapEntry {
         entity: saved,
         page: 0,
         scale_offset: [1.0, 1.0, 0.0, 0.0],

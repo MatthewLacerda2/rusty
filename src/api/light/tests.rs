@@ -1,26 +1,28 @@
 //! Tests for the `Light` namespace (`api::light`).
 
+use crate::api::bind;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use super::*;
 
 /// Build a scene with one light-bearing entity; returns `(scene, id)`.
-fn scene_with_light() -> (RefCell<Scene>, u32) {
+fn scene_with_light() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::default();
     let id = scene.add_entity("Lamp".to_string());
     scene
         .world
         .set_light(id, Some(crate::scene::authoring::default_light()));
-    (RefCell::new(scene), id)
+    (Rc::new(RefCell::new(scene)), id)
 }
 
 #[test]
 fn set_get_color_intensity_range_type() {
     let (scene, id) = scene_with_light();
-    let console = RefCell::new(ConsoleLogs::new());
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene, &console).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
 
         lua.load(format!("Light.SetColor({id}, 0.2, 0.4, 0.6)"))
             .exec()
@@ -66,26 +68,22 @@ fn set_get_color_intensity_range_type() {
 #[test]
 fn clamps_negatives_and_ignores_unknown_type() {
     let (scene, id) = scene_with_light();
-    let console = RefCell::new(ConsoleLogs::new());
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene, &console).unwrap();
+    register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
 
-        lua.load(format!("Light.SetIntensity({id}, -5.0)"))
-            .exec()
-            .unwrap();
-        lua.load(format!("Light.SetRange({id}, -2.0)"))
-            .exec()
-            .unwrap();
-        lua.load(format!("Light.SetType({id}, 'Bogus')"))
-            .exec()
-            .unwrap();
-        lua.load(format!("Light.SetMode({id}, 'Bogus')"))
-            .exec()
-            .unwrap();
-        Ok(())
-    })
-    .unwrap();
+    lua.load(format!("Light.SetIntensity({id}, -5.0)"))
+        .exec()
+        .unwrap();
+    lua.load(format!("Light.SetRange({id}, -2.0)"))
+        .exec()
+        .unwrap();
+    lua.load(format!("Light.SetType({id}, 'Bogus')"))
+        .exec()
+        .unwrap();
+    lua.load(format!("Light.SetMode({id}, 'Bogus')"))
+        .exec()
+        .unwrap();
 
     let e = scene.borrow();
     let light = e.world.light(id).unwrap().clone();
@@ -104,10 +102,10 @@ fn clamps_negatives_and_ignores_unknown_type() {
 #[test]
 fn area_light_is_baked_and_sized() {
     let (scene, id) = scene_with_light();
-    let console = RefCell::new(ConsoleLogs::new());
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene, &console).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
         lua.load(format!(
             "Light.SetType({id}, 'Area') Light.SetMode({id}, 'Mixed') \
              Light.SetAreaSize({id}, 1.2, 0.6)"

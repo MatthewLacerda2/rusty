@@ -4,9 +4,11 @@
 //! a scene save → load.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::{Vec2, Vec3};
 use mlua::{Lua, Table};
+use rusty::api::bind;
 use rusty::components::{CanvasComponent, RectTransformComponent};
 use rusty::core::settings::video::VideoSettings;
 use rusty::scene::{Camera, Scene};
@@ -27,30 +29,27 @@ pub(crate) fn ui_scene() -> (Scene, u32, u32) {
 
 /// Run `f` with the three UI namespaces registered over `scene` on a 1920×1080
 /// headless screen (the video resolution stands in for the game view).
-pub(crate) fn with_ui_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
+pub(crate) fn with_ui_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    let screen = RefCell::new(ScreenSize::default());
-    let video = RefCell::new(VideoSettings {
+    let screen = Rc::new(RefCell::new(ScreenSize::default()));
+    let video = Rc::new(RefCell::new(VideoSettings {
         width: 1920,
         height: 1080,
         ..VideoSettings::default()
-    });
-    let camera = RefCell::new(Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0));
-    lua.scope(|scope| {
-        rusty::api::canvas::register(&lua, scope, scene, &screen, &video).unwrap();
-        let (screen, video) = (&screen, &video);
-        rusty::api::rect_transform::register(&lua, scope, scene, (screen, video)).unwrap();
-        rusty::api::ui::register(&lua, scope, scene, (screen, video), &camera).unwrap();
-        f(&lua);
-        Ok(())
-    })
-    .unwrap();
+    }));
+    let camera = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
+    let camera = bind(&lua, &Rc::new(RefCell::new(camera)));
+    let (scene, screen, video) = (bind(&lua, scene), bind(&lua, &screen), bind(&lua, &video));
+    rusty::api::canvas::register(&lua, scene, screen, video).unwrap();
+    rusty::api::rect_transform::register(&lua, scene, (screen, video)).unwrap();
+    rusty::api::ui::register(&lua, scene, (screen, video), camera).unwrap();
+    f(&lua);
 }
 
 #[test]
 fn a_scripted_rect_change_shows_in_get_rect_at_once() {
     let (scene, canvas, child) = ui_scene();
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_ui_api(&scene, |lua| {
         // Stretch across the bottom, 80 tall, inset 10 from each side.
         lua.load(format!(
@@ -83,7 +82,7 @@ fn a_scripted_rect_change_shows_in_get_rect_at_once() {
 #[test]
 fn canvas_setters_validate_and_drive_the_scale_factor() {
     let (scene, canvas, child) = ui_scene();
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_ui_api(&scene, |lua| {
         lua.load(format!(
             "Canvas.SetReferenceResolution({canvas}, 960, 540)

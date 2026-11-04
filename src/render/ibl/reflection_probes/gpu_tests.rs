@@ -9,7 +9,7 @@ use crate::scene::Scene;
 
 /// A one-mip `size`² cube file named `name`, every texel `value`; returns its path.
 pub(super) fn cube_file(name: &str, size: u32, value: u8) -> String {
-    let face = vec![value; (size * size * 4) as usize];
+    let face = vec![value; (size * size * 8) as usize];
     let cube = PrefilteredCubemap {
         mips: vec![std::array::from_fn(|_| face.clone())],
         base_size: size,

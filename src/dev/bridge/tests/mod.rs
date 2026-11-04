@@ -20,7 +20,6 @@ fn a_handle_errors_once_its_instance_is_replaced() {
     let harness = Rc::new(RefCell::new(Harness::new(out, "")));
     let world = Rc::clone(&harness.borrow().world);
     let cells = world.borrow().script_manager().api_cells();
-    let ctx = cells.ctx();
     let lua = Lua::new();
     let restart = || {
         let mut w = world.borrow_mut();
@@ -29,8 +28,8 @@ fn a_handle_errors_once_its_instance_is_replaced() {
         w.set_playing(true);
         w.tick(FIXED_DT);
     };
-    lua.scope(|scope| {
-        crate::api::register(&lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
+    cells.install(&lua).unwrap();
+    crate::api::attempt(|| {
         super::register(&lua, &harness)?;
         lua.load("Harness.Step(2)").exec()?;
         let old: mlua::Value = lua.load(GET).eval()?;

@@ -27,7 +27,6 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use super::harness::Harness;
-use crate::api;
 use crate::core::project::ProjectSettings;
 
 /// Default enemy brain used by the default scene when running scenarios.
@@ -92,16 +91,16 @@ pub fn run_file(harness: Harness, scenario_path: &Path) -> Result<RunReport, Str
 pub fn run_code(harness: Harness, code: &str, name: &str) -> Result<RunReport, String> {
     let harness = Rc::new(RefCell::new(harness));
 
-    // The real API over the harness world's own cells (#1384), held for the whole
-    // run: every call borrows a cell only while it runs, and `Harness.Step` ticks
-    // the world (whose gameplay VM registers the same surface in its own scope)
-    // between calls, never inside one.
+    // The real API over the harness world's own cells (#1384), installed once on
+    // this VM (#1709): every call borrows a cell only while it runs, and
+    // `Harness.Step` ticks the world (whose gameplay VM has the same surface over
+    // the same cells) between calls, never inside one.
     let cells = harness.borrow().world.borrow().script_manager().api_cells();
-    let ctx = cells.ctx();
     // The world's one `Random` stream, not a scenario-only one: Unity has one
     // `Random` too, and a scenario's draws are its inputs, as deterministic as
     // the rest of them.
     let lua = crate::scripting::sandboxed_vm()?;
+    cells.install(&lua)?;
     // The gameplay VM's project-aware `require` / `dofile` / `loadfile` (#1717).
     harness
         .borrow()
@@ -109,17 +108,13 @@ pub fn run_code(harness: Harness, code: &str, name: &str) -> Result<RunReport, S
         .borrow()
         .script_manager()
         .install_file_access(&lua)?;
-    let exec = lua
-        .scope(|scope| {
-            api::register(&lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
-            super::bridge::register(&lua, &harness)?;
-            let journal = harness.borrow().world.borrow().script_manager().journal();
-            if journal.borrow().is_recording() {
-                super::demo::journal_calls(&lua, &journal)?;
-            }
-            Ok(lua.load(code).set_name(name).exec())
-        })
-        .map_err(|e| format!("Lua bridge error: {}", e))?;
+    let bridge_error = |e: mlua::Error| format!("Lua bridge error: {}", e);
+    super::bridge::register(&lua, &harness).map_err(bridge_error)?;
+    let journal = harness.borrow().world.borrow().script_manager().journal();
+    if journal.borrow().is_recording() {
+        super::demo::journal_calls(&lua, &journal).map_err(bridge_error)?;
+    }
+    let exec = lua.load(code).set_name(name).exec();
     if let Err(e) = &exec {
         harness
             .borrow()

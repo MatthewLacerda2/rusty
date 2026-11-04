@@ -121,6 +121,11 @@ keeps its lines to the batch's own pull requests ([`board.recent`]), `--for` wit
 `--deadline` must fit in a background command's life ([`ending.over_budget`]),
 and the last line is always [`ending.RESUME`] and the command to start it again.
 
+**Several ready pull requests can share one take** (#1785): a merge train of
+up to four, tested on one combined tree and landed together when it is green
+([`train`], [`trains.Yard`]). Who rides, who goes alone and why, and what a red
+train costs: `merging/train/__init__.py`.
+
 The decisions are pure functions over plain dictionaries; [`loop.run`] takes every
 effect as an argument, so the loop is tested without a network.
 """

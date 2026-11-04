@@ -11,9 +11,10 @@
 //! every build.
 //!
 //! `Lighting.Bake()` is the "place well + bake right now" workflow (#246): in one call
-//! it auto-places light probes and reflection probes from the static scene (unless a set
-//! is already manually authored), then runs the existing multi-bounce light-probe bake
-//! (#250, #285) and GGX reflection-probe bake (#252). It is the orchestration over the `Probe`
+//! it re-places the light probes and reflection probes the placement made, keeping every
+//! manual one (#1737), then runs the existing multi-bounce light-probe bake
+//! (#250, #285) and GGX reflection-probe bake (#252), and swaps the new sets in only
+//! when both have finished. It is the orchestration over the `Probe`
 //! and `Reflection` namespaces — manual placement on those stays available; this is the
 //! batteries-included path. `Lighting.BakeLightmaps()` / `ClearLightmaps()` (#438) bake
 //! static geometry's lightmaps beside it, and `Lighting.Generate()` (#832) runs both
@@ -25,86 +26,76 @@
 //! build the `Lighting` table holds only the environment, matching the stripped
 //! agentic layer.
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::ApiCell;
 use crate::scene::authoring::environment as env_ops;
 use crate::scene::Scene;
 
 /// Register the `Lighting` namespace table, with the environment's getters and
 /// setters, onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
-    register_skybox(scope, &table, scene)?;
-    register_ambient(scope, &table, scene)?;
-    register_ambient_gradient(scope, &table, scene)?;
-    register_sky_colors(scope, &table, scene)?;
-    register_clouds(scope, &table, scene)?;
+    register_skybox(lua, &table, scene)?;
+    register_ambient(lua, &table, scene)?;
+    register_ambient_gradient(lua, &table, scene)?;
+    register_sky_colors(lua, &table, scene)?;
+    register_clouds(lua, &table, scene)?;
     lua.globals()
         .set("Lighting", table)
         .map_err(|e| e.to_string())
 }
 
 /// `{Get,Set}Skybox`: the panorama's path, `""` for the procedural sky.
-fn register_skybox<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_skybox(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetSkybox",
-        scope.create_function(|_, ()| Ok(scene.borrow().skybox_path.clone())),
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().skybox_path.clone())),
     )?;
     put(
         table,
         "SetSkybox",
-        scope.create_function(|_, path: Option<String>| {
-            env_ops::set_skybox(&mut scene.borrow_mut(), path.as_deref().unwrap_or(""));
+        lua.create_function(move |lua, path: Option<String>| {
+            env_ops::set_skybox(
+                &mut scene.get(lua)?.borrow_mut(),
+                path.as_deref().unwrap_or(""),
+            );
             Ok(())
         }),
     )
 }
 
 /// `{Get,Set}AmbientColor` (`r, g, b`) and `{Get,Set}AmbientIntensity`.
-fn register_ambient<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_ambient(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetAmbientColor",
-        scope.create_function(|_, ()| {
-            let c = scene.borrow().ambient_color;
+        lua.create_function(move |lua, ()| {
+            let c = scene.get(lua)?.borrow().ambient_color;
             Ok((c.x, c.y, c.z))
         }),
     )?;
     put(
         table,
         "SetAmbientColor",
-        scope.create_function(|_, (r, g, b): (f32, f32, f32)| {
-            env_ops::set_ambient_color(&mut scene.borrow_mut(), Vec3::new(r, g, b));
+        lua.create_function(move |lua, (r, g, b): (f32, f32, f32)| {
+            env_ops::set_ambient_color(&mut scene.get(lua)?.borrow_mut(), Vec3::new(r, g, b));
             Ok(())
         }),
     )?;
     put(
         table,
         "GetAmbientIntensity",
-        scope.create_function(|_, ()| Ok(scene.borrow().ambient_intensity)),
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().ambient_intensity)),
     )?;
     put(
         table,
         "SetAmbientIntensity",
-        scope.create_function(|_, v: f32| {
-            env_ops::set_ambient_intensity(&mut scene.borrow_mut(), v);
+        lua.create_function(move |lua, v: f32| {
+            env_ops::set_ambient_intensity(&mut scene.get(lua)?.borrow_mut(), v);
             Ok(())
         }),
     )
@@ -113,21 +104,17 @@ fn register_ambient<'scope>(
 /// `{Get,Set}AmbientMode` (`"Color"`, `"Gradient"` or `"Skybox"`) and
 /// `{Get,Set}Ambient{Sky,Equator,Ground}Color` (`r, g, b`): Unity's
 /// `RenderSettings.ambientMode` and its trilight colours.
-fn register_ambient_gradient<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_ambient_gradient(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     use crate::scene::{AmbientMode, AmbientSettings};
     put(
         table,
         "GetAmbientMode",
-        scope.create_function(|_, ()| Ok(scene.borrow().ambient.mode.name())),
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().ambient.mode.name())),
     )?;
     put(
         table,
         "SetAmbientMode",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| { let scene = &*scene.get(lua)?;
             let mode = AmbientMode::from_name(&name).ok_or_else(|| {
                 mlua::Error::runtime(format!(
                     "Lighting.SetAmbientMode: unknown mode {name:?} (\"Color\", \"Gradient\" or \"Skybox\")"
@@ -148,16 +135,19 @@ fn register_ambient_gradient<'scope>(
         put(
             table,
             &format!("GetAmbient{name}Color"),
-            scope.create_function(move |_, ()| {
-                let c = read(&scene.borrow().ambient);
+            lua.create_function(move |lua, ()| {
+                let c = read(&scene.get(lua)?.borrow().ambient);
                 Ok((c.x, c.y, c.z))
             }),
         )?;
         put(
             table,
             &format!("SetAmbient{name}Color"),
-            scope.create_function(move |_, (r, g, b): (f32, f32, f32)| {
-                write(&mut scene.borrow_mut().ambient, Vec3::new(r, g, b));
+            lua.create_function(move |lua, (r, g, b): (f32, f32, f32)| {
+                write(
+                    &mut scene.get(lua)?.borrow_mut().ambient,
+                    Vec3::new(r, g, b),
+                );
                 Ok(())
             }),
         )?;
@@ -171,11 +161,7 @@ type SkyColorOp = fn(&mut crate::scene::SkySettings, Option<Vec3>);
 
 /// `{Get,Set}Sky{Zenith,Horizon,Ground}Color`: `r, g, b`, or `nil` while the colour
 /// follows the ambient one.
-fn register_sky_colors<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_sky_colors(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type Read = fn(&crate::scene::SkySettings) -> Option<Vec3>;
     let colors: [(&str, Read, SkyColorOp); 3] = [
         ("Zenith", |s| s.zenith, env_ops::set_sky_zenith),
@@ -186,15 +172,15 @@ fn register_sky_colors<'scope>(
         put(
             table,
             &format!("GetSky{name}Color"),
-            scope.create_function(move |_, ()| {
-                let c = read(&scene.borrow().sky);
+            lua.create_function(move |lua, ()| {
+                let c = read(&scene.get(lua)?.borrow().sky);
                 Ok((c.map(|c| c.x), c.map(|c| c.y), c.map(|c| c.z)))
             }),
         )?;
         put(
             table,
             &format!("SetSky{name}Color"),
-            scope.create_function(move |_, rgb: (Option<f32>, Option<f32>, Option<f32>)| {
+            lua.create_function(move |lua, rgb: (Option<f32>, Option<f32>, Option<f32>)| {
                 let color = match rgb {
                     (Some(r), Some(g), Some(b)) => Some(Vec3::new(r, g, b)),
                     (None, None, None) => None,
@@ -204,7 +190,7 @@ fn register_sky_colors<'scope>(
                         )))
                     }
                 };
-                write(&mut scene.borrow_mut().sky, color);
+                write(&mut scene.get(lua)?.borrow_mut().sky, color);
                 Ok(())
             }),
         )?;
@@ -213,11 +199,7 @@ fn register_sky_colors<'scope>(
 }
 
 /// `{Get,Set}CloudCoverage` and `{Get,Set}CloudOpacity`, each `0..1`.
-fn register_clouds<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_clouds(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type Read = fn(&crate::scene::SkySettings) -> f32;
     type Write = fn(&mut crate::scene::SkySettings, f32);
     let knobs: [(&str, Read, Write); 2] = [
@@ -232,13 +214,13 @@ fn register_clouds<'scope>(
         put(
             table,
             &format!("GetCloud{name}"),
-            scope.create_function(move |_, ()| Ok(read(&scene.borrow().sky))),
+            lua.create_function(move |lua, ()| Ok(read(&scene.get(lua)?.borrow().sky))),
         )?;
         put(
             table,
             &format!("SetCloud{name}"),
-            scope.create_function(move |_, v: f32| {
-                write(&mut scene.borrow_mut().sky, v);
+            lua.create_function(move |lua, v: f32| {
+                write(&mut scene.get(lua)?.borrow_mut().sky, v);
                 Ok(())
             }),
         )?;

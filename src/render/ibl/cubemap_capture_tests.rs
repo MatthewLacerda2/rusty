@@ -88,10 +88,9 @@ fn colored_box_scene() -> Scene {
 }
 
 /// The centre pixel's (r, g, b) of a face.
-fn center_rgb(face: &[u8], res: u32) -> (u8, u8, u8) {
+fn center_rgb(face: &[glam::Vec3], res: u32) -> (f32, f32, f32) {
     let mid = (res / 2) as usize;
-    let idx = (mid * res as usize + mid) * 4;
-    (face[idx], face[idx + 1], face[idx + 2])
+    face[mid * res as usize + mid].into()
 }
 
 /// Capturing from inside the coloured box yields six faces showing the wall colours
@@ -107,7 +106,7 @@ fn gpu_static_cubemap_shows_walls_and_excludes_dynamic() {
 
     assert_eq!(cap.resolution, RES);
     for f in cap.faces.iter() {
-        assert_eq!(f.len() as u32, RES * RES * 4);
+        assert_eq!(f.len() as u32, RES * RES);
     }
 
     // Each face's dominant channel must match the wall it points at.

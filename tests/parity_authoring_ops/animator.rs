@@ -1,8 +1,10 @@
 //! `Animator.Stop` vs `authoring::animator`.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::AnimatorComponent;
 use rusty::scene::authoring::animator as animator_ops;
 use rusty::scene::Scene;
@@ -12,8 +14,8 @@ use rusty::scripting::ConsoleLogs;
 fn animator_stop_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
     // The only Animator field-write binding is `Stop` (is_playing = false); it and the
     // card's "Is Playing" toggle share `authoring::animator::set_playing`.
-    let scene = RefCell::new(Scene::new());
-    let console = RefCell::new(ConsoleLogs::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let playing = || AnimatorComponent {
         is_playing: true,
         ..AnimatorComponent::default()
@@ -32,13 +34,10 @@ fn animator_stop_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::
     };
 
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::animator::register(&lua, s, &scene, &console).unwrap();
-        lua.load(format!("Animator.Stop({via_lua})"))
-            .exec()
-            .unwrap();
-        Ok(())
-    })?;
+    rusty::api::animator::register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
+    lua.load(format!("Animator.Stop({via_lua})"))
+        .exec()
+        .unwrap();
 
     {
         let mut sc = scene.borrow_mut();

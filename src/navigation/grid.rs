@@ -74,6 +74,9 @@ pub struct NavigationGraph {
     pub(super) bake_state: Option<Box<super::bake::BakeState>>,
     /// Off-mesh links (#462): generated drops and jumps, and authored links.
     pub(super) offmesh: super::offmesh::OffMeshLinks,
+    /// The play loop's view of the static geometry's changes (#1707,
+    /// `bake::still`); `None` until `bake_tracked` or `sync_changes` opens it.
+    pub(super) static_watch: Option<super::bake::StaticWatch>,
 }
 
 impl NavigationGraph {
@@ -107,6 +110,7 @@ impl NavigationGraph {
             area_costs: [super::MIN_AREA_COST; super::MAX_AREAS],
             bake_state: None,
             offmesh: Default::default(),
+            static_watch: None,
         }
     }
 

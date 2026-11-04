@@ -4,22 +4,20 @@
 //! follows the entity through a prefab extract → stamp.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::lua::eval;
 use glam::{Vec2, Vec3};
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{Entity, JointComponent, JointKind};
 use rusty::scene::prefab::extract_prefab;
 use rusty::scene::{instantiate_prefab, Scene};
 
-fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
+fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::joint::register(&lua, scope, scene).unwrap();
-        f(&lua);
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::joint::register(&lua, bind(&lua, scene)).unwrap();
+    f(&lua);
 }
 
 #[test]
@@ -28,7 +26,7 @@ fn setters_write_through_and_getters_read_back() {
     let id = scene.add_entity("Door".to_string());
     let frame = scene.add_entity("Frame".to_string());
     scene.world.set_joint(id, Some(JointComponent::default()));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "Joint.SetKind({id}, 'hinge')

@@ -6,7 +6,7 @@
 //! column's type: a `ColliderComponent`, the `TransformComponent`,
 //! `Vec<ScriptComponent>`, the `Core` flags). It is stamped at the World's write
 //! funnels, in the same call that notes the write for the edit journal
-//! (`stamp.rs`): a column borrowed mutably (`component_mut`, `with_pair_mut`),
+//! (`stamp.rs`): a column borrowed mutably (`component_mut`, `with_mut_and_ref`),
 //! attached, detached or taken (`set_component`, `take_component`), and every
 //! column of an entity placed, overwritten or removed. A write to a column the
 //! entity lacks stamps nothing (`ecs/funnel.rs`). A mutable borrow counts as
@@ -45,7 +45,7 @@ mod epoch_tests;
 mod funnel_tests;
 mod log;
 #[cfg(test)]
-mod ops_tests;
+pub(crate) mod ops_tests;
 #[cfg(test)]
 mod play_tests;
 #[cfg(test)]

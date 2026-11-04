@@ -1,9 +1,11 @@
 //! `Light.*` bindings vs `authoring::rendering::light`.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{LightComponent, LightType};
 use rusty::scene::authoring::rendering::light as light_ops;
 use rusty::scene::Scene;
@@ -26,27 +28,24 @@ fn entity_with_light(scene: &mut Scene, name: &str) -> u32 {
 
 #[test]
 fn light_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let via_lua = entity_with_light(&mut scene.borrow_mut(), "ViaLua");
     let via_op = entity_with_light(&mut scene.borrow_mut(), "ViaOp");
 
-    let console = RefCell::new(rusty::scripting::ConsoleLogs::new());
+    let console = Rc::new(RefCell::new(rusty::scripting::ConsoleLogs::new()));
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::light::register(&lua, s, &scene, &console).unwrap();
-        lua.load(format!(
-            r#"
-            Light.SetColor({via_lua}, 0.2, 0.4, 0.6)
-            Light.SetIntensity({via_lua}, -5.0)
-            Light.SetRange({via_lua}, -2.0)
-            Light.SetType({via_lua}, "Directional")
-            Light.SetCastShadows({via_lua}, true)
-        "#
-        ))
-        .exec()
-        .unwrap();
-        Ok(())
-    })?;
+    rusty::api::light::register(&lua, bind(&lua, &scene), bind(&lua, &console)).unwrap();
+    lua.load(format!(
+        r#"
+        Light.SetColor({via_lua}, 0.2, 0.4, 0.6)
+        Light.SetIntensity({via_lua}, -5.0)
+        Light.SetRange({via_lua}, -2.0)
+        Light.SetType({via_lua}, "Directional")
+        Light.SetCastShadows({via_lua}, true)
+    "#
+    ))
+    .exec()
+    .unwrap();
 
     {
         let mut sc = scene.borrow_mut();

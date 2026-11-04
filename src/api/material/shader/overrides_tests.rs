@@ -7,7 +7,7 @@ use super::tests::{run, scene_with, Baked};
 use crate::scene::Scene;
 
 /// Two entities sharing one material whose shader is `shader`: (scene, a, b, key).
-fn pair(shader: &str) -> (std::cell::RefCell<Scene>, u32, u32, String) {
+fn pair(shader: &str) -> (std::rc::Rc<std::cell::RefCell<Scene>>, u32, u32, String) {
     let (scene, a) = scene_with(shader);
     let key = scene
         .borrow()

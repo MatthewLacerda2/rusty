@@ -44,7 +44,7 @@ fn gpu_a_runtime_param_redraws_without_a_rebuild() {
     };
     let baked = Baked::new("param", &[("wipe", &[("softness", 0.01)])]);
     let (scene, _, id) = scene(Some(&baked.0));
-    let scene = RefCell::new(scene);
+    let scene = std::rc::Rc::new(RefCell::new(scene));
     let mut view = None;
     assert!(shot(&mut renderer, &mut view, &scene.borrow()).px(44, 32)[0] > 240);
     let builds = renderer.ui_renderer.shaders.builds();

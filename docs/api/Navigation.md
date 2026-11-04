@@ -26,9 +26,10 @@ what the last bake read; a link change re-snaps the links without rebaking any f
 change dirties the cells its old and new footprints cover; only those cells, plus the
 agent-radius erosion's reach around them, are rebaked. The result is exactly the navmesh
 a full bake of the scene would give, and an agent re-plans only when its path crosses a
-rebaked cell. A tick where nothing changed costs one pass over the colliders and
-obstacles, so geometry can move every frame (a door swinging shut) and agents see it the
-same tick. Play's first frame bakes in full; so does a change of the bake settings or of
+rebaked cell. A tick where no static entity changed skips the static colliders (the
+World's change log says so, #1707) and costs one pass over the obstacles, modifier volumes
+and links; a moving dynamic body never costs the static pass. So geometry can move every
+frame (a door swinging shut) and agents see it the same tick. Play's first frame bakes in full; so does a change of the bake settings or of
 the grid's bounds.
 
 Every query resolves the start and the target to spans with one rule: **the nearest

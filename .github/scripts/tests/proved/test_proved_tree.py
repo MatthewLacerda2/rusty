@@ -28,10 +28,11 @@ def built_jobs(**over) -> list[dict]:
 class Fake:
     """`gh api`: the answer for the first prefix a path starts with, else `None`."""
 
-    def __init__(self, jobs=None, tree=TREE, files=("src/lib.rs",), status="ahead", fail=()):
+    def __init__(self, jobs=None, tree=TREE, files=("src/lib.rs",), status="ahead", fail=(), tip=SHA):
         run = {"id": 7, "html_url": "http://run/7", "head_commit": {"tree_id": tree}}
         self.answers = {
             f"repos/{REPO}/compare/": {"status": status, "files": [{"filename": f} for f in files]},
+            f"repos/{REPO}/commits/main": {"sha": tip},
             f"repos/{REPO}/commits/{SHA}": {"commit": {"tree": {"sha": TREE}}},
             f"repos/{REPO}/actions/workflows/": {"workflow_runs": [run]},
             f"repos/{REPO}/actions/runs/7/jobs": {"jobs": built_jobs() if jobs is None else jobs},
@@ -58,6 +59,28 @@ class Skips(unittest.TestCase):
     def test_lint_by_its_own_built_step(self):
         fake = Fake(jobs=[job("lint", "Clippy (hard gate, default features)")])
         self.assertEqual(proved_tree.verdict(fake, REPO, "lint.yml", SHA, BEFORE)[0], "http://run/7")
+
+
+class Superseded(unittest.TestCase):
+    """A train's intermediate squash is no longer `main`'s tip by its push run (#1785)."""
+
+    def test_a_push_main_already_left_skips_without_a_run(self):
+        url, why = verdict(Fake(tree="x" * 40, tip="n" * 40))
+        self.assertEqual(url, "n" * 40)
+        self.assertIn("skips the build", why)
+
+    def test_a_push_still_the_tip_needs_its_own_proof(self):
+        self.assertIsNone(verdict(Fake(tree="x" * 40))[0])
+
+    def test_a_tip_lookup_failing_is_not_superseded(self):
+        for fake in (Fake(tree="x" * 40, fail=(f"repos/{REPO}/commits/main",)), Fake(tree="x" * 40, tip="short")):
+            with self.subTest():
+                url, why = verdict(fake)
+                self.assertIsNone(url)
+                self.assertTrue(why.startswith("runs in full"), why)
+
+    def test_a_superseded_push_that_moves_the_cache_key_still_runs(self):
+        self.assertIsNone(verdict(Fake(files=("Cargo.lock",), tip="n" * 40))[0])
 
 
 class RunsInFull(unittest.TestCase):

@@ -2,8 +2,10 @@
 //! nothing, and a clip the entity's mesh lacks warns.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::asset::anim_data::AnimationClip;
 use rusty::components::MeshComponent;
 use rusty::scene::Scene;
@@ -12,13 +14,10 @@ use rusty::scripting::{ConsoleLogs, LogLevel};
 use super::scene_with_animator;
 
 /// Run `script` against `scene` with `console` as the namespace's console.
-fn run_with(scene: &RefCell<Scene>, console: &RefCell<ConsoleLogs>, script: &str) {
+fn run_with(scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>, script: &str) {
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::animator::register(&lua, s, scene, console).unwrap();
-        lua.load(script).exec()
-    })
-    .unwrap();
+    rusty::api::animator::register(&lua, bind(&lua, scene), bind(&lua, console)).unwrap();
+    lua.load(script).exec().unwrap();
 }
 
 fn give_walk_clip(scene: &RefCell<Scene>, id: u32) {
@@ -38,7 +37,7 @@ fn give_walk_clip(scene: &RefCell<Scene>, id: u32) {
 #[test]
 fn a_successful_play_or_crossfade_logs_nothing() {
     let (scene, id) = scene_with_animator();
-    let console = RefCell::new(ConsoleLogs::new());
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     // No mesh yet: a Play issued before it arrives stays quiet (#1386).
     run_with(&scene, &console, &format!("Animator.Play({id}, 'Walk')"));
     give_walk_clip(&scene, id);
@@ -54,7 +53,7 @@ fn a_successful_play_or_crossfade_logs_nothing() {
 fn a_clip_the_mesh_lacks_warns_once_per_run_of_repeats() {
     let (scene, id) = scene_with_animator();
     give_walk_clip(&scene, id);
-    let console = RefCell::new(ConsoleLogs::new());
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let mark = console.borrow().logged();
     run_with(&scene, &console, &format!("Animator.Play({id}, 'Wlak')"));
     run_with(&scene, &console, &format!("Animator.Play({id}, 'Wlak')"));
@@ -78,7 +77,7 @@ fn a_clip_the_mesh_lacks_warns_once_per_run_of_repeats() {
 fn crossfade_into_a_clip_the_mesh_lacks_warns() {
     let (scene, id) = scene_with_animator();
     give_walk_clip(&scene, id);
-    let console = RefCell::new(ConsoleLogs::new());
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let mark = console.borrow().logged();
     run_with(
         &scene,

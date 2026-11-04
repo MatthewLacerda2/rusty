@@ -12,48 +12,39 @@
 
 mod shadows;
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::{LightMode, LightType};
 use crate::scene::authoring::rendering::light as light_ops;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Light` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>, console: ApiCell<ConsoleLogs>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_color(scope, &table, scene)?;
-    register_intensity(scope, &table, scene)?;
-    register_range(scope, &table, scene)?;
-    register_type(scope, &table, scene)?;
-    shadows::register(scope, &table, scene)?;
-    register_mode(scope, &table, scene, console)?;
-    register_area_size(scope, &table, scene)?;
+    register_color(lua, &table, scene)?;
+    register_intensity(lua, &table, scene)?;
+    register_range(lua, &table, scene)?;
+    register_type(lua, &table, scene)?;
+    shadows::register(lua, &table, scene)?;
+    register_mode(lua, &table, scene, console)?;
+    register_area_size(lua, &table, scene)?;
 
     lua.globals().set("Light", table).map_err(|e| e.to_string())
 }
 
 /// `GetColor` / `SetColor` over the light's linear RGB colour.
-fn register_color<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_color(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetColor",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let c = scene.world.light(id.read()).map(|l| l.color);
             let c = c.unwrap_or(Vec3::ONE);
@@ -64,7 +55,8 @@ fn register_color<'scope>(
     put(
         table,
         "SetColor",
-        scope.create_function(|_, (id, r, g, b): (EntityArg, f32, f32, f32)| {
+        lua.create_function(move |lua, (id, r, g, b): (EntityArg, f32, f32, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Light", "SetColor")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
@@ -76,15 +68,12 @@ fn register_color<'scope>(
 }
 
 /// `GetIntensity` / `SetIntensity` (clamped ≥ 0).
-fn register_intensity<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_intensity(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetIntensity",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene
                 .world
@@ -97,7 +86,8 @@ fn register_intensity<'scope>(
     put(
         table,
         "SetIntensity",
-        scope.create_function(|_, (id, value): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, value): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Light", "SetIntensity")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
@@ -109,15 +99,12 @@ fn register_intensity<'scope>(
 }
 
 /// `GetRange` / `SetRange` (clamped ≥ 0).
-fn register_range<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_range(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetRange",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.world.light(id.read()).map(|l| l.range).unwrap_or(0.0))
         }),
@@ -126,7 +113,8 @@ fn register_range<'scope>(
     put(
         table,
         "SetRange",
-        scope.create_function(|_, (id, value): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, value): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Light", "SetRange")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
@@ -139,15 +127,12 @@ fn register_range<'scope>(
 
 /// `GetType` / `SetType` over the light's kind, by name. Unknown names on `SetType`
 /// are ignored (the current type is kept).
-fn register_type<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_type(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetType",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let name = scene
                 .world
@@ -161,7 +146,8 @@ fn register_type<'scope>(
     put(
         table,
         "SetType",
-        scope.create_function(|_, (id, name): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Light", "SetType")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
@@ -178,16 +164,17 @@ fn register_type<'scope>(
 /// name. Unknown names on `SetMode` are ignored (the current mode is kept); an Area
 /// light reads its effective `Baked` and refuses anything else with a console
 /// warning (#1674).
-fn register_mode<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_mode(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
+    scene: ApiCell<Scene>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
     put(
         table,
         "GetMode",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let mode = scene
                 .world
@@ -200,34 +187,34 @@ fn register_mode<'scope>(
     put(
         table,
         "SetMode",
-        scope.create_function(|_, (id, name): (EntityArg, String)| {
-            let id = id.live("Light", "SetMode")?;
-            let mut scene = scene.borrow_mut();
-            if let (Some(mut c), Some(mode)) = (scene.world.light_mut(id), LightMode::parse(&name))
-            {
-                if !light_ops::set_mode(&mut c, mode) {
-                    console.borrow_mut().warn(format!(
-                        "Light.SetMode: an Area light is always Baked, \"{}\" refused",
-                        mode.name()
-                    ));
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
+            scene.with(lua, |scene| {
+                let id = id.live("Light", "SetMode")?;
+                let mut scene = scene.borrow_mut();
+                if let (Some(mut c), Some(mode)) =
+                    (scene.world.light_mut(id), LightMode::parse(&name))
+                {
+                    if !light_ops::set_mode(&mut c, mode) {
+                        console.get(lua)?.borrow_mut().warn(format!(
+                            "Light.SetMode: an Area light is always Baked, \"{}\" refused",
+                            mode.name()
+                        ));
+                    }
                 }
-            }
-            Ok(())
+                Ok(())
+            })
         }),
     )
 }
 
 /// `GetAreaSize` / `SetAreaSize`: an Area light's width and height, Unity's
 /// `areaSize` (#1674). Any light carries one; only an Area light uses it.
-fn register_area_size<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_area_size(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetAreaSize",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let size = scene.world.light(id.read()).map(|l| l.area_size);
             let size = size.unwrap_or(glam::Vec2::ZERO);
@@ -238,7 +225,8 @@ fn register_area_size<'scope>(
     put(
         table,
         "SetAreaSize",
-        scope.create_function(|_, (id, w, h): (EntityArg, f32, f32)| {
+        lua.create_function(move |lua, (id, w, h): (EntityArg, f32, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Light", "SetAreaSize")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {

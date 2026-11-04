@@ -2,12 +2,13 @@
 //! (#1369): unchanged means unchanged since `Get`, `graph = ""`, a renamed UI
 //! shader, LOD levels, flattened Animator types.
 
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
 use glam::Vec3;
 use mlua::Lua;
 
 use super::register;
+use crate::api::bind;
 use crate::components::UiShader;
 use crate::scene::authoring::{add_component, ComponentKind};
 use crate::scene::Scene;
@@ -23,12 +24,12 @@ fn run<R: mlua::FromLuaMulti>(chunks: &[&str], mut tick: impl FnMut(&mut Scene))
     }
     let other = scene.add_entity("Other".to_string());
     add_component(&mut scene, other, ComponentKind::RigidBody);
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
     lua.globals().set("id", id).unwrap();
     lua.globals().set("other", other).unwrap();
-    let out = lua.scope(|s| {
-        register(&lua, s, &scene).unwrap();
+    let out = crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene)).unwrap();
         let (last, first) = chunks.split_last().unwrap();
         for chunk in first {
             lua.load(*chunk).exec()?;
@@ -36,7 +37,7 @@ fn run<R: mlua::FromLuaMulti>(chunks: &[&str], mut tick: impl FnMut(&mut Scene))
         }
         lua.load(*last).eval::<R>()
     });
-    (scene.into_inner(), out.unwrap_or_else(|e| panic!("{e}")))
+    (scene.take(), out.unwrap_or_else(|e| panic!("{e}")))
 }
 
 #[test]

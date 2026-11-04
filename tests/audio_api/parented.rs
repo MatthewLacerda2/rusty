@@ -27,19 +27,15 @@ fn a_parented_source_is_heard_and_logged_at_its_world_position() {
         scene.world.set_audio(child, Some(source));
         child
     };
-    lua.scope(|scope| {
-        register(&lua, scope, &f);
-        lua.load(format!("Audio.Play({child})")).exec().unwrap();
-        let (gain, pan, playing): (f32, f32, bool) = lua
-            .load(format!("return Audio.GetSpatial({child})"))
-            .eval()
-            .unwrap();
-        assert!(playing);
-        assert!(pan.abs() > 0.3, "off to the side, panned: {pan}");
-        assert!(gain < 1.0, "far away, attenuated: {gain}");
-        Ok(())
-    })
-    .unwrap();
+    register(&lua, &f);
+    lua.load(format!("Audio.Play({child})")).exec().unwrap();
+    let (gain, pan, playing): (f32, f32, bool) = lua
+        .load(format!("return Audio.GetSpatial({child})"))
+        .eval()
+        .unwrap();
+    assert!(playing);
+    assert!(pan.abs() > 0.3, "off to the side, panned: {pan}");
+    assert!(gain < 1.0, "far away, attenuated: {gain}");
     let audio = f.audio.borrow();
     let logged = audio.events().last().expect("Play is logged").position;
     assert_eq!(logged, [10.0, 0.0, 10.0]);

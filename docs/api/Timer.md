@@ -68,7 +68,3 @@ An error inside a coroutine — or a yield of anything but `nil` or a `Timer.Wai
 instruction — logs `[Lua Error] Coroutine on entity N failed: …` and ends that
 coroutine. Nested `yield StartCoroutine(...)` (waiting on another coroutine) is
 not supported; use `Timer.WaitUntil(function() return not Timer.IsPending(h) end)`.
-
-> A coroutine resumes in a later script evaluation, where the namespaces are
-> registered afresh — so look namespaces up by name after a yield (`Transform.…`),
-> never through a local cached before it (`local T = Transform`).

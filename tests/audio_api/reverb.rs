@@ -5,6 +5,7 @@
 
 use super::{fixture, register};
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::ReverbZoneComponent;
 
 #[test]
@@ -16,9 +17,9 @@ fn radii_presets_and_params_round_trip() {
         .borrow_mut()
         .world
         .set_reverb_zone(id, Some(ReverbZoneComponent::default()));
-    lua.scope(|scope| {
-        register(&lua, scope, &f);
-        rusty::api::reverb_zone::register(&lua, scope, &f.scene).unwrap();
+    crate::lua::attempt(|| {
+        register(&lua, &f);
+        rusty::api::reverb_zone::register(&lua, bind(&lua, &f.scene)).unwrap();
         lua.globals().set("id", id)?;
         let radii: (f32, f32) = lua
             .load(
@@ -57,9 +58,9 @@ fn radii_presets_and_params_round_trip() {
 fn errors_name_what_is_wrong_and_the_state_starts_dry() {
     let lua = Lua::new();
     let f = fixture();
-    lua.scope(|scope| {
-        register(&lua, scope, &f);
-        rusty::api::reverb_zone::register(&lua, scope, &f.scene).unwrap();
+    crate::lua::attempt(|| {
+        register(&lua, &f);
+        rusty::api::reverb_zone::register(&lua, bind(&lua, &f.scene)).unwrap();
         lua.globals().set("id", f.bare_id)?;
         let missing: Option<f32> = lua
             .load("return AudioReverbZone.GetMinDistance(id)")

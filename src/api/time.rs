@@ -9,120 +9,107 @@
 //! windowed frame loop reads each frame. `Pause` is a hard loop halt distinct from
 //! `SetTimeScale(0)` — see the field docs on `time::Time` and `docs/api/Time.md`.
 
-use std::cell::RefCell;
-
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::ApiCell;
 use crate::time::Time;
 
 /// Register the `Time` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    time: &'scope RefCell<Time>,
-) -> Reg {
+pub fn register(lua: &Lua, time: ApiCell<Time>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
-    register_clock(scope, &table, time)?;
-    register_pause_step(scope, &table, time)?;
+    register_clock(lua, &table, time)?;
+    register_pause_step(lua, &table, time)?;
     lua.globals().set("Time", table).map_err(|e| e.to_string())
 }
 
 /// The read-only clock accessors plus the `time_scale` get/set pair.
-fn register_clock<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    time: &'scope RefCell<Time>,
-) -> Reg {
+fn register_clock(lua: &mlua::Lua, table: &mlua::Table, time: ApiCell<Time>) -> Reg {
     put(
         table,
         "deltaTime",
-        scope.create_function(|_, ()| Ok(time.borrow().delta_time)),
+        lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().delta_time)),
     )?;
     put(
         table,
         "unscaledDeltaTime",
-        scope.create_function(|_, ()| Ok(time.borrow().unscaled_delta_time)),
+        lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().unscaled_delta_time)),
     )?;
     put(
         table,
         "fixedDeltaTime",
-        scope.create_function(|_, ()| Ok(time.borrow().fixed_delta_time)),
+        lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().fixed_delta_time)),
     )?;
     put(
         table,
         "frameCount",
-        scope.create_function(|_, ()| Ok(time.borrow().frame_count)),
+        lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().frame_count)),
     )?;
     // Scaled game time (#398) — the same clock shaders read as `camera.time`.
     put(
         table,
         "time",
-        scope.create_function(|_, ()| Ok(time.borrow().time)),
+        lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().time)),
     )?;
     // Unscaled time (#427) — the clock custom UI shaders read.
     put(
         table,
         "unscaledTime",
-        scope.create_function(|_, ()| Ok(time.borrow().unscaled_time)),
+        lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().unscaled_time)),
     )?;
     put(
         table,
         "SetTimeScale",
-        scope.create_function(|_, scale: f32| {
-            time.borrow_mut().set_time_scale(scale);
+        lua.create_function(move |lua, scale: f32| {
+            time.get(lua)?.borrow_mut().set_time_scale(scale);
             Ok(())
         }),
     )?;
     put(
         table,
         "GetTimeScale",
-        scope.create_function(|_, ()| Ok(time.borrow().time_scale)),
+        lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().time_scale)),
     )
 }
 
 /// Pause / step / resume (issue #283): the loop-level control verbs the windowed
 /// frame loop reads each frame, plus `IsPaused` / `PendingSteps` readers so the
 /// control state is observable through the same surface.
-fn register_pause_step<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    time: &'scope RefCell<Time>,
-) -> Reg {
+fn register_pause_step(lua: &mlua::Lua, table: &mlua::Table, time: ApiCell<Time>) -> Reg {
     put(
         table,
         "Pause",
-        scope.create_function(|_, ()| {
-            time.borrow_mut().pause();
+        lua.create_function(move |lua, ()| {
+            time.get(lua)?.borrow_mut().pause();
             Ok(())
         }),
     )?;
     put(
         table,
         "Resume",
-        scope.create_function(|_, ()| {
-            time.borrow_mut().resume();
+        lua.create_function(move |lua, ()| {
+            time.get(lua)?.borrow_mut().resume();
             Ok(())
         }),
     )?;
     put(
         table,
         "Step",
-        scope.create_function(|_, n: u32| {
+        lua.create_function(move |lua, n: u32| {
             // Enqueues N fixed-dt steps **only while paused** (no-op otherwise — see
             // `Time::request_steps`). The windowed loop drains them at FIXED_DELTA_TIME.
-            time.borrow_mut().request_steps(n);
+            time.get(lua)?.borrow_mut().request_steps(n);
             Ok(())
         }),
     )?;
     put(
         table,
         "IsPaused",
-        scope.create_function(|_, ()| Ok(time.borrow().paused)),
+        lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().paused)),
     )?;
     put(
         table,
         "PendingSteps",
-        scope.create_function(|_, ()| Ok(time.borrow().pending_steps)),
+        lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().pending_steps)),
     )
 }

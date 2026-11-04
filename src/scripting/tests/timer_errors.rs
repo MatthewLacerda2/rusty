@@ -131,14 +131,11 @@ fn a_job_from_another_vm_is_cancelled_once() {
 #[test]
 fn a_function_from_a_non_gameplay_vm_is_refused() {
     let (m, id) = rig("timer_foreign", &counted(""));
-    let ctx = m.make_ctx();
     let lua = mlua::Lua::new();
+    m.cells.install(&lua).unwrap();
     let err = lua
-        .scope(|scope| {
-            crate::api::register(&lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
-            lua.load(format!("Timer.StartCoroutine({id}, function() end)"))
-                .exec()
-        })
+        .load(format!("Timer.StartCoroutine({id}, function() end)"))
+        .exec()
         .unwrap_err();
     assert!(err.to_string().contains("Timer.StartCoroutine"), "{err}");
 }

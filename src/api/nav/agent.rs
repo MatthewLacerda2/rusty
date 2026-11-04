@@ -3,37 +3,31 @@
 //! Reads and writes an entity's optional nav-agent component: destination, motion
 //! tuning, footprint, and the runtime queries the steering tick feeds.
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::Lua;
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::navigation::{is_at_target, NavigationGraph};
 use crate::scene::authoring::nav::agent as nav_ops;
 use crate::scene::Scene;
 
 /// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component, and
 /// its path state (`path_state`, #458).
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    nav: &'scope RefCell<NavigationGraph>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<NavigationGraph>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_agent_target(scope, &table, scene)?;
-    register_agent_motion(scope, &table, scene)?;
-    register_agent_size(scope, &table, scene)?;
-    register_agent_queries(scope, &table, scene)?;
-    register_agent_avoidance(scope, &table, scene)?;
-    super::turning::register(scope, &table, scene)?;
-    super::path_state::register_reads(scope, &table, scene)?;
-    super::path_state::register_writes(scope, &table, scene, nav)?;
-    super::offmesh::register_agent(scope, &table, scene)?;
-    super::areas::register_agent(scope, &table, scene)?;
+    register_agent_target(lua, &table, scene)?;
+    register_agent_motion(lua, &table, scene)?;
+    register_agent_size(lua, &table, scene)?;
+    register_agent_queries(lua, &table, scene)?;
+    register_agent_avoidance(lua, &table, scene)?;
+    super::turning::register(lua, &table, scene)?;
+    super::path_state::register_reads(lua, &table, scene)?;
+    super::path_state::register_writes(lua, &table, scene, nav)?;
+    super::offmesh::register_agent(lua, &table, scene)?;
+    super::areas::register_agent(lua, &table, scene)?;
 
     lua.globals()
         .set("NavMeshAgent", table)
@@ -41,15 +35,12 @@ pub fn register<'scope>(
 }
 
 /// `SetTarget` / `GetTarget` over the agent's destination.
-fn register_agent_target<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_agent_target(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetTarget",
-        scope.create_function(|_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        lua.create_function(move |lua, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("NavMeshAgent", "SetTarget")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
@@ -62,7 +53,8 @@ fn register_agent_target<'scope>(
     put(
         table,
         "GetTarget",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let t = scene
                 .world
@@ -75,15 +67,12 @@ fn register_agent_target<'scope>(
 }
 
 /// Motion tuning: `SetSpeed` / `SetAcceleration`.
-fn register_agent_motion<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_agent_motion(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetSpeed",
-        scope.create_function(|_, (id, speed): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, speed): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("NavMeshAgent", "SetSpeed")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
@@ -96,7 +85,8 @@ fn register_agent_motion<'scope>(
     put(
         table,
         "SetAcceleration",
-        scope.create_function(|_, (id, acc): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, acc): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("NavMeshAgent", "SetAcceleration")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
@@ -107,16 +97,13 @@ fn register_agent_motion<'scope>(
     )
 }
 
-/// Footprint tuning: `SetStoppingDistance` / `SetRadius` / `Set`-`GetBaseOffset`.
-fn register_agent_size<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+/// Footprint tuning: `SetStoppingDistance` / `SetRadius`, then [`register_base_offset`].
+fn register_agent_size(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetStoppingDistance",
-        scope.create_function(|_, (id, dist): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, dist): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("NavMeshAgent", "SetStoppingDistance")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
@@ -125,11 +112,11 @@ fn register_agent_size<'scope>(
             Ok(())
         }),
     )?;
-
     put(
         table,
         "SetRadius",
-        scope.create_function(|_, (id, r): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, r): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("NavMeshAgent", "SetRadius")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
@@ -138,11 +125,16 @@ fn register_agent_size<'scope>(
             Ok(())
         }),
     )?;
+    register_base_offset(lua, table, scene)
+}
 
+/// `SetBaseOffset` / `GetBaseOffset`: the agent's height above the navmesh.
+fn register_base_offset(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetBaseOffset",
-        scope.create_function(|_, (id, offset): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, offset): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("NavMeshAgent", "SetBaseOffset")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
@@ -151,11 +143,11 @@ fn register_agent_size<'scope>(
             Ok(())
         }),
     )?;
-
     put(
         table,
         "GetBaseOffset",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene
                 .world
@@ -166,15 +158,12 @@ fn register_agent_size<'scope>(
 }
 
 /// Runtime queries / toggle: `IsAtTarget`, `GetVelocity`, and `SetActive`.
-fn register_agent_queries<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_agent_queries(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "IsAtTarget",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let id = id.read();
             let scene = scene.borrow();
             let at_target = scene
@@ -189,7 +178,8 @@ fn register_agent_queries<'scope>(
     put(
         table,
         "GetVelocity",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let v = scene
                 .world
@@ -203,7 +193,8 @@ fn register_agent_queries<'scope>(
     put(
         table,
         "SetActive",
-        scope.create_function(|_, (id, active): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, active): (EntityArg, bool)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("NavMeshAgent", "SetActive")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
@@ -215,15 +206,12 @@ fn register_agent_queries<'scope>(
 }
 
 /// Local avoidance (#463): `SetAvoidancePriority` / `SetAvoidanceEnabled`.
-fn register_agent_avoidance<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_agent_avoidance(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetAvoidancePriority",
-        scope.create_function(|_, (id, priority): (EntityArg, f64)| {
+        lua.create_function(move |lua, (id, priority): (EntityArg, f64)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("NavMeshAgent", "SetAvoidancePriority")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {
@@ -236,7 +224,8 @@ fn register_agent_avoidance<'scope>(
     put(
         table,
         "SetAvoidanceEnabled",
-        scope.create_function(|_, (id, enabled): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, enabled): (EntityArg, bool)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("NavMeshAgent", "SetAvoidanceEnabled")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.nav_agent_mut(id) {

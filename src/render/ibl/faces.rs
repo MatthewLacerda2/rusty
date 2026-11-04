@@ -86,16 +86,9 @@ pub(crate) fn face_view_projection(position: Vec3, face: CubemapFace) -> Mat4 {
         * face_camera(position, face).build_view_projection(1.0)
 }
 
-/// Reverse each `resolution`-wide RGBA8 row of `face` in place (see [`face_camera`]).
-pub(super) fn mirror_rows(face: &mut [u8], resolution: u32) {
-    let row = resolution as usize * 4;
-    for line in face.chunks_exact_mut(row) {
-        let texels = line.len() / 4;
-        for x in 0..texels / 2 {
-            let (a, b) = (x * 4, (texels - 1 - x) * 4);
-            for c in 0..4 {
-                line.swap(a + c, b + c);
-            }
-        }
+/// Reverse each `resolution`-wide row of texels of `face` in place (see [`face_camera`]).
+pub(super) fn mirror_rows<T>(face: &mut [T], resolution: u32) {
+    for line in face.chunks_exact_mut(resolution as usize) {
+        line.reverse();
     }
 }

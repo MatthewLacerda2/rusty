@@ -3,21 +3,19 @@
 //! zones, rumble) read back what was written.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::core::input::gamepad::Rumble;
 use rusty::core::input::InputState;
 
 /// Run `f` with a Lua VM whose `Input` table is bound to `input`.
-fn with_input(input: &RefCell<InputState>, f: impl FnOnce(&Lua)) {
+fn with_input(input: &Rc<RefCell<InputState>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::input::register_readable(&lua, scope, input).unwrap();
-        rusty::api::input::register_writable(&lua, scope, input).unwrap();
-        f(&lua);
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::input::register_readable(&lua, bind(&lua, input)).unwrap();
+    rusty::api::input::register_writable(&lua, bind(&lua, input)).unwrap();
+    f(&lua);
 }
 
 fn eval<T: mlua::FromLuaMulti>(lua: &Lua, code: &str) -> T {
@@ -26,7 +24,7 @@ fn eval<T: mlua::FromLuaMulti>(lua: &Lua, code: &str) -> T {
 
 #[test]
 fn injected_axes_reach_lua_on_the_next_tick_and_hold() {
-    let input = RefCell::new(InputState::new());
+    let input = Rc::new(RefCell::new(InputState::new()));
     with_input(&input, |lua| {
         lua.load(r#"Input.SetAxis("PadLeftX", 0.5); Input.SetAxis("Pad1RightTrigger", 2)"#)
             .exec()
@@ -45,7 +43,7 @@ fn injected_axes_reach_lua_on_the_next_tick_and_hold() {
 
 #[test]
 fn pad_buttons_are_keys_with_one_tick_edges() {
-    let input = RefCell::new(InputState::new());
+    let input = Rc::new(RefCell::new(InputState::new()));
     with_input(&input, |lua| {
         lua.load(r#"Input.Press("PadA")"#).exec().unwrap();
         input.borrow_mut().begin_tick();
@@ -58,7 +56,7 @@ fn pad_buttons_are_keys_with_one_tick_edges() {
 
 #[test]
 fn connection_dead_zones_and_rumble_read_back() {
-    let input = RefCell::new(InputState::new());
+    let input = Rc::new(RefCell::new(InputState::new()));
     with_input(&input, |lua| {
         lua.load(
             r#"Input.SetPadConnected(1, true)

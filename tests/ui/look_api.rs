@@ -4,9 +4,11 @@
 //! gradient table round-trips, and the shapes survive a scene save → load.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec4;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{
     CanvasComponent, ImageComponent, ShapeCorner, ShapeKind, TextComponent, UiBlend,
 };
@@ -16,20 +18,23 @@ use rusty::scene::Scene;
 const RECIPE: &str = include_str!("look_recipe.lua");
 
 /// Run `f` with the namespaces the recipe uses registered over `scene`.
-fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
-    let path = RefCell::new(None);
-    let screen = RefCell::new(rusty::ui::ScreenSize::default());
-    let video = RefCell::new(rusty::core::settings::video::VideoSettings::default());
+fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
+    let path = Rc::new(RefCell::new(None));
+    let screen = Rc::new(RefCell::new(rusty::ui::ScreenSize::default()));
+    let video = Rc::new(RefCell::new(
+        rusty::core::settings::video::VideoSettings::default(),
+    ));
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::scene::register(&lua, scope, scene, &path).unwrap();
-        rusty::api::rect_transform::register(&lua, scope, scene, (&screen, &video)).unwrap();
-        rusty::api::shape::register(&lua, scope, scene).unwrap();
-        rusty::api::image::register(&lua, scope, scene).unwrap();
-        f(&lua);
-        Ok(())
-    })
+    rusty::api::scene::register(&lua, bind(&lua, scene), bind(&lua, &path)).unwrap();
+    rusty::api::rect_transform::register(
+        &lua,
+        bind(&lua, scene),
+        (bind(&lua, &screen), bind(&lua, &video)),
+    )
     .unwrap();
+    rusty::api::shape::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::api::image::register(&lua, bind(&lua, scene)).unwrap();
+    f(&lua);
 }
 
 #[test]
@@ -39,7 +44,7 @@ fn the_cyberpunk_recipe_builds_its_panel() {
     scene
         .world
         .set_canvas(hud, Some(CanvasComponent::default()));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.globals().set("hud", hud).unwrap();
         lua.load(RECIPE).exec().expect("the recipe runs");
@@ -75,7 +80,7 @@ fn setters_validate_and_blend_and_gradient_reach_image_and_text() {
     scene.world.set_image(id, Some(ImageComponent::default()));
     scene.world.set_text(id, Some(TextComponent::default()));
     scene.world.set_shape(id, Some(Default::default()));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "Shape.SetRadius({id}, -4, 2, 3, 4)

@@ -16,25 +16,20 @@ use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::OffMeshLinkComponent as Link;
 use crate::navigation::NavigationGraph;
 use crate::scene::authoring::nav::offmesh_link as ops;
 use crate::scene::Scene;
 
-type SceneCell<'s> = &'s RefCell<Scene>;
-
 /// Register the `OffMeshLink` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    nav: &'scope RefCell<NavigationGraph>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<NavigationGraph>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
-    register_ends(scope, &t, scene)?;
-    register_options(scope, &t, scene)?;
-    let f =
-        scope.create_function(move |_, id: EntityArg| Ok(nav.borrow().link_connected(id.read())));
+    register_ends(lua, &t, scene)?;
+    register_options(lua, &t, scene)?;
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(nav.get(lua)?.borrow().link_connected(id.read()))
+    });
     put(&t, "IsConnected", f)?;
     lua.globals()
         .set("OffMeshLink", t)
@@ -42,38 +37,34 @@ pub fn register<'scope>(
 }
 
 /// `id`'s link, cloned, or `None` without one.
-fn get(scene: SceneCell, id: u32) -> Option<Link> {
+fn get(scene: &RefCell<Scene>, id: u32) -> Option<Link> {
     scene.borrow().world.offmesh_link(id).map(|l| l.clone())
 }
 
 /// Apply a shared op to `id`'s link, if it has one.
-fn write(scene: SceneCell, id: u32, op: impl FnOnce(&mut Link)) {
+fn write(scene: &RefCell<Scene>, id: u32, op: impl FnOnce(&mut Link)) {
     if let Some(mut l) = scene.borrow_mut().world.offmesh_link_mut(id) {
         op(&mut l);
     }
 }
 
 /// `GetStart` / `SetStart` and `GetEnd` / `SetEnd`, as `x, y, z` local offsets.
-fn register_ends<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
+fn register_ends(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type End = (fn(&Link) -> Vec3, fn(&mut Link, Vec3));
     let ends: [(&str, End); 2] = [
         ("Start", (|l| l.start, ops::set_start)),
         ("End", (|l| l.end, ops::set_end)),
     ];
     for (name, (read, set)) in ends {
-        let f = scope.create_function(move |_, id: EntityArg| {
-            let v = get(scene, id.read()).map_or(Vec3::ZERO, |l| read(&l));
+        let f = lua.create_function(move |lua, id: EntityArg| {
+            let v = get(&*scene.get(lua)?, id.read()).map_or(Vec3::ZERO, |l| read(&l));
             Ok((v.x, v.y, v.z))
         });
         put(t, &format!("Get{name}"), f)?;
         let verb = format!("Set{name}");
-        let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        let f = lua.create_function(move |lua, (id, x, y, z): (EntityArg, f32, f32, f32)| {
             let id = id.live("OffMeshLink", &verb)?;
-            write(scene, id, |l| set(l, Vec3::new(x, y, z)));
+            write(&*scene.get(lua)?, id, |l| set(l, Vec3::new(x, y, z)));
             Ok(())
         });
         put(t, &format!("Set{name}"), f)?;
@@ -83,11 +74,7 @@ fn register_ends<'scope>(
 
 /// `Active`, `Bidirectional`, `Area` (#460) and `Cost` (negative: the link's length
 /// at its area's cost).
-fn register_options<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
+fn register_options(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Flag = (fn(&Link) -> bool, fn(&mut Link, bool));
     let flags: [(&str, Flag); 2] = [
         ("Active", (|l| l.active, ops::set_active)),
@@ -97,34 +84,35 @@ fn register_options<'scope>(
         ),
     ];
     for (name, (read, set)) in flags {
-        let f = scope.create_function(move |_, id: EntityArg| {
-            Ok(get(scene, id.read()).is_some_and(|l| read(&l)))
+        let f = lua.create_function(move |lua, id: EntityArg| {
+            Ok(get(&*scene.get(lua)?, id.read()).is_some_and(|l| read(&l)))
         });
         put(t, &format!("Get{name}"), f)?;
         let verb = format!("Set{name}");
-        let f = scope.create_function(move |_, (id, v): (EntityArg, bool)| {
+        let f = lua.create_function(move |lua, (id, v): (EntityArg, bool)| {
             let id = id.live("OffMeshLink", &verb)?;
-            write(scene, id, |l| set(l, v));
+            write(&*scene.get(lua)?, id, |l| set(l, v));
             Ok(())
         });
         put(t, &format!("Set{name}"), f)?;
     }
-    let f = scope
-        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map_or(0, |l| l.area)));
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map_or(0, |l| l.area))
+    });
     put(t, "GetArea", f)?;
-    let f = scope.create_function(move |_, (id, area): (EntityArg, i64)| {
+    let f = lua.create_function(move |lua, (id, area): (EntityArg, i64)| {
         let id = id.live("OffMeshLink", "SetArea")?;
-        write(scene, id, |l| ops::set_area(l, area));
+        write(&*scene.get(lua)?, id, |l| ops::set_area(l, area));
         Ok(())
     });
     put(t, "SetArea", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(get(scene, id.read()).map_or(-1.0, |l| l.cost_override))
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map_or(-1.0, |l| l.cost_override))
     });
     put(t, "GetCost", f)?;
-    let f = scope.create_function(move |_, (id, cost): (EntityArg, f32)| {
+    let f = lua.create_function(move |lua, (id, cost): (EntityArg, f32)| {
         let id = id.live("OffMeshLink", "SetCost")?;
-        write(scene, id, |l| ops::set_cost_override(l, cost));
+        write(&*scene.get(lua)?, id, |l| ops::set_cost_override(l, cost));
         Ok(())
     });
     put(t, "SetCost", f)

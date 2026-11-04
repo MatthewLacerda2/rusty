@@ -30,6 +30,7 @@ pub use frame::push_frame;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use glam::Vec3;
 
 use crate::audio::{AudioMaestro, Listener, Rolloff, Shot, SpeakerMode};
@@ -39,25 +40,24 @@ use crate::scene::Scene;
 use crate::time::Time;
 
 /// Register the `Audio` namespace onto `lua`.
-pub fn register<'scope>(
+pub fn register(
     lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    audio: &'scope RefCell<AudioMaestro>,
-    time: &'scope RefCell<Time>,
-    camera: &'scope RefCell<Camera>,
+    scene: ApiCell<Scene>,
+    audio: ApiCell<AudioMaestro>,
+    time: ApiCell<Time>,
+    camera: ApiCell<Camera>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_source_control(scope, &table, scene, audio, time)?;
-    register_oneshot_and_master(scope, &table, audio, time)?;
-    register_spatial(scope, &table, scene, audio, camera)?;
-    register_speaker_mode(scope, &table, audio)?;
-    groups::register_groups(scope, &table, audio)?;
-    groups::register_output(scope, &table, scene, audio)?;
-    snapshots::register_snapshots(scope, &table, audio, time)?;
-    occlusion::register_occlusion(scope, &table, scene, audio)?;
-    reverb::register_reverb(scope, &table, audio)?;
+    register_source_control(lua, &table, scene, audio, time)?;
+    register_oneshot_and_master(lua, &table, audio, time)?;
+    register_spatial(lua, &table, scene, audio, camera)?;
+    register_speaker_mode(lua, &table, audio)?;
+    groups::register_groups(lua, &table, audio)?;
+    groups::register_output(lua, &table, scene, audio)?;
+    snapshots::register_snapshots(lua, &table, audio, time)?;
+    occlusion::register_occlusion(lua, &table, scene, audio)?;
+    reverb::register_reverb(lua, &table, audio)?;
 
     lua.globals().set("Audio", table).map_err(|e| e.to_string())
 }
@@ -92,21 +92,23 @@ fn source_clip_pos(scene: &RefCell<Scene>, id: u32) -> Option<(String, [f32; 3])
 }
 
 /// `Play` / `Stop` / `SetVolume` / `GetVolume` — drive an entity's own `AudioSource`.
-fn register_source_control<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_source_control(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    audio: &'scope RefCell<AudioMaestro>,
-    time: &'scope RefCell<Time>,
+    scene: ApiCell<Scene>,
+    audio: ApiCell<AudioMaestro>,
+    time: ApiCell<Time>,
 ) -> Reg {
     // Start (or restart) entity `id`'s AudioSource from the start. Returns whether
     // the entity has a source (the backend may still be silent on a null device).
     put(
         table,
         "Play",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let audio = &*audio.get(lua)?;
             let id = id.live("Audio", "Play")?;
-            let now = tick(time);
+            let now = tick(&*time.get(lua)?);
             let src = scene.borrow().world.audio(id).map(|c| c.clone());
             let pos = src
                 .as_ref()
@@ -124,17 +126,17 @@ fn register_source_control<'scope>(
     put(
         table,
         "Stop",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
             let id = id.live("Audio", "Stop")?;
-            let now = tick(time);
-            let pos = source_clip_pos(scene, id)
+            let now = tick(&*time.get(lua)?);
+            let pos = source_clip_pos(&*scene.get(lua)?, id)
                 .map(|(_, p)| p)
                 .unwrap_or([0.0; 3]);
-            audio.borrow_mut().stop_source(id, pos, now, true);
+            audio.get(lua)?.borrow_mut().stop_source(id, pos, now, true);
             Ok(())
         }),
     )?;
-    volume::register(scope, table, scene, audio)
+    volume::register(lua, table, scene, audio)
 }
 
 /// `Audio.PlayAt(path, x, y, z [, vol [, min_distance, max_distance [, group]]])`.
@@ -169,11 +171,11 @@ fn rolloff_arg(min: Option<f32>, max: Option<f32>) -> Result<Rolloff, String> {
 }
 
 /// `PlayAt` (fire-and-forget one-shot) + master-volume get/set.
-fn register_oneshot_and_master<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_oneshot_and_master(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    audio: &'scope RefCell<AudioMaestro>,
-    time: &'scope RefCell<Time>,
+    audio: ApiCell<AudioMaestro>,
+    time: ApiCell<Time>,
 ) -> Reg {
     // Fire a one-shot at a world position. `vol` defaults to 1.0; `min_distance` /
     // `max_distance` (both or neither) widen its rolloff band past the 1 → 16 m
@@ -182,17 +184,17 @@ fn register_oneshot_and_master<'scope>(
     put(
         table,
         "PlayAt",
-        scope.create_function(|_, args: PlayAtArgs| {
+        lua.create_function(move |lua, args: PlayAtArgs| {
             let (path, x, y, z, vol, min, max, group) = args;
             let rolloff = rolloff_arg(min, max).map_err(mlua::Error::RuntimeError)?;
-            let now = tick(time);
+            let now = tick(&*time.get(lua)?);
             let shot = Shot {
                 volume: vol.unwrap_or(1.0),
                 rolloff,
                 group: group.as_deref().unwrap_or(""),
                 ..Shot::new(&path, [x, y, z])
             };
-            let played = audio.borrow_mut().play_at(&shot, 0, now);
+            let played = audio.get(lua)?.borrow_mut().play_at(&shot, 0, now);
             Ok(played)
         }),
     )?;
@@ -200,14 +202,14 @@ fn register_oneshot_and_master<'scope>(
     put(
         table,
         "GetMasterVolume",
-        scope.create_function(|_, ()| Ok(audio.borrow().master_volume())),
+        lua.create_function(move |lua, ()| Ok(audio.get(lua)?.borrow().master_volume())),
     )?;
 
     put(
         table,
         "SetMasterVolume",
-        scope.create_function(|_, v: f32| {
-            audio.borrow_mut().set_master_volume(v);
+        lua.create_function(move |lua, v: f32| {
+            audio.get(lua)?.borrow_mut().set_master_volume(v);
             Ok(())
         }),
     )
@@ -215,21 +217,21 @@ fn register_oneshot_and_master<'scope>(
 
 /// `GetSpeakerMode` / `SetSpeakerMode` — the output profile (`headphones` / `tv` /
 /// `home_theater`). Output shaping only: the sim never reads it.
-fn register_speaker_mode<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_speaker_mode(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    audio: &'scope RefCell<AudioMaestro>,
+    audio: ApiCell<AudioMaestro>,
 ) -> Reg {
     put(
         table,
         "GetSpeakerMode",
-        scope.create_function(|_, ()| Ok(audio.borrow().speaker_mode().name())),
+        lua.create_function(move |lua, ()| Ok(audio.get(lua)?.borrow().speaker_mode().name())),
     )?;
 
     put(
         table,
         "SetSpeakerMode",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| {
             let mode = SpeakerMode::parse(&name).ok_or_else(|| {
                 let valid: Vec<_> = SpeakerMode::ALL.iter().map(|m| m.name()).collect();
                 mlua::Error::RuntimeError(format!(
@@ -237,7 +239,7 @@ fn register_speaker_mode<'scope>(
                     valid.join(", ")
                 ))
             })?;
-            audio.borrow_mut().set_speaker_mode(mode);
+            audio.get(lua)?.borrow_mut().set_speaker_mode(mode);
             Ok(())
         }),
     )
@@ -249,26 +251,29 @@ fn register_speaker_mode<'scope>(
 /// occlusion muffle, `pan` is `[-1, 1]` (left→right), `occlusion` the smoothed
 /// factor in `[0, 1]` (#467). This is the agent-facing introspection (#213) for "how a source is
 /// heard right now" — pure math, identical with or without an audio device.
-fn register_spatial<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_spatial(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    audio: &'scope RefCell<AudioMaestro>,
-    camera: &'scope RefCell<Camera>,
+    scene: ApiCell<Scene>,
+    audio: ApiCell<AudioMaestro>,
+    camera: ApiCell<Camera>,
 ) -> Reg {
     put(
         table,
         "GetSpatial",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
+            let audio = &*audio.get(lua)?;
             let id = id.read();
             let scene = &scene.borrow();
             let Some((src, pos)) = emitter(scene, id) else {
                 // No source: report silent + centred + not playing + clear.
                 return Ok((0.0_f32, 0.0_f32, false, 0.0_f32));
             };
-            let info = audio
-                .borrow()
-                .voice_info(id, &src, pos, &listener(camera, scene));
+            let info =
+                audio
+                    .borrow()
+                    .voice_info(id, &src, pos, &listener(&*camera.get(lua)?, scene));
             let spatial = info.spatial;
             Ok((spatial.gain, spatial.pan, info.playing, info.occlusion))
         }),

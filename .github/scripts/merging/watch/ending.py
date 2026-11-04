@@ -48,6 +48,10 @@ RELAUNCH_STATUS = 5
 # Somebody asked the watch to stop ([`STOP_FILE`], #908): do not relaunch it.
 STOPPED_STATUS = 6
 
+# A merge train landed and `main`'s tree is not the one it proved (#1785,
+# `train.land.check`): stop, and do not relaunch; somebody looks at `main` first.
+MISMATCH_STATUS = 9
+
 # The file that asks it, under the checkout's common git directory: `make
 # queue-stop` writes it, the watch and its supervisor remove it as they obey.
 STOP_FILE = "merge-queue/stop"

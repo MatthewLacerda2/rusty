@@ -210,16 +210,17 @@ fn advance_frame(_world: &mut World, res: &mut Resources) {
 
 /// Keep the navmesh in step with the scene every tick (#456): advance the
 /// obstacles' carving bookkeeping, then rebake only the cells whose static
-/// colliders or carving obstacles changed. Play frame 0 bakes in full, so a Play
+/// colliders or carving obstacles changed; a tick no static entity changed in
+/// skips the static colliders altogether (#1707). Play frame 0 bakes in full, so a Play
 /// session starts from the same navmesh whatever edit mode left behind.
 fn rebake_nav(world: &mut World, res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
     crate::navigation::tick_obstacles(&mut scene, res.frame_dt);
     let mut nav = res.nav.borrow_mut();
     if res.play_frame == 0 {
-        nav.bake(&scene);
+        nav.bake_tracked(&mut scene);
     } else {
-        nav.sync(&scene);
+        nav.sync_changes(&mut scene);
     }
 }
 
@@ -246,8 +247,8 @@ fn animate(world: &mut World, res: &mut Resources) {
         let graph = path.and_then(|p| res.animation_graphs.get_or_load(&p, &res.console));
         // The animator + mesh split borrow goes through the facade's sanctioned
         // helper (#344) — the animate system's re-pose step.
-        let stepped = s.world.with_animator_and_mesh_mut(id, |anim, mesh| {
-            let crossed = super::animation::advance(anim, mesh.as_deref(), graph, dt);
+        let stepped = s.world.with_animator_mut_and_mesh(id, |anim, mesh| {
+            let crossed = super::animation::advance(anim, mesh, graph, dt);
             (
                 crossed,
                 mesh.map(|m| super::animation::bone_writes(anim, m, graph)),

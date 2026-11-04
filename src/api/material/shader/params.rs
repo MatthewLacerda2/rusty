@@ -13,51 +13,55 @@
 //! a param the shader does not expose at runtime, or a wrong number of values,
 //! raises an error naming it and listing the runtime params there are.
 
-use std::cell::RefCell;
-
 use mlua::{IntoLua, Lua, Value};
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
 /// Register the shader-param verbs onto the `Material` `table`.
-pub fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetShaderParam",
-        scope.create_function(|_, (id, name, value): (EntityArg, String, Value)| {
+        lua.create_function(move |lua, (id, name, value): (EntityArg, String, Value)| {
             let id = id.live("Material", "SetShaderParam")?;
             let value = floats(value)?;
-            mat_ops::set_entity_shader_param(&mut scene.borrow_mut(), id, &name, value).map_err(err)
+            mat_ops::set_entity_shader_param(&mut scene.get(lua)?.borrow_mut(), id, &name, value)
+                .map_err(err)
         }),
     )?;
     put(
         table,
         "GetShaderParam",
-        scope.create_function(|lua, (id, name): (EntityArg, String)| {
-            let v = mat_ops::entity_shader_param(&mut scene.borrow_mut(), id.read(), &name);
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
+            let v =
+                mat_ops::entity_shader_param(&mut scene.get(lua)?.borrow_mut(), id.read(), &name);
             to_lua(lua, v.map_err(err)?)
         }),
     )?;
     put(
         table,
         "ClearShaderParam",
-        scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, Option<String>)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Material", "ClearShaderParam")?;
             let mut scene = scene.borrow_mut();
             mat_ops::clear_entity_shader_param(&mut scene, id, name.as_deref()).map_err(err)
         }),
     )?;
+    register_asset(lua, table, scene)
+}
+
+/// The library asset's own values: `SetAssetShaderParam` / `GetAssetShaderParam`.
+fn register_asset(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetAssetShaderParam",
-        scope.create_function(|_, (asset, name, value): (String, String, Value)| {
+        lua.create_function(move |lua, (asset, name, value): (String, String, Value)| {
+            let scene = &*scene.get(lua)?;
             let value = floats(value)?;
             let mut scene = scene.borrow_mut();
             let layout = asset_layout(&scene, &asset)?;
@@ -68,7 +72,8 @@ pub fn register<'scope>(
     put(
         table,
         "GetAssetShaderParam",
-        scope.create_function(|lua, (asset, name): (String, String)| {
+        lua.create_function(move |lua, (asset, name): (String, String)| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let layout = asset_layout(&scene, &asset)?;
             let v = mat_ops::shader_param(&scene.materials, &asset, &layout, &name);
