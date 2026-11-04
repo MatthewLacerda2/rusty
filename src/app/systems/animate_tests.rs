@@ -1,5 +1,5 @@
-//! src/app/systems/animate_tests.rs — root motion through the real play loop (#1745): a lunge whose hips move 2 m
-//! moves the entity 2 m with the hips held under it, a wall stops a
+//! src/app/systems/animate_tests.rs — root motion through the real play loop
+//! (#1745): a lunge whose hips move 2 m moves the entity 2 m with the hips held under it, a wall stops a
 //! CharacterController's lunge, and a NavMeshAgent follows the lunge instead of
 //! its own speed.
 

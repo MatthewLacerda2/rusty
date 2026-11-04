@@ -169,13 +169,15 @@ impl RootBone {
         }
         let local = |s: usize| pose.get(s).copied().flatten().unwrap_or(skin.local_bind[s]);
         let parent = self.entity_matrix(skin, self.chain.len() - 1, local);
-        let (scale, rotation, position) =
-            (parent * local(self.slot).matrix()).to_scale_rotation_translation();
+        let posed = parent * local(self.slot).matrix();
+        // lint: allow(world-space) a joint chain in the skinned entity's space, rig data, not the scene hierarchy
+        let (scale, rotation, position) = posed.to_scale_rotation_translation();
         let rotation = Quat::from_rotation_y(self.bind.yaw - yaw_of(rotation)) * rotation;
         let position = Vec3::new(self.bind.position.x, position.y, self.bind.position.z);
         let held = Mat4::from_scale_rotation_translation(scale, rotation.normalize(), position);
-        let (scale, rotation, translation) =
-            (parent.inverse() * held).to_scale_rotation_translation();
+        let held = parent.inverse() * held;
+        // lint: allow(world-space) a joint chain in the skinned entity's space, rig data, not the scene hierarchy
+        let (scale, rotation, translation) = held.to_scale_rotation_translation();
         if let Some(slot) = pose.get_mut(self.slot) {
             *slot = Some(JointTransform {
                 translation,
@@ -210,6 +212,7 @@ fn wrapped(span: (f32, f32), length: f32, piece: impl Fn(f32, f32) -> RootMotion
 }
 
 fn frame(m: Mat4) -> Frame {
+    // lint: allow(world-space) a joint chain in the skinned entity's space, rig data, not the scene hierarchy
     let (_, rotation, position) = m.to_scale_rotation_translation();
     Frame {
         position,

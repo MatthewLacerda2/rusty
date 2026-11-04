@@ -20,6 +20,12 @@ use crate::scene::Scene;
 
 /// Register the root-motion verbs onto the `Animator` table.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    register_settings(lua, table, scene)?;
+    register_get_root_motion(lua, table, scene)
+}
+
+/// The saved settings: `Set`/`GetApplyRootMotion` and `Set`/`GetRootBone`.
+fn register_settings(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetApplyRootMotion",
@@ -61,7 +67,11 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
             let scene = scene.borrow();
             Ok(scene.world.animator(id.read()).map(|a| a.root_bone.clone()))
         }),
-    )?;
+    )
+}
+
+/// `GetRootMotion`: the last step's world-space delta and yaw (degrees).
+fn register_get_root_motion(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetRootMotion",

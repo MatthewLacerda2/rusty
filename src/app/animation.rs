@@ -30,7 +30,7 @@ pub(crate) mod root_motion;
 pub use events::{Crossed, END_EVENT};
 pub use motion::Pose;
 
-use crate::asset::animation_graph::{AnimationGraph, GraphLayer, LayerBlending};
+use crate::asset::animation_graph::{AnimationGraph, LayerBlending};
 use crate::asset::mesh_data::{JointTransform, SkinData};
 use crate::components::{
     AnimatorComponent, MeshComponent, Playback, RootMotion, TransformComponent,
@@ -200,20 +200,14 @@ pub fn step(
         if state.weight > 0.0 {
             events.extend(layer_events);
         }
-        let covers = |skin: &SkinData, bone: &RootBone, layer: &GraphLayer| {
-            mask_slots(skin, &layer.mask).get(bone.slot()) == Some(&true)
-        };
-        if let (Some(delta), Some(layer), Some(skin), Some(bone)) =
-            (layer_root, graph_layers.get(i), skin, bone.as_ref())
-        {
-            if state.weight > 0.0 && covers(skin, bone, layer) {
-                root = Some(stack(
-                    root.unwrap_or_default(),
-                    delta,
-                    layer.blending,
-                    state.weight,
-                ));
-            }
+        // The layer's motion counts where its mask covers the root bone.
+        let covering = graph_layers.get(i).zip(skin).zip(bone.as_ref());
+        let covering = covering.filter(|((layer, skin), bone)| {
+            state.weight > 0.0 && mask_slots(skin, &layer.mask).get(bone.slot()) == Some(&true)
+        });
+        if let (Some(delta), Some(((layer, _), _))) = (layer_root, covering) {
+            let below = root.unwrap_or_default();
+            root = Some(stack(below, delta, layer.blending, state.weight));
         }
     }
     events::sort(&mut events);

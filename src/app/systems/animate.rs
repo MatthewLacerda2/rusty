@@ -11,6 +11,7 @@
 //!   agent's own steering would (the agent stops moving itself: `tick_nav`
 //!   leaves its position to this);
 //! - else the **Transform** moves by it outright.
+//!
 //! The turn is applied about the entity's own up axis.
 
 use glam::{Quat, Vec3};
@@ -71,10 +72,15 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
 /// `motion`, measured in the skinned entity's space, in world space: its
 /// displacement under the entity's world rotation and scale. The yaw stays a
 /// turn about the entity's own up axis.
+/// A non-finite one (a clip keyed with a NaN) moves nothing.
 fn to_world(motion: RootMotion, (rotation, scale): (Quat, Vec3)) -> RootMotion {
-    RootMotion {
+    let world = RootMotion {
         position: rotation * (scale * motion.position),
         yaw: motion.yaw,
+    };
+    match world.position.is_finite() && world.yaw.is_finite() {
+        true => world,
+        false => RootMotion::ZERO,
     }
 }
 
