@@ -205,7 +205,7 @@ impl Baking {
             // A target whose drawn side faces away from the whole cell is seen
             // from no point in it.
             let reached = |t: &Vec<Target>| {
-                let facing = t.iter().filter(|t| t.faces((min, max))).map(|t| t.at);
+                let facing = t.iter().filter(|t| t.faces((min, max)));
                 self.reaches(&points, facing, i as u32)
             };
             if overlaps || targets.as_ref().is_none_or(reached) {
@@ -239,9 +239,16 @@ impl Baking {
 
     /// Whether a ray from any of `from` reaches any of `targets` (on object
     /// `object`) with no other object's occluder turned toward it in between.
-    fn reaches(&self, from: &[Vec3], mut targets: impl Iterator<Item = Vec3>, object: u32) -> bool {
-        targets.any(|to| {
-            from.iter().any(|&origin| {
+    fn reaches<'t>(
+        &self,
+        from: &[Vec3],
+        mut targets: impl Iterator<Item = &'t Target>,
+        object: u32,
+    ) -> bool {
+        targets.any(|target| {
+            let to = target.at;
+            let from = from.iter().filter(|&&o| target.drawn_toward(o));
+            from.copied().any(|origin| {
                 let delta = to - origin;
                 let reach = delta.length();
                 if reach <= REACH_SLACK {

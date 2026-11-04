@@ -5,8 +5,8 @@
 //! is seen through, however large the object is.
 //!
 //! Each point keeps the plane of its triangle's drawn side, so a cell wholly
-//! behind it skips it: no camera in that cell sees that side (a two-sided
-//! triangle is never skipped).
+//! behind it skips it, and a ray from a cell point behind it is never cast: no
+//! camera there sees that side (a two-sided triangle is never skipped).
 //!
 //! An object whose lattice would pass [`MAX_TARGETS`] points (some 2000 m² of
 //! surface, a 600 m wall 3 m high) has no targets: the bake keeps it visible from
@@ -43,6 +43,13 @@ impl Target {
             at: p.lerp((t[0] + t[1] + t[2]) / 3.0, INWARD),
             front: front.map(|n| (n, n.dot(t[0]))),
         }
+    }
+
+    /// Whether `point` is on its drawn side: a ray from behind reaches only its
+    /// undrawn back.
+    pub(super) fn drawn_toward(&self, point: Vec3) -> bool {
+        self.front
+            .is_none_or(|(n, d)| n.dot(point) >= d - 1e-4 * n.length())
     }
 
     /// Whether any point of the box `(min, max)` is on its drawn side.
