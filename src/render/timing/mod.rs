@@ -59,6 +59,10 @@ crate::core::named_enum! {
         Ssao = "ssao",
         /// The SSAO blur at the occlusion's resolution and its upsample to full.
         SsaoBlur = "ssao_blur",
+        /// Screen-space indirect lighting (#1750): its gather, blur, accumulate and
+        /// upsample before the base camera's forward pass, and the source it keeps
+        /// after it.
+        Ssil = "ssil",
         /// The opaque scene pass: solids, skybox.
         Forward = "forward",
         /// Screen-space reflections (#1526): the copy of the opaque image and the

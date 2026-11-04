@@ -50,6 +50,8 @@ crate::core::named_enum! {
         MotionBlur = "motion_blur",
         /// Screen-space ambient occlusion (off on the Low tier).
         Ssao = "ssao",
+        /// Screen-space indirect lighting (#1750).
+        Ssil = "ssil",
         /// Screen-space reflections (High tier only).
         Ssr = "ssr",
         /// The volume's vignette (#1439).

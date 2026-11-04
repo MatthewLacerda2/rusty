@@ -47,6 +47,7 @@ pub(crate) mod grading;
 pub(crate) mod lens;
 pub(crate) mod lens_flare;
 pub(crate) mod motion_blur;
+pub(crate) mod ssil;
 pub(crate) mod ssr;
 
 pub(crate) use layout::{
@@ -77,6 +78,7 @@ pub(crate) const POST_EFFECTS: &[PostEffect] = &[
     lens_flare::EFFECT,
     lift_gamma_gain::EFFECT,
     motion_blur::EFFECT,
+    ssil::EFFECT,
     ssr::EFFECT,
     tonemapping::EFFECT,
     vignette::EFFECT,

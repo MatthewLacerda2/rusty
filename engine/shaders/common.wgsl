@@ -52,7 +52,10 @@ struct CameraUniforms {
     // x: this camera's index in its stack, bottom to top (#1436), what the velocity
     // target's `.a` carries so motion blur orders a higher camera in front. y: last
     // frame's game time (#1524), what the motion vectors move vertex blocks with (this
-    // frame's `time` where the view has no last frame). zw: unused.
+    // frame's `time` where the view has no last frame). z: 1 during the opaque pass
+    // of a base camera running SSIL (#1750), which then reads SSIL's bounce and
+    // writes the share of its light SSIL gathers in its alpha; 0 everywhere else,
+    // the translucents after it included. w: unused.
     stack: vec4<f32>,
     // `view_proj`'s inverse (#1523): a transparent surface rebuilds the world point
     // of the opaque depth behind it from it, for refraction and absorption.

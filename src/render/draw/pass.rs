@@ -55,6 +55,8 @@ pub(crate) struct ScenePassFrame {
     pub clear: PassClear,
     /// This camera's SSAO (#436), recorded ahead of the scene pass; `None` when off.
     pub ssao: Option<SsaoFrame>,
+    /// This camera's SSIL (#1750), recorded after SSAO; the base camera's alone.
+    pub ssil: Option<crate::render::postfx::effects::ssil::SsilFrame>,
     /// Whether this is the stack's base camera. SSR reads only what the base camera
     /// wrote and runs before any overlay draws (#1526), so an overlay binds no SSR
     /// surface target and draws with the plain velocity pipelines.
@@ -123,10 +125,8 @@ impl Renderer {
         // The shadow maps were rendered once for the frame (`run_shadow_passes`).
         // Bind active skybox view & sampler into the global group for reflections.
         self.update_global_bind_group();
-        // A. SSAO (#436): prepass, occlusion and blur, which the scene pass samples.
-        if let Some(ssao) = &frame.ssao {
-            self.record_ssao(view, &mut encoder, ssao, solid_batches);
-        }
+        // A. SSAO (#436) and SSIL (#1750): what the scene pass samples.
+        self.record_screen_space(view, &mut encoder, &frame, solid_batches);
         // B. Main scene pass. The editor's gizmos draw after post-FX (`draw_handles`).
         self.record_scene_pass(view, &mut encoder, &frame, solid_batches);
         let velocity = view.post_fx.motion.target_view().is_some();
@@ -180,7 +180,7 @@ impl Renderer {
             None => SolidPass::Opaque(view.forward_pipeline(&self.render_pipeline), primed),
         };
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
-        render_pass.set_bind_group(3, self.scene_group3(view, frame.ssao.is_some()), &[]);
+        render_pass.set_bind_group(3, self.scene_group3(view, frame), &[]);
         // Solid entities (each batch binds its shader's pipeline).
         self.draw_batches(&mut render_pass, solid_batches, solid_pass);
 

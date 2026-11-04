@@ -308,6 +308,9 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 // and *Depth Texture* in one: rgb its colour after the opaque pass and SSR, alpha
 // the distance from the eye to that surface; a 1x1 stand-in in every pass but a
 // transparent one with a surface that refracts or absorbs. Linear, clamped sampler.
+// In the opaque pass of a base camera running SSIL (`camera.stack.z`, #1750), which
+// reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel: the
+// stage's 16 sampled textures, wgpu's default limit, are all taken.
 @group(3) @binding(6)
 var t_opaque: texture_2d<f32>;
 @group(3) @binding(7)

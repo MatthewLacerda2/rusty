@@ -10,8 +10,8 @@
 //! [`CameraCtx`]; a new camera-uniform field is set once, in [`CameraCtx::new`].
 //! No trait objects and no registration at runtime: a static, ordered table.
 //!
-//! Four stages are not every camera's: `ssr` runs only on the stack's base camera,
-//! over its opaque image (#1526); `post_fx` runs only on the stack's last
+//! Five stages are not every camera's: `ssil_source` (#1750) and `ssr` run only on
+//! the base camera, over its opaque image (#1526); `post_fx` runs only on the last
 //! camera (it composites the whole stack) and returns early on the others, and the
 //! editor's `outline` and `handles` follow it there, onto the finished image, in
 //! Unity's order: scene, post-FX, outline, handles, then the UI (#1224). An
@@ -27,6 +27,7 @@ use crate::render::gpu::uniforms::FogUniform;
 use crate::render::lod::LodSelection;
 use crate::render::passes::particles::ParticleDraws;
 use crate::render::passes::ssao::{SsaoFrame, SsaoPlan};
+use crate::render::postfx::effects::ssil::{SsilFrame, SsilView};
 use crate::render::postfx::effects::ssr;
 use crate::render::{CameraUniform, Frustum, RenderView, Renderer};
 use crate::scene::{Camera, ClearFlags, Scene};
@@ -41,6 +42,7 @@ pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("clusters", bin_clusters),
     ("solids", batch_solids),
     ("scene", scene_pass),
+    ("ssil_source", ssil_source),
     ("ssr", ssr),
     ("opaque_copy", opaque_copy),
     ("transparent", transparent),
@@ -74,6 +76,8 @@ pub(crate) struct CameraCtx<'a> {
     pub fog: FogUniform,
     /// The stack's SSAO, or `None` on an overlay camera, which samples no AO.
     pub ssao: Option<SsaoPlan>,
+    /// The view's SSIL (#1750) on its base camera; `None` on every other camera.
+    pub ssil: Option<SsilFrame>,
     /// Whether this camera's `receive_ssr` translucents trace SSR (#1570): the base
     /// camera of a view running it ([`ssr_march`]).
     pub traces: bool,
@@ -96,6 +100,8 @@ pub(crate) struct StackShared {
     pub prev_time: f32,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
+    /// The view's SSIL (#1750) and what its history is valid for, when it runs.
+    pub ssil: Option<SsilView>,
     /// The base camera's transparent SSR march (#1570), `[steps, step, min
     /// smoothness, fade width]`; zero when the view runs no SSR.
     pub ssr_march: [f32; 4],
@@ -113,6 +119,7 @@ impl<'a> CameraCtx<'a> {
         let clusters = ClusterGrid::new(cam, shared.aspect);
         let overlay = is_overlay(idx == 0, cam.clear_flags);
         let (march, traces) = ssr_march(idx == 0, shared.ssr_march);
+        let ssil = SsilFrame::for_camera(shared.ssil.filter(|_| idx == 0), view_proj, cam);
         Self {
             scene,
             cam,
@@ -127,6 +134,7 @@ impl<'a> CameraCtx<'a> {
             fog: shared.fog,
             ssao: shared.ssao.filter(|_| !overlay),
             traces,
+            ssil,
             lod: LodSelection::for_camera(scene, cam),
             uniform: CameraUniform {
                 view_proj: view_proj.to_cols_array(),
@@ -135,7 +143,7 @@ impl<'a> CameraCtx<'a> {
                 fog: shared.fog,
                 clusters: clusters.uniform(),
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
-                stack: [idx as f32, shared.prev_time, 0.0, 0.0],
+                stack: [idx as f32, shared.prev_time, ssil.map_or(0.0, |_| 1.0), 0.0],
                 inv_view_proj: view_proj.inverse().to_cols_array(),
                 ssr: march,
             },
@@ -204,8 +212,14 @@ fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
             .ssao
             .map(|plan| SsaoFrame::for_camera(plan, ctx.view_proj, ctx.cam)),
         base: ctx.is_first,
+        ssil: ctx.ssil,
     };
     r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque);
+}
+
+/// SSIL's source (#1750), kept after the base camera's opaque pass (`ssil::run`).
+fn ssil_source(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    r.keep_ssil_source(view, ctx);
 }
 
 /// Screen-space reflections (#1526) over the base camera's opaque image, before

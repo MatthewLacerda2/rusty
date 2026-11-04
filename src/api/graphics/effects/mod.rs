@@ -22,6 +22,7 @@ pub(super) mod knobs;
 mod lens;
 mod lens_flare;
 mod motion_blur;
+mod ssil;
 mod ssr;
 
 use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, white_balance};
@@ -47,6 +48,7 @@ pub(crate) const REGISTRARS: &[(&str, Registrar)] = &[
     ("lens_flare", lens_flare::register),
     ("lift_gamma_gain", lift_gamma_gain::register),
     ("motion_blur", motion_blur::register),
+    ("ssil", ssil::register),
     ("ssr", ssr::register),
     ("tonemapping", tonemapping::register),
     ("vignette", vignette::register),

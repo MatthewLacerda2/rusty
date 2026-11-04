@@ -47,6 +47,7 @@ fn pass_names_are_stable_and_unique() {
             "ssao_prepass",
             "ssao",
             "ssao_blur",
+            "ssil",
             "forward",
             "ssr",
             "transparent",

@@ -12,6 +12,7 @@
 // terms by the result.
 
 #import fullscreen
+#import lighting::screen_space::{depth_weight, flatter, hemisphere, ign, tangents}
 
 struct SsaoParams {
     inv_view_proj: mat4x4<f32>,
@@ -58,21 +59,6 @@ fn view_depth(world: vec3<f32>) -> f32 {
     return dot(world - p.camera_pos.xyz, p.camera_fwd.xyz);
 }
 
-// Interleaved gradient noise (Jimenez 2014): a per-pixel rotation the blur removes.
-fn ign(px: vec2<f32>) -> f32 {
-    return fract(52.9829189 * fract(dot(px, vec2<f32>(0.06711056, 0.00583715))));
-}
-
-// Of the two one-sided differences along an axis, the one that stays on this
-// surface (smaller depth step), so a silhouette never bends the normal.
-fn flatter(back: vec3<f32>, fwd: vec3<f32>) -> vec3<f32> {
-    let f = p.camera_fwd.xyz;
-    if (dot(back, back) < 1e-12 || (dot(fwd, fwd) > 1e-12 && abs(dot(fwd, f)) < abs(dot(back, f)))) {
-        return fwd;
-    }
-    return back;
-}
-
 // How many pixels a `radius` offset at `P`, across the view, spans on screen.
 fn radius_in_pixels(P: vec3<f32>, radius: f32, dims: vec2<f32>) -> f32 {
     let f = p.camera_fwd.xyz;
@@ -91,8 +77,9 @@ fn fs_ao(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         return vec4<f32>(1.0);
     }
     let P = world_at(px, d);
-    let dx = flatter(P - world_px(px - vec2<i32>(step, 0)), world_px(px + vec2<i32>(step, 0)) - P);
-    let dy = flatter(P - world_px(px - vec2<i32>(0, step)), world_px(px + vec2<i32>(0, step)) - P);
+    let f = p.camera_fwd.xyz;
+    let dx = flatter(P - world_px(px - vec2<i32>(step, 0)), world_px(px + vec2<i32>(step, 0)) - P, f);
+    let dy = flatter(P - world_px(px - vec2<i32>(0, step)), world_px(px + vec2<i32>(0, step)) - P, f);
     let c = cross(dx, dy);
     if (dot(c, c) < 1e-20) {
         return vec4<f32>(1.0);
@@ -101,9 +88,7 @@ fn fs_ao(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     if (dot(N, p.camera_pos.xyz - P) < 0.0) {
         N = -N;
     }
-    let helper = select(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), abs(N.x) > 0.9);
-    let T = normalize(helper - N * dot(helper, N));
-    let B = cross(N, T);
+    let tb = tangents(N);
 
     let radius = p.params.x;
     let n = u32(p.params.z);
@@ -121,10 +106,7 @@ fn fs_ao(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     for (var i = 0u; i < n; i = i + 1u) {
         // Cosine-weighted hemisphere direction on a golden-angle spiral; the reach
         // is biased short so contact detail gets most of the samples.
-        let t = (f32(i) + 0.5) / f32(n);
-        let phi = f32(i) * 2.39996323 + rot;
-        let sin_t = sqrt(t);
-        let dir = T * (cos(phi) * sin_t) + B * (sin(phi) * sin_t) + N * sqrt(1.0 - t);
+        let dir = hemisphere(i, n, rot, N, tb);
         let s = fract(f32(i) * 0.7548777 + jitter);
         let S = P + N * (0.02 * radius) + dir * (radius * mix(0.1, 1.0, s * s));
         let clip = p.view_proj * vec4<f32>(S, 1.0);
@@ -153,13 +135,6 @@ fn fs_ao(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
 // View depth at AO texel `t`: its full-resolution pixel's (see the header).
 fn texel_depth(t: vec2<i32>, step: i32) -> f32 {
     return view_depth(world_px(t * step));
-}
-
-// How much a tap at view depth `d` counts beside a centre at `center`: taps whose
-// depth differs by more than ~5% of the view distance fall away, so occlusion never
-// bleeds across a silhouette.
-fn depth_weight(d: f32, center: f32) -> f32 {
-    return exp(-abs(d - center) / (0.05 * max(center, 0.1)));
 }
 
 @fragment

@@ -105,6 +105,12 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsaoRadius` / `SetSsaoRadius` | `()` / `(units)` | `number` (world units, clamped ≥ 0.01, **default `0.5`**) |
 | `Graphics.GetSsaoResolutionDivisor` / `SetSsaoResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` occlusion target is the view's size over this (clamped 1–4, **default `2`**) |
 | `Graphics.GetSsaoSamples` / `SetSsaoSamples` | `()` / `(n)` | `number`: the `Custom` samples per texel (clamped 1–64, **default `8`**) |
+| `Graphics.GetSsilActive` / `SetSsilActive` | `()` / `(bool)` | `bool`: screen-space indirect lighting (**default `false`**; see *Screen-space indirect lighting*) |
+| `Graphics.GetSsilIntensity` / `SetSsilIntensity` | `()` / `(value)` | `number`: how strongly the bounce lights a surface (clamped 0–4, **default `1`**) |
+| `Graphics.GetSsilQuality` / `SetSsilQuality` | `()` / `(name)` | which samples and resolution it gathers at (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
+| `Graphics.GetSsilRadius` / `SetSsilRadius` | `()` / `(units)` | `number`: the gather's reach, world units (clamped 0.1–10, **default `2`**) |
+| `Graphics.GetSsilResolutionDivisor` / `SetSsilResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` gather runs at the view's size over this (clamped 1–4, **default `2`**) |
+| `Graphics.GetSsilSamples` / `SetSsilSamples` | `()` / `(n)` | `number`: the `Custom` samples per texel (clamped 1–32, **default `8`**) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
 | `Graphics.GetSsrMinSmoothness` / `SetSsrMinSmoothness` | `()` / `(smoothness)` | `number`: HDRP's *Minimum Smoothness*, below which a surface keeps its probe or sky reflection (clamped 0–1, **default `0.3`**: reflects up to roughness 0.7, fully to 0.5; whole by smoothness 0.9 whatever the minimum; from `0.96` no surface reflects and SSR does not run) |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
@@ -279,6 +285,52 @@ the Inspector's **Lens Effects** section edits the same fields.
 Splits green and blue outwards from the screen centre, on the HDR image before the
 grade; its **intensity** (`0`–`1`) is how far the channels split at the corners. The
 player's `chromatic_aberration` option gates it. Tween paths: `Graphics.chromatic_aberration.intensity`.
+
+<!-- effect: ssil -->
+#### Screen-space indirect lighting
+
+**SSIL** (#1750, Godot 4's SSIL; HDRP's SSGI in its cheap form) gives realtime light
+one bounce off the surfaces on screen: a point light on a red wall tints the white
+floor in front of it, a muzzle flash lights the corridor around it, a lit wall
+colours the enemy beside it. It is **off by default**; a volume turns it on. Each
+frame, before the base camera's opaque pass, a half-resolution pass (at the seeded
+`Medium` level) gathers a cosine-weighted hemisphere of samples around each surface
+point, sharing SSAO's depth prepass and sample pattern (it draws that prepass itself
+when SSAO is off). Each sample lands on the surface on screen there and reads **last
+frame's** light at that surface, reprojected through last frame's camera, weighted
+by how squarely the two surfaces face each other and by distance within `radius`.
+A depth-aware blur, a temporal accumulate (90% history, rejected where a surface's
+distance from the eye moved, clamped to the frame's own neighbourhood, so a light
+switched off is gone within two frames; no TAA needed) and a depth-aware upsample
+follow. The forward pass adds the result to the **indirect diffuse** only, through
+the same `albedo × 0.96 × (1 − metallic)` response and SSAO as the ambient term: a
+metal takes none, and a transparent surface or an overlay camera (a viewmodel)
+reads none.
+
+**It never counts baked bounce twice.** What the gather reads is each pixel's light
+less its indirect term (its lightmap, light probe or flat ambient, and SSIL
+itself), its environment reflection and, on a lightmapped surface, its emission:
+the light of `Realtime` and `Mixed` lights and of unbaked emission. So a scene lit
+only by indirect light, a lightmapped one with only `Baked` lights included,
+brightens by **at most 0.5%** of its light with SSIL on (the test holds it; it
+measures 0), while a `Mixed` light's bounce adds to the indirect light its bake
+stored, as Godot adds SSIL over every bake. Unlit surfaces and the sky feed nothing.
+The source is the base camera's HDR colour right after its opaque pass, before
+SSR, translucents, overlay cameras, bloom, the grade and the UI.
+
+A cut (a scene load, Play or Stop, a camera switch), a resize or a quality change
+leaves it no history: that frame adds nothing, and the bounce builds back over the
+next frames. Bake captures and the shader preview never run it; a render texture's
+camera runs it in its own view. Under TAA's jitter (#1702) the gather's samples move
+by under a texel at half resolution, which the accumulate averages like its own
+noise. **Budget**: a target of 1.5 ms at 1080p, half resolution, on a base M-series
+GPU, **not yet measured** (`Debug.Stats().gpu_passes.ssil` times it; lavapipe has
+no timer). Its **quality** sets the samples and resolution (see *Quality presets*):
+the seeded `Medium` preset gathers 6, 8 or 12 samples at half resolution at its
+`Low`, `Medium` and `High` levels (the `Low` preset 4, 6 and 8; the `High` preset 8
+and 12 at half, 16 at full), and `Custom` gathers `samples` at `resolution_divisor`.
+The player's `ssil` option gates it.
+Tween paths: `Graphics.ssil.intensity`, `Graphics.ssil.radius`.
 
 <!-- effect: ssr -->
 #### Screen-space reflections
@@ -673,7 +725,7 @@ or intensity `0` — skips every one of those passes.
 Every post effect with a cost carries a **quality** on its camera or volume (#1522),
 HDRP's model: `"Low"`, `"Medium"` or `"High"` take that effect's values from the
 **running quality preset**, its row for that level, and `"Custom"` takes the values
-authored beside it (SSAO's `samples` and `resolution_divisor`, SSR's `steps` and
+authored beside it (SSAO's and SSIL's `samples` and `resolution_divisor`, SSR's `steps` and
 `step_length`, bloom's and depth of field's `resolution_divisor`, motion blur's
 `samples`). A new volume and camera start at `"Medium"`. A preset never turns an
 effect off: an effect a camera has on (and the player allows) runs, at the quality
@@ -689,7 +741,7 @@ without one, the middle preset):
 ```json
 "quality": { "default": "Medium", "presets": [
   { "name": "Low", "ssao": { "low": { "samples": 4, "resolution_divisor": 2 }, … },
-    "ssr": { … }, "bloom_resolution_divisor": { "low": 4, "medium": 4, "high": 2 },
+    "ssil": { … }, "ssr": { … }, "bloom_resolution_divisor": { "low": 4, "medium": 4, "high": 2 },
     "depth_of_field_resolution_divisor": { … }, "motion_blur_samples": { … },
     "ui_blur_divisor": 4 }, … ] }
 ```
@@ -782,6 +834,7 @@ An option can only turn an effect off; it never turns on what a camera left off.
 | `lens_flare` | the volume's lens flare (only while bloom runs) |
 | `motion_blur` | the camera's motion blur |
 | `ssao` | the volume's ambient occlusion |
+| `ssil` | the volume's screen-space indirect lighting |
 | `ssr` | the volume's screen-space reflections |
 | `vignette` | the volume's vignette |
 

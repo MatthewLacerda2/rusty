@@ -6,7 +6,7 @@
 #import forward::transparent
 #import forward::mapping
 #import forward::reflection::{baked_diffuse, environment_reflection, specular_occlusion}
-#import forward::lighting::{ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, flat_ambient, fold_decals, lightmap_direction_rebalance, lightmap_level, probe_irradiance}
+#import forward::lighting::{ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, flat_ambient, fold_decals, indirect_bounce, lightmap_direction_rebalance, lightmap_level, probe_irradiance, realtime_share, ssil_share, with_ssil_share}
 #import forward::local_shadow::local_shadow
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 #import forward::specular_aa
@@ -193,8 +193,12 @@ fn fs_gizmo(in: VertexOutput) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return transparent::finite_hdr(surface_color(in));
+    return with_ssil_share(transparent::finite_hdr(surface_color(in)));
 }
+
+// SSIL's share (#1750, `forward::lighting::with_ssil_share`): `surface_color`
+// records it at step 6; an unlit surface returns first and leaves it 0, so it
+// feeds nothing.
 
 // ---- Motion vectors (#1435) ----
 // A view that runs motion blur draws its opaque solids through these instead: the
@@ -247,7 +251,7 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
         in.clip_position, in.world_position, in.world_normal, in.tex_coords,
         in.world_tangent, in.instance, in.lightmap_uv,
     );
-    return VelocityTargets(transparent::finite_hdr(surface_color(v)), velocity_texel(in));
+    return VelocityTargets(with_ssil_share(transparent::finite_hdr(surface_color(v))), velocity_texel(in));
 }
 
 // The velocity target's texel for `in` (`forward::motion::motion_texel`).
@@ -408,7 +412,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let ao = ambient_occlusion(in.clip_position.xy) * surface.occlusion;
     // The diffuse share is URP's `albedo * oneMinusReflectivity`: what the
     // environment reflection (step 5) takes, a dielectric's 4%, is not diffused too.
-    var lighting_color = ambient_irradiance * diffuse_albedo * (0.96 * (1.0 - metallic)) * ao;
+    // SSIL's bounce (#1750) is indirect diffuse too: the same response, the same AO.
+    var lighting_color = (ambient_irradiance + indirect_bounce(in.clip_position.xy)) * diffuse_albedo * (0.96 * (1.0 - metallic)) * ao;
+    let indirect = lighting_color;
 
     // A lightmapped surface skips `Baked` lights below: their direct light is already
     // in its lightmap (#438). Only a probe/reflection bake capture uploads them at all
@@ -507,6 +513,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         emissive *= mapping::sample(t_emissive, s_emissive, maps).rgb;
     }
     lighting_color += emissive;
+    ssil_share = realtime_share(lighting_color, lighting_color - indirect - reflection - emissive * f32(lightmap_page > 0u));
 
     // 7. Scene fog (#437), last, in linear HDR before post-FX, and how a transparent
     // surface composites (#1523). Authored surface blocks fold into `lighting_color`

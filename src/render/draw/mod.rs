@@ -3,11 +3,11 @@
 //! from the original monolithic `Renderer::render` (behavior unchanged).
 
 pub(crate) mod batch;
-mod camera;
+pub(crate) mod camera;
 mod lighting;
 pub(crate) mod materials;
 mod overlays;
-mod pass;
+pub(crate) mod pass;
 pub(crate) mod proxy_volume;
 pub(crate) mod resources;
 mod solid_key;

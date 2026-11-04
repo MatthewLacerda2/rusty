@@ -20,6 +20,7 @@ fn stages_run_in_the_frames_order() {
             "clusters",
             "solids",
             "scene",
+            "ssil_source",
             "ssr",
             "opaque_copy",
             "transparent",
