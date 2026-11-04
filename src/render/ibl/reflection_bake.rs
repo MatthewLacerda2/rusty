@@ -4,7 +4,8 @@
 //! probe it captures the STATIC scene to a 6-face cubemap from the probe position
 //! (`capture_reflection_cubemap`, #243, #1584), GGX-prefilters it into a roughness mip
 //! chain (`reflection_prefilter`, on the GPU since #1602), encodes the result to KTX2
-//! (`ktx2_encode`), writes that file next to the scene, and stores its path on the
+//! (`ktx2_encode`), writes that file into the folder it is given ([`cube_file`]; the
+//! dev bake passes the scene's own `<scene>.reflections/`, #1692), and stores its path on the
 //! probe (the `cubemap_path` field from #244). The probe array copies it in while the
 //! probe is near the camera (`Renderer::update_reflection_probes`), and the forward
 //! pass reflects it.
@@ -18,7 +19,7 @@
 //! directory — no wall-clock / RNG, so it is clean under the determinism guard
 //! like the capture and prefilter it stands on. File I/O is plain baked-asset output.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::render::ibl::cubemap_capture::CaptureLens;
 use crate::render::ibl::ktx2_encode::encode_cubemap;
@@ -27,6 +28,15 @@ use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
 use crate::render::{CubemapCapture, Renderer};
 use crate::scene::lighting::reflection_probe::clamp_resolution;
 use crate::scene::{ReflectionProbe, Scene};
+
+/// The name every baked cube starts with: probe `i`'s is `reflection_probe_<i>.ktx2`.
+pub const CUBE_PREFIX: &str = "reflection_probe_";
+
+/// Where probe `i`'s cube goes in `dir`: the one name both bake paths (this run-to-end
+/// one and the editor's stepped one) write.
+pub fn cube_file(dir: &Path, i: usize) -> PathBuf {
+    dir.join(format!("{CUBE_PREFIX}{i}.ktx2"))
+}
 
 impl Renderer {
     /// Bake one reflection probe: capture the static scene from its position at
@@ -114,7 +124,7 @@ impl Renderer {
         let default = scene.lighting_settings.reflections.resolution;
         let resolution = clamp_resolution(probe.resolution.unwrap_or(default));
         let bytes = self.bake_reflection(scene, &probe, resolution);
-        let path = out_dir.join(format!("reflection_probe_{i}.ktx2"));
+        let path = cube_file(out_dir, i);
         crate::core::fs::written::write(&path, &bytes)
             .map_err(|e| format!("Failed to write reflection cubemap {}: {e}", path.display()))?;
         scene

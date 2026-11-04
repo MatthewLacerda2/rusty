@@ -11,15 +11,20 @@ use glam::{Quat, Vec3};
 
 /// Which joint slots `clip` has any keyframes for.
 pub(super) fn driven_slots(clip: &AnimationClip, joints: usize) -> Vec<bool> {
-    (0..joints)
-        .map(|slot| {
-            clip.tracks.get(slot).is_some_and(|t| {
-                !t.translation.times.is_empty()
-                    || !t.rotation.times.is_empty()
-                    || !t.scale.times.is_empty()
-            })
-        })
-        .collect()
+    let mut driven = vec![false; joints];
+    mark_driven(clip, &mut driven);
+    driven
+}
+
+/// Set every slot of `driven` that `clip` has any keyframes for.
+pub(super) fn mark_driven(clip: &AnimationClip, driven: &mut [bool]) {
+    for (slot, d) in driven.iter_mut().enumerate() {
+        *d |= clip.tracks.get(slot).is_some_and(|t| {
+            !t.translation.times.is_empty()
+                || !t.rotation.times.is_empty()
+                || !t.scale.times.is_empty()
+        });
+    }
 }
 
 /// Sample each joint's local transform: the clip's track value at `time`, falling
@@ -29,20 +34,29 @@ pub(super) fn sampled_locals(
     clip: &AnimationClip,
     time: f32,
 ) -> Vec<JointTransform> {
-    skin.local_bind
-        .iter()
-        .enumerate()
-        .map(|(slot, bind)| {
-            let Some(track) = clip.tracks.get(slot) else {
-                return *bind;
-            };
-            JointTransform {
-                translation: sample_vec(&track.translation, time).unwrap_or(bind.translation),
-                rotation: sample_quat(&track.rotation, time).unwrap_or(bind.rotation),
-                scale: sample_vec(&track.scale, time).unwrap_or(bind.scale),
-            }
-        })
-        .collect()
+    let mut out = Vec::with_capacity(skin.local_bind.len());
+    sample_into(skin, clip, time, &mut out);
+    out
+}
+
+/// [`sampled_locals`] into `out`, reusing its allocation.
+pub(super) fn sample_into(
+    skin: &SkinData,
+    clip: &AnimationClip,
+    time: f32,
+    out: &mut Vec<JointTransform>,
+) {
+    out.clear();
+    out.extend(skin.local_bind.iter().enumerate().map(|(slot, bind)| {
+        let Some(track) = clip.tracks.get(slot) else {
+            return *bind;
+        };
+        JointTransform {
+            translation: sample_vec(&track.translation, time).unwrap_or(bind.translation),
+            rotation: sample_quat(&track.rotation, time).unwrap_or(bind.rotation),
+            scale: sample_vec(&track.scale, time).unwrap_or(bind.scale),
+        }
+    }));
 }
 
 /// Find the keyframe interval `[i, i+1]` bracketing `time` and the in-segment factor

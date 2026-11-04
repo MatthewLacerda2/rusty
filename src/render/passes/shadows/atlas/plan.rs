@@ -1,21 +1,17 @@
-//! Which point and spot lights get a shadow this frame, and where (#468).
+//! Which point and spot lights ask for a shadow this frame, and how big (#468).
 //!
-//! Pure CPU: the frame's local lights and the base camera in, the atlas tiles out.
-//! A light that wants a shadow and reaches into the view is a candidate. The
-//! caller decides "wants": it casts (`cast_shadows`) and the camera's light budget
-//! keeps it (`clusters::shadow_requests`, #873), so a light that is never shaded
-//! never takes tiles. Candidates are ranked by **importance**, how much of the screen the
-//! light can cover times its intensity, the most important first. Each one asks
-//! for a tile size from its screen coverage (Unity URP's per-light resolution tier,
-//! picked automatically), never larger than the tile of a more important light.
-//! A spotlight takes one tile and a point light six (a cube, one face per tile).
+//! Pure CPU. A light that wants a shadow and reaches into the view is a
+//! candidate. The caller decides "wants": it casts (`cast_shadows`) and the
+//! camera's light budget keeps it (`clusters::shadow_requests`, #873), so a light
+//! that is never shaded never takes tiles. Candidates are ranked by
+//! **importance**, how much of the screen the light can cover times its intensity,
+//! the most important first. Each one asks for a tile size from its screen
+//! coverage (Unity URP's per-light resolution tier, picked automatically). A
+//! spotlight takes one tile and a point light six (a cube, one face per tile).
 //!
-//! Tiles are square powers of two from [`MIN_TILE`] to [`MAX_TILE`], packed in
-//! Z-order over a grid of [`MIN_TILE`] cells. Sizes never grow down the list, so
-//! each tile starts aligned to its own size and none overlap. A light that no
-//! longer fits is retried at half the size, down to [`MIN_TILE`]. One that still
-//! does not fit is **dropped**: it shades unshadowed and is counted in
-//! `RenderCounters::shadow_lights_dropped`, never silently.
+//! Tiles are square powers of two from [`MIN_TILE`] to [`MAX_TILE`], over a grid of
+//! [`MIN_TILE`] cells. Where they go, and how long a light keeps them, is
+//! [`super::slots`]'s (#1711): this file only ranks and sizes.
 
 use glam::camera::rh::{proj::directx, view::look_to_mat4};
 use glam::{Mat4, Vec3};
@@ -30,7 +26,7 @@ pub(crate) const MAX_TILE: u32 = 512;
 /// The smallest tile, and the packing grid's cell.
 pub(crate) const MIN_TILE: u32 = 128;
 /// Cells across the packing grid.
-const CELLS: u32 = ATLAS_SIZE / MIN_TILE;
+pub(super) const CELLS: u32 = ATLAS_SIZE / MIN_TILE;
 /// The most tiles the atlas can hold: every cell its own [`MIN_TILE`] tile.
 pub(crate) const MAX_TILES: usize = (CELLS * CELLS) as usize;
 /// A point light's tiles: its cube faces in the order the shader picks them.
@@ -75,15 +71,39 @@ impl AtlasPlan {
 }
 
 /// A light that asked for a shadow and reaches the view.
-struct Candidate {
-    light: usize,
-    importance: f32,
-    size: u32,
+pub(super) struct Candidate {
+    /// Its index in the frame's lights.
+    pub light: usize,
+    pub importance: f32,
+    /// The tile side its screen coverage asks for, a power of two.
+    pub size: u32,
+    /// The same, before rounding to a power of two: what the size hysteresis reads.
+    pub want: f32,
 }
 
 /// Plan the atlas for `lights` (each with whether it asks for a shadow), seen
-/// through `view_proj` from `eye`.
+/// through `view_proj` from `eye`, with no tile kept from an earlier frame: each
+/// light keyed by its index. Bake captures plan this way (#1711), so they never
+/// move the live frame's tiles.
 pub(crate) fn plan(lights: &[(LocalLight, bool)], view_proj: Mat4, eye: Vec3) -> AtlasPlan {
+    let ids: Vec<u32> = (0..lights.len() as u32).collect();
+    let frame = super::slots::Frame {
+        lights,
+        ids: &ids,
+        view_proj,
+        eye,
+    };
+    super::slots::ShadowSlots::default().plan(None, &frame, |_| true)
+}
+
+/// The lights that ask for a shadow and reach the view, the most important first.
+/// A light at intensity 0 is no candidate: it shades nothing, so it draws no shadow,
+/// though it keeps its tiles while it is off (#1711).
+pub(super) fn candidates(
+    lights: &[(LocalLight, bool)],
+    view_proj: Mat4,
+    eye: Vec3,
+) -> Vec<Candidate> {
     let frustum = Frustum::from_view_proj(view_proj);
     let mut candidates: Vec<Candidate> = lights
         .iter()
@@ -97,36 +117,7 @@ pub(crate) fn plan(lights: &[(LocalLight, bool)], view_proj: Mat4, eye: Vec3) ->
         .collect();
     // Most important first; the index breaks ties, so the plan is deterministic.
     candidates.sort_by(|a, b| (b.importance.total_cmp(&a.importance)).then(a.light.cmp(&b.light)));
-
-    let mut out = AtlasPlan::default();
-    let mut cursor = 0;
-    let mut cap = MAX_TILE;
-    for c in candidates {
-        let light = &lights[c.light].0;
-        let faces = if light.kind == KIND_SPOT { 1 } else { 6 };
-        let mut size = c.size.min(cap);
-        while size > MIN_TILE && !fits(cursor, size, faces) {
-            size /= 2;
-        }
-        if !fits(cursor, size, faces) {
-            out.dropped += 1;
-            continue;
-        }
-        cap = size;
-        out.shadows.push((c.light, out.tiles.len() as u32));
-        for view_proj in light_views(light) {
-            let texel = texel_at_one_metre(light, size);
-            let origin = cell_origin(cursor);
-            out.tiles.push(Tile {
-                view_proj,
-                origin,
-                size,
-                texel,
-            });
-            cursor += cells(size);
-        }
-    }
-    out
+    candidates
 }
 
 /// A shadowed light's rank and the tile size its screen coverage asks for: the
@@ -135,12 +126,13 @@ pub(crate) fn plan(lights: &[(LocalLight, bool)], view_proj: Mat4, eye: Vec3) ->
 fn candidate(light: usize, l: &LocalLight, eye: Vec3) -> Candidate {
     let distance = eye.distance(l.sphere().0).max(1e-3);
     let coverage = (l.range / distance).min(1.0);
-    let wanted = (MAX_TILE as f32 * coverage) as u32;
-    let size = prev_power_of_two(wanted).clamp(MIN_TILE, MAX_TILE);
+    let want = MAX_TILE as f32 * coverage;
+    let size = prev_power_of_two(want as u32).clamp(MIN_TILE, MAX_TILE);
     Candidate {
         light,
         importance: coverage * l.intensity,
         size,
+        want,
     }
 }
 
@@ -152,27 +144,13 @@ fn prev_power_of_two(n: u32) -> u32 {
     }
 }
 
-/// Grid cells one tile of `size` covers.
-fn cells(size: u32) -> u32 {
-    (size / MIN_TILE).pow(2)
-}
-
-/// Whether `faces` tiles of `size` fit after the first `cursor` cells.
-fn fits(cursor: u32, size: u32, faces: u32) -> bool {
-    cursor + faces * cells(size) <= CELLS * CELLS
-}
-
-/// The texel corner of Z-order cell `index`: its even bits are x, its odd bits y.
-fn cell_origin(index: u32) -> [u32; 2] {
-    let compact = |mut v: u32| {
-        let mut out = 0;
-        for bit in 0..16 {
-            out |= (v & 1) << bit;
-            v >>= 2;
-        }
-        out
-    };
-    [compact(index) * MIN_TILE, compact(index >> 1) * MIN_TILE]
+/// How many tiles a light takes: a spotlight one, a point light its six cube faces.
+pub(super) fn faces(light: &LocalLight) -> u32 {
+    if light.kind == KIND_SPOT {
+        1
+    } else {
+        6
+    }
 }
 
 /// The near plane of a light's shadow views: close enough for a light against a
@@ -204,7 +182,7 @@ pub(crate) fn light_views(light: &LocalLight) -> Vec<Mat4> {
 }
 
 /// World size of one texel of a `size` tile, one metre from the light.
-fn texel_at_one_metre(light: &LocalLight, size: u32) -> f32 {
+pub(super) fn texel_at_one_metre(light: &LocalLight, size: u32) -> f32 {
     let fov = match light.kind {
         KIND_SPOT => spot_fov(light),
         _ => std::f32::consts::FRAC_PI_2,

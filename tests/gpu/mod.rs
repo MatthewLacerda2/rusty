@@ -38,6 +38,7 @@ pub fn black_sky(scene: &mut rusty::scene::Scene) {
 mod bloom_screenshot;
 mod cascaded_shadows_screenshot;
 mod custom_postfx_screenshot;
+mod diffuse_model_screenshot;
 mod directional_lightmap_screenshot;
 #[cfg(feature = "editor")]
 mod editor_capture;

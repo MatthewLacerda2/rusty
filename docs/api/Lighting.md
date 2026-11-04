@@ -14,8 +14,8 @@ The two individual verbs stay for a script that wants only one of them.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, saved }` |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, diffuseModel, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, diffuseModel?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
@@ -35,6 +35,31 @@ The two individual verbs stay for a script that wants only one of them.
   *Reflection Probes* section (see `Reflection.md`). A scene whose settings are all
   at their defaults leaves the block out of its file. `Lighting.BakeLightmaps` takes the
   same settings for every argument it is not given.
+- **The diffuse model** (`diffuseModel`, #1698) is how a lamp's direct light falls off
+  across a surface, scene-wide: `"Lambert"` (the default, the physical `max(N·L, 0)`)
+  or `"HalfLambert"` (the retro squared wrap `((N·L + 1) / 2)²`: a quarter of the light
+  at the terminator, none only straight behind, and about a third more diffuse
+  overall). The name is read in any case; an unknown one is an error, and a
+  `SetSettings` call that raises changes nothing. The editor's card edits it under the
+  bake knobs, greyed out while a bake runs. It is left out of the file at `Lambert`.
+  - **Where it applies:** wherever a lamp lights a surface. Realtime shading, lightmap
+    texels, the light probes' baked lamps (and `Probe.BakeAnalytic`'s sun), the surfaces
+    a bake's bounce rays hit and those a probe capture renders. So global illumination
+    gets brighter under `HalfLambert` too; only the transfer from one surface to the
+    next, and the sky, stay Lambert. Live lights follow a change at once, baked light at
+    the next bake.
+  - **Baked vs Realtime:** one lamp lights the side of a surface facing it the same
+    either way. Past the terminator, under `HalfLambert`, they agree only when the live
+    lamp casts shadows: a bake always traces a shadow ray, and from a point facing away
+    from the lamp that ray hits the surface's own mesh, as a shadow-casting live lamp's
+    shadow map does. A live point or spot lamp without shadows (`Light.SetCastShadows`,
+    off by default; the sun always casts them) keeps the wrap's back-side light (fading
+    from a quarter at the terminator to none straight behind); a baked or shadowed
+    one cuts it to dark at N·L = 0, a hard step where the wrap still gives a
+    quarter. A dynamic object lit through the probes beside it keeps the back-side
+    light: a probe stores the lamp unshadowed at its own position. This step is a known
+    limit of the opt-in retro mode; under `Lambert` there is nothing past the
+    terminator to lose, and every path agrees.
 - **The result is written at once**, as Unity writes its lighting data asset: the
   lightmap pages, the probes' baked SH (`<scene>.lighting.json`), and the scene file's
   lighting fields (probe layout, reflection probes, lightmap set, settings). Only those
@@ -46,7 +71,8 @@ The two individual verbs stay for a script that wants only one of them.
   but has no such entity, and the entry is ignored.
 - **Refused during Play**, as `Scene.Save` is (#1340): it writes the scene file, and the
   World then holds the play state. The editor's button is greyed out while playing.
-- **Needs a saved scene** (the bakes write beside its file); errors otherwise. The
+- **Needs a saved scene** (the bakes write into folders named after its file,
+  `<scene>.lightmaps/` and `<scene>.reflections/`); errors otherwise. The
   probe step needs a GPU/software adapter and skips gracefully without one, as
   `Lighting.Bake` does.
 - **In the editor** the lightmap step runs in the background (#808) with a progress
@@ -122,7 +148,9 @@ moving static geometry, `Probe.Clear()` / `Reflection.Clear()` first, then `Ligh
 
 Like the individual bakes, it is **dev-only** and needs a GPU/software adapter; with none
 the placement still runs but the bakes skip gracefully (returns `false`, never errors —
-except reflections need a saved scene path to write their cubemaps beside). Save the scene
+except reflections need a saved scene path: their cubemaps go in its own
+`<scene file>.reflections/` folder, and a reflection bake that runs removes that folder's
+cubes past the probe count, all of them when the scene has no reflection probes). Save the scene
 afterward to persist the baked SH (`<scene>.lighting.json`) and the cubemap paths, or use
 `Lighting.Generate()`, which writes them.
 
