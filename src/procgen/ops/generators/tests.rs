@@ -80,14 +80,6 @@ fn lattice_ops() -> Vec<OpKind> {
                 }));
             }
         }
-        ops.push(OpKind::Wave(Wave {
-            kind: WaveKind::Bands,
-            frequency: s,
-            profile: Default::default(),
-            distortion: 0.0,
-            detail: 2,
-            seed: 0,
-        }));
         ops.extend(hard_surface_ops(s));
         ops.extend(distorted_ops(s));
         ops.push(OpKind::Checker(Checker {

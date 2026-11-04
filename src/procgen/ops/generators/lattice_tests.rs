@@ -43,8 +43,8 @@ pub(super) fn distorted_ops(s: f32) -> Vec<OpKind> {
         angle: s / 10.0,
         seed: 0,
     })];
-    for profile in [Sine, Saw, Triangle] {
-        let (distortion, detail, seed) = (s, 3, 0);
+    for (profile, distortion) in [(Sine, 0.0), (Sine, s), (Saw, s), (Triangle, s)] {
+        let (detail, seed) = (3, 0);
         let (kind, frequency) = (WaveKind::Bands, s);
         ops.push(OpKind::Wave(Wave {
             kind,

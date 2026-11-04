@@ -120,7 +120,8 @@ fn height(profile: ShapeProfile, d: f32, depth: f32) -> f32 {
     if !(depth > 0.0 && depth.is_finite()) {
         return 0.0;
     }
-    let t = (-d / depth).max(0.0).min(1.0);
+    let t = -d / depth;
+    let t = if t.is_nan() { 0.0 } else { t.clamp(0.0, 1.0) };
     let out = 1.0 - t;
     match profile {
         ShapeProfile::Flat | ShapeProfile::Cone => t,

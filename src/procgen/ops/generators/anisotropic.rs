@@ -5,7 +5,7 @@
 //! cells in `(s, t)`, `along` cells per unit of `s` and `across` per unit of `t`,
 //! and a step of one tile moves a point by a whole number of cells on each axis:
 //! `P = (a·along, −b·across)` for a step in `u`, `Q = (b·along, a·across)` in `v`.
-//! A cell's value is hashed after reducing it modulo `P` and `Q` ([`reduce`]), so the
+//! A cell's value is hashed after reducing it modulo `P` and `Q` (`Lattice::reduce`), so the
 //! field repeats exactly once per tile, at any of those directions.
 //!
 //! The asked angle snaps to the nearest direction with both components at most
