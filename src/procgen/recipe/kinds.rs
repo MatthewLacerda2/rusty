@@ -98,6 +98,9 @@ pub enum VoronoiOutput {
     F2,
     /// `F2 − F1`: ~0 on cell borders — cracks, dried mud, cobble outlines.
     Edges,
+    /// F1 with its creases rounded by `smoothness`, Blender's *Smooth F1*: blobby
+    /// cells for pebbles, scales, dried paint.
+    SmoothF1,
 }
 
 /// What the brick op outputs per pixel. Mortar reads 0 in every output.
@@ -126,6 +129,11 @@ pub enum ShapeKind {
     RoundedRect,
     /// A horizontal stroke with round caps: `size` is its length and thickness.
     Line,
+    /// A regular polygon of `sides`, inscribed in the ellipse of `size`, a vertex up.
+    Polygon,
+    /// A star of `points`, inscribed in the ellipse of `size`, a point up; its inner
+    /// vertices at `inner_radius` of the outer.
+    Star,
 }
 
 /// How an `image` op reads its file's channels (#1491), Blender's Image Texture
