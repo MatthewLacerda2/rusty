@@ -14,7 +14,8 @@
 //! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
 //!   `progress` ([`BakeProgress`], #808); its `pool` is the one work pool every
 //!   mesh's texels share, in fixed-size batches (#1656);
-//! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]);
+//! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
+//!   a cell its BC blocks and first [`MIP_LEVELS`] mips never leave (#1694);
 //! * `encode` — RGBM, how a page is stored as an 8-bit PNG, and the RGBA8 direction
 //!   page a directional bake adds (#810);
 //! * `set` — the scene's pages and each entity's place in them ([`LightmapSet`]);
@@ -38,7 +39,7 @@ mod rng;
 mod set;
 mod trace;
 
-pub use atlas::{pack, LightmapAtlas, MAX_PAGE};
+pub use atlas::{max_map_edge, pack, LightmapAtlas, MAX_PAGE, MIP_LEVELS, PAD};
 pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
 pub use encode::{encode_directions, encode_texels};
 pub use input::{BakeLight, BakeMesh, BakeRun, BakeScene, LightShape};
@@ -54,8 +55,6 @@ mod ambient_tests;
 mod area_reach_tests;
 #[cfg(test)]
 mod area_tests;
-#[cfg(test)]
-mod atlas_tests;
 #[cfg(test)]
 mod casting_tests;
 #[cfg(test)]

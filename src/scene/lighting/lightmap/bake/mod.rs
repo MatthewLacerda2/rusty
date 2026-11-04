@@ -10,6 +10,7 @@ use std::thread;
 
 use glam::Vec3;
 
+use super::atlas::{max_map_edge, MAX_PAGE};
 use super::filter::smooth;
 use super::input::BakeScene;
 use super::progress::BakeProgress;
@@ -37,7 +38,9 @@ pub struct BakeSettings {
     pub bounces: u32,
     /// The seed every texel's sample stream derives from.
     pub seed: u64,
-    /// Largest lightmap edge, in texels (at most an atlas page, less its ring).
+    /// Largest lightmap edge, in texels. At most [`max_map_edge`] of the largest
+    /// page ([`MAX_PAGE`]), so the biggest maps still pair on a page (#1694); the
+    /// default is the largest that pairs on a 1024 page.
     pub max_resolution: u32,
     /// Radius, in texels, of the Gaussian that smooths the baked bounce (Unity's
     /// indirect filter); 0 leaves it raw. Baked direct light is never filtered.
@@ -55,7 +58,7 @@ impl Default for BakeSettings {
             samples: 128,
             bounces: 3,
             seed: 0,
-            max_resolution: 512,
+            max_resolution: max_map_edge(1024),
             filter_radius: 3,
             directional: true,
         }
@@ -133,8 +136,8 @@ pub(super) fn bake_on(
 ) -> Option<Vec<Lightmap>> {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer { scene, rays: &rays };
-    // Every lightmap must fit an atlas page with its ring around it.
-    let max = settings.max_resolution.min(super::atlas::MAX_PAGE - 2);
+    // Every lightmap must pair on the largest atlas page with its ring around it.
+    let max = settings.max_resolution.min(max_map_edge(MAX_PAGE));
     // Rasterize everything first, so the total is known before the first texel.
     let charts: Vec<(usize, u32, Vec<TexelPoint>)> = scene
         .meshes
