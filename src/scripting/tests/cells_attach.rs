@@ -38,7 +38,7 @@ fn every_api_handle_reaches_its_own_attached_cell() {
 /// such read fails, so registering the whole surface must succeed.
 #[test]
 fn registering_the_surface_reads_no_cell() {
-    let lua = crate::scripting::sandboxed_vm().unwrap();
+    let lua = Lua::new();
     crate::api::register(&lua, &ApiCtx::default()).unwrap();
     let err = lua.load("return Time.time()").eval::<f64>().unwrap_err();
     assert!(err.to_string().contains("attached"), "{err}");
