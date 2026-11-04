@@ -2,16 +2,17 @@
 //! tonemap (ACEScc under ACES), so a mild boost darkens dark metal without clipping
 //! it to black.
 
-use super::knobs::analytic;
+use super::analytic::analytic;
 use super::{chain, f16_value, W};
 use crate::components::{PostProcessingComponent, Tonemap};
 use crate::core::color::linear_to_srgb;
 use crate::scene::authoring::default_post_processing;
 use crate::scene::authoring::rendering::post_processing as ops;
 
-/// The default (ACES) volume at `contrast`.
+/// The default volume under ACES at `contrast`: ACEScc's pivot is exactly the 0.18 grey card (under the others, LogC's sits near 0.22, as in URP).
 fn at(contrast: f32) -> PostProcessingComponent {
     let mut vc = default_post_processing();
+    vc.tonemapping.mode = Tonemap::Aces;
     ops::grading::color_adjustments::set_contrast(&mut vc, contrast);
     vc
 }
@@ -22,7 +23,7 @@ fn gpu_contrast_steepens_around_mid_grey_without_clipping_the_shadows() {
     // Pixel 0 black, 1 the issue's dark metal (0.05), 2 a grey card, 3 a highlight.
     let mut row = vec![[0.0f32; 3]; W as usize];
     (row[1], row[2], row[3]) = ([0.05; 3], [0.18; 3], [2.0; 3]);
-    let neutral = c.run(&row, 0.0, Some(&default_post_processing()));
+    let neutral = c.run(&row, 0.0, Some(&at(1.0)));
     let punchy = c.run(&row, 0.0, Some(&at(1.12)));
     let flat = c.run(&row, 0.0, Some(&at(0.5)));
     let g = |out: &[[u8; 4]], i: usize| out[i][1];

@@ -16,10 +16,10 @@ fn wheel(tonemap: Tonemap, which: Wheel, color: [f32; 3], offset: f32) -> PostPr
 }
 
 #[test]
-fn gpu_a_negative_lift_keeps_black_black_under_either_tonemap() {
+fn gpu_a_negative_lift_keeps_black_black_under_every_tonemap() {
     let Some(mut c) = chain() else { return };
     let row = vec![[0.0f32; 3]; W as usize];
-    for tonemap in [Tonemap::Aces, Tonemap::Reinhard] {
+    for tonemap in Tonemap::ALL {
         // Grey lifts below zero, and a cyan one whose red channel lands far below.
         for (color, offset) in [([1.0; 3], -0.1), ([1.0; 3], -0.3), ([0.0, 1.0, 1.0], -0.5)] {
             let out = c.run(&row, 0.0, Some(&wheel(tonemap, Wheel::Lift, color, offset)));
@@ -38,7 +38,7 @@ fn gpu_a_gamma_wheel_at_its_floor_leaves_highlights_white_not_nan() {
     // Black, then highlights well above display white.
     let mut row = vec![[10.0f32; 3]; W as usize];
     (row[0], row[1], row[2]) = ([0.0; 3], [4.0; 3], [40.0; 3]);
-    for tonemap in [Tonemap::Aces, Tonemap::Reinhard] {
+    for tonemap in Tonemap::ALL {
         // Gamma offset −1: a per-channel power of 1000, which overflows any x > 1.
         let out = c.run(
             &row,
