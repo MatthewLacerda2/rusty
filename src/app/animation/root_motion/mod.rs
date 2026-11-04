@@ -239,4 +239,6 @@ mod bind_tests;
 #[cfg(test)]
 mod blend_tests;
 #[cfg(test)]
+mod retarget_tests;
+#[cfg(test)]
 mod tests;

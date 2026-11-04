@@ -100,7 +100,7 @@ fn the_assets_api_sets_and_reads_a_textures_import_settings() {
     assert_eq!(stored.filter_mode, crate::asset::sidecar::FilterMode::Point);
 }
 
-fn manager(scene: &Rc<RefCell<Scene>>) -> ScriptManager {
+pub(super) fn manager(scene: &Rc<RefCell<Scene>>) -> ScriptManager {
     let mut m = ScriptManager::new(
         Rc::clone(scene),
         Rc::new(RefCell::new(InputState::new())),

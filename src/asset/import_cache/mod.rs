@@ -11,13 +11,15 @@
 //! instance.
 //!
 //! - **Key**: the path as written, plus the import settings that change geometry
-//!   (the Scale Factor, #1398, and Generate Lightmap UVs). The sidecar is read on
+//!   (the Scale Factor, #1398, Generate Lightmap UVs, and the humanoid map and
+//!   clip sources, #1747). The sidecar is read on
 //!   every lookup (one small file), so ticking a box is a different key and never
 //!   serves the old import. One entry per path: a new key replaces the old one.
 //! - **Fresh**: an entry records every file its parse read: the one parsed (the
 //!   source, or for a converted `.fbx`/`.blend` its cached `.glb`, so a game
 //!   exported without its sources still hits) and the others it pulled in
-//!   (`reads`: an `.obj`'s `.mtl`, a `.gltf`'s `.bin`). Each lookup drains the
+//!   (`reads`: an `.obj`'s `.mtl`, a `.gltf`'s `.bin`), and for a model that
+//!   borrows clips (#1747) each source model's files and its sidecar. Each lookup drains the
 //!   write log (`core::fs::written`) through a [`Freshness`], as the renderer's
 //!   texture cache does, and drops every entry whose source or read files were
 //!   written; the sidecar is not followed, since its geometry settings are the
@@ -57,6 +59,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
+use super::humanoid::HumanoidSettings;
 use super::lightmap_uv::LightmapUvSettings;
 use super::mesh_data::ImportedAsset;
 use super::{ImportError, ImportSettings};
@@ -96,10 +99,12 @@ impl std::ops::Deref for Imported {
 
 /// The import settings that change geometry: what an entry is keyed by beside
 /// its path.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct Geometry {
     scale: u32,
     lightmap_uvs: LightmapUvSettings,
+    /// The humanoid map and clip sources (#1747): they change the clips.
+    humanoid: HumanoidSettings,
 }
 
 impl Geometry {
@@ -107,6 +112,7 @@ impl Geometry {
         Self {
             scale: settings.scale.to_bits(),
             lightmap_uvs: settings.lightmap_uvs,
+            humanoid: settings.humanoid.clone(),
         }
     }
 }
@@ -157,11 +163,16 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
         CACHE.with_borrow_mut(|cache| cache.remove(&key));
     })?;
     let settings = super::settings_of(path);
+    // The models it borrows clips from too (#1747): a re-exported source's
+    // re-conversion is noted the same way, so the lookup drops this import.
+    for from in &settings.humanoid.clips_from {
+        let _ = super::read_target(Path::new(from));
+    }
     let geometry = Geometry::of(&settings);
     let held = CACHE.with_borrow_mut(|cache| {
         cache.enter(project::moves());
         cache.forget_written();
-        cache.hit(&key, geometry)
+        cache.hit(&key, &geometry)
     });
     if let Some(import) = held {
         return Ok(import);
@@ -169,7 +180,7 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
     #[cfg(test)]
     PARSES.set(PARSES.get() + 1);
     // Stamped before the parse: a write during it is a change next time.
-    let files = files_of(&read);
+    let files = files_of(&read, &settings.humanoid.clips_from);
     let fresh = super::import_with(path, &read, &settings);
     CACHE.with_borrow_mut(|cache| match fresh {
         Ok(asset) => Ok(cache.insert(key, geometry, files, asset, BUDGET_BYTES)),
@@ -216,7 +227,7 @@ impl Cache {
 
     /// The entry for `key` when its settings match and every file it read reads
     /// as it did (the parsed one still there).
-    fn hit(&mut self, key: &str, geometry: Geometry) -> Option<Imported> {
+    fn hit(&mut self, key: &str, geometry: &Geometry) -> Option<Imported> {
         self.lookups += 1;
         let lookups = self.lookups;
         let entry = self.by_path.get_mut(key)?;
@@ -224,7 +235,7 @@ impl Cache {
             let now = stamp(Path::new(file));
             now == *was && (i > 0 || now.is_some())
         };
-        if entry.geometry != geometry || !entry.files.iter().enumerate().all(same) {
+        if entry.geometry != *geometry || !entry.files.iter().enumerate().all(same) {
             return None;
         }
         entry.used = lookups;
@@ -278,6 +289,8 @@ impl Cache {
     }
 }
 
+#[cfg(test)]
+mod borrow_tests;
 #[cfg(test)]
 mod budget_tests;
 #[cfg(test)]
