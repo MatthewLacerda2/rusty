@@ -16,7 +16,8 @@ pub const FALLOFF_EPSILON_SQ: f32 = 1e-4;
 /// close, smoothly windowed to exactly zero at `range`; zero at and past it, and
 /// for a `range` of zero or less, NaN or a NaN `d`.
 pub fn falloff(d: f32, range: f32) -> f32 {
-    if !(d < range) {
+    // NaN in either compares false, so it lands here too.
+    if d.partial_cmp(&range) != Some(std::cmp::Ordering::Less) {
         return 0.0;
     }
     let ratio = d / range;
