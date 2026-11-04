@@ -45,15 +45,7 @@ pub(super) fn register_snapshots(
             let mut patches = Vec::new();
             for pair in groups.pairs::<String, Table>() {
                 let (group, fields) = pair?;
-                let mut patch = patch(&fields)?;
-                if let Some(list) = fields.get::<Option<Table>>("effects")? {
-                    let tables = field_list(&list)?;
-                    let maestro = audio.borrow();
-                    let mixer = maestro.mixer();
-                    let id = mixer.require(&group).map_err(err)?;
-                    let effects = mixer.parse_effect_patch(id, &tables).map_err(err)?;
-                    patch.effect_params = Some(effects);
-                }
+                let patch = group_patch(&audio.borrow(), &group, &fields)?;
                 patches.push((group, patch));
             }
             audio
@@ -121,6 +113,19 @@ fn register_ducks(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) 
             Ok(())
         }),
     )
+}
+
+/// Group `group`'s snapshot entry as a patch, its `effects` list checked against
+/// the effects the group has now (#1748).
+fn group_patch(maestro: &AudioMaestro, group: &str, fields: &Table) -> mlua::Result<GroupPatch> {
+    let mut patch = patch(fields)?;
+    if let Some(list) = fields.get::<Option<Table>>("effects")? {
+        let tables = field_list(&list)?;
+        let mixer = maestro.mixer();
+        let id = mixer.require(group).map_err(err)?;
+        patch.effect_params = Some(mixer.parse_effect_patch(id, &tables).map_err(err)?);
+    }
+    Ok(patch)
 }
 
 /// A snapshot entry `{ volume = 0.5, low_pass = 800, ... }` as a patch. Unknown

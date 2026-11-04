@@ -325,7 +325,12 @@ ancestors, or a loop of sidechains (`Music` keyed by `SFX` and `SFX` by `Music`)
 a **cycle**: `SetGroupEffects` keeps the compressor but drops that sidechain, with a
 warning in the console, and the compressor listens to its own input.
 
-**Cost.** COST_LINE
+**Cost.** Measured in a release build on one x86_64 core, per group per 128-frame
+block (the callback's budget is 2.67 ms at 48 kHz): an empty chain 0.3 µs, a limiter
+1.7 µs, a delay 1.5 µs, an EQ with all six bands on 4 µs, a compressor 5 µs, a
+distortion 8.5 µs, and all five in one chain 20 µs, under 1 % of the budget. A
+group with no effects only measures its peak for sidechains, and an effect sleeps,
+with its group's filters, over a second of silence.
 
 There is no mixer panel in the editor: groups and their effects are set through this
 API.
