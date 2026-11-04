@@ -280,6 +280,21 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
 - `curvature {radius, strength=1}` (*filter*, 1 input): height → `0.5 + strength × (h
   − mean of h on a ring radius away)`: above mid-grey on convex edges — edge wear —
   below in concave grooves — grime; `map_range` it into a hard mask.
+- `directional_blur {length, angle=0}` (*filter*, 1 input): a motion blur, like
+  Substance's *Directional Blur*: each pixel averages the input along a line `length`
+  tiles long, centred on it and turned `angle` turns from the horizontal (0 smears
+  left–right, 0.25 up–down, 0.125 along the diagonal). It wraps, so it tiles at **any**
+  angle, which `mapping` cannot: brushed metal, rain streaks, scratches in several
+  directions (one `directional_blur` of a `ridged` noise per direction). The samples
+  are about a pixel apart, so a sub-pixel `length` still softens; `length` caps at one
+  tile, and 0 passes the input through. At most about 90 bilinear reads a pixel (two
+  passes past 64): at 2048² roughly 10 s of one core for a long streak, split across
+  cores by rows.
+- `directional_warp {strength, angle=0}` (*vector*, 2 inputs): pushes input 1 along
+  `angle` (turns: 0 right, 0.25 down) by `strength × red` of input 2, in tiles, like
+  Substance's *Directional Warp*: black moves nothing, white the full `strength`, and
+  a negative strength pushes the other way (capped at ±16 tiles). The one-direction,
+  grayscale counterpart of `warp`; wraps, so it tiles at any angle. Two reads a pixel.
 - `distance {radius}` (*filter*, 1 input): mask → bevel. The input's red above 0.5 is
   inside, and each inside pixel reads its distance to the mask's edge divided by
   `radius`, clamped to 1; outside reads 0. It rounds **any** mask — a Voronoi cell, a
@@ -320,7 +335,11 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
 - `map_range {from_min, from_max, to_min, to_max}` (*math*, 1 input).
 - `mapping {scale=[1,1], rotation=0, translation=[0,0], tiling=true}` (*vector*, 1
   input): bilinear, wrapped resample; `rotation` in turns; each transform left out is
-  the identity, so `mapping {rotation = 0.25}` only turns.
+  the identity, so `mapping {rotation = 0.25}` only turns. With `tiling` the rotation
+  snaps to a quarter turn (*Tiling*), so a stretched noise only ever lines up with the
+  axes: `rotation = 0.125` on a `scale = {1, 12}` stretch gives vertical lines, not
+  diagonal ones. For streaks at any angle, `directional_blur` a noise (or
+  `directional_warp` it).
 - `math {func, value=0.5}` (*math*, 1 or 2 inputs) with `func` ∈
   `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt`: the right-hand side is
   `value`, or with a second input wired, that input's matching channel per pixel
@@ -357,6 +376,15 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   `c + intensity × (c − blur(c))` with a Gaussian of `radius` (a tile fraction, about
   two pixels at 512²): crisps an `image` input or a blurred chain. Unclamped, so a
   hard edge overshoots until the bake clamps it.
+- `slope_blur {intensity, samples=8, mode="blur"|"min"|"max"}` (*filter*, 2 inputs:
+  image, slope): smears input 1 down the slopes of input 2's red, like Substance's
+  *Slope Blur*: each pixel reads `samples` points (1–64) along `intensity ×` the
+  slope's gradient (height per tile, so a reach in tiles), uphill of it, and keeps
+  their mean (`blur`), darkest (`min`) or brightest (`max`). Flat ground is left as it
+  is; a negative intensity smears up the slopes. Erosion, chipped paint edges, grime
+  running off a shape: a noise through `slope_blur` on a `shape`'s height runs down its
+  sides. The reach caps at one tile. `samples + 4` reads a pixel: about 1–2 s of one
+  core at 2048² with 8 samples.
 - `tile {count, jitter=0, rotation_jitter=0, scale_jitter=0, seed=0}` (*vector*, 1
   input): stamps the input once per cell of a `count`×`count` grid; each cell is
   seeded from the recipe and node `seed` with an offset of up to ±`jitter`/2 cells, a
@@ -530,6 +558,9 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
 - `distance.radius` is in tiles: the distance from the edge that reads 1.
 - `cavity.radius` is a tile fraction like `blur.radius`; `curvature.radius` is a
   distance in tiles, sampled bilinearly (so sub-pixel radii stay smooth).
+- `directional_blur.length` and `directional_warp.strength` are in tiles; `angle`
+  on both is in turns, like `mapping.rotation`, but never snaps: they tile at any
+  angle. `slope_blur`'s reach is `intensity ×` the slope in height per tile, in tiles.
 - `ambient_occlusion.radius` and `.depth` are in tiles; `edge_detect.width` is the
   line's whole width in tiles; `highpass.radius` and `sharpen.radius` are tile
   fractions like `blur.radius`.
