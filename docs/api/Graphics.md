@@ -37,6 +37,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetBloomIntensity` / `SetBloomIntensity` | `()` / `(value)` | `number` (≥ 0) |
 | `Graphics.GetBloomQuality` / `SetBloomQuality` | `()` / `(name)` | `"Low"` / `"Medium"` / `"High"` / `"Custom"`: which buffer size it runs at (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
 | `Graphics.GetBloomResolutionDivisor` / `SetBloomResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` buffer is the view's size over this (clamped 1–4, **default `2`**) |
+| `Graphics.GetBloomScatter` / `SetBloomScatter` | `()` / `(value)` | `number` (clamped 0–1, **default `0.7`**): how far the glow spreads (see *Bloom*) |
 | `Graphics.GetBloomThreshold` / `SetBloomThreshold` | `()` / `(value)` | `number` (≥ 0) |
 | `Graphics.GetChromaticAberrationActive` / `SetChromaticAberrationActive` | `()` / `(bool)` | `bool` (**default `false`**) |
 | `Graphics.GetChromaticAberrationIntensity` / `SetChromaticAberrationIntensity` | `()` / `(value)` | `number` (clamped 0–1, **default `0.3`**) |
@@ -126,14 +127,14 @@ Each post effect is one module in every layer of the engine (#1467): its setting
 the volume (motion blur and FXAA on the camera, as Unity keeps them), its ops, its
 `Graphics.*` functions, its Inspector section, its render functions or pass, and its
 section below. They run in this order: depth of field, motion blur, the exposure
-meter, bloom's bright pass and the lens flare over the HDR scene; then the composite, which runs
+meter, bloom's chain and the lens flare over the HDR scene; then the composite, which runs
 chromatic aberration, screen-space reflections, bloom's add, the lens flare's add and the
 exposure on the HDR colour, then the grading LUT (white balance, Lift / Gamma / Gain, the color
 adjustments, the tonemapper, the display gamma and the Color Lookup, baked into one
 table), then the vignette and film grain on the display colour; then the custom
 effects and FXAA. An effect that is off costs nothing and leaves the image
 byte-identical; one left on at a zero strength draws the same image, but may still
-run its passes (bloom at intensity `0` still runs its bright pass and blur).
+run its passes (bloom at intensity `0` still runs its chain).
 
 **Tweening.** Every numeric knob of an effect tweens by its path inside the effect's
 settings, `Tween.To(volume, "Graphics.<effect>.<knob>", to, seconds)` on the volume
@@ -322,14 +323,35 @@ Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness` (a count,
 <!-- effect: bloom -->
 #### Bloom
 
-**Bloom** bleeds the scene's bright parts into their surroundings: a bright pass
-keeps the light above the **threshold** (by luminance), a gaussian blur spreads it at
-a fraction of the view's resolution its **quality** picks (the seeded presets'
-`Medium` level: a quarter on `Low`, half on `Medium`, a third on `High`; `Custom` takes the
-`resolution_divisor` knob; see *Quality presets*), and the composite adds it back times
-the **intensity**, before the exposure. It reads the scene after depth of field and
-motion blur, so a moving highlight blooms along its streak. The player's `bloom`
-option gates it. A new volume starts with bloom on at intensity `1`, threshold `0.8`.
+**Bloom** bleeds the scene's bright parts into their surroundings, as Unity URP's
+does, after Call of Duty's (Jimenez, SIGGRAPH 2014; #1700). A prefilter keeps the
+light above the **threshold** (by a pixel's brightest channel, with a soft knee half
+the threshold wide either side, as URP fixes it) into the first mip of a chain, at a
+fraction of the view's resolution its **quality** picks from the running preset (the
+seeded `Medium` preset's levels: a quarter at `Low`, half at `Medium` and `High`; the
+`High` preset's `Medium` level is a third; `Custom` takes the `resolution_divisor`
+knob; see *Quality presets*), so each level changes what the chain costs. A lower level
+also widens the glow on screen (at a quarter every mip covers twice the pixels it
+does at half), and at 4K
+the 8-mip cap leaves the widest glow at half the screen share it has at 1080p. Past
+half resolution the prefilter still writes at half and a resample takes that down to
+the chain's size, so every scene pixel reaches the chain and a one-pixel spark moving
+across the view keeps its glow. That costs the prefilter's 13 taps per half-size
+texel (3.25 per scene pixel) at every level, plus the resample's 13 per first-mip
+texel (1.4 per scene pixel at a third, 0.8 at a quarter); what a lower level saves is
+in the chain below it, smaller at every mip, and its widest upsample. Each mip below is half the one
+above, down to a few texels across (at most 8 mips), and the chain is blended back up,
+each mip taking the **scatter**'s share of the wider glow below it (`0`: a tight glow,
+`1`: a wide, soft one). The composite adds the result times the **intensity**, before
+the exposure. The prefilter's Karis average weighs each box of texels down by its
+brightness, which damps how far a lone specular sparkle spreads into the texels
+around it (not its own glow). A NaN pixel is dropped; an infinite one is clamped to
+65472 and still glows (or, where the driver's filtering makes it NaN, dropped), so
+neither reaches the chain as inf or NaN. The chain is allocated the first frame a
+view blooms and dropped when it stops, so bloom off costs nothing. It
+reads the scene after depth of field and motion blur, so a moving highlight blooms
+along its streak. The player's `bloom` option gates it. A new volume starts with bloom
+on at intensity `1`, threshold `0.8`, scatter `0.7`.
 
 **Lens dirt** (#1442) is Unity's *Dirt Texture* / *Dirt Intensity*: an image that
 the bloom lights, so smudges on the lens show only where bright light reaches them
@@ -344,13 +366,14 @@ names the engine's own neutral smudges, for a game with no art of its own; an
 draws no dirt (a missing one is picked up when it appears, an unreadable one when it
 is written again). A new volume starts with no dirt texture and a dirt intensity of `0`.
 Tween paths: `Graphics.bloom.intensity`, `Graphics.bloom.threshold`,
-`Graphics.bloom.dirt_intensity`.
+`Graphics.bloom.scatter`, `Graphics.bloom.dirt_intensity`.
 
 <!-- effect: lens_flare -->
 #### Lens flare
 
 **Lens flare** (#1443) is Unity URP's *Screen Space Lens Flare*: built from bloom's
-blurred bright pass, so **every** bright pixel (the sun, a muzzle flash, a fire)
+prefiltered first mip (thresholded, before the chain spreads it, so the scatter
+never reshapes it), so **every** bright pixel (the sun, a muzzle flash, a fire)
 flares with no per-light authoring. Each bright pixel throws **ghosts** mirrored
 through the screen centre (`ghost_count` of them, each at its own scale and lens
 tint, so a light left of the centre ghosts on the right), a **halo** ring around the
@@ -364,8 +387,9 @@ volume's chromatic aberration.
 **It runs only while bloom runs**, since it reads bloom's chain: bloom off, or the
 player's `bloom` option off, means no flare. The player's `lens_flare` option gates
 it. A new volume starts with it off; once on, four
-ghosts, a halo at `0.5` and no streaks. A frame with nothing above bloom's threshold
-is byte-identical with it on and off, and a flare that can add nothing (no ghosts,
+ghosts, a halo at `0.5` and no streaks. A frame with nothing reaching bloom's soft
+knee (half the threshold, `0.4` at the default `0.8`) is byte-identical with it on and
+off, and a flare that can add nothing (no ghosts,
 halo or streaks, or a black tint) costs no pass. Its GPU time is
 `Debug.Stats().gpu_passes.lens_flare`. Tween paths: `Graphics.lens_flare.intensity`,
 `Graphics.lens_flare.ghost_intensity`, `Graphics.lens_flare.halo_intensity`,

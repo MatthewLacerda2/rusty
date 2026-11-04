@@ -14,7 +14,7 @@
 //!   the view's LUT, in order;
 //! - a **pass** ([`Pass`]): its own GPU work, on the HDR scene before the composite
 //!   ([`Pass::Scene`]: depth of field, motion blur, the exposure meter, bloom's
-//!   bright pass, the lens flare) or on the LDR image after it ([`Pass::Ldr`]: the authored effects,
+//!   mip chain, the lens flare) or on the LDR image after it ([`Pass::Ldr`]: the authored effects,
 //!   FXAA).
 //!
 //! **Params without a shared struct.** Each function packs its own vec4 slots; the
