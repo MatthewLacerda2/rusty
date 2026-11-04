@@ -4,13 +4,14 @@
 //! `AudioSourceComponent` field by field: the `clip` path, per-source `volume`, the
 //! playback flags (`looping` / `play_on_start` / `is_time_scaled`), and the spatial
 //! fields (`spatial_blend` / `initial_distance` / `final_distance`) and the mixer
-//! `output_group` (#465), and the `occlusion_enabled` opt-out (#467).
+//! `output_group` (#465), the `occlusion_enabled` opt-out (#467), and the `doppler_level` (#1749).
 //!
 //! The editor's Audio Source card routes every field write through these (#287). The
 //! Lua `Audio.*` namespace mostly drives the live `AudioMaestro` voice (play / stop /
-//! live volume), NOT the persisted component fields; its two field writes,
-//! `Audio.SetOutputGroup` and `Audio.SetOcclusionEnabled`, share
-//! [`set_output_group`] and [`set_occlusion_enabled`] with the card. They are plain
+//! live volume), NOT the persisted component fields; its three field writes,
+//! `Audio.SetOutputGroup`, `Audio.SetOcclusionEnabled` and `Audio.SetDopplerLevel`,
+//! share [`set_output_group`], [`set_occlusion_enabled`] and [`set_doppler_level`]
+//! with the card. They are plain
 //! sets; the card's drag-range clamps are a UI affordance applied to the widget
 //! local before the op is called.
 //!
@@ -69,6 +70,11 @@ pub fn set_occlusion_enabled(a: &mut AudioSourceComponent, on: bool) {
     a.occlusion_enabled = on;
 }
 
+/// Set how strongly motion bends the source's pitch (#1749): `0` off, `1` physical.
+pub fn set_doppler_level(a: &mut AudioSourceComponent, level: f32) {
+    a.doppler_level = non_negative(level);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -98,6 +104,7 @@ mod tests {
         set_final_distance(&mut e, 20.0);
         set_output_group(&mut e, "Music".to_string());
         set_occlusion_enabled(&mut e, false);
+        set_doppler_level(&mut e, 2.5);
         let a = &*e;
         assert_eq!(a.clip, "sfx/hit.ogg");
         assert_eq!(a.volume, 0.5);
@@ -109,5 +116,6 @@ mod tests {
         assert_eq!(a.final_distance, 20.0);
         assert_eq!(a.output_group, "Music");
         assert!(!a.occlusion_enabled);
+        assert_eq!(a.doppler_level, 2.5);
     }
 }

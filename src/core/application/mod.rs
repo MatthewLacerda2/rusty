@@ -50,6 +50,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::core::project::{ProjectFile, ProjectSettings};
+use crate::core::settings::audio::AudioSettings;
 use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::demos::DemoSettings;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
@@ -120,6 +121,8 @@ pub struct Application {
     decal_limits: DecalLimits,
     /// How many play demos the project keeps (#1581).
     demos: DemoSettings,
+    /// The project's audio settings (#1749) as last read or set.
+    audio: AudioSettings,
     /// The bound file's text the budgets and presets were last parsed from, good or
     /// bad: the same text again is not re-parsed, so its warnings are not repeated.
     read_from: Option<String>,
@@ -165,6 +168,7 @@ impl Application {
         self.quality = file.quality;
         self.decal_limits = file.decals;
         self.demos = file.demos;
+        self.audio = file.audio;
         Ok(())
     }
 
@@ -176,6 +180,7 @@ impl Application {
         self.quality = settings.quality;
         self.decal_limits = settings.decals;
         self.demos = settings.demos;
+        self.audio = settings.audio;
     }
 
     /// The project settings this run plays under, as [`run_with`](Self::run_with)
@@ -187,6 +192,7 @@ impl Application {
             quality: self.quality.clone(),
             decals: self.decal_limits,
             demos: self.demos,
+            audio: self.audio,
         }
     }
 
@@ -249,6 +255,7 @@ impl Application {
         file.build = self.build.clone();
         file.graphics_options = self.graphics_defaults;
         file.quality = self.quality.clone();
+        file.audio = self.audio;
         file.write(path)
     }
 }

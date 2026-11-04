@@ -4,7 +4,7 @@ Play sound through the engine's `AudioMaestro` (the audio engine singleton). An
 entity carries an `AudioSource` component (`clip`, `volume`, `loop`,
 `play_on_start`, `is_time_scaled`, plus the spatial fields `spatial_blend`,
 `initial_distance`, `final_distance`, `output_group`, the mixer group it plays
-through, and `occlusion_enabled`); these verbs start/stop and retune it, fire
+through, `occlusion_enabled` and `doppler_level`); these verbs start/stop and retune it, fire
 one-shots, set the single master volume and the speaker mode, read a source's
 resolved 3D spatial state, tune [occlusion](#occlusion), and drive the
 [mixer](#mixer-groups-snapshots-and-ducking): groups (buses) with volume, filters and
@@ -48,6 +48,13 @@ Dev builds read it back with `Debug.AudioEvents` and the live per-source roster 
 | `Audio.GetOcclusionSettings` | `()` | table — `strength`, `layer_mask`, `voices_per_tick` |
 | `Audio.SetOcclusionEnabled` | `(id, bool)` | — sets the entity's `AudioSource.occlusion_enabled` (default `true`); an entity with no `AudioSource` is an error |
 | `Audio.GetOcclusionEnabled` | `(id)` | `bool` — the source's `occlusion_enabled`, or `nil` with no `AudioSource` |
+| `Audio.SetDopplerLevel` | `(id, level)` | — sets the entity's `AudioSource.doppler_level` (default `1`; `0` off, above `1` exaggerated; a negative or non-finite value stores `0`); an entity with no `AudioSource` is an error. See [Doppler](#doppler) |
+| `Audio.GetDopplerLevel` | `(id)` | `number` — the source's `doppler_level`, or `nil` with no `AudioSource` |
+| `Audio.GetDoppler` | `(id)` | `number` — the doppler rate the source's voice plays at as of the last tick (`343/293` for one closing at 50 m/s); `1` when not playing |
+| `Audio.SetSpeedOfSound` | `(c)` | — the speed of sound doppler resolves with, m/s, until Stop puts the project's back; not finite and positive is an error |
+| `Audio.GetSpeedOfSound` | `()` | `number` — the speed of sound in force (default 343) |
+| `Audio.SetDefaultSpeedOfSound` | `(c)` | — the project's speed of sound, `project.rusty`'s `"audio"` (the Build Settings window's *Speed of sound*): written to the file in the editor and a session, in memory only in the player and `play`; entering Play and Stop apply it. Not finite and positive is an error |
+| `Audio.GetDefaultSpeedOfSound` | `()` | `number` — the project's speed of sound (default 343) |
 | `Audio.SetOutputGroup` | `(id, group)` | — sets the entity's `AudioSource.output_group` (`""` is Master); an unknown group, or an entity with no `AudioSource`, is an error. Takes effect at the voice's next `Play` |
 | `Audio.GetOutputGroup` | `(id)` | `string` — the source's `output_group` (`""` is Master), or `nil` with no `AudioSource` |
 | `Audio.GetGroups` | `()` | `{string}` — every mixer group's name, parents before children (`Master` first) |
@@ -155,6 +162,46 @@ the intended bullet-time sound), and it is **paused** while `Time.timeScale == 0
 `Time.Pause()` is on, resuming where it left off. `is_time_scaled = false` (music, UI)
 ignores both and always plays at normal rate. `Audio.PlayAt` one-shots are
 time-scaled.
+
+### Doppler
+
+A 3D source moving against the listener plays faster as they close and slower as
+they part, so a rocket passing overhead whooshes (Unity's *Doppler Level*). The rate is
+
+    rate = (c − v_listener·n) / (c − v_source·n)
+
+with `n` the unit vector from the source to the listener and `c` the speed of
+sound: at 50 m/s and `c = 343`, `343/293` (+17 %) coming and `343/393` (−13 %)
+going. It multiplies the time-scale rate.
+
+- **Level.** Both velocities are scaled by `doppler_level × spatial_blend`: a 2D
+  source (`spatial_blend = 0`, the `AudioSource` default) never shifts, a fully 3D
+  one shifts physically at level `1`, and a level of `2` doubles the effect. The
+  inspector's *Doppler Level* is the same field.
+- **Velocities** are each body's world-position motion over the tick, divided by
+  the tick's scaled sim time: a Transform a script moves, a Rigidbody, a
+  CharacterController and a source parented under any of them are all measured
+  the same way. A `PlayAt` one-shot stays where it was fired; the listener's
+  motion still shifts it.
+- **No chirps.** The rate is clamped to `0.5..2` and the device glides it over the
+  same ~10 ms as gain and pan; a body faster than sound plays at the clamp. A
+  tick with no sim time (`Time.Pause`, `timeScale = 0`) keeps a time-scaled
+  voice's rate, and plays an unscaled one (`is_time_scaled = false`) at `1`.
+- **Jumps.** Play, Stop and a scene load forget the listener's motion, so the
+  next tick hears it still. A body that moves faster than 1000 m/s in one tick is
+  taken as a teleport and counts as still for that tick. A shorter jump (a
+  respawn a few metres away) is not told apart from motion: it reads as velocity
+  for that one tick (3 m toward the listener at 60 Hz is 180 m/s), clamped and
+  smoothed by the glide.
+- **Speed of sound.** A project setting: `project.rusty`'s
+  `"audio": { "speed_of_sound": 343 }`, edited in the editor's *File ▸ Build
+  Settings* window (*Speed of sound*, written when a drag or typed edit ends) or
+  with `Audio.SetDefaultSpeedOfSound`. Entering Play and Stop apply the file's
+  value; `Audio.SetSpeedOfSound` changes the running game's until Stop. A value in
+  the file that is not a positive number (`"343"`, `null`, `-5`) keeps 343 with a
+  warning, and the project still opens.
+
+Output only: nothing in the sim reads a rate, so a replay is unchanged.
 
 ### Speaker mode
 

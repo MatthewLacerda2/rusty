@@ -78,6 +78,7 @@ scene.entities[].animator.speed: f32
 scene.entities[].animator.time: f32
 scene.entities[].animator: option
 scene.entities[].audio.clip: string
+scene.entities[].audio.doppler_level: f32
 scene.entities[].audio.final_distance: f32
 scene.entities[].audio.initial_distance: f32
 scene.entities[].audio.is_time_scaled: bool
