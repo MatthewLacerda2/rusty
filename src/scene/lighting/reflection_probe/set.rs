@@ -5,6 +5,7 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 use super::ReflectionProbe;
+use crate::scene::lighting::sh::Sh9;
 
 /// The scene-level reflection-probe dataset. Owned by `Scene`, serialized into the
 /// scene document (positions, boxes, settings and cubemap paths; no GPU data).
@@ -73,9 +74,37 @@ impl ReflectionProbeSet {
     }
 
     /// Hold every probe as [`Self::edit`] does: what a loaded scene file wrote goes
-    /// through it once, so no reader clamps again (#1584).
+    /// through it once, so no reader clamps again (#1584). A file naming more than
+    /// one fallback probe keeps the first.
     pub fn hold(&mut self) {
         self.probes.iter_mut().for_each(hold);
+        self.set_fallback(self.fallback());
+    }
+
+    /// The fallback probe (#1697, Unity's default reflection probe), if one is named.
+    pub fn fallback(&self) -> Option<usize> {
+        self.probes.iter().position(|p| p.fallback)
+    }
+
+    /// Name probe `index` the fallback, or none with `None`; every other probe loses
+    /// the flag. Naming one makes it manual, so a bake's auto-placement keeps it
+    /// (#1737). `false` when there is no such probe (nothing changes).
+    pub fn set_fallback(&mut self, index: Option<usize>) -> bool {
+        if index.is_some_and(|i| i >= self.probes.len()) {
+            return false;
+        }
+        for (i, p) in self.probes.iter_mut().enumerate() {
+            p.fallback = Some(i) == index;
+            p.manual |= p.fallback;
+        }
+        true
+    }
+
+    /// Store probe `index`'s baked irradiance (#1697; no-op if out of range).
+    pub fn set_irradiance(&mut self, index: usize, irradiance: Option<Sh9>) {
+        if let Some(p) = self.probes.get_mut(index) {
+            p.irradiance = irradiance;
+        }
     }
 
     /// Remove probe `index` (no-op if out of range).
@@ -91,9 +120,16 @@ impl ReflectionProbeSet {
     }
 }
 
-/// `p`'s settings held to their ranges and its box corners in order.
+/// `p`'s settings held to their ranges, its box corners in order, and a stored
+/// irradiance with a non-finite coefficient (a damaged file) dropped, so the probe
+/// scales by 1 rather than shading NaN.
 fn hold(p: &mut ReflectionProbe) {
     p.clamp_settings();
+    if p.irradiance
+        .is_some_and(|sh| sh.coeffs.as_flattened().iter().any(|c| !c.is_finite()))
+    {
+        p.irradiance = None;
+    }
     (p.box_min, p.box_max) = (p.box_min.min(p.box_max), p.box_min.max(p.box_max));
 }
 

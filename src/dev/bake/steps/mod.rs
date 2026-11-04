@@ -174,8 +174,8 @@ impl LightingBake {
         };
         let out_dir = out_dir(self.scene_path.as_deref())?;
         say(format!("Baking reflection probe {} of {total}", i + 1));
-        let bytes = renderer.bake_reflection(scene, probe, *resolution);
-        self.staged.write(&out_dir, &bytes)?;
+        let baked = renderer.bake_reflection(scene, probe, *resolution);
+        self.staged.write(&out_dir, &baked)?;
         Ok(self.staged.len() >= total)
     }
 
@@ -208,7 +208,7 @@ impl LightingBake {
             let live = scene.reflection_probes.probes.get(from).cloned();
             reflections.probes[i] = live.ok_or(PROBES_CHANGED)?;
         }
-        self.staged.commit(&mut reflections)?;
+        self.staged.commit(scene, &mut reflections)?;
         // A reflection bake that ran leaves only its own cubes in the scene's folder.
         if let (true, Some(path)) = (self.report.ran_reflection_bake, self.scene_path.as_deref()) {
             prune_stale(&reflection_dir(path), self.staged.len())?;

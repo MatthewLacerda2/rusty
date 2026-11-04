@@ -38,6 +38,7 @@ use std::ops::RangeInclusive;
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
+use super::sh::Sh9;
 pub use blend::ProbeBlend;
 pub use set::ReflectionProbeSet;
 
@@ -82,6 +83,19 @@ pub struct ReflectionProbe {
     /// probes without it. `Reflection.Add` and the Inspector's Add set it.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub manual: bool,
+    /// The irradiance the baked cube gives at the probe (#1697), stored by the bake
+    /// beside [`Self::cubemap_path`]: the cube's own SH plus the direct light of
+    /// `Baked` lights there, the quantity a light probe at its position would hold.
+    /// The forward pass scales the probe's reflection at a pixel by the baked
+    /// diffuse there over this along the normal (probe normalisation); `None` (not
+    /// baked, or baked before it was stored) scales by 1.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub irradiance: Option<Sh9>,
+    /// Unity's default reflection probe (#1697): what an object no probe box
+    /// reaches reflects instead of the sky, and what a partial blend leaves. At
+    /// most one probe of a set has it ([`ReflectionProbeSet::set_fallback`]).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub fallback: bool,
 }
 
 impl Default for ReflectionProbe {
@@ -118,6 +132,8 @@ impl ReflectionProbe {
             shadows: true,
             intensity: 1.0,
             manual: false,
+            irradiance: None,
+            fallback: false,
         }
     }
 

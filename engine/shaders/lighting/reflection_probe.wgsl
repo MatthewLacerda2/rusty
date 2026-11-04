@@ -1,15 +1,18 @@
 // engine/shaders/lighting/reflection_probe.wgsl — one resident reflection probe as
 // the shader reads it, and its box-projected parallax correction (#244, #1206): the
 // WGSL side of `scene::lighting::reflection_probe`. `common::LightingUniforms` holds
-// the resident probes; `forward::lighting::environment_reflection` samples them.
+// the resident probes; `forward::reflection::environment_reflection` samples them.
 
 #define_import_path lighting::reflection_probe
 
 // One resident reflection probe (#1206): its capture point, its parallax box, the
 // layer of the probe cube array its cube sits in (probes sharing a cube share it),
-// where that cube's prefiltered mip chain (#245) starts, and (#1584) its intensity
-// (`params.x`) and box-projection switch (`params.y`, 1 on). Mirrors the Rust
-// `ReflectionProbeUniform` byte-for-byte.
+// where that cube's prefiltered mip chain (#245) starts, (#1584) its intensity
+// (`params.x`) and box-projection switch (`params.y`, 1 on), and (#1697) the
+// fallback flag (`params.z`, only ever slot 0), the normalisation switch (`params.w`,
+// 1 when `irradiance` is stored) and the luminance of its stored irradiance as 9 L2
+// SH coefficients, convolved over pi. Mirrors the Rust `ReflectionProbeUniform`
+// byte-for-byte.
 struct ReflectionProbe {
     center: vec3<f32>,
     mip_base: f32,
@@ -18,6 +21,7 @@ struct ReflectionProbe {
     box_max: vec3<f32>,
     layer: u32,
     params: vec4<f32>,
+    irradiance: array<vec4<f32>, 3>,
 };
 
 // Box-projected parallax correction (#244), the standard Lagarde technique. Given a

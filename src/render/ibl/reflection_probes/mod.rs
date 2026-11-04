@@ -36,6 +36,7 @@ mod frame;
 mod gpu;
 mod pack;
 pub(crate) mod slots;
+mod uniform;
 
 use std::collections::HashMap;
 
@@ -45,31 +46,12 @@ use self::admit::admitted;
 pub(crate) use self::pack::pack_blend;
 use self::slots::SlotTable;
 pub(crate) use self::slots::{MAX_REFLECTION_PROBES, SPARE_SLOTS};
+pub(crate) use self::uniform::ReflectionProbeUniform;
 use super::cubemap::{CubeShape, CubemapTexture};
 use crate::scene::{ReflectionProbe, ReflectionProbeSet};
 
 /// The largest face a resident cube may have: the largest a probe bakes at.
 pub(crate) const MAX_FACE: u32 = *ReflectionProbe::RESOLUTION.end();
-
-/// One resident probe as the shader reads it: its capture point, its parallax box,
-/// its cube's array layer, where the cube's mip chain sits in it, and its intensity
-/// and box-projection switch. Mirrors
-/// `ReflectionProbe` in `engine/shaders/lighting/reflection_probe.wgsl` byte-for-byte.
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct ReflectionProbeUniform {
-    pub center: [f32; 3],
-    /// The array mip holding this cube's base level.
-    pub mip_base: f32,
-    pub box_min: [f32; 3],
-    /// How many mips its chain has.
-    pub mip_count: f32,
-    pub box_max: [f32; 3],
-    /// The array layer (cube) its cube was copied into.
-    pub layer: u32,
-    /// `x` intensity, `y` 1 when box projection is on.
-    pub params: [f32; 4],
-}
 
 /// A probe the array holds this frame: the probe, its cube's shape, and how many mips
 /// below the array's base level the cube's chain starts.
@@ -259,21 +241,11 @@ impl ProbeArray {
                 None => self.active.probes.push(probe.clone()),
             }
             let probe = &self.active.probes[i];
-            self.uniforms[i] = ReflectionProbeUniform {
-                center: probe.position.to_array(),
-                mip_base: shift as f32,
-                box_min: probe.box_min.to_array(),
-                mip_count: cube.mips as f32,
-                box_max: probe.box_max.to_array(),
-                layer,
-                params: [
-                    probe.intensity,
-                    f32::from(u8::from(probe.box_projection)),
-                    0.0,
-                    0.0,
-                ],
-            };
+            self.uniforms[i] = ReflectionProbeUniform::of(probe, shift, cube.mips, layer);
         }
+        // The slots past the frame's probes are cleared: no draw names them, but the
+        // shader reads slot 0's fallback flag whatever the draw (#1697).
+        self.uniforms[kept.len()..].fill(ReflectionProbeUniform::default());
     }
 }
 

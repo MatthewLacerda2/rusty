@@ -23,7 +23,8 @@ impl Renderer {
     /// array are passed over and never uploaded (#1245). Which probes are resident
     /// depends on the camera's distance to each box; only ties are broken by scene
     /// index, and the residents are handed over in scene order, so two runs from one
-    /// camera agree. A cube that fails to load is refused until it is re-written, and
+    /// camera agree. The scene's fallback probe (#1697) is ranked first, so it is
+    /// always taken, and handed over first, so it is slot 0. A cube that fails to load is refused until it is re-written, and
     /// the frame's probes are chosen again without it, so no slot is bound to what it
     /// held before (#1609).
     pub(crate) fn update_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) {
@@ -58,7 +59,8 @@ impl Renderer {
             paths = push_new(paths, path);
             wanted.push((i, shape));
         }
-        wanted.sort_by_key(|&(i, _)| i);
+        // Scene order, the fallback first: the shader finds it in slot 0 (#1697).
+        wanted.sort_by_key(|&(i, _)| (!probes[i].fallback, i));
         let wanted: Vec<_> = wanted.into_iter().map(|(i, s)| (&probes[i], s)).collect();
         let (copies, rebuilt) = self.reflection_probes.place(&self.device, &wanted, budget);
         let (mut loaded, mut placed) = (Vec::new(), true);
@@ -130,14 +132,21 @@ fn push_new<'a>(mut paths: Vec<&'a str>, path: &'a str) -> Vec<&'a str> {
     paths
 }
 
-/// The indices of the baked probes, nearest box to `camera_pos` first (zero inside
-/// it), ties to the lower scene index, so the order is the same every run.
-fn ranked(probes: &[ReflectionProbe], camera_pos: Vec3) -> Vec<usize> {
+/// The indices of the baked probes, the fallback first (#1697: the first is always
+/// taken, so it stays resident wherever the camera is), then nearest box to
+/// `camera_pos` first (zero inside it), ties to the lower scene index, so the order
+/// is the same every run.
+pub(super) fn ranked(probes: &[ReflectionProbe], camera_pos: Vec3) -> Vec<usize> {
     let mut order: Vec<usize> = (0..probes.len())
         .filter(|&i| !probes[i].cubemap_path.is_empty())
         .collect();
     let distance = |i: usize| probes[i].box_distance_sq(camera_pos);
-    order.sort_by(|&a, &b| distance(a).total_cmp(&distance(b)).then(a.cmp(&b)));
+    order.sort_by(|&a, &b| {
+        (!probes[a].fallback)
+            .cmp(&!probes[b].fallback)
+            .then(distance(a).total_cmp(&distance(b)))
+            .then(a.cmp(&b))
+    });
     order
 }
 

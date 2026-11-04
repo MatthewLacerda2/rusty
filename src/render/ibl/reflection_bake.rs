@@ -21,13 +21,26 @@
 
 use std::path::{Path, PathBuf};
 
+use glam::Vec3;
+
 use crate::render::ibl::cubemap_capture::CaptureLens;
 use crate::render::ibl::ktx2_encode::encode_cubemap;
+use crate::render::ibl::probe::bake::project_cubemap;
 use crate::render::ibl::reflection_prefilter::gpu::ProbePrefilter;
 use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
 use crate::render::{CubemapCapture, Renderer};
+use crate::scene::lighting::lightmap::{baked_direct_sh, BakeScene};
 use crate::scene::lighting::reflection_probe::clamp_resolution;
-use crate::scene::{ReflectionProbe, Scene};
+use crate::scene::lighting::sh::Sh9;
+use crate::scene::{ReflectionProbe, ReflectionProbeSet, Scene};
+
+/// One baked reflection probe: its KTX2 cube, and the irradiance that cube gives at
+/// the probe, the cube's own L2 SH ([`project_cubemap`]) before the direct light of
+/// `Baked` lights is added ([`with_baked_direct`]).
+pub struct BakedCube {
+    pub bytes: Vec<u8>,
+    pub irradiance: Sh9,
+}
 
 /// The name every baked cube starts with: probe `i`'s is `reflection_probe_<i>.ktx2`.
 pub const CUBE_PREFIX: &str = "reflection_probe_";
@@ -41,13 +54,14 @@ pub fn cube_file(dir: &Path, i: usize) -> PathBuf {
 impl Renderer {
     /// Bake one reflection probe: capture the static scene from its position at
     /// `resolution` per face through its clip planes and shadow setting, prefilter it
-    /// into a roughness mip chain, and return the encoded KTX2 bytes.
+    /// into a roughness mip chain, and return the encoded KTX2 bytes with the
+    /// capture's irradiance SH (#1697).
     pub fn bake_reflection(
         &mut self,
         scene: &Scene,
         probe: &ReflectionProbe,
         resolution: u32,
-    ) -> Vec<u8> {
+    ) -> BakedCube {
         // A scene's probes are held to range on load and on edit, but any probe may be
         // passed here (a test builds its own): bake from a held copy.
         let mut probe = probe.clone();
@@ -59,6 +73,7 @@ impl Renderer {
             shadows: probe.shadows,
         };
         let capture = self.capture_reflection_cubemap(scene, probe.position, resolution, lens);
+        let irradiance = project_cubemap(&capture);
         let prefiltered = self.prefilter_gpu(&capture);
         // The mip a fully-rough surface samples (CPU mirror of the shader's selection),
         // logged so a bake's roughness range is visible when debugging a probe.
@@ -70,7 +85,10 @@ impl Renderer {
                 prefiltered.level_count() as u32
             )
         );
-        encode_cubemap(&prefiltered)
+        BakedCube {
+            bytes: encode_cubemap(&prefiltered),
+            irradiance,
+        }
     }
 
     /// GGX-prefilter `capture` on the GPU (#1602), building the pipeline on the
@@ -100,9 +118,14 @@ impl Renderer {
         observe: &mut dyn FnMut(usize, usize),
     ) -> Result<usize, String> {
         let total = scene.reflection_probes.len();
+        let mut cubes = Vec::with_capacity(total);
         for i in 0..total {
             observe(i, total);
-            self.bake_reflection_into(scene, i, out_dir)?;
+            cubes.push(self.bake_reflection_into(scene, i, out_dir)?);
+        }
+        let irradiance = with_baked_direct(scene, &scene.reflection_probes, &cubes);
+        for (i, sh) in irradiance.into_iter().enumerate() {
+            scene.reflection_probes.set_irradiance(i, sh);
         }
         Ok(total)
     }
@@ -111,27 +134,54 @@ impl Renderer {
     /// `out_dir/reflection_probe_<i>.ktx2` and point the probe at it: one probe of
     /// [`Renderer::bake_reflections`]. The editor's stepped bake does not come here: it
     /// steps through `LightingBake::step`, which stages each cube and applies them all
-    /// at the end (#1602). A probe index past the set bakes nothing.
-    pub fn bake_reflection_into(
+    /// at the end (#1602). Returns the cube's own irradiance SH, which the caller
+    /// finishes with [`with_baked_direct`] and stores; the probe's stored one is left
+    /// as it was. A probe index past the set bakes nothing (`None`).
+    fn bake_reflection_into(
         &mut self,
         scene: &mut Scene,
         i: usize,
         out_dir: &Path,
-    ) -> Result<(), String> {
+    ) -> Result<Option<Sh9>, String> {
         let Some(probe) = scene.reflection_probes.probes.get(i).cloned() else {
-            return Ok(());
+            return Ok(None);
         };
         let default = scene.lighting_settings.reflections.resolution;
         let resolution = clamp_resolution(probe.resolution.unwrap_or(default));
-        let bytes = self.bake_reflection(scene, &probe, resolution);
+        let baked = self.bake_reflection(scene, &probe, resolution);
         let path = cube_file(out_dir, i);
-        crate::core::fs::written::write(&path, &bytes)
+        crate::core::fs::written::write(&path, &baked.bytes)
             .map_err(|e| format!("Failed to write reflection cubemap {}: {e}", path.display()))?;
         scene
             .reflection_probes
             .set_cubemap(i, path.to_string_lossy().into_owned());
-        Ok(())
+        Ok(Some(baked.irradiance))
     }
+}
+
+/// The irradiance each probe of `set` stores (#1697): `cubes[i]`, probe `i`'s cube
+/// SH (`None` for one not baked), plus the direct light of `scene`'s `Baked` lights
+/// at its position, shadowed by the static meshes and traced once for every probe
+/// (`baked_direct_sh`). A capture sees lit surfaces, never a light, so without it a
+/// probe beside a `Baked` lamp would store only the lamp's bounce, while the lightmap
+/// and the light probes it is compared with hold its direct light too: the light
+/// probe bake adds it the same way (`probe::bounce`).
+pub fn with_baked_direct(
+    scene: &Scene,
+    set: &ReflectionProbeSet,
+    cubes: &[Option<Sh9>],
+) -> Vec<Option<Sh9>> {
+    let positions: Vec<Vec3> = set.probes.iter().map(|p| p.position).collect();
+    let statics = BakeScene::gather(scene, &|_| None);
+    let direct = baked_direct_sh(&statics, &positions);
+    (cubes.iter().zip(direct))
+        .map(|(cube, direct)| {
+            cube.map(|mut sh| {
+                sh.accumulate(&direct);
+                sh
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
