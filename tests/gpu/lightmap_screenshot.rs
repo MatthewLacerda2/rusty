@@ -80,7 +80,7 @@ fn bake(scene: &mut Scene, name: &str) {
         samples: 32,
         bounces: 2,
         seed: 3,
-        max_resolution: 32,
+        max_lightmap_size: 64,
         filter_radius: 2,
         directional: true,
     };

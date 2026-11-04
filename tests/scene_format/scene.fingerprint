@@ -320,6 +320,7 @@ scene.entities[].mesh.asset_ref: option
 scene.entities[].mesh.asset_ref: string
 scene.entities[].mesh.cast_shadows: enum On|Off|TwoSided|ShadowsOnly
 scene.entities[].mesh.primitive_type: string
+scene.entities[].mesh.scale_in_lightmap: f32
 scene.entities[].mesh.skeleton.bodies: map
 scene.entities[].mesh.skeleton.bodies{key}: string
 scene.entities[].mesh.skeleton.bodies{}.bone_refs: map
@@ -780,7 +781,7 @@ scene.lighting_settings.diffuse_model: enum Lambert|HalfLambert
 scene.lighting_settings.lightmaps.bounces: u32
 scene.lighting_settings.lightmaps.directional: bool
 scene.lighting_settings.lightmaps.filter_radius: u32
-scene.lighting_settings.lightmaps.max_resolution: u32
+scene.lighting_settings.lightmaps.max_lightmap_size: u32
 scene.lighting_settings.lightmaps.samples: u32
 scene.lighting_settings.lightmaps.seed: u64
 scene.lighting_settings.lightmaps.texels_per_unit: f32

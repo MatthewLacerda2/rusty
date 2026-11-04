@@ -13,6 +13,30 @@ pub(crate) struct LightmapArray {
     pub sampler: wgpu::Sampler,
 }
 
+/// Whether `limits` take a page list of `layers` pages `edge` texels a side as one
+/// array (#1704). A file baked past the bake's [`MAX_PAGES`] refusal (a hand edit,
+/// another engine version) would panic `create_texture` in wgpu's default error
+/// handler on every load; `Err` instead leaves the scene unlit by lightmaps.
+///
+/// [`MAX_PAGES`]: crate::scene::lighting::lightmap::MAX_PAGES
+pub(crate) fn fits(limits: &wgpu::Limits, edge: u32, layers: usize) -> Result<(), String> {
+    if layers > limits.max_texture_array_layers as usize {
+        return Err(format!(
+            "{layers} pages, more than the {} layers a texture array holds on this GPU; \
+             rebake with a larger Max Lightmap Size",
+            limits.max_texture_array_layers
+        ));
+    }
+    if edge > limits.max_texture_dimension_2d {
+        return Err(format!(
+            "pages of {edge}², larger than the {}² this GPU takes; rebake with a smaller \
+             Max Lightmap Size",
+            limits.max_texture_dimension_2d
+        ));
+    }
+    Ok(())
+}
+
 /// Upload `loaded` as a 2D texture array with its mip chain.
 pub(crate) fn upload(device: &wgpu::Device, queue: &wgpu::Queue, loaded: &Loaded) -> LightmapArray {
     let levels = loaded.layers[0].len() as u32;

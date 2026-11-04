@@ -47,6 +47,13 @@ pub struct MeshComponent {
     /// written, so `Component.Get` reads `On` too; a file without it reads `On`.
     #[serde(default)]
     pub cast_shadows: ShadowCasting,
+    /// Unity's *Scale In Lightmap* (#1704): a multiplier on the bake's texel
+    /// density for this mesh, in [`MeshComponent::SCALE_IN_LIGHTMAP`]. At 0 the
+    /// mesh gets no lightmap and reads light probes ([`MeshComponent::reads_probes`]),
+    /// while still blocking and bouncing light in the bake. Always written; a file
+    /// without it reads 1.
+    #[serde(default = "one_f32")]
+    pub scale_in_lightmap: f32,
     #[serde(skip)]
     pub vertices: Vec<Vertex>,
     #[serde(skip)]
@@ -93,11 +100,25 @@ fn one() -> u32 {
     1
 }
 
+fn one_f32() -> f32 {
+    1.0
+}
+
 fn is_one(n: &u32) -> bool {
     *n == 1
 }
 
 impl MeshComponent {
+    /// The Scale In Lightmap values a mesh takes. Unity has no upper bound; past a
+    /// few the map reaches the page's cap anyway (`lightmap::max_map_edge`).
+    pub const SCALE_IN_LIGHTMAP: std::ops::RangeInclusive<f32> = 0.0..=64.0;
+
+    /// Whether a static mesh reads light probes instead of a lightmap: its Scale
+    /// In Lightmap is 0, so the bake gives it none (#1704).
+    pub fn reads_probes(&self) -> bool {
+        self.scale_in_lightmap <= 0.0
+    }
+
     /// A static mesh: `primitive_type` (see the field) over this geometry, with no
     /// asset reference, skin or clips, and a fresh revision so every renderer uploads it.
     /// Set the skinned and asset fields on top with `..MeshComponent::new(…)`.
@@ -111,6 +132,7 @@ impl MeshComponent {
             asset_ref: None,
             subdivisions: 1,
             cast_shadows: ShadowCasting::On,
+            scale_in_lightmap: 1.0,
             vertices,
             indices,
             ranges: Vec::new(),

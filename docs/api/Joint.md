@@ -24,7 +24,8 @@ connected body — and is used only with auto-configure off; auto-configure (the
 default) puts it wherever the anchor sits. **The pose the bodies are in when the
 joint is built is its rest pose** — at play-enter, when its shape (kind, body,
 anchors, axes, limits, collision flag) changes during play, or when it comes back
-after its body was deactivated; the limits are measured from it. With auto-configure
+after its body was deactivated; the limits are measured from it. Starting Play
+paused, and the physics world rebuilt after a rapier panic, keep it. With auto-configure
 off, a partner that moved meanwhile is pulled back to the saved anchors, and that pull
 counts toward a break force. **A joint to a bone** (a prop on a rope tied to `spine`, or one skeleton's bone
 jointed to another's) is saved by the bone's name, then its ancestors', and

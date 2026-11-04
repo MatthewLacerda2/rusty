@@ -163,15 +163,18 @@ pub(crate) fn preserves_specular(m: &MaterialAsset) -> bool {
 /// One solid's instance: its world matrix, the SH its ambient term reads when a light
 /// probe covers it (see [`entity_probe_sh`]), and its baked lightmap when it has one
 /// and `lightmaps` has its pages bound (#438), directional when their direction
-/// pages are bound too (#810).
+/// pages are bound too (#810). `capture` is the renderer's [`CaptureMode`]: a bake
+/// capture's static surfaces read probes only on a probe bounce.
+///
+/// [`CaptureMode`]: crate::render::ibl::cubemap_capture::CaptureMode
 pub(crate) fn solid_instance(
     scene: &Scene,
     id: u32,
     model_matrix: Mat4,
-    light_static_from_probes: bool,
+    capture: &crate::render::ibl::cubemap_capture::CaptureMode,
     lightmaps: &Lightmaps,
 ) -> InstanceData {
-    let (use_sh, sh) = entity_probe_sh(scene, id, model_matrix, light_static_from_probes);
+    let (use_sh, sh) = entity_probe_sh(scene, id, model_matrix, capture);
     let lightmap = scene.lightmaps.get(id).filter(|_| lightmaps.resident());
     InstanceData {
         model_matrix: model_matrix.to_cols_array(),
@@ -202,20 +205,26 @@ fn material_color_tint(material: Option<&MaterialAsset>) -> [f32; 4] {
 /// Resolve the light-probe SH for one entity (#240): the scene's probe field sampled
 /// (trilinear) at the entity's world position, flattened to the `vec4`-padded GPU
 /// layout. Only NON-STATIC objects opt in — static geometry keeps the flat ambient
-/// term (and is the bake's target, not its consumer). Returns `(use_sh, coeffs)`;
-/// `use_sh == 0` with zeroed coeffs when the entity is static or no probe covers it.
+/// term (and is the bake's target, not its consumer) — and a static mesh at *Scale
+/// In Lightmap* 0 (#1704), which the lightmap bake skips: as in Unity, it reads
+/// light probes instead. Returns `(use_sh, coeffs)`; `use_sh == 0` with zeroed
+/// coeffs when the entity is static (and lightmapped) or no probe covers it.
 ///
-/// `light_static_from_probes` overrides the "static ⇒ no probe SH" rule (#285): the
+/// `capture.probe_bounce` overrides the "static ⇒ no probe SH" rule (#285): the
 /// multi-bounce probe bake sets it so static surfaces *do* sample the in-progress
 /// probe field during a bounce-≥2 capture, feeding the previous bounce's indirect
 /// light back into the scene. It is off everywhere else (runtime shading, bounce 1).
+/// A bake capture (`static_only`) treats a Scale In Lightmap 0 mesh as any static
+/// one, so a bounce-1 capture never reads the probes it is baking.
 fn entity_probe_sh(
     scene: &Scene,
     id: u32,
     model_matrix: Mat4,
-    light_static_from_probes: bool,
+    capture: &crate::render::ibl::cubemap_capture::CaptureMode,
 ) -> (u32, [[f32; 4]; 9]) {
-    if scene.world.is_static(id) && !light_static_from_probes {
+    let probe_lit =
+        || !capture.static_only && scene.world.mesh(id).is_some_and(|m| m.reads_probes());
+    if scene.world.is_static(id) && !capture.probe_bounce && !probe_lit() {
         return (0, [[0.0; 4]; 9]);
     }
     probe_sh_at(scene, model_matrix.w_axis.truncate())
@@ -239,3 +248,7 @@ pub(crate) fn probe_sh_at(scene: &Scene, position: glam::Vec3) -> (u32, [[f32; 4
 #[cfg(test)]
 #[path = "uniforms_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "probe_sh_tests.rs"]
+mod probe_sh_tests;

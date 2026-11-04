@@ -91,7 +91,7 @@ fn probe_and_bake(scene: &mut Scene, name: &str, normalised: bool) {
         samples: 16,
         bounces: 1,
         seed: 3,
-        max_resolution: 32,
+        max_lightmap_size: 64,
         filter_radius: 1,
         directional: false,
     };

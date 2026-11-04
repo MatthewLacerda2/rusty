@@ -60,7 +60,7 @@ pub(super) fn settings() -> BakeSettings {
         samples: 32,
         bounces: 2,
         seed: 7,
-        max_resolution: 16,
+        max_lightmap_size: 32,
         filter_radius: 0,
         directional: true,
     }

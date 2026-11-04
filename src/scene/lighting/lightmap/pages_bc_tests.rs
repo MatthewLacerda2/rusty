@@ -6,7 +6,7 @@
 
 use glam::Vec3;
 
-use super::atlas::{pack, GRID};
+use super::atlas::{pack, GRID, MAX_PAGE};
 use super::bake::Lightmap;
 use super::pages::colour_page;
 use crate::asset::lightmap_page::decode_bc6h;
@@ -33,7 +33,7 @@ fn every_compressed_level_of_a_map_reads_its_own_light() {
         map(4, 2, green),
         map(5, 3, dim * 10.0),
     ];
-    let atlas = pack(&maps);
+    let atlas = pack(&maps, MAX_PAGE);
     let edge = atlas.page_size;
     let page = colour_page(&atlas.pages[0], edge, 2, &|| false).expect("never stopped");
     assert_eq!(page.levels.len(), 3, "the base and two mips");
