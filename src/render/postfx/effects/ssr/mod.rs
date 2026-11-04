@@ -58,11 +58,37 @@ pub(crate) fn march(ssr: &Ssr, graphics: GraphicsSettings) -> SsrQuality {
     }
 }
 
+/// HDRP's default *Smoothness Fade Start*: SSR is whole from this smoothness
+/// whatever the *Minimum Smoothness* below it, so `min_smoothness` 0.8 fades in over
+/// 0.1 exactly as SSR did before it was a knob (#1736).
+const FADE_START: f32 = 0.9;
+
+/// The narrowest fade, for a *Minimum Smoothness* at or above [`FADE_START`]:
+/// nearly a hard cut, never a division by zero.
+const HARD_FADE: f32 = 0.01;
+
+/// The smoothest a surface gets: the forward pass clamps roughness to at least
+/// 0.04 (`shader.wgsl`, `common.wgsl`'s decals). A *Minimum Smoothness* this high
+/// reflects nothing, so the view runs no SSR and builds no pyramid.
+pub(crate) const SMOOTHEST: f32 = 0.96;
+
+/// `[min, width]`: the *Minimum Smoothness* `min_smoothness`, within `0..=1`, and
+/// the smoothness over which SSR fades in above it, what `ssr_surface.wgsl`'s
+/// `smoothness_fade` divides by: `Ssr::SMOOTHNESS_FADE`, narrowed so SSR is whole
+/// by [`FADE_START`], and never under [`HARD_FADE`].
+pub(crate) fn fade(min_smoothness: f32) -> [f32; 2] {
+    let min = min_smoothness.clamp(0.0, 1.0);
+    let width = (FADE_START - min).clamp(HARD_FADE, Ssr::SMOOTHNESS_FADE);
+    [min, width]
+}
+
 /// Whether a view whose base camera is `post`'s runs SSR this frame: its volume has
-/// it on and the player's option allows it. `full` is the stack's
-/// `full_post_fx`. The opaque pass writes the surface targets exactly then.
+/// it on, below [`SMOOTHEST`], and the player's option allows it. `full` is the
+/// stack's `full_post_fx`. The opaque pass writes the surface targets exactly then.
 pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bool) -> bool {
-    let on = post.volume.is_some_and(|vc| vc.ssr.active);
+    let on = post
+        .volume
+        .is_some_and(|vc| vc.ssr.active && vc.ssr.min_smoothness < SMOOTHEST);
     full && effect_runs(graphics, EFFECT.gate, on)
 }
 

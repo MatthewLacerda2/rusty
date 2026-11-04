@@ -104,7 +104,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsaoResolutionDivisor` / `SetSsaoResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` occlusion target is the view's size over this (clamped 1–4, **default `2`**) |
 | `Graphics.GetSsaoSamples` / `SetSsaoSamples` | `()` / `(n)` | `number`: the `Custom` samples per texel (clamped 1–64, **default `8`**) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
-| `Graphics.GetSsrMinSmoothness` / `SetSsrMinSmoothness` | `()` / `(smoothness)` | `number`: HDRP's *Minimum Smoothness*, below which a surface keeps its probe or sky reflection (clamped 0–1, **default `0.3`**: reflects up to roughness 0.7, fully to 0.5) |
+| `Graphics.GetSsrMinSmoothness` / `SetSsrMinSmoothness` | `()` / `(smoothness)` | `number`: HDRP's *Minimum Smoothness*, below which a surface keeps its probe or sky reflection (clamped 0–1, **default `0.3`**: reflects up to roughness 0.7, fully to 0.5; whole by smoothness 0.9 whatever the minimum; from `0.96` no surface reflects and SSR does not run) |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
@@ -281,16 +281,23 @@ player's `chromatic_aberration` option gates it. Tween paths: `Graphics.chromati
 where it hits something on screen, puts that in place of the sky or reflection probe
 the surface was reflecting. A surface reflects from its `min_smoothness` (HDRP's
 *Minimum Smoothness*, smoothness being 1 − roughness; default 0.3, so roughness 0.7)
-and all of it from 0.2 of smoothness above that (roughness 0.5 by default), weighted
+and all of it from 0.2 of smoothness above that (roughness 0.5 by default), or from
+0.9 when that comes sooner (HDRP's default *Smoothness Fade Start*: a `min_smoothness`
+of 0.8 fades in over 0.1); from 0.96, the smoothest any surface gets (roughness is at
+least 0.04), no surface reflects and the view runs no SSR at all. It is weighted
 by the material's Fresnel (its metallic and base colour) at the shading normal, its
 SSAO and its fog. A rough surface reflects a blur (#1736): the hit is read from a mip
 pyramid of the opaque image at the width of the surface's GGX lobe there, so a
 satin floor shows a soft reflection of what stands on it and a mirror a sharp one
+(up to roughness 0.05 the hit is read sharp at any resolution, widening to the full
+lobe by 0.1)
 (cone-traced SSR: no history, so it is stable with no accumulation; the pyramid adds
 a third of an `Rgba16Float` frame to the copy SSR already held). A hit fades by its
 confidence (the screen's edge, wider the blurrier it is, and the march's last fifth of
 reach) and a miss keeps the sky or probe reflection, so a weak hit falls back to it
-without a seam. It runs on the base camera's opaque image, right after its opaque
+without a seam. A ray a normal map tilts below the surface's own geometry (a rough,
+bumpy floor seen at a grazing angle) keeps the probe reflection too, rather than
+reflecting the floor it leaves. It runs on the base camera's opaque image, right after its opaque
 pass (HDRP's order): translucent surfaces, particles, ribbons and world canvases blend
 over the reflection (a `Transparent` material with `receive_ssr` traces its own in
 its pass, against that opaque image, sharp and so never below a smoothness of 0.7; see `Material.SetReceiveSsr`), depth of field and motion blur blur it, and a `DepthOnly` overlay

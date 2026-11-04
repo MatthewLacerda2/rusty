@@ -25,7 +25,10 @@ pub struct Ssr {
     /// HDRP's *Minimum Smoothness*, `0..=1`: a surface less smooth than this
     /// (smoothness is `1 − roughness`) gets no SSR and keeps its probe or sky
     /// reflection; SSR fades in over the next [`Ssr::SMOOTHNESS_FADE`] of
-    /// smoothness. The default 0.3 reflects up to roughness 0.7, fully to 0.5.
+    /// smoothness, narrowed so it is whole by smoothness 0.9 (HDRP's default
+    /// *Smoothness Fade Start*: 0.8 fades in over 0.1, SSR's look before this knob).
+    /// From 0.96, the smoothest any surface gets, the view runs no SSR. The default
+    /// 0.3 reflects up to roughness 0.7, fully to 0.5.
     pub min_smoothness: f32,
 }
 
@@ -35,8 +38,9 @@ impl Ssr {
     /// The shortest and longest step a write accepts.
     pub const MIN_STEP_LENGTH: f32 = 0.05;
     pub const MAX_STEP_LENGTH: f32 = 2.0;
-    /// How much smoothness above `min_smoothness` SSR takes to fade fully in
-    /// (HDRP's *Smoothness Fade Start* is `min_smoothness` plus this).
+    /// How much smoothness above `min_smoothness` SSR takes to fade fully in, at
+    /// most (HDRP's *Smoothness Fade Start* is `min_smoothness` plus this, up to 0.9:
+    /// `render::postfx::effects::ssr::fade`).
     pub const SMOOTHNESS_FADE: f32 = 0.2;
 }
 

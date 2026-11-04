@@ -21,7 +21,7 @@ fn volume(steps: u32, step_length: f32) -> PostProcessingComponent {
     }
 }
 
-fn march(vc: &PostProcessingComponent, on: bool) -> [f32; 3] {
+fn march(vc: &PostProcessingComponent, on: bool) -> [f32; 4] {
     let post = PostSource {
         camera: None,
         volume: Some(vc),
@@ -32,12 +32,18 @@ fn march(vc: &PostProcessingComponent, on: bool) -> [f32; 3] {
 #[test]
 fn the_base_camera_marches_ssrs_quality_only_while_the_view_runs_ssr() {
     let vc = volume(40, 0.3);
-    assert_eq!(march(&vc, true), [40.0, 0.3, SHARP_SMOOTHNESS]);
-    assert_eq!(march(&vc, false), [0.0; 3], "SSR off: nothing traces");
+    let on = march(&vc, true);
+    assert_eq!(
+        on[..3],
+        [40.0, 0.3, SHARP_SMOOTHNESS],
+        "whole from 0.9: {on:?}"
+    );
+    assert!((on[2] + on[3] - 0.9).abs() < 1e-6, "whole from 0.9: {on:?}");
+    assert_eq!(march(&vc, false), [0.0; 4], "SSR off: nothing traces");
     let none = PostSource::default();
     assert_eq!(
         camera_march(none, GraphicsSettings::default(), true),
-        [0.0; 3]
+        [0.0; 4]
     );
     // A preset written by hand is held to the march's range.
     let far = march(&volume(0, 99.0), true);
@@ -102,14 +108,4 @@ fn a_material_too_rough_to_ever_reflect_traces_nothing() {
     };
     assert!(traces(&mapped));
     assert_eq!(surface_uniform(true, Some(&glass(0.6))).receive_ssr, 0);
-}
-
-#[test]
-fn the_smoothness_fade_is_one_number_in_rust_and_wgsl() {
-    let wgsl = include_str!("../../../../../engine/shaders/lighting/ssr_surface.wgsl");
-    let line = format!("const SMOOTHNESS_FADE: f32 = {:.1};", Ssr::SMOOTHNESS_FADE);
-    assert!(
-        wgsl.contains(&line),
-        "ssr_surface.wgsl should declare `{line}`"
-    );
 }

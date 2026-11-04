@@ -5,6 +5,7 @@
 use super::fixture::{draw, eye, frame, pixel, renderer, rgb, scene, Surface};
 use super::fixture::{RED, REFLECTING, W};
 use crate::render::postfx::effects::ssr::pyramid::levels;
+use crate::render::readback;
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::Scene;
 
@@ -38,24 +39,39 @@ fn gpu_a_satin_floor_reflects_the_cube_softly_and_follows_it() {
     assert!(on >= moved + 15, "the reflection goes where the cube goes");
 }
 
-/// The largest jump in redness between neighbouring pixels along the row of
-/// [`REFLECTING`]: how sharp the reflected cube's sides are.
+/// The sharpest step in redness along the row just above the bottom of a 720p
+/// frame of the cube on a floor of `roughness`: how hard the reflected cube's sides
+/// are where the reflected ray is longest. 720p, not the fixture's 96×72: a cone's
+/// width on screen grows with the resolution, so only a real one can show a
+/// near-mirror going soft (#1736's review: roughness 0.05 read level 2 at 1080p).
 fn sharpest_edge(r: &mut Renderer, roughness: f32) -> i32 {
-    let f = frame(r, &shifted(true, roughness, 0.0));
-    let y = pixel(REFLECTING).1;
-    (1..W)
-        .map(|x| (redness(rgb(&f, (x, y))) - redness(rgb(&f, (x - 1, y)))).abs())
-        .max()
-        .unwrap()
+    let (w, h) = (1280, 720);
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, w, h);
+    let out = view.color_target_view().unwrap();
+    r.render(
+        &mut view,
+        &shifted(true, roughness, 0.0),
+        &eye(),
+        &out,
+        false,
+    );
+    let f = readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), w, h);
+    let red = |x: u32| {
+        let i = (((h - 4) * w + x) * 4) as usize;
+        i32::from(f[i]) - i32::from(f[i + 2])
+    };
+    (1..w).map(|x| (red(x) - red(x - 1)).abs()).max().unwrap()
 }
 
 #[test]
 fn gpu_a_near_mirror_stays_sharp_where_a_satin_floor_blurs() {
     let Some(mut r) = renderer() else { return };
-    let (sharp, soft) = (sharpest_edge(&mut r, 0.05), sharpest_edge(&mut r, 0.4));
-    eprintln!("[ssr] sharpest reflected edge: 0.05 {sharp}, 0.4 {soft}");
-    assert!(sharp >= 40, "the 0.05 floor reflects a hard edge");
-    assert!(sharp >= soft * 2, "the 0.4 floor's is blurred");
+    let (mirror, near) = (sharpest_edge(&mut r, 0.0), sharpest_edge(&mut r, 0.05));
+    let soft = sharpest_edge(&mut r, 0.4);
+    eprintln!("[ssr] sharpest reflected edge at 720p: 0 {mirror}, 0.05 {near}, 0.4 {soft}");
+    assert!(near >= 60, "the 0.05 floor reflects a hard edge");
+    assert!(near * 10 >= mirror * 9, "as hard as a mirror's");
+    assert!(near >= soft * 2, "the 0.4 floor's is blurred");
 }
 
 #[test]

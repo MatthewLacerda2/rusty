@@ -6,7 +6,8 @@
 //! target of its own: the copy is made for it as for a refracting surface, and a
 //! frame with no such translucent on screen pays nothing.
 //!
-//! The march rides in the camera uniform's `ssr` (`[steps, step, min smoothness]`),
+//! The march rides in the camera uniform's `ssr` (`[steps, step, min smoothness,
+//! fade width]`),
 //! set on the stack's base camera while its view runs SSR and zero everywhere else
 //! (an overlay camera, a view with SSR off), so the shader's branch on it is uniform.
 //! The copy has no mip pyramid, so a translucent's hit is sharp (#1736): it reflects
@@ -15,29 +16,29 @@
 //! reflect ([`traces`]) does not trace at all, nor asks for the copy: frosted glass
 //! pays nothing.
 
-use super::march;
+use super::{fade, march};
 use crate::components::MaterialAsset;
 use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::params::PostSource;
 
 /// What a base camera's `receive_ssr` translucents trace: `[steps, step length,
-/// minimum smoothness]`, the last the volume's held to at least [`SHARP_SMOOTHNESS`];
-/// all zero when the view runs no SSR (`on`, as `draw_stack` decides it for the
-/// surface targets).
-pub(crate) fn camera_march(post: PostSource, graphics: GraphicsSettings, on: bool) -> [f32; 3] {
+/// minimum smoothness, fade width]`, the minimum the volume's held to at least
+/// [`SHARP_SMOOTHNESS`] and the width [`fade`]'s for it; all zero when the view runs
+/// no SSR (`on`, as `draw_stack` decides it for the surface targets).
+pub(crate) fn camera_march(post: PostSource, graphics: GraphicsSettings, on: bool) -> [f32; 4] {
     match post.volume.filter(|_| on) {
         Some(vc) => {
             let m = march(&vc.ssr, graphics);
-            let floor = vc.ssr.min_smoothness.clamp(SHARP_SMOOTHNESS, 1.0);
-            [m.steps as f32, m.step_length, floor]
+            let [floor, width] = fade(vc.ssr.min_smoothness.max(SHARP_SMOOTHNESS));
+            [m.steps as f32, m.step_length, floor, width]
         }
-        None => [0.0; 3],
+        None => [0.0; 4],
     }
 }
 
 /// The least smoothness a translucent reflects a sharp SSR hit at, whatever the
-/// volume's *Minimum Smoothness*: it fades in from here over `Ssr::SMOOTHNESS_FADE`,
-/// so it is whole from smoothness 0.9 (roughness 0.1), as before #1736.
+/// volume's *Minimum Smoothness*: it fades in from here over [`fade`]'s width, so it
+/// is whole from smoothness 0.9 (roughness 0.1), as before #1736.
 pub(crate) const SHARP_SMOOTHNESS: f32 = 0.7;
 
 /// Whether a lit `Transparent` material traces SSR: it sets `receive_ssr` and some

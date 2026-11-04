@@ -60,7 +60,7 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
 fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<f32> {
     // A pixel too rough to reflect (HDRP's *Minimum Smoothness*) marches nothing,
     // as the SSR pass discards a surface its fade refuses.
-    let fade = ssr_surface::smoothness_fade(roughness, camera.ssr.z);
+    let fade = ssr_surface::smoothness_fade(roughness, camera.ssr.z, camera.ssr.w);
     if (material().receive_ssr == 0u || camera.ssr.x < 1.0 || fade <= 0.0) {
         return reflection;
     }

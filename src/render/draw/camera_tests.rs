@@ -84,10 +84,10 @@ fn only_a_stacked_depth_only_camera_is_an_overlay() {
 #[test]
 fn only_the_base_camera_traces_transparent_ssr() {
     use super::ssr_march;
-    let march = [32.0, 0.3, 0.7];
+    let march = [32.0, 0.3, 0.7, 0.2];
     assert_eq!(ssr_march(true, march), (march, true));
     // A viewmodel overlay (#1497) traces nothing, whatever the stack marches.
-    assert_eq!(ssr_march(false, march), ([0.0; 3], false));
+    assert_eq!(ssr_march(false, march), ([0.0; 4], false));
     // A view running no SSR: the base camera traces nothing either.
-    assert_eq!(ssr_march(true, [0.0; 3]), ([0.0; 3], false));
+    assert_eq!(ssr_march(true, [0.0; 4]), ([0.0; 4], false));
 }

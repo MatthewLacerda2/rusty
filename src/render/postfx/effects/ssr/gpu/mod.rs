@@ -6,5 +6,6 @@ mod cover;
 mod energy;
 mod fixture;
 mod glossy;
+mod packing;
 mod reflect;
 mod transparent;

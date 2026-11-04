@@ -31,7 +31,8 @@ pub(crate) struct SsrParams {
     camera_pos: [f32; 4],
     /// x: step count, y: step length (world units).
     march: [f32; 4],
-    /// x: the *Minimum Smoothness* (#1736).
+    /// x: the *Minimum Smoothness* (#1736), y: the width it fades in over
+    /// ([`super::fade`]).
     surface: [f32; 4],
 }
 
@@ -44,7 +45,10 @@ impl SsrParams {
             view_proj: view_proj.to_cols_array(),
             camera_pos: eye.extend(0.0).to_array(),
             march: [m.steps as f32, m.step_length, 0.0, 0.0],
-            surface: [min_smoothness.clamp(0.0, 1.0), 0.0, 0.0, 0.0],
+            surface: {
+                let [min, width] = super::fade(min_smoothness);
+                [min, width, 0.0, 0.0]
+            },
         }
     }
 }
@@ -114,15 +118,10 @@ pub(crate) struct SsrTargets {
 }
 
 impl SsrTargets {
-    fn new(
-        device: &wgpu::Device,
-        passes: &SsrPasses,
-        linear: &wgpu::Sampler,
-        size: (u32, u32),
-    ) -> Self {
+    fn new(device: &wgpu::Device, passes: &SsrPasses, size: (u32, u32)) -> Self {
         Self {
             size,
-            pyramid: Pyramid::new(device, &passes.pyramid, linear, size),
+            pyramid: Pyramid::new(device, &passes.pyramid, size),
             params: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("SSR Params"),
                 size: std::mem::size_of::<SsrParams>() as u64,
@@ -149,12 +148,11 @@ impl PostFx {
             return;
         };
         let size = self.full_size;
-        let linear = &self.sampler;
         let fitted = self
             .targets
-            .get_or(|| SsrTargets::new(device, passes, linear, size));
+            .get_or(|| SsrTargets::new(device, passes, size));
         if fitted.size != size {
-            *fitted = SsrTargets::new(device, passes, linear, size);
+            *fitted = SsrTargets::new(device, passes, size);
         }
         let t = self.targets.get::<SsrTargets>().expect("fitted above");
         let velocity = self.motion.target_view().expect("checked above");

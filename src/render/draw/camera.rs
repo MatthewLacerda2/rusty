@@ -97,8 +97,8 @@ pub(crate) struct StackShared {
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
     /// The base camera's transparent SSR march (#1570), `[steps, step, min
-    /// smoothness]`; zero when the view runs no SSR.
-    pub ssr_march: [f32; 3],
+    /// smoothness, fade width]`; zero when the view runs no SSR.
+    pub ssr_march: [f32; 4],
 }
 
 impl<'a> CameraCtx<'a> {
@@ -137,7 +137,7 @@ impl<'a> CameraCtx<'a> {
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
                 stack: [idx as f32, shared.prev_time, 0.0, 0.0],
                 inv_view_proj: view_proj.inverse().to_cols_array(),
-                ssr: [march[0], march[1], march[2], 0.0],
+                ssr: march,
             },
             clusters,
             solids: SolidResources::default(),
@@ -154,12 +154,12 @@ pub(crate) fn is_overlay(is_first: bool, clear_flags: ClearFlags) -> bool {
     !is_first && clear_flags == ClearFlags::DepthOnly
 }
 
-/// The transparent SSR march `[steps, step, min smoothness]` a camera hands its
+/// The transparent SSR march `[steps, step, min smoothness, fade width]` a camera hands its
 /// translucents, and whether it traces at all: the stack's `march` on its base
 /// (first) camera, none on an overlay or any other stacked camera (SSR is the base
 /// camera's alone).
-pub(crate) fn ssr_march(is_first: bool, march: [f32; 3]) -> ([f32; 3], bool) {
-    let march = if is_first { march } else { [0.0; 3] };
+pub(crate) fn ssr_march(is_first: bool, march: [f32; 4]) -> ([f32; 4], bool) {
+    let march = if is_first { march } else { [0.0; 4] };
     (march, march[0] > 0.0)
 }
 

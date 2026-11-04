@@ -1,6 +1,7 @@
 //! SSR's colour pyramid (#1736): the copy of the opaque image the march reads, with
-//! every mip down to 1×1, each the 2×2 box average of the one above
-//! (`postfx/ssr_pyramid.wgsl`). A rough surface reads its hit at the level whose
+//! every mip down to 1×1, each texel the average of the finite texels among the 2×2
+//! above it (`postfx/ssr_pyramid.wgsl`; an odd level's last row or column is left
+//! out of the one below, as a mip chain's floor halving leaves no texel for it). A rough surface reads its hit at the level whose
 //! texels are its GGX cone's on-screen width (`lighting/ssr_march.wgsl`'s `trace`),
 //! so it reflects a blur of what is on screen: cone-traced SSR, needing no history.
 //!
@@ -13,7 +14,7 @@
 
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::Fullscreen;
-use crate::render::gpu::layout_entries::{sampler_entry, texture_entry};
+use crate::render::gpu::layout_entries::texture_entry;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::HDR_FORMAT;
@@ -37,10 +38,7 @@ impl PyramidPass {
         let shader = registry.load(device, "postfx/ssr_pyramid.wgsl", "SSR Pyramid Shader");
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("SSR Pyramid Layout"),
-            entries: &[
-                texture_entry(0, wgpu::TextureViewDimension::D2),
-                sampler_entry(1),
-            ],
+            entries: &[texture_entry(0, wgpu::TextureViewDimension::D2)],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("SSR Pyramid Pipeline Layout"),
@@ -91,11 +89,10 @@ pub(crate) struct Pyramid {
 }
 
 impl Pyramid {
-    /// A pyramid of `size`, its levels read through `linear` (one level each).
+    /// A pyramid of `size`, each level read whole by the one below it.
     pub(crate) fn new(
         device: &wgpu::Device,
         pass: &PyramidPass,
-        linear: &wgpu::Sampler,
         (width, height): (u32, u32),
     ) -> Self {
         use wgpu::TextureUsages as U;
@@ -126,10 +123,10 @@ impl Pyramid {
                 let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("SSR Pyramid Bind Group"),
                     layout: &pass.layout,
-                    entries: &[
-                        entry(0, wgpu::BindingResource::TextureView(&level(mip - 1))),
-                        entry(1, wgpu::BindingResource::Sampler(linear)),
-                    ],
+                    entries: &[entry(
+                        0,
+                        wgpu::BindingResource::TextureView(&level(mip - 1)),
+                    )],
                 });
                 (level(mip), group)
             })

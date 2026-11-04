@@ -18,17 +18,16 @@
 // The packing (#1736): the eight halves are full, and a ninth target would pass
 // wgpu's 32 bytes of colour attachments per sample. So each alpha carries an integer
 // payload in the bits of an `f16` (exponent 1..30, never a denormal, an infinity or
-// a NaN, so the write and read are exact): an 11-bit octahedral component (about
-// what an `f16` in [-1, 1] held) times 15, plus a base-15 digit of the roughness,
-// which so takes 225 levels.
+// a NaN, so the write and read are exact): an octahedral component on 2047 levels
+// (`OCT_LEVELS` + 1, about what an `f16` in [-1, 1] held, and 0 exactly among them)
+// times 15, plus a base-15 digit of the roughness, which so takes 225 levels. Neither
+// texel may be blended or filtered: its alpha is an integer in disguise.
 
 #define_import_path lighting::ssr_surface
 
-// How much smoothness above the *Minimum Smoothness* SSR takes to fade fully in:
-// HDRP's *Smoothness Fade Start* is the minimum plus this (`Ssr::SMOOTHNESS_FADE`).
-const SMOOTHNESS_FADE: f32 = 0.2;
 // The packing's levels: of an octahedral component, and of each roughness digit.
-const OCT_LEVELS: f32 = 2047.0;
+// Even, so the middle level is exactly 0 and an axis-aligned normal decodes untilted.
+const OCT_LEVELS: f32 = 2046.0;
 const DIGIT: u32 = 15u;
 // The payload's offset into the `f16` bits: exponent 1, the smallest normal number.
 const F16_NORMAL: u32 = 1024u;
@@ -79,9 +78,11 @@ struct SsrTexels {
 };
 
 // How much SSR a surface of `roughness` gets under *Minimum Smoothness* `min_smoothness`:
-// 0 below it, 1 from *Smoothness Fade Start* (`SMOOTHNESS_FADE` above it).
-fn smoothness_fade(roughness: f32, min_smoothness: f32) -> f32 {
-    return clamp((1.0 - roughness - min_smoothness) / SMOOTHNESS_FADE, 0.0, 1.0);
+// 0 below it, 1 from `width` of smoothness above it (HDRP's *Smoothness Fade Start*).
+// The two ride in the uniforms from `render::postfx::effects::ssr::fade`, which
+// keeps `width` at 0.01 or more (zero where nothing traces).
+fn smoothness_fade(roughness: f32, min_smoothness: f32, width: f32) -> f32 {
+    return clamp((1.0 - roughness - min_smoothness) / max(width, 1e-4), 0.0, 1.0);
 }
 
 // The texels of a surface with shading normal `n` and `roughness`, whose environment

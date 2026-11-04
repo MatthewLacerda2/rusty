@@ -57,8 +57,9 @@ struct CameraUniforms {
     // of the opaque depth behind it from it, for refraction and absorption.
     inv_view_proj: mat4x4<f32>,
     // What a `receive_ssr` translucent traces (#1570, #1736): x its march's step
-    // count, y its step length, z the *Minimum Smoothness* it reflects down to; all
-    // zero where the camera runs no SSR (`render::postfx::effects::ssr::transparent`).
+    // count, y its step length, z the *Minimum Smoothness* it reflects down to, w the
+    // smoothness it fades in over above that (`ssr::fade`); all zero where the camera
+    // runs no SSR (`render::postfx::effects::ssr::transparent`).
     ssr: vec4<f32>,
 };
 
