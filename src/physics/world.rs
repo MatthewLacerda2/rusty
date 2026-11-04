@@ -14,6 +14,10 @@
 //!   3. `sync_from_rapier`— write the integrated transforms + velocities back onto
 //!      the entities, and return the trigger and collision events scripts expect.
 //!
+//! The world is derived state: `recover` rebuilds it from the scene when rapier
+//! panics in a release build (#1797) and before a first real step that only
+//! zero-length ones preceded (#1795).
+//!
 //! Engine-glam <-> rapier-math conversion is confined to `convert`.
 
 use crate::core::collections::Map;
@@ -26,6 +30,7 @@ use super::events::collision::CollisionEvents;
 use super::events::trigger::TriggerEvents;
 use super::joints::JointMap;
 use super::live::body_type;
+use super::recover::Recovery;
 use super::shape::build::{gravity_scale, EntityBodyState};
 use super::watch::{Owners, Tracked};
 use super::PhysicsEvents;
@@ -61,16 +66,18 @@ pub struct PhysicsWorld {
     /// Last tick's trigger-overlap pairs, diffed each step to recover the
     /// enter/exit edges (#310). Starts empty, so a play session's first
     /// overlapping tick is an "enter".
-    prev_triggers: Vec<(u32, u32)>,
+    pub(super) prev_triggers: Vec<(u32, u32)>,
     /// Last tick's touching solid pairs, diffed the same way for the
     /// `OnCollision*` edges (#448).
-    prev_collisions: Vec<(u32, u32)>,
+    pub(super) prev_collisions: Vec<(u32, u32)>,
     /// Joint entity id -> its live rapier joint (#449, see `joints`).
     pub(super) joints: JointMap,
     /// The fixed body world-anchored joints attach to, made on first use.
     pub(super) world_body: Option<RigidBodyHandle>,
     /// What the sync before each step needs to sync only what changed (#1707).
     pub(super) tracked: Tracked,
+    /// What decides a rebuild from the scene (#1795, #1797, see `recover`).
+    pub(super) recovery: Recovery,
 }
 
 impl PhysicsWorld {
@@ -100,6 +107,7 @@ impl PhysicsWorld {
             joints: JointMap::new(),
             world_body: None,
             tracked: Tracked::default(),
+            recovery: Recovery::default(),
         };
         world.build_bodies(scene);
         world.resync_joints(scene);
@@ -150,12 +158,41 @@ impl PhysicsWorld {
     /// Advance the rapier world by `dt` and surface the tick's trigger and
     /// solid-contact events — enter/stay/exit distinctly (#310, #448) — and the
     /// joints that broke (#449), each list sorted for deterministic dispatch.
+    /// A panic inside rapier rebuilds the world instead, in a release build (#1797,
+    /// see `recover`).
     pub fn step(&mut self, scene: &mut Scene, dt: f32) -> PhysicsEvents {
+        self.before_step(scene, dt);
         self.integration_parameters.dt = dt;
         let synced = self.sync_to_rapier(scene);
         let awake_before = self.awake_owners();
         let pre_solve = self.snapshot_velocities();
 
+        if let Err(message) = self.run_pipeline() {
+            return self.recover(scene, message);
+        }
+
+        let overlaps = self.overlap_pairs();
+        let triggers = TriggerEvents::from_overlap_sets(&self.prev_triggers, overlaps);
+        self.prev_triggers = triggers.stayed.clone();
+        let contacts = self.collect_contact_pairs(&pre_solve);
+        let collisions = CollisionEvents::from_contact_sets(&self.prev_collisions, contacts);
+        self.prev_collisions = collisions.stayed_keys();
+        let joint_breaks = self.break_joints(scene, &pre_solve, dt);
+        self.sync_from_rapier(scene, &synced, awake_before);
+        PhysicsEvents {
+            triggers,
+            collisions,
+            joint_breaks,
+            rebuilt: None,
+        }
+    }
+
+    /// One step of rapier's pipeline over the whole world.
+    pub(super) fn pipeline_step(&mut self) {
+        #[cfg(test)]
+        if std::mem::take(&mut self.recovery.panic_next) {
+            panic!("a panic forced through the test seam");
+        }
         self.physics_pipeline.step(
             self.gravity,
             &self.integration_parameters,
@@ -171,20 +208,6 @@ impl PhysicsWorld {
             &(),
             &(),
         );
-
-        let overlaps = self.overlap_pairs();
-        let triggers = TriggerEvents::from_overlap_sets(&self.prev_triggers, overlaps);
-        self.prev_triggers = triggers.stayed.clone();
-        let contacts = self.collect_contact_pairs(&pre_solve);
-        let collisions = CollisionEvents::from_contact_sets(&self.prev_collisions, contacts);
-        self.prev_collisions = collisions.stayed_keys();
-        let joint_breaks = self.break_joints(scene, &pre_solve, dt);
-        self.sync_from_rapier(scene, &synced, awake_before);
-        PhysicsEvents {
-            triggers,
-            collisions,
-            joint_breaks,
-        }
     }
 
     /// Write one owner's integrated pose and velocities back onto its entity;

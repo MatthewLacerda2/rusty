@@ -165,17 +165,23 @@ fn apply_destroys(_world: &mut World, res: &mut Resources) {
     res.audio.borrow_mut().stop_sources(removed, tick);
 }
 
-/// Step the rapier world and dispatch the resulting trigger and collision
-/// events to scripts.
+/// Step the rapier world and dispatch its trigger and collision events to scripts;
+/// a step rapier panicked in (its world rebuilt, #1797) logs one console error.
 fn step_physics(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
-    let events = {
+    let mut events = {
         let mut s = world.scene.borrow_mut();
         match res.physics.borrow_mut().as_mut() {
             Some(physics) => physics.step(&mut s, dt),
             None => crate::physics::PhysicsEvents::default(),
         }
     };
+    if let Some(message) = events.rebuilt.take() {
+        let frame = res.play_frame();
+        res.console.borrow_mut().error(format!(
+            "Physics: rapier panicked on frame {frame} ({message}); the physics world was rebuilt from the scene"
+        ));
+    }
     res.script_manager.dispatch_physics_events(events);
 }
 

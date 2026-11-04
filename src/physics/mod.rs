@@ -32,6 +32,9 @@ mod material;
 #[cfg(test)]
 mod material_tests;
 mod query;
+mod recover;
+#[cfg(test)]
+mod recover_tests;
 mod shape;
 mod sync;
 mod watch;
@@ -58,6 +61,10 @@ pub struct PhysicsEvents {
     pub triggers: TriggerEvents,
     pub collisions: CollisionEvents,
     pub joint_breaks: Vec<JointBreak>,
+    /// rapier panicked during this step, with this message, and its world was
+    /// rebuilt from the scene (#1797, release builds only): the step surfaced no
+    /// other event, and the caller logs it.
+    pub rebuilt: Option<String>,
 }
 
 /// The hitscan acceptance test shared by the engine hitscan and the Lua

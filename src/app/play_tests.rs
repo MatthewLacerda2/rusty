@@ -85,3 +85,32 @@ fn the_navmesh_rebakes_only_when_static_geometry_changes() {
     gw.tick(DT);
     assert_eq!(generation(&gw), entry + 1);
 }
+
+/// A step rapier panicked in, under the release behaviour, rebuilds the world and
+/// logs one console error naming the frame (#1797).
+#[test]
+fn a_caught_physics_panic_logs_one_error_with_the_frame() {
+    let mut gw = world_with_a_player();
+    gw.set_playing(true);
+    gw.tick(DT);
+    gw.tick(DT);
+    let frame = gw.play_frame();
+    if let Some(physics) = gw.resources.physics.borrow_mut().as_mut() {
+        physics.force_caught_panic();
+    }
+    gw.tick(DT);
+    gw.tick(DT);
+    let console = gw.console().borrow();
+    let errors: Vec<_> = console
+        .messages
+        .iter()
+        .filter(|(m, _)| m.starts_with("Physics:"))
+        .collect();
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(
+        errors[0].0.contains(&format!("frame {frame}")),
+        "{}",
+        errors[0].0
+    );
+    assert!(errors[0].0.contains("a panic forced through the test seam"));
+}

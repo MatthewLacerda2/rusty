@@ -375,3 +375,20 @@ if hit and bone then
   Physics.AddImpulseAtPosition(bone, dx * 80, dy * 80, dz * 80, px, py, pz)
 end
 ```
+
+### When the physics world is rebuilt (#1797)
+
+The rapier world is derived from the scene, so the engine throws it away and
+builds it again from the scene, as a scene load does, in two cases:
+
+- **rapier panics during a step.** In a shipped (release) build the game keeps
+  running: the console logs one error naming the play frame and the panic's
+  message, and the world is rebuilt at once. That step reports no physics
+  events; on the next one, every pair still touching or overlapping fires
+  `OnCollisionEnter` / `OnTriggerEnter` again and nothing exits, as after a
+  `Scene.Load`. Joints are re-anchored at the bodies' current poses. A debug
+  build (and every test) still panics, so the bug is seen rather than hidden.
+- **Play starts paused** (`Time.SetTimeScale(0)` before the first step). The
+  first step with time in it runs on a world rebuilt from the scene, keeping
+  the touching and overlapping pairs, so no enter fires twice; nothing moved
+  while paused, so it steps exactly as a world that never paused (#1795).
