@@ -13,12 +13,11 @@
 //! A decal is a projected *volume*, not a particle: gibs/blood spray are the
 //! separate GPU particle system (`Particles`), triggered on the same hit.
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::{Lua, Variadic};
 
 use super::{put, Reg};
+use crate::api::ApiCell;
 use crate::asset::MapRef;
 use crate::core::settings::decals::DecalLimits;
 use crate::scene::decal::DecalSpec;
@@ -29,11 +28,7 @@ const DEFAULT_SIZE: f32 = 0.5;
 const DEFAULT_DEPTH: f32 = 0.5;
 
 /// Register the `Decals` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     // Decals.Spawn(x,y,z, nx,ny,nz, [size], [texture], [rotation_deg], [r,g,b,a])
@@ -51,7 +46,7 @@ pub fn register<'scope>(
     put(
         &table,
         "Spawn",
-        scope.create_function(|_, args: Variadic<mlua::Value>| {
+        lua.create_function(move |lua, args: Variadic<mlua::Value>| { let scene = &*scene.get(lua)?;
             let (point, normal) = hit_from(&args)?;
             let spec = match args.get(6) {
                 Some(mlua::Value::Table(opts)) => spec_from_opts(opts)?,
@@ -75,7 +70,7 @@ pub fn register<'scope>(
         }),
     )?;
 
-    register_registry(&table, scope, scene)?;
+    register_registry(&table, lua, scene)?;
 
     lua.globals()
         .set("Decals", table)
@@ -84,18 +79,18 @@ pub fn register<'scope>(
 
 /// The functions over the live decals onto `table`: `Remove`, `Count`, `Clear`, and
 /// the budgets' `SetLimits` and `GetLimits` (#1517).
-fn register_registry<'scope>(
-    table: &mlua::Table,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_registry(table: &mlua::Table, lua: &mlua::Lua, scene: ApiCell<Scene>) -> Reg {
     // Decals.Remove(id, [fade]) — remove one decal now, or fade it out over `fade`
     // seconds. Returns whether a live decal had that id.
     put(
         table,
         "Remove",
-        scope.create_function(|_, (decal, fade): (u32, Option<f32>)| {
-            Ok(scene.borrow_mut().decals.remove(decal, fade.unwrap_or(0.0)))
+        lua.create_function(move |lua, (decal, fade): (u32, Option<f32>)| {
+            Ok(scene
+                .get(lua)?
+                .borrow_mut()
+                .decals
+                .remove(decal, fade.unwrap_or(0.0)))
         }),
     )?;
 
@@ -103,7 +98,7 @@ fn register_registry<'scope>(
     put(
         table,
         "Count",
-        scope.create_function(|_, ()| Ok(scene.borrow().decals.len() as u32)),
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().decals.len() as u32)),
     )?;
 
     // Decals.Clear([{ persistent = false }]) — drop every live decal (game over),
@@ -111,9 +106,9 @@ fn register_registry<'scope>(
     put(
         table,
         "Clear",
-        scope.create_function(|_, opts: Option<mlua::Table>| {
+        lua.create_function(move |lua, opts: Option<mlua::Table>| {
             let keep = clear_keeps_persistent(opts.as_ref())?;
-            scene.borrow_mut().clear_decals(keep);
+            scene.get(lua)?.borrow_mut().clear_decals(keep);
             Ok(())
         }),
     )?;
@@ -124,7 +119,8 @@ fn register_registry<'scope>(
     put(
         table,
         "SetLimits",
-        scope.create_function(|_, opts: mlua::Table| {
+        lua.create_function(move |lua, opts: mlua::Table| {
+            let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
             let limits = limits_from(&opts, scene.decals.limits())?;
             scene.decals.set_limits(limits);
@@ -136,8 +132,8 @@ fn register_registry<'scope>(
     put(
         table,
         "GetLimits",
-        scope.create_function(|lua, ()| {
-            let limits = scene.borrow().decals.limits();
+        lua.create_function(move |lua, ()| {
+            let limits = scene.get(lua)?.borrow().decals.limits();
             let out = lua.create_table()?;
             out.set("per_owner", limits.max_per_owner)?;
             out.set("world", limits.max_world)?;

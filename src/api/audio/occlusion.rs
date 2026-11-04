@@ -4,13 +4,12 @@
 //! budget) and the per-source opt-out (`AudioSource.occlusion_enabled`). The
 //! factor itself is read back through `Audio.GetSpatial`.
 
-use std::cell::RefCell;
-
 use mlua::{Table, Value};
 
 use super::super::{put, Reg};
 use super::groups::err;
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::audio::{AudioMaestro, OcclusionSettings};
 use crate::scene::authoring::audio::source as audio_ops;
 use crate::scene::Scene;
@@ -47,16 +46,17 @@ fn patched(mut settings: OcclusionSettings, patch: &Table) -> mlua::Result<Occlu
 }
 
 /// `SetOcclusionSettings` / `GetOcclusionSettings` and the per-source toggle.
-pub(super) fn register_occlusion<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register_occlusion(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    audio: &'scope RefCell<AudioMaestro>,
+    scene: ApiCell<Scene>,
+    audio: ApiCell<AudioMaestro>,
 ) -> Reg {
     put(
         table,
         "SetOcclusionSettings",
-        scope.create_function(|_, patch: Table| {
+        lua.create_function(move |lua, patch: Table| {
+            let audio = &*audio.get(lua)?;
             let settings = patched(audio.borrow().occlusion_settings(), &patch)?;
             audio.borrow_mut().set_occlusion_settings(settings);
             Ok(())
@@ -65,8 +65,8 @@ pub(super) fn register_occlusion<'scope>(
     put(
         table,
         "GetOcclusionSettings",
-        scope.create_function(|lua, ()| {
-            let s = audio.borrow().occlusion_settings();
+        lua.create_function(move |lua, ()| {
+            let s = audio.get(lua)?.borrow().occlusion_settings();
             let t = lua.create_table()?;
             t.set("strength", s.strength)?;
             t.set("layer_mask", s.layer_mask)?;
@@ -77,7 +77,8 @@ pub(super) fn register_occlusion<'scope>(
     put(
         table,
         "SetOcclusionEnabled",
-        scope.create_function(|_, (id, on): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, on): (EntityArg, bool)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Audio", "SetOcclusionEnabled")?;
             let mut scene = scene.borrow_mut();
             let mut source = scene
@@ -91,7 +92,8 @@ pub(super) fn register_occlusion<'scope>(
     put(
         table,
         "GetOcclusionEnabled",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.world.audio(id.read()).map(|a| a.occlusion_enabled))
         }),

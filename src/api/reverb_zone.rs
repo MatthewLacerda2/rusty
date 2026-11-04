@@ -13,25 +13,20 @@ use mlua::{Lua, Table, Value};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 use crate::scene::authoring::audio::reverb_zone as ops;
 use crate::scene::Scene;
-
-type SceneCell<'s> = &'s RefCell<Scene>;
 
 /// The keys a params table carries.
 const KEYS: [&str; 4] = ["decay_time", "pre_delay", "damping", "wet"];
 
 /// Register the `AudioReverbZone` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
-    register_radii(scope, &t, scene)?;
-    register_preset(scope, &t, scene)?;
-    register_params(scope, &t, scene)?;
+    register_radii(lua, &t, scene)?;
+    register_preset(lua, &t, scene)?;
+    register_params(lua, &t, scene)?;
     lua.globals()
         .set("AudioReverbZone", t)
         .map_err(|e| e.to_string())
@@ -42,12 +37,16 @@ fn err(message: String) -> mlua::Error {
 }
 
 /// `id`'s zone, cloned, or `None` without one.
-fn get(scene: SceneCell, id: u32) -> Option<ReverbZoneComponent> {
+fn get(scene: &RefCell<Scene>, id: u32) -> Option<ReverbZoneComponent> {
     scene.borrow().world.reverb_zone(id).map(|z| z.clone())
 }
 
 /// Apply `f` to `id`'s zone; an error without one.
-fn set(scene: SceneCell, id: u32, f: impl FnOnce(&mut ReverbZoneComponent)) -> mlua::Result<()> {
+fn set(
+    scene: &RefCell<Scene>,
+    id: u32,
+    f: impl FnOnce(&mut ReverbZoneComponent),
+) -> mlua::Result<()> {
     let mut s = scene.borrow_mut();
     let mut z = s
         .world
@@ -58,40 +57,34 @@ fn set(scene: SceneCell, id: u32, f: impl FnOnce(&mut ReverbZoneComponent)) -> m
 }
 
 /// `Get/SetMinDistance`, `Get/SetMaxDistance`.
-fn register_radii<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
-    let f = scope
-        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map(|z| z.min_distance)));
+fn register_radii(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map(|z| z.min_distance))
+    });
     put(t, "GetMinDistance", f)?;
-    let f = scope.create_function(move |_, (id, d): (EntityArg, f32)| {
+    let f = lua.create_function(move |lua, (id, d): (EntityArg, f32)| {
         let id = id.live("AudioReverbZone", "SetMinDistance")?;
-        set(scene, id, |z| ops::set_min_distance(z, d))
+        set(&*scene.get(lua)?, id, |z| ops::set_min_distance(z, d))
     });
     put(t, "SetMinDistance", f)?;
-    let f = scope
-        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map(|z| z.max_distance)));
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map(|z| z.max_distance))
+    });
     put(t, "GetMaxDistance", f)?;
-    let f = scope.create_function(move |_, (id, d): (EntityArg, f32)| {
+    let f = lua.create_function(move |lua, (id, d): (EntityArg, f32)| {
         let id = id.live("AudioReverbZone", "SetMaxDistance")?;
-        set(scene, id, |z| ops::set_max_distance(z, d))
+        set(&*scene.get(lua)?, id, |z| ops::set_max_distance(z, d))
     });
     put(t, "SetMaxDistance", f)
 }
 
 /// `GetPreset`, `SetPreset`, `GetPresets`.
-fn register_preset<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(get(scene, id.read()).map(|z| z.preset.name()))
+fn register_preset(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map(|z| z.preset.name()))
     });
     put(t, "GetPreset", f)?;
-    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+    let f = lua.create_function(move |lua, (id, name): (EntityArg, String)| {
         let id = id.live("AudioReverbZone", "SetPreset")?;
         let preset = ReverbPreset::parse(&name).ok_or_else(|| {
             let names: Vec<_> = ReverbPreset::ALL.iter().map(|p| p.name()).collect();
@@ -100,26 +93,23 @@ fn register_preset<'scope>(
                 names.join(", ")
             ))
         })?;
-        set(scene, id, |z| ops::set_preset(z, preset))
+        set(&*scene.get(lua)?, id, |z| ops::set_preset(z, preset))
     });
     put(t, "SetPreset", f)?;
-    let f = scope.create_function(|_, ()| Ok(ReverbPreset::ALL.map(|p| p.name()).to_vec()));
+    let f = lua.create_function(|_, ()| Ok(ReverbPreset::ALL.map(|p| p.name()).to_vec()));
     put(t, "GetPresets", f)
 }
 
 /// `GetParams`, `SetParams`.
-fn register_params<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
-    let f = scope.create_function(move |lua, id: EntityArg| {
-        get(scene, id.read())
+fn register_params(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        get(&*scene.get(lua)?, id.read())
             .map(|z| params_table(lua, &z.params))
             .transpose()
     });
     put(t, "GetParams", f)?;
-    let f = scope.create_function(move |_, (id, patch): (EntityArg, Table)| {
+    let f = lua.create_function(move |lua, (id, patch): (EntityArg, Table)| {
+        let scene = &*scene.get(lua)?;
         let id = id.live("AudioReverbZone", "SetParams")?;
         let Some(zone) = get(scene, id) else {
             return Err(err(format!("entity {id} has no AudioReverbZone")));

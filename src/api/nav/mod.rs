@@ -15,41 +15,31 @@ mod query;
 mod settings;
 mod turning;
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::Lua;
 
 use super::{put, Reg};
+use crate::api::ApiCell;
 use crate::navigation::NavigationGraph;
 use crate::scene::Scene;
 
 /// Register the `Navigation` and `NavMeshAgent` namespaces onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    nav: &'scope RefCell<NavigationGraph>,
-) -> Reg {
-    register_navigation(lua, scope, scene, nav)?;
-    agent::register(lua, scope, scene, nav)
+pub fn register(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<NavigationGraph>) -> Reg {
+    register_navigation(lua, scene, nav)?;
+    agent::register(lua, scene, nav)
 }
 
 /// `Navigation.GetNextPathStep` over the shared nav graph, plus the per-scene navmesh
 /// bake-settings getters/setters (#276).
-fn register_navigation<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    nav: &'scope RefCell<NavigationGraph>,
-) -> Reg {
+fn register_navigation(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<NavigationGraph>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     put(
         &table,
         "GetNextPathStep",
-        scope.create_function(
-            |_, (cx, cy, cz, tx, ty, tz): (f32, f32, f32, f32, f32, f32)| {
+        lua.create_function(
+            move |lua, (cx, cy, cz, tx, ty, tz): (f32, f32, f32, f32, f32, f32)| {
+                let nav = &*nav.get(lua)?;
                 let step = nav
                     .borrow()
                     .get_next_path_step(Vec3::new(cx, cy, cz), Vec3::new(tx, ty, tz));
@@ -58,10 +48,10 @@ fn register_navigation<'scope>(
         ),
     )?;
 
-    settings::register(scope, &table, scene, nav)?;
-    query::register(scope, &table, nav)?;
-    offmesh::register_navigation(scope, &table, scene, nav)?;
-    areas::register_navigation(scope, &table, scene, nav)?;
+    settings::register(lua, &table, scene, nav)?;
+    query::register(lua, &table, nav)?;
+    offmesh::register_navigation(lua, &table, scene, nav)?;
+    areas::register_navigation(lua, &table, scene, nav)?;
 
     lua.globals()
         .set("Navigation", table)

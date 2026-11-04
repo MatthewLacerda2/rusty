@@ -13,9 +13,12 @@ This skill is how the orchestrator runs a batch on top of them.
 
 ## What runs together: file collision, not count
 
-Merging is serialized, so every branch behind another pays an update (a merge of
-`main` into it) per merge ahead of it. Over separate files that is seconds of `git`; over shared code it is
-a session of conflict resolution. **Before starting a branch, ask whether it edits
+Merging is serialized, one tested tree at a time, but the queue tests up to four
+pull requests together on one tree (a merge train, #1785, `ci-merge`): a branch that
+merges cleanly onto `main` and the others rides without being touched. One that
+conflicts with a branch merged ahead of it is not: it pays an update (a merge of
+`main` into it) and its own CI round alone. Over separate files that never happens;
+over shared code it is a session of conflict resolution. **Before starting a branch, ask whether it edits
 the same types as one in flight.** Spread across modules (physics, UI,
 navigation, audio, CI) at once; within one module, run one branch at a time.
 

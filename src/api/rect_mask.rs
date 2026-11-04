@@ -5,27 +5,23 @@
 //! `RemoveComponent`. The setters route through the shared
 //! `scene::authoring::ui::rect_mask` op the inspector card uses.
 
-use std::cell::RefCell;
-
 use glam::Vec4;
 use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring::ui::rect_mask as mask_ops;
 use crate::scene::Scene;
 
 /// Register the `RectMask` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(
         &table,
         "GetPadding",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let p = scene
                 .world
@@ -37,18 +33,21 @@ pub fn register<'scope>(
     put(
         &table,
         "SetPadding",
-        scope.create_function(|_, (id, l, b, r, t): (EntityArg, f32, f32, f32, f32)| {
-            let id = id.live("RectMask", "SetPadding")?;
-            if let Some(mut m) = scene.borrow_mut().world.rect_mask_mut(id) {
-                mask_ops::set_padding(&mut m, Vec4::new(l, b, r, t));
-            }
-            Ok(())
-        }),
+        lua.create_function(
+            move |lua, (id, l, b, r, t): (EntityArg, f32, f32, f32, f32)| {
+                let id = id.live("RectMask", "SetPadding")?;
+                if let Some(mut m) = scene.get(lua)?.borrow_mut().world.rect_mask_mut(id) {
+                    mask_ops::set_padding(&mut m, Vec4::new(l, b, r, t));
+                }
+                Ok(())
+            },
+        ),
     )?;
     put(
         &table,
         "GetFeather",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.world.rect_mask(id.read()).map_or(0.0, |m| m.feather))
         }),
@@ -56,9 +55,9 @@ pub fn register<'scope>(
     put(
         &table,
         "SetFeather",
-        scope.create_function(|_, (id, feather): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, feather): (EntityArg, f32)| {
             let id = id.live("RectMask", "SetFeather")?;
-            if let Some(mut m) = scene.borrow_mut().world.rect_mask_mut(id) {
+            if let Some(mut m) = scene.get(lua)?.borrow_mut().world.rect_mask_mut(id) {
                 mask_ops::set_feather(&mut m, feather);
             }
             Ok(())

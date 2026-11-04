@@ -17,7 +17,7 @@ impl ScriptManager {
         if events.is_empty() {
             return;
         }
-        self.with_api_scope(|lua| {
+        self.with_lua(|lua| {
             for (id, name) in events {
                 for key in self.awoken_keys_for(*id) {
                     self.call_hook(lua, key, ON_ANIMATION_EVENT, (*id, name.as_str()));

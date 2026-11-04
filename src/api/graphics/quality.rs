@@ -15,6 +15,7 @@ use std::cell::RefCell;
 use mlua::LuaSerdeExt;
 
 use super::super::{put, Reg};
+use crate::api::ApiCell;
 use crate::core::application::Application;
 use crate::core::settings::GraphicsSettings;
 
@@ -29,32 +30,36 @@ fn sync(graphics: &RefCell<GraphicsSettings>, app: &Application) {
 }
 
 /// Select, list and author the presets.
-pub(super) fn register_quality<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register_quality(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    graphics: &'scope RefCell<GraphicsSettings>,
-    app: &'scope RefCell<Application>,
+    graphics: ApiCell<GraphicsSettings>,
+    app: ApiCell<Application>,
 ) -> Reg {
     put(
         table,
         "GetQuality",
-        scope.create_function(|_, ()| Ok(app.borrow().quality().map(str::to_string))),
+        lua.create_function(move |lua, ()| {
+            Ok(app.get(lua)?.borrow().quality().map(str::to_string))
+        }),
     )?;
     put(
         table,
         "SetQuality",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| {
+            let app = &*app.get(lua)?;
             let mut app = app.borrow_mut();
             app.select_quality(&name)
                 .map_err(|e| refused("SetQuality", e))?;
-            sync(graphics, &app);
+            sync(&*graphics.get(lua)?, &app);
             Ok(())
         }),
     )?;
     put(
         table,
         "QualityPresets",
-        scope.create_function(|lua, ()| {
+        lua.create_function(move |lua, ()| {
+            let app = &*app.get(lua)?;
             let mut app = app.borrow_mut();
             app.reread();
             lua.to_value(&app.quality_presets().presets)
@@ -63,50 +68,53 @@ pub(super) fn register_quality<'scope>(
     put(
         table,
         "GetDefaultQuality",
-        scope.create_function(|_, ()| Ok(app.borrow_mut().default_quality())),
+        lua.create_function(move |lua, ()| Ok(app.get(lua)?.borrow_mut().default_quality())),
     )?;
     put(
         table,
         "SetDefaultQuality",
-        scope.create_function(|_, name: Option<String>| {
+        lua.create_function(move |lua, name: Option<String>| {
+            let app = &*app.get(lua)?;
             let mut app = app.borrow_mut();
             app.set_default_quality(name.as_deref())
                 .map_err(|e| refused("SetDefaultQuality", e))?;
-            sync(graphics, &app);
+            sync(&*graphics.get(lua)?, &app);
             Ok(())
         }),
     )?;
-    register_authoring(scope, table, graphics, app)
+    register_authoring(lua, table, graphics, app)
 }
 
 /// `SetQualityPreset(name, values)` (a partial edit over the preset of that name, or
 /// a new one over the engine's values) and `RemoveQualityPreset(name)`.
-fn register_authoring<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_authoring(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    graphics: &'scope RefCell<GraphicsSettings>,
-    app: &'scope RefCell<Application>,
+    graphics: ApiCell<GraphicsSettings>,
+    app: ApiCell<Application>,
 ) -> Reg {
     put(
         table,
         "SetQualityPreset",
-        scope.create_function(|lua, (name, values): (String, mlua::Value)| {
+        lua.create_function(move |lua, (name, values): (String, mlua::Value)| {
+            let app = &*app.get(lua)?;
             let patch: serde_json::Value = lua.from_value(values)?;
             let mut app = app.borrow_mut();
             app.edit_quality_preset(&name, &patch)
                 .map_err(|e| refused("SetQualityPreset", e))?;
-            sync(graphics, &app);
+            sync(&*graphics.get(lua)?, &app);
             Ok(())
         }),
     )?;
     put(
         table,
         "RemoveQualityPreset",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| {
+            let app = &*app.get(lua)?;
             let mut app = app.borrow_mut();
             app.remove_quality_preset(&name)
                 .map_err(|e| refused("RemoveQualityPreset", e))?;
-            sync(graphics, &app);
+            sync(&*graphics.get(lua)?, &app);
             Ok(())
         }),
     )

@@ -8,9 +8,13 @@
 //! resized or toggled: its old cells and its new cells are dirty. Records are kept
 //! by ascending entity id, so the diff is a merge-join and its order is fixed.
 //!
-//! Change tracking is a per-tick comparison, not a hook on every writer: a script,
-//! the physics write-back, the editor and a parent's move all change the pose the
-//! same way, and none of them can forget to report it.
+//! The diff is a comparison, so a writer the change log misses still shows up
+//! here. But during Play it runs only when the log names a static entity
+//! (`still.rs`, #1707): there the trigger is the World's write funnels, which
+//! stamp every component write and a parent's move on its subtree. A new way to
+//! write a static entity's pose, Collider or flags must go through those funnels
+//! (`ecs::changes`), or Play's navmesh misses it. The editor's `sync` diffs every
+//! call, as before.
 
 use glam::Mat4;
 

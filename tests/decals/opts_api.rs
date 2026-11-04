@@ -2,25 +2,27 @@
 //! `depth` and the decal `material`; unknown options and materials are errors.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::MaterialAsset;
 use rusty::scene::Scene;
 
-fn run(scene: &RefCell<Scene>, script: &str) -> mlua::Result<()> {
+fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<()> {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::decals::register(&lua, scope, scene).unwrap();
+    crate::lua::attempt(|| {
+        rusty::api::decals::register(&lua, bind(&lua, scene)).unwrap();
         lua.load(script).exec()
     })
 }
 
-fn with_blood() -> RefCell<Scene> {
+fn with_blood() -> Rc<RefCell<Scene>> {
     let mut scene = Scene::new();
     scene
         .materials
         .insert("blood".into(), MaterialAsset::default());
-    RefCell::new(scene)
+    Rc::new(RefCell::new(scene))
 }
 
 #[test]

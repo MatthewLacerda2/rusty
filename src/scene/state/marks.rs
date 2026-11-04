@@ -96,7 +96,7 @@ pub const MARKS: &[Mark] = marks! {
     "reflection_probes.cubemap" as BakeOutput
         => |s, _| s.reflection_probes.probes[0].cubemap_path = "marked.ktx2".into(),
         s.reflection_probes.probes.first().is_some_and(|p| p.cubemap_path == "marked.ktx2");
-    "lightmaps" => |s, b| s.lightmaps.entries.push(LightmapEntry {
+    "lightmaps" => |s, b| s.lightmaps.insert(LightmapEntry {
             entity: b,
             page: 0,
             scale_offset: [1.0, 1.0, 0.0, 0.0],

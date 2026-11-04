@@ -6,13 +6,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::core::settings::decals::DecalLimits;
 use rusty::scene::Scene;
 
-fn eval<T: mlua::FromLuaMulti>(scene: &RefCell<Scene>, script: &str) -> mlua::Result<T> {
+fn eval<T: mlua::FromLuaMulti>(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<T> {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::decals::register(&lua, scope, scene).unwrap();
+    crate::lua::attempt(|| {
+        rusty::api::decals::register(&lua, bind(&lua, scene)).unwrap();
         lua.load(script).eval()
     })
 }
@@ -22,7 +23,7 @@ fn shooting_the_floor_keeps_the_crate_mark() {
     let mut scene = Scene::new();
     let floor = scene.add_entity("Floor".into());
     let crate_id = scene.add_entity("Crate".into());
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let script = format!(
         "local mark = Decals.Spawn(0,0,0, 0,1,0, {{ owner = {crate_id} }})
          for i = 1, 257 do Decals.Spawn(i * 0.01,0,0, 0,1,0, {{ owner = {floor} }}) end
@@ -35,7 +36,7 @@ fn shooting_the_floor_keeps_the_crate_mark() {
 
 #[test]
 fn set_limits_takes_a_partial_table_and_get_limits_reads_it_back() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let got: (u32, u32, u32) = eval(
         &scene,
         "Decals.SetLimits{ world = 2 }
@@ -48,7 +49,7 @@ fn set_limits_takes_a_partial_table_and_get_limits_reads_it_back() {
 
 #[test]
 fn lowering_the_world_limit_fades_the_oldest_excess() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     eval::<()>(
         &scene,
         "for i = 1, 5 do Decals.Spawn(i,0,0, 0,1,0) end
@@ -61,7 +62,7 @@ fn lowering_the_world_limit_fades_the_oldest_excess() {
 
 #[test]
 fn an_unknown_limit_is_an_error_naming_the_valid_ones() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let err = eval::<()>(&scene, "Decals.SetLimits{ owner = 3 }").unwrap_err();
     assert!(err.to_string().contains("per_owner, world, total"), "{err}");
     assert_eq!(scene.borrow().decals.limits(), DecalLimits::default());

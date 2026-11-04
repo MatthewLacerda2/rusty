@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::particle::{EmitMode, ParticleEmitterComponent};
 use rusty::core::curve::Range;
 use rusty::scene::Scene;
@@ -55,15 +56,11 @@ fn the_tick_spawns_at_the_world_position() {
 #[test]
 fn emit_and_burst_spawn_at_the_world_position() {
     let (scene, id) = parented(EmitMode::Burst);
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::particle::register(&lua, scope, &scene).unwrap();
-        lua.load(format!("Particles.Emit({id}, 3); Particles.Burst({id})"))
-            .exec()
-            .unwrap();
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
+    lua.load(format!("Particles.Emit({id}, 3); Particles.Burst({id})"))
+        .exec()
+        .unwrap();
     all_at_pivot(&scene.borrow(), id);
 }

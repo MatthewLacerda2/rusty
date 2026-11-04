@@ -3,6 +3,7 @@
 //! the floor reads as if it were never there. Skips with no adapter.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::{Quat, Vec3};
 
@@ -42,7 +43,7 @@ pub(crate) fn slab_yard(shader: Option<&str>) -> (Scene, u32) {
 }
 
 /// Point `id`'s mask at `d`'s and set its `dissolve.amount`.
-pub(crate) fn dissolve(scene: &RefCell<Scene>, id: u32, d: &Dissolve, amount: f32) {
+pub(crate) fn dissolve(scene: &Rc<RefCell<Scene>>, id: u32, d: &Dissolve, amount: f32) {
     let script = format!(
         r#"Material.SetShaderTexture({id}, "mask", [==[{}]==])
         Material.SetShaderParam({id}, "dissolve.amount", {amount})"#,
@@ -83,7 +84,7 @@ fn gpu_a_half_dissolved_slab_casts_a_shadow_with_a_hole() {
         return;
     };
     let (scene, slab) = slab_yard(Some(&d.shader));
-    let scene = RefCell::new(scene);
+    let scene = std::rc::Rc::new(RefCell::new(scene));
 
     dissolve(&scene, slab, &d, 0.0);
     let whole = ground_halves(&mut r, &scene.borrow());
@@ -122,7 +123,7 @@ fn gpu_a_dissolved_crate_leaves_no_ambient_occlusion() {
             .set_camera(volume, Some(crate::components::CameraComponent::default()));
         let crate_id =
             with_crate.then(|| block(&mut scene, Vec3::Y, Vec3::splat(2.0), Some(&d.shader)));
-        (RefCell::new(scene), crate_id)
+        (Rc::new(RefCell::new(scene)), crate_id)
     };
     let cam = Camera::new(Vec3::new(0.0, 2.5, 5.0), -90.0, -20.0);
     let (empty, _) = yard(false);

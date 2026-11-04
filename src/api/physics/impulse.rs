@@ -15,6 +15,7 @@ use mlua::Table;
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 use crate::time::FIXED_DELTA_TIME;
@@ -23,21 +24,27 @@ use crate::time::FIXED_DELTA_TIME;
 type AtPoint = (EntityArg, f32, f32, f32, f32, f32, f32);
 
 /// Register `AddForceAtPosition` / `AddImpulseAtPosition` onto `Physics`.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     // A continuous force feeds one fixed step, as `AddForce` does: F · dt.
     for (name, scale) in [
         ("AddForceAtPosition", FIXED_DELTA_TIME),
         ("AddImpulseAtPosition", 1.0),
     ] {
-        let f = scope.create_function(move |_, (id, x, y, z, px, py, pz): AtPoint| {
+        let f = lua.create_function(move |lua, (id, x, y, z, px, py, pz): AtPoint| {
             let id = id.live("Physics", name)?;
             let impulse = Vec3::new(x, y, z) * scale;
-            apply(scene, physics, id, impulse, Vec3::new(px, py, pz));
+            apply(
+                &*scene.get(lua)?,
+                &*physics.get(lua)?,
+                id,
+                impulse,
+                Vec3::new(px, py, pz),
+            );
             Ok(())
         });
         put(table, name, f)?;

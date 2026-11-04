@@ -12,7 +12,9 @@
 //!
 //! Every dev entry point that builds a world ([`Session`](super::session::Session),
 //! [`Harness`](super::harness::Harness), the windowed shell) calls [`install_api`]
-//! first; it is idempotent, so the order and the count don't matter.
+//! first, before its first Lua VM starts: a VM installs the surface once, when it
+//! starts (#1709), so one started before the extension never has it. The call is
+//! idempotent, so the count doesn't matter.
 
 // sorted: one module per dev namespace; kept in order so parallel branches don't collide
 mod bake;
@@ -28,7 +30,7 @@ use std::sync::Once;
 
 use mlua::Lua;
 
-use crate::api::{self, ApiScopedCtx, Reg};
+use crate::api::{self, ApiCtx, Reg};
 
 /// Install the dev namespaces onto the Lua surface, once per process.
 pub fn install_api() {
@@ -38,21 +40,17 @@ pub fn install_api() {
 
 /// The [`api::Extension`] itself: `Debug`, the bake verbs and the audio capture
 /// (#1579) on the tables `api` already registered, `Editor` (#1360), `Sfx` (#388), and `Speech` (#386) with its voice verbs (#387).
-fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // sorted: each registrar adds its own table or extends one `api` made; `voices`
     // extends `Speech`, which `speech` sorts before
-    bake::register(lua, scope, ctx)?;
-    capture::register(lua, scope, ctx)?;
-    debug::register(lua, scope, ctx)?;
-    editor::register(lua, scope, ctx)?;
-    generate::register(lua, scope, ctx)?;
-    sfx::register(lua, scope, ctx)?;
-    speech::register(lua, scope, ctx)?;
-    voices::register(lua, scope, ctx)
+    bake::register(lua, ctx)?;
+    capture::register(lua, ctx)?;
+    debug::register(lua, ctx)?;
+    editor::register(lua, ctx)?;
+    generate::register(lua, ctx)?;
+    sfx::register(lua, ctx)?;
+    speech::register(lua, ctx)?;
+    voices::register(lua, ctx)
 }
 
 #[cfg(test)]

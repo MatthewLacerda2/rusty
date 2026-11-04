@@ -89,12 +89,18 @@ pub fn arena() -> Scene {
     scene
 }
 
-/// A Dust2-sized level: `n × n` open rooms of `size` metres on one slab, every
-/// wall between neighbours cut by a doorway.
+/// A roof slab over `[x0, x1] × [z0, z1]`, its underside at `at`.
+pub fn roof(scene: &mut Scene, (x0, z0): (f32, f32), (x1, z1): (f32, f32), at: f32) {
+    block(scene, Vec3::new(x0, at, z0), Vec3::new(x1, at + 0.2, z1));
+}
+
+/// A Dust2-sized level: `n × n` rooms of `size` metres on one slab under one roof,
+/// every wall between neighbours cut by a doorway.
 pub fn grid_of_rooms(n: usize, size: f32) -> Scene {
     let mut scene = Scene::new();
     let extent = n as f32 * size;
     slab(&mut scene, 0.0, 0.0, extent, extent);
+    roof(&mut scene, (0.0, 0.0), (extent, extent), WALL_HEIGHT);
     for k in 0..=n {
         let at = k as f32 * size;
         let inner = (k > 0 && k < n).then_some(());
@@ -106,4 +112,15 @@ pub fn grid_of_rooms(n: usize, size: f32) -> Scene {
         }
     }
     scene
+}
+
+/// The reflection probes placement plans for `scene` from its static colliders
+/// alone (no nav surface, no manual probe).
+pub fn plan_static(
+    scene: &Scene,
+    params: &super::ReflectionPlacement,
+) -> Vec<super::ReflectionPlan> {
+    super::Site::survey(scene, None, None, params.cell).map_or_else(Vec::new, |site| {
+        super::plan_reflection_probes(scene, &site, params, &[])
+    })
 }

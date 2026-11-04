@@ -1,9 +1,11 @@
 //! The #439 `Particles` setters write the component through the shared ops.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::particle::{EmitFrom, EmitShape, ParticleEmitterComponent};
 use rusty::core::curve::Range;
 use rusty::scene::Scene;
@@ -16,11 +18,10 @@ fn module_setters_write_the_emitter() {
         .world
         .set_particles(id, Some(ParticleEmitterComponent::default()));
     let smoke = scene.add_entity("Smoke".to_string());
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
-    let (ok, bad_shape, bad_trigger): (bool, bool, bool) = lua
-        .scope(|s| {
-            rusty::api::particle::register(&lua, s, &scene).unwrap();
+    let (ok, bad_shape, bad_trigger): (bool, bool, bool) = crate::lua::attempt(|| {
+            rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
             lua.load(format!(
                 r#"
                 local ok = Particles.SetShape({id}, "cone", {{ angle = 40, radius = 0.2, surface = true }})
@@ -64,10 +65,10 @@ fn clearing_a_sub_emitter_takes_nil() {
     let mut cfg = ParticleEmitterComponent::default();
     cfg.sub_emitters.birth = Some(7);
     scene.world.set_particles(id, Some(cfg));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::particle::register(&lua, s, &scene).unwrap();
+    crate::lua::attempt(|| {
+        rusty::api::particle::register(&lua, bind(&lua, &scene)).unwrap();
         lua.load(format!("Particles.SetSubEmitter({id}, 'birth', nil)"))
             .exec()
     })

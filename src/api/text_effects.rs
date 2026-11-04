@@ -5,28 +5,28 @@
 //! (`width, r, g, b, a`), `Shadow` (`dx, dy, r, g, b, a`) — and auto-size as
 //! `enabled, min, max`. Split from `text.rs` to keep each file one responsibility.
 
-use std::cell::RefCell;
-
 use mlua::{Table, Variadic};
 
 use super::text::Effect;
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring::ui::text as ops;
 use crate::scene::Scene;
 
 /// `Get<suffix>(id)` / `Set<suffix>(id, …)` for every effect row.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     effects: &[Effect],
 ) -> Reg {
     for &(suffix, lead, get, set) in effects {
         put(
             table,
             &format!("Get{suffix}"),
-            scope.create_function(move |_, id: EntityArg| {
+            lua.create_function(move |lua, id: EntityArg| {
+                let scene = &*scene.get(lua)?;
                 let scene = scene.borrow();
                 let v = scene.world.text(id.read()).map_or([0.0; 6], |t| get(&t));
                 Ok(Variadic::from_iter(
@@ -38,7 +38,7 @@ pub(super) fn register<'scope>(
         put(
             table,
             &format!("Set{suffix}"),
-            scope.create_function(move |_, (id, args): (EntityArg, Variadic<f32>)| {
+            lua.create_function(move |lua, (id, args): (EntityArg, Variadic<f32>)| {
                 let id = id.live("Text", &verb)?;
                 if args.len() < lead + 4 {
                     let msg = format!("Text.Set{suffix} expects {} numbers", lead + 4);
@@ -47,7 +47,7 @@ pub(super) fn register<'scope>(
                 let mut v = [0.0; 6];
                 v[..lead].copy_from_slice(&args[..lead]);
                 v[2..].copy_from_slice(&args[lead..lead + 4]);
-                if let Some(mut t) = scene.borrow_mut().world.text_mut(id) {
+                if let Some(mut t) = scene.get(lua)?.borrow_mut().world.text_mut(id) {
                     set(&mut t, v);
                 }
                 Ok(())
@@ -59,15 +59,12 @@ pub(super) fn register<'scope>(
 
 /// `GetAutoSize(id) -> enabled, min, max` / `SetAutoSize(id, enabled[, min, max])`
 /// (omitted bounds keep their values).
-pub(super) fn register_auto_size<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub(super) fn register_auto_size(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetAutoSize",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let t = scene.world.text(id.read());
             Ok(t.map_or((false, 0.0, 0.0), |t| {
@@ -78,10 +75,10 @@ pub(super) fn register_auto_size<'scope>(
     put(
         table,
         "SetAutoSize",
-        scope.create_function(
-            |_, (id, on, min, max): (EntityArg, bool, Option<f32>, Option<f32>)| {
+        lua.create_function(
+            move |lua, (id, on, min, max): (EntityArg, bool, Option<f32>, Option<f32>)| {
                 let id = id.live("Text", "SetAutoSize")?;
-                if let Some(mut t) = scene.borrow_mut().world.text_mut(id) {
+                if let Some(mut t) = scene.get(lua)?.borrow_mut().world.text_mut(id) {
                     let (lo, hi) = (
                         min.unwrap_or(t.auto_size_min),
                         max.unwrap_or(t.auto_size_max),

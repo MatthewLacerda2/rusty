@@ -1,9 +1,11 @@
 //! `Trail.*` / `Line.*` bindings vs `authoring::{ribbon::trail, ribbon::line, ribbon}` (#441).
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{LineComponent, ParticleBlend, TextureMode, TrailComponent};
 use rusty::core::curve::{Curve, Gradient};
 use rusty::scene::authoring::{
@@ -14,21 +16,17 @@ use rusty::scene::Scene;
 /// Two sibling entities (Lua-driven, op-driven), each given a default component
 /// by `attach`; runs `script` (with `{id}` = the Lua entity) through both
 /// namespaces. Returns the scene and the two ids.
-fn drive(attach: fn(&mut Scene, u32) -> bool, script: &str) -> (RefCell<Scene>, u32, u32) {
-    let scene = RefCell::new(Scene::new());
+fn drive(attach: fn(&mut Scene, u32) -> bool, script: &str) -> (Rc<RefCell<Scene>>, u32, u32) {
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let via_lua = scene.borrow_mut().add_entity("ViaLua".to_string());
     let via_op = scene.borrow_mut().add_entity("ViaOp".to_string());
     attach(&mut scene.borrow_mut(), via_lua);
     attach(&mut scene.borrow_mut(), via_op);
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::trail::register(&lua, s, &scene).unwrap();
-        rusty::api::line::register(&lua, s, &scene).unwrap();
-        let code = script.replace("{id}", &via_lua.to_string());
-        lua.load(code).exec().unwrap();
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::trail::register(&lua, bind(&lua, &scene)).unwrap();
+    rusty::api::line::register(&lua, bind(&lua, &scene)).unwrap();
+    let code = script.replace("{id}", &via_lua.to_string());
+    lua.load(code).exec().unwrap();
     (scene, via_lua, via_op)
 }
 

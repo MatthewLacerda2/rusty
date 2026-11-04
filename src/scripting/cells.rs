@@ -23,6 +23,7 @@ impl ScriptManager {
     /// play-mode systems must agree on one device/log).
     pub fn set_audio_cell(&mut self, audio: Rc<RefCell<AudioMaestro>>) {
         self.cells.audio = audio;
+        self.reattach_cells();
     }
 
     /// Handle to the live rapier world's cell: the manager owns it from construction
@@ -36,6 +37,7 @@ impl ScriptManager {
     /// `UI` namespace and the layout system read the same screen.
     pub fn set_screen_cell(&mut self, screen: Rc<RefCell<ScreenSize>>) {
         self.cells.screen = screen;
+        self.reattach_cells();
     }
 
     /// Handle to the UI event system (#420), so `Resources` drives the same state
@@ -48,6 +50,7 @@ impl ScriptManager {
     /// `Application` namespace and the host that acts on `Quit` agree.
     pub fn set_application_cell(&mut self, application: Rc<RefCell<Application>>) {
         self.cells.application = application;
+        self.reattach_cells();
     }
 
     /// Handle to the shared scene-path cell: the editor holds this very cell as its
@@ -60,6 +63,7 @@ impl ScriptManager {
     /// runtime, the console REPL and the app all read/write the same `Storage`.
     pub fn set_storage(&mut self, storage: Rc<RefCell<Storage>>) {
         self.cells.storage = storage;
+        self.reattach_cells();
     }
 
     /// Handle to the shared graphics cell (quality preset values + player options,

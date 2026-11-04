@@ -2,21 +2,19 @@
 //! validation included (#421).
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec2;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{LayoutConstraint, LayoutElementComponent, LayoutGroupComponent};
 use rusty::scene::Scene;
 
-fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
+fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::layout_group::register(&lua, scope, scene).unwrap();
-        rusty::api::layout_element::register(&lua, scope, scene).unwrap();
-        f(&lua);
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::layout_group::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::api::layout_element::register(&lua, bind(&lua, scene)).unwrap();
+    f(&lua);
 }
 
 #[test]
@@ -27,7 +25,7 @@ fn layout_group_setters_validate_through_the_shared_ops() {
     scene
         .world
         .set_layout_group(id, Some(LayoutGroupComponent::default()));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "LayoutGroup.SetKind({id}, 'grid')
@@ -71,7 +69,7 @@ fn layout_element_sizes_clear_with_nil_and_fit_by_name() {
     scene
         .world
         .set_layout_element(id, Some(LayoutElementComponent::default()));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "LayoutElement.SetPreferredSize({id}, 120, nil)

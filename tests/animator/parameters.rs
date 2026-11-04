@@ -4,8 +4,10 @@
 //! `to_scene_data` → `apply_scene_data` document a scene save/load uses).
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::AnimatorParameter;
 use rusty::scene::{apply_scene_data, to_scene_data, Scene};
 use rusty::scripting::ConsoleLogs;
@@ -13,20 +15,16 @@ use rusty::scripting::ConsoleLogs;
 use super::scene_with_animator;
 
 /// Register the `Animator` namespace against `scene` and run `script`.
-fn run(scene: &RefCell<Scene>, console: &RefCell<ConsoleLogs>, script: &str) {
+fn run(scene: &Rc<RefCell<Scene>>, console: &Rc<RefCell<ConsoleLogs>>, script: &str) {
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::animator::register(&lua, s, scene, console).unwrap();
-        lua.load(script).exec().unwrap();
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::animator::register(&lua, bind(&lua, scene), bind(&lua, console)).unwrap();
+    lua.load(script).exec().unwrap();
 }
 
 #[test]
 fn lua_setters_write_every_parameter_kind() {
     let (scene, id) = scene_with_animator();
-    let console = RefCell::new(ConsoleLogs::new());
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     run(
         &scene,
         &console,
@@ -51,7 +49,7 @@ fn lua_setters_write_every_parameter_kind() {
 #[test]
 fn wrong_typed_lua_set_is_a_warned_no_op() {
     let (scene, id) = scene_with_animator();
-    let console = RefCell::new(ConsoleLogs::new());
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     run(
         &scene,
         &console,
@@ -78,7 +76,7 @@ fn wrong_typed_lua_set_is_a_warned_no_op() {
 #[test]
 fn setter_on_missing_entity_or_animator_is_a_silent_no_op() {
     let (scene, _) = scene_with_animator();
-    let console = RefCell::new(ConsoleLogs::new());
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let id = scene.borrow_mut().add_entity("NoAnimator".to_string());
     // Neither the animator-less entity nor a bogus id may error.
     run(

@@ -10,28 +10,24 @@ use mlua::{Lua, Table, Value};
 
 use super::super::providers::environment;
 use super::super::providers::voices::{self, Account, Answer, Availability, Voice, REFRESH};
-use crate::api::{global_table, put, ApiScopedCtx, Reg};
+use crate::api::{global_table, put, ApiCtx, Reg};
 
 /// `Voices([refresh])` and `FindVoice(query [, refresh])` → `voices, source`, where
 /// `source` says whether the list was just read or cached and how old it is.
 /// `VoiceInfo(id)` → the voice, or `nil, why` when it is withdrawn. Anything that
 /// stops every question (Play, no key on a cold cache, the vendor) raises.
-pub(super) fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let scene = ctx.scene;
     let table = global_table(lua, "Speech")?;
     put(
         &table,
         "Voices",
-        scope.create_function(move |lua, refresh: Option<bool>| {
+        lua.create_function(move |lua, refresh: Option<bool>| {
             let env = environment();
             let account = Account { environment: &env };
             let answer = voices::list(
                 Path::new(""),
-                scene.borrow().is_playing(),
+                scene.get(lua)?.borrow().is_playing(),
                 &account,
                 refresh.unwrap_or(false),
             );
@@ -41,10 +37,10 @@ pub(super) fn register<'scope>(
     put(
         &table,
         "FindVoice",
-        scope.create_function(move |lua, (query, refresh): (String, Option<bool>)| {
+        lua.create_function(move |lua, (query, refresh): (String, Option<bool>)| {
             let env = environment();
             let account = Account { environment: &env };
-            let at = (Path::new(""), scene.borrow().is_playing());
+            let at = (Path::new(""), scene.get(lua)?.borrow().is_playing());
             let answer = voices::find(at.0, at.1, &account, &query, refresh.unwrap_or(false));
             listing(lua, answer.map_err(mlua::Error::external)?)
         }),
@@ -52,10 +48,10 @@ pub(super) fn register<'scope>(
     put(
         &table,
         "VoiceInfo",
-        scope.create_function(move |lua, id: String| {
+        lua.create_function(move |lua, id: String| {
             let env = environment();
             let account = Account { environment: &env };
-            match voices::info(scene.borrow().is_playing(), &account, &id)
+            match voices::info(scene.get(lua)?.borrow().is_playing(), &account, &id)
                 .map_err(mlua::Error::external)?
             {
                 Availability::Available(voice) => {

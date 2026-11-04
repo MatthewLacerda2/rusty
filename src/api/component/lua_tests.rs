@@ -1,12 +1,14 @@
 //! `Component.Get` / `Set` / `Fields` from Lua (#1369).
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
 use serde_json::Value;
 
 use super::register;
 use super::value::from_lua;
+use crate::api::bind;
 use crate::scene::authoring::fields::{Skip, KINDS};
 use crate::scene::authoring::{add_component, ComponentKind};
 use crate::scene::Scene;
@@ -18,14 +20,14 @@ fn run<R: mlua::FromLuaMulti>(chunk: &str) -> (Scene, mlua::Result<R>) {
     let id = scene.add_entity("Body".to_string());
     add_component(&mut scene, id, ComponentKind::RigidBody);
     add_component(&mut scene, id, ComponentKind::Light);
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
     lua.globals().set("id", id).unwrap();
-    let out = lua.scope(|s| {
-        register(&lua, s, &scene).unwrap();
+    let out = crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene)).unwrap();
         lua.load(chunk).eval::<R>()
     });
-    (scene.into_inner(), out)
+    (scene.take(), out)
 }
 
 fn error(chunk: &str) -> String {
@@ -117,11 +119,11 @@ fn every_component_round_trips_get_into_set_through_lua() {
     for add in ComponentKind::ALL {
         add_component(&mut scene, id, *add);
     }
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
     lua.globals().set("id", id).unwrap();
-    lua.scope(|s| {
-        register(&lua, s, &scene).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene)).unwrap();
         for kind in KINDS.iter().filter(|k| k.add.is_some()) {
             let before = (kind.read)(&scene.borrow().world, id);
             let got = format!(r#"return Component.Get(id, "{}")"#, kind.name);

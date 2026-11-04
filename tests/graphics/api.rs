@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{CameraComponent, PostProcessingComponent, Tonemap};
 use rusty::core::settings::quality::EffectQuality;
 use rusty::core::settings::GraphicsSettings;
@@ -41,38 +42,40 @@ fn bloom_and_color_round_trip() {
     let lua = Lua::new();
     let scene = scene_with_volume();
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
-    let app = RefCell::default();
+    let app = Rc::default();
 
-    lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
-        lua.load(
-            r#"
-            Graphics.SetBloomActive(true)
-            Graphics.SetBloomIntensity(3.5)
-            Graphics.SetExposure(1.25)
-            Graphics.SetGamma(2.0)
-            Graphics.SetTonemap("Reinhard")
-        "#,
-        )
-        .exec()
-        .unwrap();
-
-        let s = scene.borrow();
-        let id = s.entity_ids()[0];
-        let vc = s.world.post_processing(id).unwrap().clone();
-        assert!(vc.bloom.active);
-        assert_eq!(vc.bloom.intensity, 3.5);
-        assert_eq!(vc.exposure.fixed_ev, 1.25);
-        assert_eq!(vc.tonemapping.display_gamma, 2.0);
-        assert_eq!(vc.tonemapping.mode, Tonemap::Reinhard);
-
-        let read: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
-        assert!(read);
-        let tm: String = lua.load("return Graphics.GetTonemap()").eval().unwrap();
-        assert_eq!(tm, "Reinhard");
-        Ok(())
-    })
+    rusty::api::graphics::register(
+        &lua,
+        bind(&lua, &scene),
+        bind(&lua, &quality),
+        bind(&lua, &app),
+    )
     .unwrap();
+    lua.load(
+        r#"
+        Graphics.SetBloomActive(true)
+        Graphics.SetBloomIntensity(3.5)
+        Graphics.SetExposure(1.25)
+        Graphics.SetGamma(2.0)
+        Graphics.SetTonemap("Reinhard")
+    "#,
+    )
+    .exec()
+    .unwrap();
+
+    let s = scene.borrow();
+    let id = s.entity_ids()[0];
+    let vc = s.world.post_processing(id).unwrap().clone();
+    assert!(vc.bloom.active);
+    assert_eq!(vc.bloom.intensity, 3.5);
+    assert_eq!(vc.exposure.fixed_ev, 1.25);
+    assert_eq!(vc.tonemapping.display_gamma, 2.0);
+    assert_eq!(vc.tonemapping.mode, Tonemap::Reinhard);
+
+    let read: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
+    assert!(read);
+    let tm: String = lua.load("return Graphics.GetTonemap()").eval().unwrap();
+    assert_eq!(tm, "Reinhard");
 }
 
 #[test]
@@ -80,25 +83,27 @@ fn motion_blur_knobs_are_clamped() {
     let lua = Lua::new();
     let scene = scene_with_volume();
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
-    let app = RefCell::default();
+    let app = Rc::default();
 
-    lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
-        let set = "Graphics.SetMotionBlurActive(true); Graphics.SetMotionBlurSamples(99); \
-            Graphics.SetMotionBlurIntensity(-1); Graphics.SetMotionBlurMaxLength(5)";
-        lua.load(set).exec().unwrap();
-        let s = scene.borrow();
-        let id = s.entity_ids()[0];
-        let cam = s.world.camera(id).unwrap().clone();
-        assert!(cam.motion_blur_active);
-        assert_eq!(cam.motion_blur_samples, 32, "clamped into 2..=32");
-        assert_eq!(
-            (cam.motion_blur_intensity, cam.motion_blur_max_length),
-            (0.0, 0.2)
-        );
-        Ok(())
-    })
+    rusty::api::graphics::register(
+        &lua,
+        bind(&lua, &scene),
+        bind(&lua, &quality),
+        bind(&lua, &app),
+    )
     .unwrap();
+    let set = "Graphics.SetMotionBlurActive(true); Graphics.SetMotionBlurSamples(99); \
+        Graphics.SetMotionBlurIntensity(-1); Graphics.SetMotionBlurMaxLength(5)";
+    lua.load(set).exec().unwrap();
+    let s = scene.borrow();
+    let id = s.entity_ids()[0];
+    let cam = s.world.camera(id).unwrap().clone();
+    assert!(cam.motion_blur_active);
+    assert_eq!(cam.motion_blur_samples, 32, "clamped into 2..=32");
+    assert_eq!(
+        (cam.motion_blur_intensity, cam.motion_blur_max_length),
+        (0.0, 0.2)
+    );
 }
 
 #[test]
@@ -106,15 +111,17 @@ fn getters_return_defaults_with_no_active_volume() {
     let lua = Lua::new();
     let scene = Rc::new(RefCell::new(Scene::new()));
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
-    let app = RefCell::default();
+    let app = Rc::default();
 
-    lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, &scene, &quality, &app).unwrap();
-        let bloom: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
-        assert!(!bloom);
-        let gamma: f32 = lua.load("return Graphics.GetGamma()").eval().unwrap();
-        assert_eq!(gamma, 1.0, "display gamma is neutral at 1.0 (#415)");
-        Ok(())
-    })
+    rusty::api::graphics::register(
+        &lua,
+        bind(&lua, &scene),
+        bind(&lua, &quality),
+        bind(&lua, &app),
+    )
     .unwrap();
+    let bloom: bool = lua.load("return Graphics.GetBloomActive()").eval().unwrap();
+    assert!(!bloom);
+    let gamma: f32 = lua.load("return Graphics.GetGamma()").eval().unwrap();
+    assert_eq!(gamma, 1.0, "display gamma is neutral at 1.0 (#415)");
 }

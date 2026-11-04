@@ -6,13 +6,12 @@
 //! through. Unity: the `*Collider` component's size fields and its
 //! `sharedMaterial` (`PhysicMaterial`).
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::{CapsuleAxis, ColliderShape, CombineMode, PhysicsMaterial};
 use crate::scene::authoring::physics::collider as collider_ops;
 use crate::scene::Scene;
@@ -22,26 +21,19 @@ fn err(msg: String) -> mlua::Error {
 }
 
 /// Register the collider shape + material accessors onto the `Physics` table.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    register_shape(scope, table, scene)?;
-    register_material(scope, table, scene)
+pub(super) fn register(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
+    register_shape(lua, table, scene)?;
+    register_material(lua, table, scene)
 }
 
 /// `GetColliderShape(id)` → a `{ kind = .., .. }` table (or `nil` without a
 /// collider); `SetColliderShape(id, shape)` takes the same table back.
-fn register_shape<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_shape(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetColliderShape",
-        scope.create_function(|lua, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let shape = scene
                 .borrow()
                 .world
@@ -53,7 +45,8 @@ fn register_shape<'scope>(
     put(
         table,
         "SetColliderShape",
-        scope.create_function(|_, (id, t): (EntityArg, Table)| {
+        lua.create_function(move |lua, (id, t): (EntityArg, Table)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Physics", "SetColliderShape")?;
             let shape = shape_from_table(&t)?;
             let mut scene = scene.borrow_mut();
@@ -156,15 +149,13 @@ fn shape_from_table(t: &Table) -> mlua::Result<ColliderShape> {
 /// `GetPhysicsMaterial(id)` → `friction, bounciness, friction_combine,
 /// bounce_combine` (the defaults without a collider);
 /// `SetPhysicsMaterial(id, friction, bounciness [, friction_combine [, bounce_combine]])`.
-fn register_material<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_material(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
+    type MaterialArgs = (EntityArg, f32, f32, Option<String>, Option<String>);
     put(
         table,
         "GetPhysicsMaterial",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let m = scene
                 .borrow()
                 .world
@@ -182,15 +173,9 @@ fn register_material<'scope>(
     put(
         table,
         "SetPhysicsMaterial",
-        scope.create_function(
-            |_,
-             (id, friction, bounciness, fc, bc): (
-                EntityArg,
-                f32,
-                f32,
-                Option<String>,
-                Option<String>,
-            )| {
+        lua.create_function(
+            move |lua, (id, friction, bounciness, fc, bc): MaterialArgs| {
+                let scene = &*scene.get(lua)?;
                 let id = id.live("Physics", "SetPhysicsMaterial")?;
                 if !friction.is_finite() || !bounciness.is_finite() {
                     return Err(err(

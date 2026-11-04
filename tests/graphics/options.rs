@@ -4,23 +4,27 @@
 //! switch, and an unknown name is an error naming the valid ones.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::core::application::Application;
 use rusty::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::Scene;
 
 /// Run `f` with a `Graphics` namespace over fresh cells.
-fn with_graphics(f: impl FnOnce(&Lua, &RefCell<GraphicsSettings>, &RefCell<Application>)) {
-    let (lua, scene) = (Lua::new(), RefCell::new(Scene::new()));
-    let (graphics, app) = (RefCell::default(), RefCell::new(Application::new()));
-    lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, &scene, &graphics, &app).unwrap();
-        f(&lua, &graphics, &app);
-        Ok(())
-    })
+fn with_graphics(f: impl FnOnce(&Lua, &Rc<RefCell<GraphicsSettings>>, &Rc<RefCell<Application>>)) {
+    let (lua, scene) = (Lua::new(), Rc::new(RefCell::new(Scene::new())));
+    let (graphics, app) = (Rc::default(), Rc::new(RefCell::new(Application::new())));
+    rusty::api::graphics::register(
+        &lua,
+        bind(&lua, &scene),
+        bind(&lua, &graphics),
+        bind(&lua, &app),
+    )
     .unwrap();
+    f(&lua, &graphics, &app);
 }
 
 #[test]

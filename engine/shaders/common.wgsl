@@ -51,13 +51,16 @@ struct CameraUniforms {
     // x: this camera's index in its stack, bottom to top (#1436), what the velocity
     // target's `.a` carries so motion blur orders a higher camera in front. y: last
     // frame's game time (#1524), what the motion vectors move vertex blocks with (this
-    // frame's `time` where the view has no last frame). zw: the march a `receive_ssr`
-    // translucent traces (#1570), its step count and step length; zero where the
-    // camera runs no SSR (`render::postfx::effects::ssr::transparent`).
+    // frame's `time` where the view has no last frame). zw: unused.
     stack: vec4<f32>,
     // `view_proj`'s inverse (#1523): a transparent surface rebuilds the world point
     // of the opaque depth behind it from it, for refraction and absorption.
     inv_view_proj: mat4x4<f32>,
+    // What a `receive_ssr` translucent traces (#1570, #1736): x its march's step
+    // count, y its step length, z the *Minimum Smoothness* it reflects down to, w the
+    // smoothness it fades in over above that (`ssr::fade`); all zero where the camera
+    // runs no SSR (`render::postfx::effects::ssr::transparent`).
+    ssr: vec4<f32>,
 };
 
 // The forward lighting uniform (group 0, binding 1) and its light records. Shared
@@ -129,6 +132,9 @@ struct LocalLight {
     shadow: u32,
     // 1.0 for a `Baked` light (#438): a lightmapped surface skips its direct light.
     baked: f32,
+    // Camera distance past which its shadow is not sampled (#1712); 0 never fades.
+    shadow_fade: f32,
+    _pad: vec2<f32>,
 };
 
 // The light cluster `world` falls in: its screen tile (from `view_proj`) and its

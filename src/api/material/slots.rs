@@ -13,20 +13,17 @@ use std::cell::RefCell;
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
 /// Register the slot verbs onto the `Material` `table`.
-pub fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "Get",
-        scope.create_function(|_, id: EntityArg| {
-            Ok(mat_ops::keys(&scene.borrow().world, id.read())
+        lua.create_function(move |lua, id: EntityArg| {
+            Ok(mat_ops::keys(&scene.get(lua)?.borrow().world, id.read())
                 .into_iter()
                 .next())
         }),
@@ -34,24 +31,24 @@ pub fn register<'scope>(
     put(
         table,
         "GetAll",
-        scope.create_function(|_, id: EntityArg| {
-            Ok(mat_ops::keys(&scene.borrow().world, id.read()))
+        lua.create_function(move |lua, id: EntityArg| {
+            Ok(mat_ops::keys(&scene.get(lua)?.borrow().world, id.read()))
         }),
     )?;
     put(
         table,
         "Set",
-        scope.create_function(|_, (id, key): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, key): (EntityArg, String)| {
             let id = id.live("Material", "Set")?;
-            set(scene, id, 0, &key)
+            set(&*scene.get(lua)?, id, 0, &key)
         }),
     )?;
     put(
         table,
         "SetAt",
-        scope.create_function(|_, (id, slot, key): (EntityArg, usize, String)| {
+        lua.create_function(move |lua, (id, slot, key): (EntityArg, usize, String)| {
             let id = id.live("Material", "SetAt")?;
-            set(scene, id, slot, &key)
+            set(&*scene.get(lua)?, id, slot, &key)
         }),
     )
 }

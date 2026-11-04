@@ -1,9 +1,11 @@
 //! `Physics.*` bindings vs `authoring::physics::rigidbody`.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::CollisionDetection;
 use rusty::scene::authoring::physics::rigidbody as rb_ops;
 use rusty::scene::Scene;
@@ -19,25 +21,22 @@ fn entity_with_rb(scene: &mut Scene, name: &str) -> u32 {
 
 #[test]
 fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let via_lua = entity_with_rb(&mut scene.borrow_mut(), "ViaLua");
     let via_op = entity_with_rb(&mut scene.borrow_mut(), "ViaOp");
 
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::physics::register(&lua, s, &scene).unwrap();
-        lua.load(format!(
-            r#"
-            Physics.SetVelocity({via_lua}, 1.0, 2.0, 3.0)
-            Physics.SetKinematic({via_lua}, true)
-            Physics.SetAngularVelocity({via_lua}, 0.0, 4.0, 0.0)
-            Physics.SetCollisionDetection({via_lua}, "Continuous")
-        "#
-        ))
-        .exec()
-        .unwrap();
-        Ok(())
-    })?;
+    rusty::api::physics::register(&lua, bind(&lua, &scene)).unwrap();
+    lua.load(format!(
+        r#"
+        Physics.SetVelocity({via_lua}, 1.0, 2.0, 3.0)
+        Physics.SetKinematic({via_lua}, true)
+        Physics.SetAngularVelocity({via_lua}, 0.0, 4.0, 0.0)
+        Physics.SetCollisionDetection({via_lua}, "Continuous")
+    "#
+    ))
+    .exec()
+    .unwrap();
 
     {
         let mut sc = scene.borrow_mut();
@@ -62,14 +61,14 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
 /// write through theirs and the getters read them back (#1365).
 #[test]
 fn mass_gravity_and_trigger_reach_their_ops() -> Result<(), Box<dyn std::error::Error>> {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let id = entity_with_rb(&mut scene.borrow_mut(), "Body");
     let collider = rusty::scene::authoring::default_collider();
     scene.borrow_mut().world.set_collider(id, Some(collider));
 
     let lua = Lua::new();
-    let read: (f32, f32, bool, bool, f32) = lua.scope(|s| {
-        rusty::api::physics::register(&lua, s, &scene).unwrap();
+    let read: (f32, f32, bool, bool, f32) = crate::lua::attempt(|| {
+        rusty::api::physics::register(&lua, bind(&lua, &scene)).unwrap();
         lua.load(format!(
             r#"
             local before = Physics.GetMass({id})

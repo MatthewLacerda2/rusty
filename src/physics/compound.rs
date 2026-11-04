@@ -41,18 +41,30 @@ pub(super) fn body_owner(scene: &Scene, id: u32) -> u32 {
     scene.world.body_carrier(id).unwrap_or(id)
 }
 
+/// The owner whose body `id`'s collider joins; `None` when `id` puts no collider
+/// in the plan: it has neither an active Collider nor a CharacterController (whose
+/// capsule is a collider of its own). The one membership rule: [`plan`] is built
+/// from it, and the change watch checks a named id against it (#1707).
+pub(super) fn member(scene: &Scene, id: u32) -> Option<u32> {
+    let w = &scene.world;
+    let collides = w.has_character_controller(id) || w.collider(id).is_some_and(|c| c.active);
+    collides.then(|| body_owner(scene, id))
+}
+
 /// Group every active collider — and every CharacterController's capsule — under
-/// the body that will carry it.
+/// the body that will carry it ([`member`]).
 pub(super) fn plan(scene: &Scene) -> BodyPlan {
     let mut plan = BodyPlan::new();
     let world = &scene.world;
+    // A character's own Collider is its capsule: listed once, with the characters.
     let colliders = world
         .ids_with_collider()
         .into_iter()
-        .filter(|&id| world.collider(id).is_some_and(|c| c.active))
         .filter(|&id| !world.has_character_controller(id));
     for id in colliders.chain(world.ids_with_character_controller()) {
-        plan.entry(body_owner(scene, id)).or_default().push(id);
+        if let Some(owner) = member(scene, id) {
+            plan.entry(owner).or_default().push(id);
+        }
     }
     for (&owner, ids) in plan.iter_mut() {
         // Stable partition: the owner's own collider first, others in order.

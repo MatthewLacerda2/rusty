@@ -113,7 +113,8 @@ fn gpu_the_probe_step_runs_across_frames() {
     scene.lighting_settings.reflections.resolution = 16;
     for x in [0.0, 4.0] {
         let at = glam::Vec3::new(x, 1.0, 0.0);
-        scene.reflection_probes.add(at, glam::Vec3::splat(2.0));
+        let i = scene.reflection_probes.add(at, glam::Vec3::splat(2.0));
+        scene.reflection_probes.edit(i, |p| p.manual = true);
     }
     scene.save_to_file(&path).unwrap();
     let mut console = ConsoleLogs::new();

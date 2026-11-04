@@ -32,10 +32,11 @@ class Line:
             self.since.pop(gone)
             self.passes.pop(gone, None)
 
-    def took(self, number: int) -> None:
-        """`number` was taken: everyone else in line was passed over once."""
+    def took(self, *numbers: int) -> None:
+        """`numbers` were taken in one take (a merge train's members, #1785):
+        everyone else in line was passed over once, and none of them was."""
         for other in self.since:
-            if other != number:
+            if other not in numbers:
                 self.passes[other] = self.passes.get(other, 0) + 1
 
     def aged(self, now: float) -> set[int]:
