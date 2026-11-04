@@ -69,7 +69,10 @@ shade at once; the last active one is the sun that casts the cascaded shadows. O
 the last active ambient light counts: it replaces the scene's ambient, a `Gradient`
 one included, with its single colour (`Lighting.md`, *Environment*).
 
-**Shadows.** The sun (slot 0 above) always casts its cascaded shadows. A point or
+**Shadows.** The sun (slot 0 above) always casts its cascaded shadows. A `Baked`
+sun is not drawn live, so it is no sun here: outside a bake capture, which does draw
+it live and shadow it, a scene with no live directional light fits, draws and samples
+no cascade at all (#1713). A point or
 spot light casts only when `SetCastShadows(id, true)` (off by default, as in Unity:
 each one costs a depth pass per tile). Shadowed point and spot lights share one
 2048² **shadow atlas** (#468): a spotlight takes one tile, a point light six (one
