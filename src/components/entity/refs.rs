@@ -3,9 +3,10 @@
 //! An entity names others by id in a handful of component fields. Every follower of
 //! those references goes through this walk, never a list of its own: a prefab save,
 //! stamp or propagation remapping them ([`EntityRefs::remap_refs`]), a despawn clearing
-//! the ones that name the dead id (`ecs::World::forget_references`), a save keeping a
-//! bone by name (`scene::skeleton::bone_refs`), and the property test that checks no
-//! dead id survives (`scene::skeleton`'s `despawn_refs_tests`).
+//! the ones that name the dead id (`ecs::World::forget_references`, found through
+//! the World's reverse index), a save keeping a bone by name
+//! (`scene::skeleton::bone_refs`), and the property test that checks no dead id
+//! survives (`scene::skeleton`'s `despawn_refs_tests`).
 //!
 //! The components that hold ids are listed once, in [`with_ref_components`]; each
 //! implements [`EntityRefs`]. The leaves, as JSON pointers under the entity:
@@ -23,7 +24,7 @@
 //! Not walked: `MeshComponent`'s `skeleton.bones`, one `Option` per joint slot
 //! (runtime-only, never saved, re-bound by name on load). They join the clearing
 //! pass only: `MeshComponent` overrides [`EntityRefs::forget`] and
-//! [`EntityRefs::names_any`], so a despawn or a load that leaves a bone behind sets
+//! [`EntityRefs::each_held`], so a despawn or a load that leaves a bone behind sets
 //! its slot to `None`, missing (#1273). Nor the runtime-only `OffMeshLinkData::owner`
 //! and `SubEmitEvent::target`, never saved and read through `World::contains`.
 //! A new component field that holds an entity id joins its component's
@@ -66,11 +67,11 @@ pub trait EntityRefs {
         });
     }
 
-    /// Whether any reference names an entity `dead` holds for.
-    fn names_any(&self, dead: &dyn Fn(u32) -> bool) -> bool {
-        let mut hit = false;
-        self.each_ref(&mut |_, r| hit |= dead(r));
-        hit
+    /// Every id the component holds, the clearing-only slots included (a skinned
+    /// mesh's bones): what [`EntityRefs::forget`] reaches, and what the World's
+    /// reverse index keys (`ecs::despawn`, #1708).
+    fn each_held(&self, visit: &mut dyn FnMut(u32)) {
+        self.each_ref(&mut |_, r| visit(r));
     }
 
     /// A value with at least one id slot of each kind it can hold, for the tests that

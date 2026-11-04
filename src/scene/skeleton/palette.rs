@@ -20,9 +20,7 @@ impl Scene {
             let Some(palette) = self.skin_palette(owner) else {
                 continue;
             };
-            if let Some(mut mesh) = self.world.mesh_mut(owner) {
-                mesh.pose_palette = palette;
-            }
+            self.world.set_pose_palette(owner, palette);
         }
     }
 
