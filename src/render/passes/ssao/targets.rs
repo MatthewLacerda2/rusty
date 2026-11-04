@@ -86,6 +86,12 @@ impl SsaoTargets {
         }
     }
 
+    /// The full-resolution occlusion the forward pass reads (SSIL's group 3 binds
+    /// it beside its own result, #1750).
+    pub(crate) fn ao(&self) -> &wgpu::TextureView {
+        &self.ao
+    }
+
     /// Where the blur writes: the low-resolution target the upsample reads, or the
     /// result itself at full resolution.
     pub(super) fn blur_target(&self) -> &wgpu::TextureView {

@@ -114,6 +114,7 @@ end
 | `shadow_atlas_tiles` / `shadow_atlas_texels` | atlas tiles drawn (one per spotlight, six per point light) / the texels they cover, out of 2048² = 4194304 (#468) |
 | `shadow_atlas_cached` / `shadow_atlas_rebaked` | atlas tiles whose static casters came from the cache / were re-drawn this frame (#694). A tile re-bakes when its light moves or turns, when it gets another place or size in the atlas (a size change past the hysteresis, or a repack, #1711), or when the editor changes static geometry; a still scene, or a light blinking off and on, reads all cached |
 | `ssao_samples` | depth taps the SSAO pass traced (occlusion texels × the samples its quality picks, #436, #1522); `0` when AO is off |
+| `ssil_samples` | samples the SSIL gather took (its texels × the samples its quality picks, #1750); `0` when SSIL is off |
 | `particles_drawn` | particles the renderer drew — sprite instances plus mesh particles, summed over the camera stack (#440). Their draws are in `draw_calls`: one per merged sprite batch, one per instanced run of mesh particles |
 | `render_texture_draws` | cameras drawn into render textures this frame (#430) — their geometry is already in `draw_calls` / `triangles`; a camera skipped (unreferenced, or between its `update_every` frames) is not counted |
 | `velocity_passes` | opaque scene passes that wrote a velocity buffer (#1435): one per stacked camera of each view whose base camera runs motion blur, depth of field or SSR (SSR's holds only depths, #1526); `0` when none does |
@@ -143,6 +144,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `ssao_prepass` | the SSAO depth prepass (#1578): every visible solid's depth into the view's depth target, which a primed forward pass starts from |
 | `ssao` | the SSAO occlusion pass, at its quality's resolution |
 | `ssao_blur` | the SSAO blur at the occlusion's resolution, and the depth-aware upsample to full resolution when that is lower |
+| `ssil` | screen-space indirect lighting (#1750): its gather, blur, accumulate and upsample before the base camera's opaque pass, and the source it keeps after it; the depth prepass it draws on a camera without SSAO is under `ssao_prepass` |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
 | `ssr` | screen-space reflections (#1526): the march over the base camera's opaque image; the copy of that image it reads and its mip pyramid (#1736) are recorded before the timed pass, untimed, so they aren't counted |
 | `transparent` | translucent solids |

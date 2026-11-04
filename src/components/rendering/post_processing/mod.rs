@@ -20,6 +20,7 @@ mod grading;
 mod lens;
 mod lens_flare;
 mod lighting;
+mod ssil;
 mod ssr;
 
 // sorted: each module's settings, re-exported by name
@@ -34,6 +35,7 @@ pub use grading::{
 pub use lens::{ChromaticAberration, FilmGrain, Vignette};
 pub use lens_flare::LensFlare;
 pub use lighting::{ShadowSettings, SsaoSettings};
+pub use ssil::Ssil;
 pub use ssr::Ssr;
 
 /// A post-processing volume. Every field defaults when a file leaves it out, so a
@@ -58,6 +60,7 @@ pub struct PostProcessingComponent {
     pub film_grain: FilmGrain,
     pub lens_flare: LensFlare,
     pub lift_gamma_gain: LiftGammaGain,
+    pub ssil: Ssil,
     pub ssr: Ssr,
     pub tonemapping: Tonemapping,
     pub vignette: Vignette,
@@ -89,6 +92,7 @@ impl Default for PostProcessingComponent {
             film_grain: Default::default(),
             lens_flare: Default::default(),
             lift_gamma_gain: Default::default(),
+            ssil: Default::default(),
             ssr: Default::default(),
             tonemapping: Default::default(),
             vignette: Default::default(),

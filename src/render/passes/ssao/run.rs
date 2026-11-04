@@ -3,7 +3,9 @@
 
 use super::{SsaoFrame, SsaoTargets, Stage};
 use crate::render::draw::batch::DrawBatch;
+use crate::render::draw::pass::ScenePassFrame;
 use crate::render::gpu::pipelines::surface::SolidPass;
+use crate::render::postfx::effects::ssil;
 use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
 
@@ -51,22 +53,46 @@ impl Renderer {
         c.ssao_samples += u64::from(w) * u64::from(h) * u64::from(frame.plan.quality.samples);
     }
 
-    /// The forward pass's group 3 for `view`: its AO when the SSAO passes ran this
-    /// camera (`ran`), else the white no-AO group.
+    /// Record `frame`'s screen-space passes ahead of its forward pass: SSAO's
+    /// prepass, occlusion and blur, then SSIL's gather over that prepass's depth
+    /// (#1750; it draws its own without SSAO).
+    pub(crate) fn record_screen_space(
+        &mut self,
+        view: &mut RenderView,
+        encoder: &mut wgpu::CommandEncoder,
+        frame: &ScenePassFrame,
+        solids: &[DrawBatch],
+    ) {
+        if let Some(ssao) = &frame.ssao {
+            self.record_ssao(view, encoder, ssao, solids);
+        }
+        if let Some(ssil) = &frame.ssil {
+            self.record_ssil(view, encoder, ssil, solids, frame.ssao.is_some());
+        }
+    }
+
+    /// The forward pass's group 3 for `view` under `frame`: SSIL's (with the AO
+    /// beside it) when SSIL ran this camera (#1750), else its AO when the SSAO
+    /// passes ran this camera, else the white no-AO group.
     pub(crate) fn scene_group3<'a>(
         &'a self,
         view: &'a RenderView,
-        ran: bool,
+        frame: &ScenePassFrame,
     ) -> &'a wgpu::BindGroup {
-        match (ran, &view.ssao) {
+        let ssil = ssil::forward_group(&view.post_fx).filter(|_| frame.ssil.is_some());
+        if let Some(group) = ssil {
+            return group;
+        }
+        match (frame.ssao.is_some(), &view.ssao) {
             (true, Some(targets)) => &targets.forward_group,
             _ => &self.shadow_bind_group,
         }
     }
 
     /// The solids' depth alone into `depth` (the view's, #1578), through the forward
-    /// vertex stage. A primed forward pass loads it; any other clears it.
-    fn record_prepass(
+    /// vertex stage. A primed forward pass loads it; any other clears it. SSIL draws
+    /// it too, on a camera SSAO skips (#1750).
+    pub(crate) fn record_prepass(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         depth: &wgpu::TextureView,

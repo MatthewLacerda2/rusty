@@ -48,6 +48,9 @@ pub(crate) struct CameraUniform {
     /// The transparent SSR trace (#1570, #1736): steps, step length and the minimum
     /// smoothness it reflects down to, then a pad; zero where the camera traces none.
     pub ssr: [f32; 4],
+    /// `x`: 1 in the opaque pass of a base camera running SSIL (#1750), which then
+    /// adds its bounce and writes its realtime share; `yzw` unused.
+    pub ssil: [f32; 4],
     /// `x`: the material maps' mip bias (#1702), negative while TAA upscales the
     /// view (`log2(scene/output)`), else 0, which samples exactly as without one.
     /// `yzw`: unused.
@@ -131,7 +134,10 @@ pub(crate) struct DirectionalLightUniform {
     /// 1.0 for a `Baked` light (#438): a lightmapped surface already carries its
     /// direct light, so it skips this one.
     pub baked: f32,
-    pub _pad2: [f32; 3],
+    /// 1.0 when the scene's lightmap bake took this light in (#1750,
+    /// `LightmapSet::baked_light`): SSIL gathers none of its light.
+    pub bounce_baked: f32,
+    pub _pad2: [f32; 2],
 }
 
 /// The most directional lights shaded at once (#434); slot 0 is the sun, the one
@@ -208,7 +214,10 @@ pub(crate) struct InstanceData {
     // The Light Probe Proxy Volume it reads (#1672): where it starts in the frame's
     // proxy array (`draw::proxy_volume`), plus one; 0 for none.
     pub proxy_volume: u32,
-    pub _motion_pad: u32,
+    // 1 when the scene holds a lightmap bake that took this mesh in
+    // (`BakeScene::takes_mesh`, #1750): its emission is in the bake, so SSIL
+    // gathers none of it, lightmap UVs or not.
+    pub in_bake: u32,
     pub sh: [[f32; 4]; 9],
 }
 
@@ -226,7 +235,7 @@ impl InstanceData {
         prev_bone_base: 0,
         motion: 0,
         proxy_volume: 0,
-        _motion_pad: 0,
+        in_bake: 0,
         sh: [[0.0; 4]; 9],
     };
 }
