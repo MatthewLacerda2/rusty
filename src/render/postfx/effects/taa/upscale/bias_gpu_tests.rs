@@ -13,9 +13,10 @@ use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::Scene;
 
 /// The first upscaled frame's checker contrast must be this many times the
-/// unbiased frame's. Measured on lavapipe: 14.9 against 0.9, and 0.9 with
-/// `camera.lod.x` forced to 0 in `forward::mapping::lookup`.
-const FACTOR: f64 = 3.0;
+/// unbiased frame's. Measured: 14.9 against 0.9 on lavapipe, 2.9 against 0.9 on
+/// Metal (where the one jittered sample lands on the checker decides how much of it
+/// shows); with `camera.lod.x` forced to 0 in `forward::mapping::lookup`, 0.9.
+const FACTOR: f64 = 2.0;
 
 /// A 320×320 emissive checker of single texels: about two texels a scene pixel on
 /// the wall below at 0.5, so its footprint reads mip 1, which is flat grey, and
