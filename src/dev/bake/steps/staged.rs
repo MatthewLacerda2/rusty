@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use glam::Vec3;
 
+use crate::render::ibl::reflection_bake::cube_file;
 use crate::scene::lighting::reflection_probe::clamp_resolution;
 use crate::scene::{ReflectionProbe, Scene};
 
@@ -56,7 +57,7 @@ fn inputs((p, resolution): &(ReflectionProbe, u32)) -> BakeInputs {
 }
 
 /// Cubemaps baked but not applied: each one at `<final>.baking`, moved over
-/// `reflection_probe_<i>.ktx2` on [`commit`](Self::commit). Whatever is still staged
+/// `<scene>.reflections/reflection_probe_<i>.ktx2` on [`commit`](Self::commit). Whatever is still staged
 /// when the bake is dropped is deleted, so a dropped bake leaves no file behind.
 #[derive(Default)]
 pub(super) struct StagedCubemaps {
@@ -74,9 +75,10 @@ impl StagedCubemaps {
 
     /// Stage the next probe's cube in `dir`.
     pub(super) fn write(&mut self, dir: &Path, bytes: &[u8]) -> Result<(), String> {
-        let name = format!("reflection_probe_{}.ktx2", self.files.len());
-        let target = dir.join(&name);
-        let staged = dir.join(format!("{name}.baking"));
+        let target = cube_file(dir, self.files.len());
+        let mut staged = target.clone().into_os_string();
+        staged.push(".baking");
+        let staged = PathBuf::from(staged);
         std::fs::write(&staged, bytes).map_err(|e| {
             format!(
                 "Failed to write reflection cubemap {}: {e}",
