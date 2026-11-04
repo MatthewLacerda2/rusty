@@ -287,7 +287,8 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   **normal-mapped** normal faces that direction, so bumps, tiles and panel seams read
   under baked light as they do under realtime light (a surface without a normal map
   keeps its baked diffuse exactly as a non-directional bake gives it). Where `Baked`
-  lights reach a texel the direction is theirs, so there a normal map reshapes the
+  lights supply a quarter or more of a texel's light the direction is theirs (eased
+  toward the mean of all its light below that), so there a normal map reshapes the
   texel's bounce by the lamp too. Each texel also stores its **lamp share**, how much
   of its light is `Baked` lights' direct light from one way, which gives a glossy
   surface one specular highlight from those lights ([`Light`](Light.md), #1695) and
