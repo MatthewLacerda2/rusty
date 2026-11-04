@@ -3,6 +3,8 @@
 
 use glam::Vec3;
 
+use super::cone::{Bounds, Cone, WIDEST_CULLED_CONE};
+
 use crate::components::LightComponent;
 use crate::scene::{LightType, Scene};
 
@@ -18,7 +20,8 @@ pub(crate) const NO_SHADOW: u32 = u32::MAX;
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct LocalLight {
     pub position: [f32; 3],
-    /// Past this distance the light contributes nothing; also its binning radius.
+    /// Past this distance the light contributes nothing; the per-camera cut ranks
+    /// it by this sphere.
     pub range: f32,
     pub color: [f32; 3],
     pub intensity: f32,
@@ -33,6 +36,10 @@ pub(crate) struct LocalLight {
     pub shadow: u32,
     /// 1.0 for a `Baked` light (#438): lightmapped surfaces skip its direct light.
     pub baked: f32,
+    /// The camera distance past which its shadow is not sampled (#1712,
+    /// `LightComponent::shadow_fade_distance`); `0` never fades.
+    pub shadow_fade: f32,
+    pub _pad: [f32; 3],
 }
 
 impl LocalLight {
@@ -69,6 +76,10 @@ impl LocalLight {
             outer_cone: f32::to_radians(cones.1).cos(),
             shadow: NO_SHADOW,
             baked: f32::from(u8::from(light.effective_mode().bakes_direct())),
+            shadow_fade: Some(light.shadow_fade_distance)
+                .filter(|d| d.is_finite() && *d > 0.0)
+                .unwrap_or(0.0),
+            _pad: [0.0; 3],
         })
     }
 
@@ -78,17 +89,44 @@ impl LocalLight {
         self.intensity * crate::core::color::luminance(self.color)
     }
 
-    /// The bounding sphere the binner tests: centre and range. A spotlight is
-    /// bounded by its whole range sphere, which is conservative.
+    /// The light's range sphere: centre and range. What every per-camera cut
+    /// (the binner's and the shadow atlas's) ranks by.
     pub(crate) fn sphere(&self) -> (Vec3, f32) {
         (Vec3::from(self.position), self.range)
+    }
+
+    /// What the binner tests (#1712): the range [`Self::sphere`], and for a
+    /// spotlight its [`Cone`], which decides which clusters list it once kept. A
+    /// cone wider than [`WIDEST_CULLED_CONE`] (an Area light's 90° stand-in among
+    /// them) gets no cone and lists by its range sphere alone.
+    pub(crate) fn bounds(&self) -> Bounds {
+        let (apex, range) = self.sphere();
+        let axis = Vec3::from(self.direction);
+        let cos = self.outer_cone;
+        let culled = self.kind == KIND_SPOT
+            && cos >= WIDEST_CULLED_CONE.to_radians().cos()
+            && cos <= 1.0
+            && axis.is_finite();
+        let cone = culled.then(|| Cone {
+            apex,
+            axis,
+            range,
+            cos,
+            sin: (1.0 - cos * cos).max(0.0).sqrt(),
+        });
+        Bounds {
+            sphere: (apex, range),
+            cone,
+        }
     }
 }
 
 /// Every active point and spot light in the scene that the frame (or, with
 /// `capture`, a bake capture) draws live (`LightMode::renders_live`, #809), in entity
 /// order, each with whether it asks for a shadow (`LightComponent::cast_shadows`,
-/// #468). The one place `Baked` local lights leave the realtime path.
+/// #468). The one place `Baked` local lights leave the realtime path. A capture
+/// takes no shadow fade (#1712): its camera is a probe, not the player, so a
+/// fade measured from it would bake a lamp unshadowed through walls for good.
 pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, bool)> {
     scene
         .world
@@ -106,7 +144,11 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
                 scene.world.world_position(id),
                 scene.world.transform_direction(id, Vec3::NEG_Z),
             );
-            Some((LocalLight::new(at, forward, &light)?, light.cast_shadows))
+            let mut local = LocalLight::new(at, forward, &light)?;
+            if capture {
+                local.shadow_fade = 0.0;
+            }
+            Some((local, light.cast_shadows))
         })
         .collect()
 }

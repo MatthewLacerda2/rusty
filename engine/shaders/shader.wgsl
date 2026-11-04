@@ -1,4 +1,4 @@
-#import common::{DecalSurface, NO_SHADOW, PI, VertexInput, apply_fog, blend_joints, fog_factor, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow}
+#import common::{DecalSurface, PI, VertexInput, apply_fog, blend_joints, fog_factor, cluster_index, local_light_radiance}
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
 #import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, draw, instances, lighting, local_lights, material, normal_to_world, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
@@ -6,6 +6,7 @@
 #import forward::transparent
 #import forward::mapping
 #import forward::lighting::{LIGHTMAP_RGBM_RANGE, ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, flat_ambient, fold_decals, lightmap_direction_rebalance, probe_irradiance}
+#import forward::local_shadow::local_shadow
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
@@ -450,15 +451,14 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         if (all(radiance == vec3<f32>(0.0))) {
             continue;
         }
-        // Its shadow, when the atlas holds one (#468), off the back face too for a
+        // Its shadow (#468, faded by distance #1712), off the back face too for a
         // translucent surface.
-        let tile = local_shadow_tile(light, in.world_position);
         var lit = 1.0;
         var back_lit = 1.0;
-        if (tile != NO_SHADOW && m.receive_shadows == 1u) {
-            lit = sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, N);
+        if (m.receive_shadows == 1u) {
+            lit = local_shadow(light, in.world_position, N);
             if (translucent) {
-                back_lit = sample_local_shadow(shadow_tiles[tile], t_shadow_atlas, s_shadow, light.position, in.world_position, -N);
+                back_lit = local_shadow(light, in.world_position, -N);
             }
         }
         let L = normalize(light.position - in.world_position);

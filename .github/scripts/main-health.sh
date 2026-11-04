@@ -8,8 +8,9 @@
 # One open issue per workflow, found by a hidden marker in its body. A red run
 # opens it, or comments on it when the set of failing jobs changed since the
 # last note. A green run comments once, and never closes it: green here can be
-# vacuous (a docs-only merge skips the build steps; the nightly does not
-# rebuild), so the fix PR closes the issue, not this script.
+# vacuous (a docs-only merge skips the build steps, and so does a push whose
+# tree its PR run already built, #1784), so the fix PR closes the issue, not
+# this script.
 set -euo pipefail
 
 WATCHED='ci lint mutants-sweep coverage windows cargo-test'
@@ -137,7 +138,8 @@ if [[ $state == red && -z $issue ]]; then
     echo 'goes red too: Windows is not a shipped platform, so this never blocked a merge, but it is'
     echo 'how Windows rot is caught before it piles up (#741). Later red runs comment here when the set of'
     echo 'failing jobs changes. A green run leaves a note but does not close this: green can be'
-    echo 'vacuous (a docs-only merge skips the build steps; the nightly does not rebuild), so close'
+    echo 'vacuous (a docs-only merge skips the build steps, and so does a push whose tree its PR'
+    echo 'run already built, #1784), so close'
     echo 'it from the PR that fixes it.'
     echo ''
     # The `Kind:` line every bug carries (#1173): this issue is its workflow's root.
@@ -163,7 +165,7 @@ fi
     echo "Still red, and the failing jobs changed:"
   else
     echo "This run was green. Check that it re-ran what failed before closing — a docs-only merge"
-    echo "skips the build steps and the nightly does not rebuild."
+    echo "skips the build steps, and so does a push whose tree its PR run built (#1784)."
   fi
   echo ''
   details
