@@ -145,7 +145,7 @@ pub fn advance(
 }
 
 /// What one [`step`] did: the events crossed and the root motion (#1745) the
-/// playheads' travel amounts to, in the skinned entity's space — `None` when
+/// playheads' travel amounts to, in the model's Y-up space — `None` when
 /// nothing moved or no motion playing keys the root bone.
 #[derive(Debug, Default)]
 pub struct Stepped {

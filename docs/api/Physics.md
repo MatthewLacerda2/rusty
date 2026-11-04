@@ -329,7 +329,7 @@ card) fits one collider per bone of `id`'s skinned mesh and returns
   most. A bone's hitbox is the box around its vertices in the bone's own frame:
   a **capsule** along the longest side, or a **box** when the cross-section is
   flat (a chest, a pelvis, a hand). A bone spanning less than `min_size` (model
-  units, default `0.08`) — a finger, an eye, a twist bone — hands its vertices to
+  units, so metres under a Blender export's 0.01 `Armature` too; default `0.08`) — a finger, an eye, a twist bone — hands its vertices to
   its parent, so the hand's hitbox covers the fingers. `bones = {"head", ..}`
   limits generation to those bones (the others fold into their nearest listed
   ancestor). Same skin, same hitboxes: regenerating refits the existing ones in
