@@ -61,3 +61,41 @@ fn control_clamps_out_of_range_values_and_tracks_liveness() {
     control.stop();
     assert!(!control.is_live());
 }
+
+/// A voice retuned while paused resumes on its new mix, not gliding from the old
+/// one (#1693): a muted pause menu never blips at full gain on unpause.
+#[test]
+fn a_voice_retuned_while_paused_resumes_on_its_new_mix() {
+    use crate::audio::backend::{AudioBackend, PlayParams, VoiceId};
+    use crate::audio::device::backend::backend_tests::{flat, rig};
+    use crate::audio::device::capture::RATE;
+    const BLOCK: usize = 128; // whole kira blocks, so no stale buffered frames
+    let mut b = rig(&[0.5]);
+    let params = PlayParams {
+        looping: true,
+        ..flat("clip")
+    };
+    assert!(b.play(VoiceId(1), &params));
+    b.device().render(BLOCK);
+    let paused = |m: VoiceMix| VoiceMix { paused: true, ..m };
+    let new = VoiceMix {
+        gain: 0.5,
+        pan: -1.0,
+        low_pass: 800.0,
+        ..VoiceMix::FLAT
+    };
+    b.set_mix(VoiceId(1), &paused(VoiceMix::FLAT));
+    b.device().render(BLOCK);
+    b.set_mix(VoiceId(1), &paused(new));
+    b.device().render(BLOCK);
+    b.set_mix(VoiceId(1), &new);
+    let first = b.device().render(1)[0];
+    let a = LowPass::coefficient(800.0, 1.0 / f64::from(RATE));
+    // The filter's state followed the dry (0.5, 0.5) while open, as it always has,
+    // so the closed filter starts from there; the pan sends it 0 on the right.
+    let mut filter = LowPass::default();
+    filter.process(None, (0.5, 0.5));
+    let (l, r) = filter.process(a, (0.5, 0.0));
+    let on_targets = (l * 0.5, r * 0.5);
+    assert_eq!(first, on_targets, "gain, pan and low-pass on their targets");
+}

@@ -19,7 +19,8 @@
 //! with the same API they get (`api::register`) plus the scenario-only `Harness`
 //! table (`dev::bridge`), and the same deterministic stdlib (#1408): no `os` /
 //! `io`, and `math.random` draws from the world's one seeded `Random` stream, so
-//! `results.json` is a pure function of the scenario.
+//! `results.json` is a pure function of the scenario. `require`, `dofile` and
+//! `loadfile` read against the project as in Play (#1717).
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -101,6 +102,13 @@ pub fn run_code(harness: Harness, code: &str, name: &str) -> Result<RunReport, S
     // `Random` too, and a scenario's draws are its inputs, as deterministic as
     // the rest of them.
     let lua = crate::scripting::sandboxed_vm()?;
+    // The gameplay VM's project-aware `require` / `dofile` / `loadfile` (#1717).
+    harness
+        .borrow()
+        .world
+        .borrow()
+        .script_manager()
+        .install_file_access(&lua)?;
     let exec = lua
         .scope(|scope| {
             api::register(&lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;

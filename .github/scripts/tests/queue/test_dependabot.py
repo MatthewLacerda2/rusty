@@ -17,7 +17,9 @@ from pathlib import Path
 from unittest import mock
 
 from merging.queue import cli, dependabot, gitio, outcomes, pulls, taking, update, waiting
+from merging.verdict import reviewed
 from merging.watch import board, handbacks, loop, order
+from tests.queue.fixtures import REVIEW
 
 
 SHA = "a" * 40
@@ -48,6 +50,7 @@ class OneDeadline(unittest.TestCase):
                 "headRefOid": SHA, "author": {"login": author}, "title": "t"}
         opts = cli.parse(["524", "--no-merge", "--deadline", "45"])
         with mock.patch.object(pulls, "look", return_value=pull), \
+            mock.patch.object(reviewed, "comments", return_value=REVIEW), \
             mock.patch.object(gitio, "git"), \
             mock.patch.object(dependabot, "bot_head", return_value=(SHA, [])), \
             mock.patch.object(update, "advance", return_value=(SHA, [])), \
@@ -96,7 +99,7 @@ class WorkflowBumps(unittest.TestCase):
             fx = argparse.Namespace(
                 pulls=pulls, issue_labels=dict, clashes=lambda p: set(),
                 main_conflicts=lambda p: {}, stale_code=list, stop_requested=bool, turn=lambda n, tick: taken.append(n) or (n, outcomes.MERGED, "why"), head=lambda n: None,
-                attempts=lambda n, sha: None, blocks=lambda issues: None,
+                attempts=lambda n, sha: None, blocks=lambda issues: None, decided=lambda n: None,
                 clock=lambda: now[0], sleep=sleep, say=lambda *a: said.append(a[0]),
                 memory=Path(tmp, handbacks.MEMORY), bots=BOTS, merged=outcomes.MERGED,
                 ends=set(), stops={outcomes.STOPPED}, skips={outcomes.NOT_READY},
