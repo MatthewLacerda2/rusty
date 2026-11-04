@@ -1,4 +1,4 @@
-//! src/physics/watch.rs — what changed since the last step, read from the World's
+//! src/physics/watch/ — what changed since the last step, read from the World's
 //! change log (#1707, on #1705's `ecs::changes`).
 //!
 //! The sync before each step used to re-derive everything it pushes into rapier
@@ -46,6 +46,13 @@ use crate::components::{
 use crate::core::collections::Map;
 use crate::ecs::{Activity, Changes, Channel, Cursor, Layer, StaticSet, World, WorldPose};
 use crate::scene::{CollisionMatrix, Scene};
+
+#[cfg(test)]
+mod fixture_tests;
+#[cfg(test)]
+mod ops_tests;
+#[cfg(test)]
+mod tests;
 
 /// The cursors physics reads before each step, one per channel in the table above.
 pub(super) struct Watch {

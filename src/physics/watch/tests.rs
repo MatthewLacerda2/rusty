@@ -1,4 +1,4 @@
-//! src/physics/watch_tests.rs — the incremental sync is the full one (#1707): two
+//! src/physics/watch/tests.rs — the incremental sync is the full one (#1707): two
 //! copies of a scene take the same random edits and steps, one synced from the
 //! change log, one in full every step, and rapier holds the same bits in both
 //! after every step, as do the scenes the bodies write back into.
@@ -7,11 +7,11 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use proptest::prelude::*;
 
-use super::watch_fixture_tests::{digest, fixture, scene_digest};
-use super::watch_ops_tests::{apply, op, Op};
-use super::PhysicsWorld;
+use super::fixture_tests::{digest, fixture, scene_digest};
+use super::ops_tests::{apply, op, Op};
 use crate::components::RigidBodyComponent;
 use crate::ecs::{Changes, WorldPose};
+use crate::physics::PhysicsWorld;
 
 /// Run `ops` on two copies: incremental and full. Both must agree after each step.
 fn agree(ops: &[Op]) -> Result<(), TestCaseError> {

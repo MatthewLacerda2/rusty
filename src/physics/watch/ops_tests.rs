@@ -1,17 +1,17 @@
-//! src/physics/watch_ops_tests.rs — the physics edits the incremental sync's
-//! equivalence proptest runs (#1707, `watch_tests.rs`), on top of the World's own
+//! src/physics/watch/ops_tests.rs — the physics edits the incremental sync's
+//! equivalence proptest runs (#1707, `tests.rs`), on top of the World's own
 //! shared edit sequence (`ecs::changes::ops_tests`).
 
 use glam::Vec3;
 use proptest::prelude::*;
 
-use super::watch_fixture_tests::world_op;
-use super::PhysicsWorld;
+use super::fixture_tests::world_op;
 use crate::components::{
     CharacterControllerComponent, ColliderComponent, ColliderShape, JointComponent,
     RigidBodyComponent,
 };
 use crate::ecs::changes::ops_tests;
+use crate::physics::PhysicsWorld;
 use crate::scene::authoring::defaults::{default_collider, default_rigidbody};
 use crate::scene::Scene;
 

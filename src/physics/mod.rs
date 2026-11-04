@@ -35,12 +35,6 @@ mod query;
 mod shape;
 mod sync;
 mod watch;
-#[cfg(test)]
-mod watch_fixture_tests;
-#[cfg(test)]
-mod watch_ops_tests;
-#[cfg(test)]
-mod watch_tests;
 mod world;
 
 pub use character::{can_stand, move_character, CharacterMove};

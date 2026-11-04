@@ -1,5 +1,5 @@
-//! src/physics/watch_fixture_tests.rs — what the incremental sync's equivalence
-//! proptest (#1707, `watch_tests.rs`) starts from and compares: the scene it edits,
+//! src/physics/watch/fixture_tests.rs — what the incremental sync's equivalence
+//! proptest (#1707, `tests.rs`) starts from and compares: the scene it edits,
 //! the World edits completed as an Undo completes them, and exact digests of what
 //! rapier and the scene hold.
 
@@ -7,9 +7,9 @@ use std::fmt::Write;
 
 use glam::Vec3;
 
-use super::watch_ops_tests::{apply, Op, Phys};
-use super::PhysicsWorld;
+use super::ops_tests::{apply, Op, Phys};
 use crate::ecs::changes::ops_tests;
+use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 /// A ground slab, three bodies dropped side by side onto it and a kinematic box
