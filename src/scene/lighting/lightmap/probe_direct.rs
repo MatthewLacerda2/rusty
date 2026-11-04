@@ -7,7 +7,9 @@
 //! projects into the SH as a delta of the radiance arriving from it. `Sh9::eval` then
 //! reads it back as `radiance · max(cos, 0)` (to L2 accuracy), the irradiance a
 //! realtime light gives, so a dynamic object lit through the probe matches the Lambert
-//! response the forward shader gives a live light. Same falloff and cones as the
+//! response the forward shader gives a live light. Under the `HalfLambert` diffuse
+//! model (#1698) each band is rescaled (`DiffuseModel::sh_band_scale`) so the same
+//! read-back gives the squared wrap instead, exactly: it is a quadratic in N·L. Same falloff and cones as the
 //! lightmap tracer (`trace::arrival`). An Area light (#1674) is integrated over a
 //! fixed grid of points on its rectangle, one shadow ray each (`area::grid`).
 
@@ -50,7 +52,7 @@ pub fn baked_direct_sh(scene: &BakeScene, positions: &[Vec3]) -> Vec<Sh9> {
                     _ => add(Vec2::ZERO, 1.0),
                 }
             }
-            sh
+            sh.band_scaled(scene.diffuse.sh_band_scale())
         })
         .collect()
 }
