@@ -122,8 +122,8 @@ fn register_play_node<'scope>(
 }
 
 /// `PlayAnimation` — play a clip by name directly, returning whether the entity's
-/// mesh actually carries a clip of that name (the honest, queryable sibling of the
-/// silently no-op'ing `Play`).
+/// mesh actually carries a clip of that name (the queryable sibling of `Play`,
+/// which takes over the base layer even for a clip the mesh lacks).
 fn register_play_animation<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,

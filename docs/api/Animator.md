@@ -34,9 +34,9 @@ path + active state are saved with the entity.
 
 | Function | Signature | Notes |
 |---|---|---|
-| `Animator.Play` | `(id, clip)` | Hard-cut the base layer to `clip` from its start (also releases a `Pause`). Raw clip-level control: it does not consult the graph — jump graph states with `PlayNode`. |
-| `Animator.PlayAnimation` | `(id, clip)` | Like `Play`, but honest and queryable: returns `true` only when the entity's mesh actually carries a clip named `clip` (and an animator to play it); `false` otherwise, without side effects (`Play` silently no-ops on a missing clip). |
-| `Animator.Crossfade` | `(id, clip, duration)` | Blend out of the current clip over `duration` seconds (a zero/negative duration, or a fade into the current clip, degrades to `Play`). |
+| `Animator.Play` | `(id, clip)` | Hard-cut the base layer to `clip` from its start (also releases a `Pause`). Raw clip-level control: it does not consult the graph — jump graph states with `PlayNode`. Logs nothing on success; when the entity's mesh has clips and none is named `clip`, it warns in the console (repeats collapse into one counted line). |
+| `Animator.PlayAnimation` | `(id, clip)` | Like `Play`, but honest and queryable: returns `true` only when the entity's mesh actually carries a clip named `clip` (and an animator to play it); `false` otherwise, without side effects (`Play` on a missing clip still takes over the base layer: the old motion stops, the playhead resets and `GetClip` returns the missing name, so a clip that loads later plays, #1386). |
+| `Animator.Crossfade` | `(id, clip, duration)` | Blend out of the current clip over `duration` seconds (a zero/negative duration, or a fade into the current clip, degrades to `Play`). Warns on an unknown clip as `Play` does. |
 | `Animator.Stop` | `(id)` | Halt playback (freezes the pose). |
 | `Animator.Pause` | `(id)` | Hold the playhead where it is: the pose freezes but playback stays active (a hold, not a `Stop`). |
 | `Animator.Resume` | `(id)` | Release a `Pause`, continuing from the held playhead. |
