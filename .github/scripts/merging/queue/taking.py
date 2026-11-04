@@ -9,7 +9,7 @@ import time
 
 from merging.queue.conflict import record
 from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, refusal, stamping, update, waiting
-from merging.verdict import carried, closing, decide, github, protocol
+from merging.verdict import carried, closing, decide, github, protocol, reviewed
 from merging.watch import handbacks
 
 
@@ -63,6 +63,11 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         blocking = closing.blocking(closes)
         state = outcomes.AWAITS_ISSUE if blocking else outcomes.AWAITS_EDIT
         return outcomes.Awaiting(number, state, refused[0], handbacks.claim(pull), blocking)
+    # Then whether a review was decided (#1764): a refusal only a comment clears.
+    refused = reviewed.refusal(pull, reviewed.comments(repo, number), pulls.is_bot(pull))
+    if refused:
+        outcomes.say(f"#{number}: {refused[0]}", *refused[1:])
+        return outcomes.Awaiting(number, outcomes.AWAITS_REVIEW, refused[0], handbacks.claim(pull))
 
     branch, head = pull["headRefName"], pull["headRefOid"]
     gitio.remote("fetch", "--quiet", "origin", "main", cwd=opts.root)

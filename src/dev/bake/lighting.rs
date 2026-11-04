@@ -72,7 +72,8 @@ pub struct LightingBakeReport {
 
 /// Auto-place (per the manual-vs-auto rule) then bake both probe sets. Returns a
 /// report on success; errors only when a bake's own contract fails (e.g. reflections
-/// need a saved scene path to write the cubemaps beside). A missing GPU adapter is NOT
+/// need a saved scene path, whose `<scene>.reflections/` folder takes the cubemaps,
+/// and a stale cube there must be removable). A missing GPU adapter is NOT
 /// an error — each bake skips gracefully and the report's `ran_*` flag is `false`.
 /// Runs [`start_lighting`]'s job to the end, its progress lines to `say` and `log`,
 /// and commits it. Refused while the editor's Generate Lighting runs.
@@ -114,7 +115,8 @@ pub(super) fn run_to_end(
 /// a job to step ([`LightingBake::step`]): the editor takes one step a frame. The
 /// scene keeps its probes and their lighting until the job commits, as Unity's bake
 /// does: a bake that is refused, dropped or fails leaves the old lighting (#1737).
-/// Errors when reflection probes have no saved scene to write beside.
+/// Errors when reflection probes have no saved scene whose `<scene>.reflections/`
+/// folder takes their cubemaps.
 pub fn start_lighting(
     scene: &Scene,
     scene_path: Option<&str>,

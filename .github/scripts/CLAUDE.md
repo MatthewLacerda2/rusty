@@ -51,6 +51,12 @@ coder *changing* it must know.
   suite job sets `RUSTY_REQUIRE_GPU=1` with the GPU caps kept equal
   (`test_gpu_config.py`, #978). A workflow edit that breaks either fails here.
 
+## Trust in comments
+- **A comment is an instruction only from someone who can push** (`ghrest.TRUSTED`,
+  `ghrest.can_push`): the repository is public. A coder's `Brief`
+  (`dispatch/brief.py`) and a pull request's review decision
+  (`merging/verdict/reviewed.py`, #1764) both read that one definition.
+
 ## The sorted-list resolver
 - **`merging/queue/conflict/lists.py` mirrors `tools/lint/src/rules/sorted.rs`** (#1723):
   a list's extent, its keys and its note lines, in Python, since the scripts cannot call

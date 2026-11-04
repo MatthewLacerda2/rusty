@@ -35,9 +35,11 @@ fn gpu_a_bake_dropped_midway_keeps_the_old_lighting() {
 fn gpu_a_cube_write_failure_keeps_the_old_lighting() {
     let mut scene = lit_room();
     let was = old(&scene);
-    let gone = crate::test_temp::dir().join("rusty_1737_missing");
-    let gone = gone.join("nowhere").join("level.scene");
-    let gone = gone.to_string_lossy().into_owned();
+    // A file where the scene's cube folder goes: the folder cannot be made.
+    let gone = saved_path("blocked");
+    let folder = crate::dev::bake::reflection::reflection_dir(&gone);
+    let _ = std::fs::remove_dir_all(&folder);
+    std::fs::write(&folder, b"not a folder").unwrap();
     let job = start_lighting(&scene, Some(&gone), None, params()).unwrap();
     if !job.report().ran_reflection_bake {
         return; // no adapter
@@ -45,12 +47,12 @@ fn gpu_a_cube_write_failure_keeps_the_old_lighting() {
     let mut job = job;
     let failed = loop {
         match job.step(&mut scene, &mut |_| {}) {
-            Ok(true) => panic!("baked into a directory that does not exist"),
+            Ok(true) => panic!("baked into a folder that is a file"),
             Ok(false) => continue,
             Err(e) => break e,
         }
     };
-    assert!(failed.contains("reflection cubemap"), "{failed}");
+    assert!(failed.contains("reflection"), "{failed}");
     assert_old_lighting(&scene, &was);
 }
 

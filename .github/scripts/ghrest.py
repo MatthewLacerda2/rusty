@@ -33,6 +33,17 @@ REMOTE = re.compile(r"[/:]([^/:]+)/([^/]+?)(?:\.git)?/?$")
 
 PER_PAGE = 100
 
+#: The `author_association` of someone who can push to the repository. The
+#: repository is public, so a comment is trusted as an instruction only from
+#: one of these: a coder's `Brief` (`dispatch/brief.py`, #1569) and a pull
+#: request's review decision (`merging/verdict/reviewed.py`, #1764).
+TRUSTED = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
+
+
+def can_push(comment: dict) -> bool:
+    """Whether a REST comment's author can push here ([`TRUSTED`])."""
+    return comment.get("author_association") in TRUSTED
+
 
 def slug_of(url: str) -> str | None:
     """`owner/name` from a remote URL, or `None` when it names no repository."""

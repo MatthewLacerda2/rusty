@@ -59,10 +59,12 @@ impl BoundsQueue {
 
 impl World {
     /// `id`'s subtree moved in world space: its world matrices go dirty before the next
-    /// read, and its colliders' AABBs are due a refresh. O(1).
+    /// read, and its colliders' AABBs are due a refresh. O(1), unless a cursor reads
+    /// `WorldPose`: then its subtree is stamped there too, once until that is read.
     pub(in crate::ecs) fn moved(&mut self, id: u32) {
         self.world_space.moved(id);
         self.bounds.push(id);
+        self.stamp_pose_below(id); // only while a cursor reads `WorldPose`
     }
 
     /// `id`'s collider world AABB, `(min, max)`; `None` without a collider. Never stale:
@@ -110,7 +112,9 @@ impl World {
     }
 
     /// Refresh `id`'s stored collider AABB from its world pose now (a no-op without a
-    /// collider). Setting or reshaping a collider does this itself.
+    /// collider). Setting or reshaping a collider does this itself. The box is derived
+    /// state, so the Collider change channel is not stamped: a consumer told a
+    /// collider changed is told it was edited, and asks `WorldPose` for moves.
     pub fn refresh_collider_aabb(&mut self, id: u32) {
         if !self.has_collider(id) {
             return;
@@ -118,7 +122,7 @@ impl World {
         let Some(pose) = self.world_pose(id) else {
             return;
         };
-        if let Some(mut col) = self.component_mut::<crate::components::ColliderComponent>(id) {
+        if let Some(mut col) = self.derived_mut::<crate::components::ColliderComponent>(id) {
             (col.aabb_min, col.aabb_max) = col.calculate_world_aabb(pose);
         }
     }
