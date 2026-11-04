@@ -183,11 +183,15 @@ mod bounds_tests;
 #[cfg(test)]
 mod clamp_tests;
 #[cfg(test)]
+mod dominant_tests;
+#[cfg(test)]
 mod end_resolve_tests;
 #[cfg(test)]
 mod end_tests;
 #[cfg(test)]
 mod layer_tests;
+#[cfg(test)]
+mod nested_pose_tests;
 #[cfg(test)]
 mod playhead_tests;
 #[cfg(test)]

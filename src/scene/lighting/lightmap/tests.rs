@@ -78,6 +78,7 @@ fn same_seed_gives_identical_texels() {
         meshes: vec![floor(), wall()],
         lights: vec![sun(false)],
         sky: Vec3::new(0.3, 0.4, 0.5).into(),
+        diffuse: Default::default(),
     };
     let a = bake(&scene, &settings());
     assert_eq!(a, bake(&scene, &settings()), "same seed, same texels");
@@ -96,6 +97,7 @@ fn a_mixed_light_reaches_the_floor_only_by_bounce() {
         meshes: vec![floor()],
         lights: vec![sun(false)],
         sky: Vec3::ZERO.into(),
+        diffuse: Default::default(),
     };
     assert_eq!(
         mean(&bake(&alone, &settings()), 1),
@@ -126,6 +128,7 @@ fn a_baked_light_bakes_its_direct_light_too() {
         meshes: vec![floor(), wall()],
         lights: vec![sun(baked)],
         sky: Vec3::ZERO.into(),
+        diffuse: Default::default(),
     };
     let wall_mixed = mean(&bake(&scene(false), &settings()), 2);
     let wall_baked = mean(&bake(&scene(true), &settings()), 2);

@@ -72,12 +72,9 @@ impl World {
         if std::mem::replace(&mut core.active, active) != active {
             drop(core);
             self.activity.invalidate_all();
-            // The shadow sweeps skip inactive entities, so a static one going dark or
-            // lit changes the static caster set. A toggle with no static in its subtree
-            // (a muzzle flash, a pickup) leaves the static bakes alone.
-            if self.self_and_descendants(id).any(|e| self.is_static(e)) {
-                self.static_revision += 1;
-            }
+            // The subtree may go dark or lit; with no static in it (a muzzle flash, a
+            // pickup) the static bakes stay put.
+            self.stamp_hierarchy_below(id);
         }
         true
     }
@@ -94,18 +91,18 @@ impl World {
         };
         if std::mem::replace(&mut core.is_static, is_static) != is_static {
             drop(core);
-            self.static_revision += 1;
+            self.stamp_static(id);
         }
         true
     }
 
-    /// Moves whenever the set of static entities may have changed: a flag flipped, a
-    /// static entity (or an ancestor of one) activated or deactivated, a static entity
-    /// placed or removed, a row overwritten, the World cleared. Whoever
-    /// made the change (the inspector, a script in Play, a load), a cache of static
-    /// geometry keyed on it (the renderer's static shadow bakes) goes stale (#1496).
+    /// The [`StaticSet`](super::changes::StaticSet) channel's revision: it moves
+    /// whenever the set of static entities may have changed, the World cleared or
+    /// rewound included, so a cache of static geometry keyed on it (the renderer's
+    /// static shadow bakes) goes stale (#1496). A cache that wants *which* entities
+    /// moved opens a cursor on that channel.
     pub fn static_revision(&self) -> u64 {
-        self.static_revision
+        self.static_set_revision()
     }
 
     /// The entity's layer index (`0`, the default layer, for a dead id).
@@ -114,9 +111,13 @@ impl World {
     }
 
     pub fn set_layer(&mut self, id: u32, layer: u8) -> bool {
-        self.component_mut::<Core>(id)
-            .map(|mut c| c.layer = layer)
-            .is_some()
+        let Some(mut core) = self.component_mut::<Core>(id) else {
+            return false;
+        };
+        let changed = std::mem::replace(&mut core.layer, layer) != layer;
+        drop(core);
+        changed.then(|| self.stamp_layer(id));
+        true
     }
 
     /// The local Transform matrix and the parent, in one lookup — the hot read
@@ -166,6 +167,7 @@ impl World {
         self.moved(id);
         if relinked {
             self.activity.invalidate_all();
+            self.stamp_hierarchy_below(id); // under a new parent it may go dark or lit
         }
         true
     }

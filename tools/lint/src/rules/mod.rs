@@ -18,6 +18,7 @@ mod atomic_write;
 mod converter_log;
 mod dir_size;
 mod drag_range;
+mod ecs_write;
 mod entity_arg;
 mod full_literal;
 mod fullscreen_triangle;
@@ -71,6 +72,7 @@ const RULES: &[(Rule, Allow)] = &[
     (converter_log::run, Allow::Inline),
     (dir_size::run, Allow::Own),
     (drag_range::run, Allow::Inline),
+    (ecs_write::run, Allow::Inline),
     (entity_arg::run, Allow::Inline),
     (full_literal::run, Allow::Inline),
     (fullscreen_triangle::run, Allow::Inline),

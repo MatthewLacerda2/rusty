@@ -1,12 +1,16 @@
 //! src/asset/animation_graph/validate_motion.rs — a node's motion is sound (#457).
 //!
 //! A node plays exactly one motion: a clip, or a blend tree. A tree needs at
-//! least one child, every child a clip, every axis a declared `Float` parameter,
-//! and finite, distinct positions — two children on one point would split the
-//! weight arbitrarily, so that is an authoring error, not something to guess at.
+//! least one child, every child exactly one of a clip and a nested tree (#1746),
+//! every axis a declared `Float` parameter, and finite, distinct positions —
+//! two children on one point would split the weight arbitrarily, so that is an
+//! authoring error, not something to guess at. The checks recurse into nested
+//! trees, each problem naming the tree's path (`Loco/children[2]`), down to
+//! [`MAX_TREE_DEPTH`]; no cycle check is needed, since a tree holds its
+//! children by value.
 
 use super::event::check_events;
-use super::{AnimationGraph, BlendTree, GraphNode, ParameterDeclaration};
+use super::{AnimationGraph, BlendTree, GraphNode, ParameterDeclaration, MAX_TREE_DEPTH};
 
 impl AnimationGraph {
     pub(super) fn check_motion(&self, node: &GraphNode, problems: &mut Vec<String>) {
@@ -16,8 +20,11 @@ impl AnimationGraph {
             (Some(_), false) => {
                 problems.push(format!("node '{name}' has both a clip and a blend tree"))
             }
-            (Some(tree), true) => self.check_tree(name, tree, problems),
-            (None, false) => {}
+            _ => {}
+        }
+        if let Some(tree) = &node.blend_tree {
+            let label = format!("node '{name}' blend tree");
+            self.check_tree(&label, name, tree, 1, problems);
         }
         let label = format!("node '{name}'");
         if node.blend_tree.is_some() && !node.events.is_empty() {
@@ -28,8 +35,16 @@ impl AnimationGraph {
         check_events(&label, &node.events, problems);
     }
 
-    fn check_tree(&self, node: &str, tree: &BlendTree, problems: &mut Vec<String>) {
-        let label = format!("node '{node}' blend tree");
+    /// Check `tree`, reported under `label`, at `path` and nesting `depth` (the
+    /// node's own tree is depth 1).
+    fn check_tree(
+        &self,
+        label: &str,
+        path: &str,
+        tree: &BlendTree,
+        depth: usize,
+        problems: &mut Vec<String>,
+    ) {
         for parameter in tree.parameters() {
             if !matches!(
                 self.parameters.get(parameter),
@@ -40,14 +55,10 @@ impl AnimationGraph {
                 ));
             }
         }
-        let clips = tree.clips();
-        if clips.is_empty() {
+        if tree.is_empty() {
             problems.push(format!("{label} has no children"));
         }
-        if clips.iter().any(|c| c.is_empty()) {
-            problems.push(format!("{label} has a child with an empty clip name"));
-        }
-        let points = positions(tree);
+        let points: Vec<[f32; 2]> = tree.children().map(|(_, p)| p).collect();
         if points.iter().flatten().any(|v| !v.is_finite()) {
             problems.push(format!("{label} has a non-finite child position"));
         }
@@ -58,21 +69,52 @@ impl AnimationGraph {
         if duplicated {
             problems.push(format!("{label} has two children at the same position"));
         }
-        for (clip, events) in clips.iter().zip(tree.child_events()) {
-            check_events(&format!("{label} child '{clip}'"), events, problems);
-        }
+        self.check_children(label, path, tree, depth, problems);
     }
-}
 
-/// Every child's position as an `[x, y]` point (a 1D threshold sits on the x axis).
-fn positions(tree: &BlendTree) -> Vec<[f32; 2]> {
-    match tree {
-        BlendTree::Simple1D { children, .. } => {
-            children.iter().map(|c| [c.threshold, 0.0]).collect()
-        }
-        BlendTree::FreeformDirectional2D { children, .. }
-        | BlendTree::FreeformCartesian2D { children, .. } => {
-            children.iter().map(|c| c.position).collect()
+    /// Each child holds exactly one of a clip and a tree; a nested tree is
+    /// checked in turn, one level deeper.
+    fn check_children(
+        &self,
+        label: &str,
+        path: &str,
+        tree: &BlendTree,
+        depth: usize,
+        problems: &mut Vec<String>,
+    ) {
+        for (i, (motion, _)) in tree.children().enumerate() {
+            let child = format!("{path}/children[{i}]");
+            let has_clip = !motion.clip.is_empty();
+            match (&motion.blend_tree, has_clip) {
+                (None, false) => problems.push(format!(
+                    "{label} child '{child}' has neither a clip nor a blend tree"
+                )),
+                (Some(_), true) => problems.push(format!(
+                    "{label} child '{child}' has both a clip and a blend tree"
+                )),
+                _ => {}
+            }
+            if let Some(nested) = &motion.blend_tree {
+                let nested_label = format!("blend tree '{child}'");
+                if depth >= MAX_TREE_DEPTH {
+                    problems.push(format!(
+                        "{label} child '{child}' nests trees deeper than {MAX_TREE_DEPTH}"
+                    ));
+                } else {
+                    self.check_tree(&nested_label, &child, nested, depth + 1, problems);
+                }
+                if !motion.events.is_empty() {
+                    problems.push(format!(
+                        "{nested_label} has events of its own; put them on its children"
+                    ));
+                }
+            }
+            let named = if has_clip { &motion.clip } else { &child };
+            check_events(
+                &format!("{label} child '{named}'"),
+                &motion.events,
+                problems,
+            );
         }
     }
 }
