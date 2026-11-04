@@ -1,7 +1,7 @@
 """The handed-back heads remembered across watches, and what re-admits each (#751, #869, #1279).
 
 Every hand-back remembers its head ([`MEMORY`]) and is passed over until that
-moves. Three things count as moving without a push:
+moves. Four things count as moving without a push:
 
 - **a new run attempt on the head** ([`RUNS_MEMORY`], [`rerun_heads`], #869): `gh
   run rerun --failed` after a runner outage or a flake;
@@ -13,7 +13,11 @@ moves. Three things count as moving without a push:
   restart, so even that did not help until a CI re-run;
 - **the issue it closes no longer blocking it** ([`ISSUES_MEMORY`], [`unblocked`],
   #1279): labelled `planning`/`human`, blocked or already closed, which no edit
-  of the pull request fixes. Those issues are asked again each listing.
+  of the pull request fixes. Those issues are asked again each listing;
+- **a comment recording its review decision** ([`REVIEWS_MEMORY`], [`reviewed`],
+  #1764): a pull request queued before anyone wrote `Independent review` or
+  `No review: <why>` on it. Its claim is kept too, so a label taken off and put
+  back re-admits it like an edit.
 
 A red run, a conflict or a committed image has no claim entry and waits for
 its head. Every side memory is kept only for numbers still in [`MEMORY`].
@@ -42,6 +46,10 @@ CLAIMS_MEMORY = "handed-back-claims.json"
 
 # And for a hand-back the issue refused, which issues to ask about again (#1279).
 ISSUES_MEMORY = "handed-back-issues.json"
+
+
+# And for a hand-back no review decision was recorded on, its number (#1764).
+REVIEWS_MEMORY = "handed-back-reviews.json"
 
 
 def claim(pull: dict) -> str:
@@ -74,6 +82,19 @@ def unblocked(pulls: list[dict], memory: dict[int, str], issues: dict[int, str],
         pull["number"] for pull in pulls
         if not pull.get("isDraft") and pull.get("number") in memory and pull.get("number") in issues
         and blocks(read(issues[pull["number"]])) == []
+    ]
+
+
+def reviewed(pulls: list[dict], memory: dict[int, str], reviews: dict[int, str], decided) -> list[int]:
+    """The remembered review hand-backs that now carry the decision (#1764).
+
+    `decided(number)` asks GitHub ([`verdict.reviewed.decided`]), `None` when it
+    could not answer (no news). Asked only for ready pull requests.
+    """
+    return [
+        pull["number"] for pull in pulls
+        if not pull.get("isDraft") and pull.get("number") in memory and pull.get("number") in reviews
+        and decided(pull["number"]) is True
     ]
 
 
