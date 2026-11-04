@@ -34,6 +34,7 @@ pub(crate) fn light(
         outer_cone: super::rendering::light::DEFAULT_CONES.1,
         cast_shadows: false,
         mode: Default::default(),
+        shadow_fade_distance: 0.0,
     }
 }
 

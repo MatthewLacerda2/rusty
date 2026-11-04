@@ -12,9 +12,11 @@
 //! the one mandatory component. Iteration is in insertion order so the former
 //! `Vec<Entity>` semantics (physics pair ordering, render order) are preserved.
 //!
-//! The generic helpers (`component`, `each_component`, `set_component`, …) are
-//! the ONLY place raw hecs column access happens; `access.rs` and `core.rs` build
-//! the typed surface on them. `Entity` stays the on-disk *document* shape:
+//! The generic helpers (`component`, `each_component`, here; `component_mut`,
+//! `set_component`, … in `funnel.rs`) are the ONLY place raw hecs column access
+//! happens; `access.rs` and `core.rs` build the typed surface on them. Every raw
+//! write carries the `ecs-write` lint's inline allow (`docs/linting.md`), since a
+//! write that skips `World::touch` stamps no change. `Entity` stays the on-disk *document* shape:
 //! `bundle::build_bundle` turns one into a single `EntityBuilder` placement (one
 //! archetype move), and `core.rs`'s `entity_document` recomposes it.
 
@@ -22,6 +24,7 @@ use crate::components::Entity;
 
 use super::activity::ActivityStore;
 use super::bundle::Core;
+use super::changes::ChangeLogs;
 use super::handles::Handles;
 use super::journal::Journal;
 use super::world_space::{BoundsQueue, WorldStore};
@@ -45,8 +48,8 @@ pub struct World {
     pub(super) bounds: BoundsQueue,
     /// Every entity's `activeInHierarchy`, kept (`ecs::activity`).
     pub(super) activity: ActivityStore,
-    /// Bumped whenever the set of static entities may have changed (`World::static_revision`).
-    pub(super) static_revision: u64,
+    /// Every channel's change log and the cursors' epoch (`ecs::changes`, #1705).
+    pub(super) changes: ChangeLogs,
     /// The edit-mode change journal the editor's Undo reads (`ecs::journal`, #1631).
     pub(super) journal: Journal,
 }
@@ -68,7 +71,7 @@ impl World {
             world_space: WorldStore::default(),
             bounds: BoundsQueue::default(),
             activity: ActivityStore::default(),
-            static_revision: 0,
+            changes: ChangeLogs::default(),
             journal: Journal::default(),
         }
     }
@@ -113,17 +116,20 @@ impl World {
         if entity.id >= self.next_id {
             self.next_id = entity.id + 1;
         }
+        let id = entity.id;
         self.place(entity);
         self.invalidate_caches(); // an orphan may already name this id as parent
+        self.stamp_hierarchy_below(id); // and go dark or lit under it
     }
 
     /// Drop the rows of `ids`, whose references `World::despawn_all` cleared first.
     pub(super) fn remove_rows(&mut self, ids: &std::collections::BTreeSet<u32>) {
         for &id in ids {
-            self.note(id);
-            self.static_revision += u64::from(self.is_static(id));
+            self.touch_entity(id, self.is_static(id));
+            self.stamp_pose_below(id);
             self.world_space.forget(id);
             if let Some(handle) = self.handles.remove(id) {
+                // lint: allow(ecs-write) the funnel: `touch_entity` stamped the removal above
                 let _ = self.inner.despawn(handle);
             }
         }
@@ -133,10 +139,11 @@ impl World {
 
     /// Remove all entities and reset the id allocator (used on scene load).
     pub fn clear(&mut self) {
-        self.inner.clear();
+        self.inner.clear(); // lint: allow(ecs-write) the World is emptied: `new_epoch` below
         self.handles.clear();
         self.order.clear();
         self.journal = Journal::default();
+        self.changes.new_epoch();
         self.next_id = 1;
         self.next_seq = 0;
         self.reset_caches();
@@ -176,16 +183,6 @@ impl World {
         self.inner.get::<&T>(handle).ok()
     }
 
-    /// Exclusive borrow of one component column, by stable id.
-    pub(in crate::ecs) fn component_mut<T: hecs::Component>(
-        &mut self,
-        id: u32,
-    ) -> Option<RefMut<'_, T>> {
-        let handle = self.handles.get(id)?;
-        self.note(id);
-        self.inner.get::<&mut T>(handle).ok()
-    }
-
     /// Visit every `T`, in no set order and without allocating.
     pub(in crate::ecs) fn each_component<T: hecs::Component>(&self, mut visit: impl FnMut(&T)) {
         self.inner.query::<&T>().iter().for_each(|(_, v)| visit(v));
@@ -210,54 +207,6 @@ impl World {
             .collect();
         matches.sort_unstable_by_key(|&(seq, _)| seq);
         matches.into_iter().map(|(_, id)| id).collect()
-    }
-
-    /// Attach (`Some`) or detach (`None`) a component column. Returns `false`
-    /// when the entity does not exist.
-    pub(in crate::ecs) fn set_component<T: hecs::Component>(
-        &mut self,
-        id: u32,
-        value: Option<T>,
-    ) -> bool {
-        let Some(handle) = self.handles.get(id) else {
-            return false;
-        };
-        self.note(id);
-        match value {
-            Some(v) => {
-                let _ = self.inner.insert_one(handle, v);
-            }
-            None => {
-                let _ = self.inner.remove_one::<T>(handle);
-            }
-        }
-        true
-    }
-
-    /// Detach and return a component column (`None` when absent or the entity
-    /// is dead).
-    pub(in crate::ecs) fn take_component<T: hecs::Component>(&mut self, id: u32) -> Option<T> {
-        let handle = self.handles.get(id)?;
-        self.note(id);
-        self.inner.remove_one::<T>(handle).ok()
-    }
-
-    /// Borrow two DIFFERENT component columns of the same entity mutably at
-    /// once — sound because they're independent hecs columns. `None` when the
-    /// entity is missing or lacks the mandatory `A`.
-    pub(in crate::ecs) fn with_pair_mut<A: hecs::Component, B: hecs::Component, R>(
-        &mut self,
-        id: u32,
-        f: impl FnOnce(&mut A, Option<&mut B>) -> R,
-    ) -> Option<R> {
-        let handle = self.handles.get(id)?;
-        self.note(id);
-        let mut query = self
-            .inner
-            .query_one::<(&mut A, Option<&mut B>)>(handle)
-            .ok()?;
-        let (a, b) = query.get()?;
-        Some(f(a, b))
     }
 
     /// Shared borrow of two columns of one entity under a single id lookup.

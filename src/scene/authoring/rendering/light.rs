@@ -2,7 +2,7 @@
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `LightComponent` field by field (colour, intensity, range, type, the
-//! spotlight cone angles, the shadow toggle and an Area light's size), including the validation each write owns (the `≥ 0`
+//! spotlight cone angles, the shadow toggle and fade distance, and an Area light's size), including the validation each write owns (the `≥ 0`
 //! clamp on intensity/range, the inner≤outer cone ordering).
 //!
 //! BOTH callers route through here so the editor and the API can never drift: the
@@ -96,6 +96,13 @@ pub fn set_cast_shadows(l: &mut LightComponent, on: bool) {
     l.cast_shadows = on;
 }
 
+/// Set the camera distance past which the light's shadow is no longer sampled
+/// (#1712, HDRP's Shadow Fade Distance), clamped to `≥ 0`; `0` turns the fade
+/// off. NaN or infinite takes `0`.
+pub fn set_shadow_fade_distance(l: &mut LightComponent, value: f32) {
+    l.shadow_fade_distance = non_negative(value);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,6 +165,12 @@ mod tests {
         assert_eq!((e.inner_cone, e.outer_cone), (0.0, 0.0));
         set_cones(&mut e, 10.0, 500.0);
         assert_eq!((e.inner_cone, e.outer_cone), (10.0, MAX_CONE));
+        set_shadow_fade_distance(&mut e, 30.0);
+        assert_eq!(e.shadow_fade_distance, 30.0);
+        for bad in [f32::NAN, f32::INFINITY, -4.0] {
+            set_shadow_fade_distance(&mut e, bad);
+            assert_eq!(e.shadow_fade_distance, 0.0, "{bad} turns the fade off");
+        }
     }
 
     /// An Area light is Baked and stays so; its size keeps a floor (#1674).

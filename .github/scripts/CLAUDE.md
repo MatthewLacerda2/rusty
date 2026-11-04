@@ -39,7 +39,7 @@ coder *changing* it must know.
 - **`make scripts` is a hard gate** (in `make gates` and `lint.yml`): `unittest` over
   `.github/scripts/tests/` (and `tools/launcher/tests/`). Tests are grouped there by area — `verdict/`, `queue/`,
   `watch/`, `reclaim/`, `board/`, `checks/`, `mutants/`, `dispatch/`, `health/`,
-  `resolved/`, `ruleset/` — each a package; a new area gets its own folder. A test never
+  `resolved/`, `ruleset/`, `proved/` (#1784) — each a package; a new area gets its own folder. A test never
   reaches GitHub or pushes: it fakes `gh` and `git` the way
   `.github/scripts/tests/watch/fakes.py` and the `fixtures.py` files do.
 - **The size gate measures `.py`** (#926): 300 lines of code, 150 for a file under a
@@ -50,6 +50,12 @@ coder *changing* it must know.
   command appears in `ci.yml`/`lint.yml` (`test_gate_mirror.py`, #964), and every
   suite job sets `RUSTY_REQUIRE_GPU=1` with the GPU caps kept equal
   (`test_gpu_config.py`, #978). A workflow edit that breaks either fails here.
+
+## Trust in comments
+- **A comment is an instruction only from someone who can push** (`ghrest.TRUSTED`,
+  `ghrest.can_push`): the repository is public. A coder's `Brief`
+  (`dispatch/brief.py`) and a pull request's review decision
+  (`merging/verdict/reviewed.py`, #1764) both read that one definition.
 
 ## The sorted-list resolver
 - **`merging/queue/conflict/lists.py` mirrors `tools/lint/src/rules/sorted.rs`** (#1723):
