@@ -9,7 +9,7 @@ import time
 from merging.queue.conflict import record
 from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, refusal, stamping, update, waiting
 from merging.verdict import carried, closing, decide, github, protocol, reviewed
-from merging.watch import handbacks
+from merging.watch import board, handbacks
 
 
 def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, str]:
@@ -105,10 +105,19 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
     spent = time.monotonic() - began if pulls.is_bot(pull) else 0.0
     state, lines = waiting.wait_for(repo, number, fresh, head, dependabot.left(opts.deadline, spent), opts.poll, tick)
     outcomes.say(f"#{number}: {lines[0]}", *lines[1:])
+    if state == outcomes.HEAD_MOVED and opts.watch:
+        # Nothing was judged about the new head (#1799): it goes back in line,
+        # remembered against nothing, and its next take waits on its own CI.
+        # A named take keeps the hand-back: nobody watches a line for it.
+        return number, outcomes.REQUEUED, f"{lines[0]} Back in line on its new head."
     if state != outcomes.GO:
         return number, outcomes.HANDED_BACK, lines[0]
     if opts.no_merge:
         return number, outcomes.GREEN, lines[0]
+    if opts.watch and not board.queued(pulls.look(number)):
+        # The label came off during the wait (a re-brief, #1799): the fix hasn't been
+        # pushed yet, so a green head must not merge. A named take needs no label.
+        return number, outcomes.REQUEUED, "it lost the `queue` label during its CI wait; not merged."
 
     state, why = landing.squash(repo, pull, fresh, opts.root, opts.poll)
     if state == landing.BASE_MOVED:  # no fault of the branch's: taken again, not handed back
