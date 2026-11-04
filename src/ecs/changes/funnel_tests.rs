@@ -39,17 +39,21 @@ fn detaching_or_taking_a_missing_column_stamps_nothing() {
 }
 
 #[test]
-fn with_pair_mut_stamps_each_column_only_when_held() {
+fn with_mut_and_ref_stamps_only_the_held_mutable_column() {
     let (mut w, plain, full) = pair();
     let mut animators = w.change_cursor::<AnimatorComponent>();
     let mut joints = w.change_cursor::<JointComponent>();
     let mut transforms = w.change_cursor::<TransformComponent>();
-    let none = w.with_pair_mut::<AnimatorComponent, JointComponent, _>(plain, |_, _| ());
+    let none = w.with_mut_and_ref::<AnimatorComponent, JointComponent, _>(plain, |_, _| ());
     assert!(none.is_none(), "no animator: nothing borrowed");
-    w.with_pair_mut::<TransformComponent, JointComponent, _>(plain, |_, j| assert!(j.is_none()));
-    w.with_pair_mut::<AnimatorComponent, JointComponent, _>(full, |_, j| assert!(j.is_some()));
+    w.with_mut_and_ref::<TransformComponent, JointComponent, _>(plain, |_, j| assert!(j.is_none()));
+    w.with_mut_and_ref::<AnimatorComponent, JointComponent, _>(full, |_, j| assert!(j.is_some()));
     assert_eq!(w.changes(&mut animators), Changes::Ids(vec![full]));
-    assert_eq!(w.changes(&mut joints), Changes::Ids(vec![full]));
+    assert_eq!(
+        w.changes(&mut joints),
+        Changes::Ids(vec![]),
+        "read, never stamped"
+    );
     assert_eq!(w.changes(&mut transforms), Changes::Ids(vec![plain]));
 }
 

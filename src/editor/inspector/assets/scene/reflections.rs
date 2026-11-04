@@ -75,6 +75,8 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
             .body_returned
             .unwrap_or(false);
         if edited {
+            // A hand edit makes it manual (#1737), unless the edit was unticking it.
+            probe.manual |= probe.manual == scene.reflection_probes.probes[i].manual;
             scene.reflection_probes.edit(i, |p| *p = probe);
             changed = true;
         }
@@ -84,10 +86,11 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
         changed = true;
     }
     if ui.button(format!("{}  Add probe", icon::PLUS)).clicked() {
-        scene
-            .reflection_probes
-            .probes
-            .push(ReflectionProbe::default());
+        // Placed by hand: Generate Lighting keeps it (#1737).
+        scene.reflection_probes.probes.push(ReflectionProbe {
+            manual: true,
+            ..ReflectionProbe::default()
+        });
         changed = true;
     }
     changed
@@ -96,6 +99,10 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
 /// Probe `i`'s fields; returns whether one changed.
 fn draw_probe(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe, default: u32) -> bool {
     let mut changed = false;
+    changed |= ui
+        .checkbox(&mut p.manual, "Manual")
+        .on_hover_text("Generate Lighting keeps a manual probe and re-places the others")
+        .changed();
     changed |= vec_row(ui, "Position", &mut p.position);
     changed |= vec_row(ui, "Box min", &mut p.box_min);
     changed |= vec_row(ui, "Box max", &mut p.box_max);

@@ -16,14 +16,23 @@ Probes are addressed by **index** (0-based, in placement order), not by entity i
 `Move`/`Remove` on an out-of-range index are no-ops. `Remove` drops the grid layout
 (indices shift), so re-`FillGrid` after manual edits if you need trilinear sampling.
 
+A probe is **manual** or **placed** (#1737). `Add` and `FillGrid` make manual probes;
+`Lighting.Bake()` / Generate Lighting make placed ones. `Move` is a hand edit, so it
+makes the probe manual too: the next bake would otherwise put it back. Every bake
+replaces the placed probes and keeps the manual ones where they are, placing no probe
+within half a step of one. `SetManual` turns either into the other; a saved probe
+without the flag loads as placed. `Clear` removes both kinds.
+
 | Function | Signature | Returns |
 |---|---|---|
-| `Probe.Add` | `(x, y, z)` | the new probe's `index` |
-| `Probe.Move` | `(index, x, y, z)` | — |
+| `Probe.Add` | `(x, y, z)` | the new probe's `index` (manual) |
+| `Probe.SetManual` | `(index, manual)` | — (manual probes survive a bake's re-placement) |
+| `Probe.IsManual` | `(index)` | `true` if the probe is manual (`false` out of range) |
+| `Probe.Move` | `(index, x, y, z)` | — (the probe becomes manual) |
 | `Probe.Remove` | `(index)` | — (drops the grid layout) |
 | `Probe.Clear` | `()` | — (removes every probe) |
 | `Probe.Count` | `()` | probe count |
-| `Probe.FillGrid` | `(minX, minY, minZ, maxX, maxY, maxZ, spacing)` | — (regular grid; replaces existing probes) |
+| `Probe.FillGrid` | `(minX, minY, minZ, maxX, maxY, maxZ, spacing)` | — (regular grid of manual probes; replaces existing probes) |
 | `Probe.BakeAnalytic` | `()` | — (deterministic stand-in fill: projects the scene's ambient sky + first directional light to SH) |
 | `Probe.Bake` *(dev-only)* | `()` | `true` if the bake ran (or there are no probes, a no-op), `false` if no GPU/software adapter was available (skipped) — the real multi-bounce GI bake |
 | `Probe.SampleIrradiance` | `(x, y, z, nx, ny, nz)` | `r, g, b` — interpolated probe irradiance for a surface normal at a world position (linear RGB; black when there are no probes) |
@@ -71,5 +80,10 @@ field varies in space) and stays deterministic, so it runs anywhere with no GPU.
 it for quick, reproducible fills; use `Bake` for the real lighting. Its sky is the
 scene's ambient by direction, `Gradient` included, the same ambient `Bake` sees
 where its captures escape the scene. Sampling is
-**trilinear** over a grid, falling back to the nearest probe for free-placed probes or
-points outside the grid.
+**trilinear** over a grid. For free-placed probes, the automatic placement's layout
+(which has no grid: its density follows the geometry) or a point outside the grid, it
+blends the **four nearest probes** by inverse squared distance less the fifth's, so a
+probe's weight reaches zero just as a nearer one replaces it and an object moving
+between probes fades rather than pops. The nearest probes are found through a spatial index the
+set builds when it is first sampled after a change, so a sample reads the probes near
+it, not the whole set.
