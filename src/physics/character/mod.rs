@@ -16,7 +16,8 @@
 //! The capsule stays upright whatever the entity's rotation, and is the entity's
 //! collider in the physics world, so other characters, rays and triggers meet the
 //! same shape the move sweeps. [`PhysicsWorld::sync_characters`] keeps that
-//! collider's size and offset current each tick (crouching resizes it).
+//! collider's size and offset current before each step that follows a change to
+//! the controller or its pose (crouching resizes it; #1707).
 //!
 //! Determinism: the controller is a pure query over the pipeline state at the
 //! fixed dt; no wall-clock or RNG.

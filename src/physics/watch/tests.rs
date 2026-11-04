@@ -8,38 +8,76 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use proptest::prelude::*;
 
 use super::fixture_tests::{digest, fixture, scene_digest};
-use super::ops_tests::{apply, op, Op};
+use super::ops_tests::{apply, op, Op, SETTLE_STEPS};
 use crate::components::RigidBodyComponent;
 use crate::ecs::{Changes, WorldPose};
 use crate::physics::PhysicsWorld;
+use crate::scene::Scene;
 
-/// Run `ops` on two copies: incremental and full. Both must agree after each step.
-fn agree(ops: &[Op]) -> Result<(), TestCaseError> {
-    let (mut a, mut b) = (fixture(), fixture());
-    let mut fast = PhysicsWorld::from_scene(&a);
-    let mut full = PhysicsWorld::from_scene(&b);
-    full.tracked.always_full = true;
-    for (n, op) in ops.iter().chain(&[Op::Step, Op::Step]).enumerate() {
+/// The fixture twice: `a` synced from the change log, `b` in full every step.
+pub struct Twin {
+    pub a: Scene,
+    b: Scene,
+    pub fast: PhysicsWorld,
+    full: PhysicsWorld,
+}
+
+impl Twin {
+    pub fn new() -> Self {
+        let (a, b) = (fixture(), fixture());
+        let (fast, mut full) = (PhysicsWorld::from_scene(&a), PhysicsWorld::from_scene(&b));
+        full.tracked.always_full = true;
+        Self { a, b, fast, full }
+    }
+
+    /// Apply `op` to both copies, which must agree after every step it takes;
+    /// `Ok(false)` when rapier panicked in both, which ends the run.
+    pub fn run(&mut self, op: &Op) -> Result<bool, TestCaseError> {
+        if matches!(op, Op::Settle) {
+            for _ in 0..SETTLE_STEPS {
+                if !self.run(&Op::Step)? {
+                    return Ok(false);
+                }
+            }
+            return Ok(true);
+        }
         // A joint between two bodies rapier cannot solve panics inside its step,
         // on both syncs alike (#1775): that ends the run, and must end both.
-        let ran_a = catch_unwind(AssertUnwindSafe(|| apply(&mut a, &mut fast, op)));
-        let ran_b = catch_unwind(AssertUnwindSafe(|| apply(&mut b, &mut full, op)));
+        let ran_a = catch_unwind(AssertUnwindSafe(|| apply(&mut self.a, &mut self.fast, op)));
+        let ran_b = catch_unwind(AssertUnwindSafe(|| apply(&mut self.b, &mut self.full, op)));
         prop_assert_eq!(
             ran_a.is_ok(),
             ran_b.is_ok(),
-            "only one panicked at op {}",
-            n
+            "only one panicked at {:?}",
+            op
         );
         if ran_a.is_err() {
-            return Ok(());
+            return Ok(false);
         }
         if matches!(op, Op::Step | Op::Pause) {
-            let (l, r) = (digest(&fast), digest(&full));
-            let diff: Vec<_> = l.lines().zip(r.lines()).filter(|(a, b)| a != b).collect();
-            prop_assert!(l == r, "rapier after op {}: {:#?}", n, diff);
-            let (l, r) = (scene_digest(&a), scene_digest(&b));
-            let diff: Vec<_> = l.lines().zip(r.lines()).filter(|(a, b)| a != b).collect();
-            prop_assert!(l == r, "scene after op {}: {:#?}", n, diff);
+            same("rapier", &digest(&self.fast), &digest(&self.full))?;
+            same("scene", &scene_digest(&self.a), &scene_digest(&self.b))?;
+        }
+        Ok(true)
+    }
+}
+
+/// `l` and `r` are the same text; otherwise fail with the lines that differ.
+fn same(what: &str, l: &str, r: &str) -> Result<(), TestCaseError> {
+    let diff: Vec<_> = l.lines().zip(r.lines()).filter(|(a, b)| a != b).collect();
+    prop_assert!(l == r, "{} differs: {:#?}", what, diff);
+    Ok(())
+}
+
+/// Run `ops`, then two steps, on a [`Twin`].
+pub fn agree(ops: &[Op]) -> Result<(), TestCaseError> {
+    let mut twin = Twin::new();
+    for (n, op) in ops.iter().chain(&[Op::Step, Op::Step]).enumerate() {
+        let ran = twin
+            .run(op)
+            .map_err(|e| TestCaseError::fail(format!("op {n}: {e}")))?;
+        if !ran {
+            return Ok(());
         }
     }
     Ok(())
@@ -71,20 +109,4 @@ fn a_settled_level_names_nothing() {
         }
     }
     panic!("a body at rest still names itself every step");
-}
-
-/// A body disabled under a falling one keeps its world pose: the full write-back
-/// re-reads it under its parent's new pose, so the narrowed one must reach it too,
-/// though nothing named it before the step (the proptest's first find).
-#[test]
-fn a_disabled_body_under_a_falling_one_is_written_back() {
-    use crate::ecs::changes::ops_tests::{Edit, Op as W};
-    let ops = vec![
-        Op::World(W::On(2, Edit::Adopt(false))),
-        Op::World(W::On(5, Edit::Reparent(Some(1)))),
-        Op::Step,
-        Op::Pause,
-    ];
-    let r = agree(&ops);
-    assert!(r.is_ok(), "{r:?}");
 }

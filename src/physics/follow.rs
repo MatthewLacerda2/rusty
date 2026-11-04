@@ -1,7 +1,7 @@
 //! src/physics/follow.rs — colliders that follow animated bones (#464).
 //!
 //! A tick runs `Update` scripts → the physics step → the Animator → `LateUpdate`.
-//! The step pushes every pose into rapier at its *start*, so the bones the
+//! The step pushes the poses that changed into rapier at its *start* (#1707), so the bones the
 //! Animator (and `LateUpdate`) moved afterwards would otherwise be queried where
 //! they stood a tick earlier — a headshot would hit last frame's head. After the
 //! tick's last bone writer, [`PhysicsWorld::follow_bones`] moves every collider

@@ -11,8 +11,9 @@
 
 use std::collections::BTreeSet;
 
+use super::compound::member;
 use super::shape::build::body_state;
-use super::watch::{carriers, joint_deps, member, Changed, Owners, Watch};
+use super::watch::{carriers, joint_deps, Changed, Owners, Watch};
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
 

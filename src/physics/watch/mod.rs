@@ -39,7 +39,7 @@
 
 use std::collections::BTreeSet;
 
-use super::compound::{body_owner, BodyPlan};
+use super::compound::BodyPlan;
 use crate::components::{
     CharacterControllerComponent, ColliderComponent, JointComponent, RigidBodyComponent,
 };
@@ -53,6 +53,8 @@ mod edit_tests;
 mod fixture_tests;
 #[cfg(test)]
 mod ops_tests;
+#[cfg(test)]
+mod sleep_tests;
 #[cfg(test)]
 mod tests;
 
@@ -187,14 +189,6 @@ impl Tracked {
             self.member_owner.extend(ids.iter().map(|&id| (id, owner)));
         }
     }
-}
-
-/// The owner whose body `id`'s collider joins, as [`super::compound::plan`]
-/// decides it; `None` when `id` puts no collider in the plan.
-pub(super) fn member(scene: &Scene, id: u32) -> Option<u32> {
-    let w = &scene.world;
-    let collides = w.has_character_controller(id) || w.collider(id).is_some_and(|c| c.active);
-    collides.then(|| body_owner(scene, id))
 }
 
 /// Every entity that carries a body of its own: a Rigidbody or a CharacterController.

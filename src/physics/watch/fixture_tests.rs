@@ -6,6 +6,7 @@
 use std::fmt::Write;
 
 use glam::Vec3;
+use rapier3d::prelude::InteractionGroups;
 
 use super::ops_tests::{apply, Op, Phys};
 use crate::ecs::changes::ops_tests;
@@ -73,7 +74,11 @@ pub fn world_op(w: &mut crate::ecs::World, op: &ops_tests::Op) {
     }
 }
 
-/// Everything rapier holds for the scene's entities, as exact text (`{:?}` prints
+/// Everything rapier holds for the scene's entities that a sync writes or a step
+/// reads back: each body's class, enabled and sleeping flags, pose and next
+/// (kinematic) pose, velocities, gravity, CCD and mass; each collider's flags,
+/// collision and solver groups, offset, extent, material and mass; each joint's
+/// key, bodies and frames. As exact text (`{:?}` prints
 /// an `f32` so it reads back to the same bits).
 pub fn digest(p: &PhysicsWorld) -> String {
     let mut out = format!("plan {:?}\n", p.plan);
@@ -81,7 +86,8 @@ pub fn digest(p: &PhysicsWorld) -> String {
     bodies.sort_by_key(|&(&id, _)| id);
     for (id, &h) in bodies {
         let b = &p.bodies[h];
-        let (ty, on, pose) = (b.body_type(), b.is_enabled(), b.position());
+        let (ty, on, asleep) = (b.body_type(), b.is_enabled(), b.is_sleeping());
+        let pose = (b.position(), b.next_position());
         let (v, w, g, ccd) = (
             b.linvel(),
             b.angvel(),
@@ -90,7 +96,7 @@ pub fn digest(p: &PhysicsWorld) -> String {
         );
         let _ = writeln!(
             out,
-            "b{id} {ty:?} {on} {pose:?} {v:?} {w:?} {g} {ccd} {}",
+            "b{id} {ty:?} {on} {asleep} {pose:?} {v:?} {w:?} {g} {ccd} {}",
             b.mass()
         );
     }
@@ -98,8 +104,9 @@ pub fn digest(p: &PhysicsWorld) -> String {
     colliders.sort_by_key(|&(&id, _)| id);
     for (id, &h) in colliders {
         let c = &p.colliders[h];
-        let (on, sensor, g) = (c.is_enabled(), c.is_sensor(), c.collision_groups());
-        let groups = (g.memberships.bits(), g.filter.bits());
+        let (on, sensor) = (c.is_enabled(), c.is_sensor());
+        let bits = |g: InteractionGroups| (g.memberships.bits(), g.filter.bits());
+        let groups = (bits(c.collision_groups()), bits(c.solver_groups()));
         let local = (c.position_wrt_parent(), c.shape().compute_local_aabb());
         let material = (c.friction(), c.restitution(), c.friction_combine_rule());
         let _ = writeln!(
@@ -108,7 +115,12 @@ pub fn digest(p: &PhysicsWorld) -> String {
             c.mass()
         );
     }
-    let joints: Vec<_> = p.joints.iter().map(|(id, j)| (id, &j.key)).collect();
-    let _ = writeln!(out, "joints {joints:?}");
+    for (id, j) in &p.joints {
+        let frames = p.impulse_joints.get(j.handle).map(|r| {
+            let d = &r.data;
+            (r.body1(), r.body2(), d.local_frame1, d.local_frame2)
+        });
+        let _ = writeln!(out, "j{id} {:?} {frames:?}", j.key);
+    }
     out
 }

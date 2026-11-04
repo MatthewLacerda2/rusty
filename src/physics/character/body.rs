@@ -1,6 +1,6 @@
 //! src/physics/character/body.rs — the CharacterController's capsule as the
 //! entity's collider in the physics world: what it is built from, and keeping it
-//! sized and upright each tick.
+//! sized and upright before each step that follows a change to it (#1707).
 
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
