@@ -8,7 +8,9 @@
 //! edge, so a sliver owns every texel it crosses along its length. What is left to
 //! dilation: an overlap shallower than the inset at the border of a wider triangle,
 //! and texels no triangle touches. Dilation fills the ones bordering a chart so
-//! filtering never reads black at a seam.
+//! filtering never reads black at a seam, and [`fill_rest`] the rest of the map
+//! from its nearest chart, so no mip level averages the empty background in
+//! (#1694).
 
 use glam::{Vec2, Vec3};
 
@@ -176,6 +178,33 @@ pub(super) fn dilate(texels: &mut [Vec3], filled: &mut [bool], size: u32, passes
                     texels[i] = sum / n;
                     filled[i] = true;
                 }
+            }
+        }
+    }
+}
+
+/// Fill every texel still empty with the value of its nearest filled texel (in
+/// four-neighbour steps, ties to the texel found first in row-major order), so a
+/// mip level that averages a chart's border with the map's empty background reads
+/// the chart's light, not black (#1694). A map with no filled texel stays as it is.
+pub(super) fn fill_rest(texels: &mut [Vec3], filled: &[bool], size: u32) {
+    let size = size as usize;
+    let mut done = filled.to_vec();
+    let mut queue: std::collections::VecDeque<usize> =
+        (0..done.len()).filter(|&i| done[i]).collect();
+    while let Some(i) = queue.pop_front() {
+        let (x, y) = (i % size, i / size);
+        let near = [
+            (x > 0).then(|| i - 1),
+            (x + 1 < size).then(|| i + 1),
+            (y > 0).then(|| i - size),
+            (y + 1 < size).then(|| i + size),
+        ];
+        for j in near.into_iter().flatten() {
+            if !done[j] {
+                texels[j] = texels[i];
+                done[j] = true;
+                queue.push_back(j);
             }
         }
     }

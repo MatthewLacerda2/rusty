@@ -10,7 +10,7 @@
 #import lighting::sh::sh_basis
 #import lighting::reflection_probe::{ReflectionProbe, parallax_correct}
 #import forward::proxy_volume::proxy_irradiance
-#import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, instances, lighting, s_decal, s_refl_cube, s_shadow, s_skybox, shadow, t_ao, t_decal_color, t_decal_data, t_refl_cube, t_shadow, t_skybox}
+#import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, instances, lighting, s_decal, s_refl_cube, s_shadow, s_skybox, shadow, t_ao, t_decal_color, t_decal_data, t_lightmaps, t_refl_cube, t_shadow, t_skybox}
 
 // Fold the decals binned into `cluster` into `s`, oldest first (FIFO, #638): each
 // newer decal lands over the older ones. Derivatives are taken here, before the
@@ -33,8 +33,19 @@ fn ambient_occlusion(frag: vec2<f32>) -> f32 {
     return textureLoad(t_ao, min(vec2<u32>(frag), last), 0).r;
 }
 
-// RGBM's range (#438); mirrors `RGBM_RANGE` in src/scene/lighting/lightmap/encode.rs.
-const LIGHTMAP_RGBM_RANGE: f32 = 8.0;
+// The mip level of the lightmap pages that `uv` reads (#1694): the larger screen
+// footprint of one pixel, in page texels, as a GPU's own implicit LOD picks it. The
+// derivatives are taken here, so call it before any per-pixel branch
+// (src/render/CLAUDE.md); the sample itself then reads with `textureSampleLevel`,
+// which is safe in the per-instance branch that follows.
+fn lightmap_level(uv: vec2<f32>) -> f32 {
+    let edge = f32(textureDimensions(t_lightmaps).x);
+    let levels = f32(textureNumLevels(t_lightmaps));
+    let dx = dpdx(uv) * edge;
+    let dy = dpdy(uv) * edge;
+    let footprint = max(dot(dx, dx), dot(dy, dy));
+    return clamp(0.5 * log2(max(footprint, 1e-8)), 0.0, levels - 1.0);
+}
 
 // Directional lightmaps (#810): reshape baked irradiance by how the shading normal `N`
 // faces the dominant incoming direction, relative to the geometric normal `Ng` the

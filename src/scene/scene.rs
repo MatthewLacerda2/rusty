@@ -105,7 +105,7 @@ pub struct Scene {
     /// applicable probe with box-projected parallax correction instead of the global
     /// skybox. The cubemaps themselves are baked by a later issue (#245).
     pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
-    /// Baked lightmaps (#438): which RGBM lightmap file each static mesh wears. A mesh
+    /// Baked lightmaps (#438): which lightmap page each static mesh wears. A mesh
     /// absent from it keeps probe / ambient lighting.
     pub lightmaps: crate::scene::lighting::lightmap::LightmapSet,
     /// What Generate Lighting bakes with (#832), saved with the scene.

@@ -9,6 +9,7 @@ use super::{Progress, Step};
 pub(super) fn progress(p: &Progress, left: Option<Duration>) -> String {
     let what = match p.step {
         Step::Lightmaps => "lightmaps".to_string(),
+        Step::LightmapPages => "lightmap pages".to_string(),
         Step::LightProbes { bounce, max } => {
             format!("light probes, bounce {bounce} of at most {max}:")
         }
@@ -25,6 +26,7 @@ pub(super) fn progress(p: &Progress, left: Option<Duration>) -> String {
             count(p.total)
         ),
         (Step::Lightmaps, None) => format!("{}/{} texels", count(p.done), count(p.total)),
+        (Step::LightmapPages, _) => format!("{}/{} pages encoded", p.done, p.total),
         _ => format!("{}/{} probes", p.done, p.total),
     };
     let mut line = format!("[Lighting] {what} {percent}% ({counts})");

@@ -270,6 +270,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5ca8c67a97492f3c8263ce18d307053f8aa657e8ecbf191484676bb25ae5f4a"
 dependencies = [
  "bytemuck",
+ "half",
 ]
 
 [[package]]
@@ -1287,6 +1288,7 @@ version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b"
 dependencies = [
+ "bytemuck",
  "cfg-if",
  "crunchy",
  "num-traits",

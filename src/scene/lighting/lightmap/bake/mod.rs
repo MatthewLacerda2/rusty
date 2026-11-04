@@ -10,10 +10,11 @@ use std::thread;
 
 use glam::Vec3;
 
+use super::atlas::{max_map_edge, MAX_PAGE};
 use super::filter::smooth;
 use super::input::BakeScene;
 use super::progress::BakeProgress;
-use super::raster::{dilate, lightmap_size, rasterize, world_per_uv, TexelPoint};
+use super::raster::{dilate, fill_rest, lightmap_size, rasterize, world_per_uv, TexelPoint};
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
@@ -37,7 +38,9 @@ pub struct BakeSettings {
     pub bounces: u32,
     /// The seed every texel's sample stream derives from.
     pub seed: u64,
-    /// Largest lightmap edge, in texels (at most an atlas page, less its ring).
+    /// Largest lightmap edge, in texels. At most [`max_map_edge`] of the largest
+    /// page ([`MAX_PAGE`]), so the biggest maps still pair on a page (#1694); the
+    /// default is the largest that pairs on a 1024 page.
     pub max_resolution: u32,
     /// Radius, in texels, of the Gaussian that smooths the baked bounce (Unity's
     /// indirect filter); 0 leaves it raw. Baked direct light is never filtered.
@@ -55,7 +58,7 @@ impl Default for BakeSettings {
             samples: 128,
             bounces: 3,
             seed: 0,
-            max_resolution: 512,
+            max_resolution: max_map_edge(1024),
             filter_radius: 3,
             directional: true,
         }
@@ -133,8 +136,8 @@ pub(super) fn bake_on(
 ) -> Option<Vec<Lightmap>> {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer { scene, rays: &rays };
-    // Every lightmap must fit an atlas page with its ring around it.
-    let max = settings.max_resolution.min(super::atlas::MAX_PAGE - 2);
+    // Every lightmap must pair on the largest atlas page with its ring around it.
+    let max = settings.max_resolution.min(max_map_edge(MAX_PAGE));
     // Rasterize everything first, so the total is known before the first texel.
     let charts: Vec<(usize, u32, Vec<TexelPoint>)> = scene
         .meshes
@@ -199,7 +202,8 @@ fn lightmap(
 
 /// One chart's traced texels as its `size`² lightmap and, for a directional bake,
 /// its direction map: the bounce (and its directions) smoothed, the direct light
-/// added, then both dilated past the chart's edge.
+/// added, then both dilated past the chart's edge and the rest of the map filled
+/// from its nearest chart (`raster::fill_rest`, for the mips, #1694).
 fn assemble(
     points: &[TexelPoint],
     light: &[TexelLight],
@@ -228,11 +232,14 @@ fn assemble(
         filled[point.index] = true;
     }
     if settings.directional {
-        dilate(&mut directions, &mut filled.clone(), size, DILATE_PASSES);
+        let mut ring = filled.clone();
+        dilate(&mut directions, &mut ring, size, DILATE_PASSES);
+        fill_rest(&mut directions, &ring, size);
     } else {
         directions.clear();
     }
     dilate(&mut texels, &mut filled, size, DILATE_PASSES);
+    fill_rest(&mut texels, &filled, size);
     (texels, directions)
 }
 

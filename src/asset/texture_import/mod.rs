@@ -34,6 +34,10 @@
 //! source's bytes, the settings and [`ENCODER_VERSION`]; any difference re-encodes
 //! (`cache`). An export ships it (`dev::export`), so a shipped game never encodes.
 //!
+//! **What it skips**: a baked lightmap page (`asset::lightmap_page`, #1694), which
+//! is not a colour texture. A cache whose source is gone, or is such a page, is
+//! deleted by the next [`refresh_all`] (`orphans`).
+//!
 //! **When it is not compressed**: *Compression* `None`, or an image whose fitted
 //! size is not a multiple of 4 on both sides (a BC texture's base level must be;
 //! Unity leaves such a texture uncompressed too). A downscale to *Max Size* rounds
@@ -41,6 +45,7 @@
 
 mod cache;
 mod encode;
+mod orphans;
 mod refresh;
 mod shrink;
 
@@ -50,6 +55,7 @@ use std::path::{Path, PathBuf};
 
 use image::ImageReader;
 
+pub(crate) use encode::{banded, blocks_len};
 pub use encode::{full_chain_len, BlockFormat, Compressed};
 pub use refresh::{images, queue, queue_changed, refresh, refresh_all, Refreshed};
 pub use shrink::fit;
@@ -221,6 +227,8 @@ pub const CACHE_SUFFIX: &str = ".bctex";
 mod cache_tests;
 #[cfg(test)]
 mod load_tests;
+#[cfg(test)]
+mod orphans_tests;
 #[cfg(test)]
 mod srgb_tests;
 #[cfg(test)]
