@@ -9,6 +9,11 @@ from __future__ import annotations
 
 WAIT, GO, STOP = "wait", "go", "stop"
 
+# The head moved during the CI wait to a sha this queue never pushed (#1799):
+# nothing was judged about it, so under `--watch` the take ends [`REQUEUED`]
+# and remembers nothing; a named take still hands it back.
+HEAD_MOVED = "head moved"
+
 # Red for the runners' reasons only ([`verdict.runners.outage`], #869): re-run it once.
 RERUN = "rerun"
 
@@ -52,7 +57,8 @@ STOPPED, NOT_TAKEN = "stopped the queue", "not taken"
 NOT_READY = "not ready"
 
 # A merge train's member that goes back in line as it was: its train was red or
-# stalled (its half is tested next), or a member ahead of it did not land (#1785).
+# stalled (its half is tested next), or a member ahead of it did not land (#1785);
+# or a single take whose head moved during its CI wait ([`HEAD_MOVED`], #1799).
 # Nothing is remembered against it.
 REQUEUED = "back in line"
 
