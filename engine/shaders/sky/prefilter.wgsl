@@ -3,7 +3,7 @@
 // skybox-as-default-reflection-probe. One dispatch per mip, one invocation per texel
 // of every face; mip 0 is the sky itself (roughness 0), each later mip the sky
 // convolved for roughness `mip / (mips - 1)`, read at
-// `roughness * (mips - 1)` by `forward::lighting::environment_reflection` exactly as a
+// `roughness * (mips - 1)` by `forward::reflection::environment_reflection` exactly as a
 // probe cube is.
 //
 // The convolution is `render::ibl::reflection_prefilter`'s, on the GPU, through the

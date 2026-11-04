@@ -99,6 +99,7 @@ pub const LAYERS: &[Layer] = &[
             "audio",
             "components",
             "core",
+            "ecs",
             "navigation",
             "physics",
             "scene",

@@ -14,7 +14,7 @@ use rusty::scene::{Camera, Scene};
 
 /// A one-mip `size`² half-float KTX2 cubemap (what the bake writes, #1696), every
 /// face the solid linear `rgb`.
-fn solid_cube_ktx2(size: u32, rgb: [f32; 3]) -> Vec<u8> {
+pub(crate) fn solid_cube_ktx2(size: u32, rgb: [f32; 3]) -> Vec<u8> {
     const MAGIC: [u8; 12] = [
         0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
     ];

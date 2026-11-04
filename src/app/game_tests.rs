@@ -9,10 +9,10 @@ use glam::Vec3;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub(super) const DT: f32 = 1.0 / 60.0;
+pub(in crate::app) const DT: f32 = 1.0 / 60.0;
 
 /// A bare play-mode world over `scene`; nav grid spans the demo bounds.
-pub(super) fn world_with(scene: Rc<RefCell<Scene>>) -> GameWorld {
+pub(in crate::app) fn world_with(scene: Rc<RefCell<Scene>>) -> GameWorld {
     let input = Rc::new(RefCell::new(InputState::new()));
     let nav = Rc::new(RefCell::new(NavigationGraph::new(
         -20.0, 20.0, -20.0, 20.0, 1.0,

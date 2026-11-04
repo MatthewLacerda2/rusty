@@ -47,16 +47,26 @@ pub(super) fn sample_into(
     out: &mut Vec<JointTransform>,
 ) {
     out.clear();
-    out.extend(skin.local_bind.iter().enumerate().map(|(slot, bind)| {
-        let Some(track) = clip.tracks.get(slot) else {
-            return *bind;
-        };
-        JointTransform {
-            translation: sample_vec(&track.translation, time).unwrap_or(bind.translation),
-            rotation: sample_quat(&track.rotation, time).unwrap_or(bind.rotation),
-            scale: sample_vec(&track.scale, time).unwrap_or(bind.scale),
-        }
-    }));
+    out.extend((0..skin.local_bind.len()).map(|slot| sample_joint(skin, clip, slot, time)));
+}
+
+/// One joint's local transform at `time` (see [`sampled_locals`]); the identity
+/// for a slot the skin doesn't have.
+pub(super) fn sample_joint(
+    skin: &SkinData,
+    clip: &AnimationClip,
+    slot: usize,
+    time: f32,
+) -> JointTransform {
+    let bind = skin.local_bind.get(slot).copied().unwrap_or_default();
+    let Some(track) = clip.tracks.get(slot) else {
+        return bind;
+    };
+    JointTransform {
+        translation: sample_vec(&track.translation, time).unwrap_or(bind.translation),
+        rotation: sample_quat(&track.rotation, time).unwrap_or(bind.rotation),
+        scale: sample_vec(&track.scale, time).unwrap_or(bind.scale),
+    }
 }
 
 /// Find the keyframe interval `[i, i+1]` bracketing `time` and the in-segment factor

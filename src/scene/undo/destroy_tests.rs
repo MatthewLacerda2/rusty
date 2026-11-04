@@ -110,3 +110,26 @@ fn an_undone_destroy_of_a_child_puts_it_back_in_its_parents_children() {
     scene.world.set_active(parent, false);
     assert!(!scene.world.is_active_in_hierarchy(child));
 }
+
+/// Undo puts a step's entities back in id order (#1805): a child despawned out of
+/// its parent's list comes back listed once, and a child older than its parent
+/// comes back before it and waits for it.
+#[test]
+fn an_undone_destroy_puts_both_sides_of_a_parent_link_back() {
+    for child_first in [false, true] {
+        let mut scene = Scene::new();
+        let names = if child_first {
+            ["Child", "Group"]
+        } else {
+            ["Group", "Child"]
+        };
+        let [a, b] = names.map(|n| scene.add_entity(n.to_string()));
+        let (group, child) = if child_first { (b, a) } else { (a, b) };
+        scene.set_parent(child, Some(group)).unwrap();
+        let before = document(&scene);
+        destroy(&mut scene, if child_first { group } else { child });
+        scene.undo();
+        assert_eq!(document(&scene), before, "child first: {child_first}");
+        assert_eq!(scene.world.children(group), vec![child]);
+    }
+}

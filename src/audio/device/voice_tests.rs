@@ -2,6 +2,7 @@
 //! #465). The rendered behaviour — through kira's tracks — is `backend_tests.rs`.
 
 use super::*;
+use crate::audio::backend::VoiceMix;
 
 #[test]
 fn mono_panned_hard_left_silences_the_right_channel() {
@@ -50,6 +51,7 @@ fn control_clamps_out_of_range_values_and_tracks_liveness() {
         pan: -3.0,
         spatial_blend: 2.0,
         speed: -1.0,
+        doppler: f32::NAN,
         paused: false,
         low_pass: 500.0,
     });

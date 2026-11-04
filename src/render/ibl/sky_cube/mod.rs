@@ -3,7 +3,7 @@
 //! (Lighting → Environment → Environment Reflections), the sky is captured into a
 //! cube and GGX-prefiltered into a roughness mip chain (`sky/prefilter.wgsl`), and
 //! the forward pass samples it at `roughness * (mips - 1)` exactly as it samples a
-//! probe (`forward::lighting::environment_reflection`). So a rough metal reflects a
+//! probe (`forward::reflection::environment_reflection`). So a rough metal reflects a
 //! blurred sky and a mirror a sharp one; the sky pass still draws the sky sharp.
 //!
 //! Three cubes, one bound at group-0 binding 2 in the panorama's old place:

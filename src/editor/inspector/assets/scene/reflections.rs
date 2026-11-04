@@ -2,7 +2,8 @@
 //! defaults (resolution, memory budget, probe ceiling) and every probe's Unity Reflection Probe
 //! settings, the same fields `Reflection.Set` / `Reflection.Get` and
 //! `Lighting.SetSettings` write. Edits go through `ReflectionProbeSet::edit`, which
-//! clamps them as the API's do.
+//! clamps them as the API's do; *Fallback* goes through `set_fallback`, which keeps
+//! one (#1697), as `Reflection.SetFallback` does.
 
 use egui_phosphor::regular as icon;
 
@@ -76,8 +77,14 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
             .unwrap_or(false);
         if edited {
             // A hand edit makes it manual (#1737), unless the edit was unticking it.
-            probe.manual |= probe.manual == scene.reflection_probes.probes[i].manual;
+            let was = &scene.reflection_probes.probes[i];
+            probe.manual |= probe.manual == was.manual;
+            let fallback = (probe.fallback != was.fallback).then_some(probe.fallback);
             scene.reflection_probes.edit(i, |p| *p = probe);
+            if let Some(on) = fallback {
+                // At most one fallback: ticking it here unticks any other (#1697).
+                scene.reflection_probes.set_fallback(on.then_some(i));
+            }
             changed = true;
         }
     }
@@ -102,6 +109,10 @@ fn draw_probe(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe, default: u32
     changed |= ui
         .checkbox(&mut p.manual, "Manual")
         .on_hover_text("Generate Lighting keeps a manual probe and re-places the others")
+        .changed();
+    changed |= ui
+        .checkbox(&mut p.fallback, "Fallback")
+        .on_hover_text("What objects outside every probe's box reflect instead of the sky")
         .changed();
     changed |= vec_row(ui, "Position", &mut p.position);
     changed |= vec_row(ui, "Box min", &mut p.box_min);
@@ -140,6 +151,9 @@ fn draw_probe(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe, default: u32
         false => p.cubemap_path.as_str(),
     };
     ui.label(format!("Cubemap: {baked}"));
+    if p.irradiance.is_none() && !p.cubemap_path.is_empty() {
+        ui.label("Baked before normalisation: re-bake to darken it in dark corners");
+    }
     changed
 }
 
