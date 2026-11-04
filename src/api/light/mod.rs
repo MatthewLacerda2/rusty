@@ -1,14 +1,16 @@
-//! src/api/light.rs — `Light` namespace.
+//! src/api/light/ — `Light` namespace.
 //!
 //! Get/Set over an entity's optional `LightComponent`: colour, intensity, range,
-//! light type, whether it casts shadows, its mode (#438) and an Area light's size
-//! (#1674). Every setter maps onto a
+//! light type, whether it casts shadows and how far its shadow reaches
+//! (`shadows`), its mode (#438) and an Area light's size (#1674). Every setter maps onto a
 //! real field the renderer reads
 //! (`apply_scene_lights`), so a script tweak takes effect on the next frame's
 //! lighting uniform; an Area light is baked only, so its size shows after the
 //! next bake. There is no per-light "active" flag in the engine — a light
 //! is gated by its owning entity's `active` (a `Scene` concern), so this surface
 //! deliberately exposes the light's own data and nothing more.
+
+mod shadows;
 
 use glam::Vec3;
 use mlua::Lua;
@@ -29,7 +31,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, console: ApiCell<ConsoleLogs>)
     register_intensity(lua, &table, scene)?;
     register_range(lua, &table, scene)?;
     register_type(lua, &table, scene)?;
-    register_cast_shadows(lua, &table, scene)?;
+    shadows::register(lua, &table, scene)?;
     register_mode(lua, &table, scene, console)?;
     register_area_size(lua, &table, scene)?;
 
@@ -158,34 +160,6 @@ fn register_type(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
     )
 }
 
-/// `GetCastShadows` / `SetCastShadows`: whether a point or spot light casts shadows
-/// through the shadow atlas (#468). The sun always casts; it ignores the flag.
-fn register_cast_shadows(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
-    put(
-        table,
-        "GetCastShadows",
-        lua.create_function(move |lua, id: EntityArg| {
-            let scene = &*scene.get(lua)?;
-            let scene = scene.borrow();
-            Ok(scene.world.light(id.read()).is_some_and(|l| l.cast_shadows))
-        }),
-    )?;
-
-    put(
-        table,
-        "SetCastShadows",
-        lua.create_function(move |lua, (id, on): (EntityArg, bool)| {
-            let scene = &*scene.get(lua)?;
-            let id = id.live("Light", "SetCastShadows")?;
-            let mut scene = scene.borrow_mut();
-            if let Some(mut c) = scene.world.light_mut(id) {
-                light_ops::set_cast_shadows(&mut c, on);
-            }
-            Ok(())
-        }),
-    )
-}
-
 /// `GetMode` / `SetMode` over the light's Realtime / Mixed / Baked mode (#438), by
 /// name. Unknown names on `SetMode` are ignored (the current mode is kept); an Area
 /// light reads its effective `Baked` and refuses anything else with a console
@@ -264,5 +238,4 @@ fn register_area_size(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
 }
 
 #[cfg(test)]
-#[path = "light_tests.rs"]
-mod light_tests;
+mod tests;

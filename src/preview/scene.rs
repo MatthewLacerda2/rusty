@@ -133,6 +133,7 @@ fn add_key_light(scene: &mut Scene) {
             outer_cone: 0.0,
             cast_shadows: false,
             mode: Default::default(),
+            shadow_fade_distance: 0.0,
         }),
     );
 }

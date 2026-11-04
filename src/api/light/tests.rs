@@ -39,6 +39,13 @@ fn set_get_color_intensity_range_type() {
         lua.load(format!("Light.SetCastShadows({id}, true)"))
             .exec()
             .unwrap();
+        lua.load(format!("Light.SetShadowFadeDistance({id}, 40)"))
+            .exec()
+            .unwrap();
+        let fade: f32 = lua
+            .load(format!("return Light.GetShadowFadeDistance({id})"))
+            .eval()?;
+        assert_eq!(fade, 40.0);
         lua.load(format!("Light.SetMode({id}, 'baked')"))
             .exec()
             .unwrap();

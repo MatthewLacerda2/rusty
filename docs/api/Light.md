@@ -1,7 +1,7 @@
 ## `Light`
 
 Read and tune an entity's `LightComponent` — colour, intensity, range, type and
-whether it casts shadows, and its mode.
+whether it casts shadows (and how far from the camera), and its mode.
 Every setter but `SetAreaSize` maps onto a field the renderer reads when it packs
 the lighting uniform, so a change takes effect on the next frame; an Area light is
 baked only, so its size (and any change to an Area light) shows after the next
@@ -22,6 +22,7 @@ entity has no light. A spotlight's cone half-angles have no verb here: write
 | `Light.GetRange` / `SetRange` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
 | `Light.GetType` / `SetType` | `(id)` / `(id, name)` | `"Ambient"` / `"Directional"` / `"Point"` / `"Spot"` / `"Area"` (Unity's names) |
 | `Light.GetCastShadows` / `SetCastShadows` | `(id)` / `(id, on)` | `boolean` (default `false`; point and spot lights, and an Area light's stand-in in a bake capture: the lightmap and probe bake shadow an Area light always) |
+| `Light.GetShadowFadeDistance` / `SetShadowFadeDistance` | `(id)` / `(id, metres)` | `number`: how far from the camera a point or spot light's shadow reaches (default `0`, no fade; clamped ≥ 0; NaN or `math.huge` reads as 0) |
 | `Light.GetMode` / `SetMode` | `(id)` / `(id, name)` | `"Realtime"` / `"Mixed"` / `"Baked"` (an Area light reads `"Baked"` and refuses all but `"Baked"`, with a console warning) |
 | `Light.GetAreaSize` / `SetAreaSize` | `(id)` / `(id, width, height)` | `width, height` in world units (default `1, 1`; each side floored at `0.01`; a NaN or `math.huge` side refuses the whole size, keeping the current one; `0, 0` with no light) |
 
@@ -56,8 +57,14 @@ the room outranks a dim one beside the camera. Ties go to the earlier entity, so
 the same scene always drops the same lights. Camera drops are counted in
 `Debug.Stats().lights_dropped`, cluster drops in `cluster_lights_dropped` (non-zero
 means some corner of the view is over budget). `Baked` lights never take part. A
-light outside the view costs nothing. A light's **range** is a hard cut-off and also how far it reaches into
-the cluster grid, so a tight range is the cheap one. Up to **4** directional lights
+light outside the view costs nothing. One whose intensity or colour is zero (a
+blinking alarm in its off half: #1712) is listed in no cluster, so no pixel shades
+it; it still counts towards the camera's budget of 64 (by its range, as any light
+does) and, if it casts shadows, it may still take atlas tiles and draw its
+casters. A light's **range** is a hard cut-off, what the camera's budget ranks it
+by, and how far it reaches into the cluster grid, so a tight range is the cheap
+one; a spotlight is listed only in the clusters its cone touches, so a narrow beam
+costs fewer pixels than a point light of the same range. Up to **4** directional lights
 shade at once; the last active one is the sun that casts the cascaded shadows. Only
 the last active ambient light counts: it replaces the scene's ambient, a `Gradient`
 one included, with its single colour (`Lighting.md`, *Environment*).
@@ -89,7 +96,11 @@ The atlas holds sixteen 512² tiles, so one point light at full size takes
 six of them. Every caster shadows
 into the atlas as it does into the cascades: cutout and dissolving materials clip
 their shadow, skinned meshes cast in their animated pose. Lit particles are not
-shadowed.
+shadowed. **Shadow fade distance** (`SetShadowFadeDistance`, HDRP's *Shadow Fade
+Distance*, #1712) stops a far light's shadow from being sampled: over the last tenth
+of that distance between the camera and the light the shadow fades out, and past it
+the light shades unshadowed. `0`, the default, never fades. The light keeps its
+atlas tiles either way.
 
 ### Cast Shadows
 
