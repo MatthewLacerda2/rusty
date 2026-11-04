@@ -8,10 +8,11 @@
 //! still (speed 0) fires nothing. Which markers count:
 //! - only the **current** motion's: a motion being faded out by a crossfade is
 //!   silent (the one coming in fires from its first frame);
-//! - in a blend tree, only the **dominant** leaf clip's — the highest weight
-//!   over the whole tree, nested trees included (#1746), the first depth-first
-//!   on a tie — so a walk/run blend plays one footstep, not two, and a clip
-//!   reached by two paths never fires twice;
+//! - in a blend tree, only the **dominant** leaf clip's: the heaviest child at
+//!   each level, down through nested trees (#1746), the first on a tie, among
+//!   children with a clip the mesh has beneath them — so a walk/run blend plays
+//!   one footstep, not two, and a direction split into walk and run still beats
+//!   a lighter direction;
 //! - on an extra layer, only while its weight is above 0;
 //! - plus the automatic [`END_EVENT`] when a non-looping motion reaches its end
 //!   playing forwards: once per pass, since its playhead clamps there (#1362),
@@ -24,7 +25,7 @@
 
 use crate::components::{Bounds, Motion, Playback, Playhead, Step};
 
-use super::blend_tree::{for_each_leaf, Leaf};
+use super::blend_tree::dominant_leaf;
 use super::motion::MotionContext;
 
 /// The automatic event a non-looping clip (or blend tree) fires when its playhead
@@ -115,13 +116,8 @@ impl MotionContext<'_> {
                 let Some(tree) = machine.node(node).and_then(|n| n.blend_tree.as_ref()) else {
                     return Vec::new();
                 };
-                let mut dominant: Option<Leaf> = None;
-                for_each_leaf(tree, self.parameters, &mut |leaf| {
-                    if dominant.is_none_or(|d| leaf.weight > d.weight) {
-                        dominant = Some(leaf);
-                    }
-                });
-                let Some(leaf) = dominant else {
+                let resolves = |clip: &str| self.clip(clip).is_some();
+                let Some(leaf) = dominant_leaf(tree, self.parameters, &resolves) else {
                     return Vec::new();
                 };
                 let length = self.clip(leaf.clip).map_or(0.0, |c| c.duration);

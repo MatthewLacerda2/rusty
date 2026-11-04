@@ -20,11 +20,11 @@ impl AnimationGraph {
             (Some(_), false) => {
                 problems.push(format!("node '{name}' has both a clip and a blend tree"))
             }
-            (Some(tree), true) => {
-                let label = format!("node '{name}' blend tree");
-                self.check_tree(&label, name, tree, 1, problems)
-            }
-            (None, false) => {}
+            _ => {}
+        }
+        if let Some(tree) = &node.blend_tree {
+            let label = format!("node '{name}' blend tree");
+            self.check_tree(&label, name, tree, 1, problems);
         }
         let label = format!("node '{name}'");
         if node.blend_tree.is_some() && !node.events.is_empty() {
@@ -84,31 +84,37 @@ impl AnimationGraph {
     ) {
         for (i, (motion, _)) in tree.children().enumerate() {
             let child = format!("{path}/children[{i}]");
-            match (&motion.blend_tree, motion.clip.is_empty()) {
-                (None, true) => problems.push(format!(
+            let has_clip = !motion.clip.is_empty();
+            match (&motion.blend_tree, has_clip) {
+                (None, false) => problems.push(format!(
                     "{label} child '{child}' has neither a clip nor a blend tree"
                 )),
-                (Some(_), false) => problems.push(format!(
+                (Some(_), true) => problems.push(format!(
                     "{label} child '{child}' has both a clip and a blend tree"
                 )),
-                (Some(_), true) if depth >= MAX_TREE_DEPTH => problems.push(format!(
-                    "{label} child '{child}' nests trees deeper than {MAX_TREE_DEPTH}"
-                )),
-                (Some(nested), true) => {
-                    let nested_label = format!("blend tree '{child}'");
-                    self.check_tree(&nested_label, &child, nested, depth + 1, problems);
-                    if !motion.events.is_empty() {
-                        problems.push(format!(
-                            "{nested_label} has events of its own; put them on its children"
-                        ));
-                    }
-                }
-                (None, false) => check_events(
-                    &format!("{label} child '{}'", motion.clip),
-                    &motion.events,
-                    problems,
-                ),
+                _ => {}
             }
+            if let Some(nested) = &motion.blend_tree {
+                let nested_label = format!("blend tree '{child}'");
+                if depth >= MAX_TREE_DEPTH {
+                    problems.push(format!(
+                        "{label} child '{child}' nests trees deeper than {MAX_TREE_DEPTH}"
+                    ));
+                } else {
+                    self.check_tree(&nested_label, &child, nested, depth + 1, problems);
+                }
+                if !motion.events.is_empty() {
+                    problems.push(format!(
+                        "{nested_label} has events of its own; put them on its children"
+                    ));
+                }
+            }
+            let named = if has_clip { &motion.clip } else { &child };
+            check_events(
+                &format!("{label} child '{named}'"),
+                &motion.events,
+                problems,
+            );
         }
     }
 }

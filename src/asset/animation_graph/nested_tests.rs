@@ -118,3 +118,29 @@ fn trees_nest_at_most_the_depth_cap() {
     assert_eq!(chain(MAX_TREE_DEPTH).validate(), Ok(()));
     assert!(problems(&chain(MAX_TREE_DEPTH + 1)).contains("nests trees deeper than 8"));
 }
+
+#[test]
+fn one_load_reports_a_tree_under_a_child_that_also_has_a_clip() {
+    let mut graph = parsed();
+    graph.parameters.remove("speed");
+    if let Some(BlendTree::FreeformDirectional2D { children, .. }) =
+        &mut graph.base.nodes[0].blend_tree
+    {
+        children[0].motion.clip = "Fwd".into();
+        let event = |time: f32| AnimationEvent {
+            time,
+            name: "".into(),
+        };
+        children[0].motion.events.push(event(-1.0));
+    }
+    let found = problems(&graph);
+    for expected in [
+        "child 'Loco/children[0]' has both a clip and a blend tree",
+        "blend tree 'Loco/children[0]' reads 'speed'",
+        "blend tree 'Loco/children[0]' has events of its own",
+        "child 'Fwd' has an event with an empty name",
+        "event '' has a negative or non-finite time",
+    ] {
+        assert!(found.contains(expected), "missing '{expected}' in: {found}");
+    }
+}

@@ -128,7 +128,7 @@ walk→run tree by `speed`:
   (`blend tree 'Locomotion/children[0]' reads 'speed', which is not a declared
   Float parameter`): undeclared parameters, empty trees, duplicate points, a
   child with both or neither of `clip` and `blend_tree`, and events on a child
-  holding a tree.
+  holding a tree. One load reports every problem it finds, at every level.
 - Trees nest at most **8 deep**, the node's own tree included. A tree holds its
   children by value, so a graph cannot loop back on itself.
 
@@ -230,10 +230,15 @@ starts:
 
 - During a crossfade, the motion being **faded out is silent**; the one coming
   in fires from its first frame: a transition hands the events over.
-- In a **blend tree**, only the **dominant clip** fires — the highest weight
-  over the whole tree, nested trees included, the first depth-first on a tie —
-  so a walk/run blend plays one set of footsteps, not two, and a clip reached
-  by two paths never fires twice. Put the same marker names on each child.
+- In a **blend tree**, only the **dominant clip** fires, so a walk/run blend
+  plays one set of footsteps, not two. It is found from the top down: the
+  heaviest child at each level (the first on a tie), into a nested tree when
+  that child holds one. So a direction split into walk and run still fires
+  over a lighter direction (forward 0.6 as walk 0.3 + run 0.3 beats a strafe at
+  0.4), and the source doesn't jump as speed changes. A child whose clips the
+  mesh doesn't have is passed over, as the pose skips them. A clip reached by
+  two paths is weighed per path, not summed. Put the same marker names on each
+  child.
 - **Extra layers** fire too, while their weight is above 0 (an upper-body
   reload layer fires `MagIn`); a layer at weight 0 is silent.
 

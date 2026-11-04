@@ -81,6 +81,10 @@ fn walk<'a>(
     }
 }
 
+/// How many children's raw weights [`child_weights`] keeps on the stack, so
+/// each is computed once; a wider tree recomputes the ones past this.
+const INLINE_CHILDREN: usize = 32;
+
 /// Each direct child's weight within `tree`, in authored order. A parameter
 /// that is unset or not a `Float` reads 0. When nothing has any weight (the
 /// point far outside every child's band), the child nearest it plays alone, so
@@ -101,12 +105,63 @@ pub fn child_weights<'a>(
         BlendTree::FreeformDirectional2D { .. } => influence(tree, i, at, true),
         BlendTree::FreeformCartesian2D { .. } => influence(tree, i, at, false),
     };
-    let total: f32 = (0..tree.len()).map(raw).sum();
+    let mut kept = [0.0_f32; INLINE_CHILDREN];
+    let mut total = 0.0_f32;
+    for i in 0..tree.len() {
+        let w = raw(i);
+        if let Some(slot) = kept.get_mut(i) {
+            *slot = w;
+        }
+        total += w;
+    }
     let fallback = (!(total > EPSILON && total.is_finite())).then(|| nearest(tree, at));
     (0..tree.len()).map(move |i| match fallback {
-        None => raw(i) / total,
+        None => kept.get(i).copied().unwrap_or_else(|| raw(i)) / total,
         Some(n) => f32::from(u8::from(n == Some(i))),
     })
+}
+
+/// The leaf whose animation events a tree fires (#459, #1746): from the top,
+/// the heaviest child at each level (the first on a tie), counting only the
+/// children with a leaf beneath them that `resolves` (a clip the mesh has).
+/// Its `weight` is its path's product, as in [`for_each_leaf`]. `None` when no
+/// weighted leaf resolves.
+pub fn dominant_leaf<'a>(
+    tree: &'a BlendTree,
+    parameters: &AnimatorParameters,
+    resolves: &impl Fn(&str) -> bool,
+) -> Option<Leaf<'a>> {
+    dominant(tree, parameters, 1.0, 1, resolves)
+}
+
+fn dominant<'a>(
+    tree: &'a BlendTree,
+    parameters: &AnimatorParameters,
+    scale: f32,
+    depth: usize,
+    resolves: &impl Fn(&str) -> bool,
+) -> Option<Leaf<'a>> {
+    let mut best: Option<(f32, Leaf<'a>)> = None;
+    for ((motion, _), w) in tree.children().zip(child_weights(tree, parameters)) {
+        if w <= 0.0 || best.is_some_and(|(b, _)| w <= b) {
+            continue;
+        }
+        let leaf = match &motion.blend_tree {
+            Some(nested) if depth < MAX_TREE_DEPTH => {
+                dominant(nested, parameters, scale * w, depth + 1, resolves)
+            }
+            Some(_) => None,
+            None => resolves(&motion.clip).then_some(Leaf {
+                clip: &motion.clip,
+                events: &motion.events,
+                weight: scale * w,
+            }),
+        };
+        if let Some(leaf) = leaf {
+            best = Some((w, leaf));
+        }
+    }
+    best.map(|(_, leaf)| leaf)
 }
 
 /// Where the parameters put the tree's sample point (1D on the x axis).

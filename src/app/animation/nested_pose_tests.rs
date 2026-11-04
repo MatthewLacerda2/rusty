@@ -12,7 +12,7 @@ use crate::asset::animation_graph::{
 use crate::components::{AnimatorParameter, Motion};
 
 /// `(clip, end x, duration)`: each slides the hips from 0 to its end x.
-const CLIPS: [(&str, f32, f32); 5] = [
+pub(super) const CLIPS: [(&str, f32, f32); 5] = [
     ("Walk", 2.0, 1.0),
     ("Run", 6.0, 2.0),
     ("Back", -2.0, 1.2),
@@ -21,7 +21,7 @@ const CLIPS: [(&str, f32, f32); 5] = [
 ];
 
 /// The 1D walk (speed 2) / run (speed 6) tree, Walk stepping at 0.5 s.
-fn walk_run() -> BlendTree {
+pub(super) fn walk_run() -> BlendTree {
     let mut walk = ChildMotion::clip("Walk");
     walk.events = vec![AnimationEvent {
         time: 0.5,
@@ -43,7 +43,7 @@ fn walk_run() -> BlendTree {
     }
 }
 
-fn nested() -> (MeshComponent, AnimationGraph) {
+pub(super) fn nested() -> (MeshComponent, AnimationGraph) {
     let clips = CLIPS.iter().map(|&(n, x, d)| slide(n, &[HIPS], 0.0, x, d));
     let tree = GraphNode {
         clip: String::new(),
@@ -69,7 +69,7 @@ fn flattened(anim: &AnimatorComponent) -> Vec<(&'static str, f32)> {
     CLIPS.iter().map(|c| c.0).zip(weights).collect()
 }
 
-fn set(anim: &mut AnimatorComponent, values: [f32; 3]) {
+pub(super) fn set(anim: &mut AnimatorComponent, values: [f32; 3]) {
     for (name, v) in ["vx", "vy", "speed"].into_iter().zip(values) {
         anim.parameters
             .insert(name.into(), AnimatorParameter::Float(v));
