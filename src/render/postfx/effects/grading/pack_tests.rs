@@ -40,17 +40,17 @@ fn neutral_knobs_bake_the_identity_grade_with_the_volumes_tonemap() {
     assert!(close(Vec3::from_slice(&lgg[1][..3]), Vec3::ONE));
     assert!(close(Vec3::from_slice(&lgg[2][..3]), Vec3::ONE));
     let adjust = packed(v, None, "color_adjustments");
-    let aces = Tonemap::Aces.to_index() as f32;
+    let neutral = Tonemap::Neutral.to_index() as f32;
     assert_eq!(
         adjust,
-        [[1.0, aces, 0.0, 0.0], [0.0; 4], [1.0, 0.0, 0.0, 0.0]],
-        "contrast (in ACES's log space), hue, saturation"
+        [[1.0, neutral, 0.0, 0.0], [0.0; 4], [1.0, 0.0, 0.0, 0.0]],
+        "contrast (in the default tonemapper's log space), hue, saturation"
     );
     let tone = packed(v, None, "tonemapping");
     assert_eq!(
         tone,
         [
-            [Tonemap::Aces.to_index() as f32, 0.0, 0.0, 0.0],
+            [Tonemap::Neutral.to_index() as f32, 0.0, 0.0, 0.0],
             [1.0, 0.0, 0.0, 0.0]
         ]
     );
