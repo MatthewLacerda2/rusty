@@ -29,6 +29,7 @@
 // Texel `t` stands for full-resolution pixel `t * step`, as in `ssao.wgsl`.
 
 #import fullscreen
+#import numeric::finite3
 #import lighting::screen_space::{bilateral_blur, bilateral_upsample, hemisphere, ign, load_depth, normal_at, radius_in_pixels, screen_uv, slope_bias, tangents, View, view_depth, world_at, world_px}
 
 struct SsilParams {
@@ -83,13 +84,10 @@ fn view() -> View {
     return View(p.inv_view_proj, p.view_proj, p.camera_pos.xyz, p.camera_fwd.xyz);
 }
 
-// `c` with every non-finite channel zeroed: a NaN or an infinity never spreads.
-// Checked on the exponent bits (all ones), as `motion_blur.wgsl` and
-// `ssr_pyramid.wgsl` do, since a compiler may fold a NaN compare away.
+// `c`, or black when any channel is not finite (`numeric::finite3`) or past what
+// an `Rgba16Float` target holds: a NaN or an infinity never spreads.
 fn finite(c: vec3<f32>) -> vec3<f32> {
-    let exponent = bitcast<vec3<u32>>(c) & vec3<u32>(0x7f800000u);
-    let ok = (exponent != vec3<u32>(0x7f800000u)) & (abs(c) <= vec3<f32>(65504.0));
-    return select(vec3<f32>(0.0), c, ok);
+    return select(vec3<f32>(0.0), c, finite3(c) && all(abs(c) <= vec3<f32>(65504.0)));
 }
 
 // Where world point `P` was in last frame's screen, in [0, 1]; x < 0 off it.

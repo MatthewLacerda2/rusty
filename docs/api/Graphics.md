@@ -360,9 +360,11 @@ keeps the history, which the accumulate blends over within a few frames, so a
 tweened knob never flashes. **A single headless frame shows no bounce**: render a
 few frames of the same view (four is plenty) before a screenshot is read. Bake
 captures and the shader preview never run it; a render texture's camera runs it in
-its own view when its `post_fx` is on. Under TAA's jitter (#1702) the gather's
-samples move by under a texel at half resolution, which the accumulate averages
-like its own noise. **Budget**: a target of 1.5 ms at 1080p, half resolution, on a
+its own view when its `post_fx` is on. With TAA on (#1702), each frame is drawn
+jittered and SSIL rebuilds and reprojects its points through that frame's jittered
+camera, so last frame's light is read where it was drawn; the sub-pixel shift moves
+its samples by under a texel at half resolution, which the accumulate averages like
+its own noise, and TAA's resolve runs after, over the lit image. **Budget**: a target of 1.5 ms at 1080p, half resolution, on a
 base M-series GPU, **not yet measured** (`Debug.Stats().gpu_passes.ssil` times it;
 lavapipe has no timer). Its **quality** sets the samples and resolution (see
 *Quality presets*):

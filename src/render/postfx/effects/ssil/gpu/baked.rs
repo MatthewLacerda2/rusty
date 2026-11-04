@@ -15,7 +15,7 @@ use crate::scene::Scene;
 pub(super) const BAKED_GAIN: f32 = 0.005;
 
 /// The fixture's scene with its lamp in `mode`, baked into a temp folder `name`.
-fn baked(mode: LightMode, name: &str) -> (Scene, u32) {
+pub(super) fn baked(mode: LightMode, name: &str) -> (Scene, u32) {
     let (mut scene, lamp) = scene(Ssil::default(), LAMP);
     scene.world.set_light(lamp, Some(point(LAMP, mode)));
     let maps = bake(&mut scene, name);
@@ -28,6 +28,11 @@ fn baked(mode: LightMode, name: &str) -> (Scene, u32) {
 
 /// Bake `scene` into a temp folder `name`; the lightmaps it wrote.
 pub(super) fn bake(scene: &mut Scene, name: &str) -> usize {
+    bake_with(scene, name, false)
+}
+
+/// [`bake`], into `directional` pages (#810) or not.
+pub(super) fn bake_with(scene: &mut Scene, name: &str, directional: bool) -> usize {
     let dir = crate::test_temp::dir().join(format!("rusty_ssil_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -39,7 +44,7 @@ pub(super) fn bake(scene: &mut Scene, name: &str) -> usize {
         seed: 1,
         max_lightmap_size: 64,
         filter_radius: 1,
-        directional: false,
+        directional,
     };
     bake_scene_lightmaps(scene, Some(&path), &settings).expect("baked")
 }

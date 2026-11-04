@@ -1,10 +1,10 @@
 //! src/render/scene/equivalence_tests.rs — the retained objects after any edit
 //! sequence equal a build from scratch (#1706), as `ecs/changes/derived_tests.rs`
 //! proves the change log's consumers: the ECS write paths of `ops_tests`, then the
-//! inputs the log does not cover (the material library, overrides, lightmaps,
-//! probes, a capture, a re-uploaded shared mesh), and what the shadow sweeps read
-//! (`shadow_ops`): each frame the static bakes' key equals a from-scratch digest. One
-//! renderer for every case.
+//! inputs the log does not cover (the material library, overrides, lightmaps and
+//! a bake's light record, which alone sets `in_bake` (#1750), probes, a capture, a
+//! re-uploaded shared mesh), and what the shadow sweeps read (`shadow_ops`): each
+//! frame the static bakes' key equals a from-scratch digest. One renderer for all.
 
 use glam::Vec3;
 use proptest::prelude::*;
@@ -28,7 +28,7 @@ enum R {
     Library(u8),
     Override(usize, bool),
     Light(usize, bool),
-    Lightmap(usize, bool),
+    Lightmap(usize, u8),
     Probe(u8),
     Capture(bool),
     Unmesh(usize),
@@ -47,7 +47,7 @@ fn r_op() -> impl Strategy<Value = R> {
         1 => (0u8..4).prop_map(R::Library),
         2 => (at(), any::<bool>()).prop_map(|(i, s)| R::Override(i, s)),
         1 => (at(), any::<bool>()).prop_map(|(i, l)| R::Light(i, l)),
-        1 => (at(), any::<bool>()).prop_map(|(i, l)| R::Lightmap(i, l)),
+        1 => (at(), 0u8..4).prop_map(|(i, l)| R::Lightmap(i, l)),
         1 => (0u8..4).prop_map(R::Probe),
         1 => any::<bool>().prop_map(R::Capture),
         1 => at().prop_map(R::Unmesh),
@@ -90,12 +90,14 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
             s.world.set_light(id, sun.filter(|_| l));
         }),
         R::Lightmap(i, l) => on(scene, pick(scene, i), |s, id| match l {
-            true => s.lightmaps.insert(LightmapEntry {
+            0 => drop(s.lightmaps.remove(id)),
+            1 => drop(s.lightmaps.lights.insert(id)),
+            2 => drop(s.lightmaps.lights.remove(&id)),
+            _ => s.lightmaps.insert(LightmapEntry {
                 entity: id,
                 page: 0,
                 scale_offset: [0.5, 0.5, 0.0, 0.0],
             }),
-            false => drop(s.lightmaps.remove(id)),
         }),
         R::Unmesh(i) => on(scene, pick(scene, i), |s, id| {
             s.world.set_mesh(id, None);
@@ -110,9 +112,8 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
 }
 
 fn on(scene: &mut Scene, id: Option<u32>, f: impl FnOnce(&mut Scene, u32)) {
-    if let Some(id) = id {
-        f(scene, id);
-    }
+    let Some(id) = id else { return };
+    f(scene, id);
 }
 
 /// After every frame of `ops`, the objects `r` holds equal a fresh build.

@@ -91,3 +91,22 @@ fn gpu_a_metal_floor_takes_no_bounce() {
         "a metal takes none"
     );
 }
+
+#[test]
+fn gpu_the_tint_holds_under_taas_jitter() {
+    let Some(mut r) = renderer() else { return };
+    // TAA (#1702) draws each frame jittered: SSIL reprojects through the jittered
+    // cameras, so last frame's light is read where it was drawn.
+    let red_over_green = |r: &mut _, ssil| {
+        let (mut scene, _) = scene(ssil, LAMP);
+        for id in scene.world.ids_with_camera() {
+            scene.world.camera_mut(id).unwrap().taa_active = true;
+        }
+        let [red, green, _] = patch(&settled(r, &scene, 8), FLOOR);
+        red / green
+    };
+    let off = red_over_green(&mut r, Ssil::default());
+    let lit = red_over_green(&mut r, on(1.0));
+    eprintln!("[ssil] the floor's red/green under TAA: {off} off, {lit} on");
+    assert!(lit >= off * TINT, "the bounce tints the floor red");
+}
