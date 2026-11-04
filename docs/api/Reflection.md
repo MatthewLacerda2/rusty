@@ -16,7 +16,35 @@ it), and the sky takes whatever the probes don't cover. Every fragment of the ob
 box-projects against each probe's box when that probe's `boxProjection` is on (the
 standard Lagarde technique, so the reflection tracks the room as the camera moves); a
 fragment outside the box, or a probe with it off, reflects the cubemap as if
-infinitely far away. An object no baked probe reaches reflects the global skybox.
+infinitely far away. An object no baked probe reaches reflects the global skybox, or
+the scene's **fallback probe** when it names one (below).
+
+**Normalised by the baked light (#1697).** A probe's cube shows its room as lit at the
+capture point, so on its own a glossy floor in a dark corner would reflect the bright
+room at full strength. Each bake therefore also stores the **irradiance** the cube gives
+at the probe (its L2 SH, plus the direct light of `Baked` lights there: what a light
+probe at that point would hold), and each pixel scales a probe's reflection by
+*luminance of its own baked diffuse* ÷ *luminance of the probe's stored irradiance along
+its normal*, held to 0–1.5 (UE's lightmap mixing, Frostbite's probe normalisation). The
+pixel's baked diffuse is its lightmap on a lightmapped surface and its light-probe SH on
+a dynamic object. Where there is neither (no bake), or the probe was baked without the
+irradiance, the scale is 1; the sky is never scaled. A bake capture never normalises, so
+what one probe's capture sees does not depend on another probe's stored irradiance.
+Light from `Mixed` and `Realtime` lights is in neither side: it shades live.
+
+**Specular occlusion.** The whole environment reflection (probes, sky and SSR's hit)
+is weighted by Frostbite's specular occlusion from the ambient occlusion, roughness and
+view angle, as HDRP's `GetSpecularOcclusionFromAmbientOcclusion` has it. The occlusion
+is SSAO's times the decals'; with SSAO off and no decal it is 1, and the baked
+normalisation above is what darkens a corner.
+
+**The fallback probe** (Unity's default reflection probe, `SetFallback`): one baked
+probe a scene names takes the share the sky took: everything an object's probes leave,
+all of it for an object outside every box. It stays resident wherever the camera is
+(it is taken first, inside the budget) and is always slot 0 of the resident probes.
+With none named, or the named one not baked, that share is the sky's. Naming a probe
+makes it manual, so Generate Lighting keeps it; removing it, `Clear`, or loading a
+scene that names none leaves the scene without one. A file naming two keeps the first.
 
 **Settings per probe** (`Reflection.Set` / `Reflection.Get`, the scene Inspector's
 *Reflection Probes* section, and the saved scene all carry every one):
@@ -33,6 +61,8 @@ infinitely far away. An object no baked probe reaches reflects the global skybox
 | `nearClip`, `farClip` | `0.05`, `1000` | the capture cameras' clip planes (far is kept past twice the near) |
 | `shadows` | `true` | the capture renders shadows |
 | `intensity` | `1` | brightness of the reflection, `0`–`8` |
+| `fallback` | `false` | read-only in `Get`: this is the scene's fallback probe (set it with `SetFallback`) |
+| `normalised` | `false` | read-only in `Get`: the bake stored this probe's irradiance, so its reflection is normalised by the baked light (re-bake a probe baked before it) |
 | `manual` | `true` from `Add`, `false` when placed | a bake's auto-placement keeps a manual probe as it is and leaves the room it covers to it; it re-places the others (`Lighting.md`, #1737). A hand edit (`Move`, `SetBox`, `Set`, an Inspector field) makes a probe manual, so a tuned box survives the next bake, `local p = Reflection.Get(i); …; Reflection.Set(i, p)` included; `Set{ manual = false }` un-marks a probe that is manual already (on a placed one it is ignored, since a round trip carries the `false` it read), and unticking *Manual* in the Inspector does too |
 
 **Scene defaults** live in the lighting settings (`Lighting.GetSettings()` /
@@ -67,6 +97,8 @@ path and the runtime falls back to the skybox. `Move`/`SetBox`/`SetCubemap`/`Set
 | `Reflection.Add` | `(x, y, z, halfX, halfY, halfZ)` | the new probe's `index` (box is centred on the position with the given half-extents; the probe is manual) |
 | `Reflection.Move` | `(index, x, y, z)` | — (box stays centred on the new position) |
 | `Reflection.SetBox` | `(index, minX, minY, minZ, maxX, maxY, maxZ)` | — (explicit parallax box corners; normalized so min ≤ max) |
+| `Reflection.SetFallback` | `(index \| nil)` | `true`, or `false` for an index past the set (nothing changes) — name the fallback probe, or none with `nil`; any other loses the flag |
+| `Reflection.GetFallback` | `()` | the fallback probe's `index`, or `nil` |
 | `Reflection.SetCubemap` | `(index, path)` | — (point the probe at a baked cubemap KTX2 file) |
 | `Reflection.Set` | `(index, { position?, boxMin?, boxMax?, cubemap?, boxProjection?, blendDistance?, importance?, resolution?, nearClip?, farClip?, shadows?, intensity?, manual? })` | — (changes only the fields it names, each clamped to its range) |
 | `Reflection.Get` | `(index)` | every field above as a table, or `nil` |
@@ -96,4 +128,4 @@ unsaved (there is nowhere to write the cubemaps), when a cubemap file cannot be 
 or a stale one removed, and while the
 editor's Generate Lighting runs (see `Lighting.md`). It logs its progress, probe by probe, to stderr as it goes (#1667). It is **dev-only** (an authoring action driving a headless
 renderer), so it is absent from ship builds. Save the scene afterward to persist each
-probe's `cubemap_path` into the `.scene` document.
+probe's `cubemap_path` and its stored `irradiance` into the `.scene` document.

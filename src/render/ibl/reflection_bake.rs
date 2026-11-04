@@ -187,3 +187,7 @@ pub fn with_baked_direct(
 #[cfg(test)]
 #[path = "reflection_bake_tests.rs"]
 mod reflection_bake_tests;
+
+#[cfg(test)]
+#[path = "reflection_irradiance_tests.rs"]
+mod reflection_irradiance_tests;
