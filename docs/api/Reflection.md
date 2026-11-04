@@ -33,7 +33,7 @@ infinitely far away. An object no baked probe reaches reflects the global skybox
 | `nearClip`, `farClip` | `0.05`, `1000` | the capture cameras' clip planes (far is kept past twice the near) |
 | `shadows` | `true` | the capture renders shadows |
 | `intensity` | `1` | brightness of the reflection, `0`–`8` |
-| `manual` | `true` from `Add`, `false` when placed | a bake's auto-placement keeps a manual probe as it is and leaves the room it covers to it; it re-places the others (`Lighting.md`, #1737). A hand edit (`Move`, `SetBox`, `Set`, an Inspector field) makes a probe manual, so a tuned box survives the next bake; `Set{ manual = false }` says otherwise, and unticking *Manual* in the Inspector does too |
+| `manual` | `true` from `Add`, `false` when placed | a bake's auto-placement keeps a manual probe as it is and leaves the room it covers to it; it re-places the others (`Lighting.md`, #1737). A hand edit (`Move`, `SetBox`, `Set`, an Inspector field) makes a probe manual, so a tuned box survives the next bake, `local p = Reflection.Get(i); …; Reflection.Set(i, p)` included; `Set{ manual = false }` un-marks a probe that is manual already (on a placed one it is ignored, since a round trip carries the `false` it read), and unticking *Manual* in the Inspector does too |
 
 **Scene defaults** live in the lighting settings (`Lighting.GetSettings()` /
 `SetSettings{ reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }`): the resolution a probe

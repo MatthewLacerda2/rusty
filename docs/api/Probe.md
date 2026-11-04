@@ -74,7 +74,8 @@ scene's ambient by direction, `Gradient` included, the same ambient `Bake` sees
 where its captures escape the scene. Sampling is
 **trilinear** over a grid. For free-placed probes, the automatic placement's layout
 (which has no grid: its density follows the geometry) or a point outside the grid, it
-blends the **four nearest probes** by inverse squared distance, so an object moving
+blends the **four nearest probes** by inverse squared distance less the fifth's, so a
+probe's weight reaches zero just as a nearer one replaces it and an object moving
 between probes fades rather than pops. The nearest probes are found through a spatial index the
 set builds when it is first sampled after a change, so a sample reads the probes near
 it, not the whole set.

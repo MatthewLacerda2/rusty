@@ -96,12 +96,16 @@ so the same level always yields the same layout). Both sets are planned from the
 two pictures of the level (#1737):
 
 - the **floor plan**: where actors stand. With a baked **nav surface** it holds only
-  **reachable** floor: every area joined by walking that holds a `NavMeshAgent` or
-  `CharacterController`, or, with none of those on the surface, the largest area that
-  is not an **elevated top** (an area lying over at least half of another area: a roof
-  over its room, so an indoor level whose roof is larger than its room still probes
-  the room), and what off-mesh links (drops, jumps) lead to from those. So wall tops,
-  roof tops and crate tops no one reaches get no probe.
+  **reachable** floor: the **main floor**, always, which is the largest area joined
+  by walking that is not an **elevated top** (an area lying over at least half of
+  another area at least a quarter its size: a roof over its room, so an indoor level
+  whose roof is larger than its room still probes the room, while a small sealed
+  nook under the floor does not lift it); plus every area that holds a `NavMeshAgent`
+  or `CharacterController` (a sentry on a roof adds the roof, never removes the
+  floor); and what off-mesh links (drops, jumps) lead to from those. So wall tops,
+  roof tops and crate tops no one reaches get no probe. The rule still misreads a
+  main floor over a basement at least a quarter its size as a top; an actor start
+  on that floor adds it back.
   Without a nav surface the plan is rasterized from the static colliders' bounds
   (each cell's lowest top) and has no connectivity to read, so every floor in it counts.
   Either way, **a liquid is not floor**: under a static, flat, `Transparent` mesh with

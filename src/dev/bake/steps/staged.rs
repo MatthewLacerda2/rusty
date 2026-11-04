@@ -75,8 +75,8 @@ fn inputs((p, resolution): &(ReflectionProbe, u32)) -> BakeInputs {
 pub(super) struct StagedCubemaps {
     /// `(staged, final)` per probe baked, in probe order.
     files: Vec<(PathBuf, PathBuf)>,
-    /// Whether the files were moved into place: nothing is left to delete.
-    committed: bool,
+    /// How many of `files` are moved into place: a failed commit resumes there.
+    moved: usize,
 }
 
 impl StagedCubemaps {
@@ -100,14 +100,12 @@ impl StagedCubemaps {
         Ok(())
     }
 
-    /// Move every staged cube into place and point its probe at it. The caller has
-    /// checked the probes are the ones baked.
-    pub(super) fn commit(&mut self, scene: &mut Scene) -> Result<(), String> {
-        if std::mem::replace(&mut self.committed, true) {
-            return Ok(());
-        }
-        for i in 0..self.files.len() {
-            let (staged, target) = &self.files[i];
+    /// Move every staged cube not yet moved into place, then point each probe of
+    /// `set` (the planned copy, not the scene's) at its cube. The caller has checked
+    /// the probes are the ones baked. On a failed move `set` is untouched and a
+    /// retry resumes at the cube that failed.
+    pub(super) fn commit(&mut self, set: &mut ReflectionProbeSet) -> Result<(), String> {
+        while let Some((staged, target)) = self.files.get(self.moved) {
             let path = target.to_string_lossy().into_owned();
             // Noted first, so the editor's follow never reads the engine's own write
             // as an outside edit.
@@ -115,7 +113,10 @@ impl StagedCubemaps {
             // lint: allow(atomic-write) publishes a cube staged whole beside its name at bake time
             std::fs::rename(staged, target)
                 .map_err(|e| format!("Failed to write reflection cubemap {path}: {e}"))?;
-            scene.reflection_probes.set_cubemap(i, path);
+            self.moved += 1;
+        }
+        for (i, (_, target)) in self.files.iter().enumerate() {
+            set.set_cubemap(i, target.to_string_lossy().into_owned());
         }
         Ok(())
     }
@@ -123,8 +124,8 @@ impl StagedCubemaps {
 
 impl Drop for StagedCubemaps {
     fn drop(&mut self) {
-        // After a commit the staged names are gone; a failed commit's rest remain.
-        for (staged, _) in &self.files {
+        // The moved ones' staged names are gone; a failed commit's rest remain.
+        for (staged, _) in &self.files[self.moved..] {
             // Best effort: a staged file that is already gone needs no removing.
             let _ = std::fs::remove_file(staged);
         }

@@ -39,3 +39,18 @@ fn an_unreachable_roof_gets_no_probe() {
     roofed_house(&mut scene);
     assert_in_the_room(&plan_on_nav(&scene));
 }
+
+/// The only actor is a sentry on the roof: the room, the main floor, still gets
+/// its own probe.
+#[test]
+fn a_sentry_on_the_roof_keeps_the_room_probed() {
+    let scene = indoor_house();
+    let plans = plan_on_nav_from(&scene, &[Vec3::new(0.0, 4.4, 0.0)]);
+    let inside = |p: &ReflectionPlan| {
+        p.position.x.abs() < 5.0 && p.position.z.abs() < 5.0 && p.position.y < 3.0
+    };
+    assert!(
+        plans.iter().any(inside),
+        "the room has its own probe: {plans:?}"
+    );
+}

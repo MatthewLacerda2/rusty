@@ -16,7 +16,8 @@
 //! Interpolation is TRILINEAR over the grid (no tetrahedral gold-plating). Outside
 //! a grid, or for a set with none (the automatic placement's, #1737, whose density
 //! follows the geometry), the [`BLEND_PROBES`] nearest probes are blended by inverse
-//! squared distance, so a moving object fades from one probe to the next. They are
+//! squared distance less the next one's, so a probe's weight reaches zero just as it
+//! leaves the blend and a moving object fades from one probe to the next. They are
 //! found through a spatial index (`index.rs`) built when the set is first sampled
 //! after a change, so a sample reads the probes near it, not the whole set; edit
 //! positions through [`ProbeVolume`]'s methods, which drop the stale index.
@@ -262,20 +263,35 @@ impl ProbeVolume {
         self.blend(&near)
     }
 
-    /// The probes of `near` blended by inverse squared distance.
+    /// The first [`BLEND_PROBES`] of `near` blended by `1/d² − 1/d²ₙ`, where `dₙ`
+    /// is the next probe's distance: a probe's weight falls to zero as the next one
+    /// draws level and replaces it, so a swap never pops.
     fn blend(&self, near: &index::Nearest) -> Sh9 {
-        let (mut sum, mut total) = (Sh9::zero(), 0.0);
-        for &(d, i) in near.iter().filter(|n| n.1 != usize::MAX) {
-            if d <= ON_PROBE {
-                return self.probes[i].sh;
-            }
-            let w = 1.0 / d;
-            sum = Sh9::lerp(&sum, &self.probes[i].sh, w / (total + w));
-            total += w;
+        let (blended, next) = near.split_at(BLEND_PROBES);
+        let found = || blended.iter().filter(|n| n.1 != usize::MAX);
+        if let Some(&(_, i)) = found().find(|n| n.0 <= ON_PROBE) {
+            return self.probes[i].sh;
         }
-        sum
+        // `1/dₙ²` is 0 with no next probe (an infinite distance); the plain weights
+        // are the fallback when every blended probe is as far as the next.
+        for fade in [1.0 / next[0].0, 0.0] {
+            let (mut sum, mut total) = (Sh9::zero(), 0.0);
+            for &(d, i) in found() {
+                let w = 1.0 / d - fade;
+                if w > 0.0 {
+                    sum = Sh9::lerp(&sum, &self.probes[i].sh, w / (total + w));
+                    total += w;
+                }
+            }
+            if total > 0.0 {
+                return sum;
+            }
+        }
+        Sh9::zero()
     }
 }
 
+#[cfg(test)]
+mod blend_tests;
 #[cfg(test)]
 mod tests;

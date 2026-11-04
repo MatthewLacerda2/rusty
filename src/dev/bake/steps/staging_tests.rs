@@ -97,3 +97,19 @@ fn without_an_adapter_nothing_is_applied() {
     assert!(!job.report().ran_light_bake && !job.report().ran_reflection_bake);
     assert_old_lighting(&scene, &was);
 }
+
+/// With the static geometry deleted and no manual probe, the plan is empty and its
+/// commit removes the old probes: "nothing to bake" is not "no adapter".
+#[test]
+fn an_empty_plan_removes_every_probe() {
+    let mut scene = lit_room();
+    for id in scene.world.ids_with_collider() {
+        scene.world.set_collider(id, None);
+    }
+    let (planned, report) = plan_probes(&scene, None, params());
+    assert!(planned.light.is_empty() && planned.reflections.is_empty());
+    let mut job = LightingBake::on(None, &scene, None, planned, report).unwrap();
+    assert!(job.step(&mut scene, &mut |_| {}).unwrap());
+    job.commit(&mut scene).unwrap();
+    assert!(scene.probes.is_empty() && scene.reflection_probes.is_empty());
+}

@@ -6,7 +6,7 @@ use glam::{Vec2, Vec3};
 
 use super::floor::{FloorCell, FloorGrid, MAX_FLOOR_CELLS};
 use super::occupancy::{Occupancy, Solid, CELL};
-use super::room_probes::plan_rooms;
+use super::room_probes::{plan_rooms, Rooms};
 use super::test_level::{block, grid_of_rooms, plan_static, roof};
 use super::{ReflectionPlacement, EYE_HEIGHT, MIN_REGION};
 use crate::scene::Scene;
@@ -109,7 +109,8 @@ fn a_capture_point_on_a_stair_stands_over_its_own_step() {
     };
     let slab = Solid::cuboid(Vec3::new(0.0, -1.0, 0.0), Vec3::new(9.0, 0.0, 3.0));
     let occ = Occupancy::build(&[slab], CELL).unwrap();
-    let plans = plan_rooms((&grid, &occ), &[Some(0); 27], 1, 20.0, 50.0);
+    let rooms = Rooms::new((&grid, &occ), &[Some(0); 27], 1);
+    let (plans, _) = plan_rooms((&grid, &occ), &rooms, 20.0, 50.0);
     let p = plans[0];
     assert_eq!(p.position.y, 3.0 + EYE_HEIGHT, "{p:?}");
     assert!(p.box_max.y > p.position.y, "the box holds it: {p:?}");

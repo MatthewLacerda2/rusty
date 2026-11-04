@@ -41,10 +41,19 @@ fn a_scatter_matches_the_scan() {
     assert_same(&scatter(3000, size), size);
 }
 
+/// A flat set grids in 2D: a query in it looks at a few cubes, never the
+/// millimetre grid a zero-height cube would make, nor a scan.
 #[test]
 fn a_flat_layout_matches_the_scan() {
     let size = Vec3::new(50.0, 0.0, 30.0);
-    assert_same(&scatter(500, size), size);
+    let probes = scatter(500, size);
+    assert_same(&probes, size);
+    let index = ProbeIndex::build(&probes).unwrap();
+    let inside = |q: &Vec3| q.cmpge(Vec3::ZERO).all() && q.cmple(size).all();
+    for at in queries(size).filter(inside) {
+        let work = index.nearest_counted(&probes, at).1;
+        assert!(work.is_some_and(|w| w < 64), "{work:?} cubes at {at}");
+    }
 }
 
 /// A lattice queried at its cells' middles has many probes at the same distance:

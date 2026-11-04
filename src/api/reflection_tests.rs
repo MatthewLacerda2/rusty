@@ -117,8 +117,9 @@ fn added_probes_are_manual_and_set_can_change_it() {
     assert!(!scene.borrow().reflection_probes.probes[0].manual);
 }
 
-/// A hand edit makes a placed probe manual, so the next bake keeps it (#1737);
-/// `Set{ manual = false }` says otherwise.
+/// A hand edit makes a placed probe manual, so the next bake keeps it (#1737),
+/// a Get-modify-Set round trip included; `Set{ manual = false }` un-marks a
+/// probe that is manual already.
 #[test]
 fn hand_edits_make_a_placed_probe_manual() {
     let scene = empty_scene();
@@ -127,6 +128,7 @@ fn hand_edits_make_a_placed_probe_manual() {
         "Reflection.Move(0, 1, 2, 3)",
         "Reflection.SetBox(0, -1,-1,-1, 2,2,2)",
         "Reflection.Set(0, { intensity = 2 })",
+        "local p = Reflection.Get(0); p.boxMax.y = 6; Reflection.Set(0, p)",
     ] {
         scene.borrow_mut().reflection_probes = Default::default();
         scene

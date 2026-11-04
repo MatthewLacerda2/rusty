@@ -15,8 +15,8 @@
 //! Placement plans both probe sets when the job starts, into copies the scene does
 //! not hold (#1737); the bakes read the copies, and their results are staged without
 //! touching the scene: the light probes' SH in the solve, the cubemaps in
-//! `<name>.baking` files. [`LightingBake::commit`] swaps the planned sets in, with
-//! their lighting, in one step; until then the scene keeps its probes and their old
+//! `<name>.baking` files. [`LightingBake::commit`] moves the cubes into place, then
+//! swaps the planned sets in, with their lighting, in one step; until then the scene keeps its probes and their old
 //! lighting, so a bake that is refused, dropped or fails changes nothing. If either of
 //! the scene's own probe sets changed since the start (one added, removed, moved or
 //! marked manual, a reflection probe's resolution, clip planes or shadows), a step or
@@ -58,11 +58,14 @@ pub enum Stage {
 }
 
 /// A probe bake in progress: the headless renderer it captures with (`None`
-/// without an adapter, when both bakes skip and nothing is applied), the planned
+/// without an adapter, when both bakes skip and nothing is applied, or with nothing
+/// to bake, when the empty planned sets are applied), the planned
 /// light probes' solve, the planned reflection probes with the cubes staged so far,
 /// and the scene's own sets as they were, to tell an edit made midway.
 pub struct LightingBake {
     renderer: Option<Renderer>,
+    /// There were probes to bake and no adapter to bake them: commit applies nothing.
+    skipped: bool,
     light: BounceSolve,
     light_done: bool,
     scene_path: Option<String>,
@@ -120,7 +123,8 @@ impl LightingBake {
     }
 
     /// [`start`](Self::start) on `renderer`: `None` skips both bakes, and the
-    /// commit then applies nothing, so the scene keeps its old lighting.
+    /// commit then applies nothing, so the scene keeps its old lighting, unless
+    /// nothing was planned: then the commit applies the empty sets.
     fn on(
         renderer: Option<Renderer>,
         scene: &Scene,
@@ -134,7 +138,9 @@ impl LightingBake {
         report.ran_light_bake = planned.light.is_empty() || renderer.is_some();
         report.ran_reflection_bake = planned.reflections.is_empty() || renderer.is_some();
         let default = scene.lighting_settings.reflections.resolution;
+        let any = !planned.light.is_empty() || !planned.reflections.is_empty();
         Ok(Self {
+            skipped: any && renderer.is_none(),
             light: BounceSolve::of(planned.light, DEFAULT_BAKE_RESOLUTION),
             light_done: renderer.is_none(),
             renderer,
@@ -174,15 +180,17 @@ impl LightingBake {
 
     /// Apply a finished bake to `scene` in one step: the planned light probes with
     /// their SH, and the planned reflection probes with their cubes, in place of the
-    /// scene's sets. Errors, applying nothing, when the bake has not finished or the
-    /// scene's probes changed since it started; without an adapter nothing was baked
-    /// and nothing is applied.
+    /// scene's sets. Errors, applying nothing to the scene, when the bake has not
+    /// finished, the scene's probes changed since it started, or a cube could not be
+    /// moved into place (the cubes moved before it are on disk; a retry moves the
+    /// rest). Without an adapter nothing was baked and nothing is applied; with
+    /// nothing planned (no static geometry, no manual probe) the empty sets are.
     pub fn commit(&mut self, scene: &mut Scene) -> Result<(), String> {
         self.refuse_changed(scene)?;
         if self.stage() != Stage::Done {
             return Err("the probe bake has not finished".into());
         }
-        if self.renderer.is_none() {
+        if self.skipped {
             return Ok(()); // nothing baked
         }
         let light = self
@@ -196,9 +204,10 @@ impl LightingBake {
             let live = scene.reflection_probes.probes.get(from).cloned();
             reflections.probes[i] = live.ok_or(PROBES_CHANGED)?;
         }
+        self.staged.commit(&mut reflections)?;
         scene.probes = light.clone();
         scene.reflection_probes = reflections;
-        self.staged.commit(scene)
+        Ok(())
     }
 
     /// [`PROBES_CHANGED`] when either of the scene's probe sets is not the one this
@@ -267,6 +276,8 @@ fn out_dir(scene_path: Option<&str>) -> Result<PathBuf, String> {
 
 #[cfg(test)]
 mod snapshot_tests;
+#[cfg(test)]
+mod staged_tests;
 #[cfg(test)]
 mod staging_gpu_tests;
 #[cfg(test)]

@@ -26,29 +26,48 @@ pub const EYE_HEIGHT: f32 = 1.6;
 /// The least room a capture point keeps under the ceiling.
 const CEILING_GAP: f32 = 0.1;
 
-/// The probes for the rooms `find_rooms` labelled (`room` of each cell, `count`
-/// rooms), in room order and then tile order. `region` is the widest an empty
-/// room's probe box may be; `sky` is the height an open room's box reaches.
+/// The rooms `find_rooms` labelled, each with its cells and its clutter. The
+/// clutter never depends on the region, so a placement that re-tiles wider reads
+/// it once per room, not once per pass.
+pub struct Rooms {
+    cells: Vec<Vec<usize>>,
+    clutter: Vec<f32>,
+}
+
+impl Rooms {
+    /// The `count` rooms of `room` (each cell's room) on `site`.
+    pub fn new(site: (&FloorGrid, &Occupancy), room: &[Option<u32>], count: u32) -> Self {
+        let mut cells: Vec<Vec<usize>> = vec![Vec::new(); count as usize];
+        for (i, r) in room.iter().enumerate() {
+            if let Some(r) = r {
+                cells[*r as usize].push(i);
+            }
+        }
+        let clutter = (cells.iter())
+            .map(|c| room_clutter(site.0, site.1, c))
+            .collect();
+        Self { cells, clutter }
+    }
+}
+
+/// The probes for `rooms`, in room order and then tile order, and whether every
+/// room is one tile (so a wider region places no fewer). `region` is the widest
+/// an empty room's probe box may be; `sky` is the height an open room's box reaches.
 pub fn plan_rooms(
     site: (&FloorGrid, &Occupancy),
-    room: &[Option<u32>],
-    count: u32,
+    rooms: &Rooms,
     region: f32,
     sky: f32,
-) -> Vec<ReflectionPlan> {
+) -> (Vec<ReflectionPlan>, bool) {
     let (grid, occ) = site;
-    let mut cells: Vec<Vec<usize>> = vec![Vec::new(); count as usize];
-    for (i, r) in room.iter().enumerate() {
-        if let Some(r) = r {
-            cells[*r as usize].push(i);
-        }
-    }
     let mut plans = Vec::new();
-    for room_cells in &cells {
-        let region = cluttered_region(region, room_clutter(grid, occ, room_cells), MIN_REGION);
+    let mut single = true;
+    for (room_cells, &clutter) in rooms.cells.iter().zip(&rooms.clutter) {
+        let region = cluttered_region(region, clutter, MIN_REGION);
         let tiles: Vec<ReflectionPlan> = (tiles(grid, room_cells, region.max(grid.cell)).iter())
             .map(|tile| plan_tile(site, tile, sky))
             .collect();
+        single &= tiles.len() <= 1;
         let open = tiles
             .iter()
             .filter(|p| open_to_sky(occ, p.position))
@@ -62,7 +81,7 @@ pub fn plan_rooms(
             false => plans.extend(tiles),
         }
     }
-    plans
+    (plans, single)
 }
 
 /// `cells` cut into a grid of tiles at most `region` across, non-empty ones only,

@@ -6,7 +6,7 @@
 //! hash of the occupied cubes only (`core::collections`, no seed). A query walks
 //! shells of cubes outwards from the point's own and stops once no unvisited cube
 //! can hold a nearer probe, so it returns exactly what the full scan returns: the
-//! [`BLEND_PROBES`] nearest by distance, ties to the lower index. When the walk
+//! [`FOUND`] nearest by distance, ties to the lower index. When the walk
 //! would visit more cubes than the set has probes (a point far outside a sparse
 //! set), it scans instead. Built when a set is first sampled after it changed,
 //! never saved.
@@ -14,6 +14,10 @@
 use glam::{IVec3, Vec3};
 
 use super::{Probe, BLEND_PROBES};
+
+/// How many nearest probes a query finds: the [`BLEND_PROBES`] blended and the one
+/// past them, whose distance fades the farthest blended one out (`ProbeVolume::blend`).
+pub const FOUND: usize = BLEND_PROBES + 1;
 use crate::core::collections::Map;
 
 /// Below this many probes a scan is as fast as the index.
@@ -25,7 +29,7 @@ const MAX_DIM: f32 = 1.0e6;
 
 /// The nearest probes found so far: `(squared distance, index)`, sorted by both,
 /// unfilled slots `(INFINITY, usize::MAX)`.
-pub type Nearest = [(f32, usize); BLEND_PROBES];
+pub type Nearest = [(f32, usize); FOUND];
 
 /// The bucketed probe set: each occupied cube's run in `order`.
 #[derive(Clone, Debug)]
@@ -75,14 +79,20 @@ impl ProbeIndex {
         })
     }
 
-    /// The [`BLEND_PROBES`] nearest of `probes` to `at`, as [`scan`] finds them.
+    /// The [`FOUND`] nearest of `probes` to `at`, as [`scan`] finds them.
     pub fn nearest(&self, probes: &[Probe], at: Vec3) -> Nearest {
+        self.nearest_counted(probes, at).0
+    }
+
+    /// [`nearest`](Self::nearest) and its cost: the cubes looked at, or `None` when
+    /// it scanned instead.
+    fn nearest_counted(&self, probes: &[Probe], at: Vec3) -> (Nearest, Option<usize>) {
         if self.count != probes.len() || !at.is_finite() {
-            return scan(probes, at);
+            return (scan(probes, at), None);
         }
         let c = ((at - self.origin) / self.cell).floor();
         if c.abs().max_element() > MAX_DIM {
-            return scan(probes, at);
+            return (scan(probes, at), None);
         }
         let c = c.as_ivec3();
         // The first shell that can hold a cube; the last that does.
@@ -102,16 +112,16 @@ impl ProbeIndex {
                 }
             });
             if work > self.order.len() {
-                return scan(probes, at);
+                return (scan(probes, at), None);
             }
             // Every cube not yet looked at is at least `r` cubes away; a hair less,
             // so rounding in the keys never stops the walk a shell early.
             let reach = (r as f32 - 1.0e-3).max(0.0) * self.cell;
-            if near[BLEND_PROBES - 1].0 < reach * reach {
+            if near[FOUND - 1].0 < reach * reach {
                 break;
             }
         }
-        near
+        (near, Some(work))
     }
 
     /// Call `f` with the probe run of every occupied cube in the shell `r` cubes out
@@ -142,9 +152,9 @@ impl ProbeIndex {
 }
 
 /// No probe found yet.
-const EMPTY: Nearest = [(f32::INFINITY, usize::MAX); BLEND_PROBES];
+const EMPTY: Nearest = [(f32::INFINITY, usize::MAX); FOUND];
 
-/// The [`BLEND_PROBES`] nearest of `probes` to `at` by a full scan: the answer the
+/// The [`FOUND`] nearest of `probes` to `at` by a full scan: the answer the
 /// index must give.
 pub fn scan(probes: &[Probe], at: Vec3) -> Nearest {
     let mut near = EMPTY;
@@ -157,11 +167,11 @@ pub fn scan(probes: &[Probe], at: Vec3) -> Nearest {
 /// Keep probe `i` at squared distance `d` if it is among the nearest: by distance,
 /// then by index. A non-finite distance never is.
 fn offer(near: &mut Nearest, d: f32, i: usize) {
-    let worst = near[BLEND_PROBES - 1];
+    let worst = near[FOUND - 1];
     if !d.is_finite() || !(d < worst.0 || (d == worst.0 && i < worst.1)) {
         return;
     }
-    let mut at = BLEND_PROBES - 1;
+    let mut at = FOUND - 1;
     while at > 0 && (d < near[at - 1].0 || (d == near[at - 1].0 && i < near[at - 1].1)) {
         near[at] = near[at - 1];
         at -= 1;
@@ -170,15 +180,18 @@ fn offer(near: &mut Nearest, d: f32, i: usize) {
 }
 
 /// A cube's edge for `count` probes across `extent`: about [`PER_CELL`] probes a
-/// cube, over the axes the set spreads along (a flat layout grids in 2D).
+/// cube, over the axes the set spreads along (a flat layout grids in 2D, a line
+/// in 1D). An arm whose size is zero is not taken: a flat set's cube is 0 m, and
+/// `0 ≥ 0` would grid it in millimetres.
 fn cell_size(extent: Vec3, count: usize) -> f32 {
     let mut e = extent.to_array();
     e.sort_by(|a, b| b.total_cmp(a));
     let per = PER_CELL / count as f32;
     let cube = (e[0] * e[1] * e[2] * per).cbrt();
+    let square = (e[0] * e[1] * per).sqrt();
     let cell = match () {
-        _ if e[2] >= cube => cube,
-        _ if e[1] >= (e[0] * e[1] * per).sqrt() => (e[0] * e[1] * per).sqrt(),
+        _ if cube > 0.0 && e[2] >= cube => cube,
+        _ if square > 0.0 && e[1] >= square => square,
         _ => e[0] * per,
     };
     cell.max(1.0e-3)

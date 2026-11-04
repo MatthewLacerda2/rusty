@@ -6,7 +6,7 @@ use glam::Vec3;
 
 use super::enclosure::CLUTTER_GAIN;
 use super::grid::static_scene_aabb;
-use super::room_probes::plan_rooms;
+use super::room_probes::{plan_rooms, Rooms};
 use super::rooms::{find_rooms, RoomParams};
 use super::{ReflectionPlan, Site, VERTICAL_HEADROOM};
 use crate::scene::lighting::settings::ReflectionSettings;
@@ -84,17 +84,20 @@ pub fn plan_reflection_probes(
         );
         return Vec::new();
     }
+    let site_ref = (grid, &site.occupancy);
+    let rooms = Rooms::new(site_ref, &room, count);
     let plan = |region: f32| {
-        let mut plans = plan_rooms((grid, &site.occupancy), &room, count, region, sky);
+        let (mut plans, single) = plan_rooms(site_ref, &rooms, region, sky);
         plans.retain(|p| !manual.iter().any(|m| covers(m, p)));
-        plans
+        (plans, single)
     };
     // Clutter narrows a room's tiles under the region (`enclosure.rs`), so the region
-    // widens until even the most cluttered room is one tile.
-    let (mut region, mut plans) = (asked, plan(asked));
-    while plans.len() > max && region < widest * (1.0 + CLUTTER_GAIN) {
+    // widens until even the most cluttered room is one tile; past that a wider one
+    // places no fewer, so the loop stops.
+    let (mut region, (mut plans, mut single)) = (asked, plan(asked));
+    while plans.len() > max && !single && region < widest * (1.0 + CLUTTER_GAIN) {
         region *= (plans.len() as f32 / max as f32).sqrt().max(1.1);
-        plans = plan(region);
+        (plans, single) = plan(region);
     }
     let cut = plans.len() > max;
     if cut {

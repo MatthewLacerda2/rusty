@@ -153,9 +153,12 @@ fn register_settings<'scope>(
                 return Ok(());
             };
             // Every field is read before any is written: a bad one changes nothing.
-            // A hand edit makes the probe manual (#1737), unless it says otherwise.
-            probe.manual = true;
+            // A hand edit makes the probe manual (#1737). `manual = false` un-marks
+            // only a probe that was manual already: a Get-modify-Set round trip of a
+            // placed probe carries the `false` it read, and must keep the edit.
+            let was_manual = probe.manual;
             write_fields(&mut probe, &t)?;
+            probe.manual |= !was_manual;
             set.edit(index as usize, |p| *p = probe);
             Ok(())
         }),

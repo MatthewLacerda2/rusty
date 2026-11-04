@@ -164,7 +164,7 @@ pub struct PlannedProbes {
 }
 
 /// The site both probe sets are planned on (#1737): the nav surface's reachable
-/// floor (the largest walkable area and wherever an actor starts) when one is
+/// floor (the main floor, always, and wherever an actor starts) when one is
 /// baked, and the static colliders' triangles. `None` with nothing to place on.
 fn survey(scene: &Scene, nav: Option<&NavigationGraph>, floor_cell: f32) -> Option<Site> {
     let floor = nav.and_then(|nav| {

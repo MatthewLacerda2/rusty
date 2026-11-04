@@ -13,9 +13,15 @@
 //! **Bake outputs are not edits** (Unity's Undo never reverts a lighting bake):
 //! the lightmaps are not on the list at all, and of the probe sets only what the
 //! user places is: a light probe's baked SH and a reflection probe's cubemap are
-//! neither compared nor put back while the set keeps its length, so an Undo of a
-//! probe move after a bake keeps the bake. A restore that changes a set's length
-//! (an add or a removal undone) takes the recorded probes whole.
+//! never compared, and a restored probe keeps the live one's where a live probe
+//! stands at its position, so an Undo after a bake keeps the bake for every probe
+//! the bake lit in place. Matched by position, not index: a bake that re-places
+//! the set (#1737) changes which probe sits at an index, and an index match would
+//! hand old probes the new set's cubes. A restored probe with no live probe at its
+//! position keeps what was recorded; its cube is read from the file it names, which
+//! a later bake may have rewritten for another probe until the next bake.
+
+use std::collections::BTreeMap;
 
 use serde::Serialize;
 
@@ -115,11 +121,20 @@ fn same_probes(a: &ProbeVolume, b: &ProbeVolume) -> bool {
             .all(|(p, q)| eq_or_bytes(&p.position, &q.position) && p.manual == q.manual)
 }
 
-/// Put the probes back, keeping the live baked SH while the count is unchanged.
+/// A position as a map key: its bits, so equal positions match exactly.
+fn at(p: glam::Vec3) -> [u32; 3] {
+    p.to_array().map(f32::to_bits)
+}
+
+/// Put the probes back, each keeping the baked SH of a live probe at its position.
 fn put_probes(mut value: ProbeVolume, slot: &mut ProbeVolume) {
-    if value.probes.len() == slot.probes.len() {
-        for (p, live) in value.probes.iter_mut().zip(&slot.probes) {
-            p.sh = live.sh;
+    let mut live: BTreeMap<[u32; 3], _> = BTreeMap::new();
+    for p in slot.probes.iter().rev() {
+        live.insert(at(p.position), p.sh);
+    }
+    for p in &mut value.probes {
+        if let Some(&sh) = live.get(&at(p.position)) {
+            p.sh = sh;
         }
     }
     *slot = value;
@@ -138,12 +153,16 @@ fn same_reflections(a: &ReflectionProbeSet, b: &ReflectionProbeSet) -> bool {
         })
 }
 
-/// Put the reflection probes back, keeping the live cubemaps while the count is
-/// unchanged.
+/// Put the reflection probes back, each keeping the cubemap of a live probe at its
+/// position.
 fn put_reflections(mut value: ReflectionProbeSet, slot: &mut ReflectionProbeSet) {
-    if value.probes.len() == slot.probes.len() {
-        for (p, live) in value.probes.iter_mut().zip(&mut slot.probes) {
-            p.cubemap_path = std::mem::take(&mut live.cubemap_path);
+    let mut live: BTreeMap<[u32; 3], &str> = BTreeMap::new();
+    for p in slot.probes.iter().rev() {
+        live.insert(at(p.position), &p.cubemap_path);
+    }
+    for p in &mut value.probes {
+        if let Some(path) = live.get(&at(p.position)) {
+            p.cubemap_path = (*path).to_owned();
         }
     }
     *slot = value;
