@@ -17,6 +17,7 @@ use crate::components::{ParticleBlend, RibbonStyle};
 use crate::render::draw::batch::sort::{back_to_front, view_depth};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::passes::particles::ParticleDraws;
+use crate::render::postfx::effects::taa::{jitter::jittered, jitter_of};
 use crate::render::timing::GpuPass;
 use crate::render::{GpuTexture, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -69,8 +70,10 @@ impl Renderer {
         if ribbons.draws.is_empty() {
             return 0;
         }
+        // Jittered as the solids are on a TAA view (#1702).
+        let view_proj = jittered(camera.build_view_projection(view.aspect()), jitter_of(view));
         let globals = RibbonGlobals {
-            view_proj: camera.build_view_projection(view.aspect()).to_cols_array(),
+            view_proj: view_proj.to_cols_array(),
             cam_pos: camera.position.extend(0.0).to_array(),
             fog: FogUniform::from_settings(&scene.fog),
         };

@@ -38,7 +38,9 @@ pub(crate) struct CameraUniform {
     pub prev_view_proj: [f32; 16],
     /// `x`: this camera's index in its stack, bottom to top (#1436): the velocity
     /// target's `.a`, so motion blur orders a higher camera in front. `y`: last
-    /// frame's game time (#1524), for the vertex blocks' motion. `zw`: unused.
+    /// frame's game time (#1524), for the vertex blocks' motion. `zw`: the TAA jitter
+    /// `view_proj` carries, in NDC (#1702; zero without TAA), which the velocity
+    /// shaders subtract: `prev_view_proj` is unjittered.
     pub stack: [f32; 4],
     /// `view_proj`'s inverse (#1523), what refraction and absorption rebuild the
     /// opaque depth's world point with.

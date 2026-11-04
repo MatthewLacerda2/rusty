@@ -32,5 +32,6 @@ fn sky_velocity(camera: CameraUniforms, dir: vec3<f32>) -> vec2<f32> {
     if (abs(now.w) < 1e-6 || abs(prev.w) < 1e-6) {
         return vec2<f32>(0.0);
     }
-    return now.xy / now.w - prev.xy / prev.w;
+    // Less TAA's jitter (`stack.zw`, #1702): `view_proj` is the jittered one.
+    return now.xy / now.w - camera.stack.zw - prev.xy / prev.w;
 }

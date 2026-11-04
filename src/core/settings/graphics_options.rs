@@ -52,6 +52,8 @@ crate::core::named_enum! {
         Ssao = "ssao",
         /// Screen-space reflections (High tier only).
         Ssr = "ssr",
+        /// The camera's temporal anti-aliasing (#1702).
+        Taa = "taa",
         /// The volume's vignette (#1439).
         Vignette = "vignette",
     }

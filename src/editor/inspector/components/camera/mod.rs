@@ -1,14 +1,15 @@
 //! src/editor/inspector/components/camera/ — the Camera inspector card (this
 //! `mod.rs`) plus the Post Processing card (`post_processing`, one section per post
 //! effect). Both cards live on the same camera entity. The Camera card draws the
-//! camera effects' sections (`CAMERA_SECTIONS`: motion blur in `motion_blur`,
-//! FXAA here).
+//! camera effects' sections (`CAMERA_SECTIONS`: motion blur in `motion_blur`, TAA
+//! in `taa`, FXAA here).
 
 use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
 mod motion_blur;
 pub(crate) mod post_processing;
+mod taa;
 mod target;
 
 pub use post_processing::{commit_abandoned_paths, draw_post_processing};
@@ -50,7 +51,7 @@ pub fn draw_camera(
     }
 }
 
-/// One camera effect's section of the Camera card (#1467): motion blur and FXAA,
+/// One camera effect's section of the Camera card (#1467): motion blur, FXAA and TAA,
 /// whose settings live on the camera, not on a volume.
 pub(crate) struct CameraSection {
     /// The effect, as `render::postfx::effects` names it.
@@ -72,6 +73,11 @@ pub(crate) const CAMERA_SECTIONS: &[CameraSection] = &[
         effect: "motion_blur",
         order: 1,
         draw: motion_blur::draw_motion_blur,
+    },
+    CameraSection {
+        effect: "taa",
+        order: 3,
+        draw: taa::draw_taa,
     },
 ];
 

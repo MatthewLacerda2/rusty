@@ -28,6 +28,7 @@ use crate::render::lod::LodSelection;
 use crate::render::passes::particles::ParticleDraws;
 use crate::render::passes::ssao::{SsaoFrame, SsaoPlan};
 use crate::render::postfx::effects::ssr;
+use crate::render::postfx::effects::taa::jitter::jittered;
 use crate::render::{CameraUniform, Frustum, RenderView, Renderer};
 use crate::scene::{Camera, ClearFlags, Scene};
 
@@ -64,8 +65,9 @@ pub(crate) struct CameraCtx<'a> {
     /// A `DepthOnly` camera stacked on another (a viewmodel): see [`is_overlay`].
     pub overlay: bool,
     pub aspect: f32,
+    /// This camera's view-projection as it draws: jittered on a TAA view (#1702).
     pub view_proj: glam::Mat4,
-    /// The stack's base (first) camera's view-projection, for post-FX.
+    /// The stack's base (first) camera's unjittered view-projection, for post-FX.
     pub base_view_proj: glam::Mat4,
     /// World-space frustum, for culling off-screen entities (#330).
     pub frustum: Frustum,
@@ -89,11 +91,14 @@ pub(crate) struct CameraCtx<'a> {
 /// The per-stack values every camera's context reads.
 pub(crate) struct StackShared {
     pub aspect: f32,
-    /// Each camera's view-projection, bottom to top, and its last frame's (#1435).
+    /// Each camera's view-projection, bottom to top, and its last frame's (#1435),
+    /// both unjittered.
     pub view_projs: Vec<glam::Mat4>,
     pub prev_view_projs: Vec<glam::Mat4>,
     /// The game time the view drew at last frame (#1524), the shader time without one.
     pub prev_time: f32,
+    /// TAA's jitter this frame, in NDC (#1702): zero without TAA.
+    pub jitter: glam::Vec2,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
     /// The base camera's transparent SSR march (#1570), `[steps, step, min
@@ -109,7 +114,9 @@ impl<'a> CameraCtx<'a> {
         idx: usize,
     ) -> Self {
         let cam = &stack.stack[idx];
-        let view_proj = shared.view_projs[idx];
+        // Drawn jittered (TAA, #1702); culled through the unjittered matrix.
+        let unjittered = shared.view_projs[idx];
+        let view_proj = jittered(unjittered, shared.jitter);
         let clusters = ClusterGrid::new(cam, shared.aspect);
         let overlay = is_overlay(idx == 0, cam.clear_flags);
         let (march, traces) = ssr_march(idx == 0, shared.ssr_march);
@@ -123,7 +130,7 @@ impl<'a> CameraCtx<'a> {
             aspect: shared.aspect,
             view_proj,
             base_view_proj: shared.view_projs[0],
-            frustum: Frustum::from_view_proj(view_proj),
+            frustum: Frustum::from_view_proj(unjittered),
             fog: shared.fog,
             ssao: shared.ssao.filter(|_| !overlay),
             traces,
@@ -135,7 +142,12 @@ impl<'a> CameraCtx<'a> {
                 fog: shared.fog,
                 clusters: clusters.uniform(),
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
-                stack: [idx as f32, shared.prev_time, 0.0, 0.0],
+                stack: [
+                    idx as f32,
+                    shared.prev_time,
+                    shared.jitter.x,
+                    shared.jitter.y,
+                ],
                 inv_view_proj: view_proj.inverse().to_cols_array(),
                 ssr: march,
             },

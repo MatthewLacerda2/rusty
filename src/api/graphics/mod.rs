@@ -4,7 +4,7 @@
 //! can drive its own settings logic in Lua. What it reaches:
 //!
 //! * The post effects (`effects`, #1467): one registrar per effect, over the main
-//!   camera's active `PostProcessingComponent` or, for motion blur and FXAA, its
+//!   camera's active `PostProcessingComponent` or, for motion blur, FXAA and TAA, its
 //!   `CameraComponent`. The main camera is the screen stack's base
 //!   (`scene::camera::main_camera`, Unity's `Camera.main`, #1434), the camera whose
 //!   components the renderer packs into the screen's post-FX EVERY frame, so a write

@@ -121,6 +121,12 @@ pub fn set_fxaa_active(c: &mut CameraComponent, active: bool) {
     c.fxaa_active = active;
 }
 
+/// Set the camera's TAA flag — temporal anti-aliasing (#1702), which replaces FXAA
+/// while it runs. Shared by the editor's Camera card and `Graphics.SetTaaActive`.
+pub fn set_taa_active(c: &mut CameraComponent, active: bool) {
+    c.taa_active = active;
+}
+
 /// The largest render-texture side, in pixels — a guard against a typo allocating
 /// gigabytes, not a quality bound (4096² is a 64 MB colour target).
 pub const MAX_TARGET_SIZE: u32 = 4096;

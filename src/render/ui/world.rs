@@ -29,6 +29,7 @@ use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::gpu::layout_entries::dynamic_uniform_entry;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::uniforms::FogUniform;
+use crate::render::postfx::effects::taa::{jitter::jittered, jitter_of};
 use crate::render::timing::{GpuPass, GpuTimer};
 use crate::render::{RenderView, Renderer};
 use crate::scene::Camera;
@@ -114,7 +115,8 @@ impl Renderer {
         aspect: f32,
         fog: FogUniform,
     ) {
-        let view_proj = cam.build_view_projection(aspect);
+        // Jittered as the solids are on a TAA view (#1702): it is depth-tested.
+        let view_proj = jittered(cam.build_view_projection(aspect), jitter_of(view));
         let mut items = world_items(&view.ui, cam);
         if items.is_empty() {
             return;

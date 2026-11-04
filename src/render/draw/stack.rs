@@ -9,7 +9,7 @@ use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::effects::ssr::{ssr_enabled, surface, transparent};
-use crate::render::postfx::effects::{self, EffectCx, PassCx};
+use crate::render::postfx::effects::{self, taa, EffectCx, PassCx};
 use crate::render::postfx::params::{frame_params, PostSource};
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -31,7 +31,7 @@ pub(crate) struct StackPass<'a> {
     /// Where post-FX writes the finished image.
     pub output: &'a wgpu::TextureView,
     pub editor_mode: bool,
-    /// Run `post`'s grading, bloom, SSR, motion blur and FXAA. Off, the image is
+    /// Run `post`'s grading, bloom, SSR, TAA, motion blur and FXAA. Off, the image is
     /// only brought from HDR to display (a render texture's `post_fx = false`).
     pub full_post_fx: bool,
     /// How many frames of motion this draw's velocities span: 1 for the screen, a
@@ -74,6 +74,10 @@ impl Renderer {
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.scene_size();
         surface::begin(&mut view.post_fx.targets, &self.device, size, ssr);
+        // TAA (#1702): the frame's sub-pixel jitter, every camera's alike.
+        let taa_on =
+            taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode) && !own_pipeline;
+        let jitter = taa::begin(&mut view.post_fx.targets, &self.device, size, taa_on);
         let prev_view_projs =
             view.post_fx
                 .motion
@@ -84,6 +88,7 @@ impl Renderer {
             view_projs,
             prev_view_projs,
             prev_time,
+            jitter,
             fog: FogUniform::from_settings(&scene.fog),
             ssao: SsaoPlan::for_volume(pass.post.volume, self.graphics(pass.editor_mode)),
             ssr_march: transparent::camera_march(pass.post, graphics, ssr),
