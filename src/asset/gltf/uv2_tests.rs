@@ -87,6 +87,7 @@ fn bake_input(mesh: &SubMesh) -> crate::scene::lighting::lightmap::BakeScene {
         }],
         lights: Vec::new(),
         sky: glam::Vec3::ONE.into(),
+        diffuse: Default::default(),
     }
 }
 

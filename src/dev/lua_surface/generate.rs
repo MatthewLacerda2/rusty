@@ -1,7 +1,8 @@
 //! `Lighting.Generate()` and the scene's lighting settings (#832): the one verb
 //! behind the editor's Generate Lighting button, and `Lighting.GetSettings()` /
 //! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, and the
-//! reflection probes' default resolution, memory budget and probe ceiling, #1584).
+//! reflection probes' default resolution, memory budget and probe ceiling, #1584,
+//! and the scene's diffuse model, #1698).
 
 use mlua::{Lua, Table};
 
@@ -10,6 +11,7 @@ use super::super::bake::progress::BakeLog;
 use crate::api::{global_table, put, ApiCell, ApiCtx, Reg};
 use crate::scene::lighting::lightmap::BakeSettings;
 use crate::scene::lighting::settings::ReflectionSettings;
+use crate::scene::lighting::DiffuseModel;
 use crate::scene::Scene;
 
 /// The knobs a script may override, each optional; `None` keeps `base`'s.
@@ -90,6 +92,7 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
             out.set("bounces", s.bounces)?;
             out.set("seed", s.seed)?;
             out.set("directional", s.directional)?;
+            out.set("diffuseModel", settings.diffuse_model.name())?;
             put_reflections(&out, &r)?;
             Ok(out)
         }),
@@ -98,14 +101,38 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
         table,
         "SetSettings",
         lua.create_function(move |lua, t: Table| {
-            let scene = &*scene.get(lua)?;
-            let overrides = Overrides::from_table(&t)?;
+            let scene = scene.get(lua)?;
             let mut scene = scene.borrow_mut();
-            let s = &mut scene.lighting_settings.lightmaps;
-            *s = overrides.apply(*s);
-            set_reflections(&t, &mut scene.lighting_settings.reflections)
+            set_settings(&mut scene, &t)
         }),
     )
+}
+
+/// `SetSettings{…}`: the fields `t` names written into the scene's settings, each
+/// clamped. Every field is read and checked before any is written, so a call that
+/// raises (an unknown diffuse model, a value of the wrong type) changes nothing.
+fn set_settings(scene: &mut crate::scene::Scene, t: &Table) -> mlua::Result<()> {
+    let overrides = Overrides::from_table(t)?;
+    let model = diffuse_model(t)?;
+    let mut reflections = scene.lighting_settings.reflections;
+    set_reflections(t, &mut reflections)?;
+    let settings = &mut scene.lighting_settings;
+    settings.diffuse_model = model.unwrap_or(settings.diffuse_model);
+    settings.lightmaps = overrides.apply(settings.lightmaps);
+    settings.reflections = reflections;
+    Ok(())
+}
+
+/// The diffuse model `t` names (#1698), if any; an unknown name is an error.
+fn diffuse_model(t: &Table) -> mlua::Result<Option<DiffuseModel>> {
+    let Some(name) = t.get::<Option<String>>("diffuseModel")? else {
+        return Ok(None);
+    };
+    DiffuseModel::from_name(&name).map(Some).ok_or_else(|| {
+        mlua::Error::runtime(format!(
+            "unknown diffuseModel '{name}' (Lambert or HalfLambert)"
+        ))
+    })
 }
 
 /// The reflection probes' defaults, as `GetSettings` returns them (#1584).

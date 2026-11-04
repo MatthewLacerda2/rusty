@@ -14,6 +14,7 @@
 use glam::Vec3;
 
 use crate::scene::lighting::sh::Sh9;
+use crate::scene::lighting::DiffuseModel;
 use crate::scene::{AmbientRadiance, LightType, Scene};
 
 /// The environment the analytic fill projects: the ambient's radiance by direction
@@ -26,6 +27,9 @@ struct AnalyticEnv {
     /// Sun direction *toward* the light (normalized) and its radiance, if any.
     pub sun_dir: Option<Vec3>,
     pub sun_radiance: Vec3,
+    /// The scene's diffuse model (#1698): the sun is a lamp, so its read-back
+    /// follows it, as `baked_direct_sh` does; the ambient stays Lambert.
+    pub diffuse: DiffuseModel,
 }
 
 impl AnalyticEnv {
@@ -53,6 +57,7 @@ impl AnalyticEnv {
             sky,
             sun_dir,
             sun_radiance,
+            diffuse: scene.lighting_settings.diffuse_model,
         }
     }
 
@@ -61,7 +66,7 @@ impl AnalyticEnv {
     /// probe's cosine-convolved read-back over π is the forward shader's flat ambient,
     /// exactly for the `Color` hemisphere (linear in `y`, carried by L0 and L1) and up
     /// to the L2 cut for the `Gradient` trilight (its horizon kink needs L2). The sun
-    /// is a single bright directional sample.
+    /// is a single bright directional sample, shaped by the diffuse model.
     pub fn project(&self) -> Sh9 {
         let mut sh = Sh9::zero();
         // The ambient, integrated over the sphere. A Fibonacci sphere is
@@ -72,9 +77,12 @@ impl AnalyticEnv {
             sh.add_sample(*d, self.sky.incoming(*d), w);
         }
         // Directional sun: one delta-ish sample. Weighted so its reconstructed
-        // contribution reads as a plausible directional bounce, not a full sphere.
+        // contribution reads as a plausible directional bounce, not a full sphere,
+        // and reshaped per band so it reads back with the scene's diffuse model.
         if let Some(dir) = self.sun_dir {
-            sh.add_sample(dir, self.sun_radiance, 1.0);
+            let mut sun = Sh9::zero();
+            sun.add_sample(dir, self.sun_radiance, 1.0);
+            sh.accumulate(&sun.band_scaled(self.diffuse.sh_band_scale()));
         }
         sh
     }
