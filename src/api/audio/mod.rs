@@ -31,25 +31,19 @@ pub use frame::push_frame;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::api::ApiCell;
+use crate::api::{ApiCell, ApiCtx};
 use glam::Vec3;
 
 use crate::audio::{AudioMaestro, Listener, Rolloff, Shot, SpeakerMode};
 use crate::components::AudioSourceComponent;
-use crate::core::application::Application;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
 
-/// Register the `Audio` namespace onto `lua`.
-pub fn register(
-    lua: &Lua,
-    scene: ApiCell<Scene>,
-    audio: ApiCell<AudioMaestro>,
-    time: ApiCell<Time>,
-    camera: ApiCell<Camera>,
-    app: ApiCell<Application>,
-) -> Reg {
+/// Register the `Audio` namespace onto `lua`, reaching the scene, the maestro, the
+/// clock, the camera and the project settings (`Application`) through `ctx`.
+pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
+    let (scene, audio, time, camera) = (ctx.scene, ctx.audio, ctx.time, ctx.camera);
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_source_control(lua, &table, scene, audio, time)?;
@@ -61,7 +55,7 @@ pub fn register(
     snapshots::register_snapshots(lua, &table, audio, time)?;
     occlusion::register_occlusion(lua, &table, scene, audio)?;
     doppler::register_doppler(lua, &table, scene, audio)?;
-    doppler::register_default_speed(lua, &table, app)?;
+    doppler::register_default_speed(lua, &table, ctx.application)?;
     reverb::register_reverb(lua, &table, audio)?;
 
     lua.globals().set("Audio", table).map_err(|e| e.to_string())

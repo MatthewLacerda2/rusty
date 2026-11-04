@@ -96,11 +96,10 @@ fn a_scene_load_forgets_the_listener_motion() {
     scene
         .borrow_mut()
         .request_load(level.to_string_lossy().into_owned());
-    game.tick(DT); // the load lands at the tick's tail
-    assert!(game.resources.audio.borrow().is_source_playing(speaker));
-    // The camera lands 1 m closer: 100 m/s if it were measured across the load.
+    // The camera lands 1 m closer with the load: 100 m/s if it were measured.
     game.resources.camera.borrow_mut().position = Vec3::new(-1.0, 0.0, 0.0);
-    game.tick(DT);
+    game.tick(DT); // the load lands at the tick's tail, before the audio push
+    assert!(game.resources.audio.borrow().is_source_playing(speaker));
     assert_eq!(rate(&game, speaker), 1.0, "the load forgot the listener");
     game.resources.camera.borrow_mut().position = Vec3::new(-2.0, 0.0, 0.0);
     game.tick(DT);
