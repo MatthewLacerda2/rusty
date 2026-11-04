@@ -9,17 +9,15 @@ pub(super) fn fake(dir: &Path, output: &str) -> PathBuf {
     script(dir, &format!("echo '{output}'"))
 }
 
-/// A fake `blender` in `dir` that runs the shell `body`. Written under another
-/// name, closed, then renamed into place: a process forked meanwhile by another
-/// test can't hold it open for writing ("text file busy").
+/// A fake `blender` in `dir` that runs the shell `body`. A process another test
+/// forks meanwhile may hold it open for writing an instant longer, so starting
+/// it can meet "text file busy": the engine's start waits that out (#1821).
 pub(super) fn script(dir: &Path, body: &str) -> PathBuf {
     use std::os::unix::fs::PermissionsExt;
     std::fs::create_dir_all(dir).unwrap();
-    let (draft, path) = (dir.join("blender.draft"), dir.join("blender"));
-    std::fs::write(&draft, format!("#!/bin/sh\n{body}\n")).unwrap();
-    std::fs::set_permissions(&draft, std::fs::Permissions::from_mode(0o755)).unwrap();
-    // lint: allow(atomic-write) the draft is executable before it takes the name, which `write_atomic` can't do
-    std::fs::rename(&draft, &path).unwrap();
+    let path = dir.join("blender");
+    std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
     path
 }
 

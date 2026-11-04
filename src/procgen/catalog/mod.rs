@@ -120,6 +120,10 @@ catalog! {
     #[cfg(test)]
     Dummy(color::dummy::Dummy),
     EdgeDetect(filter::mask::edge_detect::EdgeDetect),
+    FloodBbox(filter::flood::bbox::FloodBbox),
+    FloodFill(filter::flood::fill::FloodFill),
+    FloodGradient(filter::flood::gradient::FloodGradient),
+    FloodRandom(filter::flood::random::FloodRandom),
     Gamma(color::gamma::Gamma),
     Gradient(generators::gradient::Gradient),
     Highpass(filter::blurs::highpass::Highpass),

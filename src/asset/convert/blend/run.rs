@@ -26,6 +26,11 @@ const TAIL_LINES: usize = 12;
 /// How often a run is polled for its end.
 const POLL: Duration = Duration::from_millis(20);
 
+/// How often, and how far apart, a start refused as "text file busy" is tried
+/// again: about a fifth of a second in all.
+const BUSY_TRIES: u32 = 100;
+const BUSY_WAIT: Duration = Duration::from_millis(2);
+
 /// What the Blender at `path` answers when asked its version: `Ok` of the version
 /// its answer names (or why it names none), `Err` when it gave no answer at all,
 /// since it could not start or ran past its limit.
@@ -103,12 +108,11 @@ impl Failed {
 /// Run `command` (starting the program at `program`) to its end, output captured,
 /// killing it once it has run `limit`.
 fn run(program: &Path, command: &mut Command, limit: Duration) -> Result<Output, Failed> {
-    let mut child = command
+    command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| Failed::Start(start_error(program, &e)))?;
+        .stderr(Stdio::piped());
+    let mut child = spawn(command).map_err(|e| Failed::Start(start_error(program, &e)))?;
     let stdout = drain(child.stdout.take());
     let stderr = drain(child.stderr.take());
     match wait(&mut child, limit) {
@@ -124,6 +128,25 @@ fn run(program: &Path, command: &mut Command, limit: Duration) -> Result<Output,
             Err(e) => Err(Failed::Start(start_error(program, &e))),
         },
         Err(e) => Err(Failed::Start(start_error(program, &e))),
+    }
+}
+
+/// Start `command`, trying again for a bounded moment while the system refuses
+/// it as "text file busy" (`ETXTBSY`, #1821): the program was just written, and
+/// a process another thread is forking holds the file open for writing until
+/// its own `exec`. A fake Blender a test writes meets this; renaming the file
+/// into place does not help, since the inherited descriptor is on the file
+/// itself, not its name. A real install is only ever busy that briefly too.
+fn spawn(command: &mut Command) -> std::io::Result<Child> {
+    let mut tries = 1;
+    loop {
+        match command.spawn() {
+            Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && tries < BUSY_TRIES => {
+                tries += 1;
+                std::thread::sleep(BUSY_WAIT);
+            }
+            started => return started,
+        }
     }
 }
 
