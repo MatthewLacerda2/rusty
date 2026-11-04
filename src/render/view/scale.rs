@@ -2,6 +2,8 @@
 //! Scale*: the scene renders at the output's size times the scale, and the finished,
 //! post-processed image is upscaled to the output with bilinear filtering (URP's
 //! *Auto* filter outside FSR) before the UI, which stays at the output's resolution.
+//! A view running TAA upscales through it instead (TAAU, #1702:
+//! `postfx::effects::taa::upscale`), and this bilinear copy is then skipped.
 //!
 //! A view is native until its consumer sets a scale: only the screen's views (the
 //! standalone player, the editor's Game view, a harness capture) do, from

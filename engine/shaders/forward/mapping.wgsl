@@ -6,11 +6,17 @@
 // `sample_normal`, so all maps of a material agree on where they are read.
 //
 // Every branch here is on `material()` (the draw's record, indexed by a per-draw
-// uniform), so the implicit-LOD samples sit in uniform control flow.
+// uniform) or on the camera's mip bias, so the implicit-LOD samples sit in uniform
+// control flow.
+//
+// The mip bias (#1702) is TAA's while it upscales the view (`camera.lod.x`,
+// `log2(scene/output)`): only the material maps read through here take it, never the
+// lightmap, the AO target or the specular AA's derivatives. At 0 the lookup is the
+// plain `textureSample`, so a view that doesn't upscale samples as it always did.
 
 #define_import_path forward::mapping
 
-#import forward::bindings::material
+#import forward::bindings::{camera, material}
 #import forward::maps::{map_factor, unpack_normal}
 
 const UV0: u32 = 0u;
@@ -93,14 +99,24 @@ fn sample_any(t: texture_2d<f32>, s: sampler, m: Mapping, uv: vec2<f32>, positio
         + textureSampleGrad(t, s, c.z, dx[2], dy[2]) * c.weights.z;
 }
 
+// One material-map lookup at `uv`, with the camera's mip bias when it has one.
+// The branch is on a uniform, so both samples are in uniform control flow.
+fn lookup(t: texture_2d<f32>, s: sampler, uv: vec2<f32>) -> vec4<f32> {
+    let bias = camera.lod.x;
+    if (bias == 0.0) {
+        return textureSample(t, s, uv);
+    }
+    return textureSampleBias(t, s, uv, bias);
+}
+
 // Map `t` at `c`.
 fn sample(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
     if (material().uv_mapping != TRIPLANAR) {
-        return textureSample(t, s, c.uv);
+        return lookup(t, s, c.uv);
     }
-    return textureSample(t, s, c.x) * c.weights.x
-        + textureSample(t, s, c.y) * c.weights.y
-        + textureSample(t, s, c.z) * c.weights.z;
+    return lookup(t, s, c.x) * c.weights.x
+        + lookup(t, s, c.y) * c.weights.y
+        + lookup(t, s, c.z) * c.weights.z;
 }
 
 // The factor metallic or roughness map `t` at `c` multiplies its scalar by, under
@@ -124,16 +140,16 @@ fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tan
     if (mapping == UV0) {
         let T = normalize(tangent.xyz);
         let B = cross(n, T) * tangent.w;
-        let sampled = unpack_normal(textureSample(t, s, c.uv));
+        let sampled = unpack_normal(lookup(t, s, c.uv));
         return normalize(mat3x3<f32>(T, B, n) * sampled);
     }
-    let ty = unpack_normal(textureSample(t, s, c.uv));
+    let ty = unpack_normal(lookup(t, s, c.uv));
     var tx = vec3<f32>(0.0, 0.0, 1.0);
     var tz = vec3<f32>(0.0, 0.0, 1.0);
     var w = vec3<f32>(0.0, 1.0, 0.0);
     if (mapping == TRIPLANAR) {
-        tx = unpack_normal(textureSample(t, s, c.x));
-        tz = unpack_normal(textureSample(t, s, c.z));
+        tx = unpack_normal(lookup(t, s, c.x));
+        tz = unpack_normal(lookup(t, s, c.z));
         w = c.weights;
     }
     let nx = vec3<f32>(tx.xy + n.zy, abs(tx.z) * n.x);

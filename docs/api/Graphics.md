@@ -625,8 +625,25 @@ scene load, Play or Stop, a camera switch, a resize) is the current frame alone,
 nothing of the last shot ghosts in. The editor's Scene view never runs TAA (it keeps
 FXAA); the Game view, the player and a render-texture camera with `taa_active` and
 `post_fx` on do, each with its own history. The player's `taa` option can turn it
-off. It runs at the view's render-scale size: a render scale below 1 is resolved,
-then upscaled like the rest of the scene.
+off.
+
+**With a render scale below 1, TAA upscales** (TAAU, #1702; URP's TAA upscaling and
+FSR2 do the same): the scene renders at the scaled size and TAA rebuilds the
+output-resolution image from the jittered samples of many frames, instead of the
+bilinear upscale, so `0.67` looks close to native and `0.5` keeps thin wires
+whole. The post chain (depth of field, motion blur, the exposure meter, bloom, the
+grade, the authored effects) runs at the scaled size as it does without TAA, FXAA
+is skipped, and the resolve runs on its finished image, just before the UI. While
+it upscales, the jitter runs a sequence of `8 × (1/scale)²` offsets (18 at `0.67`,
+32 at `0.5`) and the material maps (albedo, normal, metallic, roughness, emissive)
+read with a mip bias of `log2(scale)`, so their detail matches the output's
+pixels; the lightmaps and the ambient occlusion keep theirs. The resolve works on
+the graded image, so film grain and an authored effect's screen-space pattern
+(`Shader.md`) are softened by it. A render-scale change, a resize and a move to a
+monitor of another density under `"match_display"` start the history over: no
+ghost of the old size. At `1` (or above, supersampling) it resolves at the scene's
+size as before. There is no filter setting: with TAA on and a scale below `1` it
+upscales, and with TAA off the bilinear upscale runs as it always did.
 
 **Harness screenshots see one frame of it, not a player's settled image.** A
 headless capture (`Harness.Screenshot`, `Harness.Render`) draws one frame per shot
@@ -767,8 +784,8 @@ renders the 3D scene at `s` times the surface's resolution, each side rounded (a
 least 1 pixel). Every scene target is that size: colour, depth (which the SSAO prepass fills),
 motion vectors and the post-FX targets, so the cost of the fill-bound passes follows
 the pixel count. The finished, post-processed image is then upscaled (bilinear, as
-URP's *Auto* filter outside FSR) to the surface **before the UI**, which stays at
-native resolution and sharp. Below `1` the scene looks softer; above `1` it
+URP's *Auto* filter outside FSR, or, on a camera running TAA, by TAA itself: see
+*TAA*) to the surface **before the UI**, which stays at native resolution and sharp. Below `1` the scene looks softer; above `1` it
 supersamples. On a 2× Retina surface `0.5` renders at the 1× pixel count:
 `Video.SetResolution` sizes the window (or, fullscreen, the whole framebuffer, UI
 included), and cannot do that. Each side is capped at the device's largest texture

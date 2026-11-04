@@ -48,6 +48,10 @@ pub(crate) struct CameraUniform {
     /// The transparent SSR trace (#1570, #1736): steps, step length and the minimum
     /// smoothness it reflects down to, then a pad; zero where the camera traces none.
     pub ssr: [f32; 4],
+    /// `x`: the material maps' mip bias (#1702), negative while TAA upscales the
+    /// view (`log2(scene/output)`), else 0, which samples exactly as without one.
+    /// `yzw`: unused.
+    pub lod: [f32; 4],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in

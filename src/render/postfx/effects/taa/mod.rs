@@ -12,26 +12,32 @@
 //!   by URP's frame influence. Its output is what motion blur, the exposure meter,
 //!   bloom and the composite read ([`super::super::PostFx::scene_color`]) and next
 //!   frame's history;
-//! - **the history** ([`TaaHistory`]), the view's, in [`super::Targets`]: two HDR
-//!   targets at the view's scene size, read and written in turn. It is dropped on a
-//!   resize and when TAA stops; it holds no frame after a cut the motion history
-//!   names (a scene load, Play or Stop, a camera switch,
+//! - **the history** ([`TaaHistory`], [`history`]), the view's, in [`super::Targets`]:
+//!   two HDR targets read and written in turn. It is dropped on a resize, a
+//!   render-scale change and when TAA stops; it holds no frame after a cut the
+//!   motion history names (a scene load, Play or Stop, a camera switch,
 //!   `MotionVectors::reset`), so the first frame after one is the current frame
 //!   alone, with no ghost of the last.
 //!
-//! **Size.** The jitter and the resolve are in scene-size pixels, so a render scale
-//! below 1 resolves at the scaled size and is upscaled after, as every other post
-//! target is. Upscaling inside the resolve (TAAU) is #1702's part 3.
+//! **Upscaling (TAAU, part 3).** With a render scale below 1 the view upscales
+//! inside TAA instead of bilinearly ([`upscale`]): the post chain runs at the
+//! scene's size as it always did, and the resolve then reconstructs the
+//! post-processed image at the output's size from the jittered samples of many
+//! frames, in place of the bilinear upscale. [`history`] says which path a view
+//! takes.
 //!
 //! **Defaults (URP's `TemporalAA.Settings`).** Frame influence 0.1 (*Base Blend
-//! Factor* 0.9), variance clamp scale 0.9, jitter scale 1, mip bias 0 (no texture
-//! LOD bias: `lightmap_level` and the specular AA's derivatives see the frame as
-//! drawn), no sharpening.
+//! Factor* 0.9), variance clamp scale 0.9, jitter scale 1, mip bias 0 when not
+//! upscaling (`log2(scene/output)` when it is, on the material maps only), no
+//! sharpening.
 
 mod effect;
+pub(crate) mod history;
 pub(crate) mod jitter;
+mod upscale;
 
 pub(crate) use effect::{wanted, EFFECT};
+pub(crate) use history::{begin, TaaFrame, TaaHistory};
 
 use glam::Vec2;
 
@@ -40,9 +46,8 @@ use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::postfx::{PfxTarget, PostFx, HDR_FORMAT};
+use crate::render::postfx::{PostFx, HDR_FORMAT};
 use crate::render::timing::{GpuPass, GpuTimer};
-use crate::render::RenderView;
 
 /// URP's frame influence: the current frame's weight in the blend.
 pub(crate) const FRAME_INFLUENCE: f32 = 0.1;
@@ -55,28 +60,39 @@ pub(crate) const VARIANCE_CLAMP_SCALE: f32 = 0.9;
 struct TaaParams {
     size: [f32; 4],
     knobs: [f32; 4],
+    scene: [f32; 4],
+    jitter: [f32; 4],
 }
 
 impl TaaParams {
-    fn new((w, h): (u32, u32), history: bool) -> Self {
-        let (w, h) = (w as f32, h as f32);
+    /// The history's size `size`, the scene's `scene` (the same when not upscaling)
+    /// and the frame's jitter in scene pixels.
+    fn new(size: (u32, u32), scene: (u32, u32), history: bool, jitter: Vec2) -> Self {
+        let dims = |(w, h): (u32, u32)| {
+            let (w, h) = (w.max(1) as f32, h.max(1) as f32);
+            [w, h, 1.0 / w, 1.0 / h]
+        };
         Self {
-            size: [w, h, 1.0 / w, 1.0 / h],
+            size: dims(size),
             knobs: [
                 FRAME_INFLUENCE,
                 VARIANCE_CLAMP_SCALE,
                 f32::from(u8::from(history)),
                 0.0,
             ],
+            scene: dims(scene),
+            jitter: [jitter.x, jitter.y, 0.0, 0.0],
         }
     }
 }
 
-/// The resolve's pipeline, shared by every view.
+/// The resolve's pipelines, shared by every view: the scene-size resolve and the
+/// upscaling one (TAAU), both into an HDR history target.
 pub(crate) struct TaaPasses {
     layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     resolve: LazyPipeline,
+    upscale: LazyPipeline,
 }
 
 impl TaaPasses {
@@ -97,21 +113,26 @@ impl TaaPasses {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
-        let resolve = LazyPipeline::new(device, move |device| {
-            let target = wgpu::ColorTargetState {
-                format: HDR_FORMAT,
-                blend: None,
-                write_mask: wgpu::ColorWrites::ALL,
-            };
-            Fullscreen {
-                label: "TAA Resolve",
-                shader: &shader,
-                layout: &pipeline_layout,
-                vs: "vs_fullscreen",
-                fs: "fs_resolve",
-            }
-            .colour(device, &[Some(target)])
-        });
+        let pipeline = |fs: &'static str, label: &'static str| {
+            let (shader, layout) = (shader.clone(), pipeline_layout.clone());
+            LazyPipeline::new(device, move |device| {
+                let target = wgpu::ColorTargetState {
+                    format: HDR_FORMAT,
+                    blend: None,
+                    write_mask: wgpu::ColorWrites::ALL,
+                };
+                Fullscreen {
+                    label,
+                    shader: &shader,
+                    layout: &layout,
+                    vs: "vs_fullscreen",
+                    fs,
+                }
+                .colour(device, &[Some(target)])
+            })
+        };
+        let resolve = pipeline("fs_resolve", "TAA Resolve");
+        let upscale = pipeline("fs_upscale", "TAA Upscale");
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("TAA History Sampler"),
             mag_filter: wgpu::FilterMode::Linear,
@@ -122,80 +143,14 @@ impl TaaPasses {
             layout,
             sampler,
             resolve,
+            upscale,
         }
     }
 
     /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 1] {
-        [&self.resolve]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+        [&self.resolve, &self.upscale]
     }
-}
-
-/// One view's TAA state while it runs: the two history targets, where the jitter
-/// sequence is and whether the history holds a resolved frame.
-pub(crate) struct TaaHistory {
-    size: (u32, u32),
-    frames: [PfxTarget; 2],
-    params: wgpu::Buffer,
-    /// Which of `frames` holds the latest resolve.
-    latest: usize,
-    /// Whether `frames[latest]` is a frame of this view (not a fresh target).
-    valid: bool,
-    /// The jitter sequence's frame counter.
-    frame: u32,
-    /// Whether the resolve ran this frame: its output is then the scene.
-    ran: bool,
-}
-
-impl TaaHistory {
-    fn new(device: &wgpu::Device, (w, h): (u32, u32)) -> Self {
-        let frame = |label| PostFx::target(device, w, h, label, HDR_FORMAT);
-        Self {
-            size: (w, h),
-            frames: [frame("TAA History A"), frame("TAA History B")],
-            params: device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("TAA Params"),
-                size: std::mem::size_of::<TaaParams>() as u64,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }),
-            latest: 0,
-            valid: false,
-            frame: 0,
-            ran: false,
-        }
-    }
-
-    /// This frame's resolve, when it ran: what the rest of the chain reads.
-    pub(crate) fn output(&self) -> Option<&PfxTarget> {
-        self.ran.then(|| &self.frames[self.latest])
-    }
-}
-
-/// Start a stack's frame, after the motion history's `begin`: with `on`, fit the
-/// view's history to its scene size and return this frame's jitter in NDC;
-/// without, drop the history and return none. A view that runs no TAA draws with
-/// the unjittered projection, bit for bit. On a cut (the motion history starts
-/// over) the history is forgotten and the sequence restarts, so the frame is
-/// exactly a new view's first.
-pub(crate) fn begin(view: &mut RenderView, device: &wgpu::Device, on: bool) -> Vec2 {
-    let (size, cut) = (view.scene_size(), view.post_fx.motion.history.cut());
-    let targets = &mut view.post_fx.targets;
-    if !on {
-        targets.remove::<TaaHistory>();
-        return Vec2::ZERO;
-    }
-    let size_px = (size.width.max(1), size.height.max(1));
-    let h = targets.get_or(|| TaaHistory::new(device, size_px));
-    if h.size != size_px {
-        *h = TaaHistory::new(device, size_px);
-    }
-    if cut {
-        (h.frame, h.valid) = (0, false);
-    }
-    h.frame = h.frame.wrapping_add(1);
-    h.ran = false;
-    jitter::ndc(jitter::pixels(h.frame), size)
 }
 
 impl PostFx {
@@ -213,8 +168,12 @@ impl PostFx {
         else {
             return;
         };
+        // An upscaling view resolves after the post chain instead (`taa_upscale`).
+        if h.upscale {
+            return;
+        }
         let (read, write) = (h.latest, 1 - h.latest);
-        let params = TaaParams::new(h.size, h.valid);
+        let params = TaaParams::new(h.size, h.size, h.valid, h.pixels);
         queue.write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
         let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("TAA Bind Group"),
@@ -237,9 +196,12 @@ impl PostFx {
         (h.latest, h.valid, h.ran) = (write, true, true);
     }
 
-    /// Whether the TAA resolve ran this frame (FXAA then skips: one anti-aliasing).
+    /// Whether TAA anti-aliases this frame: its scene-size resolve ran, or the view
+    /// upscales through it after the chain. FXAA then skips: one anti-aliasing.
     pub(crate) fn taa_ran(&self) -> bool {
-        self.targets.get::<TaaHistory>().is_some_and(|h| h.ran)
+        self.targets
+            .get::<TaaHistory>()
+            .is_some_and(|h| h.ran || h.upscale)
     }
 }
 
@@ -260,11 +222,9 @@ mod viewmodel_gpu_tests;
 /// test. A pass never reads it: every camera's jittered matrix is
 /// `CameraCtx::view_proj`, the one a pass that builds its own uniform takes.
 #[cfg(test)]
-pub(crate) fn jitter_of(view: &RenderView) -> Vec2 {
+pub(crate) fn jitter_of(view: &crate::render::RenderView) -> Vec2 {
     let history = view.post_fx.targets.get::<TaaHistory>();
-    history.map_or(Vec2::ZERO, |h| {
-        jitter::ndc(jitter::pixels(h.frame), view.scene_size())
-    })
+    history.map_or(Vec2::ZERO, |h| jitter::ndc(h.pixels, view.scene_size()))
 }
 
 #[cfg(test)]

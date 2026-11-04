@@ -79,16 +79,16 @@ impl Renderer {
                 .motion
                 .begin(&self.device, size, key, velocity, &cameras);
         let prev_time = view.post_fx.motion.history.game_time(scene.shader_time);
-        // TAA (#1702): the frame's sub-pixel jitter, every camera's alike; a cut
-        // forgets its history.
+        // TAA (#1702): the frame's sub-pixel jitter, every camera's alike, and the
+        // material maps' mip bias while it upscales; a cut forgets its history.
         let taa_on = taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode);
-        let jitter = taa::begin(view, &self.device, taa_on && !own_pipeline);
+        let taa = taa::begin(view, &self.device, taa_on && !own_pipeline);
         let shared = StackShared {
             aspect,
             view_projs,
             prev_view_projs,
             prev_time,
-            jitter,
+            taa,
             fog: FogUniform::from_settings(&scene.fog),
             ssao: SsaoPlan::for_volume(pass.post.volume, self.graphics(pass.editor_mode)),
             ssr_march: transparent::camera_march(pass.post, graphics, ssr),

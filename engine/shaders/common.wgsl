@@ -62,6 +62,10 @@ struct CameraUniforms {
     // smoothness it fades in over above that (`ssr::fade`); all zero where the camera
     // runs no SSR (`render::postfx::effects::ssr::transparent`).
     ssr: vec4<f32>,
+    // x: the material maps' mip bias (#1702): `log2(scene/output)` while TAA
+    // upscales the view, else exactly 0 (`forward::mapping` then samples without
+    // one). yzw: unused.
+    lod: vec4<f32>,
 };
 
 // The forward lighting uniform (group 0, binding 1) and its light records. Shared
