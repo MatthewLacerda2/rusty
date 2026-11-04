@@ -47,8 +47,18 @@ class Attempts(unittest.TestCase):
         self.assertNotEqual(one, handbacks.attempts([{"id": 7, "run_attempt": 2}, {"id": 3}]))
         self.assertNotEqual(one, handbacks.attempts([{"id": 7}, {"id": 3}, {"id": 9}]))
 
+    def test_a_run_ending_changes_the_spelling(self):
+        out = handbacks.attempts([{"id": 7, "run_attempt": 1, "status": "in_progress"}])
+        self.assertEqual(out, "7.1~")
+        self.assertEqual(handbacks.attempts([{"id": 7, "status": "completed"}]), "7.1")
+
 
 class Requeue(unittest.TestCase):
+    def test_a_run_ending_after_a_stall_hand_back_brings_the_head_back(self):
+        taken, said, _ = run(["1.1~", "1.1~", "1.1"], [outcomes.HANDED_BACK, outcomes.MERGED])
+        self.assertEqual(taken, [1, 1])
+        self.assertIn("watch: #1 has run again on its handed-back head; back in line.", said)
+
     def test_a_re_run_on_the_same_head_is_taken_again(self):
         taken, said, _ = run(["1.1", "1.1", "1.2"], [outcomes.HANDED_BACK, outcomes.MERGED])
         self.assertEqual(taken, [1, 1])

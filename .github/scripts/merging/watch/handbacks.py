@@ -114,9 +114,16 @@ def forget_closed(memory: dict[int, str], pulls: list[dict]) -> dict[int, str]:
 
 
 def attempts(runs: list[dict]) -> str:
-    """The runs on a head as one comparable string: each run's id and attempt.
-    A re-run bumps an attempt; a new run (a dispatch, a fresh `ready`) adds an id."""
-    return " ".join(sorted(f"{r.get('id')}.{r.get('run_attempt', 1)}" for r in runs))
+    """The runs on a head as one comparable string: each run's id and attempt,
+    with `~` while it is still out. A re-run bumps an attempt; a new run (a
+    dispatch, a fresh `ready`) adds an id; a run ending drops its `~`, so a head
+    handed back for outwaiting its run comes back when the run ends (#1831)."""
+
+    def mark(run: dict) -> str:
+        out = "~" if run.get("status", "completed") != "completed" else ""
+        return f"{run.get('id')}.{run.get('run_attempt', 1)}{out}"
+
+    return " ".join(sorted(mark(r) for r in runs))
 
 
 def rerun_heads(pulls: list[dict], memory: dict[int, str], marks: dict[int, str], runs_now) -> list[int]:
