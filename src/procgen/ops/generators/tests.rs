@@ -4,11 +4,11 @@
 
 use super::*;
 use crate::procgen::ops::field::Links;
-use crate::procgen::recipe::ShapeKind::*;
 use crate::procgen::recipe::VoronoiMetric::*;
 use crate::procgen::recipe::{
-    BrickOutput, Gradient, NoiseKind, OpKind, VoronoiOutput, Wave, WhiteNoise,
+    BrickOutput, Gradient, NoiseKind, OpKind, VoronoiOutput, Wave, WaveKind, WhiteNoise,
 };
+use lattice::{distorted_ops, hard_surface_ops};
 
 /// The sampler [`super::super::eval_node`] paints for the generator `op`.
 fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Sampler<'_> {
@@ -18,7 +18,8 @@ fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Sampler<'_> {
         OpKind::Noise(p) => noise(p, f(&p.gain), seed),
         OpKind::Voronoi(p) => voronoi(p, f(&p.randomness), seed),
         OpKind::Gradient(p) => gradient(p.kind),
-        OpKind::Wave(p) => wave(p.kind, p.frequency),
+        OpKind::Wave(p) => wave(p, seed),
+        OpKind::AnisotropicNoise(p) => anisotropic::sampler(p, seed),
         OpKind::Brick(p) => brick(p, seed),
         OpKind::Shape(p) => shape(p, f(&p.softness)),
         OpKind::Checker(p) => checker(p),
@@ -57,6 +58,7 @@ fn lattice_ops() -> Vec<OpKind> {
                 octaves: 3,
                 lacunarity: s,
                 gain: 0.6.into(),
+                distortion: 0.0,
                 seed: 0,
             }));
         }
@@ -65,6 +67,7 @@ fn lattice_ops() -> Vec<OpKind> {
             VoronoiOutput::Cells,
             VoronoiOutput::F2,
             VoronoiOutput::Edges,
+            VoronoiOutput::SmoothF1,
         ] {
             for metric in [Euclidean, Manhattan, Chebyshev] {
                 ops.push(OpKind::Voronoi(Voronoi {
@@ -72,6 +75,7 @@ fn lattice_ops() -> Vec<OpKind> {
                     output,
                     metric,
                     randomness: (s / 8.0).into(),
+                    smoothness: 1.0,
                     seed: 0,
                 }));
             }
@@ -79,8 +83,13 @@ fn lattice_ops() -> Vec<OpKind> {
         ops.push(OpKind::Wave(Wave {
             kind: WaveKind::Bands,
             frequency: s,
+            profile: Default::default(),
+            distortion: 0.0,
+            detail: 2,
+            seed: 0,
         }));
         ops.extend(hard_surface_ops(s));
+        ops.extend(distorted_ops(s));
         ops.push(OpKind::Checker(Checker {
             tiles: s as u32,
             color_a: [0.0; 4],
@@ -90,31 +99,6 @@ fn lattice_ops() -> Vec<OpKind> {
     ops.push(OpKind::Gradient(Gradient {
         kind: GradientKind::LinearTiling,
     }));
-    ops
-}
-
-/// #407's brick outputs and shapes at fractional `s`.
-fn hard_surface_ops(s: f32) -> Vec<OpKind> {
-    let mut ops = Vec::new();
-    for output in [BrickOutput::Mask, BrickOutput::Random, BrickOutput::Bevel] {
-        let (rows, cols, mortar) = (s, s + 0.7, 0.05);
-        ops.push(OpKind::Brick(Brick {
-            rows,
-            cols,
-            mortar,
-            output,
-            seed: 0,
-        }));
-    }
-    for kind in [Circle, Rect, RoundedRect, Line] {
-        let (size, roundness, softness) = ([s / 6.0, 0.3], 0.5, s / 20.0);
-        ops.push(OpKind::Shape(Shape {
-            kind,
-            size,
-            roundness,
-            softness: softness.into(),
-        }));
-    }
     ops
 }
 
@@ -144,6 +128,10 @@ fn radial_generators_meet_the_edge_continuously() {
         OpKind::Wave(Wave {
             kind: WaveKind::Rings,
             frequency: 3.4,
+            profile: Default::default(),
+            distortion: 0.0,
+            detail: 2,
+            seed: 0,
         }),
     ];
     for op in radial {
@@ -206,7 +194,7 @@ fn linear_tiling_gradient_is_a_triangle() {
 }
 
 fn grid_voronoi(output: VoronoiOutput) -> Sampler<'static> {
-    voronoi::sampler(4.0, output, Euclidean, Field::Const(0.0), 5)
+    voronoi::sampler(4.0, (output, Euclidean), Field::Const(0.0), 1.0, 5)
 }
 
 #[test]
@@ -237,6 +225,7 @@ fn ridged_and_turbulence_span_the_unit_range() {
             octaves: 4,
             lacunarity: 2.0,
             gain: 0.5.into(),
+            distortion: 0.0,
             seed: 0,
         });
         let f = sampler(&op, 64, 1);
@@ -251,3 +240,6 @@ fn ridged_and_turbulence_span_the_unit_range() {
         assert!(hi - lo > 0.3, "{kind:?}: [{lo}, {hi}] is nearly flat");
     }
 }
+
+#[path = "lattice_tests.rs"]
+mod lattice;

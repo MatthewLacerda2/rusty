@@ -99,6 +99,7 @@ mod tests {
                     octaves: 4,
                     lacunarity: 2.0,
                     gain: 0.5.into(),
+                    distortion: 0.0,
                     seed: 0,
                 }),
                 inputs: vec![],

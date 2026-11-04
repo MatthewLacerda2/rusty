@@ -10,6 +10,8 @@ use rusty::procgen::recipe::{
 use rusty::procgen::recipe::{NoiseKind::*, VoronoiOutput::*, WaveKind};
 use rusty::procgen::Image;
 
+use serde_json::json;
+
 pub use super::node;
 
 const RES: u32 = 64;
@@ -55,37 +57,21 @@ pub fn assert_seamless(label: &str, img: &Image) {
 }
 
 pub fn generators() -> Vec<(String, OpKind)> {
+    let op = |v: serde_json::Value| -> OpKind { serde_json::from_value(v).unwrap() };
     let mut ops = Vec::new();
     for s in [1.0, 3.0, 4.5, 5.5, 7.3] {
         for kind in [Perlin, Fbm, Ridged, Turbulence] {
-            ops.push((
-                format!("noise {kind:?} {s}"),
-                OpKind::Noise(Noise {
-                    kind,
-                    scale: s,
-                    octaves: 3,
-                    lacunarity: s,
-                    gain: 0.5.into(),
-                    seed: 0,
-                }),
-            ));
+            let noise =
+                json!({"op": "noise", "kind": kind, "scale": s, "octaves": 3, "lacunarity": s});
+            ops.push((format!("noise {kind:?} {s}"), op(noise)));
         }
         for output in [Distance, F2, Edges] {
-            let randomness = s / 8.0;
-            let op = OpKind::Voronoi(Voronoi {
-                scale: s,
-                output,
-                metric: VoronoiMetric::Euclidean,
-                randomness: randomness.into(),
-                seed: 0,
-            });
-            ops.push((format!("voronoi {output:?} {s}"), op));
+            let v = json!({"op": "voronoi", "scale": s, "output": output, "randomness": s / 8.0});
+            ops.push((format!("voronoi {output:?} {s}"), op(v)));
         }
         for kind in [WaveKind::Bands, WaveKind::Rings] {
-            ops.push((
-                format!("wave {kind:?} {s}"),
-                OpKind::Wave(Wave { kind, frequency: s }),
-            ));
+            let wave = json!({"op": "wave", "kind": kind, "frequency": s});
+            ops.push((format!("wave {kind:?} {s}"), op(wave)));
         }
     }
     for kind in [GradientKind::Radial, GradientKind::LinearTiling] {
@@ -113,6 +99,7 @@ fn mapping_keeps_a_seamless_input_seamless() {
             octaves: 1,
             lacunarity: 2.0,
             gain: 0.5.into(),
+            distortion: 0.0,
             seed: 0,
         });
         let map = OpKind::Mapping(Mapping {

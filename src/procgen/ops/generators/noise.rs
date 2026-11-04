@@ -4,8 +4,14 @@
 //! fractional without opening a seam: octave `o` runs at `count(scale × lacunarity^o)`.
 //! With the defaults (`lacunarity = 2`, `gain = 0.5`) that is exactly the doubling
 //! fBM rusty always baked, so older recipes bake byte-identically.
+//!
+//! `distortion` (Blender's Noise Texture *Distortion*) is a domain warp built in:
+//! the point is pushed by two more tiling Perlin octaves at the base lattice, up to
+//! about `distortion` lattice cells, before the noise is read. Both the push and the
+//! noise repeat every tile, so the warped field still tiles; 0 skips the warp, so a
+//! recipe that doesn't set it bakes as before.
 
-use super::{count, gray, Sampler};
+use super::{count, finite, gray, Sampler};
 use crate::procgen::hash;
 use crate::procgen::ops::field::Field;
 use crate::procgen::recipe::NoiseKind;
@@ -33,17 +39,33 @@ impl Octaves {
     }
 }
 
+/// The largest `distortion`, in lattice cells, either way: past a few cells the
+/// warp is already white noise, and the cap keeps an infinite one finite.
+pub const MAX_DISTORTION: f32 = 1000.0;
+
+/// The seed salts of the warp's two push octaves, apart from every fBM octave's.
+const WARP_SALT: [u64; 2] = [0x5bd1_e995, 0x27d4_eb2f];
+
 /// The sampler for a [`NoiseKind`] at `scale` lattice cells per tile, its octaves
-/// `(count, lacunarity, gain)`, the gain read at each pixel (#1494). `perlin` is a
-/// single octave whatever `octaves` says.
+/// `(count, lacunarity, gain)`, the gain read at each pixel (#1494), and its
+/// `distortion` in lattice cells (NaN reads 0, the rest is capped at
+/// [`MAX_DISTORTION`]). `perlin` is a single octave whatever `octaves` says.
 pub fn sampler(
     kind: NoiseKind,
     scale: f32,
     (octave_count, lacunarity, gain): (u32, f32, Field<'_>),
+    distortion: f32,
     seed: u64,
 ) -> Sampler<'_> {
     let base = count(scale);
+    let warp = finite(distortion, 0.0).clamp(-MAX_DISTORTION, MAX_DISTORTION) / base;
     Box::new(move |u, v| {
+        let (u, v) = if warp == 0.0 {
+            (u, v)
+        } else {
+            let push = |salt: u64| warp * perlin_tiling(u, v, base, seed ^ salt) * UNIT;
+            (u + push(WARP_SALT[0]), v + push(WARP_SALT[1]))
+        };
         let octaves = match kind {
             NoiseKind::Perlin => Octaves::new(1, 2.0, 0.5),
             _ => Octaves::new(octave_count, lacunarity, gain.at_pixel(u, v)),
@@ -77,6 +99,12 @@ fn sum(u: f32, v: f32, base: f32, oct: Octaves, seed: u64, shape: impl Fn(f32) -
         freq *= oct.lacunarity;
     }
     total / norm
+}
+
+/// `octaves` doubling fBM octaves of signed Perlin at `period` cells per tile, about
+/// `[-1, 1]`: the noise `wave`'s `distortion` pushes its phase by.
+pub(super) fn signed_fbm(u: f32, v: f32, period: f32, octaves: u32, seed: u64) -> f32 {
+    sum(u, v, period, Octaves::new(octaves, 2.0, 0.5), seed, |n| n) * UNIT
 }
 
 /// A single octave of tiling gradient (Perlin) noise in `[-1, 1]`. `period` is a

@@ -98,6 +98,7 @@ macro_rules! catalog {
 catalog! {
     // sorted: one row per op; registry order is only the order `Texture.Ops()` lists
     AmbientOcclusion(filter::relief::ambient_occlusion::AmbientOcclusion),
+    AnisotropicNoise(generators::anisotropic_noise::AnisotropicNoise),
     /// Stretch RGB so the input's minimum maps to 0 and its maximum to 1, one range
     /// across R, G and B (hue kept); alpha untouched, a flat input unchanged.
     AutoLevels = color::auto_levels::AutoLevels,

@@ -14,19 +14,19 @@
 //! `image` is no sampler: it resamples a decoded file, whose tiling is the file's own
 //! (#1491).
 
+pub mod anisotropic;
 mod brick;
 mod image;
 mod noise;
 mod shape;
 mod voronoi;
+mod wave;
 
 pub use image::image;
 
 use super::super::hash;
 use super::super::image_buf::{Rgba, Size};
-use super::super::recipe::{
-    Brick, Checker, Constant, GradientKind, Noise, Shape, Voronoi, WaveKind,
-};
+use super::super::recipe::{Brick, Checker, Constant, GradientKind, Noise, Shape, Voronoi, Wave};
 use super::field::Field;
 
 /// A generator's per-point function over the unit domain, borrowing for `'a` the
@@ -37,6 +37,17 @@ pub type Sampler<'a> = Box<dyn Fn(f32, f32) -> Rgba + Send + Sync + 'a>;
 #[inline]
 fn gray(v: f32) -> Rgba {
     [v, v, v, 1.0]
+}
+
+/// `x`, or `fallback` when it is NaN or infinite: a malformed number becomes a
+/// no-op, never a panic or a poisoned map.
+#[inline]
+pub fn finite(x: f32, fallback: f32) -> f32 {
+    if x.is_finite() {
+        x
+    } else {
+        fallback
+    }
 }
 
 /// A periodic param as a whole number of periods per tile: rounded, at least 1. A
@@ -55,12 +66,14 @@ pub fn constant(p: &Constant) -> Sampler<'static> {
 /// The `noise` family: Perlin and its fBM / ridged / turbulence sums. `gain` is the
 /// op's `gain`, read at each pixel.
 pub fn noise<'a>(p: &Noise, gain: Field<'a>, seed: u64) -> Sampler<'a> {
-    noise::sampler(p.kind, p.scale, (p.octaves, p.lacunarity, gain), seed)
+    let octaves = (p.octaves, p.lacunarity, gain);
+    noise::sampler(p.kind, p.scale, octaves, p.distortion, seed)
 }
 
 /// The Voronoi / Worley cellular pattern. `randomness` is the op's, read per cell.
 pub fn voronoi<'a>(p: &Voronoi, randomness: Field<'a>, seed: u64) -> Sampler<'a> {
-    voronoi::sampler(p.scale, p.output, p.metric, randomness, seed)
+    let modes = (p.output, p.metric);
+    voronoi::sampler(p.scale, modes, randomness, p.smoothness, seed)
 }
 
 /// The running-bond brick pattern.
@@ -70,7 +83,7 @@ pub fn brick(p: &Brick, seed: u64) -> Sampler<'static> {
 
 /// One centred shape per tile. `softness` is the op's, read at each pixel.
 pub fn shape<'a>(p: &Shape, softness: Field<'a>) -> Sampler<'a> {
-    shape::sampler(p.kind, p.size, p.roundness, softness)
+    shape::sampler(p, softness)
 }
 
 /// Per-pixel uniform white noise, grayscale. The pixel lattice wraps at `size`, per
@@ -117,17 +130,11 @@ pub fn gradient(kind: GradientKind) -> Sampler<'static> {
     })
 }
 
-/// Bands (parallel) or rings (concentric): a `[0, 1]` sine with `frequency` whole
-/// cycles across the domain.
-pub fn wave(kind: WaveKind, frequency: f32) -> Sampler<'static> {
-    let f = count(frequency);
-    Box::new(move |u, v| {
-        let phase = match kind {
-            WaveKind::Bands => u * f,
-            WaveKind::Rings => (u - 0.5).hypot(v - 0.5) * f,
-        };
-        gray(0.5 + 0.5 * (phase * std::f32::consts::TAU).sin())
-    })
+/// Bands (parallel) or rings (concentric): `frequency` whole cycles of the op's
+/// `profile` across the domain, its phase pushed by `distortion`.
+pub fn wave(p: &Wave, seed: u64) -> Sampler<'static> {
+    let shape = (p.profile, p.distortion, p.detail);
+    wave::sampler(p.kind, p.frequency, shape, seed)
 }
 
 #[cfg(test)]
