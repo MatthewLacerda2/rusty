@@ -9,8 +9,8 @@ use crate::scene::{Scene, SceneId};
 /// Which scene's static casters a bake holds, at which of its
 /// [`World::static_revision`](crate::ecs::World::static_revision)s, and with which
 /// casting modes, render faces and cutout tests: a Static flag flipped, a static
-/// entity spawned or despawned, a static mesh's `cast_shadows` changed (#1571), a
-/// static material's Render Face switched (#1615), or a static Cutout material's
+/// entity spawned or despawned, a static mesh's `cast_shadows` changed (#1571) or
+/// its small-object cull set or cleared (#1714), a static material's Render Face switched (#1615), or a static Cutout material's
 /// test or mapping edited (#1594) re-bakes them on the next frame whoever
 /// made the change — the inspector, a script in Play, a load (#1496).
 pub(crate) type StaticsKey = (SceneId, u64, u64);
@@ -32,6 +32,7 @@ fn mix(key: u64, word: u64) -> u64 {
 /// A digest, by entity in scene order, of what shapes each static mesh's shadow that
 /// no revision tracks: a `cast_shadows` that changes it (`Off`, `TwoSided`, #1571;
 /// `ShadowsOnly` casts exactly as `On`, so switching between them keeps the bake),
+/// whether it sets a small-object cull (#1714: such a caster leaves the bake),
 /// each slot's Render Face other than `Front` (the faces it casts from, #1615),
 /// and each Cutout slot's test — cutoff, albedo map and mapping (#1594), the terms
 /// its clip reads. It moves when one of them changes.
@@ -42,9 +43,14 @@ fn casting_key(scene: &Scene) -> u64 {
         if !world.is_static(id) {
             continue;
         }
-        let mode = world.mesh(id).map_or(ShadowCasting::On, |m| m.cast_shadows);
+        let mesh = world.mesh(id);
+        let mode = mesh.as_ref().map_or(ShadowCasting::On, |m| m.cast_shadows);
         if !mode.casts() || mode == ShadowCasting::TwoSided {
             key = mix(key, (u64::from(id) << 2) | mode as u64);
+        }
+        // A mesh a camera may cull as small casts from the per-frame sweep (#1714).
+        if mesh.is_some_and(|m| m.culls_when_small()) {
+            key = mix(key, (u64::from(id) << 3) | 0b111);
         }
         // By slot index, unresolved keys included, so the digest names the slot
         // `slot_clip` clips (`material_assets_of` would skip them and shift it).

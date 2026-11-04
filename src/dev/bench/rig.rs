@@ -55,6 +55,8 @@ pub fn soldier() -> MeshComponent {
         clips: vec![walk()],
         pose_palette: Vec::new(),
         skeleton: Default::default(),
+        max_draw_distance: 0.0,
+        min_screen_size: 0.0,
         revision: Default::default(),
     }
 }

@@ -83,6 +83,17 @@ pub struct MeshComponent {
     /// overrides (#453). Only the overrides are saved, and only when there are any.
     #[serde(default, skip_serializing_if = "BoneBinding::is_unmodified")]
     pub skeleton: BoneBinding,
+    /// Past this many metres from a camera (to its bounds' centre) the mesh is not
+    /// drawn (#1714): Unreal's *Max Draw Distance*. `0`, the default, is unlimited.
+    /// Saved only when set. `render::SmallObjectCull` reads it.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub max_draw_distance: f32,
+    /// Below this screen-relative height (`0..1`: its bounds' largest extent over
+    /// the view's height at its distance, the measure Unity's `LODGroup` picks its
+    /// levels and its *Culled* share by) the mesh is not drawn (#1714): Unreal's
+    /// min screen radius. `0`, the default, is off. Saved only when set.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub min_screen_size: f32,
     /// Which edit of the geometry this is; set a [`MeshRevision::next`] whenever
     /// `vertices` or `indices` change, so every renderer re-uploads them.
     #[serde(skip)]
@@ -95,6 +106,10 @@ fn one() -> u32 {
 
 fn is_one(n: &u32) -> bool {
     *n == 1
+}
+
+fn is_zero(v: &f32) -> bool {
+    *v == 0.0
 }
 
 impl MeshComponent {
@@ -119,6 +134,8 @@ impl MeshComponent {
             clips: Vec::new(),
             pose_palette: Vec::new(),
             skeleton: BoneBinding::default(),
+            max_draw_distance: 0.0,
+            min_screen_size: 0.0,
             revision: MeshRevision::next(),
         }
     }
@@ -152,6 +169,14 @@ impl MeshComponent {
         } else {
             &self.pose_palette
         }
+    }
+
+    /// Whether a camera may cull this mesh for its distance or its size on screen
+    /// (#1714): either of `max_draw_distance` and `min_screen_size` is set. Such a
+    /// mesh's shadow is drawn every frame with the camera's verdict, never baked into
+    /// a cached static shadow (`render::passes::shadows`).
+    pub fn culls_when_small(&self) -> bool {
+        self.max_draw_distance > 0.0 || self.min_screen_size > 0.0
     }
 
     /// Whether this mesh is skinned (carries an imported skeleton). Frustum culling

@@ -35,6 +35,8 @@ inspect! {
         ),
         op!("cast_shadows", mesh::set_cast_shadows),
         ro!("skeleton", MESH),
+        op!("max_draw_distance", mesh::set_max_draw_distance),
+        op!("min_screen_size", mesh::set_min_screen_size),
     ];
     MaterialComponent => material, material_mut, &[
         ro!("materials", "Material.Set points a slot at a library material"),

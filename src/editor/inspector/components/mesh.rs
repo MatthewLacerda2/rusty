@@ -1,11 +1,12 @@
 //! The Mesh card (Unity's *Mesh Filter* and *Mesh Renderer* together): the mesh's
-//! source, a `Plane`'s subdivisions (#1524), how it casts shadows (#1571), and a
-//! skinned mesh's hitbox and ragdoll tools.
+//! source, a `Plane`'s subdivisions (#1524), how it casts shadows (#1571), when a
+//! camera culls it as too far or too small (#1714), and a skinned mesh's hitbox and
+//! ragdoll tools.
 
 use egui_phosphor::regular as icon;
 
 use super::card::{component_card, remove_component};
-use super::particles::widgets::combo;
+use super::particles::widgets::{clamped, combo};
 use crate::components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use crate::components::ShadowCasting;
 use crate::editor::widgets::DragRange;
@@ -38,6 +39,7 @@ pub fn draw_mesh(
     let mut remove = false;
     let mut subdivide = None;
     let mut casting = None;
+    let mut culling = None;
     component_card(ui, icon::CUBE, "Mesh Filter", Some(&mut remove), |ui| {
         if let Some(mesh) = world.mesh(id) {
             ui.label(format!("Type: {} primitive", mesh.primitive_type));
@@ -49,6 +51,7 @@ pub fn draw_mesh(
             if combo(ui, "Cast Shadows", &mut mode, &modes) {
                 casting = Some(mode);
             }
+            culling = draw_culling(ui, mesh.max_draw_distance, mesh.min_screen_size);
             ui.label(format!(
                 "Geometry: {} verts | {} indices",
                 mesh.vertices.len(),
@@ -68,10 +71,24 @@ pub fn draw_mesh(
         mesh_ops::set_cast_shadows(&mut mesh, mode);
         *is_dirty = true;
     }
+    if let (Some((distance, size)), Some(mut mesh)) = (culling, world.mesh_mut(id)) {
+        mesh_ops::set_max_draw_distance(&mut mesh, distance);
+        mesh_ops::set_min_screen_size(&mut mesh, size);
+        *is_dirty = true;
+    }
     if remove {
         // The shared verb behind `Scene.RemoveComponent`: the Material goes too.
         remove_component(world, id, ComponentKind::Mesh, is_dirty);
     }
+}
+
+/// The small-object cull (#1714): *Max Draw Distance* (metres, 0 unlimited) and *Min
+/// Screen Size* (screen-relative height, 0 off). Both values when either changed.
+fn draw_culling(ui: &mut egui::Ui, distance: f32, size: f32) -> Option<(f32, f32)> {
+    let (mut d, mut s) = (distance, size);
+    let changed = clamped(ui, "Max Draw Distance", &mut d, 0.0..=f32::MAX)
+        | clamped(ui, "Min Screen Size", &mut s, 0.0..=1.0);
+    changed.then_some((d, s))
 }
 
 /// *Generate Hitboxes* and *Build Ragdoll*, deferred into `skin_tool`.

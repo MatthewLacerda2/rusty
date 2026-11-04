@@ -18,7 +18,7 @@ use std::collections::HashSet;
 
 use glam::Mat4;
 
-use crate::components::LodGroupComponent;
+use crate::components::{LodGroupComponent, Projection};
 use crate::scene::{Camera, Scene};
 
 /// The entities one view hides because their LOD level is not the one shown.
@@ -68,15 +68,24 @@ impl LodSelection {
 }
 
 /// The fraction of `cam`'s viewport height a `size`-metre object at `world`'s origin
-/// covers: `size / (2 · distance · tan(fov / 2))`. At the camera it is infinite
-/// (always the finest level). Orthographic: `size / (2 · half-height)`.
+/// covers ([`relative_height`] at its distance from the camera).
 pub(crate) fn screen_height(size: f32, cam: &Camera, world: Mat4) -> f32 {
+    let distance = world.w_axis.truncate().distance(cam.position);
+    relative_height(size, distance, cam.fov, cam.projection)
+}
+
+/// The fraction of the viewport height a `size`-metre object `distance` metres from
+/// a camera of vertical `fov` (degrees) covers: `size / (2 · distance · tan(fov / 2))`,
+/// Unity's `LODGroup` relative height (#472). At the camera it is infinite (always the
+/// finest level, never culled). Orthographic: `size / (2 · half-height)`, whatever the
+/// distance. Small-object culling (#1714) measures with it too, so a *Min Screen
+/// Size* means what a `LODGroup` threshold means.
+pub(crate) fn relative_height(size: f32, distance: f32, fov: f32, projection: Projection) -> f32 {
     // An orthographic view (#430) shows everything at one scale, whatever the distance.
-    if let crate::components::Projection::Orthographic { size: half } = cam.projection {
+    if let Projection::Orthographic { size: half } = projection {
         return size / (2.0 * half);
     }
-    let distance = world.w_axis.truncate().distance(cam.position);
-    let half_fov = (cam.fov.to_radians() * 0.5).tan();
+    let half_fov = (fov.to_radians() * 0.5).tan();
     match distance * half_fov {
         d if d > 0.0 => size / (2.0 * d),
         _ => f32::INFINITY,

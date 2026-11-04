@@ -43,6 +43,7 @@ pub mod lod_group;
 pub(crate) mod lua_json;
 pub mod mask;
 pub mod material;
+pub mod mesh;
 pub mod nav;
 pub mod nav_modifier;
 pub mod nav_obstacle;
@@ -143,6 +144,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     line::register(lua, ctx.scene)?;
     lod_group::register(lua, ctx.scene)?;
     material::register(lua, ctx.scene)?;
+    mesh::register(lua, ctx.scene)?;
     particle::register(lua, ctx.scene)?;
     physics::register(lua, ctx.scene)?;
     physics::register_hitscan(lua, ctx.scene, ctx.physics)?;

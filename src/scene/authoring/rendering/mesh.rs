@@ -2,13 +2,15 @@
 //!
 //! A mesh's geometry comes from the model or primitive it was made from; the values
 //! authored on it are a `Plane`'s subdivisions, the grid a vertex block
-//! (`vertex_waves`) needs to move, and how it casts shadows (#1571). The Inspector's
+//! (`vertex_waves`) needs to move, how it casts shadows (#1571), and when a camera
+//! culls it as too far or too small (#1714). The Inspector's
 //! Mesh card and `Component.Set` both write them here.
 //!
 //! Pure.
 
 use crate::components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use crate::components::{MeshComponent, ShadowCasting};
+use crate::scene::authoring::sanitize::{clamped, non_negative};
 use crate::scene::authoring::{subdivided_geometry, Primitive};
 
 /// Cut a `Plane` into `subdivisions` quads per side and rebuild its geometry.
@@ -46,6 +48,20 @@ pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(
 /// frame or bake, a static one's cached shadow included.
 pub fn set_cast_shadows(mesh: &mut MeshComponent, mode: ShadowCasting) {
     mesh.cast_shadows = mode;
+}
+
+/// Set the distance in metres past which a camera stops drawing the mesh (#1714,
+/// Unreal's *Max Draw Distance*); `0` is unlimited. Negative, NaN or infinite
+/// is `0`.
+pub fn set_max_draw_distance(mesh: &mut MeshComponent, metres: f32) {
+    mesh.max_draw_distance = non_negative(metres);
+}
+
+/// Set the screen-relative height (`0..1`, Unity `LODGroup`'s measure) under which a
+/// camera stops drawing the mesh (#1714); `0` is off. Held to `[0, 1]`; NaN or
+/// infinite is `0`.
+pub fn set_min_screen_size(mesh: &mut MeshComponent, height: f32) {
+    mesh.min_screen_size = clamped(height, 0.0, 1.0);
 }
 
 /// Hold a count read from a file (#1524), so the field agrees with the grid the

@@ -26,7 +26,7 @@ use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::CameraUniform;
 use atlas::ShadowAtlas;
 use cascades::{Cascade, MAX_CASCADES};
-use casters::CasterBuffer;
+use casters::{CasterBuffer, ShadowCulls};
 use clips::Clip;
 use glam::Mat4;
 
@@ -82,6 +82,8 @@ pub struct ShadowRenderer {
     /// `(num_indices, instances)` of the caster draws since the renderer last cleared
     /// it — one frame's worth, read into the frame counters (#433).
     pub(crate) drawn: Vec<(u32, u32)>,
+    /// What the sweeps' culling did since the renderer last reset it (#1714).
+    pub(crate) culls: ShadowCulls,
     /// Mirrors `Renderer::instancing`: off draws one caster per call (#470 tests).
     pub(crate) instancing: bool,
     /// The point and spot lights' shadow atlas (#468).
@@ -147,6 +149,7 @@ impl ShadowRenderer {
             static_casters,
             dynamic_casters,
             drawn: Vec::new(),
+            culls: ShadowCulls::default(),
             instancing: true,
             atlas,
         }
