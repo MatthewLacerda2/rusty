@@ -10,7 +10,7 @@
 use rapier3d::prelude::*;
 
 use super::watch::Owners;
-use super::world::PhysicsWorld;
+use super::world::{collider_to_write, PhysicsWorld};
 use crate::components::{CombineMode, PhysicsMaterial};
 use crate::scene::Scene;
 
@@ -22,6 +22,14 @@ pub(super) fn combine_rule(mode: CombineMode) -> CoefficientCombineRule {
         CombineMode::Multiply => CoefficientCombineRule::Multiply,
         CombineMode::Maximum => CoefficientCombineRule::Max,
     }
+}
+
+/// Whether `collider` holds anything but `material`.
+pub(super) fn material_differs(collider: &Collider, material: &PhysicsMaterial) -> bool {
+    collider.friction() != material.friction
+        || collider.restitution() != material.bounciness
+        || collider.friction_combine_rule() != combine_rule(material.friction_combine)
+        || collider.restitution_combine_rule() != combine_rule(material.bounce_combine)
 }
 
 /// Write `material` onto `collider`, touching only what differs so an
@@ -49,14 +57,15 @@ impl PhysicsWorld {
     pub(super) fn sync_materials(&mut self, scene: &Scene, owners: &Owners) {
         for (_, ids) in owners.pick(&self.plan) {
             for id in ids {
-                let handle = self.id_to_collider.get(id);
-                let (Some(c), Some(collider)) = (
-                    scene.world.collider(*id),
-                    handle.and_then(|&h| self.colliders.get_mut(h)),
-                ) else {
+                let (Some(c), Some(&handle)) =
+                    (scene.world.collider(*id), self.id_to_collider.get(id))
+                else {
                     continue;
                 };
-                apply_material(collider, &c.material);
+                let differs = |held: &Collider| material_differs(held, &c.material);
+                if let Some(collider) = collider_to_write(&mut self.colliders, handle, differs) {
+                    apply_material(collider, &c.material);
+                }
             }
         }
     }

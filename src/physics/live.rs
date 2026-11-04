@@ -26,7 +26,7 @@ use rapier3d::prelude::*;
 
 use super::shape::build::{interaction_groups, EntityBodyState};
 use super::watch::Owners;
-use super::world::PhysicsWorld;
+use super::world::{collider_to_write, PhysicsWorld};
 use crate::scene::Scene;
 
 /// The lightest mass a body may be given, so a zero never divides.
@@ -54,10 +54,8 @@ impl PhysicsWorld {
                 };
                 let layer = scene.world.layer(*id);
                 let groups = interaction_groups(layer, scene.collision_matrix.filter_mask(layer));
-                if self.colliders.get(handle).map(|c| c.collision_groups()) == Some(groups) {
-                    continue;
-                }
-                if let Some(c) = self.colliders.get_mut(handle) {
+                let differs = |c: &Collider| c.collision_groups() != groups;
+                if let Some(c) = collider_to_write(&mut self.colliders, handle, differs) {
                     c.set_collision_groups(groups);
                     c.set_solver_groups(groups);
                 }
@@ -82,10 +80,9 @@ impl PhysicsWorld {
                 if world.character_controller(*id).is_some() {
                     continue;
                 }
-                if let Some(c) = self.colliders.get_mut(handle) {
-                    if c.is_sensor() != is_trigger {
-                        c.set_sensor(is_trigger);
-                    }
+                let differs = |c: &Collider| c.is_sensor() != is_trigger;
+                if let Some(c) = collider_to_write(&mut self.colliders, handle, differs) {
+                    c.set_sensor(is_trigger);
                 }
             }
         }
@@ -113,11 +110,9 @@ impl PhysicsWorld {
             }
             for (handle, volume) in parts {
                 let target = mass * volume / total;
-                let current = self.colliders.get(handle).map_or(target, |c| c.mass());
-                if (current - target).abs() <= target.max(MIN_MASS) * 1.0e-4 {
-                    continue;
-                }
-                if let Some(c) = self.colliders.get_mut(handle) {
+                let differs =
+                    |c: &Collider| (c.mass() - target).abs() > target.max(MIN_MASS) * 1.0e-4;
+                if let Some(c) = collider_to_write(&mut self.colliders, handle, differs) {
                     c.set_mass(target);
                 }
             }
