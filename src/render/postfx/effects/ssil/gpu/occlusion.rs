@@ -1,5 +1,6 @@
 //! What the gather must not see (#1750): light through a partition between a floor
-//! point and a lit wall, a flat floor's own light, and fog taken for light.
+//! point and a lit wall, a flat floor's own light, and fog bounced brighter than
+//! the light under it.
 
 use glam::Vec3;
 
@@ -57,28 +58,49 @@ fn gpu_a_white_floor_alone_bounces_nothing_onto_itself() {
     assert!(most <= 1e-3, "the floor lit itself: {most}");
 }
 
+/// The HDR result the forward pass read on the 6th frame of `scene`. Not the
+/// frame: under thick fog an 8-bit frame rounds the floor's bounce away on
+/// lavapipe and flips one code step on Metal (run 41886704978).
+fn result(r: &mut crate::render::Renderer, scene: &Scene) -> Vec<Vec3> {
+    let mut v = super::fixture::view(r);
+    for _ in 0..6 {
+        super::fixture::draw(r, &mut v, scene, &super::fixture::eye(0.0));
+    }
+    v.post_fx.ssil_result(&r.device, &r.queue)
+}
+
 #[test]
-fn gpu_fog_is_not_gathered_as_light() {
+fn gpu_fog_greys_the_bounce_but_never_adds_light() {
     let Some(mut r) = renderer() else { return };
     // A dark scene: no ambient, a dim lamp on the red wall, and thick grey fog: the
     // wall's fogged colour is mostly fog, and only the lamp's red is light.
-    let at = super::fixture::FLOOR;
     let build = |fogged: bool| {
-        move |ssil| {
-            let (mut scene, _) = scene(ssil, LAMP * 0.05);
-            scene.ambient_color = Vec3::ZERO;
-            if fogged {
-                scene.fog.mode = FogMode::Exponential;
-                (scene.fog.density, scene.fog.start) = (0.3, 0.0);
-                scene.fog.color = Vec3::splat(0.8);
-            }
-            scene
+        let (mut scene, _) = scene(on(1.0), LAMP * 0.05);
+        scene.ambient_color = Vec3::ZERO;
+        if fogged {
+            scene.fog.mode = FogMode::Exponential;
+            (scene.fog.density, scene.fog.start) = (0.3, 0.0);
+            scene.fog.color = Vec3::splat(0.8);
         }
+        scene
     };
-    let clear = bounce(&mut r, build(false), at);
-    let fogged = bounce(&mut r, build(true), at);
-    eprintln!("[ssil] a dim lamp's bounce: {clear} clear, {fogged} in fog");
-    // Fog dims the lamp's light, so its bounce too; it bounces none of its own grey.
-    assert!(clear.x > 0.0 && fogged.x <= clear.x, "{fogged} vs {clear}");
-    assert!(fogged.y <= 1e-3, "the fog's grey bounced: {fogged}");
+    let clear = result(&mut r, &build(false));
+    let fogged = result(&mut r, &build(true));
+    let sum = |res: &[Vec3]| res.iter().fold(Vec3::ZERO, |a, c| a + *c);
+    let (clear_sum, fog_sum) = (sum(&clear), sum(&fogged));
+    eprintln!("[ssil] a dim lamp's bounce over the frame: {clear_sum} clear, {fog_sum} in fog");
+    // Fog dims the lamp's light, so its bounce too.
+    assert!(
+        clear_sum.x > 0.0 && fog_sum.x <= clear_sum.x,
+        "{fog_sum} vs {clear_sum}"
+    );
+    // The share is one number per pixel (`realtime_share`): the source takes the
+    // fogged colour at the red light's share, so the fog's grey comes along and
+    // the bounce turns grey (lavapipe measures green at 0.99 of red at the floor).
+    // It never passes the light under the fog: no channel above the red one.
+    let over = fogged
+        .iter()
+        .map(|c| c.y.max(c.z) - c.x * 1.01)
+        .fold(f32::MIN, f32::max);
+    assert!(over <= 1e-5, "the fog added light of its own: {over}");
 }

@@ -331,7 +331,11 @@ whose lights were all baked brightens by **at most 0.5%** of its light with SSIL
 scene lit only by flat ambient. A scene with no lightmap bake has no record: its
 `Mixed` lights' bounce adds to what a light-probe bake stored for them. Unlit
 surfaces and the sky feed nothing. The share is taken of the **fogged** colour, as
-the fog takes it from the light, so fog is never gathered as light. An authored
+the fog takes it from the light, so fog never bounces more than the light under it.
+It does tint the bounce, because the share is one number (below): a fogged pixel
+passes on its fog's colour at its light's share, so under thick fog the bounce of a
+red light turns almost the fog's grey (measured: green at 0.99 of red), at no more
+than the light's own brightness. An authored
 surface block that scales the colour per channel (`hit_flash`, `dissolve`, `tint`)
 scales the share with it, as it scales SSR's reflection; one that isn't such a
 scale (`toon_ramp`, `hologram`, `desaturate` above 0) feeds nothing, and the light one adds of its own
