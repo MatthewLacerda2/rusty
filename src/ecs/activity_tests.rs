@@ -21,8 +21,9 @@ enum Op {
     /// The same link written raw: the parent's `children` does not list it.
     RawParent(usize, usize),
     Despawn(usize),
-    /// An id no live entity has: a despawned one, or one an orphan may already name.
-    Insert(u32, bool),
+    /// An id no live entity has: a despawned one, or one an orphan may already name;
+    /// its document may name a parent, live or not, that does not list it.
+    Insert(u32, bool, Option<usize>),
     Overwrite(usize, bool, Option<usize>),
     Clear,
     /// Ask one id, so later writes meet a partly warm cache.
@@ -39,7 +40,8 @@ fn op() -> impl Strategy<Value = Op> {
         3 => (at.clone(), proptest::option::of(at.clone())).prop_map(|(i, p)| Op::SetParent(i, p)),
         1 => (at.clone(), at.clone()).prop_map(|(i, p)| Op::RawParent(i, p)),
         1 => at.clone().prop_map(Op::Despawn),
-        1 => (1u32..16, any::<bool>()).prop_map(|(id, a)| Op::Insert(id, a)),
+        1 => (1u32..16, any::<bool>(), proptest::option::of(at.clone()))
+            .prop_map(|(id, a, p)| Op::Insert(id, a, p)),
         1 => (at.clone(), any::<bool>(), proptest::option::of(at.clone()))
             .prop_map(|(i, a, p)| Op::Overwrite(i, a, p)),
         1 => Just(Op::Clear),
@@ -76,9 +78,10 @@ fn apply(w: &mut World, op: &Op) {
                 w.despawn(id);
             }
         }
-        Op::Insert(id, a) if !w.contains(id) => {
+        Op::Insert(id, a, p) if !w.contains(id) => {
             let mut e = Entity::new(id, "late".into());
             e.active = a;
+            e.parent_id = p.map(|p| pick(w, p));
             w.insert_entity(e);
         }
         Op::Insert(..) => {}
