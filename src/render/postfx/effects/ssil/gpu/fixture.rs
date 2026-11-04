@@ -31,7 +31,13 @@ pub(super) fn eye(yaw: f32) -> Camera {
     Camera::new(Vec3::new(0.0, 1.5, 0.0), -90.0 + yaw, -12.0)
 }
 
-fn block(scene: &mut Scene, name: &str, (position, scale): (Vec3, Vec3), color: [f32; 3]) {
+/// A static box named `name` at `position`, `scale`, of a rough `color`.
+pub(super) fn block(
+    scene: &mut Scene,
+    name: &str,
+    (position, scale): (Vec3, Vec3),
+    color: [f32; 3],
+) -> u32 {
     let id = create_entity(scene, name, Some(Primitive::Box));
     let mut t = scene.world.transform_mut(id).unwrap();
     (t.position, t.scale) = (position, scale);
@@ -45,11 +51,28 @@ fn block(scene: &mut Scene, name: &str, (position, scale): (Vec3, Vec3), color: 
     scene
         .world
         .set_material(id, Some(MaterialComponent::new(name.to_string())));
+    scene.world.set_static(id, true);
+    id
 }
 
 /// The scene with SSIL `ssil` and the light at `light` intensity (0: none at all,
 /// so only the ambient lights it). Returns it and the light's entity.
 pub(super) fn scene(ssil: Ssil, light: f32) -> (Scene, u32) {
+    let mut scene = floor(ssil);
+    let wall = (Vec3::new(0.0, 1.5, -6.0), Vec3::new(6.0, 3.0, 0.2));
+    block(&mut scene, "wall", wall, [1.0, 0.05, 0.05]);
+    let lamp = scene.add_entity("Lamp".to_string());
+    scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.0, 1.0, -5.3);
+    if light > 0.0 {
+        scene
+            .world
+            .set_light(lamp, Some(point(light, LightMode::Realtime)));
+    }
+    (scene, lamp)
+}
+
+/// The camera, its volume with SSIL `ssil`, a dim ambient and the white floor alone.
+pub(super) fn floor(ssil: Ssil) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     scene.ambient_color = Vec3::splat(0.05);
@@ -62,22 +85,29 @@ pub(super) fn scene(ssil: Ssil, light: f32) -> (Scene, u32) {
     scene.world.set_post_processing(cam, Some(volume));
     let floor = (Vec3::new(0.0, -0.05, -10.0), Vec3::new(20.0, 0.1, 30.0));
     block(&mut scene, "floor", floor, [0.9, 0.9, 0.9]);
-    let wall = (Vec3::new(0.0, 1.5, -6.0), Vec3::new(6.0, 3.0, 0.2));
-    block(&mut scene, "wall", wall, [1.0, 0.05, 0.05]);
+    scene
+}
+
+/// A realtime [`point`] light of `intensity` at `at`.
+pub(super) fn lamp(scene: &mut Scene, at: Vec3, intensity: f32) -> u32 {
     let lamp = scene.add_entity("Lamp".to_string());
-    scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.0, 1.0, -5.3);
-    let point = LightComponent {
+    scene.world.transform_mut(lamp).unwrap().position = at;
+    scene
+        .world
+        .set_light(lamp, Some(point(intensity, LightMode::Realtime)));
+    lamp
+}
+
+/// An unshadowed point light of `intensity` over 4 m, in `mode`.
+pub(super) fn point(intensity: f32, mode: LightMode) -> LightComponent {
+    LightComponent {
         light_type: LightType::Point,
-        intensity: light,
+        intensity,
         range: 4.0,
         cast_shadows: false,
-        mode: LightMode::Realtime,
+        mode,
         ..default_light()
-    };
-    if light > 0.0 {
-        scene.world.set_light(lamp, Some(point));
     }
-    (scene, lamp)
 }
 
 /// SSIL on, at `intensity`, at its defaults otherwise.
@@ -152,4 +182,11 @@ pub(super) fn energy(frame: &[u8]) -> f32 {
         .chunks_exact(4)
         .flat_map(|px| px[..3].iter().map(lin))
         .sum()
+}
+
+/// Turn every volume in `scene` to `ssil`.
+pub(super) fn set_ssil(scene: &mut Scene, ssil: Ssil) {
+    for id in scene.world.ids_with_post_processing() {
+        scene.world.post_processing_mut(id).unwrap().ssil = ssil;
+    }
 }

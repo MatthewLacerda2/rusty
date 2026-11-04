@@ -131,13 +131,34 @@ impl PostFx {
         queue: &wgpu::Queue,
     ) -> Vec<glam::Vec3> {
         let t = self.targets.get::<SsilTargets>().expect("ran");
-        let target = t.full.as_ref().unwrap_or(&t.results[t.current]);
-        let size = target.texture.size();
-        let read = crate::render::readback::read_texture_bytes;
-        let bytes = read(device, queue, &target.texture, (size.width, size.height), 8);
-        let half = |b: &[u8]| crate::core::color::f16_to_f32(u16::from_le_bytes([b[0], b[1]]));
-        (bytes.chunks_exact(8))
-            .map(|t| glam::Vec3::new(half(&t[..2]), half(&t[2..4]), half(&t[4..6])))
-            .collect()
+        decode(
+            device,
+            queue,
+            t.full.as_ref().unwrap_or(&t.results[t.current]),
+        )
     }
+
+    /// This frame's blur and accumulate, at the gather's resolution, and its width.
+    pub(crate) fn ssil_accumulate(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> (Vec<glam::Vec3>, Vec<glam::Vec3>, u32) {
+        let t = self.targets.get::<SsilTargets>().expect("ran");
+        let blurred = decode(device, queue, &t.blurred);
+        let result = decode(device, queue, &t.results[t.current]);
+        (blurred, result, t.raw_size().0)
+    }
+}
+
+/// `target`'s `Rgba16Float` texels, their rgb as stored.
+#[cfg(test)]
+fn decode(device: &wgpu::Device, queue: &wgpu::Queue, target: &PfxTarget) -> Vec<glam::Vec3> {
+    let size = target.texture.size();
+    let read = crate::render::readback::read_texture_bytes;
+    let bytes = read(device, queue, &target.texture, (size.width, size.height), 8);
+    let half = |b: &[u8]| crate::core::color::f16_to_f32(u16::from_le_bytes([b[0], b[1]]));
+    (bytes.chunks_exact(8))
+        .map(|t| glam::Vec3::new(half(&t[..2]), half(&t[2..4]), half(&t[4..6])))
+        .collect()
 }
