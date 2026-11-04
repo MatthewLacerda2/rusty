@@ -234,9 +234,17 @@ A few notes hold for a whole family. The colour ops are pixel to pixel. Noise us
 only part of the range (a 4-octave fBM spans about 0.35–0.64), so a ramp fed straight
 from it shows only its middle; `auto_levels` before the `color_ramp` uses the whole
 ramp, whatever the input's spread. The filters wrap, so a tiling input gives a tiling
-result; `cavity` and `curvature` read the input's red as height.
+result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as height.
 
 <!-- sorted: one bullet per op, so two branches adding ops land on different lines -->
+- `ambient_occlusion {radius, depth=0.1, quality=8}` (*filter*, 1 input): height →
+  occlusion by horizon search, like Substance's *Ambient Occlusion (HBAO)*: from each
+  pixel it walks `quality` directions (1–64), 16 samples each out to `radius` tiles,
+  and darkens by the sky the steepest rise hides; `depth` is how tall white stands, in
+  tiles. Unlike `cavity`, it darkens the foot of a tall shape and the floor of a wide
+  groove. Multiply it into albedo or bake it as the occlusion map. Its cost is
+  `pixels × quality × 16` samples, whatever the radius: at 2048² and quality 8, about
+  15 s of one core, split across cores by rows; iterate at a low `resolution`.
 - `auto_levels` (*color*, 1 input): stretches RGB so the input's minimum maps to 0 and
   its maximum to 1 — one range across R, G and B, so a colour keeps its hue, like
   Substance's Auto Levels; alpha untouched, a flat input unchanged.
@@ -280,12 +288,35 @@ result; `cavity` and `curvature` read the input's red as height.
   `func = "sqrt"` (a curve steepest at the rim and flat on top) it is a rounded,
   convex edge. Avoid an `ease` `color_ramp` here: it is flat at the rim too, so the
   edge reads as a pillow.
+- `edge_detect {width, roundness=0}` (*filter*, 1 input): mask → its outline, like
+  Substance's *Edge Detect*: red above 0.5 is inside (as `distance`), and a line
+  `width` tiles wide straddles every edge. `roundness` 0 is a flat-topped line, 1 a
+  round bead that bevels through `bump_to_normal`: grout from tiles, panel seams,
+  crack rims. A pixel the line only partly covers reads the share it covers, so a
+  line thinner than a pixel at a low `resolution` fades rather than vanishing, and
+  the map's mean holds across resolutions. A mask with no edge reads black.
 - `gamma {gamma}` (*color*, 1 input).
 - `gradient {kind="linear"|"linear_tiling"|"radial"}` (*generator*).
+- `highpass {radius}` (*filter*, 1 input): `c − blur(c) + 0.5` per channel with a
+  Gaussian of `radius` (a tile fraction, as `blur`): the detail smaller than the radius
+  kept around mid-grey, the large shapes flattened, like Substance's *Highpass*. Lifts a
+  detail layer off a photo or a busy noise before a normal map or roughness.
+- `histogram_scan {position, contrast=0}` (*color*, 1 input): a threshold per channel,
+  like Substance's *Histogram Scan*: `position` slides it from all black (0) to all
+  white (1), `contrast` sets its edge from the input's own gradient (0) to a hard step
+  (1); `position = 0.5` with `contrast = 0` passes the input through. It scans the
+  **absolute** `[0, 1]` scale, not the input's own range (values outside it clamp
+  first), so put `auto_levels` in front of a noise: a 4-octave fBM spans about
+  0.35–0.64 and, straight in, bakes all black at `position = 0.25`, `contrast = 1`.
+  `auto_levels` → `histogram_scan` turns a noise into a mask of a chosen coverage.
 - `hue_sat_value {hue, sat, value}` (*color*, 1 input).
 - `image {path, encoding="srgb"|"linear"}` (*generator*): an image file, see *Image
   files* below.
 - `invert` (*color*, 1 input).
+- `levels {in_low=0, in_high=1, gamma=1, out_low=0, out_high=1}` (*color*, 1 input):
+  per channel, `[in_low, in_high]` → `[0, 1]` (clamped), raised to `1 / gamma`, then
+  onto `[out_low, out_high]`, like Substance's *Levels*: `gamma` above 1 lifts the
+  midtones and below 1 sinks them without moving the ends.
 - `map_range {from_min, from_max, to_min, to_max}` (*math*, 1 input).
 - `mapping {scale=[1,1], rotation=0, translation=[0,0], tiling=true}` (*vector*, 1
   input): bilinear, wrapped resample; `rotation` in turns; each transform left out is
@@ -322,6 +353,10 @@ result; `cavity` and `curvature` read the input's red as height.
   thick with round caps — turn it with `mapping {rotation = 0.25}`; `roundness` 0–1
   rounds a `rounded_rect`'s corners; `softness > 0` ramps the edge from 0 to 1 that
   far inside, a bevel profile for `bump_to_normal`.
+- `sharpen {intensity=1, radius=0.004}` (*filter*, 1 input): an unsharp mask,
+  `c + intensity × (c − blur(c))` with a Gaussian of `radius` (a tile fraction, about
+  two pixels at 512²): crisps an `image` input or a blurred chain. Unclamped, so a
+  hard edge overshoots until the bake clamps it.
 - `tile {count, jitter=0, rotation_jitter=0, scale_jitter=0, seed=0}` (*vector*, 1
   input): stamps the input once per cell of a `count`×`count` grid; each cell is
   seeded from the recipe and node `seed` with an offset of up to ±`jitter`/2 cells, a
@@ -373,6 +408,7 @@ number.
 - `curvature.strength`: read at each pixel.
 - `distance.radius`: read at each pixel.
 - `gamma.gamma`: read at each pixel.
+- `histogram_scan.position`, `histogram_scan.contrast`: read at each pixel.
 - `hue_sat_value.hue`, `hue_sat_value.sat`, `hue_sat_value.value`: read at each pixel.
 - `noise.gain`: read at each pixel.
 - `normal_blend.strength`: read at each pixel.
@@ -494,6 +530,9 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
 - `distance.radius` is in tiles: the distance from the edge that reads 1.
 - `cavity.radius` is a tile fraction like `blur.radius`; `curvature.radius` is a
   distance in tiles, sampled bilinearly (so sub-pixel radii stay smooth).
+- `ambient_occlusion.radius` and `.depth` are in tiles; `edge_detect.width` is the
+  line's whole width in tiles; `highpass.radius` and `sharpen.radius` are tile
+  fractions like `blur.radius`.
 - `white_noise` is the exception: its grain is one pixel by definition (on each axis).
 
 ### Non-square bakes — `size`
