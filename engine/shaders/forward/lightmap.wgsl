@@ -66,6 +66,12 @@ fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, N: vec
 // behind the surface a normal map has turned toward.
 const GRAZING_FLOOR: f32 = 0.1;
 
+// The least lamp share that is a lamp, rescaled from there to 1: BC7 lends a
+// lamp-free texel up to 4/255 of share from its block, which a glossy metal turns
+// into a visible highlight (`lightmap::share_tests` holds BC7 under it and this
+// line to its value). A lamp under 3% of a texel's light gives no highlight.
+const SHARE_FLOOR: f32 = 8.0 / 255.0;
+
 // The least directionality the lobe takes its direction from: below it the page's
 // 8-bit vector is too short to aim a highlight.
 const MIN_DIRECTIONALITY: f32 = 0.02;
@@ -76,7 +82,7 @@ const MIN_DIRECTIONALITY: f32 = 0.02;
 // `N` the shading normal, `roughness` already widened by specular AA. Zero in a bake
 // capture, where no lamp lights the texel, and where its light has no direction.
 fn baked_specular(texel: vec3<f32>, dir: vec4<f32>, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
-    let share = saturate(dir.w) * lighting.baked_specular;
+    let share = saturate((dir.w - SHARE_FLOOR) / (1.0 - SHARE_FLOOR)) * lighting.baked_specular;
     let directionality = length(dir.xyz);
     if (share <= 0.0 || directionality < MIN_DIRECTIONALITY) {
         return vec3<f32>(0.0);

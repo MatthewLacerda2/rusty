@@ -166,7 +166,8 @@ var t_lightmaps: texture_2d_array<f32>;
 @group(0) @binding(15)
 var s_lightmaps: sampler;
 // Their direction pages (#810), same layers and UVs: RGB the dominant incoming
-// direction in [0,1], A its directionality; a 1x1 zero page when not baked.
+// direction scaled by its directionality, A its lamp share (#1695;
+// `decode_lightmap_direction`); a 1x1 zero page, never read, when not baked.
 @group(0) @binding(16)
 var t_lightmap_dirs: texture_2d_array<f32>;
 

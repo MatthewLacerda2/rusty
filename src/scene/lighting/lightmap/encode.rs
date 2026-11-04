@@ -14,7 +14,9 @@
 //! `|direct_dir| / luminance(direct + indirect)` (`bake::direction_texel`), 0 where no
 //! lamp reaches. Both are linear in the stored bytes, so bilinear filtering, the box
 //! mips and BC7 average them as the vectors and shares they are (a packed bit field
-//! would not survive). The shader's direction read mirrors [`decode_direction`].
+//! would not survive), though BC7 lends a lamp-free texel a few steps of its block's
+//! share, which the shader's `SHARE_FLOOR` ignores (`share_tests`). The shader's
+//! direction read mirrors [`decode_direction`].
 
 use glam::{Vec3, Vec4};
 

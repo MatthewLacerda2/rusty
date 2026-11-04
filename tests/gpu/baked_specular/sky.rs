@@ -5,7 +5,7 @@
 //! lamp under the sky keeps its own.
 
 use glam::{Quat, Vec3};
-use rusty::components::{LightMode, MaterialAsset};
+use rusty::components::MaterialAsset;
 use rusty::scene::{Camera, Scene};
 
 use super::highlight::{agree, highlights};

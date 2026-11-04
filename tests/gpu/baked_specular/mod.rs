@@ -60,15 +60,20 @@ pub(super) fn plane(
     material: MaterialAsset,
 ) {
     let plane = scene.add_entity(name.to_string());
-    let world = &mut scene.world;
-    world.set_mesh(plane, primitive_mesh_component(Primitive::Plane));
-    world.set_static(plane, true);
-    let transform = world.transform_mut(plane).unwrap();
-    (transform.position, transform.rotation) = (at, rotation);
-    transform.scale = Vec3::splat(scale);
+    scene
+        .world
+        .set_mesh(plane, primitive_mesh_component(Primitive::Plane));
+    scene.world.set_static(plane, true);
+    place(scene, plane, at, rotation);
+    scene.world.transform_mut(plane).unwrap().scale = Vec3::splat(scale);
     scene.materials.insert(name.to_string(), material);
     let component = MaterialComponent::new(name.to_string());
     scene.world.set_material(plane, Some(component));
+}
+
+fn place(scene: &mut Scene, id: u32, at: Vec3, rotation: Quat) {
+    let mut transform = scene.world.transform_mut(id).unwrap();
+    (transform.position, transform.rotation) = (at, rotation);
 }
 
 /// A point lamp of `mode`, intensity 1 and range 8.
@@ -86,8 +91,7 @@ pub(super) fn point(mode: LightMode) -> LightComponent {
 pub(super) fn lamp(scene: &mut Scene, at: Vec3, rotation: Quat, light: LightComponent) {
     let lamp = scene.add_entity("Lamp".to_string());
     scene.world.set_light(lamp, Some(light));
-    let transform = scene.world.transform_mut(lamp).unwrap();
-    (transform.position, transform.rotation) = (at, rotation);
+    place(scene, lamp, at, rotation);
 }
 
 /// Bake `scene`'s lightmaps into a temp folder named `name`; returns its path.

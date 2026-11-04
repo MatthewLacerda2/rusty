@@ -200,7 +200,9 @@ whether it is drawn live:
   - **Lamps only.** Sky, bounce and emission give no highlight, however much they
     come from one side (an open sky over a dark ground, a `Mixed` spot's bounce off
     the floor onto a glossy ceiling): the environment reflection reflects them. A
-    `Mixed` light gives its highlight live, and its baked bounce none.
+    `Mixed` light gives its highlight live, and its baked bounce none. A lamp
+    supplying under about 3% of a texel's light gives none either: the compressed
+    page can't tell so little from none.
   - **One highlight per texel.** Two lamps lighting one texel give one highlight
     between them, pulled toward both and weakened (two lamps at 45° either side of
     a floor's normal keep about 0.7 of their light in it), where live lights give

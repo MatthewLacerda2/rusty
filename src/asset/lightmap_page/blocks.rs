@@ -17,7 +17,7 @@ use crate::asset::texture_import::banded;
 /// 5% (`tests`); a 2048² page with its mips took 1.9 s on four cores of the 2026
 /// cloud container, against 4.8 s at `basic`, which held them no closer.
 const BC6H: CompressionVariant = CompressionVariant::BC6H(BC6HSettings::very_fast());
-/// BC7's profile for a direction page (its alpha is the directionality): the one
+/// BC7's profile for a direction page (its alpha is the lamp share, #1695): the one
 /// the texture importer uses (`texture_import::encode`), 4.4 s a 2048² page there.
 /// Not ultra-fast (1.4 s): like BC1 it flattens a block of two contrasting colours,
 /// which a direction page has at every crease.
