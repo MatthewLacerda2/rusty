@@ -37,6 +37,11 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   and `passes::shadows::statics_key` (the from-scratch digest the tests compare)
   folds it too. The material table and the per-camera instance array are still
   rebuilt per frame: part 3.
+- **Occlusion culling reads the scene's baked PVS** (#1714, `scene/occlusion.rs`):
+  bound per scene and re-checked against each baked object's fingerprint only after
+  a static object changed; it may keep what is hidden and never culls what a camera
+  sees. A new path that decides what a camera draws reads it through
+  `Renderer::occlusion_eye`, so a capture culls nothing.
 
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no

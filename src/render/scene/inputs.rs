@@ -49,6 +49,10 @@
 //! - **Per frame, on purpose:** the base camera's LOD level and small-object
 //!   verdict, and a palette object's palette and posed bounds (unstamped).
 //!
+//! **The baked PVS** (#1714, `occlusion.rs`, outside the objects): bound per scene,
+//! re-bound when `Scene::occlusion`'s revision moved or a static object was
+//! re-derived or moved; a camera reads its cell's row per frame, on purpose.
+//!
 //! **Decals** (`decals::kept`, outside the objects): each decal's maps are kept by
 //! decal id, re-read when it names another material or texture or the scene or
 //! library revision moved; its owner's pose and its age's fade are read every

@@ -349,6 +349,13 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   extremes), then every cell also takes its 26 neighbours' sets. Cells that see the
   same set share one row. The bake is a pure function of the scene and a fixed seed:
   the same bytes at any thread count.
+- **Cost** (release build, 4 threads, primitive levels): a Kolvik-sized interior
+  (48 × 48 m of 6 m rooms, 418 static meshes, 3645 cells) bakes in about 11 s into
+  180 KB, and hides about two thirds of the meshes from a room; a Dust2-sized level
+  (200 × 200 m, two storeys of 10 m rooms, 4163 meshes, 14580 cells of 3.9 m) takes
+  about 9 minutes and 7.8 MB. The bake runs on Generate Lighting's last step, on the
+  editor's frame, so the editor waits for it. At runtime a camera costs one cell
+  lookup, and each static mesh a map lookup and a bit test.
 - **Stored** beside the scene as `<scene>.occlusion` (a small binary file, written
   with the lighting and on every save; removed when the scene has none). A file that
   is truncated or out of range is refused on load with a warning, and nothing is
