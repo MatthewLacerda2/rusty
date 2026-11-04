@@ -37,7 +37,7 @@ infinitely far away. An object no baked probe reaches reflects the global skybox
 **Scene defaults** live in the lighting settings (`Lighting.GetSettings()` /
 `SetSettings{ reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }`): the resolution a probe
 without its own bakes at (**512**), the **memory budget** of resident cubes
-(**128 MB**) and the most probes `Lighting.Generate()` places (**512**). Each frame keeps the baked probes whose boxes are nearest the camera (a
+(**256 MB**) and the most probes `Lighting.Generate()` places (**512**). Each frame keeps the baked probes whose boxes are nearest the camera (a
 box the camera stands in counts as distance zero; ties go to the lower index), at most
 32, while the cubes stay within the budget: a cube that would pass it is skipped and
 farther ones that fit are still taken; the nearest is always kept. They share one
@@ -45,7 +45,7 @@ texture whose face is the largest resident cube's, so a 512 cube costs 16 MB the
 (half-float texels, with their mips) and a smaller cube rides in its lower mips. That
 texture is the only copy of a resident cube (a file is read, copied in and dropped), and
 it keeps two spare cubes inside the budget for the ones that just left range, so a
-128 MB budget shades with 6 512 cubes (30 at 256) and pacing back and forth across its
+256 MB budget shades with 14 512 cubes (32, the cap, at 256) and pacing back and forth across its
 edge reads nothing from disk. A cube is judged by
 its file header before it is read, and once the budget is full no file is read at
 all. A cubemap whose size is not a power of two up to 2048 is skipped with

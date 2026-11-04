@@ -6,7 +6,7 @@
 //! fixed 80-byte header, a level index (one 24-byte entry per mip, largest mip first), a
 //! Basic Data Format Descriptor, then the level data. We emit exactly that for an HDR
 //! `R16G16B16A16_SFLOAT` cubemap with a full roughness mip chain (#1696), so the loader
-//! reads back what we wrote. BC6H would quarter the size; it waits on a cube encoder.
+//! reads back what we wrote. BC6H would hold the same cube in an eighth of the size; it waits on a cube encoder.
 //!
 //! Output is plain baked-asset bytes — a pure function of the prefiltered faces, no
 //! wall-clock / RNG — so the encode is clean under the determinism guard.

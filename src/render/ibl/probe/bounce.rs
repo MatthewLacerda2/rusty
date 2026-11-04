@@ -41,10 +41,11 @@ use crate::scene::Scene;
 pub const MAX_BOUNCES: u32 = 5;
 
 /// Early-out threshold on the energy a pass adds, measured as the max absolute
-/// per-coefficient SH delta across every probe (see `field_delta`). A fully white
-/// hemisphere projects to a DC coefficient on the order of a few units, so a pass
-/// that nudges no coefficient by even 1e-3 is below the half-float capture's own
-/// precision at that scale — the next bounce cannot matter, so we stop.
+/// per-coefficient SH delta across every probe (see `field_delta`). An absolute
+/// bound: a fully white hemisphere projects to a DC coefficient of a few units, so a
+/// pass that nudges no coefficient by even 1e-3 cannot matter, and we stop. A bright
+/// field whose static surfaces read the probes (no lightmap) rarely gets that close,
+/// so it runs to [`MAX_BOUNCES`]; lightmapped surfaces don't change between passes.
 pub const CONVERGENCE_EPSILON: f32 = 1.0e-3;
 
 /// Outcome of a multi-bounce bake — the converged SH per probe is written in place on

@@ -30,7 +30,7 @@ The two individual verbs stay for a script that wants only one of them.
   bounces; a NaN or infinite density takes the default `8`); the editor's card edits the
   same fields under the button. The reflection probes' defaults sit beside them:
   `reflectionResolution` (default `512`, a power of two in 16–2048) and
-  `reflectionBudgetMB` (default `128`, `8`–`2048`) and `reflectionMaxProbes` (default
+  `reflectionBudgetMB` (default `256`, `8`–`2048`) and `reflectionMaxProbes` (default
   `512`, `1`–`4096`, the most probes auto-placement makes), edited in the scene Inspector's
   *Reflection Probes* section (see `Reflection.md`). A scene whose settings are all
   at their defaults leaves the block out of its file. `Lighting.BakeLightmaps` takes the
