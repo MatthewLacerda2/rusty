@@ -54,22 +54,52 @@ impl SmallObjectCull {
         &self,
         mesh: &MeshComponent,
         centre: Vec3,
+        local: (Vec3, Vec3),
+        world: Mat4,
+    ) -> bool {
+        self.culls_by(SmallLimits::of(mesh), centre, local, world)
+    }
+
+    /// [`Self::culls`] for a mesh whose two limits are `limits`, read once and kept
+    /// (the retained scene's objects, `render::scene`, #1706).
+    pub(crate) fn culls_by(
+        &self,
+        limits: SmallLimits,
+        centre: Vec3,
         (min, max): (Vec3, Vec3),
         world: Mat4,
     ) -> bool {
         let Some((eye, fov, projection)) = self.lens else {
             return false;
         };
-        if !mesh.culls_when_small() {
-            return false;
-        }
+        // Each limit culls only when set, so this culls only a mesh whose
+        // `MeshComponent::culls_when_small` holds: the shadow caches and the camera
+        // read one rule.
         let distance = centre.distance(eye);
-        if mesh.max_draw_distance > 0.0 && distance > mesh.max_draw_distance {
+        if limits.max_draw_distance > 0.0 && distance > limits.max_draw_distance {
             return true;
         }
-        let size = (max - min).max_element() * max_scale(world);
-        mesh.min_screen_size > 0.0
-            && relative_height(size, distance, fov, projection) < mesh.min_screen_size
+        limits.min_screen_size > 0.0 && {
+            let size = (max - min).max_element() * max_scale(world);
+            relative_height(size, distance, fov, projection) < limits.min_screen_size
+        }
+    }
+}
+
+/// A mesh's *Max Draw Distance* and *Min Screen Size* (#1714), as a value.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct SmallLimits {
+    pub max_draw_distance: f32,
+    pub min_screen_size: f32,
+}
+
+impl SmallLimits {
+    /// `mesh`'s limits.
+    pub(crate) fn of(mesh: &MeshComponent) -> Self {
+        Self {
+            max_draw_distance: mesh.max_draw_distance,
+            min_screen_size: mesh.min_screen_size,
+        }
     }
 }
 

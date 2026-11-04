@@ -98,7 +98,7 @@ impl Renderer {
 /// Write a freshly-solved SH field onto a solve's probes (one SH per probe, in
 /// order). The next bounce's lit capture reads these back through the probe field.
 pub(super) fn write_field(volume: &mut ProbeVolume, field: &[Sh9]) {
-    for (probe, &sh) in volume.probes.iter_mut().zip(field) {
+    for (probe, &sh) in volume.probes_mut().iter_mut().zip(field) {
         probe.sh = sh;
     }
 }
@@ -106,13 +106,13 @@ pub(super) fn write_field(volume: &mut ProbeVolume, field: &[Sh9]) {
 /// Add the direct light of `scene`'s `Baked` lights to every probe of `volume` (#809),
 /// shadowed by the static meshes the lightmap bake sees.
 pub(super) fn add_baked_direct(scene: &Scene, volume: &mut ProbeVolume) {
-    let positions: Vec<Vec3> = volume.probes.iter().map(|p| p.position).collect();
+    let positions: Vec<Vec3> = volume.probes().iter().map(|p| p.position).collect();
     if positions.is_empty() {
         return;
     }
     let statics = BakeScene::gather(scene, &|_| None);
     for (probe, direct) in volume
-        .probes
+        .probes_mut()
         .iter_mut()
         .zip(baked_direct_sh(&statics, &positions))
     {

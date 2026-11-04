@@ -47,7 +47,7 @@ fn probed(mode: AmbientMode) -> Scene {
 fn analytic(mode: AmbientMode) -> Sh9 {
     let mut scene = probed(mode);
     analytic_fill(&mut scene);
-    scene.probes.probes[0].sh
+    scene.probes.probes()[0].sh
 }
 
 /// Both read back as a surface does (irradiance over π), equal at every normal.
@@ -83,7 +83,7 @@ fn an_open_capture_projects_the_ambient() {
     let sh = project_light_probe(&capture, ringing.drawn_ambient().radiance());
     ringing.probes.add_probe(Vec3::ZERO);
     analytic_fill(&mut ringing);
-    let fill = ringing.probes.probes[0].sh;
+    let fill = ringing.probes.probes()[0].sh;
     let lift = NORMALS.map(|n| sh.eval(n.normalize()) - fill.eval(n.normalize()));
     assert!(lift.iter().all(|d| d.min_element() > -1e-4), "{lift:?}");
     assert!(lift.iter().any(|d| d.max_element() > 1e-2), "{lift:?}");
@@ -106,7 +106,7 @@ fn gpu_an_empty_scene_bakes_the_analytic_fill() {
         assert_matches(&baked, &analytic(mode), mode.name());
         let mut solved = probed(mode);
         renderer.bake_probes(&mut solved, RES);
-        assert_matches(&solved.probes.probes[0].sh, &baked, "multi-bounce");
+        assert_matches(&solved.probes.probes()[0].sh, &baked, "multi-bounce");
     }
 }
 

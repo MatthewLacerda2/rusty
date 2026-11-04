@@ -195,16 +195,16 @@ pub(crate) fn room(max_bytes: u64) -> usize {
 /// `core::hash::content` (xxh3), once per render.
 pub(crate) fn fingerprint(probes: &ProbeVolume, scratch: &mut Vec<u8>) -> u64 {
     scratch.clear();
-    for p in &probes.probes {
+    for p in probes.probes() {
         scratch.extend_from_slice(bytemuck::bytes_of(&p.position));
         scratch.extend_from_slice(bytemuck::cast_slice(&p.sh.coeffs));
     }
-    if let Some(g) = probes.grid {
+    if let Some(g) = probes.grid() {
         scratch.extend_from_slice(bytemuck::bytes_of(&g.origin));
         scratch.extend_from_slice(bytemuck::bytes_of(&g.spacing));
         scratch.extend_from_slice(bytemuck::cast_slice(&g.counts));
     }
-    scratch.extend_from_slice(&(probes.probes.len() as u64).to_le_bytes());
+    scratch.extend_from_slice(&(probes.probes().len() as u64).to_le_bytes());
     crate::core::hash::content(scratch)
 }
 

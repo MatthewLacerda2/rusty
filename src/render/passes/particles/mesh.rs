@@ -70,7 +70,7 @@ impl Renderer {
                 let model = mesh_particle_matrix(p.position, emitter.size_of(p), p.orientation());
                 let (use_sh, sh) = probe_sh_at(scene, p.position);
                 let item = DrawItem {
-                    key: key.clone(),
+                    key,
                     instance: InstanceData {
                         model_matrix: model.to_cols_array(),
                         use_sh,
@@ -124,7 +124,7 @@ impl Renderer {
         let key = BatchKey {
             pipeline,
             facing: Facing::of_material(Mat4::IDENTITY, material),
-            mesh,
+            mesh: self.retained.meshes.intern(&mesh),
             // The emitter names one material: the whole mesh is one run.
             indices: (0..num_indices).into(),
             material: self.material_index(entry, pipeline, None),
