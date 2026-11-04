@@ -2,11 +2,12 @@
 //! size that the opaque forward pass writes as its third and fourth colour
 //! attachments, beside the velocity target, while the view runs SSR. Their texels are
 //! laid out in `engine/shaders/lighting/ssr_surface.wgsl`: the weight a hit gets and
-//! the environment reflection the forward pass applied, which a hit replaces, with the
-//! shading normal split across their alphas. Two targets, not one packed integer
-//! texture: the eight halves fill both exactly, cost the same 16 bytes, and read back
-//! as plain floats. A view that runs no SSR holds none and writes none, so it pays
-//! nothing for them.
+//! the environment reflection the forward pass applied, which a hit replaces, in
+//! their rgb, and in their alphas the shading normal and the roughness, packed as an
+//! integer in the bits of an `f16` (#1736). So the rgb are plain floats, but an alpha
+//! is not: neither target may be blended, filtered or resampled, only loaded. The
+//! eight halves fill both targets exactly, at 16 bytes a pixel. A view that runs no
+//! SSR holds none and writes none, so it pays nothing for them.
 
 use crate::render::postfx::effects::Targets;
 use crate::render::postfx::{PfxTarget, PostFx};
@@ -15,14 +16,16 @@ use crate::render::PixelSize;
 /// The surface targets' format.
 pub(crate) const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
-/// What it clears to: no smoothness, so no SSR (the sky, and a layer nothing drew).
+/// What it clears to: no weight, so no SSR (the sky, and a layer nothing drew).
 pub(crate) const CLEAR: wgpu::Color = wgpu::Color::TRANSPARENT;
 
 /// The view's surface targets, at the size they were made for.
 pub(crate) struct SurfaceTarget {
-    /// rgb: the weight a hit gets; a: the normal's octahedral x.
+    /// rgb: the weight a hit gets; a: the normal's octahedral x and the roughness's
+    /// high digit, packed (`ssr_surface.wgsl`'s `pack_lane`).
     pub weight: PfxTarget,
-    /// rgb: the environment reflection the forward pass applied; a: octahedral y.
+    /// rgb: the environment reflection the forward pass applied; a: the normal's
+    /// octahedral y and the roughness's low digit, packed.
     pub applied: PfxTarget,
     size: PixelSize,
 }

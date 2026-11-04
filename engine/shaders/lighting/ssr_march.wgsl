@@ -64,10 +64,35 @@ fn probe(f: Frame, t_depth: texture_2d<f32>, p: vec3<f32>) -> Probe {
     return Probe(depth_of(f, p) - scene, uv, valid, on_screen);
 }
 
+// How much of the march's reach, at its far end, a hit fades out over: a ray that
+// hits just before running out and its neighbour that misses meet without a seam.
+const REACH_FADE: f32 = 0.2;
+
+// The on-screen diameter, in texels of `dim`, of the cone of tangent `cone` around
+// the ray `r` where it hits `p`, `t` world units from where it left: the disk of
+// radius `cone × t` across the ray, measured along the one direction across both the
+// ray and the line of sight, which faces the camera.
+fn footprint(f: Frame, p: vec3<f32>, r: vec3<f32>, t: f32, cone: f32, uv: vec2<f32>, dim: vec2<f32>) -> f32 {
+    var across = cross(r, p - f.eye);
+    if (dot(across, across) < 1e-10) {
+        across = cross(r, select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(r.y) > 0.9));
+    }
+    let rim = f.view_proj * vec4<f32>(p + normalize(across) * (cone * t), 1.0);
+    let s = rim.xy / max(rim.w, 1e-6);
+    let rim_uv = vec2<f32>(s.x * 0.5 + 0.5, 0.5 - s.y * 0.5);
+    return 2.0 * length((rim_uv - uv) * dim);
+}
+
 // March the reflected ray `r` from `origin` in `steps` steps of `step` world units,
 // against `t_depth`'s depths as `f` measures them. Returns the colour of `t_color`
-// it hits and, in `.w`, how much the hit counts (0: a miss).
-fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32) -> vec4<f32> {
+// it hits and, in `.w`, how much the hit counts (0: a miss): faded at the screen's
+// edge, wider by the blur's radius, and over the reach's last `REACH_FADE`.
+//
+// `cone` is the tangent of the half-angle of the surface's GGX lobe (0: a mirror,
+// #1736): the hit is read at the mip of `t_color` whose texels are the cone's
+// on-screen width there, so a rough surface reflects a blur of what it sees (cone
+// tracing, as Frostbite and UE do). A `t_color` with one level reads sharp.
+fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32) -> vec4<f32> {
     let thickness = step * 1.5;
     var prev = origin;
     for (var i = 0; i < steps; i = i + 1) {
@@ -90,11 +115,19 @@ fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: 
                 }
             }
             let hit = probe(f, t_depth, back);
+            let dim = vec2<f32>(textureDimensions(t_color));
+            let t = distance(origin, back);
+            let width = footprint(f, back, r, t, cone, hit.uv, dim);
+            let top = f32(textureNumLevels(t_color) - 1u);
+            let lod = clamp(log2(max(width, 1.0)), 0.0, top);
             let edge = min(min(hit.uv.x, 1.0 - hit.uv.x), min(hit.uv.y, 1.0 - hit.uv.y));
+            let blur = 0.5 * width / min(dim.x, dim.y);
+            let reach = f32(steps) * step;
+            let far = clamp((reach - t) / (reach * REACH_FADE), 0.0, 1.0);
             // Explicit-LOD sample: a gradient instruction inside this break-bounded
             // (varying-iteration) loop fails to compile under D3D12/FXC.
-            let colour = textureSampleLevel(t_color, s_color, hit.uv, 0.0).rgb;
-            return vec4<f32>(colour, clamp(edge / SCREEN_FADE, 0.0, 1.0));
+            let colour = textureSampleLevel(t_color, s_color, hit.uv, lod).rgb;
+            return vec4<f32>(colour, clamp(edge / (SCREEN_FADE + blur), 0.0, 1.0) * far);
         }
         prev = p;
     }
