@@ -8,6 +8,7 @@ use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
+use crate::render::postfx::effects::ssil;
 use crate::render::postfx::effects::ssr::{ssr_enabled, surface, transparent};
 use crate::render::postfx::effects::{self, taa, EffectCx, PassCx};
 use crate::render::postfx::params::{frame_params, PostSource};
@@ -66,11 +67,7 @@ impl Renderer {
         let moving =
             motion::target_wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode)
                 && !own_pipeline;
-        let velocity = match (moving, ssr) {
-            (true, _) => Velocity::Motion,
-            (false, true) => Velocity::Depths,
-            (false, false) => Velocity::Off,
-        };
+        let velocity = velocity_target(moving, ssr);
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.scene_size();
         surface::begin(&mut view.post_fx.targets, &self.device, size, ssr);
@@ -79,6 +76,9 @@ impl Renderer {
                 .motion
                 .begin(&self.device, size, key, velocity, &cameras);
         let prev_time = view.post_fx.motion.history.game_time(scene.shader_time);
+        // SSIL (#1750) keeps a history per view: a bake capture's faces and the
+        // shader preview keep none, so they never run it.
+        let keeps = !own_pipeline && !self.capture.static_only;
         // TAA (#1702): the frame's sub-pixel jitter, every camera's alike; a cut
         // forgets its history.
         let taa_on = taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode);
@@ -92,6 +92,7 @@ impl Renderer {
             fog: FogUniform::from_settings(&scene.fog),
             ssao: SsaoPlan::for_volume(pass.post.volume, self.graphics(pass.editor_mode)),
             ssr_march: transparent::camera_march(pass.post, graphics, ssr),
+            ssil: ssil::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
         };
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);
@@ -144,5 +145,15 @@ impl Renderer {
         };
         view.post_fx
             .run((&self.device, &self.queue), chain, &effect, params);
+    }
+}
+
+/// The velocity target a view writes: motion vectors when an effect reads motion,
+/// SSR's depths alone when only SSR runs, else none (#1435, #1526).
+fn velocity_target(moving: bool, ssr: bool) -> Velocity {
+    match (moving, ssr) {
+        (true, _) => Velocity::Motion,
+        (false, true) => Velocity::Depths,
+        (false, false) => Velocity::Off,
     }
 }

@@ -48,7 +48,11 @@ pub(crate) struct LocalLight {
     /// the panel gets its true limit of `π × intensity`, not one point's
     /// `intensity × area / ε²`; `0` for a point or spot light.
     pub near: f32,
-    pub _pad: [f32; 2],
+    /// 1.0 when the scene's lightmap bake took this light in (#1750,
+    /// `LightmapSet::baked_light`): SSIL gathers none of its light. Set by
+    /// [`local_lights`], which knows the scene.
+    pub bounce_baked: f32,
+    pub _pad: f32,
 }
 
 impl LocalLight {
@@ -91,7 +95,8 @@ impl LocalLight {
                 .filter(|d| d.is_finite() && *d > 0.0)
                 .unwrap_or(0.0),
             near: if near.is_finite() { near } else { 0.0 },
-            _pad: [0.0; 2],
+            bounce_baked: 0.0,
+            _pad: 0.0,
         })
     }
 
@@ -166,6 +171,7 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
             if capture {
                 local.shadow_fade = 0.0;
             }
+            local.bounce_baked = f32::from(u8::from(scene.lightmaps.baked_light(id)));
             Some((local, light.cast_shadows))
         })
         .collect()

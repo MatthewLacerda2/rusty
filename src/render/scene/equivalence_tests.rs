@@ -1,7 +1,8 @@
 //! src/render/scene/equivalence_tests.rs — after any edit sequence the retained
 //! objects and their object-table records equal a build from scratch (#1706): the
 //! ECS write paths of `ops_tests`, the inputs the log does not cover (library,
-//! overrides, lightmaps, probes, a capture, a re-uploaded shared mesh) and the
+//! overrides, lightmaps and a bake's light record, which alone sets `in_bake` (#1750),
+//! probes, a capture, a re-uploaded shared mesh) and the
 //! shadow ops (`shadow_ops`; the bakes' key equals a fresh digest). The table leaks
 //! no slot and the GPU mirrors it (`table_holds`). One renderer for every case.
 
@@ -27,7 +28,7 @@ enum R {
     Library(u8),
     Override(usize, bool),
     Light(usize, bool),
-    Lightmap(usize, bool),
+    Lightmap(usize, u8),
     Probe(u8),
     Capture(bool),
     Unmesh(usize),
@@ -46,7 +47,7 @@ fn r_op() -> impl Strategy<Value = R> {
         2 => (0u8..6).prop_map(R::Library),
         2 => (at(), any::<bool>()).prop_map(|(i, s)| R::Override(i, s)),
         1 => (at(), any::<bool>()).prop_map(|(i, l)| R::Light(i, l)),
-        1 => (at(), any::<bool>()).prop_map(|(i, l)| R::Lightmap(i, l)),
+        1 => (at(), 0u8..4).prop_map(|(i, l)| R::Lightmap(i, l)),
         1 => (0u8..4).prop_map(R::Probe),
         1 => any::<bool>().prop_map(R::Capture),
         1 => at().prop_map(R::Unmesh),
@@ -89,12 +90,14 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
             s.world.set_light(id, sun.filter(|_| l));
         }),
         R::Lightmap(i, l) => on(scene, pick(scene, i), |s, id| match l {
-            true => s.lightmaps.insert(LightmapEntry {
+            0 => drop(s.lightmaps.remove(id)),
+            1 => drop(s.lightmaps.lights.insert(id)),
+            2 => drop(s.lightmaps.lights.remove(&id)),
+            _ => s.lightmaps.insert(LightmapEntry {
                 entity: id,
                 page: 0,
                 scale_offset: [0.5, 0.5, 0.0, 0.0],
             }),
-            false => drop(s.lightmaps.remove(id)),
         }),
         R::Unmesh(i) => on(scene, pick(scene, i), |s, id| {
             s.world.set_mesh(id, None);

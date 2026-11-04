@@ -14,6 +14,7 @@ use crate::render::gpu::uniforms::{MappingUniform, ObjectData, SurfaceUniform};
 use crate::render::postfx::effects::ssr;
 use crate::render::MaterialData;
 use crate::scene::authoring::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
+use crate::scene::lighting::lightmap::BakeScene;
 use crate::scene::Scene;
 
 /// Compute the material record (tint, lit flag, PBR params, cutout) for a solid
@@ -182,8 +183,8 @@ pub(crate) fn solid_object(
         lightmap_page: lightmap.map_or(0, |l| l.page + 1),
         lightmap_directional: u32::from(lightmap.is_some() && lightmaps.directional()),
         lightmap_st: lightmap.map_or([0.0; 4], |l| l.scale_offset),
+        in_bake: u32::from(!scene.lightmaps.is_empty() && BakeScene::takes_mesh(scene, id)),
         sh,
-        ..ObjectData::IDENTITY
     }
 }
 

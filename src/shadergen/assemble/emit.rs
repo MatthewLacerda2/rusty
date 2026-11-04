@@ -191,10 +191,15 @@ pub fn cuts(instances: &[Instance], layout: &ParamLayout) -> Vec<String> {
         .collect()
 }
 
-/// The statements that scale the SSR record (`ssr_texels`, #1526) as the colour
-/// blocks scale the colour, one per colour instance whose [`Block::reflection`] is not
-/// [`Reflection::Kept`], in recipe order, with `{args}` filled as [`chain`] fills it.
-/// Empty when every block keeps the reflection.
+/// The statements that scale the SSR record (`ssr_texels`, #1526) and SSIL's
+/// realtime light (`ssil_realtime`, #1750) as the colour blocks scale the colour,
+/// one per colour instance whose [`Block::reflection`] is not [`Reflection::Kept`],
+/// in recipe order, with `{args}` filled as [`chain`] fills it, and the factor
+/// bound once to a `let` both read. A block that is no
+/// per-channel scale ([`Reflection::Dropped`]) zeroes both: SSIL gathers nothing
+/// from a toon-ramped surface rather than light it cannot place. Empty when every
+/// block keeps the reflection; a block that adds light of its own (a rim) adds
+/// none to what SSIL gathers.
 pub fn reflection_folds(instances: &[Instance], layout: &ParamLayout) -> Vec<String> {
     instances
         .iter()
@@ -206,8 +211,12 @@ pub fn reflection_folds(instances: &[Instance], layout: &ParamLayout) -> Vec<Str
                 Reflection::Scaled(factor) => factor.replace("{args}", &args(block, index, layout)),
                 Reflection::Dropped => "vec3<f32>(0.0)".to_string(),
             };
+            // Bound once: a factor can sample textures (`triplanar_detail` takes
+            // three), and both records read it.
             Some(format!(
-                "ssr_texels = ssr_surface::scale(ssr_texels, {factor});"
+                "let fold_factor_{index} = {factor};\n        \
+                 ssr_texels = ssr_surface::scale(ssr_texels, fold_factor_{index});\n        \
+                 ssil_realtime *= fold_factor_{index};"
             ))
         })
         .collect()

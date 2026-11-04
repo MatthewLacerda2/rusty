@@ -56,6 +56,7 @@ impl LightmapBakeJob {
     ) -> Result<Self, String> {
         let scene_path = scene_path.ok_or(UNSAVED)?.to_string();
         let input = gather_bake_input(scene);
+        let lights = crate::scene::lighting::lightmap::taken_lights(scene);
         let static_meshes = lightmap_receivers(&input);
         let progress = Arc::new(BakeProgress::default());
         let watch = Arc::clone(&progress);
@@ -63,7 +64,8 @@ impl LightmapBakeJob {
             .name("lightmap-bake".into())
             .spawn(
                 move || match bake_with_progress(&input, &settings, &watch) {
-                    Some(maps) => encode_pages(&maps, settings.page(), &watch),
+                    Some(maps) => encode_pages(&maps, settings.page(), &watch)
+                        .map(|pages| pages.map(|p| EncodedPages { lights, ..p })),
                     None => Ok(None),
                 },
             )

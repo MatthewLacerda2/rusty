@@ -96,7 +96,9 @@ struct ObjectData {
     // 1 when the lightmap's direction page is bound (#810): normal maps reshape
     // the baked light, and its `Baked` lamps add one specular lobe (#1695).
     lightmap_directional: u32,
-    object_pad: u32,
+    // 1 when the scene's lightmap bake took this mesh in (#1750): SSIL gathers
+    // none of its emission.
+    in_bake: u32,
     lightmap_st: vec4<f32>,
     sh: array<vec4<f32>, 9>,
 };
@@ -332,6 +334,9 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 // and *Depth Texture* in one: rgb its colour after the opaque pass and SSR, alpha
 // the distance from the eye to that surface; a 1x1 stand-in in every pass but a
 // transparent one with a surface that refracts or absorbs. Linear, clamped sampler.
+// In the opaque pass of a base camera running SSIL (`camera.ssil.x`, #1750), which
+// reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel: the
+// stage's 16 sampled textures, wgpu's default limit, are all taken.
 @group(3) @binding(6)
 var t_opaque: texture_2d<f32>;
 @group(3) @binding(7)
