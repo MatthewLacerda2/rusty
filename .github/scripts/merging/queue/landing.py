@@ -18,7 +18,7 @@ import subprocess
 import time
 
 import ghrest
-from merging.queue import outcomes
+from merging.queue import gitio, outcomes, pulls
 
 
 # How long a merge call that failed in transit is given to show up as merged.
@@ -97,3 +97,45 @@ def confirm(number: int, poll: float) -> tuple[str, list[str]]:
             return state, lines
         outcomes.say(f"#{number}: {lines[0]}")
         time.sleep(min(poll, MERGE_SETTLES_SECONDS / 4))
+
+
+def squash_message(fresh: str, root: str) -> str:
+    """The squash commit's body: a bullet per commit the branch made, oldest first,
+    its merges of `main` left out, so `main` carries no `Merge remote-tracking
+    branch` bullets (#1568). Empty when git cannot say."""
+    done = gitio.git("log", "--no-merges", "--reverse", "--format=%s", f"origin/main..{fresh}", cwd=root)
+    if done.returncode != 0:
+        return ""
+    return "\n".join(f"* {line.strip()}" for line in done.stdout.splitlines() if line.strip())
+
+
+def squash(repo: str, pull: dict, sha: str, root: str, poll: float) -> tuple[str, str]:
+    """Squash-merge `pull` at head `sha`: [`outcomes.MERGED`], or why not.
+
+    REST's merge (#970); `sha` is `--match-head-commit`, so a push after the
+    verdict makes GitHub refuse. A refusal is [`outcomes.HANDED_BACK`]; a call
+    that failed in transit is asked about ([`confirm`]), and one GitHub never
+    says merged is [`UNKNOWN`]: the merge train must not land past it.
+    """
+    number = pull["number"]
+    done = subprocess.run(
+        ["gh", "api", "--method", "PUT", f"repos/{repo}/pulls/{number}/merge",
+         "-f", "merge_method=squash", "-f", f"sha={sha}", "-f", f"commit_title={pulls.subject(pull)}",
+         "-f", f"commit_message={squash_message(sha, root)}"],
+        capture_output=True, text=True, check=False,
+    )
+    if done.returncode == 0:
+        return outcomes.MERGED, "merged."
+    failure = done.stderr.strip()
+    if not transport(failure):
+        blocked = f"CI passed but the merge was refused: {failure}"
+        outcomes.say(f"#{number}: {blocked}")
+        return outcomes.HANDED_BACK, blocked
+    outcomes.say(f"#{number}: the merge call failed in transit: {failure}")
+    state, after = confirm(number, poll)
+    outcomes.say(f"#{number}: {after[0]}", *after[1:])
+    return (outcomes.MERGED, after[0]) if state == outcomes.GO else (UNKNOWN, after[0])
+
+
+# What [`squash`] returns when the call failed in transit and GitHub never said it merged.
+UNKNOWN = "merge unknown"

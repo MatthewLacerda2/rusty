@@ -1,0 +1,51 @@
+"""Waiting for the gates on a train's tip ([`wait`]), on the queue's own polling rules.
+
+The tip is no pull request's head, so it is judged as one with nothing to claim:
+[`queue.polling.progress`] over a pull request of only `headRefOid`, whose
+description rules (`verdict.protocol`) have nothing to read and refuse nothing.
+Every reading rule a pull request's wait has holds here unchanged: a run not
+listed yet waits out its grace, a runner outage is re-run once (#869), a red whose
+jobs lag waits for them (#1109, #1182), a run seen once and dropped from the
+listing is still waited for (#592). The members' own claims were judged before
+the train formed, as [`queue.taking.take`] judges them before its push.
+"""
+
+from __future__ import annotations
+
+import time
+
+from merging.queue import outcomes, polling, waiting
+from merging.verdict import github, runners
+
+
+# How a train's wait ends besides [`outcomes.GO`]: its gates said no (the halves
+# are tested), or nothing said anything in time (its members go back in line, as
+# they were: a runner outage or a deadline is not the trees' fault).
+RED, STALLED = "red", "stalled"
+
+
+def wait(repo: str, sha: str, deadline: float, poll: float, tick=None, say=outcomes.say) -> tuple[str, list[str]]:
+    """Poll until the gates on `sha` settle: [`outcomes.GO`], [`RED`] or
+    [`STALLED`], with why. Past `deadline` seconds it is stalled, nothing red."""
+    began, seen, rerun, red_since = time.monotonic(), set(), {}, {}
+    while True:
+        waited = time.monotonic() - began
+        runs, jobs = github.evidence(repo, sha)
+        tip = {"headRefOid": sha, "isDraft": False, "statusCheckRollup": github.rollup(repo, sha)}
+        seen |= polling.sighted(tip, runs)
+        state, lines = polling.progress(tip, runs, jobs, [], waited, seen, rerun, red_since)
+        if state == outcomes.RERUN:
+            refused = waiting.rerun_failed(runners.outage(tip, runs, jobs, polling.expiry(waited, red_since)), rerun)
+            if refused:
+                return STALLED, [f"{outcomes.RUNNERS}, and the re-run was refused: {refused}", *lines]
+        elif state == outcomes.GO:
+            return state, lines
+        elif state != outcomes.WAIT:
+            # Cancelled again after its one re-run: the runners', not the tree's (#869).
+            return (STALLED if lines[0].startswith(outcomes.RUNNERS) else RED), lines
+        if waited > deadline:
+            return STALLED, [f"still waiting on the train {sha[:7]} after {waited / 60:.0f} minutes.", *lines]
+        say(f"train {sha[:7]}: {lines[0]}")
+        if tick is not None:
+            tick()
+        time.sleep(poll)

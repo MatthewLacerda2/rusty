@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import functools
-import subprocess
 import time
 
 from merging.queue.conflict import record
@@ -32,20 +31,11 @@ def dry(repo: str, pull: dict, fresh: str, notes: list[str]) -> tuple[int, str, 
     return number, outcomes.DRY, f"{moved}; head {head[:7]} is {'mergeable' if ok else 'not mergeable'}."
 
 
-def squash_message(fresh: str, root: str) -> str:
-    """The squash commit's body: a bullet per commit the branch made, oldest first,
-    its merges of `main` left out, so `main` carries no `Merge remote-tracking
-    branch` bullets (#1568). Empty when git cannot say."""
-    done = gitio.git("log", "--no-merges", "--reverse", "--format=%s", f"origin/main..{fresh}", cwd=root)
-    if done.returncode != 0:
-        return ""
-    return "\n".join(f"* {line.strip()}" for line in done.stdout.splitlines() if line.strip())
-
-
-def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[int, str, str]:
-    """One pull request, from where it is to merged or handed back. `tick()`,
-    when given, is called on each poll of the CI wait ([`waiting.wait_for`])."""
-    pull = pulls.look(number)
+def claims(repo: str, number: int, pull: dict | None = None) -> tuple[int, str, str] | None:
+    """Why pull request `number` is refused before any push, as a hand-back
+    result, or `None`: not open, a draft, what it claims (#927), or no review
+    decision recorded (#1764). A merge train asks it of each member too (#1785)."""
+    pull = pull if pull is not None else pulls.look(number)
     if pull.get("state") != "OPEN":
         return number, outcomes.HANDED_BACK, outcomes.NOT_OPEN.format(str(pull.get("state")).lower())
     if pull.get("isDraft"):
@@ -68,7 +58,16 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
     if refused:
         outcomes.say(f"#{number}: {refused[0]}", *refused[1:])
         return outcomes.Awaiting(number, outcomes.AWAITS_REVIEW, refused[0], handbacks.claim(pull))
+    return None
 
+
+def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[int, str, str]:
+    """One pull request, from where it is to merged or handed back. `tick()`,
+    when given, is called on each poll of the CI wait ([`waiting.wait_for`])."""
+    pull = pulls.look(number)
+    refused = claims(repo, number, pull)
+    if refused is not None:
+        return refused
     branch, head = pull["headRefName"], pull["headRefOid"]
     gitio.remote("fetch", "--quiet", "origin", "main", cwd=opts.root)
     gitio.remote("fetch", "--quiet", "origin", head, cwd=opts.root)
@@ -111,25 +110,9 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
     if opts.no_merge:
         return number, outcomes.GREEN, lines[0]
 
-    # REST's merge (#970); `sha` is `--match-head-commit`: a push after the
-    # verdict makes GitHub refuse.
-    done = subprocess.run(
-        ["gh", "api", "--method", "PUT", f"repos/{repo}/pulls/{number}/merge",
-         "-f", "merge_method=squash", "-f", f"sha={fresh}", "-f", f"commit_title={pulls.subject(pull)}",
-         "-f", f"commit_message={squash_message(fresh, opts.root)}"],
-        capture_output=True, text=True, check=False,
-    )
-    if done.returncode != 0:
-        failure = done.stderr.strip()
-        if not landing.transport(failure):
-            blocked = f"CI passed but the merge was refused: {failure}"
-            outcomes.say(f"#{number}: {blocked}")
-            return number, outcomes.HANDED_BACK, blocked
-        outcomes.say(f"#{number}: the merge call failed in transit: {failure}")
-        state, after = landing.confirm(number, opts.poll)
-        outcomes.say(f"#{number}: {after[0]}", *after[1:])
-        if state != outcomes.GO:
-            return number, outcomes.HANDED_BACK, after[0]
+    state, why = landing.squash(repo, pull, fresh, opts.root, opts.poll)
+    if state != outcomes.MERGED:
+        return number, outcomes.HANDED_BACK, why
     outcomes.say(f"#{number}: merged.")
     return number, outcomes.MERGED, lines[0]
 

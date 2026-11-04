@@ -12,6 +12,7 @@ import ghrest
 
 from merging.queue import checks, gitio, outcomes, stopping, taking, world
 from merging.queue.conflict import record
+from merging.train import rails
 from merging.verdict import github
 from merging.watch import ending, lock, loop
 
@@ -139,6 +140,10 @@ def start(opts: argparse.Namespace, argv: list[str]) -> int:
         return ending.MACHINE_STATUS
     began = datetime.now(timezone.utc).replace(microsecond=0)  # the record keeps whole seconds
     if opts.watch:
+        if not opts.dry_run:
+            # A train a killed watch left behind; none is in flight, this one holds the lock (#1785).
+            for name in rails.sweep(opts.root):
+                outcomes.say(f"deleted {name}, a merge train left behind by an earlier watch.")
         results, why, status = loop.run(world.effects(repo, opts), opts)
     else:
         results = stopping.drain(outcomes.ordered(opts.prs), lambda number: taking.take(repo, number, opts))
