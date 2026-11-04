@@ -8,7 +8,8 @@
 //! the end of every tick, whoever drives the sim, so a scenario's capture hears the
 //! same mix the speakers would, and once on a paused frame that ran no tick, with no
 //! time, so a `Time.Pause` reaches the device. It uses the same listener and emitter lookups as
-//! `Audio.GetSpatial`, so what the agent reads back is what plays.
+//! `Audio.GetSpatial`, so what the agent reads back is the mix the device is
+//! given: the target it glides to over a few ms (#1693), not the sample playing.
 
 use std::cell::RefCell;
 
