@@ -108,7 +108,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
-| `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"None"` / `"Reinhard"` / `"ACES"` (Unity's name; names are case-insensitive) |
+| `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"Neutral"` / `"AgX"` / `"ACES"` / `"Reinhard"` / `"None"` (**default `"Neutral"`**; Unity's names; names are case-insensitive) |
 | `Graphics.GetVignetteActive` / `SetVignetteActive` | `()` / `(bool)` | `bool` (**default `false`**; see *Lens effects*) |
 | `Graphics.GetVignetteCenter` / `SetVignetteCenter` | `()` / `(x, y)` | `x, y` (screen uv, `0, 0` top-left, each clamped 0–1, **default `0.5, 0.5`**) |
 | `Graphics.GetVignetteColor` / `SetVignetteColor` | `()` / `(r, g, b)` | `r, g, b` (linear, each clamped 0–1, **default black**) |
@@ -224,8 +224,11 @@ the metered one. A new volume starts `Fixed` at `0`.
 **Automatic exposure** (#1444) is Unity HDRP's *Automatic Histogram*: eye
 adaptation, so stepping from a dark corridor into daylight blinds you for a moment and
 a dark room becomes readable once you're in it. With the mode `"Automatic"`, each frame
-the renderer meters its view's HDR scene into a 64-bin log-luminance histogram (a fixed
-64 × 64 sample, on the GPU), averages the bins between the **low** and **high
+the renderer meters its view's HDR scene into a 64-bin log-luminance histogram (on the
+GPU, from the scene downsampled to a quarter of its size, so every pixel counts by its
+area and a small bright lamp doesn't flicker the exposure as the camera moves, and
+weighted towards the centre of the picture, a corner counting a quarter as much as the
+middle, as HDRP's *Center Weighted* metering does), averages the bins between the **low** and **high
 percentiles** (the darkest and brightest pixels ignored), and computes the exposure
 that brings that average to middle grey, plus the **compensation**, held to the
 **limits**. The applied exposure eases towards it at **speed up** EV per second while
@@ -379,7 +382,8 @@ and saturation. Exposure stays a plain HDR scale ahead of all of it. Everything 
 the display gamma acts on the scene's linear HDR colour, before the tonemap, in
 URP's order: white balance, contrast, Lift / Gamma / Gain, the hue shift,
 saturation; the display gamma acts on the tonemapped colour. The renderer bakes the whole grade and the tonemap into a 32³ lookup table
-per view and grades each pixel with one fetch from it; the table is rebaked only on
+per view and grades each pixel with one read of it (tetrahedral interpolation, so a grey
+reads only grey entries and stays exact under a tonemapper that mixes the channels); the table is rebaked only on
 a frame where one of those knobs or the tonemap changed, which `Debug.Stats()`
 counts as `grade_lut_bakes`. Each view grades with its base camera's volume, like
 the rest of its post-FX. The Inspector's **Color Correction** section edits the
@@ -411,8 +415,27 @@ Tween paths: `Graphics.color_adjustments.contrast`, `Graphics.color_adjustments.
 <!-- effect: tonemapping -->
 #### Tonemapping
 
-The operator (`"ACES"`, the default, `"Reinhard"` or `"None"`) that brings HDR to the
-display, and the display-gamma tweak after the rest of the grade.
+The operator that brings HDR to the display, and the display-gamma tweak after the
+rest of the grade (#1701):
+
+- **`"Neutral"`**, the default: Khronos PBR Neutral (Unity's mode of that name is the
+  same idea). Colours below about 0.76 pass through 1:1 with their hue and saturation,
+  so an author's albedo and light colours survive; brighter ones roll off to white
+  along a line that keeps their hue, so a saturated orange lamp stays orange.
+- **`"AgX"`**: Blender 4's and Godot 4.4's filmic curve, a log encoding of about
+  16.5 EV around middle grey and a sigmoid; contrastier than Neutral, and bright
+  saturated colours bleach towards white. The sigmoid runs per channel, so like ACES
+  it turns a saturated orange towards yellow as it brightens: for warm lamps that
+  must stay orange, use Neutral.
+- **`"ACES"`**: Narkowicz's fit of the ACES film curve, at the original curve's
+  exposure (his fit pre-exposes the input; rusty undoes that, so 1.0 maps to about
+  0.67, not 0.8). Rich contrast, but applied per channel, so saturated highlights turn
+  in hue (orange goes yellow) and clip to flat white-yellow.
+- **`"Reinhard"`**: `c / (1 + c)` per channel, a soft, flat rolloff.
+- **`"None"`**: clamp only, for debugging.
+
+A volume saved without a mode reads as `"Neutral"`; one that saved `"ACES"` keeps it.
+Contrast works in ACEScc under ACES and in LogC under every other mode (URP's split).
 
 **Gamma** is a display-gamma *tweak*, not the output encode: the render target
 (window, Game view, and headless screenshot alike) is sRGB and encodes linear →

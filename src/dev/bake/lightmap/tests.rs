@@ -1,6 +1,8 @@
 //! The lightmap bake as an authoring action (#438): files written beside the scene,
 //! referenced from it, byte-identical per seed, and surviving a save / load.
 
+use std::path::Path;
+
 use super::*;
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
 use crate::scene::lighting::lightmap::bake;
@@ -64,14 +66,16 @@ fn bakes_the_lightmappable_static_mesh_and_references_its_page() {
     let name = file.rsplit('/').next().unwrap();
     assert!(file.contains("level.scene.lightmaps/"), "{file}");
     assert!(
-        name.starts_with("lightmap_0_") && name.ends_with(".png"),
+        name.starts_with("lightmap_0_") && name.ends_with(".ktx2"),
         "{name}"
     );
     assert!(
         scene.lightmaps.get(ball).is_none(),
         "no UV2: probes, not a lightmap"
     );
-    let png = image::open(file).unwrap().to_rgba8();
+    let png = image::open(Path::new(file).with_extension("png"))
+        .unwrap()
+        .to_rgba8();
     assert!(png.width() >= 4 && png.width() == png.height());
 }
 
@@ -123,8 +127,19 @@ fn a_directional_bake_writes_a_direction_page_per_colour_page() {
     assert_eq!(set.directions.len(), set.pages.len());
     let name = set.directions[0].rsplit('/').next().unwrap();
     assert!(name.starts_with("lightmap_dir_0_"), "{name}");
-    let (dir, colour) = (image::open(&set.directions[0]), image::open(&set.pages[0]));
-    assert_eq!(dir.unwrap().width(), colour.unwrap().width());
+    let read = |p: &str| crate::asset::lightmap_page::read(&std::fs::read(p).unwrap()).unwrap();
+    let (dir, colour) = (read(&set.directions[0]), read(&set.pages[0]));
+    assert_eq!(dir.edge, colour.edge);
+    let png = |p: &str| {
+        image::open(Path::new(p).with_extension("png"))
+            .unwrap()
+            .width()
+    };
+    assert_eq!(
+        png(&set.directions[0]),
+        colour.edge,
+        "the PNG fallback beside it"
+    );
     let flat = BakeSettings {
         directional: false,
         ..quick()

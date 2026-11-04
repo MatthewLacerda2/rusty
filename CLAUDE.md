@@ -307,6 +307,9 @@ the ones tooling or a past mistake depends on.
   merged like any other ready PR, even when the fix changes how a scene plays.
   **Guard:** a change to the five kinds, the one API surface or the determinism rule
   never slips in under a `bug` label; it is a decision, and goes through the test above.
+- **A default the game developer can change is not a question** (the operator,
+  2026-11-04). Pick a general, standard default (a tonemapper, a knob's starting
+  value), say which in the PR, and go on: the developer changes it later if they want.
 - **Decisions are written down, not waited on.** An issue that needs a decision states
   each one with a recommendation. The user answers, the answers go into the issue, and
   it is filed startable. The one `planning` Claude applies itself is to an *unattended*

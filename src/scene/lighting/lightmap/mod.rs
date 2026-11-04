@@ -14,9 +14,12 @@
 //! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
 //!   `progress` ([`BakeProgress`], #808); its `pool` is the one work pool every
 //!   mesh's texels share, in fixed-size batches (#1656);
-//! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]);
-//! * `encode` — RGBM, how a page is stored as an 8-bit PNG, and the RGBA8 direction
+//! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
+//!   a cell its BC blocks and first [`MIP_LEVELS`] mips never leave (#1694);
+//! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, and the RGBA8 direction
 //!   page a directional bake adds (#810);
+//! * `pages` — a packed page's mip chain, as BC6H irradiance and a BC7 direction
+//!   page (#1694), with the RGBM PNG beside it as the fallback;
 //! * `set` — the scene's pages and each entity's place in them ([`LightmapSet`]);
 //! * `probe_direct` — the direct light of `Baked` lights at light probes, which the
 //!   probe bake adds analytically ([`baked_direct_sh`], #809).
@@ -30,6 +33,7 @@ mod encode;
 mod filter;
 mod input;
 mod lights;
+mod pages;
 mod probe_direct;
 mod progress;
 mod raster;
@@ -38,11 +42,12 @@ mod rng;
 mod set;
 mod trace;
 
-pub use atlas::{pack, LightmapAtlas, MAX_PAGE};
+pub use atlas::{max_map_edge, pack, LightmapAtlas, MAX_PAGE, MIP_LEVELS, PAD};
 pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
-pub use encode::{encode_directions, encode_texels};
+pub use encode::{decode_direction, decode_rgbm, encode_directions, encode_texels};
 pub use input::{BakeLight, BakeMesh, BakeRun, BakeScene, LightShape};
 pub use lights::area::AreaShape;
+pub use pages::{colour_page, direction_levels, direction_page, level_count, levels};
 pub use probe_direct::baked_direct_sh;
 pub use progress::BakeProgress;
 pub use raster::{lightmap_size, MIN_RESOLUTION};
@@ -55,8 +60,6 @@ mod area_reach_tests;
 #[cfg(test)]
 mod area_tests;
 #[cfg(test)]
-mod atlas_tests;
-#[cfg(test)]
 mod casting_tests;
 #[cfg(test)]
 mod coverage_tests;
@@ -68,6 +71,10 @@ mod falloff_tests;
 mod gather_tests;
 #[cfg(test)]
 mod inset_tests;
+#[cfg(test)]
+mod pages_bc_tests;
+#[cfg(test)]
+mod pages_tests;
 #[cfg(test)]
 mod pool_tests;
 #[cfg(test)]
