@@ -166,6 +166,8 @@ fn to_world(
 #[cfg(test)]
 mod agent_tests;
 #[cfg(test)]
+mod armature_tests;
+#[cfg(test)]
 mod body_tests;
 #[cfg(test)]
 mod tests;

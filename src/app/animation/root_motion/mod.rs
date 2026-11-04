@@ -243,6 +243,8 @@ fn wrap_angle(angle: f32) -> f32 {
 }
 
 #[cfg(test)]
+mod armature_tests;
+#[cfg(test)]
 mod bind_tests;
 #[cfg(test)]
 mod blend_tests;
