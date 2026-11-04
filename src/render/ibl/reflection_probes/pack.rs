@@ -4,7 +4,7 @@ use super::MAX_REFLECTION_PROBES;
 use crate::scene::lighting::reflection_probe::ProbeBlend;
 
 /// The packed blend an instance carries in `InstanceData::reflection_probe`, which
-/// `environment_reflection` in `engine/shaders/forward/lighting.wgsl` unpacks: bits
+/// `environment_reflection` in `engine/shaders/forward/reflection.wgsl` unpacks: bits
 /// 0–5 the first probe's index plus one, 6–11 the second's (0 for none), 12–21 the
 /// first's weight and 22–31 the second's, each in 1023ths; the sky takes what they
 /// leave. 0 is "the sky alone".

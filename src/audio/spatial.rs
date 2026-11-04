@@ -17,8 +17,9 @@
 //!     (full `volume`, centred — the #212 behaviour), at `1` it is fully spatialized,
 //!     and in between each of gain and pan lerps toward the spatial value.
 //!
-//! Out of scope (same exclusions as the issue): reverb (`reverb/`, #469), occlusion,
-//! doppler, mixer groups, non-linear rolloff curves, surround/HRTF, pitch.
+//! Elsewhere: reverb (`reverb/`, #469), occlusion (`occlusion/`, #467), doppler
+//! (`doppler.rs`, #1749) and mixer groups (`mixer/`, #465). Out of scope: non-linear
+//! rolloff curves, surround/HRTF.
 
 use glam::{Quat, Vec3};
 

@@ -156,6 +156,14 @@ impl ScriptManager {
                 let _ = crate::scripting::instances::forget(lua, id);
             }
         }
-        self.load_attempted.retain(|(eid, _)| !gone(eid));
+        // Every id whose load records go is queued: one still in the World loads again.
+        let requeued = &mut self.requeued;
+        self.load_attempted.retain(|&(eid, _)| {
+            let keep = !gone(&eid);
+            if !keep {
+                requeued.insert(eid);
+            }
+            keep
+        });
     }
 }

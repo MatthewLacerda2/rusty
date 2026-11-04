@@ -44,6 +44,8 @@ pub struct VoiceMix {
     pub spatial_blend: f32,
     /// Playback rate (`Time.timeScale` for a time-scaled voice, else `1.0`).
     pub speed: f32,
+    /// The doppler rate (#1749), multiplied into `speed`; the device glides it.
+    pub doppler: f32,
     /// Whether the voice is held paused (resumes where it left off).
     pub paused: bool,
     /// The voice's own low-pass cutoff in Hz, closed by occlusion (#467); at
@@ -59,9 +61,15 @@ impl VoiceMix {
         pan: 0.0,
         spatial_blend: 0.0,
         speed: 1.0,
+        doppler: 1.0,
         paused: false,
         low_pass: LOW_PASS_OFF,
     };
+
+    /// This mix playing at doppler rate `doppler` (#1749).
+    pub fn with_doppler(self, doppler: f32) -> Self {
+        Self { doppler, ..self }
+    }
 
     /// This mix with its gain multiplied by `master`.
     pub fn with_master(self, master: f32) -> Self {

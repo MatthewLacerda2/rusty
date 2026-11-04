@@ -2,8 +2,8 @@
 //!
 //! Unity's `AudioSource`: a per-entity emitter referencing an audio `clip` to play,
 //! with a linear 3D rolloff (`spatial_blend`, `initial_distance`, `final_distance`),
-//! a time-scale opt-out, the mixer group it plays through (#465) and an occlusion
-//! opt-out (#467). The windowed
+//! a time-scale opt-out, the mixer group it plays through (#465), an occlusion
+//! opt-out (#467) and a doppler level (#1749). The windowed
 //! runtime applies all of it to the device every tick (`api/audio/frame.rs`).
 //!
 //! Pure authoring data — every field serde-persists. The component knows nothing
@@ -54,6 +54,17 @@ pub struct AudioSourceComponent {
     /// (`spatial_blend > 0`) is ever occluded.
     #[serde(default = "occlusion_default")]
     pub occlusion_enabled: bool,
+
+    /// How strongly the source's and the listener's motion bend its pitch (#1749,
+    /// Unity's *Doppler Level*): `0` off, `1` physical, above `1` exaggerated. It is
+    /// scaled by `spatial_blend`, so a 2D source never shifts whatever it says.
+    #[serde(default = "doppler_default")]
+    pub doppler_level: f32,
+}
+
+/// Physical doppler unless a source says otherwise.
+fn doppler_default() -> f32 {
+    1.0
 }
 
 /// Occlusion is on unless a source opts out.
@@ -74,6 +85,7 @@ impl Default for AudioSourceComponent {
             final_distance: 16.0,
             output_group: String::new(),
             occlusion_enabled: true,
+            doppler_level: 1.0,
         }
     }
 }

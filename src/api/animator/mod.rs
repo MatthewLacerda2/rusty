@@ -16,6 +16,8 @@
 //! IK surface (#461: `Add*IK`, `RemoveIK`, `SetIK*`, `GetIKWeight`) in `ik.rs`,
 //! the playback-speed surface (#1342: `SetSpeed`, `GetSpeed`) in `speed.rs`, the
 //! typed parameters (`SetBool`/`SetFloat`/`SetInt`/`SetTrigger`) in `parameters.rs`,
+//! root motion (#1745: `SetApplyRootMotion`, `GetApplyRootMotion`, `SetRootBone`,
+//! `GetRootBone`, `GetRootMotion`) in `root_motion.rs`,
 //! and `Play`/`Crossfade` themselves in `play.rs` —
 //! one namespace, split to stay under the size cap.
 
@@ -24,6 +26,7 @@ mod ik;
 mod layers;
 mod parameters;
 mod play;
+mod root_motion;
 mod speed;
 
 use mlua::Lua;
@@ -44,6 +47,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, console: ApiCell<ConsoleLogs>)
     register_pause_resume(lua, &table, scene)?;
     register_set_looping(lua, &table, scene)?;
     speed::register(lua, &table, scene)?;
+    root_motion::register(lua, &table, scene)?;
     parameters::register(lua, &table, scene, console)?;
     register_get_bone(lua, &table, scene)?;
     graph::register(lua, &table, scene, console)?;

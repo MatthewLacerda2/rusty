@@ -106,9 +106,9 @@ fn stop_voices(world: &World, res: &Resources, ids: &[u32]) {
     let scene = world.scene.borrow();
     let at = |&id: &u32| (id, scene.world.world_position(id).to_array());
     let tick = res.play_frame();
-    res.audio
-        .borrow_mut()
-        .stop_sources(ids.iter().map(at), tick);
+    let mut audio = res.audio.borrow_mut();
+    audio.stop_sources(ids.iter().map(at), tick);
+    audio.forget_motion(); // the camera may land anywhere: no doppler chirp (#1749)
 }
 
 #[cfg(test)]
