@@ -69,7 +69,7 @@ pub fn liquids(scene: &Scene) -> Vec<Liquid> {
 impl FloorGrid {
     /// Drop the floor under each of `liquids`' surfaces: in every cell whose centre
     /// is over a liquid's bounds, the first floor below the surface (the pit's or
-    /// pool's bottom), when it is at least [`DEPTH`] below. A floor further down (the
+    /// pool's bottom), when it is at least `DEPTH` below. A floor further down (the
     /// ground storey under a rooftop pool) and one barely under (the deck under a
     /// puddle or a grime decal) stay.
     pub fn drown(&mut self, liquids: &[Liquid]) {

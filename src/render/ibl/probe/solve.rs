@@ -142,6 +142,8 @@ impl BounceSolve {
     }
 
     /// The baked probe set, its SH the solve's field, once the solve has finished.
+    /// Read by the dev bake's commit, which applies a planned set (#1737).
+    #[cfg(feature = "dev")]
     pub fn baked(&self) -> Option<&ProbeVolume> {
         self.report.map(|_| &self.volume)
     }
