@@ -100,8 +100,6 @@ impl Scene {
             self.persistent.remove(id);
             self.lightmaps.remove(*id);
         }
-        if !self.pending_destroy.is_empty() {
-            self.pending_destroy.retain(|e| !ids.contains(e)); // the queue, not the level
-        }
+        self.pending_destroy.retain(|e| !ids.contains(e));
     }
 }

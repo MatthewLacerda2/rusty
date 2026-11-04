@@ -75,7 +75,7 @@ fn agree(w: &mut World, extra: &BTreeSet<u32>) -> Result<(), TestCaseError> {
     let mut sets: Vec<BTreeSet<u32>> = w.ids().iter().map(|&id| BTreeSet::from([id])).collect();
     sets.push(extra.clone());
     for dead in sets {
-        let by_index = w.with_ref_index(|index, _| index.naming(&dead));
+        let by_index = w.with_ref_index(|index| index.naming(&dead));
         prop_assert_eq!(by_index, w.naming_by_scan(&dead), "dead {:?}", dead);
     }
     Ok(())
@@ -135,4 +135,16 @@ proptest! {
         }
         agree(&mut w, &BTreeSet::new())?;
     }
+}
+
+/// Undo revives a dead id, a holder names it again before the next refresh (#1774).
+#[test]
+fn a_holder_naming_a_revived_id_again_is_listed() {
+    use ops_tests::{Edit::UndoDespawn, Op::*};
+    let holds = Op::Hold(0, 0, Target::At(1));
+    let ops = [Op::Base(Spawn), Op::Base(Spawn), holds.clone()];
+    let ops = ops.into_iter().chain([Op::Base(On(1, UndoDespawn)), holds]);
+    let mut w = World::new();
+    ops.for_each(|op| run(&mut w, &op).expect("runs"));
+    agree(&mut w, &BTreeSet::new()).expect("the index names what the scan names");
 }

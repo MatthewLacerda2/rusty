@@ -20,14 +20,16 @@
 //! despawn's re-rooting clears both sides; a raw [`World::set_parent_id`] naming a
 //! parent whose list lacks the child (a test linking one side, code bypassing
 //! `Scene::set_parent`) marks the store `unlisted`, and from then until a `clear`
-//! every invalidation is the whole-store bump again. A document is trusted to carry
-//! both sides, as the world-space store trusts it.
+//! every invalidation is the whole-store bump again. A loaded document is checked
+//! once ([`World::one_sided_links`], which a scene load calls and warns on), since
+//! a hand-written file can carry one side only.
 //!
 //! **Determinism.** An answer is a pure function of the `active` flags and parent links;
 //! stamps only gate the cache, never a result.
 
 use std::cell::RefCell;
 
+use super::bundle::Core;
 use super::world::World;
 
 /// The remembered answers. Interior-mutable so a `&World` read can fill them; the world
@@ -108,6 +110,18 @@ impl ActivityStore {
         }
     }
 
+    /// Whether `id`'s kept answer is clean: what the cost tests check a despawn by.
+    #[cfg(test)]
+    pub(in crate::ecs) fn is_clean(&self, id: u32) -> bool {
+        self.inner.borrow().clean(id).is_some()
+    }
+
+    /// Whether a one-sided link turned the subtree walks off (module docs).
+    #[cfg(test)]
+    pub(in crate::ecs) fn is_unlisted(&self) -> bool {
+        self.unlisted
+    }
+
     /// Forget every answer (a `clear`, after which ids restart at 1).
     pub(in crate::ecs) fn reset(&mut self) {
         *self.inner.borrow_mut() = Flags::new();
@@ -165,10 +179,32 @@ impl World {
     /// `id`'s parent link was re-pointed at `parent`: its subtree goes dirty, and the
     /// store is marked when `parent`'s `children` does not list it (module docs).
     pub(in crate::ecs) fn relinked_activity(&mut self, id: u32, parent: Option<u32>) {
-        if parent.is_some_and(|p| !self.children(p).contains(&id)) {
+        if parent.is_some_and(|p| !self.lists_child(p, id)) {
             self.activity.mark_unlisted();
         }
         self.invalidate_activity_below(id);
+    }
+
+    /// Whether `parent`'s `children` names `child`, read in place.
+    fn lists_child(&self, parent: u32, child: u32) -> bool {
+        self.component::<Core>(parent)
+            .is_some_and(|c| c.children.contains(&child))
+    }
+
+    /// Check every parent link of a freshly loaded World once: a child naming a
+    /// live parent whose `children` lacks it (a hand-written document can carry one
+    /// side) marks the store `unlisted`. Returns those children, ascending.
+    pub fn one_sided_links(&mut self) -> Vec<u32> {
+        let one_sided = |&c: &u32| {
+            let parent = self.parent_id(c).filter(|&p| self.contains(p));
+            parent.is_some_and(|p| !self.lists_child(p, c))
+        };
+        let mut found: Vec<u32> = self.ids().iter().copied().filter(one_sided).collect();
+        found.sort_unstable();
+        if !found.is_empty() {
+            self.activity.mark_unlisted();
+        }
+        found
     }
 
     /// `id`'s activity answer and every descendant's dirty (an `active` flag or a

@@ -56,3 +56,19 @@ fn a_named_target_s_death_touches_its_holders() {
     let touched = w.refs.as_ref().expect("opened").touched - before;
     assert!(touched <= 2, "the leaf's removal and the hinge: {touched}");
 }
+
+#[test]
+fn a_leaf_s_death_leaves_every_other_activity_answer_clean() {
+    let (mut w, hinge, leaves) = level(50, 2);
+    let group = w.spawn("group".into());
+    w.add_child(group, leaves[1]);
+    w.set_parent_id(leaves[1], Some(group));
+    assert!(!w.activity.is_unlisted(), "both sides linked");
+    let ids = w.ids().to_vec();
+    ids.iter().for_each(|&id| _ = w.is_active_in_hierarchy(id));
+    w.despawn(leaves[1]);
+    let others = ids.iter().copied().filter(|&id| id != leaves[1]);
+    let dirty: Vec<u32> = others.filter(|&id| !w.activity.is_clean(id)).collect();
+    assert_eq!(dirty, Vec::<u32>::new(), "only the dead leaf's answer goes");
+    assert!(w.activity.is_clean(hinge) && w.activity.is_clean(group));
+}

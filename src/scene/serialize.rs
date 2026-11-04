@@ -199,6 +199,13 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
         scene.world.insert_entity(entity);
     }
     scene.world.bump_next_id(data.next_entity_id);
+    let one_sided = scene.world.one_sided_links();
+    if !one_sided.is_empty() {
+        log::warn!(
+            "[Scene] entities {one_sided:?} name a parent whose children list lacks them; \
+             activeInHierarchy falls back to re-resolving everything on each change."
+        );
+    }
     scene.selected_entity_id = data.selected_entity_id;
     scene.skybox_path = data.skybox_path;
     scene.ambient_color = data.ambient_color;
@@ -260,3 +267,7 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "serialize_tests.rs"]
+mod tests;

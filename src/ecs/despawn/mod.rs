@@ -110,17 +110,22 @@ impl World {
             }
         }
         let is_dead = |r: u32| dead.contains(&r);
-        for e in self.with_ref_index(|index, _| index.take_naming(dead)) {
+        let naming = self.with_ref_index(|index| {
+            let naming = index.naming(dead);
+            #[cfg(test)]
+            {
+                index.touched += naming.len() as u64;
+            }
+            naming
+        });
+        for e in naming {
             self.forget_in(e, &is_dead);
         }
     }
 
     /// Run `f` on the reverse index, caught up with every write since the last
     /// despawn (opened, and every holder indexed, the first time).
-    pub(in crate::ecs) fn with_ref_index<R>(
-        &mut self,
-        f: impl FnOnce(&mut RefIndex, &World) -> R,
-    ) -> R {
+    pub(in crate::ecs) fn with_ref_index<R>(&mut self, f: impl FnOnce(&mut RefIndex) -> R) -> R {
         let mut index = match self.refs.take() {
             Some(mut index) => {
                 index.refresh(self);
@@ -128,7 +133,7 @@ impl World {
             }
             None => RefIndex::open(self),
         };
-        let out = f(&mut index, self);
+        let out = f(&mut index);
         self.refs = Some(index);
         out
     }

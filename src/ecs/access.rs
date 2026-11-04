@@ -169,4 +169,13 @@ impl World {
     pub fn each_image(&self, visit: impl FnMut(&ImageComponent)) {
         self.each_component(visit);
     }
+
+    /// Store skinned mesh `id`'s posed bone palette. Derived from the bones' poses
+    /// every tick, so it stamps no change and notes nothing for Undo (`derived_mut`):
+    /// a Mesh change cursor (the despawn index's) sees no write (#1708).
+    pub fn set_pose_palette(&mut self, id: u32, palette: Vec<glam::Mat4>) {
+        if let Some(mut mesh) = self.derived_mut::<MeshComponent>(id) {
+            mesh.pose_palette = palette;
+        }
+    }
 }

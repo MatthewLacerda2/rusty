@@ -152,9 +152,11 @@ impl World {
         let seq_of = |e: u32| self.component::<Core>(e).map_or(0, |c| c.seq);
         let seq = self.component::<Core>(id)?.seq;
         let at = self.order.partition_point(|&e| seq_of(e) < seq);
-        match self.order.get(at) == Some(&id) {
+        let sorted = self.order.get(at) == Some(&id);
+        debug_assert!(sorted, "`order` lost its `Core::seq` sort at {id}");
+        match sorted {
             true => Some(at),
-            false => self.order.iter().position(|&e| e == id), // never, while sorted
+            false => self.order.iter().position(|&e| e == id),
         }
     }
 

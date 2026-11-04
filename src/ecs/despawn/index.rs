@@ -78,6 +78,7 @@ pub(in crate::ecs) struct RefIndex {
     by_holder: BTreeMap<u32, Vec<u32>>,
     /// Holders re-read or handed to a despawn since opening: what a test counts
     /// a despawn's work by.
+    #[cfg(test)]
     pub(in crate::ecs) touched: u64,
 }
 
@@ -88,6 +89,7 @@ impl RefIndex {
             cursors: Cursors::open(world),
             by_target: BTreeMap::new(),
             by_holder: BTreeMap::new(),
+            #[cfg(test)]
             touched: 0,
         };
         index.rebuild(world);
@@ -112,7 +114,10 @@ impl RefIndex {
 
     /// Re-read what `holder` holds now (nothing, once it is gone).
     fn reindex(&mut self, world: &World, holder: u32) {
-        self.touched += 1;
+        #[cfg(test)]
+        {
+            self.touched += 1;
+        }
         let held = if world.contains(holder) {
             world.held_by(holder)
         } else {
@@ -139,22 +144,9 @@ impl RefIndex {
         };
     }
 
-    /// The live entities outside `dead` holding any of its ids, ascending. Their
-    /// targets in `dead` are dropped from the index: the despawn clears them, and
-    /// each holder it writes is re-read at the next refresh.
-    pub(in crate::ecs) fn take_naming(&mut self, dead: &BTreeSet<u32>) -> Vec<u32> {
-        let mut naming = BTreeSet::new();
-        for d in dead {
-            if let Some(holders) = self.by_target.remove(d) {
-                naming.extend(holders.into_iter().filter(|h| !dead.contains(h)));
-            }
-        }
-        self.touched += naming.len() as u64;
-        naming.into_iter().collect()
-    }
-
-    /// The same answer without dropping anything: what the tests compare.
-    #[cfg(test)]
+    /// The live entities outside `dead` holding any of its ids, ascending. Read
+    /// only: the despawn writes each of them, and removes the dead rows, so the
+    /// next refresh re-reads every holder involved and the index stays exact.
     pub(in crate::ecs) fn naming(&self, dead: &BTreeSet<u32>) -> Vec<u32> {
         let holders = dead.iter().filter_map(|d| self.by_target.get(d)).flatten();
         let naming: BTreeSet<u32> = holders.filter(|h| !dead.contains(h)).copied().collect();
