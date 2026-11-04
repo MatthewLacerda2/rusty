@@ -50,7 +50,10 @@ fn unpack_lane(a: f32) -> vec2<f32> {
     let exponent = u32(split.exp + 14);
     let mantissa = u32(round((split.fract * 2.0 - 1.0) * 1024.0));
     let payload = ((exponent << 10u) | mantissa) - F16_NORMAL;
-    return vec2<f32>((f32(payload / DIGIT) * 2.0 - OCT_LEVELS) / OCT_LEVELS, f32(payload % DIGIT));
+    // The difference in integers: Metal's fast math may divide by a reciprocal, which
+    // would leave a float difference of 0 at about -1e-9 (#1736).
+    let level = i32(payload / DIGIT) * 2 - i32(OCT_LEVELS);
+    return vec2<f32>(f32(level) / OCT_LEVELS, f32(payload % DIGIT));
 }
 
 // Octahedral encoding of a unit vector into [-1, 1]² (Cigolle et al. 2014).
