@@ -1,12 +1,12 @@
 //! Corrupt and unsupported cube files (#1609): every one is refused, by the header
 //! read and the full parse alike, and none panics.
 
-use super::cubemap_tests::{build_cubemap_ktx2, R8G8B8A8_SRGB};
+use super::cubemap_tests::{build_cubemap_ktx2, R16G16B16A16_SFLOAT};
 use super::*;
 
 /// A valid 4-texel cube with its three mips, laid out as the bake writes them.
 fn mipped_cube() -> Vec<u8> {
-    let mut bytes = build_cubemap_ktx2(4, R8G8B8A8_SRGB, 6);
+    let mut bytes = build_cubemap_ktx2(4, R16G16B16A16_SFLOAT, 6);
     let index = HEADER + 3 * LEVEL_ENTRY;
     let base_at = u64_at(&bytes, HEADER) as usize;
     // Room for two more index entries, then the 2- and 1-texel levels appended.
@@ -16,7 +16,7 @@ fn mipped_cube() -> Vec<u8> {
     put_u32(&mut bytes, 48, dfd_at + 48);
     put_u64(&mut bytes, HEADER, base_at as u64 + 48);
     for (level, edge) in [(1, 2u64), (2, 1)] {
-        let len = edge * edge * 24;
+        let len = edge * edge * 48;
         let entry = HEADER + level * LEVEL_ENTRY;
         let at = bytes.len() as u64;
         put_u64(&mut bytes, entry, at);

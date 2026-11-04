@@ -3,8 +3,8 @@
 //! The rendered-capture counterpart to the analytic stand-in (`scene::probe_fill`).
 //! For each probe we capture the STATIC scene to a 6-face cubemap from the probe's
 //! position (`Renderer::capture_light_probe`, on #243's capture), then project that
-//! captured radiance into an L2 irradiance SH (`scene::sh`, #240): every texel is
-//! decoded to linear RGB, aimed down its true world direction, and accumulated
+//! captured radiance into an L2 irradiance SH (`scene::sh`, #240): every texel, linear
+//! HDR radiance as captured (#1696), is aimed down its true world direction, and accumulated
 //! weighted by its cubemap solid angle. A texel nothing covered escapes the scene
 //! and takes the ambient's radiance along its direction instead of the sky
 //! (`probe::capture`, #1668) (cosine-lobe convolution then happens on read-back in
@@ -23,7 +23,6 @@
 use glam::Vec3;
 
 use super::capture::ProbeCapture;
-use crate::core::color::srgb_to_linear;
 use crate::render::ibl::cube_sample::{face_uv, FaceProjections};
 use crate::render::{CubemapCapture, CubemapFace, Renderer};
 use crate::scene::lighting::sh::Sh9;
@@ -84,7 +83,7 @@ pub fn project_light_probe(capture: &ProbeCapture, ambient: AmbientRadiance) -> 
 }
 
 /// Sum every texel of every face, each aimed down its world direction, weighted by
-/// its solid angle, its decoded radiance plus `extra(face, texel index, direction)`.
+/// its solid angle, its captured radiance plus `extra(face, texel index, direction)`.
 fn project(capture: &CubemapCapture, extra: impl Fn(CubemapFace, usize, Vec3) -> Vec3) -> Sh9 {
     let res = capture.resolution.max(1);
     let mut sh = Sh9::zero();
@@ -96,8 +95,7 @@ fn project(capture: &CubemapCapture, extra: impl Fn(CubemapFace, usize, Vec3) ->
                 let (u, v) = face_uv(px, py, res);
                 let texel = (py * res + px) as usize;
                 let dir = proj.direction(face, u, v);
-                let rgb =
-                    decode_linear(&pixels[texel * 4..texel * 4 + 3]) + extra(face, texel, dir);
+                let rgb = pixels[texel] + extra(face, texel, dir);
                 sh.add_sample(dir, rgb, texel_solid_angle(u, v, res));
             }
         }
@@ -113,18 +111,6 @@ fn texel_solid_angle(u: f32, v: f32, res: u32) -> f32 {
     let area = texel * texel;
     let d2 = 1.0 + u * u + v * v;
     area / (d2 * d2.sqrt())
-}
-
-/// Decode an LDR sRGB-encoded RGB texel (the tonemapped capture, read back from the
-/// sRGB `OFFSCREEN_FORMAT`) to
-/// linear radiance, so a red wall projects as red light rather than its gamma-coded
-/// byte value.
-fn decode_linear(bytes: &[u8]) -> Vec3 {
-    Vec3::new(
-        srgb_to_linear(bytes[0]),
-        srgb_to_linear(bytes[1]),
-        srgb_to_linear(bytes[2]),
-    )
 }
 
 #[cfg(test)]

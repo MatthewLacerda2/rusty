@@ -80,30 +80,27 @@ impl World {
         self.inner.remove_one::<T>(handle).ok() // lint: allow(ecs-write) the funnel: touched above
     }
 
-    /// Borrow two DIFFERENT component columns of the same entity mutably at
-    /// once — sound because they're independent hecs columns. `None` when the
-    /// entity is missing or lacks the mandatory `A`; `B` is stamped only when held.
-    pub(in crate::ecs) fn with_pair_mut<A, B, R>(
+    /// Borrow column `A` mutably and a DIFFERENT column `B` for reading, of the same
+    /// entity at once — sound because they're independent hecs columns. `None` when
+    /// the entity is missing or lacks the mandatory `A`; only `A` is stamped.
+    pub(in crate::ecs) fn with_mut_and_ref<A, B, R>(
         &mut self,
         id: u32,
-        f: impl FnOnce(&mut A, Option<&mut B>) -> R,
+        f: impl FnOnce(&mut A, Option<&B>) -> R,
     ) -> Option<R>
     where
         A: hecs::Component + Channel,
-        B: hecs::Component + Channel,
+        B: hecs::Component,
     {
         if !self.holds::<A>(id) {
             return None;
         }
         self.touch::<A>(id);
-        if self.holds::<B>(id) {
-            self.touch::<B>(id);
-        }
         let handle = self.handles.get(id)?;
         let mut query = self
             .inner
             // lint: allow(ecs-write) the funnel: touched above
-            .query_one::<(&mut A, Option<&mut B>)>(handle)
+            .query_one::<(&mut A, Option<&B>)>(handle)
             .ok()?;
         let (a, b) = query.get()?;
         Some(f(a, b))

@@ -44,7 +44,10 @@ every API call from the console, a script line or an agent.
   Selection is not part of a step.
 - **A bake is never undone**, as in Unity: the lightmaps, the probes' baked light
   and the reflection probes' cubemaps are left as the last bake made them, so
-  undoing a setting after Generate Lighting keeps the bake. A bake is no step
+  undoing a setting after Generate Lighting keeps the bake. A probe an Undo puts
+  back takes the baked light of the probe the bake left at its position (matched
+  by position, since a bake re-places the set); one with none there keeps what was
+  recorded. A bake is no step
   either: the probes Generate Lighting places never join an edit, and a destroyed
   entity brought back by Undo keeps its lightmap. A skinned entity comes back
   bound to its bones.

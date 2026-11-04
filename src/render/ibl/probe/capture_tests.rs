@@ -63,7 +63,7 @@ fn assert_matches(got: &Sh9, want: &Sh9, what: &str) {
 #[test]
 fn an_open_capture_projects_the_ambient() {
     let res = 16;
-    let black = || vec![0u8; (res * res * 4) as usize];
+    let black = || vec![Vec3::ZERO; (res * res) as usize];
     let capture = ProbeCapture {
         cube: CubemapCapture {
             resolution: res,

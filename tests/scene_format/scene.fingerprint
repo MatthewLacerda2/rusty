@@ -891,6 +891,7 @@ scene.probes.grid.spacing: tuple(3)
 scene.probes.grid.spacing[]: f32
 scene.probes.grid: option
 scene.probes.probes: seq
+scene.probes.probes[].manual: bool
 scene.probes.probes[].position: tuple(3)
 scene.probes.probes[].position[]: f32
 scene.reflection_probes.probes: seq
@@ -904,6 +905,7 @@ scene.reflection_probes.probes[].cubemap_path: string
 scene.reflection_probes.probes[].far_clip: f32
 scene.reflection_probes.probes[].importance: i32
 scene.reflection_probes.probes[].intensity: f32
+scene.reflection_probes.probes[].manual: bool
 scene.reflection_probes.probes[].near_clip: f32
 scene.reflection_probes.probes[].position: tuple(3)
 scene.reflection_probes.probes[].position[]: f32

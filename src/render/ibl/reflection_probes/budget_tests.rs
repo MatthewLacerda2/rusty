@@ -34,7 +34,8 @@ fn gpu_the_budget_keeps_the_nearest_probes() {
         "the nearest is kept past a zero budget"
     );
     assert_eq!(probe_at(&renderer, 6.0), 0, "the next is past the budget");
-    assert_eq!((array_bytes(4, 1), array_bytes(512, 1)), (512, 8_388_608));
+    // Half-float texels (#1696): a 512-texel cube with its mips is 16 MiB.
+    assert_eq!((array_bytes(4, 1), array_bytes(512, 1)), (1024, 16_777_216));
 }
 
 /// A cube too big for the budget is passed over; the farther ones that fit are
@@ -63,8 +64,8 @@ fn gpu_one_big_cube_does_not_empty_the_resident_set() {
     );
 }
 
-/// A line of `n` probes 4 m apart, each its own 64-texel cube, under a 1 MB budget:
-/// eight 64-texel cubes, six shaded and two spare.
+/// A line of `n` probes 4 m apart, each its own 64-texel cube, under a 2 MB budget:
+/// eight 64-texel half-float cubes, six shaded and two spare.
 fn level(n: usize, name: &str) -> Scene {
     let mut scene = Scene::new();
     for k in 0..n {
@@ -72,7 +73,7 @@ fn level(n: usize, name: &str) -> Scene {
         let i = set.add(Vec3::new(4.0 * k as f32, 0.0, 0.0), Vec3::ONE);
         set.set_cubemap(i, cube_file(&format!("{name}_{k}.ktx2"), 64, k as u8));
     }
-    scene.lighting_settings.reflections.budget_mb = 1;
+    scene.lighting_settings.reflections.budget_mb = 2;
     scene
 }
 
@@ -108,7 +109,7 @@ fn gpu_a_walk_through_the_level_stays_within_the_budget() {
         renderer.update_reflection_probes(&scene, Vec3::new(x, 0.0, 0.0));
         let probes = &renderer.reflection_probes;
         assert!(
-            array_bytes(probes.face(), probes.cubes) <= 1 << 20,
+            array_bytes(probes.face(), probes.cubes) <= 2 << 20,
             "at {x}"
         );
         let underfoot = (x / 4.0).round().min(39.0) * 4.0;
