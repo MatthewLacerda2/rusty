@@ -9,13 +9,19 @@
 //! [`MAX_PAGE`] pages as it takes.
 //!
 //! **The cell.** Each lightmap sits in a square cell: the map, a [`PAD`]-texel ring
-//! copied from its own edge, and the cell rounded up to a multiple of [`PAD`], at a
-//! corner that is one too. Its edge texels fill the whole cell. So a 4×4 BC block
-//! never spans two maps, and a texel of mip level `L < MIP_LEVELS` (`2^L` base
-//! texels wide) never does either: bilinear filtering at a map's border, at any of
-//! those levels, reads only the map's own light. [`MIP_LEVELS`] is capped at what
-//! the ring covers: level 2 is 4 texels wide, the ring's width; a level 3 texel
-//! would straddle two cells.
+//! copied from its own edge, and the cell rounded up to a multiple of [`GRID`], at a
+//! corner that is one too. Its edge texels fill the whole cell. So a texel of mip
+//! level `L < MIP_LEVELS` (`2^L` base texels wide) never spans two maps, and
+//! bilinear filtering at a map's border, at any of those levels, reads only the
+//! map's own light. [`MIP_LEVELS`] is capped at what the ring covers: level 2 is 4
+//! texels wide, the ring's width; a level 3 texel would straddle two cells.
+//!
+//! **The grid** is a 4×4 BC block of the last kept level: 16 base texels. A
+//! 4-texel grid kept a level-0 block inside one cell but let a level-2 block (16
+//! base texels) hold two maps, or a map and the page's empty black, and BC6H then
+//! bent a dim map's light by up to 8.6% (`pages_bc_tests`, against 5% elsewhere).
+//! On a level-shaped bake (`tests::level_sizes`) the 16-texel grid costs 4% more
+//! cell area and no extra page.
 //!
 //! **The packer** is MaxRects (`rects`) over the cells, largest first (ties by
 //! order), each one into the first page with room (a gap an earlier page left is
@@ -40,9 +46,12 @@ pub const MAX_PAGE: u32 = 2048;
 /// The mip levels a page's layout keeps apart (see the module doc): the base and
 /// two halvings.
 pub const MIP_LEVELS: u32 = 3;
-/// The ring around each lightmap, in texels, and the grid cells are aligned to:
-/// the width of a texel of the last mip level, and a whole BC block.
+/// The ring around each lightmap, in texels: the width of a texel of the last
+/// mip level.
 pub const PAD: u32 = 1 << (MIP_LEVELS - 1);
+/// The grid cells are aligned to, in texels: a 4×4 BC block of the last mip
+/// level, so no block of any kept level spans two cells.
+pub const GRID: u32 = 4 << (MIP_LEVELS - 1);
 /// The smallest page tried.
 const MIN_PAGE: u32 = 32;
 
@@ -116,7 +125,7 @@ pub fn pack(maps: &[Lightmap]) -> LightmapAtlas {
 
 /// A map's cell edge: the map, its ring, rounded up to the grid.
 fn cell_edge(size: u32) -> u32 {
-    (size + 2 * PAD).div_ceil(PAD) * PAD
+    (size + 2 * PAD).div_ceil(GRID) * GRID
 }
 
 /// Pack the cells of `sizes` (visited in `order`) into `page`-edge pages: each
@@ -125,7 +134,7 @@ fn place(order: &[usize], sizes: &[u32], page: u32) -> (Vec<(u32, u32, u32)>, us
     let mut corners = vec![(0, 0, 0); sizes.len()];
     let mut pages: Vec<rects::Page> = Vec::new();
     for &i in order {
-        let cell = cell_edge(sizes[i]) / PAD;
+        let cell = cell_edge(sizes[i]) / GRID;
         let spot = pages
             .iter_mut()
             .enumerate()
@@ -133,7 +142,7 @@ fn place(order: &[usize], sizes: &[u32], page: u32) -> (Vec<(u32, u32, u32)>, us
         let (p, x, y) = match spot {
             Some(found) => found,
             None => {
-                let mut fresh = rects::Page::new(page / PAD);
+                let mut fresh = rects::Page::new(page / GRID);
                 // A cell is never wider than a page: `page` grows until it is.
                 let Some((x, y)) = fresh.place(cell) else {
                     return (corners, usize::MAX);
@@ -142,7 +151,7 @@ fn place(order: &[usize], sizes: &[u32], page: u32) -> (Vec<(u32, u32, u32)>, us
                 (pages.len() - 1, x, y)
             }
         };
-        corners[i] = (p as u32, x * PAD, y * PAD);
+        corners[i] = (p as u32, x * GRID, y * GRID);
     }
     (corners, pages.len())
 }

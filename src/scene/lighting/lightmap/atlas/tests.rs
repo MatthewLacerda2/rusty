@@ -35,7 +35,7 @@ fn small_bakes_share_the_smallest_page_that_fits() {
         assert_eq!(atlas.placements[i].0, m.entity);
         // The whole cell, ring and slack included, holds the map's own light.
         let (page, x0, y0, x1, y1) = cell(&atlas, i, m.size);
-        assert!(x0 % PAD == 0 && y0 % PAD == 0, "aligned to the grid");
+        assert!(x0 % GRID == 0 && y0 % GRID == 0, "aligned to the grid");
         for y in y0..y1 {
             for x in x0..x1 {
                 let texel = atlas.pages[page as usize][(y * atlas.page_size + x) as usize];

@@ -209,8 +209,9 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   takes; a gap in a page is filled before another opens, #1694). Each page is a
   `lightmap_<page>_<tag>.ktx2` in `<scene file>.lightmaps/` (old pages there are removed
   first): BC6H HDR light, a byte a texel, with two mips, which the renderer picks between
-  by distance; each lightmap sits in a 4-texel ring of its own edge light, so neither a
-  compressed block nor a mip ever mixes two lightmaps. An RGBM-encoded PNG of the same
+  by distance; each lightmap sits in a 4-texel ring of its own edge light, in a cell
+  aligned to 16 texels, so no compressed block and no texel of any of the three levels
+  ever mixes two lightmaps. An RGBM-encoded PNG of the same
   name sits beside it: what a GPU without BC compression loads, and a picture an agent
   can open. A directional bake writes a `lightmap_dir_<page>_<tag>.ktx2` (BC7) and
   `.png` beside each page: RGB the direction mapped to 0–1 and A the directionality,
