@@ -12,13 +12,24 @@ const FALLOFF_EPSILON_SQ: f32 = 0.0001;
 // exactly zero at and past `range`. The CPU's twin is `components::falloff`, held
 // equal by `render::clusters::falloff_gpu_tests`.
 fn light_falloff(d: f32, range: f32) -> f32 {
+    return light_falloff_near(d, range, 0.0);
+}
+
+// `light_falloff` with its inverse square floored at distance `near`: a particle
+// sprite that size, or an Area light's stand-in (`components::falloff_near`).
+fn light_falloff_near(d: f32, range: f32, near: f32) -> f32 {
+    return light_window(d, range) / max(max(d * d, near * near), FALLOFF_EPSILON_SQ);
+}
+
+// The window alone, saturate(1 - (d/r)^4)^2 (`components::falloff_window`).
+fn light_window(d: f32, range: f32) -> f32 {
     if (d >= range) {
         return 0.0;
     }
     let ratio = d / range;
     let r2 = ratio * ratio;
-    let window = clamp(1.0 - r2 * r2, 0.0, 1.0);
-    return window * window / max(d * d, FALLOFF_EPSILON_SQ);
+    let w = clamp(1.0 - r2 * r2, 0.0, 1.0);
+    return w * w;
 }
 
 // A spotlight's cone at `cos_theta` off its axis: URP's squared ramp between the

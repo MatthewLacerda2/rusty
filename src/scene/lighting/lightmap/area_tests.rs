@@ -1,5 +1,5 @@
-//! Area lights in the bake (#1674): intensity × area far away, one-sided, cut at
-//! `range`, and penumbrae that widen with the panel.
+//! Area lights in the bake (#1674): intensity × area far away, one-sided, faded to
+//! zero at `range`, and penumbrae that widen with the panel.
 
 use glam::Vec3;
 
@@ -65,7 +65,7 @@ fn far_away_a_panel_is_a_point_light_of_intensity_times_area() {
 }
 
 #[test]
-fn a_panel_is_one_sided_and_cut_at_its_range() {
+fn a_panel_is_one_sided_and_dark_past_its_range() {
     let scene = lit(vec![panel(1.0, 1.0, 2.0, 5.0)], vec![]);
     assert!(direct_at(&scene, Vec3::ZERO, Vec3::Y) > 0.0);
     let above = Vec3::new(0.0, 4.0, 0.0);
@@ -122,7 +122,7 @@ fn a_probe_under_a_panel_gets_its_direct_light_from_the_front_only() {
     let scene = lit(vec![panel(1.2, 0.6, 20.0, 100.0)], vec![]);
     let probes = [Vec3::ZERO, Vec3::new(0.0, 25.0, 0.0)];
     let sh = baked_direct_sh(&scene, &probes);
-    let point = RADIANCE * 0.72 / 401.0;
+    let point = RADIANCE * 0.72 * falloff(20.0, 100.0);
     let toward = sh[0].eval(Vec3::Y).x;
     // An L2 delta overshoots a clamped cosine by ~6% head-on.
     assert!((toward - point).abs() < point * 0.1, "{toward} vs {point}");

@@ -63,6 +63,8 @@ mod coverage_tests;
 #[cfg(test)]
 mod direction_tests;
 #[cfg(test)]
+mod falloff_tests;
+#[cfg(test)]
 mod gather_tests;
 #[cfg(test)]
 mod inset_tests;

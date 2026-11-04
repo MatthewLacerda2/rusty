@@ -16,14 +16,41 @@ pub const FALLOFF_EPSILON_SQ: f32 = 1e-4;
 /// close, smoothly windowed to exactly zero at `range`; zero at and past it, and
 /// for a `range` of zero or less, NaN or a NaN `d`.
 pub fn falloff(d: f32, range: f32) -> f32 {
+    falloff_near(d, range, 0.0)
+}
+
+/// [`falloff`] with its inverse square floored at distance `near` (#1699): for a
+/// receiver that stands for more than a point (a particle sprite `near` across),
+/// or an emitter that is more than one (an Area light's stand-in), so the light
+/// never climbs past what something that size receives. The [`falloff_window`] still runs
+/// on `d`, so it reaches zero at `range` whatever `near` is.
+pub fn falloff_near(d: f32, range: f32, near: f32) -> f32 {
+    falloff_window(d, range) / (d * d).max(near * near).max(FALLOFF_EPSILON_SQ)
+}
+
+/// The smooth window of [`falloff`] alone, `saturate(1 − (d/r)⁴)²`: 1 at the lamp,
+/// exactly 0 at and past `range`, and 0 for a `range` of zero or less or a NaN.
+pub fn falloff_window(d: f32, range: f32) -> f32 {
     // NaN in either compares false, so it lands here too.
     if d.partial_cmp(&range) != Some(std::cmp::Ordering::Less) {
         return 0.0;
     }
     let ratio = d / range;
     let r2 = ratio * ratio;
-    let window = (1.0 - r2 * r2).clamp(0.0, 1.0);
-    window * window / (d * d).max(FALLOFF_EPSILON_SQ)
+    let w = (1.0 - r2 * r2).clamp(0.0, 1.0);
+    w * w
+}
+
+/// [`falloff_window`] at squared distance `d2`, for a caller that never takes the root
+/// (the cluster binner's per-pair score).
+pub fn falloff_window_sq(d2: f32, range: f32) -> f32 {
+    let r2 = range * range;
+    if !(range > 0.0 && d2 < r2) {
+        return 0.0;
+    }
+    let t = d2 / r2;
+    let w = (1.0 - t * t).clamp(0.0, 1.0);
+    w * w
 }
 
 /// A spotlight's cone at a direction whose cosine to its axis is `cos_theta`:
@@ -66,6 +93,27 @@ mod tests {
     fn falloff_of_a_degenerate_light_is_zero() {
         for (d, r) in [(0.0, 0.0), (1.0, -1.0), (f32::NAN, 5.0), (1.0, f32::NAN)] {
             assert_eq!(falloff(d, r), 0.0, "d {d} r {r}");
+        }
+    }
+
+    #[test]
+    fn the_near_floor_caps_the_inverse_square_and_keeps_the_window() {
+        assert_eq!(falloff_near(0.0, 5.0, 0.5), 4.0);
+        assert_eq!(falloff_near(0.1, 5.0, 0.5), 4.0 * falloff_window(0.1, 5.0));
+        // Past `near` it is the plain falloff; at the range it is still zero.
+        assert_eq!(falloff_near(2.0, 5.0, 0.5), falloff(2.0, 5.0));
+        assert_eq!(falloff_near(5.0, 5.0, 10.0), 0.0);
+    }
+
+    #[test]
+    fn the_squared_window_is_the_window() {
+        for i in 0..=60 {
+            let d = i as f32 * 0.1;
+            let (a, b) = (falloff_window(d, 5.0), falloff_window_sq(d * d, 5.0));
+            assert!((a - b).abs() < 1e-5, "at {d}: {a} vs {b}");
+        }
+        for (d2, r) in [(0.0, 0.0), (0.25, -1.0), (f32::NAN, 5.0), (1.0, f32::NAN)] {
+            assert_eq!(falloff_window_sq(d2, r), 0.0, "d2 {d2} r {r}");
         }
     }
 
