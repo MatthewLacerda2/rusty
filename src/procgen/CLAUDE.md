@@ -73,14 +73,16 @@ adding to. `dir-size` counts a folder's `.rs` files except its `mod.rs` and test
 and fails past 12; an allow for a folder under the cap is itself refused
 (`dir_size::check_dir`), so a full folder is clustered, never excused.
 
-- `color/` (8 with `dummy`): `histogram_scan`, `levels` (#1743): tone
+- `color/` (10 with `dummy`): `histogram_scan`, `levels` (#1743, landed): tone
   adjustments beside `auto_levels` and `gamma`.
 - `filter/blurs/`: `directional_blur`, `slope_blur` (#1739); `highpass`, `sharpen`
-  (#1743): a kernel's smear, or the difference from one.
+  (#1743, landed): a kernel's smear, or the difference from one.
 - `filter/flood/` (new, #1741): `flood_fill`, `flood_random`, `flood_gradient`,
   `flood_bbox`; that branch makes the folder and its `pub mod flood;` line.
-- `filter/mask/`: `edge_detect` (#1743), beside `distance`.
-- `filter/relief/`: `ambient_occlusion` (#1743), beside `cavity` and `curvature`.
+- `filter/mask/`: `edge_detect` (#1743, landed), beside `distance`.
+- `filter/relief/`: `ambient_occlusion` (#1743, landed), beside `cavity` and
+  `curvature`. A filter's tests share `filter/test_probe.rs` (run one op on one
+  image, roll it to show the op wraps).
 - `generators/` (10): the anisotropic noise (#1740) makes 11, under the cap; the
   rest of #1740 is params on existing generators.
 - `vector/` (7): `directional_warp` (#1739), beside `warp`; #1742 is params and

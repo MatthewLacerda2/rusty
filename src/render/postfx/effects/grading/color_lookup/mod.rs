@@ -1,6 +1,6 @@
 //! The Color Lookup (#1441): the bake's last function, the volume's user LUT
 //! (`user`, uploaded as a 3D texture the bake binds) over the display colour, so the
-//! composite still grades a pixel with one fetch.
+//! composite still grades a pixel with one read of the grading LUT.
 
 mod user;
 

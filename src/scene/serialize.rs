@@ -97,8 +97,8 @@ pub struct SceneData {
     /// files, never inlined, like `skybox_path`. None when absent.
     #[serde(default)]
     pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
-    /// Which lightmap file each static mesh wears (#438). Paths only; the RGBM PNGs
-    /// sit beside the scene. Empty — and left out of the file — by default.
+    /// Which lightmap page each static mesh wears (#438). Paths only; the KTX2 pages
+    /// (#1694) sit beside the scene. Empty — and left out of the file — by default.
     #[serde(default, skip_serializing_if = "LightmapSet::is_empty")]
     pub lightmaps: LightmapSet,
     /// The lightmap bake's knobs (#832). Left out while every one is at its default,

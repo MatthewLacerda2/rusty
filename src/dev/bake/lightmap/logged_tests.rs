@@ -1,5 +1,5 @@
 //! A logged lightmap bake (#1667): the same bytes as an unlogged one, and lines
-//! that end at every texel and mesh.
+//! that end at every texel and mesh, then at every page encoded (#1694).
 
 use std::cell::{Cell, RefCell};
 use std::time::Duration;
@@ -22,16 +22,16 @@ fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
         now.get()
     };
     let mut log = BakeLog::new(clock, |l| lines.borrow_mut().push(l));
-    let logged = bake_logged(&input, &quick(), &mut log);
+    let logged = bake_logged(&input, &quick(), &mut log).unwrap();
     drop(log);
-    assert!(!plain.is_empty());
-    assert_eq!(logged, plain, "a log never changes a texel");
+    let plain = plain.unwrap();
+    assert!(plain.maps > 0);
+    assert_eq!(logged, plain, "a log never changes a byte");
     let lines = lines.into_inner();
     assert!(lines[0].milestone, "the step's first line is a milestone");
+    // The trace, then the encode, whose last line is its last page.
+    let pages = plain.colour.len() + plain.directions.len();
     let last = &lines.last().expect("a line").text;
-    let n = plain.len();
-    assert!(
-        last.starts_with(&format!("[Lighting] lightmaps 100% ({n}/{n} meshes,")),
-        "{last}"
-    );
+    let encoded = format!("[Lighting] lightmap pages 100% ({pages}/{pages} pages encoded)");
+    assert_eq!(last, &encoded);
 }

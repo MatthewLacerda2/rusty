@@ -3,3 +3,5 @@
 
 // sorted: one module per op; none reads another
 pub mod blur;
+pub mod highpass;
+pub mod sharpen;
