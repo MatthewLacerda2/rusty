@@ -78,7 +78,8 @@ pub fn world_op(w: &mut crate::ecs::World, op: &ops_tests::Op) {
 /// reads back: each body's class, enabled and sleeping flags, pose and next
 /// (kinematic) pose, velocities, gravity, CCD and mass; each collider's flags,
 /// collision and solver groups, offset, extent, material and mass; each joint's
-/// key, bodies and frames. As exact text (`{:?}` prints
+/// key, bodies and frames; the contact pairs in the order the solver meets
+/// them. As exact text (`{:?}` prints
 /// an `f32` so it reads back to the same bits).
 pub fn digest(p: &PhysicsWorld) -> String {
     let mut out = format!("plan {:?}\n", p.plan);
@@ -108,7 +109,8 @@ pub fn digest(p: &PhysicsWorld) -> String {
         let bits = |g: InteractionGroups| (g.memberships.bits(), g.filter.bits());
         let groups = (bits(c.collision_groups()), bits(c.solver_groups()));
         let local = (c.position_wrt_parent(), c.shape().compute_local_aabb());
-        let material = (c.friction(), c.restitution(), c.friction_combine_rule());
+        let rules = (c.friction_combine_rule(), c.restitution_combine_rule());
+        let material = (c.friction(), c.restitution(), rules);
         let _ = writeln!(
             out,
             "c{id} {on} {sensor} {groups:?} {local:?} {material:?} {}",
@@ -122,5 +124,11 @@ pub fn digest(p: &PhysicsWorld) -> String {
         });
         let _ = writeln!(out, "j{id} {:?} {frames:?}", j.key);
     }
+    // The order the solver meets the contacts in: two twins listing the same
+    // pairs in another order step apart (#1798).
+    let id = |h| p.collider_to_id.get(&h).copied();
+    let pairs = p.narrow_phase.contact_pairs();
+    let order: Vec<_> = pairs.map(|c| (id(c.collider1), id(c.collider2))).collect();
+    let _ = writeln!(out, "contacts {order:?}");
     out
 }

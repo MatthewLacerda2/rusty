@@ -156,11 +156,12 @@ fn install(world: &mut GameWorld, demo: Demo, lua: Lua) {
     let app = world.resources.application.borrow();
     host.graphics = GraphicsSettings::load(
         &host.storage,
-        app.graphics_defaults(),
+        (app.graphics_defaults(), app.render_scale_default()),
         app.quality_presets(),
     );
     drop(app);
     host.game_view = header.size.or(host.game_view);
+    host.display_scale = header.display_scale.or(host.display_scale);
     host.put(world);
     let before_play = header.before_play.iter().filter_map(host_call).collect();
     let verdict = Verdict {
@@ -200,14 +201,16 @@ impl Replayer {
             return;
         };
         let (t, acts, size) = (tick.t, std::mem::take(&mut tick.host), tick.size);
+        let scale = tick.display_scale;
         self.acts(world, t, acts);
+        let mut screen = world.resources.screen.borrow_mut();
         if let Some((width, height)) = size {
-            world
-                .resources
-                .screen
-                .borrow_mut()
-                .set_game_view(width, height);
+            screen.set_game_view(width, height);
         }
+        if let Some(scale) = scale {
+            screen.set_display_scale(scale);
+        }
+        drop(screen);
         if let Some(tick) = &self.tick {
             world.input().borrow_mut().set_frame(&tick.input);
         }

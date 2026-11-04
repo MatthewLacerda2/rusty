@@ -9,6 +9,11 @@
 //! `Application::set_default_option`, the op `Graphics.SetDefaultOption` calls; the
 //! live options follow it where the player hasn't chosen, to preview a fresh install.
 //!
+//! Then the project's render-scale default (#1715), a factor or *Match display*,
+//! through `Application::set_default_render_scale`, the op
+//! `Graphics.SetDefaultRenderScale` calls; it runs at once unless the player chose a
+//! scale.
+//!
 //! Last, the project's audio settings (#1749): the speed of sound doppler resolves
 //! with, written through `Application::set_speed_of_sound` (the op
 //! `Audio.SetDefaultSpeedOfSound` calls) once a drag or a typed edit ends, and
@@ -19,6 +24,8 @@ use egui_phosphor::regular as icon;
 use crate::core::application::{Application, BuildSettings, WindowMode};
 use crate::core::project::PROJECT_FILE;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+use crate::core::settings::render_scale::{RenderScale, RenderScaleDefault, RenderScaleSetting};
+use crate::core::settings::GraphicsSettings;
 use crate::editor::widgets::DragRange;
 use crate::editor::EditorUi;
 use crate::scripting::ConsoleLogs;
@@ -29,7 +36,7 @@ pub fn draw(
     editor: &mut EditorUi,
     ctx: &egui::Context,
     app: &mut Application,
-    live: &mut GraphicsOptions,
+    live: &mut GraphicsSettings,
     console: &mut ConsoleLogs,
 ) {
     if !editor.show_build_settings {
@@ -51,7 +58,9 @@ pub fn draw(
             ui.separator();
             save = ui.button(format!("{}  Save", icon::FLOPPY_DISK)).clicked();
             ui.separator();
-            graphics_defaults(ui, app, live, console);
+            graphics_defaults(ui, app, &mut live.options, console);
+            ui.separator();
+            render_scale_default(ui, app, &mut live.render_scale, console);
             ui.separator();
             audio(ui, app, console);
         });
@@ -112,6 +121,53 @@ fn graphics_defaults(
             if let Err(err) = app.set_default_option(option, on, live) {
                 console.error(err);
             }
+        }
+    }
+}
+
+/// The project's render-scale default: a factor, or *Match display* (`1 / display
+/// scale`). A drag or a typed factor is held as a draft, as [`audio`]'s is, and
+/// written once it ends.
+fn render_scale_default(
+    ui: &mut egui::Ui,
+    app: &mut Application,
+    live: &mut RenderScaleSetting,
+    console: &mut ConsoleLogs,
+) {
+    let current = app.render_scale_default();
+    let id = ui.id().with("render_scale_default");
+    let draft = ui.data(|d| d.get_temp::<f32>(id));
+    let mut next = None;
+    ui.horizontal(|ui| {
+        ui.label("Default render scale");
+        let matching = current == RenderScaleDefault::MatchDisplay;
+        if ui.selectable_label(matching, "Match display").clicked() && !matching {
+            next = Some(RenderScaleDefault::MatchDisplay);
+        }
+        let mut factor = draft.unwrap_or(match current {
+            RenderScaleDefault::Fixed(scale) => scale.get(),
+            RenderScaleDefault::MatchDisplay => 1.0,
+        });
+        let range = RenderScale::MIN..=RenderScale::MAX;
+        let drag = egui::DragValue::new(&mut factor).speed(0.01).ranged(range);
+        let r = ui.add_enabled(!matching, drag);
+        if matching && ui.small_button("Fixed").clicked() {
+            next = Some(RenderScaleDefault::Fixed(RenderScale::NATIVE));
+        }
+        let editing = r.dragged() || r.has_focus();
+        if r.changed() && editing {
+            ui.data_mut(|d| d.insert_temp(id, factor));
+        } else if r.changed() || (!editing && draft.is_some()) {
+            ui.data_mut(|d| d.remove::<f32>(id));
+            next = Some(RenderScaleDefault::Fixed(RenderScale::new(factor)));
+        }
+    });
+    if live.chosen.is_some() {
+        ui.weak("The player's saved render scale overrides it here.");
+    }
+    if let Some(default) = next.filter(|d| *d != current) {
+        if let Err(err) = app.set_default_render_scale(default, live) {
+            console.error(err);
         }
     }
 }

@@ -6,6 +6,11 @@
 //! frame; a headless run never writes it and falls back to the `VideoSettings`
 //! resolution, so the harness lays out exactly as a window of that size would.
 //!
+//! The display's backing scale rides with the size (#1715, `Video.GetDisplayScale`):
+//! physical pixels per point, which the windowed platform writes every frame (so a
+//! move to another monitor is seen the next frame). Headless it is 1. A script reads
+//! it, so it is a sim input too, and a demo records it as it records the size.
+//!
 //! The textures' native sizes ride along (#1221): an `Image` measures by its
 //! texture's size, which the tick reads from the files and writes here
 //! ([`TextureSizes`]) before it steps, so the layout never reads a file. One `Rc` is shared with
@@ -25,6 +30,9 @@ pub struct ScreenSize {
     /// The game view's size in physical pixels, as the platform last reported it.
     /// `None` until a platform writes one (always, headless).
     game_view: Option<(u32, u32)>,
+    /// The display's backing scale as the platform last reported it; `None` (read
+    /// as 1) until a platform writes one.
+    display_scale: Option<f32>,
     /// The native size of each texture the scene's Images use, as the platform
     /// last read them.
     textures: Rc<TextureSizes>,
@@ -46,6 +54,28 @@ impl ScreenSize {
     /// until a run sets one.
     pub fn game_view(&self) -> Option<(u32, u32)> {
         self.game_view
+    }
+
+    /// Record the display's backing scale (the platform layer, once per frame).
+    pub fn set_display_scale(&mut self, scale: f32) {
+        self.display_scale = Some(scale);
+    }
+
+    /// Put back a scale read with [`reported_display_scale`](Self::reported_display_scale),
+    /// `None` included (a demo replay, as [`restore_game_view`](Self::restore_game_view)).
+    pub fn restore_display_scale(&mut self, scale: Option<f32>) {
+        self.display_scale = scale;
+    }
+
+    /// The display scale as the platform last wrote it; `None` headless.
+    pub fn reported_display_scale(&self) -> Option<f32> {
+        self.display_scale
+    }
+
+    /// The display's backing scale: physical pixels per point, 1 when no platform
+    /// reported one or it reported one that is not a positive number.
+    pub fn display_scale(&self) -> f32 {
+        self.display_scale.filter(|s| *s > 0.0).unwrap_or(1.0)
     }
 
     /// The screen size in pixels the UI lays out on: the game view when a platform
@@ -92,5 +122,19 @@ mod tests {
         assert_eq!(screen.pixels(&video), Vec2::new(800.0, 600.0));
         screen.set_game_view(1920, 0);
         assert_eq!(screen.pixels(&video), Vec2::new(1920.0, 1.0));
+    }
+
+    #[test]
+    fn display_scale_is_one_until_a_platform_reports_one() {
+        let mut screen = ScreenSize::default();
+        assert_eq!(screen.display_scale(), 1.0);
+        screen.set_display_scale(2.0);
+        assert_eq!(screen.display_scale(), 2.0);
+        for bad in [0.0, -1.0, f32::NAN] {
+            screen.set_display_scale(bad);
+            assert_eq!(screen.display_scale(), 1.0, "{bad}");
+        }
+        screen.restore_display_scale(None);
+        assert_eq!(screen.reported_display_scale(), None);
     }
 }

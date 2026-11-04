@@ -107,7 +107,8 @@ player's options with it), `Time.timeScale`, `Time.paused` and the queued
 `Time.Step`s Play started from, and a digest of the scene file and of the
 project's `.lua` files, read right
 before Play is entered (whether by a tick, a paused frame or `Editor.EnterPlay`),
-the Game view size at each change, and per tick the input the tick published
+the Game view size and the display scale (`Video.GetDisplayScale`, #1715) at
+each change, and per tick the input the tick published
 (`InputFrame`), as a delta from the tick before, and the tick's `dt`: the editor
 and the dev player tick on wall-clock time, and the replay runs each tick on the
 `dt` it was recorded with. Everything else that reaches a playing world is
@@ -125,8 +126,9 @@ passing or returning a function or a handle (`Scene.GetScript`'s calls are not
 recorded), Play started on unsaved scene edits. The replay warns from there on.
 Script and asset changes on disk wait for Stop (the editor's watch holds them
 through Play), so they never reach a Play session. `play --size` and `--scene`
-are refused with `--demo`: the replay plays the scene and the Game view size the
-demo recorded (the sim lays the UI out on it, and every frame renders at it).
+are refused with `--demo`: the replay plays the scene, the Game view size and the
+display scale the demo recorded (the sim lays the UI out on the size, every frame
+renders at it, and a `"match_display"` render scale resolves on the scale).
 
 **Open one in the editor.** `Editor.OpenDemo(path)` ([`api/Editor.md`](api/Editor.md),
 *The demo timeline*) plays a demo on the Game view with a timeline: play/pause,
@@ -292,8 +294,10 @@ cargo-nextest` (CI uses `taiki-e/install-action`). What it buys over `cargo test
 - **A fixed proptest seed in CI, a random one elsewhere** (#1800). `ci.yml` runs its
   gates on one `PROPTEST_RNG_SEED`, so a red proptest there comes from the commit under
   test: reproduce it with that seed, since a local `make test` draws random ones. The
-  nightly and local runs explore. Whichever finds a case, commit its `cc` line to the
-  test's `.proptest-regressions` file with the fix. A suite that pins its own seed in
+  nightly and local runs explore. Whichever finds a case, commit its `cc` line with the
+  fix, to the file proptest names when it fails: `proptest-regressions/<module
+  path>.txt` at the crate root (e.g. `proptest-regressions/physics/watch/tests.txt`,
+  #1798), which every later run replays first. A suite that pins its own seed in
   its config (`tests/proptest/world_space.rs`) doesn't explore.
 - **No retries.** A retried pass is still green, and a flaky test is a bug.
 

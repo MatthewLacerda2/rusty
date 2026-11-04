@@ -12,9 +12,11 @@
 //! them, kinematic velocities included), and a body's own collider — a
 //! Rigidbody's or a CharacterController's — is the step's to place.
 
+use rapier3d::prelude::Collider;
+
 use super::compound::world_pose;
 use super::convert::to_pose;
-use super::world::PhysicsWorld;
+use super::world::{collider_to_write, PhysicsWorld};
 use crate::scene::Scene;
 
 impl PhysicsWorld {
@@ -33,13 +35,12 @@ impl PhysicsWorld {
             if carries_body {
                 continue;
             }
-            let (Some(pose), Some(collider)) =
-                (world_pose(scene, id), self.colliders.get_mut(handle))
-            else {
+            let Some(pose) = world_pose(scene, id) else {
                 continue;
             };
             let target = to_pose(pose.pos, pose.rot);
-            if *collider.position() != target {
+            let differs = |c: &Collider| *c.position() != target;
+            if let Some(collider) = collider_to_write(&mut self.colliders, handle, differs) {
                 collider.set_position(target);
                 moved.push(handle);
             }

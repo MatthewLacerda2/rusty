@@ -11,7 +11,7 @@ use crate::physics::compound::{relative_pose, world_pose};
 use crate::physics::convert::to_pose;
 use crate::physics::shape::build::ColliderInputs;
 use crate::physics::watch::Owners;
-use crate::physics::world::PhysicsWorld;
+use crate::physics::world::{collider_to_write, PhysicsWorld};
 use crate::scene::Scene;
 
 /// A CharacterController's collider inputs: its capsule, upright at its centre.
@@ -63,22 +63,28 @@ impl PhysicsWorld {
                 else {
                     continue;
                 };
-                let handle = self.id_to_collider.get(&id);
-                let Some(collider) = handle.and_then(|&h| self.colliders.get_mut(h)) else {
+                let Some(&handle) = self.id_to_collider.get(&id) else {
                     continue;
                 };
                 let (pos, rot) = relative_pose(&owner_pose, &pose);
                 let offset = upright_offset(owner_pose.rot, pos, rot, cc.center * pose.scale);
-                if collider.position_wrt_parent() != Some(&offset) {
-                    collider.set_position_wrt_parent(offset);
-                }
                 let (half_segment, radius) =
                     capsule_dims(cc.radius, cc.height, CapsuleAxis::Y, pose.scale);
-                let same = collider.shape().as_capsule().is_some_and(|c| {
-                    (c.half_height() - half_segment).abs() < 1e-6
-                        && (c.radius - radius).abs() < 1e-6
-                });
-                if !same {
+                let sized = |c: &Collider| {
+                    c.shape().as_capsule().is_some_and(|c| {
+                        (c.half_height() - half_segment).abs() < 1e-6
+                            && (c.radius - radius).abs() < 1e-6
+                    })
+                };
+                let placed = |c: &Collider| c.position_wrt_parent() == Some(&offset);
+                let differs = |c: &Collider| !placed(c) || !sized(c);
+                let Some(collider) = collider_to_write(&mut self.colliders, handle, differs) else {
+                    continue;
+                };
+                if !placed(collider) {
+                    collider.set_position_wrt_parent(offset);
+                }
+                if !sized(collider) {
                     collider.set_shape(SharedShape::capsule_y(half_segment, radius));
                 }
             }

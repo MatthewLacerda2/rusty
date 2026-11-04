@@ -25,6 +25,7 @@ fn the_operators(game: &mut GameWorld, file: &Path) -> (u64, GraphicsSettings, V
     game.resources.script_manager.set_play_seed(seed);
     game.time().borrow_mut().time_scale = SCALE;
     game.resources.screen.borrow_mut().set_game_view(800, 600);
+    game.resources.screen.borrow_mut().set_display_scale(1.5);
     let mut app = game.resources.application.borrow_mut();
     app.restore_quality(Some(QUALITY.to_string()));
     drop(app);
@@ -87,6 +88,7 @@ fn opening_scrubbing_and_closing_a_demo_leaves_saved_files_and_settings_alone() 
     assert_eq!(game.script_manager().play_seed(), seed);
     assert_eq!(game.time().borrow().time_scale, SCALE);
     assert_eq!(game.resources.screen.borrow().game_view(), Some((800, 600)));
+    assert_eq!(game.resources.screen.borrow().display_scale(), 1.5);
     // The store is bound to its file again: the editor's own flush still writes.
     game.resources.flush_storage();
     assert_ne!(std::fs::read_to_string(&file).unwrap(), SAVED);

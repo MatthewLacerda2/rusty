@@ -41,6 +41,8 @@ pub struct DemoTick {
     pub host: Vec<HostCall>,
     /// The Game view's size from this tick on.
     pub size: Option<(u32, u32)>,
+    /// The display scale from this tick on (#1715).
+    pub display_scale: Option<f32>,
     /// The state digest stored after this tick, if one was.
     pub digest: Option<String>,
 }
@@ -157,6 +159,7 @@ impl Demo {
             tick: DemoTick {
                 dt: FIXED_DT,
                 size: self.header.size,
+                display_scale: self.header.display_scale,
                 ..DemoTick::default()
             },
         }
@@ -242,6 +245,7 @@ impl Iterator for DemoTicks {
             }
             self.tick.host = entry.host.iter().filter_map(host_call).collect();
             self.tick.size = entry.size.or(self.tick.size);
+            self.tick.display_scale = entry.display_scale.or(self.tick.display_scale);
             self.tick.digest = entry.digest;
         }
         Some(self.tick.clone())

@@ -47,7 +47,7 @@ fn bloom_and_color_round_trip() {
     rusty::api::graphics::register(
         &lua,
         bind(&lua, &scene),
-        bind(&lua, &quality),
+        (bind(&lua, &quality), rusty::api::ApiCell::default()),
         bind(&lua, &app),
     )
     .unwrap();
@@ -88,7 +88,7 @@ fn motion_blur_knobs_are_clamped() {
     rusty::api::graphics::register(
         &lua,
         bind(&lua, &scene),
-        bind(&lua, &quality),
+        (bind(&lua, &quality), rusty::api::ApiCell::default()),
         bind(&lua, &app),
     )
     .unwrap();
@@ -116,7 +116,7 @@ fn getters_return_defaults_with_no_active_volume() {
     rusty::api::graphics::register(
         &lua,
         bind(&lua, &scene),
-        bind(&lua, &quality),
+        (bind(&lua, &quality), rusty::api::ApiCell::default()),
         bind(&lua, &app),
     )
     .unwrap();

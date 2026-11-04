@@ -7,6 +7,7 @@ use rusty::dev::demo::{self, Demo, Destination, Replayer, Verdict};
 use rusty::dev::harness::Harness;
 use rusty::dev::scenario;
 
+mod display_scale;
 mod edit_mode;
 mod ends;
 mod hosts;

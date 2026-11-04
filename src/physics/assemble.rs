@@ -19,7 +19,7 @@ use super::shape::build::{
     BodyClass,
 };
 use super::watch::{carriers, Owners};
-use super::world::PhysicsWorld;
+use super::world::{body_to_write, collider_to_write, PhysicsWorld};
 use crate::scene::Scene;
 
 /// The body-type pairs a collider generates contacts for: every one but
@@ -179,17 +179,21 @@ impl PhysicsWorld {
     /// hides it from every query (#521).
     pub(super) fn sync_enabled(&mut self, scene: &Scene, owners: &Owners) {
         for (&owner, ids) in owners.pick(&self.plan) {
-            if let Some(body) = self
-                .id_to_body
-                .get(&owner)
-                .and_then(|&h| self.bodies.get_mut(h))
-            {
-                body.set_enabled(scene.world.is_active_in_hierarchy(owner));
+            let on = scene.world.is_active_in_hierarchy(owner);
+            let body = self.id_to_body.get(&owner);
+            let body =
+                body.and_then(|&h| body_to_write(&mut self.bodies, h, |b| b.is_enabled() != on));
+            if let Some(body) = body {
+                body.set_enabled(on);
             }
             for &id in ids {
+                let on = scene.world.is_active_in_hierarchy(id);
                 let handle = self.id_to_collider.get(&id);
-                if let Some(collider) = handle.and_then(|&h| self.colliders.get_mut(h)) {
-                    collider.set_enabled(scene.world.is_active_in_hierarchy(id));
+                let differs = |c: &Collider| c.is_enabled() != on;
+                if let Some(c) =
+                    handle.and_then(|&h| collider_to_write(&mut self.colliders, h, differs))
+                {
+                    c.set_enabled(on);
                 }
             }
         }
@@ -207,13 +211,11 @@ impl PhysicsWorld {
             else {
                 continue;
             };
-            let Some(collider) = self.colliders.get_mut(handle) else {
-                continue;
-            };
             let (pos, rot) = relative_pose(&owner_pose, &pose);
             let offset = to_pose(pos, rot);
-            if collider.position_wrt_parent() != Some(&offset) {
-                collider.set_position_wrt_parent(offset);
+            let differs = |c: &Collider| c.position_wrt_parent() != Some(&offset);
+            if let Some(c) = collider_to_write(&mut self.colliders, handle, differs) {
+                c.set_position_wrt_parent(offset);
             }
         }
     }

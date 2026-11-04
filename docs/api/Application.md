@@ -55,6 +55,15 @@ session, and only the running value in the player and `play`. A player's saved c
 options*. An unknown option name or a non-`bool` value is ignored with a warning in
 the console, since the file is the developer's to fix.
 
+**The render-scale default** (#1715) lives in the same file, under `"graphics"`:
+`{ "render_scale": 0.75 }`, or `"match_display"` for `1 / Video.GetDisplayScale()`.
+It runs while the player has saved no render scale, and the same split applies:
+`Graphics.SetDefaultRenderScale` and the Build Settings window's **Default render
+scale** write the file in the editor and the session, and only the running value in
+the player and `play`. A value that is neither a positive number nor
+`"match_display"` keeps `1`, with a warning; see [`Graphics.md`](Graphics.md),
+*Render scale*.
+
 **Quality presets** (#1522) live in the same file, under `"quality"`: the game's
 named presets, seeded with `Low`, `Medium` and `High` when the file is created, with
 the same split (`Graphics.SetQualityPreset` / `RemoveQualityPreset` write the file
