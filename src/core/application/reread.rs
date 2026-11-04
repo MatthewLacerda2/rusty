@@ -61,7 +61,8 @@ impl Application {
         self.audio
     }
 
-    /// Set the project's speed of sound (the Build Settings window), writing the
+    /// Set the project's speed of sound (the Build Settings window and
+    /// `Audio.SetDefaultSpeedOfSound`), writing the
     /// bound file (if any). Not finite and positive is an error, and nothing changes.
     pub fn set_speed_of_sound(&mut self, c: f32) -> Result<(), String> {
         if !(c.is_finite() && c > 0.0) {

@@ -43,6 +43,10 @@ fn a_baked_one_shot_plays_through_the_audio_namespace() {
         bind(&lua, &audio),
         bind(&lua, &time),
         bind(&lua, &camera),
+        bind(
+            &lua,
+            &Rc::new(RefCell::new(rusty::core::application::Application::new())),
+        ),
     )
     .unwrap();
     let script = format!(

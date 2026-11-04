@@ -36,6 +36,7 @@ use glam::Vec3;
 
 use crate::audio::{AudioMaestro, Listener, Rolloff, Shot, SpeakerMode};
 use crate::components::AudioSourceComponent;
+use crate::core::application::Application;
 use crate::scene::Camera;
 use crate::scene::Scene;
 use crate::time::Time;
@@ -47,6 +48,7 @@ pub fn register(
     audio: ApiCell<AudioMaestro>,
     time: ApiCell<Time>,
     camera: ApiCell<Camera>,
+    app: ApiCell<Application>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -59,6 +61,7 @@ pub fn register(
     snapshots::register_snapshots(lua, &table, audio, time)?;
     occlusion::register_occlusion(lua, &table, scene, audio)?;
     doppler::register_doppler(lua, &table, scene, audio)?;
+    doppler::register_default_speed(lua, &table, app)?;
     reverb::register_reverb(lua, &table, audio)?;
 
     lua.globals().set("Audio", table).map_err(|e| e.to_string())

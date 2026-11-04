@@ -21,11 +21,16 @@
 //! and a source parented under any of them, since all of them end the tick at a
 //! world position. It is divided by the tick's scaled sim time, so slow motion keeps
 //! the shift a body's real speed gives, and the time scale bends the pitch on top.
-//! A tick with no sim time (a pause, `timeScale = 0`) keeps every rate as it was.
-//! A body whose move in one tick is faster than sound is taken as a **teleport** (a
-//! respawn, a scene load) and counts as still for that tick, and the listener's
-//! motion is forgotten when voices are all stopped and when a scene loads, so a jump
-//! never chirps.
+//! A tick with no sim time (a pause, `timeScale = 0`) keeps a time-scaled voice's
+//! rate as it was; an unscaled voice, which plays at normal rate through a pause,
+//! returns to 1.
+//!
+//! **Jumps.** A scene load and Play/Stop forget the listener's motion, so the next
+//! push hears it still. A body whose move in one tick is faster than
+//! [`TELEPORT_SPEED`] (far above any projectile) is taken as a **teleport** and
+//! counts as still for that tick. A shorter jump is not told apart from motion: it
+//! reads as velocity for that one tick (3 m toward the listener at 60 Hz is
+//! 180 m/s), clamped, and the device's glide smooths it.
 //!
 //! Output only: the sim never reads a rate, so determinism is untouched.
 
@@ -41,6 +46,10 @@ pub use crate::core::settings::audio::SPEED_OF_SOUND;
 pub const RATE_MIN: f32 = 0.5;
 /// The fastest a doppler shift plays a voice (an octave up).
 pub const RATE_MAX: f32 = 2.0;
+/// The speed, in m/s, past which one tick's move is a teleport and counts as still.
+/// Not the speed of sound: a body faster than sound plays at the clamp, and a slow
+/// speed of sound (`Audio.SetSpeedOfSound`) must not silence real motion.
+pub const TELEPORT_SPEED: f32 = 1000.0;
 
 /// The motion the next push measures against: the listener's position at the last
 /// push (`None` once forgotten) and the speed of sound in force.
@@ -67,7 +76,7 @@ impl DopplerState {
         let was = self.listener_was.replace(now).unwrap_or(now);
         Body {
             position: now,
-            velocity: velocity(was, now, env.dt, self.speed_of_sound),
+            velocity: velocity(was, now, env.dt),
         }
     }
 
@@ -109,7 +118,8 @@ impl AudioMaestro {
 }
 
 /// The doppler rate a voice of `source` plays at this push, having moved
-/// `was → now`; a push with no sim time keeps the rate `held` last played at.
+/// `was → now`. A push with no sim time keeps the rate `held` last played at for a
+/// time-scaled voice, and plays an unscaled one (which a pause doesn't stop) at 1.
 pub fn source_rate(
     env: &MixEnv,
     ear: Body,
@@ -119,21 +129,25 @@ pub fn source_rate(
     held: VoiceMix,
 ) -> f32 {
     if env.dt <= 0.0 {
-        return held.doppler;
+        return if source.is_time_scaled {
+            held.doppler
+        } else {
+            1.0
+        };
     }
     let body = Body {
         position: now,
-        velocity: velocity(was, now, env.dt, c),
+        velocity: velocity(was, now, env.dt),
     };
     let level = source.doppler_level * source.spatial_blend.clamp(0.0, 1.0);
     rate(ear, body, c, level)
 }
 
 /// The velocity a body moving `was → now` over `dt` seconds had, or zero when its
-/// move is faster than sound (`c`), a teleport, or nothing finite.
-pub fn velocity(was: Vec3, now: Vec3, dt: f32, c: f32) -> Vec3 {
+/// move is faster than [`TELEPORT_SPEED`] (a teleport), or nothing finite.
+pub fn velocity(was: Vec3, now: Vec3, dt: f32) -> Vec3 {
     let v = (now - was) / dt;
-    if dt > 0.0 && v.is_finite() && v.length() < c {
+    if dt > 0.0 && v.is_finite() && v.length() < TELEPORT_SPEED {
         v
     } else {
         Vec3::ZERO

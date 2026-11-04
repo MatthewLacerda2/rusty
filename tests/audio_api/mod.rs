@@ -3,6 +3,7 @@
 //! play/stop/volume bookkeeping and the `GetSpatial` introspection assert
 //! identically with or without hardware — exactly what the harness runs on.
 
+mod defaults;
 mod global;
 mod mixer;
 mod occlusion;
@@ -18,6 +19,7 @@ use glam::Vec3;
 use mlua::Lua;
 use rusty::audio::AudioMaestro;
 use rusty::components::AudioSourceComponent;
+use rusty::core::application::Application;
 use rusty::scene::Camera;
 use rusty::scene::Scene;
 use rusty::time::Time;
@@ -27,6 +29,7 @@ struct Fixture {
     audio: Rc<RefCell<AudioMaestro>>,
     time: Rc<RefCell<Time>>,
     camera: Rc<RefCell<Camera>>,
+    app: Rc<RefCell<Application>>,
     source_id: u32,
     bare_id: u32,
 }
@@ -50,6 +53,7 @@ fn fixture() -> Fixture {
         audio: Rc::new(RefCell::new(AudioMaestro::default())),
         time: Rc::new(RefCell::new(Time::default())),
         camera: Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0))),
+        app: Rc::new(RefCell::new(Application::new())),
         source_id,
         bare_id,
     }
@@ -58,6 +62,6 @@ fn fixture() -> Fixture {
 fn register(lua: &Lua, f: &Fixture) {
     use rusty::api::bind;
     let (scene, audio) = (bind(lua, &f.scene), bind(lua, &f.audio));
-    rusty::api::audio::register(lua, scene, audio, bind(lua, &f.time), bind(lua, &f.camera))
-        .unwrap();
+    let (time, camera, app) = (bind(lua, &f.time), bind(lua, &f.camera), bind(lua, &f.app));
+    rusty::api::audio::register(lua, scene, audio, time, camera, app).unwrap();
 }

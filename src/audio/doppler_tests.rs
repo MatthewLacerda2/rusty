@@ -80,10 +80,16 @@ fn a_co_located_pair_or_a_nan_plays_at_one() {
 }
 
 #[test]
-fn a_move_faster_than_sound_is_a_teleport() {
-    let v = velocity(Vec3::ZERO, Vec3::new(0.5, 0.0, 0.0), 0.01, C);
+fn a_move_past_the_teleport_speed_is_still() {
+    let v = velocity(Vec3::ZERO, Vec3::new(0.5, 0.0, 0.0), 0.01);
     assert!((v.x - 50.0).abs() < 1e-3);
-    assert_eq!(velocity(Vec3::ZERO, Vec3::splat(40.0), 0.01, C), Vec3::ZERO);
-    assert_eq!(velocity(Vec3::ZERO, Vec3::X, 0.0, C), Vec3::ZERO, "no time");
-    assert_eq!(velocity(Vec3::ZERO, Vec3::NAN, 0.01, C), Vec3::ZERO);
+    let supersonic = velocity(Vec3::ZERO, Vec3::new(4.0, 0.0, 0.0), 0.01);
+    assert!(
+        (supersonic.x - 400.0).abs() < 1e-2,
+        "faster than sound is motion"
+    );
+    let jump = Vec3::new(100.0, 0.0, 0.0);
+    assert_eq!(velocity(Vec3::ZERO, jump, 0.01), Vec3::ZERO, "a 100 m jump");
+    assert_eq!(velocity(Vec3::ZERO, Vec3::X, 0.0), Vec3::ZERO, "no time");
+    assert_eq!(velocity(Vec3::ZERO, Vec3::NAN, 0.01), Vec3::ZERO);
 }

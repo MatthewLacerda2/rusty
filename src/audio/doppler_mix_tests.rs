@@ -69,7 +69,32 @@ fn a_push_with_no_sim_time_keeps_the_rate() {
 #[test]
 fn a_teleport_is_no_shift() {
     let (_, rate) = pushed(&source(1.0), 0.0, 0.01);
-    assert_eq!(rate, 1.0, "100 m in one tick is faster than sound");
+    assert_eq!(rate, 1.0, "100 m in one tick is past the teleport speed");
+}
+
+#[test]
+fn a_source_faster_than_sound_plays_at_the_clamp() {
+    let (_, rate) = pushed(&source(1.0), -96.0, 0.01);
+    assert_eq!(rate, crate::audio::doppler::RATE_MAX, "400 m/s closing");
+    let (mut maestro, src) = (AudioMaestro::default(), source(1.0));
+    maestro.set_speed_of_sound(40.0); // slow motion: a 50 m/s rocket is supersonic
+    maestro.play_source(1, &src, [-100.0, 0.0, 0.0], 0);
+    let at = Vec3::new(-99.5, 0.0, 0.0);
+    maestro.apply_mix(&env(Vec3::ZERO, 0.01), |_| Some((src.clone(), at)));
+    assert_eq!(maestro.source_doppler(1), crate::audio::doppler::RATE_MAX);
+}
+
+#[test]
+fn an_unscaled_voice_plays_at_one_through_a_pause() {
+    let src = AudioSourceComponent {
+        is_time_scaled: false,
+        ..source(1.0)
+    };
+    let (mut maestro, rate) = pushed(&src, -99.5, 0.01);
+    assert!(rate > 1.0, "shifted while moving");
+    let at = Vec3::new(-99.5, 0.0, 0.0);
+    maestro.apply_mix(&env(Vec3::ZERO, 0.0), |_| Some((src.clone(), at)));
+    assert_eq!(maestro.source_doppler(1), 1.0, "nothing moves in a pause");
 }
 
 #[test]

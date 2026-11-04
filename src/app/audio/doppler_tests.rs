@@ -1,5 +1,6 @@
 //! Doppler through the world's ticks (#1749): a source parented under a moving
-//! body is measured by its world position, and a pause holds the rate.
+//! body is measured by its world position, a pause holds the rate, and a scene load
+//! forgets the listener's motion.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -83,4 +84,25 @@ fn a_pause_holds_the_rate_and_the_resume_does_not_jump() {
     game.time().borrow_mut().resume();
     fly(&mut game, rocket, 0.0);
     assert_eq!(rate(&game, speaker), 1.0, "stopped while paused: still");
+}
+
+#[test]
+fn a_scene_load_forgets_the_listener_motion() {
+    let (mut game, rocket, speaker) = rocket();
+    let level = crate::test_temp::dir().join("rusty_1749_level.scene");
+    Scene::new().save_to_file(&level.to_string_lossy()).unwrap();
+    let scene = game.scene().clone();
+    scene.borrow_mut().dont_destroy_on_load(rocket); // the speaker rides along
+    scene
+        .borrow_mut()
+        .request_load(level.to_string_lossy().into_owned());
+    game.tick(DT); // the load lands at the tick's tail
+    assert!(game.resources.audio.borrow().is_source_playing(speaker));
+    // The camera lands 1 m closer: 100 m/s if it were measured across the load.
+    game.resources.camera.borrow_mut().position = Vec3::new(-1.0, 0.0, 0.0);
+    game.tick(DT);
+    assert_eq!(rate(&game, speaker), 1.0, "the load forgot the listener");
+    game.resources.camera.borrow_mut().position = Vec3::new(-2.0, 0.0, 0.0);
+    game.tick(DT);
+    assert!(rate(&game, speaker) > 1.0, "measured again after the load");
 }

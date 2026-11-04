@@ -1,8 +1,9 @@
 //! src/api/audio/doppler.rs — the `Audio` doppler verbs (#1749).
 //!
 //! The per-source level (`AudioSource.doppler_level`, the authoring op the
-//! inspector shares), the running speed of sound, and the rate a source's voice
-//! plays at now, for a play-test to assert a pass-by bends the pitch.
+//! inspector shares), the running speed of sound and the project's saved one (the
+//! Build Settings window's twin), and the rate a source's voice plays at now, for a
+//! play-test to assert a pass-by bends the pitch.
 
 use mlua::Table;
 
@@ -11,6 +12,7 @@ use super::groups::err;
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::audio::AudioMaestro;
+use crate::core::application::Application;
 use crate::scene::authoring::audio::source as audio_ops;
 use crate::scene::Scene;
 
@@ -75,5 +77,33 @@ fn register_speed_of_sound(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioM
         table,
         "GetSpeedOfSound",
         lua.create_function(move |lua, ()| Ok(audio.get(lua)?.borrow().speed_of_sound())),
+    )
+}
+
+/// `SetDefaultSpeedOfSound` / `GetDefaultSpeedOfSound`: the project's, in
+/// `project.rusty` (`Application::set_speed_of_sound`, the op the Build Settings
+/// window calls). It writes the file where one is bound (the editor, a session) and
+/// changes the value in memory elsewhere; entering Play and Stop apply it.
+pub(super) fn register_default_speed(
+    lua: &mlua::Lua,
+    table: &Table,
+    app: ApiCell<Application>,
+) -> Reg {
+    put(
+        table,
+        "SetDefaultSpeedOfSound",
+        lua.create_function(move |lua, c: f32| {
+            app.get(lua)?
+                .borrow_mut()
+                .set_speed_of_sound(c)
+                .map_err(|e| err(format!("SetDefaultSpeedOfSound: {e}")))
+        }),
+    )?;
+    put(
+        table,
+        "GetDefaultSpeedOfSound",
+        lua.create_function(move |lua, ()| {
+            Ok(app.get(lua)?.borrow().audio_settings().speed_of_sound)
+        }),
     )
 }
