@@ -26,6 +26,7 @@ use super::input::{BakeLight, BakeRun, BakeScene, LightShape};
 use super::lights::area::{strata, stratified};
 use super::rays::{Hit, Rays};
 use super::rng::Rng;
+use crate::components::{falloff, spot_cone};
 use crate::core::color::luminance;
 
 /// Ray offset along the surface normal, against self-intersection, in world units.
@@ -193,8 +194,8 @@ impl Tracer<'_> {
 }
 
 /// Unit direction to `light`, distance to it, and the radiance arriving at `point`
-/// (before the cosine), with the forward shader's falloff: `1 / (d² + 1)` inside
-/// `range`, and the spot's linear inner-to-outer cone fade. An Area light is
+/// (before the cosine), with the forward shader's falloff and cone (#1699):
+/// [`falloff`] inside `range`, and for a spot [`spot_cone`]. An Area light is
 /// asked about its point at `u` in `[0, 1]²` (`area`'s model); the rest ignore
 /// `u`. `None` out of reach.
 pub(super) fn arrival(light: &BakeLight, point: Vec3, u: Vec2) -> Option<(Vec3, f32, Vec3)> {
@@ -206,7 +207,7 @@ pub(super) fn arrival(light: &BakeLight, point: Vec3, u: Vec2) -> Option<(Vec3, 
         LightShape::Directional { direction } => Some((-direction, f32::MAX, light.radiance)),
         LightShape::Point { position, range } => {
             let (dir, d) = toward(position, point, range)?;
-            Some((dir, d, light.radiance / (d * d + 1.0)))
+            Some((dir, d, light.radiance * falloff(d, range)))
         }
         LightShape::Spot {
             position,
@@ -220,8 +221,8 @@ pub(super) fn arrival(light: &BakeLight, point: Vec3, u: Vec2) -> Option<(Vec3, 
             if theta <= cos_outer {
                 return None;
             }
-            let cone = ((theta - cos_outer) / (cos_inner - cos_outer).max(1e-4)).clamp(0.0, 1.0);
-            Some((dir, d, light.radiance * cone / (d * d + 1.0)))
+            let cone = spot_cone(theta, cos_inner, cos_outer);
+            Some((dir, d, light.radiance * cone * falloff(d, range)))
         }
     }
 }

@@ -3,12 +3,13 @@
 //!
 //! The emitter is a `width × height` rectangle facing `forward` (its local −Z),
 //! one-sided, with `radiance` (colour × intensity) per unit area: a patch `dA`
-//! seen at distance `d` and angle `θ` off its normal sends `radiance · cos θ · dA /
-//! (d² + 1)` toward a receiver, the point light's falloff with the patch's
-//! Lambertian cosine. Integrated, a small or far panel acts as a point light of
-//! intensity `intensity × area` straight ahead, fading with `cos θ` to its sides,
-//! which is the energy rule the tests hold. `range` cuts it off, measured from the
-//! centre, as for point and spot lights.
+//! seen at distance `d` and angle `θ` off its normal sends `radiance · cos θ · dA ·
+//! falloff(d, range)` toward a receiver, the point light's windowed
+//! inverse-square ([`falloff`], #1699) with the patch's Lambertian cosine.
+//! Integrated, a small or far panel acts as a point light of intensity
+//! `intensity × area` straight ahead, fading with `cos θ` to its sides, which is
+//! the energy rule the tests hold. `range` is where it reaches zero, and
+//! no receiver farther than that from the centre is lit.
 //!
 //! The rectangle is integrated by sampling points on it: the lightmap tracer draws
 //! jittered, stratified points from the texel's seeded stream, so penumbrae come out
@@ -17,7 +18,7 @@
 
 use glam::{Vec2, Vec3};
 
-use crate::components::LightComponent;
+use crate::components::{falloff, LightComponent};
 use crate::scene::Scene;
 
 /// Cells per side of the fixed grid the probe bake integrates a rectangle over:
@@ -90,7 +91,7 @@ impl AreaShape {
         }
         let dir = offset / d;
         let cos_emit = -dir.dot(self.forward);
-        (cos_emit > 0.0).then(|| (dir, d, cos_emit * self.area() / (d * d + 1.0)))
+        (cos_emit > 0.0).then(|| (dir, d, cos_emit * self.area() * falloff(d, self.range)))
     }
 }
 

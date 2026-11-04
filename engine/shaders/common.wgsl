@@ -4,6 +4,7 @@
 // a helper only common itself calls may live in a module of its own (`sky/noise.wgsl`).
 
 #import fog::height::fog_height_mean
+#import lighting::falloff::{light_falloff, spot_cone}
 #import lighting::reflection_probe::ReflectionProbe
 #import sky::noise::sky_fbm
 
@@ -121,7 +122,7 @@ struct LocalLight {
     color: vec3<f32>,
     intensity: f32,
     direction: vec3<f32>,
-    kind: u32,        // 0 point, 1 spot
+    kind: u32,        // 0 point, 1 spot, 2 an Area light's capture stand-in
     inner_cone: f32,  // cosine of the inner half-angle
     outer_cone: f32,  // cosine of the outer half-angle
     // First tile in the shadow atlas (#468): a spotlight's one, a point light's six
@@ -148,19 +149,21 @@ fn cluster_index(c: Clusters, view_proj: mat4x4<f32>, world: vec3<f32>) -> u32 {
     return tile.x + c.dims.x * (tile.y + c.dims.y * slice);
 }
 
-// The radiance a local light delivers at `world`: inverse-square falloff cut at its
-// range, and for a spotlight the smoothed cone. Zero when out of reach.
+// The radiance a local light delivers at `world`: `light_falloff` within its range,
+// and for a spotlight `spot_cone` (an Area stand-in, kind 2, its facing's cosine).
+// Zero when out of reach.
 fn local_light_radiance(light: LocalLight, world: vec3<f32>) -> vec3<f32> {
     let d = distance(light.position, world);
-    if (d > light.range) {
+    if (d >= light.range) {
         return vec3<f32>(0.0);
     }
     var cone = 1.0;
-    if (light.kind == 1u) {
+    if (light.kind != 0u) {
         let theta = dot((light.position - world) / max(d, 1e-6), -light.direction);
-        cone = clamp((theta - light.outer_cone) / max(light.inner_cone - light.outer_cone, 1e-4), 0.0, 1.0);
+        // kind 2 is an Area light's capture stand-in: a Lambert emitter's cos.
+        cone = select(spot_cone(theta, light.inner_cone, light.outer_cone), max(theta, 0.0), light.kind == 2u);
     }
-    return light.color * light.intensity * cone / (d * d + 1.0);
+    return light.color * light.intensity * cone * light_falloff(d, light.range);
 }
 
 // ---- Surface decals (#638) ----
@@ -259,10 +262,11 @@ struct ShadowTile {
     params: vec4<f32>,
 };
 
-// The atlas tile holding `light`'s shadow at `world`: a spotlight's one, or the
+// The atlas tile holding `light`'s shadow at `world`: a spotlight's (or an Area
+// stand-in's) one, or the
 // point light's cube face along the major axis from the light; NO_SHADOW if none.
 fn local_shadow_tile(light: LocalLight, world: vec3<f32>) -> u32 {
-    if (light.shadow == NO_SHADOW || light.kind == 1u) {
+    if (light.shadow == NO_SHADOW || light.kind != 0u) {
         return light.shadow;
     }
     let d = world - light.position;

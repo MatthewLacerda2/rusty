@@ -47,3 +47,25 @@ fn a_bake_capture_takes_no_shadow_fade() {
     let fade = |capture| local_lights(&scene, capture)[0].0.shadow_fade;
     assert_eq!((fade(false), fade(true)), (20.0, 0.0));
 }
+
+/// An Area light's capture stand-in (#1674) is its own kind (#1699): shadowed
+/// through one frustum like a spot, but fading as the Lambert `cos θ`, which the
+/// spotlight's squared cone would not give it.
+#[test]
+fn an_area_light_stands_in_as_its_own_one_frustum_kind() {
+    use super::lights::{LocalLight, KIND_AREA};
+    let light = LightComponent {
+        light_type: LightType::Area,
+        ..crate::scene::authoring::default_light()
+    };
+    let l = LocalLight::new(Vec3::ZERO, Vec3::NEG_Z, &light).expect("a local light");
+    assert_eq!(l.kind, KIND_AREA);
+    assert!(l.one_frustum());
+    let point = LightComponent {
+        light_type: LightType::Point,
+        ..crate::scene::authoring::default_light()
+    };
+    assert!(!LocalLight::new(Vec3::ZERO, Vec3::NEG_Z, &point)
+        .unwrap()
+        .one_frustum());
+}

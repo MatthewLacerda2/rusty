@@ -12,6 +12,10 @@ use crate::scene::{LightType, Scene};
 pub(crate) const KIND_POINT: u32 = 0;
 /// `LocalLight::kind` for a spotlight (cone cosines apply).
 pub(crate) const KIND_SPOT: u32 = 1;
+/// `LocalLight::kind` for an Area light's stand-in in a bake capture (#1674): a
+/// spot shadowed as one, whose light fades as the Lambert `cos θ` off its facing
+/// instead of a spotlight's squared cone (#1699).
+pub(crate) const KIND_AREA: u32 = 2;
 /// `LocalLight::shadow` for a light with no tile in the shadow atlas (#468).
 pub(crate) const NO_SHADOW: u32 = u32::MAX;
 
@@ -48,8 +52,8 @@ impl LocalLight {
     ///
     /// An Area light (#1674) only ever gets here in a bake capture, being always
     /// `Baked`: it is drawn as its far field, a spot at its centre of intensity
-    /// `intensity × area` whose 0°–90° cone fades as `cos θ`, a one-sided
-    /// Lambertian emitter's falloff. The lightmap and the probes' direct term
+    /// `intensity × area` ([`KIND_AREA`]) whose light fades as `cos θ` off its
+    /// facing, a one-sided Lambertian emitter's falloff. The lightmap and the probes' direct term
     /// integrate the rectangle itself.
     pub(crate) fn new(position: Vec3, forward: Vec3, light: &LightComponent) -> Option<Self> {
         let (kind, intensity, cones) = match light.light_type {
@@ -61,7 +65,7 @@ impl LocalLight {
             ),
             LightType::Area => {
                 let area = light.area_size.x * light.area_size.y;
-                (KIND_SPOT, light.intensity * area, (0.0, 90.0))
+                (KIND_AREA, light.intensity * area, (0.0, 90.0))
             }
             LightType::Ambient | LightType::Directional => return None,
         };
@@ -89,6 +93,12 @@ impl LocalLight {
         self.intensity * crate::core::color::luminance(self.color)
     }
 
+    /// Whether it shadows through one spot frustum (a spotlight or an Area
+    /// light's stand-in) rather than a point light's six cube faces.
+    pub(crate) fn one_frustum(&self) -> bool {
+        self.kind != KIND_POINT
+    }
+
     /// The light's range sphere: centre and range. What every per-camera cut
     /// (the binner's and the shadow atlas's) ranks by.
     pub(crate) fn sphere(&self) -> (Vec3, f32) {
@@ -97,8 +107,8 @@ impl LocalLight {
 
     /// What the binner tests (#1712): the range [`Self::sphere`], and for a
     /// spotlight its [`Cone`], which decides which clusters list it once kept. A
-    /// cone wider than [`WIDEST_CULLED_CONE`] (an Area light's 90° stand-in among
-    /// them) gets no cone and lists by its range sphere alone.
+    /// cone wider than [`WIDEST_CULLED_CONE`], and an Area light's 90° stand-in,
+    /// get no cone and list by their range sphere alone.
     pub(crate) fn bounds(&self) -> Bounds {
         let (apex, range) = self.sphere();
         let axis = Vec3::from(self.direction);

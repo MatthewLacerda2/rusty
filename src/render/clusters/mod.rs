@@ -70,6 +70,9 @@ mod cone_budget_tests;
 #[path = "cone_tests.rs"]
 mod cone_tests;
 #[cfg(test)]
+#[path = "falloff_gpu_tests.rs"]
+mod falloff_gpu_tests;
+#[cfg(test)]
 #[path = "gpu_tests.rs"]
 mod gpu_tests;
 #[cfg(test)]

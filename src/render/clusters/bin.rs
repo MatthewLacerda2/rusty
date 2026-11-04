@@ -10,6 +10,7 @@ use super::footprint::{footprint, Footprint};
 use super::grid::AabbCache;
 use super::lists::{fill_lists, Pair};
 use super::{ClusterGrid, LocalLight, CLUSTER_COUNT, GRID, MAX_CLUSTER_LIGHTS, MAX_VISIBLE_LIGHTS};
+use crate::components::falloff;
 
 /// One camera's binned spheres (lights or decals): per cluster an `[offset, count]`
 /// into `indices`, the flat list of indices (into the frame's light or decal
@@ -64,12 +65,13 @@ impl Budget<'_> {
         }
     }
 
-    /// How much sphere `item` matters to one cluster whose nearest point lies
-    /// `d2` (squared) from its centre (a light's position, so the lamp): the most
-    /// it delivers there, with the shader's `1 / (d² + 1)` falloff.
-    fn cluster_score(&self, item: u32, d2: f32) -> f32 {
+    /// How much sphere `item` of `radius` matters to one cluster whose nearest
+    /// point lies `d2` (squared) from its centre (a light's position, so the
+    /// lamp): the most it delivers there, with the shader's falloff
+    /// ([`falloff`], #1699).
+    fn cluster_score(&self, item: u32, d2: f32, radius: f32) -> f32 {
         self.brightness
-            .map_or(0.0, |b| b[item as usize] / (d2 + 1.0))
+            .map_or(0.0, |b| b[item as usize] * falloff(d2.sqrt(), radius))
     }
 
     /// Whether a kept `item` is listed at all: not a light whose brightness is not
@@ -181,7 +183,7 @@ fn bin_bounds(
                     let d2 = c.center.clamp(lo, hi).distance_squared(c.center);
                     let in_cone = |k: &Cone| k.may_touch_box(lo, hi);
                     if d2 <= c.radius * c.radius && cone.as_ref().is_none_or(in_cone) {
-                        let score = budget.cluster_score(c.item, d2);
+                        let score = budget.cluster_score(c.item, d2, c.radius);
                         pairs.push(Pair {
                             cluster,
                             item: c.item,

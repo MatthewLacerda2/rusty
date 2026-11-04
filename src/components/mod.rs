@@ -62,7 +62,7 @@ pub use physics::rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use rendering::camera::{
     is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX,
 };
-pub use rendering::light::{LightComponent, LightMode, LightType};
+pub use rendering::light::{falloff, spot_cone, LightComponent, LightMode, LightType};
 pub use rendering::light_probe_proxy_volume::{
     LightProbeProxyVolumeComponent, ProxyBoundsMode, ProxyGrid, ProxyQuality, ProxyResolutionMode,
 };

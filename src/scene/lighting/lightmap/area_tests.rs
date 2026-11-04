@@ -10,6 +10,7 @@ use super::rng::Rng;
 use super::tests::quad;
 use super::trace::Tracer;
 use super::*;
+use crate::components::falloff;
 
 pub(super) const RADIANCE: f32 = 4.0;
 
@@ -51,7 +52,7 @@ fn far_away_a_panel_is_a_point_light_of_intensity_times_area() {
     for (w, h) in [(1.2, 0.6), (2.0, 0.5), (0.3, 0.3)] {
         let scene = lit(vec![panel(w, h, d, 100.0)], vec![]);
         let e = direct_at(&scene, Vec3::ZERO, Vec3::Y);
-        let point = RADIANCE * w * h / (d * d + 1.0);
+        let point = RADIANCE * w * h * falloff(d, 100.0);
         assert!((e - point).abs() < point * 0.01, "{w}×{h}: {e} vs {point}");
     }
     // 60° off the panel's facing, the receiver turned toward it: cos 60° as much.
@@ -59,7 +60,7 @@ fn far_away_a_panel_is_a_point_light_of_intensity_times_area() {
     let at = Vec3::new(10.0 * 3f32.sqrt(), 0.0, 0.0);
     let toward = (Vec3::new(0.0, 10.0, 0.0) - at).normalize();
     let e = direct_at(&scene, at, toward);
-    let expected = RADIANCE * 0.5 / (400.0 + 1.0);
+    let expected = RADIANCE * 0.5 * falloff(20.0, 100.0);
     assert!((e - expected).abs() < expected * 0.02, "{e} vs {expected}");
 }
 
