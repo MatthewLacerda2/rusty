@@ -58,7 +58,7 @@ pub const GRID: u32 = 4 << (MIP_LEVELS - 1);
 pub const MIN_PAGE: u32 = 32;
 
 /// The largest lightmap edge a `page`-edge atlas takes: the page less the ring on
-/// both sides, so its cell is exactly the page (`page` is a multiple of [`GRID`]).
+/// both sides, so its cell is exactly the page (`page` is a multiple of the 16-texel grid).
 /// The one definition of a map's cap (#1704).
 pub const fn max_map_edge(page: u32) -> u32 {
     page - 2 * PAD

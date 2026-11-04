@@ -10,7 +10,7 @@
 
 use crate::components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use crate::components::{MeshComponent, ShadowCasting};
-use crate::scene::authoring::{subdivided_geometry, Primitive};
+use crate::scene::authoring::{sanitize, subdivided_geometry, Primitive};
 
 /// Cut a `Plane` into `subdivisions` quads per side and rebuild its geometry.
 /// Refuses a count outside `1..=`[`MAX_PLANE_SUBDIVISIONS`], and any count but 1 on
@@ -53,11 +53,8 @@ pub fn set_cast_shadows(mesh: &mut MeshComponent, mode: ShadowCasting) {
 /// [`MeshComponent::SCALE_IN_LIGHTMAP`]; a non-finite value keeps the default 1.
 /// The next bake reads it. A load runs this too, so a hand-edited file is held.
 pub fn set_scale_in_lightmap(mesh: &mut MeshComponent, scale: f32) {
-    let range = MeshComponent::SCALE_IN_LIGHTMAP;
-    mesh.scale_in_lightmap = match scale.is_finite() {
-        true => scale.clamp(*range.start(), *range.end()),
-        false => 1.0,
-    };
+    let (lo, hi) = MeshComponent::SCALE_IN_LIGHTMAP.into_inner();
+    mesh.scale_in_lightmap = sanitize::finite_or(scale, 1.0).clamp(lo, hi);
 }
 
 /// Hold a count read from a file (#1524), so the field agrees with the grid the
