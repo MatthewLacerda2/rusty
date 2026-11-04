@@ -4,7 +4,7 @@
 scene has, in order, with the scene's own settings, and the result **written** — no
 separate save. It bakes the lightmaps (`Lighting.BakeLightmaps`, below), then the light
 and reflection probes (`Lighting.Bake`), so walls and actors are always lit by the same
-bake. The editor's **"Generate Lighting"** button (the scene inspector) is this exact
+bake, then the occlusion culling's PVS (*Occlusion culling*, below). The editor's **"Generate Lighting"** button (the scene inspector) is this exact
 path. The call returns when the bake is done (Unity's `Lightmapping.Bake`); the button
 bakes the same probes a step a frame — one reflection probe or a few light probes —
 so the editor and the MCP keep answering (Unity's `BakeAsync`, #1602). Both say each
@@ -13,7 +13,7 @@ The two individual verbs stay for a script that wants only one of them.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, saved }` |
+| `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, saved }` (the occlusion fields `0` when nothing occludes) |
 | `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, diffuseModel, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
 | `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, diffuseModel?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
@@ -327,6 +327,48 @@ Properties → UV Maps*, unwrap it with no overlapping islands (*Lightmap Pack*,
 UV Project* with some island margin), keep the first map for textures, and export glTF 2.0
 with *UVs* enabled — Blender writes the second map as `TEXCOORD_1`. Or skip all that and
 tick the model's **Generate Lightmap UVs** (Unity's checkbox): rusty unwraps one at import.
+
+### Occlusion culling
+
+Unity's *Occlusion Culling* (#1714, part 2): Generate Lighting bakes, from the static
+scene, which static meshes each cell of the level may see, and a camera with
+`use_occlusion_culling` on (the default; `Camera.SetUseOcclusionCulling`, the Camera
+card's *Occlusion Culling* box) skips the static meshes its cell cannot see. It changes
+no pixel: a mesh it skips is one no ray from the camera's cell reaches.
+
+- **What takes part.** rusty has one static flag, so a static mesh is both of Unity's
+  `StaticEditorFlags`: an opaque one (no surface shader) is an **occluder and an
+  occludee**; a Transparent, Cutout or custom-shader one, one in a `LODGroup`, one
+  with a max draw distance or min screen size, and a light's gizmo are **occludees
+  only** (what draws of them changes, or a view passes through them). Dynamic,
+  skinned, shadows-only and inactive meshes take no part and are always drawn.
+- **Cells.** A uniform grid of 2 m cubes over the static bounds, one cell of margin
+  round them, coarser cubes past 16384 cells (a Dust2-sized level). A camera outside
+  every cell culls nothing. Each cell keeps what any point in it may see: rays from
+  seeded points in the cell to seeded points on each mesh's triangles (and its
+  extremes), then every cell also takes its 26 neighbours' sets. Cells that see the
+  same set share one row. The bake is a pure function of the scene and a fixed seed:
+  the same bytes at any thread count.
+- **Stored** beside the scene as `<scene>.occlusion` (a small binary file, written
+  with the lighting and on every save; removed when the scene has none). A file that
+  is truncated or out of range is refused on load with a warning, and nothing is
+  occlusion-culled.
+- **A bake older than the scene** never hides what is there: a static mesh moved,
+  re-materialled or made dynamic since is drawn, a mesh added since is drawn, and if
+  an occluder moved, was removed or deactivated, nothing is occlusion-culled until
+  the next Generate Lighting. The console says so once.
+- **Per camera.** Each camera reads its own position's cell: the base camera, a
+  stacked or viewmodel camera, a render-texture camera. Probe and reflection bakes
+  cull nothing. A camera whose culling mask leaves out an occluder's layer sees past
+  it, so it culls nothing by occlusion. A selected mesh the editor's outline rings is
+  always drawn.
+- **Not culled by it:** shadows. A caster the camera cannot see may still cast into
+  view, and the shadow maps gather their casters by each light's volume as before.
+- **See it** in the editor (Unity's *Visualization*): select a camera, and the Scene
+  view outlines the cell it stands in (yellow) and every static mesh the bake hides
+  from it (red). `make editor-capture ARGS="--select <camera>"` renders the same.
+- **Measure** with `Debug.Stats().occlusion_culled` (per frame, summed over the
+  camera views).
 
 ### Environment
 

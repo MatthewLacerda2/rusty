@@ -29,7 +29,9 @@ pub(crate) struct CameraSolids<'a> {
 impl Renderer {
     /// Collect `scene`'s retained solids `view` draws into `out`, each marked for the
     /// outline when `ringed` names it; with `history`, each carries its last-frame
-    /// pose (#1435). Returns what culling skipped and how many objects drew.
+    /// pose (#1435). An object the frustum and the small-object cull kept is then
+    /// left out when the scene's baked PVS hides it from the camera's cell (#1714).
+    /// Returns what culling skipped and how many objects drew.
     pub(crate) fn camera_solids(
         &mut self,
         scene: &Scene,
@@ -42,10 +44,17 @@ impl Renderer {
         }
         let retained = self.retained.take(scene.id());
         let (mut culls, mut visible) = (CameraCulls::default(), 0);
+        let pvs = &retained.occlusion;
+        let row = view.occlusion.and_then(|eye| pvs.row(eye, view.mask));
         for (id, object) in retained.objects() {
             let Some(bounds) = self.cull_object(scene, (id, object), view, &mut culls) else {
                 continue;
             };
+            // The selection outline rings a solid through walls: a ringed one stays.
+            if row.is_some_and(|row| pvs.hides(row, id)) && !ringed.contains(&id) {
+                culls.occluded += 1;
+                continue;
+            }
             if !object.resident || object.slots.is_empty() {
                 continue;
             }

@@ -127,6 +127,14 @@ pub fn set_taa_active(c: &mut CameraComponent, active: bool) {
     c.taa_active = active;
 }
 
+/// Set the camera's Occlusion Culling flag (#1714, Unity's
+/// `Camera.useOcclusionCulling`): whether it skips what the scene's baked PVS says
+/// its cell cannot see. Shared by the editor's Camera card and
+/// `Camera.SetUseOcclusionCulling`.
+pub fn set_use_occlusion_culling(c: &mut CameraComponent, on: bool) {
+    c.use_occlusion_culling = on;
+}
+
 /// The largest render-texture side, in pixels — a guard against a typo allocating
 /// gigabytes, not a quality bound (4096² is a 64 MB colour target).
 pub const MAX_TARGET_SIZE: u32 = 4096;

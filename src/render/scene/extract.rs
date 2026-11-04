@@ -56,6 +56,7 @@ impl Renderer {
             rs.regroup(UnbakedCasters::of(scene));
         }
         rs.refold_casting();
+        rs.occlusion.refresh(scene);
         stats
     }
 
@@ -68,6 +69,7 @@ impl Renderer {
         rs.objects.clear();
         rs.order.clear();
         rs.casting = None;
+        rs.occlusion.forget();
         ExtractStats {
             extracted: self.derive_objects(scene, rs, &ids),
             posed: 0,
@@ -112,6 +114,9 @@ impl Renderer {
             if let Some(object) = rs.objects.get_mut(&id) {
                 self.pose_object(scene, id, object);
                 moved += 1;
+                if object.is_static {
+                    rs.occlusion.forget();
+                }
             }
         }
         ExtractStats {

@@ -72,7 +72,8 @@ impl Renderer {
     pub(crate) fn precreate_overlays(&self, scene: &Scene) -> Overlays {
         let mut draws = OverlayDraws::default();
         let grid = self.precreate_grid(&mut draws);
-        let aabb = self.precreate_aabb(scene, &mut draws);
+        let mut aabb = self.precreate_aabb(scene, &mut draws);
+        aabb.extend(self.precreate_occlusion(scene, &mut draws));
         let axis = self.precreate_axis_arrows(scene, &mut draws);
         let probes = self.precreate_probes(scene, &mut draws);
         Overlays {
@@ -114,6 +115,7 @@ impl Renderer {
             lod,
             frustum,
             small: self.small_object_cull(cam),
+            occlusion: self.occlusion_eye(cam),
         };
         let out = CameraSolids {
             opaque: &mut opaque,

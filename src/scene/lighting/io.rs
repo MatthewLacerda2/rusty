@@ -58,10 +58,12 @@ pub fn apply_lighting(scene: &mut Scene, data: &LightingData) {
     }
 }
 
-/// Write the lighting sidecar next to `scene_path`, but only if at least one probe
+/// Write the baked PVS beside `scene_path` (`occlusion::save_sidecar`, #1714), and
+/// the lighting sidecar next to it, but only if at least one probe
 /// carries non-zero SH. When no probe is baked the sidecar is removed (if present) so
 /// stale data can't linger. Errors are returned as strings, matching scene I/O.
 pub fn save_lighting_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
+    super::occlusion::save_sidecar(scene, scene_path)?;
     let path = sidecar_path(scene_path);
     let has_baked = scene.probes.probes().iter().any(|p| p.sh != Sh9::zero());
     if !has_baked {
@@ -77,10 +79,11 @@ pub fn save_lighting_sidecar(scene: &Scene, scene_path: &str) -> Result<(), Stri
     std::fs::write(&path, json).map_err(|e| format!("Failed to write lighting sidecar: {}", e))
 }
 
-/// Load the lighting sidecar for `scene_path` onto the scene's probes, if it exists.
-/// A missing sidecar is a no-op (probes keep zero SH). Returns an error only on a
+/// Load the lighting sidecar for `scene_path` onto the scene's probes, if it exists,
+/// and the baked PVS beside it (`occlusion::load_sidecar`, #1714). A missing sidecar is a no-op (probes keep zero SH). Returns an error only on a
 /// present-but-corrupt sidecar.
 pub fn load_lighting_sidecar(scene: &mut Scene, scene_path: &str) -> Result<(), String> {
+    super::occlusion::load_sidecar(scene, scene_path);
     let path = sidecar_path(scene_path);
     if !Path::new(&path).exists() {
         return Ok(());

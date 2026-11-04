@@ -32,6 +32,10 @@
 //! The equivalence tests (`equivalence_tests.rs`) hold that an incrementally updated
 //! scene equals one built from scratch; a new input gets a case there.
 //!
+//! **Occlusion** (#1714): the scene's baked PVS is bound to the objects
+//! ([`OcclusionBinding`]), re-checked only after a static object changed or the PVS
+//! was replaced; a camera then culls an unchanged static object its cell cannot see.
+//!
 //! **Shadows** (part 2): the cascades' and the atlas's sweeps gather their casters
 //! from the objects (`passes::shadows::casters`), each slot carrying its shadow
 //! clip, and the static bakes' key is the scene's [`RenderScene::statics_key`],
@@ -51,6 +55,9 @@ mod handles;
 mod idle_tests;
 mod inputs;
 mod object;
+mod occlusion;
+#[cfg(test)]
+mod occlusion_gpu_tests;
 #[cfg(test)]
 mod shadow_ops;
 
@@ -59,6 +66,7 @@ use std::collections::BTreeMap;
 pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
 pub(crate) use object::{RenderObject, SlotDraw};
+pub(crate) use occlusion::OcclusionBinding;
 
 use crate::render::passes::shadows::{casting_key, StaticsKey, UnbakedCasters};
 use crate::render::{GpuMesh, Renderer};
@@ -131,6 +139,9 @@ pub(crate) struct RenderScene {
     /// the objects only after a static one was re-derived or `unbaked` changed;
     /// `None` until then.
     casting: Option<u64>,
+    /// The scene's baked PVS bound to these objects (#1714), re-bound after a static
+    /// one changed or the PVS was replaced.
+    pub(crate) occlusion: OcclusionBinding,
 }
 
 impl RenderScene {
@@ -152,10 +163,11 @@ impl RenderScene {
         }
     }
 
-    /// A static object came or went: the digest is refolded.
+    /// A static object came or went: the digest is refolded, and the PVS re-bound.
     fn forget_casting(&mut self, is_static: bool) {
         if is_static {
             self.casting = None;
+            self.occlusion.forget();
         }
     }
 

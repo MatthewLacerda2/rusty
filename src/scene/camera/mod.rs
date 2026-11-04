@@ -47,6 +47,10 @@ pub struct Camera {
     pub clear_flags: ClearFlags,
     /// Perspective (through `fov`) or orthographic (#430).
     pub projection: Projection,
+    /// Cull static meshes the scene's baked PVS says this camera's cell cannot see
+    /// (#1714, Unity's `Camera.useOcclusionCulling`). On by default; it culls nothing
+    /// in a scene with no bake.
+    pub use_occlusion_culling: bool,
     /// The view's up vector: +Y for every camera a person or script drives, which
     /// aims by yaw and pitch. A cube-capture face sets its own (#1615), so a face
     /// looking straight up or down has a basis that isn't left to rounding.
@@ -76,6 +80,7 @@ impl Camera {
             culling_mask: u32::MAX,
             clear_flags: ClearFlags::Skybox,
             projection: Projection::Perspective,
+            use_occlusion_culling: true,
             up: Vec3::Y,
             scene_lens: false,
         }
@@ -134,13 +139,14 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
         .then(|| main_camera(scene))
         .flatten()
         .and_then(|id| scene.world.camera(id))
-        .map(|c| (held_lens(&c), c.culling_mask));
+        .map(|c| (held_lens(&c), c.culling_mask, c.use_occlusion_culling));
 
     let had_scene_lens = std::mem::replace(&mut camera.scene_lens, lens.is_some());
     match lens {
-        Some((lens, mask)) => {
+        Some((lens, mask, occlusion)) => {
             lens.apply(camera);
             camera.culling_mask = mask;
+            camera.use_occlusion_culling = occlusion;
         }
         None => {
             // The fov goes back to the default only when a scene camera stops
@@ -153,6 +159,7 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
             camera.near = DEFAULT_NEAR;
             camera.far = DEFAULT_FAR;
             camera.culling_mask = u32::MAX;
+            camera.use_occlusion_culling = true;
         }
     }
 }
@@ -187,11 +194,12 @@ pub fn camera_for_entity(base: &Camera, scene: &Scene, id: u32) -> Option<Camera
     Some(cam)
 }
 
-/// Layer `c`'s lens (fov/near/far/projection), culling mask and clear flags onto
-/// `cam`, keeping its pose.
+/// Layer `c`'s lens (fov/near/far/projection), culling mask and occlusion culling
+/// and clear flags onto `cam`, keeping its pose.
 pub fn apply_lens(cam: &mut Camera, c: &crate::components::CameraComponent) {
     held_lens(c).apply(cam);
     cam.culling_mask = c.culling_mask;
+    cam.use_occlusion_culling = c.use_occlusion_culling;
     cam.clear_flags = c.clear_flags;
 }
 

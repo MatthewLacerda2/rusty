@@ -37,6 +37,9 @@ pub struct SceneSnapshot {
     /// The text the engine last read or wrote at the scene's file (#1340), so the
     /// editor's own next write after a put-back is no outside change to reload.
     disk_text: crate::scene::io::DiskText,
+    /// The baked PVS (#1714): no document field (it is the `<scene>.occlusion`
+    /// file), so it is put back as it was.
+    occlusion: Option<std::sync::Arc<crate::scene::lighting::occlusion::OcclusionData>>,
 }
 
 impl SceneSnapshot {
@@ -49,6 +52,7 @@ impl SceneSnapshot {
             decals: scene.decals.clone(),
             id: scene.id(),
             disk_text: scene.disk_text(),
+            occlusion: (*scene.occlusion).clone(),
         }
     }
 
@@ -64,5 +68,8 @@ impl SceneSnapshot {
         scene.probes = self.probes;
         scene.restore_id(self.id);
         scene.restore_disk_text(self.disk_text);
+        if *scene.occlusion != self.occlusion {
+            *scene.occlusion = self.occlusion;
+        }
     }
 }

@@ -3,8 +3,9 @@
 //!
 //! Unity 5's one button: lightmaps first (`lightmap_bake`, #438), then light and
 //! reflection probes (`lighting_bake`, #246), both with the scene's own
-//! [`LightingSettings`](crate::scene::lighting::LightingSettings), and finally the
-//! lighting written into the scene file ([`save_lighting`]) so nobody has to
+//! [`LightingSettings`](crate::scene::lighting::LightingSettings), then the
+//! occlusion culling's PVS (`scene::lighting::occlusion`, #1714, which Unity bakes
+//! from its Occlusion window), and finally the lighting written into the scene file ([`save_lighting`]) so nobody has to
 //! remember to save. The individual bakes stay for scripts that want one of them.
 //!
 //! The editor runs the lightmap step on a worker (#808), then steps the probe bake
@@ -19,6 +20,7 @@ use crate::dev::bake::lightmap::bake_scene_lightmaps_logged;
 use crate::dev::bake::progress::BakeLog;
 use crate::dev::bake::steps::LightingBake;
 use crate::navigation::NavigationGraph;
+use crate::scene::lighting::occlusion::{bake_occlusion, OcclusionBakeReport};
 use crate::scene::{save_lighting, LightingSave, Scene, LIGHTING_IN_PLAY};
 
 /// Why Generate Lighting cannot start: the bakes write beside the scene file.
@@ -31,6 +33,11 @@ pub struct GenerateReport {
     pub lightmaps: usize,
     /// The probe step's placement and bake.
     pub probes: LightingBakeReport,
+    /// The occlusion bake (#1714): its cells, rows and size; all zero when nothing
+    /// occludes.
+    pub occlusion: OcclusionBakeReport,
+    /// Wall-clock milliseconds the occlusion bake took.
+    pub occlusion_ms: u64,
     /// Whether the lighting reached the scene file or needs a full save.
     pub saved: LightingSave,
 }
@@ -43,6 +50,16 @@ impl GenerateReport {
             "Generated lighting: {} lightmap(s), {} light probe(s), {} reflection probe(s)",
             self.lightmaps, p.light_probes, p.reflection_probes
         );
+        let o = &self.occlusion;
+        if o.cells > 0 {
+            line.push_str(&format!(
+                ", occlusion over {} cell(s) of {} object(s) ({} KiB, {} ms)",
+                o.cells,
+                o.objects,
+                o.bytes.div_ceil(1024),
+                self.occlusion_ms
+            ));
+        }
         line.push_str(match self.saved {
             LightingSave::Written => "; saved",
             LightingSave::NeedsSceneSave => "; save the scene to keep it",
@@ -93,8 +110,9 @@ pub fn start_probes(
 }
 
 /// The last step, once lightmaps (`lightmaps` of them, already applied to `scene`)
-/// and probes are baked and committed ([`LightingBake::commit`]): write the lighting
-/// into the file at `path`.
+/// and probes are baked and committed ([`LightingBake::commit`]): bake the occlusion
+/// culling's PVS from the static scene as it stands (#1714), then write the lighting
+/// into the file at `path` and the PVS beside it.
 pub fn finish(
     scene: &mut Scene,
     path: &str,
@@ -102,10 +120,17 @@ pub fn finish(
     probes: LightingBakeReport,
 ) -> Result<GenerateReport, String> {
     refuse_in_play(scene)?;
+    let start = std::time::Instant::now();
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let (data, occlusion) = bake_occlusion(scene, threads);
+    let occlusion_ms = start.elapsed().as_millis() as u64;
+    *scene.occlusion = data.map(std::sync::Arc::new);
     let saved = save_lighting(scene, path)?;
     Ok(GenerateReport {
         lightmaps,
         probes,
+        occlusion,
+        occlusion_ms,
         saved,
     })
 }

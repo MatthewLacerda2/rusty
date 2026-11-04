@@ -93,6 +93,11 @@ pub struct CameraComponent {
     /// Perspective (the default) or orthographic — a top-down minimap (#430).
     #[serde(default)]
     pub projection: Projection,
+    /// Occlusion Culling (#1714, Unity's `Camera.useOcclusionCulling`): skip the
+    /// static meshes the scene's baked PVS says this camera's cell cannot see. On by
+    /// default, as Unity's camera is; a scene with no bake culls nothing by it.
+    #[serde(default = "default_use_occlusion_culling")]
+    pub use_occlusion_culling: bool,
     /// Draw into a named render texture instead of the screen (#430): the camera
     /// leaves the screen stack and UI `Image`s / material maps show it as
     /// `"rt:<name>"`. `None` (the default) is an ordinary screen camera.
@@ -114,6 +119,10 @@ impl CameraComponent {
     pub const DEFAULT_MOTION_BLUR_MAX_LENGTH: f32 = 0.05;
     /// The highest motion-blur clamp (Unity's upper bound, 0.2).
     pub const MAX_MOTION_BLUR_MAX_LENGTH: f32 = 0.2;
+}
+
+fn default_use_occlusion_culling() -> bool {
+    true
 }
 
 fn default_motion_blur_intensity() -> f32 {
@@ -151,6 +160,7 @@ impl Default for CameraComponent {
             fxaa_active: default_fxaa_active(),
             taa_active: false,
             projection: Projection::Perspective,
+            use_occlusion_culling: default_use_occlusion_culling(),
             target_texture: None,
         }
     }

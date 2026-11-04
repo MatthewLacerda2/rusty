@@ -17,7 +17,7 @@ use rapier3d::parry::shape::TriMesh;
 
 /// One triangle: a corner and the two edges from it, plus where it came from.
 #[derive(Clone, Copy)]
-pub(super) struct Tri {
+pub(in crate::scene::lighting) struct Tri {
     pub a: Vec3,
     pub e1: Vec3,
     pub e2: Vec3,
@@ -32,7 +32,13 @@ pub(super) struct Tri {
 }
 
 impl Tri {
-    pub(super) fn new(a: Vec3, b: Vec3, c: Vec3, mesh: u32, first: u32) -> Self {
+    pub(in crate::scene::lighting) fn new(
+        a: Vec3,
+        b: Vec3,
+        c: Vec3,
+        mesh: u32,
+        first: u32,
+    ) -> Self {
         Tri {
             a,
             e1: b - a,
@@ -54,14 +60,14 @@ impl Tri {
     }
 
     /// The unnormalized geometric normal (winding order).
-    pub(super) fn normal(&self) -> Vec3 {
+    pub(in crate::scene::lighting) fn normal(&self) -> Vec3 {
         self.e1.cross(self.e2)
     }
 }
 
 /// The nearest hit along a ray: the triangle, and the barycentrics of `b` and `c`.
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Hit {
+pub(in crate::scene::lighting) struct Hit {
     pub tri: usize,
     pub u: f32,
     pub v: f32,
@@ -69,13 +75,13 @@ pub(super) struct Hit {
 
 /// The static triangles and the mesh that traces them; `tris[i]` is the mesh's
 /// triangle `i`. `None` when there is nothing to hit (parry refuses an empty mesh).
-pub(super) struct Rays {
+pub(in crate::scene::lighting) struct Rays {
     pub tris: Vec<Tri>,
     mesh: Option<TriMesh>,
 }
 
 impl Rays {
-    pub(super) fn build(tris: Vec<Tri>) -> Self {
+    pub(in crate::scene::lighting) fn build(tris: Vec<Tri>) -> Self {
         if tris.is_empty() {
             return Rays { tris, mesh: None };
         }
@@ -97,7 +103,13 @@ impl Rays {
 
     /// The nearest triangle it can see along `origin + t * dir` with `t` in
     /// `[t_min, t_max)`.
-    pub(super) fn closest(&self, origin: Vec3, dir: Vec3, t_min: f32, t_max: f32) -> Option<Hit> {
+    pub(in crate::scene::lighting) fn closest(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        t_min: f32,
+        t_max: f32,
+    ) -> Option<Hit> {
         let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);
         let (tri, (_, weights)) = mesh.bvh().find_best(
@@ -119,6 +131,19 @@ impl Rays {
     /// `[t_min, t_max)`. Stops
     /// at the first blocker rather than looking for the nearest.
     pub(super) fn occluded(&self, origin: Vec3, dir: Vec3, t_min: f32, t_max: f32) -> bool {
+        self.occluded_by(origin, dir, (t_min, t_max), |i| self.tris[i].blocks)
+    }
+
+    /// Whether a triangle `blocks` accepts (by its index) lies on `origin + t * dir`
+    /// for `t` in `[t_min, t_max)`: [`Self::occluded`] with the caller's say on
+    /// which triangles stop the ray (the occlusion bake's facing test, #1714).
+    pub(in crate::scene::lighting) fn occluded_by(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        (t_min, t_max): (f32, f32),
+        blocks: impl Fn(usize) -> bool,
+    ) -> bool {
         let Some(mesh) = &self.mesh else {
             return false;
         };
@@ -130,7 +155,7 @@ impl Rays {
                 return TraversalAction::Prune;
             }
             if let Some(i) = node.leaf_data() {
-                if self.tris[i as usize].blocks && hit(mesh, i, &ray, reach).is_some() {
+                if blocks(i as usize) && hit(mesh, i, &ray, reach).is_some() {
                     blocked = true;
                     return TraversalAction::EarlyExit;
                 }

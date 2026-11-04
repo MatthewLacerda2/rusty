@@ -107,6 +107,11 @@ authored_fields!(scene_state {
         decals: EditRuntime, Restored;
         // An Undo of a Destroy puts its entity's entry back (`undo::side`).
         lightmaps: BakeOutput, Restored;
+        // The baked PVS (#1714) is no document field: it is the `<scene>.occlusion`
+        // file the lighting save writes beside the lightmaps, so it saves as them.
+        // Keyed by entity, but checked against each entity's fingerprint on use, so
+        // a despawn or a Play load leaves it as it is.
+        occlusion: BakeOutput, No as ["lightmaps"];
         pending_destroy: Runtime, Dropped;
         playing: Runtime, No;
         pending_load: Runtime, No;

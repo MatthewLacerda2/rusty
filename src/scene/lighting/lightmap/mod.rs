@@ -54,6 +54,8 @@ pub use pages::{colour_page, direction_levels, direction_page, level_count, leve
 pub use probe_direct::baked_direct_sh;
 pub use progress::BakeProgress;
 pub use raster::{lightmap_size, MIN_RESOLUTION};
+pub(in crate::scene::lighting) use rays::{Rays, Tri};
+pub(in crate::scene::lighting) use rng::Rng;
 pub use set::{LightmapEntry, LightmapSet};
 
 #[cfg(test)]
