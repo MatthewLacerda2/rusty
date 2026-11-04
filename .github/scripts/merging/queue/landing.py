@@ -36,7 +36,16 @@ TRANSPORT_WORDS = (
     "connection refused",
     "broken pipe",
     "unexpected eof",
+    # `gh` cut off mid-answer: #1713's merge call printed it on 2026-11-04 and a
+    # healthy pull request was handed back for nothing.
+    "unexpected end of json input",
 )
+
+# GitHub's 405 to a merge call made right after another landed on the base
+# (#1785's review): the merge train squashes its members back to back. It is
+# asked again after each wait here; still refused, it is [`BASE_MOVED`].
+BASE_MODIFIED = "base branch was modified"
+BASE_RETRIES = (3, 10, 30)
 
 
 def transport(stderr: str) -> bool:
@@ -109,24 +118,32 @@ def squash_message(fresh: str, root: str) -> str:
     return "\n".join(f"* {line.strip()}" for line in done.stdout.splitlines() if line.strip())
 
 
-def squash(repo: str, pull: dict, sha: str, root: str, poll: float) -> tuple[str, str]:
+def squash(repo: str, pull: dict, sha: str, root: str, poll: float, runner=None, sleep=None) -> tuple[str, str]:
     """Squash-merge `pull` at head `sha`: [`outcomes.MERGED`], or why not.
 
     REST's merge (#970); `sha` is `--match-head-commit`, so a push after the
-    verdict makes GitHub refuse. A refusal is [`outcomes.HANDED_BACK`]; a call
-    that failed in transit is asked about ([`confirm`]), and one GitHub never
-    says merged is [`UNKNOWN`]: the merge train must not land past it.
+    verdict makes GitHub refuse. A refusal is [`outcomes.HANDED_BACK`], except
+    "Base branch was modified", asked again on [`BASE_RETRIES`] and then
+    [`BASE_MOVED`]; a call that failed in transit is asked about ([`confirm`]),
+    and one GitHub never says merged is [`UNKNOWN`]: the merge train must not
+    land past it.
     """
-    number = pull["number"]
-    done = subprocess.run(
-        ["gh", "api", "--method", "PUT", f"repos/{repo}/pulls/{number}/merge",
-         "-f", "merge_method=squash", "-f", f"sha={sha}", "-f", f"commit_title={pulls.subject(pull)}",
-         "-f", f"commit_message={squash_message(sha, root)}"],
-        capture_output=True, text=True, check=False,
-    )
-    if done.returncode == 0:
-        return outcomes.MERGED, "merged."
-    failure = done.stderr.strip()
+    number, runner, sleep = pull["number"], runner or subprocess.run, sleep or time.sleep
+    call = ["gh", "api", "--method", "PUT", f"repos/{repo}/pulls/{number}/merge",
+            "-f", "merge_method=squash", "-f", f"sha={sha}", "-f", f"commit_title={pulls.subject(pull)}",
+            "-f", f"commit_message={squash_message(sha, root)}"]
+    for wait in (*BASE_RETRIES, None):
+        done = runner(call, capture_output=True, text=True, check=False)
+        if done.returncode == 0:
+            return outcomes.MERGED, "merged."
+        failure = done.stderr.strip()
+        if BASE_MODIFIED not in failure.lower():
+            break
+        if wait is None:
+            outcomes.say(f"#{number}: GitHub still says its base branch was modified: {failure}")
+            return BASE_MOVED, f"GitHub still says its base branch was modified after {len(BASE_RETRIES)} retries: {failure}"
+        outcomes.say(f"#{number}: GitHub says its base branch was modified; asking again in {wait}s.")
+        sleep(wait)
     if not transport(failure):
         blocked = f"CI passed but the merge was refused: {failure}"
         outcomes.say(f"#{number}: {blocked}")
@@ -139,3 +156,7 @@ def squash(repo: str, pull: dict, sha: str, root: str, poll: float) -> tuple[str
 
 # What [`squash`] returns when the call failed in transit and GitHub never said it merged.
 UNKNOWN = "merge unknown"
+
+# What [`squash`] returns when GitHub kept saying the base moved: no fault of the
+# pull request's, so it goes back in line, never handed back.
+BASE_MOVED = "base moved"

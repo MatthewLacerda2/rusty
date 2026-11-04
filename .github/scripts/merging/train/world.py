@@ -8,7 +8,7 @@ import os
 import tempfile
 
 import ghrest
-from merging.queue import checks, gitio, landing, pulls, outcomes, taking
+from merging.queue import checks, gitio, landing, pulls, outcomes, stopping, taking
 from merging.train import build, rails, ride
 from merging.verdict import decide, github, runlist
 
@@ -35,7 +35,7 @@ def claimed(repo: str, number: int) -> tuple[int, str, str] | None:
     """[`queue.taking.claims`], with GitHub not answering a refusal for this round."""
     try:
         return taking.claims(repo, number)
-    except github.Unreachable:
+    except (github.Unreachable, SystemExit):  # SystemExit: a `gh` refusal, `verdict.github.gh`
         return number, outcomes.NOT_READY, "GitHub did not answer about its description."
 
 
@@ -48,25 +48,41 @@ def compiles(sha: str, opts: argparse.Namespace) -> list[str]:
         work = os.path.join(tmp, "wt")
         made = gitio.git("worktree", "add", "--detach", work, sha, cwd=opts.root)
         if made.returncode != 0:
-            return [f"could not check the train out: {made.stderr.strip()}"]
+            # The machine's failure, not the trees' (#580's rule, `queue.checks`):
+            # a full disk must not mark every member red.
+            raise stopping.Stopped([f"could not check the train out: {made.stderr.strip()}"])
         try:
             return checks.verify(work, target=checks.target_dir(opts))
         finally:
             gitio.git("worktree", "remove", "--force", work, cwd=opts.root)
 
 
-def main_state(git, base: str) -> tuple[str, int | None]:
-    """`origin/main`'s tree, fresh, and its first-parent commits since `base`."""
-    git("fetch", "--quiet", "origin", "main")
-    tree = git("rev-parse", "origin/main^{tree}")[1].strip()
-    status, count = git("rev-list", "--first-parent", "--count", f"{base}..origin/main")
-    return tree, int(count.strip()) if status == 0 and count.strip().isdigit() else None
+def fetched(root: str) -> bool:
+    """Whether `origin/main` was fetched now, through the retrying [`gitio.remote`]."""
+    try:
+        return gitio.remote("fetch", "--quiet", "origin", "main", cwd=root).returncode == 0
+    except github.Unreachable:
+        return False
 
 
-def started(git) -> build.Train | None:
-    """An empty train on `origin/main`, fetched now."""
-    git("fetch", "--quiet", "origin", "main")
-    return build.start(git)
+def main_state(git, root: str, base: str) -> tuple[str, int] | None:
+    """`origin/main`'s tree, fetched now, and its first-parent commits since
+    `base`; `None` when either is unknown. A failed fetch is unknown, never the
+    old `origin/main` (#1785's review: read as "nothing moved", a train would
+    land on a tree CI never tested, and after a landing read as "something else
+    merged", exit 9 on a healthy `main`)."""
+    if not fetched(root):
+        return None
+    status, tree = git("rev-parse", "--verify", "--quiet", "origin/main^{tree}")
+    counted, count = git("rev-list", "--first-parent", "--count", f"{base}..origin/main")
+    if status != 0 or not tree.strip() or counted != 0 or not count.strip().isdigit():
+        return None
+    return tree.strip(), int(count.strip())
+
+
+def started(git, root: str) -> build.Train | None:
+    """An empty train on `origin/main`, fetched now; `None` when it could not be."""
+    return build.start(git) if fetched(root) else None
 
 
 def effects(repo: str, opts: argparse.Namespace, git) -> argparse.Namespace:
@@ -90,7 +106,7 @@ def effects(repo: str, opts: argparse.Namespace, git) -> argparse.Namespace:
         return head in green
 
     return argparse.Namespace(
-        start=functools.partial(started, git),
+        start=functools.partial(started, git, opts.root),
         git=git,
         files=listed,
         green=passed,
@@ -102,7 +118,7 @@ def effects(repo: str, opts: argparse.Namespace, git) -> argparse.Namespace:
         delete=functools.partial(rails.delete, root=opts.root),
         look=pulls.look,
         squash=lambda pull, sha: landing.squash(repo, pull, sha, opts.root, opts.poll),
-        main_state=functools.partial(main_state, git),
+        main_state=functools.partial(main_state, git, opts.root),
         say=outcomes.say,
         bots=pulls.BOTS,
         dry_run=getattr(opts, "dry_run", False),

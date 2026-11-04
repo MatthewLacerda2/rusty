@@ -45,6 +45,7 @@ class Fx:
         self.verdicts, self.squashes, self.merged, self.said = list(verdicts), {}, [], []
         self.pushed, self.deleted, self.main_moved, self.tree_override = [], [], 0, None
         self.red_own, self.broken = set(red_own), []
+        self.main_reads, self.unknown_at = 0, set()  # which `main_state` reads (0-based) fail
         self.ns = argparse.Namespace(
             start=lambda: build.Train("main", "main"), git=git(clashing),
             files=lambda n, h: [f["path"] for f in self.by[n]["files"]],
@@ -70,6 +71,9 @@ class Fx:
         return state, f"{state}."
 
     def main_state(self, base):
+        self.main_reads += 1
+        if self.main_reads - 1 in self.unknown_at:
+            return None
         tree = "main" + "".join(f"+h{n}" for n in self.merged)
         return self.tree_override or tree, len(self.merged) + self.main_moved
 

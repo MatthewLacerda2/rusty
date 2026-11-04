@@ -26,16 +26,20 @@ CAP = 4
 # watch relaunches itself on its own code (`watch.freshness`) and a train would
 # prove a workflow by running the other one; the manifests, because two members
 # resolving dependencies apart is exactly what a textual merge cannot see.
+# `tools/lint/` is the gate's own code, so it goes alone, but not the tables in it
+# that feature branches edit as data (#1785's review: 2 of 9 ready pull requests
+# on 2026-11-04 touched only these): the train's tree proves them like any file.
 ALONE_PREFIXES = (".github/scripts/merging/", ".github/workflows/", "tools/lint/")
 ALONE_FILES = (
     "Makefile", "Cargo.toml", "Cargo.lock",
     ".github/scripts/merge-queue.py", ".github/scripts/queue-daemon.py",
 )
+RIDES = ("tools/lint/src/layers/table.rs", "tools/lint/src/components/waivers.rs")
 
 
 def alone(files: list[str]) -> str | None:
     """Why a change to `files` must take its turn alone, or `None`."""
-    hit = next((f for f in files if f in ALONE_FILES or f.startswith(ALONE_PREFIXES)), None)
+    hit = next((f for f in files if f not in RIDES and (f in ALONE_FILES or f.startswith(ALONE_PREFIXES))), None)
     return f"it changes {hit}, which goes alone" if hit else None
 
 

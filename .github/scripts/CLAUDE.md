@@ -78,6 +78,12 @@ coder *changing* it must know.
   process: `merge-train/*` branches are the queue's own throwaways, swept at launch
   (`train.rails.sweep`). Changing a member's head or persisting a half-built train
   needs its own argument for what a relaunch then does.
+- **GitHub failing partway through a train is a stop, never a traceback** (#1785's
+  review): `train.land.DOWN` (`Unreachable`, and the `SystemExit` a `gh` refusal
+  raises) is caught around every call of a landing, what landed is settled and
+  saved, `main`'s tree is still checked, and the watch exits 3. A `main` that
+  cannot be read (`train.world.main_state` is `None`) neither lands nor reports a
+  mismatch.
 - **Every rule is one the queue can read**; no model is asked anything. The cap is
   `train.group.CAP`, with its measurement beside it: change both together.
 

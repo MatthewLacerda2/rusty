@@ -166,6 +166,8 @@ otherwise, and always for named pull requests, it is one pull request:
    commit the branch made with its merges of `main` left out (so `main` reads
    no `Merge remote-tracking branch` lines), and
    `--match-head-commit`, so a push after the verdict makes GitHub refuse.
+   GitHub's "Base branch was modified" is asked again three times, then the
+   pull request is taken again rather than handed back (#1785's review).
 
 It **hands back** — names why, skips that entry and carries on, named pull
 requests and `--watch` alike — on a
@@ -252,19 +254,25 @@ and keeps its place (`watch: #N waits …`); it is never updated for the train. 
 **go alone**, through the steps above: the first in line when it cannot ride (it
 conflicts with `main`, even in a `sorted` list the take resolves; its own CI is not
 green; Dependabot), a pull request touching `.github/scripts/merging/`,
-`.github/workflows/`, `tools/lint/`, `Makefile`, `merge-queue.py`, `queue-daemon.py`,
+`.github/workflows/`, `tools/lint/` (its code: the layer table and the component
+waivers ride, `train.group.RIDES`), `Makefile`, `merge-queue.py`, `queue-daemon.py`,
 `Cargo.toml` or `Cargo.lock` (`watch: #N goes alone: it changes …`), one whose head
-was in a red train, and a train that found nobody to ride with its first.
+was in a red train, and a train that found nobody to ride with its first. A train's
+take counts as one pass for those behind it in the aging count, none for its members.
 
 The train's tip is pushed to `merge-train/<main>-<a>-<b>…` (never forced: one left
 behind is deleted first) and `ci.yml` and `lint.yml` are dispatched on it
-(`workflow_dispatch` runs every gating job); without `--no-check` the tip is
-compile-checked first, as step 2. Its runs are read by the same rules as a pull
-request's (the grace, the runner re-run, the lagging jobs). The branch is deleted
-once they settle. Then:
+(`workflow_dispatch` runs every gating job; `lint.yml` first, so a dispatch that
+fails halfway leaves only the cheap run going); without `--no-check` the tip is
+compile-checked first, as step 2, and a checkout that fails stops the watch as a
+machine failure, not a red train. Its runs are read by the same rules as a pull
+request's (the grace, the runner re-run, the lagging jobs; a runner outage is
+stalled, never red). The branch is deleted once they settle. Then:
 
-- **Green:** if `main` moved while it ran, the train is stale and its members go
-  back in line to be rebuilt. Otherwise each member is squash-merged in order,
+- **Green:** if `main` moved while it ran, the train is stale: its members are
+  rebuilt first, on the new `main`, and none is marked red. If git cannot read
+  `main` (a fetch failed through its retries), nothing lands and the watch stops
+  as a machine failure (exit 3). Otherwise each member is squash-merged in order,
   exactly as step 6, with `sha` = its own head; then `main`'s tree must equal the
   train's and hold exactly that many new commits. If it does not, the watch prints
   `watch: STOPPED: main's tree is not the train's …` and exits **9**, which the
@@ -273,6 +281,12 @@ once they settle. Then:
   the landing there: it is handed back as today (an unknown merge says so), and
   every member after it goes back in line (`back in line`), to be retested on the
   new `main`. What did land is checked against the tree the train built for it.
+  A member whose description now refuses it (a stray `closes #N`, re-read at
+  landing) goes back in line, and its next take hands it back. GitHub answering
+  "Base branch was modified" is asked again three times, then the member goes back
+  in line, never handed back. GitHub failing outright mid-landing settles what
+  landed, still checks `main`'s tree, and stops the watch with exit 3; if `main`
+  cannot be read for that check, the stop says to look at `main` first.
 - **Red:** the train is split in half and each half is retested before any new
   train, on the latest `main`; a green half lands, and a half of one goes alone, so
   a pull request red on its own is handed back with its run linked. A flaky test

@@ -192,14 +192,14 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             rode, halt = [fx.turn(number, tick)], None
         else:
             fx.say(f"watch: taking {', '.join(f'#{n}' for n in train.numbers)} together.")
-            for n in train.numbers:
-                line.took(n)
+            line.took(*train.numbers)  # one take: one pass for those behind it, none for its members
             rode, halt = yard.ride(train, tick)
         heads = {p["number"]: p.get("headRefOid", "") for p in members}
-        stop = next((s for s in (settle(r[0], r, heads.get(r[0], "")) for r in rode) if s), None)
+        stops = [settle(r[0], r, heads.get(r[0], "")) for r in rode]  # every member, then the first stop
+        stop = next((s for s in stops if s), None)
         save()
         if halt:
-            return results, halt, ending.MISMATCH_STATUS
+            return results, *halt
         if stop:
             return results, stop, ending.status(handed, True)
         last = None  # the merge moved `main` and the listing; look afresh

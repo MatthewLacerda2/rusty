@@ -7,15 +7,16 @@ branch, the gates dispatched on it, the wait, the branch deleted, then landing
 ([`train.land`]) or splitting. A dry run prints the train it would form and pushes
 nothing; `--no-merge` stops a green train at green. What the members' own claims
 say (`verdict.protocol`, the review decision) is asked before a pull request may
-ride, through the same [`queue.taking.claims`] a take asks first.
+ride, through the same [`queue.taking.claims`] a take asks first, and again of
+each half before it rides ([`Yard.claimed`]); at landing, each member's
+description is re-read ([`train.land.moved`]).
 """
 
 from __future__ import annotations
 
 from merging.queue import outcomes, stopping
 from merging.train import build, group, land, rails, ride
-from merging.verdict import github
-from merging.watch import board
+from merging.watch import board, ending
 
 
 def halves(train: build.Train) -> list[list[tuple[int, str]]]:
@@ -56,7 +57,13 @@ class Yard:
             return why
         if not self.fx.green(number, head):
             return "its own head's `ci-gate` and `lint-gate` are not both green"
-        refused = self.fx.claims(number)
+        return self.claimed(pull)
+
+    def claimed(self, pull: dict) -> str | None:
+        """Why what `pull` claims now refuses it (its description, its issues'
+        labels and blockers, its review decision), or `None`. Asked of a half
+        too: it rides up to an hour after its train formed (#1785's review)."""
+        refused = self.fx.claims(pull["number"])
         return refused[2].rstrip(".") if refused else None
 
     def form(self, ranked: list[dict]) -> tuple[list[dict], build.Train | None, list[str]]:
@@ -68,12 +75,13 @@ class Yard:
         while self.waiting:
             half = [by[n] for n, head in self.waiting.pop(0) if n in by and by[n].get("headRefOid") == head]
             if half:
-                return group.form(half, train, self.fx.git, lambda pull: None, cap=len(half))
+                return group.form(half, train, self.fx.git, self.claimed, cap=len(half))
         return group.form(ranked, train, self.fx.git, self.refuse)
 
-    def ride(self, train: build.Train, tick=None) -> tuple[list[tuple[int, str, str]], str | None]:
+    def ride(self, train: build.Train, tick=None) -> tuple[list[tuple[int, str, str]], tuple[str, int] | None]:
         """Test and land (or split) one train: the members' results, and why the
-        watch must stop ([`train.land.MISMATCH`]), or `None`."""
+        watch must stop with which status ([`train.land.MISMATCH`], or a landing
+        whose check could not run), or `None`."""
         name, fx = rails.branch(train), self.fx
         listed = ", ".join(f"#{n}" for n in train.numbers)
         if fx.dry_run:
@@ -81,8 +89,8 @@ class Yard:
             return [(n, outcomes.DRY, f"would ride {name}.") for n in train.numbers], None
         try:
             state, lines = self.test(train, name, tick)
-        except (github.Unreachable, stopping.Stopped) as down:
-            why = down.lines[0] if isinstance(down, stopping.Stopped) else stopping.unreachable(down)[0]
+        except (*land.DOWN, stopping.Stopped) as down:
+            why = down.lines[0] if isinstance(down, stopping.Stopped) else land.down_why(down)
             return [(train.numbers[0], outcomes.STOPPED, why)], None
         fx.say(f"watch: train {listed}: {lines[0]}", *lines[1:])
         if state == outcomes.STOPPED:
@@ -94,16 +102,36 @@ class Yard:
             return [(n, outcomes.REQUEUED, f"its train was {state}; its half is tested next.") for n in train.numbers], None
         if fx.no_merge:
             return [(n, outcomes.GREEN, f"its train {train.tip[:7]} is green.") for n in train.numbers], None
-        if fx.main_state(train.base)[1] != 0:
-            # `main` moved while the train ran: its tree is not what landing now leaves.
+        return self.land(train)
+
+    def land(self, train: build.Train) -> tuple[list[tuple[int, str, str]], tuple[str, int] | None]:
+        """A green train: checked for staleness, landed, and `main`'s tree checked."""
+        fx, cars = self.fx, [(car.number, car.head) for car in train.cars]
+        now = fx.main_state(train.base)
+        if now is None:
+            # Unknown is neither "nothing moved" nor a mismatch: nothing lands.
+            why = "git could not read `main` before landing the train; nothing landed."
+            return [(train.numbers[0], outcomes.STOPPED, why)] + [(n, outcomes.REQUEUED, why) for n in train.numbers[1:]], None
+        if now[1] != 0:
+            # `main` moved while the train ran: its tree is not what landing now
+            # leaves. Not red: the same members are rebuilt first, on the new `main`.
+            for number, _ in cars:
+                self.red.pop(number, None)
+            self.waiting.insert(0, cars)
             fx.say(f"watch: `main` moved past {train.base[:7]} while the train ran; rebuilding it on the new `main`.")
             return [(n, outcomes.REQUEUED, "its train went stale; rebuilt on the new `main`.") for n in train.numbers], None
         results, landed, unknown = land.land(train, fx.look, fx.squash)
-        if landed or unknown:
-            halt = land.check(train, landed, unknown, *fx.main_state(train.base))
-            if halt:
-                fx.say(f"watch: STOPPED: {halt}")
-                return results, halt
+        if not (landed or unknown):
+            return results, None
+        now = fx.main_state(train.base)
+        if now is None:
+            halt = f"{landed} member(s) of the train landed, and git could not read `main` to check its tree; look at `main` before merging anything more."
+            fx.say(f"watch: STOPPED: {halt}")
+            return results, (halt, ending.MACHINE_STATUS)
+        halt = land.check(train, landed, unknown, *now)
+        if halt:
+            fx.say(f"watch: STOPPED: {halt}")
+            return results, (halt, ending.MISMATCH_STATUS)
         return results, None
 
     def test(self, train: build.Train, name: str, tick) -> tuple[str, list[str]]:

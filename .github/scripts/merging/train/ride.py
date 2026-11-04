@@ -24,12 +24,15 @@ from merging.verdict import decide, github, runlist, runners
 RED, STALLED = "red", "stalled"
 
 
-def failed(tip: dict, runs: list[dict], jobs: dict[int, list[dict]]) -> bool:
-    """Whether a gating workflow's run on the tip failed for the code's reasons."""
+def failed(tip: dict, runs: list[dict], jobs: dict[int, list[dict]], expired: runners.Expired = runners.patient) -> bool:
+    """Whether a gating workflow's run on the tip failed for the code's reasons.
+    `expired` is the wait's own ([`polling.expiry`]): without it a run cancelled
+    again past the jobs' grace read as the code's, and a runner outage sent every
+    member to a CI round of its own (#1785's review)."""
     sha = tip["headRefOid"]
     return any(
         decide.assess(tip, w, runlist.runs_for(runs, sha, w), jobs)[0] == decide.FAILED
-        and not runners.outage(tip, runs, jobs)
+        and not runners.outage(tip, runs, jobs, expired)
         for w in runlist.WORKFLOWS
     )
 
@@ -53,7 +56,8 @@ def wait(repo: str, sha: str, deadline: float, poll: float, tick=None, say=outco
         elif state != outcomes.WAIT:
             # Red only for a run that failed: a run cancelled again after its one
             # re-run (#869), or none that ever built the tip, is not the tree's.
-            return (RED if failed(tip, runs, jobs) else STALLED), lines
+            red = failed(tip, runs, jobs, polling.expiry(waited, red_since))
+            return (RED if red else STALLED), lines
         if waited > deadline:
             return STALLED, [f"still waiting on the train {sha[:7]} after {waited / 60:.0f} minutes.", *lines]
         say(f"train {sha[:7]}: {lines[0]}")

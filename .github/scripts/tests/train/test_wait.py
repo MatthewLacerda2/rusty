@@ -55,7 +55,7 @@ class Rails(unittest.TestCase):
             return subprocess.CompletedProcess(argv, 0, "", "")
 
         self.assertIsNone(rails.dispatch("o/r", "merge-train/x", runner=runner))
-        self.assertEqual([c[4] for c in calls], [f"repos/o/r/actions/workflows/{w}/dispatches" for w in ("ci.yml", "lint.yml")])
+        self.assertEqual([c[4] for c in calls], [f"repos/o/r/actions/workflows/{w}/dispatches" for w in ("lint.yml", "ci.yml")])
         self.assertTrue(all(c[-1] == "ref=merge-train/x" for c in calls))
 
     def test_a_refused_dispatch_says_why(self):

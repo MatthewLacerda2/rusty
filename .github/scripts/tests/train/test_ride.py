@@ -30,7 +30,7 @@ class Riding(unittest.TestCase):
     def test_a_tree_mismatch_stops_the_watch(self):
         fx = Fx(LINE)
         fx.tree_override = "something else"
-        self.assertIn(land.MISMATCH, go(fx)[2])
+        self.assertIn(land.MISMATCH, go(fx)[2][0])
 
     def test_a_merge_from_elsewhere_while_landing_stops_the_watch(self):
         fx = Fx(LINE)
@@ -42,7 +42,7 @@ class Riding(unittest.TestCase):
             return real(pull, sha)
 
         fx.ns.squash = squash
-        self.assertIn("something else merged while it landed", go(fx)[2])
+        self.assertIn("something else merged while it landed", go(fx)[2][0])
 
     def test_red_splits_and_marks_its_heads(self):
         fx = Fx(LINE, verdicts=(ride.RED, outcomes.GO))

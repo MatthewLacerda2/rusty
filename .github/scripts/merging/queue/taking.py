@@ -111,6 +111,8 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         return number, outcomes.GREEN, lines[0]
 
     state, why = landing.squash(repo, pull, fresh, opts.root, opts.poll)
+    if state == landing.BASE_MOVED:  # no fault of the branch's: taken again, not handed back
+        return number, outcomes.NOT_READY, why
     if state != outcomes.MERGED:
         return number, outcomes.HANDED_BACK, why
     outcomes.say(f"#{number}: merged.")

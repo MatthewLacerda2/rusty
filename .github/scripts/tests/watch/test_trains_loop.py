@@ -52,9 +52,14 @@ class Loop(unittest.TestCase):
         self.assertEqual(results[-1][:2], (2, outcomes.MERGED))
         self.assertEqual(status, 0)  # nothing was handed back
 
+    def test_github_down_mid_landing_settles_what_landed_and_stops_as_the_machine(self):
+        yard, results, why, status = run({1: outcomes.MERGED, 2: outcomes.STOPPED, 3: outcomes.REQUEUED})
+        self.assertEqual(status, ending.MACHINE_STATUS)  # the supervisor retries it, with its backoff
+        self.assertEqual([r[:2] for r in results], [(1, outcomes.MERGED), (2, outcomes.STOPPED), (3, outcomes.REQUEUED)])
+
     def test_a_tree_mismatch_stops_the_watch_with_its_own_status(self):
         halt = f"{land.MISMATCH}: look at main."
-        yard, results, why, status = run({1: outcomes.MERGED, 2: outcomes.MERGED}, halt)
+        yard, results, why, status = run({1: outcomes.MERGED, 2: outcomes.MERGED}, (halt, ending.MISMATCH_STATUS))
         self.assertEqual((why, status), (halt, ending.MISMATCH_STATUS))
 
 
