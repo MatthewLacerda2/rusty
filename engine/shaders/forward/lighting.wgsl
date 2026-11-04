@@ -9,6 +9,7 @@
 #import lighting::ambient::ambient_radiance
 #import lighting::sh::sh_basis
 #import forward::proxy_volume::proxy_irradiance
+#import forward::transparent
 #import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, instances, lighting, s_decal, s_shadow, shadow, t_ao, t_decal_color, t_decal_data, t_lightmaps, t_opaque, t_shadow}
 
 // Fold the decals binned into `cluster` into `s`, oldest first (FIFO, #638): each
@@ -35,31 +36,51 @@ fn ambient_occlusion(frag: vec2<f32>) -> f32 {
 // The screen-space bounce at pixel `frag` (#1750): irradiance as E / pi, as the
 // ambient term is, so the same diffuse response lights it. Only the opaque pass of
 // a base camera running SSIL reads it (`camera.stack.z`), from `t_opaque`, which
-// holds it there; every other pass gets none.
+// holds it there; every other pass gets none, for a uniform branch and no texture
+// read (`textureLoad` takes no derivatives, so the branch is safe).
 fn indirect_bounce(frag: vec2<f32>) -> vec3<f32> {
+    if (camera.stack.z <= 0.5) {
+        return vec3<f32>(0.0);
+    }
     let last = textureDimensions(t_opaque) - vec2<u32>(1u);
-    let bounce = textureLoad(t_opaque, min(vec2<u32>(frag), last), 0).rgb;
-    return select(vec3<f32>(0.0), bounce, camera.stack.z > 0.5);
+    return textureLoad(t_opaque, min(vec2<u32>(frag), last), 0).rgb;
 }
 
-// The share of a pixel's `lit` colour that is realtime light (`realtime`), what SSIL
-// gathers from it next frame (#1750): by the brightest channel, so a coloured light
-// keeps its weight; 0 for a black pixel.
+// The realtime light in the pixel's colour, which SSIL gathers next frame (#1750):
+// `surface_color` sums it at steps 2, 3 (`lamp`: the direct light of every light no
+// lightmap bake took in) and 6 (emission no lightmap holds), takes the fog off it at
+// step 7 as the fog takes it off the colour, and an authored surface block scales
+// it as it scales the colour (`shadergen::assemble`'s folds; a block that is no
+// per-channel scale zeroes it). An unlit surface leaves it zero: it feeds nothing.
+var<private> ssil_realtime: vec3<f32>;
+
+// One lamp's light at a surface: its direct light under radiance `front`, and on a
+// translucent surface (`transmission.w`, #1523) what it transmits under `back`
+// (the light reaching the back face). SSIL (#1750) gathers it unless the lightmap
+// bake took the lamp in (`bounce_baked`).
+fn lamp(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, front: vec3<f32>, back: vec3<f32>, F0: vec3<f32>, metallic: f32, roughness: f32, albedo: vec3<f32>, transmission: vec4<f32>, bounce_baked: f32) -> vec3<f32> {
+    var c = calculate_pbr(N, V, L, front, F0, metallic, roughness, albedo);
+    if (transmission.w > 0.0) {
+        c += transparent::transmitted(N, L, back, albedo, transmission.rgb);
+    }
+    ssil_realtime += c * (1.0 - bounce_baked);
+    return c;
+}
+
+// The share of colour `lit` that is realtime light (`realtime`): by the brightest
+// channel, so a coloured light keeps its weight; 0 for a black pixel.
 fn realtime_share(lit: vec3<f32>, realtime: vec3<f32>) -> f32 {
     let whole = max(lit.r, max(lit.g, lit.b));
     let part = max(realtime.r, max(realtime.g, realtime.b));
     return select(0.0, saturate(part / whole), whole > 0.0);
 }
 
-// The share of the pixel's light SSIL gathers next frame (#1750), which
-// `surface_color` records: the opaque pass of a base camera running SSIL
-// (`camera.stack.z`, set for that pass alone: the translucents after it draw with
-// it cleared, so their alpha still blends) writes it in its alpha, and SSIL's
-// source keeps it (`postfx/ssil.wgsl`).
-var<private> ssil_share: f32;
-
+// The opaque pass of a base camera running SSIL (`camera.stack.z`, set for that
+// pass alone: the translucents after it draw with it cleared, so their alpha still
+// blends) writes in its alpha the share of the final colour `c` that is
+// `ssil_realtime`, which SSIL's source keeps (`postfx/ssil.wgsl`).
 fn with_ssil_share(c: vec4<f32>) -> vec4<f32> {
-    return vec4<f32>(c.rgb, select(c.a, ssil_share, camera.stack.z > 0.5));
+    return vec4<f32>(c.rgb, select(c.a, realtime_share(c.rgb, ssil_realtime), camera.stack.z > 0.5));
 }
 
 // The mip level of the lightmap pages that `uv` reads (#1694): the larger screen

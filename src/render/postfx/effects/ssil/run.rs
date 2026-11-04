@@ -52,22 +52,29 @@ impl Renderer {
 
         let (passes, timer) = (&self.post_passes.ssil, &self.gpu_timer);
         let depth = &view.depth_view;
-        let stage = |encoder: &mut wgpu::CommandEncoder, stage, (input, prev), target| {
+        let [normal, last_normal] = [&t.normals[t.current].view, &t.normals[1 - t.current].view];
+        let stage = |encoder: &mut wgpu::CommandEncoder, stage, (input, prev), targets: &[_]| {
             let inputs = StageInputs {
                 uniform: &t.uniform,
                 depth,
                 input,
                 prev,
+                prev_normal: last_normal,
             };
-            passes.record((device, encoder), stage, inputs, (target, timer));
+            passes.record((device, encoder), stage, inputs, (targets, timer));
         };
         let (source, raw, blurred) = (&t.source.view, &t.raw.view, &t.blurred.view);
         let [result, last] = [&t.results[t.current].view, &t.results[1 - t.current].view];
-        stage(encoder, Stage::Gather, (source, source), raw);
-        stage(encoder, Stage::Blur, (raw, raw), blurred);
-        stage(encoder, Stage::Accumulate, (blurred, last), result);
+        stage(encoder, Stage::Gather, (source, source), &[raw]);
+        stage(encoder, Stage::Blur, (raw, raw), &[blurred]);
+        stage(
+            encoder,
+            Stage::Accumulate,
+            (blurred, last),
+            &[result, normal],
+        );
         if let Some(full) = &t.full {
-            stage(encoder, Stage::Upsample, (result, result), &full.view);
+            stage(encoder, Stage::Upsample, (result, result), &[&full.view]);
         }
 
         t.forward_group = Some(self.ssil_group3(view.ssao.as_ref().filter(|_| prepassed), t));
@@ -113,9 +120,10 @@ impl Renderer {
                 depth: &view.depth_view,
                 input: scene,
                 prev: scene,
+                prev_normal: scene,
             };
             let gpu = (&self.device, &mut encoder);
-            let target = (&t.source.view, &self.gpu_timer);
+            let target = (&[&t.source.view][..], &self.gpu_timer);
             (self.post_passes.ssil).record(gpu, Stage::Source, inputs, target);
             self.queue.submit(std::iter::once(encoder.finish()));
             let camera = Previous {

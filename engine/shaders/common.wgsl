@@ -52,10 +52,9 @@ struct CameraUniforms {
     // x: this camera's index in its stack, bottom to top (#1436), what the velocity
     // target's `.a` carries so motion blur orders a higher camera in front. y: last
     // frame's game time (#1524), what the motion vectors move vertex blocks with (this
-    // frame's `time` where the view has no last frame). z: 1 during the opaque pass
-    // of a base camera running SSIL (#1750), which then reads SSIL's bounce and
-    // writes the share of its light SSIL gathers in its alpha; 0 everywhere else,
-    // the translucents after it included. w: unused.
+    // frame's `time` where the view has no last frame). z: 1 in the opaque pass of a
+    // base camera running SSIL (#1750, `forward::lighting::with_ssil_share`), 0
+    // everywhere else, the translucents after it included. w: unused.
     stack: vec4<f32>,
     // `view_proj`'s inverse (#1523): a transparent surface rebuilds the world point
     // of the opaque depth behind it from it, for refraction and absorption.
@@ -95,6 +94,8 @@ struct DirectionalLight {
     intensity: f32,
     // 1.0 for a `Baked` light (#438): a lightmapped surface skips its direct light.
     baked: f32,
+    // 1.0 when the lightmap bake took this light in: SSIL gathers none (#1750).
+    bounce_baked: f32,
 };
 
 struct LightingUniforms {
@@ -141,7 +142,9 @@ struct LocalLight {
     // The distance its inverse square is floored at (#1699): an Area stand-in's
     // sqrt(area / pi), 0 for a point or spot.
     near: f32,
-    _pad: vec2<f32>,
+    // 1.0 when the lightmap bake took this light in: SSIL gathers none (#1750).
+    bounce_baked: f32,
+    _pad: f32,
 };
 
 // The light cluster `world` falls in: its screen tile (from `view_proj`) and its
@@ -355,12 +358,8 @@ fn blend_joints(
     weights: vec4<f32>,
 ) -> mat4x4<f32> {
     if (weights.x + weights.y + weights.z + weights.w < 0.01) {
-        return mat4x4<f32>(
-            vec4<f32>(1.0, 0.0, 0.0, 0.0),
-            vec4<f32>(0.0, 1.0, 0.0, 0.0),
-            vec4<f32>(0.0, 0.0, 1.0, 0.0),
-            vec4<f32>(0.0, 0.0, 0.0, 1.0)
-        );
+        // The identity: a diagonal matrix constructor.
+        return mat4x4<f32>(vec4<f32>(1.0, 0.0, 0.0, 0.0), vec4<f32>(0.0, 1.0, 0.0, 0.0), vec4<f32>(0.0, 0.0, 1.0, 0.0), vec4<f32>(0.0, 0.0, 0.0, 1.0));
     }
     return j0 * weights.x + j1 * weights.y + j2 * weights.z + j3 * weights.w;
 }

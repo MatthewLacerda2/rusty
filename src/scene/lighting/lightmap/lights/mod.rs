@@ -43,6 +43,24 @@ pub struct BakeLight {
     pub bakes_direct: bool,
 }
 
+/// The lights a bake of `scene` takes in, by entity (`LightmapSet::lights`,
+/// #1750): every active `Mixed` or `Baked` light [`BakeScene::gather`] keeps.
+pub fn taken_lights(scene: &Scene) -> std::collections::BTreeSet<u32> {
+    let takes = |id: &u32| {
+        let light = scene.world.light(*id);
+        scene.world.is_active_in_hierarchy(*id)
+            && light.is_some_and(|l| {
+                l.light_type != LightType::Ambient && l.effective_mode().bakes_indirect()
+            })
+    };
+    scene
+        .world
+        .ids_with_light()
+        .into_iter()
+        .filter(takes)
+        .collect()
+}
+
 impl BakeScene {
     /// The active lights that take part in the bake (an `Ambient` light is in the
     /// sky already, through `Scene::drawn_ambient`).

@@ -204,7 +204,7 @@ impl Renderer {
     }
 
     /// Depth priming (#1499), Unity URP's *Auto* mode: when this camera ran the SSAO
-    /// prepass, which drew straight into the view's depth (#1578), the forward pass
+    /// prepass (or SSIL's, #1750), which drew straight into the view's depth (#1578), the forward pass
     /// starts from it and shades each lit pixel once. The prepass is the forward
     /// vertex stage at the view's size and format, clipping cutouts as `fs_main` does.
     /// A view shading with a pipeline of its own (the shader preview) is not primed:
@@ -215,9 +215,10 @@ impl Renderer {
         self.primes(view, frame).then_some(&self.primed_pipelines)
     }
 
-    /// Whether this camera's forward pass is primed ([`Self::prime_depth`]).
+    /// Whether this camera's forward pass is primed ([`Self::prime_depth`]): it
+    /// ran SSAO's prepass, or SSIL's, the same one (#1750).
     fn primes(&self, view: &RenderView, frame: &ScenePassFrame) -> bool {
-        let prepass = frame.ssao.is_some() && view.ssao.is_some();
+        let prepass = (frame.ssao.is_some() && view.ssao.is_some()) || frame.ssil.is_some();
         let on = self.depth_priming && self.priming_recommended;
         on && prepass && !view.has_forward_override()
     }

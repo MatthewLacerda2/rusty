@@ -13,20 +13,23 @@
 //                      point (SSAO's pattern, `lighting::screen_space`). Each lands
 //                      on the surface on screen there, is turned back into last
 //                      frame's screen through its view-projection and reads the
-//                      source: that light, where the two surfaces face each
-//                      other, fading out by distance. Nothing before a history.
+//                      source: that light, where the two surfaces face each other
+//                      past SSAO's slope-scaled bias and nothing on screen stands
+//                      between them (`blocked`), fading out by distance. Nothing
+//                      before a history.
 //  * `fs_blur`       — a depth-aware 7x7 blur.
 //  * `fs_accumulate` — the temporal accumulate: last frame's result, reprojected
 //                      through the camera and rejected where the surface's distance
-//                      from the eye moved (a disocclusion), clamped to this frame's
-//                      neighbourhood and blended in at 90%. Its alpha holds the
-//                      distance, for next frame's rejection.
+//                      from the eye moved (a disocclusion) or its normal turned,
+//                      clamped to this frame's neighbourhood and blended in at 90%.
+//                      Its alpha holds the distance and its second target the
+//                      normal, for next frame's rejection.
 //  * `fs_upsample`   — below full resolution, a depth-aware bilinear upsample to it
 //                      (SSAO's), so the forward pass reads one texel per pixel.
 // Texel `t` stands for full-resolution pixel `t * step`, as in `ssao.wgsl`.
 
 #import fullscreen
-#import lighting::screen_space::{depth_weight, flatter, hemisphere, ign, tangents}
+#import lighting::screen_space::{bilateral_blur, bilateral_upsample, hemisphere, ign, load_depth, normal_at, radius_in_pixels, screen_uv, slope_bias, tangents, View, view_depth, world_at, world_px}
 
 struct SsilParams {
     inv_view_proj: mat4x4<f32>,
@@ -54,71 +57,45 @@ var t_in: texture_2d<f32>;
 // Last frame's result, for `fs_accumulate`; the same as `t_in` for the others.
 @group(0) @binding(3)
 var t_prev: texture_2d<f32>;
+// The normals last frame's accumulate kept (`n * 0.5 + 0.5`), for `fs_accumulate`.
+@group(0) @binding(4)
+var t_prev_normal: texture_2d<f32>;
 
 // How fast the accumulate forgets: the history's weight where it is accepted.
 const HISTORY: f32 = 0.9;
 // How far, as a share of the distance from the eye, a reprojected surface may have
 // moved before the history there is rejected.
 const REJECT: f32 = 0.05;
+// The least cosine between a surface's normal now and the one its history was
+// gathered for (about 25 degrees): a surface turned further starts over.
+const REJECT_TURN: f32 = 0.9;
+// Where along the segment between a point and a sample's surface the gather looks
+// for something on screen in between (`blocked`).
+const OCCLUSION_TAPS: array<f32, 3> = array<f32, 3>(0.3, 0.5, 0.7);
 
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
     return fullscreen::triangle(i);
 }
 
-fn load_depth(px: vec2<i32>) -> f32 {
-    let dims = vec2<i32>(textureDimensions(t_depth));
-    return textureLoad(t_depth, clamp(px, vec2<i32>(0), dims - 1), 0);
-}
-
-// World position of full-resolution pixel `px` at NDC depth `d`.
-fn world_at(px: vec2<i32>, d: f32) -> vec3<f32> {
-    let uv = (vec2<f32>(px) + 0.5) / vec2<f32>(textureDimensions(t_depth));
-    let w = p.inv_view_proj * vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
-    return w.xyz / w.w;
-}
-
-fn world_px(px: vec2<i32>) -> vec3<f32> {
-    return world_at(px, load_depth(px));
-}
-
-// Distance along the camera's forward axis, the depth the blurs compare.
-fn view_depth(world: vec3<f32>) -> f32 {
-    return dot(world - p.camera_pos.xyz, p.camera_fwd.xyz);
-}
-
-// The camera-facing normal at full-resolution pixel `px` (world `P`), rebuilt from
-// the depths `step` pixels around it, as SSAO's; zero where they are degenerate.
-fn normal_at(px: vec2<i32>, P: vec3<f32>, step: i32) -> vec3<f32> {
-    let f = p.camera_fwd.xyz;
-    let dx = flatter(P - world_px(px - vec2<i32>(step, 0)), world_px(px + vec2<i32>(step, 0)) - P, f);
-    let dy = flatter(P - world_px(px - vec2<i32>(0, step)), world_px(px + vec2<i32>(0, step)) - P, f);
-    let c = cross(dx, dy);
-    if (dot(c, c) < 1e-20) {
-        return vec3<f32>(0.0);
-    }
-    let N = normalize(c);
-    return select(N, -N, dot(N, p.camera_pos.xyz - P) < 0.0);
+// The camera this frame's depth is read through (`lighting::screen_space`).
+fn view() -> View {
+    return View(p.inv_view_proj, p.view_proj, p.camera_pos.xyz, p.camera_fwd.xyz);
 }
 
 // `c` with every non-finite channel zeroed: a NaN or an infinity never spreads.
+// Checked on the exponent bits (all ones), as `motion_blur.wgsl` and
+// `ssr_pyramid.wgsl` do, since a compiler may fold a NaN compare away.
 fn finite(c: vec3<f32>) -> vec3<f32> {
-    let ok = (c == c) & (abs(c) <= vec3<f32>(65504.0));
+    let exponent = bitcast<vec3<u32>>(c) & vec3<u32>(0x7f800000u);
+    let ok = (exponent != vec3<u32>(0x7f800000u)) & (abs(c) <= vec3<f32>(65504.0));
     return select(vec3<f32>(0.0), c, ok);
 }
 
-// Where world point `P` was in last frame's screen, in [0, 1]; `None` (x < 0) off it.
+// Where world point `P` was in last frame's screen, in [0, 1]; x < 0 off it.
 fn prev_uv(P: vec3<f32>) -> vec2<f32> {
-    let clip = p.prev_view_proj * vec4<f32>(P, 1.0);
-    if (clip.w <= 0.0) {
-        return vec2<f32>(-1.0);
-    }
-    let ndc = clip.xy / clip.w;
-    let uv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
-    if (any(uv < vec2<f32>(0.0)) || any(uv >= vec2<f32>(1.0))) {
-        return vec2<f32>(-1.0);
-    }
-    return uv;
+    let prev = View(p.inv_view_proj, p.prev_view_proj, p.prev_camera_pos.xyz, p.camera_fwd.xyz);
+    return screen_uv(prev, P);
 }
 
 @fragment
@@ -131,7 +108,7 @@ fn fs_source(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     for (var y = 0; y < step; y = y + 1) {
         for (var x = 0; x < step; x = x + 1) {
             let px = min(base + vec2<i32>(x, y), last);
-            if (load_depth(px) >= 1.0) {
+            if (load_depth(t_depth, px) >= 1.0) {
                 continue;
             }
             let c = textureLoad(t_in, px, 0);
@@ -142,16 +119,37 @@ fn fs_source(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     return vec4<f32>(sum / max(count, 1.0), 1.0);
 }
 
+// Whether something on screen stands between surface point `P` and the surface
+// point `Q` a sample landed on: at each of `OCCLUSION_TAPS` along the segment, the
+// surface on screen there is nearer the eye than the segment by more than `bias`,
+// and by no more than `thickness` (a pillar metres in front of the segment hides
+// it from the eye, not from `P`).
+fn blocked(v: View, P: vec3<f32>, Q: vec3<f32>, dims: vec2<f32>, bias: f32, thickness: f32) -> bool {
+    for (var k = 0; k < 3; k = k + 1) {
+        let M = mix(P, Q, OCCLUSION_TAPS[k]);
+        let uv = screen_uv(v, M);
+        if (uv.x < 0.0) {
+            continue;
+        }
+        let behind = view_depth(v, M) - view_depth(v, world_px(t_depth, v, vec2<i32>(uv * dims)));
+        if (behind > bias && behind < thickness) {
+            return true;
+        }
+    }
+    return false;
+}
+
 @fragment
 fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
     let px = vec2<i32>(frag.xy) * step;
-    let d = load_depth(px);
+    let d = load_depth(t_depth, px);
     if (p.camera_fwd.w < 0.5 || d >= 1.0) {
         return vec4<f32>(0.0);
     }
-    let P = world_at(px, d);
-    let N = normal_at(px, P, step);
+    let v = view();
+    let P = world_at(t_depth, v, px, d);
+    let N = normal_at(t_depth, v, px, P, step);
     if (dot(N, N) == 0.0) {
         return vec4<f32>(0.0);
     }
@@ -166,37 +164,37 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let jitter = ign(frag.yx + 17.0 + turn);
     let dims = vec2<f32>(textureDimensions(t_depth));
     let source = vec2<f32>(textureDimensions(t_in));
+    // SSAO's slope-scaled bias: a sample's surface must stand off this point's
+    // plane by more than depth noise, so a flat floor never lights itself.
+    let bias = slope_bias(v, P, N, radius, dims);
+    // What counts as standing in between: past one pixel's depth step at the
+    // reach (no grazing scale: the taps sit in the open, off any surface).
+    let between = 0.02 * radius + radius / max(radius_in_pixels(v, P, radius, dims), 1e-3);
     var sum = vec3<f32>(0.0);
     for (var i = 0u; i < n; i = i + 1u) {
         let s = fract(f32(i) * 0.7548777 + jitter);
         let S = P + N * (0.02 * radius) + hemisphere(i, n, rot, N, tb) * (radius * mix(0.1, 1.0, s));
-        let clip = p.view_proj * vec4<f32>(S, 1.0);
-        if (clip.w <= 0.0) {
-            continue;
-        }
-        let ndc = clip.xy / clip.w;
-        let uv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
-        if (any(uv < vec2<f32>(0.0)) || any(uv >= vec2<f32>(1.0))) {
+        let uv = screen_uv(v, S);
+        if (uv.x < 0.0) {
             continue;
         }
         // The surface on screen where the sample lands, and whether it and this
         // point face each other.
         let q = vec2<i32>(uv * dims);
-        let dq = load_depth(q);
+        let dq = load_depth(t_depth, q);
         if (dq >= 1.0) {
             continue;
         }
-        let Q = world_at(q, dq);
+        let Q = world_at(t_depth, v, q, dq);
         let to_q = Q - P;
         let dist = length(to_q);
-        let L = to_q / max(dist, 1e-4);
-        let NQ = normal_at(q, Q, 1);
-        // Its light reaches this point only where the two face each other; it
-        // fades out over the last third of 1.5 radii.
-        let facing = dot(NQ, -L) > 0.0 && dot(N, L) > 1e-4;
+        let NQ = normal_at(t_depth, v, q, Q, 1);
+        // Its light reaches this point only where the two face each other, past
+        // the bias; it fades out over the last third of 1.5 radii.
+        let facing = dot(N, to_q) > bias && dot(NQ, -to_q) > 0.0;
         let reach = saturate(3.0 - 2.0 * dist / radius);
         let was = prev_uv(Q);
-        if (!facing || reach <= 0.0 || was.x < 0.0) {
+        if (!facing || reach <= 0.0 || was.x < 0.0 || blocked(v, P, Q, dims, between, radius)) {
             continue;
         }
         let light = finite(textureLoad(t_in, vec2<i32>(was * source), 0).rgb);
@@ -205,54 +203,51 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     return vec4<f32>(finite(sum * (p.params.y / f32(max(n, 1u)))), 1.0);
 }
 
-// View depth at texel `t`: its full-resolution pixel's.
-fn texel_depth(t: vec2<i32>, step: i32) -> f32 {
-    return view_depth(world_px(t * step));
-}
-
 @fragment
 fn fs_blur(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
     let base = vec2<i32>(frag.xy);
-    let d = load_depth(base * step);
+    let d = load_depth(t_depth, base * step);
     if (d >= 1.0) {
         return vec4<f32>(0.0);
     }
-    let center = view_depth(world_at(base * step, d));
-    let last = vec2<i32>(textureDimensions(t_in)) - 1;
-    var sum = vec3<f32>(0.0);
-    var weight = 0.0;
-    for (var y = -3; y <= 3; y = y + 1) {
-        for (var x = -3; x <= 3; x = x + 1) {
-            let tap = clamp(base + vec2<i32>(x, y), vec2<i32>(0), last);
-            let w = depth_weight(texel_depth(tap, step), center);
-            sum += textureLoad(t_in, tap, 0).rgb * w;
-            weight += w;
-        }
-    }
-    return vec4<f32>(sum / max(weight, 1e-4), 1.0);
+    let v = view();
+    let center = view_depth(v, world_at(t_depth, v, base * step, d));
+    return vec4<f32>(bilateral_blur(t_depth, v, t_in, base, step, 3, center).rgb, 1.0);
 }
 
+struct Accumulated {
+    // rgb the bounce, a the surface's distance from the eye.
+    @location(0) result: vec4<f32>,
+    // The surface's normal, as `n * 0.5 + 0.5`.
+    @location(1) normal: vec4<f32>,
+};
+
 @fragment
-fn fs_accumulate(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
+fn fs_accumulate(@builtin(position) frag: vec4<f32>) -> Accumulated {
     let step = i32(p.params.w);
     let t = vec2<i32>(frag.xy);
-    let d = load_depth(t * step);
+    let d = load_depth(t_depth, t * step);
     if (d >= 1.0) {
-        return vec4<f32>(0.0);
+        return Accumulated(vec4<f32>(0.0), vec4<f32>(0.5, 0.5, 0.5, 1.0));
     }
-    let P = world_at(t * step, d);
+    let v = view();
+    let P = world_at(t_depth, v, t * step, d);
+    let N = normal_at(t_depth, v, t * step, P, step);
+    let normal = vec4<f32>(N * 0.5 + 0.5, 1.0);
     let dist = distance(P, p.camera_pos.xyz);
     let last = vec2<i32>(textureDimensions(t_in)) - 1;
     let now = finite(textureLoad(t_in, t, 0).rgb);
     let was = prev_uv(P);
     if (p.camera_fwd.w < 0.5 || was.x < 0.0) {
-        return vec4<f32>(now, dist);
+        return Accumulated(vec4<f32>(now, dist), normal);
     }
-    let history = textureLoad(t_prev, vec2<i32>(was * vec2<f32>(last + 1)), 0);
+    let at = vec2<i32>(was * vec2<f32>(last + 1));
+    let history = textureLoad(t_prev, at, 0);
     let moved = abs(distance(P, p.prev_camera_pos.xyz) - history.a);
-    if (moved > REJECT * dist) {
-        return vec4<f32>(now, dist);
+    let turned = dot(N, textureLoad(t_prev_normal, at, 0).xyz * 2.0 - 1.0) < REJECT_TURN;
+    if (moved > REJECT * dist || turned) {
+        return Accumulated(vec4<f32>(now, dist), normal);
     }
     // This frame's 3x3 neighbourhood bounds the history: a light switched off, or a
     // surface uncovered behind a mover, never lingers.
@@ -266,7 +261,7 @@ fn fs_accumulate(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         }
     }
     let kept = clamp(finite(history.rgb), lo, hi);
-    return vec4<f32>(mix(now, kept, HISTORY), dist);
+    return Accumulated(vec4<f32>(mix(now, kept, HISTORY), dist), normal);
 }
 
 // Full resolution from the result, SSAO's bilateral upsample on colour.
@@ -274,36 +269,11 @@ fn fs_accumulate(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
 fn fs_upsample(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);
     let px = vec2<i32>(frag.xy);
-    let d = load_depth(px);
+    let d = load_depth(t_depth, px);
     if (d >= 1.0) {
         return vec4<f32>(0.0);
     }
-    let center = view_depth(world_at(px, d));
-    let f = vec2<f32>(px) / f32(step);
-    let t0 = vec2<i32>(floor(f));
-    let fr = f - floor(f);
-    let last = vec2<i32>(textureDimensions(t_in)) - 1;
-    var sum = vec3<f32>(0.0);
-    var weight = 0.0;
-    var nearest = vec3<f32>(0.0);
-    var nearest_gap = 3.4e38;
-    for (var i = 0; i < 4; i = i + 1) {
-        let o = vec2<i32>(i & 1, i >> 1u);
-        let tap = min(t0 + o, last);
-        let td = texel_depth(tap, step);
-        let c = textureLoad(t_in, tap, 0).rgb;
-        let bw = mix(1.0 - fr, fr, vec2<f32>(o));
-        let w = bw.x * bw.y * depth_weight(td, center);
-        sum += c * w;
-        weight += w;
-        let gap = abs(td - center);
-        if (gap < nearest_gap) {
-            nearest_gap = gap;
-            nearest = c;
-        }
-    }
-    if (weight < 1e-3) {
-        return vec4<f32>(nearest, 1.0);
-    }
-    return vec4<f32>(sum / weight, 1.0);
+    let v = view();
+    let center = view_depth(v, world_at(t_depth, v, px, d));
+    return vec4<f32>(bilateral_upsample(t_depth, v, t_in, px, step, center).rgb, 1.0);
 }

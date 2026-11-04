@@ -2,7 +2,7 @@
 //! view, built on first use and warmed with the rest; and how one stage records.
 
 use crate::render::gpu::bind_entry as entry;
-use crate::render::gpu::fullscreen::{color_pass, Fullscreen};
+use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
@@ -49,15 +49,37 @@ impl Stage {
             Self::Upsample => "fs_upsample",
         }
     }
+
+    /// The formats it writes: the accumulate keeps each texel's normal beside its
+    /// result, for next frame's rejection.
+    fn targets(self) -> &'static [Option<wgpu::ColorTargetState>] {
+        const fn plain(format: wgpu::TextureFormat) -> Option<wgpu::ColorTargetState> {
+            Some(wgpu::ColorTargetState {
+                format,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })
+        }
+        const ONE: &[Option<wgpu::ColorTargetState>] = &[plain(HDR_FORMAT)];
+        const TWO: &[Option<wgpu::ColorTargetState>] = &[plain(HDR_FORMAT), plain(NORMAL_FORMAT)];
+        match self {
+            Self::Accumulate => TWO,
+            _ => ONE,
+        }
+    }
 }
 
-/// What one stage reads: the view's uniform and depth, its input, and last frame's
-/// result (its input again, for every stage but the accumulate).
+/// The format of the normals the accumulate keeps (`n * 0.5 + 0.5`).
+pub(super) const NORMAL_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+
+/// What one stage reads: the view's uniform and depth, its input, last frame's
+/// result and its normals (its input again, for every stage but the accumulate).
 pub(super) struct StageInputs<'a> {
     pub uniform: &'a wgpu::Buffer,
     pub depth: &'a wgpu::TextureView,
     pub input: &'a wgpu::TextureView,
     pub prev: &'a wgpu::TextureView,
+    pub prev_normal: &'a wgpu::TextureView,
 }
 
 /// The renderer-wide half of SSIL: its layout and pipelines.
@@ -77,6 +99,7 @@ impl SsilPasses {
                 depth_entry(1, d2),
                 texture_entry(2, d2),
                 texture_entry(3, d2),
+                texture_entry(4, d2),
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -94,7 +117,7 @@ impl SsilPasses {
                     vs: "vs_fullscreen",
                     fs: stage.entry(),
                 };
-                pass.colour(device, &[Some(HDR_FORMAT.into())])
+                pass.colour(device, stage.targets())
             })
         };
         Self {
@@ -108,13 +131,14 @@ impl SsilPasses {
         self.pipelines.iter()
     }
 
-    /// Record `stage` over `inputs` into `target`, timed under `ssil`.
+    /// Record `stage` over `inputs` into `targets` (the accumulate's two, every
+    /// other stage's one), timed under `ssil`.
     pub(super) fn record(
         &self,
         (device, encoder): (&wgpu::Device, &mut wgpu::CommandEncoder),
         stage: Stage,
         inputs: StageInputs,
-        (target, timer): (&wgpu::TextureView, &GpuTimer),
+        (targets, timer): (&[&wgpu::TextureView], &GpuTimer),
     ) {
         let view = wgpu::BindingResource::TextureView;
         let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -125,11 +149,30 @@ impl SsilPasses {
                 entry(1, view(inputs.depth)),
                 entry(2, view(inputs.input)),
                 entry(3, view(inputs.prev)),
+                entry(4, view(inputs.prev_normal)),
             ],
         });
-        let timed = (stage.label(), timer, GpuPass::Ssil);
-        let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
-        let mut pass = color_pass(encoder, timed, target, clear);
+        let attachments: Vec<_> = (targets.iter())
+            .map(|&view| {
+                Some(wgpu::RenderPassColorAttachment {
+                    depth_slice: None,
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })
+            })
+            .collect();
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            multiview_mask: None,
+            label: Some(stage.label()),
+            color_attachments: &attachments,
+            depth_stencil_attachment: None,
+            timestamp_writes: timer.writes(GpuPass::Ssil),
+            occlusion_query_set: None,
+        });
         pass.set_pipeline(self.pipelines[stage as usize].get());
         pass.set_bind_group(0, &group, &[]);
         pass.draw(0..3, 0..1);

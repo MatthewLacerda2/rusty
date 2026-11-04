@@ -86,7 +86,8 @@ pub(crate) fn apply_scene_lights(
                     // `Baked` (#438), only ever uploaded in a bake capture: a
                     // lightmapped surface skips it, its lightmap holds it.
                     baked: f32::from(u8::from(light.mode.bakes_direct())),
-                    _pad2: [0.0; 3],
+                    bounce_baked: f32::from(u8::from(scene.lightmaps.baked_light(id))),
+                    _pad2: [0.0; 2],
                 })
             }
             LightType::Ambient

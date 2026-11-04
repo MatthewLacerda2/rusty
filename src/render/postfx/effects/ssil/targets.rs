@@ -1,10 +1,12 @@
 //! One view's SSIL state (#1750), held in `PostFx::targets` while the view runs it:
 //! the source (last frame's realtime light), the gather and its blur, the two
-//! results the accumulate alternates between, the full-resolution result the
+//! results the accumulate alternates between and the normals beside each, the
+//! full-resolution result the
 //! forward pass reads, and what the history was drawn from. Made at the view's
 //! size and the quality's divisor, rebuilt (history and all) when either changes;
 //! a resize drops it with every slot.
 
+use super::pass::NORMAL_FORMAT;
 use super::{Previous, SsilUniform};
 use crate::render::motion::HistoryKey;
 use crate::render::postfx::{PfxTarget, PostFx, HDR_FORMAT};
@@ -23,6 +25,9 @@ pub(crate) struct SsilTargets {
     pub(super) raw: PfxTarget,
     pub(super) blurred: PfxTarget,
     pub(super) results: [PfxTarget; 2],
+    /// The normal of each result's texels, which next frame's accumulate rejects
+    /// a turned surface's history by.
+    pub(super) normals: [PfxTarget; 2],
     /// The full-resolution result; `None` at full resolution, where the forward
     /// pass reads the current result itself.
     pub(super) full: Option<PfxTarget>,
@@ -53,6 +58,10 @@ impl SsilTargets {
             raw: make("SSIL Gather"),
             blurred: make("SSIL Blurred"),
             results: [make("SSIL Result A"), make("SSIL Result B")],
+            normals: [
+                PostFx::target(device, w, h, "SSIL Normals A", NORMAL_FORMAT),
+                PostFx::target(device, w, h, "SSIL Normals B", NORMAL_FORMAT),
+            ],
             full: (divisor > 1)
                 .then(|| PostFx::target(device, width, height, "SSIL Full", HDR_FORMAT)),
             uniform: device.create_buffer(&wgpu::BufferDescriptor {

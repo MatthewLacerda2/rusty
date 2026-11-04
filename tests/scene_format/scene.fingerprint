@@ -803,6 +803,8 @@ scene.lightmaps.entries[].entity: u32
 scene.lightmaps.entries[].page: u32
 scene.lightmaps.entries[].scale_offset: tuple(4)
 scene.lightmaps.entries[].scale_offset[]: f32
+scene.lightmaps.lights: seq
+scene.lightmaps.lights[]: u32
 scene.lightmaps.pages: seq
 scene.lightmaps.pages[]: string
 scene.materials: map

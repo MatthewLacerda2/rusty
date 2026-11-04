@@ -125,7 +125,10 @@ pub(crate) struct DirectionalLightUniform {
     /// 1.0 for a `Baked` light (#438): a lightmapped surface already carries its
     /// direct light, so it skips this one.
     pub baked: f32,
-    pub _pad2: [f32; 3],
+    /// 1.0 when the scene's lightmap bake took this light in (#1750,
+    /// `LightmapSet::baked_light`): SSIL gathers none of its light.
+    pub bounce_baked: f32,
+    pub _pad2: [f32; 2],
 }
 
 /// The most directional lights shaded at once (#434); slot 0 is the sun, the one
