@@ -67,12 +67,26 @@ impl Renderer {
     }
 
     /// Every mesh entity re-derived: the first frame, a load, an Undo, a renderer
-    /// input. The one walk of the World an extract takes.
+    /// input. The one walk of the World an extract takes. An object still there
+    /// keeps its slot, so a record whose value did not move uploads nothing; only
+    /// the slots of objects gone are freed.
     pub(super) fn rebuild_objects(&mut self, scene: &Scene, rs: &mut RenderScene) -> ExtractStats {
         let ids = scene.world.ids_with_mesh();
         self.upload_meshes_of(scene, &ids);
         self.load_maps_of(scene, &ids);
-        rs.release(&mut self.retained.objects);
+        let meshed: BTreeSet<u32> = ids.iter().copied().collect();
+        let gone: Vec<u32> = rs
+            .objects
+            .keys()
+            .filter(|id| !meshed.contains(id))
+            .copied()
+            .collect();
+        for id in gone {
+            let slot = rs.objects[&id].slot;
+            self.retained.objects.release(slot);
+            rs.set(id, None);
+        }
+        rs.casting = None;
         ExtractStats {
             extracted: self.derive_objects(scene, rs, &ids),
             posed: 0,

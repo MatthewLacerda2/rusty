@@ -1,10 +1,9 @@
 //! src/render/scene/equivalence_tests.rs — after any edit sequence the retained
 //! objects and their object-table records equal a build from scratch (#1706): the
 //! ECS write paths of `ops_tests`, the inputs the log does not cover (library,
-//! overrides, lightmaps and a bake's light record, which alone sets `in_bake` (#1750),
-//! probes, a capture, a re-uploaded shared mesh) and the
-//! shadow ops (`shadow_ops`; the bakes' key equals a fresh digest). The table leaks
-//! no slot and the GPU mirrors it (`table_holds`). One renderer for every case.
+//! overrides, lightmaps and a bake's light record (`in_bake`, #1750), probes, a
+//! capture, a re-uploaded shared mesh) and the shadow ops (`shadow_ops`). The table
+//! leaks no slot and the GPU mirrors it (`table_holds`). One renderer for every case.
 
 use glam::Vec3;
 use proptest::prelude::*;
@@ -24,7 +23,8 @@ use crate::scene::Scene;
 enum R {
     World(Op),
     Prop(u8),
-    Material(usize, Option<u8>),
+    /// Entity, material, and whether two slots name it (`set_slot` pads a list).
+    Material(usize, Option<u8>, bool),
     Library(u8),
     Override(usize, bool),
     Light(usize, bool),
@@ -43,7 +43,8 @@ fn r_op() -> impl Strategy<Value = R> {
     prop_oneof![
         8 => op().prop_map(R::World),
         2 => (0u8..3).prop_map(R::Prop),
-        2 => (at(), proptest::option::of(0u8..3)).prop_map(|(i, m)| R::Material(i, m)),
+        3 => (at(), proptest::option::of(0u8..3), any::<bool>())
+            .prop_map(|(i, m, two)| R::Material(i, m, two)),
         2 => (0u8..6).prop_map(R::Library),
         2 => (at(), any::<bool>()).prop_map(|(i, s)| R::Override(i, s)),
         1 => (at(), any::<bool>()).prop_map(|(i, l)| R::Light(i, l)),
@@ -68,16 +69,16 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
             create_entity(scene, "prop", Some(kinds[k as usize]));
         }
         R::Library(c) => library(scene, c),
-        R::Probe(x) => {
-            scene.probes.add_probe(Vec3::X * f32::from(x));
-        }
+        R::Probe(x) => drop(scene.probes.add_probe(Vec3::X * f32::from(x))),
         R::Capture(on) => r.capture.static_only = on,
         R::Rewind => scene.world.rewind_changes(),
         R::Shadow(ref op) => shadow_ops::edit(scene, op),
         R::Frame => {}
-        R::Material(i, m) => on(scene, pick(scene, i), |s, id| {
+        R::Material(i, m, two) => on(scene, pick(scene, i), |s, id| {
             let name = m.map(|m| ["red", "glass", "blue"][m as usize].to_string());
-            s.world.set_material(id, name.map(MaterialComponent::new));
+            let slots = name.map(|n| vec![n; 1 + usize::from(two)]);
+            let slots = slots.map(|materials| MaterialComponent { materials });
+            s.world.set_material(id, slots);
         }),
         R::Override(i, set) => on(scene, pick(scene, i), |s, id| match set {
             true => s.shader_overrides.set(id, "tint".into(), vec![1.0]),

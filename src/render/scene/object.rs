@@ -4,7 +4,7 @@
 
 use glam::{Mat4, Vec3};
 
-use crate::components::{MaterialAsset, RenderFace, ShadowCasting};
+use crate::components::{MaterialAsset, MaterialComponent, RenderFace, ShadowCasting};
 use crate::render::draw::batch::BatchKey;
 use crate::render::draw::materials::material_texture_paths;
 use crate::render::draw::uniforms::solid_object;
@@ -70,8 +70,9 @@ pub(crate) struct RenderObject {
     /// freed when the object goes. A camera's instance names it.
     pub slot: u32,
     pub slots: Vec<SlotDraw>,
-    /// The library names its material slots reference, found or not: an edit to
-    /// one of them re-derives it (`RenderScene::by_material`), and no other does.
+    /// The library names its material slots reference, found or not, each once
+    /// (sorted): an edit to one of them re-derives it (`RenderScene::by_material`),
+    /// and no other does.
     pub materials: Vec<String>,
     /// Its slots' depth draws, adjacent slots that cast alike joined
     /// (`passes::shadows::shadow_runs`): derived with the slots, so a shadow sweep
@@ -89,6 +90,16 @@ impl RenderObject {
     pub(crate) fn origin(&self) -> Vec3 {
         self.world.w_axis.truncate()
     }
+}
+
+/// The names `materials` references, each once: two slots may name one material
+/// (`scene::authoring::material::set_slot` pads with its key), and `RenderScene::set` indexes
+/// each name once.
+fn library_names(materials: Option<&MaterialComponent>) -> Vec<String> {
+    let mut names = materials.map_or_else(Vec::new, |m| m.materials.clone());
+    names.sort_unstable();
+    names.dedup();
+    names
 }
 
 impl Renderer {
@@ -133,9 +144,7 @@ impl Renderer {
             reads_render_texture: false,
             slot,
             slots: Vec::with_capacity(runs.len()),
-            materials: world
-                .material(id)
-                .map_or_else(Vec::new, |m| m.materials.clone()),
+            materials: library_names(world.material(id).as_deref()),
             shadow_runs: Vec::new(),
         };
         drop(mesh);

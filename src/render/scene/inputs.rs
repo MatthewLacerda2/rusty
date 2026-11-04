@@ -69,6 +69,11 @@
 //! **Known gaps:**
 //! - Any change to the lightmap set rebuilds every object, and a despawn removes the
 //!   entity's lightmap entry: destroying one lightmapped prop re-derives the World.
+//!   Each object keeps its slot through a rebuild, so only records whose value
+//!   moved are uploaded.
+//! - A library edit re-derives every user of the material: 4000 props sharing one
+//!   animated colour re-derive all 4000 a frame. What removes it is a persistent
+//!   material record updated in place, no object re-derived (#1706 stays open).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -232,16 +237,13 @@ type Library = BTreeMap<String, MaterialAsset>;
 impl Kept<Library> {
     /// Bring the copy up to `now`; the names whose material was added, removed or
     /// edited. One compare of the revisions when nothing wrote the library; when
-    /// something did, one compare per material, and only the edited ones copied.
+    /// something did, one walk of both (sorted) maps together, one compare per name,
+    /// and only the edited ones copied.
     fn edited(&mut self, now: &Revisioned<Library>) -> BTreeSet<String> {
         if std::mem::replace(&mut self.seen, now.revision()) == now.revision() {
             return BTreeSet::new();
         }
-        let names = self.copy.keys().chain(now.keys());
-        let edited: BTreeSet<String> = names
-            .filter(|&name| self.copy.get(name) != now.get(name))
-            .cloned()
-            .collect();
+        let edited = library_diff(&self.copy, now);
         for name in &edited {
             match now.get(name) {
                 Some(asset) => self.copy.insert(name.clone(), asset.clone()),
@@ -249,6 +251,35 @@ impl Kept<Library> {
             };
         }
         edited
+    }
+}
+
+/// The names added, removed or edited between `old` and `new`: one merge walk of
+/// the two sorted maps, each name visited once.
+fn library_diff(old: &Library, new: &Library) -> BTreeSet<String> {
+    use std::cmp::Ordering::{Equal, Greater, Less};
+    let (mut a, mut b) = (old.iter().peekable(), new.iter().peekable());
+    let mut edited = BTreeSet::new();
+    loop {
+        let name = match (a.peek(), b.peek()) {
+            (None, None) => return edited,
+            (Some(_), None) => a.next().map(|(n, _)| n),
+            (None, Some(_)) => b.next().map(|(n, _)| n),
+            (Some((x, ma)), Some((y, mb))) => match x.cmp(y) {
+                Less => a.next().map(|(n, _)| n),
+                Greater => b.next().map(|(n, _)| n),
+                Equal if ma == mb => {
+                    a.next();
+                    b.next();
+                    None
+                }
+                Equal => {
+                    b.next();
+                    a.next().map(|(n, _)| n)
+                }
+            },
+        };
+        edited.extend(name.cloned());
     }
 }
 

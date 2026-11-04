@@ -3,7 +3,8 @@
 //! moving, skinned (posed every frame, unstamped), static, transparent and
 //! lightmap-entried solids, with material, layer, activity and override edits, a
 //! two-sided, a Cutout and a mirrored static caster: their shadows included. And a
-//! move uploads the moved object's record alone (`render_upload_bytes`).
+//! move uploads the moved object's record alone (`render_upload_bytes`), and a
+//! rebuild none.
 
 use glam::{Mat4, Vec3};
 
@@ -111,23 +112,24 @@ fn gpu_a_kept_scene_draws_what_a_fresh_renderer_draws_after_every_edit() {
 }
 
 #[test]
-fn gpu_a_move_uploads_the_moved_record_alone() {
+fn gpu_a_move_uploads_the_moved_record_alone_and_a_rebuild_none() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let mut scene = yard(6);
     frame(&mut r, &scene);
     let idle = frame(&mut r, &scene).1.render_upload_bytes;
-    scene
-        .world
-        .transform_mut(scene.world.ids_with_mesh()[0])
-        .unwrap()
-        .position
-        .y += 0.01;
+    let mover = scene.world.ids_with_mesh()[0];
+    scene.world.transform_mut(mover).unwrap().position.y += 0.01;
     let moved = frame(&mut r, &scene).1.render_upload_bytes;
     assert_eq!(
         moved - idle,
         240,
-        "one object record, nothing per static object"
+        "one object record, none per static object"
     );
+    // A rebuild re-derives every object; each keeps its slot, so none uploads.
+    r.retained.touch();
+    let rebuilt = frame(&mut r, &scene).1;
+    assert_eq!(rebuilt.render_extracted, 6, "the six props, re-derived");
+    assert_eq!(rebuilt.render_upload_bytes, idle, "no record moved");
 }

@@ -17,6 +17,11 @@ use std::ops::Range;
 
 use crate::render::gpu::uniforms::ObjectData;
 
+/// How many clean slots a dirty run may span to join the next one: 16 records are
+/// 3.75 KB, about what one more `write_buffer` call costs in staging and recording
+/// (the PR measured it, #1706).
+pub(crate) const JOIN_GAP: u32 = 16;
+
 pub(crate) struct ObjectTable {
     /// Every slot's record, freed ones included (unread until reused).
     records: Vec<ObjectData>,
@@ -25,6 +30,10 @@ pub(crate) struct ObjectTable {
     dirty: Vec<u32>,
     /// One camera's mesh particles, at slots `records.len()..`.
     transient: Vec<ObjectData>,
+    /// Which slots are free, by slot: what checks a double release in linear time
+    /// (a scene's release frees every slot it held).
+    #[cfg(debug_assertions)]
+    freed: Vec<bool>,
 }
 
 impl Default for ObjectTable {
@@ -35,6 +44,8 @@ impl Default for ObjectTable {
             // The identity reaches the GPU with the first upload.
             dirty: vec![0],
             transient: Vec::new(),
+            #[cfg(debug_assertions)]
+            freed: vec![false],
         }
     }
 }
@@ -48,20 +59,28 @@ impl ObjectTable {
             self.transient.is_empty(),
             "no slot moves under a camera's particles"
         );
-        self.free.pop().unwrap_or_else(|| {
+        let slot = self.free.pop().unwrap_or_else(|| {
             let slot = self.records.len() as u32;
             self.records.push(ObjectData::IDENTITY);
             self.dirty.push(slot);
             slot
-        })
+        });
+        #[cfg(debug_assertions)]
+        {
+            self.freed.resize(self.records.len(), false);
+            self.freed[slot as usize] = false;
+        }
+        slot
     }
 
     /// `slot`'s object is gone: the slot is reused by a later [`Self::alloc`].
     pub(crate) fn release(&mut self, slot: u32) {
-        debug_assert!(
-            slot != 0 && !self.free.contains(&slot),
-            "slot {slot} freed twice"
-        );
+        #[cfg(debug_assertions)]
+        {
+            let freed = &mut self.freed[slot as usize];
+            assert!(slot != 0 && !*freed, "slot {slot} freed twice");
+            *freed = true;
+        }
         self.free.push(slot);
     }
 
@@ -97,14 +116,17 @@ impl ObjectTable {
         (&self.records, &self.transient)
     }
 
-    /// The runs of slots written since the last call, each once, ascending.
+    /// The runs of slots written since the last call, each once, ascending. Runs
+    /// fewer than [`JOIN_GAP`] slots apart are joined, the slots between rewritten
+    /// with what they already hold: each run is one `queue.write_buffer`, and so
+    /// one staging allocation, so scattered movers cost a few writes, not one each.
     pub(crate) fn take_dirty(&mut self) -> Vec<Range<u32>> {
         self.dirty.sort_unstable();
         self.dirty.dedup();
         let mut runs: Vec<Range<u32>> = Vec::new();
         for slot in self.dirty.drain(..) {
             match runs.last_mut() {
-                Some(run) if run.end == slot => run.end += 1,
+                Some(run) if slot - run.end < JOIN_GAP => run.end = slot + 1,
                 _ => runs.push(slot..slot + 1),
             }
         }
@@ -141,7 +163,11 @@ mod tests {
         t.write(a, at(1.0));
         t.write(c, at(3.0));
         t.write(b, ObjectData::IDENTITY); // unchanged: not dirty
-        assert_eq!(t.take_dirty(), vec![1..2, 3..4]);
+        assert_eq!(
+            t.take_dirty(),
+            vec![1..4],
+            "a short gap is rewritten, not split"
+        );
         t.write(b, at(2.0));
         t.write(a, at(1.5));
         t.write(a, at(1.5));
@@ -155,6 +181,29 @@ mod tests {
             "the GPU already holds what it held"
         );
         assert_eq!(t.get(c).model_matrix[12], 3.0);
+    }
+
+    #[test]
+    fn runs_join_across_a_short_gap_only() {
+        let mut t = ObjectTable::default();
+        (0..3 * JOIN_GAP).for_each(|_| _ = t.alloc());
+        t.take_dirty();
+        // 15 clean slots between 2 and 18 join; 16 between 18 and 35 do not.
+        let (near, far) = (2 + JOIN_GAP, 3 + 2 * JOIN_GAP);
+        for slot in [1, 2, near, far] {
+            t.write(slot, at(slot as f32));
+        }
+        assert_eq!(t.take_dirty(), vec![1..near + 1, far..far + 1]);
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "freed twice")]
+    fn a_slot_freed_twice_is_caught() {
+        let mut t = ObjectTable::default();
+        let a = t.alloc();
+        t.release(a);
+        t.release(a);
     }
 
     #[test]
