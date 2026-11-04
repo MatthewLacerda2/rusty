@@ -45,9 +45,11 @@ fn every_stage_reads_only_what_an_earlier_stage_wrote() {
     assert!(position("solids") < position("scene"));
     assert!(position("solids") < position("transparent"));
     assert!(position("world_ui") < position("effects"));
-    // SSR reflects the opaque image the scene pass drew, before anything blends over
-    // it (#1526, HDRP's order).
-    assert_eq!(position("ssr"), position("scene") + 1);
+    // SSIL keeps the opaque pass's light before SSR adds reflections to it (#1750),
+    // and SSR reflects the opaque image the scene pass drew, before anything blends
+    // over it (#1526, HDRP's order).
+    assert_eq!(position("ssil_source"), position("scene") + 1);
+    assert_eq!(position("ssr"), position("ssil_source") + 1);
     // The opaque copy holds the reflected image a refracting surface reads, and the
     // depth postpass writes over what the translucents drew (#1523).
     assert_eq!(position("opaque_copy"), position("ssr") + 1);

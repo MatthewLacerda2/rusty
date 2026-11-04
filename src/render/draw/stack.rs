@@ -8,7 +8,7 @@ use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
-use crate::render::postfx::effects::ssil::{SsilPlan, SsilTargets};
+use crate::render::postfx::effects::ssil;
 use crate::render::postfx::effects::ssr::{ssr_enabled, surface, transparent};
 use crate::render::postfx::effects::{self, EffectCx, PassCx};
 use crate::render::postfx::params::{frame_params, PostSource};
@@ -82,11 +82,7 @@ impl Renderer {
         let prev_time = view.post_fx.motion.history.game_time(scene.shader_time);
         // SSIL (#1750) keeps a history per view: a bake capture's faces and the
         // shader preview keep none, so they never run it.
-        let ssil = SsilPlan::for_view(pass.post, graphics, pass.full_post_fx)
-            .filter(|_| !own_pipeline && !self.capture.static_only);
-        if ssil.is_none() {
-            view.post_fx.targets.remove::<SsilTargets>();
-        }
+        let keeps = !own_pipeline && !self.capture.static_only;
         let shared = StackShared {
             aspect,
             view_projs,
@@ -95,7 +91,7 @@ impl Renderer {
             fog: FogUniform::from_settings(&scene.fog),
             ssao: SsaoPlan::for_volume(pass.post.volume, self.graphics(pass.editor_mode)),
             ssr_march: transparent::camera_march(pass.post, graphics, ssr),
-            ssil: ssil.map(|plan| (plan, key)),
+            ssil: ssil::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
         };
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);

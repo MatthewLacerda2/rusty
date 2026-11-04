@@ -7,6 +7,7 @@ use super::{Previous, SsilFrame};
 use crate::render::draw::batch::DrawBatch;
 use crate::render::draw::camera::CameraCtx;
 use crate::render::gpu::bind_layouts::create_shadow_bind_group;
+use crate::render::passes::ssao::SsaoTargets;
 use crate::render::passes::transparent::OpaqueViews;
 use crate::render::{RenderView, Renderer};
 
@@ -68,25 +69,26 @@ impl Renderer {
             stage(encoder, Stage::Upsample, (result, result), &full.view);
         }
 
-        let ao = match (prepassed, &view.ssao) {
-            (true, Some(ssao)) => ssao.ao(),
-            _ => &self.ssao.no_ao,
-        };
-        t.forward_group = Some(create_shadow_bind_group(
-            device,
+        t.forward_group = Some(self.ssil_group3(view.ssao.as_ref().filter(|_| prepassed), t));
+        let (w, h) = t.raw_size();
+        let samples = u64::from(frame.plan.quality.samples);
+        self.frame_counters.ssil_samples += u64::from(w) * u64::from(h) * samples;
+    }
+
+    /// The forward pass's group 3 with `t`'s result in the opaque copy's slot (the
+    /// opaque pass reads no copy) and `ssao`'s AO when it ran this camera.
+    fn ssil_group3(&self, ssao: Option<&SsaoTargets>, t: &SsilTargets) -> wgpu::BindGroup {
+        create_shadow_bind_group(
+            &self.device,
             &self.shadow_layout,
             &self.shadow_uniform_buffer,
             &self.shadow_renderer,
-            ao,
-            // The opaque pass reads no opaque copy: its slot carries the bounce.
+            ssao.map_or(&self.ssao.no_ao, SsaoTargets::ao),
             OpaqueViews {
                 texture: t.result(),
                 ..self.opaque_copy.fallback()
             },
-        ));
-        let (w, h) = t.raw_size();
-        let samples = u64::from(frame.plan.quality.samples);
-        self.frame_counters.ssil_samples += u64::from(w) * u64::from(h) * samples;
+        )
     }
 
     /// Keep this frame's realtime light, after `ctx`'s opaque pass and before SSR

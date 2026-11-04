@@ -64,6 +64,7 @@ use crate::components::Ssil;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::{SsilQuality, MAX_RESOLUTION_DIVISOR};
 use crate::core::settings::GraphicsSettings;
+use crate::render::draw::stack::StackPass;
 use crate::render::motion::HistoryKey;
 use crate::render::postfx::params::{effect_runs, Gate, PostSource};
 
@@ -122,6 +123,22 @@ impl SsilPlan {
             },
         })
     }
+}
+
+/// The SSIL of a view drawing `stack` this frame ([`SsilPlan::for_view`]) under
+/// `graphics`, with its history `key`, when it runs, and only on a view that
+/// `keeps` a history; else drop its state, so off holds nothing.
+pub(crate) fn begin(
+    post_fx: &mut crate::render::postfx::PostFx,
+    (stack, graphics, key): (&StackPass, GraphicsSettings, HistoryKey),
+    keeps: bool,
+) -> Option<SsilView> {
+    let plan = SsilPlan::for_view(stack.post, graphics, stack.full_post_fx);
+    let plan = plan.filter(|_| keeps);
+    if plan.is_none() {
+        post_fx.targets.remove::<SsilTargets>();
+    }
+    plan.map(|plan| (plan, key))
 }
 
 /// One base camera's SSIL inputs: the plan, where the camera looks, and what its

@@ -116,11 +116,6 @@ pub(super) fn settled(r: &mut Renderer, scene: &Scene, frames: u32) -> Vec<u8> {
     last
 }
 
-/// The pixel world point `p` lands on through [`eye`].
-pub(super) fn pixel(p: Vec3) -> (u32, u32) {
-    pixel_at(p, 0.0)
-}
-
 /// The pixel world point `p` lands on through [`eye`] turned `yaw` degrees.
 pub(super) fn pixel_at(p: Vec3, yaw: f32) -> (u32, u32) {
     let clip = eye(yaw).build_view_projection(W as f32 / H as f32) * p.extend(1.0);
