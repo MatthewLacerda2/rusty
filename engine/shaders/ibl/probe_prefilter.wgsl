@@ -37,7 +37,9 @@ fn direction(face: u32, uv: vec2<f32>) -> vec3<f32> {
 // The captured radiance along `dir` in source mip `level` (base `params.p.z` wide): the
 // nearest texel of the first face whose frustum holds it, as `cube_sample::sample`.
 fn capture_at(dir: vec3<f32>, level: i32) -> vec3<f32> {
-    let res = max(floor(params.p.z / exp2(f32(level))), 1.0);
+    // An integer shift, as the CPU's `base >> level`: a float `exp2` a hair off (Metal's
+    // fast math) would floor 32 / 2 to 15 and read every tap's neighbour.
+    let res = f32(max(u32(params.p.z) >> u32(level), 1u));
     for (var face = 0u; face < 6u; face = face + 1u) {
         let clip = params.view_proj[face] * vec4<f32>(dir, 0.0);
         if (clip.w <= 0.0) {
