@@ -75,13 +75,25 @@ pub fn bake_scene_lightmaps_logged(
     let scene_path = scene_path.ok_or(UNSAVED)?;
     let input = gather_bake_input(scene);
     let encoded = logged::bake_logged(&input, settings, log)?;
-    warn_missing_uvs(input.meshes.len(), encoded.maps);
+    warn_missing_uvs(lightmap_receivers(&input), encoded.maps);
     apply_encoded(scene, scene_path, &encoded)
 }
 
+/// The static meshes asking for a lightmap (`BakeMesh::receives_lightmap`): not a
+/// `ShadowsOnly` one nor one at Scale In Lightmap 0 (#1704), which get none by
+/// design. What [`missing_uv_report`] counts against.
+pub fn lightmap_receivers(input: &BakeScene) -> usize {
+    input
+        .meshes
+        .iter()
+        .filter(|m| m.receives_lightmap())
+        .count()
+}
+
 /// The bake summary's one-time nudge (#831): how many static meshes got no lightmap
-/// for want of a lightmap UV, or `None` when every one got one. Each static mesh with
-/// a usable lightmap UV bakes exactly one lightmap, so the difference is the rest.
+/// for want of a lightmap UV, or `None` when every one got one. `static_meshes`
+/// counts those asking for one ([`lightmap_receivers`]); each with a usable
+/// lightmap UV bakes exactly one lightmap, so the difference is the rest.
 pub fn missing_uv_report(static_meshes: usize, lightmaps: usize) -> Option<String> {
     let n = static_meshes.saturating_sub(lightmaps);
     let (noun, verb) = if n == 1 {
@@ -123,6 +135,8 @@ fn texture_average(map: &MapRef) -> Option<Vec3> {
 
 #[cfg(test)]
 mod job_tests;
+#[cfg(test)]
+mod limits_tests;
 #[cfg(test)]
 mod logged_tests;
 #[cfg(test)]

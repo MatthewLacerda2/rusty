@@ -52,7 +52,7 @@ mod borrow_tests;
 #[cfg(test)]
 mod edit_tests;
 #[cfg(test)]
-mod fixture_tests;
+pub(super) mod fixture_tests;
 #[cfg(test)]
 mod ops_tests;
 #[cfg(test)]

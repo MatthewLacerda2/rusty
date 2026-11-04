@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use super::atlas::{pack, MIP_LEVELS};
+use super::atlas::{pack, MAX_PAGE, MIP_LEVELS};
 use super::bake::Lightmap;
 use super::pages::{level_count, levels};
 use super::raster::fill_rest;
@@ -21,7 +21,7 @@ fn map(entity: u32, size: u32, value: f32) -> Lightmap {
 #[test]
 fn every_kept_level_of_a_map_reads_only_its_own_light() {
     let maps = [map(1, 13, 1.0), map(2, 7, 5.0), map(3, 21, 0.25)];
-    let atlas = pack(&maps);
+    let atlas = pack(&maps, MAX_PAGE);
     let edge = atlas.page_size;
     assert_eq!(level_count(edge), MIP_LEVELS);
     let chain = levels(&atlas.pages[0], edge);

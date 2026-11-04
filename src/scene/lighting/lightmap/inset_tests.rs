@@ -4,7 +4,7 @@
 
 use glam::{Vec2, Vec3};
 
-use super::raster::rasterize;
+use super::raster::{rasterize, world_per_uv};
 use super::tests::quad;
 use super::*;
 
@@ -101,13 +101,14 @@ fn floor_at_wall() -> BakeScene {
 
 #[test]
 fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
+    let scene = floor_at_wall();
+    // A density that sizes the floor's map at exactly S.
     let settings = BakeSettings {
-        texels_per_unit: 4.0,
+        texels_per_unit: (S as f32 - 0.5) / world_per_uv(&scene.meshes[0]).unwrap(),
         samples: 64,
-        max_resolution: S,
         ..super::tests::settings()
     };
-    let map = &bake(&floor_at_wall(), &settings)[0];
+    let map = &bake(&scene, &settings)[0];
     assert_eq!(map.size, S);
     // Mean of column `x` over the rows clear of the floor's other borders.
     let column = |x: usize| {

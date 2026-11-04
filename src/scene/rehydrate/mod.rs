@@ -149,7 +149,7 @@ fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
 /// entity has no Mesh of its own; another shape's is left without geometry.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
-        hold_subdivisions(entity.id, mesh);
+        hold_fields(entity.id, mesh);
         let rebuilt = rehydrate_one(mesh);
         install(mesh, rebuilt);
         if let Some(collider) = &mut entity.collider {
@@ -167,7 +167,7 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
         return;
     };
     let mut mesh = shared.reference();
-    hold_subdivisions(entity.id, &mut mesh);
+    hold_fields(entity.id, &mut mesh);
     shared.subdivisions = mesh.subdivisions;
     let rebuilt = rehydrate_one(&mesh);
     install(&mut mesh, rebuilt);
@@ -177,9 +177,16 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     }
 }
 
-/// Clamp `mesh`'s subdivisions to what its primitive takes, warning when it had to.
-fn hold_subdivisions(id: u32, mesh: &mut crate::scene::MeshComponent) {
-    if let Some(warning) = crate::scene::authoring::rendering::mesh::hold_subdivisions(mesh) {
+/// Hold the Mesh fields the field table leaves `unheld!`: clamp `mesh`'s
+/// subdivisions to what its primitive takes and its Scale In Lightmap to its range
+/// (#1704), warning for each it had to move.
+fn hold_fields(id: u32, mesh: &mut crate::scene::MeshComponent) {
+    use crate::scene::authoring::rendering::mesh;
+    let warnings = [
+        mesh::hold_subdivisions(mesh),
+        mesh::hold_scale_in_lightmap(mesh),
+    ];
+    for warning in warnings.into_iter().flatten() {
         log::warn!("[Scene] entity {id}: {warning}");
     }
 }

@@ -15,7 +15,10 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
 use super::UNSAVED;
-use super::{apply_encoded, encode_pages, gather_bake_input, warn_missing_uvs, EncodedPages};
+use super::{
+    apply_encoded, encode_pages, gather_bake_input, lightmap_receivers, warn_missing_uvs,
+    EncodedPages,
+};
 use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeSettings};
 use crate::scene::Scene;
 
@@ -39,7 +42,7 @@ pub struct LightmapBakeJob {
     progress: Arc<BakeProgress>,
     worker: Option<JoinHandle<Encoded>>,
     scene_path: String,
-    /// Static meshes the bake gathered, for the missing-lightmap-UV report (#831).
+    /// Static meshes asking for a lightmap, for the missing-lightmap-UV report (#831).
     static_meshes: usize,
 }
 
@@ -53,14 +56,14 @@ impl LightmapBakeJob {
     ) -> Result<Self, String> {
         let scene_path = scene_path.ok_or(UNSAVED)?.to_string();
         let input = gather_bake_input(scene);
-        let static_meshes = input.meshes.len();
+        let static_meshes = lightmap_receivers(&input);
         let progress = Arc::new(BakeProgress::default());
         let watch = Arc::clone(&progress);
         let worker = thread::Builder::new()
             .name("lightmap-bake".into())
             .spawn(
                 move || match bake_with_progress(&input, &settings, &watch) {
-                    Some(maps) => encode_pages(&maps, &watch),
+                    Some(maps) => encode_pages(&maps, settings.page(), &watch),
                     None => Ok(None),
                 },
             )
