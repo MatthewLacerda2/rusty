@@ -33,7 +33,7 @@ fn agree(ops: &[Op]) -> Result<(), TestCaseError> {
         if ran_a.is_err() {
             return Ok(());
         }
-        if matches!(op, Op::Step) {
+        if matches!(op, Op::Step | Op::Pause) {
             let (l, r) = (digest(&fast), digest(&full));
             let diff: Vec<_> = l.lines().zip(r.lines()).filter(|(a, b)| a != b).collect();
             prop_assert!(l == r, "rapier after op {}: {:#?}", n, diff);

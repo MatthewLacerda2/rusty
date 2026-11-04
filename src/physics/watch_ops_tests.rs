@@ -38,6 +38,8 @@ pub enum Op {
     On(usize, Phys),
     Matrix(u8, bool),
     Step,
+    /// A step at `Time.timeScale` 0: `dt` is 0.
+    Pause,
 }
 
 fn phys() -> impl Strategy<Value = Phys> {
@@ -65,6 +67,7 @@ pub fn op() -> impl Strategy<Value = Op> {
         8 => (0usize..10, phys()).prop_map(|(i, p)| Op::On(i, p)),
         1 => (0u8..3, any::<bool>()).prop_map(|(l, on)| Op::Matrix(l, on)),
         6 => Just(Op::Step),
+        1 => Just(Op::Pause),
     ]
 }
 
@@ -83,8 +86,13 @@ pub fn apply(scene: &mut Scene, physics: &mut PhysicsWorld, op: &Op) {
     let (e, edit) = match op {
         Op::World(op) => return world_op(&mut scene.world, op),
         Op::Matrix(l, on) => return scene.collision_matrix.set_collision(0, *l, *on),
-        Op::Step => {
-            physics.step(scene, 1.0 / 60.0);
+        Op::Step | Op::Pause => {
+            let dt = if matches!(op, Op::Step) {
+                1.0 / 60.0
+            } else {
+                0.0
+            };
+            physics.step(scene, dt);
             return;
         }
         Op::On(i, edit) => match scene.world.ids().get(*i).copied() {

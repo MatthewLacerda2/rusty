@@ -45,7 +45,7 @@ impl StaticWatch {
 
     /// Whether the static geometry is as it was at the last read. Reads every
     /// cursor, so each has read everything after this.
-    fn still(&mut self, w: &mut World) -> bool {
+    pub(in crate::navigation) fn still(&mut self, w: &mut World) -> bool {
         let membership =
             matches!(w.changes(&mut self.statics), Changes::Ids(ids) if ids.is_empty());
         let reads = [
