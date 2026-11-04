@@ -55,7 +55,7 @@ mod object;
 mod shadow_ops;
 mod table;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
@@ -106,13 +106,15 @@ impl Retained {
     }
 
     /// Keep `scene` as `id`'s, the most recently drawn; a scene evicted past
-    /// [`MAX_SCENES`] gives its slots back.
-    fn put(&mut self, id: SceneId, scene: RenderScene) {
+    /// [`MAX_SCENES`] gives its slots back, and its id is returned.
+    fn put(&mut self, id: SceneId, scene: RenderScene) -> Option<SceneId> {
         self.scenes.push((id, scene));
-        if self.scenes.len() > MAX_SCENES {
-            let (_, mut evicted) = self.scenes.remove(0);
-            evicted.release(&mut self.objects);
+        if self.scenes.len() <= MAX_SCENES {
+            return None;
         }
+        let (gone, mut evicted) = self.scenes.remove(0);
+        evicted.release(&mut self.objects);
+        Some(gone)
     }
 
     /// Objects kept across every scene: with the identity, the object table's live
@@ -137,6 +139,9 @@ pub(crate) struct RenderScene {
     objects: BTreeMap<u32, RenderObject>,
     /// Ids by insertion sequence: `ids_with_mesh`'s order.
     order: BTreeMap<u64, u32>,
+    /// Ids by the library names their objects reference
+    /// (`RenderObject::materials`): who a library edit re-derives.
+    by_material: BTreeMap<String, BTreeSet<u32>>,
     /// The renderers its `LODGroup`s keep out of the static bakes (#1714), re-read
     /// only when a group or a mesh changed.
     pub(crate) unbaked: UnbakedCasters,
@@ -157,12 +162,31 @@ impl RenderScene {
         if let Some(old) = self.objects.remove(&id) {
             self.order.remove(&old.seq);
             self.forget_casting(old.is_static);
+            for name in &old.materials {
+                let users = self.by_material.get_mut(name).expect("indexed with it");
+                users.remove(&id);
+                if users.is_empty() {
+                    self.by_material.remove(name);
+                }
+            }
         }
         if let Some(object) = object {
             self.forget_casting(object.is_static);
             self.order.insert(object.seq, id);
+            for name in &object.materials {
+                self.by_material.entry(name.clone()).or_default().insert(id);
+            }
             self.objects.insert(id, object);
         }
+    }
+
+    /// The objects drawing any library material in `names`.
+    fn users_of<'a>(&'a self, names: &'a BTreeSet<String>) -> impl Iterator<Item = u32> + 'a {
+        names
+            .iter()
+            .filter_map(|name| self.by_material.get(name))
+            .flatten()
+            .copied()
     }
 
     /// Drop every object, giving its slot back to `table`.
@@ -172,6 +196,7 @@ impl RenderScene {
         }
         self.objects.clear();
         self.order.clear();
+        self.by_material.clear();
         self.casting = None;
     }
 
@@ -219,6 +244,14 @@ pub(crate) struct ExtractStats {
 }
 
 impl Renderer {
+    /// Keep `rs` as scene `id`'s objects. A scene that evicts gives back its slots
+    /// and its material param buffers (`MaterialCache::release_scene`).
+    fn keep_scene(&mut self, id: SceneId, rs: RenderScene) {
+        if let Some(gone) = self.retained.put(id, rs) {
+            self.materials.release_scene(gone);
+        }
+    }
+
     /// The resident buffers of the mesh `handle` names.
     pub(crate) fn gpu_mesh_of(&self, handle: MeshHandle) -> Option<&GpuMesh> {
         self.gpu_meshes.get(self.retained.meshes.id(handle))

@@ -54,7 +54,7 @@ impl Renderer {
             let outline = ringed.contains(&id);
             self.object_items(scene, at, (eye, outline), &mut history, &mut out);
         }
-        self.retained.put(scene.id(), retained);
+        self.keep_scene(scene.id(), retained);
         (culls, visible)
     }
 

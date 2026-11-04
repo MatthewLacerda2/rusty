@@ -9,7 +9,7 @@ use glam::Vec3;
 use proptest::prelude::*;
 use proptest::test_runner::{Config, TestRunner};
 
-use super::fixture::{fresh, held, table_holds, yard, RES};
+use super::fixture::{fresh, held, library, on, table_holds, yard, RES};
 use super::shadow_ops::{self, s_op, S};
 use crate::components::mesh::MeshRevision;
 use crate::components::{LightComponent, MaterialComponent};
@@ -23,7 +23,7 @@ use crate::scene::Scene;
 enum R {
     World(Op),
     Prop(u8),
-    Material(usize, Option<bool>),
+    Material(usize, Option<u8>),
     Library(u8),
     Override(usize, bool),
     Light(usize, bool),
@@ -42,8 +42,8 @@ fn r_op() -> impl Strategy<Value = R> {
     prop_oneof![
         8 => op().prop_map(R::World),
         2 => (0u8..3).prop_map(R::Prop),
-        2 => (at(), proptest::option::of(any::<bool>())).prop_map(|(i, m)| R::Material(i, m)),
-        1 => (0u8..4).prop_map(R::Library),
+        2 => (at(), proptest::option::of(0u8..3)).prop_map(|(i, m)| R::Material(i, m)),
+        2 => (0u8..6).prop_map(R::Library),
         2 => (at(), any::<bool>()).prop_map(|(i, s)| R::Override(i, s)),
         1 => (at(), any::<bool>()).prop_map(|(i, l)| R::Light(i, l)),
         1 => (at(), any::<bool>()).prop_map(|(i, l)| R::Lightmap(i, l)),
@@ -66,7 +66,7 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         R::Prop(k) => {
             create_entity(scene, "prop", Some(kinds[k as usize]));
         }
-        R::Library(c) => scene.materials.get_mut("red").unwrap().base_color[0] = f32::from(c),
+        R::Library(c) => library(scene, c),
         R::Probe(x) => {
             scene.probes.add_probe(Vec3::X * f32::from(x));
         }
@@ -75,7 +75,7 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         R::Shadow(ref op) => shadow_ops::edit(scene, op),
         R::Frame => {}
         R::Material(i, m) => on(scene, pick(scene, i), |s, id| {
-            let name = m.map(|red| if red { "red" } else { "glass" }.to_string());
+            let name = m.map(|m| ["red", "glass", "blue"][m as usize].to_string());
             s.world.set_material(id, name.map(MaterialComponent::new));
         }),
         R::Override(i, set) => on(scene, pick(scene, i), |s, id| match set {
@@ -105,12 +105,6 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
                 mesh.revision = MeshRevision::next(); // every sharer's buffers change
             }
         }),
-    }
-}
-
-fn on(scene: &mut Scene, id: Option<u32>, f: impl FnOnce(&mut Scene, u32)) {
-    if let Some(id) = id {
-        f(scene, id);
     }
 }
 

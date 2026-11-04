@@ -95,10 +95,12 @@ pub(super) struct RendererInputs {
 pub(super) enum Dirty {
     /// Re-derive every object.
     Rebuild,
-    /// Re-derive `whole`; re-place `posed` (a move alone).
+    /// Re-derive `whole` and every object drawing a library material named in
+    /// `materials` (one added, removed or edited); re-place `posed` (a move alone).
     Some {
         whole: BTreeSet<u32>,
         posed: BTreeSet<u32>,
+        materials: BTreeSet<String>,
     },
 }
 
@@ -112,7 +114,7 @@ pub(super) struct Inputs {
     layer: Cursor<Layer>,
     statics: Cursor<StaticSet>,
     lod_groups: Cursor<LodGroupComponent>,
-    library: Kept<BTreeMap<String, MaterialAsset>>,
+    library: Kept<Library>,
     overrides: ShaderOverrides,
     lightmaps: Kept<LightmapSet>,
     probes: Revision,
@@ -174,7 +176,7 @@ impl Inputs {
         let mut posed = BTreeSet::new();
         take(w.changes(&mut self.pose), &mut posed);
         rebuild |= std::mem::replace(&mut self.renderer, renderer) != renderer;
-        rebuild |= self.library.refresh(&scene.materials);
+        let materials = self.library.edited(&scene.materials);
         rebuild |= self.lightmaps.refresh(&scene.lightmaps);
         let probes = scene.probes.revision();
         rebuild |= std::mem::replace(&mut self.probes, probes) != probes;
@@ -187,7 +189,11 @@ impl Inputs {
             return Dirty::Rebuild;
         }
         posed.retain(|id| !whole.contains(id));
-        Dirty::Some { whole, posed }
+        Dirty::Some {
+            whole,
+            posed,
+            materials,
+        }
     }
 }
 
@@ -216,6 +222,32 @@ impl<T: Clone + PartialEq> Kept<T> {
         }
         self.copy.clone_from(now);
         true
+    }
+}
+
+/// The material library, as the scene holds it.
+type Library = BTreeMap<String, MaterialAsset>;
+
+impl Kept<Library> {
+    /// Bring the copy up to `now`; the names whose material was added, removed or
+    /// edited. One compare of the revisions when nothing wrote the library; when
+    /// something did, one compare per material, and only the edited ones copied.
+    fn edited(&mut self, now: &Revisioned<Library>) -> BTreeSet<String> {
+        if std::mem::replace(&mut self.seen, now.revision()) == now.revision() {
+            return BTreeSet::new();
+        }
+        let names = self.copy.keys().chain(now.keys());
+        let edited: BTreeSet<String> = names
+            .filter(|&name| self.copy.get(name) != now.get(name))
+            .cloned()
+            .collect();
+        for name in &edited {
+            match now.get(name) {
+                Some(asset) => self.copy.insert(name.clone(), asset.clone()),
+                None => self.copy.remove(name),
+            };
+        }
+        edited
     }
 }
 

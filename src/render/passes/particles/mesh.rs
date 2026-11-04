@@ -132,7 +132,7 @@ impl Renderer {
             mesh: self.retained.meshes.intern(&mesh),
             // The emitter names one material: the whole mesh is one run.
             indices: (0..num_indices).into(),
-            material: self.material_index(entry, pipeline, None),
+            material: self.material_index(scene.id(), entry, pipeline, None),
             record: record.words(),
             bone_base: 0,
         };

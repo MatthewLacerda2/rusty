@@ -119,3 +119,22 @@ pub(super) fn table_holds(r: &mut Renderer) -> Result<(), String> {
         false => Err("the GPU's object records differ from the table's".into()),
     }
 }
+
+/// Edit the library: `red`'s colour, `glass`'s alpha, or add or remove `blue`,
+/// which objects may name while it is missing.
+pub(super) fn library(scene: &mut Scene, c: u8) {
+    let m = &mut scene.materials;
+    match c {
+        0..=2 => m.get_mut("red").unwrap().base_color[0] = f32::from(c),
+        3 => m.get_mut("glass").unwrap().alpha = 0.2,
+        _ if m.remove("blue").is_some() => {}
+        _ => drop(m.insert("blue".into(), Default::default())),
+    }
+}
+
+/// Run `f` on entity `id` of `scene`, when there is one.
+pub(super) fn on(scene: &mut Scene, id: Option<u32>, f: impl FnOnce(&mut Scene, u32)) {
+    if let Some(id) = id {
+        f(scene, id);
+    }
+}

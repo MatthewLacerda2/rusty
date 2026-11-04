@@ -70,6 +70,9 @@ pub(crate) struct RenderObject {
     /// freed when the object goes. A camera's instance names it.
     pub slot: u32,
     pub slots: Vec<SlotDraw>,
+    /// The library names its material slots reference, found or not: an edit to
+    /// one of them re-derives it (`RenderScene::by_material`), and no other does.
+    pub materials: Vec<String>,
     /// Its slots' depth draws, adjacent slots that cast alike joined
     /// (`passes::shadows::shadow_runs`): derived with the slots, so a shadow sweep
     /// allocates nothing per caster.
@@ -130,6 +133,9 @@ impl Renderer {
             reads_render_texture: false,
             slot,
             slots: Vec::with_capacity(runs.len()),
+            materials: world
+                .material(id)
+                .map_or_else(Vec::new, |m| m.materials.clone()),
             shadow_runs: Vec::new(),
         };
         drop(mesh);

@@ -19,7 +19,7 @@ impl Renderer {
         let start = std::time::Instant::now();
         let mut retained = self.retained.take(scene.id());
         let last = self.update_objects(scene, &mut retained);
-        self.retained.put(scene.id(), retained);
+        self.keep_scene(scene.id(), retained);
         self.frame_counters.render_extracted += last.extracted;
         self.frame_counters.render_posed += last.posed;
         self.frame_counters.render_extract_us += start.elapsed().as_micros() as u64;
@@ -47,7 +47,14 @@ impl Renderer {
         };
         let stats = match dirty {
             Dirty::Rebuild => self.rebuild_objects(scene, rs),
-            Dirty::Some { whole, posed } => self.update_some(scene, rs, whole, posed),
+            Dirty::Some {
+                mut whole,
+                posed,
+                materials,
+            } => {
+                whole.extend(rs.users_of(&materials));
+                self.update_some(scene, rs, whole, posed)
+            }
         };
         let inputs = rs.inputs.as_mut().expect("opened above");
         inputs.uploads_seen = self.retained.meshes.uploads();
