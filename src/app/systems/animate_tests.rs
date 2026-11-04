@@ -118,3 +118,30 @@ fn a_nav_agent_follows_the_lunge_not_its_speed() {
     );
     assert!(end.y.abs() < 1e-3, "on the floor: {end}");
 }
+
+#[test]
+fn scripts_read_the_delta_and_turn_root_motion_off() {
+    let mut scene = Scene::new();
+    let guard = lunging(&mut scene);
+    let scene = Rc::new(RefCell::new(scene));
+    let mut gw = world_with(Rc::clone(&scene));
+    gw.set_playing(true);
+    gw.tick(DT);
+    let eval = |gw: &crate::app::GameWorld, line: &str| gw.script_manager().eval(line).unwrap();
+    let dx: f32 = eval(&gw, &format!("return (Animator.GetRootMotion({guard}))"))
+        .parse()
+        .unwrap();
+    assert!((dx - 2.0 * DT).abs() < 1e-4, "{dx}");
+    eval(&gw, &format!("Animator.SetApplyRootMotion({guard}, false)"));
+    let before = scene.borrow().world.world_position(guard);
+    gw.tick(DT);
+    assert_eq!(
+        scene.borrow().world.world_position(guard),
+        before,
+        "off: it stays"
+    );
+    let still: f32 = eval(&gw, &format!("return (Animator.GetRootMotion({guard}))"))
+        .parse()
+        .unwrap();
+    assert!(still > 0.0, "still measured while off");
+}
