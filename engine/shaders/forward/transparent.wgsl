@@ -45,6 +45,19 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
     return vec4<f32>(color + (1.0 - opacity) * behind(world, N, pixel), 1.0);
 }
 
+// The brightest a forward colour channel is written (#1699): below `Rgba16Float`'s
+// 65504, with room for the rounding to f16.
+const MAX_HDR: f32 = 60000.0;
+
+// `c` with its colour channels within +-`MAX_HDR`, alpha as is. Every colour entry
+// point returns through it, so a pixel that would overflow half-float (polished
+// metal a hand's width from a lamp: inverse-square light has no ceiling) stores a
+// large finite value, not `Inf`, which would turn bloom's bright pass NaN and its
+// blur would spread into a black block; SSR and the exposure meter read it too.
+fn finite_hdr(c: vec4<f32>) -> vec4<f32> {
+    return vec4<f32>(clamp(c.rgb, vec3<f32>(-MAX_HDR), vec3<f32>(MAX_HDR)), c.a);
+}
+
 // HDRP's *Receive SSR Transparent* (#1570): the environment reflection `reflection`
 // (step 5's probe or sky term, added under `weight`) with what the reflected ray `R`
 // from `world` hits on screen in its place, as the SSR pass does for an opaque pixel

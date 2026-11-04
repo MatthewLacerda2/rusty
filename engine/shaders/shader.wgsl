@@ -190,7 +190,7 @@ fn fs_gizmo(in: VertexOutput) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return surface_color(in);
+    return transparent::finite_hdr(surface_color(in));
 }
 
 // ---- Motion vectors (#1435) ----
@@ -244,7 +244,7 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
         in.clip_position, in.world_position, in.world_normal, in.tex_coords,
         in.world_tangent, in.instance, in.lightmap_uv,
     );
-    return VelocityTargets(surface_color(v), velocity_texel(in));
+    return VelocityTargets(transparent::finite_hdr(surface_color(v)), velocity_texel(in));
 }
 
 // The velocity target's texel for `in`: its screen motion, its view depth and its
