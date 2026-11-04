@@ -25,11 +25,10 @@ fn shape(kind: ShapeKind, softness: f32) -> Node {
 /// Rivets: a soft circle scattered over a jittered grid.
 fn rivets(jitter: f32, rotation_jitter: f32, scale_jitter: f32) -> Vec<Node> {
     let tile = OpKind::Tile(Tile {
-        count: 5.0,
         jitter: jitter.into(),
         rotation_jitter: rotation_jitter.into(),
         scale_jitter: scale_jitter.into(),
-        seed: 0,
+        ..Tile::new(5.0)
     });
     vec![shape(ShapeKind::Circle, 0.1), node("t", tile, &["s"])]
 }
@@ -106,13 +105,7 @@ fn tile_of_a_rect_panel_has_no_gaps_at_the_cell_borders() {
         inner_radius: 0.5,
         profile: Default::default(),
     });
-    let tile = OpKind::Tile(Tile {
-        count: 3.0,
-        jitter: 0.0.into(),
-        rotation_jitter: 0.0.into(),
-        scale_jitter: 0.0.into(),
-        seed: 0,
-    });
+    let tile = OpKind::Tile(Tile::new(3.0));
     let img = bake(vec![node("s", op, &[]), node("t", tile, &["s"])]);
     assert!(img.pixels().iter().all(|p| p[0] == 1.0));
 }

@@ -4,12 +4,13 @@
 use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 
 /// The *worn, grimy painted metal* example (docs/api/Texture.md) plus a blur,
-/// warp, tile, mapping, bump, a distance bevel, a normal blend, the channel ops,
-/// two-image math, auto levels and the #1743 filters (occlusion, edges, highpass,
-/// sharpen, histogram scan, levels), #1739's directional ops (directional blur
-/// and warp, slope blur), #1740's generators (fibres, a distorted saw wave, a
-/// distorted noise, smooth F1, a star and a polygon with heights) and the #1741
-/// flood fill and its readers, so every banded path runs.
+/// warp, tile (also with a mask, a size map and the `over` and `add` blends),
+/// mapping, bump, a distance bevel, a normal blend, the channel ops, two-image
+/// math, auto levels and the #1743 filters (occlusion, edges, highpass, sharpen,
+/// histogram scan, levels), #1739's directional ops (directional blur and warp,
+/// slope blur), #1740's generators (fibres, a distorted saw wave, a distorted
+/// noise, smooth F1, a star and a polygon with heights) and the #1741 flood fill
+/// and its readers, so every banded path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
   "nodes": [
@@ -26,6 +27,9 @@ const RECIPE: &str = r#"{
     { "id": "soft", "op": "blur", "radius": 0.07, "inputs": ["chips"] },
     { "id": "dots", "op": "shape", "kind": "circle", "size": [0.5, 0.5] },
     { "id": "rivets", "op": "tile", "count": 5, "jitter": 0.3, "inputs": ["dots"] },
+    { "id": "leaves", "op": "tile", "count": 6, "jitter": 0.8, "rotation_jitter": 1, "scale_jitter": 0.5,
+      "value_jitter": 0.6, "probability": 0.8, "output": "random", "blend": "over", "inputs": ["dots", "chips", "soft"] },
+    { "id": "piled", "op": "tile", "count": 7, "jitter": 1, "blend": "add", "inputs": ["dots"] },
     { "id": "bent", "op": "warp", "strength": 0.1, "inputs": ["rivets", "soft"] },
     { "id": "turned", "op": "mapping", "scale": [2, 1], "rotation": 0.1, "translation": [0.1, 0], "inputs": ["bent"] },
     { "id": "n", "op": "bump_to_normal", "strength": 0.4, "inputs": ["turned"] },
@@ -66,7 +70,8 @@ const RECIPE: &str = r#"{
     { "id": "fb", "op": "flood_bbox", "output": "center_x", "inputs": ["ff"] },
     { "id": "flood", "op": "combine_rgb", "inputs": ["fr", "fg", "fb"] },
     { "id": "lt5", "op": "mix", "mode": "add", "factor": 0.4, "inputs": ["lt4", "flood"] },
-    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt5", "soft"] }
+    { "id": "lt6", "op": "combine_rgb", "inputs": ["leaves", "piled", "lt5"] },
+    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt6", "soft"] }
   ],
   "output": "out"
 }"#;
