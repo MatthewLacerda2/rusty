@@ -50,7 +50,7 @@ fn unpack_lane(a: f32) -> vec2<f32> {
     let exponent = u32(split.exp + 14);
     let mantissa = u32(round((split.fract * 2.0 - 1.0) * 1024.0));
     let payload = ((exponent << 10u) | mantissa) - F16_NORMAL;
-    return vec2<f32>(f32(payload / DIGIT) / OCT_LEVELS * 2.0 - 1.0, f32(payload % DIGIT));
+    return vec2<f32>((f32(payload / DIGIT) * 2.0 - OCT_LEVELS) / OCT_LEVELS, f32(payload % DIGIT));
 }
 
 // Octahedral encoding of a unit vector into [-1, 1]² (Cigolle et al. 2014).
