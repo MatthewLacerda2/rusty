@@ -86,6 +86,10 @@ pub fn share_world(host: &mut CaptureHost, world: &GameWorld, width: u32, height
     if let Some(renderer) = host.renderer(width, height) {
         let textures = world.resources.screen.borrow().textures().clone();
         renderer.set_ui_textures(textures);
-        renderer.apply_graphics(*world.script_manager().graphics_cell().borrow());
+        let display_scale = world.resources.screen.borrow().display_scale();
+        renderer.apply_graphics(
+            *world.script_manager().graphics_cell().borrow(),
+            display_scale,
+        );
     }
 }

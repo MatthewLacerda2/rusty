@@ -2,40 +2,13 @@
 //!
 //! Locate the screen's camera, `scene::camera::main_camera` (Unity's `Camera.main`,
 //! the base of the screen stack, #1434), and its post-FX volume, and read or mutate
-//! them, and the render scale in the shared graphics cell.
-//! These are the only places `Graphics.*` reaches into render-only component state.
+//! them. These are the only places `Graphics.*` reaches into render-only component state.
 
 use std::cell::RefCell;
 
-use super::super::{put, Reg};
-use crate::api::ApiCell;
 use crate::components::{CameraComponent, PostProcessingComponent};
-use crate::core::settings::render_scale::RenderScale;
-use crate::core::settings::GraphicsSettings;
 use crate::scene::camera::{camera_volume, main_camera};
 use crate::scene::Scene;
-
-/// The scene's render scale (#1498), in the shared graphics cell: clamped to URP's
-/// range.
-pub(super) fn register_render_scale(
-    lua: &mlua::Lua,
-    table: &mlua::Table,
-    graphics: ApiCell<GraphicsSettings>,
-) -> Reg {
-    put(
-        table,
-        "GetRenderScale",
-        lua.create_function(move |lua, ()| Ok(graphics.get(lua)?.borrow().render_scale.get())),
-    )?;
-    put(
-        table,
-        "SetRenderScale",
-        lua.create_function(move |lua, scale: f32| {
-            graphics.get(lua)?.borrow_mut().render_scale = RenderScale::new(scale);
-            Ok(())
-        }),
-    )
-}
 
 /// The main camera, when its post-processing volume is active: the volume the
 /// screen's post-FX reads.

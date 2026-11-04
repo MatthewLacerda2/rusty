@@ -107,7 +107,8 @@ player's options with it), `Time.timeScale`, `Time.paused` and the queued
 `Time.Step`s Play started from, and a digest of the scene file and of the
 project's `.lua` files, read right
 before Play is entered (whether by a tick, a paused frame or `Editor.EnterPlay`),
-the Game view size at each change, and per tick the input the tick published
+the Game view size and the display scale (`Video.GetDisplayScale`, #1715) at
+each change, and per tick the input the tick published
 (`InputFrame`), as a delta from the tick before, and the tick's `dt`: the editor
 and the dev player tick on wall-clock time, and the replay runs each tick on the
 `dt` it was recorded with. Everything else that reaches a playing world is
@@ -125,8 +126,9 @@ passing or returning a function or a handle (`Scene.GetScript`'s calls are not
 recorded), Play started on unsaved scene edits. The replay warns from there on.
 Script and asset changes on disk wait for Stop (the editor's watch holds them
 through Play), so they never reach a Play session. `play --size` and `--scene`
-are refused with `--demo`: the replay plays the scene and the Game view size the
-demo recorded (the sim lays the UI out on it, and every frame renders at it).
+are refused with `--demo`: the replay plays the scene, the Game view size and the
+display scale the demo recorded (the sim lays the UI out on the size, every frame
+renders at it, and a `"match_display"` render scale resolves on the scale).
 
 **Open one in the editor.** `Editor.OpenDemo(path)` ([`api/Editor.md`](api/Editor.md),
 *The demo timeline*) plays a demo on the Game view with a timeline: play/pause,
