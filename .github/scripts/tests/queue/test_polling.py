@@ -97,9 +97,9 @@ class Rebasing(unittest.TestCase):
     def test_the_pre_push_head_stops_being_an_excuse_after_the_grace(self):
         self.assertEqual(polling.head_state(SHA, "1" * 40, SHA, waited=SPENT)[0], outcomes.STOP)
 
-    def test_a_third_sha_is_somebody_else_and_stops_immediately(self):
+    def test_a_third_sha_is_somebody_else_and_ends_the_wait_at_once(self):
         state, lines = polling.head_state("2" * 40, "1" * 40, SHA, waited=0.0)
-        self.assertEqual(state, outcomes.STOP)
+        self.assertEqual(state, outcomes.HEAD_MOVED)
         self.assertIn("Somebody else pushed", " ".join(lines))
 
     def test_the_watched_head_goes(self):
