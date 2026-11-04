@@ -78,10 +78,12 @@ fn gpu_a_small_lamp_glows_far_past_the_old_reach() {
     };
     let off = unbloomed(&mut r);
     let on = shot(&mut r, &scene(40.0, |_| ()), (W, H));
-    // The old blur reached ±4 full-resolution texels past the dot's few pixels.
+    // The old blur reached ±4 full-resolution texels past the dot's few pixels, so
+    // any light here is the mip chain's. Neutral (#1701) holds a dim glow near its
+    // linear value: about +170 at this lamp, far above the rounding of a frame.
     let (far_off, far_on) = (light_right(&off, 16, 40), light_right(&on, 16, 40));
     eprintln!("[bloom] 16..40 px right of the lamp: off {far_off}, on {far_on}");
-    assert!(far_on > far_off + 200, "the glow reaches 16..40 px out");
+    assert!(far_on > far_off + 100, "the glow reaches 16..40 px out");
 }
 
 #[test]
