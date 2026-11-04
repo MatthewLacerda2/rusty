@@ -4,11 +4,12 @@
 //! restitution and their combine rules. rapier resolves two colliders' rules the
 //! way Unity does (the higher-priority mode wins, `Average < Minimum < Multiply <
 //! Maximum`), so the mapping is one-to-one and the solver does the combining.
-//! Applied at collider build and re-applied each tick, so a material edited
+//! Applied at collider build and re-applied whenever the Collider changes, so a material edited
 //! mid-play (`Physics.SetPhysicsMaterial`) takes effect on the next step.
 
 use rapier3d::prelude::*;
 
+use super::watch::Owners;
 use super::world::PhysicsWorld;
 use crate::components::{CombineMode, PhysicsMaterial};
 use crate::scene::Scene;
@@ -43,16 +44,20 @@ pub(super) fn apply_material(collider: &mut Collider, material: &PhysicsMaterial
 }
 
 impl PhysicsWorld {
-    /// Re-apply every built collider's material from its component, so a
+    /// Re-apply each built collider's material from its component, so a
     /// material edited since the last tick reaches the solver.
-    pub(super) fn sync_materials(&mut self, scene: &Scene) {
-        for (&id, &handle) in &self.id_to_collider {
-            let (Some(c), Some(collider)) =
-                (scene.world.collider(id), self.colliders.get_mut(handle))
-            else {
-                continue;
-            };
-            apply_material(collider, &c.material);
+    pub(super) fn sync_materials(&mut self, scene: &Scene, owners: &Owners) {
+        for (_, ids) in owners.pick(&self.plan) {
+            for id in ids {
+                let handle = self.id_to_collider.get(id);
+                let (Some(c), Some(collider)) = (
+                    scene.world.collider(*id),
+                    handle.and_then(|&h| self.colliders.get_mut(h)),
+                ) else {
+                    continue;
+                };
+                apply_material(collider, &c.material);
+            }
         }
     }
 }

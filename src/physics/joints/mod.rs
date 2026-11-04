@@ -1,10 +1,10 @@
 //! src/physics/joints/mod.rs — `Joint` components as rapier impulse joints (#449).
 //!
-//! Each tick, before the step, [`PhysicsWorld::resync_joints`] matches the live
-//! joints to the scene: a joint is (re)built when it is new, when its shape
+//! Before a step, when the change log names a `Joint`, its entity or connected
+//! body, or the body plan changed (always on a full sync; `physics::sync`, #1707),
+//! [`PhysicsWorld::resync_joints`] (re)builds a joint when new, when its shape
 //! (kind, bodies, anchors, axes, limits, collision flag) changed, or when either
-//! body was rebuilt — rapier drops a removed body's joints with it. Break
-//! thresholds are read live and never force a rebuild.
+//! body was rebuilt (rapier drops a removed body's joints). Break thresholds are read live.
 //!
 //! **Frames.** The joint's frame sits at `anchor` (this entity's local space,
 //! scaled like its geometry) with its X axis along `axis` and its Y axis along

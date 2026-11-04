@@ -1,10 +1,12 @@
 //! Ragdolls end to end (#466): the builder's bodies and joints, the joints bending
 //! the natural way, a fall that comes to rest, an impulse at the hit point, the
-//! Animator ↔ physics switch, IK leaving a ragdoll alone (#461), and determinism. Saving is in-crate
+//! Animator ↔ physics switch, IK leaving a ragdoll alone (#461), a resting one
+//! falling when its floor is switched off (#1707), and determinism. Saving is in-crate
 //! (`scene::skeleton::ragdoll::persist_tests`), over the glTF fixture.
 
 mod decapitated;
 mod fall;
+mod floor_off;
 mod ik;
 mod mirrored;
 mod own_mirror;

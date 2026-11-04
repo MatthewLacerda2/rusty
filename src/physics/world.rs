@@ -5,7 +5,8 @@
 //! from the scene on entering Play and stepped once per fixed physics tick:
 //!
 //!   1. `sync_to_rapier`  — push the (externally mutated) component transforms and
-//!      velocities into rapier. Kinematic bodies are pure movers: their next pose
+//!      velocities into rapier, for the bodies the World's change log names
+//!      (`sync`, `watch`; every body on the first step, a load or an Undo). Kinematic bodies are pure movers: their next pose
 //!      is their Transform (a CharacterController has already collided-and-slid
 //!      it there in `Move`, see `character`); dynamic bodies get their pose,
 //!      linear velocity, and gravity scale; static bodies stay put.
@@ -25,7 +26,8 @@ use super::events::collision::CollisionEvents;
 use super::events::trigger::TriggerEvents;
 use super::joints::JointMap;
 use super::live::body_type;
-use super::shape::build::{body_state, gravity_scale, EntityBodyState};
+use super::shape::build::{gravity_scale, EntityBodyState};
+use super::watch::{Owners, Tracked};
 use super::PhysicsEvents;
 use crate::scene::Scene;
 
@@ -45,10 +47,12 @@ pub struct PhysicsWorld {
     pub(super) soft_bodies: SoftBodySet,
     ccd_solver: CCDSolver,
     /// The body layout last built (#445): owner entity id -> the collider
-    /// entities its body carries. Diffed each tick to rebuild changed bodies.
+    /// entities its body carries. Re-derived and diffed to rebuild changed bodies.
     pub(super) plan: BodyPlan,
     /// body-owner entity id -> rigid-body handle.
     pub(super) id_to_body: Map<u32, RigidBodyHandle>,
+    /// rigid-body handle -> its owner entity (inverse of `id_to_body`).
+    pub(super) body_to_id: Map<RigidBodyHandle, u32>,
     /// collider handle -> the entity that owns the *collider* (not the body's
     /// root), so a hit on a compound reports which part was hit.
     pub(super) collider_to_id: Map<ColliderHandle, u32>,
@@ -65,6 +69,8 @@ pub struct PhysicsWorld {
     pub(super) joints: JointMap,
     /// The fixed body world-anchored joints attach to, made on first use.
     pub(super) world_body: Option<RigidBodyHandle>,
+    /// What the sync before each step needs to sync only what changed (#1707).
+    pub(super) tracked: Tracked,
 }
 
 impl PhysicsWorld {
@@ -86,52 +92,26 @@ impl PhysicsWorld {
             ccd_solver: CCDSolver::new(),
             plan: BodyPlan::new(),
             id_to_body: Map::default(),
+            body_to_id: Map::default(),
             collider_to_id: Map::default(),
             id_to_collider: Map::default(),
             prev_triggers: Vec::new(),
             prev_collisions: Vec::new(),
             joints: JointMap::new(),
             world_body: None,
+            tracked: Tracked::default(),
         };
         world.build_bodies(scene);
         world.resync_joints(scene);
-        world.sync_enabled(scene);
+        world.sync_enabled(scene, &Owners::All);
         // Prime the query tree so a raycast works before the first step.
         let all: Vec<ColliderHandle> = world.colliders.iter().map(|(h, _)| h).collect();
         world.refresh_query_tree(&all);
         world
     }
 
-    /// Push current component state into rapier before stepping: first rebuild
-    /// any body whose collider set changed, then every enabled flag (before any
-    /// character sweep, so no sweep sees a stale one), then each owner's world
-    /// pose and velocities and each compound collider's offset. Walks the sorted
-    /// plan, so the order is deterministic.
-    fn sync_to_rapier(&mut self, scene: &Scene) {
-        self.resync_topology(scene);
-        self.resync_joints(scene);
-        self.sync_enabled(scene);
-        self.sync_materials(scene);
-        self.sync_layers(scene);
-        self.sync_sensors(scene);
-        self.sync_masses(scene);
-        self.sync_characters(scene);
-        let plan = std::mem::take(&mut self.plan);
-        for (&owner, ids) in &plan {
-            let Some(&handle) = self.id_to_body.get(&owner) else {
-                continue;
-            };
-            let Some(snapshot) = body_state(scene, owner) else {
-                continue;
-            };
-            self.apply_body_state(handle, &snapshot);
-            self.sync_compound_parts(scene, owner, ids);
-        }
-        self.plan = plan;
-    }
-
     /// Push one entity's snapshot into its rapier body for this tick.
-    fn apply_body_state(&mut self, handle: RigidBodyHandle, snap: &EntityBodyState) {
+    pub(super) fn apply_body_state(&mut self, handle: RigidBodyHandle, snap: &EntityBodyState) {
         let body = &mut self.bodies[handle];
         let class = body_type(snap);
         if body.body_type() != class {
@@ -141,7 +121,7 @@ impl PhysicsWorld {
             body.set_body_type(class, true);
             body.set_position(to_pose(snap.pos, snap.rot), true);
         }
-        // Re-apply the CCD mode each tick so `Physics.SetCollisionDetection`
+        // Re-apply the CCD mode on every sync of the body so `Physics.SetCollisionDetection`
         // toggled mid-play takes effect (mirrors the `gravity_scale` re-apply).
         body.enable_ccd(snap.ccd_enabled);
         if snap.kinematic {
@@ -172,7 +152,8 @@ impl PhysicsWorld {
     /// joints that broke (#449), each list sorted for deterministic dispatch.
     pub fn step(&mut self, scene: &mut Scene, dt: f32) -> PhysicsEvents {
         self.integration_parameters.dt = dt;
-        self.sync_to_rapier(scene);
+        let synced = self.sync_to_rapier(scene);
+        let awake_before = self.awake_owners();
         let pre_solve = self.snapshot_velocities();
 
         self.physics_pipeline.step(
@@ -198,7 +179,7 @@ impl PhysicsWorld {
         let collisions = CollisionEvents::from_contact_sets(&self.prev_collisions, contacts);
         self.prev_collisions = collisions.stayed_keys();
         let joint_breaks = self.break_joints(scene, &pre_solve, dt);
-        self.sync_from_rapier(scene);
+        self.sync_from_rapier(scene, &synced, awake_before);
         PhysicsEvents {
             triggers,
             collisions,
@@ -206,43 +187,45 @@ impl PhysicsWorld {
         }
     }
 
-    /// Write integrated poses + velocities back onto the owner entities,
-    /// converting each body's world pose into the owner's local `Transform`
-    /// (#445). Static and kinematic bodies keep their transform: physics never
-    /// moves the one, and the other is where its Transform sent it (no
-    /// world↔local round-trip drift). The Transform write refreshes the world
-    /// AABB of every collider under the owner, compound children included.
-    fn sync_from_rapier(&self, scene: &mut Scene) {
-        for &owner in self.plan.keys() {
-            self.write_back(scene, owner);
-        }
-    }
-
-    /// Write one owner's integrated pose and velocities back onto its entity.
-    pub(super) fn write_back(&self, scene: &mut Scene, owner: u32) {
+    /// Write one owner's integrated pose and velocities back onto its entity;
+    /// whether its local Transform took a new value (its subtree moved).
+    pub(super) fn write_back(&self, scene: &mut Scene, owner: u32) -> bool {
         let body = self
             .id_to_body
             .get(&owner)
             .and_then(|&h| self.bodies.get(h));
         let Some(body) = body.filter(|_| self.plan.contains_key(&owner)) else {
-            return;
+            return false;
         };
         // Only a dynamic body's pose is the solver's. A kinematic one ended the
         // step where its Transform put it, so writing it back would only add
         // world↔local rounding to every animated bone each tick.
+        let mut moved = false;
         if body.is_dynamic() {
             let (pos, rot) = from_pose(body.position());
             let (local_pos, local_rot) = world_to_local(scene, owner, pos, rot);
+            let held = scene
+                .world
+                .transform(owner)
+                .map(|t| (t.position, t.rotation));
+            moved = held.is_some_and(|held| held != (local_pos, local_rot));
             if let Some(mut t) = scene.world.transform_mut(owner) {
                 t.position = local_pos;
                 t.rotation = local_rot;
             }
         }
-        if let Some(mut rb) = scene.world.rigidbody_mut(owner) {
-            if !rb.is_kinematic {
-                rb.velocity = body.linvel();
-                rb.angular_velocity = body.angvel();
+        // Compared before borrowing: a borrow stamps the Rigidbody as edited, and a
+        // body at rest must not name itself to the next tick's sync (#1707).
+        let (vel, ang) = (body.linvel(), body.angvel());
+        let new_velocity = scene.world.rigidbody(owner).is_some_and(|rb| {
+            !rb.is_kinematic && (rb.velocity != vel || rb.angular_velocity != ang)
+        });
+        if new_velocity {
+            if let Some(mut rb) = scene.world.rigidbody_mut(owner) {
+                rb.velocity = vel;
+                rb.angular_velocity = ang;
             }
         }
+        moved
     }
 }
