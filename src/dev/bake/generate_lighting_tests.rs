@@ -56,7 +56,7 @@ fn gpu_generate_bakes_lightmaps_then_probes_and_writes_the_scene() {
     let mut back = Scene::new();
     back.load_from_file(&path).unwrap();
     assert_eq!(back.lightmaps, scene.lightmaps, "no re-save needed");
-    assert_eq!(back.probes.probes.len(), scene.probes.probes.len());
+    assert_eq!(back.probes.probes().len(), scene.probes.probes().len());
     assert_eq!(back.lighting_settings, scene.lighting_settings);
 }
 
@@ -164,9 +164,9 @@ fn gpu_generate_inside_an_edit_is_no_part_of_its_step() {
     )
     .unwrap();
     scene.commit_edits(None);
-    let (probes, lightmaps) = (scene.probes.probes.len(), scene.lightmaps.clone());
+    let (probes, lightmaps) = (scene.probes.probes().len(), scene.lightmaps.clone());
     assert!(probes > 0, "the bake placed probes");
     while scene.undo().is_some() {}
-    assert_eq!(scene.probes.probes.len(), probes);
+    assert_eq!(scene.probes.probes().len(), probes);
     assert_eq!(scene.lightmaps, lightmaps);
 }

@@ -66,7 +66,7 @@ fn gpu_the_commit_applies_the_planned_sets() {
     while !job.step(&mut scene, &mut |_| {}).unwrap() {}
     job.commit(&mut scene).unwrap();
     let report = job.report();
-    assert_eq!(scene.probes.probes.len(), report.light_probes);
+    assert_eq!(scene.probes.probes().len(), report.light_probes);
     assert_eq!(scene.reflection_probes.len(), report.reflection_probes);
     assert!(scene
         .reflection_probes
@@ -75,7 +75,7 @@ fn gpu_the_commit_applies_the_planned_sets() {
         .all(|p| p.cubemap_path != "old.ktx2"));
     assert!(scene
         .probes
-        .probes
+        .probes()
         .iter()
         .any(|p| p.sh != crate::scene::lighting::sh::Sh9::zero()));
 }

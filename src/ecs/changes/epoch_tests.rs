@@ -18,7 +18,7 @@ fn world_of(n: usize) -> World {
 /// World's log, so the log alone would answer it with ids that are not its.
 #[test]
 fn a_cursor_read_against_another_recording_world_reads_rebuild() {
-    let mut first = world_of(3);
+    let first = world_of(3);
     let mut cursor = first.change_cursor::<TransformComponent>();
     let mut other = World::new();
     let _opened = other.change_cursor::<TransformComponent>();

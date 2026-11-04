@@ -1,7 +1,25 @@
 //! The instancing grouping rules (#470), pinned without a GPU.
 
 use super::{BatchKey, DrawItem, FrameDraws};
-use crate::render::{InstanceData, MeshId};
+use crate::render::scene::MeshHandle;
+use crate::render::InstanceData;
+
+/// The mesh names these tests draw, sorted: a name's handle is its index, so
+/// handles order as the names do.
+const MESHES: [&str; 10] = [
+    "A", "B", "Barrel", "Box", "Crate", "Far", "Glass", "Mid", "Near", "Wall",
+];
+
+/// The handle of test mesh `name`.
+pub(super) fn handle(name: &str) -> MeshHandle {
+    let at = MESHES.iter().position(|&m| m == name);
+    MeshHandle(at.unwrap_or_else(|| panic!("add {name} to MESHES")) as u32)
+}
+
+/// The name of test mesh `handle`.
+pub(super) fn name(handle: MeshHandle) -> &'static str {
+    MESHES[handle.0 as usize]
+}
 
 /// An item of mesh `mesh`, palette `bone_base`, tint `tint`, tagged by `tag` in its
 /// instance's translation so a test can read back the order instances were packed in.
@@ -14,7 +32,7 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
         key: BatchKey {
             pipeline: 0,
             facing: Default::default(),
-            mesh: MeshId(mesh.to_string()),
+            mesh: handle(mesh),
             indices: (0..36).into(),
             material: 0,
             record,
@@ -42,7 +60,7 @@ fn copies_of_one_mesh_and_material_become_one_draw() {
     let runs: Vec<_> = draws
         .opaque
         .iter()
-        .map(|b| (b.key.mesh.0.as_str(), b.instances.clone()))
+        .map(|b| (name(b.key.mesh), b.instances.clone()))
         .collect();
     assert_eq!(runs, [("Barrel", 0..1), ("Box", 1..4)]);
     // Stable within a run: at one depth, the boxes keep their scene order.
@@ -86,7 +104,7 @@ fn transparent_order_is_kept_and_only_neighbours_merge() {
     let runs: Vec<_> = draws
         .transparent
         .iter()
-        .map(|b| (b.key.mesh.0.as_str(), b.instances.clone()))
+        .map(|b| (name(b.key.mesh), b.instances.clone()))
         .collect();
     assert_eq!(runs, [("A", 1..3), ("B", 3..4), ("A", 4..5)]);
     assert_eq!(tags(&draws), [9.0, 0.0, 1.0, 2.0, 3.0]);

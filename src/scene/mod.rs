@@ -18,6 +18,7 @@
 //!   asset_instance, prefab — instantiate one imported sub-object; prefabs
 //!   camera, decal, lighting — the active view, decal records, baked lighting
 //!   identity, material_lookup — a live scene's identity; material slot lookups
+//!   revision  — how a reader learns a scene-level value changed (`Revisioned`)
 //!   rehydrate — rebuild a mesh's geometry + rig from its on-disk reference; `model_writes` reloads re-written models
 //!   settings  — project/scene-wide settings: fog, layers, collision matrix, shader
 //!               overrides, sky, ambient
@@ -50,6 +51,7 @@ pub mod model_instance;
 pub mod nav_settings;
 pub mod prefab;
 pub mod rehydrate;
+pub mod revision;
 pub mod runtime;
 #[expect(
     clippy::module_inception,

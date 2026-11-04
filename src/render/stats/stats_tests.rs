@@ -1,5 +1,6 @@
 use super::*;
 use crate::components::{LightComponent, LightMode};
+use crate::scene::{LightType, Scene};
 
 fn light(light_type: LightType) -> LightComponent {
     LightComponent {

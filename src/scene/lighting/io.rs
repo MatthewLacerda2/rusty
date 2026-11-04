@@ -40,7 +40,7 @@ pub fn sidecar_path(scene_path: &str) -> PathBuf {
 /// Pull the baked SH out of a scene's probes into a serializable sidecar.
 pub fn extract_lighting(scene: &Scene) -> LightingData {
     LightingData {
-        probe_sh: scene.probes.probes.iter().map(|p| p.sh).collect(),
+        probe_sh: scene.probes.probes().iter().map(|p| p.sh).collect(),
     }
 }
 
@@ -48,7 +48,12 @@ pub fn extract_lighting(scene: &Scene) -> LightingData {
 /// on either side are ignored (the shorter length wins) so a stale sidecar can't
 /// panic the load.
 pub fn apply_lighting(scene: &mut Scene, data: &LightingData) {
-    for (probe, sh) in scene.probes.probes.iter_mut().zip(data.probe_sh.iter()) {
+    for (probe, sh) in scene
+        .probes
+        .probes_mut()
+        .iter_mut()
+        .zip(data.probe_sh.iter())
+    {
         probe.sh = *sh;
     }
 }
@@ -58,7 +63,7 @@ pub fn apply_lighting(scene: &mut Scene, data: &LightingData) {
 /// stale data can't linger. Errors are returned as strings, matching scene I/O.
 pub fn save_lighting_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
     let path = sidecar_path(scene_path);
-    let has_baked = scene.probes.probes.iter().any(|p| p.sh != Sh9::zero());
+    let has_baked = scene.probes.probes().iter().any(|p| p.sh != Sh9::zero());
     if !has_baked {
         if path.exists() {
             std::fs::remove_file(&path).map_err(|e| format!("Failed to remove sidecar: {}", e))?;
@@ -107,13 +112,13 @@ mod tests {
         let mut scene = Scene::default();
         scene.probes.add_probe(Vec3::ZERO);
         scene.probes.add_probe(Vec3::X);
-        scene.probes.probes[1].sh.coeffs[0] = [1.0, 2.0, 3.0];
+        scene.probes.probes_mut()[1].sh.coeffs[0] = [1.0, 2.0, 3.0];
         let data = extract_lighting(&scene);
 
         let mut other = Scene::default();
         other.probes.add_probe(Vec3::ZERO);
         other.probes.add_probe(Vec3::X);
         apply_lighting(&mut other, &data);
-        assert_eq!(other.probes.probes[1].sh.coeffs[0], [1.0, 2.0, 3.0]);
+        assert_eq!(other.probes.probes()[1].sh.coeffs[0], [1.0, 2.0, 3.0]);
     }
 }

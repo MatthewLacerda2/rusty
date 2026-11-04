@@ -87,7 +87,7 @@ mod skinned;
 mod small;
 
 pub use skinned::SkinBounds;
-pub(crate) use small::SmallObjectCull;
+pub(crate) use small::{SmallLimits, SmallObjectCull};
 
 #[cfg(test)]
 mod gpu_tests;

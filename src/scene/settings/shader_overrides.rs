@@ -27,6 +27,11 @@ impl ShaderOverrides {
         self.0.get(&id)
     }
 
+    /// Every entity holding an override, ascending.
+    pub fn entities(&self) -> impl Iterator<Item = u32> + '_ {
+        self.0.keys().copied()
+    }
+
     /// Whether entity `id` has any override.
     pub fn has(&self, id: u32) -> bool {
         self.0.contains_key(&id)

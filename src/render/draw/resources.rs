@@ -4,16 +4,16 @@
 //! `overlays` and its children. Each block returns owned resources that outlive the
 //! render pass.
 
-use super::batch::sort::{back_to_front, view_depth};
+use super::batch::sort::back_to_front;
 use super::batch::{DrawItem, FrameDraws};
 use super::overlays::{OverlayBindings, OverlayDraws};
-use super::proxy_volume;
 use super::visibility::{CameraCulls, ViewCull};
-use crate::render::gpu::draw_buffers::{push_palette, FrameUpload, JointMatrix};
+use crate::render::gpu::draw_buffers::{FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
-use crate::render::motion::{track, MotionHistory};
+use crate::render::motion::MotionHistory;
 use crate::render::passes::outline::{outlined, OutlineBounds};
-use crate::render::{Frustum, MeshId, Renderer};
+use crate::render::scene::CameraSolids;
+use crate::render::{Frustum, Renderer};
 use crate::scene::Scene;
 
 /// One camera's solids as instanced draws (#470), split into the two passes a frame
@@ -95,11 +95,10 @@ impl Renderer {
         cam: &crate::scene::Camera,
         frustum: &Frustum,
         lod: &LodSelection,
-        (outline, mut history): (bool, Option<&mut MotionHistory>),
+        (outline, history): (bool, Option<&mut MotionHistory>),
     ) -> SolidResources {
-        let (cam_pos, cam_fwd) = (cam.position, cam.forward());
+        let eye = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
-        let (mut culls, mut visible) = (CameraCulls::default(), 0);
         let limits = self.device.limits();
         let binding = limits.max_storage_buffer_binding_size;
         let mut proxies = self
@@ -116,24 +115,13 @@ impl Renderer {
             frustum,
             small: self.small_object_cull(cam),
         };
-        for id in scene.world.ids_with_mesh() {
-            let Some(bounds) = self.visible_bounds(scene, id, &view, &mut culls) else {
-                continue;
-            };
-            let motion = history.as_deref_mut();
-            let eye = (cam_pos, cam_fwd);
-            let frame = (&mut joints, &mut proxies);
-            let items = self.solid_draw_items(scene, id, (bounds, eye), frame, motion);
-            visible += u32::from(!items.is_empty());
-            for (mut item, world_pos, is_transparent) in items {
-                item.outline = ringed.contains(&id);
-                if is_transparent {
-                    transparent.push((item, view_depth(world_pos, cam_pos, cam_fwd)));
-                } else {
-                    opaque.push(item);
-                }
-            }
-        }
+        let out = CameraSolids {
+            opaque: &mut opaque,
+            transparent: &mut transparent,
+            joints: &mut joints,
+            proxies: &mut proxies,
+        };
+        let (culls, visible) = self.camera_solids(scene, (&view, eye, &ringed), out, history);
         let mesh_particles = self.push_mesh_particles(scene, cam, (&mut opaque, &mut transparent));
         let outline_bounds = self.outline_bounds(scene, &ringed);
         SolidResources {
@@ -171,87 +159,4 @@ impl Renderer {
         );
         draws
     }
-
-    /// One solid's draw items, one per material slot (#1285), each drawing its index
-    /// run with that slot's material ([`GpuMesh::runs`](crate::render::GpuMesh::runs)):
-    /// its batch key (mesh, run, material group, per-draw uniform) and instance, plus its world-space origin (the transparent sort key's
-    /// anchor) and whether its material is Transparent. A skinned mesh's palette is
-    /// appended to `joints` once, and its uniform's `bone_base` points at it — so it is
-    /// a draw of its own. `bounds` are its world bounds when known
-    /// ([`Self::world_bounds`]); its reflection probe is picked at their centre, and
-    /// its view depth, from the camera `eye` (position, forward), is taken there.
-    /// With `history`, its instance carries its last-frame pose (#1435). Its Light
-    /// Probe Proxy Volume, when it reads probes and has one, joins `proxies` (#1672).
-    /// Empty if its mesh is not resident on the GPU yet.
-    fn solid_draw_items(
-        &mut self,
-        scene: &Scene,
-        id: u32,
-        (bounds, eye): (Option<(glam::Vec3, glam::Vec3)>, (glam::Vec3, glam::Vec3)),
-        (joints, proxies): (&mut Vec<JointMatrix>, &mut proxy_volume::Frame),
-        history: Option<&mut MotionHistory>,
-    ) -> Vec<(DrawItem, glam::Vec3, bool)> {
-        let Some(mesh) = scene.world.mesh(id) else {
-            return Vec::new();
-        };
-        let mesh_id = MeshId::from_mesh(&mesh);
-        let Some(gpu_mesh) = self.gpu_meshes.get(&mesh_id) else {
-            return Vec::new();
-        };
-        let runs = gpu_mesh.runs(&mesh, scene.world.material(id).as_deref());
-        let local_bounds = gpu_mesh.local_aabb;
-        let model_matrix = scene.world.local_to_world(id);
-        let origin = model_matrix.w_axis.truncate();
-        let mut instance = super::uniforms::solid_instance(
-            scene,
-            id,
-            model_matrix,
-            &self.capture,
-            &self.lightmaps,
-        );
-        // Like Unity, the reflection probe is picked per object, at the centre of its
-        // world bounds (its origin when they are unknown), #1206, and the opaque pass
-        // orders it by that centre's view depth (#1499).
-        let centre = bounds.map_or(origin, |(min, max)| (min + max) * 0.5);
-        instance.reflection_probe = self.reflection_probes.probe_for(centre);
-        // A capture draws static geometry for a bake: its probes are in flux.
-        if instance.use_sh == 1 && !self.capture.static_only {
-            let at = (model_matrix, local_bounds);
-            instance.proxy_volume = self.proxy_volumes.push(scene, id, at, proxies);
-        }
-
-        // The active bone palette: the live animated pose when a clip plays (#80),
-        // else the bind pose (#79). Primitives/static meshes leave it empty and bind
-        // the shared identity joint at element 0. The base lives in the uniform, so
-        // two skinned entities never share a batch.
-        let palette = mesh.active_palette();
-        let bone_base = push_palette(joints, palette);
-        if let Some(history) = history.filter(|_| has_opaque_run(scene, id, &runs)) {
-            let pose = (model_matrix, palette);
-            track(history, id, pose, bone_base, joints, &mut instance);
-        }
-        let mut items = Vec::with_capacity(runs.len());
-        for (slot, indices) in runs {
-            let at = (model_matrix, &mesh_id, bone_base);
-            let (key, transparent) = self.slot_key(scene, id, (slot, indices), at);
-            let item = DrawItem {
-                key,
-                instance,
-                depth: view_depth(centre, eye.0, eye.1),
-                outline: false,
-            };
-            items.push((item, origin, transparent));
-        }
-        items
-    }
-}
-
-/// Whether any of entity `id`'s material runs draws in the opaque pass: only those
-/// write velocity, so an all-transparent entity keeps no motion pose (#1435).
-fn has_opaque_run(scene: &Scene, id: u32, runs: &[(usize, std::ops::Range<u32>)]) -> bool {
-    runs.iter().any(|&(slot, _)| {
-        !scene
-            .material_entry_at(id, slot)
-            .is_some_and(|(_, m)| m.is_transparent())
-    })
 }

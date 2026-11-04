@@ -19,7 +19,7 @@ fn marking_a_probe_manual_undoes() {
     scene.probes.set_manual(0, true);
     assert!(scene.commit_edits(None), "the flag is an edit");
     scene.undo().expect("a step to undo");
-    assert!(!scene.probes.probes[0].manual);
+    assert!(!scene.probes.probes()[0].manual);
 }
 
 /// A bake that re-places the set between an edit and its Undo (#1737): the

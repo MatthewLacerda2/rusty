@@ -106,7 +106,7 @@ fn gpu_bake_probes_fills_all_in_place() {
     renderer.bake_probes(&mut scene, RES);
     assert!(scene
         .probes
-        .probes
+        .probes()
         .iter()
         .all(|p| p.sh != crate::scene::lighting::sh::Sh9::zero()));
 }

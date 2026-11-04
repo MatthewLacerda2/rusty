@@ -62,26 +62,25 @@ pub(crate) fn stale_uploads(
 }
 
 impl Renderer {
-    /// Upload every entity's mesh once per unique mesh-asset identity (#127): N
-    /// entities sharing a primitive/asset collapse to a single buffer pair. An
-    /// inactive entity's mesh is uploaded too, as Unity keeps it loaded: only what
-    /// is drawn follows activity, so re-enabling a holstered weapon doesn't stall on
-    /// uploads (#1363). An identity is (re-)uploaded when it is not resident or a
-    /// mesh under it carries a newer [`MeshRevision`] than the resident buffers, from
-    /// the newest such mesh, once. Reading the revision changes nothing, so every
-    /// renderer drawing the scene sees the same edit (#1540).
-    pub(crate) fn upload_scene_meshes(&mut self, scene: &Scene) {
-        let candidates = scene.world.ids_with_mesh().into_iter().map(|entity| {
-            let mesh = scene
-                .world
-                .mesh(entity)
-                .expect("id came from ids_with_mesh");
-            UploadCandidate {
+    /// Upload the meshes of `entities` once per unique mesh-asset identity (#127): N
+    /// entities sharing a primitive/asset collapse to a single buffer pair. The
+    /// retained scene (`render::scene`, #1706) passes the entities whose mesh changed
+    /// since it last looked, or every mesh entity on a rebuild, inactive ones included
+    /// as Unity keeps them loaded: only what is drawn follows activity, so re-enabling a
+    /// holstered weapon doesn't stall on uploads (#1363). An identity is (re-)uploaded
+    /// when it is not resident or a mesh under it carries a newer [`MeshRevision`]
+    /// than the resident buffers, from the newest such mesh, once. Reading the
+    /// revision changes nothing, so every renderer drawing the scene sees the same
+    /// edit (#1540).
+    pub(crate) fn upload_meshes_of(&mut self, scene: &Scene, entities: &[u32]) {
+        let candidates = entities.iter().filter_map(|&entity| {
+            let mesh = scene.world.mesh(entity)?;
+            Some(UploadCandidate {
                 id: MeshId::from_mesh(&mesh),
                 revision: mesh.revision,
                 entity,
                 has_geometry: has_geometry(&mesh.vertices, &mesh.indices),
-            }
+            })
         });
         let resident = |id: &MeshId| self.gpu_meshes.get(id).map(|g| g.revision);
         for (id, (revision, entity)) in stale_uploads(candidates, resident) {
@@ -115,6 +114,8 @@ impl Renderer {
         // bounds stay correct.
         let local_aabb = local_aabb(vertices);
         let skin_bounds = SkinBounds::from_vertices(vertices);
+        // Every retained object drawing this geometry re-reads its runs and bounds.
+        self.retained.meshes.uploaded(&id);
 
         // Re-use resident buffers when the new data still fits (a newer revision
         // of geometry already resident under this id). Both buffers carry COPY_DST
