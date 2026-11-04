@@ -116,6 +116,20 @@ impl SkinData {
         *global * local.matrix().inverse()
     }
 
+    /// From mesh-local space (where `bind_global` lives) into model space: the
+    /// skinned mesh node's own transform, so an `Armature` node above it (a
+    /// Blender export's Z-up turn and centimetre scale) is undone and up is +Y,
+    /// as glTF has it. What reads a rig's up or facing reads it here, never in
+    /// mesh-local space; the identity when `mesh_inverse` can't be inverted.
+    pub fn mesh_to_model(&self) -> Mat4 {
+        let m = self.mesh_inverse.inverse();
+        if m.is_finite() {
+            m
+        } else {
+            Mat4::IDENTITY
+        }
+    }
+
     /// The bind-pose bone palette: `bind_global[j] * inverse_bind[j]` per joint.
     /// Joints are paired in order; a length mismatch is truncated to the shorter.
     pub fn bind_palette(&self) -> Vec<Mat4> {
