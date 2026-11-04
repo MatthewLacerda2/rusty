@@ -1,19 +1,12 @@
 //! The direction page's lamp share (#1695): only `Baked` lamps' direct light makes a
 //! texel's specular lobe. An even sky over a dark ground and a `Mixed` light's bounce
 //! leave a texel directional but lamp-free; a lamp alone gives a share of 1 toward
-//! itself; two opposed lamps weaken it; and BC7 keeps a lamp-free texel's share
-//! under the floor the shader ignores.
+//! itself; and two opposed lamps weaken it. BC7's share: `share_bc7_tests`.
 
 use glam::{Vec3, Vec4};
 
 use super::tests::{floor, quad, settings, sun, wall};
 use super::*;
-use crate::asset::lightmap_page::decode_bc7;
-
-/// The most lamp share, in bytes of A, BC7 may lend a texel its bake stored none
-/// in: the shader's `SHARE_FLOOR` (`forward/lightmap.wgsl`), which it treats as no
-/// lamp and rescales the rest from. A sky-lit wall's page measured 4 (#1695).
-const SHARE_FLOOR: u8 = 8;
 
 /// Every direction texel of `entity`'s lightmap, and their mean.
 fn texels(maps: &[Lightmap], entity: u32) -> (Vec<Vec4>, Vec4) {
@@ -103,36 +96,4 @@ fn two_opposed_lamps_weaken_the_share() {
         mean.truncate().normalize().dot(Vec3::Y) > 0.99,
         "between them: {mean}"
     );
-}
-
-#[test]
-fn bc7_keeps_a_lamp_free_texels_share_under_the_floor() {
-    // A 32² page: the left half under a lamp (share 1), the right half under sky,
-    // its direction turning texel by texel as a real page's does.
-    let page: Vec<Vec4> = (0..1024u32)
-        .map(|i| {
-            let (x, y) = ((i % 32) as f32, (i / 32) as f32);
-            match x < 16.0 {
-                true => Vec4::new(-0.6, 0.6, 0.0, 1.0),
-                false => Vec4::new((x * 0.7).sin() * 0.4, 0.6, (y * 0.5).cos() * 0.4, 0.0),
-            }
-        })
-        .collect();
-    let encoded = direction_page(&page, 32, 1, &|| false).expect("never stopped");
-    for level in 0..encoded.levels.len() {
-        let want = super::pages::direction_levels(&page, 32).swap_remove(level);
-        for (i, (w, got)) in want.iter().zip(decode_bc7(&encoded, level)).enumerate() {
-            if w[3] == 0 {
-                assert!(got[3] <= SHARE_FLOOR, "level {level} texel {i}: {got:?}");
-            }
-        }
-    }
-    let back = decode_direction(decode_bc7(&encoded, 0)[0]);
-    assert!(
-        (back - page[0]).length() < 0.03,
-        "a lamp texel survives: {back}"
-    );
-    let shader = include_str!("../../../../engine/shaders/forward/lightmap.wgsl");
-    let mirror = format!("const SHARE_FLOOR: f32 = {SHARE_FLOOR}.0 / 255.0;");
-    assert!(shader.contains(&mirror), "the shader's floor is this one");
 }

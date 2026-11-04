@@ -9,9 +9,11 @@
 //! * `room`: a `Mixed` spot's bounce gives a glossy ceiling no lobe; a lamp in a
 //!   bright-walled room aims its lobe at itself.
 //! * `capture`: a bake capture never draws it.
+//! * `behind`: a two-sided surface's back face reads its front's baked light.
 //!
 //! Skips (passes without asserting) when no GPU / software adapter is present.
 
+mod behind;
 mod capture;
 mod highlight;
 mod room;

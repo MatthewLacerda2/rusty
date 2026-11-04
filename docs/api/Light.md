@@ -201,14 +201,23 @@ whether it is drawn live:
     come from one side (an open sky over a dark ground, a `Mixed` spot's bounce off
     the floor onto a glossy ceiling): the environment reflection reflects them. A
     `Mixed` light gives its highlight live, and its baked bounce none. A lamp
-    supplying under about 3% of a texel's light gives none either: the compressed
+    supplying under about 6% of a texel's light gives none either: the compressed
     page can't tell so little from none.
   - **One highlight per texel.** Two lamps lighting one texel give one highlight
     between them, pulled toward both and weakened (two lamps at 45° either side of
     a floor's normal keep about 0.7 of their light in it), where live lights give
     two. Where a lamp supplies under a quarter of a texel's light (the edge of its
     range), the highlight's direction eases from the lamp's toward the mean of all
-    the texel's light, so the hand-over leaves no seam.
+    the texel's light, and the highlight fades with it, so the hand-over leaves no
+    seam and no highlight where no light comes from.
+  - **An Area light gives a dot, not a panel.** A `Baked` Area light's highlight is
+    one tight lobe toward its centre, and it weakens where the panel fills the
+    texel's view (its light arrives from many directions there).
+  - **Grazing light weakens it.** A lamp within about 6° of a surface's plane gives
+    a fraction of its live highlight (a lamp 0.5 m over a polished floor, 8 m off,
+    about 62%; a sun 2° up, about 35%).
+  - **A two-sided surface's back face** shows its front's baked light (the bake
+    lights the front only) and no highlight.
   - **Its sharpness is the lightmap's.** A glossy highlight smaller than a lightmap
     texel is spread over one; raise the bake's texels per unit where it matters.
   - **A level needs a directional bake** to have it; a non-directional lightmap, a

@@ -57,7 +57,9 @@ fn lightmap_level(uv: vec2<f32>) -> f32 {
 fn lightmap_direction_rebalance(dir: vec3<f32>, N: vec3<f32>, Ng: vec3<f32>) -> f32 {
     let shaded = dot(N, dir) * 0.5 + 0.5;
     let baked = dot(Ng, dir) * 0.5 + 0.5;
-    return shaded / max(baked, 1e-3);
+    // The decoded vector can be a hair longer than 1 (bytes round, `encode_direction`),
+    // so `shaded` can dip just under 0 behind a lamp: a response is never negative.
+    return max(shaded, 0.0) / max(baked, 1e-3);
 }
 
 // A direction page texel back to its vector (`xyz`, direction scaled by

@@ -388,7 +388,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let lightmap_page = instances[in.instance].lightmap_page;
     if (lightmap_page > 0u) {
         // Baked lightmap (#438, `forward::lightmap`), at the level taken above.
-        let baked = lightmap_light(in.lightmap_uv, lightmap_page - 1u, lightmap_lod, instances[in.instance].lightmap_directional == 1u, N, geometric, V, F0, roughness);
+        let baked = lightmap_light(in.lightmap_uv, lightmap_page - 1u, lightmap_lod, instances[in.instance].lightmap_directional == 1u, behind, N, geometric, V, F0, roughness);
         ambient_irradiance = baked.irradiance;
         lightmap_specular = baked.specular;
     } else if (instances[in.instance].use_sh == 1u) {

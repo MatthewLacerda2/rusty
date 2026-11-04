@@ -187,7 +187,7 @@ pub(crate) struct InstanceData {
     // Per instance, so lightmapped copies of a prop still share one draw.
     pub lightmap_page: u32,
     // 1 when the lightmap's direction page is bound (#810): normal maps then
-    // reshape the baked light.
+    // reshape the baked light, and its `Baked` lamps add one specular lobe (#1695).
     pub lightmap_directional: u32,
     // The resident reflection probes this instance blends (#1584): two indices plus
     // one and their weights, packed by `reflection_probes::pack_blend`; 0 for the sky

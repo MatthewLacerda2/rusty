@@ -16,13 +16,14 @@ use crate::core::color::luminance;
 /// texel's light to the lamps' own: a quarter, so a lamp supplying most of a texel
 /// aims its lobe at itself, while one fading out at the edge of its range hands the
 /// direction back smoothly instead of leaving a seam on a normal-mapped surface.
-pub(super) const LAMP_RAMP: f32 = 0.25;
+pub(in super::super) const LAMP_RAMP: f32 = 0.25;
 
 /// One texel's direction page value: `xyz` its dominant incoming direction scaled
 /// by its directionality (the luminance-weighted mean of where its smoothed bounce
 /// and its direct light arrived from), `w` its lamp share, `|direct_dir| /
-/// luminance(direct + indirect)`: 1 for one lamp alone, 0 with none, weakened by
-/// two opposed lamps. The direction is the lamps' mean once the share reaches
+/// luminance(direct + indirect)`: 1 for one point, spot or directional lamp alone,
+/// 0 with none, weakened by two opposed lamps, and by a `Baked` Area light whose
+/// panel fills the texel's view (its arrivals spread, so `direct_dir` shortens). The direction is the lamps' mean once the share reaches
 /// [`LAMP_RAMP`], blended from the mean of everything below it. Black texels have none.
 pub(super) fn direction_texel(indirect: Vec3, indirect_dir: Vec3, light: &TexelLight) -> Vec4 {
     let weight = luminance(indirect + light.direct);

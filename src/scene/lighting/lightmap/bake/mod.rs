@@ -19,7 +19,7 @@ use super::rays::{Rays, Tri};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
 
-mod direction;
+pub(super) mod direction;
 pub(super) mod pool;
 
 use direction::direction_texel;
@@ -49,9 +49,11 @@ pub struct BakeSettings {
     /// Radius, in texels, of the Gaussian that smooths the baked bounce (Unity's
     /// indirect filter); 0 leaves it raw. Baked direct light is never filtered.
     pub filter_radius: u32,
-    /// Also bake each texel's dominant incoming light direction (#810, Unity's
-    /// *Directional* mode), so normal maps reshape baked light. Off saves the
-    /// direction pages' memory; the colour lightmaps are the same either way.
+    /// Also bake each texel's dominant incoming light direction and its `Baked`
+    /// lamps' share (#810, Unity's *Directional* mode; #1695), so normal maps
+    /// reshape baked light and `Baked` lamps give a lightmapped surface one
+    /// specular highlight. Off saves the direction pages' memory; the colour
+    /// lightmaps are the same either way.
     pub directional: bool,
 }
 

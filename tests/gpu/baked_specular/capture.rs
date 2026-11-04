@@ -6,36 +6,18 @@
 
 use glam::Vec3;
 use rusty::components::LightMode;
+use rusty::core::color::f16_to_f32;
 use rusty::dev::bake::progress::BakeLog;
 use rusty::dev::bake::reflection::{bake_scene_reflections, reflection_dir};
 
 use super::{bake, scene};
-
-/// One IEEE half float's value.
-fn half(bits: u16) -> f32 {
-    let (sign, exp, frac) = (
-        bits >> 15,
-        ((bits >> 10) & 0x1f) as i32,
-        (bits & 0x3ff) as f32,
-    );
-    let magnitude = match exp {
-        0 => frac * 2f32.powi(-24),
-        31 => f32::INFINITY,
-        _ => (1.0 + frac / 1024.0) * 2f32.powi(exp - 15),
-    };
-    if sign == 1 {
-        -magnitude
-    } else {
-        magnitude
-    }
-}
 
 /// Every level's texels of the `Rgba16Float` cube a reflection bake wrote.
 fn texels(bytes: &[u8]) -> Vec<f32> {
     let reader = ktx2::Reader::new(bytes).expect("a KTX2 cube");
     let halves = reader.levels().flat_map(|level| level.chunks_exact(2));
     halves
-        .map(|b| half(u16::from_le_bytes([b[0], b[1]])))
+        .map(|b| f16_to_f32(u16::from_le_bytes([b[0], b[1]])))
         .collect()
 }
 
@@ -61,6 +43,11 @@ fn a_reflection_bake_never_sees_the_lobe() {
     };
     let plain = cube(false).unwrap();
     assert_eq!(lobed.len(), plain.len(), "the same cube");
+    // A NaN or an infinity would vanish in the fold below (`inf - inf` is NaN).
+    assert!(
+        lobed.iter().chain(&plain).all(|t| t.is_finite()),
+        "every texel is finite"
+    );
     // A lobe would add the lamp's highlight, many times the plane's diffuse light; a
     // rounding difference is a part in a thousand of the texel.
     let worst = lobed
