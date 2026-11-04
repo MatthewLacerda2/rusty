@@ -185,6 +185,7 @@ pub(super) fn energy(frame: &[u8]) -> f32 {
 }
 
 /// Turn every volume in `scene` to `ssil`.
+#[cfg(feature = "dev")]
 pub(super) fn set_ssil(scene: &mut Scene, ssil: Ssil) {
     for id in scene.world.ids_with_post_processing() {
         scene.world.post_processing_mut(id).unwrap().ssil = ssil;

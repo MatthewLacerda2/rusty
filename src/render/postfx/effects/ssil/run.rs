@@ -50,8 +50,22 @@ impl Renderer {
             self.frame_counters.add_draws(draws);
         }
 
-        let (passes, timer) = (&self.post_passes.ssil, &self.gpu_timer);
-        let depth = &view.depth_view;
+        self.record_stages(encoder, &view.depth_view, t);
+        t.forward_group = Some(self.ssil_group3(view.ssao.as_ref().filter(|_| prepassed), t));
+        let (w, h) = t.raw_size();
+        let samples = u64::from(frame.plan.quality.samples);
+        self.frame_counters.ssil_samples += u64::from(w) * u64::from(h) * samples;
+    }
+
+    /// Record the gather, blur, accumulate and upsample over `depth` into `t`'s
+    /// targets: this frame's result and normals, from last frame's.
+    fn record_stages(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        depth: &wgpu::TextureView,
+        t: &SsilTargets,
+    ) {
+        let (device, passes, timer) = (&self.device, &self.post_passes.ssil, &self.gpu_timer);
         let [normal, last_normal] = [&t.normals[t.current].view, &t.normals[1 - t.current].view];
         let stage = |encoder: &mut wgpu::CommandEncoder, stage, (input, prev), targets: &[_]| {
             let inputs = StageInputs {
@@ -76,11 +90,6 @@ impl Renderer {
         if let Some(full) = &t.full {
             stage(encoder, Stage::Upsample, (result, result), &[&full.view]);
         }
-
-        t.forward_group = Some(self.ssil_group3(view.ssao.as_ref().filter(|_| prepassed), t));
-        let (w, h) = t.raw_size();
-        let samples = u64::from(frame.plan.quality.samples);
-        self.frame_counters.ssil_samples += u64::from(w) * u64::from(h) * samples;
     }
 
     /// The forward pass's group 3 with `t`'s result in the opaque copy's slot (the
