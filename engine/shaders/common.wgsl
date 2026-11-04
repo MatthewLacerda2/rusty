@@ -19,9 +19,7 @@ struct Fog {
     density: f32,
     height_falloff: f32,
     base_height: f32,
-    _pad_a: f32,
-    _pad_b: f32,
-    _pad_c: f32,
+    _pad_a: f32, _pad_b: f32, _pad_c: f32,
 };
 
 // How a point finds its light cluster (#434). Mirrors the Rust `ClusterUniform`;
@@ -111,6 +109,12 @@ struct LightingUniforms {
     // 1.0 under the scene's `HalfLambert` diffuse model (#1698): `calculate_pbr`
     // shades a lamp with the squared wrap instead of Lambert, as the bakes do.
     diffuse_wrap: f32,
+    // 1.0 when a directional lightmap adds its one specular lobe
+    // (`forward::baked_specular`, #1695); 0.0 in every bake capture, so a
+    // view-dependent highlight is never frozen into a probe.
+    baked_specular: f32,
+    // Scalars, not a vec3, which would align to 16 and move `refl_probes`.
+    baked_specular_pad_a: f32, baked_specular_pad_b: f32, baked_specular_pad_c: f32,
     // The resident reflection probes (#1206); a draw's instance names the two it
     // blends (`InstanceData.reflection_probe`, packed indices + 1 and weights, #1584). Length is the Rust
     // `MAX_REFLECTION_PROBES`. Mirrors the Rust `LightingUniform` byte-for-byte.

@@ -102,6 +102,36 @@ fn FresnelSchlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+// The GGX specular BRDF (Cook-Torrance: D * G * F / (4 N·V N·L)) for light from `L`
+// seen from `V`, given its Fresnel `F` at the half vector. Shared by every live light
+// (`calculate_pbr`) and the directional lightmap's one baked lobe
+// (`forward::baked_specular`, #1695), so the two highlights agree.
+fn ggx_specular(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, H: vec3<f32>, F: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let NdotL = max(dot(N, L), 0.0);
+    let NdotV = max(dot(N, V), 0.0);
+    let D = DistributionGGX(N, H, roughness);
+    let G = GeometrySmith(N, V, L, roughness);
+    let numerator = D * G * F;
+    let denominator = 4.0 * NdotV * NdotL + 0.0001;
+    return numerator / denominator;
+}
+
+// What a light of `radiance` arriving from `L` reflects specularly toward `V`: the
+// GGX lobe times N·L, with no diffuse term.
+fn specular_response(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, radiance: vec3<f32>, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let H = normalize(L + V);
+    let F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+    return ggx_specular(N, V, L, H, F, roughness) * radiance * max(dot(N, L), 0.0);
+}
+
+// The share of a lamp's radiance a surface diffuses at `NdotL_raw` = N·L under the
+// scene's diffuse model (#1698), the one the lightmap and probe bakes use too
+// (`DiffuseModel::response`): Lambert, or the retro squared wrap.
+fn diffuse_response(NdotL_raw: f32) -> f32 {
+    let wrap = clamp(NdotL_raw * 0.5 + 0.5, 0.0, 1.0);
+    return select(max(NdotL_raw, 0.0), wrap * wrap, lighting.diffuse_wrap > 0.5);
+}
+
 fn calculate_pbr(
     N: vec3<f32>, 
     V: vec3<f32>, 
@@ -113,30 +143,19 @@ fn calculate_pbr(
     albedo: vec3<f32>
 ) -> vec3<f32> {
     let H = normalize(L + V);
-    let NdotL_raw = dot(N, L);
-    let NdotL = max(NdotL_raw, 0.0);
-    // The scene's diffuse model (#1698), the one the lightmap and probe bakes use too
-    // (`DiffuseModel::response`): Lambert, or the retro squared wrap. Specular is
-    // always the physical N·L.
-    let wrap = clamp(NdotL_raw * 0.5 + 0.5, 0.0, 1.0);
-    let diffuse_response = select(NdotL, wrap * wrap, lighting.diffuse_wrap > 0.5);
-    let NdotV = max(dot(N, V), 0.0);
-
-    let D = DistributionGGX(N, H, roughness);
-    let G = GeometrySmith(N, V, L, roughness);
+    let NdotL = max(dot(N, L), 0.0);
+    // Diffuse follows the scene's model (`diffuse_response`); specular is always the
+    // physical N·L.
     let F = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
     let kS = F;
     var kD = vec3<f32>(1.0) - kS;
     kD *= 1.0 - metallic;
 
-    let numerator = D * G * F;
-    let denominator = 4.0 * NdotV * NdotL + 0.0001;
-    let specular = numerator / denominator;
-
+    let specular = ggx_specular(N, V, L, H, F, roughness);
     let diffuse = kD * albedo / PI;
 
-    return diffuse * radiance * diffuse_response + specular * radiance * NdotL;
+    return diffuse * radiance * diffuse_response(dot(N, L)) + specular * radiance * NdotL;
 }
 
 // Percentage-closer filtering (PCF) kernel radius, in texels. The kernel is a

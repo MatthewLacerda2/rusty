@@ -24,6 +24,8 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
             DiffuseModel::Lambert => 0.0,
             DiffuseModel::HalfLambert => 1.0,
         },
+        baked_specular: 1.0,
+        _pad_baked_specular: [0.0; 3],
         refl_probes: [Default::default(); MAX_REFLECTION_PROBES],
     }
 }
@@ -137,6 +139,9 @@ impl crate::render::Renderer {
         apply_scene_lights(&mut lighting_uniform, scene, self.capture.static_only);
         lighting_uniform.refl_probes = *self.reflection_probes.uniforms();
         if self.capture.static_only {
+            // No bake capture sees the directional lightmap's specular lobe (#1695):
+            // it depends on the view, and a probe is seen from everywhere.
+            lighting_uniform.baked_specular = 0.0;
             for probe in &mut lighting_uniform.refl_probes {
                 probe.params[3] = 0.0;
             }

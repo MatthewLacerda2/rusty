@@ -114,6 +114,10 @@ fn lighting_uniform_matches_wgsl_layout() {
             "env_reflection",
             offset_of!(LightingUniform, env_reflection),
         ),
+        (
+            "baked_specular",
+            offset_of!(LightingUniform, baked_specular),
+        ),
         ("refl_probes", offset_of!(LightingUniform, refl_probes)),
     ];
     assert_layout("LightingUniforms", &pairs, size_of::<LightingUniform>());

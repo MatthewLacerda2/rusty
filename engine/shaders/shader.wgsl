@@ -6,10 +6,11 @@
 #import forward::transparent
 #import forward::mapping
 #import forward::reflection::{baked_diffuse, environment_reflection, specular_occlusion}
-#import forward::lighting::{ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, flat_ambient, fold_decals, lightmap_direction_rebalance, lightmap_level, probe_irradiance}
+#import forward::lighting::{ambient_occlusion, calculate_pbr, calculate_shadow, flat_ambient, fold_decals, lightmap_level, probe_irradiance}
 #import forward::local_shadow::local_shadow
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 #import forward::specular_aa
+#import forward::lightmap::lightmap_light
 #import forward::motion::{motion_texel}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
@@ -382,18 +383,14 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // gradient. All three are E / pi, so they feed the same albedo * 0.96 * (1 - metallic)
     // Lambert response (the 4% is the dielectric's reflection, step 5).
     var ambient_irradiance: vec3<f32>;
+    // A directional lightmap's one specular lobe: the `Baked` lamps' highlight (#1695).
+    var lightmap_specular = vec3<f32>(0.0);
     let lightmap_page = instances[in.instance].lightmap_page;
     if (lightmap_page > 0u) {
-        // Baked lightmap (#438): bounce, sky, emission and `Baked` lights' direct light,
-        // stored linear (BC6H, #1694) as E / pi, so `* albedo` is the Lambert response a
-        // realtime light gives. Sampled at the level taken above: this branch may diverge.
-        ambient_irradiance = textureSampleLevel(t_lightmaps, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, lightmap_lod).rgb;
-        if (instances[in.instance].lightmap_directional == 1u) {
-            // The normal-mapped (and decal-perturbed) N reshapes the baked light.
-            let texel = textureSampleLevel(t_lightmap_dirs, s_lightmaps, in.lightmap_uv, lightmap_page - 1u, lightmap_lod);
-            let dir = decode_lightmap_direction(texel);
-            ambient_irradiance *= lightmap_direction_rebalance(dir, N, geometric);
-        }
+        // Baked lightmap (#438, `forward::lightmap`), at the level taken above.
+        let baked = lightmap_light(in.lightmap_uv, lightmap_page - 1u, lightmap_lod, instances[in.instance].lightmap_directional == 1u, N, geometric, V, F0, roughness);
+        ambient_irradiance = baked.irradiance;
+        lightmap_specular = baked.specular;
     } else if (instances[in.instance].use_sh == 1u) {
         // `probe_irradiance` returns irradiance E (its one SH sample, or its Light Probe
         // Proxy Volume's grid inside one, #1672); a Lambert surface reflects albedo / pi
@@ -409,6 +406,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // The diffuse share is URP's `albedo * oneMinusReflectivity`: what the
     // environment reflection (step 5) takes, a dielectric's 4%, is not diffused too.
     var lighting_color = ambient_irradiance * diffuse_albedo * (0.96 * (1.0 - metallic)) * ao;
+    lighting_color += lightmap_specular;
 
     // A lightmapped surface skips `Baked` lights below: their direct light is already
     // in its lightmap (#438). Only a probe/reflection bake capture uploads them at all
