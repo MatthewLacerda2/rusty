@@ -27,8 +27,8 @@ impl PhysicsWorld {
     /// query tree (refreshed at the end of every step) what it overlaps now,
     /// under the same layer groups and liveness rule (#521) as its pairs. A
     /// collider never pairs with its own body, so that body is excluded. Two
-    /// static colliders never pair, the contacts' rule (#1779) and Unity's: a
-    /// static trigger reports only what has a Rigidbody or moves as kinematic.
+    /// static colliders never pair, the contacts' rule (#1779): a static trigger
+    /// reports only colliders whose body is not fixed.
     pub(in crate::physics) fn overlap_pairs(&self) -> Vec<(u32, u32)> {
         let fixed = |c: &Collider| {
             let body = c.parent().and_then(|h| self.bodies.get(h));

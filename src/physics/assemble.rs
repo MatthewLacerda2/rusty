@@ -23,9 +23,11 @@ use super::world::PhysicsWorld;
 use crate::scene::Scene;
 
 /// The body-type pairs a collider generates contacts for: every one but
-/// static↔static (#1779). rapier tests it against the bodies' types each step,
-/// so a body switched to or from static in Play is filtered by what it is now.
-pub(super) const ACTIVE_TYPES: ActiveCollisionTypes =
+/// static↔static (#1779). rapier's broad phase refuses to create a filtered pair,
+/// and a body type change forces its colliders back through it, so a body switched
+/// to or from static in Play is filtered by what it is now. Setting this on a live
+/// collider alone would not do that.
+const ACTIVE_TYPES: ActiveCollisionTypes =
     ActiveCollisionTypes::all().difference(ActiveCollisionTypes::FIXED_FIXED);
 
 impl PhysicsWorld {
