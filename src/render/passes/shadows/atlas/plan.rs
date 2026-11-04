@@ -16,7 +16,7 @@
 use glam::camera::rh::{proj::directx, view::look_to_mat4};
 use glam::{Mat4, Vec3};
 
-use crate::render::clusters::{LocalLight, KIND_SPOT};
+use crate::render::clusters::LocalLight;
 use crate::render::Frustum;
 
 /// The atlas's side in texels: 2048² is Unity URP's default for additional lights.
@@ -146,7 +146,7 @@ fn prev_power_of_two(n: u32) -> u32 {
 
 /// How many tiles a light takes: a spotlight one, a point light its six cube faces.
 pub(super) fn faces(light: &LocalLight) -> u32 {
-    if light.kind == KIND_SPOT {
+    if light.one_frustum() {
         1
     } else {
         6
@@ -168,7 +168,7 @@ fn spot_fov(light: &LocalLight) -> f32 {
 pub(crate) fn light_views(light: &LocalLight) -> Vec<Mat4> {
     let position = Vec3::from(light.position);
     let (near, far) = (near_plane(light), light.range.max(near_plane(light) * 2.0));
-    if light.kind == KIND_SPOT {
+    if light.one_frustum() {
         let dir = Vec3::from(light.direction);
         let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
         let proj = directx::perspective(spot_fov(light), 1.0, near, far);
@@ -183,9 +183,10 @@ pub(crate) fn light_views(light: &LocalLight) -> Vec<Mat4> {
 
 /// World size of one texel of a `size` tile, one metre from the light.
 pub(super) fn texel_at_one_metre(light: &LocalLight, size: u32) -> f32 {
-    let fov = match light.kind {
-        KIND_SPOT => spot_fov(light),
-        _ => std::f32::consts::FRAC_PI_2,
+    let fov = if light.one_frustum() {
+        spot_fov(light)
+    } else {
+        std::f32::consts::FRAC_PI_2
     };
     2.0 * (fov * 0.5).tan() / size as f32
 }

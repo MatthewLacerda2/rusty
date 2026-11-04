@@ -23,7 +23,9 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     `say(...)` (also each board change, [`board.transitions`]), `memory` (a path), `bots`, and the end states: `merged`, `ends`
     (ended without a hand-back: green under `--no-merge`, previewed by a dry run)
     `stops` (the machine's failure, [`queue.stopping.Stopped`]) and `skips` (it
-    turned draft or closed after the listing, or its branch moved mid-take). Anything else is a hand-back: it is
+    turned draft or closed after the listing, or its branch moved mid-take).
+    [`outcomes.REQUEUED`] (a train's member, or a head that moved during its CI
+    wait, #1799) remembers nothing and is said. Anything else is a hand-back: it is
     remembered, announced ([`ending.handed_back`]) and passed over until its head
     moves or runs again; one in [`outcomes.AWAITING`] also until its body or labels
     change ([`handbacks.reworded`]), and an `AWAITS_ISSUE` one until its issues no
@@ -80,7 +82,9 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         elif state in fx.ends:
             done.add(number)
         elif state == outcomes.REQUEUED:
-            pass  # a train's member back in line as it was (#1785): nothing to remember
+            # A train's member back in line as it was (#1785), or a head that moved
+            # during its CI wait (#1799): nothing to remember, an old hand-back dropped.
+            forget(number)
         elif state in fx.skips:
             fx.sleep(opts.poll)
         elif state in fx.stops:
@@ -190,6 +194,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             fx.say(f"watch: taking #{number}.")
             line.took(number)
             rode, halt = [fx.turn(number, tick)], None
+            if rode[0][1] == outcomes.REQUEUED:
+                fx.say(f"watch: #{number} goes back in line: {rode[0][2]}")
         else:
             fx.say(f"watch: taking {', '.join(f'#{n}' for n in train.numbers)} together.")
             line.took(*train.numbers)  # one take: one pass for those behind it, none for its members

@@ -5,7 +5,8 @@
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
-#import forward::lighting::{ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, environment_reflection, flat_ambient, fold_decals, lightmap_direction_rebalance, lightmap_level, probe_irradiance}
+#import forward::reflection::{baked_diffuse, environment_reflection, specular_occlusion}
+#import forward::lighting::{ambient_occlusion, calculate_pbr, calculate_shadow, decode_lightmap_direction, flat_ambient, fold_decals, lightmap_direction_rebalance, lightmap_level, probe_irradiance}
 #import forward::local_shadow::local_shadow
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 
@@ -190,7 +191,7 @@ fn fs_gizmo(in: VertexOutput) -> @location(0) vec4<f32> {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return surface_color(in);
+    return transparent::finite_hdr(surface_color(in));
 }
 
 // ---- Motion vectors (#1435) ----
@@ -244,7 +245,7 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
         in.clip_position, in.world_position, in.world_normal, in.tex_coords,
         in.world_tangent, in.instance, in.lightmap_uv,
     );
-    return VelocityTargets(surface_color(v), velocity_texel(in));
+    return VelocityTargets(transparent::finite_hdr(surface_color(v)), velocity_texel(in));
 }
 
 // The velocity target's texel for `in`: its screen motion, its view depth and its
@@ -403,7 +404,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     } else {
         ambient_irradiance = flat_ambient(N);
     }
-    // SSAO (#436) darkens only the indirect light: ambient here, env reflection below.
+    // SSAO (#436) times the decals' occlusion darkens only the indirect light: ambient
+    // here, and the env reflection below through its specular occlusion (#1697).
     let ao = ambient_occlusion(in.clip_position.xy) * surface.occlusion;
     // The diffuse share is URP's `albedo * oneMinusReflectivity`: what the
     // environment reflection (step 5) takes, a dielectric's 4%, is not diffused too.
@@ -448,7 +450,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         if (skip_baked && light.baked > 0.5) {
             continue;
         }
-        let radiance = local_light_radiance(light, in.world_position);
+        let radiance = local_light_radiance(light, in.world_position, 0.0);
         if (all(radiance == vec3<f32>(0.0))) {
             continue;
         }
@@ -484,15 +486,16 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // URP's `perceptualRoughness`; a dielectric reflects F0 = 0.04 head-on. The angle is
     // `|N.V|`: a normal map or a vertex normal can still lean away from the camera on a
     // face turned toward it, which would otherwise take the grazing Fresnel.
+    // The AO weighs it as specular occlusion (#1697, Frostbite's, as HDRP has it), and
+    // each probe is normalised by this pixel's baked diffuse (`baked_diffuse`).
     let R = reflect(-V, N);
-    let reflectivity = 0.04 + 0.96 * metallic;
-    let grazing = saturate(1.0 - roughness + reflectivity);
+    let grazing = saturate(1.0 - roughness + (0.04 + 0.96 * metallic)); // URP's reflectivity
     let alpha = roughness * roughness;
     let fresnel = pow(1.0 - saturate(abs(dot(N, V))), 4.0);
     let env_brdf = mix(F0, vec3<f32>(grazing), fresnel) / (alpha * alpha + 1.0);
-    let reflection_weight = env_brdf * ao;
+    let reflection_weight = env_brdf * specular_occlusion(saturate(abs(dot(N, V))), ao, roughness);
     // A transparent surface with `receive_ssr` traces SSR over it here (#1570).
-    let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, roughness, instances[in.instance].reflection_probe) * reflection_weight, reflection_weight, in.world_position, N, R, roughness);
+    let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, N, roughness, instances[in.instance].reflection_probe, baked_diffuse(ambient_irradiance, lightmap_page > 0u || instances[in.instance].use_sh == 1u)) * reflection_weight, reflection_weight, in.world_position, N, R, roughness);
     lighting_color += reflection;
     ssr_texels = ssr_surface::encode(N, roughness, reflection, reflection_weight, fog_factor(camera.fog, in.world_position, camera.camera_pos));
 

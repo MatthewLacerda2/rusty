@@ -6,13 +6,11 @@
 //! fire-and-forget one-shot voices, and is the home for the agent-facing
 //! introspection (the roster + the event log).
 //!
-//! It runs in the **platform layer**, not the sim: by default it carries a
-//! [`NullBackend`] (the harness path), and the windowed app swaps in the real
-//! `KiraBackend` after construction. It also owns the [`Mixer`] (#465), whose groups
-//! every voice routes into (`mixer/maestro.rs`). A play action always updates the
-//! deterministic introspection log; only the *sound* is a backend side effect. Voice
-//! ids are a monotone counter and the event `tick` is supplied by the caller — no
-//! wall clock or unseeded RNG, so nothing here threatens replay.
+//! It runs in the **platform layer**, not the sim: it carries a [`NullBackend`] (the
+//! harness) until the windowed app swaps in the real `KiraBackend`. It owns the
+//! [`Mixer`] (#465) every voice routes into and the doppler state (#1749). A play
+//! always updates the deterministic introspection log; only the *sound* is a backend
+//! side effect. Voice ids are a monotone counter, the event `tick` the caller's.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -21,6 +19,7 @@ use crate::core::collections::Map;
 use glam::Vec3;
 
 use super::backend::{AudioBackend, NullBackend, PlayParams, VoiceId, VoiceMix};
+use super::doppler::DopplerState;
 use super::introspection::{AudioEvent, AudioEventKind, AudioEventLog, DEFAULT_EVENT_CAP};
 use super::mix::{self, MixEnv};
 use super::mixer::{GroupId, Mixer};
@@ -29,15 +28,16 @@ use super::reverb::ReverbState;
 use super::speaker::SpeakerMode;
 use crate::components::AudioSourceComponent;
 
-/// A live entity voice: the backend handle, the source settings and position it was
-/// last resolved from, its per-source (pre-master) volume, and the pre-master mix
-/// last handed to the backend — so a master change can re-fold it and the per-frame
-/// mix only sends what changed.
+/// A live entity voice: the backend handle, the source and position it was last
+/// resolved from, its pre-master volume, the pre-master mix last sent (a master
+/// change re-folds it, the per-frame mix sends only what changed), and where the
+/// last push heard it, which doppler measures motion from (#1749).
 pub(super) struct LiveVoice {
     pub(super) voice: VoiceId,
     pub(super) source: AudioSourceComponent,
     pub(super) source_volume: f32,
     pub(super) position: Vec3,
+    pub(super) heard_at: Vec3,
     pub(super) mix: VoiceMix,
     pub(super) group: GroupId,
 }
@@ -64,17 +64,17 @@ pub struct AudioMaestro {
     pub(super) entity_voices: Map<u32, LiveVoice>,
     /// Live `PlayAt` one-shots, reaped once the backend reports them finished.
     pub(super) oneshots: BTreeMap<VoiceId, OneShot>,
-    /// The listener + clock state of the last per-frame mix; a voice started between
-    /// frames is resolved against it so its first samples are already mixed.
+    /// The listener + clock of the last mix, which a voice started between frames uses.
     pub(super) env: MixEnv,
     /// The mixer groups, snapshots and ducks every voice routes through (#465).
     pub(super) mixer: Mixer,
+    /// The speed of sound and the listener motion doppler measures (#1749).
+    pub(super) doppler: DopplerState,
     /// Every voice's occlusion factor and the casts behind it (#467).
     pub(super) occlusion: Occlusion,
     /// The listener's reverb, as the zones around it resolve (#469).
     pub(super) reverb: ReverbState,
-    /// The agent-facing log of play/stop/one-shot actions; read through the
-    /// accessors in `introspection`.
+    /// The agent-facing log of play/stop/one-shot actions (`introspection`).
     pub(super) log: AudioEventLog,
     /// The entities whose `AudioSource` was active in the hierarchy last frame, so
     /// `note_source_active` sees the OnEnable/OnDisable edges (#1363).
@@ -93,8 +93,7 @@ impl Default for AudioMaestro {
 
 impl AudioMaestro {
     /// Build a maestro over `backend`. `GameWorld::new` uses the `Default`
-    /// (`NullBackend`); the windowed app calls [`AudioMaestro::set_backend`] with the
-    /// real device afterwards.
+    /// (`NullBackend`); the windowed app then calls [`AudioMaestro::set_backend`].
     pub fn with_backend(backend: Box<dyn AudioBackend>) -> Self {
         let mut maestro = Self {
             backend,
@@ -104,6 +103,7 @@ impl AudioMaestro {
             oneshots: BTreeMap::new(),
             env: MixEnv::default(),
             mixer: Mixer::default(),
+            doppler: DopplerState::default(),
             occlusion: Occlusion::default(),
             reverb: ReverbState::DRY,
             log: AudioEventLog::new(DEFAULT_EVENT_CAP),
@@ -115,9 +115,8 @@ impl AudioMaestro {
         maestro
     }
 
-    /// Swap in a different backend (the windowed app injects the real `KiraBackend`
-    /// after `GameWorld::new`). Any voices live on the old backend are forgotten;
-    /// the new one takes the current speaker mode and mixer groups.
+    /// Swap in a different backend (the windowed app's `KiraBackend`). Voices live on
+    /// the old one are forgotten; the new one takes the speaker mode and groups.
     pub fn set_backend(&mut self, mut backend: Box<dyn AudioBackend>) {
         backend.set_speaker_mode(self.speaker_mode);
         self.backend = backend;
@@ -196,6 +195,7 @@ impl AudioMaestro {
                     source: source.clone(),
                     source_volume,
                     position: at,
+                    heard_at: at,
                     mix,
                     group,
                 },
@@ -237,9 +237,8 @@ impl AudioMaestro {
         self.entity_voices.contains_key(&id)
     }
 
-    /// Fire a one-shot at a world position — `Audio.PlayAt`. It owns no entity voice
-    /// (it is fire-and-forget), so it is *only* recorded in the event log; that log
-    /// entry is the one-shot's sole trace. `source_entity` attributes it to an
+    /// Fire a one-shot at a world position — `Audio.PlayAt`. It owns no entity voice,
+    /// so its event log entry is its sole trace; `source_entity` attributes it to an
     /// emitter (or `0`). Returns whether the backend accepted it.
     pub fn play_at(&mut self, shot: &mix::Shot, source_entity: u32, tick: u64) -> bool {
         let mix::Shot {
@@ -287,6 +286,7 @@ impl AudioMaestro {
         self.entity_voices.clear();
         self.oneshots.clear();
         self.enabled_sources.clear();
+        self.doppler.forget();
         self.backend.stop_all();
     }
 }

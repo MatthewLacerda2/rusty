@@ -31,7 +31,7 @@ def wait_for(
         pull = pulls.look(number)
         waited = time.monotonic() - began
         state, lines = polling.head_state(pull.get("headRefOid", ""), sha, before, waited)
-        if state == outcomes.STOP:
+        if state in (outcomes.STOP, outcomes.HEAD_MOVED):
             return state, lines
         if state == outcomes.GO:
             runs, jobs = github.evidence(repo, sha)

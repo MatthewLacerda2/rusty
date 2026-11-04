@@ -37,6 +37,7 @@ fn draw(
         let rows = [
             ("    Intensity:", "intensity", 5.0),
             ("    Threshold:", "threshold", 1.0),
+            ("    Scatter:", "scatter", 1.0),
             ("    Dirt Intensity:", "dirt_intensity", 10.0),
         ];
         for (label, field, max) in rows {

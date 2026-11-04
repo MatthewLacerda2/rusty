@@ -50,7 +50,7 @@ fn add_wall(scene: &mut Scene, name: &str, pos: Vec3, scale: Vec3, emissive: [f3
 }
 
 /// A box of six coloured static walls around the origin (the room the probe captures).
-fn colored_room() -> Scene {
+pub(super) fn colored_room() -> Scene {
     let mut scene = Scene::new();
     let walls = [
         ("PosX", Vec3::X * 6.0, [9.0, 0.0, 0.0]),
@@ -92,7 +92,7 @@ fn gpu_bake_shows_room_and_mips_blur() {
     };
     let scene = colored_room();
     let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(5.0));
-    let bytes = renderer.bake_reflection(&scene, &probe, RES);
+    let bytes = renderer.bake_reflection(&scene, &probe, RES).bytes;
 
     let mips = parse_ktx2_cubemap_mips(&bytes).expect("baked KTX2 parses");
     assert_eq!(mips.size, RES);

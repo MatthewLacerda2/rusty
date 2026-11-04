@@ -1,8 +1,8 @@
 //! Lens flare (#1443), Unity URP's *Screen Space Lens Flare*: a scene pass after
-//! bloom's, built from bloom's blurred bright pass, so every bright pixel flares
-//! with no per-light authoring (`postfx/lens_flare.wgsl`). It draws ghosts mirrored
-//! through the screen centre, a halo ring and anamorphic streaks at half the bloom
-//! buffer's size (a quarter of the view's). The composite adds them after bloom's add
+//! bloom's, built from bloom's prefiltered first mip (thresholded, before its chain
+//! spreads it, #1700), so every bright pixel flares with no per-light authoring
+//! (`postfx/lens_flare.wgsl`). It draws ghosts mirrored through the screen centre, a
+//! halo ring and anamorphic streaks at half the bloom buffer's size (a quarter of the view's). The composite adds them after bloom's add
 //! (`postfx/effects/lens_flare.wgsl`), reading the flare as its composite texture
 //! (#1473), so they go through the exposure and the grade like the scene, as URP's
 //! uber pass adds its flare with bloom, and SSR never reflects them.
@@ -182,11 +182,14 @@ pub(crate) fn flare_size((w, h): (u32, u32)) -> (u32, u32) {
     ((w / 2).max(1), (h / 2).max(1))
 }
 
-/// The flare (bloom's blur -> its target), which the composite adds, when the view
+/// The flare (bloom's prefiltered mip -> its target), which the composite adds, when the view
 /// flares; its target dropped when it doesn't.
 fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let pfx = &mut view.post_fx;
-    let bloom = pfx.bloom.size;
+    let Some(bloom) = pfx.targets.get::<bloom::BloomTargets>().map(|t| t.size) else {
+        pfx.targets.remove::<FlareTargets>();
+        return;
+    };
     let aspect = pfx.full_size.0 as f32 / pfx.full_size.1.max(1) as f32;
     let Some(params) = flare_params(&cx.effect, aspect) else {
         pfx.targets.remove::<FlareTargets>();
@@ -199,6 +202,10 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     }
     let pfx = &view.post_fx;
     let t = pfx.targets.get::<FlareTargets>().expect("made above");
+    let chain = pfx
+        .targets
+        .get::<bloom::BloomTargets>()
+        .expect("checked above");
     queue.write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
     let passes = &r.post_passes.lens_flare;
     let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -206,7 +213,7 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
         layout: &passes.layout,
         entries: &[
             entry(0, t.params.as_entire_binding()),
-            entry(1, wgpu::BindingResource::TextureView(&pfx.bloom.b.view)),
+            entry(1, wgpu::BindingResource::TextureView(chain.prefiltered())),
             entry(2, wgpu::BindingResource::Sampler(&pfx.sampler)),
         ],
     });

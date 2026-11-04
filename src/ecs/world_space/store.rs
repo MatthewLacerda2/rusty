@@ -24,12 +24,15 @@
 //! bumps the generation instead: every slot goes dirty in O(1).
 //!
 //! The downward walk follows `children`, which `Scene::set_parent` (which changes
-//! nothing when it fails) and rehydration keep in step with the parent links. Only a
-//! raw `set_parent_id` can write a parent link its parent's `children` lacks: a corrupt
-//! file, or engine code linking one side by hand; such a child reads its parent as of its
-//! own last move or the last generation bump, so a parent despawned under it can leave
-//! it stale, but never NaN and never a hang (the walk stops at dirty entities, so a
-//! cycle in `children` ends it too).
+//! nothing when it fails) keeps in step with the parent links, and which a placement
+//! completes: a spawned, loaded, stamped or restored document naming a parent is
+//! listed there, at once or when that parent arrives (`ecs::placement`, #1805), so a
+//! corrupt file or prefab is repaired as it loads. What can still leave a parent link
+//! its parent's `children` lacks is engine code linking one side by hand: a raw
+//! `set_parent_id`, or an overwrite whose caller writes the document's side alone.
+//! Such a child reads its parent as of its own last move or the last generation bump,
+//! so a parent moved or despawned under it can leave it stale, but never NaN and never
+//! a hang (the walk stops at dirty entities, so a cycle in `children` ends it too).
 //!
 //! **Determinism.** A matrix is a pure function of the local transforms up its chain,
 //! whatever order slots are cleaned in; stamps only gate the cache, never a result.

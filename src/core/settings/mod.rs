@@ -1,6 +1,8 @@
 //! The engine's global settings resources: the quality presets' values, the player's
-//! graphics options, the video settings, the game's decal budgets and how many play demos it keeps.
+//! graphics options, the video settings, the game's decal budgets, how many play demos it keeps
+//! and its audio settings (the speed of sound, #1749).
 
+pub mod audio;
 pub mod decals;
 pub mod demos;
 pub mod graphics_options;
