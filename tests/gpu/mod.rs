@@ -35,6 +35,7 @@ pub fn black_sky(scene: &mut rusty::scene::Scene) {
     scene.skybox_path = path.to_string_lossy().into_owned();
 }
 
+mod baked_specular;
 mod bloom_screenshot;
 mod cascaded_shadows_screenshot;
 mod custom_postfx_screenshot;

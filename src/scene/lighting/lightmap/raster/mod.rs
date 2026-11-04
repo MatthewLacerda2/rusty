@@ -12,9 +12,24 @@
 //! from its nearest chart, so no mip level averages the empty background in
 //! (#1694).
 
+use std::ops::{Add, Div, Mul};
+
 use glam::{Vec2, Vec3};
 
 use super::input::BakeMesh;
+
+/// A value a lightmap map holds texel by texel: a colour (`Vec3`), or a direction
+/// texel (`Vec4`, the vector and its lamp share, #1695). Dilation, the fill, the
+/// atlas and the mips only ever copy, add and scale one.
+pub(super) trait Texel:
+    Copy + Default + Add<Output = Self> + Mul<f32, Output = Self> + Div<f32, Output = Self>
+{
+}
+
+impl<T> Texel for T where
+    T: Copy + Default + Add<Output = T> + Mul<f32, Output = T> + Div<f32, Output = T>
+{
+}
 
 mod clip;
 
@@ -151,7 +166,7 @@ fn barycentric(uv: [Vec2; 3], area: f32, p: Vec2) -> Option<Vec3> {
 
 /// Fill each empty texel bordering filled ones with their average, `passes` rings
 /// deep, so bilinear filtering at a chart's edge reads lit texels, not black.
-pub(super) fn dilate(texels: &mut [Vec3], filled: &mut [bool], size: u32, passes: u32) {
+pub(super) fn dilate<T: Texel>(texels: &mut [T], filled: &mut [bool], size: u32, passes: u32) {
     let size = size as i32;
     for _ in 0..passes {
         let snapshot = filled.to_vec();
@@ -162,7 +177,7 @@ pub(super) fn dilate(texels: &mut [Vec3], filled: &mut [bool], size: u32, passes
                 if snapshot[i] {
                     continue;
                 }
-                let (mut sum, mut n) = (Vec3::ZERO, 0.0);
+                let (mut sum, mut n) = (T::default(), 0.0);
                 for (dx, dy) in NEIGHBOURS {
                     let (nx, ny) = (x + dx, y + dy);
                     if nx < 0 || ny < 0 || nx >= size || ny >= size {
@@ -170,7 +185,7 @@ pub(super) fn dilate(texels: &mut [Vec3], filled: &mut [bool], size: u32, passes
                     }
                     let j = (ny * size + nx) as usize;
                     if snapshot[j] {
-                        sum += values[j];
+                        sum = sum + values[j];
                         n += 1.0;
                     }
                 }
@@ -187,7 +202,7 @@ pub(super) fn dilate(texels: &mut [Vec3], filled: &mut [bool], size: u32, passes
 /// four-neighbour steps, ties to the texel found first in row-major order), so a
 /// mip level that averages a chart's border with the map's empty background reads
 /// the chart's light, not black (#1694). A map with no filled texel stays as it is.
-pub(super) fn fill_rest(texels: &mut [Vec3], filled: &[bool], size: u32) {
+pub(super) fn fill_rest<T: Texel>(texels: &mut [T], filled: &[bool], size: u32) {
     let size = size as usize;
     let mut done = filled.to_vec();
     let mut queue: std::collections::VecDeque<usize> =

@@ -151,6 +151,11 @@ pub(crate) struct LightingUniform {
     // `diffuse_wrap` (#1698) 1.0 under `DiffuseModel::HalfLambert`: the squared wrap
     // replaces Lambert in `calculate_pbr`, as in the lightmap and probe bakes.
     pub diffuse_wrap: f32,
+    // `baked_specular` (#1695) 1.0 when a directional lightmap adds its specular lobe;
+    // 0.0 in every bake capture (`CaptureMode::static_only`), so a view-dependent
+    // highlight is never frozen into a probe. The pad keeps the probe array aligned.
+    pub baked_specular: f32,
+    pub _pad_baked_specular: [f32; 3],
     // The resident reflection probes (#1206): a draw's instance names the two it
     // blends (`InstanceData::reflection_probe`, #1584), and the shader box-projects
     // against each one's box and samples its cube's layer of the binding-4 cube array.
@@ -182,7 +187,7 @@ pub(crate) struct InstanceData {
     // Per instance, so lightmapped copies of a prop still share one draw.
     pub lightmap_page: u32,
     // 1 when the lightmap's direction page is bound (#810): normal maps then
-    // reshape the baked light.
+    // reshape the baked light, and its `Baked` lamps add one specular lobe (#1695).
     pub lightmap_directional: u32,
     // The resident reflection probes this instance blends (#1584): two indices plus
     // one and their weights, packed by `reflection_probes::pack_blend`; 0 for the sky

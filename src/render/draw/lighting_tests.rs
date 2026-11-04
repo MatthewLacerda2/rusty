@@ -1,9 +1,10 @@
 //! Which lights the realtime path uploads, by mode (#809): a frame drops `Baked`
 //! lights, a bake capture drops `Realtime` ones.
 
-use super::{apply_scene_lights, default_lighting_uniform};
+use super::{apply_capture, apply_scene_lights, default_lighting_uniform};
 use crate::components::{LightComponent, LightMode, LightType};
 use crate::render::clusters::local_lights;
+use crate::render::ibl::cubemap_capture::CaptureMode;
 use crate::scene::Scene;
 
 /// One light of `light_type` per mode, in `LightMode::ALL` order, each a different
@@ -81,4 +82,20 @@ fn an_ambient_light_ignores_its_mode() {
         uniform.ambient.intensity, 3.0,
         "the last ambient, though Baked"
     );
+}
+
+#[test]
+fn only_a_frame_draws_the_directional_lightmaps_specular() {
+    let scene = Scene::new();
+    let lobe = |capture| {
+        let mut uniform = default_lighting_uniform(&scene);
+        apply_capture(&mut uniform, capture);
+        uniform.baked_specular
+    };
+    assert_eq!(lobe(CaptureMode::default()), 1.0, "a frame (#1695)");
+    let bake = CaptureMode {
+        static_only: true,
+        ..CaptureMode::default()
+    };
+    assert_eq!(lobe(bake), 0.0, "every bake capture");
 }

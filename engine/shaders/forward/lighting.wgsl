@@ -48,24 +48,25 @@ fn lightmap_level(uv: vec2<f32>) -> f32 {
 
 // Directional lightmaps (#810): reshape baked irradiance by how the shading normal `N`
 // faces the dominant incoming direction, relative to the geometric normal `Ng` the
-// bake saw (Unity's half-Lambert rebalance). `dir` is the decoded direction page texel:
-// direction scaled by directionality, so a texel lit evenly from all round (0) or a
-// surface whose normal map is flat (N == Ng) keeps its lightmap exactly.
+// bake saw (Unity's half-Lambert rebalance). `dir` is the decoded direction page
+// texel's vector: direction scaled by directionality, so a surface whose normal map
+// is flat (N == Ng) keeps its lightmap exactly at any direction, and a texel lit with
+// no dominant direction (0, which an open surface never quite reaches: an even sky
+// gives 2/3) keeps it too. Where `Baked` lamps light the texel, the direction is
+// theirs (`bake::direction`), so a normal map reshapes the bounce there by the lamp.
 fn lightmap_direction_rebalance(dir: vec3<f32>, N: vec3<f32>, Ng: vec3<f32>) -> f32 {
     let shaded = dot(N, dir) * 0.5 + 0.5;
     let baked = dot(Ng, dir) * 0.5 + 0.5;
-    return shaded / max(baked, 1e-3);
+    // The decoded vector can be a hair longer than 1 (bytes round, `encode_direction`),
+    // so `shaded` can dip just under 0 behind a lamp: a response is never negative.
+    return max(shaded, 0.0) / max(baked, 1e-3);
 }
 
-// A direction page texel back to the direction scaled by its directionality; mirrors
-// `decode_direction` in src/scene/lighting/lightmap/encode.rs.
-fn decode_lightmap_direction(texel: vec4<f32>) -> vec3<f32> {
-    let d = texel.xyz * 2.0 - 1.0;
-    let len = length(d);
-    if (len < 1e-4) {
-        return vec3<f32>(0.0);
-    }
-    return d / len * texel.a;
+// A direction page texel back to its vector (`xyz`, direction scaled by
+// directionality) and its lamp share (`w`, #1695); mirrors `decode_direction` in
+// src/scene/lighting/lightmap/encode.rs, which stores each component as 128 + 127x.
+fn decode_lightmap_direction(texel: vec4<f32>) -> vec4<f32> {
+    return vec4<f32>((texel.xyz * 255.0 - 128.0) / 127.0, texel.a);
 }
 
 fn DistributionGGX(N: vec3<f32>, H: vec3<f32>, roughness: f32) -> f32 {
@@ -102,6 +103,36 @@ fn FresnelSchlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+// The GGX specular BRDF (Cook-Torrance: D * G * F / (4 N·V N·L)) for light from `L`
+// seen from `V`, given its Fresnel `F` at the half vector. Shared by every live light
+// (`calculate_pbr`) and the directional lightmap's one baked lobe
+// (`forward::lightmap::baked_specular`, #1695), so the two highlights agree.
+fn ggx_specular(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, H: vec3<f32>, F: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let NdotL = max(dot(N, L), 0.0);
+    let NdotV = max(dot(N, V), 0.0);
+    let D = DistributionGGX(N, H, roughness);
+    let G = GeometrySmith(N, V, L, roughness);
+    let numerator = D * G * F;
+    let denominator = 4.0 * NdotV * NdotL + 0.0001;
+    return numerator / denominator;
+}
+
+// What a light of `radiance` arriving from `L` reflects specularly toward `V`: the
+// GGX lobe times N·L, with no diffuse term.
+fn specular_response(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, radiance: vec3<f32>, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let H = normalize(L + V);
+    let F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+    return ggx_specular(N, V, L, H, F, roughness) * radiance * max(dot(N, L), 0.0);
+}
+
+// The share of a lamp's radiance a surface diffuses at `NdotL_raw` = N·L under the
+// scene's diffuse model (#1698), the one the lightmap and probe bakes use too
+// (`DiffuseModel::response`): Lambert, or the retro squared wrap.
+fn diffuse_response(NdotL_raw: f32) -> f32 {
+    let wrap = clamp(NdotL_raw * 0.5 + 0.5, 0.0, 1.0);
+    return select(max(NdotL_raw, 0.0), wrap * wrap, lighting.diffuse_wrap > 0.5);
+}
+
 fn calculate_pbr(
     N: vec3<f32>, 
     V: vec3<f32>, 
@@ -113,30 +144,19 @@ fn calculate_pbr(
     albedo: vec3<f32>
 ) -> vec3<f32> {
     let H = normalize(L + V);
-    let NdotL_raw = dot(N, L);
-    let NdotL = max(NdotL_raw, 0.0);
-    // The scene's diffuse model (#1698), the one the lightmap and probe bakes use too
-    // (`DiffuseModel::response`): Lambert, or the retro squared wrap. Specular is
-    // always the physical N·L.
-    let wrap = clamp(NdotL_raw * 0.5 + 0.5, 0.0, 1.0);
-    let diffuse_response = select(NdotL, wrap * wrap, lighting.diffuse_wrap > 0.5);
-    let NdotV = max(dot(N, V), 0.0);
-
-    let D = DistributionGGX(N, H, roughness);
-    let G = GeometrySmith(N, V, L, roughness);
+    let NdotL = max(dot(N, L), 0.0);
+    // Diffuse follows the scene's model (`diffuse_response`); specular is always the
+    // physical N·L.
     let F = FresnelSchlick(max(dot(H, V), 0.0), F0);
 
     let kS = F;
     var kD = vec3<f32>(1.0) - kS;
     kD *= 1.0 - metallic;
 
-    let numerator = D * G * F;
-    let denominator = 4.0 * NdotV * NdotL + 0.0001;
-    let specular = numerator / denominator;
-
+    let specular = ggx_specular(N, V, L, H, F, roughness);
     let diffuse = kD * albedo / PI;
 
-    return diffuse * radiance * diffuse_response + specular * radiance * NdotL;
+    return diffuse * radiance * diffuse_response(dot(N, L)) + specular * radiance * NdotL;
 }
 
 // Percentage-closer filtering (PCF) kernel radius, in texels. The kernel is a

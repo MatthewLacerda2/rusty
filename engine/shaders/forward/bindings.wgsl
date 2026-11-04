@@ -94,7 +94,8 @@ struct InstanceData {
     // Baked lightmap (#438): atlas page + 1 (0 for none), and the scale/offset from
     // the mesh's lightmap UV into that page.
     lightmap_page: u32,
-    // 1 when the lightmap's direction page is bound (#810).
+    // 1 when the lightmap's direction page is bound (#810): normal maps reshape
+    // the baked light, and its `Baked` lamps add one specular lobe (#1695).
     lightmap_directional: u32,
     // The resident reflection probes this instance blends (#1584): two indices plus
     // one and their weights, packed by `pack_blend`; 0 for the sky alone. Picked per
@@ -166,7 +167,8 @@ var t_lightmaps: texture_2d_array<f32>;
 @group(0) @binding(15)
 var s_lightmaps: sampler;
 // Their direction pages (#810), same layers and UVs: RGB the dominant incoming
-// direction in [0,1], A its directionality; a 1x1 zero page when not baked.
+// direction scaled by its directionality, A its lamp share (#1695;
+// `decode_lightmap_direction`); a 1x1 zero page, never read, when not baked.
 @group(0) @binding(16)
 var t_lightmap_dirs: texture_2d_array<f32>;
 
