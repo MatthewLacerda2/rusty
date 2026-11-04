@@ -1,7 +1,7 @@
 """The handed-back heads remembered across watches, and what re-admits each (#751, #869, #1279).
 
 Every hand-back remembers its head ([`MEMORY`]) and is passed over until that
-moves. Four things count as moving without a push:
+moves. Five things count as moving without a push:
 
 - **a new run attempt on the head** ([`RUNS_MEMORY`], [`rerun_heads`], #869): `gh
   run rerun --failed` after a runner outage or a flake;
@@ -17,7 +17,13 @@ moves. Four things count as moving without a push:
 - **a comment recording its review decision** ([`REVIEWS_MEMORY`], [`reviewed`],
   #1764): a pull request queued before anyone wrote `Independent review` or
   `No review: <why>` on it. Its claim is kept too, so a label taken off and put
-  back re-admits it like an edit.
+  back re-admits it like an edit;
+- **the runs it outwaited going green** ([`STALLS_MEMORY`], [`stalls.returned`],
+  #1831): a take that hit its deadline with nothing red and nothing green.
+  #1820 and #1827 went green after such a hand-back during GitHub's Actions
+  incidents of 2026-11-04 and sat parked, since a run *ending* changes no
+  attempt. The check is on the runs' state, not a change of mark. A stall
+  that ends cancelled or red is said once and then waits like a red run.
 
 A red run, a conflict or a committed image has no claim entry and waits for
 its head. Every side memory is kept only for numbers still in [`MEMORY`].
@@ -50,6 +56,10 @@ ISSUES_MEMORY = "handed-back-issues.json"
 
 # And for a hand-back no review decision was recorded on, its number (#1764).
 REVIEWS_MEMORY = "handed-back-reviews.json"
+
+# And for a hand-back that outwaited its runs, its number (#1831, [`stalls`]):
+# asked about until those runs end.
+STALLS_MEMORY = "handed-back-stalls.json"
 
 
 def claim(pull: dict) -> str:

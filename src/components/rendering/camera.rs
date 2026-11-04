@@ -83,6 +83,13 @@ pub struct CameraComponent {
     /// floor wants (MSAA being the expensive alternative).
     #[serde(default = "default_fxaa_active")]
     pub fxaa_active: bool,
+    /// Run temporal anti-aliasing (#1702): jitter the projection a sub-pixel each
+    /// frame and resolve against the view's history through its motion vectors.
+    /// Off by default, as URP's camera is: it costs a history target and can ghost.
+    /// With it on, TAA is the camera's anti-aliasing and the FXAA pass skips
+    /// (Unity's camera has one anti-aliasing mode).
+    #[serde(default)]
+    pub taa_active: bool,
     /// Perspective (the default) or orthographic — a top-down minimap (#430).
     #[serde(default)]
     pub projection: Projection,
@@ -126,7 +133,7 @@ pub const DEFAULT_FAR: f32 = 200.0;
 
 impl Default for CameraComponent {
     /// A plain perspective screen camera: the scene defaults' lens, every layer,
-    /// skybox clear, FXAA on, motion blur off.
+    /// skybox clear, FXAA on, TAA and motion blur off.
     fn default() -> Self {
         Self {
             active: true,
@@ -142,6 +149,7 @@ impl Default for CameraComponent {
             motion_blur_intensity: default_motion_blur_intensity(),
             motion_blur_max_length: default_motion_blur_max_length(),
             fxaa_active: default_fxaa_active(),
+            taa_active: false,
             projection: Projection::Perspective,
             target_texture: None,
         }

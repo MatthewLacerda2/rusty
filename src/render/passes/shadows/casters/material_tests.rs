@@ -79,14 +79,20 @@ fn gpu_cutouts_differing_only_in_tint_share_one_caster_batch() {
         (asset.base_color, asset.render_mode) = (rgb, RenderMode::Cutout);
         id
     });
-    let clips = r.shadow_clips(&scene);
+    r.extract_scene(&scene);
+    let kept = r.retained.scene(scene.id()).expect("extracted");
+    let clip = |id: u32| {
+        let (_, object) = kept.objects().find(|&(o, _)| o == id).expect("a leaf");
+        object.slots[0].clip.expect("a Cutout clips")
+    };
+    let clips = leaves.map(clip);
     let _ = std::fs::remove_file(&map);
-    let casters = leaves
-        .map(|id| {
+    let casters = clips
+        .map(|clip| {
             let key = CasterKey {
                 facing: Facing::Ccw,
-                clip: Some(clips[&(id, 0)].clip),
-                mesh: crate::render::MeshId("Plane".into()),
+                clip: Some(clip.clip),
+                mesh: crate::render::scene::MeshHandle(0),
                 indices: (0..6).into(),
             };
             (key, CasterData::new(glam::Mat4::IDENTITY, 0))

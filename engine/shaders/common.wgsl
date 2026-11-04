@@ -6,7 +6,7 @@
 #import fog::height::fog_height_mean
 #import lighting::falloff::{light_falloff_near, spot_cone}
 #import lighting::reflection_probe::ReflectionProbe
-#import sky::noise::sky_fbm
+#import sky::noise::{cloud_shift, sky_fbm}
 
 // The scene's distance + height fog (#437). Mirrors the Rust `FogUniform`
 // byte-for-byte (naga_oil rejects imported names ending `_<digit>`, hence `_pad_a`).
@@ -52,9 +52,8 @@ struct CameraUniforms {
     // x: this camera's index in its stack, bottom to top (#1436), what the velocity
     // target's `.a` carries so motion blur orders a higher camera in front. y: last
     // frame's game time (#1524), what the motion vectors move vertex blocks with (this
-    // frame's `time` where the view has no last frame). z: 1 in the opaque pass of a
-    // base camera running SSIL (#1750, `forward::lighting::with_ssil_share`), 0
-    // everywhere else, the translucents after it included. w: unused.
+    // frame's `time` where the view has no last frame). zw: TAA's jitter in NDC
+    // (#1702), which the velocity shaders subtract.
     stack: vec4<f32>,
     // `view_proj`'s inverse (#1523): a transparent surface rebuilds the world point
     // of the opaque depth behind it from it, for refraction and absorption.
@@ -64,6 +63,10 @@ struct CameraUniforms {
     // smoothness it fades in over above that (`ssr::fade`); all zero where the camera
     // runs no SSR (`render::postfx::effects::ssr::transparent`).
     ssr: vec4<f32>,
+    // x: 1 in the opaque pass of a base camera running SSIL (#1750,
+    // `forward::lighting::with_ssil_share`), 0 everywhere else, the translucents
+    // after it included. yzw: unused.
+    ssil: vec4<f32>,
 };
 
 // The forward lighting uniform (group 0, binding 1) and its light records. Shared
@@ -115,6 +118,12 @@ struct LightingUniforms {
     // 1.0 under the scene's `HalfLambert` diffuse model (#1698): `calculate_pbr`
     // shades a lamp with the squared wrap instead of Lambert, as the bakes do.
     diffuse_wrap: f32,
+    // 1.0 when a directional lightmap adds its one specular lobe
+    // (`forward::lightmap::baked_specular`, #1695); 0.0 in every bake capture, so a
+    // view-dependent highlight is never frozen into a probe.
+    baked_specular: f32,
+    // Scalars, not a vec3, which would align to 16 and move `refl_probes`.
+    baked_specular_pad_a: f32, baked_specular_pad_b: f32, baked_specular_pad_c: f32,
     // The resident reflection probes (#1206); a draw's instance names the two it
     // blends (`InstanceData.reflection_probe`, packed indices + 1 and weights, #1584). Length is the Rust
     // `MAX_REFLECTION_PROBES`. Mirrors the Rust `LightingUniform` byte-for-byte.
@@ -438,16 +447,8 @@ struct ProceduralSky {
 // (`a * ambient + b`, `a` one scalar per direction): every colour is either set (a
 // constant) or a scalar multiple of the zenith plus a constant, so it holds, and the
 // cube bakes the two terms once per `sky` and applies the ambient colour per sample
-// (`sky/prefilter.wgsl`). Its clouds are `sky_fbm` (`sky/noise.wgsl`).
-
-// How far `coverage` shifts the FBM before the cloud mask's ramp (0.45..0.80) carves
-// it: exactly 0 at the default 0.5 (the layer the sky always drew), -0.55 at 0 so
-// even the FBM's maximum (31/32) stays under the ramp and nothing is carved, +0.8 at
-// 1 so even its minimum (0) clears it and every direction is cloud.
-fn cloud_shift(coverage: f32) -> f32 {
-    let c = coverage - 0.5;
-    return c * select(1.1, 1.6, c > 0.0);
-}
+// (`sky/prefilter.wgsl`). Its clouds are `sky_fbm`, shifted by `cloud_shift`
+// (`sky/noise.wgsl`).
 
 fn procedural_sky(sky: ProceduralSky, ambient: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     // Unset, the zenith is the ambient colour, the horizon a desaturated lift toward

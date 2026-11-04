@@ -1,6 +1,6 @@
 //! src/render/motion/mod.rs — per-object motion vectors (#1435).
 //!
-//! A view that runs motion blur, depth of field or SSR gets a **velocity target**: an `Rgba16Float` texture
+//! A view that runs motion blur, TAA, depth of field or SSR gets a **velocity target**: an `Rgba16Float` texture
 //! at full view resolution that the opaque forward pass writes as its second colour
 //! attachment. Each pixel holds how far the surface under it moved on screen since
 //! last frame, `ndc_now.xy - ndc_prev.xy`, in `.b` that surface's depth along the
@@ -18,6 +18,9 @@
 //! that cleared the depth buffer. A surface behind the camera last frame writes no
 //! motion.
 //! The sky writes the camera's rotation alone (`sky::motion::sky_velocity`).
+//! Both matrices are unjittered: a TAA view's projection moves a sub-pixel each
+//! frame (#1702), and the shaders take that jitter (`camera.stack.zw`) back out of
+//! the current position, so a still camera on a still scene writes 0.
 //!
 //! **What writes it.** Opaque and cutout solids (mesh particles among them, camera
 //! motion only) and the sky. Transparent surfaces, sprite particles, ribbons, decals
@@ -32,7 +35,7 @@
 //!
 //! **Cost.** The target exists and the velocity pipelines run only while a view runs
 //! motion blur ([`wanted`]: the camera has it on, the player's option allows it,
-//! #1438, and it is not the editor's Scene view), depth of
+//! #1438, and it is not the editor's Scene view), TAA (#1702), depth of
 //! field, which reads its depths ([`target_wanted`], #1445), or SSR, which reads its
 //! depths (#1526, `draw::stack`). SSR alone records no entity poses
 //! ([`Velocity::Depths`]). On any other frame the forward pass draws exactly as
@@ -44,7 +47,7 @@ pub(crate) use history::{track, HistoryKey, MotionHistory};
 
 use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::effects::{
-    depth_of_field::dof_enabled, motion_blur::motion_blur_enabled,
+    depth_of_field::dof_enabled, motion_blur::motion_blur_enabled, taa,
 };
 use crate::render::postfx::params::PostSource;
 use crate::render::postfx::PfxTarget;
@@ -80,8 +83,9 @@ pub(crate) fn wanted(
 }
 
 /// Whether a view writes the velocity target with its motion this frame: when it runs
-/// motion blur ([`wanted`]) or depth of field (#1445), the second for each pixel's
-/// depth from its own camera (the motion may then be read by no one). Gated alike, so
+/// motion blur ([`wanted`]), TAA (#1702), which reprojects its history through it, or
+/// depth of field (#1445), the last for each pixel's depth from its own camera (the
+/// motion may then be read by no one). Gated alike, so
 /// the Scene view and a display-only render texture write none. SSR reads the target
 /// too, for its depths alone ([`Velocity::Depths`], #1526, `draw::stack`).
 pub(crate) fn target_wanted(
@@ -91,7 +95,8 @@ pub(crate) fn target_wanted(
     scene_view: bool,
 ) -> bool {
     let dof = full && !scene_view && dof_enabled(post, graphics);
-    dof || wanted(post, graphics, full, scene_view)
+    let taa = taa::wanted(post, graphics, full, scene_view);
+    dof || taa || wanted(post, graphics, full, scene_view)
 }
 
 /// One view's motion vectors: the velocity target (while active) and its history.
@@ -110,7 +115,8 @@ pub(crate) enum Velocity {
     /// A target of depths (and cameras), but no entity poses: only SSR reads it
     /// (#1526), so its motion may be the camera's alone.
     Depths,
-    /// A target with each entity's motion: motion blur or depth of field reads it.
+    /// A target with each entity's motion: motion blur, TAA or depth of field reads
+    /// it.
     Motion,
 }
 

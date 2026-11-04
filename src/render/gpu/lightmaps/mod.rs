@@ -30,7 +30,8 @@
 //! A directional bake (#810) adds its direction pages as a second array at binding 16,
 //! read through the same sampler with the same page index and UV. They are bound only
 //! beside a bound colour array whose page count and size they match; otherwise the
-//! zeroed fallback stands in, whose zero directionality leaves the lightmap as is.
+//! zeroed fallback stands in, never read: an instance reads its direction page only
+//! when one is bound (`InstanceData::lightmap_directional`, [`Lightmaps::directional`]).
 
 mod load;
 mod upload;

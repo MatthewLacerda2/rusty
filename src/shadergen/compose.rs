@@ -23,6 +23,7 @@ pub use naga::Module;
 pub const MODULES: &[&str] = &[
     "fullscreen.wgsl",
     "lighting/screen_space.wgsl",
+    "numeric.wgsl",
     "lighting/sh.wgsl",
     "color/srgb.wgsl",
     "sky/noise.wgsl",
@@ -44,6 +45,7 @@ pub const MODULES: &[&str] = &[
     "forward/proxy_volume.wgsl",
     "forward/transparent.wgsl",
     "forward/lighting.wgsl",
+    "forward/lightmap.wgsl",
     "forward/reflection.wgsl",
     "forward/local_shadow.wgsl",
     "postfx/params.wgsl",

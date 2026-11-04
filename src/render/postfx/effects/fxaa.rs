@@ -22,8 +22,10 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     }),
 };
 
-fn prepare(_: &mut PostFx, _: &wgpu::Device, cx: &EffectCx) -> bool {
-    cx.full && fxaa_enabled(cx.post, cx.graphics)
+/// Skipped on a frame TAA resolved (#1702): Unity's camera has one anti-aliasing
+/// mode, and TAA's is the one that ran.
+fn prepare(pfx: &mut PostFx, _: &wgpu::Device, cx: &EffectCx) -> bool {
+    cx.full && fxaa_enabled(cx.post, cx.graphics) && !pfx.taa_ran()
 }
 
 /// Whether the FXAA pass runs this frame for `post`'s camera.

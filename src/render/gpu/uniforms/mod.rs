@@ -38,7 +38,9 @@ pub(crate) struct CameraUniform {
     pub prev_view_proj: [f32; 16],
     /// `x`: this camera's index in its stack, bottom to top (#1436): the velocity
     /// target's `.a`, so motion blur orders a higher camera in front. `y`: last
-    /// frame's game time (#1524), for the vertex blocks' motion. `zw`: unused.
+    /// frame's game time (#1524), for the vertex blocks' motion. `zw`: the TAA jitter
+    /// `view_proj` carries, in NDC (#1702; zero without TAA), which the velocity
+    /// shaders subtract: `prev_view_proj` is unjittered.
     pub stack: [f32; 4],
     /// `view_proj`'s inverse (#1523), what refraction and absorption rebuild the
     /// opaque depth's world point with.
@@ -46,6 +48,9 @@ pub(crate) struct CameraUniform {
     /// The transparent SSR trace (#1570, #1736): steps, step length and the minimum
     /// smoothness it reflects down to, then a pad; zero where the camera traces none.
     pub ssr: [f32; 4],
+    /// `x`: 1 in the opaque pass of a base camera running SSIL (#1750), which then
+    /// adds its bounce and writes its realtime share; `yzw` unused.
+    pub ssil: [f32; 4],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in
@@ -154,6 +159,11 @@ pub(crate) struct LightingUniform {
     // `diffuse_wrap` (#1698) 1.0 under `DiffuseModel::HalfLambert`: the squared wrap
     // replaces Lambert in `calculate_pbr`, as in the lightmap and probe bakes.
     pub diffuse_wrap: f32,
+    // `baked_specular` (#1695) 1.0 when a directional lightmap adds its specular lobe;
+    // 0.0 in every bake capture (`CaptureMode::static_only`), so a view-dependent
+    // highlight is never frozen into a probe. The pad keeps the probe array aligned.
+    pub baked_specular: f32,
+    pub _pad_baked_specular: [f32; 3],
     // The resident reflection probes (#1206): a draw's instance names the two it
     // blends (`InstanceData::reflection_probe`, #1584), and the shader box-projects
     // against each one's box and samples its cube's layer of the binding-4 cube array.
@@ -185,7 +195,7 @@ pub(crate) struct InstanceData {
     // Per instance, so lightmapped copies of a prop still share one draw.
     pub lightmap_page: u32,
     // 1 when the lightmap's direction page is bound (#810): normal maps then
-    // reshape the baked light.
+    // reshape the baked light, and its `Baked` lamps add one specular lobe (#1695).
     pub lightmap_directional: u32,
     // The resident reflection probes this instance blends (#1584): two indices plus
     // one and their weights, packed by `reflection_probes::pack_blend`; 0 for the sky

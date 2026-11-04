@@ -24,6 +24,7 @@
 
 mod atlas;
 mod gpu;
+mod kept;
 mod record;
 
 pub(crate) use gpu::DecalBuffers;

@@ -13,7 +13,7 @@
 //! - **grade functions** ([`Grade`]): functions the grading bake runs on each texel of
 //!   the view's LUT, in order;
 //! - a **pass** ([`Pass`]): its own GPU work, on the HDR scene before the composite
-//!   ([`Pass::Scene`]: depth of field, motion blur, the exposure meter, bloom's
+//!   ([`Pass::Scene`]: depth of field, TAA, motion blur, the exposure meter, bloom's
 //!   mip chain, the lens flare) or on the LDR image after it ([`Pass::Ldr`]: the authored effects,
 //!   FXAA).
 //!
@@ -49,6 +49,7 @@ pub(crate) mod lens_flare;
 pub(crate) mod motion_blur;
 pub(crate) mod ssil;
 pub(crate) mod ssr;
+pub(crate) mod taa;
 
 pub(crate) use layout::{
     composite_layout, composite_slots, composite_slots_len, grade_layout, grade_slots,
@@ -80,6 +81,7 @@ pub(crate) const POST_EFFECTS: &[PostEffect] = &[
     motion_blur::EFFECT,
     ssil::EFFECT,
     ssr::EFFECT,
+    taa::EFFECT,
     tonemapping::EFFECT,
     vignette::EFFECT,
     white_balance::EFFECT,
@@ -114,7 +116,7 @@ pub(crate) struct PostEffect {
 pub(crate) enum Owner {
     /// A field of the post-processing volume.
     Volume,
-    /// The camera's own component (motion blur and FXAA, Unity's camera properties).
+    /// The camera's own component (motion blur, FXAA and TAA, Unity's camera properties).
     Camera,
 }
 

@@ -1,4 +1,4 @@
-//! src/render/draw/camera.rs — the per-camera pass list (#636). Every camera of a
+//! src/render/draw/camera/mod.rs — the per-camera pass list (#636). Every camera of a
 //! stack runs [`CAMERA_PASSES`] in order over one [`CameraCtx`], built once by
 //! [`CameraCtx::new`]. The order is the table's order, reviewable in one place, the
 //! same way `app/registry.rs` orders the sim systems.
@@ -19,18 +19,20 @@
 //! base camera's screen-space work: no decals in its clusters, no SSAO (#1497),
 //! no transparent SSR ([`ssr_march`], #1570).
 
-use super::pass::{PassClear, ScenePassFrame};
+mod stages;
+
 use super::resources::SolidResources;
 use super::stack::StackPass;
 use crate::render::clusters::ClusterGrid;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::lod::LodSelection;
 use crate::render::passes::particles::ParticleDraws;
-use crate::render::passes::ssao::{SsaoFrame, SsaoPlan};
+use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::effects::ssil::{SsilFrame, SsilView};
-use crate::render::postfx::effects::ssr;
+use crate::render::postfx::effects::taa::jitter::jittered;
 use crate::render::{CameraUniform, Frustum, RenderView, Renderer};
 use crate::scene::{Camera, ClearFlags, Scene};
+use stages::*;
 
 /// One stage of a camera's frame.
 pub(crate) type CameraPass = fn(&mut Renderer, &mut RenderView, &mut CameraCtx);
@@ -65,9 +67,9 @@ pub(crate) struct CameraCtx<'a> {
     pub is_last: bool,
     /// A `DepthOnly` camera stacked on another (a viewmodel): see [`is_overlay`].
     pub overlay: bool,
-    pub aspect: f32,
+    /// This camera's view-projection as it draws: jittered on a TAA view (#1702).
     pub view_proj: glam::Mat4,
-    /// The stack's base (first) camera's view-projection, for post-FX.
+    /// The stack's base (first) camera's unjittered view-projection, for post-FX.
     pub base_view_proj: glam::Mat4,
     /// World-space frustum, for culling off-screen entities (#330).
     pub frustum: Frustum,
@@ -93,11 +95,14 @@ pub(crate) struct CameraCtx<'a> {
 /// The per-stack values every camera's context reads.
 pub(crate) struct StackShared {
     pub aspect: f32,
-    /// Each camera's view-projection, bottom to top, and its last frame's (#1435).
+    /// Each camera's view-projection, bottom to top, and its last frame's (#1435),
+    /// both unjittered.
     pub view_projs: Vec<glam::Mat4>,
     pub prev_view_projs: Vec<glam::Mat4>,
     /// The game time the view drew at last frame (#1524), the shader time without one.
     pub prev_time: f32,
+    /// TAA's jitter this frame, in NDC (#1702): zero without TAA.
+    pub jitter: glam::Vec2,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
     /// The view's SSIL (#1750) and what its history is valid for, when it runs.
@@ -115,7 +120,9 @@ impl<'a> CameraCtx<'a> {
         idx: usize,
     ) -> Self {
         let cam = &stack.stack[idx];
-        let view_proj = shared.view_projs[idx];
+        // Drawn jittered (TAA, #1702); culled through the unjittered matrix.
+        let unjittered = shared.view_projs[idx];
+        let view_proj = jittered(unjittered, shared.jitter);
         let clusters = ClusterGrid::new(cam, shared.aspect);
         let overlay = is_overlay(idx == 0, cam.clear_flags);
         let (march, traces) = ssr_march(idx == 0, shared.ssr_march);
@@ -127,10 +134,9 @@ impl<'a> CameraCtx<'a> {
             is_first: idx == 0,
             is_last: idx + 1 == stack.stack.len(),
             overlay,
-            aspect: shared.aspect,
             view_proj,
             base_view_proj: shared.view_projs[0],
-            frustum: Frustum::from_view_proj(view_proj),
+            frustum: Frustum::from_view_proj(unjittered),
             fog: shared.fog,
             ssao: shared.ssao.filter(|_| !overlay),
             traces,
@@ -143,9 +149,15 @@ impl<'a> CameraCtx<'a> {
                 fog: shared.fog,
                 clusters: clusters.uniform(),
                 prev_view_proj: shared.prev_view_projs[idx].to_cols_array(),
-                stack: [idx as f32, shared.prev_time, ssil.map_or(0.0, |_| 1.0), 0.0],
+                stack: [
+                    idx as f32,
+                    shared.prev_time,
+                    shared.jitter.x,
+                    shared.jitter.y,
+                ],
                 inv_view_proj: view_proj.inverse().to_cols_array(),
                 ssr: march,
+                ssil: [ssil.as_ref().map_or(0.0, |_| 1.0), 0.0, 0.0, 0.0],
             },
             clusters,
             solids: SolidResources::default(),
@@ -171,127 +183,5 @@ pub(crate) fn ssr_march(is_first: bool, march: [f32; 4]) -> ([f32; 4], bool) {
     (march, march[0] > 0.0)
 }
 
-fn upload_camera(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
-    r.queue
-        .write_buffer(&r.camera_buffer, 0, bytemuck::bytes_of(&ctx.uniform));
-}
-
-/// Bin the frame's point and spot lights (#434) and its decals (#638) into this
-/// camera's clusters. An overlay camera ([`is_overlay`]) bins no decals: world
-/// decals never land on the viewmodel.
-fn bin_clusters(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
-    r.bin_clusters(&ctx.clusters, !ctx.overlay);
-}
-
-/// This camera's solids (the culling mask differs per camera) as instanced draws
-/// (#470), split opaque/cutout vs transparent (#242).
-/// A view writing motion vectors gives each solid its last-frame pose (#1435).
-fn batch_solids(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    let outline = ctx.stack.editor_mode;
-    let motion = &mut view.post_fx.motion;
-    let history = motion.active().then_some(&mut motion.history);
-    let (scene, cam) = (ctx.scene, ctx.cam);
-    ctx.solids =
-        r.precreate_solid_resources(scene, cam, &ctx.frustum, &ctx.lod, (outline, history));
-}
-
-/// A light-probe capture's clear (#1668): black, and no sky, so a direction that
-/// escapes the scene carries only the ambient its bake adds.
-const OPEN_CLEAR: PassClear = PassClear {
-    color: Some(wgpu::Color::BLACK),
-    flags: ClearFlags::SolidColor,
-};
-
-fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    let frame = ScenePassFrame {
-        clear: match r.capture.ambient_sky {
-            true => OPEN_CLEAR,
-            false => PassClear::for_pass(ctx.is_first, ctx.cam.clear_flags),
-        },
-        ssao: ctx
-            .ssao
-            .map(|plan| SsaoFrame::for_camera(plan, ctx.view_proj, ctx.cam)),
-        base: ctx.is_first,
-        ssil: ctx.ssil,
-    };
-    r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque);
-}
-
-/// SSIL's source (#1750), kept after the base camera's opaque pass (`ssil::run`).
-fn ssil_source(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.keep_ssil_source(view, ctx);
-}
-
-/// Screen-space reflections (#1526) over the base camera's opaque image, before
-/// anything blends over it or an overlay camera draws: the base camera's alone.
-fn ssr(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    if ctx.is_first {
-        let stack = ctx.stack;
-        let settings = (
-            stack.post,
-            r.graphics(stack.editor_mode),
-            stack.full_post_fx,
-        );
-        ssr::run(r, view, settings, (ctx.view_proj, ctx.cam.position));
-    }
-}
-
-/// Unity's *Opaque Texture* (#1523): this camera's colour and depth, after SSR, for
-/// the translucents that refract or absorb, or trace SSR (#1570); skipped when none
-/// of them does.
-fn opaque_copy(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.copy_opaque(view, &ctx.solids.draws.transparent, ctx.traces);
-}
-
-/// Translucent solids (#242), back-to-front over the opaque ones.
-fn transparent(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.draw_transparent(view, &ctx.solids.draws.transparent);
-}
-
-/// HDRP's transparent depth postpass (#1523): the translucents that ask for it
-/// write their depth (and velocity texel) over what they drew over.
-fn depth_postpass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.draw_depth_postpass(view, &ctx.solids.draws.transparent);
-}
-
-/// World canvases (#429): scene geometry, occluded by it, before particles.
-fn world_ui(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.draw_world_ui(view, ctx.cam, ctx.aspect, ctx.fog);
-}
-
-/// Ribbons (#441) then sprite particles, each back to front; mesh particles drew
-/// with the solids.
-fn effects(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    ctx.effects = r.draw_effects(view, ctx.scene, ctx.cam);
-}
-
-fn count(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {
-    r.count_camera(&ctx.solids, ctx.effects);
-}
-
-/// Composite + post-process once, over the final camera's HDR target.
-fn post_fx(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    if ctx.is_last {
-        r.run_post_fx(view, ctx);
-    }
-}
-
-/// The editor's selection outline (#1175), onto the finished post-FX image (#1224).
-/// Only an editor camera marked any solid for it (`batch_solids`).
-fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    if ctx.is_last {
-        r.draw_outline(view, &ctx.solids, ctx.view_proj, ctx.stack.output);
-    }
-}
-
-/// The editor's handles and gizmos (grid, collider boxes, axis arrows, probes) over
-/// the outline, depth-tested against this camera's scene (#1224).
-fn handles(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    if ctx.is_last && ctx.stack.editor_mode {
-        r.draw_handles(view, ctx.scene, ctx.stack.output);
-    }
-}
-
 #[cfg(test)]
-#[path = "camera_tests.rs"]
 mod tests;

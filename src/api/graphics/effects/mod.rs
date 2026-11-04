@@ -1,7 +1,7 @@
 //! `Graphics.*` per post effect (#1467): one registrar per effect, in its own file
 //! (grading and lens effects in their folders), listed once in [`REGISTRARS`]. A
 //! volume effect writes the main camera's active post-processing volume and a camera
-//! effect (motion blur, FXAA) the main camera's component, both through the
+//! effect (motion blur, FXAA, TAA) the main camera's component, both through the
 //! `scene::authoring` ops the Inspector calls; an effect's numeric knobs that are a
 //! pair on their own come from its knob table ([`knobs`]).
 
@@ -24,6 +24,7 @@ mod lens_flare;
 mod motion_blur;
 mod ssil;
 mod ssr;
+mod taa;
 
 use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, white_balance};
 use lens::{chromatic_aberration, film_grain, vignette};
@@ -50,6 +51,7 @@ pub(crate) const REGISTRARS: &[(&str, Registrar)] = &[
     ("motion_blur", motion_blur::register),
     ("ssil", ssil::register),
     ("ssr", ssr::register),
+    ("taa", taa::register),
     ("tonemapping", tonemapping::register),
     ("vignette", vignette::register),
     ("white_balance", white_balance::register),

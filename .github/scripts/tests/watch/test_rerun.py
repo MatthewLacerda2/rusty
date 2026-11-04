@@ -47,6 +47,12 @@ class Attempts(unittest.TestCase):
         self.assertNotEqual(one, handbacks.attempts([{"id": 7, "run_attempt": 2}, {"id": 3}]))
         self.assertNotEqual(one, handbacks.attempts([{"id": 7}, {"id": 3}, {"id": 9}]))
 
+    def test_a_run_ending_is_not_a_change(self):
+        # #1831's review: a red hand-back must not return because another run ended.
+        out = handbacks.attempts([{"id": 7, "status": "in_progress"}, {"id": 3, "status": "completed"}])
+        self.assertEqual(out, handbacks.attempts([{"id": 7, "status": "completed"}, {"id": 3, "status": "completed"}]))
+
+
 
 class Requeue(unittest.TestCase):
     def test_a_re_run_on_the_same_head_is_taken_again(self):

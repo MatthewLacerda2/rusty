@@ -107,6 +107,13 @@ coder *changing* it must know.
   `merge-queue.py --watch` command line on this machine, and on 2026-10-05 a `pkill -f`
   meant for rusty's watch killed scorsese's too. Find rusty's by its working directory
   (`lsof -a -p <pid> -d cwd`) and kill that PID.
+- **Each kind of hand-back is re-admitted by what fixes it, and only that**
+  (`merging/watch/handbacks.py`): a push or a new run attempt for all, an edit,
+  an issue, a review comment or (#1831, `merging/watch/stalls.py`) the outwaited
+  runs going green for its own kind, each in its own side memory. A signal
+  added to the mark every hand-back shares re-admits them all: #1831's first
+  draft put "a run ended" there, which would have brought a red head back each
+  time another run on it ended, and pushed a `main` merge onto unfixed code.
 - **Its exit statuses are an interface**: 1 (read the hand-backs), 3 (the machine or
   GitHub failed), 4 (another watch holds the lock), 5 (relaunch), 6 (a stop was
   requested, `make queue-stop`; `merging/watch/ending.py`), 9 (a merge train landed

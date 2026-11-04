@@ -10,7 +10,7 @@
 //!   temporal accumulate and an upsample to full resolution. The forward pass reads
 //!   the result at its group 3, in the opaque copy's slot (`t_opaque`, which that
 //!   pass never reads: the stage's 16 sampled textures are all taken) while the
-//!   camera uniform's `stack.z` says it runs; adds it to the ambient irradiance
+//!   camera uniform's `ssil.x` says it runs; adds it to the ambient irradiance
 //!   (`forward::lighting::indirect_bounce`) through the same `albedo × 0.96 ×
 //!   (1 − metallic)` response and the same `ao` (SSAO's contact occlusion is
 //!   visibility the half-resolution gather misses), so a metal takes none.
@@ -42,7 +42,7 @@
 //! there when its `post_fx` is on.
 //!
 //! **Cost.** Off, no target, no pass and no texture read: the forward pass reads no
-//! bounce and writes no share (`stack.z` is 0: a uniform branch), and keeps only
+//! bounce and writes no share (`ssil.x` is 0: a uniform branch), and keeps only
 //! `ssil_realtime`'s sum, a multiply-add per light, and one multiply per surface
 //! block's factor, bound once. On, per frame: the
 //! prepass when SSAO doesn't run one (which then primes the forward pass), per

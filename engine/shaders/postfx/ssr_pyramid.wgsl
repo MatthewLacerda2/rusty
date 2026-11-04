@@ -7,6 +7,7 @@
 // reads a rough surface's hit from the level whose texels are its cone's width.
 
 #import fullscreen
+#import numeric
 
 // The level above, as a one-level view.
 @group(0) @binding(0) var t_src: texture_2d<f32>;
@@ -14,12 +15,6 @@
 @vertex
 fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32> {
     return fullscreen::triangle(vid);
-}
-
-// Whether every lane of `v` is a number: its exponent bits are not all ones.
-fn finite(v: vec4<f32>) -> bool {
-    let exponent = bitcast<vec4<u32>>(v) & vec4<u32>(0x7f800000u);
-    return all(exponent != vec4<u32>(0x7f800000u));
 }
 
 @fragment
@@ -31,7 +26,7 @@ fn fs_downsample(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     for (var i = 0; i < 4; i = i + 1) {
         let p = min(base + vec2<i32>(i & 1, i >> 1u), top);
         let c = textureLoad(t_src, p, 0);
-        if (finite(c)) {
+        if (numeric::finite4(c)) {
             sum = sum + c;
             count = count + 1.0;
         }

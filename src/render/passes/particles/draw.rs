@@ -8,7 +8,7 @@
 
 use std::rc::Rc;
 
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
 use super::instance::{emitter_instances, emitter_light, Eye, ParticleGlobals, ParticleInstance};
@@ -66,6 +66,7 @@ impl Renderer {
         view: &mut RenderView,
         scene: &Scene,
         camera: &Camera,
+        view_proj: Mat4,
     ) -> ParticleDraws {
         let eye = Eye {
             pos: camera.position,
@@ -75,7 +76,6 @@ impl Renderer {
         if runs.is_empty() {
             return ParticleDraws::default();
         }
-        let view_proj = camera.build_view_projection(view.aspect());
         let (right, up) = billboard_basis(camera);
         let globals = ParticleGlobals {
             view_proj: view_proj.to_cols_array(),

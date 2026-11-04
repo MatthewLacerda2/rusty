@@ -146,7 +146,7 @@ impl Renderer {
         }
         // After that submit: a write lands before the next one, so the opaque pass
         // read the flag set and everything after it reads it clear.
-        ctx.uniform.stack[2] = 0.0;
+        ctx.uniform.ssil[0] = 0.0;
         let uniform = bytemuck::bytes_of(&ctx.uniform);
         self.queue.write_buffer(&self.camera_buffer, 0, uniform);
     }

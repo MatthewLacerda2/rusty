@@ -459,15 +459,34 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   running off a shape: a noise through `slope_blur` on a `shape`'s height runs down its
   sides. The reach caps at one tile. `samples + 5` reads a pixel: an estimate of
   about 1–2 s of one core at 2048² with 8 samples.
-- `tile {count, jitter=0, rotation_jitter=0, scale_jitter=0, seed=0}` (*vector*, 1
-  input): stamps the input once per cell of a `count`×`count` grid; each cell is
-  seeded from the recipe and node `seed` with an offset of up to ±`jitter`/2 cells, a
-  turn of up to ±`rotation_jitter`/2 turns and a scale in `1 ± scale_jitter/2`, each
-  jitter clamped to 0–1. The input is read as **one stamp** — the unit square,
-  nothing outside it — so give it empty margins (a `shape` smaller than the tile); a
-  stamp pushed over its cell's border is drawn into the neighbour cell, and
-  overlapping stamps keep the brighter value per channel. Rivets are `shape circle` →
-  `tile`.
+- `tile {count, jitter=0, rotation_jitter=0, scale_jitter=0, value_jitter=0,
+  probability=1, output="stamp"|"random"|"index", blend="max"|"add"|"over", seed=0}`
+  (*vector*, 1–3 inputs: the stamp, then an optional mask, then an optional size
+  map): Substance Designer's *Tile Sampler* essentials. Stamps input 1 once per cell
+  of a `count`×`count` grid; each cell is seeded from the recipe and node `seed` with
+  an offset of up to ±`jitter`/2 cells, a turn of up to ±`rotation_jitter`/2 turns
+  and a scale in `1 ± scale_jitter/2`, each jitter clamped to 0–1. The input is read
+  as **one stamp** — the unit square, nothing outside it — so give it empty margins
+  (a `shape` smaller than the tile); a stamp pushed over its cell's border is drawn
+  into the neighbour cell. `output = "random"` fills each stamp with the input's red
+  times its own seeded grey (per-rivet tint, per-pebble height); `"index"` with the
+  red times the cell's row-major index `(i + 1) / count²`. `value_jitter` (0–2)
+  multiplies each stamp by `1 ± value_jitter/2`. `probability` (0–1) is the chance a
+  cell gets a stamp. Input 2, the mask: no stamp in a cell whose centre reads below
+  0.5 red. Input 3, the size map: the red at the cell's centre scales that stamp
+  (0–2; 0 or less draws none); to use a size map with no mask, wire a white
+  `constant` as input 2. Both are read at the cell's centre, wrapped, so they don't
+  vary with resolution. Placement draws never change when `probability` or
+  `value_jitter` are added: each takes its own hash stream. Overlaps: `max` keeps the
+  brighter value per channel, `add` sums the colours, `over` lays each stamp on the
+  ones before it, premultiplied: `out = colour × alpha + out × (1 − coverage)`, in
+  row-major order of the cells (row 0 first, left to right), whatever the band
+  split. `over` reads a stamp's **brightness as its coverage** (its red under
+  `output = "random"` or `"index"`, its brightest channel under `"stamp"`, times its
+  alpha), so a soft edge stays soft over what is under it and a dark colour stamp is
+  thin; output alpha is left as `max` leaves it. A NaN `probability` or
+  `value_jitter` is ignored, an out-of-range one clamped. Rivets are `shape circle`
+  → `tile`.
 - `voronoi {scale, output="distance"|"cells"|"f2"|"edges"|"smooth_f1",
   metric="euclidean"|"manhattan"|"chebyshev", randomness=1, smoothness=1, seed=0}` (*generator*):
   `f2` is the distance to the second-nearest point, `edges` is F2 − F1 — ~0 on cell

@@ -39,7 +39,7 @@
 
 mod rects;
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 
 use super::bake::Lightmap;
 
@@ -77,7 +77,7 @@ pub struct LightmapAtlas {
     pub pages: Vec<Vec<Vec3>>,
     /// The direction pages (#810), one per colour page, packed identically. Empty
     /// unless every lightmap carries directions.
-    pub directions: Vec<Vec<Vec3>>,
+    pub directions: Vec<Vec<Vec4>>,
     /// Per input lightmap, in order: its entity, page, and the scale/offset that maps
     /// its lightmap UV into the page (`uv * st.xy + st.zw`).
     pub placements: Vec<(u32, u32, [f32; 4])>,
@@ -97,7 +97,7 @@ pub fn pack(maps: &[Lightmap], max_page: u32) -> LightmapAtlas {
     let mut pages = vec![vec![Vec3::ZERO; (page_size * page_size) as usize]; page_count];
     let directional = !maps.is_empty() && maps.iter().all(|m| !m.directions.is_empty());
     let mut directions = match directional {
-        true => pages.clone(),
+        true => vec![vec![Vec4::ZERO; (page_size * page_size) as usize]; page_count],
         false => Vec::new(),
     };
     let mut placements = Vec::with_capacity(maps.len());
@@ -232,7 +232,7 @@ struct Cell {
 impl Cell {
     /// Copy `texels` (a `map_size`-wide lightmap) into `page`, extending its edge
     /// outward over the rest of the cell (the ring and the grid's slack).
-    fn blit(&self, page: &mut [Vec3], texels: &[Vec3], map_size: u32) {
+    fn blit<T: Copy>(&self, page: &mut [T], texels: &[T], map_size: u32) {
         let (size, edge) = (self.size, cell_edge(self.size));
         let at = |row: u32, col: u32| {
             texels[(row.min(size - 1) * map_size + col.min(size - 1)) as usize]

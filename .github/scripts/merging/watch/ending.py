@@ -113,7 +113,9 @@ def handed_back(number: int, why: str, waits: str | None = None) -> str:
     """The line a hand-back prints as it happens, beginning [`HANDED_BACK_LINE`].
     It says which fix it waits for (#1279): an edit of the description or labels
     (`waits` is `outcomes.AWAITS_EDIT`), a change to the issue it closes
-    (`AWAITS_ISSUE`), a review decision's comment (`AWAITS_REVIEW`, #1764), or else a push or a re-run."""
+    (`AWAITS_ISSUE`), a review decision's comment (`AWAITS_REVIEW`, #1764), the
+    runs it outwaited (`STALLED`, #1831: no re-run, which would spend a runner
+    during the outage that stalled it), or else a push or a re-run."""
     if waits == outcomes.AWAITS_EDIT:
         fix = "Fix the description or labels; no push needed: passed over until they change (or its head moves)"
     elif waits == outcomes.AWAITS_ISSUE:
@@ -124,10 +126,22 @@ def handed_back(number: int, why: str, waits: str | None = None) -> str:
                " passed over until such a comment appears (or its description, labels or head change)."
                " Take the `queue` label off while must-fix findings are open: any `Independent review`"
                " comment puts it back in line, whatever the record says")
+    elif waits == outcomes.STALLED:
+        fix = ("Nothing failed, so nothing to re-run: while a watch runs, it comes back by itself when the runs it"
+               " outwaited go green (said here, as a hand-back, if they end otherwise)")
     else:
         fix = ("Push a fix, or re-run the failed jobs (`gh run rerun --failed`) when it was runners or a flake:"
                " passed over until its head moves or runs again")
     return f"{HANDED_BACK_LINE} #{number}: {why} {fix}; the watch carries on."
+
+
+def stall_ended(number: int, why: str) -> str:
+    """The line for a stall whose runs ended cancelled or red (#1831), beginning
+    [`HANDED_BACK_LINE`]: someone has to act now, and the Monitor `issue-batch`
+    runs and `ci-merge`'s grep wake only on that."""
+    return (f"{HANDED_BACK_LINE} #{number}: the runs its hand-back outwaited ended without going green: {why}"
+            " Re-run the failed jobs (`gh run rerun --failed`) or push a fix:"
+            " passed over until its head moves or runs again; the watch carries on.")
 
 
 def over_budget(for_minutes: float | None, deadline: float) -> str | None:

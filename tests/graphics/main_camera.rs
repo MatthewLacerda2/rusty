@@ -58,7 +58,7 @@ fn a_render_texture_camera_created_first_does_not_take_the_screens_writes() {
 
     run(
         &scene,
-        "Graphics.SetSaturation(0.25) Graphics.SetFxaaActive(false)",
+        "Graphics.SetSaturation(0.25) Graphics.SetFxaaActive(false) Graphics.SetTaaActive(true)",
     );
 
     let s = scene.borrow();
@@ -69,11 +69,14 @@ fn a_render_texture_camera_created_first_does_not_take_the_screens_writes() {
             .color_adjustments
             .saturation
     };
-    let fxaa = |id| s.world.camera(id).unwrap().fxaa_active;
-    assert_eq!((saturation(main), fxaa(main)), (0.25, false));
+    let aa = |id| {
+        let cam = s.world.camera(id).unwrap();
+        (cam.fxaa_active, cam.taa_active)
+    };
+    assert_eq!((saturation(main), aa(main)), (0.25, (false, true)));
     assert_eq!(
-        (saturation(monitor), fxaa(monitor)),
-        (1.0, true),
+        (saturation(monitor), aa(monitor)),
+        (1.0, (true, false)),
         "the monitor keeps its own"
     );
 }
@@ -91,6 +94,7 @@ fn without_a_screen_camera_getters_are_neutral_and_setters_no_ops() {
         &scene,
         "Graphics.SetSaturation(0.25)
          assert(Graphics.GetSaturation() == 1.0 and Graphics.GetFxaaActive())
+         assert(not Graphics.GetTaaActive())
          -- Nothing blurs, and the whole motion-blur group says so (#1436).
          assert(not Graphics.GetMotionBlurActive() and Graphics.GetMotionBlurSamples() == 0)
          assert(Graphics.GetMotionBlurIntensity() == 0 and Graphics.GetMotionBlurMaxLength() == 0)",

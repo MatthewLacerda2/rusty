@@ -34,6 +34,12 @@ AWAITS_EDIT, AWAITS_ISSUE = "handed back: description", "handed back: issue"
 AWAITS_REVIEW = "handed back: review"
 AWAITING = (AWAITS_EDIT, AWAITS_ISSUE, AWAITS_REVIEW)
 
+# A hand-back for outwaiting its runs (#1831): the deadline passed with nothing
+# red and nothing green. #1820's and #1827's runs went green after it during
+# GitHub's Actions incidents of 2026-11-04 and sat parked, so the watch asks
+# again ([`watch.stalls`]) and brings the head back once every run on it is green.
+STALLED = "handed back: stalled"
+
 
 class Awaiting(tuple):
     """An `AWAITS_*` hand-back: the `(number, state, why)` every caller unpacks,

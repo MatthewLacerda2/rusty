@@ -8,7 +8,7 @@
 use std::ops::RangeInclusive;
 use std::thread;
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 
 use super::atlas::{max_map_edge, page_edge, MAX_PAGE, MIN_PAGE};
 use super::filter::smooth;
@@ -18,9 +18,11 @@ use super::raster::{dilate, fill_rest, lightmap_size, rasterize, world_per_uv, T
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
-use crate::core::color::luminance;
 
+pub(super) mod direction;
 pub(super) mod pool;
+
+use direction::direction_texel;
 
 /// Rings of empty texels dilation fills around each chart.
 const DILATE_PASSES: u32 = 3;
@@ -47,9 +49,11 @@ pub struct BakeSettings {
     /// Radius, in texels, of the Gaussian that smooths the baked bounce (Unity's
     /// indirect filter); 0 leaves it raw. Baked direct light is never filtered.
     pub filter_radius: u32,
-    /// Also bake each texel's dominant incoming light direction (#810, Unity's
-    /// *Directional* mode), so normal maps reshape baked light. Off saves the
-    /// direction pages' memory; the colour lightmaps are the same either way.
+    /// Also bake each texel's dominant incoming light direction and its `Baked`
+    /// lamps' share (#810, Unity's *Directional* mode; #1695), so normal maps
+    /// reshape baked light and `Baked` lamps give a lightmapped surface one
+    /// specular highlight. Off saves the direction pages' memory; the colour
+    /// lightmaps are the same either way.
     pub directional: bool,
 }
 
@@ -111,10 +115,12 @@ pub struct Lightmap {
     pub entity: u32,
     pub size: u32,
     pub texels: Vec<Vec3>,
-    /// Per texel (#810), the dominant direction its light arrives from, scaled by
-    /// its directionality: length 1 when it all comes from one way, 0 when it comes
-    /// evenly from everywhere. Empty when the bake was not [`BakeSettings::directional`].
-    pub directions: Vec<Vec3>,
+    /// Per texel (#810), `xyz` the dominant direction its light arrives from, scaled
+    /// by its directionality (length 1 when it all comes from one way, 0 when it comes
+    /// evenly from everywhere), and `w` its lamp share (#1695: how much of it is
+    /// `Baked` lamps' direct light from one way, `direction::direction_texel`). Empty
+    /// when the bake was not [`BakeSettings::directional`].
+    pub directions: Vec<Vec4>,
 }
 
 /// Bake every mesh in `scene` that has a usable lightmap UV and receives a lightmap
@@ -225,7 +231,7 @@ fn assemble(
     size: u32,
     texel_world: f32,
     settings: &BakeSettings,
-) -> (Vec<Vec3>, Vec<Vec3>) {
+) -> (Vec<Vec3>, Vec<Vec4>) {
     let indirect: Vec<Vec3> = light.iter().map(|l| l.indirect).collect();
     let radius = settings.filter_radius;
     let indirect = smooth(points, &indirect, size, radius, texel_world);
@@ -239,11 +245,11 @@ fn assemble(
         false => vec![Vec3::ZERO; points.len()],
     };
     let mut texels = vec![Vec3::ZERO; (size * size) as usize];
-    let mut directions = vec![Vec3::ZERO; texels.len()];
+    let mut directions = vec![Vec4::ZERO; texels.len()];
     let mut filled = vec![false; texels.len()];
     for (k, (point, light)) in points.iter().zip(light).enumerate() {
         texels[point.index] = indirect[k] + light.direct;
-        directions[point.index] = dominant(indirect[k], indirect_dir[k], light);
+        directions[point.index] = direction_texel(indirect[k], indirect_dir[k], light);
         filled[point.index] = true;
     }
     if settings.directional {
@@ -256,17 +262,6 @@ fn assemble(
     dilate(&mut texels, &mut filled, size, DILATE_PASSES);
     fill_rest(&mut texels, &filled, size);
     (texels, directions)
-}
-
-/// A texel's dominant incoming direction scaled by its directionality: the
-/// luminance-weighted mean of the directions its (smoothed) bounce and its direct
-/// light arrived from. Black texels have none.
-fn dominant(indirect: Vec3, indirect_dir: Vec3, light: &TexelLight) -> Vec3 {
-    let weight = luminance(indirect + light.direct);
-    if weight <= 0.0 {
-        return Vec3::ZERO;
-    }
-    ((indirect_dir + light.direct_dir) / weight).clamp_length_max(1.0)
 }
 
 /// Every mesh's occluding triangles, for the BVH: a Transparent run lets light
