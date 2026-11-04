@@ -15,6 +15,7 @@
 
 use glam::{Vec2, Vec3};
 
+use super::enclosure::CAPTURE_CLEARANCE;
 use super::enclosure::{ceiling_over, clearest, cluttered_region, open_to_sky, room_clutter};
 use super::floor::FloorGrid;
 use super::occupancy::Occupancy;
@@ -65,7 +66,7 @@ pub fn plan_rooms(
     for (room_cells, &clutter) in rooms.cells.iter().zip(&rooms.clutter) {
         let region = cluttered_region(region, clutter, MIN_REGION);
         let tiles: Vec<ReflectionPlan> = (tiles(grid, room_cells, region.max(grid.cell)).iter())
-            .map(|tile| plan_tile(site, tile, sky))
+            .map(|tile| plan_tile(site, tile, sky, false))
             .collect();
         single &= tiles.len() <= 1;
         let open = tiles
@@ -76,7 +77,7 @@ pub fn plan_rooms(
             true => plans.push(ReflectionPlan {
                 box_projection: false,
                 importance: OPEN_AIR_IMPORTANCE,
-                ..plan_tile(site, room_cells, sky)
+                ..plan_tile(site, room_cells, sky, true)
             }),
             false => plans.extend(tiles),
         }
@@ -107,8 +108,16 @@ fn tiles(grid: &FloorGrid, cells: &[usize], region: f32) -> Vec<Vec<usize>> {
     out
 }
 
-/// The probe for one tile's `cells` (all open, at least one).
-fn plan_tile((grid, occ): (&FloorGrid, &Occupancy), cells: &[usize], sky: f32) -> ReflectionPlan {
+/// The probe for one tile's `cells` (all open, at least one). An `open_air` probe
+/// captures from the first point near the centroid that is itself open to the sky
+/// and clear: a yard round a house has its centroid inside the house, and the
+/// nearest clear point to it, the doorway, would show the yard the room's walls.
+fn plan_tile(
+    (grid, occ): (&FloorGrid, &Occupancy),
+    cells: &[usize],
+    sky: f32,
+    open_air: bool,
+) -> ReflectionPlan {
     let centre = |i: usize| grid.centre(i % grid.width, i / grid.width);
     let open = |i: usize| grid.cells[i].expect("a room's cells are open");
     let half = Vec2::splat(grid.cell * 0.5 + grid.inset);
@@ -138,7 +147,12 @@ fn plan_tile((grid, occ): (&FloorGrid, &Occupancy), cells: &[usize], sky: f32) -
         Vec3::new(at.x, y, at.y)
     };
     let candidates: Vec<(usize, Vec3)> = by_centre.iter().map(|&i| (i, eye(i))).collect();
-    let (_, position) = clearest(occ, &candidates).expect("a tile has cells");
+    let outdoors = |&(_, at): &(usize, Vec3)| {
+        open_air && occ.clearance(at) >= CAPTURE_CLEARANCE && open_to_sky(occ, at)
+    };
+    let (_, position) = (candidates.iter().copied().find(outdoors))
+        .or_else(|| clearest(occ, &candidates))
+        .expect("a tile has cells");
     let floor_plan = ceiling(cells.iter().map(|&i| open(i).ceiling), sky);
     // The ray is good to a cell: it lowers the floor plan's ceiling only past that.
     let ray = ceiling_over(occ, position).filter(|&c| c < floor_plan - occ.cell);

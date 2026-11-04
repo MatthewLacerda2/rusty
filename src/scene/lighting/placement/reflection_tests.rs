@@ -54,3 +54,19 @@ fn a_sentry_on_the_roof_keeps_the_room_probed() {
         "the room has its own probe: {plans:?}"
     );
 }
+
+/// A yard round a roofed house: its open-air probe captures from under the sky,
+/// not from the doorway nearest the yard's centroid, which is inside the house.
+#[test]
+fn a_yard_round_a_house_captures_outdoors() {
+    let mut scene = yard();
+    roofed_house(&mut scene);
+    let plans = plan_on_nav(&scene);
+    let open: Vec<_> = plans.iter().filter(|p| !p.box_projection).collect();
+    assert_eq!(open.len(), 1, "{plans:?}");
+    let at = open[0].position;
+    assert!(
+        at.x.abs() > 7.0 || at.z.abs() > 7.0,
+        "under the roof at {at}"
+    );
+}

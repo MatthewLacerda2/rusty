@@ -145,7 +145,9 @@ two pictures of the level (#1737):
   (straight up and a ring at 30°) reach the sky is **open air**: it gets **one probe
   without box projection**, not a box under an invented ceiling, at importance `0`:
   its box spans the room's whole footprint, so the room probes inside it (importance
-  `1`) draw over it.
+  `1`) draw over it. It captures from the clear point nearest the room's middle that
+  is itself open to the sky, so a yard round a house never captures from the house's
+  doorway.
   A room wider than its region is split into probes no wider than it: the region is
   `reflectionRegion` (default `12.0`, at least `2.0`: a smaller one is
   an error) for an empty room, narrowed by its **clutter** (the solid fraction of the
