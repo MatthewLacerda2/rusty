@@ -6,8 +6,9 @@ use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 /// The *worn, grimy painted metal* example (docs/api/Texture.md) plus a blur,
 /// warp, tile, mapping, bump, a distance bevel, a normal blend, the channel ops,
 /// two-image math, auto levels and the #1743 filters (occlusion, edges, highpass,
-/// sharpen, histogram scan, levels) and #1740's generators (fibres, a distorted saw
-/// wave, a distorted noise, smooth F1, a star and a polygon with heights), so every
+/// sharpen, histogram scan, levels), #1739's directional ops (directional blur
+/// and warp, slope blur) and #1740's generators (fibres, a distorted saw wave, a
+/// distorted noise, smooth F1, a star and a polygon with heights), so every
 /// banded path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
@@ -45,6 +46,10 @@ const RECIPE: &str = r#"{
     { "id": "lv", "op": "levels", "in_low": 0.1, "gamma": 1.4, "inputs": ["hs"] },
     { "id": "more", "op": "combine_rgb", "inputs": ["ao", "ed", "lv"] },
     { "id": "lt2", "op": "mix", "mode": "multiply", "factor": 0.5, "inputs": ["lt", "more"] },
+    { "id": "db", "op": "directional_blur", "length": 0.1, "angle": 0.125, "inputs": ["chips"] },
+    { "id": "dw", "op": "directional_warp", "strength": 0.05, "angle": 0.3, "inputs": ["db", "h"] },
+    { "id": "sb", "op": "slope_blur", "intensity": 0.01, "mode": "max", "inputs": ["dw", "bev"] },
+    { "id": "lt3", "op": "mix", "mode": "screen", "factor": 0.4, "inputs": ["lt2", "sb"] },
     { "id": "fib", "op": "anisotropic_noise", "scale": 24, "anisotropy": 6, "angle": 0.1, "seed": 2 },
     { "id": "saw", "op": "wave", "kind": "bands", "frequency": 5, "profile": "saw", "distortion": 4, "detail": 3 },
     { "id": "dn", "op": "noise", "kind": "fbm", "scale": 4, "octaves": 3, "distortion": 1.5 },
@@ -54,8 +59,8 @@ const RECIPE: &str = r#"{
     { "id": "gen", "op": "combine_rgb", "inputs": ["fib", "saw", "dn"] },
     { "id": "gen2", "op": "combine_rgb", "inputs": ["sf", "st", "pg"] },
     { "id": "gens", "op": "mix", "mode": "screen", "inputs": ["gen", "gen2"] },
-    { "id": "lt3", "op": "mix", "mode": "overlay", "factor": 0.5, "inputs": ["lt2", "gens"] },
-    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt3", "soft"] }
+    { "id": "lt4", "op": "mix", "mode": "overlay", "factor": 0.5, "inputs": ["lt3", "gens"] },
+    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt4", "soft"] }
   ],
   "output": "out"
 }"#;

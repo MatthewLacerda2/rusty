@@ -130,6 +130,7 @@ impl OutputStage {
                 .makeup_gain(Decibels(MAKEUP_DB))
                 .mix(compressor_mix(mode)),
             wake.clone(),
+            None,
         ));
         let control = OutputControl::new(mode);
         main.add_effect(Shaper(Arc::clone(&control)));

@@ -229,3 +229,7 @@ mod capture_tests;
 #[cfg(test)]
 #[path = "doppler_tests.rs"]
 mod doppler_tests;
+
+#[cfg(test)]
+#[path = "loud_tests.rs"]
+mod loud_tests;

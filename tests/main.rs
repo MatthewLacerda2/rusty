@@ -45,6 +45,7 @@ mod light_probes;
 mod lod_group_api;
 mod material_authoring;
 mod material_library;
+mod mesh_culling;
 mod nav;
 mod navigation_layered;
 mod navmesh_settings;

@@ -75,7 +75,7 @@ and fails past 12; an allow for a folder under the cap is itself refused
 
 - `color/` (10 with `dummy`): `histogram_scan`, `levels` (#1743, landed): tone
   adjustments beside `auto_levels` and `gamma`.
-- `filter/blurs/`: `directional_blur`, `slope_blur` (#1739); `highpass`, `sharpen`
+- `filter/blurs/`: `directional_blur`, `slope_blur` (#1739, landed); `highpass`, `sharpen`
   (#1743, landed): a kernel's smear, or the difference from one.
 - `filter/flood/` (new, #1741): `flood_fill`, `flood_random`, `flood_gradient`,
   `flood_bbox`; that branch makes the folder and its `pub mod flood;` line.
@@ -86,7 +86,7 @@ and fails past 12; an allow for a folder under the cap is itself refused
 - `generators/` (11): `anisotropic_noise` (#1740, landed); the rest of #1740 was
   params on existing generators. A generator's op enum that is new (`WaveProfile`,
   `ShapeProfile`) lives in its op file, as the rule above says.
-- `vector/` (7): `directional_warp` (#1739), beside `warp`; #1742 is params and
+- `vector/` (8): `directional_warp` (#1739, landed), beside `warp`; #1742 is params and
   inputs on `tile`.
 
 A two-input op with an optional mask and an output mode is `dummy`'s shape:
