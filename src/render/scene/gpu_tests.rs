@@ -2,7 +2,8 @@
 //! of edits draws what a renderer built fresh on the final state draws (#1706):
 //! moving, skinned (posed every frame, unstamped), static, transparent and
 //! lightmap-entried solids, with material, layer, activity and override edits, a
-//! two-sided, a Cutout and a mirrored static caster: their shadows included.
+//! two-sided, a Cutout and a mirrored static caster: their shadows included. And a
+//! move uploads the moved object's record alone (`render_upload_bytes`).
 
 use glam::{Mat4, Vec3};
 
@@ -107,4 +108,26 @@ fn gpu_a_kept_scene_draws_what_a_fresh_renderer_draws_after_every_edit() {
         shown.extend(pixels.chunks(4).map(<[u8]>::to_vec));
     }
     assert!(shown.len() > 8, "the run shows the solids");
+}
+
+#[test]
+fn gpu_a_move_uploads_the_moved_record_alone() {
+    let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+        return;
+    };
+    let mut scene = yard(6);
+    frame(&mut r, &scene);
+    let idle = frame(&mut r, &scene).1.render_upload_bytes;
+    scene
+        .world
+        .transform_mut(scene.world.ids_with_mesh()[0])
+        .unwrap()
+        .position
+        .y += 0.01;
+    let moved = frame(&mut r, &scene).1.render_upload_bytes;
+    assert_eq!(
+        moved - idle,
+        240,
+        "one object record, nothing per static object"
+    );
 }

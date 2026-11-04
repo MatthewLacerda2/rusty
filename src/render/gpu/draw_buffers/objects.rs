@@ -25,17 +25,20 @@ impl DrawBuffers {
         let grew = self.objects.reserve(device, bytes);
         if grew {
             self.objects.write_at(queue, 0, bytemuck::cast_slice(kept));
+            self.written += kept.len() as u64 * STRIDE;
         } else {
             for run in runs {
                 let slots = &kept[run.start as usize..run.end as usize];
                 let at = u64::from(run.start) * STRIDE;
                 self.objects
                     .write_at(queue, at, bytemuck::cast_slice(slots));
+                self.written += slots.len() as u64 * STRIDE;
             }
         }
         let after = kept.len() as u64 * STRIDE;
         self.objects
             .write_at(queue, after, bytemuck::cast_slice(transient));
+        self.written += transient.len() as u64 * STRIDE;
         grew
     }
 }
