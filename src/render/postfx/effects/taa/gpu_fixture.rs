@@ -35,6 +35,12 @@ pub(super) fn frame(
     readback::read_texture_rgba8(&r.device, &r.queue, target, size.width, size.height)
 }
 
+/// One frame of `scene` in a fresh view (no history).
+pub(super) fn fresh_frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
+    let mut v = view(r);
+    frame(r, &mut v, scene, cam)
+}
+
 /// `n` frames of a still `scene`; the last one.
 pub(super) fn settle(
     r: &mut Renderer,

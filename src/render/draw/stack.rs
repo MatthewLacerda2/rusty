@@ -74,15 +74,18 @@ impl Renderer {
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.scene_size();
         surface::begin(&mut view.post_fx.targets, &self.device, size, ssr);
-        // TAA (#1702): the frame's sub-pixel jitter, every camera's alike.
-        let taa_on =
-            taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode) && !own_pipeline;
-        let jitter = taa::begin(&mut view.post_fx.targets, &self.device, size, taa_on);
         let prev_view_projs =
             view.post_fx
                 .motion
                 .begin(&self.device, size, key, velocity, &cameras);
         let prev_time = view.post_fx.motion.history.game_time(scene.shader_time);
+        // TAA (#1702): the frame's sub-pixel jitter, every camera's alike; a cut
+        // forgets its history.
+        let taa_on =
+            taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode) && !own_pipeline;
+        let cut = view.post_fx.motion.history.cut();
+        let frame = (size, taa_on, cut);
+        let jitter = taa::begin(&mut view.post_fx.targets, &self.device, frame);
         let shared = StackShared {
             aspect,
             view_projs,

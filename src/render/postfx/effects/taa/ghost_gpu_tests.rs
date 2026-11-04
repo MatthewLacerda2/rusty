@@ -5,16 +5,17 @@
 use glam::{Quat, Vec3};
 
 use super::gpu_fixture::{
-    cube, diff, eye, frame, pixel, project, renderer, settle, taa_scene, view,
+    cube, diff, eye, frame, fresh_frame, pixel, project, renderer, settle, taa_scene, view,
 };
 use crate::components::particle::{Particle, ParticleEmitterComponent};
 use crate::components::CameraComponent;
+use crate::render::motion::gpu_fixture::{H, W};
 use crate::scene::{ClearFlags, Scene};
 
-/// Frames after the move a trail may take to fade, and how far off the sky a pixel
-/// may be then.
+/// Frames after the move a trail may take to fade, and how far off the unjittered
+/// sky a pixel may be then (the jittered sky's own gradient moves a sub-pixel).
 const AFTER: u32 = 4;
-const TRAIL: u8 = 2;
+const TRAIL: u8 = 4;
 
 /// Pixel at world point `p`'s projection.
 fn at(p: Vec3) -> (u32, u32) {
@@ -33,7 +34,7 @@ fn gpu_a_moving_cube_leaves_no_trail() {
     let first = frame(&mut r, &mut v, &scene, &cam);
     let last = settle(&mut r, &mut v, &scene, &cam, AFTER);
     let (sky, _) = taa_scene(false, false);
-    let empty = frame(&mut r, &mut view(&r), &sky, &cam);
+    let empty = fresh_frame(&mut r, &sky, &cam);
     let was = at(Vec3::new(-0.8, 0.0, -4.5));
     eprintln!(
         "[taa] where the cube was: {} off the sky the first frame, {} after {AFTER}",
@@ -73,7 +74,7 @@ fn gpu_a_moving_sprite_particle_leaves_no_trail() {
     drop(p);
     let last = settle(&mut r, &mut v, &scene, &cam, AFTER);
     let (sky, _) = taa_scene(false, false);
-    let empty = frame(&mut r, &mut view(&r), &sky, &cam);
+    let empty = fresh_frame(&mut r, &sky, &cam);
     assert!(
         diff(&held, &empty, was) > 40,
         "the particle drew where it was"
@@ -94,9 +95,9 @@ fn gpu_a_scene_load_leaves_no_ghost_of_the_last_scene() {
     // Another scene (another id): a cut, as Play, Stop or a camera switch are.
     let (after, _) = taa_scene(true, true);
     let first = frame(&mut r, &mut v, &after, &cam);
-    let fresh = frame(&mut r, &mut view(&r), &after, &cam);
-    let worst = (0..crate::render::motion::gpu_fixture::W * crate::render::motion::gpu_fixture::H)
-        .map(|i| diff(&first, &fresh, (i % 64, i / 64)))
+    let fresh = fresh_frame(&mut r, &after, &cam);
+    let worst = (0..W * H)
+        .map(|i| diff(&first, &fresh, (i % W, i / W)))
         .max()
         .unwrap();
     assert!(
@@ -138,7 +139,7 @@ fn gpu_a_viewmodel_does_not_swim_against_the_turning_world() {
     let (mut plain, overlay) = viewmodel(false);
     plain.world.transform_mut(overlay).unwrap().rotation =
         Quat::from_rotation_y(-21f32.to_radians());
-    let sharp = frame(&mut r, &mut view(&r), &plain, &eye(21.0));
+    let sharp = fresh_frame(&mut r, &plain, &eye(21.0));
     let gun = (29..=35).flat_map(|x| (21..=27).map(move |y| (x, y)));
     let worst = gun.map(|p| diff(&last, &sharp, p)).max().unwrap();
     eprintln!("[taa] the gun under a turning camera differs from no TAA by {worst}");

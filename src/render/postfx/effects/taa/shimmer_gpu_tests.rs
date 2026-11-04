@@ -1,7 +1,7 @@
 //! The symptom #1702 exists for, on lavapipe: a glossy, normal-mapped metal sphere
 //! turning a few degrees a frame under a lamp (part 1's specular-AA scene, in a
 //! view kept across frames). Its highlight sparkles from frame to frame; TAA's
-//! per-pixel temporal variance must sit well below FXAA's.
+//! per-pixel frame-to-frame flicker must sit well below FXAA's.
 
 use glam::{Quat, Vec3};
 
@@ -13,8 +13,14 @@ use crate::scene::Scene;
 /// Frames to settle, then frames measured.
 const WARM: u32 = 8;
 const MEASURED: u32 = 12;
-/// TAA's relative temporal variance must be below FXAA's by this factor.
-const FACTOR: f64 = 2.0;
+/// TAA's relative flicker must be below FXAA's by this factor. Measured on
+/// lavapipe: FXAA 0.0146, TAA 0.0068 (2.1x). What TAA keeps is its own jitter's:
+/// a still sphere flickers 0 under FXAA and a little under TAA, since each
+/// jittered frame still weighs 0.1 (URP's frame influence).
+const FACTOR: f64 = 1.5;
+/// Degrees the sphere turns a frame: slow enough that a pixel's change from one
+/// frame to the next is the highlight jumping, not the sphere's own turn.
+const STEP: f32 = 1.0;
 
 /// A 64×64 tangent-space normal map of seeded noise.
 fn bumpy_normal_map() -> String {
@@ -37,6 +43,13 @@ fn bumpy_normal_map() -> String {
 /// The fixture scene with the sphere and a lamp; returns it and the sphere.
 fn sphere_scene(taa: bool) -> (Scene, u32) {
     let (mut scene, _) = taa_scene(taa, true);
+    // A black sky, so the measure is the sphere's.
+    let sky = std::env::temp_dir().join("rusty_1702_taa_black_sky.png");
+    image::RgbaImage::from_pixel(2, 1, image::Rgba([0, 0, 0, 255]))
+        .save(&sky)
+        .unwrap();
+    scene.skybox_path = sky.to_string_lossy().into_owned();
+    scene.ambient_intensity = 0.0;
     let id = create_entity(&mut scene, "Sphere", Some(Primitive::Sphere));
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 0.0, -3.5);
     let material = Some(MaterialComponent::new("m".to_string()));
@@ -60,14 +73,14 @@ fn sphere_scene(taa: bool) -> (Scene, u32) {
     (scene, id)
 }
 
-/// Each measured frame's luma, the sphere turning 3° a frame; `None` without an adapter.
+/// Each measured frame's luma, the sphere turning `STEP` a frame; `None` without an adapter.
 fn lumas(taa: bool) -> Option<Vec<Vec<f64>>> {
     let mut r = renderer()?;
     let (mut scene, id) = sphere_scene(taa);
     let mut v = view(&r);
     let mut out = Vec::new();
     for f in 0..WARM + MEASURED {
-        let turn = Quat::from_rotation_y((f as f32 * 3.0).to_radians());
+        let turn = Quat::from_rotation_y((f as f32 * STEP).to_radians());
         scene.world.transform_mut(id).unwrap().rotation = turn;
         let rgba = frame(&mut r, &mut v, &scene, &eye(0.0));
         let luma = rgba
@@ -80,29 +93,29 @@ fn lumas(taa: bool) -> Option<Vec<Vec<f64>>> {
     Some(out)
 }
 
-/// Each pixel's variance over the frames, summed, over each pixel's mean squared,
-/// summed: flicker relative to the signal (part 1's measure).
-fn relative_temporal_variance(frames: &[Vec<f64>]) -> f64 {
+/// The flicker: each pixel's frame-to-frame change squared, averaged over the
+/// frames and summed, over each pixel's mean squared, summed. Successive frames,
+/// not the whole window, so the sphere's own slow turn (which TAA must keep) is
+/// not counted as shimmer; a highlight jumping between pixels is.
+fn relative_flicker(frames: &[Vec<f64>]) -> f64 {
     let n = frames.len() as f64;
-    let (mut variance, mut signal) = (0.0, 0.0);
+    let (mut flicker, mut signal) = (0.0, 0.0);
     for px in 0..frames[0].len() {
         let mean = frames.iter().map(|f| f[px]).sum::<f64>() / n;
-        variance += frames.iter().map(|f| (f[px] - mean).powi(2)).sum::<f64>() / n;
+        let steps = frames.windows(2).map(|w| (w[1][px] - w[0][px]).powi(2));
+        flicker += steps.sum::<f64>() / (n - 1.0);
         signal += mean * mean;
     }
-    variance / signal.max(1e-9)
+    flicker / signal.max(1e-9)
 }
 
 #[test]
 fn gpu_a_turning_glossy_bumpy_sphere_shimmers_less_under_taa_than_fxaa() {
     let Some(fxaa) = lumas(false) else { return };
     let taa = lumas(true).expect("an adapter, as above");
-    let (f, t) = (
-        relative_temporal_variance(&fxaa),
-        relative_temporal_variance(&taa),
-    );
+    let (f, t) = (relative_flicker(&fxaa), relative_flicker(&taa));
     eprintln!(
-        "[taa] relative temporal variance: FXAA {f:.5}, TAA {t:.5} ({:.1}x)",
+        "[taa] relative flicker: FXAA {f:.5}, TAA {t:.5} ({:.1}x)",
         f / t
     );
     assert!(

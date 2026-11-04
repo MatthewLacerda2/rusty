@@ -1,7 +1,9 @@
 use glam::{Mat4, Vec2, Vec3, Vec4};
 
 use super::{halton, jittered, ndc, pixels, SEQUENCE};
+use crate::components::Projection;
 use crate::render::PixelSize;
+use crate::scene::Camera;
 
 #[test]
 fn halton_starts_as_urp_does() {
@@ -9,7 +11,7 @@ fn halton_starts_as_urp_does() {
         [halton(1, 2), halton(2, 2), halton(3, 2)],
         [0.5, 0.25, 0.75]
     );
-    let third = [halton(1, 3), halton(2, 3), halton(4, 3)];
+    let third = [halton(1, 3), halton(2, 3), halton(3, 3)];
     assert!((third[0] - 1.0 / 3.0).abs() < 1e-6 && (third[1] - 2.0 / 3.0).abs() < 1e-6);
     assert!((third[2] - 1.0 / 9.0).abs() < 1e-6);
 }
@@ -32,8 +34,10 @@ fn the_jitter_moves_every_point_by_the_same_fraction_of_a_pixel() {
     };
     let offset = ndc(Vec2::new(0.5, -0.25), size);
     assert_eq!(offset, Vec2::new(1.0 / 64.0, -1.0 / 96.0));
-    let persp = Mat4::perspective_rh(1.0, 4.0 / 3.0, 0.1, 100.0);
-    let ortho = Mat4::orthographic_rh(-2.0, 2.0, -1.5, 1.5, 0.1, 100.0);
+    let persp = Camera::new(Vec3::ZERO, -90.0, 0.0).build_view_projection(4.0 / 3.0);
+    let mut lens = Camera::new(Vec3::ZERO, -90.0, 0.0);
+    lens.projection = Projection::Orthographic { size: 3.0 };
+    let ortho = lens.build_view_projection(4.0 / 3.0);
     for vp in [persp, ortho] {
         let moved = jittered(vp, offset);
         for p in [Vec3::new(0.3, -0.2, -2.0), Vec3::new(-1.0, 0.5, -30.0)] {

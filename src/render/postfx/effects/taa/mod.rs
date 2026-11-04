@@ -178,12 +178,13 @@ impl TaaHistory {
 
 /// Start a stack's frame: with `on`, fit the view's history to `size` and return
 /// this frame's jitter in NDC; without, drop the history and return none. A view
-/// that runs no TAA draws with the unjittered projection, bit for bit.
+/// that runs no TAA draws with the unjittered projection, bit for bit. On a `cut`
+/// (the motion history starts over) the history is forgotten and the sequence
+/// restarts, so the frame is exactly a new view's first.
 pub(crate) fn begin(
     targets: &mut Targets,
     device: &wgpu::Device,
-    size: PixelSize,
-    on: bool,
+    (size, on, cut): (PixelSize, bool, bool),
 ) -> Vec2 {
     if !on {
         targets.remove::<TaaHistory>();
@@ -193,6 +194,9 @@ pub(crate) fn begin(
     let h = targets.get_or(|| TaaHistory::new(device, size_px));
     if h.size != size_px {
         *h = TaaHistory::new(device, size_px);
+    }
+    if cut {
+        (h.frame, h.valid) = (0, false);
     }
     h.frame = h.frame.wrapping_add(1);
     h.ran = false;
@@ -210,13 +214,11 @@ pub(crate) fn jitter_of(view: &RenderView) -> Vec2 {
 
 impl PostFx {
     /// Resolve this frame against the history, or drop the history when the view
-    /// wrote no velocity. `cut`: the motion history starts over this frame, so the
-    /// history holds nothing of this view.
+    /// wrote no velocity.
     pub(crate) fn run_taa(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         passes: &TaaPasses,
-        cut: bool,
         timer: &GpuTimer,
     ) {
         if self.motion.target_view().is_none() {
@@ -228,7 +230,7 @@ impl PostFx {
             return;
         };
         let (read, write) = (h.latest, 1 - h.latest);
-        let params = TaaParams::new(h.size, h.valid && !cut);
+        let params = TaaParams::new(h.size, h.valid);
         queue.write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
         let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("TAA Bind Group"),
