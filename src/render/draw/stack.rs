@@ -67,11 +67,7 @@ impl Renderer {
         let moving =
             motion::target_wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode)
                 && !own_pipeline;
-        let velocity = match (moving, ssr) {
-            (true, _) => Velocity::Motion,
-            (false, true) => Velocity::Depths,
-            (false, false) => Velocity::Off,
-        };
+        let velocity = velocity_target(moving, ssr);
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.scene_size();
         surface::begin(&mut view.post_fx.targets, &self.device, size, ssr);
@@ -149,5 +145,15 @@ impl Renderer {
         };
         view.post_fx
             .run((&self.device, &self.queue), chain, &effect, params);
+    }
+}
+
+/// The velocity target a view writes: motion vectors when an effect reads motion,
+/// SSR's depths alone when only SSR runs, else none (#1435, #1526).
+fn velocity_target(moving: bool, ssr: bool) -> Velocity {
+    match (moving, ssr) {
+        (true, _) => Velocity::Motion,
+        (false, true) => Velocity::Depths,
+        (false, false) => Velocity::Off,
     }
 }
