@@ -18,6 +18,7 @@ fn noise_recipe(resolution: u32, seed: u64) -> TextureRecipe {
                 octaves: 1,
                 lacunarity: 2.0,
                 gain: 0.5.into(),
+                distortion: 0.0,
                 seed: 0,
             }),
             inputs: vec![],

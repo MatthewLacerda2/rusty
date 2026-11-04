@@ -8,7 +8,9 @@ use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 /// mapping, bump, a distance bevel, a normal blend, the channel ops, two-image
 /// math, auto levels and the #1743 filters (occlusion, edges, highpass, sharpen,
 /// histogram scan, levels), #1739's directional ops (directional blur and warp,
-/// slope blur) and the #1741 flood fill and its readers, so every banded path runs.
+/// slope blur), #1740's generators (fibres, a distorted saw wave, a distorted
+/// noise, smooth F1, a star and a polygon with heights) and the #1741 flood fill
+/// and its readers, so every banded path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
   "nodes": [
@@ -52,14 +54,24 @@ const RECIPE: &str = r#"{
     { "id": "dw", "op": "directional_warp", "strength": 0.05, "angle": 0.3, "inputs": ["db", "h"] },
     { "id": "sb", "op": "slope_blur", "intensity": 0.01, "mode": "max", "inputs": ["dw", "bev"] },
     { "id": "lt3", "op": "mix", "mode": "screen", "factor": 0.4, "inputs": ["lt2", "sb"] },
+    { "id": "fib", "op": "anisotropic_noise", "scale": 24, "anisotropy": 6, "angle": 0.1, "seed": 2 },
+    { "id": "saw", "op": "wave", "kind": "bands", "frequency": 5, "profile": "saw", "distortion": 4, "detail": 3 },
+    { "id": "dn", "op": "noise", "kind": "fbm", "scale": 4, "octaves": 3, "distortion": 1.5 },
+    { "id": "sf", "op": "voronoi", "scale": 6, "output": "smooth_f1", "smoothness": 0.6 },
+    { "id": "st", "op": "shape", "kind": "star", "size": [1.2, 1.2], "points": 5, "profile": "cone" },
+    { "id": "pg", "op": "shape", "kind": "polygon", "size": [0.6, 0.5], "sides": 7, "profile": "hemisphere" },
+    { "id": "gen", "op": "combine_rgb", "inputs": ["fib", "saw", "dn"] },
+    { "id": "gen2", "op": "combine_rgb", "inputs": ["sf", "st", "pg"] },
+    { "id": "gens", "op": "mix", "mode": "screen", "inputs": ["gen", "gen2"] },
+    { "id": "lt4", "op": "mix", "mode": "overlay", "factor": 0.5, "inputs": ["lt3", "gens"] },
     { "id": "ff", "op": "flood_fill", "threshold": 0.55, "inputs": ["chips"] },
     { "id": "fr", "op": "flood_random", "seed": 3, "inputs": ["ff"] },
     { "id": "fg", "op": "flood_gradient", "angle": 0.1, "angle_jitter": 0.2, "seed": 1, "inputs": ["ff"] },
     { "id": "fb", "op": "flood_bbox", "output": "center_x", "inputs": ["ff"] },
     { "id": "flood", "op": "combine_rgb", "inputs": ["fr", "fg", "fb"] },
-    { "id": "lt4", "op": "mix", "mode": "add", "factor": 0.4, "inputs": ["lt3", "flood"] },
-    { "id": "lt5", "op": "combine_rgb", "inputs": ["leaves", "piled", "lt4"] },
-    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt5", "soft"] }
+    { "id": "lt5", "op": "mix", "mode": "add", "factor": 0.4, "inputs": ["lt4", "flood"] },
+    { "id": "lt6", "op": "combine_rgb", "inputs": ["leaves", "piled", "lt5"] },
+    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt6", "soft"] }
   ],
   "output": "out"
 }"#;

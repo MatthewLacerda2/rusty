@@ -12,7 +12,8 @@ use crate::procgen::recipe::{
 /// Gradient noise (grayscale, written to RGB, alpha 1). The fBM family (`fbm`,
 /// `ridged`, `turbulence`) sums `octaves`, each `lacunarity`× the previous frequency
 /// (rounded to a whole count, so every octave tiles) and `gain`× its amplitude;
-/// `perlin` is one octave.
+/// `perlin` is one octave. `distortion` warps the domain by up to about that many
+/// lattice cells first, Blender's Noise Texture *Distortion*.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Noise {
     pub kind: NoiseKind,
@@ -23,6 +24,8 @@ pub struct Noise {
     pub lacunarity: f32,
     #[serde(default = "half")]
     pub gain: Param,
+    #[serde(default)]
+    pub distortion: f32,
     #[serde(default)]
     pub seed: u32,
 }
@@ -38,6 +41,7 @@ impl Row for Noise {
             opt("octaves", "integer", Lit::Integer(1)),
             opt("lacunarity", "number", Lit::Number(2.0)),
             socket(opt("gain", "number", Lit::Number(0.5))),
+            opt("distortion", "number", Lit::Number(0.0)),
             SEED,
         ],
     );
