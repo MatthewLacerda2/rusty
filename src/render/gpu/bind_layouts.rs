@@ -59,9 +59,16 @@ pub(crate) fn create_scene_depth_layout(device: &wgpu::Device) -> wgpu::BindGrou
 /// packed uniforms, the joint-matrix array (1) the vertex shader indexes from the
 /// uniform's `bone_base` (#455), the instance array (2) it indexes by
 /// `instance_index`, the material records (4) the uniform's `material` indexes
-/// (#1616; binding 3 is the shadow casters', in the same module), and the Light Probe
-/// Proxy Volumes (5) an instance's `proxy_volume` indexes (#1672). One bind group
-/// serves every solid draw; only the offset changes between batches.
+/// (#1616; binding 3 is the shadow casters', in the same module), the Light Probe
+/// Proxy Volumes (5) an instance's `proxy_volume` indexes (#1672), and the object
+/// records (6) an instance's `object` names (#1706). One bind group serves every
+/// solid draw; only the offset changes between batches.
+///
+/// The instances are the vertex stage's alone: it hands the fragment stage the
+/// object, reflection probe and proxy volume it needs as a flat varying, which keeps
+/// the fragment stage at `wgpu::Limits::default()`'s 8 storage buffers (4 in group 0,
+/// materials, proxies and objects here, the shadow tiles in group 3), the limit the
+/// renderer requests on every backend. The vertex stage binds 7.
 pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     use crate::render::DrawUniform;
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -73,9 +80,10 @@ pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGro
                 std::mem::size_of::<DrawUniform>() as u64,
             ),
             storage_entry(1, wgpu::ShaderStages::VERTEX),
-            storage_entry(2, wgpu::ShaderStages::VERTEX_FRAGMENT),
+            storage_entry(2, wgpu::ShaderStages::VERTEX),
             storage_entry(4, wgpu::ShaderStages::VERTEX_FRAGMENT),
             storage_entry(5, wgpu::ShaderStages::FRAGMENT),
+            storage_entry(6, wgpu::ShaderStages::VERTEX_FRAGMENT),
         ],
     })
 }

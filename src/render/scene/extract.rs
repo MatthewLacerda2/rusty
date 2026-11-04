@@ -65,9 +65,7 @@ impl Renderer {
         let ids = scene.world.ids_with_mesh();
         self.upload_meshes_of(scene, &ids);
         self.load_maps_of(scene, &ids);
-        rs.objects.clear();
-        rs.order.clear();
-        rs.casting = None;
+        rs.release(&mut self.retained.objects);
         ExtractStats {
             extracted: self.derive_objects(scene, rs, &ids),
             posed: 0,
@@ -120,13 +118,17 @@ impl Renderer {
         }
     }
 
-    /// Re-derive the objects of `ids` (an id without a mesh drops its object); how
-    /// many were derived.
+    /// Re-derive the objects of `ids`, each keeping its slot (an id without a mesh
+    /// drops its object and frees its slot); how many were derived.
     fn derive_objects(&mut self, scene: &Scene, rs: &mut RenderScene, ids: &[u32]) -> u32 {
         let mut derived = 0;
         for &id in ids {
-            let object = self.extract_object(scene, id);
-            derived += u32::from(object.is_some());
+            let slot = rs.objects.get(&id).map(|o| o.slot);
+            let object = self.extract_object(scene, id, slot);
+            match (&object, slot) {
+                (None, Some(slot)) => self.retained.objects.release(slot),
+                _ => derived += u32::from(object.is_some()),
+            }
             rs.set(id, object);
         }
         derived

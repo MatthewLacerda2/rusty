@@ -27,7 +27,7 @@ fn an_outlined_item_names_its_own_instance_and_slot() {
             .find(|b| b.instances.contains(&outline.instance))
             .unwrap();
         assert_eq!(
-            draws.instances[outline.instance as usize].model_matrix[12],
+            super::tests::tag_of(&draws.instances[outline.instance as usize]),
             tag
         );
         assert_eq!(outline.uniform_slot, batch.uniform_slot);

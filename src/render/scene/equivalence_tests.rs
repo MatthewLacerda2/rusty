@@ -1,16 +1,15 @@
-//! src/render/scene/equivalence_tests.rs — the retained objects after any edit
-//! sequence equal a build from scratch (#1706), as `ecs/changes/derived_tests.rs`
-//! proves the change log's consumers: the ECS write paths of `ops_tests`, then the
-//! inputs the log does not cover (the material library, overrides, lightmaps,
-//! probes, a capture, a re-uploaded shared mesh), and what the shadow sweeps read
-//! (`shadow_ops`): each frame the static bakes' key equals a from-scratch digest. One
-//! renderer for every case.
+//! src/render/scene/equivalence_tests.rs — after any edit sequence the retained
+//! objects and their object-table records equal a build from scratch (#1706): the
+//! ECS write paths of `ops_tests`, the inputs the log does not cover (library,
+//! overrides, lightmaps, probes, a capture, a re-uploaded shared mesh) and the
+//! shadow ops (`shadow_ops`; the bakes' key equals a fresh digest). The table leaks
+//! no slot and the GPU mirrors it (`table_holds`). One renderer for every case.
 
 use glam::Vec3;
 use proptest::prelude::*;
 use proptest::test_runner::{Config, TestRunner};
 
-use super::fixture::{fresh, held, yard, RES};
+use super::fixture::{fresh, held, table_holds, yard, RES};
 use super::shadow_ops::{self, s_op, S};
 use crate::components::mesh::MeshRevision;
 use crate::components::{LightComponent, MaterialComponent};
@@ -126,6 +125,8 @@ fn holds(r: &mut Renderer, ops: &[R]) -> Result<(), TestCaseError> {
             r.extract_scene(&scene);
             let kept = held(r, &scene);
             prop_assert_eq!(kept, fresh(r, &scene), "after {:?}", ops);
+            let table = table_holds(r);
+            prop_assert!(table.is_ok(), "{:?} after {:?}", table, ops);
             let shadows = shadow_ops::kept_equals_fresh(r, &scene);
             prop_assert!(shadows.is_ok(), "{:?} after {:?}", shadows, ops);
         }

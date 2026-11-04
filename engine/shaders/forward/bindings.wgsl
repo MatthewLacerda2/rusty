@@ -81,15 +81,14 @@ struct MaterialData {
     mapping_pad: u32,
 };
 
-// One instance of an instanced draw (#470), indexed by `instance_index`. Mirrors
-// `InstanceData` (src/render/gpu/uniforms/mod.rs) byte-for-byte. Only per-copy data lives
-// here — the world matrix and the light-probe SH (#240: when `use_sh == 1` the ambient
-// term is reconstructed from `sh`, xyz = RGB radiance). Material flags stay in the
-// draw's `MaterialData`, so texture sampling never depends on an instance value.
-struct InstanceData {
+// One object a kept scene draws (#1706), at its slot of `objects`: what the object
+// holds, written when it changes, never per camera. Mirrors `ObjectData`
+// (src/render/gpu/uniforms/instance.rs) byte-for-byte. Slot 0 is the identity, which
+// overlays name. `use_sh == 1` reconstructs the ambient term from `sh` (#240, xyz =
+// RGB radiance). Material flags stay in the draw's `MaterialData`, so texture
+// sampling never depends on an object value.
+struct ObjectData {
     model_matrix: mat4x4<f32>,
-    // Last frame's world matrix, read only when `motion == 1` (#1435).
-    prev_model_matrix: mat4x4<f32>,
     use_sh: u32,
     // Baked lightmap (#438): atlas page + 1 (0 for none), and the scale/offset from
     // the mesh's lightmap UV into that page.
@@ -97,21 +96,28 @@ struct InstanceData {
     // 1 when the lightmap's direction page is bound (#810): normal maps reshape
     // the baked light, and its `Baked` lamps add one specular lobe (#1695).
     lightmap_directional: u32,
+    object_pad: u32,
+    lightmap_st: vec4<f32>,
+    sh: array<vec4<f32>, 9>,
+};
+
+// One instance of an instanced draw (#470), indexed by `instance_index`: what one
+// camera decides for one drawn object this frame. Mirrors `InstanceData`
+// (src/render/gpu/uniforms/instance.rs) byte-for-byte.
+struct InstanceData {
+    // The object's slot in `objects`.
+    object: u32,
     // The resident reflection probes this instance blends (#1584): two indices plus
     // one and their weights, packed by `pack_blend`; 0 for the sky alone. Picked per
     // object at its world-bounds centre (#1206).
     reflection_probe: u32,
-    lightmap_st: vec4<f32>,
-    // Motion vectors (#1435): where last frame's joint palette starts in `bones`, and
-    // 1 when `prev_model_matrix` and it hold last frame's pose. 0 (no history: a first
-    // draw, a camera cut, a mesh particle) moves the vertex with the camera only.
-    prev_bone_base: u32,
-    motion: u32,
     // The Light Probe Proxy Volume it reads its probe light from (#1672): where the
     // volume starts in `proxy_volumes`, plus one; 0 for none.
     proxy_volume: u32,
-    motion_pad_b: u32,
-    sh: array<vec4<f32>, 9>,
+    // Motion vectors (#1435): where last frame's world matrix sits in `bones`, its
+    // last-frame palette (a skinned draw's) right after it; 0 (no history: a first
+    // draw, a camera cut, a mesh particle) moves the vertex with the camera only.
+    motion: u32,
 };
 
 @group(0) @binding(0)
@@ -180,8 +186,20 @@ var<uniform> draw: DrawUniforms;
 @group(1) @binding(1)
 var<storage, read> bones: array<mat4x4<f32>>;
 
+// The camera's instances, packed in draw order; the vertex stage alone reads them
+// and hands the fragment stage what it needs (`VertexOutput::instance`).
 @group(1) @binding(2)
 var<storage, read> instances: array<InstanceData>;
+
+// Every kept object's record (#1706), by slot, persistent across frames and cameras;
+// an instance names its own (`InstanceData::object`).
+@group(1) @binding(6)
+var<storage, read> objects: array<ObjectData>;
+
+// The object instance `instance` draws.
+fn object_of(instance: u32) -> u32 {
+    return instances[instance].object;
+}
 
 // The frame's Light Probe Proxy Volumes (#1672), back to back; an instance reads
 // its own from `proxy_volume` (layout: `forward/proxy_volume.wgsl`).
@@ -210,7 +228,7 @@ fn vertex_to_world(model: VertexInput, instance: u32) -> mat4x4<f32> {
         bones[joints.x], bones[joints.y], bones[joints.z], bones[joints.w],
         model.joint_weights,
     );
-    return draw.model_matrix * instances[instance].model_matrix * bone_transform;
+    return draw.model_matrix * objects[object_of(instance)].model_matrix * bone_transform;
 }
 
 // `normal` (object space) to world space under `to_world` (#1596): by the
@@ -241,17 +259,21 @@ fn tangent_to_world(to_world: mat4x4<f32>, tangent: vec3<f32>, normal: vec3<f32>
 
 // Where `model`'s vertex was in world space last frame (#1435): last frame's palette
 // under last frame's world matrix, or this frame's placement when the instance has no
-// history, so it moves with the camera alone.
+// history, so it moves with the camera alone. Last frame's world matrix is
+// `bones[motion]`; a skinned draw (`bone_base` past the identity) finds last frame's
+// palette right after it.
 fn vertex_to_world_prev(model: VertexInput, instance: u32) -> mat4x4<f32> {
-    if (instances[instance].motion == 0u) {
+    let motion = instances[instance].motion;
+    if (motion == 0u) {
         return vertex_to_world(model, instance);
     }
-    let joints = model.joint_indices + vec4<u32>(instances[instance].prev_bone_base);
+    let prev_base = select(0u, motion + 1u, draw.bone_base != 0u);
+    let joints = model.joint_indices + vec4<u32>(prev_base);
     let bone_transform = blend_joints(
         bones[joints.x], bones[joints.y], bones[joints.z], bones[joints.w],
         model.joint_weights,
     );
-    return draw.model_matrix * instances[instance].prev_model_matrix * bone_transform;
+    return draw.model_matrix * bones[motion] * bone_transform;
 }
 
 // The material maps, each with its own sampler (#1323): wrap and filter are the

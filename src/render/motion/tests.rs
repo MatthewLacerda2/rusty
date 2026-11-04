@@ -74,34 +74,35 @@ fn track_gives_an_instance_its_last_pose_and_palette() {
     let (mut joints, mut first) = (Vec::new(), InstanceData::IDENTITY);
     let rig = [at(1.0), at(2.0)];
     h.begin(k, &one(Mat4::IDENTITY));
-    track(&mut h, 3, (at(5.0), &rig), 1, &mut joints, &mut first);
+    track(&mut h, 3, (at(5.0), &rig), &mut joints, &mut first);
     assert_eq!(first.motion, 0, "a first draw moves with the camera only");
+    assert!(joints.is_empty(), "and appends nothing");
     h.end();
 
     h.begin(k, &one(Mat4::IDENTITY));
     let (mut joints, mut second) = (vec![[0.0; 16]; 2], InstanceData::IDENTITY);
-    track(&mut h, 3, (at(6.0), &rig), 1, &mut joints, &mut second);
-    assert_eq!(second.motion, 1);
-    assert_eq!(second.prev_model_matrix, at(5.0).to_cols_array());
+    track(&mut h, 3, (at(6.0), &rig), &mut joints, &mut second);
     assert_eq!(
-        second.prev_bone_base, 3,
-        "last palette appended after this one"
+        second.motion, 3,
+        "after this frame's palette and the identity"
     );
-    assert_eq!(joints[2], at(1.0).to_cols_array());
+    assert_eq!(joints[2], at(5.0).to_cols_array(), "last frame's matrix");
+    assert_eq!(joints[3..], [at(1.0), at(2.0)].map(|m| m.to_cols_array()));
     h.end();
 
     // The skin changed size: this frame's palette under last frame's matrix.
     h.begin(k, &one(Mat4::IDENTITY));
-    let mut third = InstanceData::IDENTITY;
-    track(
-        &mut h,
-        3,
-        (at(7.0), &rig[..1]),
-        9,
-        &mut Vec::new(),
-        &mut third,
-    );
-    assert_eq!((third.motion, third.prev_bone_base), (1, 9));
+    let (mut joints, mut third) = (Vec::new(), InstanceData::IDENTITY);
+    track(&mut h, 3, (at(7.0), &rig[..1]), &mut joints, &mut third);
+    assert_eq!(third.motion, 1);
+    assert_eq!(joints, [at(6.0), at(1.0)].map(|m| m.to_cols_array()));
+    h.end();
+
+    // No skin: the matrix alone.
+    h.begin(k, &one(Mat4::IDENTITY));
+    let mut joints = Vec::new();
+    track(&mut h, 3, (at(8.0), &[]), &mut joints, &mut third);
+    assert_eq!(joints, [at(7.0).to_cols_array()]);
 }
 
 #[test]
@@ -138,6 +139,6 @@ fn velocity_is_written_only_where_motion_blur_runs() {
 }
 
 #[test]
-fn an_instance_carries_its_last_pose_in_80_bytes() {
-    assert_eq!(std::mem::size_of::<InstanceData>(), 240 + 80);
+fn an_instance_is_16_bytes_its_history_in_the_joints() {
+    assert_eq!(std::mem::size_of::<InstanceData>(), 16);
 }

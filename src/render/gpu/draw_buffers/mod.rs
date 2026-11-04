@@ -1,8 +1,8 @@
-//! src/render/gpu/draw_buffers.rs — the forward pass's per-frame instancing buffers
-//! (#470), and the resources every group-1 bind group is built from.
+//! src/render/gpu/draw_buffers/ — the forward pass's instancing buffers (#470), and
+//! the resources every group-1 bind group is built from.
 //!
 //! This replaces the per-entity pool of #210 (one uniform buffer, bone buffer and two
-//! bind groups kept alive per entity). A camera's solids are now five packed arrays —
+//! bind groups kept alive per entity). A camera's solids are five packed arrays —
 //! per-draw uniforms at a 256-byte stride, joint matrices, instances, the material
 //! records the uniforms index (#1616) and the Light Probe Proxy Volumes the instances
 //! index (#1672) — written with a `write_buffer` each, behind
@@ -13,14 +13,29 @@
 //! entity, so two scenes rendered in one frame (#355) cannot evict each other: each
 //! render simply rewrites the arrays before its own submit.
 //!
+//! **The object array** (#1706) is the one that is not packed per camera: every kept
+//! object's [`ObjectData`] (world matrix, probe SH, lightmap) at its slot of the
+//! renderer's `scene::ObjectTable`, written where it changed (`objects.rs`). A
+//! camera's instance is 16 bytes naming its object's slot, so the per-camera upload
+//! no longer grows with what the objects hold.
+//!
 //! The joint matrices are one storage array (#455), not a fixed 64-matrix uniform: a
 //! skinned draw's palette is its run of the array, as long as its skin, and the draw's
 //! uniform carries where that run starts (`bone_base`). Element 0 is one identity
-//! matrix, which every non-skinned draw and overlay points at.
+//! matrix, which every non-skinned draw and overlay points at. A view writing motion
+//! vectors appends each instance's last-frame world matrix and palette there too
+//! (`motion::track`).
 
 use wgpu::util::DeviceExt;
 
+mod objects;
+mod pack;
+
+pub(crate) use pack::{joint_array_bytes, push_palette, uniform_array_bytes, JointMatrix};
+
 use super::grow_buffer::GrowBuffer;
+use super::uniforms::ObjectData;
+use crate::render::scene::ObjectTable;
 use crate::render::{DrawUniform, InstanceData, MaterialData};
 
 /// Byte distance between per-draw uniforms: wgpu's default
@@ -32,20 +47,19 @@ const _: () = assert!(std::mem::size_of::<DrawUniform>() <= UNIFORM_STRIDE);
 /// the array overlays bind.
 const IDENTITY_JOINT: [f32; 16] = glam::Mat4::IDENTITY.to_cols_array();
 
-/// One joint matrix, as the storage array packs it.
-pub(crate) type JointMatrix = [f32; 16];
-
 /// One camera's draw data: `uniforms` in slot order, the skinned draws' `joints`
 /// back to back (a draw whose `bone_base` is `n` starts at `joints[n - 1]`; element 0
 /// of the uploaded array is the identity), the packed `instances`, and the
-/// `materials` the uniforms index, and the `proxies` the instances index
-/// (`draw::proxy_volume`).
+/// `materials` the uniforms index, the `proxies` the instances index
+/// (`draw::proxy_volume`), and the object table the instances name, whose changed
+/// slots and transient ones are written with them.
 pub(crate) struct FrameUpload<'a> {
     pub uniforms: &'a [DrawUniform],
     pub joints: &'a [JointMatrix],
     pub instances: &'a [InstanceData],
     pub materials: &'a [MaterialData],
     pub proxies: &'a [[f32; 4]],
+    pub objects: &'a mut ObjectTable,
 }
 
 pub(crate) struct DrawBuffers {
@@ -54,6 +68,8 @@ pub(crate) struct DrawBuffers {
     instances: GrowBuffer,
     materials: GrowBuffer,
     proxies: GrowBuffer,
+    /// Every kept object's record, by slot (`objects.rs`).
+    objects: GrowBuffer,
     /// The material bytes last written, so an unchanged array is not rewritten.
     last_materials: Vec<u8>,
     bind_group: wgpu::BindGroup,
@@ -71,6 +87,8 @@ impl DrawBuffers {
         let instances = GrowBuffer::new(device, "Frame Instances", U::STORAGE);
         let materials = GrowBuffer::new(device, "Frame Materials", U::STORAGE);
         let proxies = GrowBuffer::new(device, "Frame Proxy Volumes", U::STORAGE);
+        // Copyable, so a test can read back that it mirrors the table.
+        let objects = GrowBuffer::new(device, "Object Records", U::STORAGE | U::COPY_SRC);
         let init = |label, contents: &[u8], usage| {
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(label),
@@ -98,6 +116,7 @@ impl DrawBuffers {
                 instances.buffer(),
                 materials.buffer(),
                 proxies.buffer(),
+                objects.buffer(),
             ],
         );
         Self {
@@ -106,6 +125,7 @@ impl DrawBuffers {
             instances,
             materials,
             proxies,
+            objects,
             last_materials: Vec::new(),
             bind_group,
             default_bones,
@@ -113,8 +133,8 @@ impl DrawBuffers {
         }
     }
 
-    /// Write one camera's draw data. Rebuilds the bind group only when a buffer had
-    /// to grow.
+    /// Write one camera's draw data, and the object slots that changed since the
+    /// last upload. Rebuilds the bind group only when a buffer had to grow.
     pub(crate) fn upload(
         &mut self,
         device: &wgpu::Device,
@@ -128,6 +148,7 @@ impl DrawBuffers {
             instances,
             materials,
             proxies,
+            objects,
         } = frame;
         let uniform_bytes = uniform_array_bytes(uniforms);
         let bone_bytes = joint_array_bytes(joints);
@@ -147,21 +168,28 @@ impl DrawBuffers {
             materials_grew,
             self.proxies
                 .upload(device, queue, bytemuck::cast_slice(proxies)),
+            self.sync_objects(device, queue, objects),
         ];
         if grew.contains(&true) {
-            self.bind_group = group1(
-                device,
-                layout,
-                "Frame Draw Bind Group",
-                [
-                    self.uniforms.buffer(),
-                    self.bones.buffer(),
-                    self.instances.buffer(),
-                    self.materials.buffer(),
-                    self.proxies.buffer(),
-                ],
-            );
+            self.rebind(device, layout);
         }
+    }
+
+    /// Rebuild the bind group over the buffers as they are now (one grew).
+    fn rebind(&mut self, device: &wgpu::Device, layout: &wgpu::BindGroupLayout) {
+        self.bind_group = group1(
+            device,
+            layout,
+            "Frame Draw Bind Group",
+            [
+                self.uniforms.buffer(),
+                self.bones.buffer(),
+                self.instances.buffer(),
+                self.materials.buffer(),
+                self.proxies.buffer(),
+                self.objects.buffer(),
+            ],
+        );
     }
 
     /// The one group-1 bind group every solid draw binds, at [`Self::offsets`].
@@ -187,16 +215,21 @@ impl DrawBuffers {
     pub(crate) fn proxies(&self) -> &wgpu::Buffer {
         self.proxies.buffer()
     }
+
+    /// The object array, which overlays bind for its identity at slot 0.
+    pub(crate) fn objects(&self) -> &wgpu::Buffer {
+        self.objects.buffer()
+    }
 }
 
-/// A group-1 bind group over `[uniform, bones, instances, materials, proxies]`. The uniform
-/// binds one element's width, so a dynamic offset can slide across the packed array;
-/// the joint, instance, material and proxy arrays bind whole, and the shader indexes them.
+/// A group-1 bind group over `[uniform, bones, instances, materials, proxies,
+/// objects]`. The uniform binds one element's width, so a dynamic offset can slide
+/// across the packed array; the other arrays bind whole, and the shader indexes them.
 pub(crate) fn group1(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     label: &str,
-    [uniform, bones, instances, materials, proxies]: [&wgpu::Buffer; 5],
+    [uniform, bones, instances, materials, proxies, objects]: [&wgpu::Buffer; 6],
 ) -> wgpu::BindGroup {
     let sized = |buffer, size: usize| {
         wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -229,63 +262,10 @@ pub(crate) fn group1(
                 binding: 5,
                 resource: proxies.as_entire_binding(),
             },
+            wgpu::BindGroupEntry {
+                binding: 6,
+                resource: objects.as_entire_binding(),
+            },
         ],
     })
-}
-
-/// `uniforms` at [`UNIFORM_STRIDE`], the layout a dynamic offset of
-/// [`DrawBuffers::offsets`] slides across; editor overlays (#1616) and the shadow
-/// casters' draws pack theirs through this too.
-pub(crate) fn uniform_array_bytes(uniforms: &[DrawUniform]) -> Vec<u8> {
-    let mut bytes = vec![0u8; uniforms.len() * UNIFORM_STRIDE];
-    for (chunk, u) in bytes.chunks_mut(UNIFORM_STRIDE).zip(uniforms) {
-        chunk[..std::mem::size_of::<DrawUniform>()].copy_from_slice(bytemuck::bytes_of(u));
-    }
-    bytes
-}
-
-/// The joint storage array as uploaded: the shared identity at element 0, then
-/// `joints` — the layout every `bone_base` from [`push_palette`] indexes. The shadow
-/// pass (#599) uploads its casters' palettes through this too.
-pub(crate) fn joint_array_bytes(joints: &[JointMatrix]) -> Vec<u8> {
-    let mut bytes = bytemuck::bytes_of(&IDENTITY_JOINT).to_vec();
-    bytes.extend_from_slice(bytemuck::cast_slice(joints));
-    bytes
-}
-
-/// Append a draw's joint `palette` to the frame's `joints` and return its `bone_base`
-/// — every joint kept, however many (#455). An empty palette (a non-skinned mesh)
-/// appends nothing and returns `0`, the shared identity.
-pub(crate) fn push_palette(joints: &mut Vec<JointMatrix>, palette: &[glam::Mat4]) -> u32 {
-    if palette.is_empty() {
-        return 0;
-    }
-    // Element 0 of the uploaded array is the identity, so this run starts one later.
-    let base = joints.len() as u32 + 1;
-    joints.extend(palette.iter().map(glam::Mat4::to_cols_array));
-    base
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use glam::{Mat4, Vec3};
-
-    #[test]
-    fn every_joint_of_a_large_skin_is_kept_past_64() {
-        let rig: Vec<Mat4> = (0..100)
-            .map(|j| Mat4::from_translation(Vec3::X * j as f32))
-            .collect();
-        let mut joints = Vec::new();
-        assert_eq!(push_palette(&mut joints, &[]), 0, "non-skinned: identity");
-        assert!(joints.is_empty(), "non-skinned draws allocate no palette");
-        assert_eq!(push_palette(&mut joints, &rig), 1);
-        assert_eq!(
-            push_palette(&mut joints, &rig[..3]),
-            101,
-            "packed back to back"
-        );
-        assert_eq!(joints.len(), 103);
-        assert_eq!(joints[99][12], 99.0, "joint 99 is posed, not identity");
-    }
 }

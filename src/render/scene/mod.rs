@@ -53,12 +53,14 @@ mod inputs;
 mod object;
 #[cfg(test)]
 mod shadow_ops;
+mod table;
 
 use std::collections::BTreeMap;
 
 pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
 pub(crate) use object::{RenderObject, SlotDraw};
+pub(crate) use table::ObjectTable;
 
 use crate::render::passes::shadows::{casting_key, StaticsKey, UnbakedCasters};
 use crate::render::{GpuMesh, Renderer};
@@ -73,6 +75,8 @@ const MAX_SCENES: usize = 4;
 #[derive(Default)]
 pub(crate) struct Retained {
     pub meshes: MeshHandles,
+    /// Every kept scene's objects' records, by slot (`table.rs`), mirrored on the GPU.
+    pub objects: ObjectTable,
     /// Bumped by [`Self::touch`] whenever a renderer-side input every object's keys
     /// read changes (a material group dropped, a surface shader re-built): each scene
     /// re-derives all its objects on its next frame. Render textures have their own
@@ -101,12 +105,21 @@ impl Retained {
         }
     }
 
-    /// Keep `scene` as `id`'s, the most recently drawn.
+    /// Keep `scene` as `id`'s, the most recently drawn; a scene evicted past
+    /// [`MAX_SCENES`] gives its slots back.
     fn put(&mut self, id: SceneId, scene: RenderScene) {
         self.scenes.push((id, scene));
         if self.scenes.len() > MAX_SCENES {
-            self.scenes.remove(0);
+            let (_, mut evicted) = self.scenes.remove(0);
+            evicted.release(&mut self.objects);
         }
+    }
+
+    /// Objects kept across every scene: with the identity, the object table's live
+    /// slots.
+    #[cfg(test)]
+    pub(crate) fn kept_objects(&self) -> usize {
+        self.scenes.iter().map(|(_, s)| s.objects.len()).sum()
     }
 
     /// Scene `id`'s objects, if kept.
@@ -150,6 +163,16 @@ impl RenderScene {
             self.order.insert(object.seq, id);
             self.objects.insert(id, object);
         }
+    }
+
+    /// Drop every object, giving its slot back to `table`.
+    pub(super) fn release(&mut self, table: &mut ObjectTable) {
+        for object in self.objects.values() {
+            table.release(object.slot);
+        }
+        self.objects.clear();
+        self.order.clear();
+        self.casting = None;
     }
 
     /// A static object came or went: the digest is refolded.

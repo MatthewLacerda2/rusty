@@ -36,7 +36,10 @@ fn assert_outlines_forward(
         ids.len(),
         "one outline per ringed solid"
     );
-    let world_of = |i: u32| Mat4::from_cols_array(&draws.instances[i as usize].model_matrix);
+    let world_of = |i: u32| {
+        let object = r.retained.objects.get(draws.instances[i as usize].object);
+        Mat4::from_cols_array(&object.model_matrix)
+    };
     ids.iter()
         .map(|&id| {
             let world = scene.world.local_to_world(id);

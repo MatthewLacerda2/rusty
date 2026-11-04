@@ -93,6 +93,7 @@ impl Renderer {
                 self.draw_buffers.identity_instance(),
                 &records,
                 self.draw_buffers.proxies(),
+                self.draw_buffers.objects(),
             ],
         );
         Some(OverlayBindings { group })

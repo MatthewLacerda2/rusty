@@ -10,7 +10,7 @@
 //! - **On the `Scene`, outside the log**, by revision (`scene::revision`): one
 //!   compare on a frame nothing wrote them. The probe field (`entity_probe_sh`) by
 //!   [`crate::scene::ProbeVolume::revision`]; the material library
-//!   (`material_entry_at`, `entity_params`) and the lightmap set (`solid_instance`)
+//!   (`material_entry_at`, `entity_params`) and the lightmap set (`solid_object`)
 //!   by their `Revisioned` revisions, kept with a copy compared only when a revision
 //!   moved, so a write of the same value (a script setting a colour each frame)
 //!   re-derives nothing. The shader overrides are compared whole (a handful of

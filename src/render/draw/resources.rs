@@ -155,8 +155,10 @@ impl Renderer {
                 instances: &draws.instances,
                 materials: &materials,
                 proxies,
+                objects: &mut self.retained.objects,
             },
         );
+        self.retained.objects.end_camera();
         draws
     }
 }
