@@ -148,34 +148,39 @@ impl NavigationGraph {
         (min.x <= max.x).then_some((min, max))
     }
 
-    /// The floor plan reflection-probe placement finds rooms in (#1584): one cell per
-    /// grid cell, its lowest walkable span's floor and the underside above it, `None`
-    /// where no one stands. Handed to `scene::lighting::placement` as data, as
-    /// [`Self::walkable_aabb`] is (#721). The spans stop `agent_radius` short of the
-    /// walls, which the plan's `inset` carries. `None` when the graph is unbaked.
-    pub fn floor_grid(&self, agent_radius: f32) -> Option<FloorGrid> {
+    /// The floor plan probe placement works on (#1584): one cell per grid cell, its
+    /// lowest walkable span's floor and the underside above it, `None` where no one
+    /// stands, and every span above that lowest one as an upper floor. With
+    /// `reachable` ([`Self::reachable_spans`], #1737) only the spans it marks count,
+    /// so a wall top or a roof no actor reaches is no floor. Handed to
+    /// `scene::lighting::placement` as data, as [`Self::walkable_aabb`] is (#721).
+    /// The spans stop `agent_radius` short of the walls, which the plan's `inset`
+    /// carries. `None` when the graph is unbaked.
+    pub fn floor_grid(&self, agent_radius: f32, reachable: Option<&[bool]>) -> Option<FloorGrid> {
         let baked =
             self.width > 1 && self.height > 1 && self.max_x > self.min_x && self.max_z > self.min_z;
         if !baked {
             return None;
         }
-        let cells = (0..self.height)
-            .flat_map(|gz| (0..self.width).map(move |gx| (gx, gz)))
-            .map(|(gx, gz)| {
-                let lowest = self.span_range(gx, gz).next()?;
-                let span = &self.spans[lowest];
-                Some(FloorCell {
-                    floor: span.y,
-                    ceiling: span.ceiling,
-                })
-            })
-            .collect();
+        let counts = |i: &usize| reachable.is_none_or(|r| r.get(*i).copied().unwrap_or(false));
+        let mut cells = Vec::with_capacity((self.width * self.height) as usize);
+        let mut upper = Vec::new();
+        for (gx, gz) in (0..self.height).flat_map(|gz| (0..self.width).map(move |gx| (gx, gz))) {
+            let mut floors = self.span_range(gx, gz).filter(counts);
+            cells.push(floors.next().map(|lowest| FloorCell {
+                floor: self.spans[lowest].y,
+                ceiling: self.spans[lowest].ceiling,
+            }));
+            let cell = cells.len() - 1;
+            upper.extend(floors.map(|i| (cell, self.spans[i].y)));
+        }
         Some(FloorGrid {
             origin: Vec2::new(self.min_x, self.min_z),
             cell: self.grid_spacing,
             width: self.width as usize,
             depth: self.height as usize,
             cells,
+            upper,
             inset: agent_radius.max(0.0),
         })
     }

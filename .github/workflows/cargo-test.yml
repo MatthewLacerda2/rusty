@@ -20,7 +20,7 @@ name: cargo-test
 # 60 days without repository activity; check the Actions tab if a week passes
 # with no run.
 on:
-  # Nightly, 04:17 UTC: off the hour, clear of `ci.yml`'s nightly `deny` (03:07)
+  # Nightly, 04:17 UTC: off the hour, clear of `ci.yml`'s nightly run (03:07)
   # and of `mutants-sweep.yml` (Saturdays 04:41) and `coverage.yml` (Mondays 05:23).
   # Two lines so the `dead-pub` job's `if:` can tell Sunday's run from the rest.
   schedule:
