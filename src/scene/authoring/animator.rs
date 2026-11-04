@@ -2,7 +2,8 @@
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `AnimatorComponent` field by field: the `current_clip` name, the playback
-//! `speed`, and the `is_playing` / `freeze` / `loop_clip` flags.
+//! `speed`, the `is_playing` / `freeze` / `loop_clip` flags, and root motion's
+//! `apply_root_motion` / `root_bone` (#1745).
 //!
 //! The editor's Animator card routes every field write through these (#287). The Lua
 //! `Animator.*` surface is mostly *operations* over the component's own state machine
@@ -67,6 +68,18 @@ pub fn set_graph_enabled(a: &mut AnimatorComponent, enabled: bool) {
     a.graph_enabled = enabled;
 }
 
+/// Turn *Apply Root Motion* on or off (#1745): on, the root bone's horizontal
+/// travel and yaw move the entity instead of the pose.
+pub fn set_apply_root_motion(a: &mut AnimatorComponent, apply: bool) {
+    a.apply_root_motion = apply;
+}
+
+/// Name the bone root motion is read from (#1745); empty is the skeleton's first
+/// root joint. A name the skeleton lacks measures nothing.
+pub fn set_root_bone(a: &mut AnimatorComponent, bone: String) {
+    a.root_bone = bone;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,6 +106,8 @@ mod tests {
         set_looping(&mut e, true);
         set_graph(&mut e, Some("guard.animgraph".to_string()));
         set_graph_enabled(&mut e, false);
+        set_apply_root_motion(&mut e, true);
+        set_root_bone(&mut e, "Hips".to_string());
         let a = &*e;
         assert_eq!(a.base.current_clip, "Run");
         assert_eq!(a.speed, 2.0);
@@ -101,6 +116,8 @@ mod tests {
         assert!(a.base.loop_clip);
         assert_eq!(a.graph.as_deref(), Some("guard.animgraph"));
         assert!(!a.graph_enabled);
+        assert!(a.apply_root_motion);
+        assert_eq!(a.root_bone, "Hips");
     }
 
     #[test]

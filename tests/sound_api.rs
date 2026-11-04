@@ -37,14 +37,11 @@ fn a_baked_one_shot_plays_through_the_audio_namespace() {
     let camera = Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0)));
 
     rusty::api::sound::register(&lua).unwrap();
-    rusty::api::audio::register(
-        &lua,
-        bind(&lua, &scene),
-        bind(&lua, &audio),
-        bind(&lua, &time),
-        bind(&lua, &camera),
-    )
-    .unwrap();
+    bind(&lua, &scene);
+    bind(&lua, &audio);
+    bind(&lua, &time);
+    bind(&lua, &camera);
+    rusty::api::audio::register(&lua, &rusty::api::ApiCtx::default()).unwrap();
     let script = format!(
         r#"
         local clip = Sound.Bake({GUNSHOT}, "C2", "{path}", {{ duration = 0.12, seed = 9 }})

@@ -104,7 +104,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, tick_nav)
         .add_system(Stage::FixedUpdate, step_physics)
         .add_system(Stage::FixedUpdate, super::animation::graph::evaluate_graphs)
-        .add_system(Stage::FixedUpdate, animate)
+        .add_system(Stage::FixedUpdate, super::systems::animate::animate)
         .add_system(Stage::FixedUpdate, pose_ragdolls)
         .add_system(Stage::FixedUpdate, dispatch_animation_events)
         .add_system(
@@ -228,41 +228,6 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
     let mut s = world.scene.borrow_mut();
     let nav = res.nav.borrow();
     nav.tick_nav_agents(&mut s, res.frame_dt);
-}
-
-/// Advance every active entity's animator and write the sampled pose onto its
-/// bone GameObjects (#80, #453). Blend-tree nodes and extra layers (#457) resolve
-/// against the animator's graph asset, from the cache the evaluator just filled.
-/// The sampler is a pure function of (skin, clips, graph, parameters, time), so
-/// stepping at the fixed dt is deterministic. Writers after this one (`LateUpdate`
-/// scripts, physics) may override a bone before the palette build.
-fn animate(world: &mut World, res: &mut Resources) {
-    let dt = res.frame_dt;
-    let mut s = world.scene.borrow_mut();
-    for id in s.world.ids_with_animator() {
-        if !s.world.is_active_in_hierarchy(id) {
-            continue;
-        }
-        let path = s.world.animator(id).and_then(|a| a.graph.clone());
-        let graph = path.and_then(|p| res.animation_graphs.get_or_load(&p, &res.console));
-        // The animator + mesh split borrow goes through the facade's sanctioned
-        // helper (#344) — the animate system's re-pose step.
-        let stepped = s.world.with_animator_mut_and_mesh(id, |anim, mesh| {
-            let crossed = super::animation::advance(anim, mesh, graph, dt);
-            (
-                crossed,
-                mesh.map(|m| super::animation::bone_writes(anim, m, graph)),
-            )
-        });
-        let (crossed, writes) = stepped.unwrap_or_default();
-        let events = crossed.into_iter().map(|e| (id, e.name));
-        res.animation_events.extend(events);
-        for (bone, local) in writes.unwrap_or_default() {
-            if let Some(mut t) = s.world.transform_mut(bone) {
-                *t = local;
-            }
-        }
-    }
 }
 
 /// `OnAnimationEvent(id, name)` (#459) for every event `animate` queued this

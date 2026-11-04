@@ -20,9 +20,12 @@ fn render_at(
     name: &str,
 ) -> Option<RgbImage> {
     let mut scene = scene;
-    if let Some((file, k)) = dirt {
-        for id in scene.world.ids_with_post_processing() {
-            let mut vc = scene.world.post_processing_mut(id).unwrap();
+    for id in scene.world.ids_with_post_processing() {
+        let mut vc = scene.world.post_processing_mut(id).unwrap();
+        // The tightest glow (#1700): at the default scatter the chain's glow fills
+        // a view this small, and these tests read where the dirt is lit.
+        vc.bloom.scatter = 0.0;
+        if let Some((file, k)) = dirt {
             vc.bloom.dirt_texture = Some(file.to_string_lossy().into_owned());
             vc.bloom.dirt_intensity = k;
         }
@@ -132,8 +135,12 @@ fn lens_dirt_is_cropped_to_cover_a_wider_view() {
         "wide_banded",
     )
     .unwrap();
+    // Rows 7..11 read black dirt when cropped, white when stretched. Only that band
+    // is read: the chain's faint tail (#1700) reaches the screen's top and bottom
+    // rows, where the dirt is white either way.
+    let banded_band = gain(&clean, &got, (24, 7), 4);
     assert!(
-        got == clean,
-        "the dirt's cropped rows showed: it was stretched"
+        banded_band < band / 10.0,
+        "the dirt's cropped rows showed: it was stretched ({banded_band:.2} vs {band:.2})"
     );
 }

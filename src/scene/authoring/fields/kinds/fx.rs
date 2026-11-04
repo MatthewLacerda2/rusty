@@ -44,6 +44,8 @@ inspect! {
         op!("graph_enabled", animator::set_graph_enabled),
         ro!("layers", "Animator.SetLayerWeight writes a layer's weight"),
         ro!("ik", "Animator.AddTwoBoneIK / AddAimIK / SetIKWeight write them"),
+        op!("apply_root_motion", animator::set_apply_root_motion),
+        op!("root_bone", animator::set_root_bone),
     ];
     ParticleEmitterComponent => particles, particles_mut, &[
         op!("active", fx::set_active),
@@ -91,6 +93,7 @@ inspect! {
         op!("final_distance", audio::set_final_distance),
         op!("output_group", audio::set_output_group),
         op!("occlusion_enabled", audio::set_occlusion_enabled),
+        op!("doppler_level", audio::set_doppler_level),
     ];
     ReverbZoneComponent => reverb_zone, reverb_zone_mut, &[
         op!("min_distance", reverb::set_min_distance),

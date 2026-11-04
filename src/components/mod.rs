@@ -26,8 +26,9 @@ pub mod transform;
 pub mod ui;
 
 pub use animator::{
-    AnimatorComponent, AnimatorParameter, AnimatorParameters, Bounds, IkChain, IkConstraint,
-    IkTarget, LayerState, Motion, Playback, Playhead, Step,
+    root_chain, AnimatorComponent, AnimatorParameter, AnimatorParameters, Bounds, IkChain,
+    IkConstraint, IkTarget, LayerState, Motion, Playback, Playhead, RootMotion, RootMotionState,
+    Step,
 };
 pub use audio::reverb_zone::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 pub use audio::source::AudioSourceComponent;
@@ -62,7 +63,10 @@ pub use physics::rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use rendering::camera::{
     is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX,
 };
-pub use rendering::light::{LightComponent, LightMode, LightType};
+pub use rendering::light::{
+    falloff, falloff_near, falloff_window, falloff_window_sq, spot_cone, LightComponent, LightMode,
+    LightType, FALLOFF_EPSILON_SQ,
+};
 pub use rendering::light_probe_proxy_volume::{
     LightProbeProxyVolumeComponent, ProxyBoundsMode, ProxyGrid, ProxyQuality, ProxyResolutionMode,
 };

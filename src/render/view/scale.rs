@@ -92,7 +92,7 @@ impl Renderer {
         let io = pfx.io_bind_group(
             &self.device,
             scaled,
-            &pfx.bloom.b.view,
+            pfx.bloom_view(),
             ctx.depth_view,
             ctx.skybox,
         );

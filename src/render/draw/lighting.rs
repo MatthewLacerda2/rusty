@@ -127,11 +127,20 @@ impl crate::render::Renderer {
     /// when a panorama is loaded (#718), else the shader reflects the procedural sky the
     /// sky pass draws. A light-probe capture reflects nothing (#1668): Unity's
     /// light-probe bake leaves specular out, so neither the sky nor a reflection probe
-    /// reaches a probe through a glossy static surface.
+    /// reaches a probe through a glossy static surface. No bake capture normalises a
+    /// probe's reflection by its stored irradiance (#1697): a reflection capture's
+    /// glossy static surfaces reflect the resident probes at their baked strength,
+    /// so what a capture sees never depends on another probe's half-finished or
+    /// stale normalisation, nor on the order probes bake in.
     fn build_lighting_uniform(&self, scene: &Scene) -> LightingUniform {
         let mut lighting_uniform = default_lighting_uniform(scene);
         apply_scene_lights(&mut lighting_uniform, scene, self.capture.static_only);
         lighting_uniform.refl_probes = *self.reflection_probes.uniforms();
+        if self.capture.static_only {
+            for probe in &mut lighting_uniform.refl_probes {
+                probe.params[3] = 0.0;
+            }
+        }
         if self.skybox_texture.is_some() {
             lighting_uniform.sky_textured = 1.0;
         }

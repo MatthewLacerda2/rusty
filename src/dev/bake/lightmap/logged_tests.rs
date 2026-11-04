@@ -4,10 +4,11 @@
 use std::cell::{Cell, RefCell};
 use std::time::Duration;
 
-use super::logged::bake_logged;
+use super::logged::{bake_logged, watch};
 use super::tests::{quick, scene};
 use super::*;
 use crate::dev::bake::progress::Line;
+use crate::scene::lighting::lightmap::BakeProgress;
 
 #[test]
 fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
@@ -34,4 +35,25 @@ fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
     let last = &lines.last().expect("a line").text;
     let encoded = format!("[Lighting] lightmap pages 100% ({pages}/{pages} pages encoded)");
     assert_eq!(last, &encoded);
+}
+
+/// A trace done before the first poll (#1808): the worker reaches and finishes its
+/// pages at once, yet the log still says the lightmap step started, first.
+#[test]
+fn a_bake_that_reaches_its_pages_at_once_still_says_the_lightmaps_first() {
+    let lines: RefCell<Vec<Line>> = RefCell::default();
+    let mut log = BakeLog::new(|| Duration::ZERO, |l| lines.borrow_mut().push(l));
+    let instant = |progress: &BakeProgress| {
+        progress.start_pages(1);
+        progress.page_done();
+        Ok(())
+    };
+    watch(&BakeProgress::default(), &mut log, instant).unwrap();
+    drop(log);
+    let lines = lines.into_inner();
+    // No timing: whatever a poll saw in between, the first and last lines hold.
+    assert_eq!(lines[0].text, "[Lighting] lightmaps preparing");
+    assert!(lines[0].milestone, "the step's start stays in the console");
+    let last = &lines.last().expect("a line").text;
+    assert_eq!(last, "[Lighting] lightmap pages 100% (1/1 pages encoded)");
 }

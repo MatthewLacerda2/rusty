@@ -1,9 +1,9 @@
 //! src/audio/mix.rs — the per-frame mix: what each live voice sounds like now (#412).
 //!
 //! `spatial::resolve` computes a source's `(gain, pan)`; this module turns that plus
-//! `Time.timeScale` / `Time.Pause` into the [`VoiceMix`] the backend applies, and
-//! [`AudioMaestro::apply_mix`] re-resolves every live voice once a frame against the
-//! current listener. [`resolve_voice`] is the **one** call behind both the applied
+//! `Time.timeScale` / `Time.Pause` and the doppler rate (`doppler.rs`, #1749) into the
+//! [`VoiceMix`] the backend applies; [`AudioMaestro::apply_mix`] re-resolves every
+//! live voice once a frame against the current listener. [`resolve_voice`] is the **one** call behind both the applied
 //! mix and `Audio.GetSpatial` (`AudioMaestro::voice_info`), so the headless
 //! read-back and the device cannot drift apart.
 //!
@@ -13,13 +13,13 @@
 //!
 //! One-shots (`Audio.PlayAt`) are diegetic: fully spatial (`spatial_blend = 1`) and
 //! time-scaled, with the `AudioSource` default rolloff band unless the caller passes
-//! a [`Rolloff`] (#575 — a gunshot that must carry past 16 m).
-//!
-//! Pure and clock-free — the caller supplies the listener and the time state.
+//! a [`Rolloff`] (#575 — a gunshot that must carry past 16 m). Clock-free: the
+//! caller supplies the listener and the time state.
 
 use glam::{Quat, Vec3};
 
 use super::backend::VoiceMix;
+use super::doppler;
 use super::introspection::{SpatialResult, VoiceInfo};
 use super::maestro::AudioMaestro;
 use super::occlusion;
@@ -34,6 +34,9 @@ pub struct MixEnv {
     pub time_scale: f32,
     /// The loop-level `Time.Pause` flag.
     pub paused: bool,
+    /// Scaled sim seconds since the last push: what the doppler velocities are
+    /// measured over (#1749); `0` keeps every rate as it was.
+    pub dt: f32,
 }
 
 impl Default for MixEnv {
@@ -44,6 +47,7 @@ impl Default for MixEnv {
             listener: Listener::from_transform(Vec3::ZERO, Quat::IDENTITY),
             time_scale: 1.0,
             paused: false,
+            dt: 0.0,
         }
     }
 }
@@ -73,6 +77,7 @@ pub fn resolve_voice(
         pan,
         spatial_blend: source.spatial_blend.clamp(0.0, 1.0),
         speed: if scaled { env.time_scale } else { 1.0 },
+        doppler: 1.0,
         paused: scaled && (env.paused || env.time_scale <= 0.0),
         low_pass,
     }
@@ -159,20 +164,18 @@ impl AudioMaestro {
                 self.backend.stop(live.voice);
             }
         }
-        let occlusion = &self.occlusion;
+        let (occlusion, ear) = (&self.occlusion, self.doppler.listen(env));
+        let c = self.doppler.speed_of_sound;
         for (&id, live) in self.entity_voices.iter_mut() {
             if let Some((source, position)) = lookup(id) {
                 live.source = source;
                 live.position = position;
             }
-            let occluded = occlusion.applied(live.voice);
-            let mix = resolve_voice(
-                env,
-                &live.source,
-                live.source_volume,
-                live.position,
-                occluded,
-            );
+            let (at, occluded) = (live.position, occlusion.applied(live.voice));
+            let was = std::mem::replace(&mut live.heard_at, at);
+            let rate = doppler::source_rate(env, ear, (was, at), &live.source, c, live.mix);
+            let mix = resolve_voice(env, &live.source, live.source_volume, at, occluded)
+                .with_doppler(rate);
             if mix != live.mix {
                 live.mix = mix;
                 self.backend
@@ -185,8 +188,10 @@ impl AudioMaestro {
                 backend.stop(voice);
                 return false;
             }
-            let occluded = occlusion.applied(voice);
-            let mix = resolve_voice(env, &shot.source, shot.volume, shot.position, occluded);
+            let (at, occluded) = (shot.position, occlusion.applied(voice));
+            let rate = doppler::source_rate(env, ear, (at, at), &shot.source, c, shot.mix);
+            let mix =
+                resolve_voice(env, &shot.source, shot.volume, at, occluded).with_doppler(rate);
             if mix != shot.mix {
                 shot.mix = mix;
                 backend.set_mix(voice, &mix.for_output(master, mode));
@@ -240,7 +245,8 @@ impl AudioMaestro {
             live.source_volume = volume.max(0.0);
             let occluded = self.occlusion.applied(live.voice);
             let (source, at) = (&live.source, live.position);
-            live.mix = resolve_voice(&self.env, source, live.source_volume, at, occluded);
+            live.mix = resolve_voice(&self.env, source, live.source_volume, at, occluded)
+                .with_doppler(live.mix.doppler);
             self.backend
                 .set_mix(live.voice, &live.mix.for_output(master, mode));
         }

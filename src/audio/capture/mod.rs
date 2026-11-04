@@ -225,3 +225,7 @@ fn discard(mut file: WavStream, path: &Path) {
 #[cfg(test)]
 #[path = "capture_tests.rs"]
 mod capture_tests;
+
+#[cfg(test)]
+#[path = "doppler_tests.rs"]
+mod doppler_tests;
