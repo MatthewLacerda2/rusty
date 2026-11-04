@@ -1,16 +1,16 @@
 //! src/render/scene/equivalence_tests.rs — the retained objects after any edit
 //! sequence equal a build from scratch (#1706), as `ecs/changes/derived_tests.rs`
-//! proves the change log's consumers: the ECS write paths of `ops_tests`, then the
-//! inputs the log does not cover (the material library, overrides, lightmaps and
-//! a bake's light record, which alone sets `in_bake` (#1750), probes, a capture, a
-//! re-uploaded shared mesh), and what the shadow sweeps read (`shadow_ops`): each
-//! frame the static bakes' key equals a from-scratch digest. One renderer for all.
+//! proves the change log's consumers: the ECS write paths of `ops_tests`, the inputs
+//! the log does not cover (the library, overrides, lightmaps and a bake's light
+//! record (#1750), probes, a capture, a re-uploaded shared mesh), the shadow sweeps'
+//! key (`shadow_ops`) and the baked PVS's binding (`occlusion_ops`). One renderer.
 
 use glam::Vec3;
 use proptest::prelude::*;
 use proptest::test_runner::{Config, TestRunner};
 
-use super::fixture::{fresh, held, yard, RES};
+use super::fixture::{fresh, held, RES};
+use super::occlusion_ops::{self, baked_yard};
 use super::shadow_ops::{self, s_op, S};
 use crate::components::mesh::MeshRevision;
 use crate::components::{LightComponent, MaterialComponent};
@@ -100,7 +100,7 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
             }),
         }),
         R::Unmesh(i) => on(scene, pick(scene, i), |s, id| {
-            s.world.set_mesh(id, None);
+            drop(s.world.set_mesh(id, None))
         }),
         R::Reshape(i) => on(scene, pick(scene, i), |s, id| {
             if let Some(mut mesh) = s.world.mesh_mut(id) {
@@ -118,16 +118,16 @@ fn on(scene: &mut Scene, id: Option<u32>, f: impl FnOnce(&mut Scene, u32)) {
 
 /// After every frame of `ops`, the objects `r` holds equal a fresh build.
 fn holds(r: &mut Renderer, ops: &[R]) -> Result<(), TestCaseError> {
-    let mut scene = yard(6);
+    let mut scene = baked_yard(6);
     r.capture.static_only = false;
     r.extract_scene(&scene);
     for op in ops.iter().chain([&R::Frame]) {
         edit(r, &mut scene, op);
         if matches!(op, R::Frame) {
             r.extract_scene(&scene);
-            let kept = held(r, &scene);
-            prop_assert_eq!(kept, fresh(r, &scene), "after {:?}", ops);
-            let shadows = shadow_ops::kept_equals_fresh(r, &scene);
+            prop_assert_eq!(held(r, &scene), fresh(r, &scene), "after {:?}", ops);
+            let shadows = shadow_ops::kept_equals_fresh(r, &scene)
+                .and_then(|()| occlusion_ops::kept_equals_fresh(r, &scene));
             prop_assert!(shadows.is_ok(), "{:?} after {:?}", shadows, ops);
         }
     }

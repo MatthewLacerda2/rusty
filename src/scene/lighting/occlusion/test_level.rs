@@ -13,8 +13,8 @@ pub const DEPTH: f32 = 8.0;
 /// The level's length along X and its height.
 pub const LENGTH: f32 = 20.0;
 pub const HEIGHT: f32 = 3.0;
-const WALL: f32 = 0.2;
-const DOOR: f32 = 1.4;
+pub(super) const WALL: f32 = 0.2;
+pub(super) const DOOR: f32 = 1.4;
 
 /// A static box over `[min, max]`.
 pub fn block(scene: &mut Scene, name: &str, min: Vec3, max: Vec3) -> u32 {

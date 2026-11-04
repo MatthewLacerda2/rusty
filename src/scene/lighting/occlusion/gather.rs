@@ -2,11 +2,12 @@
 //! which static meshes take part, each one's [`fingerprint`], and the occluders'
 //! world-space triangles with the side of each a camera sees.
 
-use std::collections::BTreeSet;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet};
 
 use glam::{Mat4, Vec3};
 
-use crate::components::mesh::{clip_runs, material_runs};
+use crate::components::mesh::{clip_runs, material_runs, MeshRevision};
 use crate::components::{MaterialAsset, MeshComponent, RenderFace, RenderMode};
 use crate::scene::Scene;
 
@@ -30,6 +31,16 @@ impl Face {
         }
     }
 
+    /// The normal of the side a camera sees, given the world winding normal
+    /// `normal`; `None` when both sides draw.
+    pub(super) fn front(self, normal: Vec3) -> Option<Vec3> {
+        match self {
+            Self::Ccw => Some(normal),
+            Self::Cw => Some(-normal),
+            Self::Both => None,
+        }
+    }
+
     /// Whether a ray along `dir` meets the drawn side of a triangle whose world
     /// winding normal is `normal`.
     pub(super) fn stops(self, normal: Vec3, dir: Vec3) -> bool {
@@ -41,34 +52,53 @@ impl Face {
     }
 }
 
-/// One object as the bake sees it: its drawn triangles (where a view must reach),
-/// and its occluding ones with the side each draws (empty for an occludee alone).
+/// One object as the bake sees it: its drawn triangles (where a view must reach)
+/// and its occluding ones (empty for an occludee alone), each with the side it draws.
 pub(super) struct Object {
     pub entity: u32,
     pub fingerprint: u64,
-    pub drawn: Vec<[Vec3; 3]>,
+    pub drawn: Vec<([Vec3; 3], Face)>,
     pub occluding: Vec<([Vec3; 3], Face)>,
 }
 
 /// The scene-wide facts a fingerprint reads, gathered once: the renderers every
-/// `LODGroup` holds (which never occlude: the drawn level moves with the camera).
+/// `LODGroup` holds (which never occlude: the drawn level moves with the camera),
+/// and each geometry's content hash, kept by its revision so a re-check of an
+/// unchanged level hashes no vertex.
+#[derive(Default)]
 pub struct Fingerprints {
     grouped: BTreeSet<u32>,
+    /// Revision → (its positions' and indices' hash, the sweep it was last used in).
+    /// The revision is only the cache's key: the hash is of the vertices themselves,
+    /// so a fingerprint is the same whatever revision a geometry carries.
+    geometry: RefCell<BTreeMap<MeshRevision, (u64, u64)>>,
+    sweep: u64,
 }
 
 impl Fingerprints {
     pub fn of_scene(scene: &Scene) -> Self {
-        let world = &scene.world;
-        let groups = world.ids_with_lod_group().into_iter();
-        let grouped = groups
-            .filter_map(|id| {
-                world
-                    .lod_group(id)
-                    .map(|g| g.renderers().collect::<Vec<_>>())
-            })
-            .flatten()
-            .collect();
-        Self { grouped }
+        Self {
+            grouped: grouped(scene),
+            ..Self::default()
+        }
+    }
+
+    /// Re-read the `LODGroup`s: whether which renderers they hold changed, which
+    /// changes those renderers' fingerprints.
+    pub fn regroup(&mut self, scene: &Scene) -> bool {
+        let now = grouped(scene);
+        let changed = now != self.grouped;
+        self.grouped = now;
+        changed
+    }
+
+    /// Start a sweep over every baked object: geometry hashes no object of the
+    /// last sweep read are dropped at the next one, so the cache never outgrows
+    /// the geometries in use.
+    pub fn sweep(&mut self) {
+        let last = self.sweep;
+        self.geometry.get_mut().retain(|_, (_, used)| *used == last);
+        self.sweep += 1;
     }
 
     /// Entity `id`'s fingerprint and whether it occludes, `None` when it takes no
@@ -81,9 +111,8 @@ impl Fingerprints {
             && world.is_static(id)
             && !mesh.is_skinned()
             && mesh.active_palette().is_empty()
-            && mesh.cast_shadows.is_visible()
-            && !mesh.indices.is_empty();
-        if !takes_part {
+            && mesh.cast_shadows.is_visible();
+        if !takes_part || drawn_runs(scene, id, &mesh).is_empty() {
             return None;
         }
         let slots = slot_materials(scene, id, &mesh);
@@ -104,6 +133,7 @@ impl Fingerprints {
             u32::from(occluder),
         ];
         counts.iter().for_each(|c| bytes.extend(c.to_le_bytes()));
+        bytes.extend(self.geometry(&mesh).to_le_bytes());
         for range in &mesh.ranges {
             bytes.extend(range.start.to_le_bytes());
             bytes.extend(range.end.to_le_bytes());
@@ -127,19 +157,22 @@ impl Fingerprints {
         let world = scene.world.local_to_world(id);
         let corner =
             |i: u32| world.transform_point3(Vec3::from(mesh.vertices[i as usize].position));
-        let ranges = clip_runs(mesh.index_ranges(), mesh.indices.len() as u32);
         let count = scene.world.material(id).map(|m| m.materials.len());
         let (mut drawn, mut occluding) = (Vec::new(), Vec::new());
-        for (slot, range) in material_runs(ranges, count) {
+        for (slot, range) in drawn_runs(scene, id, &mesh) {
             let material = count.and_then(|_| scene.material_entry_at(id, slot).map(|(_, m)| m));
             let face = Face::of(world, material.map_or(RenderFace::Front, |m| m.render_face));
             for tri in mesh.indices[range.start as usize..range.end as usize].chunks_exact(3) {
                 let tri = [corner(tri[0]), corner(tri[1]), corner(tri[2])];
-                drawn.push(tri);
+                drawn.push((tri, face));
                 if occluder && occludes(material) {
                     occluding.push((tri, face));
                 }
             }
+        }
+        // A run shorter than a triangle draws nothing: such an object takes no part.
+        if drawn.is_empty() {
+            return None;
         }
         Some(Object {
             entity: id,
@@ -148,6 +181,49 @@ impl Fingerprints {
             occluding,
         })
     }
+}
+
+impl Fingerprints {
+    /// `mesh`'s positions and indices as one hash, computed once per revision.
+    fn geometry(&self, mesh: &MeshComponent) -> u64 {
+        let mut cache = self.geometry.borrow_mut();
+        let entry = cache.entry(mesh.revision).or_insert_with(|| {
+            let mut bytes = Vec::with_capacity(mesh.vertices.len() * 12 + mesh.indices.len() * 4);
+            for v in &mesh.vertices {
+                v.position
+                    .iter()
+                    .for_each(|f| bytes.extend(f.to_bits().to_le_bytes()));
+            }
+            mesh.indices
+                .iter()
+                .for_each(|i| bytes.extend(i.to_le_bytes()));
+            (crate::core::hash::content(&bytes), self.sweep)
+        });
+        entry.1 = self.sweep;
+        entry.0
+    }
+}
+
+/// The renderers every `LODGroup` of `scene` holds.
+fn grouped(scene: &Scene) -> BTreeSet<u32> {
+    let world = &scene.world;
+    let groups = world.ids_with_lod_group().into_iter();
+    let renderers = groups.filter_map(|id| {
+        world
+            .lod_group(id)
+            .map(|g| g.renderers().collect::<Vec<_>>())
+    });
+    renderers.flatten().collect()
+}
+
+/// Entity `id`'s index runs by material slot, each holding at least one whole
+/// triangle: empty when it draws nothing (no index, or an empty material list).
+fn drawn_runs(scene: &Scene, id: u32, mesh: &MeshComponent) -> Vec<(usize, std::ops::Range<u32>)> {
+    let ranges = clip_runs(mesh.index_ranges(), mesh.indices.len() as u32);
+    let count = scene.world.material(id).map(|m| m.materials.len());
+    let mut runs = material_runs(ranges, count);
+    runs.retain(|(_, r)| r.len() >= 3);
+    runs
 }
 
 /// Entity `id`'s fingerprint, gathering the scene-wide facts for it alone: what
@@ -170,9 +246,8 @@ fn slot_materials<'a>(
     id: u32,
     mesh: &MeshComponent,
 ) -> Vec<(String, Option<&'a MaterialAsset>)> {
-    let ranges = clip_runs(mesh.index_ranges(), mesh.indices.len() as u32);
     let count = scene.world.material(id).map(|m| m.materials.len());
-    let slots = material_runs(ranges, count)
+    let slots = drawn_runs(scene, id, mesh)
         .into_iter()
         .map(|(slot, _)| slot);
     let entry = |slot| count.and_then(|_| scene.material_entry_at(id, slot));

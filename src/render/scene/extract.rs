@@ -53,7 +53,7 @@ impl Renderer {
         inputs.uploads_seen = self.retained.meshes.uploads();
         inputs.render_textures_seen = self.retained.render_textures;
         if inputs.regroup {
-            rs.regroup(UnbakedCasters::of(scene));
+            rs.regroup(scene, UnbakedCasters::of(scene));
         }
         rs.refold_casting();
         rs.occlusion.refresh(scene);
@@ -115,7 +115,7 @@ impl Renderer {
                 self.pose_object(scene, id, object);
                 moved += 1;
                 if object.is_static {
-                    rs.occlusion.forget();
+                    rs.occlusion.touch(id);
                 }
             }
         }

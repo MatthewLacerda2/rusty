@@ -1,7 +1,9 @@
 //! The occlusion bake (#1714): which baked objects each cell may see, by rays from
 //! seeded points in the cell to seeded points on each object's triangles, through
 //! the lightmap bake's BVH (`lightmap::Rays`), then dilated over each cell's
-//! neighbours and folded into shared rows.
+//! neighbours and folded into shared rows. Gathered on the caller's thread
+//! ([`gather_occlusion`]) and baked on any ([`OcclusionInput::bake`]), so the editor
+//! bakes on a worker and a script in line, the same bytes either way.
 //!
 //! A pure function of the scene and [`OCCLUSION_SEED`]: each cell draws from its own
 //! stream and is baked alone, so the result is the same at any worker count.
@@ -13,6 +15,8 @@ use std::sync::Mutex;
 use glam::Vec3;
 
 use super::gather::{Face, Fingerprints, Object};
+use super::progress::OcclusionProgress;
+use super::targets::{target_points, Target};
 use super::{BakedObject, Grid, OcclusionData};
 use crate::scene::lighting::lightmap::{Rays, Rng, Tri};
 use crate::scene::Scene;
@@ -23,19 +27,20 @@ pub const OCCLUSION_SEED: u64 = 0x5056_5321;
 
 /// Points sampled in each cell (its centre first, the rest seeded in the box).
 const CELL_POINTS: usize = 6;
-/// Points sampled on each object's triangles, area-weighted, beside its extremes.
-const OBJECT_POINTS: usize = 8;
 /// How far short of a target point a ray stops, so the triangle it lies on (or
 /// one touching it) does not hide it.
 const REACH_SLACK: f32 = 1e-3;
 
-/// What one occlusion bake found.
+/// What one occlusion bake found. All zero when it baked nothing.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OcclusionBakeReport {
     /// Static meshes baked as occludees.
     pub objects: usize,
     /// Of them, the ones that occlude.
     pub occluders: usize,
+    /// Of them, the ones too large to sample (`targets::MAX_TARGETS`), kept in
+    /// sight of every cell.
+    pub never_culled: usize,
     pub cells: usize,
     /// Distinct visible sets the cells share.
     pub rows: usize,
@@ -43,42 +48,70 @@ pub struct OcclusionBakeReport {
     pub bytes: usize,
 }
 
-/// Bake `scene`'s PVS on `threads` workers. `None` when there is nothing to cull:
-/// no static mesh, or none that occludes.
+/// The static scene as the bake reads it, owned, so a worker thread can bake it
+/// while the scene goes on ([`gather_occlusion`]).
+pub struct OcclusionInput {
+    objects: Vec<Object>,
+}
+
+/// What `scene`'s occlusion bake reads, gathered on the caller's thread.
+pub fn gather_occlusion(scene: &Scene) -> OcclusionInput {
+    let prints = Fingerprints::of_scene(scene);
+    let mut ids = scene.world.ids_with_mesh();
+    ids.sort_unstable();
+    let objects = ids.iter().filter_map(|&id| prints.object(scene, id));
+    OcclusionInput {
+        objects: objects.collect(),
+    }
+}
+
+/// Bake `scene`'s PVS on `threads` workers, in line. `None` when there is nothing
+/// to cull: no static mesh, or none that occludes.
 pub fn bake_occlusion(
     scene: &Scene,
     threads: usize,
 ) -> (Option<OcclusionData>, OcclusionBakeReport) {
-    let prints = Fingerprints::of_scene(scene);
-    let mut ids = scene.world.ids_with_mesh();
-    ids.sort_unstable();
-    let objects: Vec<Object> = ids
-        .iter()
-        .filter_map(|&id| prints.object(scene, id))
-        .collect();
-    let occluders = objects.iter().filter(|o| !o.occluding.is_empty()).count();
-    let mut report = OcclusionBakeReport {
-        objects: objects.len(),
-        occluders,
-        ..Default::default()
-    };
-    if occluders == 0 {
-        return (None, report);
+    let input = gather_occlusion(scene);
+    input
+        .bake(threads, &OcclusionProgress::default())
+        .expect("nobody cancels it")
+}
+
+impl OcclusionInput {
+    /// Bake the PVS on `threads` workers, counting into `progress`; `None` when it
+    /// was cancelled, else the data (`None` when nothing occludes) and the report.
+    pub fn bake(
+        &self,
+        threads: usize,
+        progress: &OcclusionProgress,
+    ) -> Option<(Option<OcclusionData>, OcclusionBakeReport)> {
+        let objects = &self.objects;
+        let occluders = objects.iter().filter(|o| !o.occluding.is_empty()).count();
+        if occluders == 0 {
+            return Some((None, OcclusionBakeReport::default()));
+        }
+        let scene = Baking::of(objects);
+        let grid = Grid::over(scene.bounds.0, scene.bounds.1);
+        progress.start(grid.cell_count());
+        let seen = scene.cells(&grid, threads.max(1), progress)?;
+        let (rows, cells) = fold_rows(&grid, &seen, objects.len().div_ceil(64));
+        let baked = objects.iter().map(|o| BakedObject {
+            entity: o.entity,
+            fingerprint: o.fingerprint,
+            occluder: !o.occluding.is_empty(),
+        });
+        let data = OcclusionData::new(grid, baked.collect(), rows, cells);
+        let data = data.expect("rows fit the grid");
+        let report = OcclusionBakeReport {
+            objects: objects.len(),
+            occluders,
+            never_culled: scene.targets.iter().filter(|t| t.2.is_none()).count(),
+            cells: grid.cell_count(),
+            rows: data.row_count(),
+            bytes: super::encode(&data).len(),
+        };
+        Some((Some(data), report))
     }
-    let scene = Baking::of(&objects);
-    let grid = Grid::over(scene.bounds.0, scene.bounds.1);
-    let seen = scene.cells(&grid, threads.max(1));
-    let (rows, cells) = fold_rows(&grid, &seen, objects.len().div_ceil(64));
-    let baked = objects.iter().map(|o| BakedObject {
-        entity: o.entity,
-        fingerprint: o.fingerprint,
-        occluder: !o.occluding.is_empty(),
-    });
-    let data = OcclusionData::new(grid, baked.collect(), rows, cells).expect("rows fit the grid");
-    report.cells = grid.cell_count();
-    report.rows = data.row_count();
-    report.bytes = super::encode(&data).len();
-    (Some(data), report)
 }
 
 /// The scene ready to sample: the occluders' BVH and each triangle's drawn side,
@@ -86,7 +119,9 @@ pub fn bake_occlusion(
 struct Baking {
     rays: Rays,
     faces: Vec<Face>,
-    targets: Vec<(Vec3, Vec3, Vec<Vec3>)>,
+    /// Per object its bounds and target points, `None` when it is too large to
+    /// sample and stays in sight.
+    targets: Vec<(Vec3, Vec3, Option<Vec<Target>>)>,
     bounds: (Vec3, Vec3),
 }
 
@@ -100,13 +135,13 @@ impl Baking {
                 tris.push(Tri::new(a, b, c, i as u32, 0));
                 faces.push(face);
             }
-            let corners = object.drawn.iter().flatten();
+            let corners = object.drawn.iter().flat_map(|(t, _)| t);
             let min = corners
                 .clone()
                 .fold(Vec3::splat(f32::MAX), |m, &p| m.min(p));
             let max = corners.fold(Vec3::splat(f32::MIN), |m, &p| m.max(p));
             bounds = (bounds.0.min(min), bounds.1.max(max));
-            targets.push((min, max, target_points(&object.drawn, i as u64)));
+            targets.push((min, max, target_points(&object.drawn)));
         }
         Self {
             rays: Rays::build(tris),
@@ -116,8 +151,14 @@ impl Baking {
         }
     }
 
-    /// Each cell's own visible bits, `words` per cell, baked on `threads` workers.
-    fn cells(&self, grid: &Grid, threads: usize) -> Vec<Vec<u64>> {
+    /// Each cell's own visible bits, `words` per cell, baked on `threads` workers;
+    /// `None` when `progress` was cancelled.
+    fn cells(
+        &self,
+        grid: &Grid,
+        threads: usize,
+        progress: &OcclusionProgress,
+    ) -> Option<Vec<Vec<u64>>> {
         let count = grid.cell_count();
         let next = AtomicUsize::new(0);
         let out = Mutex::new(vec![Vec::new(); count]);
@@ -125,15 +166,17 @@ impl Baking {
             for _ in 0..threads.min(count) {
                 s.spawn(|| loop {
                     let cell = next.fetch_add(1, Ordering::Relaxed);
-                    if cell >= count {
+                    if cell >= count || progress.is_cancelled() {
                         break;
                     }
                     let bits = self.cell(grid, cell);
                     out.lock().unwrap_or_else(|e| e.into_inner())[cell] = bits;
+                    progress.cell_done();
                 });
             }
         });
-        out.into_inner().unwrap_or_else(|e| e.into_inner())
+        let out = out.into_inner().unwrap_or_else(|e| e.into_inner());
+        (!progress.is_cancelled()).then_some(out)
     }
 
     /// What cell `index` sees on its own: an object whose bounds reach the cell or
@@ -159,7 +202,13 @@ impl Baking {
         let mut bits = vec![0u64; self.targets.len().div_ceil(64)];
         for (i, (omin, omax, targets)) in self.targets.iter().enumerate() {
             let overlaps = omin.cmple(near.1).all() && omax.cmpge(near.0).all();
-            if overlaps || self.reaches(&points, targets, i as u32) {
+            // A target whose drawn side faces away from the whole cell is seen
+            // from no point in it.
+            let reached = |t: &Vec<Target>| {
+                let facing = t.iter().filter(|t| t.faces((min, max))).map(|t| t.at);
+                self.reaches(&points, facing, i as u32)
+            };
+            if overlaps || targets.as_ref().is_none_or(reached) {
                 bits[i / 64] |= 1 << (i % 64);
             }
         }
@@ -190,8 +239,8 @@ impl Baking {
 
     /// Whether a ray from any of `from` reaches any of `targets` (on object
     /// `object`) with no other object's occluder turned toward it in between.
-    fn reaches(&self, from: &[Vec3], targets: &[Vec3], object: u32) -> bool {
-        targets.iter().any(|&to| {
+    fn reaches(&self, from: &[Vec3], mut targets: impl Iterator<Item = Vec3>, object: u32) -> bool {
+        targets.any(|to| {
             from.iter().any(|&origin| {
                 let delta = to - origin;
                 let reach = delta.length();
@@ -209,43 +258,6 @@ impl Baking {
             })
         })
     }
-}
-
-/// Where views to an object are aimed: its extremes along the eight box diagonals
-/// (a corner peeking past a door frame), then [`OBJECT_POINTS`] seeded points on
-/// its triangles, area-weighted, each nudged a hair toward its triangle's centre.
-fn target_points(tris: &[[Vec3; 3]], object: u64) -> Vec<Vec3> {
-    let inward = |p: Vec3, t: &[Vec3; 3]| p.lerp((t[0] + t[1] + t[2]) / 3.0, 0.01);
-    let mut points = Vec::with_capacity(8 + OBJECT_POINTS);
-    for k in 0..8 {
-        let axis = |bit: i32| if k & bit == 0 { -1.0 } else { 1.0 };
-        let diagonal = Vec3::new(axis(1), axis(2), axis(4));
-        let best = tris.iter().flat_map(|t| t.iter().map(move |&p| (p, t)));
-        let best = best.max_by(|a, b| a.0.dot(diagonal).total_cmp(&b.0.dot(diagonal)));
-        if let Some((p, t)) = best {
-            points.push(inward(p, t));
-        }
-    }
-    let areas: Vec<f32> = tris
-        .iter()
-        .map(|t| (t[1] - t[0]).cross(t[2] - t[0]).length())
-        .collect();
-    let total: f32 = areas.iter().sum();
-    let mut rng = Rng::new(OCCLUSION_SEED, object, 0);
-    for _ in 0..OBJECT_POINTS {
-        let mut pick = rng.next_f32() * total;
-        let at = areas.iter().position(|&a| {
-            pick -= a;
-            pick <= 0.0
-        });
-        let t = &tris[at.unwrap_or(tris.len() - 1)];
-        let (mut u, mut v) = (rng.next_f32(), rng.next_f32());
-        if u + v > 1.0 {
-            (u, v) = (1.0 - u, 1.0 - v);
-        }
-        points.push(inward(t[0] + (t[1] - t[0]) * u + (t[2] - t[0]) * v, t));
-    }
-    points
 }
 
 /// Each cell's set widened by its neighbours' (the dilation), then the distinct

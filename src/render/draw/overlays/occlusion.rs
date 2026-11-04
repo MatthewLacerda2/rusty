@@ -2,7 +2,8 @@
 //! with a camera selected, the Scene view outlines the baked PVS cell that camera
 //! stands in (yellow) and every static mesh the PVS hides from it (red), over
 //! whatever the editor's own camera shows. Nothing is drawn with no usable bake, a
-//! camera with `use_occlusion_culling` off, or one outside every cell.
+//! camera with `use_occlusion_culling` off, one that culls nothing by occlusion
+//! (orthographic, or a far near plane), or one outside every cell.
 
 use glam::Vec3;
 use wgpu::util::DeviceExt;
@@ -60,11 +61,12 @@ impl Renderer {
     }
 }
 
-/// The selected entity's camera, when it uses occlusion culling: where it stands
-/// and the layers it draws.
+/// The selected entity's camera, when it culls by occlusion as the renderer's
+/// `occlusion_eye` decides: where it stands and the layers it draws.
 fn selected_camera(scene: &Scene) -> Option<(Vec3, u32)> {
     let id = scene.selected_entity_id?;
     let cam = scene.world.camera(id)?;
     let eye = scene.world.local_to_world(id).w_axis.truncate();
-    cam.use_occlusion_culling.then_some((eye, cam.culling_mask))
+    let culls = crate::scene::lighting::occlusion::culls_from(cam.projection, cam.near);
+    (cam.use_occlusion_culling && culls).then_some((eye, cam.culling_mask))
 }

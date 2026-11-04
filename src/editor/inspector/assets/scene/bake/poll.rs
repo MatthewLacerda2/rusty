@@ -1,14 +1,16 @@
 //! Generate Lighting's per-frame drive (#808, #1602): the lightmaps' worker polled
-//! and its lightmaps applied, then the probe step taken one step a frame, committed
-//! and the lighting written. A bake dropped midway says what reached the scene: the
-//! lightmaps once they landed, the probes never. Any probe-stage failure leaves the
-//! applied lightmaps unwritten, so it marks the scene unsaved.
+//! and its lightmaps applied, then the probe step taken one step a frame and
+//! committed, then the occlusion culling's worker polled (#1714) and the lighting
+//! written. A bake dropped midway says what reached the scene: the lightmaps once
+//! they landed, the probes once committed, the PVS never. Any failure after the
+//! lightmaps leaves the applied lighting unwritten, so it marks the scene unsaved.
 
 use std::time::Duration;
 
 use super::Step;
 use crate::dev::bake::generate_lighting::{finish, start_probes};
 use crate::dev::bake::lightmap::BakeOutcome;
+use crate::dev::bake::occlusion::OcclusionBakeJob;
 use crate::dev::bake::steps::PROBES_CHANGED;
 use crate::editor::EditorUi;
 use crate::navigation::NavigationGraph;
@@ -83,8 +85,10 @@ fn advance(
     log: &mut ConsoleLogs,
     nav: &NavigationGraph,
 ) -> Option<bool> {
-    let Step::Lightmaps(job) = step else {
-        return advance_probes(step, scene, log);
+    let job = match step {
+        Step::Lightmaps(job) => job,
+        Step::Probes { .. } => return advance_probes(step, scene, log),
+        Step::Occlusion { .. } => return advance_occlusion(step, scene, log),
     };
     if !job.is_finished() {
         return None;
@@ -126,7 +130,7 @@ fn land_lightmaps(
     }
 }
 
-/// One probe step; at the end, commit the probes and write the lighting.
+/// One probe step; at the end, commit the probes and start the occlusion bake.
 fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> Option<bool> {
     let Step::Probes {
         job,
@@ -143,10 +147,15 @@ fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> 
     });
     match stepped {
         Ok(false) => None,
-        Ok(true) => match finish(scene, path, *lightmaps, job.report()) {
-            Ok(report) => {
-                log.info(report.summary());
-                Some(report.saved == LightingSave::NeedsSceneSave)
+        Ok(true) => match OcclusionBakeJob::start(scene) {
+            Ok(occlusion) => {
+                *step = Step::Occlusion {
+                    job: occlusion,
+                    lightmaps: *lightmaps,
+                    probes: job.report(),
+                    path: std::mem::take(path),
+                };
+                None
             }
             Err(e) => fail(log, e, true),
         },
@@ -154,6 +163,30 @@ fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> 
             log.warn(dropped(step, "the probes changed during the bake"));
             // The lightmaps were applied but never written.
             Some(true)
+        }
+        Err(e) => fail(log, e, true),
+    }
+}
+
+/// Once the occlusion worker finished, apply its PVS and write the lighting.
+fn advance_occlusion(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> Option<bool> {
+    let Step::Occlusion {
+        job,
+        lightmaps,
+        probes,
+        path,
+    } = step
+    else {
+        return None;
+    };
+    let baked = match job.poll()? {
+        Ok(baked) => baked,
+        Err(e) => return fail(log, e, true), // the lighting applied, never written
+    };
+    match scene.unrecorded(|scene| finish(scene, path, *lightmaps, *probes, baked)) {
+        Ok(report) => {
+            log.info(report.summary());
+            Some(report.saved == LightingSave::NeedsSceneSave)
         }
         Err(e) => fail(log, e, true),
     }
@@ -172,6 +205,9 @@ fn dropped(step: &Step, why: &str) -> String {
         Step::Lightmaps(_) => format!("Generate Lighting dropped: {why}; nothing was applied"),
         Step::Probes { .. } => format!(
             "Generate Lighting dropped: {why}; the lightmaps were applied, the probes kept their old lighting"
+        ),
+        Step::Occlusion { .. } => format!(
+            "Generate Lighting dropped: {why}; the lightmaps and probes were applied, the occlusion culling kept its old bake"
         ),
     }
 }

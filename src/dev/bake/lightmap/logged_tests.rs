@@ -4,7 +4,7 @@
 use std::cell::{Cell, RefCell};
 use std::time::Duration;
 
-use super::logged::{bake_logged, watch};
+use super::logged::{bake_logged, read, watch};
 use super::tests::{quick, scene};
 use super::*;
 use crate::dev::bake::progress::Line;
@@ -48,7 +48,7 @@ fn a_bake_that_reaches_its_pages_at_once_still_says_the_lightmaps_first() {
         progress.page_done();
         Ok(())
     };
-    watch(&BakeProgress::default(), &mut log, instant).unwrap();
+    watch(&BakeProgress::default(), read, &mut log, instant).unwrap();
     drop(log);
     let lines = lines.into_inner();
     // No timing: whatever a poll saw in between, the first and last lines hold.

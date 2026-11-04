@@ -11,6 +11,7 @@
 //! step then runs one step a frame (#1602, Unity's `BakeAsync`): the probes capture
 //! through the GPU, so they stay on the UI thread, but no frame waits on more than a
 //! reflection probe or a few light probes, and the editor and the MCP keep answering.
+//! Last, the occlusion culling's PVS bakes on a worker (#1714), its cells on the bar.
 //! The card shows the stage (the light probes' bounce, or the reflection probes) on
 //! a line above the bar and `i / n` in it; the console says each pass and probe. Then [`poll`]
 //! commits the probes and writes the lighting. A bake cancelled during the lightmaps
@@ -26,7 +27,9 @@ use std::path::Path;
 
 use egui_phosphor::regular as icon;
 
+use crate::dev::bake::lighting::LightingBakeReport;
 use crate::dev::bake::lightmap::LightmapBakeJob;
+use crate::dev::bake::occlusion::OcclusionBakeJob;
 use crate::dev::bake::steps::{LightingBake, Stage};
 use crate::editor::EditorUi;
 use crate::scene::lighting::lightmap::BakeSettings;
@@ -49,7 +52,7 @@ pub struct ActiveBake {
     path: Option<String>,
 }
 
-/// Which half of Generate Lighting is running.
+/// Which part of Generate Lighting is running.
 enum Step {
     /// The lightmaps, on their worker.
     Lightmaps(LightmapBakeJob),
@@ -59,6 +62,13 @@ enum Step {
         lightmaps: usize,
         path: String,
     },
+    /// The occlusion culling's PVS, on its worker, once the probes committed.
+    Occlusion {
+        job: OcclusionBakeJob,
+        lightmaps: usize,
+        probes: LightingBakeReport,
+        path: String,
+    },
 }
 
 impl ActiveBake {
@@ -66,7 +76,7 @@ impl ActiveBake {
     pub fn scene_path(&self) -> &str {
         match &self.step {
             Step::Lightmaps(job) => job.scene_path(),
-            Step::Probes { path, .. } => path,
+            Step::Probes { path, .. } | Step::Occlusion { path, .. } => path,
         }
     }
 }
@@ -231,6 +241,7 @@ fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
     let job = match &active.step {
         Step::Lightmaps(job) => job,
         Step::Probes { job, .. } => return draw_probe_progress(ui, job.stage()),
+        Step::Occlusion { job, .. } => return draw_occlusion_progress(ui, job.cells()),
     };
     let (done, total) = job.progress();
     let text = match (job.is_cancelled(), job.pages(), total) {
@@ -265,6 +276,17 @@ fn draw_probe_progress(ui: &mut egui::Ui, stage: Stage) {
     ui.label(title);
     let bar =
         egui::ProgressBar::new(done as f32 / total.max(1) as f32).text(format!("{done} / {total}"));
+    ui.add_sized([180.0, 20.0], bar);
+}
+
+/// The occlusion step's bar: cells baked of the grid's.
+fn draw_occlusion_progress(ui: &mut egui::Ui, (done, total): (usize, usize)) {
+    ui.label("Occlusion culling");
+    let text = match total {
+        0 => "Preparing…".to_string(),
+        _ => format!("{done} / {total} cells"),
+    };
+    let bar = egui::ProgressBar::new(done as f32 / total.max(1) as f32).text(text);
     ui.add_sized([180.0, 20.0], bar);
 }
 

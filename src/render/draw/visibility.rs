@@ -45,8 +45,11 @@ impl Renderer {
     }
 
     /// Where `cam` reads the baked PVS from (#1714): its own position when it uses
-    /// occlusion culling, nowhere during a capture, which bakes every static mesh.
+    /// occlusion culling as a perspective camera with a near plane close enough
+    /// (`occlusion::culls_from`); nowhere for an orthographic one, one whose near
+    /// plane clips a wall away, or during a capture, which bakes every static mesh.
     pub(crate) fn occlusion_eye(&self, cam: &crate::scene::Camera) -> Option<glam::Vec3> {
-        (cam.use_occlusion_culling && !self.capture.static_only).then_some(cam.position)
+        let culls = crate::scene::lighting::occlusion::culls_from(cam.projection, cam.near);
+        (cam.use_occlusion_culling && culls && !self.capture.static_only).then_some(cam.position)
     }
 }

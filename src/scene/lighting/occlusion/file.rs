@@ -73,9 +73,13 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
     let origin = Vec3::new(r.f32()?, r.f32()?, r.f32()?);
     let cell = r.f32()?;
     let dims = UVec3::new(r.u32()?, r.u32()?, r.u32()?);
-    let cells_in = dims.x as u64 * dims.y as u64 * dims.z as u64;
+    // Checked: a bad file is refused whole, never a panic in a build with overflow
+    // checks.
+    let cells_in = u64::from(dims.x)
+        .checked_mul(u64::from(dims.y))
+        .and_then(|n| n.checked_mul(u64::from(dims.z)));
     let finite = origin.is_finite() && cell.is_finite() && cell > 0.0;
-    if !finite || cells_in > MAX_CELLS as u64 {
+    if !finite || cells_in.is_none_or(|n| n > MAX_CELLS as u64) {
         return Err("grid out of range".into());
     }
     let words = r.u32()? as usize;

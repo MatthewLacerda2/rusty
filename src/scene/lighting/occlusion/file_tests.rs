@@ -41,3 +41,15 @@ fn a_nan_cell_or_a_row_past_the_rows_is_refused() {
     flag[20] = 2; // the first object's occluder flag
     assert!(decode(&flag).is_err());
 }
+
+#[test]
+fn dims_whose_product_overflows_are_refused_not_a_panic() {
+    let mut bytes = bytes();
+    let objects = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
+    let dims_at = 8 + objects * 13 + 16;
+    for k in 0..3 {
+        let at = dims_at + k * 4;
+        bytes[at..at + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+    }
+    assert_eq!(decode(&bytes), Err("grid out of range".into()));
+}

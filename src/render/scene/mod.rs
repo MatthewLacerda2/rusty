@@ -33,8 +33,10 @@
 //! scene equals one built from scratch; a new input gets a case there.
 //!
 //! **Occlusion** (#1714): the scene's baked PVS is bound to the objects
-//! ([`OcclusionBinding`]), re-checked only after a static object changed or the PVS
-//! was replaced; a camera then culls an unchanged static object its cell cannot see.
+//! ([`OcclusionBinding`]): bound whole when the PVS was replaced, the objects rebuilt
+//! or the `LODGroup`s' renderers moved, and otherwise re-checked only for the static
+//! objects re-derived or moved; a camera then culls an unchanged static object its
+//! cell cannot see.
 //!
 //! **Shadows** (part 2): the cascades' and the atlas's sweeps gather their casters
 //! from the objects (`passes::shadows::casters`), each slot carrying its shadow
@@ -57,7 +59,11 @@ mod inputs;
 mod object;
 mod occlusion;
 #[cfg(test)]
+mod occlusion_camera_gpu_tests;
+#[cfg(test)]
 mod occlusion_gpu_tests;
+#[cfg(test)]
+mod occlusion_ops;
 #[cfg(test)]
 mod shadow_ops;
 
@@ -154,25 +160,28 @@ impl RenderScene {
     fn set(&mut self, id: u32, object: Option<RenderObject>) {
         if let Some(old) = self.objects.remove(&id) {
             self.order.remove(&old.seq);
-            self.forget_casting(old.is_static);
+            self.forget_casting(id, old.is_static);
         }
         if let Some(object) = object {
-            self.forget_casting(object.is_static);
+            self.forget_casting(id, object.is_static);
             self.order.insert(object.seq, id);
             self.objects.insert(id, object);
         }
     }
 
-    /// A static object came or went: the digest is refolded, and the PVS re-bound.
-    fn forget_casting(&mut self, is_static: bool) {
+    /// Static object `id` came or went: the digest is refolded, and the PVS
+    /// re-checks it.
+    fn forget_casting(&mut self, id: u32, is_static: bool) {
         if is_static {
             self.casting = None;
-            self.occlusion.forget();
+            self.occlusion.touch(id);
         }
     }
 
-    /// `unbaked` re-read: the digest is refolded when it moved.
-    fn regroup(&mut self, unbaked: UnbakedCasters) {
+    /// A `LODGroup` or a mesh changed: `unbaked` re-read, and the digest refolded
+    /// when it moved; the PVS re-bound if the groups' renderers moved.
+    fn regroup(&mut self, scene: &Scene, unbaked: UnbakedCasters) {
+        self.occlusion.regroup(scene);
         if unbaked != self.unbaked {
             self.unbaked = unbaked;
             self.casting = None;
