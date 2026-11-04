@@ -7,9 +7,9 @@ use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 /// warp, tile, mapping, bump, a distance bevel, a normal blend, the channel ops,
 /// two-image math, auto levels and the #1743 filters (occlusion, edges, highpass,
 /// sharpen, histogram scan, levels), #1739's directional ops (directional blur
-/// and warp, slope blur) and #1740's generators (fibres, a distorted saw wave, a
-/// distorted noise, smooth F1, a star and a polygon with heights), so every
-/// banded path runs.
+/// and warp, slope blur), #1740's generators (fibres, a distorted saw wave, a
+/// distorted noise, smooth F1, a star and a polygon with heights) and the #1741
+/// flood fill and its readers, so every banded path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
   "nodes": [
@@ -60,7 +60,13 @@ const RECIPE: &str = r#"{
     { "id": "gen2", "op": "combine_rgb", "inputs": ["sf", "st", "pg"] },
     { "id": "gens", "op": "mix", "mode": "screen", "inputs": ["gen", "gen2"] },
     { "id": "lt4", "op": "mix", "mode": "overlay", "factor": 0.5, "inputs": ["lt3", "gens"] },
-    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt4", "soft"] }
+    { "id": "ff", "op": "flood_fill", "threshold": 0.55, "inputs": ["chips"] },
+    { "id": "fr", "op": "flood_random", "seed": 3, "inputs": ["ff"] },
+    { "id": "fg", "op": "flood_gradient", "angle": 0.1, "angle_jitter": 0.2, "seed": 1, "inputs": ["ff"] },
+    { "id": "fb", "op": "flood_bbox", "output": "center_x", "inputs": ["ff"] },
+    { "id": "flood", "op": "combine_rgb", "inputs": ["fr", "fg", "fb"] },
+    { "id": "lt5", "op": "mix", "mode": "add", "factor": 0.4, "inputs": ["lt4", "flood"] },
+    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt5", "soft"] }
   ],
   "output": "out"
 }"#;
