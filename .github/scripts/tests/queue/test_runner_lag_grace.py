@@ -52,7 +52,7 @@ class RunnerLagGrace(unittest.TestCase):
         listing = ([FAILED, run("lint")], {1: LAGGING_OUTAGE, 2: built("lint")})
         state, lines, calls = waited([listing])
         self.assertEqual(calls, [["gh", "run", "rerun", "--failed", "1"]])
-        self.assertEqual(state, outcomes.STOP, lines)
+        self.assertEqual(state, outcomes.STALLED, lines)
 
     def test_a_cancelled_run_with_a_job_still_listed_goes_through_agrees(self):
         cancelled = run("ci", conclusion="cancelled")

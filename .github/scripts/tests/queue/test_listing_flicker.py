@@ -17,7 +17,7 @@ from merging.queue import outcomes, polling, pulls, waiting
 from merging.verdict import github
 
 from tests.verdict import fixtures
-from tests.verdict.fixtures import SHA, built, run
+from tests.verdict.fixtures import SHA, built, job, run
 
 PULL = {**fixtures.READY, "files": [{"path": "src/app/mod.rs"}]}
 POLL, DEADLINE = 30.0, 45 * 60.0
@@ -67,11 +67,21 @@ class Flicker(unittest.TestCase):
     def test_a_run_that_never_comes_back_is_handed_back_naming_the_flicker(self):
         state, lines = waited([RUNNING, EMPTY])
         said = " ".join(lines)
-        self.assertEqual(state, outcomes.STOP)
+        self.assertEqual(state, outcomes.STALLED)
+        self.assertIn("Nothing is red", said)
         self.assertIn("dropped out of the runs listing", said)
         self.assertIn("minutes", said)
         self.assertNotIn("empty commit", said)
         self.assertNotIn("no `ci` run exists", said)
+
+    def test_a_deadline_inside_a_reds_grace_does_not_say_nothing_is_red(self):
+        # #1831's review: a red first read 3 minutes before the deadline is
+        # still in its jobs-listing grace, so the stall names it.
+        lagging = [job("changes", "cancelled"), {"name": "build-test", "status": "in_progress", "conclusion": None}]
+        red = ([run("ci", conclusion="failure"), LINT], {1: lagging, 2: built("lint")})
+        state, lines = waited([RUNNING] * int((DEADLINE - 150) / POLL) + [red])
+        self.assertEqual((state, lines[-1]), (outcomes.STALLED, waiting.STALLED_RED))
+        self.assertNotIn("Nothing is red", " ".join(lines))
 
     def test_a_run_never_seen_is_still_absent_once_the_grace_is_spent(self):
         state, lines = waited([EMPTY])

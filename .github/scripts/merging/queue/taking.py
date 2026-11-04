@@ -110,6 +110,8 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         # remembered against nothing, and its next take waits on its own CI.
         # A named take keeps the hand-back: nobody watches a line for it.
         return number, outcomes.REQUEUED, f"{lines[0]} Back in line on its new head."
+    if state == outcomes.STALLED:  # outwaited, nothing red (#1831): the watch asks again
+        return number, outcomes.STALLED, lines[0]
     if state != outcomes.GO:
         return number, outcomes.HANDED_BACK, lines[0]
     if opts.no_merge:
