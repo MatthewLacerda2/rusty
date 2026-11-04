@@ -126,7 +126,7 @@ fn gpu_bake_shows_room_and_mips_blur() {
     );
 }
 
-/// `bake_reflections` writes a KTX2 file next to the scene, points the probe at it, and the
+/// `bake_reflections` writes a KTX2 file into the folder it is given, points the probe at it, and the
 /// file loads back as a mipped cube (the bake -> write -> load round-trip). Skips with no
 /// adapter.
 #[test]
