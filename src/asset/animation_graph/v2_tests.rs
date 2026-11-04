@@ -66,11 +66,11 @@ fn malformed_blend_trees_are_rejected() {
     let mut graph: AnimationGraph = serde_json::from_str(V2).unwrap();
     if let Some(BlendTree::Simple1D { children, .. }) = &mut graph.base.nodes[0].blend_tree {
         children[1].threshold = 0.0;
-        children[0].clip = String::new();
+        children[0].motion.clip = String::new();
     }
     let report = problems(&graph);
     assert!(report.contains("two children at the same position"));
-    assert!(report.contains("a child with an empty clip name"));
+    assert!(report.contains("child 'Loco/children[0]' has neither a clip nor a blend tree"));
 
     graph.base.nodes[0].blend_tree = Some(BlendTree::FreeformCartesian2D {
         parameter_x: "velX".into(),

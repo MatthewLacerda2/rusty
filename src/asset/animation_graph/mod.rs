@@ -1,7 +1,7 @@
 //! src/asset/animation_graph/ — the `AnimationGraph` asset (issue #315).
 //!
 //! The authored animation state machine, as pure data: **nodes** (each plays one
-//! clip or a [`BlendTree`] of clips, #457), directed **edges** (transitions with AND-combined conditions and a linear
+//! clip or a [`BlendTree`] of clips and nested trees, #457, #1746), directed **edges** (transitions with AND-combined conditions and a linear
 //! crossfade duration), the typed **parameter declarations** the conditions read,
 //! and the designated **entry node**. Since #457 the top-level machine is the
 //! *base layer*, and `layers` stacks further machines over it, each with a weight,
@@ -27,7 +27,7 @@ mod layer;
 mod validate;
 mod validate_motion;
 
-pub use blend_tree::{BlendChild1D, BlendChild2D, BlendTree};
+pub use blend_tree::{BlendChild1D, BlendChild2D, BlendTree, ChildMotion, MAX_TREE_DEPTH};
 pub use event::AnimationEvent;
 pub use io::{load, save};
 pub use layer::{GraphLayer, LayerBlending};
@@ -203,6 +203,8 @@ impl AnimationGraph {
 
 #[cfg(test)]
 mod event_tests;
+#[cfg(test)]
+mod nested_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

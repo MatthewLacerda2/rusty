@@ -121,3 +121,5 @@ fn a_partial_preset_loads_over_the_seeded_medium_values() {
     let err = serde_json::from_str::<QualityPresets>(typo).unwrap_err();
     assert!(err.to_string().contains("ssao.hihg"), "{err}");
 }
+
+mod seed_rows;

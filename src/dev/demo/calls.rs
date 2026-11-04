@@ -28,7 +28,7 @@ pub const HARNESS_VERBS: &[&str] = &["AttachPlayerBot", "LoadStress"];
 const WRAP: &str = r#"
 local note, check, harness_verbs = ...
 local skip = { string = true, table = true, coroutine = true, utf8 = true, math = true,
-               Harness = true, _G = true }
+               Harness = true, _G = true, package = true }
 local namespaces = {}
 for name, value in pairs(_G) do
     if type(value) == "table" and not skip[name] then namespaces[#namespaces + 1] = name end

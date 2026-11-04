@@ -12,8 +12,11 @@ from __future__ import annotations
 
 import re
 
-#: Who may brief a coder: people who can push to the repository.
-TRUSTED = {"OWNER", "MEMBER", "COLLABORATOR"}
+import ghrest
+
+#: Who may brief a coder: people who can push to the repository, the one
+#: definition the merge path's review gate reads too (#1764).
+TRUSTED = ghrest.TRUSTED
 
 #: Stage labels: `planning` and `human` mean *not yet* (CLAUDE.md).
 STOPS = {"planning", "human"}
@@ -49,7 +52,7 @@ def read(issue: dict, comments: list[dict]) -> dict:
     brief = newest(comments)
     if brief is None:
         raise Refused(f"#{number} has no comment starting with `Brief` (issue-batch, the brief template)")
-    if brief.get("author_association") not in TRUSTED:
+    if not ghrest.can_push(brief):
         who = (brief.get("user") or {}).get("login", "?")
         raise Refused(f"the newest brief on #{number} is by {who}, who cannot push here; "
                       "post the brief again yourself")
