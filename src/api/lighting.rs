@@ -11,9 +11,10 @@
 //! every build.
 //!
 //! `Lighting.Bake()` is the "place well + bake right now" workflow (#246): in one call
-//! it auto-places light probes and reflection probes from the static scene (unless a set
-//! is already manually authored), then runs the existing multi-bounce light-probe bake
-//! (#250, #285) and GGX reflection-probe bake (#252). It is the orchestration over the `Probe`
+//! it re-places the light probes and reflection probes the placement made, keeping every
+//! manual one (#1737), then runs the existing multi-bounce light-probe bake
+//! (#250, #285) and GGX reflection-probe bake (#252), and swaps the new sets in only
+//! when both have finished. It is the orchestration over the `Probe`
 //! and `Reflection` namespaces — manual placement on those stays available; this is the
 //! batteries-included path. `Lighting.BakeLightmaps()` / `ClearLightmaps()` (#438) bake
 //! static geometry's lightmaps beside it, and `Lighting.Generate()` (#832) runs both

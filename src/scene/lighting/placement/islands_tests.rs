@@ -35,6 +35,7 @@ fn room_with_boxes(boxes: &[(usize, usize, usize)]) -> FloorGrid {
         width: n,
         depth: n,
         cells,
+        upper: Vec::new(),
         inset: 0.25,
     }
 }

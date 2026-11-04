@@ -45,9 +45,10 @@ fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
         lua.create_function(move |lua, (x, y, z, hx, hy, hz): AddArgs| {
             let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
-            let i = scene
-                .reflection_probes
-                .add(Vec3::new(x, y, z), Vec3::new(hx, hy, hz));
+            let set = &mut scene.reflection_probes;
+            let i = set.add(Vec3::new(x, y, z), Vec3::new(hx, hy, hz));
+            // Placed by hand: the bake's auto-placement keeps it (#1737).
+            set.edit(i, |p| p.manual = true);
             Ok(i as u32)
         }),
     )?;
@@ -57,10 +58,10 @@ fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
         "Move",
         lua.create_function(move |lua, (index, x, y, z): (u32, f32, f32, f32)| {
             let scene = &*scene.get(lua)?;
-            scene
-                .borrow_mut()
-                .reflection_probes
-                .move_probe(index as usize, Vec3::new(x, y, z));
+            let mut scene = scene.borrow_mut();
+            let set = &mut scene.reflection_probes;
+            set.move_probe(index as usize, Vec3::new(x, y, z));
+            hand_edited(set, index);
             Ok(())
         }),
     )?;
@@ -108,11 +109,15 @@ fn register_config(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
         "SetBox",
         lua.create_function(
             move |lua, (index, min_x, min_y, min_z, max_x, max_y, max_z): BoxArgs| {
-                scene.get(lua)?.borrow_mut().reflection_probes.set_box(
-                    index as usize,
+                let scene = &*scene.get(lua)?;
+                let mut scene = scene.borrow_mut();
+                let set = &mut scene.reflection_probes;
+                let (min, max) = (
                     Vec3::new(min_x, min_y, min_z),
                     Vec3::new(max_x, max_y, max_z),
                 );
+                set.set_box(index as usize, min, max);
+                hand_edited(set, index);
                 Ok(())
             },
         ),
@@ -146,7 +151,12 @@ fn register_settings(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>
                 return Ok(());
             };
             // Every field is read before any is written: a bad one changes nothing.
+            // A hand edit makes the probe manual (#1737). `manual = false` un-marks
+            // only a probe that was manual already: a Get-modify-Set round trip of a
+            // placed probe carries the `false` it read, and must keep the edit.
+            let was_manual = probe.manual;
             write_fields(&mut probe, &t)?;
+            probe.manual |= !was_manual;
             set.edit(index as usize, |p| *p = probe);
             Ok(())
         }),
@@ -163,6 +173,12 @@ fn register_settings(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>
             }
         }),
     )
+}
+
+/// Mark probe `index` manual after a hand edit: the next bake keeps it as it was
+/// left (#1737). The bake's own writes never come through here.
+fn hand_edited(set: &mut crate::scene::ReflectionProbeSet, index: u32) {
+    set.edit(index as usize, |p| p.manual = true);
 }
 
 /// The `{ x, y, z }` table of `v`.
@@ -197,6 +213,7 @@ fn read_fields(lua: &Lua, p: &ReflectionProbe) -> mlua::Result<Table> {
     t.set("farClip", p.far_clip)?;
     t.set("shadows", p.shadows)?;
     t.set("intensity", p.intensity)?;
+    t.set("manual", p.manual)?;
     Ok(t)
 }
 
@@ -224,6 +241,7 @@ fn write_fields(p: &mut ReflectionProbe, t: &Table) -> mlua::Result<()> {
     set(t, "nearClip", &mut p.near_clip)?;
     set(t, "farClip", &mut p.far_clip)?;
     set(t, "shadows", &mut p.shadows)?;
+    set(t, "manual", &mut p.manual)?;
     set(t, "intensity", &mut p.intensity)
 }
 

@@ -7,7 +7,8 @@
 //! to one storage array (group 1, binding 5) and point their instance at theirs.
 //!
 //! [`pack`] samples the grid exactly as the single sample is taken
-//! (`ProbeVolume::sample`, trilinear over the probe grid), so a volume holds what
+//! (`ProbeVolume::sample`: trilinear over a probe grid, else the nearest probes
+//! blended), so a volume holds what
 //! the object would read standing at each of its points. A volume is sampled again
 //! only when its entity's pose, its settings, its mesh's bounds or the probe field
 //! changed ([`ProxyVolumes::push`]): Unity's *Automatic* refresh, every frame for a

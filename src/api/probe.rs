@@ -21,6 +21,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_placement(lua, &table, scene)?;
+    register_manual(lua, &table, scene)?;
     register_fill(lua, &table, scene)?;
     register_query(lua, &table, scene)?;
 
@@ -35,7 +36,10 @@ fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
         lua.create_function(move |lua, (x, y, z): (f32, f32, f32)| {
             let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
-            Ok(scene.probes.add_probe(Vec3::new(x, y, z)) as u32)
+            let i = scene.probes.add_probe(Vec3::new(x, y, z));
+            // Placed by hand: the bake's auto-placement keeps it (#1737).
+            scene.probes.set_manual(i, true);
+            Ok(i as u32)
         }),
     )?;
 
@@ -46,6 +50,8 @@ fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
             let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
             scene.probes.move_probe(index as usize, Vec3::new(x, y, z));
+            // A hand edit: the next bake keeps the probe where it was put (#1737).
+            scene.probes.set_manual(index as usize, true);
             Ok(())
         }),
     )?;
@@ -77,6 +83,36 @@ fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
     )
 }
 
+/// `SetManual` / `IsManual`: whether a bake's auto-placement keeps a probe (#1737).
+fn register_manual(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    put(
+        table,
+        "SetManual",
+        lua.create_function(move |lua, (index, manual): (u32, bool)| {
+            scene
+                .get(lua)?
+                .borrow_mut()
+                .probes
+                .set_manual(index as usize, manual);
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "IsManual",
+        lua.create_function(move |lua, index: u32| {
+            let scene = &*scene.get(lua)?;
+            let scene = scene.borrow();
+            Ok(scene
+                .probes
+                .probes
+                .get(index as usize)
+                .is_some_and(|p| p.manual))
+        }),
+    )
+}
+
 /// `FillGrid` (bounds + spacing), `BakeAnalytic` (the deterministic stand-in fill),
 /// (the dev-only `Bake`, the real rendered-capture → SH bake of #241, is installed onto
 /// this table by `dev`, #737).
@@ -94,6 +130,8 @@ fn register_fill(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
                     Vec3::new(max_x, max_y, max_z),
                     spacing,
                 );
+                // A grid asked for by hand is manual, so a bake keeps it (#1737).
+                scene.probes.probes.iter_mut().for_each(|p| p.manual = true);
                 Ok(())
             },
         ),
@@ -155,6 +193,35 @@ mod tests {
         lua.load("Probe.Remove(0)").exec().unwrap();
         let n: u32 = lua.load("return Probe.Count()").eval().unwrap();
         assert_eq!(n, 1);
+    }
+
+    #[test]
+    fn added_and_filled_probes_are_manual() {
+        let scene = empty_scene();
+        let lua = Lua::new();
+        let run = || -> mlua::Result<()> {
+            register(&lua, crate::api::bind(&lua, &scene)).unwrap();
+            let manual: bool = lua
+                .load("Probe.Add(1, 2, 3) return Probe.IsManual(0)")
+                .eval()?;
+            assert!(manual, "Add places by hand (#1737)");
+            let after: bool = lua
+                .load("Probe.SetManual(0, false) return Probe.IsManual(0)")
+                .eval()?;
+            assert!(!after);
+            assert!(
+                !lua.load("return Probe.IsManual(9)").eval::<bool>()?,
+                "out of range"
+            );
+            let moved: bool = lua
+                .load("Probe.Move(0, 4, 4, 4) return Probe.IsManual(0)")
+                .eval()?;
+            assert!(moved, "a hand move makes it manual");
+            lua.load("Probe.FillGrid(0,0,0, 1,0,0, 1)").exec()?;
+            Ok(())
+        };
+        run().unwrap();
+        assert!(scene.borrow().probes.probes.iter().all(|p| p.manual));
     }
 
     #[test]
