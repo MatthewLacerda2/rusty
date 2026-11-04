@@ -18,7 +18,7 @@ use crate::procgen::recipe::{op, opt, req, Lit, OpInfo, ONE};
 /// Height (red) → occlusion: white where a pixel sees the whole sky, darker the
 /// more of it the relief within `radius` (tiles) hides. `depth` is how tall white
 /// stands, in tiles; `quality` is how many directions are searched (1 to
-/// [`MAX_QUALITY`]). Wraps, so it tiles; samples land in tile units, so it looks the
+/// 64). Wraps, so it tiles; samples land in tile units, so it looks the
 /// same at any resolution.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AmbientOcclusion {
@@ -45,7 +45,7 @@ impl Row for AmbientOcclusion {
 /// Samples along each direction, evenly out to the radius.
 const STEPS: u32 = 16;
 /// The most directions a node searches: bounds its cost.
-pub const MAX_QUALITY: u32 = 64;
+const MAX_QUALITY: u32 = 64;
 const DEPTH: f32 = 0.1;
 const QUALITY: u32 = 8;
 
