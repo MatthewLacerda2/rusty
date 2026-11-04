@@ -37,7 +37,9 @@ fn agree(ops: &[Op]) -> Result<(), TestCaseError> {
             let (l, r) = (digest(&fast), digest(&full));
             let diff: Vec<_> = l.lines().zip(r.lines()).filter(|(a, b)| a != b).collect();
             prop_assert!(l == r, "rapier after op {}: {:#?}", n, diff);
-            prop_assert_eq!(scene_digest(&a), scene_digest(&b), "scene after op {}", n);
+            let (l, r) = (scene_digest(&a), scene_digest(&b));
+            let diff: Vec<_> = l.lines().zip(r.lines()).filter(|(a, b)| a != b).collect();
+            prop_assert!(l == r, "scene after op {}: {:#?}", n, diff);
         }
     }
     Ok(())
@@ -69,4 +71,20 @@ fn a_settled_level_names_nothing() {
         }
     }
     panic!("a body at rest still names itself every step");
+}
+
+/// A body disabled under a falling one keeps its world pose: the full write-back
+/// re-reads it under its parent's new pose, so the narrowed one must reach it too,
+/// though nothing named it before the step (the proptest's first find).
+#[test]
+fn a_disabled_body_under_a_falling_one_is_written_back() {
+    use crate::ecs::changes::ops_tests::{Edit, Op as W};
+    let ops = vec![
+        Op::World(W::On(2, Edit::Adopt(false))),
+        Op::World(W::On(5, Edit::Reparent(Some(1)))),
+        Op::Step,
+        Op::Pause,
+    ];
+    let r = agree(&ops);
+    assert!(r.is_ok(), "{r:?}");
 }

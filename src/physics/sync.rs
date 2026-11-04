@@ -21,7 +21,8 @@ impl PhysicsWorld {
     /// any body whose collider set changed, then every enabled flag (before any
     /// character sweep, so no sweep sees a stale one), then each owner's world
     /// pose and velocities and each compound collider's offset.
-    pub(super) fn sync_to_rapier(&mut self, scene: &mut Scene) {
+    /// Returns the bodies it synced.
+    pub(super) fn sync_to_rapier(&mut self, scene: &mut Scene) -> Owners {
         let owners = match self.read_changes(scene) {
             None => {
                 self.resync_topology(scene);
@@ -55,6 +56,51 @@ impl PhysicsWorld {
             self.sync_compound_parts(scene, owner, ids);
         }
         self.plan = plan;
+        owners
+    }
+
+    /// The owners of every body rapier has awake: the only ones a step can move.
+    pub(super) fn awake_owners(&self) -> BTreeSet<u32> {
+        let ids = self.islands.active_bodies();
+        ids.filter_map(|h| self.body_to_id.get(&h).copied())
+            .collect()
+    }
+
+    /// Write integrated poses + velocities back onto the owner entities,
+    /// converting each body's world pose into the owner's local `Transform`
+    /// (#445). Static and kinematic bodies keep their transform: physics never
+    /// moves the one, and the other is where its Transform sent it (no
+    /// world↔local round-trip drift). The Transform write refreshes the world
+    /// AABB of every collider under the owner, compound children included.
+    ///
+    /// After a full sync, every owner, ascending. Otherwise only the ones whose
+    /// write can differ from what they hold, in the same order: the bodies synced
+    /// (an edit may have woken one, or reset a static body's velocity), the ones
+    /// awake before or after the step (rapier neither moves a sleeping body nor
+    /// wakes one without leaving it awake), and every owner below one whose write
+    /// moved it, which the full pass reaches after it and re-reads under its new
+    /// parent pose (a body disabled under a falling one holds its world pose).
+    pub(super) fn sync_from_rapier(
+        &self,
+        scene: &mut Scene,
+        synced: &Owners,
+        mut queue: BTreeSet<u32>,
+    ) {
+        let Owners::Only(synced) = synced else {
+            for &owner in self.plan.keys() {
+                self.write_back(scene, owner);
+            }
+            return;
+        };
+        queue.extend(synced);
+        queue.extend(self.awake_owners());
+        while let Some(owner) = queue.pop_first() {
+            if !self.write_back(scene, owner) {
+                continue;
+            }
+            let below = scene.world.self_and_descendants(owner).skip(1);
+            queue.extend(below.filter(|&d| d > owner && self.plan.contains_key(&d)));
+        }
     }
 
     /// What changed since the last step; `None` for a full pass (the first step,

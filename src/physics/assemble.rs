@@ -64,6 +64,7 @@ impl PhysicsWorld {
         let Some(handle) = self.id_to_body.remove(&owner) else {
             return;
         };
+        self.body_to_id.remove(&handle);
         if let Some(body) = self.bodies.get(handle) {
             for collider in body.colliders() {
                 if let Some(id) = self.collider_to_id.remove(collider) {
@@ -119,6 +120,7 @@ impl PhysicsWorld {
             self.id_to_collider.insert(id, handle);
         }
         self.id_to_body.insert(owner, body_handle);
+        self.body_to_id.insert(body_handle, owner);
     }
 
     /// Build collider entity `id`'s rapier collider, positioned relative to its
