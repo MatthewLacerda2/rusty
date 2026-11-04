@@ -40,6 +40,8 @@ mod channel;
 #[cfg(test)]
 mod derived_tests;
 #[cfg(test)]
+mod epoch_tests;
+#[cfg(test)]
 mod funnel_tests;
 mod log;
 #[cfg(test)]
