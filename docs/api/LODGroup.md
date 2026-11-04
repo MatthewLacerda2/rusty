@@ -24,6 +24,10 @@ threshold to `0` to never cull.
   choice, so a shadow never shows a different level than its caster; static casters
   are baked at LOD0 (the bake is cached across frames). `Debug.Stats()` reports how
   many renderers a frame hid as `lod_hidden_entities`.
+- A renderer's own small-object cull ([`Mesh`](Mesh.md): max draw distance, min
+  screen size, measured the same way) still applies to the level shown, whichever
+  culls first. When any renderer of the group sets one, the whole group leaves the
+  static shadow bake and casts per frame at the level the camera shows.
 
 **Importing LODs.** A glTF whose objects are named `Crate_LOD0`, `Crate_LOD1`, … (the
 Unity / Blender convention, case-insensitive; the glTF **node** name — Blender's

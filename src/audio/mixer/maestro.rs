@@ -6,7 +6,7 @@
 //! per-frame [`AudioMaestro::advance_mixer`] runs as a `LateUpdate` system on sim
 //! time (`app/audio/`).
 
-use super::{Duck, GroupId, GroupPatch, Mixer};
+use super::{Duck, EffectChain, GroupId, GroupPatch, Mixer};
 use crate::audio::reverb::ReverbState;
 use crate::audio::AudioMaestro;
 
@@ -57,6 +57,15 @@ impl AudioMaestro {
     pub fn set_group(&mut self, name: &str, patch: &GroupPatch) -> Result<(), String> {
         let id = self.mixer.require(name)?;
         self.mixer.set(id, patch);
+        self.backend.set_group(id, &self.mixer.mix(id));
+        Ok(())
+    }
+
+    /// Replace group `name`'s effects with `chain` (#1748); a sidechain that would
+    /// make a cycle is dropped with a warning (`effects/chain.rs`).
+    pub fn set_group_effects(&mut self, name: &str, chain: EffectChain) -> Result<(), String> {
+        let id = self.mixer.require(name)?;
+        self.mixer.set_effects(id, chain);
         self.backend.set_group(id, &self.mixer.mix(id));
         Ok(())
     }

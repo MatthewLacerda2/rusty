@@ -16,6 +16,11 @@
 //! carries its `bone_base` per instance. The base rides the instance, not the draw, so
 //! skinned copies of one mesh still share one instanced draw.
 //!
+//! A caster the camera may cull as too far or too small (#1714, `cull`), and every
+//! renderer of its `LODGroup` (`UnbakedCasters`), is never cached in a static bake:
+//! it casts from the per-frame sweeps, with the base camera's verdict, so its shadow
+//! goes when it does.
+//!
 //! Casters are gathered once per sweep and culled per light volume — a cascade (#435)
 //! or an atlas tile (#468) — so a prop inside two volumes is drawn into both. The
 //! cascades' and the atlas's static bakes and dynamic passes each own a [`CasterBuffer`]
@@ -24,6 +29,7 @@
 //! earlier sweep's casters.
 
 mod buffer;
+mod cull;
 mod runs;
 mod sweep;
 
@@ -39,10 +45,12 @@ use crate::render::gpu::material_cache::MaterialCache;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
 use crate::render::gpu::pipelines::winding::Facing;
 use crate::render::lod::LodSelection;
-use crate::render::{Frustum, GpuMesh, MeshId};
+use crate::render::{GpuMesh, MeshId, SmallObjectCull};
 use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
 use buffer::{CasterData, CasterRecords, CasterUpload};
+use cull::Candidate;
+pub(crate) use cull::ShadowCulls;
 use glam::Mat4;
 use runs::{batch_casters, slot_runs};
 pub(super) use sweep::Sweep;
@@ -103,6 +111,10 @@ pub(super) struct CasterFrame<'a> {
     pub statics: super::StaticsKey,
     /// The renderer's GPU pass timer: every sweep is a `shadows` pass (#835).
     pub timer: &'a crate::render::timing::GpuTimer,
+    /// The base camera's small-object cull (#1714): a shadow goes with its prop.
+    pub small: SmallObjectCull,
+    /// The casters that cull as small, and their LOD groups, kept out of the bakes.
+    pub unbaked: super::UnbakedCasters,
 }
 
 impl ShadowRenderer {
@@ -121,18 +133,7 @@ impl ShadowRenderer {
         let mut matrices = Vec::new();
         let mut per_volume = Vec::with_capacity(volumes.len());
         for &volume in volumes {
-            // Cull casters against the LIGHT's volume, not the camera's (#330). An
-            // off-screen caster still inside a cascade must keep its shadow — culling
-            // casters by the player camera is the classic pop-a-shadow bug.
-            let frustum = Frustum::from_view_proj(volume);
-            let casters = candidates
-                .iter()
-                .filter(|c| {
-                    c.bounds
-                        .is_none_or(|(lo, hi)| frustum.intersects_aabb(lo, hi))
-                })
-                .map(|c| (c.key.clone(), c.caster))
-                .collect();
+            let casters = cull::cull(&candidates, volume, &mut self.culls);
             let (packed, mut batches) = batch_casters(casters, self.instancing);
             let base = matrices.len() as u32;
             for batch in &mut batches {
@@ -174,8 +175,7 @@ impl ShadowRenderer {
         sweep: Sweep,
     ) -> (Vec<Candidate>, Vec<JointMatrix>) {
         let scene = frame.scene;
-        let mut casters = Vec::new();
-        let mut joints = Vec::new();
+        let (mut casters, mut joints) = (Vec::new(), Vec::new());
         for id in scene.world.ids_with_mesh() {
             let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");
             let mesh_id = MeshId::from_mesh(&mesh);
@@ -190,13 +190,10 @@ impl ShadowRenderer {
             }
             let material = scene.world.material(id);
             let slots = material.as_ref().map_or(0, |m| m.materials.len());
-            let moving = (0..slots).any(|slot| {
-                frame
-                    .clips
-                    .get(&(id, slot))
-                    .is_some_and(|c| c.clip.is_variant())
-            });
-            if !sweep.takes(scene.world.is_static(id) && !moving) {
+            let moving = frame.moving(id, slots);
+            // One a camera may cull as small casts per frame, never from a bake (#1714).
+            let unbaked = frame.unbaked.contains(id, &mesh);
+            if !sweep.takes(scene.world.is_static(id) && !moving && !unbaked) {
                 continue;
             }
             let material = material.as_deref();
@@ -205,7 +202,10 @@ impl ShadowRenderer {
             // A skinned caster is bounded by its posed skeleton (#833); one whose pose
             // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.
             let bounds = gpu_mesh.world_bounds(&mesh, world);
-            let bone_base = push_palette(&mut joints, mesh.active_palette());
+            let small = frame.culls_small(&mesh, gpu_mesh, bounds, world);
+            // A culled caster never draws: no palette to upload for it.
+            let bone_base = (!small).then(|| push_palette(&mut joints, mesh.active_palette()));
+            let bone_base = bone_base.unwrap_or(0);
             let two_sided = mesh.cast_shadows == ShadowCasting::TwoSided;
             for (indices, (clip, face)) in runs {
                 let mut caster = CasterData::new(world, bone_base);
@@ -213,6 +213,7 @@ impl ShadowRenderer {
                     caster = caster.cutout(cut);
                 }
                 casters.push(Candidate {
+                    id,
                     key: CasterKey {
                         facing: caster_facing(world, two_sided, face),
                         clip: clip.map(|c| c.clip),
@@ -221,6 +222,7 @@ impl ShadowRenderer {
                     },
                     caster,
                     bounds,
+                    small,
                 });
             }
         }
@@ -272,14 +274,6 @@ impl ShadowRenderer {
             render_pass.draw_indexed(batch.key.indices.range(), 0, batch.instances.clone());
         }
     }
-}
-
-/// One caster before culling: its draw, its instance data and its world bounds (`None`
-/// when they cannot be bounded — never culled).
-struct Candidate {
-    key: CasterKey,
-    caster: CasterData,
-    bounds: Option<(glam::Vec3, glam::Vec3)>,
 }
 
 #[cfg(test)]

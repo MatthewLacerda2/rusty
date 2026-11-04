@@ -18,6 +18,7 @@ use serde_json::{json, Value};
 mod audio;
 mod components;
 mod fields;
+mod mesh;
 mod navigation;
 mod ui;
 

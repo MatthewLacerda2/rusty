@@ -25,8 +25,24 @@ pub struct RenderCounters {
     pub triangles: u64,
     /// Mesh entities drawn, summed over the camera stack.
     pub visible_entities: u32,
-    /// Mesh entities the frustum cull skipped, summed over the camera stack.
+    /// Mesh entities tested against a camera's frustum (#1714): every one a camera
+    /// draws at all whose LOD level it shows, summed over the camera views (the
+    /// stack and render-texture cameras).
+    pub cull_tested: u32,
+    /// Mesh entities the frustum cull skipped, summed over the camera views.
     pub culled_entities: u32,
+    /// Mesh entities inside a camera's frustum but past their max draw distance or
+    /// under their min screen size (#1714), summed over the camera views.
+    pub size_culled_entities: u32,
+    /// Shadow casters tested against a light volume (a cascade or an atlas tile,
+    /// #1714), one per entity per volume, summed over every shadow view the frame
+    /// drew: its cached bakes, when they re-baked, and its per-frame sweeps.
+    pub shadow_cull_tested: u32,
+    /// Shadow casters outside a light volume, summed over the shadow views.
+    pub shadow_frustum_culled: u32,
+    /// Shadow casters inside a light volume but too far or too small from the base
+    /// camera (#1714), summed over the shadow views.
+    pub shadow_size_culled: u32,
     /// Mesh entities hidden because their LODGroup showed another level (#472),
     /// summed over the camera stack.
     pub lod_hidden_entities: u32,
@@ -143,7 +159,12 @@ impl RenderCounters {
             ("draw_calls", self.draw_calls.into()),
             ("triangles", self.triangles),
             ("visible_entities", self.visible_entities.into()),
+            ("cull_tested", self.cull_tested.into()),
             ("culled_entities", self.culled_entities.into()),
+            ("size_culled_entities", self.size_culled_entities.into()),
+            ("shadow_cull_tested", self.shadow_cull_tested.into()),
+            ("shadow_frustum_culled", self.shadow_frustum_culled.into()),
+            ("shadow_size_culled", self.shadow_size_culled.into()),
             ("lod_hidden_entities", self.lod_hidden_entities.into()),
             ("lights", self.lights.into()),
             ("lights_dropped", self.lights_dropped.into()),
@@ -199,6 +220,7 @@ impl Renderer {
             ..Default::default()
         };
         self.shadow_renderer.drawn.clear();
+        self.shadow_renderer.culls = Default::default();
     }
 
     /// Count one camera's solids (mesh particles among them) and sprite particle
@@ -208,8 +230,10 @@ impl Renderer {
         let batches = solids.draws.batches();
         c.add_draws(batches.map(|b| (b.key.indices.len(), b.instances.len() as u32)));
         c.visible_entities += solids.visible;
-        c.culled_entities += solids.culled;
-        c.lod_hidden_entities += solids.lod_hidden;
+        c.cull_tested += solids.culls.tested;
+        c.culled_entities += solids.culls.culled;
+        c.size_culled_entities += solids.culls.size_culled;
+        c.lod_hidden_entities += solids.culls.lod_hidden;
         c.draw_calls += particles.draw_calls;
         c.particles_drawn += particles.instances + solids.mesh_particles;
     }
@@ -219,6 +243,10 @@ impl Renderer {
     pub(crate) fn finish_counters(&mut self, view: &RenderView) {
         let c = &mut self.frame_counters;
         c.shadow_draws = self.shadow_renderer.drawn.len() as u32;
+        let culls = self.shadow_renderer.culls;
+        c.shadow_cull_tested = culls.tested;
+        c.shadow_frustum_culled = culls.frustum;
+        c.shadow_size_culled = culls.size;
         c.add_draws(self.shadow_renderer.drawn.iter().copied());
         c.ui_draws = view.ui.last_batches() as u32;
         c.ui_mask_passes = view.ui.last_mask_passes();

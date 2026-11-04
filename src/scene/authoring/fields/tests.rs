@@ -95,7 +95,13 @@ fn each_kind_reads_its_entity_key() {
     let doc = serde_json::to_value(scene.world.entity_document(id).unwrap()).unwrap();
     for kind in KINDS {
         let read = (kind.read)(&scene.world, id).expect(kind.name).unwrap();
-        assert_eq!(read, doc[kind.key], "{} reads `{}`", kind.name, kind.key);
+        // A `shown` hook may add a field the file leaves out at its default (#1714).
+        let mut stored = read.clone();
+        stored
+            .as_object_mut()
+            .unwrap()
+            .retain(|k, _| doc[kind.key].get(k).is_some());
+        assert_eq!(stored, doc[kind.key], "{} reads `{}`", kind.name, kind.key);
         let saved: BTreeSet<&str> = read
             .as_object()
             .unwrap()

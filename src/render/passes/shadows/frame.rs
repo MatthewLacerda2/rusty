@@ -9,7 +9,7 @@ use glam::Vec3;
 
 use super::cascades::Cascade;
 use super::casters::CasterFrame;
-use super::{atlas, cascades, statics_key, CascadeUniform, ShadowRenderer};
+use super::{atlas, cascades, statics_key, CascadeUniform, ShadowRenderer, UnbakedCasters};
 use crate::components::{LightType, ShadowSettings};
 use crate::render::clusters::{self, ClusterGrid};
 use crate::render::lod::LodSelection;
@@ -58,6 +58,10 @@ impl Renderer {
             surfaces: &self.surface_shaders,
             timer: &self.gpu_timer,
             statics: statics_key(scene),
+            // Measured from the base camera, never the light (#1714); a capture
+            // culls nothing.
+            small: self.small_object_cull(camera),
+            unbaked: UnbakedCasters::of(scene),
         };
         if self.capture.shadows {
             // a probe captured without shadows samples no cascade, so draws none;

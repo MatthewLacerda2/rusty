@@ -6,8 +6,9 @@ use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 /// The *worn, grimy painted metal* example (docs/api/Texture.md) plus a blur,
 /// warp, tile, mapping, bump, a distance bevel, a normal blend, the channel ops,
 /// two-image math, auto levels and the #1743 filters (occlusion, edges, highpass,
-/// sharpen, histogram scan, levels) and the #1741 flood fill and its readers, so
-/// every banded path runs.
+/// sharpen, histogram scan, levels), #1739's directional ops (directional blur
+/// and warp, slope blur) and the #1741 flood fill and its readers, so every banded
+/// path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
   "nodes": [
@@ -44,13 +45,17 @@ const RECIPE: &str = r#"{
     { "id": "lv", "op": "levels", "in_low": 0.1, "gamma": 1.4, "inputs": ["hs"] },
     { "id": "more", "op": "combine_rgb", "inputs": ["ao", "ed", "lv"] },
     { "id": "lt2", "op": "mix", "mode": "multiply", "factor": 0.5, "inputs": ["lt", "more"] },
+    { "id": "db", "op": "directional_blur", "length": 0.1, "angle": 0.125, "inputs": ["chips"] },
+    { "id": "dw", "op": "directional_warp", "strength": 0.05, "angle": 0.3, "inputs": ["db", "h"] },
+    { "id": "sb", "op": "slope_blur", "intensity": 0.01, "mode": "max", "inputs": ["dw", "bev"] },
+    { "id": "lt3", "op": "mix", "mode": "screen", "factor": 0.4, "inputs": ["lt2", "sb"] },
     { "id": "ff", "op": "flood_fill", "threshold": 0.55, "inputs": ["chips"] },
     { "id": "fr", "op": "flood_random", "seed": 3, "inputs": ["ff"] },
     { "id": "fg", "op": "flood_gradient", "angle": 0.1, "angle_jitter": 0.2, "seed": 1, "inputs": ["ff"] },
     { "id": "fb", "op": "flood_bbox", "output": "center_x", "inputs": ["ff"] },
     { "id": "flood", "op": "combine_rgb", "inputs": ["fr", "fg", "fb"] },
-    { "id": "lt3", "op": "mix", "mode": "add", "factor": 0.4, "inputs": ["lt2", "flood"] },
-    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt3", "soft"] }
+    { "id": "lt4", "op": "mix", "mode": "add", "factor": 0.4, "inputs": ["lt3", "flood"] },
+    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt4", "soft"] }
   ],
   "output": "out"
 }"#;
