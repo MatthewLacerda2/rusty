@@ -101,7 +101,8 @@ fn register_list(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
     )
 }
 
-/// `SetBox` (explicit parallax corners) and `SetCubemap` (point at a baked KTX2).
+/// `SetBox` (explicit parallax corners), `SetFallback` / `GetFallback` (Unity's
+/// default reflection probe, #1697) and `SetCubemap` (point at a baked KTX2).
 fn register_config(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type BoxArgs = (u32, f32, f32, f32, f32, f32, f32);
     put(
@@ -121,6 +122,24 @@ fn register_config(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
                 Ok(())
             },
         ),
+    )?;
+
+    put(
+        table,
+        "SetFallback",
+        lua.create_function(move |lua, index: Option<u32>| {
+            let scene = &*scene.get(lua)?;
+            let set = &mut scene.borrow_mut().reflection_probes;
+            Ok(set.set_fallback(index.map(|i| i as usize)))
+        }),
+    )?;
+    put(
+        table,
+        "GetFallback",
+        lua.create_function(move |lua, ()| {
+            let fallback = scene.get(lua)?.borrow().reflection_probes.fallback();
+            Ok(fallback.map(|i| i as u32))
+        }),
     )?;
 
     put(
@@ -214,6 +233,8 @@ fn read_fields(lua: &Lua, p: &ReflectionProbe) -> mlua::Result<Table> {
     t.set("shadows", p.shadows)?;
     t.set("intensity", p.intensity)?;
     t.set("manual", p.manual)?;
+    t.set("fallback", p.fallback)?;
+    t.set("normalised", p.irradiance.is_some())?;
     Ok(t)
 }
 
@@ -230,6 +251,10 @@ fn write_fields(p: &mut ReflectionProbe, t: &Table) -> mlua::Result<()> {
         p.box_max = v;
     }
     if let Some(v) = t.get::<Option<String>>("cubemap")? {
+        // A new cube drops the old one's stored irradiance (#1697).
+        if v != p.cubemap_path {
+            p.irradiance = None;
+        }
         p.cubemap_path = v;
     }
     if let Some(v) = t.get::<Option<u32>>("resolution")? {
@@ -253,6 +278,9 @@ fn set<T: mlua::FromLua>(t: &Table, key: &str, slot: &mut T) -> mlua::Result<()>
     Ok(())
 }
 
+#[cfg(test)]
+#[path = "reflection_fallback_tests.rs"]
+mod fallback_tests;
 #[cfg(test)]
 #[path = "reflection_tests.rs"]
 mod tests;

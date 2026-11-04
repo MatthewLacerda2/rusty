@@ -89,7 +89,7 @@ fn gpu_a_baked_cube_reads_each_direction_as_the_capture_saw_it() {
         return;
     };
     let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(5.0));
-    let bytes = r.bake_reflection(&patched_room(), &probe, RES);
+    let bytes = r.bake_reflection(&patched_room(), &probe, RES).bytes;
     let path = crate::test_temp::dir().join(format!("cube_layout_{}.ktx2", std::process::id()));
     std::fs::write(&path, bytes).unwrap();
     let path = path.to_string_lossy().into_owned();

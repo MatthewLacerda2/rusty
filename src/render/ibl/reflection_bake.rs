@@ -21,13 +21,25 @@
 
 use std::path::{Path, PathBuf};
 
+use glam::Vec3;
+
 use crate::render::ibl::cubemap_capture::CaptureLens;
 use crate::render::ibl::ktx2_encode::encode_cubemap;
+use crate::render::ibl::probe::bake::project_light_probe;
+use crate::render::ibl::probe::capture::ProbeCapture;
 use crate::render::ibl::reflection_prefilter::gpu::ProbePrefilter;
 use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
 use crate::render::{CubemapCapture, Renderer};
 use crate::scene::lighting::reflection_probe::clamp_resolution;
-use crate::scene::{ReflectionProbe, Scene};
+use crate::scene::lighting::sh::Sh9;
+use crate::scene::{AmbientRadiance, ReflectionProbe, Scene};
+
+/// One baked reflection probe: its KTX2 cube, and the irradiance it stores beside it
+/// (#1697, [`stored_irradiance`]).
+pub struct BakedCube {
+    pub bytes: Vec<u8>,
+    pub irradiance: Sh9,
+}
 
 /// The name every baked cube starts with: probe `i`'s is `reflection_probe_<i>.ktx2`.
 pub const CUBE_PREFIX: &str = "reflection_probe_";
@@ -41,13 +53,14 @@ pub fn cube_file(dir: &Path, i: usize) -> PathBuf {
 impl Renderer {
     /// Bake one reflection probe: capture the static scene from its position at
     /// `resolution` per face through its clip planes and shadow setting, prefilter it
-    /// into a roughness mip chain, and return the encoded KTX2 bytes.
+    /// into a roughness mip chain, and return the encoded KTX2 bytes with the
+    /// capture's irradiance SH (#1697).
     pub fn bake_reflection(
         &mut self,
         scene: &Scene,
         probe: &ReflectionProbe,
         resolution: u32,
-    ) -> Vec<u8> {
+    ) -> BakedCube {
         // A scene's probes are held to range on load and on edit, but any probe may be
         // passed here (a test builds its own): bake from a held copy.
         let mut probe = probe.clone();
@@ -58,8 +71,10 @@ impl Renderer {
             far: probe.far_clip,
             shadows: probe.shadows,
         };
-        let capture = self.capture_reflection_cubemap(scene, probe.position, resolution, lens);
+        let (capture, open) =
+            self.capture_reflection_cubemap(scene, probe.position, resolution, lens);
         let prefiltered = self.prefilter_gpu(&capture);
+        let irradiance = stored_irradiance(capture, open, scene.drawn_ambient().radiance());
         // The mip a fully-rough surface samples (CPU mirror of the shader's selection),
         // logged so a bake's roughness range is visible when debugging a probe.
         log::debug!(
@@ -70,7 +85,10 @@ impl Renderer {
                 prefiltered.level_count() as u32
             )
         );
-        encode_cubemap(&prefiltered)
+        BakedCube {
+            bytes: encode_cubemap(&prefiltered),
+            irradiance,
+        }
     }
 
     /// GGX-prefilter `capture` on the GPU (#1602), building the pipeline on the
@@ -111,8 +129,9 @@ impl Renderer {
     /// `out_dir/reflection_probe_<i>.ktx2` and point the probe at it: one probe of
     /// [`Renderer::bake_reflections`]. The editor's stepped bake does not come here: it
     /// steps through `LightingBake::step`, which stages each cube and applies them all
-    /// at the end (#1602). A probe index past the set bakes nothing.
-    pub fn bake_reflection_into(
+    /// at the end (#1602). The probe stores the cube's irradiance (#1697). A probe
+    /// index past the set bakes nothing.
+    fn bake_reflection_into(
         &mut self,
         scene: &mut Scene,
         i: usize,
@@ -123,17 +142,45 @@ impl Renderer {
         };
         let default = scene.lighting_settings.reflections.resolution;
         let resolution = clamp_resolution(probe.resolution.unwrap_or(default));
-        let bytes = self.bake_reflection(scene, &probe, resolution);
+        let baked = self.bake_reflection(scene, &probe, resolution);
         let path = cube_file(out_dir, i);
-        crate::core::fs::written::write(&path, &bytes)
+        crate::core::fs::written::write(&path, &baked.bytes)
             .map_err(|e| format!("Failed to write reflection cubemap {}: {e}", path.display()))?;
-        scene
-            .reflection_probes
-            .set_cubemap(i, path.to_string_lossy().into_owned());
+        let set = &mut scene.reflection_probes;
+        set.set_cubemap(i, path.to_string_lossy().into_owned());
+        set.set_irradiance(i, Some(baked.irradiance));
         Ok(())
     }
+}
+
+/// The irradiance a reflection probe stores beside its cube (#1697): what the
+/// lightmap and a light probe at its position measure, so the forward pass's ratio of
+/// the two compares like with like. A reflection capture draws the sky where nothing
+/// covers a texel (`open`), while the lightmap's escaping rays (`Tracer::sky`) and a
+/// light probe's capture take the scene's ambient there; so those texels are cleared
+/// and the projection adds `ambient` along them, as [`project_light_probe`] does for
+/// a light probe. Glass drawn over the sky is cleared with it: a light probe would
+/// keep it, but it holds a little of a texel the ambient fills anyway. The direct
+/// light of `Baked` lamps is left out: the capture sees what they light, never the
+/// lamps, so the stored value is the bounce light the cube shows, and does not
+/// depend on how near a lamp the probe was placed.
+pub fn stored_irradiance(
+    mut cube: CubemapCapture,
+    open: [Vec<bool>; 6],
+    ambient: AmbientRadiance,
+) -> Sh9 {
+    for (face, open) in cube.faces.iter_mut().zip(&open) {
+        for (texel, _) in face.iter_mut().zip(open).filter(|(_, &o)| o) {
+            *texel = Vec3::ZERO;
+        }
+    }
+    project_light_probe(&ProbeCapture { cube, open }, ambient)
 }
 
 #[cfg(test)]
 #[path = "reflection_bake_tests.rs"]
 mod reflection_bake_tests;
+
+#[cfg(test)]
+#[path = "stored_irradiance_tests.rs"]
+mod stored_irradiance_tests;

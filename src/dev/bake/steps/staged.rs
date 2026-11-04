@@ -6,8 +6,9 @@ use std::path::{Path, PathBuf};
 
 use glam::Vec3;
 
-use crate::render::ibl::reflection_bake::cube_file;
+use crate::render::ibl::reflection_bake::{cube_file, BakedCube};
 use crate::scene::lighting::reflection_probe::clamp_resolution;
+use crate::scene::lighting::sh::Sh9;
 use crate::scene::{ReflectionProbe, ReflectionProbeSet, Scene};
 
 /// The reflection probes a bake works on: copies taken at its start, each with the
@@ -78,6 +79,8 @@ pub(super) struct StagedCubemaps {
     files: Vec<(PathBuf, PathBuf)>,
     /// How many of `files` are moved into place: a failed commit resumes there.
     moved: usize,
+    /// Each staged cube's own irradiance SH (#1697), in probe order.
+    irradiance: Vec<Sh9>,
 }
 
 impl StagedCubemaps {
@@ -86,8 +89,9 @@ impl StagedCubemaps {
         self.files.len()
     }
 
-    /// Stage the next probe's cube in `dir`.
-    pub(super) fn write(&mut self, dir: &Path, bytes: &[u8]) -> Result<(), String> {
+    /// Stage the next probe's cube in `dir`, and the irradiance it was baked with.
+    pub(super) fn write(&mut self, dir: &Path, baked: &BakedCube) -> Result<(), String> {
+        let bytes = &baked.bytes;
         let target = cube_file(dir, self.files.len());
         let mut staged = target.clone().into_os_string();
         staged.push(".baking");
@@ -99,13 +103,15 @@ impl StagedCubemaps {
             )
         })?;
         self.files.push((staged, target));
+        self.irradiance.push(baked.irradiance);
         Ok(())
     }
 
     /// Move every staged cube not yet moved into place, then point each probe of
-    /// `set` (the planned copy, not the scene's) at its cube. The caller has checked
-    /// the probes are the ones baked. On a failed move `set` is untouched and a
-    /// retry resumes at the cube that failed.
+    /// `set` (the planned copy, not the scene's) at its cube and store the irradiance
+    /// it was baked with (#1697). The caller has checked the probes are the ones
+    /// baked. On a failed move `set` is untouched and a retry resumes at the cube that
+    /// failed.
     pub(super) fn commit(&mut self, set: &mut ReflectionProbeSet) -> Result<(), String> {
         while let Some((staged, target)) = self.files.get(self.moved) {
             let path = target.to_string_lossy().into_owned();
@@ -117,8 +123,9 @@ impl StagedCubemaps {
                 .map_err(|e| format!("Failed to write reflection cubemap {path}: {e}"))?;
             self.moved += 1;
         }
-        for (i, (_, target)) in self.files.iter().enumerate() {
+        for (i, ((_, target), sh)) in self.files.iter().zip(&self.irradiance).enumerate() {
             set.set_cubemap(i, target.to_string_lossy().into_owned());
+            set.set_irradiance(i, Some(*sh));
         }
         Ok(())
     }
