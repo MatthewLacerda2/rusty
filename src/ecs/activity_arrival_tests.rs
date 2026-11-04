@@ -18,7 +18,9 @@ fn orphan(id: u32, parent: u32) -> Entity {
 #[test]
 fn an_overwrite_naming_a_future_id_follows_that_id_once_it_spawns() {
     let mut w = World::new();
-    (0..6).for_each(|_| drop(w.spawn("e".into())));
+    for _ in 0..6 {
+        w.spawn("e".into());
+    }
     let mut doc = w.entity_document(1).expect("1 is live");
     (doc.active, doc.parent_id) = (true, Some(12));
     w.overwrite(doc);
