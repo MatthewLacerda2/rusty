@@ -70,8 +70,7 @@ impl GameWorld {
         }
     }
 
-    // --- Accessors: the shared engine-state handles. The editor, renderer and the
-    //     headless dev tools borrow these cells directly, exactly as before. ---
+    // --- Accessors: the shared engine-state cells the editor and tools borrow. ---
 
     /// The active scene (the world of record).
     pub fn scene(&self) -> &Rc<RefCell<Scene>> {
@@ -108,9 +107,8 @@ impl GameWorld {
         &self.resources.script_manager
     }
 
-    /// Whether the host asked for Play ([`set_playing`](Self::set_playing)); the
-    /// World enters it at the next tick's transition. Whether it *is* in Play is
-    /// the scene's single play state, `Scene::is_playing` (#1302, #1304).
+    /// Whether the host asked for Play ([`set_playing`](Self::set_playing)), entered at
+    /// the next tick's transition; *being* in Play is `Scene::is_playing` (#1302).
     pub fn play_requested(&self) -> bool {
         self.resources.application.borrow().host_play()
     }
@@ -118,10 +116,8 @@ impl GameWorld {
     /// Ask to enter or leave Play, every host's one way in (the editor transport,
     /// the player, the harness): the next tick's transition acts on it.
     pub fn set_playing(&mut self, playing: bool) {
-        self.resources
-            .application
-            .borrow_mut()
-            .set_host_play(playing);
+        let mut app = self.resources.application.borrow_mut();
+        app.set_host_play(playing);
     }
 
     /// Advance the simulation by `dt` seconds; the play-state transition is returned
@@ -278,14 +274,17 @@ impl GameWorld {
         self.restore_edit_runtime(); // after the restore: it binds the edit scene (#1339)
     }
 
-    /// Run on the project file as it stands (#1517, #1522): hold the scene's decals
-    /// to its budgets and render with its quality presets' running values. On
+    /// Run on the project file as it stands (#1517, #1522, #1749): hold the scene's
+    /// decals to its budgets, render with its quality presets' running values and
+    /// resolve doppler with its speed of sound. On
     /// entering Play, on Stop (Unity reverts play-mode changes) and when the editor
     /// opens, so a hand edit to `project.rusty` reaches the next Play.
     pub fn apply_project_settings(&self) {
         let mut app = self.resources.application.borrow_mut();
         let limits = app.decal_limits();
         self.world.scene.borrow_mut().decals.set_limits(limits);
+        let c = app.audio_settings().speed_of_sound; // reread by `decal_limits`
+        self.resources.audio.borrow_mut().set_speed_of_sound(c);
         let graphics = self.resources.script_manager.graphics_cell();
         graphics.borrow_mut().quality = app.quality_values();
     }

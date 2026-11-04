@@ -8,12 +8,17 @@
 //! per option, each written to `project.rusty` the moment it changes through
 //! `Application::set_default_option`, the op `Graphics.SetDefaultOption` calls; the
 //! live options follow it where the player hasn't chosen, to preview a fresh install.
+//!
+//! Last, the project's audio settings (#1749): the speed of sound doppler resolves
+//! with, written at once through `Application::set_speed_of_sound` and applied to
+//! the audio on entering Play.
 
 use egui_phosphor::regular as icon;
 
 use crate::core::application::{Application, BuildSettings, WindowMode};
 use crate::core::project::PROJECT_FILE;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+use crate::editor::widgets::DragRange;
 use crate::editor::EditorUi;
 use crate::scripting::ConsoleLogs;
 
@@ -46,6 +51,8 @@ pub fn draw(
             save = ui.button(format!("{}  Save", icon::FLOPPY_DISK)).clicked();
             ui.separator();
             graphics_defaults(ui, app, live, console);
+            ui.separator();
+            audio(ui, app, console);
         });
     if save {
         match app.set_build(draft.clone()) {
@@ -106,4 +113,20 @@ fn graphics_defaults(
             }
         }
     }
+}
+
+/// The project's audio settings: the speed of sound (m/s), written as it changes.
+fn audio(ui: &mut egui::Ui, app: &mut Application, console: &mut ConsoleLogs) {
+    let mut c = app.audio_settings().speed_of_sound;
+    ui.horizontal(|ui| {
+        ui.label("Speed of sound (m/s)");
+        let drag = egui::DragValue::new(&mut c)
+            .speed(1.0)
+            .ranged(1.0..=10_000.0);
+        if ui.add(drag).changed() {
+            if let Err(err) = app.set_speed_of_sound(c) {
+                console.error(err);
+            }
+        }
+    });
 }

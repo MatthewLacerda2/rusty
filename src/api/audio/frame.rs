@@ -2,7 +2,8 @@
 //!
 //! After the sim advances, every live voice is re-resolved against the active camera
 //! and the clock state (`Time.timeScale`, `Time.Pause`) and the resulting mix is
-//! handed to the backend: distance rolloff, pan and time scaling reach the output.
+//! handed to the backend: distance rolloff, pan, time scaling and doppler (#1749)
+//! reach the output.
 //! Then the output is told how much time went by, so an offline mixer renders it and
 //! a running capture takes it (`audio::capture`). `GameWorld::push_audio` calls it at
 //! the end of every tick, whoever drives the sim, so a scenario's capture hears the
@@ -33,6 +34,8 @@ pub fn push_frame(
             listener: listener(camera, &scene),
             time_scale: time.time_scale,
             paused: time.paused,
+            // The scaled sim time this tick ran, which doppler measures motion over.
+            dt: if seconds > 0.0 { time.delta_time } else { 0.0 },
         }
     };
     let mut audio = audio.borrow_mut();

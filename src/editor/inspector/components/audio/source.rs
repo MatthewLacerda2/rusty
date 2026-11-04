@@ -2,9 +2,10 @@
 //!
 //! Edits every serde-persisted field of `AudioSourceComponent`: the clip path, per-
 //! source volume, loop / play-on-start flags, the time-scaled toggle (gameplay vs.
-//! music/UI), and the spatial fields stored now for #213 (spatial blend + the
-//! linear rolloff distances), and the mixer output group (#465). Pure authoring data — the card never touches the audio
-//! device; the `AudioMaestro` reads these when a voice starts.
+//! music/UI), the spatial fields (#213: spatial blend, the linear rolloff
+//! distances), the occlusion opt-out (#467), the doppler level (#1749) and the mixer
+//! output group (#465). Pure authoring data — the card never touches the audio
+//! device; the `AudioMaestro` reads these each tick.
 
 use crate::editor::inspector::components::card::remove_component;
 use crate::editor::widgets::DragRange;
@@ -150,7 +151,7 @@ fn draw_playback(
     changed
 }
 
-/// Spatial fields (#213) and the occlusion opt-out (#467).
+/// Spatial fields (#213), the occlusion opt-out (#467) and the doppler level (#1749).
 fn draw_spatial(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -188,6 +189,13 @@ fn draw_spatial(
     {
         if let Some(mut c) = world.audio_mut(id) {
             audio_ops::set_occlusion_enabled(&mut c, occlusion);
+        }
+        changed = true;
+    }
+    let mut doppler = a.doppler_level;
+    if clamped(ui, "Doppler Level:", &mut doppler, 0.0..=5.0) {
+        if let Some(mut c) = world.audio_mut(id) {
+            audio_ops::set_doppler_level(&mut c, doppler);
         }
         changed = true;
     }

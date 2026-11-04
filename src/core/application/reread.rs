@@ -1,10 +1,11 @@
-//! Re-reading the bound `project.rusty` (#1517, #1522): the decal budgets and the
-//! quality presets are read from the file at each Play, before every write and
+//! Re-reading the bound `project.rusty` (#1517, #1522, #1749): the decal budgets, the
+//! audio settings and the quality presets are read from the file at each Play, before every write and
 //! before every preset edit, so an edit to the file (by hand or by the agent)
 //! reaches the running editor and a save never writes back a copy from before it.
 
 use super::Application;
 use crate::core::project::ProjectFile;
+use crate::core::settings::audio::AudioSettings;
 use crate::core::settings::decals::DecalLimits;
 
 impl Application {
@@ -25,6 +26,7 @@ impl Application {
                     Ok(file) => {
                         self.decal_limits = file.decals;
                         self.quality = file.quality;
+                        self.audio = file.audio;
                         return;
                     }
                     Err(err) => err,
@@ -50,5 +52,23 @@ impl Application {
     /// opening the project read).
     pub fn set_decal_limits(&mut self, limits: DecalLimits) {
         self.decal_limits = limits;
+    }
+
+    /// The project's audio settings (#1749), which entering and leaving Play apply
+    /// to the audio, as last read: the Build Settings window asks every frame, so this
+    /// reads no file ([`reread`](Self::reread) first for the file as it stands).
+    pub fn audio_settings(&self) -> AudioSettings {
+        self.audio
+    }
+
+    /// Set the project's speed of sound (the Build Settings window), writing the
+    /// bound file (if any). Not finite and positive is an error, and nothing changes.
+    pub fn set_speed_of_sound(&mut self, c: f32) -> Result<(), String> {
+        if !(c.is_finite() && c > 0.0) {
+            return Err(format!("speed of sound must be a positive number, got {c}"));
+        }
+        self.reread();
+        self.audio.speed_of_sound = c;
+        self.save()
     }
 }
