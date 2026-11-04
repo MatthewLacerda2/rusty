@@ -67,3 +67,24 @@ fn a_program_that_could_not_start_is_asked_again() {
     mode(0o755).unwrap();
     assert_eq!(search.find().expect("asked again").version, "5.0.1");
 }
+
+/// A fake still open for writing is refused as "text file busy" (Linux holds
+/// that strictly), the way one a sibling test's fork inherited is (#1821): the
+/// start waits until it is closed.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_program_busy_for_a_moment_is_started_once_free() {
+    let dir = crate::test_temp::dir();
+    let blender = fake(&dir, "Blender 5.0.1");
+    let writer = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&blender)
+        .unwrap();
+    let release = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(30));
+        drop(writer);
+    });
+    let version = version_within(&blender, Duration::from_secs(10)).expect("started");
+    assert_eq!(version.expect("a version"), "5.0.1");
+    release.join().unwrap();
+}
