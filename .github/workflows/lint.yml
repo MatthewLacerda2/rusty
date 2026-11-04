@@ -4,7 +4,8 @@ on:
     types: [opened, reopened, synchronize, ready_for_review]
   # Post-merge on `main` (#482): this is the only run that may save the lint job's
   # cache (see the cache step), so without it every PR's lint job would start
-  # cold. It also lints the commit that actually landed.
+  # cold. It also lints the commit that actually landed, unless a run already
+  # linted that very tree; a push that moves the cache key always runs (#1784).
   push:
     branches: [main]
   workflow_dispatch:
@@ -22,11 +23,20 @@ jobs:
   # succeeds). Skipping the whole job would leave the required check "Expected"
   # under the branch ruleset (skipped ≠ pass), wedging docs-only PRs (issue #218),
   # so we guard the steps on `code` instead. See CLAUDE.md.
+  #
+  # On a push to `main`, `code` is also 'false' when a recent successful lint run
+  # already linted this very tree (#1784; ci.yml's `changes` job says how). The
+  # docrefs step is unguarded and still runs.
   changes:
     timeout-minutes: 5
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read        # the earlier runs and their jobs (proved_tree.py)
+      pull-requests: read  # paths-filter reads a PR's changed files
     outputs:
-      code: ${{ steps.filter.outputs.code || 'true' }}
+      code: ${{ steps.proved.outputs.proved == 'true' && 'false' || steps.filter.outputs.code || 'true' }}
+      proved-by: ${{ steps.proved.outputs.run }}
     steps:
       - uses: dorny/paths-filter@v4
         id: filter
@@ -35,6 +45,16 @@ jobs:
           filters: |
             code:
               - '!**/*.md'
+      - uses: actions/checkout@v7
+        if: github.event_name == 'push'
+      - name: Was this tree already proved?
+        id: proved
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python3 .github/scripts/proved_tree.py --workflow lint.yml
+          --sha "${{ github.sha }}" --before "${{ github.event.before }}" --run-id "${{ github.run_id }}"
 
   lint:
     needs: changes

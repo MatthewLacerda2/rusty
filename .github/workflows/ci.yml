@@ -11,13 +11,16 @@ on:
   push:
     branches: [main]
   # Which gating jobs also run on the schedule is a decision, not a side effect
-  # (#480): `deny` does — advisories land against code that has not changed, so a
-  # nightly check is how a new RUSTSEC reaches us between merges (RUSTSEC-2026-0257
-  # was spotted that way), and `ci-gate` goes red with it. `build-test` and
-  # `build-test-cross` do not: with the toolchain and Cargo.lock pinned, rebuilding
-  # an unchanged `main` re-proves what its `push` run already proved. (The
-  # nightly Windows run is a signal in `windows.yml`, #741.) Off the hour, where
-  # GitHub's scheduler is least backed up.
+  # (#480). Every one does now. `deny`: advisories land against code that has
+  # not changed, so a nightly check is how a new RUSTSEC reaches us between
+  # merges (RUSTSEC-2026-0257 was spotted that way). The build jobs since #1784:
+  # a push whose tree its PR run proved no longer builds, so the nightly is what
+  # rebuilds `main` against what moves with nothing in any diff (the runner
+  # image and the lavapipe driver under it, #769/#930; macOS's Metal; a
+  # `rust-cache` release) and re-saves `main`'s caches. One run a night instead
+  # of one per merge; `ci-gate` goes red with any of them. (The nightly Windows
+  # run is a signal in `windows.yml`, #741.) Off the hour, where GitHub's
+  # scheduler is least backed up.
   schedule:
     - cron: '7 3 * * *'
   # A proof run of a branch: the gates, nothing else.
@@ -46,11 +49,24 @@ jobs:
   # docs-only PR as unmergeable (issue #218). So we keep the cheap-docs-PR path by
   # guarding the required job's steps on `code`, never by skipping the job itself.
   # See the merging note in CLAUDE.md.
+  #
+  # `code` answers "must this run build?", so it is also 'false' on a push to
+  # `main` whose tree a recent successful run already built (#1784): the squash
+  # of an up-to-date head has the head's tree, which its PR run just proved.
+  # `proved_tree.py` checks that mechanically, keeps the full run when the push
+  # moves a cache key (Cargo.toml/lock, the toolchain, `.cargo/`, this file), and
+  # fails toward running on any error. Skipped, the run's gating jobs report
+  # `skipped`/`success` exactly as on a Markdown-only merge, so `ci-gate` passes.
   changes:
     timeout-minutes: 5
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read        # the earlier runs and their jobs (proved_tree.py)
+      pull-requests: read  # paths-filter reads a PR's changed files
     outputs:
-      code: ${{ steps.filter.outputs.code || 'true' }}
+      code: ${{ steps.proved.outputs.proved == 'true' && 'false' || steps.filter.outputs.code || 'true' }}
+      proved-by: ${{ steps.proved.outputs.run }}
     steps:
       # On `pull_request` paths-filter reads the changed files from the API and
       # needs no clone; on `push` it diffs `github.event.before..HEAD` in a local
@@ -76,6 +92,16 @@ jobs:
               # the game CLAUDE.md template a project's edit-open embeds (#1313).
               - 'docs/game-agent.md'
               - 'src/core/project/game_claude.md'
+      # Only a push asks, and only when it changes code: a Markdown-only merge
+      # already skips. The nightly and a dispatch always build.
+      - name: Was this tree already proved?
+        id: proved
+        if: github.event_name == 'push' && steps.filter.outputs.code != 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python3 .github/scripts/proved_tree.py --workflow ci.yml
+          --sha "${{ github.sha }}" --before "${{ github.event.before }}" --run-id "${{ github.run_id }}"
 
   # The Linux build+test. Kept as its own job (not folded into the OS matrix
   # below) so the `build-test` name `mergeable.py` and `ci-gate`'s `needs:` read
@@ -88,13 +114,15 @@ jobs:
   # `github.event.pull_request.draft == false` also matches `push` and `schedule`
   # — there is no PR, and GitHub's loose equality makes null == false — so the
   # old condition ran these jobs on events nobody had chosen. `push` is kept on
-  # purpose: it builds the commit that actually landed on `main`.
+  # purpose: it builds the commit that actually landed on `main`, unless a run
+  # already built that very tree (`changes`, #1784).
   build-test:
     needs: changes
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     if: >-
       github.event_name == 'push' ||
+      github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
     # No debuginfo override here: Cargo.toml's `[profile.dev]` (#487) strips the
@@ -196,6 +224,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     if: >-
+      github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       ((github.event_name == 'push' ||
         (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
@@ -256,6 +285,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     if: >-
+      github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       ((github.event_name == 'push' ||
         (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) &&
@@ -299,7 +329,7 @@ jobs:
           cargo nextest run --profile ci --locked --features dev --run-ignored only \
             -E 'test(/convert::blend::|^export::blend::/)'
 
-  # The one gating job that also runs nightly — see the `schedule` trigger note.
+  # Runs nightly with the others — see the `schedule` trigger note.
   deny:
     needs: changes
     timeout-minutes: 10
