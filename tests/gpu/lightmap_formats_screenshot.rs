@@ -35,11 +35,11 @@ fn scene(page: String) -> Scene {
         .set_mesh(floor, primitive_mesh_component(Primitive::Plane));
     scene.world.set_static(floor, true);
     scene.lightmaps.pages = vec![page];
-    scene.lightmaps.entries = vec![LightmapEntry {
+    scene.lightmaps.insert(LightmapEntry {
         entity: floor,
         page: 0,
         scale_offset: [1.0, 1.0, 0.0, 0.0],
-    }];
+    });
     scene
 }
 
