@@ -1,6 +1,6 @@
 //! A mesh's `cast_shadows` (#1571): set from Lua through `Component.Set`, read back
 //! with `Component.Get`, refused for a name it doesn't know, and saved with the scene
-//! and its prefabs.
+//! and its prefabs. Its neighbour `scale_in_lightmap` (#1704) the same way.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -71,4 +71,27 @@ fn cast_shadows_round_trips_through_a_scene_and_a_prefab() {
     let mut stamped = Scene::new();
     let root = instantiate_prefab(&mut stamped, &read_prefab_file(&prefab).unwrap(), None);
     assert_eq!(mode(&stamped, root), Some(ShadowCasting::TwoSided));
+}
+
+#[test]
+fn scale_in_lightmap_is_set_from_lua_and_held() {
+    let scene = Rc::new(RefCell::new(Scene::new()));
+    let mut game = playing(scene.clone(), 1.0);
+    run(&mut game, 1);
+    let read = game.script_manager().eval(
+        r#"wall = Scene.CreateEntity("Wall", "Box")
+        local before = Component.Get(wall, "Mesh").scale_in_lightmap
+        Component.Set(wall, "Mesh", { scale_in_lightmap = -3 })
+        local held = Component.Get(wall, "Mesh").scale_in_lightmap
+        Component.Set(wall, "Mesh", { scale_in_lightmap = 2.5 })
+        return before .. " " .. held .. " " .. Component.Get(wall, "Mesh").scale_in_lightmap"#,
+    );
+    assert_eq!(
+        read.unwrap(),
+        "1.0 0.0 2.5",
+        "a negative scale is held at 0"
+    );
+    let id = scene.borrow().world.ids()[0];
+    let stored = scene.borrow().world.mesh(id).map(|m| m.scale_in_lightmap);
+    assert_eq!(stored, Some(2.5), "written on the component");
 }
