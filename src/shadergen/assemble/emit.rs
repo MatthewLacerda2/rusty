@@ -214,9 +214,9 @@ pub fn reflection_folds(instances: &[Instance], layout: &ParamLayout) -> Vec<Str
             // Bound once: a factor can sample textures (`triplanar_detail` takes
             // three), and both records read it.
             Some(format!(
-                "let reflection_scale_{index} = {factor};\n        \
-                 ssr_texels = ssr_surface::scale(ssr_texels, reflection_scale_{index});\n        \
-                 ssil_realtime *= reflection_scale_{index};"
+                "let fold_factor_{index} = {factor};\n        \
+                 ssr_texels = ssr_surface::scale(ssr_texels, fold_factor_{index});\n        \
+                 ssil_realtime *= fold_factor_{index};"
             ))
         })
         .collect()

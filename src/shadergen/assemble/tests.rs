@@ -102,6 +102,6 @@ fn a_scaled_block_s_reflection_factor_runs_once() {
         wgsl.matches("srf_triplanar_detail(vec3<f32>(1.0)").count(),
         1
     );
-    assert!(wgsl.contains("ssr_surface::scale(ssr_texels, reflection_scale_0)"));
-    assert!(wgsl.contains("ssil_realtime *= reflection_scale_0;"));
+    assert!(wgsl.contains("ssr_surface::scale(ssr_texels, fold_factor_0)"));
+    assert!(wgsl.contains("ssil_realtime *= fold_factor_0;"));
 }
