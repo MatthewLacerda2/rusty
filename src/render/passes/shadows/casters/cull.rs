@@ -1,12 +1,14 @@
 //! The gathered casters culled per light volume: by the light's frustum (#330), then
 //! by the small-object verdict the gather took from the base camera (#1714), each
-//! counted once per entity per volume for `Debug.Stats` (`shadow_cull_tested`, …).
+//! counted once per entity per volume for `Debug.Stats` (`shadow_cull_tested`, …);
+//! and the gather's two per-entity tests, a variant cut and the small verdict.
 
 use glam::Mat4;
 
 use super::buffer::CasterData;
-use super::CasterKey;
-use crate::render::Frustum;
+use super::{CasterFrame, CasterKey};
+use crate::components::MeshComponent;
+use crate::render::{Frustum, GpuMesh};
 
 /// One caster run before culling: its entity, its draw, its instance data, its world
 /// bounds (`None` when they cannot be bounded: never culled) and whether the base
@@ -18,6 +20,33 @@ pub(super) struct Candidate {
     pub caster: CasterData,
     pub bounds: Option<(glam::Vec3, glam::Vec3)>,
     pub small: bool,
+}
+
+impl CasterFrame<'_> {
+    /// Whether a surface variant cuts any of entity `id`'s `slots` material slots:
+    /// such a caster counts as dynamic (see `clips`).
+    pub(super) fn moving(&self, id: u32, slots: usize) -> bool {
+        (0..slots).any(|slot| {
+            self.clips
+                .get(&(id, slot))
+                .is_some_and(|c| c.clip.is_variant())
+        })
+    }
+
+    /// Whether the base camera culls `mesh` (on `gpu_mesh`, at `world`, inside
+    /// `bounds`) as too far or too small (#1714); never when it cannot be bounded.
+    pub(super) fn culls_small(
+        &self,
+        mesh: &MeshComponent,
+        gpu_mesh: &GpuMesh,
+        bounds: Option<(glam::Vec3, glam::Vec3)>,
+        world: Mat4,
+    ) -> bool {
+        bounds.is_some_and(|(lo, hi)| {
+            let centre = (lo + hi) * 0.5;
+            self.small.culls(mesh, centre, gpu_mesh.local_aabb, world)
+        })
+    }
 }
 
 /// What the shadow views' culling did this frame, summed over every volume each

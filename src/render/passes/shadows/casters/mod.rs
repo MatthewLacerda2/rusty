@@ -190,12 +190,7 @@ impl ShadowRenderer {
             }
             let material = scene.world.material(id);
             let slots = material.as_ref().map_or(0, |m| m.materials.len());
-            let moving = (0..slots).any(|slot| {
-                frame
-                    .clips
-                    .get(&(id, slot))
-                    .is_some_and(|c| c.clip.is_variant())
-            });
+            let moving = frame.moving(id, slots);
             // One a camera may cull as small casts per frame, never from a bake (#1714).
             let unbaked = frame.unbaked.contains(id, &mesh);
             if !sweep.takes(scene.world.is_static(id) && !moving && !unbaked) {
@@ -207,16 +202,10 @@ impl ShadowRenderer {
             // A skinned caster is bounded by its posed skeleton (#833); one whose pose
             // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.
             let bounds = gpu_mesh.world_bounds(&mesh, world);
-            let small = bounds.is_some_and(|(lo, hi)| {
-                frame
-                    .small
-                    .culls(&mesh, (lo + hi) * 0.5, gpu_mesh.local_aabb, world)
-            });
+            let small = frame.culls_small(&mesh, gpu_mesh, bounds, world);
             // A culled caster never draws: no palette to upload for it.
-            let bone_base = match small {
-                true => 0,
-                false => push_palette(&mut joints, mesh.active_palette()),
-            };
+            let bone_base = (!small).then(|| push_palette(&mut joints, mesh.active_palette()));
+            let bone_base = bone_base.unwrap_or(0);
             let two_sided = mesh.cast_shadows == ShadowCasting::TwoSided;
             for (indices, (clip, face)) in runs {
                 let mut caster = CasterData::new(world, bone_base);
