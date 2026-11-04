@@ -220,10 +220,10 @@ impl PostFx {
 mod gpu_tests;
 
 #[cfg(test)]
-mod overlay_gpu_tests;
+pub(crate) mod overlay_gpu_tests;
 
 #[cfg(test)]
-mod stack_order_gpu_tests;
+pub(crate) mod stack_order_gpu_tests;
 
 #[cfg(test)]
 impl PostFx {

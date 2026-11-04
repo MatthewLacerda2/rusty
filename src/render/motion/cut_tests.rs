@@ -87,3 +87,34 @@ fn reset_is_a_cut_under_the_same_key() {
     assert_eq!(prev, [at(2.0)], "the camera kept last frame's matrix");
     assert!(mv.history.pose(7).is_none(), "the entity kept its pose");
 }
+
+/// `cut()`, what TAA forgets its history on (#1702): the view's first frame, a
+/// changed key (another scene, Play or Stop, another base camera) and a reset (a
+/// resize), and nothing else.
+#[test]
+fn cut_names_every_frame_with_no_last_frame() {
+    let (scene, mut h) = (Scene::new(), MotionHistory::default());
+    let mut cut = |h: &mut MotionHistory, key| {
+        h.begin(key, &one(at(0.0)));
+        h.end();
+        h.cut()
+    };
+    let k = super::tests::key(scene.id(), Some(1));
+    assert!(cut(&mut h, k), "the view's first frame");
+    assert!(!cut(&mut h, k), "the next frame of the same stack");
+    assert!(
+        cut(&mut h, super::tests::key(Scene::new().id(), Some(1))),
+        "a scene load"
+    );
+    let other = super::tests::key(scene.id(), Some(2));
+    assert!(cut(&mut h, other), "a camera switch");
+    assert!(!cut(&mut h, other));
+    let play = HistoryKey {
+        playing: true,
+        ..other
+    };
+    assert!(cut(&mut h, play), "Play");
+    h.clear();
+    assert!(cut(&mut h, play), "a reset (a resize)");
+    assert!(!cut(&mut h, play));
+}

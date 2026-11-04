@@ -254,13 +254,13 @@ fn depth_postpass(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) 
 
 /// World canvases (#429): scene geometry, occluded by it, before particles.
 fn world_ui(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    r.draw_world_ui(view, ctx.cam, ctx.aspect, ctx.fog);
+    r.draw_world_ui(view, ctx.cam, ctx.view_proj, ctx.fog);
 }
 
 /// Ribbons (#441) then sprite particles, each back to front; mesh particles drew
 /// with the solids.
 fn effects(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    ctx.effects = r.draw_effects(view, ctx.scene, ctx.cam);
+    ctx.effects = r.draw_effects(view, ctx.scene, ctx.cam, ctx.view_proj);
 }
 
 fn count(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {

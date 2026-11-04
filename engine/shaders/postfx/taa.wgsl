@@ -2,8 +2,8 @@
 // `TemporalAA.hlsl` at its default quality (*High*: `DoTemporalAA(2, 2, 2, 0)`):
 //   - the neighbourhood: the current pixel's 3×3 in YCoCg, its min/max box tightened
 //     to mean ± `clamp scale` × the standard deviation (variance clamping);
-//   - the motion: the velocity of the 3×3's nearest surface (so an edge reprojects
-//     with what is in front of it);
+//   - the motion: the velocity of the 3×3's frontmost surface (so an edge
+//     reprojects with what is in front of it: a viewmodel's over the world's);
 //   - the history: a 5-tap bicubic (Catmull-Rom) read at the reprojected uv, dropped
 //     when it lands off the image, on a cut, or when it isn't finite;
 //   - the blend: history clamped into the box, then lerped toward the current pixel
@@ -15,10 +15,11 @@
 // a supersampled pixel.
 //
 // Units. The velocity target holds `ndc_now - ndc_prev` in `.xy`, both unjittered,
-// and in `.z` the view depth (the sky: 65504), so the nearest surface is the
-// smallest `.z`.
+// in `.z` the view depth (the sky: 65504) and in `.w` the drawing camera's index in
+// its stack, so the frontmost surface is the highest `.w`, then the smallest `.z`.
 
 #import fullscreen
+#import numeric
 
 struct TaaParams {
     // xy: the view's size in pixels; zw: one over it
@@ -42,13 +43,6 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32
     return fullscreen::triangle(vid);
 }
 
-// Whether every component is finite: an infinity or NaN has every exponent bit set.
-// Checked on the bits, since a shader compiler may fold away a NaN compare.
-fn finite(v: vec3<f32>) -> bool {
-    let exponent = bitcast<vec3<u32>>(v) & vec3<u32>(0x7f800000u);
-    return all(exponent != vec3<u32>(0x7f800000u));
-}
-
 fn rgb_to_ycocg(c: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(
         dot(c, vec3<f32>(0.25, 0.5, 0.25)),
@@ -67,26 +61,35 @@ fn ycocg_to_rgb(c: vec3<f32>) -> vec3<f32> {
 fn current(p: vec2<i32>) -> vec4<f32> {
     let last = vec2<i32>(textureDimensions(t_current)) - 1;
     let c = textureLoad(t_current, clamp(p, vec2<i32>(0), last), 0);
-    let rgb = select(vec3<f32>(0.0), clamp(c.rgb, vec3<f32>(0.0), vec3<f32>(MAX_HDR)), finite(c.rgb));
+    let rgb = select(vec3<f32>(0.0), clamp(c.rgb, vec3<f32>(0.0), vec3<f32>(MAX_HDR)), numeric::finite3(c.rgb));
     return vec4<f32>(rgb, c.a);
 }
 
-// The NDC motion of the nearest surface in `p`'s 3×3 (URP's motion quality 2); none
-// when it isn't finite.
+// Whether velocity texel `a` is in front of `b`: motion blur's order (`behind` in
+// `motion_blur.wgsl`). A higher camera of the stack (`.w`) is in front whatever the
+// depths say, so a gun 0.6 m from its camera stays over a wall 0.35 m from the
+// world camera; on one camera, the nearer view depth (`.z`) is.
+fn in_front(a: vec4<f32>, b: vec4<f32>) -> bool {
+    if (a.w != b.w) {
+        return a.w > b.w;
+    }
+    return a.z < b.z;
+}
+
+// The NDC motion of the frontmost surface in `p`'s 3×3 (URP's motion quality 2, by
+// [`in_front`]); none when it isn't finite.
 fn nearest_motion(p: vec2<i32>) -> vec2<f32> {
     let last = vec2<i32>(textureDimensions(t_velocity)) - 1;
-    var depth = 3.0e38;
-    var motion = vec2<f32>(0.0);
+    var front = textureLoad(t_velocity, p, 0);
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
             let t = textureLoad(t_velocity, clamp(p + vec2<i32>(x, y), vec2<i32>(0), last), 0);
-            if (t.z < depth) {
-                depth = t.z;
-                motion = t.xy;
+            if (in_front(t, front)) {
+                front = t;
             }
         }
     }
-    return select(vec2<f32>(0.0), motion, finite(vec3<f32>(motion, 0.0)));
+    return select(vec2<f32>(0.0), front.xy, numeric::finite2(front.xy));
 }
 
 // The history at `uv`, Catmull-Rom from 5 bilinear taps (Jimenez's *Filmic SMAA*,
@@ -151,7 +154,7 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let prev_uv = uv - nearest_motion(p) * vec2<f32>(0.5, -0.5);
     let sampled = history_bicubic(prev_uv);
     let inside = all(abs(prev_uv - 0.5) <= vec2<f32>(0.5));
-    if (taa.knobs.z < 0.5 || !inside || !finite(sampled)) {
+    if (taa.knobs.z < 0.5 || !inside || !numeric::finite3(sampled)) {
         // No history to blend: the current frame alone, exactly.
         return here;
     }
@@ -163,5 +166,5 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let mixed = mix(a, b, taa.knobs.x);
     let rgb = ycocg_to_rgb(mixed / max(1.0 - mixed.x, 1.0 / MAX_HDR));
     let out = clamp(rgb, vec3<f32>(0.0), vec3<f32>(MAX_HDR));
-    return vec4<f32>(select(here.rgb, out, finite(rgb)), here.a);
+    return vec4<f32>(select(here.rgb, out, numeric::finite3(rgb)), here.a);
 }

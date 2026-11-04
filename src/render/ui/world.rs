@@ -29,7 +29,6 @@ use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::gpu::layout_entries::dynamic_uniform_entry;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::uniforms::FogUniform;
-use crate::render::postfx::effects::taa::{jitter::jittered, jitter_of};
 use crate::render::timing::{GpuPass, GpuTimer};
 use crate::render::{RenderView, Renderer};
 use crate::scene::Camera;
@@ -107,16 +106,16 @@ pub(crate) struct WorldUniforms {
 
 impl Renderer {
     /// Draw `view`'s world canvases that `cam` sees into its HDR target, fogged by
-    /// `fog` (see the module docs). A no-op without any.
+    /// `fog` (see the module docs), through `view_proj`, the camera's as the solids
+    /// drew (`CameraCtx::view_proj`: jittered on a TAA view, #1702), since a canvas
+    /// is depth-tested against them. A no-op without any.
     pub(crate) fn draw_world_ui(
         &mut self,
         view: &mut RenderView,
         cam: &Camera,
-        aspect: f32,
+        view_proj: Mat4,
         fog: FogUniform,
     ) {
-        // Jittered as the solids are on a TAA view (#1702): it is depth-tested.
-        let view_proj = jittered(cam.build_view_projection(aspect), jitter_of(view));
         let mut items = world_items(&view.ui, cam);
         if items.is_empty() {
             return;

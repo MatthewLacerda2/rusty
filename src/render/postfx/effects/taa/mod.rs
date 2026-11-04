@@ -131,8 +131,8 @@ impl TaaPasses {
     }
 }
 
-/// One view's TAA state while it runs: the two history targets, the frame's
-/// jitter and whether the history holds a resolved frame.
+/// One view's TAA state while it runs: the two history targets, where the jitter
+/// sequence is and whether the history holds a resolved frame.
 pub(crate) struct TaaHistory {
     size: (u32, u32),
     frames: [PfxTarget; 2],
@@ -143,8 +143,6 @@ pub(crate) struct TaaHistory {
     valid: bool,
     /// The jitter sequence's frame counter.
     frame: u32,
-    /// This frame's jitter, in NDC.
-    jitter: Vec2,
     /// Whether the resolve ran this frame: its output is then the scene.
     ran: bool,
 }
@@ -164,7 +162,6 @@ impl TaaHistory {
             latest: 0,
             valid: false,
             frame: 0,
-            jitter: Vec2::ZERO,
             ran: false,
         }
     }
@@ -198,30 +195,19 @@ pub(crate) fn begin(view: &mut RenderView, device: &wgpu::Device, on: bool) -> V
     }
     h.frame = h.frame.wrapping_add(1);
     h.ran = false;
-    h.jitter = jitter::ndc(jitter::pixels(h.frame), size);
-    h.jitter
-}
-
-/// The jitter `view` draws this frame with (zero when it runs no TAA): what a pass
-/// building its own view-projection (particles, ribbons, world UI) applies through
-/// [`jitter::jittered`], so it lines up with the depth the solids wrote.
-pub(crate) fn jitter_of(view: &RenderView) -> Vec2 {
-    let history = view.post_fx.targets.get::<TaaHistory>();
-    history.map_or(Vec2::ZERO, |h| h.jitter)
+    jitter::ndc(jitter::pixels(h.frame), size)
 }
 
 impl PostFx {
-    /// Resolve this frame against the history, or drop the history when the view
-    /// wrote no velocity.
+    /// Resolve this frame against the history. `draw_stack` gates the history
+    /// and the velocity target on the same `taa::wanted`, so a view holds both or
+    /// neither.
     pub(crate) fn run_taa(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         passes: &TaaPasses,
         timer: &GpuTimer,
     ) {
-        if self.motion.target_view().is_none() {
-            self.targets.remove::<TaaHistory>();
-        }
         let (Some(h), Some(velocity)) =
             (self.targets.get::<TaaHistory>(), self.motion.target_view())
         else {
@@ -258,6 +244,8 @@ impl PostFx {
 }
 
 #[cfg(test)]
+mod cut_gpu_tests;
+#[cfg(test)]
 mod ghost_gpu_tests;
 #[cfg(test)]
 mod gpu_fixture;
@@ -265,6 +253,19 @@ mod gpu_fixture;
 mod gpu_tests;
 #[cfg(test)]
 mod shimmer_gpu_tests;
+#[cfg(test)]
+mod viewmodel_gpu_tests;
+
+/// The jitter `view` drew its last frame with (zero when it runs no TAA), for a
+/// test. A pass never reads it: every camera's jittered matrix is
+/// `CameraCtx::view_proj`, the one a pass that builds its own uniform takes.
+#[cfg(test)]
+pub(crate) fn jitter_of(view: &RenderView) -> Vec2 {
+    let history = view.post_fx.targets.get::<TaaHistory>();
+    history.map_or(Vec2::ZERO, |h| {
+        jitter::ndc(jitter::pixels(h.frame), view.scene_size())
+    })
+}
 
 #[cfg(test)]
 impl PostFx {

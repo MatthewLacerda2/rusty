@@ -1,6 +1,6 @@
-//! TAA on lavapipe (#1702): off means off, a still view writes no motion through
-//! the jitter, a still frame converges toward a supersampled reference, and a NaN
-//! in the history does not stay.
+//! TAA on lavapipe (#1702): off means off, FXAA skips when it runs, a still view
+//! writes no motion through the jitter, a still frame converges toward a
+//! supersampled reference, and a NaN in the history does not stay.
 
 use glam::Vec3;
 
@@ -25,6 +25,21 @@ fn gpu_off_means_off_no_history_no_velocity_no_jitter() {
     );
     assert_eq!(jitter_of(&v), glam::Vec2::ZERO, "no jitter");
     assert!(first == second, "no frame-to-frame change");
+}
+
+/// One anti-aliasing: on a frame the resolve ran, FXAA's switch changes nothing.
+#[test]
+fn gpu_fxaa_skips_on_a_frame_taa_resolved() {
+    let Some(mut r) = renderer() else { return };
+    let mut run = |fxaa| {
+        let (mut scene, _) = taa_scene(true, fxaa);
+        tilted_cube(&mut scene, Vec3::new(0.0, 0.0, -5.0));
+        let mut v = view(&r);
+        let out = settle(&mut r, &mut v, &scene, &eye(0.0), 3);
+        assert!(v.post_fx.taa_ran(), "the resolve ran");
+        out
+    };
+    assert!(run(true) == run(false), "FXAA ran over TAA's frame");
 }
 
 #[test]

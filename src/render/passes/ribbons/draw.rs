@@ -7,7 +7,7 @@
 
 use std::rc::Rc;
 
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
 use super::strip::{self, RibbonVertex};
@@ -17,7 +17,6 @@ use crate::components::{ParticleBlend, RibbonStyle};
 use crate::render::draw::batch::sort::{back_to_front, view_depth};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::passes::particles::ParticleDraws;
-use crate::render::postfx::effects::taa::{jitter::jittered, jitter_of};
 use crate::render::timing::GpuPass;
 use crate::render::{GpuTexture, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -41,15 +40,18 @@ struct Ribbons {
 impl Renderer {
     /// One camera's blended effects after the world canvases: ribbons, then sprite
     /// particles. Ribbon draws count toward the frame's draw calls; `instances`
-    /// stays the sprite particles'.
+    /// stays the sprite particles'. `view_proj` is the camera's as the solids drew
+    /// (`CameraCtx::view_proj`: jittered on a TAA view, #1702), so a depth-tested or
+    /// depth-faded effect lines up with the depth it reads.
     pub(crate) fn draw_effects(
         &mut self,
         view: &mut RenderView,
         scene: &Scene,
         camera: &Camera,
+        view_proj: Mat4,
     ) -> ParticleDraws {
-        let ribbons = self.draw_ribbons(view, scene, camera);
-        let mut draws = self.draw_particles(view, scene, camera);
+        let ribbons = self.draw_ribbons(view, scene, camera, view_proj);
+        let mut draws = self.draw_particles(view, scene, camera, view_proj);
         draws.draw_calls += ribbons;
         draws
     }
@@ -61,6 +63,7 @@ impl Renderer {
         view: &RenderView,
         scene: &Scene,
         camera: &Camera,
+        view_proj: Mat4,
     ) -> u32 {
         // Ribbons are dynamic effects: never baked into a static probe capture.
         if self.capture.static_only {
@@ -70,8 +73,6 @@ impl Renderer {
         if ribbons.draws.is_empty() {
             return 0;
         }
-        // Jittered as the solids are on a TAA view (#1702).
-        let view_proj = jittered(camera.build_view_projection(view.aspect()), jitter_of(view));
         let globals = RibbonGlobals {
             view_proj: view_proj.to_cols_array(),
             cam_pos: camera.position.extend(0.0).to_array(),

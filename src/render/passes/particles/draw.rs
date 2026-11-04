@@ -8,7 +8,7 @@
 
 use std::rc::Rc;
 
-use glam::Vec3;
+use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
 use super::instance::{emitter_instances, emitter_light, Eye, ParticleGlobals, ParticleInstance};
@@ -17,7 +17,6 @@ use crate::components::particle::ParticleBlend;
 use crate::components::ParticleRenderMode;
 use crate::render::draw::batch::sort::back_to_front;
 use crate::render::gpu::uniforms::FogUniform;
-use crate::render::postfx::effects::taa::{jitter::jittered, jitter_of};
 use crate::render::timing::GpuPass;
 use crate::render::{GpuTexture, RenderView, Renderer};
 use crate::scene::Camera;
@@ -67,6 +66,7 @@ impl Renderer {
         view: &mut RenderView,
         scene: &Scene,
         camera: &Camera,
+        view_proj: Mat4,
     ) -> ParticleDraws {
         let eye = Eye {
             pos: camera.position,
@@ -76,9 +76,6 @@ impl Renderer {
         if runs.is_empty() {
             return ParticleDraws::default();
         }
-        // Jittered as the solids are on a TAA view (#1702), so a soft particle's
-        // depth fade reads the depth it lines up with.
-        let view_proj = jittered(camera.build_view_projection(view.aspect()), jitter_of(view));
         let (right, up) = billboard_basis(camera);
         let globals = ParticleGlobals {
             view_proj: view_proj.to_cols_array(),
