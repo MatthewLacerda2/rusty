@@ -344,6 +344,7 @@ where it reads best. -->
 - [`Camera`](Camera.md)
 - [`Light`](Light.md)
 - [`LODGroup`](LODGroup.md)
+- [`Mesh`](Mesh.md)
 - [`LightProbeProxyVolume`](LightProbeProxyVolume.md)
 - [`Probe`](Probe.md)
 - [`Reflection`](Reflection.md)

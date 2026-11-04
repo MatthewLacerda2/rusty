@@ -125,6 +125,33 @@ mod tests {
     }
 
     #[test]
+    fn the_small_object_cull_settings_are_held_in_range() {
+        let mut m = primitive_mesh_component(Primitive::Box).unwrap();
+        for (v, distance, size) in [(25.0, 25.0, 1.0), (0.05, 0.05, 0.05), (-3.0, 0.0, 0.0)] {
+            set_max_draw_distance(&mut m, v);
+            set_min_screen_size(&mut m, v);
+            assert_eq!(
+                (m.max_draw_distance, m.min_screen_size),
+                (distance, size),
+                "{v}"
+            );
+        }
+        for bad in [f32::NAN, f32::INFINITY] {
+            set_max_draw_distance(&mut m, bad);
+            set_min_screen_size(&mut m, bad);
+            assert_eq!(
+                (m.max_draw_distance, m.min_screen_size),
+                (0.0, 0.0),
+                "{bad}"
+            );
+        }
+        let saved = serde_json::to_value(&m).unwrap();
+        assert!(saved.get("max_draw_distance").is_none(), "off is not saved");
+        set_max_draw_distance(&mut m, 30.0);
+        assert_eq!(serde_json::to_value(&m).unwrap()["max_draw_distance"], 30.0);
+    }
+
+    #[test]
     fn a_loaded_count_is_held_into_what_the_grid_builds() {
         let mut plane = primitive_mesh_component(Primitive::Plane).unwrap();
         for (read, held) in [(0, Some(1)), (500, Some(256)), (64, None)] {
