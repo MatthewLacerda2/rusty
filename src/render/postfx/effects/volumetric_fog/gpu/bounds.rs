@@ -57,7 +57,9 @@ fn gpu_a_bright_lamp_in_thick_fog_stays_finite_and_lit() {
     };
     let lamp_depth = -LAMP_AT.z;
     for z in 1..d {
-        if far_end(z) < lamp_depth - 1.0 || far_end(z - 1) > lamp_depth {
+        // In front of the lamp, where its light scatters forward to the eye (the
+        // slices past it scatter backward, too little to show in a half float).
+        if far_end(z) < lamp_depth - 1.5 || far_end(z) > lamp_depth {
             continue;
         }
         assert!(

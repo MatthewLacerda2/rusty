@@ -98,13 +98,25 @@ fn gpu_ssr_reflects_no_light_the_fog_took() {
         ..MaterialAsset::default()
     };
     scene.materials.insert("mirror".into(), mirror);
+    // A black sky, so the mirror reflects nothing SSR's hit would replace: the
+    // whole change SSR makes is the wall it finds.
+    (scene.sky.zenith, scene.sky.horizon, scene.sky.ground) =
+        (Some(Vec3::ZERO), Some(Vec3::ZERO), Some(Vec3::ZERO));
     wall_and_lamp(&mut scene);
+    // A glowing wall, so the hit SSR finds is what changes the floor (dim
+    // enough that the 8-bit frame does not clip it).
+    let glowing = MaterialAsset {
+        base_color: [1.0, 0.05, 0.05],
+        emissive: [0.6, 0.0, 0.0],
+        ..MaterialAsset::default()
+    };
+    scene.materials.insert("red".into(), glowing);
     let Some((reflected, fogged_reflected, through)) = gains(&mut scene, set_ssr) else {
         return;
     };
     eprintln!("[volumetric] SSR {reflected} clear, {fogged_reflected} fogged, through {through}");
     assert!(
-        reflected > 0.0 && through < 0.9,
+        reflected > 0.5 && through < 0.9,
         "a reflection, and fog that takes light"
     );
     assert!(
