@@ -20,6 +20,7 @@ pub use texture::{
     TextureSettings, TextureType, WrapMode, DEFAULT_MAX_SIZE, MAX_SIZES,
 };
 
+use super::humanoid::HumanoidSettings;
 use super::lightmap_uv::LightmapUvSettings;
 use super::mesh_data::ImportedAsset;
 use super::ImportError;
@@ -69,6 +70,10 @@ pub struct ImportSettings {
     /// A texture's wrap, filter and mipmap settings (#1323); defaults for a model.
     #[serde(default)]
     pub texture: TextureSettings,
+    /// The humanoid bone map and the models whose clips are retargeted onto
+    /// this one (#1747). Left out of the file while empty.
+    #[serde(default, skip_serializing_if = "HumanoidSettings::is_empty")]
+    pub humanoid: HumanoidSettings,
 }
 
 fn default_scale() -> f32 {
@@ -83,6 +88,7 @@ impl Default for ImportSettings {
             colliders: BTreeMap::new(),
             lightmap_uvs: LightmapUvSettings::default(),
             texture: TextureSettings::default(),
+            humanoid: HumanoidSettings::default(),
         }
     }
 }
