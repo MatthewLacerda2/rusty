@@ -149,3 +149,11 @@ mod probe_bounce_tests;
 #[cfg(test)]
 #[path = "modes_tests.rs"]
 mod probe_modes_tests;
+
+#[cfg(test)]
+#[path = "hdr_tests.rs"]
+mod probe_hdr_tests;
+
+#[cfg(test)]
+#[path = "hdr_finite_tests.rs"]
+mod probe_hdr_finite_tests;

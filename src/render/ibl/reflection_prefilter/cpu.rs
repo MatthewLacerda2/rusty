@@ -48,34 +48,52 @@ fn filter_mip(
             .map(|i| {
                 let (u, v) = face_uv(i % size, i / size, size);
                 let n = proj.direction(face, u, v);
-                convolve(proj, chain, base, n, roughness)
+                convolve(proj, chain, base, n, (roughness, Taps::BAKE))
             })
             .collect();
         encode_face(&texels)
     })
 }
 
+/// How a convolution samples: how many taps, and whether each reads the source mip
+/// its solid angle picks or the base level alone.
+#[derive(Clone, Copy)]
+pub(crate) struct Taps {
+    pub count: u32,
+    pub filtered: bool,
+}
+
+impl Taps {
+    /// The bake's: [`SAMPLE_COUNT`] filtered taps.
+    pub(crate) const BAKE: Taps = Taps {
+        count: SAMPLE_COUNT,
+        filtered: true,
+    };
+}
+
 /// GGX split-sum convolution at normal `n` for `roughness`: importance-sample half-vectors
 /// around `n`, reflect the view (= n) across each, and average the source radiance at the
-/// sample's own mip, weighted by `N·L`. Returns linear RGB.
-fn convolve(
+/// sample's own mip, weighted by `N·L`. Returns linear RGB. Tests convolve with other
+/// [`Taps`] for a ground truth to hold the bake's against.
+pub(crate) fn convolve(
     proj: &FaceProjections,
     chain: &[[Vec<Vec3>; 6]],
     base: u32,
     n: Vec3,
-    roughness: f32,
+    (roughness, taps): (f32, Taps),
 ) -> Vec3 {
     let (tangent, bitangent) = basis(n);
     let a = roughness * roughness;
     let mut color = Vec3::ZERO;
     let mut weight = 0.0;
-    for i in 0..SAMPLE_COUNT {
-        let xi = hammersley(i, SAMPLE_COUNT);
+    for i in 0..taps.count {
+        let xi = hammersley(i, taps.count);
         let h = importance_sample_ggx(xi, roughness, n, tangent, bitangent);
         let l = (2.0 * n.dot(h) * h - n).normalize_or_zero();
         let ndotl = n.dot(l).max(0.0);
         if ndotl > 0.0 {
-            let lod = sample_mip(n.dot(h), a * a, SAMPLE_COUNT, base);
+            let filtered = sample_mip(n.dot(h), a * a, taps.count, base);
+            let lod = if taps.filtered { filtered } else { 0.0 };
             color += sample_lod(proj, chain, base, l, lod) * ndotl;
             weight += ndotl;
         }

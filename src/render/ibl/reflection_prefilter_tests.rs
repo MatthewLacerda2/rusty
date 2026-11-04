@@ -33,7 +33,7 @@ fn split_capture(res: u32) -> CubemapCapture {
 }
 
 /// Spatial variance of a face's summed channels (a blur lowers it).
-pub(super) fn face_variance(face: &[u8]) -> f32 {
+fn face_variance(face: &[u8]) -> f32 {
     let lum: Vec<f32> = texels(face).iter().map(|c| c.element_sum()).collect();
     let mean = lum.iter().sum::<f32>() / lum.len() as f32;
     lum.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / lum.len() as f32

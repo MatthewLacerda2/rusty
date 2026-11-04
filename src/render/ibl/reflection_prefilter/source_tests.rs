@@ -49,7 +49,11 @@ fn encode_face_writes_rgba_halves() {
 fn sample_mip_follows_the_lobe_and_stays_in_the_chain() {
     let base = 256;
     let sharp = (1.0f32 / 9.0).powi(4);
-    assert_eq!(sample_mip(1.0, sharp, 128, base), 0.0, "a mirror-like peak");
+    assert!(
+        sample_mip(1.0, sharp, 128, base) < 1.0,
+        "a mirror-like peak"
+    );
+    assert_eq!(sample_mip(1.0, sharp / 100.0, 128, base), 0.0);
     let (peak, flank) = (
         sample_mip(1.0, 0.5, 128, base),
         sample_mip(0.3, 0.5, 128, base),

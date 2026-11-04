@@ -3,8 +3,10 @@
 
 use glam::Vec3;
 
-use super::super::cpu::prefilter;
-use super::face_variance;
+use super::super::cpu::{convolve, prefilter, Taps};
+use super::super::source::source_chain;
+use super::super::SAMPLE_COUNT;
+use crate::render::ibl::cube_sample::{face_uv, FaceProjections};
 use crate::render::ibl::reflection_prefilter::source::decode_face as texels;
 use crate::render::{CubemapCapture, CubemapFace};
 
@@ -64,31 +66,57 @@ fn a_rough_mip_keeps_a_small_lamps_energy() {
     );
 }
 
-/// At high roughness one small bright source is a smooth glow: neighbouring texels
-/// of the face that sees it differ by a small part of the face's brightest, where
-/// sampling only the base level would leave a speckle of the few taps that hit it.
+/// At high roughness one small bright source is a smooth glow: the bake's 128
+/// filtered taps land close to a 16384-tap ground truth over the face that sees it,
+/// where 128 taps of the base level alone leave a speckle of the few that hit it.
 #[test]
 fn a_high_roughness_mip_of_a_small_lamp_is_smooth() {
     let res = 64;
-    let cube = prefilter(&lamp_capture(res, 1000.0));
-    let f = CubemapFace::PosZ as usize;
-    for level in [3, 4] {
-        let size = cube.level_size(level) as usize;
-        let face = texels(&cube.mips[level][f]);
-        let peak = face.iter().fold(0.0f32, |m, c| m.max(c.x));
-        let step = (0..size * size)
-            .filter(|i| i % size + 1 < size)
-            .map(|i| (face[i].x - face[i + 1].x).abs())
-            .fold(0.0f32, f32::max);
-        assert!(peak > 0.0, "mip {level} sees the lamp");
+    let capture = lamp_capture(res, 1000.0);
+    let cube = prefilter(&capture);
+    let (proj, chain) = (FaceProjections::new(), source_chain(&capture));
+    let levels = cube.level_count();
+    for level in [2, 3, 4] {
+        let size = cube.level_size(level);
+        let roughness = level as f32 / (levels - 1) as f32;
+        let at = |i: u32, taps: Taps| {
+            let (u, v) = face_uv(i % size, i / size, size);
+            let n = proj.direction(CubemapFace::PosZ, u, v);
+            convolve(&proj, &chain, res, n, (roughness, taps)).x
+        };
+        let truth: Vec<f32> = (0..size * size).map(|i| at(i, TRUTH)).collect();
+        let peak = truth.iter().fold(0.0f32, |m, &v| m.max(v));
+        let error = |got: &dyn Fn(u32) -> f32| {
+            let squares = (0..size * size).map(|i| (got(i) - truth[i as usize]).powi(2));
+            (squares.sum::<f32>() / (size * size) as f32).sqrt() / peak
+        };
+        let baked = texels(&cube.mips[level][CubemapFace::PosZ as usize]);
+        let filtered = error(&|i| baked[i as usize].x);
+        let base_only = error(&|i| at(i, BASE_ONLY));
         assert!(
-            step < MAX_NEIGHBOUR_STEP * peak,
-            "mip {level}: a neighbour step of {step} against a peak of {peak}"
+            filtered < MAX_ERROR,
+            "mip {level}: {filtered} of the peak from the truth"
         );
-        assert!(face_variance(&cube.mips[level][f]).is_finite());
+        assert!(
+            filtered < base_only / 2.0,
+            "mip {level}: filtered {filtered} vs base-only {base_only}"
+        );
     }
 }
 
-/// The largest step between neighbouring texels of a rough mip, as a part of its
-/// peak.
-const MAX_NEIGHBOUR_STEP: f32 = 0.35;
+/// The ground truth's taps: enough that every one of the lamp's texels is hit often.
+const TRUTH: Taps = Taps {
+    count: 16384,
+    filtered: false,
+};
+/// The bake's tap count without the per-tap mip: the speckle filtering removes.
+const BASE_ONLY: Taps = Taps {
+    count: SAMPLE_COUNT,
+    filtered: false,
+};
+/// The bake's root-mean-square distance from the truth, as a part of the truth's peak.
+/// Measured: 0.014, 0.051 and 0.177 at mips 2–4, against 0.099, 0.50 and 0.63 for
+/// the base level alone. The roughest mips (5 and 6 here, two texels and one) stay
+/// about 0.4 off: their taps read the 1×1 and 2×2 source levels by nearest texel,
+/// which a bilinear lookup across face edges would smooth.
+const MAX_ERROR: f32 = 0.25;
