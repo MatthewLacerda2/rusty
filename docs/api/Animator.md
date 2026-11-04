@@ -270,7 +270,10 @@ Each fixed step the root bone's **horizontal** displacement and its **yaw** (the
 turn about the up axis), measured in the model's own Y-up space, are the step's
 root motion. A Z-up Blender export (an `Armature` node turned and scaled 0.01
 above the mesh) is measured the same way, so it travels what its clip does, in
-metres, and turns about the model's up as the entity shows it (#1822):
+metres, and turns about the model's up as the entity shows it (#1822). That holds
+for the whole model, whose `Armature` entity carries the turn and scale: a mesh
+spawned alone by its `path::sub_object` reference has no such parent, so it stands
+as the file's mesh does, lying down at 100×, and travels to match. Then:
 - a looping clip's wrap doesn't snap back: the travel is split at the seam and
   the pieces chained, so a looped walk keeps walking; a non-looping clip stops
   at its end;
