@@ -8,7 +8,7 @@ import subprocess
 import ghrest
 from merging.queue import outcomes
 from merging.verdict import closing, github, reviewed, runlist
-from merging.watch import board, handbacks
+from merging.watch import board, handbacks, stalls
 
 
 # How GitHub names Dependabot as an author (REST says `dependabot[bot]`).
@@ -116,3 +116,20 @@ def head_runs(repo: str, sha: str) -> str | None:
         return None
     runs = listed.get("workflow_runs", [])
     return handbacks.attempts([r for w in runlist.WORKFLOWS for r in runlist.runs_for(runs, sha, w)])
+
+
+def head_reading(repo: str, pull: dict) -> tuple[str, str] | None:
+    """[`watch.stalls.reading`] of the gating runs on `pull`'s head and their
+    jobs, `None` when GitHub failed: what brings a stalled head back (#1831)."""
+    sha = pull.get("headRefOid", "")
+    listed = quietly("api", f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100")
+    if listed is None:
+        return None
+    runs = [r for w in runlist.WORKFLOWS for r in runlist.runs_for(listed.get("workflow_runs", []), sha, w)]
+    jobs = {}
+    for run in runs:
+        got = quietly("api", f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100")
+        if got is None:
+            return None
+        jobs[run["id"]] = got.get("jobs", [])
+    return stalls.reading(pull, runs, jobs)

@@ -67,7 +67,7 @@ class Flicker(unittest.TestCase):
     def test_a_run_that_never_comes_back_is_handed_back_naming_the_flicker(self):
         state, lines = waited([RUNNING, EMPTY])
         said = " ".join(lines)
-        self.assertEqual(state, outcomes.STOP)
+        self.assertEqual(state, outcomes.STALLED)
         self.assertIn("dropped out of the runs listing", said)
         self.assertIn("minutes", said)
         self.assertNotIn("empty commit", said)

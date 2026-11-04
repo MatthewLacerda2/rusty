@@ -21,7 +21,8 @@ def wait_for(
     runners caused is re-run once ([`polling.rerun_step`]) on the same clock,
     and a red whose jobs do not yet show it over is given a grace from the
     poll that first read it so ([`polling.lagging`], #1109, #1182), then
-    judged as its jobs are listed ([`polling.expiry`]).
+    judged as its jobs are listed ([`polling.expiry`]). Past `deadline` with
+    the runs still out it ends [`outcomes.STALLED`], not a stop (#1831).
     `tick()`, when given, runs once per poll: the watch reports its board
     there, so a pull request turning ready during a long run is heard of
     within a poll, not when the take ends (#928).
@@ -44,7 +45,9 @@ def wait_for(
             elif state != outcomes.WAIT:
                 return state, lines
         if waited > deadline:
-            return outcomes.STOP, [
+            # Its own state, not a red one: the watch brings it back by itself
+            # when the run it outwaited goes green ([`watch.stalls`], #1831).
+            return outcomes.STALLED, [
                 f"still waiting on {sha[:7]} after {waited / 60:.0f} minutes.",
                 *lines,
                 "Handed back with the run still out. Nothing is red; nothing is green either.",

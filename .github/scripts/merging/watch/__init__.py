@@ -21,7 +21,10 @@ the background is woken then. A hand-back is not one of those (#751):
   watch or a later one; `make queue PRS=N` ignores the memory. **A new run
   attempt on that head counts as moving** (#869): the runs on it are
   remembered too ([`handbacks.RUNS_MEMORY`], [`handbacks.rerun_heads`]), so `gh run rerun` after a
-  runner outage, or a flaky job re-run by hand, re-queues it without a push. **A hand-back no push fixes waits for what does**
+  runner outage, or a flaky job re-run by hand, re-queues it without a push. **A
+  hand-back for outwaiting its runs comes back when they go green** (#1831,
+  [`stalls`], [`handbacks.STALLS_MEMORY`]): #1820 and #1827 sat parked after
+  their runs went green during GitHub's Actions incidents of 2026-11-04. **A hand-back no push fixes waits for what does**
   (#1279, [`handbacks`]): one for the description or labels comes back when they
   change ([`handbacks.CLAIMS_MEMORY`]), one the closed issue refuses when that
   issue no longer does ([`handbacks.ISSUES_MEMORY`]), and one no review

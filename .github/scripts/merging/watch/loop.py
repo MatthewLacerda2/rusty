@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from merging.queue import outcomes
-from merging.watch import aging, board, ending, handbacks, mainline, order
+from merging.watch import aging, board, ending, handbacks, mainline, order, stalls
 
 
 def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
@@ -30,7 +30,11 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     moves or runs again; one in [`outcomes.AWAITING`] also until its body or labels
     change ([`handbacks.reworded`]), and an `AWAITS_ISSUE` one until its issues no
     longer refuse it ([`handbacks.unblocked`], #1279), and an `AWAITS_REVIEW` one until a
-    comment records its review decision ([`handbacks.reviewed`], #1764).
+    comment records its review decision ([`handbacks.reviewed`], #1764). An
+    [`outcomes.STALLED`] one (it outwaited its runs, #1831) also comes back when
+    `stalled(pull)` ([`stalls.reading`] of its head's runs, or `None`) says every
+    run on it went green ([`stalls.returned`]); one that ended otherwise is said
+    once and waits like a red one.
     `stale_code()` names the queue's files that changed on `main` since launch
     ([`freshness.changed`]); asked before each take, a non-empty answer ends the
     watch ([`ending.relaunch`]) with the pull request untaken.
@@ -44,6 +48,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     claims = handbacks.recall(fx.memory.with_name(handbacks.CLAIMS_MEMORY))
     issues = handbacks.recall(fx.memory.with_name(handbacks.ISSUES_MEMORY))
     reviews = handbacks.recall(fx.memory.with_name(handbacks.REVIEWS_MEMORY))
+    stalled = handbacks.recall(fx.memory.with_name(handbacks.STALLS_MEMORY))
     line = aging.Line()
     shown = [None]  # the board as last reported; `None` until the first listing
 
@@ -53,10 +58,11 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         handbacks.remember(fx.memory.with_name(handbacks.CLAIMS_MEMORY), {n: c for n, c in claims.items() if n in memory})
         handbacks.remember(fx.memory.with_name(handbacks.ISSUES_MEMORY), {n: i for n, i in issues.items() if n in memory})
         handbacks.remember(fx.memory.with_name(handbacks.REVIEWS_MEMORY), {n: r for n, r in reviews.items() if n in memory})
+        handbacks.remember(fx.memory.with_name(handbacks.STALLS_MEMORY), {n: s for n, s in stalled.items() if n in memory})
 
     def forget(number: int) -> None:
         """Drop everything remembered against `number`: it is back in line."""
-        for kept in (memory, marks, claims, issues, reviews):
+        for kept in (memory, marks, claims, issues, reviews, stalled):
             kept.pop(number, None)
 
     def report(pulls: list[dict]) -> None:
@@ -92,8 +98,10 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         else:
             forget(number)
             memory[number] = (fx.head(number) if ask else None) or head
-            waits = state if isinstance(result, outcomes.Awaiting) else None
-            if waits:
+            waits = state if isinstance(result, outcomes.Awaiting) or state == outcomes.STALLED else None
+            if waits == outcomes.STALLED:
+                stalled[number] = waits
+            elif waits:
                 claims[number] = result.claim
                 if result.issues:
                     issues[number] = handbacks.spell(result.issues)
@@ -128,6 +136,14 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         for number in handbacks.rerun_heads(pulls, memory, marks, fx.attempts):
             forget(number)
             fx.say(f"watch: #{number} has run again on its handed-back head; back in line.")
+        back, ended = stalls.returned(pulls, memory, stalled, fx.stalled)
+        for number in back:
+            forget(number)
+            fx.say(f"watch: #{number}'s runs, which its hand-back outwaited, went green; back in line.")
+        for number, why in ended:
+            stalled.pop(number)  # an ordinary hand-back from here: a re-run or a push brings it back
+            fx.say(f"watch: #{number}'s runs, which its hand-back outwaited, ended without going green: {why}"
+                   " Passed over until its head moves or runs again.")
         for number in handbacks.reworded(pulls, memory, claims):
             forget(number)
             fx.say(f"watch: #{number}'s description or labels changed since its hand-back; back in line.")
