@@ -48,7 +48,7 @@ impl Default for PostParams {
     }
 }
 
-/// A colour texture + its default view, kept together for the ping-pong buffers.
+/// A colour texture + its default view, kept together: a pass's target.
 pub struct PfxTarget {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
@@ -81,15 +81,16 @@ pub struct PostFx {
 
     /// HDR scene colour the main pass draws into.
     pub scene_hdr: PfxTarget,
-    /// Bloom's ping-pong buffers (bright pass / blur), at reduced resolution.
-    pub(crate) bloom: effects::bloom::BloomTargets,
+    /// The lens dirt bloom picked for this view this frame (#1442), its composite
+    /// texture; bloom's chain itself is one of [`PostFx::targets`] (#1700).
+    pub(crate) bloom_dirt: Option<std::rc::Rc<crate::render::GpuTexture>>,
     /// Full-resolution LDR image the composite writes when FXAA is on, so the FXAA
     /// pass has a finished, tonemapped, gamma-encoded frame to sample.
     ///
     /// This is the one target the chain gained for #360, and it is unavoidable rather
     /// than incidental: FXAA is defined on post-tonemap colour, so it cannot fold into
-    /// the composite, and the existing ping-pong buffers are at the bloom divisor's
-    /// reduced resolution and in HDR format. With FXAA off the composite writes
+    /// the composite, and bloom's chain is at its divisor's reduced resolution and in
+    /// HDR format. With FXAA off the composite writes
     /// straight to the output and this texture is simply never read — the off path
     /// stays a byte-exact pass-through.
     pub ldr: PfxTarget,
@@ -102,7 +103,8 @@ pub struct PostFx {
     /// while motion blur runs, and last frame's cameras and poses.
     pub(crate) motion: crate::render::motion::MotionVectors,
     /// Each effect's own targets while it runs (#1467): depth of field's (#1445),
-    /// motion blur's tiles and blurred scene (#1436), one slot per effect.
+    /// motion blur's tiles and blurred scene (#1436), bloom's chain (#1700), one
+    /// slot per effect.
     pub(crate) targets: effects::Targets,
 }
 

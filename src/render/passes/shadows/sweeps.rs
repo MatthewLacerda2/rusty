@@ -20,6 +20,9 @@ impl ShadowRenderer {
         frame: &CasterFrame,
         lod: &LodSelection,
     ) {
+        if self.cascades.is_empty() {
+            return; // no live sun (#1713): nothing to bake, copy or draw
+        }
         let scene = frame.scene;
         let statics = frame.statics;
         let key = |c: &Cascade| Some((statics, c.light_space));
@@ -73,7 +76,7 @@ impl ShadowRenderer {
             wgpu::Extent3d {
                 width: Self::CASCADE_SIZE,
                 height: Self::CASCADE_SIZE,
-                depth_or_array_layers: self.cascades.len().max(1) as u32,
+                depth_or_array_layers: self.cascades.len() as u32,
             },
         );
     }

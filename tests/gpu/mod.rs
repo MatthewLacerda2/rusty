@@ -50,6 +50,7 @@ mod fog;
 mod frame_stats_render;
 mod fxaa_screenshot;
 mod harness_size_screenshot;
+mod hdr_overflow_screenshot;
 mod instancing_budget;
 mod lightmap_formats_screenshot;
 mod lightmap_screenshot;

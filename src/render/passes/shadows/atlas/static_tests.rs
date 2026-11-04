@@ -128,6 +128,7 @@ fn gpu_a_static_flag_flip_rebakes_with_no_one_invalidating() {
     };
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let mut scene = lamp_room();
+    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight)); // cascades (#1713)
     let crate_id = block(
         &mut scene,
         Vec3::new(-1.0, 1.0, 0.0),

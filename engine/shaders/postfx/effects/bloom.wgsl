@@ -1,5 +1,5 @@
 // engine/shaders/postfx/effects/bloom.wgsl — bloom's add, in the composite: the
-// blurred bright pass (`postfx/bloom.wgsl`, run before the composite) over the HDR
+// top of its mip chain (`postfx/bloom.wgsl`, run before the composite) over the HDR
 // image, and the lens dirt it lights (#1442), as Unity's `UberPost` adds them:
 // `bloom *= intensity; color += bloom; color += dirt * dirt_intensity * bloom`.
 // Slot 0: x intensity, y intensity × dirt intensity (`0`: no dirt), w `1` while

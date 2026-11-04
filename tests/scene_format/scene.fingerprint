@@ -499,6 +499,7 @@ scene.entities[].post_processing.bloom.dirt_texture: string
 scene.entities[].post_processing.bloom.intensity: f32
 scene.entities[].post_processing.bloom.quality: enum Low|Medium|High|Custom
 scene.entities[].post_processing.bloom.resolution_divisor: u32
+scene.entities[].post_processing.bloom.scatter: f32
 scene.entities[].post_processing.bloom.threshold: f32
 scene.entities[].post_processing.chromatic_aberration.active: bool
 scene.entities[].post_processing.chromatic_aberration.intensity: f32
