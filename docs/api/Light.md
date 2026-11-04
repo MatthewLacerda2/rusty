@@ -188,20 +188,27 @@ whether it is drawn live:
   **Its highlight** (#1695). A lightmap holds a `Baked` light's diffuse light only, so
   on its own a metal rail or a polished floor beside a `Baked` lamp shows no glint.
   A **directional** bake (`Lighting.BakeLightmaps`'s `directional`, on by default)
-  also records where each texel's light comes from, and a lightmapped surface turns
-  that dominant direction into one GGX highlight, as a live light's, with the texel's
-  light as its strength. Unity has no such term; it follows Bakery's *Directional
-  Specular* and Frostbite. It is always on with a directional bake (a per-material
-  switch would sit with specular AA's), costs one BRDF evaluation per lightmapped
-  pixel, and is not darkened by SSAO, which leaves direct light alone (the static
-  occluders' shadows are already in the bake). Its limits:
+  also records where each texel's light comes from and how much of it is `Baked`
+  lights' direct light (its *lamp share*), and a lightmapped surface turns that part
+  into one GGX highlight from the lamps' direction, as a live light's, with the
+  lamps' share of the texel's light as its strength. Unity has no such term; it
+  follows Bakery's *Directional Specular* and Frostbite. It is always on with a
+  directional bake (a per-material switch would sit with specular AA's), costs one
+  BRDF evaluation per lightmapped pixel, and is not darkened by SSAO, which leaves
+  direct light alone (the static occluders' shadows are already in the bake). Its
+  limits:
+  - **Lamps only.** Sky, bounce and emission give no highlight, however much they
+    come from one side (an open sky over a dark ground, a `Mixed` spot's bounce off
+    the floor onto a glossy ceiling): the environment reflection reflects them. A
+    `Mixed` light gives its highlight live, and its baked bounce none.
   - **One highlight per texel.** Two lamps lighting one texel give one highlight
-    between them, pulled toward both and weakened, where live lights give two. Light
-    arriving evenly from all over the surface's hemisphere (an open sky, a room's even
-    bounce) gives none: the environment reflection already reflects it.
+    between them, pulled toward both and weakened (two lamps at 45° either side of
+    a floor's normal keep about 0.7 of their light in it), where live lights give
+    two. Where a lamp supplies under a quarter of a texel's light (the edge of its
+    range), the highlight's direction eases from the lamp's toward the mean of all
+    the texel's light, so the hand-over leaves no seam.
   - **Its sharpness is the lightmap's.** A glossy highlight smaller than a lightmap
     texel is spread over one; raise the bake's texels per unit where it matters.
   - **A level needs a directional bake** to have it; a non-directional lightmap, a
-    surface with no lightmap and a probe-lit dynamic object get none. A `Mixed` light
-    is unaffected: its lightmap holds only its bounce, and its live light gives its
-    highlight. No probe or reflection bake sees it, since it depends on the viewer.
+    surface with no lightmap and a probe-lit dynamic object get none. No probe or
+    reflection bake sees it, since it depends on the viewer.

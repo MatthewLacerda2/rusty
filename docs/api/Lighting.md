@@ -286,9 +286,12 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   colour. At runtime a lightmapped surface reshapes its baked light by how its
   **normal-mapped** normal faces that direction, so bumps, tiles and panel seams read
   under baked light as they do under realtime light (a surface without a normal map
-  keeps its baked diffuse exactly as a non-directional bake gives it). The direction
-  also gives a glossy surface one specular highlight from `Baked` lights
-  ([`Light`](Light.md), #1695), which a non-directional bake has none of. `directional = false` (or the editor's
+  keeps its baked diffuse exactly as a non-directional bake gives it). Where `Baked`
+  lights reach a texel the direction is theirs, so there a normal map reshapes the
+  texel's bounce by the lamp too. Each texel also stores its **lamp share**, how much
+  of its light is `Baked` lights' direct light from one way, which gives a glossy
+  surface one specular highlight from those lights ([`Light`](Light.md), #1695) and
+  none from sky or bounce; a non-directional bake has none. `directional = false` (or the editor's
   **"Directional lightmaps"** checkbox under the Generate Lighting button) skips the direction pages
   to save their memory; the colour lightmaps are byte-identical either way.
 - **At runtime** a lightmapped surface takes its ambient term from the lightmap instead
@@ -305,8 +308,9 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   ever mixes two lightmaps. An RGBM-encoded PNG of the same
   name sits beside it: what a GPU without BC compression loads, and a picture an agent
   can open. A directional bake writes a `lightmap_dir_<page>_<tag>.ktx2` (BC7) and
-  `.png` beside each page: RGB the direction mapped to 0–1 and A the directionality,
-  packed exactly like its colour page. The texture importer leaves that folder alone
+  `.png` beside each page, packed exactly like its colour page: RGB the direction
+  scaled by its directionality, each component `x` stored as the byte `128 + 127·x`
+  (so 0 is exact), and A the lamp share (0–1). The texture importer leaves that folder alone
   (`Assets.md`). Encoding takes time, about 2 s per million texels on four cores, after
   the trace: a 2048² page pair about 8 s, a 4096² pair about 30 s; a level whose biggest
   meshes reach the default 1016 cap, about 90 s (#1704); a 4096² page pair takes about 43 MiB of GPU memory, but filling many of them takes a density whose trace stops a bake long before memory does; the editor's Generate Lighting

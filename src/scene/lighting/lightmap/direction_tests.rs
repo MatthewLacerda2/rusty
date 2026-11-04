@@ -2,7 +2,7 @@
 //! filter smooths it without letting it grow past a unit vector, turning it off leaves
 //! the colour lightmaps untouched, and the atlas packs it exactly like the colour.
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 
 use super::tests::{floor, settings, sun, wall};
 use super::*;
@@ -10,7 +10,8 @@ use super::*;
 /// The mean direction texel of `entity`'s lightmap.
 fn mean_dir(maps: &[Lightmap], entity: u32) -> Vec3 {
     let map = maps.iter().find(|m| m.entity == entity).expect("baked");
-    map.directions.iter().sum::<Vec3>() / map.directions.len() as f32
+    let sum: Vec3 = map.directions.iter().map(|d| d.truncate()).sum();
+    sum / map.directions.len() as f32
 }
 
 #[test]
@@ -67,12 +68,13 @@ fn the_filter_smooths_directions_and_keeps_them_unit_bounded() {
         let map = maps.iter().find(|m| m.entity == 1).unwrap();
         map.directions
             .iter()
-            .map(|d| (*d - mean).length())
+            .map(|d| (d.truncate() - mean).length())
             .sum::<f32>()
     };
     assert!(spread(&smooth) < spread(&raw), "smoother than raw");
     for map in &smooth {
-        assert!(map.directions.iter().all(|d| d.length() <= 1.0 + 1e-5));
+        let bounded = |d: &Vec4| d.truncate().length() <= 1.0 + 1e-5 && d.w <= 1.0;
+        assert!(map.directions.iter().all(bounded));
     }
 }
 
@@ -107,13 +109,13 @@ fn direction_pages_share_the_colour_pages_layout() {
         entity,
         size,
         texels: vec![Vec3::splat(value); (size * size) as usize],
-        directions: vec![Vec3::Y * value; (size * size) as usize],
+        directions: vec![Vec4::Y * value; (size * size) as usize],
     };
     let atlas = pack(&[map(1, 16, 0.25), map(2, 8, 0.75)], MAX_PAGE);
     assert_eq!(atlas.directions.len(), atlas.pages.len());
     for (colour, dirs) in atlas.pages.iter().zip(&atlas.directions) {
         for (c, d) in colour.iter().zip(dirs) {
-            assert_eq!(*d, Vec3::Y * c.x, "same texel, same place");
+            assert_eq!(*d, Vec4::Y * c.x, "same texel, same place");
         }
     }
 }

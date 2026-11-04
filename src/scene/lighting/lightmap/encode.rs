@@ -7,11 +7,16 @@
 //! Values are linear (no sRGB curve). The renderer decodes the PNG on the CPU when
 //! it loads it (a GPU without BC compression, or a scene baked before #1694).
 //!
-//! A direction page (#810) is plain RGBA8, Unity's directional-lightmap layout: RGB the
-//! dominant incoming direction mapped from [-1, 1] to [0, 1], A its directionality.
-//! The shader's direction read mirrors [`decode_direction`].
+//! A direction page (#810) is plain RGBA8. RGB is the dominant incoming direction
+//! scaled by its directionality, a vector of length 0..=1, each component stored as
+//! `128 + 127·x` so 0 is exact; A is its **lamp share** (#1695): the part of the
+//! texel's light that `Baked` lamps' direct light brings from one way,
+//! `|direct_dir| / luminance(direct + indirect)` (`bake::direction_texel`), 0 where no
+//! lamp reaches. Both are linear in the stored bytes, so bilinear filtering, the box
+//! mips and BC7 average them as the vectors and shares they are (a packed bit field
+//! would not survive). The shader's direction read mirrors [`decode_direction`].
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 
 /// The brightest value RGBM can hold, per channel (Unity's range).
 pub const RGBM_RANGE: f32 = 8.0;
@@ -38,23 +43,23 @@ pub fn encode_texels(texels: &[Vec3]) -> Vec<u8> {
     texels.iter().flat_map(|&c| encode_rgbm(c)).collect()
 }
 
-/// Encode one direction texel: a vector whose length is the directionality (0..=1).
-pub fn encode_direction(d: Vec3) -> [u8; 4] {
-    let a = d.length().min(1.0);
-    let rgb = d.try_normalize().unwrap_or(Vec3::ZERO) * 0.5 + 0.5;
-    let byte = |x: f32| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
-    [byte(rgb.x), byte(rgb.y), byte(rgb.z), byte(a)]
+/// Encode one direction texel: `xyz` the direction scaled by its directionality
+/// (clamped to length 1), `w` its lamp share (clamped to 0..=1).
+pub fn encode_direction(d: Vec4) -> [u8; 4] {
+    let v = d.truncate().clamp_length_max(1.0);
+    let byte = |x: f32| (128.0 + 127.0 * x).round().clamp(1.0, 255.0) as u8;
+    let share = (d.w.clamp(0.0, 1.0) * 255.0).round() as u8;
+    [byte(v.x), byte(v.y), byte(v.z), share]
 }
 
-/// Decode one direction texel back to the direction scaled by its directionality.
-pub fn decode_direction(px: [u8; 4]) -> Vec3 {
-    let f = |b: u8| b as f32 / 255.0;
-    let dir = Vec3::new(f(px[0]), f(px[1]), f(px[2])) * 2.0 - 1.0;
-    dir.try_normalize().unwrap_or(Vec3::ZERO) * f(px[3])
+/// Decode one direction texel back to its vector and lamp share.
+pub fn decode_direction(px: [u8; 4]) -> Vec4 {
+    let f = |b: u8| (b as f32 - 128.0) / 127.0;
+    Vec4::new(f(px[0]), f(px[1]), f(px[2]), px[3] as f32 / 255.0)
 }
 
 /// A whole direction page as RGBA8 bytes, row-major.
-pub fn encode_directions(texels: &[Vec3]) -> Vec<u8> {
+pub fn encode_directions(texels: &[Vec4]) -> Vec<u8> {
     texels.iter().flat_map(|&d| encode_direction(d)).collect()
 }
 
@@ -86,14 +91,29 @@ mod tests {
     #[test]
     fn directions_round_trip_and_none_stays_none() {
         for d in [
-            Vec3::Y,
-            Vec3::new(-0.3, 0.2, 0.1),
-            Vec3::new(0.6, -0.48, 0.64),
+            Vec4::new(0.0, 1.0, 0.0, 1.0),
+            Vec4::new(-0.3, 0.2, 0.1, 0.0),
+            Vec4::new(0.6, -0.48, 0.64, 0.4),
         ] {
             let back = decode_direction(encode_direction(d));
-            assert!((back - d).length() < 0.02, "{d} -> {back}");
+            assert!((back - d).length() < 0.01, "{d} -> {back}");
         }
-        assert_eq!(decode_direction(encode_direction(Vec3::ZERO)), Vec3::ZERO);
-        assert_eq!(encode_direction(Vec3::X * 3.0)[3], 255, "clamped to 1");
+        assert_eq!(decode_direction(encode_direction(Vec4::ZERO)), Vec4::ZERO);
+        let long = encode_direction(Vec4::new(3.0, 0.0, 0.0, 2.0));
+        assert_eq!((long[0], long[3]), (255, 255), "clamped to 1");
+        assert_eq!(encode_direction(-Vec4::X)[0], 1, "-1 is a byte");
+    }
+
+    #[test]
+    fn a_page_averages_as_its_vectors_and_shares_do() {
+        // What bilinear filtering and a mip do to the bytes, done to the values.
+        let (a, b) = (
+            Vec4::new(0.8, 0.2, 0.0, 1.0),
+            Vec4::new(-0.2, 0.6, 0.4, 0.0),
+        );
+        let (ea, eb) = (encode_direction(a), encode_direction(b));
+        let mid = std::array::from_fn(|k| ((ea[k] as u16 + eb[k] as u16) / 2) as u8);
+        let back = decode_direction(mid);
+        assert!((back - (a + b) * 0.5).length() < 0.01, "{back}");
     }
 }

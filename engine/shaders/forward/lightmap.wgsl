@@ -17,13 +17,13 @@
 // cancels it, but a normal map can turn N toward a light that grazed Ng, and there
 // an unfloored division blows a whisker of baked light into a highlight.
 //
-// Its weight, the directionality. A page's direction is the luminance-weighted mean
-// of where light arrived from, so one lamp gives 1 and light from every way above
-// the surface (an even sky) gives the cosine-weighted mean, 2/3, not 0
-// (`an_open_floor_under_the_sky_points_up_but_not_fully`). That evenly spread light is
-// the environment reflection's to reflect, so the lobe counts only the directionality
-// above 2/3 (`lobe_weight`): one lamp keeps its full highlight, a sky-lit floor gets
-// none, and two lamps lighting one texel give one highlight between them, weakened.
+// Its share, the lamps'. A texel's light also holds bounce, sky and emission, which
+// the environment reflection already reflects; only `Baked` lamps' direct light
+// reaches the surface as nothing but this lobe. The bake keeps the lamps' part apart
+// (`bake::direction`) and stores it in the page's A: `|direct_dir| / luminance(all)`,
+// 1 for one lamp alone, 0 under an open sky or a `Mixed` light's bounce, weakened
+// where two lamps meet. So the lobe's radiance is `texel * share`, and its direction
+// the lamps' (the page's RGB, once the share passes a quarter).
 //
 // No AO: the lobe stands in for direct light, which AO doesn't touch here, and the
 // static occluders' shadows are already in the bake. It is off in every bake capture
@@ -55,35 +55,33 @@ fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, N: vec
     if (directional) {
         let dir = decode_lightmap_direction(textureSampleLevel(t_lightmap_dirs, s_lightmaps, uv, layer, lod));
         out.specular = baked_specular(out.irradiance, dir, N, Ng, V, F0, roughness);
-        out.irradiance *= lightmap_direction_rebalance(dir, N, Ng);
+        out.irradiance *= lightmap_direction_rebalance(dir.xyz, N, Ng);
     }
     return out;
 }
 
-// The least diffuse response the radiance is divided by: a light at about 84° off
-// the geometric normal (Lambert) or straight along the surface (the wrap's 1/4).
+// The least diffuse response the radiance is divided by: Lambert's at a light about
+// 84° off the geometric normal; the squared wrap's at about 112° (Ng·L ≈ -0.37),
+// past the surface's horizon, so under `HalfLambert` it holds only for a light
+// behind the surface a normal map has turned toward.
 const GRAZING_FLOOR: f32 = 0.1;
 
-// The directionality of light arriving evenly over the hemisphere a surface faces.
-const HEMISPHERE_DIRECTIONALITY: f32 = 2.0 / 3.0;
-
-// How much of a texel's light the lobe treats as coming from its dominant direction:
-// 0 at or below an even hemisphere's directionality, 1 for one lamp.
-fn lobe_weight(directionality: f32) -> f32 {
-    return saturate((directionality - HEMISPHERE_DIRECTIONALITY) / (1.0 - HEMISPHERE_DIRECTIONALITY));
-}
+// The least directionality the lobe takes its direction from: below it the page's
+// 8-bit vector is too short to aim a highlight.
+const MIN_DIRECTIONALITY: f32 = 0.02;
 
 // The specular a directional lightmap texel adds: `texel` its baked E / π (before the
-// normal-map rebalance), `dir` its decoded direction scaled by its directionality,
-// `Ng` the geometric normal the bake saw, `N` the shading normal, `roughness` already
-// widened by specular AA. Zero in a bake capture and where the light has no direction.
-fn baked_specular(texel: vec3<f32>, dir: vec3<f32>, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
-    let directionality = length(dir);
-    let weight = lobe_weight(directionality) * lighting.baked_specular;
-    if (weight <= 0.0) {
+// normal-map rebalance), `dir` its decoded page texel (the direction scaled by its
+// directionality, and the lamp share in `w`), `Ng` the geometric normal the bake saw,
+// `N` the shading normal, `roughness` already widened by specular AA. Zero in a bake
+// capture, where no lamp lights the texel, and where its light has no direction.
+fn baked_specular(texel: vec3<f32>, dir: vec4<f32>, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let share = saturate(dir.w) * lighting.baked_specular;
+    let directionality = length(dir.xyz);
+    if (share <= 0.0 || directionality < MIN_DIRECTIONALITY) {
         return vec3<f32>(0.0);
     }
-    let L = dir / directionality;
-    let radiance = texel * PI / max(diffuse_response(dot(Ng, L)), GRAZING_FLOOR) * weight;
+    let L = dir.xyz / directionality;
+    let radiance = texel * PI * share / max(diffuse_response(dot(Ng, L)), GRAZING_FLOOR);
     return specular_response(N, V, L, radiance, F0, roughness);
 }

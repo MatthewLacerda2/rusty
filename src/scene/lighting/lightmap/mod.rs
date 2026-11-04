@@ -93,6 +93,8 @@ mod run_tests;
 #[cfg(test)]
 mod scale_tests;
 #[cfg(test)]
+mod share_tests;
+#[cfg(test)]
 mod skybox_tests;
 #[cfg(test)]
 mod sliver_tests;

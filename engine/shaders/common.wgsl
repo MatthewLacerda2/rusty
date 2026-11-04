@@ -6,7 +6,7 @@
 #import fog::height::fog_height_mean
 #import lighting::falloff::{light_falloff_near, spot_cone}
 #import lighting::reflection_probe::ReflectionProbe
-#import sky::noise::sky_fbm
+#import sky::noise::{cloud_shift, sky_fbm}
 
 // The scene's distance + height fog (#437). Mirrors the Rust `FogUniform`
 // byte-for-byte (naga_oil rejects imported names ending `_<digit>`, hence `_pad_a`).
@@ -19,7 +19,9 @@ struct Fog {
     density: f32,
     height_falloff: f32,
     base_height: f32,
-    _pad_a: f32, _pad_b: f32, _pad_c: f32,
+    _pad_a: f32,
+    _pad_b: f32,
+    _pad_c: f32,
 };
 
 // How a point finds its light cluster (#434). Mirrors the Rust `ClusterUniform`;
@@ -110,7 +112,7 @@ struct LightingUniforms {
     // shades a lamp with the squared wrap instead of Lambert, as the bakes do.
     diffuse_wrap: f32,
     // 1.0 when a directional lightmap adds its one specular lobe
-    // (`forward::baked_specular`, #1695); 0.0 in every bake capture, so a
+    // (`forward::lightmap::baked_specular`, #1695); 0.0 in every bake capture, so a
     // view-dependent highlight is never frozen into a probe.
     baked_specular: f32,
     // Scalars, not a vec3, which would align to 16 and move `refl_probes`.
@@ -440,16 +442,8 @@ struct ProceduralSky {
 // (`a * ambient + b`, `a` one scalar per direction): every colour is either set (a
 // constant) or a scalar multiple of the zenith plus a constant, so it holds, and the
 // cube bakes the two terms once per `sky` and applies the ambient colour per sample
-// (`sky/prefilter.wgsl`). Its clouds are `sky_fbm` (`sky/noise.wgsl`).
-
-// How far `coverage` shifts the FBM before the cloud mask's ramp (0.45..0.80) carves
-// it: exactly 0 at the default 0.5 (the layer the sky always drew), -0.55 at 0 so
-// even the FBM's maximum (31/32) stays under the ramp and nothing is carved, +0.8 at
-// 1 so even its minimum (0) clears it and every direction is cloud.
-fn cloud_shift(coverage: f32) -> f32 {
-    let c = coverage - 0.5;
-    return c * select(1.1, 1.6, c > 0.0);
-}
+// (`sky/prefilter.wgsl`). Its clouds are `sky_fbm`, shifted by `cloud_shift`
+// (`sky/noise.wgsl`).
 
 fn procedural_sky(sky: ProceduralSky, ambient: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     // Unset, the zenith is the ambient colour, the horizon a desaturated lift toward
