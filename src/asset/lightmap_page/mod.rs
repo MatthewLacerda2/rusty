@@ -87,7 +87,7 @@ impl Page {
 /// blocks: what a page may hold.
 pub fn max_levels(edge: u32) -> u32 {
     (0..32)
-        .take_while(|&l| edge >> l >= 4 && (edge >> l) % 4 == 0)
+        .take_while(|&l| edge >> l >= 4 && (edge >> l).is_multiple_of(4))
         .count() as u32
 }
 

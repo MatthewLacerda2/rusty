@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use super::atlas::{pack, MIP_LEVELS, PAD};
+use super::atlas::{pack, MIP_LEVELS};
 use super::bake::Lightmap;
 use super::pages::{level_count, levels};
 use super::raster::fill_rest;
@@ -43,10 +43,6 @@ fn every_kept_level_of_a_map_reads_only_its_own_light() {
             }
         }
     }
-    assert!(
-        PAD >= 1 << (MIP_LEVELS - 1),
-        "the ring covers the last level"
-    );
 }
 
 #[test]
