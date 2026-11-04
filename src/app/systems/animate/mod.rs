@@ -76,6 +76,7 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
             }
             let unknown = skin.and_then(|skin| unknown_bone(anim, skin));
             let writes = mesh.map(|m| animation::bone_writes(anim, m, graph));
+            // lint: allow(world-space) the model's axes in mesh-local space, rig data, not the scene hierarchy
             let tilt = model.map(|m| m.to_scale_rotation_translation().1);
             (
                 stepped.events,
@@ -136,11 +137,11 @@ fn unknown_bone(
 }
 
 /// Model space in the skinned entity's own (mesh-local) space: `skin`'s
-/// [`SkinData::mesh_to_model`] inverted, `None` when the two coincide (a native
-/// Y-up rig, or no skin), so such a rig's motion is carried exactly as before.
+/// [`SkinData::mesh_to_model_axes`] inverted, `None` when their axes coincide
+/// (a native Y-up rig, or no skin), so such a rig's motion is carried exactly
+/// as before.
 fn model_in_entity(skin: Option<&SkinData>) -> Option<Mat4> {
-    let model = skin.map(SkinData::mesh_to_model)?;
-    (model != Mat4::IDENTITY).then(|| model.inverse())
+    skin?.mesh_to_model_axes().map(|m| m.inverse())
 }
 
 /// `motion`, measured in model space, in world space: its displacement taken

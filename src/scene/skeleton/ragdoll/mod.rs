@@ -172,12 +172,10 @@ impl Scene {
     /// knees forward (#1822).
     fn front_and_side(&self, owner: u32) -> (Vec3, Vec3) {
         let w = &self.world;
-        let skin = w
+        let model = w
             .mesh(owner)
-            .and_then(|m| m.skin.as_ref().map(|s| s.mesh_to_model()));
-        let to_mesh = skin
-            .filter(|m| *m != glam::Mat4::IDENTITY)
-            .map(|m| m.inverse());
+            .and_then(|m| m.skin.as_ref()?.mesh_to_model_axes());
+        let to_mesh = model.map(|m| m.inverse());
         let axis = |model: Vec3| {
             let local = to_mesh.map_or(model, |m| m.transform_vector3(model).normalize());
             w.transform_direction(owner, local)

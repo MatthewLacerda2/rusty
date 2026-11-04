@@ -53,8 +53,9 @@ pub struct RootBone {
     slot: usize,
     /// The bone's joint chain from its skeleton root down to it.
     chain: Vec<usize>,
-    /// Mesh-local space into model space, `None` when they coincide (a native
-    /// Y-up rig), so such a rig's deltas are computed exactly as before.
+    /// Mesh-local space into model space, `None` when their axes coincide (a
+    /// native Y-up rig), so such a rig's deltas are computed exactly as before
+    /// ([`SkinData::mesh_to_model_axes`]).
     model: Option<Mat4>,
     /// Where the bone stands in the bind pose, in model space.
     bind_position: Vec3,
@@ -73,7 +74,7 @@ impl RootBone {
         let mut bone = Self {
             slot,
             chain,
-            model: Some(skin.mesh_to_model()).filter(|m| *m != Mat4::IDENTITY),
+            model: skin.mesh_to_model_axes(),
             bind_position: Vec3::ZERO,
             bind_rotation: Quat::IDENTITY,
         };
