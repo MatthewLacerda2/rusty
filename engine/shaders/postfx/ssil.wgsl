@@ -5,7 +5,7 @@
 // Fullscreen passes, at the gather's resolution unless named:
 //  * `fs_source`     — after the base camera's opaque pass: its HDR colour times the
 //                      share of it the gather may bounce (the alpha the opaque
-//                      pass wrote, `shader.wgsl`'s `with_ssil_share`), averaged over
+//                      pass wrote, `forward::lighting::with_ssil_share`), averaged over
 //                      each texel's block of pixels. The sky and a NaN add nothing.
 //                      This is next frame's source.
 //  * `fs_gather`     — before the forward pass, over the SSAO prepass's depth: a
@@ -15,7 +15,7 @@
 //                      frame's screen through its view-projection and reads the
 //                      source: that light, where the two surfaces face each
 //                      other, fading out by distance. Nothing before a history.
-//  * `fs_blur`       — a depth-aware 5x5 blur.
+//  * `fs_blur`       — a depth-aware 7x7 blur.
 //  * `fs_accumulate` — the temporal accumulate: last frame's result, reprojected
 //                      through the camera and rejected where the surface's distance
 //                      from the eye moved (a disocclusion), clamped to this frame's
@@ -33,6 +33,7 @@ struct SsilParams {
     view_proj: mat4x4<f32>,
     // The view-projection last frame's source and result were drawn with.
     prev_view_proj: mat4x4<f32>,
+    // w: the frame's index (0..64), which turns the noise each frame.
     camera_pos: vec4<f32>,
     // w: 1 when the history holds last frame, 0 on a cut.
     camera_fwd: vec4<f32>,
@@ -157,11 +158,12 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let tb = tangents(N);
     let radius = p.params.x;
     let n = u32(p.params.z);
-    // The same per-pixel rotation every frame, as SSAO's: a pattern turned each
-    // frame flickers through the accumulate's clamp (measured twice the frame-to-
-    // frame change on a turning camera), where a still one the blur removes holds.
-    let rot = ign(frag.xy) * 6.2831853;
-    let jitter = ign(frag.yx + 17.0);
+    // IGN's temporal offset (Jimenez 2014): each frame turns the pattern, so the
+    // accumulate averages many frames' samples. A still pattern left blotches the
+    // 8 samples and the blur could not remove (seen on a capsule's shadowed side).
+    let turn = vec2<f32>(5.588238 * p.camera_pos.w);
+    let rot = ign(frag.xy + turn) * 6.2831853;
+    let jitter = ign(frag.yx + 17.0 + turn);
     let dims = vec2<f32>(textureDimensions(t_depth));
     let source = vec2<f32>(textureDimensions(t_in));
     var sum = vec3<f32>(0.0);
@@ -220,8 +222,8 @@ fn fs_blur(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let last = vec2<i32>(textureDimensions(t_in)) - 1;
     var sum = vec3<f32>(0.0);
     var weight = 0.0;
-    for (var y = -2; y <= 2; y = y + 1) {
-        for (var x = -2; x <= 2; x = x + 1) {
+    for (var y = -3; y <= 3; y = y + 1) {
+        for (var x = -3; x <= 3; x = x + 1) {
             let tap = clamp(base + vec2<i32>(x, y), vec2<i32>(0), last);
             let w = depth_weight(texel_depth(tap, step), center);
             sum += textureLoad(t_in, tap, 0).rgb * w;

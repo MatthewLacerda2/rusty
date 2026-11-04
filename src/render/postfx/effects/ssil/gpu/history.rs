@@ -11,7 +11,7 @@ const FADE_FRAMES: u32 = 2;
 
 /// How much a floor point's bounce may change from one frame to the next while the
 /// camera turns, as a share of the bounce.
-const CRAWL: f32 = 0.12;
+const CRAWL: f32 = 0.1;
 
 /// The floor's red with SSIL on less with it off: the bounce alone.
 fn bounce(on_frame: &[u8], off_frame: &[u8]) -> f32 {

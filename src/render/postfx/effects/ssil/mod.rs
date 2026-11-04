@@ -21,7 +21,7 @@
 //!   source ([`targets`]).
 //!
 //! **Never twice over baked bounce.** The share is what the opaque pass wrote in its
-//! alpha while SSIL runs (`shader.wgsl`'s `with_ssil_share`): the pixel's light less
+//! alpha while SSIL runs (`forward::lighting::with_ssil_share`): the pixel's light less
 //! its indirect term (lightmap, probes or flat ambient, and SSIL itself), its
 //! environment reflection and, on a lightmapped surface, its emission, over the
 //! whole. So the gather sees the light of `Realtime` and `Mixed` lights and of
@@ -39,7 +39,7 @@
 //!
 //! **Cost.** Off, nothing: no target, no pass, and the forward pass reads no
 //! bounce (`stack.z` is 0). On, per frame: the prepass when SSAO doesn't run
-//! one, `samples` taps of five depths and one colour per gather texel, a 25-tap blur,
+//! one, `samples` taps of five depths and one colour per gather texel, a 49-tap blur,
 //! a 9-tap accumulate and the 4-tap upsample, plus the source's block average. Its
 //! targets are five `Rgba16Float` textures at the gather's resolution and one at the
 //! view's; no new binding. `Debug.Stats().gpu_passes.ssil` times every pass, and `ssil_samples`
@@ -180,6 +180,7 @@ pub(crate) struct SsilUniform {
     inv_view_proj: [f32; 16],
     view_proj: [f32; 16],
     prev_view_proj: [f32; 16],
+    /// w: the frame's index, which turns the noise.
     camera_pos: [f32; 4],
     /// w: 1 with a history, 0 on a cut.
     camera_fwd: [f32; 4],
@@ -197,8 +198,8 @@ pub(crate) struct Previous {
 
 impl SsilFrame {
     /// The uniform every stage reads: `prev` is last frame's camera, `None` on a cut
-    /// (the gather then adds nothing).
-    pub(crate) fn uniform(&self, prev: Option<Previous>) -> SsilUniform {
+    /// (the gather then adds nothing); `index` turns the noise.
+    pub(crate) fn uniform(&self, prev: Option<Previous>, index: u32) -> SsilUniform {
         let p = self.plan;
         let had = prev.is_some();
         let prev = prev.unwrap_or(Previous {
@@ -209,7 +210,7 @@ impl SsilFrame {
             inv_view_proj: self.view_proj.inverse().to_cols_array(),
             view_proj: self.view_proj.to_cols_array(),
             prev_view_proj: prev.view_proj.to_cols_array(),
-            camera_pos: self.eye.extend(0.0).to_array(),
+            camera_pos: self.eye.extend(index as f32).to_array(),
             camera_fwd: self
                 .forward
                 .normalize()

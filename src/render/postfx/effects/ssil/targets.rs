@@ -29,6 +29,8 @@ pub(crate) struct SsilTargets {
     pub(super) uniform: wgpu::Buffer,
     /// Which of `results` this frame's accumulate writes.
     pub(super) current: usize,
+    /// Frames run, modulo 64: turns the gather's noise.
+    pub(super) index: u32,
     /// What the source and last result hold; `None` until the source is first kept,
     /// and after anything that invalidates them.
     pub(super) history: Option<History>,
@@ -60,6 +62,7 @@ impl SsilTargets {
                 mapped_at_creation: false,
             }),
             current: 0,
+            index: 0,
             history: None,
             forward_group: None,
         }

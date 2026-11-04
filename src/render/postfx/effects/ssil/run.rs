@@ -39,7 +39,8 @@ impl Renderer {
         let prev = t.history.filter(|h| h.key == frame.key).map(|h| h.camera);
         t.history = t.history.filter(|_| prev.is_some());
         t.current = 1 - t.current;
-        let uniform = frame.uniform(prev);
+        t.index = (t.index + 1) % 64;
+        let uniform = frame.uniform(prev, t.index);
         self.queue
             .write_buffer(&t.uniform, 0, bytemuck::bytes_of(&uniform));
         if !prepassed {

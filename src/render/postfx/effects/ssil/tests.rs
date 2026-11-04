@@ -137,14 +137,15 @@ fn frame() -> SsilFrame {
 #[test]
 fn the_uniform_says_whether_there_is_a_history() {
     let f = frame();
-    let cut = f.uniform(None);
+    let cut = f.uniform(None, 3);
+    assert_eq!(cut.camera_pos[3], 3.0, "the noise's frame index");
     assert_eq!(cut.camera_fwd, [0.0, 0.0, -1.0, 0.0]);
     assert_eq!(cut.prev_view_proj, f.view_proj.to_cols_array());
     let prev = Previous {
         view_proj: Mat4::IDENTITY,
         eye: Vec3::X,
     };
-    let held = f.uniform(Some(prev));
+    let held = f.uniform(Some(prev), 0);
     assert_eq!(held.camera_fwd[3], 1.0);
     assert_eq!(held.prev_view_proj, Mat4::IDENTITY.to_cols_array());
     assert_eq!(held.prev_camera_pos, [1.0, 0.0, 0.0, 0.0]);
