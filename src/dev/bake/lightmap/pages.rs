@@ -122,7 +122,7 @@ pub fn apply_encoded(
         set.directions
             .push(write_page(&dir, "lightmap_dir", k, page, png)?);
     }
-    set.entries = encoded.entries.clone();
+    set.extend(encoded.entries.iter().cloned());
     let bytes: usize = (encoded.colour.iter())
         .chain(&encoded.directions)
         .map(|(p, _)| p.gpu_bytes())

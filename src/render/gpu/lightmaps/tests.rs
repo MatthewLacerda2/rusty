@@ -41,7 +41,7 @@ fn gpu_lightmaps_rebind_on_colour_pages_and_match_direction_shapes() {
     assert!(maps.directional());
 
     let mut scene = Scene::new();
-    scene.lightmaps.entries.push(LightmapEntry {
+    scene.lightmaps.insert(LightmapEntry {
         entity: 1,
         page: 0,
         scale_offset: [1.0, 1.0, 0.0, 0.0],

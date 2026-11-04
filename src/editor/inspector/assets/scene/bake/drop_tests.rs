@@ -20,9 +20,9 @@ fn probing(name: &str) -> (EditorUi, Scene, String) {
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let mut scene = Scene::new();
     for x in [0.0, 4.0] {
-        scene
-            .reflection_probes
-            .add(Vec3::new(x, 1.0, 0.0), Vec3::splat(2.0));
+        let set = &mut scene.reflection_probes;
+        let i = set.add(Vec3::new(x, 1.0, 0.0), Vec3::splat(2.0));
+        set.edit(i, |p| p.manual = true);
     }
     scene.lighting_settings.reflections.resolution = 16;
     let mut editor = EditorUi::new(Default::default());

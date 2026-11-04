@@ -9,9 +9,8 @@
 
 use glam::Vec3;
 
-use super::{
-    plan_light_probes, plan_reflection_probes, static_scene_aabb, ReflectionPlacement, EYE_HEIGHT,
-};
+use super::test_level::plan_static;
+use super::{plan_light_probes, static_scene_aabb, ReflectionPlacement, EYE_HEIGHT};
 use crate::components::{ColliderComponent, ColliderShape};
 use crate::scene::Scene;
 
@@ -124,26 +123,27 @@ fn light_probe_plan_from_walkable_bounds_alone() {
 }
 
 #[test]
-fn one_open_room_wider_than_the_region_is_split() {
+fn one_open_room_is_one_probe_without_box_projection() {
     let scene = room_scene();
-    // One 20 × 20 room open to the sky, region 12: 2 × 2 probes, each at eye height
-    // over the floor (the box's top, y = 3), their boxes tiling the room.
-    let plans = plan_reflection_probes(&scene, None, &placement());
-    assert_eq!(plans.len(), 4, "{plans:?}");
+    // One 20 × 20 room open to the sky: one probe at eye height over the floor
+    // (the box's top, y = 3), no box projection, its box the whole room (#1737).
+    let plans = plan_static(&scene, &placement());
+    assert_eq!(plans.len(), 1, "{plans:?}");
     let (amin, amax) = static_scene_aabb(&scene).unwrap();
-    for p in &plans {
-        assert!(p.box_min.cmpge(amin - Vec3::splat(1e-4)).all(), "{p:?}");
-        assert!(p.box_max.x <= amax.x + 1e-4 && p.box_max.z <= amax.z + 1e-4);
-        assert_eq!(p.box_min.y, 3.0, "the floor");
-        assert!((p.position.y - (3.0 + EYE_HEIGHT)).abs() < 1e-5);
-        assert!(p.box_max.y >= p.position.y, "open: up to the sky");
-    }
+    let p = plans[0];
+    assert!(!p.box_projection);
+    assert!(p.box_min.cmpge(amin - Vec3::splat(1e-4)).all(), "{p:?}");
+    assert!(p.box_max.x <= amax.x + 1e-4 && p.box_max.z <= amax.z + 1e-4);
+    assert!(p.box_max.x - p.box_min.x > 19.0, "the whole room: {p:?}");
+    assert_eq!(p.box_min.y, 3.0, "the floor");
+    assert!((p.position.y - (3.0 + EYE_HEIGHT)).abs() < 1e-5);
+    assert!(p.box_max.y >= p.position.y, "open: up to the sky");
 }
 
 #[test]
 fn reflection_plan_empty_without_static_geometry() {
     let scene = Scene::new();
-    assert!(plan_reflection_probes(&scene, None, &placement()).is_empty());
+    assert!(plan_static(&scene, &placement()).is_empty());
 }
 
 fn placement() -> ReflectionPlacement {
@@ -160,8 +160,5 @@ fn placement_is_deterministic() {
         plan_light_probes(&a, walkable, 4.0),
         plan_light_probes(&b, walkable, 4.0)
     );
-    assert_eq!(
-        plan_reflection_probes(&a, None, &placement()),
-        plan_reflection_probes(&b, None, &placement())
-    );
+    assert_eq!(plan_static(&a, &placement()), plan_static(&b, &placement()));
 }

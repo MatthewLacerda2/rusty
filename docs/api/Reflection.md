@@ -33,6 +33,7 @@ infinitely far away. An object no baked probe reaches reflects the global skybox
 | `nearClip`, `farClip` | `0.05`, `1000` | the capture cameras' clip planes (far is kept past twice the near) |
 | `shadows` | `true` | the capture renders shadows |
 | `intensity` | `1` | brightness of the reflection, `0`–`8` |
+| `manual` | `true` from `Add`, `false` when placed | a bake's auto-placement keeps a manual probe as it is and leaves the room it covers to it; it re-places the others (`Lighting.md`, #1737). A hand edit (`Move`, `SetBox`, `Set`, an Inspector field) makes a probe manual, so a tuned box survives the next bake, `local p = Reflection.Get(i); …; Reflection.Set(i, p)` included; `Set{ manual = false }` un-marks a probe that is manual already (on a placed one it is ignored, since a round trip carries the `false` it read), and unticking *Manual* in the Inspector does too |
 
 **Scene defaults** live in the lighting settings (`Lighting.GetSettings()` /
 `SetSettings{ reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }`): the resolution a probe
@@ -61,11 +62,11 @@ path and the runtime falls back to the skybox. `Move`/`SetBox`/`SetCubemap`/`Set
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Reflection.Add` | `(x, y, z, halfX, halfY, halfZ)` | the new probe's `index` (box is centred on the position with the given half-extents) |
+| `Reflection.Add` | `(x, y, z, halfX, halfY, halfZ)` | the new probe's `index` (box is centred on the position with the given half-extents; the probe is manual) |
 | `Reflection.Move` | `(index, x, y, z)` | — (box stays centred on the new position) |
 | `Reflection.SetBox` | `(index, minX, minY, minZ, maxX, maxY, maxZ)` | — (explicit parallax box corners; normalized so min ≤ max) |
 | `Reflection.SetCubemap` | `(index, path)` | — (point the probe at a baked cubemap KTX2 file) |
-| `Reflection.Set` | `(index, { position?, boxMin?, boxMax?, cubemap?, boxProjection?, blendDistance?, importance?, resolution?, nearClip?, farClip?, shadows?, intensity? })` | — (changes only the fields it names, each clamped to its range) |
+| `Reflection.Set` | `(index, { position?, boxMin?, boxMax?, cubemap?, boxProjection?, blendDistance?, importance?, resolution?, nearClip?, farClip?, shadows?, intensity?, manual? })` | — (changes only the fields it names, each clamped to its range) |
 | `Reflection.Get` | `(index)` | every field above as a table, or `nil` |
 | `Reflection.Bake` *(dev-only)* | `()` | `true` if the bake ran, `false` if no GPU/software adapter was available (skipped, nothing written or removed) — the real prefiltered cubemap bake. With **no probes it is not a no-op**: it deletes every cube in the scene's `<scene file>.reflections/` folder and returns `true` |
 | `Reflection.Remove` | `(index)` | — |

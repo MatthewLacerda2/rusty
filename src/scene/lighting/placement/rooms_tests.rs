@@ -2,14 +2,12 @@
 
 use glam::Vec3;
 
-use super::super::test_level::{arena, grid_of_rooms, WALL_HEIGHT};
-use super::super::{
-    plan_reflection_probes, static_scene_aabb, ReflectionPlacement, ReflectionPlan, EYE_HEIGHT,
-};
+use super::super::test_level::{arena, grid_of_rooms, plan_static, WALL_HEIGHT};
+use super::super::{static_scene_aabb, ReflectionPlacement, ReflectionPlan, EYE_HEIGHT};
 use crate::scene::Scene;
 
 fn plan(scene: &Scene) -> Vec<ReflectionPlan> {
-    plan_reflection_probes(scene, None, &ReflectionPlacement::default())
+    plan_static(scene, &ReflectionPlacement::default())
 }
 
 /// The plans whose capture point stands within `x` (exclusive).
@@ -42,24 +40,22 @@ fn each_side_room_of_the_arena_gets_one_probe_fitted_to_its_walls() {
     }
 }
 
+/// The hall has no roof: it gets one probe without box projection, its box the
+/// whole hall up to the top of the level (#1737).
 #[test]
-fn the_open_hall_is_split_into_probes_no_wider_than_the_region() {
+fn the_open_hall_gets_one_probe_without_box_projection() {
     let plans = plan(&arena());
     let hall = standing_in(&plans, (-10.0, 10.0));
-    assert_eq!(hall.len(), 10, "20 × 52 m in ≤ 12 m tiles: 2 × 5");
+    assert_eq!(hall.len(), 1, "{hall:?}");
+    let p = hall[0];
+    assert!(!p.box_projection, "open to the sky");
     let sky = static_scene_aabb(&arena()).unwrap().1.y;
-    for p in &hall {
-        let size = p.box_max - p.box_min;
-        assert!(size.x <= 12.5 && size.z <= 12.5, "{p:?}");
-        assert!(
-            p.box_min.x >= -11.0 && p.box_max.x <= 11.0,
-            "inside the hall: {p:?}"
-        );
-        assert_eq!(
-            p.box_max.y, sky,
-            "open: the box reaches the top of the level"
-        );
-    }
+    assert_eq!(
+        p.box_max.y, sky,
+        "open: the box reaches the top of the level"
+    );
+    assert!(p.box_min.x >= -11.0 && p.box_max.x <= 11.0, "{p:?}");
+    assert!(p.box_max.z - p.box_min.z > 50.0, "the whole hall: {p:?}");
 }
 
 #[test]
@@ -95,7 +91,7 @@ fn a_dust2_sized_level_gets_a_probe_per_room() {
 
 #[test]
 fn an_area_too_narrow_for_a_core_gets_its_own_probes() {
-    // A 1.5 m wide, 20 m long walkway alone: narrower than a doorway everywhere,
+    // A 1.5 m wide, 20 m long roofed walkway alone: narrower than a doorway everywhere,
     // so it holds no room core, and still gets probes, tiled by the 12 m region.
     let mut scene = Scene::new();
     let block = super::super::test_level::block;
@@ -104,6 +100,7 @@ fn an_area_too_narrow_for_a_core_gets_its_own_probes() {
         Vec3::new(0.0, -0.2, 0.0),
         Vec3::new(1.5, 0.0, 20.0),
     );
+    super::super::test_level::roof(&mut scene, (0.0, 0.0), (1.5, 20.0), 3.0);
     let plans = plan(&scene);
     assert_eq!(plans.len(), 2, "{plans:?}");
     for p in &plans {
