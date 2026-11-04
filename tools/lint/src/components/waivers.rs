@@ -8,13 +8,6 @@
 /// content-driven workflow. Reviewable here, never a silent skip.
 pub(super) const WAIVERS: &[(&str, &str, &str)] = &[
     (
-        "mesh",
-        "api",
-        "Mesh geometry is content (glTF/OBJ), not a scriptable scalar surface; \
-         swapping meshes at runtime is out of the script API's scope. Material \
-         look is driven via the `Material` namespace instead.",
-    ),
-    (
         "collider",
         "api",
         "Served by the `Physics` namespace: the collider is queried via \
@@ -99,9 +92,9 @@ mod tests {
         // Every waived axis absent → nothing stale.
         assert!(stale_waivers(&all, |_, _| false).is_empty());
         // A waived axis that is met after all is stale.
-        let met = stale_waivers(&all, |c, a| c == "mesh" && a == "api");
+        let met = stale_waivers(&all, |c, a| c == "collider" && a == "api");
         assert_eq!(met.len(), 1);
-        assert!(met[0].starts_with("STALE_WAIVER `mesh` `api`"));
+        assert!(met[0].starts_with("STALE_WAIVER `collider` `api`"));
         // A waiver for a component no longer discovered is stale.
         let gone: Vec<String> = all.iter().filter(|c| *c != "rigidbody").cloned().collect();
         let stale = stale_waivers(&gone, |_, _| false);

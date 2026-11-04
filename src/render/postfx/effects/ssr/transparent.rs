@@ -46,7 +46,10 @@ pub(crate) const SHARP_SMOOTHNESS: f32 = 0.7;
 /// its roughness map's green (`shader.wgsl`, and a translucent takes no decal), so
 /// without a map a factor of 0.3 or more never reflects under any volume (the floor
 /// is at least [`SHARP_SMOOTHNESS`]), and tracing would march every step for a fade
-/// of 0.
+/// of 0. It reads the authored roughness: the shader's `reflect_ssr` fades on the
+/// roughness geometric specular AA widened (#1702), which is never smoother, so a
+/// material this refuses could not reflect anyway, and one it accepts may still fade
+/// out on a curved, distant pixel.
 pub(crate) fn traces(m: &MaterialAsset) -> bool {
     let smooth = 1.0 - m.roughness.max(0.04) - SHARP_SMOOTHNESS > 0.0;
     m.receive_ssr && (smooth || m.roughness_map.is_some())

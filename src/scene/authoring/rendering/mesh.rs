@@ -2,15 +2,16 @@
 //!
 //! A mesh's geometry comes from the model or primitive it was made from; the values
 //! authored on it are a `Plane`'s subdivisions, the grid a vertex block
-//! (`vertex_waves`) needs to move, how it casts shadows (#1571), and its Scale In
-//! Lightmap (#1704). The Inspector's
+//! (`vertex_waves`) needs to move, how it casts shadows (#1571), its Scale In Lightmap
+//! (#1704), and when a camera culls it as too far or too small (#1714). The Inspector's
 //! Mesh card and `Component.Set` both write them here.
 //!
 //! Pure.
 
 use crate::components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use crate::components::{MeshComponent, ShadowCasting};
-use crate::scene::authoring::{sanitize, subdivided_geometry, Primitive};
+use crate::scene::authoring::sanitize::{self, clamped, non_negative};
+use crate::scene::authoring::{subdivided_geometry, Primitive};
 
 /// Cut a `Plane` into `subdivisions` quads per side and rebuild its geometry.
 /// Refuses a count outside `1..=`[`MAX_PLANE_SUBDIVISIONS`], and any count but 1 on
@@ -47,6 +48,28 @@ pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(
 /// frame or bake, a static one's cached shadow included.
 pub fn set_cast_shadows(mesh: &mut MeshComponent, mode: ShadowCasting) {
     mesh.cast_shadows = mode;
+}
+
+/// Set the distance in metres past which a camera stops drawing the mesh (#1714,
+/// Unreal's *Max Draw Distance*); `0` is unlimited. Negative, NaN or infinite
+/// is `0`.
+pub fn set_max_draw_distance(mesh: &mut MeshComponent, metres: f32) {
+    mesh.max_draw_distance = non_negative(metres);
+}
+
+/// Set the screen-relative height (`0..1`, Unity `LODGroup`'s measure) under which a
+/// camera stops drawing the mesh (#1714); `0` is off. Held to `[0, 1]`; NaN or
+/// infinite is `0`.
+pub fn set_min_screen_size(mesh: &mut MeshComponent, height: f32) {
+    mesh.min_screen_size = clamped(height, 0.0, 1.0);
+}
+
+/// What `Component.Get(id, "Mesh")` reports beyond the stored value: the
+/// small-object cull's two settings, which the file leaves out while `0` (#1714),
+/// so a script reads `0` there as `Mesh.Get*` does, never `nil`.
+pub fn shown(m: &MeshComponent, value: &mut serde_json::Value) {
+    value["max_draw_distance"] = serde_json::json!(m.max_draw_distance);
+    value["min_screen_size"] = serde_json::json!(m.min_screen_size);
 }
 
 /// Set the mesh's Scale In Lightmap (#1704), held in
@@ -130,6 +153,35 @@ mod tests {
         cube.subdivisions = 4; // a stray count, from a hand-edited file
         assert_eq!(set_subdivisions(&mut cube, 1), Ok(()), "1 clears it");
         assert_eq!(cube.subdivisions, 1);
+    }
+
+    #[test]
+    fn the_small_object_cull_settings_are_held_in_range() {
+        let mut m = primitive_mesh_component(Primitive::Box).unwrap();
+        for (v, distance, size) in [(25.0, 25.0, 1.0), (0.05, 0.05, 0.05), (-3.0, 0.0, 0.0)] {
+            set_max_draw_distance(&mut m, v);
+            set_min_screen_size(&mut m, v);
+            assert_eq!(
+                (m.max_draw_distance, m.min_screen_size),
+                (distance, size),
+                "{v}"
+            );
+        }
+        for bad in [f32::NAN, f32::INFINITY] {
+            set_max_draw_distance(&mut m, bad);
+            set_min_screen_size(&mut m, bad);
+            assert_eq!(
+                (m.max_draw_distance, m.min_screen_size),
+                (0.0, 0.0),
+                "{bad}"
+            );
+        }
+        let mut saved = serde_json::to_value(&m).unwrap();
+        assert!(saved.get("max_draw_distance").is_none(), "off is not saved");
+        shown(&m, &mut saved);
+        assert_eq!(saved["max_draw_distance"], 0.0, "but is read as 0");
+        set_max_draw_distance(&mut m, 30.0);
+        assert_eq!(serde_json::to_value(&m).unwrap()["max_draw_distance"], 30.0);
     }
 
     #[test]

@@ -61,6 +61,7 @@ impl ReverbBus {
                 .damping(f64::from(params.damping))
                 .mix(Mix::WET),
             wake.clone(),
+            None,
         ));
         Some(Self {
             track: manager.add_send_track(builder).ok()?,

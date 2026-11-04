@@ -38,6 +38,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub use camera::{build_camera_stack, texture_cameras, ScreenStack, TextureCamera};
+pub(crate) use frustum::SmallObjectCull;
 pub use frustum::{Frustum, SkinBounds};
 pub use gpu::mesh::MeshId;
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
