@@ -11,6 +11,7 @@ use std::sync::Mutex;
 use super::encode::{self, Cores};
 use super::{cache, cache_file, fit, format_of, open, reader, shrink, TextureKind};
 use crate::asset::convert::{self, Seen};
+use crate::asset::lightmap_page::is_baked;
 use crate::asset::{is_image_path, sidecar};
 use crate::core::fs::written::Stale;
 use crate::core::hash::content;
@@ -74,11 +75,13 @@ fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, Strin
 }
 
 /// Every image under `root` ([`crate::asset::IMAGE_EXTENSIONS`]), sorted: what a
-/// refresh compresses and an export ships the caches of.
+/// refresh compresses and an export ships the caches of. A baked lightmap page is
+/// not among them (`asset::lightmap_page::is_baked`, #1694): it is not a colour
+/// texture, and the renderer loads the page the bake wrote.
 pub fn images(root: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
     crate::asset::manifest::walk(root, &mut |path| {
-        if is_image_path(path) {
+        if is_image_path(path) && !is_baked(path) {
             found.push(path.to_path_buf());
         }
     });
@@ -86,12 +89,13 @@ pub fn images(root: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// What a [`refresh_all`] did: how many images it encoded, and each one it could
-/// not, with why.
+/// What a [`refresh_all`] did: how many images it encoded, each one it could
+/// not, with why, and how many orphaned caches it deleted (`orphans`, #1694).
 #[derive(Debug, Default, PartialEq)]
 pub struct Refreshed {
     pub encoded: usize,
     pub failed: Vec<(PathBuf, String)>,
+    pub removed: usize,
 }
 
 /// [`refresh`] every image under `root`, in order, on this thread: what Play waits
@@ -99,9 +103,10 @@ pub struct Refreshed {
 /// what an export runs before it copies the caches. Each one re-made is noted in
 /// `core::fs::written`, so a renderer holding it uncompressed swaps it. An image
 /// that fails is warned of and the rest still run: it draws (and ships)
-/// uncompressed, as Unity builds with an import error logged. `Assets.Refresh`
-/// runs it on request. Nothing while imports are refused (Play,
-/// `convert::conversion_allowed`).
+/// uncompressed, as Unity builds with an import error logged. Last, the caches
+/// whose source is gone (or is a baked lightmap page) are deleted
+/// (`orphans`, #1694). `Assets.Refresh` runs it on request. Nothing while imports
+/// are refused (Play, `convert::conversion_allowed`).
 pub fn refresh_all(root: &Path) -> Refreshed {
     let mut done = Refreshed::default();
     if !convert::conversion_allowed() {
@@ -121,6 +126,7 @@ pub fn refresh_all(root: &Path) -> Refreshed {
             }
         }
     }
+    done.removed = super::orphans::collect(root);
     done
 }
 

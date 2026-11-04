@@ -3,6 +3,8 @@
 //! the bake did not write.
 
 use super::tests::{quick, scene, scene_path};
+use std::path::Path;
+
 use super::*;
 
 /// The sRGB texels `pixels` (`rows` equal rows) written as a PNG in a fresh temp dir.
