@@ -1,30 +1,36 @@
-//! Bloom: a scene pass, before the lens flare's, which reads its chain (the bright-pass
-//! threshold, then a 2D gaussian blur, at its quality's reduced resolution (#1522),
-//! `postfx/bloom.wgsl`), and the composite's add of the blurred result on the HDR
-//! image (`postfx/effects/bloom.wgsl`). The bright pass reads the scene after depth of field
+//! Bloom: a scene pass, before the lens flare's, which reads its result, and the
+//! composite's add of that result on the HDR image (`postfx/effects/bloom.wgsl`). The
+//! pass is a mip chain (#1700, `postfx/bloom.wgsl`, [`chain`]), after Jimenez's
+//! Call of Duty bloom with URP's knobs: a 13-tap prefilter with a Karis average and
+//! a soft-knee threshold into the first mip, at its quality's reduced resolution
+//! (#1522), 13-tap downsamples to a few texels across, and 3×3 tent upsamples
+//! blended back up by the scatter. The prefilter reads the scene after depth of field
 //! and motion blur, so a moving highlight blooms along its streak, as in URP and HDRP
 //! (#1436). The add lights the lens dirt too (`dirt`, #1442), a composite texture of
 //! bloom's own (#1473).
 
 mod cache;
+mod chain;
+#[cfg(test)]
+mod chain_gpu_tests;
 pub(crate) mod dirt;
 #[cfg(test)]
 mod dirt_tests;
+#[cfg(test)]
+mod gpu_tests;
+mod passes;
+#[cfg(test)]
+mod prefilter_gpu_tests;
 
-use std::rc::Rc;
+use chain::BloomParams;
+pub(crate) use chain::BloomTargets;
+pub(crate) use passes::BloomPasses;
 
 use super::{Composite, CompositeTexture, EffectCx, Owner, Pass, PassCx, Phase, PostEffect};
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::quality::MAX_RESOLUTION_DIVISOR;
-use crate::render::gpu::bind_entry as entry;
-use crate::render::gpu::fullscreen::Fullscreen;
-use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
-use crate::render::gpu::pipelines::LazyPipeline;
-use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::params::Gate;
-use crate::render::postfx::{PfxTarget, PostFx, HDR_FORMAT};
-use crate::render::timing::GpuPass;
-use crate::render::{GpuTexture, RenderView, Renderer};
+use crate::render::{RenderView, Renderer};
 
 pub(crate) const EFFECT: PostEffect = PostEffect {
     name: "bloom",
@@ -38,7 +44,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         slots: 1,
         textures: &[CompositeTexture {
             name: "dirt",
-            view: |pfx| pfx.bloom.dirt_view(),
+            view: |pfx| pfx.bloom_dirt.as_ref().map(|t| &t.view),
         }],
         pack,
     }],
@@ -67,160 +73,37 @@ fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     slots[0] = [b.intensity, dirt, 0.0, on];
 }
 
-/// CPU mirror of `BloomParams` in `postfx/bloom.wgsl`.
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct BloomParams {
-    /// threshold, the blurred target's texel size (x, y), unused
-    knobs: [f32; 4],
-}
-
-/// The bright pass and the blur, shared by every view, and the lens dirt textures
-/// the volumes name.
-pub(crate) struct BloomPasses {
-    layout: wgpu::BindGroupLayout,
-    bright: LazyPipeline,
-    blur: LazyPipeline,
-    pub(crate) dirt: cache::DirtCache,
-}
-
-impl BloomPasses {
-    pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
-        let shader = registry.load(device, "postfx/bloom.wgsl", "Bloom Shader");
-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Bloom Layout"),
-            entries: &[
-                uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
-                texture_entry(1, wgpu::TextureViewDimension::D2),
-                sampler_entry(2),
-            ],
-        });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Bloom Pipeline Layout"),
-            bind_group_layouts: &[Some(&layout)],
-            immediate_size: 0,
-        });
-        let pass = |fs: &'static str| {
-            let (shader, layout) = (shader.clone(), pipeline_layout.clone());
-            LazyPipeline::new(device, move |device| {
-                let label = format!("Bloom {fs}");
-                let target = wgpu::ColorTargetState {
-                    format: HDR_FORMAT,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                };
-                Fullscreen {
-                    label: &label,
-                    shader: &shader,
-                    layout: &layout,
-                    vs: "vs_fullscreen",
-                    fs,
-                }
-                .colour(device, &[Some(target)])
-            })
-        };
-        Self {
-            bright: pass("fs_bright"),
-            blur: pass("fs_blur"),
-            layout,
-            dirt: cache::DirtCache::default(),
-        }
-    }
-
-    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
-        [&self.bright, &self.blur]
-    }
-}
-
-/// One view's bloom ping-pong buffers, at its quality's reduced resolution: the
-/// bright pass writes `a`, the blur `b`, which the composite adds (binding 3); and
-/// the lens dirt it lights (bloom's composite texture), picked by the bloom pass
-/// each frame.
-pub(crate) struct BloomTargets {
-    pub(crate) a: PfxTarget,
-    pub(crate) b: PfxTarget,
-    pub(crate) size: (u32, u32),
-    /// The divisor `size` was made at; the bloom pass rebuilds them when the volume's
-    /// quality asks for another.
-    pub(crate) divisor: u32,
-    params: wgpu::Buffer,
-    dirt: Option<Rc<GpuTexture>>,
-}
-
-impl BloomTargets {
-    /// The divisor a view's buffers start at, before its bloom first runs: half.
-    pub(crate) const DIVISOR: u32 = 2;
-
-    /// The buffers for a view `width` × `height`, `1 / divisor` of its size.
-    pub(crate) fn new(device: &wgpu::Device, (w, h): (u32, u32), divisor: u32) -> Self {
-        let (bw, bh) = ((w / divisor).max(1), (h / divisor).max(1));
-        Self {
-            a: PostFx::target(device, bw, bh, "PostFX Bloom A", HDR_FORMAT),
-            b: PostFx::target(device, bw, bh, "PostFX Bloom B", HDR_FORMAT),
-            size: (bw, bh),
-            divisor,
-            params: device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("Bloom Params"),
-                size: std::mem::size_of::<BloomParams>() as u64,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }),
-            dirt: None,
-        }
-    }
-
-    /// The lens dirt the composite reads this frame, if any (the registry binds
-    /// black without one).
-    pub(crate) fn dirt_view(&self) -> Option<&wgpu::TextureView> {
-        self.dirt.as_ref().map(|t| &t.view)
-    }
-}
-
-/// Bright pass (scene -> `a`), then the blur (`a` -> `b`), when the view blooms, at
-/// its quality's divisor, with the lens dirt its volume names for the composite.
+/// The chain, when the view blooms, at its quality's divisor (made the first frame
+/// it does, dropped when it stops): the prefilter (scene -> `down[0]`), each
+/// downsample, then each upsample from the bottom (`BloomPasses::encode`); with the
+/// lens dirt its volume names for the composite.
 fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
+    let pfx = &mut view.post_fx;
     let Some(vc) = cx.effect.volume().filter(|_| blooms(&cx.effect)) else {
-        view.post_fx.bloom.dirt = None;
+        pfx.bloom_dirt = None;
+        pfx.targets.remove::<BloomTargets>();
         return;
     };
     let levels = &cx.effect.graphics.quality.bloom_resolution_divisor;
     let divisor = vc.bloom.quality.pick(levels, vc.bloom.resolution_divisor);
     let divisor = divisor.clamp(1, MAX_RESOLUTION_DIVISOR);
-    if view.post_fx.bloom.divisor != divisor {
-        let size = view.post_fx.full_size;
-        view.post_fx.bloom = BloomTargets::new(&r.device, size, divisor);
+    let (device, passes) = (&r.device, &r.post_passes.bloom);
+    let (scene, sampler) = (pfx.full_size, &pfx.sampler);
+    let make = || BloomTargets::new(device, passes, sampler, scene, divisor);
+    let t = pfx.targets.get_or(make);
+    if t.divisor != divisor {
+        *t = make();
     }
-    view.post_fx.bloom.dirt = r.lens_dirt(vc);
-    let (device, queue) = (&r.device, &r.queue);
-    let (pfx, passes) = (&view.post_fx, &r.post_passes.bloom);
-    let t = &pfx.bloom;
-    let texel = [1.0 / t.size.0 as f32, 1.0 / t.size.1 as f32];
-    let params = BloomParams {
-        knobs: [vc.bloom.threshold, texel[0], texel[1], 0.0],
-    };
-    queue.write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
-    let group = |input: &wgpu::TextureView| {
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Bloom Bind Group"),
-            layout: &passes.layout,
-            entries: &[
-                entry(0, t.params.as_entire_binding()),
-                entry(1, wgpu::BindingResource::TextureView(input)),
-                entry(2, wgpu::BindingResource::Sampler(&pfx.sampler)),
-            ],
-        })
-    };
+    pfx.bloom_dirt = r.lens_dirt(vc);
+    let pfx = &view.post_fx;
+    let t = pfx.targets.get::<BloomTargets>().expect("made above");
+    let params = BloomParams::new(&vc.bloom, t);
+    r.queue
+        .write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("Bloom Encoder"),
     });
-    let steps = [
-        (&passes.bright, group(pfx.scene_color()), &t.a),
-        (&passes.blur, group(&t.a.view), &t.b),
-    ];
-    for (pipeline, bind_group, target) in &steps {
-        let timed = (pipeline.get(), r.gpu_timer.writes(GpuPass::PostFx));
-        PostFx::fullscreen(&mut encoder, timed, &[bind_group], &target.view);
-    }
-    queue.submit(std::iter::once(encoder.finish()));
+    let input = (pfx.scene_color(), &pfx.sampler);
+    passes.encode(device, &mut encoder, t, input, &r.gpu_timer);
+    r.queue.submit(std::iter::once(encoder.finish()));
 }

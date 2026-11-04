@@ -111,9 +111,10 @@ fn gpu_without_a_bright_pixel_the_flare_changes_nothing() {
     let Some(mut r) = renderer() else {
         return;
     };
-    // Below bloom's threshold (0.8): the bright pass, and so the flare, is zero.
-    let off = shot(&mut r, &scene(0.5, false));
-    let on = shot(&mut r, &scene(0.5, true));
+    // Below bloom's threshold (0.8) and its soft knee (0.4 wide): the prefilter, and
+    // so the flare, is zero.
+    let off = shot(&mut r, &scene(0.3, false));
+    let on = shot(&mut r, &scene(0.3, true));
     assert!(
         light_around(&on, pixel_of(dot_position()), 2) > 0,
         "the dot draws"

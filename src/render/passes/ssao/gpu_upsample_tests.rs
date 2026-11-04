@@ -25,6 +25,9 @@ fn crate_on_floor(divisor: Option<u32>) -> Scene {
     let volume = create_entity(&mut scene, "Volume", None);
     let mut vc = default_post_processing();
     vc.ssao.active = divisor.is_some();
+    // Bloom's wide glow carries a darker floor into the sky by a level or two (#1700),
+    // and this holds that the AO itself never touches the sky.
+    vc.bloom.active = false;
     (vc.ssao.intensity, vc.ssao.radius) = (4.0, 1.0);
     vc.ssao.quality = EffectQuality::Custom;
     (vc.ssao.samples, vc.ssao.resolution_divisor) = (16, divisor.unwrap_or(1));

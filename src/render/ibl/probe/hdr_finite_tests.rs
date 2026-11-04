@@ -72,8 +72,10 @@ fn gpu_an_emissive_past_the_half_range_stays_finite() {
     let capture = renderer.capture_light_probe(&scene, Vec3::ZERO, RES, false);
     let texels = || capture.cube.faces.iter().flatten();
     assert!(texels().all(|t| t.is_finite() && t.max_element() <= HALF_MAX));
+    // The forward pass writes at most 60000 (`finite_hdr`, #1699), so a capture never
+    // reads an `Inf` to clamp; a sun past that is held there, not dropped.
     assert!(
-        texels().any(|t| t.x == HALF_MAX),
+        texels().any(|t| t.x >= 60000.0),
         "the sun is held, not dropped"
     );
     assert!(finite(&project_cubemap(&capture.cube)));

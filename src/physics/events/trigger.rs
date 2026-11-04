@@ -26,9 +26,14 @@ impl PhysicsWorld {
     /// into a zone would enter a tick late. Instead each live sensor asks the
     /// query tree (refreshed at the end of every step) what it overlaps now,
     /// under the same layer groups and liveness rule (#521) as its pairs. A
-    /// collider never pairs with its own body, so that body is excluded.
+    /// collider never pairs with its own body, so that body is excluded. Two
+    /// static colliders never pair, the contacts' rule (#1779): a static trigger
+    /// reports only colliders whose body is not fixed.
     pub(in crate::physics) fn overlap_pairs(&self) -> Vec<(u32, u32)> {
-        let live = |_: ColliderHandle, c: &Collider| is_live(&self.bodies, c);
+        let fixed = |c: &Collider| {
+            let body = c.parent().and_then(|h| self.bodies.get(h));
+            body.is_none_or(|b| b.is_fixed())
+        };
         let mut pairs = Vec::new();
         for (handle, sensor) in self.colliders.iter() {
             let Some(&id) = self.collider_to_id.get(&handle) else {
@@ -37,6 +42,10 @@ impl PhysicsWorld {
             if !sensor.is_sensor() || !is_live(&self.bodies, sensor) {
                 continue;
             }
+            let sensor_fixed = fixed(sensor);
+            let live = |_: ColliderHandle, c: &Collider| {
+                is_live(&self.bodies, c) && !(sensor_fixed && fixed(c))
+            };
             let mut filter = QueryFilter::default()
                 .groups(sensor.collision_groups())
                 .exclude_collider(handle);
