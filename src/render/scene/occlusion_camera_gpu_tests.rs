@@ -82,10 +82,9 @@ fn gpu_a_static_tween_rechecks_one_object_a_frame() {
     let mut scene = baked(corridors());
     let cam = Camera::new(Vec3::new(1.0, 1.6, 0.0), 0.0, 0.0);
     shot(&mut r, &scene, &cam, true);
-    let binding = |r: &Renderer, s: &Scene| &r.retained.scene(s.id()).unwrap().occlusion;
     let baked_objects = scene.occlusion.as_ref().unwrap().objects.len();
     assert_eq!(
-        binding(&r, &scene).rechecked,
+        rechecked(&r, &scene),
         baked_objects,
         "the first bind is whole"
     );
@@ -93,8 +92,13 @@ fn gpu_a_static_tween_rechecks_one_object_a_frame() {
     for step in 1..=3 {
         scene.world.transform_mut(door).unwrap().position.y += 0.01 * step as f32;
         shot(&mut r, &scene, &cam, true);
-        assert_eq!(binding(&r, &scene).rechecked, 1, "frame {step}");
+        assert_eq!(rechecked(&r, &scene), 1, "frame {step}");
     }
     shot(&mut r, &scene, &cam, true);
-    assert_eq!(binding(&r, &scene).rechecked, 0, "nothing moved");
+    assert_eq!(rechecked(&r, &scene), 0, "nothing moved");
+}
+
+/// Fingerprints the last extract of `scene` on `r` computed.
+fn rechecked(r: &Renderer, scene: &Scene) -> usize {
+    r.retained.scene(scene.id()).unwrap().occlusion.rechecked
 }

@@ -6,8 +6,7 @@
 //! key (`shadow_ops`) and the baked PVS's binding (`occlusion_ops`). One renderer.
 
 use glam::Vec3;
-use proptest::prelude::*;
-use proptest::test_runner::{Config, TestRunner};
+use proptest::{prelude::*, test_runner::Config, test_runner::TestRunner};
 
 use super::fixture::{fresh, held, RES};
 use super::occlusion_ops::{self, baked_yard};
@@ -100,7 +99,7 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
             }),
         }),
         R::Unmesh(i) => on(scene, pick(scene, i), |s, id| {
-            drop(s.world.set_mesh(id, None))
+            s.world.set_mesh(id, None);
         }),
         R::Reshape(i) => on(scene, pick(scene, i), |s, id| {
             if let Some(mut mesh) = s.world.mesh_mut(id) {

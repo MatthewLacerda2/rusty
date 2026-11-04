@@ -1,8 +1,6 @@
 //! The long-wall-behind-a-door level the occlusion tests bake and render (#1714):
 //! the case where a few points per object miss what a doorway shows.
 
-use glam::Vec3;
-
 use super::test_level::{block, DOOR, HEIGHT, WALL};
 use crate::scene::Scene;
 
