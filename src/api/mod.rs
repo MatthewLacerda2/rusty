@@ -106,6 +106,16 @@ fn register_navigation(lua: &Lua, ctx: &ApiCtx) -> Reg {
     offmesh_link::register(lua, ctx.scene, ctx.nav)
 }
 
+/// The per-renderer component namespaces: `LightProbeProxyVolume`, `LODGroup`,
+/// `Material` and `Mesh`.
+fn register_renderers(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
+    // sorted: each registrar makes its own global table
+    light_probe_proxy_volume::register(lua, scene)?;
+    lod_group::register(lua, scene)?;
+    material::register(lua, scene)?;
+    mesh::register(lua, scene)
+}
+
 /// The scene namespaces: `Scene` (structure) and `Component` (fields by name, #1369).
 fn register_scene(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // sorted: each registrar makes its own global table
@@ -139,12 +149,8 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     joint::register(lua, ctx.scene)?;
     layers::register(lua, ctx.scene)?;
     light::register(lua, ctx.scene, ctx.console)?;
-    light_probe_proxy_volume::register(lua, ctx.scene)?;
     lighting::register(lua, ctx.scene)?;
     line::register(lua, ctx.scene)?;
-    lod_group::register(lua, ctx.scene)?;
-    material::register(lua, ctx.scene)?;
-    mesh::register(lua, ctx.scene)?;
     particle::register(lua, ctx.scene)?;
     physics::register(lua, ctx.scene)?;
     physics::register_hitscan(lua, ctx.scene, ctx.physics)?;
@@ -154,6 +160,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     rect_transform::register(lua, ctx.scene, (ctx.screen, ctx.video))?;
     reflection::register(lua, ctx.scene)?;
     register_navigation(lua, ctx)?;
+    register_renderers(lua, ctx.scene)?;
     register_scene(lua, ctx)?;
     register_ui_components(lua, ctx.scene)?;
     reverb_zone::register(lua, ctx.scene)?;

@@ -8,6 +8,7 @@ use super::batch::sort::{back_to_front, view_depth};
 use super::batch::{DrawItem, FrameDraws};
 use super::overlays::{OverlayBindings, OverlayDraws};
 use super::proxy_volume;
+use super::visibility::{CameraCulls, ViewCull};
 use crate::render::gpu::draw_buffers::{push_palette, FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
 use crate::render::motion::{track, MotionHistory};
@@ -22,15 +23,8 @@ use crate::scene::Scene;
 #[derive(Default)]
 pub(crate) struct SolidResources {
     pub draws: FrameDraws,
-    /// Mesh entities tested against this camera's frustum (#1714): every one it
-    /// draws at all whose LOD level is shown.
-    pub tested: u32,
-    /// Mesh entities the frustum cull skipped for this camera (#433's counters).
-    pub culled: u32,
-    /// Mesh entities in the frustum but too far or too small for it (#1714).
-    pub size_culled: u32,
-    /// Mesh entities hidden because their LOD level is not the one shown (#472).
-    pub lod_hidden: u32,
+    /// What this camera's culling skipped, and how (#433, #472, #1714).
+    pub culls: CameraCulls,
     /// Mesh entities drawn: one each, however many material runs it draws in (#1285).
     pub visible: u32,
     /// Mesh particles among the instances (#440) — counted as particles, not entities.
@@ -105,9 +99,7 @@ impl Renderer {
     ) -> SolidResources {
         let (cam_pos, cam_fwd) = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
-        let (mut culled, mut lod_hidden, mut visible) = (0, 0, 0);
-        let (mut tested, mut size_culled) = (0, 0);
-        let small = self.small_object_cull(cam);
+        let (mut culls, mut visible) = (CameraCulls::default(), 0);
         let limits = self.device.limits();
         let binding = limits.max_storage_buffer_binding_size;
         let mut proxies = self
@@ -118,28 +110,16 @@ impl Renderer {
         } else {
             Vec::new()
         };
+        let view = ViewCull {
+            mask: cam.culling_mask,
+            lod,
+            frustum,
+            small: self.small_object_cull(cam),
+        };
         for id in scene.world.ids_with_mesh() {
-            if !self.camera_draws(scene, id, cam.culling_mask) {
+            let Some(bounds) = self.visible_bounds(scene, id, &view, &mut culls) else {
                 continue;
-            }
-            // A level of detail this camera does not show (#472).
-            if lod.hides(id) {
-                lod_hidden += 1;
-                continue;
-            }
-            // View-frustum cull (#330): skip the uniform sync, binds, and draw for any
-            // entity whose world-space AABB is fully outside what this camera can see.
-            // Then too far or too small (#1714), on what the frustum kept only.
-            tested += 1;
-            let bounds = self.world_bounds(scene, id);
-            if bounds.is_some_and(|(min, max)| !frustum.intersects_aabb(min, max)) {
-                culled += 1;
-                continue;
-            }
-            if bounds.is_some_and(|b| scene.world.mesh(id).is_some_and(|m| small.culls(&m, b))) {
-                size_culled += 1;
-                continue;
-            }
+            };
             let motion = history.as_deref_mut();
             let eye = (cam_pos, cam_fwd);
             let frame = (&mut joints, &mut proxies);
@@ -158,10 +138,7 @@ impl Renderer {
         let outline_bounds = self.outline_bounds(scene, &ringed);
         SolidResources {
             draws: self.upload_solids(opaque, transparent, (&joints, &proxies.data)),
-            tested,
-            culled,
-            size_culled,
-            lod_hidden,
+            culls,
             visible,
             mesh_particles,
             outline_bounds,

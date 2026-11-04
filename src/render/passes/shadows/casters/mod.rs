@@ -172,8 +172,7 @@ impl ShadowRenderer {
         sweep: Sweep,
     ) -> (Vec<Candidate>, Vec<JointMatrix>) {
         let scene = frame.scene;
-        let mut casters = Vec::new();
-        let mut joints = Vec::new();
+        let (mut casters, mut joints) = (Vec::new(), Vec::new());
         for id in scene.world.ids_with_mesh() {
             let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");
             let mesh_id = MeshId::from_mesh(&mesh);
@@ -194,10 +193,8 @@ impl ShadowRenderer {
                     .get(&(id, slot))
                     .is_some_and(|c| c.clip.is_variant())
             });
-            // A caster the camera may cull as small casts from the per-frame sweep,
-            // never a cached bake, so its shadow goes when it does (#1714).
-            let cached = scene.world.is_static(id) && !moving && !mesh.culls_when_small();
-            if !sweep.takes(cached) {
+            // One a camera may cull as small casts per frame, never from a bake (#1714).
+            if !sweep.takes(scene.world.is_static(id) && !moving && !mesh.culls_when_small()) {
                 continue;
             }
             let material = material.as_deref();

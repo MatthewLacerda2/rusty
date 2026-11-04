@@ -2,13 +2,79 @@
 //! mask, the Static filter a capture applies, the world bounds the frustum and the
 //! small-object cull test (#330, #1714), and where that cull measures from.
 
-use crate::render::{MeshId, Renderer, SmallObjectCull};
+use glam::Vec3;
+
+use crate::render::lod::LodSelection;
+use crate::render::{Frustum, MeshId, Renderer, SmallObjectCull};
 use crate::scene::Scene;
 
+/// A mesh's world bounds, `None` when they cannot be known (never culled).
+type Bounds = Option<(Vec3, Vec3)>;
+
+/// What one camera's culling skipped, by reason (#433's counters).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct CameraCulls {
+    /// Mesh entities tested against the frustum (#1714): every one the camera draws
+    /// at all whose LOD level it shows.
+    pub tested: u32,
+    /// Outside the frustum (#330).
+    pub culled: u32,
+    /// Inside it, but too far or too small (#1714).
+    pub size_culled: u32,
+    /// Hidden because their LOD level is not the one shown (#472).
+    pub lod_hidden: u32,
+}
+
+/// One camera's culling inputs: its culling mask (#92), the LOD levels it shows, its
+/// frustum and its small-object cull.
+pub(super) struct ViewCull<'a> {
+    pub mask: u32,
+    pub lod: &'a LodSelection,
+    pub frustum: &'a Frustum,
+    pub small: SmallObjectCull,
+}
+
 impl Renderer {
+    /// Mesh entity `id`'s world bounds when `view` draws it, its verdict counted in
+    /// `culls` when it doesn't: its mask or a capture leaves it out, then its LOD
+    /// level is hidden (#472), then the frustum (#330), then too far or too small
+    /// on what the frustum kept (#1714). Whichever culls first counts.
+    pub(super) fn visible_bounds(
+        &self,
+        scene: &Scene,
+        id: u32,
+        view: &ViewCull,
+        culls: &mut CameraCulls,
+    ) -> Option<Bounds> {
+        if !self.camera_draws(scene, id, view.mask) {
+            return None;
+        }
+        if view.lod.hides(id) {
+            culls.lod_hidden += 1;
+            return None;
+        }
+        culls.tested += 1;
+        let bounds = self.world_bounds(scene, id);
+        if bounds.is_some_and(|(min, max)| !view.frustum.intersects_aabb(min, max)) {
+            culls.culled += 1;
+            return None;
+        }
+        let small = |b| {
+            scene
+                .world
+                .mesh(id)
+                .is_some_and(|m| view.small.culls(&m, b))
+        };
+        if bounds.is_some_and(small) {
+            culls.size_culled += 1;
+            return None;
+        }
+        Some(bounds)
+    }
+
     /// Whether a camera whose culling mask (#92) is `mask` draws mesh entity `id` at
     /// all, before LOD and frustum culling.
-    pub(super) fn camera_draws(&self, scene: &Scene, id: u32, mask: u32) -> bool {
+    fn camera_draws(&self, scene: &Scene, id: u32, mask: u32) -> bool {
         // An inactive mesh, or a shadows-only one: it casts, no camera draws it (#1571).
         let mode = scene.world.mesh(id).map(|m| m.cast_shadows);
         if !scene.world.is_active_in_hierarchy(id) || mode.is_some_and(|m| !m.is_visible()) {
@@ -30,7 +96,7 @@ impl Renderer {
     /// the GPU yet, or whose pose cannot be bounded: it is never culled, since the
     /// downstream sync produces no draw for a non-resident mesh anyway, and culling a
     /// not-yet-uploaded mesh could wrongly hide it on its first frame.
-    pub(super) fn world_bounds(&self, scene: &Scene, id: u32) -> Option<(glam::Vec3, glam::Vec3)> {
+    fn world_bounds(&self, scene: &Scene, id: u32) -> Option<(glam::Vec3, glam::Vec3)> {
         let mesh = scene.world.mesh(id)?;
         let gpu_mesh = self.gpu_meshes.get(&MeshId::from_mesh(&mesh))?;
         gpu_mesh.world_bounds(&mesh, scene.world.local_to_world(id))
