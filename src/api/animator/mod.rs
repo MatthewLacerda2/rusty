@@ -14,12 +14,14 @@
 //! `PlayAnimation`) lives in `graph.rs`, and the layer surface (#457:
 //! `SetLayerWeight`, `GetLayerWeight`, `GetCurrentNode`) in `layers.rs`, and the
 //! IK surface (#461: `Add*IK`, `RemoveIK`, `SetIK*`, `GetIKWeight`) in `ik.rs`,
-//! and the playback-speed surface (#1342: `SetSpeed`, `GetSpeed`) in `speed.rs` —
+//! and the playback-speed surface (#1342: `SetSpeed`, `GetSpeed`) in `speed.rs`,
+//! and `Play`/`Crossfade` themselves in `play.rs` —
 //! one namespace, split to stay under the size cap.
 
 mod graph;
 mod ik;
 mod layers;
+mod play;
 mod speed;
 
 use std::cell::RefCell;
@@ -42,7 +44,7 @@ pub fn register<'scope>(
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_play(scope, &table, scene, console)?;
+    play::register(scope, &table, scene, console)?;
     register_stop(scope, &table, scene)?;
     register_pause_resume(scope, &table, scene)?;
     register_set_looping(scope, &table, scene)?;
@@ -57,49 +59,6 @@ pub fn register<'scope>(
     lua.globals()
         .set("Animator", table)
         .map_err(|e| e.to_string())
-}
-
-/// `Play` / `Crossfade` — start a clip (crossfade simplifies to a plain play).
-fn register_play<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
-) -> Reg {
-    put(
-        table,
-        "Play",
-        scope.create_function(|_, (id, clip): (EntityArg, String)| {
-            let id = id.live("Animator", "Play")?;
-            let mut scene = scene.borrow_mut();
-            let played = scene
-                .world
-                .animator_mut(id)
-                .map(|mut anim| anim.play(clip.clone()))
-                .is_some();
-            if played {
-                let name = scene.world.name(id).map(|n| n.clone()).unwrap_or_default();
-                console
-                    .borrow_mut()
-                    .info(format!("Entity {} playing animation: {}", name, clip));
-            }
-            Ok(())
-        }),
-    )?;
-
-    put(
-        table,
-        "Crossfade",
-        scope.create_function(|_, (id, clip, duration): (EntityArg, String, f32)| {
-            let id = id.live("Animator", "Crossfade")?;
-            // Blend out of the current clip over `duration` seconds (#80).
-            let mut scene = scene.borrow_mut();
-            if let Some(mut anim) = scene.world.animator_mut(id) {
-                anim.crossfade(clip, duration);
-            }
-            Ok(())
-        }),
-    )
 }
 
 /// `GetBone` — the bone GameObject of the entity's skeleton named `name` (#453),
