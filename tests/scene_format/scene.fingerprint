@@ -271,6 +271,7 @@ scene.entities[].light.light_type: enum Ambient|Directional|Point|Spot|Area
 scene.entities[].light.mode: enum Realtime|Mixed|Baked
 scene.entities[].light.outer_cone: f32
 scene.entities[].light.range: f32
+scene.entities[].light.shadow_fade_distance: f32
 scene.entities[].light: option
 scene.entities[].light_probe_proxy_volume.bounds_mode: enum AutomaticLocal|Custom
 scene.entities[].light_probe_proxy_volume.grid_resolution: tuple(3)
