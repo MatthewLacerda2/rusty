@@ -138,6 +138,21 @@ impl Sh9 {
         out
     }
 
+    /// Each band's coefficients times that band's factor in `bands` (l = 0, 1, 2):
+    /// a zonal reshaping of the read-back lobe, as `DiffuseModel::sh_band_scale`.
+    pub fn band_scaled(&self, bands: [f32; 3]) -> Sh9 {
+        let mut out = *self;
+        for (i, c) in out.coeffs.iter_mut().enumerate() {
+            let band = match i {
+                0 => 0,
+                1..=3 => 1,
+                _ => 2,
+            };
+            *c = (Vec3::from(*c) * bands[band]).to_array();
+        }
+        out
+    }
+
     /// Component-wise lerp between two probes (the trilinear interpolation kernel).
     pub fn lerp(a: &Sh9, b: &Sh9, t: f32) -> Sh9 {
         let mut out = Sh9::zero();
