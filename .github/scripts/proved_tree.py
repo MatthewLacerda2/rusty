@@ -26,6 +26,19 @@ workflow file itself, runs everything, so the new key's cache is written by
 `main` and a dependency bump is proven on `main`. Any other push leaves the key,
 and so the saved cache, as it was.
 
+**A superseded push skips** (#1785). A merge train lands its members as one
+squash each, seconds apart, so every push but the last carries a tree no run
+built and `main` leaves at once. When the pushed commit is no longer `main`'s
+tip (`repos/{repo}/commits/main`), its build is skipped: the newer tip's own
+push run covers it. So an intermediate tree of a train is never built, and that
+is sound: `main` is linear, each later tip holds every change of the one before,
+nothing checks out or ships the passing tree, and the train's own run proved
+the tree the last squash leaves (which then skips by the rule above, or builds).
+A run that starts before the next merge sees itself as the tip and simply
+builds: minutes spent, nothing less proved. The cache-key check comes first, so
+a superseded push that moves the key still runs in full and saves its cache. A
+partial landing leaves its last squash as the tip, and that one builds.
+
 **Fail toward running.** Any error (an API failure, a field missing, a compare
 too long to read) answers no, and the push runs every gate as before.
 
@@ -139,12 +152,23 @@ def proving_run(get: Get, repo: str, tree: str, workflow: str) -> str | None:
     return None
 
 
+def superseded(get: Get, repo: str, sha: str) -> str | None:
+    """`main`'s tip when it is now a commit other than `sha`; any doubt is `None`."""
+    tip = get(f"repos/{repo}/commits/main")
+    found = tip.get("sha") if isinstance(tip, dict) else None
+    return found if isinstance(found, str) and len(found) == 40 and found != sha else None
+
+
 def verdict(get: Get, repo: str, workflow: str, sha: str, before: str) -> tuple[str | None, str]:
-    """(the proving run's url or `None`, why), failing toward running on any error."""
+    """(what proves it: the proving run's url, or the newer tip that supersedes
+    it; `None` when nothing does) and why, failing toward running on any error."""
     try:
         why = key_change(get, repo, before, sha, workflow)
         if why:
             return None, f"runs in full: {why}"
+        newer = superseded(get, repo, sha)
+        if newer:
+            return newer, f"skips the build: `main` is at {newer} now, past {sha}, and that tip's own run covers it"
         commit = get(f"repos/{repo}/commits/{sha}")
         if not isinstance(commit, dict):
             return None, "runs in full: the pushed commit could not be read"

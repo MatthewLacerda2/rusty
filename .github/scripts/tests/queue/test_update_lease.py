@@ -17,7 +17,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from merging.queue import gitio, refusal, taking, update
+from merging.queue import gitio, landing, refusal, update
 from tests.queue.fixtures import SHA, done
 from tests.queue.test_markdown_advance import WHO
 from tests.queue.test_update_by_merge import Origin
@@ -53,7 +53,7 @@ class Lease(unittest.TestCase):
 
     def test_the_squash_body_names_the_branch_commits_and_no_merge(self):
         fresh, _ = self.advance()
-        self.assertEqual(taking.squash_message(fresh, self.repo.root), "* on b")
+        self.assertEqual(landing.squash_message(fresh, self.repo.root), "* on b")
 
 
 class MergeStopped(unittest.TestCase):
