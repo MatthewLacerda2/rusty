@@ -20,8 +20,10 @@
 //! - **Folders and lost events.** A folder that appears or moves notes every file
 //!   under it; an event asking for a rescan (inotify's queue overflowed) notes every
 //!   file under the roots.
-//! - **Held through Play.** A change seen while playing is kept, and noted on the
-//!   first frame after Stop, as conversion already waits for Stop (#1253).
+//! - **Held through Play, but for scripts.** A change seen while playing is kept,
+//!   and noted on the first frame after Stop, as conversion already waits for Stop
+//!   (#1253). A `.lua` file is noted at once: the playing VM's script classes
+//!   follow it, so the next instance spawned runs the edit (#1710).
 //! - **A polling fallback.** When the native backend (inotify, FSEvents) cannot
 //!   start, or `RUSTY_WATCH_POLL` is set (a network or container filesystem that
 //!   gives no events), `notify`'s `PollWatcher` compares the files every second, by
@@ -201,14 +203,25 @@ impl Watch {
         }
     }
 
-    /// Once per frame: drain the events, and unless `playing`, note every pending
-    /// path in the write log, then re-convert the sources the notes touched (a
-    /// texture an FBX's conversion read is no model path, so only this re-converts
-    /// it). Returns how many were noted.
+    /// Once per frame: drain the events, and note every pending path in the write
+    /// log, then re-convert the sources the notes touched (a texture an FBX's
+    /// conversion read is no model path, so only this re-converts it). While
+    /// `playing`, only scripts are noted and nothing re-converts. Returns how many
+    /// were noted.
     pub fn apply(&mut self, playing: bool) -> usize {
         self.collect();
         if playing {
-            return 0;
+            let scripts: Vec<String> = self
+                .pending
+                .iter()
+                .filter(|p| crate::core::paths::has_extension(p, "lua"))
+                .cloned()
+                .collect();
+            for path in &scripts {
+                self.pending.remove(path);
+                crate::core::fs::written::note_written(path);
+            }
+            return scripts.len();
         }
         let noted: Vec<String> = std::mem::take(&mut self.pending).into_iter().collect();
         for path in &noted {
@@ -228,8 +241,6 @@ impl Watch {
     }
 }
 
-/// Whether an event of `kind` can change what a file holds: everything but a
-/// read-only open, read or close.
 /// Whether an event is worth a frame: a change, an error to report, or a lost-events
 /// notice ([`Watch::take`] rescans on one).
 fn matters(event: &notify::Result<Event>) -> bool {
@@ -238,6 +249,8 @@ fn matters(event: &notify::Result<Event>) -> bool {
     })
 }
 
+/// Whether an event of `kind` can change what a file holds: everything but a
+/// read-only open, read or close.
 fn changes(kind: &EventKind) -> bool {
     match kind {
         EventKind::Access(AccessKind::Close(AccessMode::Write)) => true,

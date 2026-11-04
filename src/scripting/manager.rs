@@ -4,8 +4,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use crate::components::ScriptComponent;
 use crate::core::input::InputState;
 use crate::core::random::{Random, DEFAULT_SEED};
+use crate::ecs::Cursor;
 use crate::navigation::NavigationGraph;
 use crate::scene::Camera;
 use crate::scene::Scene;
@@ -40,12 +42,17 @@ pub struct ScriptManager {
     /// discipline replays rely on — without re-sorting per hook.
     pub(super) entity_scripts: BTreeMap<(u32, usize), ScriptInstance>,
     /// Every `(entity_id, script_index)` slot a load was ever attempted for,
-    /// including failures — so the per-tick spawn scan (`load_new_scripts`)
+    /// including failures — so the spawn queue's drain (`load_new_scripts`)
     /// never retries (and re-logs) a script that failed to compile.
     pub(super) load_attempted: BTreeSet<(u32, usize)>,
-    /// Script paths whose `fields` schema could not be read this VM, so the
-    /// loader warns once per script, not once per instance (#1709).
-    pub(super) schema_warned: BTreeSet<String>,
+    /// Each script file read and compiled once for this VM (#1710).
+    pub(super) classes: super::loader::ScriptClasses,
+    /// Where the spawn queue — the World's `scripts` change log — was last read
+    /// (#1710); `None` until this VM's first drain, which scans every entity.
+    pub(super) spawn_cursor: Option<Cursor<Vec<ScriptComponent>>>,
+    /// Entities whose load records were forgotten: the next drain looks at them
+    /// whether or not the log stamped them.
+    pub(super) requeued: BTreeSet<u32>,
     /// Every cell the `api::` surface borrows, shared with `Resources` and the
     /// platform layer; a second VM over the same world clones it (#1384).
     pub(super) cells: ApiCells,
@@ -74,7 +81,9 @@ impl ScriptManager {
             lua: None,
             entity_scripts: BTreeMap::new(),
             load_attempted: BTreeSet::new(),
-            schema_warned: BTreeSet::new(),
+            classes: Default::default(),
+            spawn_cursor: None,
+            requeued: BTreeSet::new(),
             cells: ApiCells::new(scene, input, nav, console, camera, time),
             workspace: PathBuf::new(),
             play_seed: DEFAULT_SEED,
@@ -135,10 +144,10 @@ impl ScriptManager {
             .map_err(|e| e.to_string())?;
 
         self.cells.install(&lua)?;
-        self.lua = Some(lua);
         self.entity_scripts.clear();
         self.load_attempted.clear();
-        self.schema_warned.clear();
+        self.forget_loads();
+        self.lua = Some(lua);
         self.cells.timers.borrow_mut().clear();
 
         Ok(())
@@ -152,11 +161,19 @@ impl ScriptManager {
         }
     }
 
+    /// Forget what this VM compiled and where its spawn queue stood: the next
+    /// drain scans every entity and reads every script afresh.
+    fn forget_loads(&mut self) {
+        self.classes = Default::default();
+        self.spawn_cursor = None;
+        self.requeued.clear();
+    }
+
     /// Stops and clears the script environment
     pub fn shutdown(&mut self) {
         self.entity_scripts.clear();
         self.load_attempted.clear();
-        self.schema_warned.clear();
+        self.forget_loads();
         self.cells.timers.borrow_mut().clear();
         self.lua = None;
     }
