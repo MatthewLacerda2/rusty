@@ -85,6 +85,12 @@ impl CompositeTextures {
         }
     }
 
+    /// The black texel, for a binding outside group 1 with nothing to show (bloom's
+    /// result while a view doesn't bloom).
+    pub(crate) fn black(&self) -> &wgpu::TextureView {
+        &self.fallback
+    }
+
     /// Group 1 for this frame: each declared texture's view, else the black texel.
     pub(crate) fn bind_group(&self, device: &wgpu::Device, pfx: &PostFx) -> wgpu::BindGroup {
         let views = bound_views(pfx, &self.fallback);

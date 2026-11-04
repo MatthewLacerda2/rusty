@@ -6,6 +6,7 @@ use glam::Vec3;
 
 use super::tests::{floor, mean, quad, settings, sun};
 use super::*;
+use crate::components::falloff;
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::lighting::DiffuseModel;
 
@@ -41,8 +42,8 @@ fn a_mixed_light_adds_nothing() {
 #[test]
 fn a_baked_light_reads_back_as_its_lambert_irradiance() {
     let sh = baked_direct_sh(&scene(vec![floor()], lamp(true)), &[PROBE])[0];
-    // 1.5 units below the lamp: 5 / (1.5² + 1), facing it head-on.
-    let expected = 5.0 / (1.5 * 1.5 + 1.0);
+    // 1.5 units below the lamp: 5 × falloff(1.5, 10), facing it head-on.
+    let expected = 5.0 * falloff(1.5, 10.0);
     let toward = sh.eval(Vec3::Y).x;
     // An L2 delta overshoots a clamped cosine by ~6% head-on.
     assert!(
@@ -78,7 +79,7 @@ fn under_half_lambert_a_probe_reads_a_baked_light_back_as_the_wrap() {
     let mut s = scene(vec![floor()], lamp(true));
     s.diffuse = DiffuseModel::HalfLambert;
     let sh = baked_direct_sh(&s, &[PROBE])[0];
-    let e = 5.0 / (1.5 * 1.5 + 1.0);
+    let e = 5.0 * falloff(1.5, 10.0);
     // The squared wrap is a quadratic in N·L: L2 holds it exactly.
     for (n, share) in [(Vec3::Y, 1.0), (Vec3::X, 0.25), (Vec3::NEG_Y, 0.0)] {
         let got = sh.eval(n).x;

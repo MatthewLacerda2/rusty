@@ -1,5 +1,5 @@
 //! Lens flare (#1443), Unity URP's *Screen Space Lens Flare* override: built from
-//! bloom's blurred bright pass, so every bright pixel flares with no per-light
+//! bloom's prefiltered first mip, so every bright pixel flares with no per-light
 //! authoring (`render::postfx::effects::lens_flare`). It runs only when bloom runs.
 
 use serde::{Deserialize, Serialize};

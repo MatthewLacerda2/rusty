@@ -12,7 +12,9 @@
 //! back is exactly `E / π`. A ray that escapes returns the sky; one that hits a front
 //! face returns that surface's emission plus `albedo / π` times its direct light (a
 //! shadow ray per light), and keeps bouncing, `bounces` surfaces deep. A back face
-//! returns nothing, so light never leaks through a closed wall.
+//! returns nothing, so light never leaks through a closed wall. A path's light is
+//! clamped at [`INDIRECT_CLAMP`] (Cycles' *Clamp Indirect*, #1699), so a lamp hung
+//! against a surface bakes no speckle; the texel's own direct light is not.
 //!
 //! Alongside each part the tracer sums where the light came from (#810): every ray's
 //! direction weighted by the luminance it brought back, so the bake can store the
@@ -26,12 +28,20 @@ use super::input::{BakeLight, BakeRun, BakeScene, LightShape};
 use super::lights::area::{strata, stratified};
 use super::rays::{Hit, Rays};
 use super::rng::Rng;
+use crate::components::{falloff, spot_cone};
 use crate::core::color::luminance;
 
 /// Ray offset along the surface normal, against self-intersection, in world units.
 const SURFACE_OFFSET: f32 = 1e-3;
 /// Nearest hit a ray accepts.
 pub(super) const T_MIN: f32 = 1e-4;
+/// The brightest one bounce path may come back (#1699), Blender Cycles' *Clamp
+/// Indirect* at its default of 10: a path is scaled down, hue kept, until its
+/// brightest channel is at most this. Inverse-square light has no ceiling, so a
+/// lamp hung 5 cm under a ceiling lights the spot beside it hundreds of times
+/// brighter than the rest; a path that happens to hit there would add a speckle
+/// the bake's filter only smears. The texel's own direct light is never clamped.
+pub(super) const INDIRECT_CLAMP: f32 = 10.0;
 /// The share of a texel's rays that may start out on back faces before the texel is
 /// judged to be inside geometry (Unity's backface tolerance, inverted).
 const BACKFACE_TOLERANCE: f32 = 0.5;
@@ -110,14 +120,15 @@ impl Tracer<'_> {
                 break;
             };
             let Some((point, hit_normal, m)) = self.surface(&hit, dir) else {
-                return (radiance, first, depth == 0); // back face: nothing comes through
+                // A back face: nothing comes through.
+                return (clamp_indirect(radiance), first, depth == 0);
             };
             let lit = self.direct(point, hit_normal, false, 1, rng).0;
             radiance += throughput * (m.emissive + m.albedo * lit / PI);
             throughput *= m.albedo;
             (origin, normal) = (point, hit_normal);
         }
-        (radiance, first, false)
+        (clamp_indirect(radiance), first, false)
     }
 
     /// The offset hit point, its shading normal and the material run it landed on
@@ -192,9 +203,19 @@ impl Tracer<'_> {
     }
 }
 
+/// `radiance` scaled down, hue kept, so no channel passes [`INDIRECT_CLAMP`].
+pub(super) fn clamp_indirect(radiance: Vec3) -> Vec3 {
+    let peak = radiance.max_element();
+    if peak > INDIRECT_CLAMP {
+        radiance * (INDIRECT_CLAMP / peak)
+    } else {
+        radiance
+    }
+}
+
 /// Unit direction to `light`, distance to it, and the radiance arriving at `point`
-/// (before the cosine), with the forward shader's falloff: `1 / (d² + 1)` inside
-/// `range`, and the spot's linear inner-to-outer cone fade. An Area light is
+/// (before the cosine), with the forward shader's falloff and cone (#1699):
+/// [`falloff`] inside `range`, and for a spot [`spot_cone`]. An Area light is
 /// asked about its point at `u` in `[0, 1]²` (`area`'s model); the rest ignore
 /// `u`. `None` out of reach.
 pub(super) fn arrival(light: &BakeLight, point: Vec3, u: Vec2) -> Option<(Vec3, f32, Vec3)> {
@@ -206,7 +227,7 @@ pub(super) fn arrival(light: &BakeLight, point: Vec3, u: Vec2) -> Option<(Vec3, 
         LightShape::Directional { direction } => Some((-direction, f32::MAX, light.radiance)),
         LightShape::Point { position, range } => {
             let (dir, d) = toward(position, point, range)?;
-            Some((dir, d, light.radiance / (d * d + 1.0)))
+            Some((dir, d, light.radiance * falloff(d, range)))
         }
         LightShape::Spot {
             position,
@@ -220,8 +241,8 @@ pub(super) fn arrival(light: &BakeLight, point: Vec3, u: Vec2) -> Option<(Vec3, 
             if theta <= cos_outer {
                 return None;
             }
-            let cone = ((theta - cos_outer) / (cos_inner - cos_outer).max(1e-4)).clamp(0.0, 1.0);
-            Some((dir, d, light.radiance * cone / (d * d + 1.0)))
+            let cone = spot_cone(theta, cos_inner, cos_outer);
+            Some((dir, d, light.radiance * cone * falloff(d, range)))
         }
     }
 }
