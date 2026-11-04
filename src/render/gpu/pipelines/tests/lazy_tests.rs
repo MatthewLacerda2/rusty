@@ -88,7 +88,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     // too (#1526) + the 2 primed forward ones (#1499) and the primed SSR one + the
     // opaque pass's and the prepass's mirrored and two-sided ones (#1615) + SSR's own
     // pass and its pyramid's (#1736) + SSAO's occlusion, blur and upsample (#1578) + the motion blur's 3 tile
-    // passes and gather (#1436) + the depth of field's 9 (#1445) + bloom's prefilter,
+    // passes and gather (#1436) + TAA's resolve (#1702) + the depth of field's 9 (#1445) + bloom's prefilter,
     // resample, downsample and upsample (#1700) + the lens flare's (#1443; the composite adds it, #1473)
     // + 2 particle + 2 ribbon + one world canvas per blend mode + 2 mirrored and 2
     // two-sided shadow (#1571) + the data-mip one + the opaque copy (#1523) + the
@@ -105,6 +105,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + 2
             + 3
             + 4
+            + 1
             + 9
             + 4
             + 1
