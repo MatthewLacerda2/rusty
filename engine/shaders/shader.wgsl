@@ -369,9 +369,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         N = faceForward(N, -V, N);
     }
     let metallic = surface.metallic;
-    // Geometric specular AA (#1702): every GGX read below (the lights, the environment
-    // reflection's mip, SSR's record) takes the widened roughness, so a highlight and
-    // its reflection agree.
+    // Geometric specular AA (#1702): every GGX read below (the lights, the lightmap's
+    // lobe, the environment reflection's mip, SSR's record) takes the widened
+    // roughness, so a highlight and its reflection agree.
     let roughness = specular_aa::widen(surface.roughness, specular_kernel);
 
     let F0 = mix(vec3<f32>(0.04), albedo, metallic);

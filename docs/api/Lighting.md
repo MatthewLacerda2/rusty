@@ -285,8 +285,10 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   evenly from everywhere). The bounce's directions are smoothed by the same filter as its
   colour. At runtime a lightmapped surface reshapes its baked light by how its
   **normal-mapped** normal faces that direction, so bumps, tiles and panel seams read
-  under baked light as they do under realtime light; a surface without a normal map
-  shades exactly as a non-directional bake would. `directional = false` (or the editor's
+  under baked light as they do under realtime light (a surface without a normal map
+  keeps its baked diffuse exactly as a non-directional bake gives it). The direction
+  also gives a glossy surface one specular highlight from `Baked` lights
+  ([`Light`](Light.md), #1695), which a non-directional bake has none of. `directional = false` (or the editor's
   **"Directional lightmaps"** checkbox under the Generate Lighting button) skips the direction pages
   to save their memory; the colour lightmaps are byte-identical either way.
 - **At runtime** a lightmapped surface takes its ambient term from the lightmap instead
