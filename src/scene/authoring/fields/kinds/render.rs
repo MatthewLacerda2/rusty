@@ -34,6 +34,10 @@ inspect! {
             with!("subdivisions", |m, n: u32| mesh::set_subdivisions(m, n)?)
         ),
         op!("cast_shadows", mesh::set_cast_shadows),
+        unheld!(
+            "rehydration holds it (mesh::hold_scale_in_lightmap) without copying the geometry",
+            op!("scale_in_lightmap", mesh::set_scale_in_lightmap)
+        ),
         ro!("skeleton", MESH),
         op!("max_draw_distance", mesh::set_max_draw_distance),
         op!("min_screen_size", mesh::set_min_screen_size),

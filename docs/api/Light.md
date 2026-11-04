@@ -144,7 +144,9 @@ Mesh card and saved with the scene and its prefabs.
 | `"ShadowsOnly"` | casts as `"On"`, but no camera draws it: an invisible shadow stand-in |
 
 Every shadow path reads it on its next frame, a static mesh's cached shadow bake
-included. Whether a surface *receives* shadows is its material's switch,
+included. Its neighbour on the Mesh card, `scale_in_lightmap` (Unity's *Scale In
+Lightmap*), scales the mesh's lightmap texel density; at `0` the mesh reads light
+probes instead ([`Lighting`](Lighting.md#generate-lighting)). Whether a surface *receives* shadows is its material's switch,
 `Material.SetReceiveShadows` ([`Material`](Material.md)).
 
 The bakes (the lightmap and the light probes, [`Lighting`](Lighting.md)) follow one
@@ -179,4 +181,6 @@ whether it is drawn live:
   bounce from the light probes, whose bake adds the light's own direct light per
   probe (shadowed by static geometry). So a dynamic object lights from it only once
   probes are baked, softly, and it casts no realtime shadow; a static surface without
-  a lightmap (no second UV map) does not receive it at all.
+  a lightmap (no second UV map) does not receive it at all, while a static mesh at
+  Scale In Lightmap `0` ([`Lighting`](Lighting.md#generate-lighting)) takes it from the
+  probes, as a dynamic object does.

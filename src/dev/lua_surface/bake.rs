@@ -154,6 +154,7 @@ fn register_lightmaps(lua: &Lua, ctx: &ApiCtx) -> Reg {
                     bounces,
                     seed,
                     directional,
+                    max_lightmap_size: None,
                 };
                 let settings = overrides.apply(scene.borrow().lighting_settings.lightmaps);
                 let path = scene_path.borrow();

@@ -20,6 +20,8 @@
 //! `bundle::build_bundle` turns one into a single `EntityBuilder` placement (one
 //! archetype move), and `core.rs`'s `entity_document` recomposes it.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::components::Entity;
 
 use super::activity::ActivityStore;
@@ -55,6 +57,8 @@ pub struct World {
     pub(super) journal: Journal,
     /// Who names whom, opened by the first despawn (`ecs::despawn`, #1708).
     pub(super) refs: Option<RefIndex>,
+    /// Absent parent id -> the children placed naming it (`ecs::placement`, #1805).
+    pub(super) awaited: BTreeMap<u32, BTreeSet<u32>>,
 }
 
 impl Default for World {
@@ -77,6 +81,7 @@ impl World {
             changes: ChangeLogs::default(),
             journal: Journal::default(),
             refs: None,
+            awaited: BTreeMap::new(),
         }
     }
 
@@ -171,6 +176,7 @@ impl World {
         self.next_seq = 0;
         self.reset_caches();
         self.bounds = BoundsQueue::default();
+        self.awaited.clear();
     }
 
     pub fn contains(&self, id: u32) -> bool {

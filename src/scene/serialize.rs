@@ -176,19 +176,6 @@ fn take_materials(scene: &mut Scene, data: &mut SceneData) {
     }
 }
 
-/// Check the loaded parent links once (`World::one_sided_links`): a hand-written
-/// file can name a parent whose `children` lacks the child, which still works but
-/// turns `activeInHierarchy`'s subtree invalidation into a whole-store one.
-fn warn_one_sided_links(world: &mut crate::ecs::World) {
-    let one_sided = world.one_sided_links();
-    if !one_sided.is_empty() {
-        log::warn!(
-            "[Scene] entities {one_sided:?} name a parent whose children list lacks them; \
-             activeInHierarchy falls back to re-resolving everything on each change."
-        );
-    }
-}
-
 /// `from_disk`: the document came from a file, so its values are held; a World
 /// snapshot's already were.
 fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
@@ -212,7 +199,6 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
         scene.world.insert_entity(entity);
     }
     scene.world.bump_next_id(data.next_entity_id);
-    warn_one_sided_links(&mut scene.world);
     scene.selected_entity_id = data.selected_entity_id;
     scene.skybox_path = data.skybox_path;
     scene.ambient_color = data.ambient_color;
@@ -237,6 +223,10 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     scene.lightmaps = data.lightmaps;
     scene.lighting_settings = data.lighting_settings;
     scene.lighting_settings.reflections.clamp();
+    // The bake's knobs too (#1704): a hand-edited Max Lightmap Size of 5000 reads
+    // back as the 4096 it bakes at.
+    let lightmaps = &mut scene.lighting_settings.lightmaps;
+    *lightmaps = lightmaps.sanitized();
 
     // Rebuild every skeleton from its model, then hang the saved attachments back
     // on their bones by name (#453) — before prefab propagation, which rebuilds a

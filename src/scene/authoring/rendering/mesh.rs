@@ -2,15 +2,15 @@
 //!
 //! A mesh's geometry comes from the model or primitive it was made from; the values
 //! authored on it are a `Plane`'s subdivisions, the grid a vertex block
-//! (`vertex_waves`) needs to move, how it casts shadows (#1571), and when a camera
-//! culls it as too far or too small (#1714). The Inspector's
+//! (`vertex_waves`) needs to move, how it casts shadows (#1571), its Scale In Lightmap
+//! (#1704), and when a camera culls it as too far or too small (#1714). The Inspector's
 //! Mesh card and `Component.Set` both write them here.
 //!
 //! Pure.
 
 use crate::components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use crate::components::{MeshComponent, ShadowCasting};
-use crate::scene::authoring::sanitize::{clamped, non_negative};
+use crate::scene::authoring::sanitize::{self, clamped, non_negative};
 use crate::scene::authoring::{subdivided_geometry, Primitive};
 
 /// Cut a `Plane` into `subdivisions` quads per side and rebuild its geometry.
@@ -70,6 +70,29 @@ pub fn set_min_screen_size(mesh: &mut MeshComponent, height: f32) {
 pub fn shown(m: &MeshComponent, value: &mut serde_json::Value) {
     value["max_draw_distance"] = serde_json::json!(m.max_draw_distance);
     value["min_screen_size"] = serde_json::json!(m.min_screen_size);
+}
+
+/// Set the mesh's Scale In Lightmap (#1704), held in
+/// [`MeshComponent::SCALE_IN_LIGHTMAP`]; a non-finite value changes nothing. The
+/// next bake reads it.
+pub fn set_scale_in_lightmap(mesh: &mut MeshComponent, scale: f32) {
+    let (lo, hi) = MeshComponent::SCALE_IN_LIGHTMAP.into_inner();
+    mesh.scale_in_lightmap = sanitize::finite_or(scale, mesh.scale_in_lightmap).clamp(lo, hi);
+}
+
+/// Hold a Scale In Lightmap read from a file (#1704) in
+/// [`MeshComponent::SCALE_IN_LIGHTMAP`] (a non-finite one reads 1). Returns the
+/// warning when it moved one. The field table leaves the field `unheld!` for
+/// this, as for [`hold_subdivisions`]: a load's generic hold would copy the
+/// mesh's whole geometry to hold one number.
+pub fn hold_scale_in_lightmap(mesh: &mut MeshComponent) -> Option<String> {
+    let read = mesh.scale_in_lightmap;
+    let (lo, hi) = MeshComponent::SCALE_IN_LIGHTMAP.into_inner();
+    let held = sanitize::finite_or(read, 1.0).clamp(lo, hi);
+    (held.to_bits() != read.to_bits()).then(|| {
+        mesh.scale_in_lightmap = held;
+        format!("a mesh's scale_in_lightmap {read} was held at {held} ({lo}..={hi})")
+    })
 }
 
 /// Hold a count read from a file (#1524), so the field agrees with the grid the
@@ -174,5 +197,30 @@ mod tests {
         cube.subdivisions = 4;
         assert!(hold_subdivisions(&mut cube).unwrap().contains("Box"));
         assert_eq!(cube.subdivisions, 1);
+    }
+
+    #[test]
+    fn scale_in_lightmap_is_held_in_its_range() {
+        let mut cube = primitive_mesh_component(Primitive::Box).unwrap();
+        assert_eq!(cube.scale_in_lightmap, 1.0);
+        // A non-finite value changes nothing, so the 64 before it stands.
+        let sets = [(2.5, 2.5), (-1.0, 0.0), (1e9, 64.0), (f32::NAN, 64.0)];
+        for (set, held) in sets.into_iter().chain([(f32::INFINITY, 64.0)]) {
+            set_scale_in_lightmap(&mut cube, set);
+            assert_eq!(cube.scale_in_lightmap, held, "{set}");
+        }
+        set_scale_in_lightmap(&mut cube, 0.0);
+        assert!(cube.reads_probes(), "0 reads light probes");
+        assert_eq!(hold_scale_in_lightmap(&mut cube), None, "0 is in range");
+        cube.scale_in_lightmap = 5000.0;
+        assert!(hold_scale_in_lightmap(&mut cube)
+            .unwrap()
+            .contains("held at 64"));
+        cube.scale_in_lightmap = f32::NAN;
+        hold_scale_in_lightmap(&mut cube);
+        assert_eq!(
+            cube.scale_in_lightmap, 1.0,
+            "a file's NaN reads the default"
+        );
     }
 }

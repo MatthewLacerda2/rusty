@@ -206,7 +206,7 @@ impl Renderer {
             scene,
             id,
             model_matrix,
-            self.capture.probe_bounce,
+            &self.capture,
             &self.lightmaps,
         );
         // Like Unity, the reflection probe is picked per object, at the centre of its

@@ -82,7 +82,7 @@ fn a_bake_is_byte_identical_on_one_worker_or_many() {
     // Dense enough that the floor and wall span several batches, the last partial.
     let s = BakeSettings {
         texels_per_unit: 5.0,
-        max_resolution: 32,
+        max_lightmap_size: 32,
         samples: 8,
         filter_radius: 2,
         ..settings()

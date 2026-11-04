@@ -17,8 +17,10 @@ use crate::scene::Scene;
 /// ones with a usable lightmap UV also receive a lightmap, over every drawn run.
 /// `cast_shadows` narrows that, as Unity bakes it (#1571): an `Off` mesh is still
 /// seen by bounce rays (it bounces and emits) but blocks no light; a `ShadowsOnly`
-/// one blocks light but is seen by nothing and gets no lightmap.
-#[derive(Clone, Debug, Default)]
+/// one blocks light but is seen by nothing and gets no lightmap. `scale_in_lightmap`
+/// scales its texel density (#1704); at 0 it gets no lightmap either, but still
+/// blocks and bounces light.
+#[derive(Clone, Debug)]
 pub struct BakeMesh {
     /// The entity the lightmap belongs to.
     pub entity: u32,
@@ -33,6 +35,24 @@ pub struct BakeMesh {
     pub runs: Vec<BakeRun>,
     /// The mesh's *Cast Shadows* mode (#1571).
     pub cast_shadows: ShadowCasting,
+    /// The mesh's *Scale In Lightmap* (#1704): a multiplier on the bake's texel
+    /// density, 1 by default.
+    pub scale_in_lightmap: f32,
+}
+
+impl Default for BakeMesh {
+    fn default() -> Self {
+        Self {
+            entity: 0,
+            positions: Vec::new(),
+            normals: Vec::new(),
+            lightmap_uvs: Vec::new(),
+            indices: Vec::new(),
+            runs: Vec::new(),
+            cast_shadows: ShadowCasting::default(),
+            scale_in_lightmap: 1.0,
+        }
+    }
 }
 
 /// One material run of a [`BakeMesh`]: the indices up to `end` (from the previous
@@ -52,6 +72,14 @@ pub struct BakeRun {
 }
 
 impl BakeMesh {
+    /// Whether the bake gives this mesh a lightmap: a camera sees it (not
+    /// `ShadowsOnly`, #1571) and its Scale In Lightmap is above 0 (#1704). One that
+    /// doesn't still takes part in the bake as its `cast_shadows` says, and reads
+    /// light probes when drawn.
+    pub fn receives_lightmap(&self) -> bool {
+        self.cast_shadows.is_visible() && self.scale_in_lightmap > 0.0
+    }
+
     /// The run index `index` (into `indices`) belongs to; the last run past the end.
     pub fn run_at(&self, index: u32) -> &BakeRun {
         let k = self.runs.partition_point(|r| r.end <= index);
@@ -123,6 +151,7 @@ impl BakeScene {
                 indices,
                 runs,
                 cast_shadows: mesh.cast_shadows,
+                scale_in_lightmap: mesh.scale_in_lightmap,
             });
         }
         out.gather_lights(scene);

@@ -80,7 +80,7 @@ fn shot(directional: bool) -> Option<image::RgbImage> {
         samples: 16,
         bounces: 1,
         seed: 5,
-        max_resolution: 32,
+        max_lightmap_size: 64,
         filter_radius: 1,
         directional,
     };

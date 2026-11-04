@@ -18,6 +18,9 @@ pub(crate) fn mesh_value(m: &MeshComponent) -> Value {
     if !m.cast_shadows.is_on() {
         v["cast_shadows"] = json!(m.cast_shadows.name());
     }
+    if m.scale_in_lightmap != 1.0 {
+        v["scale_in_lightmap"] = json!(m.scale_in_lightmap);
+    }
     if m.max_draw_distance != 0.0 {
         v["max_draw_distance"] = json!(m.max_draw_distance);
     }
