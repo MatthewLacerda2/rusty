@@ -98,9 +98,32 @@ pub fn sampler<'a>(p: &Shape, softness: Field<'a>) -> Sampler<'a> {
         };
         gray(match profile {
             ShapeProfile::Flat => coverage(d, softness.at_pixel(u, v)),
-            _ => height(profile, d, depth),
+            _ => height(profile, sdf.inward(x, y, d, depth)),
         })
     })
+}
+
+impl Sdf {
+    /// How far `(x, y)`, at distance `d`, is from the edge toward the deepest point,
+    /// from 0 at the edge to 1 there, for a shape `depth` deep (0 for a shape of no
+    /// area, or a malformed size). An ellipse's is its stretched radius, `1 − k0`, a
+    /// dome with one peak at the centre: its distance estimate is only first-order
+    /// inside, and `d / depth` would clamp to 1 along the major axis, a plateau.
+    fn inward(self, x: f32, y: f32, d: f32, depth: f32) -> f32 {
+        let t = if self.kind == ShapeKind::Circle {
+            let (rx, ry) = (self.half[0].max(1e-6), self.half[1].max(1e-6));
+            1.0 - (x / rx).hypot(y / ry)
+        } else if depth > 0.0 && depth.is_finite() {
+            -d / depth
+        } else {
+            0.0
+        };
+        if t.is_nan() {
+            0.0
+        } else {
+            t.clamp(0.0, 1.0)
+        }
+    }
 }
 
 /// 1 inside, 0 outside; with `softness`, a linear ramp over that depth inside.
@@ -114,14 +137,8 @@ fn coverage(d: f32, softness: f32) -> f32 {
     }
 }
 
-/// `profile`'s height at distance `d` inside a shape `depth` deep (0 for a shape of
-/// no area, or a malformed size).
-fn height(profile: ShapeProfile, d: f32, depth: f32) -> f32 {
-    if !(depth > 0.0 && depth.is_finite()) {
-        return 0.0;
-    }
-    let t = -d / depth;
-    let t = if t.is_nan() { 0.0 } else { t.clamp(0.0, 1.0) };
+/// `profile`'s height at `t` of the way from the edge (0) to the deepest point (1).
+fn height(profile: ShapeProfile, t: f32) -> f32 {
     let out = 1.0 - t;
     match profile {
         ShapeProfile::Flat | ShapeProfile::Cone => t,

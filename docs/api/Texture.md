@@ -253,9 +253,11 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   noise through `mapping`. To tile, the angle **snaps** to the nearest direction of
   whole steps `(a, b)` (both at most 8) no longer than `scale / anisotropy` (a longer
   step would cut the fibres shorter than asked; the axes and diagonals always fit):
-  within 3.6° of `angle` once `scale / anisotropy` is 8 or more, 5.7° at 6, 9.2° at
+  within 3.6° of `angle` once `scale / anisotropy` is 8.1 or more, 5.7° at 6, 9.2° at
   3.2, and 22.5° (axes and diagonals only) under 2.3. Raise `scale` for a truer
-  angle. Cost: about 0.2 s of one core at 2048², under a one-octave `noise`.
+  angle. On an axis (angle 0 or 0.25 snapped) a fibre is at most half a tile long,
+  whatever `anisotropy` asks: one lattice cell along the whole tile would repeat
+  itself into ruler-straight stripes. Cost: about 0.2 s of one core at 2048², under a one-octave `noise`.
 - `auto_levels` (*color*, 1 input): stretches RGB so the input's minimum maps to 0 and
   its maximum to 1 — one range across R, G and B, so a colour keeps its hue, like
   Substance's Auto Levels; alpha untouched, a flat input unchanged.
@@ -394,12 +396,15 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   ramps the edge from 0 to 1 that far inside, a bevel profile for `bump_to_normal`.
   `profile` turns any shape into a ready height stamp, Substance's *Shape* heights:
   `flat` is the mask, the others rise from 0 at the edge to 1 at the deepest point
-  (the centre): `cone` straight (a cone on a circle, a pyramid on a rect),
-  `paraboloid` round on top, `hemisphere` a dome. Feed one to `tile` →
+  (the centre): `cone` straight (a cone on a circle, a pyramid on a square `rect`),
+  `paraboloid` round on top, `hemisphere` a dome. On a `circle` the height follows
+  the ellipse's own stretch, so an elongated one is one dome peaking at the centre;
+  a non-square `rect` rises to the inside distance of its short side, so it gets a
+  hip roof with a ridge along its long axis, not one peak. Feed one to `tile` →
   `bump_to_normal` for studs, rivets, bolts and pebbles; `softness` applies to `flat`
   only. A polygon or star with a NaN `size` reads 0. Cost: about 0.3 s of one core at
   2048² for a star; one larger than the tile unions its neighbours' copies (9 for
-  up to 1.5 tiles across, about 2 s; at most 81).
+  up to 3 tiles across, about 2 s; at most 81).
 - `sharpen {intensity=1, radius=0.004}` (*filter*, 1 input): an unsharp mask,
   `c + intensity × (c − blur(c))` with a Gaussian of `radius` (a tile fraction, about
   two pixels at 512²): crisps an `image` input or a blurred chain. Unclamped, so a
@@ -424,8 +429,8 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   stamp pushed over its cell's border is drawn into the neighbour cell, and
   overlapping stamps keep the brighter value per channel. Rivets are `shape circle` →
   `tile`.
-- `voronoi {scale, output="distance"|"cells"|"f2"|"edges",
-  metric="euclidean"|"manhattan"|"chebyshev", randomness=1, seed=0}` (*generator*):
+- `voronoi {scale, output="distance"|"cells"|"f2"|"edges"|"smooth_f1",
+  metric="euclidean"|"manhattan"|"chebyshev", randomness=1, smoothness=1, seed=0}` (*generator*):
   `f2` is the distance to the second-nearest point, `edges` is F2 − F1 — ~0 on cell
   borders: cracks, dried mud, cobble outlines; `metric` is how distance is measured:
   `euclidean` gives round cells, `manhattan` (`|dx| + |dy|`) diamond-cut ones,
@@ -560,14 +565,15 @@ Texture.Bake({ resolution = 512, nodes = {
 ### Tiling
 
 Every periodic param is a **count of repeats per tile**, rounded at evaluation (the
-field stays a number, so `4.5` is accepted — it bakes as `5`):
+field stays a number, so `4.5` is accepted — it bakes as `5`), and capped at 2²⁰
+(*Units*):
 
 | Op | Param | Rounds to |
 |---|---|---|
 | noise, voronoi | `scale` | nearest whole number ≥ 1 |
 | noise (fBM family) | each octave's `scale × lacunarity^octave` | nearest whole number ≥ 1 (so a fractional `lacunarity` still tiles) |
 | wave | `frequency` | nearest whole number ≥ 1 |
-| anisotropic_noise | `scale`, and `scale ÷ anisotropy` along the fibres | nearest whole number ≥ 1, at most 4096, per lattice direction |
+| anisotropic_noise | `scale`, and `scale ÷ anisotropy` along the fibres | nearest whole number ≥ 1, at most 4096, per lattice direction (at least 2 along on an axis) |
 | anisotropic_noise | `angle` | the nearest tiling direction, see its bullet |
 | brick | `cols` | nearest whole number ≥ 1 |
 | brick | `rows` | nearest **even** number ≥ 2 (the half-brick offset must close at the wrap) |
@@ -614,6 +620,9 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
 - `noise.distortion` is in lattice cells (one cell is `1 / scale` of the tile);
   `wave.distortion` in radians of phase (`2π` is one cycle); `anisotropic_noise.angle`
   in turns, like `mapping.rotation`; `shape.inner_radius` a fraction of the outer.
+- Every whole count in *Tiling* (a `scale`, `frequency`, `count`, an octave's
+  period) is capped at 2²⁰ = 1 048 576 per tile, far past one cell per pixel at the
+  largest bake; a NaN reads 1, so `1e30`, an infinity or a NaN bakes, never panics.
 - `white_noise` is the exception: its grain is one pixel by definition (on each axis).
 
 ### Non-square bakes — `size`

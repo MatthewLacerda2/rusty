@@ -17,7 +17,8 @@ pub enum ShapeProfile {
     /// 1 inside (`softness` ramps the edge): a mask.
     #[default]
     Flat,
-    /// A straight slope to the middle: a cone on a circle, a pyramid on a rect.
+    /// A straight slope to the middle: a cone on a circle, a pyramid on a square
+    /// (a hip roof on a longer rect).
     Cone,
     /// `1 − (1 − t)²`: round on top, steep at the rim.
     Paraboloid,

@@ -60,6 +60,9 @@ pub fn sampler(
     let base = count(scale);
     let warp = finite(distortion, 0.0).clamp(-MAX_DISTORTION, MAX_DISTORTION) / base;
     Box::new(move |u, v| {
+        // The gain is read at the pixel, before the warp: a warped read would leave
+        // the tile and clamp, opening a seam a tiling link doesn't have.
+        let gain = gain.at_pixel(u, v);
         let (u, v) = if warp == 0.0 {
             (u, v)
         } else {
@@ -68,7 +71,7 @@ pub fn sampler(
         };
         let octaves = match kind {
             NoiseKind::Perlin => Octaves::new(1, 2.0, 0.5),
-            _ => Octaves::new(octave_count, lacunarity, gain.at_pixel(u, v)),
+            _ => Octaves::new(octave_count, lacunarity, gain),
         };
         let n = match kind {
             NoiseKind::Perlin | NoiseKind::Fbm => sum(u, v, base, octaves, seed, |n| n) * 0.5 + 0.5,

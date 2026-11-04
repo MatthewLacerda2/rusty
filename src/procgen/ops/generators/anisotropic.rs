@@ -14,6 +14,10 @@
 //! per cell, so a longer step would cut the fibres shorter than asked. The snap is
 //! within 3.6° of the angle once `scale / anisotropy ≥ 8.1`, 5.7° at 6, 9.2° at 3.2,
 //! and 22.5° (axes and diagonals only) under 2.3.
+//!
+//! On an axis, `P` and `Q` are `(along, 0)` and `(0, across)`, so one cell along
+//! would hash every cell of a fibre alike: ruler-straight stripes. `along` floors
+//! at 2 there, so a fibre on an axis is at most half a tile long.
 
 use std::f32::consts::{PI, SQRT_2, TAU};
 
@@ -29,14 +33,17 @@ pub const MAX_CELLS: f32 = 4096.0;
 
 /// The fibre sampler: `scale` fibres across the tile, `anisotropy` (at least 1)
 /// times as long, at `angle` turns snapped by [`snap`]. NaN params read their
-/// defaults (anisotropy 8, angle 0); counts are capped at [`MAX_CELLS`].
+/// defaults (anisotropy 8, angle 0); counts are capped at [`MAX_CELLS`], and
+/// on an axis there are at least 2 cells along the fibre.
 pub fn sampler(p: &AnisotropicNoise, seed: u64) -> Sampler<'static> {
     let scale = count(p.scale).min(MAX_CELLS);
     let aniso = finite(p.anisotropy, 8.0).clamp(1.0, MAX_CELLS);
     let (a, b) = snap(finite(p.angle, 0.0), scale / aniso);
     let len = ((a * a + b * b) as f32).sqrt();
     let across = count(scale / len).min(MAX_CELLS);
-    let along = count(scale / (aniso * len)).min(MAX_CELLS);
+    // On an axis a single cell along would repeat every cell: straight stripes.
+    let floor = if a == 0 || b == 0 { 2.0 } else { 1.0 };
+    let along = count(scale / (aniso * len)).clamp(floor, MAX_CELLS);
     let lattice = Lattice::new((a, b), (along as i64, across as i64));
     let (af, bf) = (a as f32, b as f32);
     Box::new(move |u, v| {

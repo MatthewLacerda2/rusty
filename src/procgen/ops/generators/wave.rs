@@ -12,6 +12,10 @@ use crate::procgen::recipe::WaveKind;
 /// bands are lost in noise, and finite.
 pub const MAX_DISTORTION: f32 = 1000.0;
 
+/// The distortion noise's seed salt, so it is not the `noise` op's field at the
+/// same seed and lattice.
+const DISTORTION_SALT: u64 = 0x85eb_ca6b;
+
 /// The most `detail` reads: Blender's Wave Texture caps it at 15 too.
 pub const MAX_DETAIL: u32 = 15;
 
@@ -34,7 +38,7 @@ pub fn sampler(
             WaveKind::Rings => (u - 0.5).hypot(v - 0.5) * f,
         };
         if push != 0.0 {
-            phase += push * noise::signed_fbm(u, v, f, octaves, seed);
+            phase += push * noise::signed_fbm(u, v, f, octaves, seed ^ DISTORTION_SALT);
         }
         gray(shape(profile, phase))
     })

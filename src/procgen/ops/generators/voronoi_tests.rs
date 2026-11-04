@@ -93,3 +93,35 @@ fn the_search_reach_finds_the_nearest_two_points_under_every_metric() {
         );
     }
 }
+
+#[test]
+fn smooth_min_matches_a_hand_worked_pair() {
+    // smoothness 1: k = 0.5. Running 0.6, nearer 0.4: t = 0.5 + 0.5·0.2/0.5 = 0.7,
+    // h = 0.7²(3 − 1.4) = 0.784, so 0.6 − 0.2·0.784 − 0.5·0.784·0.216 = 0.358528.
+    let s = SmoothMin::new(1.0);
+    assert!((s.fold(0.6, 0.4) - 0.358_528).abs() < 1e-6);
+    // Farther: t = 0.3, h = 0.216: 0.4 + 0.2·0.216 − 0.5·0.216·0.784 = 0.358528.
+    assert!((s.fold(0.4, 0.6) - 0.358_528).abs() < 1e-6, "symmetric");
+    // Past the window the hard minimum stands.
+    assert!((s.fold(0.9, 0.1) - 0.1).abs() < 1e-6);
+}
+
+#[test]
+fn smooth_f1_is_at_or_below_f1_and_is_f1_at_zero_smoothness() {
+    let at = |output, smoothness: f32, u, v| {
+        sampler(5.0, (output, Euclidean), Field::Const(1.0), smoothness, 4)(u, v)[0]
+    };
+    for i in 0..200 {
+        let (u, v) = (i as f32 * 0.0137 % 1.0, i as f32 * 0.0291 % 1.0);
+        let f1 = at(Distance, 1.0, u, v);
+        for smoothness in [0.3, 1.0] {
+            let soft = at(SmoothF1, smoothness, u, v);
+            assert!(
+                soft <= f1 + 1e-6,
+                "({u},{v}) at {smoothness}: {soft} > {f1}"
+            );
+        }
+        let hard = at(SmoothF1, 0.0, u, v);
+        assert!((hard - f1).abs() < 1e-5, "({u},{v}): {hard} vs F1 {f1}");
+    }
+}

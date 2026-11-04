@@ -235,3 +235,6 @@ fn ridged_and_turbulence_span_the_unit_range() {
 
 #[path = "lattice_tests.rs"]
 mod lattice;
+
+#[path = "edge_tests.rs"]
+mod edge;

@@ -52,11 +52,21 @@ pub fn finite(x: f32, fallback: f32) -> f32 {
     }
 }
 
-/// A periodic param as a whole number of periods per tile: rounded, at least 1. A
-/// fractional count cannot close at the wrap, so it is never honoured.
+/// The most periods per tile a count takes: 2²⁰, far past one cell per pixel at
+/// the largest bake, so no real recipe meets it, and small enough that a lattice
+/// index and its neighbour stay in range (`1e30` would overflow them).
+pub const MAX_COUNT: f32 = 1_048_576.0;
+
+/// A periodic param as a whole number of periods per tile: rounded, at least 1, at
+/// most [`MAX_COUNT`] (NaN reads 1). A fractional count cannot close at the wrap, so
+/// it is never honoured.
 #[inline]
 pub fn count(x: f32) -> f32 {
-    x.round().max(1.0)
+    if x.is_nan() {
+        1.0
+    } else {
+        x.round().clamp(1.0, MAX_COUNT)
+    }
 }
 
 /// A flat color fill.
