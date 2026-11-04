@@ -111,29 +111,3 @@ fn a_settled_level_names_nothing() {
     }
     panic!("a body at rest still names itself every step");
 }
-
-/// The sequence that drifted (#1798): a body's Rigidbody re-set, two spawns, a
-/// collider on the second, a body disabled, then that collider re-parented under
-/// the re-set body, which then settles.
-#[test]
-fn a_collider_reparented_under_a_body_steps_alike() {
-    use crate::ecs::changes::ops_tests::{Edit, Op as W};
-    let s = Op::Step;
-    agree(&[
-        s.clone(),
-        s.clone(),
-        Op::On(1, Phys::Body(false)),
-        Op::World(W::Spawn),
-        s.clone(),
-        Op::World(W::Spawn),
-        Op::On(6, Phys::Collider(0)),
-        s.clone(),
-        Op::World(W::On(3, Edit::SetActive(false))),
-        s.clone(),
-        s.clone(),
-        s,
-        Op::World(W::On(6, Edit::Reparent(Some(1)))),
-        Op::Settle,
-    ])
-    .unwrap();
-}

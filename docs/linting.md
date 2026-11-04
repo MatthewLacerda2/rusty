@@ -23,6 +23,7 @@ agent can read exactly what failed.
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
 | Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `src/ecs/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
+| Physics sync borrows only to write | `tools/lint -- --rules` (`physics-borrow`) | **hard gate**: a non-test line of `src/physics/` that borrows a rapier body or collider mutably (`bodies`/`colliders` with `.get_mut(`, `.iter_mut(`, or an index under `&mut` or before a `.set_` call or an assignment) fails, since rapier marks whatever is borrowed modified, written or not, and the full and incremental syncs then step differently; borrow through `physics::world::body_to_write` / `collider_to_write`, which compare first; the two helpers take `// lint: allow(physics-borrow) <why>` (#1798) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix (#934) |
@@ -391,6 +392,21 @@ new flag, gate, CI step or baseline.
   as winit's `KeyCode`) takes the allow. A parse that does more than read one name per variant (separators
   ignored, a name built from parts, a `Result` with its own listing) is left alone
   or takes `// lint: allow(named-enum) <why>`. Test code is not scanned.
+- **`physics-borrow`** (#1798) — rapier's `RigidBodySet::get_mut`,
+  `ColliderSet::get_mut` and `IndexMut` put the handle on rapier's modified list
+  whether or not anything is then written, and that list's order is the order the
+  next step meets new contact pairs, so the order the solver works them. A full
+  sync that borrowed every body stepped differently from the incremental one that
+  borrowed only what a change named. So a sync pass borrows through
+  `physics::world::body_to_write` / `collider_to_write`, which take a `differs`
+  closure and borrow only when it finds a value to write. A non-test line of
+  `src/physics/` naming `bodies` or `colliders` with `.get_mut(` or `.iter_mut(`
+  after it, or indexing one under `&mut`, before a `.set_` call or in an
+  assignment, fails; a `.get_mut(` wrapped onto the line below its receiver still
+  counts. The two helpers carry `// lint: allow(physics-borrow) <why>`; today no
+  other line in `src/physics/` borrows a body or collider mutably. Building and
+  removing (`insert_with_parent`, `remove`) are not borrows and are not matched
+  (`rules/physics_borrow.rs`).
 - **`prefix-group`** — CLAUDE.md's "group by subfolder, not by filename prefix".
   Three or more sibling `.rs` files whose names start with the same word (up to the
   first `_` or `-`) fail. Files count by stem, so `x.rs` and `x_tests.rs` are one,

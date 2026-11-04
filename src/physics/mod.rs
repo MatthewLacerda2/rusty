@@ -22,6 +22,8 @@ mod compound_tests;
 mod convert;
 #[cfg(test)]
 mod degenerate_parent_tests;
+#[cfg(test)]
+mod differs_tests;
 mod events;
 mod follow;
 mod joints;

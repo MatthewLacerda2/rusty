@@ -127,8 +127,8 @@ impl PhysicsWorld {
             body.set_body_type(class, true);
             body.set_position(pose, true);
         }
-        // Re-apply the CCD mode on every sync of the body so `Physics.SetCollisionDetection`
-        // toggled mid-play takes effect (mirrors the `gravity_scale` re-apply).
+        // Write the CCD mode whenever it differs, so `Physics.SetCollisionDetection`
+        // toggled mid-play takes effect (mirrors the `gravity_scale` write).
         body.enable_ccd(snap.ccd_enabled);
         if snap.kinematic {
             // A pure mover (Unity's kinematic Rigidbody): it goes exactly where
@@ -236,15 +236,19 @@ impl PhysicsWorld {
 }
 
 /// Whether [`PhysicsWorld::apply_body_state`] has anything to write: the
-/// comparisons its setters make before they write.
-fn state_differs(
+/// comparisons its setters make before they write. A disabled body's `position`
+/// is not read: rapier copies `next_position` into it only for an active body,
+/// so a disabled kinematic body that moved would differ forever and be borrowed
+/// by every full pass but no incremental one. Re-enabling it is safe, since
+/// `sync_enabled` runs before this in the same pass.
+pub(super) fn state_differs(
     b: &RigidBody,
     snap: &EntityBodyState,
     class: RigidBodyType,
     pose: Pose,
     scale: f32,
 ) -> bool {
-    let placed = *b.position() != pose || *b.next_position() != pose;
+    let placed = (b.is_enabled() && *b.position() != pose) || *b.next_position() != pose;
     let moved = if snap.kinematic || snap.is_static {
         placed
     } else {
@@ -268,6 +272,7 @@ pub(super) fn body_to_write(
     if !differs(bodies.get(handle)?) {
         return None;
     }
+    // lint: allow(physics-borrow) the helper itself: `differs` found a value to write
     bodies.get_mut(handle)
 }
 
@@ -280,5 +285,6 @@ pub(super) fn collider_to_write(
     if !differs(colliders.get(handle)?) {
         return None;
     }
+    // lint: allow(physics-borrow) the helper itself: `differs` found a value to write
     colliders.get_mut(handle)
 }

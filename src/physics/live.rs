@@ -110,11 +110,9 @@ impl PhysicsWorld {
             }
             for (handle, volume) in parts {
                 let target = mass * volume / total;
-                let current = self.colliders.get(handle).map_or(target, |c| c.mass());
-                if (current - target).abs() <= target.max(MIN_MASS) * 1.0e-4 {
-                    continue;
-                }
-                if let Some(c) = self.colliders.get_mut(handle) {
+                let differs =
+                    |c: &Collider| (c.mass() - target).abs() > target.max(MIN_MASS) * 1.0e-4;
+                if let Some(c) = collider_to_write(&mut self.colliders, handle, differs) {
                     c.set_mass(target);
                 }
             }

@@ -25,7 +25,7 @@ pub(super) fn combine_rule(mode: CombineMode) -> CoefficientCombineRule {
 }
 
 /// Whether `collider` holds anything but `material`.
-fn material_differs(collider: &Collider, material: &PhysicsMaterial) -> bool {
+pub(super) fn material_differs(collider: &Collider, material: &PhysicsMaterial) -> bool {
     collider.friction() != material.friction
         || collider.restitution() != material.bounciness
         || collider.friction_combine_rule() != combine_rule(material.friction_combine)
