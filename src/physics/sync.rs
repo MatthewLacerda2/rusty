@@ -6,8 +6,12 @@
 //! materials, layers, sensors, characters, masses, then each body's state and
 //! compound offsets); the incremental one visits the named bodies only, in
 //! ascending owner order, the order the full pass visits them in. A body no
-//! change named is one the full pass would leave as it is: every setter it calls
-//! compares first, and its inputs are what it last pushed.
+//! change named is one the full pass would leave as it is: its inputs are what it
+//! last pushed, and no pass so much as borrows a body or collider that already
+//! holds what it would write (`world::body_to_write`, `world::collider_to_write`).
+//! The borrow matters, not only the write: rapier lists whatever is borrowed
+//! mutably as modified, and that list's order is the order the next step meets
+//! new contact pairs and so solves them (#1798).
 
 use std::collections::BTreeSet;
 

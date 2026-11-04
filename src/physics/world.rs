@@ -110,16 +110,22 @@ impl PhysicsWorld {
         world
     }
 
-    /// Push one entity's snapshot into its rapier body for this tick.
+    /// Push one entity's snapshot into its rapier body for this tick. A body
+    /// that already holds the snapshot is not borrowed at all ([`body_to_write`]).
     pub(super) fn apply_body_state(&mut self, handle: RigidBodyHandle, snap: &EntityBodyState) {
-        let body = &mut self.bodies[handle];
         let class = body_type(snap);
+        let pose = to_pose(snap.pos, snap.rot);
+        let scale = gravity_scale(snap.use_gravity);
+        let differs = |b: &RigidBody| state_differs(b, snap, class, pose, scale);
+        let Some(body) = body_to_write(&mut self.bodies, handle, differs) else {
+            return;
+        };
         if body.body_type() != class {
             // A Rigidbody switched class mid-play (`SetKinematic`, a ragdoll
             // handoff, #466): the body changes in place at the entity's current
             // pose, so its colliders, joints and contacts survive.
             body.set_body_type(class, true);
-            body.set_position(to_pose(snap.pos, snap.rot), true);
+            body.set_position(pose, true);
         }
         // Re-apply the CCD mode on every sync of the body so `Physics.SetCollisionDetection`
         // toggled mid-play takes effect (mirrors the `gravity_scale` re-apply).
@@ -127,9 +133,9 @@ impl PhysicsWorld {
         if snap.kinematic {
             // A pure mover (Unity's kinematic Rigidbody): it goes exactly where
             // its Transform says, through anything in the way.
-            body.set_next_kinematic_position(to_pose(snap.pos, snap.rot));
+            body.set_next_kinematic_position(pose);
         } else if snap.is_static {
-            body.set_position(to_pose(snap.pos, snap.rot), true);
+            body.set_position(pose, true);
         } else {
             // Dynamic: trust rapier for pose, but let scripts inject linear and
             // angular velocity (SetVelocity / SetAngularVelocity / AddForce mutate
@@ -137,7 +143,6 @@ impl PhysicsWorld {
             // it at runtime takes effect.
             body.set_linvel(snap.vel, true);
             body.set_angvel(snap.angular_velocity, true);
-            let scale = gravity_scale(snap.use_gravity);
             if body.gravity_scale() != scale {
                 // A full wake: rapier's setter only clears the sleep flag, so a
                 // body that slept while weightless would doze straight off again.
@@ -228,4 +233,52 @@ impl PhysicsWorld {
         }
         moved
     }
+}
+
+/// Whether [`PhysicsWorld::apply_body_state`] has anything to write: the
+/// comparisons its setters make before they write.
+fn state_differs(
+    b: &RigidBody,
+    snap: &EntityBodyState,
+    class: RigidBodyType,
+    pose: Pose,
+    scale: f32,
+) -> bool {
+    let placed = *b.position() != pose || *b.next_position() != pose;
+    let moved = if snap.kinematic || snap.is_static {
+        placed
+    } else {
+        b.linvel() != snap.vel || b.angvel() != snap.angular_velocity || b.gravity_scale() != scale
+    };
+    b.body_type() != class || b.is_ccd_enabled() != snap.ccd_enabled || moved
+}
+
+/// `handle`'s body, borrowed mutably only when `differs` finds a value to
+/// write. rapier lists every body and collider borrowed mutably as modified,
+/// written or not, and the order of that list is the order the next step meets
+/// new contact pairs in, so the order the solver works them. A sync that
+/// borrowed every body (the full pass) stepped differently from one that
+/// borrowed only the bodies a change named (#1798). Every sync pass borrows
+/// through this or [`collider_to_write`].
+pub(super) fn body_to_write(
+    bodies: &mut RigidBodySet,
+    handle: RigidBodyHandle,
+    differs: impl FnOnce(&RigidBody) -> bool,
+) -> Option<&mut RigidBody> {
+    if !differs(bodies.get(handle)?) {
+        return None;
+    }
+    bodies.get_mut(handle)
+}
+
+/// [`body_to_write`] for a collider.
+pub(super) fn collider_to_write(
+    colliders: &mut ColliderSet,
+    handle: ColliderHandle,
+    differs: impl FnOnce(&Collider) -> bool,
+) -> Option<&mut Collider> {
+    if !differs(colliders.get(handle)?) {
+        return None;
+    }
+    colliders.get_mut(handle)
 }
