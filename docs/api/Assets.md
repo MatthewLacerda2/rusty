@@ -202,7 +202,9 @@ clamped sampler.
   blue) to one. The blocks and every mip are made at import, never at a draw, into
   the project's import cache (`assets/generated/imported/<path>.bctex`), and made
   again only when the image, its type, `sRGB`, compression, max size or mipmaps, or
-  the encoder change. The editor makes them in the background when an image is added,
+  the encoder change. A copy whose image is gone is deleted by the next refresh
+  (#1694). A baked lightmap page (a file in a scene's `<scene>.lightmaps/` folder) is
+  not imported at all: the bake writes the page the renderer loads. The editor makes them in the background when an image is added,
   its settings change or the project opens (the console says each one); entering
   Play waits for any still stale, as it waits for models; an export makes and ships
   them. The standalone player and the `play` harness never encode on their own:

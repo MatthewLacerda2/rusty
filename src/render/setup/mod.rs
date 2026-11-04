@@ -122,6 +122,9 @@ impl Renderer {
             gpu,
             gpu_permit,
         );
+        // A headless renderer reads lightmap pages in line, so its first frame is
+        // lit; a windowed one reads them on a worker (#1694).
+        renderer.lightmaps.read_in_line(renderer.surface.is_none());
         renderer.generate_grid_mesh();
         renderer.generate_axis_arrows();
         renderer
