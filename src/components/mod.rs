@@ -27,7 +27,7 @@ pub mod ui;
 
 pub use animator::{
     AnimatorComponent, AnimatorParameter, AnimatorParameters, Bounds, IkChain, IkConstraint,
-    IkTarget, LayerState, Motion, Playback, Playhead, Step,
+    IkTarget, LayerState, Motion, Playback, Playhead, RootMotion, Step,
 };
 pub use audio::reverb_zone::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 pub use audio::source::AudioSourceComponent;

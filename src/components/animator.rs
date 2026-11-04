@@ -15,10 +15,12 @@ mod ik;
 mod parameters;
 mod playback;
 mod playhead;
+mod root_motion;
 pub use ik::{IkChain, IkConstraint, IkTarget};
 pub use parameters::{AnimatorParameter, AnimatorParameters};
 pub use playback::{Motion, Playback, Step};
 pub use playhead::{Bounds, Playhead};
+pub use root_motion::RootMotion;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AnimatorComponent {
@@ -60,6 +62,21 @@ pub struct AnimatorComponent {
     /// before skinning: two-bone limbs and aim chains, addressed by name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ik: Vec<IkConstraint>,
+    /// Unity's *Apply Root Motion* (#1745), off by default: the root bone's
+    /// horizontal travel and turn leave the pose and move the entity instead —
+    /// through its CharacterController's `Move` when it has one (walls stop it),
+    /// else along the navmesh when it has an active NavMeshAgent, else its
+    /// Transform. Off, the pose plays as authored and the delta is only reported.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub apply_root_motion: bool,
+    /// The bone whose motion is the root motion, by name (usually the hips).
+    /// Empty means the skeleton's first root joint.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub root_bone: String,
+    /// The last step's root motion, world space (`Animator.GetRootMotion`).
+    /// Measured whether or not it is applied; runtime only, never saved.
+    #[serde(skip)]
+    pub root_motion: RootMotion,
 }
 
 /// One extra layer's runtime state (#457).
@@ -96,6 +113,9 @@ impl Default for AnimatorComponent {
             graph_enabled: true,
             layers: Vec::new(),
             ik: Vec::new(),
+            apply_root_motion: false,
+            root_bone: String::new(),
+            root_motion: RootMotion::ZERO,
         }
     }
 }

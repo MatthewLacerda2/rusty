@@ -66,10 +66,15 @@ impl NavigationGraph {
                 turn_toward(&mut agent, &mut facing, heading, delta_time);
                 scene.world.set_world_rotation(id, facing);
                 inputs.push(avoidance_input(&agent, position, moved_with, steering));
+                // Under root motion (#1745) the Animator moves it, not its speed.
+                let moved_by_root = scene
+                    .world
+                    .animator(id)
+                    .is_some_and(|a| a.apply_root_motion);
                 ticked.push(Ticked {
                     id,
                     position,
-                    moving: steering || agent.velocity != Vec3::ZERO,
+                    moving: (steering || agent.velocity != Vec3::ZERO) && !moved_by_root,
                 });
             }
             scene.world.set_nav_agent(id, Some(agent));
@@ -180,7 +185,12 @@ impl NavigationGraph {
     /// a ramp instead of riding its cell tops (#781), with its Transform
     /// `base_offset` above it (#666).
     /// Off the navmesh it does not move. `body` is the agent's Transform position.
-    fn slide(&self, agent: &mut NavMeshAgentComponent, body: Vec3, delta_time: f32) -> Vec3 {
+    pub(super) fn slide(
+        &self,
+        agent: &mut NavMeshAgentComponent,
+        body: Vec3,
+        delta_time: f32,
+    ) -> Vec3 {
         let current_pos = agent.feet(body);
         let Some(from) = self.span_under(current_pos) else {
             agent.velocity = Vec3::ZERO;

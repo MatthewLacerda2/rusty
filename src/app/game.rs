@@ -293,7 +293,7 @@ impl GameWorld {
 
 #[cfg(test)]
 #[path = "game_tests.rs"]
-mod game_tests;
+pub(super) mod game_tests;
 
 #[cfg(test)]
 #[path = "game_loop_tests.rs"]

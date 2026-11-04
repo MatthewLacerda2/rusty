@@ -25,15 +25,19 @@ mod events;
 pub(crate) mod graph;
 mod layers;
 mod motion;
+pub(crate) mod root_motion;
 
 pub use events::{Crossed, END_EVENT};
 pub use motion::Pose;
 
-use crate::asset::animation_graph::{AnimationGraph, LayerBlending};
+use crate::asset::animation_graph::{AnimationGraph, GraphLayer, LayerBlending};
 use crate::asset::mesh_data::{JointTransform, SkinData};
-use crate::components::{AnimatorComponent, MeshComponent, TransformComponent};
+use crate::components::{
+    AnimatorComponent, MeshComponent, Playback, RootMotion, TransformComponent,
+};
 use layers::{compose, mask_slots, LayerPose};
 use motion::MotionContext;
+use root_motion::RootBone;
 
 /// The local transform `anim` gives each of `mesh`'s bones this tick, as
 /// `(bone entity, transform)` writes. A joint no layer's playing motion keys (or
@@ -42,15 +46,22 @@ use motion::MotionContext;
 /// (destroyed) bone has nothing to write to. Empty without a
 /// bound skeleton: a stopped animator leaves the bones where they are. `graph` is
 /// the animator's graph asset, when it has one — blend-tree nodes and layers
-/// resolve against it.
+/// resolve against it. With `apply_root_motion`, the root bone's horizontal
+/// travel and yaw are held out of the pose (`root_motion`, #1745).
 pub fn bone_writes(
     anim: &AnimatorComponent,
     mesh: &MeshComponent,
     graph: Option<&AnimationGraph>,
 ) -> Vec<(u32, TransformComponent)> {
-    let Some((skin, pose)) = sample_pose(anim, mesh, graph) else {
+    let Some((skin, mut pose)) = sample_pose(anim, mesh, graph) else {
         return Vec::new();
     };
+    if anim.apply_root_motion {
+        // The entity carries the root bone's travel now (#1745), not the pose.
+        if let Some(bone) = RootBone::resolve(skin, &anim.root_bone) {
+            bone.strip(skin, &mut pose);
+        }
+    }
     let bones = &mesh.skeleton.bones;
     if bones.len() != pose.len() {
         return Vec::new();
@@ -130,10 +141,34 @@ pub fn advance(
     graph: Option<&AnimationGraph>,
     dt: f32,
 ) -> Vec<Crossed> {
+    step(anim, mesh, graph, dt).events
+}
+
+/// What one [`step`] did: the events crossed and the root motion (#1745) the
+/// playheads' travel amounts to, in the skinned entity's space — `None` when
+/// nothing moved or no motion playing keys the root bone.
+#[derive(Debug, Default)]
+pub struct Stepped {
+    pub events: Vec<Crossed>,
+    pub root: Option<RootMotion>,
+}
+
+/// [`advance`], also measuring the step's root motion over the root bone
+/// (`anim.root_bone`, see `root_motion`): each layer's delta, crossfades and
+/// blend trees blended as their poses are, then the layers stacked over the
+/// base one the way [`sample_pose`] stacks their poses.
+pub fn step(
+    anim: &mut AnimatorComponent,
+    mesh: Option<&MeshComponent>,
+    graph: Option<&AnimationGraph>,
+    dt: f32,
+) -> Stepped {
     if !anim.is_running() {
-        return Vec::new();
+        return Stepped::default();
     }
     let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
+    let skin = mesh.and_then(|m| m.skin.as_ref());
+    let bone = skin.and_then(|s| RootBone::resolve(s, &anim.root_bone));
     let AnimatorComponent {
         base,
         layers,
@@ -146,15 +181,52 @@ pub fn advance(
         machine: graph.and_then(|g| g.machine(layer)),
         parameters,
     };
-    let mut crossed = context(0).advance(base, dt, *speed, 0);
+    // One layer's step: its events and, with a root bone, its root motion.
+    let advance_layer = |playback: &mut Playback, layer: usize| {
+        let ctx = context(layer);
+        let outgoing = bone
+            .as_ref()
+            .and_then(|_| root_motion::Outgoing::of(playback));
+        let (events, step) = ctx.advance(playback, dt, *speed, layer);
+        let root = skin.zip(bone.as_ref()).and_then(|(skin, bone)| {
+            ctx.playback_root(skin, bone, playback, step, outgoing.as_ref())
+        });
+        (events, root)
+    };
+    let (mut events, mut root) = advance_layer(base, 0);
+    let graph_layers = graph.map_or(&[][..], |g| &g.layers[..]);
     for (i, state) in layers.iter_mut().enumerate() {
-        let events = context(i + 1).advance(&mut state.playback, dt, *speed, i + 1);
+        let (layer_events, layer_root) = advance_layer(&mut state.playback, i + 1);
         if state.weight > 0.0 {
-            crossed.extend(events);
+            events.extend(layer_events);
+        }
+        let covers = |skin: &SkinData, bone: &RootBone, layer: &GraphLayer| {
+            mask_slots(skin, &layer.mask).get(bone.slot()) == Some(&true)
+        };
+        if let (Some(delta), Some(layer), Some(skin), Some(bone)) =
+            (layer_root, graph_layers.get(i), skin, bone.as_ref())
+        {
+            if state.weight > 0.0 && covers(skin, bone, layer) {
+                root = Some(stack(
+                    root.unwrap_or_default(),
+                    delta,
+                    layer.blending,
+                    state.weight,
+                ));
+            }
         }
     }
-    events::sort(&mut crossed);
-    crossed
+    events::sort(&mut events);
+    Stepped { events, root }
+}
+
+/// A layer's root motion `delta` stacked over the `below` layers' at `weight`.
+fn stack(below: RootMotion, delta: RootMotion, blending: LayerBlending, weight: f32) -> RootMotion {
+    let weight = weight.clamp(0.0, 1.0);
+    match blending {
+        LayerBlending::Override => below.lerp(delta, weight),
+        LayerBlending::Additive => below.add_scaled(delta, weight),
+    }
 }
 
 /// Blend two poses of equal length in TRS space, `t` in `[0, 1]` (0 → `from`,
@@ -197,7 +269,7 @@ mod playhead_tests;
 #[cfg(test)]
 pub(crate) mod posed;
 #[cfg(test)]
-mod test_rig;
+pub(crate) mod test_rig;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
