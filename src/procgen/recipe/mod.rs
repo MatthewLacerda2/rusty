@@ -17,25 +17,25 @@
 //! with a default. [`Node`]'s check lives in `recipe/node.rs`.
 
 mod arity;
-mod catalog;
 pub mod color;
 mod extent;
 mod kinds;
 mod node;
 mod op_info;
 mod param;
-pub mod params;
 #[cfg(test)]
 mod sample;
-mod tag;
 
+/// The op-set, its params structs and the catalog: one file per op, in
+/// [`crate::procgen::catalog`] (#1751).
+pub use super::catalog::*;
 pub use arity::Arity;
-pub use catalog::OPS;
+pub(crate) use arity::{arity, ONE, SOURCE};
 pub use kinds::*;
 pub use node::{Fault, Node, NodeError};
+pub(crate) use op_info::{choice, op, opt, req, socket, SEED};
 pub use op_info::{Lit, OpInfo, OpParam};
 pub use param::{Link, Param};
-pub use params::*;
 #[cfg(test)]
 pub(crate) use sample::{sample_op, SAMPLE_PATH};
 
@@ -50,61 +50,6 @@ pub struct RampStop {
     pub pos: f32,
     #[serde(deserialize_with = "color::color")]
     pub color: [f32; 4],
-}
-
-/// The curated op-set ("Blender-lite"). Each variant carries its params as one
-/// struct ([`params`]); the node's `inputs` supply the upstream buffers it consumes,
-/// as many as the op's [`Arity`] in [`OPS`] allows (#1485).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "op", rename_all = "snake_case")]
-pub enum OpKind {
-    // ---- Generators (no inputs) ----
-    Constant(Constant),
-    Noise(Noise),
-    Voronoi(Voronoi),
-    Gradient(Gradient),
-    Wave(Wave),
-    Brick(Brick),
-    Shape(Shape),
-    Checker(Checker),
-    WhiteNoise(WhiteNoise),
-    Image(ImageTexture),
-
-    // ---- Color ----
-    ColorRamp(ColorRamp),
-    Mix(Mix),
-    /// Invert RGB (`1 - c`), alpha untouched.
-    Invert,
-    BrightContrast(BrightContrast),
-    HueSatValue(HueSatValue),
-    Gamma(Gamma),
-    /// Stretch RGB so the input's minimum maps to 0 and its maximum to 1, one range
-    /// across R, G and B (hue kept); alpha untouched, a flat input unchanged.
-    AutoLevels,
-
-    // ---- Vector / normal ----
-    Mapping(Mapping),
-    BumpToNormal(BumpToNormal),
-    /// Combine up to three single-channel inputs into one RGB image (alpha 1); a
-    /// channel without an input reads 0.
-    CombineRgb,
-    SeparateRgb(SeparateRgb),
-    Tile(Tile),
-    Warp(Warp),
-    NormalBlend(NormalBlend),
-
-    // ---- Converter / math ----
-    Math(Math),
-    MapRange(MapRange),
-    Clamp(Clamp),
-    /// Collapse RGB to luminance (Rec. 709), written to all of RGB.
-    RgbToBw,
-
-    // ---- Filter ----
-    Blur(Blur),
-    Cavity(Cavity),
-    Curvature(Curvature),
-    Distance(Distance),
 }
 
 /// The whole authored texture: the canvas extent (`resolution` squared, or `size`),
@@ -201,5 +146,9 @@ fn is_zero(n: &u32) -> bool {
     *n == 0
 }
 
+#[cfg(test)]
+mod catalog_tests;
+#[cfg(test)]
+mod socket_tests;
 #[cfg(test)]
 mod tests;

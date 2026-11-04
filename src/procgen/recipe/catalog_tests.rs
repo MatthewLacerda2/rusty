@@ -108,8 +108,8 @@ fn with_param(info: &OpInfo, name: &str, value: Value) -> Result<OpKind, serde_j
 
 #[test]
 fn every_seed_param_reaches_the_runner() {
-    // `OpKind::seed` has a `_ => 0` arm, so the compiler won't flag a new stochastic
-    // op missing from it: this does (#1487).
+    // `Op::seed` defaults to 0, so the compiler won't flag a stochastic op that
+    // forgets to override it: this does (#1487).
     for info in OPS
         .iter()
         .filter(|i| i.params.iter().any(|p| p.name == "seed"))

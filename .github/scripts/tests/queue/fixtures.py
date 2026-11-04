@@ -29,6 +29,10 @@ def asked(*runs: dict, waited: float = 0.0, jobs=None, pull=None, files=CODE):
     return polling.progress(pull or READY, list(runs), jobs, files, waited)
 
 
+# The comment that records a pull request's review (#1764), so a take goes on.
+REVIEW = [{"author_association": "OWNER", "body": "## Independent review\nNo findings.", "user": {"login": "o"}}]
+
+
 SPENT = polling.RUN_APPEARS_SECONDS + 1
 
 

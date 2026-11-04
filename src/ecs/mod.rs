@@ -26,6 +26,7 @@ mod activity_tests;
 #[cfg(test)]
 mod ancestors_tests;
 mod bundle;
+pub mod changes;
 pub mod core;
 mod descendants;
 #[cfg(test)]
@@ -33,6 +34,7 @@ mod descendants_tests;
 mod despawn;
 #[cfg(test)]
 mod despawn_tests;
+mod funnel;
 mod handles;
 pub mod journal;
 #[cfg(test)]
@@ -46,6 +48,7 @@ pub mod world;
 mod world_space;
 
 pub use access::{CompMut, CompRef};
+pub use changes::{Activity, ChangeStat, Changes, Channel, Cursor, Layer, StaticSet, WorldPose};
 pub use descendants::{Descendants, HierarchyPath};
 pub use journal::{Journaled, Recorded};
 pub use world::World;
