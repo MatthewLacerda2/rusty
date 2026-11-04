@@ -17,6 +17,7 @@ fn noise(id: &str, kind: NoiseKind, scale: f32) -> Node {
         octaves: 3,
         lacunarity: 2.0,
         gain: 0.5.into(),
+        distortion: 0.0,
         seed: 0,
     });
     node(id, op, &[])
@@ -59,6 +60,7 @@ fn organic_ops_bake_byte_identically_per_seed() {
             output,
             metric: VoronoiMetric::Euclidean,
             randomness: 0.7.into(),
+            smoothness: 1.0,
             seed: 0,
         });
         vec![node("v", op, &[])]

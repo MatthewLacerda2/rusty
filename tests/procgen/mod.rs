@@ -1,6 +1,8 @@
 mod aspect;
 mod bake;
 mod bands;
+mod basics;
+mod flood;
 mod hard_surface;
 mod image_input;
 mod links;

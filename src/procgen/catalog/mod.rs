@@ -98,6 +98,7 @@ macro_rules! catalog {
 catalog! {
     // sorted: one row per op; registry order is only the order `Texture.Ops()` lists
     AmbientOcclusion(filter::relief::ambient_occlusion::AmbientOcclusion),
+    AnisotropicNoise(generators::anisotropic_noise::AnisotropicNoise),
     /// Stretch RGB so the input's minimum maps to 0 and its maximum to 1, one range
     /// across R, G and B (hue kept); alpha untouched, a flat input unchanged.
     AutoLevels = color::auto_levels::AutoLevels,
@@ -120,6 +121,10 @@ catalog! {
     #[cfg(test)]
     Dummy(color::dummy::Dummy),
     EdgeDetect(filter::mask::edge_detect::EdgeDetect),
+    FloodBbox(filter::flood::bbox::FloodBbox),
+    FloodFill(filter::flood::fill::FloodFill),
+    FloodGradient(filter::flood::gradient::FloodGradient),
+    FloodRandom(filter::flood::random::FloodRandom),
     Gamma(color::gamma::Gamma),
     Gradient(generators::gradient::Gradient),
     Highpass(filter::blurs::highpass::Highpass),
