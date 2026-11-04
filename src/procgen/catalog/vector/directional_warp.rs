@@ -13,7 +13,7 @@ use crate::procgen::recipe::{arity, op, opt, req, Lit, OpInfo};
 /// the other way. It is the grayscale, one-direction counterpart of `warp`, which
 /// reads two channels around mid-grey. Both reads are bilinear and wrapped, so two
 /// tiling inputs give a tiling map at any angle. A NaN strength moves nothing; it
-/// caps at ±[`MAX_STRENGTH`] tiles.
+/// caps at ±16 tiles.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DirectionalWarp {
     pub strength: f32,

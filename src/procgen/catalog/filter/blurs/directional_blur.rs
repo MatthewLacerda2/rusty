@@ -55,7 +55,7 @@ const ONE_PASS: usize = 64;
 
 /// `img` averaged along a centred line `length` tiles long at `angle` turns.
 pub fn directional_blur(img: &Image, length: f32, angle: f32) -> Image {
-    if !(length > 0.0) {
+    if length.is_nan() || length <= 0.0 {
         return img.clone();
     }
     let len = length.min(MAX_LENGTH);
