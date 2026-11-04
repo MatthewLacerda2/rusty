@@ -2,7 +2,7 @@
 //! texture holding a camera's colour (rgb) and each pixel's distance from its eye
 //! (alpha), drawn after its opaque pass and SSR (so a refracting surface sees the
 //! reflected floor) by `opaque_copy.wgsl`. One texture, so the forward pass stays
-//! inside wgpu's 16 sampled textures per stage. The transparent pass reads it
+//! inside its sampled-texture budget (`render::setup::limits`, 17 per stage). The transparent pass reads it
 //! through its group 3. Made only on a camera whose visible translucents ask for it
 //! (a material that refracts or absorbs, `MaterialAsset::reads_opaque`, or traces
 //! SSR, `postfx::effects::ssr::transparent`) and counted

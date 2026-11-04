@@ -585,6 +585,18 @@ scene.entities[].post_processing.vignette.color: tuple(3)
 scene.entities[].post_processing.vignette.color[]: f32
 scene.entities[].post_processing.vignette.intensity: f32
 scene.entities[].post_processing.vignette.smoothness: f32
+scene.entities[].post_processing.volumetric_fog.active: bool
+scene.entities[].post_processing.volumetric_fog.albedo: tuple(3)
+scene.entities[].post_processing.volumetric_fog.albedo[]: f32
+scene.entities[].post_processing.volumetric_fog.anisotropy: f32
+scene.entities[].post_processing.volumetric_fog.base_height: f32
+scene.entities[].post_processing.volumetric_fog.depth_extent: f32
+scene.entities[].post_processing.volumetric_fog.global_light_probe_dimmer: f32
+scene.entities[].post_processing.volumetric_fog.maximum_height: f32
+scene.entities[].post_processing.volumetric_fog.mean_free_path: f32
+scene.entities[].post_processing.volumetric_fog.quality: enum Low|Medium|High|Custom
+scene.entities[].post_processing.volumetric_fog.resolution: u32
+scene.entities[].post_processing.volumetric_fog.slices: u32
 scene.entities[].post_processing.white_balance.temperature: f32
 scene.entities[].post_processing.white_balance.tint: f32
 scene.entities[].post_processing: option

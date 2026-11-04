@@ -43,7 +43,7 @@
 //!
 //! **Cost.** Off, no target, no pass and no texture read: the camera uniform's
 //! `volumetric.x` is 0, a uniform branch in every reader, and the renderer's
-//! integrated volume falls back to one clear texel once no camera has run it for
+//! integrated volume falls back to a one-texel stand-in once no camera has run it for
 //! [`volume::IDLE_RENDERS`] renders. On: per froxel one jittered point, its
 //! cluster's lights (≤ 32 live, ≤ 32 `Baked`, each with up to nine shadow taps) and
 //! one history tap; per column a loop over the slices. Memory: two `Rgba16Float`

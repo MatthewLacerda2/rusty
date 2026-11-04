@@ -175,8 +175,8 @@ var s_lightmaps: sampler;
 @group(0) @binding(16)
 var t_lightmap_dirs: texture_2d_array<f32>;
 // The integrated volumetric fog (#1703, `fog::volumetric`): rgb the light the air
-// scatters toward the eye, a what gets through, per froxel; a 1x1x1 clear texel
-// while no camera runs it, and read only where `camera.volumetric.x` says so.
+// scatters toward the eye, a what gets through, per froxel; a 1x1x1 stand-in
+// while no camera runs it, read only where `camera.volumetric.x` says so.
 @group(0) @binding(17)
 var t_fog_volume: texture_3d<f32>;
 @group(0) @binding(18)
@@ -310,8 +310,8 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 // the distance from the eye to that surface; a 1x1 stand-in in every pass but a
 // transparent one with a surface that refracts or absorbs. Linear, clamped sampler.
 // In the opaque pass of a base camera running SSIL (`camera.ssil.x`, #1750), which
-// reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel: the
-// stage's 16 sampled textures, wgpu's default limit, are all taken.
+// reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel, so
+// the stage binds no texture more than `render::setup::limits` allows (17).
 @group(3) @binding(6)
 var t_opaque: texture_2d<f32>;
 @group(3) @binding(7)

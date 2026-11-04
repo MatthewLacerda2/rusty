@@ -4,7 +4,7 @@
 // transparent surface the alpha its blend mode reads and, when it refracts or
 // absorbs, what is behind it), and thin translucency's back-lit light. Every colour
 // entry point returns through `composite`; an opaque surface leaves it exactly as
-// `apply_fog` would, at alpha 1. A transparent surface may also trace screen-space
+// `fogged` would, at alpha 1. A transparent surface may also trace screen-space
 // reflections (`reflect_ssr`, #1570).
 
 #define_import_path forward::transparent

@@ -45,73 +45,31 @@ fn grid_out(binding: u32) -> wgpu::BindGroupLayoutEntry {
 
 impl VolumetricFogPasses {
     pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
-        use wgpu::TextureViewDimension::{D2Array, D2, D3};
+        use wgpu::TextureViewDimension::D3;
         let module = registry.load(device, "volumetric_fog.wgsl", "Volumetric Fog");
         let uniform = |b| uniform_entry(b, wgpu::ShaderStages::COMPUTE);
-        let storage = |b| storage_entry(b, wgpu::ShaderStages::COMPUTE);
-        let layout = |label, entries: &[wgpu::BindGroupLayoutEntry]| {
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some(label),
-                entries,
-            })
-        };
-        let comparison = wgpu::BindGroupLayoutEntry {
-            binding: 11,
-            visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
-            count: None,
-        };
-        let scatter_layout = layout(
-            "Volumetric Scatter",
-            &[
-                uniform(0),
-                uniform(1),
-                uniform(2),
-                storage(3),
-                storage(4),
-                storage(5),
-                storage(6),
-                storage(7),
-                storage(8),
-                uniform(9),
-                compute(depth_entry(10, D2Array)),
-                comparison,
-                compute(depth_entry(12, D2)),
-                storage(13),
-                compute(texture_entry(14, D3)),
-                compute(sampler_entry(15)),
-                grid_out(16),
-            ],
-        );
+        let scatter_layout = scatter_layout(device);
         let integrate_layouts = [
-            layout("Volumetric Integrate Uniforms", &[uniform(0), uniform(1)]),
             layout(
+                device,
+                "Volumetric Integrate Uniforms",
+                &[uniform(0), uniform(1)],
+            ),
+            layout(
+                device,
                 "Volumetric Integrate Grids",
                 &[compute(texture_entry(0, D3)), grid_out(1)],
             ),
         ];
-        let pipeline = |label: &'static str, groups: &[&wgpu::BindGroupLayout], entry| {
-            let groups: Vec<_> = groups.iter().map(|g| Some(*g)).collect();
-            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some(label),
-                bind_group_layouts: &groups,
-                immediate_size: 0,
-            });
-            let module = module.clone();
-            LazyCompute::new(device, move |device| {
-                device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                    label: Some(label),
-                    layout: Some(&layout),
-                    module: &module,
-                    entry_point: Some(entry),
-                    compilation_options: Default::default(),
-                    cache: None,
-                })
-            })
-        };
-        let scatter = pipeline("Volumetric Scatter", &[&scatter_layout], "cs_scatter");
+        let scatter = lazy(
+            device,
+            &module,
+            ("Volumetric Scatter", "cs_scatter"),
+            &[&scatter_layout],
+        );
         let [uniforms, grids] = &integrate_layouts;
-        let integrate = pipeline("Volumetric Integrate", &[uniforms, grids], "cs_integrate");
+        let names = ("Volumetric Integrate", "cs_integrate");
+        let integrate = lazy(device, &module, names, &[uniforms, grids]);
         Self {
             scatter,
             integrate,
@@ -131,4 +89,77 @@ impl VolumetricFogPasses {
     pub(crate) fn lazy_computes(&self) -> [&LazyCompute; 2] {
         [&self.scatter, &self.integrate]
     }
+}
+
+fn layout(
+    device: &wgpu::Device,
+    label: &str,
+    entries: &[wgpu::BindGroupLayoutEntry],
+) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some(label),
+        entries,
+    })
+}
+
+/// `cs_scatter`'s group, as `volumetric_fog.wgsl` declares it.
+fn scatter_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    use wgpu::TextureViewDimension::{D2Array, D2, D3};
+    let uniform = |b| uniform_entry(b, wgpu::ShaderStages::COMPUTE);
+    let storage = |b| storage_entry(b, wgpu::ShaderStages::COMPUTE);
+    let comparison = wgpu::BindGroupLayoutEntry {
+        binding: 11,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+        count: None,
+    };
+    layout(
+        device,
+        "Volumetric Scatter",
+        &[
+            uniform(0),
+            uniform(1),
+            uniform(2),
+            storage(3),
+            storage(4),
+            storage(5),
+            storage(6),
+            storage(7),
+            storage(8),
+            uniform(9),
+            compute(depth_entry(10, D2Array)),
+            comparison,
+            compute(depth_entry(12, D2)),
+            storage(13),
+            compute(texture_entry(14, D3)),
+            compute(sampler_entry(15)),
+            grid_out(16),
+        ],
+    )
+}
+
+/// A compute pipeline of `module`'s entry point over `groups`, built on first use.
+fn lazy(
+    device: &wgpu::Device,
+    module: &wgpu::ShaderModule,
+    (label, entry): (&'static str, &'static str),
+    groups: &[&wgpu::BindGroupLayout],
+) -> LazyCompute {
+    let groups: Vec<_> = groups.iter().map(|g| Some(*g)).collect();
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some(label),
+        bind_group_layouts: &groups,
+        immediate_size: 0,
+    });
+    let module = module.clone();
+    LazyCompute::new(device, move |device| {
+        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some(label),
+            layout: Some(&layout),
+            module: &module,
+            entry_point: Some(entry),
+            compilation_options: Default::default(),
+            cache: None,
+        })
+    })
 }

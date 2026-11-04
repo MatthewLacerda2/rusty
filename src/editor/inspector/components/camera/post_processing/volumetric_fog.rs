@@ -66,6 +66,18 @@ fn draw(
         let row = (label, knob(knobs, field));
         *is_dirty |= knob_row(ui, (&mut *world, id), row, vc, range);
     }
+    draw_albedo(ui, world, id, vc, is_dirty);
+    draw_quality(ui, world, id, vc, is_dirty);
+}
+
+/// The albedo's colour picker.
+fn draw_albedo(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    vc: &PostProcessingComponent,
+    is_dirty: &mut bool,
+) {
     let mut albedo = vc.volumetric_fog.albedo;
     let changed = ui
         .horizontal(|ui| {
@@ -79,7 +91,6 @@ fn draw(
         }
         *is_dirty = true;
     }
-    draw_quality(ui, world, id, vc, is_dirty);
 }
 
 /// The quality level, and at `Custom` the grid.

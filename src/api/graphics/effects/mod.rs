@@ -5,6 +5,8 @@
 //! `scene::authoring` ops the Inspector calls; an effect's numeric knobs that are a
 //! pair on their own come from its knob table ([`knobs`]).
 
+// lint: allow(dir-size) a flat registry: one file per effect's `Graphics.*` functions, listed in `REGISTRARS`; families already have their folders (`grading`, `lens`)
+
 use super::super::Reg;
 use crate::api::ApiCell;
 use crate::scene::Scene;
