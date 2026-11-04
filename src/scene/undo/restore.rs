@@ -36,6 +36,7 @@ pub(super) fn apply(scene: &mut Scene, step: Step) -> Step {
     if let Some(level) = step.level {
         level.restore(scene);
     }
+    scene.world.rewind_changes(); // once per step: every change cursor rebuilds
     inverse
 }
 

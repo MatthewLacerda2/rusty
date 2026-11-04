@@ -32,7 +32,7 @@ fn events_parse_onto_nodes_and_children_and_round_trip() {
     let mag_in = &graph.base.nodes[0].events[0];
     assert_eq!((mag_in.time, mag_in.name.as_str()), (1.2, "MagIn"));
     let tree = graph.base.nodes[1].blend_tree.as_ref().unwrap();
-    let events = tree.child_events();
+    let events: Vec<_> = tree.children().map(|(m, _)| &m.events).collect();
     assert_eq!((events[0][0].name.as_str(), events[1].len()), ("Step", 0));
     let json = serde_json::to_string(&graph).unwrap();
     assert_eq!(
@@ -55,7 +55,7 @@ fn malformed_events_are_rejected() {
     });
     graph.base.nodes[1].events = graph.base.nodes[0].events.clone();
     if let Some(BlendTree::Simple1D { children, .. }) = &mut graph.base.nodes[1].blend_tree {
-        children[1].events.push(AnimationEvent {
+        children[1].motion.events.push(AnimationEvent {
             time: f32::NAN,
             name: "Bad".to_string(),
         });

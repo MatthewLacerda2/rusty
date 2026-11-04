@@ -20,6 +20,7 @@
 //! and world counters only.
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -46,6 +47,8 @@ pub struct TimingProbe {
     /// This frame's per-system times, held until `end_frame` knows whether the frame
     /// opened a new Play session (and so must reset the stats first).
     system_ms: Vec<(&'static str, f64)>,
+    /// Each change channel's `logged` count at the last frame's end, for its delta.
+    logged: BTreeMap<&'static str, u64>,
 }
 
 impl TimingProbe {
@@ -54,6 +57,7 @@ impl TimingProbe {
             stats,
             stage_ms: [0.0; 4],
             system_ms: Vec::new(),
+            logged: BTreeMap::new(),
         }
     }
 }
@@ -87,6 +91,9 @@ impl SystemProbe for TimingProbe {
         stats.record("frame_ms", total);
         self.stage_ms = [0.0; 4];
         record_world(&mut stats, world, res);
+        let changes = world.scene.borrow().world.change_stats();
+        let changes = changes.into_iter().map(|s| (s.name, s.logged));
+        record_changes(&mut stats, changes, &mut self.logged);
         stats.frames += 1;
     }
 }
@@ -116,6 +123,20 @@ fn record_world(stats: &mut FrameStats, world: &World, res: &Resources) {
     stats.record("scripts", res.script_manager.live_script_count() as f64);
     stats.record("skeletons", skinned.len() as f64);
     stats.record("bones", bones as f64);
+}
+
+/// `changes_<channel>`: per change channel a cursor reads, the distinct ids dirtied
+/// this frame (the entries its log appended since the last frame, #1705).
+fn record_changes(
+    stats: &mut FrameStats,
+    channels: impl Iterator<Item = (&'static str, u64)>,
+    last: &mut BTreeMap<&'static str, u64>,
+) {
+    for (name, logged) in channels {
+        let before = last.insert(name, logged).unwrap_or(0);
+        let key = format!("changes_{name}");
+        stats.record(&key, logged.saturating_sub(before) as f64);
+    }
 }
 
 /// Install a [`TimingProbe`] on `world`, writing into the script runtime's stats cell

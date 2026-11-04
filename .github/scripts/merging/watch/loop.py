@@ -18,7 +18,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     calls `tick()` on each poll of its CI wait, so the board is reported
     during it), `head(number)`, `attempts(number, sha)`
     (the runs on that head, [`handbacks.attempts`], or `None`), `blocks(issues)`
-    (which of those issues still refuse a merge, or `None`), `clock()`, `sleep(seconds)`,
+    (which of those issues still refuse a merge, or `None`), `decided(number)` (whether a
+    comment now records its review decision, or `None`), `clock()`, `sleep(seconds)`,
     `say(...)` (also each board change, [`board.transitions`]), `memory` (a path), `bots`, and the end states: `merged`, `ends`
     (ended without a hand-back: green under `--no-merge`, previewed by a dry run)
     `stops` (the machine's failure, [`queue.stopping.Stopped`]) and `skips` (it
@@ -26,7 +27,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     remembered, announced ([`ending.handed_back`]) and passed over until its head
     moves or runs again; one in [`outcomes.AWAITING`] also until its body or labels
     change ([`handbacks.reworded`]), and an `AWAITS_ISSUE` one until its issues no
-    longer refuse it ([`handbacks.unblocked`], #1279).
+    longer refuse it ([`handbacks.unblocked`], #1279), and an `AWAITS_REVIEW` one until a
+    comment records its review decision ([`handbacks.reviewed`], #1764).
     `stale_code()` names the queue's files that changed on `main` since launch
     ([`freshness.changed`]); asked before each take, a non-empty answer ends the
     watch ([`ending.relaunch`]) with the pull request untaken.
@@ -39,6 +41,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     memory, marks = handbacks.recall(fx.memory), handbacks.recall(fx.memory.with_name(handbacks.RUNS_MEMORY))
     claims = handbacks.recall(fx.memory.with_name(handbacks.CLAIMS_MEMORY))
     issues = handbacks.recall(fx.memory.with_name(handbacks.ISSUES_MEMORY))
+    reviews = handbacks.recall(fx.memory.with_name(handbacks.REVIEWS_MEMORY))
     line = aging.Line()
     shown = [None]  # the board as last reported; `None` until the first listing
 
@@ -47,10 +50,11 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         handbacks.remember(fx.memory.with_name(handbacks.RUNS_MEMORY), {n: m for n, m in marks.items() if n in memory})
         handbacks.remember(fx.memory.with_name(handbacks.CLAIMS_MEMORY), {n: c for n, c in claims.items() if n in memory})
         handbacks.remember(fx.memory.with_name(handbacks.ISSUES_MEMORY), {n: i for n, i in issues.items() if n in memory})
+        handbacks.remember(fx.memory.with_name(handbacks.REVIEWS_MEMORY), {n: r for n, r in reviews.items() if n in memory})
 
     def forget(number: int) -> None:
         """Drop everything remembered against `number`: it is back in line."""
-        for kept in (memory, marks, claims, issues):
+        for kept in (memory, marks, claims, issues, reviews):
             kept.pop(number, None)
 
     def report(pulls: list[dict]) -> None:
@@ -87,6 +91,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
                 claims[number] = result.claim
                 if result.issues:
                     issues[number] = handbacks.spell(result.issues)
+                if waits == outcomes.AWAITS_REVIEW:
+                    reviews[number] = waits
             mark = fx.attempts(number, memory[number])
             if mark is not None:
                 marks[number] = mark
@@ -122,6 +128,9 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         for number in handbacks.unblocked(pulls, memory, issues, fx.blocks):
             forget(number)
             fx.say(f"watch: #{number}'s issues no longer refuse it; back in line.")
+        for number in handbacks.reviewed(pulls, memory, reviews, fx.decided):
+            forget(number)
+            fx.say(f"watch: #{number} has its review decision recorded now; back in line.")
         report(pulls)
         now = board.heads(pulls)
         if now != last:

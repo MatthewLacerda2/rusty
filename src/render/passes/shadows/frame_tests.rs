@@ -75,3 +75,36 @@ fn gpu_the_cascades_follow_the_main_cameras_volume() {
     r.render(&mut view, &scene, &cam, &out, false);
     assert_eq!(r.shadow_renderer.cascades.len(), 3);
 }
+
+/// The atlas keys each light's tiles by the id `local_light_ids` gives it (#1711):
+/// one id per light `local_lights` stages, in its order, live or in a capture.
+#[test]
+fn every_staged_light_has_its_entity_id_in_order() {
+    use crate::render::clusters::local_lights;
+    let mut scene = Scene::new();
+    let lamps = [
+        Primitive::PointLight,
+        Primitive::DirectionalLight,
+        Primitive::SpotLight,
+        Primitive::PointLight,
+        Primitive::SpotLight,
+    ];
+    let ids: Vec<u32> = (lamps.iter().enumerate())
+        .map(|(i, &p)| {
+            let id = rotated_light(&mut scene, p, Quat::IDENTITY);
+            scene.world.transform_mut(id).unwrap().position = Vec3::X * i as f32;
+            id
+        })
+        .collect();
+    scene.world.light_mut(ids[3]).unwrap().mode = LightMode::Baked;
+    scene.world.set_active(ids[4], false);
+    for capture in [false, true] {
+        let staged = local_lights(&scene, capture);
+        let keyed = super::local_light_ids(&scene, capture);
+        assert_eq!(staged.len(), keyed.len(), "capture {capture}");
+        for ((light, _), id) in staged.iter().zip(&keyed) {
+            let at = scene.world.world_position(*id);
+            assert_eq!(Vec3::from(light.position), at, "capture {capture}");
+        }
+    }
+}

@@ -1,6 +1,6 @@
 //! The atlas's depth sweeps (#468, #694): re-bake the stale tiles' static casters
-//! into the static atlas, then build the active atlas — each tile copied from the
-//! static one, the dynamic casters drawn over it.
+//! into the static atlas, then bring the active atlas up to date — each tile that
+//! needs it copied from the static one, the dynamic casters drawn over it.
 
 use glam::Mat4;
 
@@ -19,9 +19,11 @@ pub(in crate::render::passes::shadows) struct AtlasBake {
 
 impl ShadowRenderer {
     /// Record the atlas's sweeps for this frame's tiles: re-bake the stale tiles'
-    /// static casters (always at LOD0, as the cascades' bake), then clear the active
-    /// atlas and, per tile, copy its statics in and draw the dynamic casters `lod`
-    /// shows over them. Nothing when no light is shadowed.
+    /// static casters (always at LOD0, as the cascades' bake), then, per tile that
+    /// needs it, copy its statics into the active atlas and draw the dynamic casters
+    /// `lod` shows over them. A tile no dynamic caster reaches, whose active texels
+    /// already hold its current bake, is left as it is (#1711): the forward shader
+    /// samples the same depths either way.
     pub(in crate::render::passes::shadows) fn render_atlas(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -33,12 +35,28 @@ impl ShadowRenderer {
         if !tiles.is_empty() {
             let volumes: Vec<Mat4> = tiles.iter().map(|t| t.view_proj).collect();
             let batches = self.prepare_casters(frame, lod, Sweep::AtlasDynamic, &volumes);
-            let view = &self.atlas.view;
-            let mut pass = depth_pass(encoder, frame, "Shadow Atlas Pass", view, true);
-            for (i, (tile, batches)) in tiles.iter().zip(&batches).enumerate() {
-                focus(&mut pass, tile);
-                self.atlas.blit.copy(&mut pass);
-                self.draw_casters(&mut pass, frame, batches, Sweep::AtlasDynamic, i);
+            let scene = frame.statics;
+            let clean = &self.atlas.clean_tiles;
+            let fresh = self.atlas.fresh;
+            let work: Vec<usize> = (0..tiles.len())
+                .filter(|&i| fresh || !batches[i].is_empty() || !clean.holds(scene, &tiles[i]))
+                .collect();
+            if !work.is_empty() {
+                let view = &self.atlas.view;
+                let mut pass = depth_pass(encoder, frame, "Shadow Atlas Pass", view, fresh);
+                for &i in &work {
+                    focus(&mut pass, &tiles[i]);
+                    self.atlas.blit.copy(&mut pass);
+                    self.draw_casters(&mut pass, frame, &batches[i], Sweep::AtlasDynamic, i);
+                }
+            }
+            self.atlas.fresh &= work.is_empty();
+            for &i in &work {
+                // Drawn over: clean again only when nothing dynamic was drawn.
+                self.atlas.clean_tiles.forget(&tiles[i]);
+                if batches[i].is_empty() {
+                    self.atlas.clean_tiles.commit(scene, [tiles[i]]);
+                }
             }
         }
         self.atlas.frame_tiles = tiles;
@@ -77,6 +95,10 @@ impl ShadowRenderer {
         }
         let rebaked = stale.iter().map(|&i| tiles[i]);
         self.atlas.static_tiles.commit(scene, rebaked);
+        // The active atlas's copy of a re-baked tile is the old bake's.
+        stale
+            .iter()
+            .for_each(|&i| self.atlas.clean_tiles.forget(&tiles[i]));
         bake
     }
 }
