@@ -69,6 +69,7 @@ fn sub_texel_strips_bake_lit_not_black() {
         meshes: vec![strips()],
         lights: Vec::new(),
         sky: Vec3::ONE.into(),
+        diffuse: Default::default(),
     };
     let settings = BakeSettings {
         max_resolution: S,

@@ -30,6 +30,7 @@ use crate::dev::bake::lightmap::LightmapBakeJob;
 use crate::dev::bake::steps::{LightingBake, Stage};
 use crate::editor::EditorUi;
 use crate::scene::lighting::lightmap::BakeSettings;
+use crate::scene::lighting::DiffuseModel;
 use crate::scene::{Scene, SceneId};
 use crate::scripting::ConsoleLogs;
 
@@ -93,9 +94,13 @@ pub fn draw(
         } else {
             "Open this scene to bake it"
         });
+    // The diffuse model is greyed out with the knobs: lightmaps and probes bake one
+    // after the other, and a change between them would save two models as one.
+    let settings = &mut scene.lighting_settings;
     let changed = ui
         .add_enabled_ui(idle, |ui| {
-            draw_settings(ui, &mut scene.lighting_settings.lightmaps)
+            draw_settings(ui, &mut settings.lightmaps)
+                | draw_diffuse_model(ui, &mut settings.diffuse_model)
         })
         .inner;
     editor.is_dirty |= changed;
@@ -140,6 +145,24 @@ fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
         .on_hover_text("Bake light directions too, so normal maps show under baked light (#810)")
         .changed();
     changed
+}
+
+/// The scene's diffuse model (#1698); returns whether it changed. Live lights follow
+/// it at once, baked light from the next Generate Lighting.
+fn draw_diffuse_model(ui: &mut egui::Ui, model: &mut DiffuseModel) -> bool {
+    let before = *model;
+    egui::ComboBox::from_label("Diffuse model")
+        .selected_text(model.name())
+        .show_ui(ui, |ui| {
+            for m in DiffuseModel::ALL {
+                ui.selectable_value(model, m, m.name());
+            }
+        })
+        .response
+        .on_hover_text(
+            "Lambert, or the retro half-Lambert wrap; Realtime and baked lamps both use it",
+        );
+    *model != before
 }
 
 /// Whether the card's scene file is the editor's open scene. Unity bakes the open

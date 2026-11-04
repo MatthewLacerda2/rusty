@@ -95,6 +95,7 @@ fn floor_at_wall() -> BakeScene {
             bakes_direct: true,
         }],
         sky: Vec3::splat(0.5).into(),
+        diffuse: Default::default(),
     }
 }
 

@@ -53,6 +53,7 @@ inspect! {
                 .ok_or_else(|| format!("an Area light is always Baked, not {}", m.name()))?
         }),
         op!("area_size", light::set_area_size),
+        op!("shadow_fade_distance", light::set_shadow_fade_distance),
     ], shown light::shown;
     CameraComponent => camera, camera_mut, &[
         ro!("active", NO_OP),
