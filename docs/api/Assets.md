@@ -173,7 +173,10 @@ What it holds is not shared: like an own clip, every skinned mesh instanced from
 model holds its own copy of the model's clips (each `Mesh` clones them), so 40 clips on
 100 enemies are 100 copies. And each borrowing model imports its source in full (the
 source's whole file, not only its clips) when it imports, as `Assets.Manifest` does on
-each call, with the warnings again each time.
+each call, with the warnings again each time. Measured in release on a primitive 11-bone rig (#1747),
+40 clips of 30 keys a bone: retargeting all 40 takes about 0.2 ms; one copy of them holds
+about 280 KB of keys, so 100 enemies hold about 27 MB, and cloning them into 100 meshes
+takes about 12 ms. A 22-bone humanoid is about twice each.
 
 A mask or `Animator.SetRootBone` names the **target** rig's bones: the clip is keyed on
 them. A source rig's bone name there is simply not in the skeleton (a mask ignores it,
