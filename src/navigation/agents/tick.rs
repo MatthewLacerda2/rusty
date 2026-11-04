@@ -8,6 +8,7 @@ use super::super::avoidance::{self, AvoidanceAgent};
 use super::super::obstacle::avoidance_obstacles;
 use super::super::{path_length, NavigationGraph};
 use super::link::auto_traverse;
+use super::root_motion::root_moved;
 use super::state::is_at_target;
 use super::turn::turn_toward;
 use crate::scene::{NavMeshAgentComponent, Scene};
@@ -65,11 +66,18 @@ impl NavigationGraph {
                 let mut facing = scene.world.world_rotation(id);
                 turn_toward(&mut agent, &mut facing, heading, delta_time);
                 scene.world.set_world_rotation(id, facing);
-                inputs.push(avoidance_input(&agent, position, moved_with, steering));
+                // Under root motion (#1745) the Animator moves it, not its speed,
+                // and its neighbours see the velocity it really moves at.
+                let root = root_moved(scene, id, delta_time);
+                let mut input = avoidance_input(&agent, position, moved_with, steering);
+                if let Some(v) = root {
+                    (input.velocity, input.preferred, input.solves) = (xz(v), xz(v), false);
+                }
+                inputs.push(input);
                 ticked.push(Ticked {
                     id,
                     position,
-                    moving: steering || agent.velocity != Vec3::ZERO,
+                    moving: (steering || agent.velocity != Vec3::ZERO) && root.is_none(),
                 });
             }
             scene.world.set_nav_agent(id, Some(agent));
@@ -180,7 +188,12 @@ impl NavigationGraph {
     /// a ramp instead of riding its cell tops (#781), with its Transform
     /// `base_offset` above it (#666).
     /// Off the navmesh it does not move. `body` is the agent's Transform position.
-    fn slide(&self, agent: &mut NavMeshAgentComponent, body: Vec3, delta_time: f32) -> Vec3 {
+    pub(super) fn slide(
+        &self,
+        agent: &mut NavMeshAgentComponent,
+        body: Vec3,
+        delta_time: f32,
+    ) -> Vec3 {
         let current_pos = agent.feet(body);
         let Some(from) = self.span_under(current_pos) else {
             agent.velocity = Vec3::ZERO;

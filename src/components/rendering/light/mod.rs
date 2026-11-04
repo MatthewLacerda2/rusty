@@ -1,10 +1,15 @@
-//! src/components/rendering/light.rs — Light component
+//! src/components/rendering/light/mod.rs — Light component
 //!
 //! ambient/directional/point/spot/area. Unity: Light. Moved verbatim from the former
 //! `core/scene.rs`; the per-light [`LightMode`] (#438) is Unity's Light Mode.
 
 use glam::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};
+
+mod falloff;
+pub use falloff::{
+    falloff, falloff_near, falloff_window, falloff_window_sq, spot_cone, FALLOFF_EPSILON_SQ,
+};
 
 crate::core::named_enum! {
     /// What kind of light it is. Its names are the editor's, the API's and the scene

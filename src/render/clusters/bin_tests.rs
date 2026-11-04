@@ -41,7 +41,7 @@ pub(super) fn lists_of(binned: &Binned, cluster: u32) -> &[u32] {
 /// Whether `l` lights `p` at all, `p` in its range: a spot only inside its cone.
 fn lights_at(l: &LocalLight, p: Vec3) -> bool {
     let to = (p - Vec3::from(l.position)).normalize_or_zero();
-    l.kind != KIND_SPOT || to.dot(Vec3::from(l.direction)) >= l.outer_cone
+    !l.one_frustum() || to.dot(Vec3::from(l.direction)) >= l.outer_cone
 }
 
 /// Every sampled point a light reaches (in range, in its cone) inside the view

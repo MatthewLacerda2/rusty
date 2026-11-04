@@ -10,6 +10,7 @@
 
 pub mod backend;
 pub mod capture;
+mod control;
 pub mod decode;
 mod gate;
 pub mod groups;

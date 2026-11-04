@@ -171,8 +171,38 @@ fn animator_card_body(
         }
         *is_dirty = true;
     }
+    draw_root_motion(ui, world, id, anim, is_dirty);
     draw_graph(ui, world, id, anim, is_dirty);
     draw_parameters(ui, anim);
+}
+
+/// Unity's *Apply Root Motion* toggle and the bone it reads (#1745), through the
+/// same `authoring::animator` ops as `Animator.SetApplyRootMotion` / `SetRootBone`.
+fn draw_root_motion(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    anim: &crate::components::AnimatorComponent,
+    is_dirty: &mut bool,
+) {
+    let mut apply = anim.apply_root_motion;
+    if ui.checkbox(&mut apply, "Apply Root Motion").changed() {
+        if let Some(mut a) = world.animator_mut(id) {
+            animator_ops::set_apply_root_motion(&mut a, apply);
+        }
+        *is_dirty = true;
+    }
+    let mut bone = anim.root_bone.clone();
+    ui.horizontal(|ui| {
+        ui.label("Root Bone:")
+            .on_hover_text("Empty: the skeleton's first root joint");
+        if ui.text_edit_singleline(&mut bone).changed() {
+            if let Some(mut a) = world.animator_mut(id) {
+                animator_ops::set_root_bone(&mut a, bone);
+            }
+            *is_dirty = true;
+        }
+    });
 }
 
 /// The animation-graph reference (#315/#316): the `.animgraph` path driving this

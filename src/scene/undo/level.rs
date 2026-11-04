@@ -140,13 +140,15 @@ fn put_probes(mut value: ProbeVolume, slot: &mut ProbeVolume) {
     *slot = value;
 }
 
-/// The reflection probes as placed and set, without the baked cubemap's path.
+/// The reflection probes as placed and set, without what a bake stores: the cubemap's
+/// path and its irradiance (#1697).
 fn same_reflections(a: &ReflectionProbeSet, b: &ReflectionProbeSet) -> bool {
     a.probes.len() == b.probes.len()
         && a.probes.iter().zip(&b.probes).all(|(p, q)| {
             let unbaked = |r: &crate::scene::lighting::reflection_probe::ReflectionProbe| {
                 let mut r = r.clone();
                 r.cubemap_path.clear();
+                r.irradiance = None;
                 r
             };
             p == q || eq_or_bytes(&unbaked(p), &unbaked(q))
@@ -154,15 +156,16 @@ fn same_reflections(a: &ReflectionProbeSet, b: &ReflectionProbeSet) -> bool {
 }
 
 /// Put the reflection probes back, each keeping the cubemap of a live probe at its
-/// position.
+/// position, and the irradiance baked with it (#1697).
 fn put_reflections(mut value: ReflectionProbeSet, slot: &mut ReflectionProbeSet) {
-    let mut live: BTreeMap<[u32; 3], &str> = BTreeMap::new();
+    let mut live: BTreeMap<[u32; 3], (&str, _)> = BTreeMap::new();
     for p in slot.probes.iter().rev() {
-        live.insert(at(p.position), &p.cubemap_path);
+        live.insert(at(p.position), (p.cubemap_path.as_str(), p.irradiance));
     }
     for p in &mut value.probes {
-        if let Some(path) = live.get(&at(p.position)) {
-            p.cubemap_path = (*path).to_owned();
+        if let Some(&(path, irradiance)) = live.get(&at(p.position)) {
+            p.cubemap_path = path.to_owned();
+            p.irradiance = irradiance;
         }
     }
     *slot = value;

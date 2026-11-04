@@ -1,10 +1,13 @@
 //! The frame's shadow sweep (#435): pick the sun, fit the cascades to the base camera,
 //! upload both uniforms, plan the point/spot shadow atlas (#468) and record the depth
 //! passes — once per frame, before the camera stack draws, so every stacked camera
-//! samples the same maps.
+//! samples the same maps. A frame with no live sun fits no cascade, draws none and
+//! uploads a count of 0, which the forward shader's `calculate_shadow` skips on
+//! (#1713): a `Baked` sun costs no shadow work, as in Unity.
 
 use glam::Vec3;
 
+use super::cascades::Cascade;
 use super::casters::CasterFrame;
 use super::{atlas, cascades, statics_key, CascadeUniform, ShadowRenderer};
 use crate::components::{LightType, ShadowSettings};
@@ -27,13 +30,7 @@ impl Renderer {
         settings: &ShadowSettings,
         lod: &LodSelection,
     ) {
-        let fitted = cascades::fit(
-            camera,
-            aspect,
-            sun_direction(scene, self.capture.static_only),
-            settings,
-            ShadowRenderer::CASCADE_SIZE,
-        );
+        let fitted = frame_cascades(scene, self.capture.static_only, camera, aspect, settings);
         // A probe captured without shadows (#1584) samples no cascade.
         let sampled: &[_] = if self.capture.shadows { &fitted } else { &[] };
         let uniform = CascadeUniform::new(sampled, camera.position, camera.forward());
@@ -63,7 +60,8 @@ impl Renderer {
             statics: statics_key(scene),
         };
         if self.capture.shadows {
-            // a probe captured without shadows samples no cascade, so draws none
+            // a probe captured without shadows samples no cascade, so draws none;
+            // without a live sun there is no cascade to draw (#1713)
             self.shadow_renderer
                 .render_cascades(&mut encoder, &frame, lod);
         }
@@ -133,18 +131,34 @@ pub(super) fn local_light_ids(scene: &Scene, capture: bool) -> Vec<u32> {
         .collect()
 }
 
-/// The direction the scene's (last) active directional light shines, or the default
-/// sun's when there is none. Only lights the frame (or a bake `capture`) draws live
-/// count (#809), so the cascades follow the light in the uniform's slot 0.
-fn sun_direction(scene: &Scene, capture: bool) -> Vec3 {
-    let mut dir = Vec3::new(-0.5, -1.0, -0.3).normalize();
+/// The cascades the frame fits to `camera` (at `aspect`): `settings`' count for the
+/// live sun, none without one (#1713), so nothing is swept, re-baked or sampled for a
+/// `Baked` sun.
+fn frame_cascades(
+    scene: &Scene,
+    capture: bool,
+    camera: &Camera,
+    aspect: f32,
+    settings: &ShadowSettings,
+) -> Vec<Cascade> {
+    live_sun(scene, capture).map_or_else(Vec::new, |dir| {
+        cascades::fit(camera, aspect, dir, settings, ShadowRenderer::CASCADE_SIZE)
+    })
+}
+
+/// The direction the scene's (last) active directional light shines, or `None` when
+/// there is none. Only lights the frame (or a bake `capture`) draws live count
+/// (#809), so the cascades follow the light in the uniform's slot 0. The sun always
+/// casts: its `cast_shadows` is not read.
+fn live_sun(scene: &Scene, capture: bool) -> Option<Vec3> {
+    let mut dir = None;
     for id in scene.world.ids_with_light() {
         if !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
         let light = scene.world.light(id).expect("id came from ids_with_light");
         if light.light_type == LightType::Directional && light.mode.renders_live(capture) {
-            dir = scene.world.transform_direction(id, Vec3::NEG_Z).normalize();
+            dir = Some(scene.world.transform_direction(id, Vec3::NEG_Z).normalize());
         }
     }
     dir

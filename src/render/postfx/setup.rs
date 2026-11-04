@@ -8,7 +8,6 @@ use crate::render::gpu::layout_entries::{
 };
 use crate::render::gpu::shaders::ShaderRegistry;
 
-use super::effects::bloom::BloomTargets;
 use super::effects::custom_effects::CustomChain;
 use super::effects::exposure::ExposureMeter;
 use super::effects::textures::CompositeTextures;
@@ -42,7 +41,6 @@ impl PostFx {
 
         let (full_size, scene_hdr, ldr) =
             Self::create_targets(device, width, height, output_format);
-        let bloom = BloomTargets::new(device, full_size, BloomTargets::DIVISOR);
         let custom = CustomChain::new(device, &io_layout, output_format, full_size);
         let grade = GradeLut::new(device);
         let exposure = ExposureMeter::new(device);
@@ -60,7 +58,7 @@ impl PostFx {
             fx_buffer,
             sampler,
             scene_hdr,
-            bloom,
+            bloom_dirt: None,
             ldr,
             full_size,
             output_format,
@@ -136,14 +134,13 @@ impl PostFx {
         (params_buffer, fx_buffer, sampler)
     }
 
-    /// (Re)allocate the HDR + bloom + LDR targets for a new framebuffer size; bloom
-    /// keeps the divisor it last ran at.
+    /// (Re)allocate the HDR + LDR targets for a new framebuffer size; the effects'
+    /// own (bloom's chain among them) are made again the next frame they run.
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
         let (full_size, scene_hdr, ldr) =
             Self::create_targets(device, width, height, self.output_format);
         self.full_size = full_size;
         self.scene_hdr = scene_hdr;
-        self.bloom = BloomTargets::new(device, full_size, self.bloom.divisor);
         self.ldr = ldr;
         self.custom.resize(device, full_size.0, full_size.1);
         // A resize is a cut (#1435): no smear from last frame's framing, and the

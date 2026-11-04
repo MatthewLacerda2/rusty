@@ -88,7 +88,7 @@ fn gpu_probe_bake_light_modes() {
         down(&baked),
         down(&mixed)
     );
-    // Its direct light comes from above: 4 / (2² + 1) at the probe, facing up.
+    // Its direct light comes from above: 4 × falloff(2, 20), about 1, at the probe, facing up.
     assert!(
         up(&baked) - up(&mixed) > 0.6,
         "a Baked light's direct light is in the probe: {} vs {}",

@@ -3,6 +3,7 @@ mod bounds_tests;
 mod changed;
 mod link;
 pub use link::complete_off_mesh_link;
+mod root_motion;
 pub mod state;
 #[cfg(test)]
 mod state_tests;

@@ -3,7 +3,7 @@
 //! one-shot still starts on its targets with no fade-in.
 
 use super::*;
-use crate::audio::backend::{AudioBackend, PlayParams, VoiceId};
+use crate::audio::backend::{AudioBackend, PlayParams, VoiceId, VoiceMix};
 use crate::audio::device::backend::backend_tests::{flat, rig};
 use crate::audio::device::capture::RATE;
 use crate::audio::device::decode::CachedClip;
@@ -129,6 +129,7 @@ fn a_glide_lands_on_its_target_and_recovers_from_a_nan() {
         pan: v,
         blend: v,
         low_pass: v,
+        doppler: v,
     };
     let mut g = at(0.0);
     for _ in 0..100_000 {

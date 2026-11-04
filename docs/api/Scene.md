@@ -21,7 +21,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.SetActive` | `(id, active)` | `true` if an entity existed at `id` — Unity's `SetActive`; its callbacks follow the edge (`OnEnable` / `OnDisable`) |
 | `Scene.IsActive` | `(id)` | Unity's `activeSelf`: the entity's own `active` flag (`false` for a missing or `nil` id; an inactive ancestor still hides it) |
 | `Scene.IsActiveInHierarchy` | `(id)` | Unity's `activeInHierarchy`: `true` when the entity and every ancestor are active (`false` for a missing or `nil` id) — what decides whether it draws, simulates and ticks |
-| `Scene.SetStatic` | `(id, static)` | `true` if an entity existed at `id` — the inspector's **Static** checkbox. Unlike Unity's editor-only `GameObject.isStatic`, rusty's flag is live: from the next tick a static entity is a fixed physics body (a Rigidbody stops moving), its shadow moves into the cached static bake, and probe lighting skips it. The navmesh and the lightmap read it at their next bake, so rebake after changing it (`Lighting.md`) |
+| `Scene.SetStatic` | `(id, static)` | `true` if an entity existed at `id` — the inspector's **Static** checkbox. Unlike Unity's editor-only `GameObject.isStatic`, rusty's flag is live: from the next tick a static entity is a fixed physics body (a Rigidbody stops moving, and any pair with another static collider ends: `OnCollisionExit` or `OnTriggerExit` fires though the two still touch), its shadow moves into the cached static bake, and probe lighting skips it. The navmesh and the lightmap read it at their next bake, so rebake after changing it (`Lighting.md`) |
 | `Scene.IsStatic` | `(id)` | the entity's Static flag (`false` for a missing or `nil` id) |
 | `Scene.GetParent` | `(id)` | the parent's `id`, or `nil` (also for a `nil` id) |
 | `Scene.GetChildren` | `(id)` | array of child ids, in hierarchy order (empty for a `nil` id) |
@@ -122,6 +122,19 @@ from their defaults, as the inspector does: numbers, booleans and strings only
 declare is ignored. In Play the script loads at the head of the next tick, like a
 spawned entity's, so `GetScript` sees it from then on. The engine's Dropdown
 attaches its list items' click script this way.
+
+A script file is read and compiled once per Play (#1710), as Unity compiles a
+MonoBehaviour class once: each instance re-runs the compiled file for a table of
+its own, so its top level still runs once per instance (a top-level
+`_ENV = setmetatable({}, …)` gives each instance its own globals), and spawning a
+thousand copies reads the file once. A file that fails to compile is compiled once
+too, and every instance attached to it logs the error. A file the engine re-writes,
+or that the editor's file watch sees edited (in Play too), is read again for
+instances made after that; live instances keep the version they were made from. A
+build with no file watch (`play`, the player, a headless session) sees an outside
+edit at the next Play. An error names the file and line
+(`assets/scripts/enemy.lua:12: …`): `Syntax error compiling` when the file does not
+compile, `Error running` when its top level fails.
 
 **Component dependencies (`RequireComponent`).** A first-class component may
 *declare that it requires another* — rusty's analog of Unity's

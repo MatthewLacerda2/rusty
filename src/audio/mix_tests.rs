@@ -25,6 +25,7 @@ fn env_at(pos: Vec3, time_scale: f32, paused: bool) -> MixEnv {
         listener: Listener::from_transform(pos, Quat::IDENTITY),
         time_scale,
         paused,
+        dt: 0.0,
     }
 }
 

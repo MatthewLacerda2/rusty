@@ -1,6 +1,8 @@
-//! The engine's own per-frame ticks the schedule runs: the render camera's sync,
+//! The engine's own per-frame ticks the schedule runs: the animator step and its
+//! root motion, the render camera's sync,
 //! decal ageing, the particle simulation, trail recording and the UI systems.
 
+pub(super) mod animate;
 pub(super) mod camera_sync;
 pub(super) mod decals;
 pub(super) mod particles;
