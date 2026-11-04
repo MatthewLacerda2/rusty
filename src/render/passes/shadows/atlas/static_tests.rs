@@ -11,10 +11,10 @@ use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{Camera, Scene};
 
-const RES: u32 = 48;
+pub(super) const RES: u32 = 48;
 
 /// A box at `position` scaled by `scale`, static when `is_static`; returns its id.
-fn block(scene: &mut Scene, position: Vec3, scale: Vec3, is_static: bool) -> u32 {
+pub(super) fn block(scene: &mut Scene, position: Vec3, scale: Vec3, is_static: bool) -> u32 {
     let id = create_entity(scene, "Block", Some(Primitive::Box));
     let mut t = scene.world.transform_mut(id).unwrap();
     (t.position, t.scale) = (position, scale);
@@ -24,7 +24,7 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3, is_static: bool) -> u32
 }
 
 /// A static floor and pillar under a shadowing spotlight and point light (7 tiles).
-fn lamp_room() -> Scene {
+pub(super) fn lamp_room() -> Scene {
     let mut scene = dark();
     let floor = Vec3::new(20.0, 1.0, 20.0);
     block(&mut scene, Vec3::new(0.0, -0.5, 0.0), floor, true);
@@ -49,7 +49,7 @@ fn lamp_room() -> Scene {
 
 /// Render one frame of `scene`; returns the active atlas's raw texels (four bytes
 /// each, the Depth32Float values bit for bit).
-fn frame(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> Vec<u8> {
+pub(super) fn frame(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> Vec<u8> {
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 6.0, 6.0), -90.0, -40.0);
     r.render(view, scene, &cam, &out, false);
@@ -58,7 +58,7 @@ fn frame(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> Vec<u8> {
 }
 
 /// `(cached, rebaked)` tiles of the last frame.
-fn bake(r: &Renderer) -> (u32, u32) {
+pub(super) fn bake(r: &Renderer) -> (u32, u32) {
     let c = &r.frame_counters;
     (c.shadow_atlas_cached, c.shadow_atlas_rebaked)
 }

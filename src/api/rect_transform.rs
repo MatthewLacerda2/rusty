@@ -10,13 +10,12 @@
 //! `SetAnchorPreset` (#423) is the inspector's anchor-preset grid: it re-anchors
 //! against the parent's rect on the sim's screen, keeping the element in place.
 
-use std::cell::RefCell;
-
 use glam::{Vec2, Vec3};
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::RectTransformComponent;
 use crate::core::settings::video::VideoSettings;
 use crate::scene::authoring::ui::layout::rect_transform::{
@@ -43,18 +42,17 @@ const PAIRS: [(&str, Getter, Setter); 5] = [
 ];
 
 /// Register the `RectTransform` namespace onto `lua`.
-pub fn register<'scope>(
+pub fn register(
     lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    screen: (&'scope RefCell<ScreenSize>, &'scope RefCell<VideoSettings>),
+    scene: ApiCell<Scene>,
+    screen: (ApiCell<ScreenSize>, ApiCell<VideoSettings>),
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     for (suffix, get, set) in PAIRS {
-        register_pair(scope, &table, scene, suffix, get, set)?;
+        register_pair(lua, &table, scene, suffix, get, set)?;
     }
-    register_world_anchor(scope, &table, scene)?;
-    register_preset(scope, &table, scene, screen)?;
+    register_world_anchor(lua, &table, scene)?;
+    register_preset(lua, &table, scene, screen)?;
     lua.globals()
         .set("RectTransform", table)
         .map_err(|e| e.to_string())
@@ -62,10 +60,10 @@ pub fn register<'scope>(
 
 /// `Get<suffix>(id) -> x, y` (`0, 0` without a RectTransform) and
 /// `Set<suffix>(id, x, y)` (a no-op without one).
-fn register_pair<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_pair(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     suffix: &str,
     get: Getter,
     set: Setter,
@@ -73,7 +71,8 @@ fn register_pair<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let v = scene.world.rect_transform(id.read()).map(|r| get(&r));
             let v = v.unwrap_or(Vec2::ZERO);
@@ -84,7 +83,8 @@ fn register_pair<'scope>(
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, x, y): (EntityArg, f32, f32)| {
+        lua.create_function(move |lua, (id, x, y): (EntityArg, f32, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("RectTransform", &verb)?;
             let mut scene = scene.borrow_mut();
             if let Some(mut r) = scene.world.rect_transform_mut(id) {
@@ -98,14 +98,15 @@ fn register_pair<'scope>(
 /// `SetAnchorPreset(id, x, y, setPivot?, setPosition?)`: `x` is `left` / `center`
 /// / `right` / `stretch`, `y` is `bottom` / `middle` / `top` / `stretch`. A no-op
 /// without a RectTransform; an unknown name is an error.
-fn register_preset<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_preset(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    (screen, video): (&'scope RefCell<ScreenSize>, &'scope RefCell<VideoSettings>),
+    scene: ApiCell<Scene>,
+    (screen, video): (ApiCell<ScreenSize>, ApiCell<VideoSettings>),
 ) -> Reg {
     type Args = (EntityArg, String, String, Option<bool>, Option<bool>);
-    let f = scope.create_function(move |_, (id, x, y, pivot, position): Args| {
+    let f = lua.create_function(move |lua, (id, x, y, pivot, position): Args| {
+        let scene = &*scene.get(lua)?;
         let id = id.live("RectTransform", "SetAnchorPreset")?;
         let axis = |name: &str, axis| {
             AxisPreset::from_name(name, axis).ok_or_else(|| {
@@ -119,7 +120,10 @@ fn register_preset<'scope>(
             set_pivot: pivot.unwrap_or(false),
             set_position: position.unwrap_or(false),
         };
-        let view = screen.borrow().view(&video.borrow(), None);
+        let view = screen
+            .get(lua)?
+            .borrow()
+            .view(&video.get(lua)?.borrow(), None);
         let mut scene = scene.borrow_mut();
         let parent = scene.world.parent_id(id);
         let parent = parent.and_then(|p| rect_in(&scene.world, p, &view));
@@ -139,37 +143,36 @@ type AnchorFlag = fn(&mut RectTransformComponent, bool);
 /// `ClearWorldAnchor(id)`, `GetWorldAnchor(id)` (a table, or `nil` for a
 /// non-marker), and the options `SetWorldAnchorClamp(id, clamp, padding)`,
 /// `SetWorldAnchorRotate(id, on)`, `SetWorldAnchorHideWhenBehind(id, on)`.
-fn register_world_anchor<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    let edit = move |id: u32, f: &dyn Fn(&mut RectTransformComponent)| {
-        if let Some(mut r) = scene.borrow_mut().world.rect_transform_mut(id) {
+fn register_world_anchor(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
+    let edit = move |lua: &mlua::Lua, id: u32, f: &dyn Fn(&mut RectTransformComponent)| {
+        if let Some(mut r) = scene.get(lua)?.borrow_mut().world.rect_transform_mut(id) {
             f(&mut r);
         }
+        mlua::Result::Ok(())
     };
     type Args = (EntityArg, EntityArg, Option<f32>, Option<f32>, Option<f32>);
-    let f = scope.create_function(move |_, (id, target, x, y, z): Args| {
+    let f = lua.create_function(move |lua, (id, target, x, y, z): Args| {
         let (id, target) = (id.live("RectTransform", "SetWorldAnchor")?, target.get());
         let offset = Vec3::new(x.unwrap_or(0.0), y.unwrap_or(0.0), z.unwrap_or(0.0));
-        edit(id, &|r| rect_ops::set_world_anchor(r, target, offset));
+        edit(lua, id, &|r| rect_ops::set_world_anchor(r, target, offset))?;
         Ok(())
     });
     put(table, "SetWorldAnchor", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
+    let f = lua.create_function(move |lua, id: EntityArg| {
         let id = id.live("RectTransform", "ClearWorldAnchor")?;
-        edit(id, &rect_ops::clear_world_anchor);
+        edit(lua, id, &rect_ops::clear_world_anchor)?;
         Ok(())
     });
     put(table, "ClearWorldAnchor", f)?;
-    let f = scope.create_function(move |_, (id, clamp, pad): (EntityArg, bool, Option<f32>)| {
-        let id = id.live("RectTransform", "SetWorldAnchorClamp")?;
-        edit(id, &|r| {
-            rect_ops::set_anchor_clamp(r, clamp, pad.unwrap_or(0.0))
-        });
-        Ok(())
-    });
+    let f = lua.create_function(
+        move |lua, (id, clamp, pad): (EntityArg, bool, Option<f32>)| {
+            let id = id.live("RectTransform", "SetWorldAnchorClamp")?;
+            edit(lua, id, &|r| {
+                rect_ops::set_anchor_clamp(r, clamp, pad.unwrap_or(0.0))
+            })?;
+            Ok(())
+        },
+    );
     put(table, "SetWorldAnchorClamp", f)?;
     let flags: [(&str, AnchorFlag); 2] = [
         ("SetWorldAnchorRotate", rect_ops::set_anchor_rotate),
@@ -179,23 +182,20 @@ fn register_world_anchor<'scope>(
         ),
     ];
     for (name, set) in flags {
-        let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
+        let f = lua.create_function(move |lua, (id, on): (EntityArg, bool)| {
             let id = id.live("RectTransform", name)?;
-            edit(id, &|r| set(r, on));
+            edit(lua, id, &|r| set(r, on))?;
             Ok(())
         });
         put(table, name, f)?;
     }
-    register_get_world_anchor(scope, table, scene)
+    register_get_world_anchor(lua, table, scene)
 }
 
 /// `GetWorldAnchor(id)`: the marker's anchor as a table, or `nil` for a non-marker.
-fn register_get_world_anchor<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    let f = scope.create_function(move |lua, id: EntityArg| {
+fn register_get_world_anchor(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let scene = &*scene.get(lua)?;
         let scene = scene.borrow();
         let anchor = scene
             .world

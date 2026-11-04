@@ -19,24 +19,19 @@ use crate::scene::Scene;
 /// What a step's destroyed entities held in the scene's side tables.
 #[derive(Debug, Default)]
 pub(super) struct Side {
-    /// Lightmap entries by entity: each one's slot in the entry list and its value.
-    lightmaps: BTreeMap<u32, (usize, LightmapEntry)>,
+    /// Lightmap entries by entity.
+    lightmaps: BTreeMap<u32, LightmapEntry>,
     /// The decals they owned, oldest first.
     decals: Vec<Decal>,
 }
 
 impl Side {
-    /// The live side entries of `ids`: their lightmap entries, with their slots,
-    /// and the decals they own.
+    /// The live side entries of `ids`: their lightmap entries and the decals they
+    /// own.
     pub(super) fn of(scene: &Scene, ids: impl IntoIterator<Item = u32>) -> Self {
         let ids: BTreeSet<u32> = ids.into_iter().collect();
-        let list = &scene.lightmaps.entries;
-        let lightmaps = list
-            .iter()
-            .enumerate()
-            .filter(|(_, e)| ids.contains(&e.entity))
-            .map(|(slot, e)| (e.entity, (slot, e.clone())))
-            .collect();
+        let entry = |id: &u32| Some((*id, scene.lightmaps.get(*id)?.clone()));
+        let lightmaps = ids.iter().filter_map(entry).collect();
         let owned = |d: &&Decal| d.owner.is_some_and(|o| ids.contains(&o.entity));
         let decals = scene.decals.iter().filter(owned).cloned().collect();
         Self { lightmaps, decals }
@@ -62,26 +57,22 @@ impl Side {
     }
 
     /// Put back what belongs to a live entity and is missing: each lightmap entry
-    /// at its old slot (lowest first, so the list's order comes back as it was),
-    /// each decal at its place in the blend order.
+    /// (the set keeps entity order, so the saved list comes back as it was), each
+    /// decal at its place in the blend order.
     pub(super) fn put_back(self, scene: &mut Scene) {
         let live = |id: u32| scene.world.contains(id);
-        let mut missing: Vec<(usize, LightmapEntry)> = self
+        let missing: Vec<LightmapEntry> = self
             .lightmaps
             .into_iter()
             .filter(|(id, _)| live(*id) && scene.lightmaps.get(*id).is_none())
-            .map(|(_, slotted)| slotted)
+            .map(|(_, entry)| entry)
             .collect();
         let decals: Vec<Decal> = self
             .decals
             .into_iter()
             .filter(|d| d.owner.is_some_and(|o| live(o.entity)))
             .collect();
-        missing.sort_by_key(|(slot, _)| *slot);
-        let list = &mut scene.lightmaps.entries;
-        for (slot, entry) in missing {
-            list.insert(slot.min(list.len()), entry);
-        }
+        scene.lightmaps.extend(missing);
         scene.decals.put_back(decals);
     }
 }

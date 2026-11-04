@@ -39,7 +39,7 @@ impl ScriptManager {
     /// `OnJointBreak(id, force, torque)` on the scripts of each entity whose
     /// joint broke this tick (#449), in the list's ascending order.
     fn dispatch_joint_breaks(&mut self, breaks: &[JointBreak]) {
-        self.with_api_scope(|lua| {
+        self.with_lua(|lua| {
             for b in breaks {
                 for key in self.awoken_keys_for(b.id) {
                     self.call_hook(lua, key, ON_JOINT_BREAK, (b.id, b.force, b.torque));
@@ -58,7 +58,7 @@ impl ScriptManager {
             (ON_TRIGGER, &events.stayed),
             (ON_TRIGGER_EXIT, &events.exited),
         ];
-        self.with_api_scope(|lua| {
+        self.with_lua(|lua| {
             for (hook, pairs) in hooks {
                 for &(a, b) in pairs {
                     self.notify_pair(lua, hook, (a, b));
@@ -78,7 +78,7 @@ impl ScriptManager {
             (ON_COLLISION_ENTER, &events.entered),
             (ON_COLLISION_STAY, &events.stayed),
         ];
-        self.with_api_scope(|lua| {
+        self.with_lua(|lua| {
             for (hook, pairs) in touching {
                 for pair in pairs {
                     for (id, other, contact) in pair.sides() {

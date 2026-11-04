@@ -3,20 +3,18 @@
 //! exactly as `GameWorld::tick` drives them.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::core::input::{CursorState, InputState};
 
 /// Run `f` with a Lua VM whose `Input` table is bound to `input`.
-fn with_input(input: &RefCell<InputState>, f: impl FnOnce(&Lua)) {
+fn with_input(input: &Rc<RefCell<InputState>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::input::register_readable(&lua, scope, input).unwrap();
-        rusty::api::input::register_writable(&lua, scope, input).unwrap();
-        f(&lua);
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::input::register_readable(&lua, bind(&lua, input)).unwrap();
+    rusty::api::input::register_writable(&lua, bind(&lua, input)).unwrap();
+    f(&lua);
 }
 
 fn eval<T: mlua::FromLuaMulti>(lua: &Lua, code: &str) -> T {
@@ -25,7 +23,7 @@ fn eval<T: mlua::FromLuaMulti>(lua: &Lua, code: &str) -> T {
 
 #[test]
 fn key_and_mouse_button_edges_hold_for_one_tick() {
-    let input = RefCell::new(InputState::new());
+    let input = Rc::new(RefCell::new(InputState::new()));
     with_input(&input, |lua| {
         lua.load(r#"Input.Press("Mouse0"); Input.Press("e")"#)
             .exec()
@@ -48,7 +46,7 @@ fn key_and_mouse_button_edges_hold_for_one_tick() {
 
 #[test]
 fn mouse_scroll_and_text_injection_publish_on_the_next_tick() {
-    let input = RefCell::new(InputState::new());
+    let input = Rc::new(RefCell::new(InputState::new()));
     with_input(&input, |lua| {
         lua.load(
             r#"Input.MoveMouse(320, 240)
@@ -75,7 +73,7 @@ fn mouse_scroll_and_text_injection_publish_on_the_next_tick() {
 
 #[test]
 fn the_cursor_request_is_recorded_for_the_platform() {
-    let input = RefCell::new(InputState::new());
+    let input = Rc::new(RefCell::new(InputState::new()));
     input.borrow_mut().reset_cursor(CursorState::PLAY);
     with_input(&input, |lua| {
         let now: (bool, bool) = eval(

@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{CameraComponent, RenderTarget};
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::default_post_processing;
@@ -29,9 +30,15 @@ fn camera(scene: &mut Scene, name: &str, target: Option<RenderTarget>) -> u32 {
 fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
     let lua = Lua::new();
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
-    let app = RefCell::default();
-    lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, scene, &quality, &app).unwrap();
+    let app = Rc::default();
+    crate::lua::attempt(|| {
+        rusty::api::graphics::register(
+            &lua,
+            bind(&lua, scene),
+            bind(&lua, &quality),
+            bind(&lua, &app),
+        )
+        .unwrap();
         lua.load(script).exec()
     })
     .unwrap();

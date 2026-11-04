@@ -17,7 +17,7 @@ name: mutants-sweep
 # itself on the board through `main-health.yml`; survivors stay in the report.
 on:
   # Saturdays, 04:41 UTC: off the hour, where GitHub's scheduler is least
-  # backed up, clear of `ci.yml`'s nightly `deny` (03:07) and two days clear of
+  # backed up, clear of `ci.yml`'s nightly run (03:07) and two days clear of
   # `coverage.yml` (Mondays 05:23). The sweep holds seven runners for about a
   # day and a half (`max-parallel` on `mutants` has the arithmetic), so it
   # ends on Sunday, and a weekend is when the fewest pull requests want them.

@@ -14,107 +14,56 @@
 //! `PlayAnimation`) lives in `graph.rs`, and the layer surface (#457:
 //! `SetLayerWeight`, `GetLayerWeight`, `GetCurrentNode`) in `layers.rs`, and the
 //! IK surface (#461: `Add*IK`, `RemoveIK`, `SetIK*`, `GetIKWeight`) in `ik.rs`,
-//! and the playback-speed surface (#1342: `SetSpeed`, `GetSpeed`) in `speed.rs` —
+//! the playback-speed surface (#1342: `SetSpeed`, `GetSpeed`) in `speed.rs`, the
+//! typed parameters (`SetBool`/`SetFloat`/`SetInt`/`SetTrigger`) in `parameters.rs`,
+//! and `Play`/`Crossfade` themselves in `play.rs` —
 //! one namespace, split to stay under the size cap.
 
 mod graph;
 mod ik;
 mod layers;
+mod parameters;
+mod play;
 mod speed;
-
-use std::cell::RefCell;
 
 use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::components::AnimatorParameter;
+use crate::api::ApiCell;
 use crate::scene::authoring::animator as animator_ops;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Animator` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>, console: ApiCell<ConsoleLogs>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_play(scope, &table, scene, console)?;
-    register_stop(scope, &table, scene)?;
-    register_pause_resume(scope, &table, scene)?;
-    register_set_looping(scope, &table, scene)?;
-    speed::register(scope, &table, scene)?;
-    register_set_bool_float(scope, &table, scene, console)?;
-    register_set_int_trigger(scope, &table, scene, console)?;
-    register_get_bone(scope, &table, scene)?;
-    graph::register(scope, &table, scene, console)?;
-    layers::register(scope, &table, scene, console)?;
-    ik::register(scope, &table, scene, console)?;
+    play::register(lua, &table, scene, console)?;
+    register_stop(lua, &table, scene)?;
+    register_pause_resume(lua, &table, scene)?;
+    register_set_looping(lua, &table, scene)?;
+    speed::register(lua, &table, scene)?;
+    parameters::register(lua, &table, scene, console)?;
+    register_get_bone(lua, &table, scene)?;
+    graph::register(lua, &table, scene, console)?;
+    layers::register(lua, &table, scene, console)?;
+    ik::register(lua, &table, scene, console)?;
 
     lua.globals()
         .set("Animator", table)
         .map_err(|e| e.to_string())
 }
 
-/// `Play` / `Crossfade` — start a clip (crossfade simplifies to a plain play).
-fn register_play<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
-) -> Reg {
-    put(
-        table,
-        "Play",
-        scope.create_function(|_, (id, clip): (EntityArg, String)| {
-            let id = id.live("Animator", "Play")?;
-            let mut scene = scene.borrow_mut();
-            let played = scene
-                .world
-                .animator_mut(id)
-                .map(|mut anim| anim.play(clip.clone()))
-                .is_some();
-            if played {
-                let name = scene.world.name(id).map(|n| n.clone()).unwrap_or_default();
-                console
-                    .borrow_mut()
-                    .info(format!("Entity {} playing animation: {}", name, clip));
-            }
-            Ok(())
-        }),
-    )?;
-
-    put(
-        table,
-        "Crossfade",
-        scope.create_function(|_, (id, clip, duration): (EntityArg, String, f32)| {
-            let id = id.live("Animator", "Crossfade")?;
-            // Blend out of the current clip over `duration` seconds (#80).
-            let mut scene = scene.borrow_mut();
-            if let Some(mut anim) = scene.world.animator_mut(id) {
-                anim.crossfade(clip, duration);
-            }
-            Ok(())
-        }),
-    )
-}
-
 /// `GetBone` — the bone GameObject of the entity's skeleton named `name` (#453),
 /// or `nil`. Bones are ordinary entities: parent to one, move it, add to it. Also
 /// `GetClip`, the other per-entity read.
-fn register_get_bone<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_get_bone(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetBone",
-        scope.create_function(|_, (id, name): (EntityArg, String)| {
-            Ok(scene.borrow().find_bone(id.read(), &name))
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
+            Ok(scene.get(lua)?.borrow().find_bone(id.read(), &name))
         }),
     )?;
     // `GetClip` (#1384): the base layer's current clip, Unity's
@@ -122,7 +71,8 @@ fn register_get_bone<'scope>(
     put(
         table,
         "GetClip",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene
                 .world
@@ -133,15 +83,12 @@ fn register_get_bone<'scope>(
 }
 
 /// `Stop` — halt playback on the entity's animator.
-fn register_stop<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_stop(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "Stop",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Animator", "Stop")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
@@ -155,15 +102,12 @@ fn register_stop<'scope>(
 /// `Pause` / `Resume` — hold and release the playhead over the component's `freeze`
 /// flag (#313). Unlike `Stop`, `is_playing` stays set: the pose holds where it is
 /// and `Resume` continues from the same frame.
-fn register_pause_resume<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_pause_resume(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "Pause",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Animator", "Pause")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
@@ -176,7 +120,8 @@ fn register_pause_resume<'scope>(
     put(
         table,
         "Resume",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Animator", "Resume")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
@@ -189,15 +134,12 @@ fn register_pause_resume<'scope>(
 
 /// `SetLooping` — wrap the playhead at the current clip's end so it repeats
 /// seamlessly (idle/run/walk cycles, #313). Off, the last frame holds as before.
-fn register_set_looping<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_set_looping(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetLooping",
-        scope.create_function(|_, (id, looping): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, looping): (EntityArg, bool)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Animator", "SetLooping")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.animator_mut(id) {
@@ -206,87 +148,4 @@ fn register_set_looping<'scope>(
             Ok(())
         }),
     )
-}
-
-/// `SetBool` / `SetFloat` — write a typed graph parameter (#314).
-fn register_set_bool_float<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
-) -> Reg {
-    put(
-        table,
-        "SetBool",
-        scope.create_function(|_, (id, name, value): (EntityArg, String, bool)| {
-            let id = id.live("Animator", "SetBool")?;
-            write_parameter(scene, console, id, &name, AnimatorParameter::Bool(value));
-            Ok(())
-        }),
-    )?;
-
-    put(
-        table,
-        "SetFloat",
-        scope.create_function(|_, (id, name, value): (EntityArg, String, f32)| {
-            let id = id.live("Animator", "SetFloat")?;
-            write_parameter(scene, console, id, &name, AnimatorParameter::Float(value));
-            Ok(())
-        }),
-    )
-}
-
-/// `SetInt` / `SetTrigger` — the remaining parameter setters (#314). `SetTrigger`
-/// takes no value: it latches the one-shot true, and the graph evaluator (#316)
-/// auto-clears it when it consumes a transition.
-fn register_set_int_trigger<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
-) -> Reg {
-    put(
-        table,
-        "SetInt",
-        scope.create_function(|_, (id, name, value): (EntityArg, String, i32)| {
-            let id = id.live("Animator", "SetInt")?;
-            write_parameter(scene, console, id, &name, AnimatorParameter::Int(value));
-            Ok(())
-        }),
-    )?;
-
-    put(
-        table,
-        "SetTrigger",
-        scope.create_function(|_, (id, name): (EntityArg, String)| {
-            let id = id.live("Animator", "SetTrigger")?;
-            write_parameter(scene, console, id, &name, AnimatorParameter::Trigger(true));
-            Ok(())
-        }),
-    )
-}
-
-/// Write one typed parameter on the entity's animator. A name already bound to a
-/// DIFFERENT type is a warned no-op, never a panic (#314); a missing entity or
-/// animator is silently skipped, like every other `Animator.*` binding.
-fn write_parameter(
-    scene: &RefCell<Scene>,
-    console: &RefCell<ConsoleLogs>,
-    id: u32,
-    name: &str,
-    value: AnimatorParameter,
-) {
-    let mut scene = scene.borrow_mut();
-    let failed = scene
-        .world
-        .animator_mut(id)
-        .map(|mut anim| !anim.set_parameter(name, value))
-        .unwrap_or(false);
-    if failed {
-        let entity_name = scene.world.name(id).map(|n| n.clone()).unwrap_or_default();
-        console.borrow_mut().warn(format!(
-            "Animator parameter '{}' on entity {} already holds a different type; set ignored",
-            name, entity_name
-        ));
-    }
 }

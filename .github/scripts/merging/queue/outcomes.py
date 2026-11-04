@@ -23,8 +23,11 @@ MERGED, GREEN, DRY, HANDED_BACK = "merged", "green", "dry run", "handed back"
 # description sat until the daemon restarted). `AWAITS_EDIT`: what the description
 # or labels claim, re-read when they change; `AWAITS_ISSUE`: the issue it closes
 # is staged, blocked or closed, re-read when that issue no longer blocks it.
+# `AWAITS_REVIEW`: no comment records its review decision ([`verdict.reviewed`],
+# #1764), re-read when one appears (or, like an edit, when its labels change).
 AWAITS_EDIT, AWAITS_ISSUE = "handed back: description", "handed back: issue"
-AWAITING = (AWAITS_EDIT, AWAITS_ISSUE)
+AWAITS_REVIEW = "handed back: review"
+AWAITING = (AWAITS_EDIT, AWAITS_ISSUE, AWAITS_REVIEW)
 
 
 class Awaiting(tuple):
@@ -47,6 +50,11 @@ STOPPED, NOT_TAKEN = "stopped the queue", "not taken"
 # or whose branch was pushed to during its take ([`refusal.MOVED`], #1568), and
 # what [`taking.take`] says about one.
 NOT_READY = "not ready"
+
+# A merge train's member that goes back in line as it was: its train was red or
+# stalled (its half is tested next), or a member ahead of it did not land (#1785).
+# Nothing is remembered against it.
+REQUEUED = "back in line"
 
 NOT_OPEN, A_DRAFT = "it is {}.", "it is a draft; mark it ready first."
 

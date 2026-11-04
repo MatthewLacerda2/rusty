@@ -3,8 +3,8 @@
 //! The event system (`ui::events`) decides *who* receives each UI event; this file
 //! answers its one question about scripts — does entity `id` have a live script
 //! defining a callback ([`ScriptManager::has_ui_handler`], the bubbling test) — and
-//! fires what it returns ([`ScriptManager::dispatch_ui_events`]), in order, inside
-//! one API scope. Direct calls, no event bus. The same active gate as every other
+//! fires what it returns ([`ScriptManager::dispatch_ui_events`]), in order. Direct
+//! calls, no event bus. The same active gate as every other
 //! gameplay hook applies: only awoken instances of active entities are called.
 
 use glam::Vec2;
@@ -60,7 +60,7 @@ impl ScriptManager {
         if deliveries.is_empty() {
             return;
         }
-        self.with_api_scope(|lua| {
+        self.with_lua(|lua| {
             for d in deliveries {
                 let name = callback(d.hook);
                 for key in self.awoken_keys_for(d.entity) {

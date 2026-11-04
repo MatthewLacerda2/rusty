@@ -93,8 +93,8 @@ fn advance(
     scene.unrecorded(|scene| land_lightmaps(step, scene, log, nav))
 }
 
-/// Apply the finished lightmaps, then start the probe step (placing the probes
-/// when the scene has none).
+/// Apply the finished lightmaps, then start the probe step (planning the probe
+/// sets it applies when it commits).
 fn land_lightmaps(
     step: &mut Step,
     scene: &mut Scene,

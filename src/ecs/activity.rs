@@ -6,26 +6,39 @@
 //! stamp is the store's current `generation`; a read cleans the chain above an entity
 //! top-down, so every ancestor it passes is answered for the next read too.
 //!
-//! **What invalidates.** Anything that can change an answer bumps the generation, O(1),
-//! and every flag goes dirty at once: an `active` flag that changed, a parent link
-//! changed, a despawn (a dead parent ends its children's chains), a document inserted
-//! or overwritten, a `clear`. These are rare next to the reads, and after one the next
-//! pass re-resolves each entity once, its ancestors already answered. A per-subtree
-//! dirty walk (as `world_space` does) would follow `children`, which a raw
-//! `set_parent_id` does not keep in step; the bump reads only parent links, so it is
-//! never stale.
+//! **What invalidates.** Only what can change an answer. An `active` flag that
+//! changed, or a parent link, dirties that entity and its subtree (a walk down the
+//! `children` lists, bounded like every subtree walk); a despawn dirties the dead
+//! ids and, through the re-parent that makes them roots, each surviving child's
+//! subtree, so a leaf's death touches its own answer alone (#1708). A document
+//! inserted, overwritten or put back, and a `clear`, still dirty everything at once
+//! (O(1), a generation bump): a document can bring a parent link in any order, an
+//! orphan naming the new id from no `children` list.
+//!
+//! The subtree walks follow `children`, so they hold only while every parent link
+//! has its `children` entry. `Scene::set_parent` writes the entry first, and the
+//! despawn's re-rooting clears both sides; a raw [`World::set_parent_id`] naming a
+//! parent whose list lacks the child (a test linking one side, code bypassing
+//! `Scene::set_parent`) marks the store `unlisted`, and from then until a `clear`
+//! every invalidation is the whole-store bump again. A loaded document is checked
+//! once ([`World::one_sided_links`], which a scene load calls and warns on), since
+//! a hand-written file can carry one side only.
 //!
 //! **Determinism.** An answer is a pure function of the `active` flags and parent links;
 //! stamps only gate the cache, never a result.
 
 use std::cell::RefCell;
 
+use super::bundle::Core;
 use super::world::World;
 
 /// The remembered answers. Interior-mutable so a `&World` read can fill them; the world
 /// lives on one thread, so the cell never contends.
 pub(in crate::ecs) struct ActivityStore {
     inner: RefCell<Flags>,
+    /// A parent link was written without its `children` entry: subtree walks can
+    /// miss a descendant, so every invalidation bumps the whole store.
+    unlisted: bool,
 }
 
 struct Flags {
@@ -41,6 +54,7 @@ impl Default for ActivityStore {
     fn default() -> Self {
         Self {
             inner: RefCell::new(Flags::new()),
+            unlisted: false,
         }
     }
 }
@@ -80,9 +94,43 @@ impl ActivityStore {
         }
     }
 
+    /// Dead `id`'s answer dirty; everything, when a one-sided link may hang a
+    /// descendant below it that no `children` list names.
+    pub(in crate::ecs) fn forget_dead(&self, id: u32) {
+        match self.unlisted {
+            true => self.invalidate_all(),
+            false => self.invalidate(id),
+        }
+    }
+
+    /// `id`'s answer dirty: the next read climbs from it again.
+    fn invalidate(&self, id: u32) {
+        if let Some(flag) = self.inner.borrow_mut().flags.get_mut(id as usize) {
+            flag.0 = 0;
+        }
+    }
+
+    /// Whether `id`'s kept answer is clean: what the cost tests check a despawn by.
+    #[cfg(test)]
+    pub(in crate::ecs) fn is_clean(&self, id: u32) -> bool {
+        self.inner.borrow().clean(id).is_some()
+    }
+
+    /// Whether a one-sided link turned the subtree walks off (module docs).
+    #[cfg(test)]
+    pub(in crate::ecs) fn is_unlisted(&self) -> bool {
+        self.unlisted
+    }
+
     /// Forget every answer (a `clear`, after which ids restart at 1).
-    pub(in crate::ecs) fn reset(&self) {
+    pub(in crate::ecs) fn reset(&mut self) {
         *self.inner.borrow_mut() = Flags::new();
+        self.unlisted = false;
+    }
+
+    /// A parent link without its `children` entry was written (see the module docs).
+    pub(in crate::ecs) fn mark_unlisted(&mut self) {
+        self.unlisted = true;
     }
 
     /// Whether live entity `id` and every ancestor are active, cleaning the dirty chain
@@ -128,11 +176,52 @@ impl World {
         self.activity.invalidate_all();
     }
 
-    /// Every cached world matrix and activity answer forgotten (a `clear`), and every
-    /// static-geometry cache outside the World told so (`World::static_revision`).
+    /// `id`'s parent link was re-pointed at `parent`: its subtree goes dirty, and the
+    /// store is marked when `parent`'s `children` does not list it (module docs).
+    pub(in crate::ecs) fn relinked_activity(&mut self, id: u32, parent: Option<u32>) {
+        if parent.is_some_and(|p| !self.lists_child(p, id)) {
+            self.activity.mark_unlisted();
+        }
+        self.invalidate_activity_below(id);
+    }
+
+    /// Whether `parent`'s `children` names `child`, read in place.
+    fn lists_child(&self, parent: u32, child: u32) -> bool {
+        self.component::<Core>(parent)
+            .is_some_and(|c| c.children.contains(&child))
+    }
+
+    /// Check every parent link of a freshly loaded World once: a child naming a
+    /// live parent whose `children` lacks it (a hand-written document can carry one
+    /// side) marks the store `unlisted`. Returns those children, ascending.
+    pub fn one_sided_links(&mut self) -> Vec<u32> {
+        let one_sided = |&c: &u32| {
+            let parent = self.parent_id(c).filter(|&p| self.contains(p));
+            parent.is_some_and(|p| !self.lists_child(p, c))
+        };
+        let mut found: Vec<u32> = self.ids().iter().copied().filter(one_sided).collect();
+        found.sort_unstable();
+        if !found.is_empty() {
+            self.activity.mark_unlisted();
+        }
+        found
+    }
+
+    /// `id`'s activity answer and every descendant's dirty (an `active` flag or a
+    /// parent link changed there). See the module docs.
+    pub(in crate::ecs) fn invalidate_activity_below(&self, id: u32) {
+        if self.activity.unlisted {
+            return self.activity.invalidate_all();
+        }
+        for e in self.self_and_descendants(id) {
+            self.activity.invalidate(e);
+        }
+    }
+
+    /// Every cached world matrix and activity answer forgotten (a `clear`; the change
+    /// logs' new epoch moves `World::static_revision` too).
     pub(in crate::ecs) fn reset_caches(&mut self) {
         self.world_space.reset();
         self.activity.reset();
-        self.static_revision += 1;
     }
 }

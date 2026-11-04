@@ -4,6 +4,7 @@
 //! checker a missing map shows — and stays whole. Skips with no adapter.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use super::params_tests::{halves, lua, sphere, RES};
 use crate::render::Renderer;
@@ -57,13 +58,13 @@ impl Drop for Dissolve {
 
 /// A lit scene with two spheres drawn by the dissolve shader; only the left
 /// (`masked`) one names the gray mask. Returns the scene and the two ids.
-fn two_spheres(d: &Dissolve) -> (RefCell<Scene>, u32, u32) {
+fn two_spheres(d: &Dissolve) -> (Rc<RefCell<Scene>>, u32, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
     let masked = sphere(&mut scene, -1.2, &d.shader);
     let plain = sphere(&mut scene, 1.2, &d.shader);
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     // A long-bracket string: a Windows path's backslashes are not escapes there.
     let script = format!(
         r#"Material.SetShaderTexture({masked}, "mask", [==[{}]==])"#,
@@ -74,7 +75,7 @@ fn two_spheres(d: &Dissolve) -> (RefCell<Scene>, u32, u32) {
 }
 
 /// The left half with the masked sphere moved out of view: what a hole shows.
-fn backdrop(renderer: &mut Renderer, scene: &RefCell<Scene>, masked: u32) -> (u32, u32) {
+fn backdrop(renderer: &mut Renderer, scene: &Rc<RefCell<Scene>>, masked: u32) -> (u32, u32) {
     let moved = |x: f32| {
         scene
             .borrow_mut()

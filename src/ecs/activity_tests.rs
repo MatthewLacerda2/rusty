@@ -1,7 +1,9 @@
 //! src/ecs/activity_tests.rs — the kept `activeInHierarchy` answers against the walk
 //! they replaced (#1388): after any sequence of `Core` writes, every live id's answer
 //! is `self_and_ancestors(id).all(is_active_self)`. A future writer that forgets to
-//! invalidate breaks this.
+//! invalidate breaks this. Parent links are mostly written with their `children`
+//! entries, as `Scene::set_parent` writes them (the subtree invalidation walks
+//! those, #1708), and sometimes raw, one-sided (the whole-store fallback).
 
 use proptest::prelude::*;
 
@@ -16,6 +18,8 @@ enum Op {
     SetActive(usize, bool),
     /// Parent `None` unparents; the parent may be the entity itself or a descendant.
     SetParent(usize, Option<usize>),
+    /// The same link written raw: the parent's `children` does not list it.
+    RawParent(usize, usize),
     Despawn(usize),
     /// An id no live entity has: a despawned one, or one an orphan may already name.
     Insert(u32, bool),
@@ -33,6 +37,7 @@ fn op() -> impl Strategy<Value = Op> {
         3 => Just(Op::Spawn),
         3 => (at.clone(), any::<bool>()).prop_map(|(i, a)| Op::SetActive(i, a)),
         3 => (at.clone(), proptest::option::of(at.clone())).prop_map(|(i, p)| Op::SetParent(i, p)),
+        1 => (at.clone(), at.clone()).prop_map(|(i, p)| Op::RawParent(i, p)),
         1 => at.clone().prop_map(Op::Despawn),
         1 => (1u32..16, any::<bool>()).prop_map(|(id, a)| Op::Insert(id, a)),
         1 => (at.clone(), any::<bool>(), proptest::option::of(at.clone()))
@@ -60,7 +65,10 @@ fn apply(w: &mut World, op: &Op) {
         }
         Op::SetParent(i, p) => {
             let parent = p.map(|p| pick(w, p));
-            w.set_parent_id(pick(w, i), parent);
+            relink(w, pick(w, i), parent);
+        }
+        Op::RawParent(i, p) => {
+            w.set_parent_id(pick(w, i), Some(pick(w, p)));
         }
         Op::Despawn(i) => {
             let id = pick(w, i);
@@ -77,13 +85,27 @@ fn apply(w: &mut World, op: &Op) {
         Op::Overwrite(i, a, p) => {
             let parent = p.map(|p| pick(w, p));
             if let Some(mut doc) = w.entity_document(pick(w, i)) {
+                let id = doc.id;
+                relink(w, id, None);
                 (doc.active, doc.parent_id) = (a, parent);
                 w.overwrite(doc);
+                parent.map(|p| w.add_child(p, id));
             }
         }
         Op::Clear => w.clear(),
         Op::Read(_) | Op::ReadAll => {}
     }
+}
+
+/// Re-parent `id`, its old and new parents' `children` kept in step.
+fn relink(w: &mut World, id: u32, parent: Option<u32>) {
+    if let Some(old) = w.parent_id(id) {
+        w.remove_child(old, id);
+    }
+    if w.contains(id) {
+        parent.map(|p| w.add_child(p, id));
+    }
+    w.set_parent_id(id, parent);
 }
 
 fn walked(w: &World, id: u32) -> bool {

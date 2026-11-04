@@ -8,6 +8,7 @@
 use std::cell::RefCell;
 
 use super::super::{put, Reg};
+use crate::api::ApiCell;
 use crate::components::{CameraComponent, PostProcessingComponent};
 use crate::core::settings::render_scale::RenderScale;
 use crate::core::settings::GraphicsSettings;
@@ -16,21 +17,21 @@ use crate::scene::Scene;
 
 /// The scene's render scale (#1498), in the shared graphics cell: clamped to URP's
 /// range.
-pub(super) fn register_render_scale<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register_render_scale(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    graphics: &'scope RefCell<GraphicsSettings>,
+    graphics: ApiCell<GraphicsSettings>,
 ) -> Reg {
     put(
         table,
         "GetRenderScale",
-        scope.create_function(|_, ()| Ok(graphics.borrow().render_scale.get())),
+        lua.create_function(move |lua, ()| Ok(graphics.get(lua)?.borrow().render_scale.get())),
     )?;
     put(
         table,
         "SetRenderScale",
-        scope.create_function(|_, scale: f32| {
-            graphics.borrow_mut().render_scale = RenderScale::new(scale);
+        lua.create_function(move |lua, scale: f32| {
+            graphics.get(lua)?.borrow_mut().render_scale = RenderScale::new(scale);
             Ok(())
         }),
     )

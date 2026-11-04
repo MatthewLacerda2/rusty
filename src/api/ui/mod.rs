@@ -16,14 +16,13 @@ mod view;
 
 pub use events::register_events;
 
-use std::cell::RefCell;
-
 use glam::Vec2;
 use mlua::{Lua, Table};
 use serde_json::{json, Value};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::core::settings::video::VideoSettings;
 use crate::scene::authoring::ui::widgets::{create_ui, UiWidget};
 use crate::scene::{Camera, Scene};
@@ -31,20 +30,25 @@ use crate::ui::space::{rect_screen_bounds, space_of, CanvasSpace};
 use crate::ui::{layout, ScreenSize, UiRect, UiView};
 
 /// Register the `UI` namespace onto `lua`.
-pub fn register<'scope>(
+pub fn register(
     lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    (screen, video): (&'scope RefCell<ScreenSize>, &'scope RefCell<VideoSettings>),
-    camera: &'scope RefCell<Camera>,
+    scene: ApiCell<Scene>,
+    (screen, video): (ApiCell<ScreenSize>, ApiCell<VideoSettings>),
+    camera: ApiCell<Camera>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
-    let ui_view = move || view::ui_view(screen, video, camera, &scene.borrow());
+    let ui_view = move |lua: &Lua| -> mlua::Result<UiView> {
+        let (screen, video, camera) = (screen.get(lua)?, video.get(lua)?, camera.get(lua)?);
+        let scene = scene.get(lua)?;
+        let view = view::ui_view(&screen, &video, &camera, &scene.borrow());
+        Ok(view)
+    };
     put(
         &table,
         "GetRect",
-        scope.create_function(move |lua, id: EntityArg| {
-            let view = ui_view();
+        lua.create_function(move |lua, id: EntityArg| {
+            let view = ui_view(lua)?;
+            let scene = &*scene.get(lua)?;
             let world = &scene.borrow().world;
             let Some(rect) = layout::rect_in(world, id.read(), &view) else {
                 return Ok(None);
@@ -58,15 +62,15 @@ pub fn register<'scope>(
     put(
         &table,
         "GetScreenSize",
-        scope.create_function(move |_, ()| {
-            let px = screen.borrow().pixels(&video.borrow());
+        lua.create_function(move |lua, ()| {
+            let px = screen.get(lua)?.borrow().pixels(&video.get(lua)?.borrow());
             Ok((px.x, px.y))
         }),
     )?;
     put(
         &table,
         "Create",
-        scope.create_function(|_, (kind, parent): (String, EntityArg)| {
+        lua.create_function(move |lua, (kind, parent): (String, EntityArg)| {
             let parent = parent.get();
             let widget = UiWidget::parse(&kind).ok_or_else(|| {
                 let all: Vec<_> = UiWidget::ALL.iter().map(|w| w.label()).collect();
@@ -75,10 +79,10 @@ pub fn register<'scope>(
                     all.join(", ")
                 ))
             })?;
-            Ok(create_ui(&mut scene.borrow_mut(), widget, parent))
+            Ok(create_ui(&mut scene.get(lua)?.borrow_mut(), widget, parent))
         }),
     )?;
-    shader::register(scope, &table, scene)?;
+    shader::register(lua, &table, scene)?;
     lua.globals().set("UI", table).map_err(|e| e.to_string())
 }
 

@@ -126,10 +126,9 @@ impl EntityRefs for MeshComponent {
         }
     }
 
-    fn names_any(&self, dead: &dyn Fn(u32) -> bool) -> bool {
-        let mut hit = self.skeleton.bones.iter().flatten().any(|&b| dead(b));
-        self.each_ref(&mut |_, r| hit |= dead(r));
-        hit
+    fn each_held(&self, visit: &mut dyn FnMut(u32)) {
+        self.skeleton.bones.iter().flatten().for_each(|&b| visit(b));
+        self.each_ref(&mut |_, r| visit(r));
     }
 
     #[cfg(test)]

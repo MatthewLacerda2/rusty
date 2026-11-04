@@ -16,7 +16,7 @@ use std::rc::Rc;
 use mlua::{Function, Lua, MultiValue, Table, Value};
 
 use crate::scene::Scene;
-use crate::scripting::{ApiCells, HostCall, HostJournal, Plain};
+use crate::scripting::{HostCall, HostJournal, Plain};
 
 /// The `Harness` verbs that change the world without a tick: noted like an API
 /// call. Every other `Harness` verb reads the world, or steps it.
@@ -60,8 +60,8 @@ end
 /// How deep a table argument may nest; deeper is treated as a cycle.
 const MAX_DEPTH: usize = 32;
 
-/// Note every API call `lua` makes from now on in `journal`. Call it inside the
-/// scope that registered the API, after registering it.
+/// Note every API call `lua` makes from now on in `journal`. Call it once, after
+/// the API is installed on `lua` (`ApiCells::install`).
 pub fn journal_calls(lua: &Lua, journal: &Rc<RefCell<HostJournal>>) -> mlua::Result<()> {
     let notes = Rc::clone(journal);
     let note = lua.create_function(move |_, (function, args): (String, MultiValue)| {
@@ -156,23 +156,24 @@ fn to_lua(lua: &Lua, value: &Plain) -> mlua::Result<Value> {
     })
 }
 
-/// Make the call `function` (`Namespace.Function`) with `args` in `lua`, over the
-/// world's API `cells`: what a scenario did before this tick, again.
-pub fn invoke(lua: &Lua, cells: &ApiCells, function: &str, args: &[Plain]) -> Result<(), String> {
+/// Make the call `function` (`Namespace.Function`) with `args` in `lua`: what a
+/// scenario did before this tick, again. The replay's VM has the surface over the
+/// world's cells from `replay::replay_vm` (a restart builds a new one).
+pub fn invoke(lua: &Lua, function: &str, args: &[Plain]) -> Result<(), String> {
     let (namespace, name) = function
         .split_once('.')
         .ok_or_else(|| format!("{function} is not Namespace.Function"))?;
-    let ctx = cells.ctx();
-    lua.scope(|scope| {
-        crate::api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
-        let f: Function = lua.globals().get::<Table>(namespace)?.get(name)?;
-        let args: MultiValue = args
-            .iter()
-            .map(|a| to_lua(lua, a))
-            .collect::<mlua::Result<_>>()?;
-        f.call::<MultiValue>(args).map(drop)
-    })
-    .map_err(|e| format!("{function}: {e}"))
+    call(lua, (namespace, name), args).map_err(|e| format!("{function}: {e}"))
+}
+
+/// Call `namespace.name` in `lua` with `args`.
+fn call(lua: &Lua, (namespace, name): (&str, &str), args: &[Plain]) -> mlua::Result<()> {
+    let f: Function = lua.globals().get::<Table>(namespace)?.get(name)?;
+    let args: MultiValue = args
+        .iter()
+        .map(|a| to_lua(lua, a))
+        .collect::<mlua::Result<_>>()?;
+    f.call::<MultiValue>(args).map(drop)
 }
 
 /// Make the `Harness.<verb>` call (one of [`HARNESS_VERBS`]) with `args` on

@@ -6,13 +6,12 @@
 //! A path is `{status = "complete"|"partial"|"invalid", corners = {{x,y,z}, ...},
 //! length = n}`: the Lua face of [`NavPath`].
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::super::{put, Reg};
 use super::areas::mask_arg;
+use crate::api::ApiCell;
 use crate::navigation::{path_length, NavPath, NavPathStatus, NavigationGraph};
 
 /// Two points and an optional area mask (#460): the path queries' arguments.
@@ -51,30 +50,29 @@ fn corners_of(path: &Table) -> mlua::Result<Vec<Vec3>> {
 }
 
 /// Register the queries onto the `Navigation` table.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    nav: &'scope RefCell<NavigationGraph>,
-) -> Reg {
+pub(super) fn register(lua: &mlua::Lua, table: &Table, nav: ApiCell<NavigationGraph>) -> Reg {
     put(
         table,
         "CalculatePath",
-        scope.create_function(|lua, (fx, fy, fz, tx, ty, tz, mask): PathArgs| {
-            let (from, to) = (Vec3::new(fx, fy, fz), Vec3::new(tx, ty, tz));
+        lua.create_function(move |lua, (fx, fy, fz, tx, ty, tz, mask): PathArgs| {
+            let (from, to, nav) = (Vec3::new(fx, fy, fz), Vec3::new(tx, ty, tz), nav.get(lua)?);
+            let path = nav.borrow().calculate_path_masked(from, to, mask_arg(mask));
             let NavPath {
                 status, corners, ..
-            } = nav.borrow().calculate_path_masked(from, to, mask_arg(mask));
+            } = path;
             path_table(lua, status, &corners)
         }),
     )?;
     put(
         table,
         "SamplePosition",
-        scope.create_function(
-            |_, (x, y, z, reach, mask): (f32, f32, f32, f32, Option<i64>)| {
-                let found =
-                    nav.borrow()
-                        .sample_position_masked(Vec3::new(x, y, z), reach, mask_arg(mask));
+        lua.create_function(
+            move |lua, (x, y, z, reach, mask): (f32, f32, f32, f32, Option<i64>)| {
+                let found = nav.get(lua)?.borrow().sample_position_masked(
+                    Vec3::new(x, y, z),
+                    reach,
+                    mask_arg(mask),
+                );
                 Ok(match found {
                     Some(p) => (true, p.x, p.y, p.z),
                     None => (false, 0.0, 0.0, 0.0),
@@ -85,9 +83,8 @@ pub(super) fn register<'scope>(
     put(
         table,
         "Raycast",
-        scope.create_function(|_, (fx, fy, fz, tx, ty, tz, mask): PathArgs| {
-            let from = Vec3::new(fx, fy, fz);
-            let to = Vec3::new(tx, ty, tz);
+        lua.create_function(move |lua, (fx, fy, fz, tx, ty, tz, mask): PathArgs| {
+            let (from, to, nav) = (Vec3::new(fx, fy, fz), Vec3::new(tx, ty, tz), nav.get(lua)?);
             let walk = nav.borrow().raycast_masked(from, to, mask_arg(mask));
             Ok(match walk {
                 Some(w) => (w.hit, w.position.x, w.position.y, w.position.z),
@@ -98,6 +95,6 @@ pub(super) fn register<'scope>(
     put(
         table,
         "GetPathLength",
-        scope.create_function(|_, path: Table| Ok(path_length(&corners_of(&path)?))),
+        lua.create_function(|_, path: Table| Ok(path_length(&corners_of(&path)?))),
     )
 }

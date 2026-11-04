@@ -1,17 +1,20 @@
 //! The cells every `api::` namespace borrows, in one owned bundle (#1384).
 //!
-//! [`ScriptManager`] keeps them as one [`ApiCells`] and lends them out per
-//! evaluation as an [`ApiScopedCtx`]. A second VM that drives the same world from
-//! the outside (the dev layer's scenario VM) cannot borrow the manager for that: it
-//! holds its API scope for a whole run, while the world it observes ticks, and so
-//! borrows the manager mutably, in between. It clones the bundle once
-//! ([`ScriptManager::api_cells`]): the same `Rc`s, the same surface, one
-//! registration, a second caller. A new cell is added here, once.
+//! [`ScriptManager`] keeps them as one [`ApiCells`] and attaches them to its VM
+//! ([`ApiCells::attach`]), where the surface's functions reach each one through an
+//! `api::ApiCell` handle (#1709). A second VM that drives the same world from the
+//! outside (the dev layer's scenario VM) clones the bundle once
+//! ([`ScriptManager::api_cells`]) and attaches it to its own VM: the same `Rc`s, the
+//! same surface, a second caller. A new cell is added here, once, to
+//! [`ApiCells::attach`], to `api::ApiCtx`, and to the list in
+//! `tests::cells_attach`, which fails to compile until it is.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::api::ApiScopedCtx;
+use mlua::Lua;
+
+use crate::api::bind;
 use crate::audio::AudioMaestro;
 use crate::core::application::Application;
 use crate::core::frame_stats::FrameStats;
@@ -28,7 +31,8 @@ use crate::ui::{EventSystem, ScreenSize};
 
 use super::{ConsoleLogs, ScriptManager, TimerScheduler};
 
-/// The shared cells behind one [`ApiScopedCtx`], owned (see the module doc).
+/// The shared cells the surface reaches through `api::ApiCtx`, owned (see the
+/// module doc).
 #[derive(Clone)]
 pub struct ApiCells {
     pub(super) scene: Rc<RefCell<Scene>>,
@@ -117,28 +121,35 @@ impl ApiCells {
         }
     }
 
-    /// The scoped context over these cells, as `api::register` takes it.
-    pub fn ctx(&self) -> ApiScopedCtx<'_> {
-        ApiScopedCtx {
-            scene: &self.scene,
-            input: &self.input,
-            nav: &self.nav,
-            camera: &self.camera,
-            time: &self.time,
-            physics: &self.physics,
-            console: &self.console,
-            storage: &self.storage,
-            graphics: &self.graphics,
-            video: &self.video,
-            scene_path: &self.scene_path,
-            audio: &self.audio,
-            random: &self.random,
-            screen: &self.screen,
-            application: &self.application,
-            stats: &self.stats,
-            timers: &self.timers,
-            event_system: &self.event_system,
-        }
+    /// Attach these cells to `lua` and register the whole API surface on it: what a
+    /// VM does once, when it starts (#1709).
+    pub fn install(&self, lua: &Lua) -> Result<(), String> {
+        self.attach(lua);
+        crate::api::register(lua, &crate::api::ApiCtx::default())
+    }
+
+    /// Attach every cell to `lua` as the one its API functions reach, replacing any
+    /// attached before.
+    pub(super) fn attach(&self, lua: &Lua) {
+        // sorted: one cell per type, so the order is free
+        bind(lua, &self.application);
+        bind(lua, &self.audio);
+        bind(lua, &self.camera);
+        bind(lua, &self.console);
+        bind(lua, &self.event_system);
+        bind(lua, &self.graphics);
+        bind(lua, &self.input);
+        bind(lua, &self.nav);
+        bind(lua, &self.physics);
+        bind(lua, &self.random);
+        bind(lua, &self.scene);
+        bind(lua, &self.scene_path);
+        bind(lua, &self.screen);
+        bind(lua, &self.stats);
+        bind(lua, &self.storage);
+        bind(lua, &self.time);
+        bind(lua, &self.timers);
+        bind(lua, &self.video);
     }
 }
 

@@ -1,7 +1,7 @@
 //! src/scripting/lifecycle/ — dispatch the lifecycle hooks to entity scripts.
 //!
-//! Every hook routes through the same two helpers: [`ScriptManager::with_api_scope`]
-//! (live-runtime check + API-surface registration) and [`ScriptManager::call_hook`]
+//! Every hook routes through the same two helpers: [`ScriptManager::with_lua`]
+//! (the live-runtime check; the API surface is registered once, at VM start, #1709) and [`ScriptManager::call_hook`]
 //! (resolve table → get function → call → log error) — one dispatch core, so a
 //! new callback is a loop, not a fourth copy (#322). Dispatch order is
 //! deterministic everywhere: `entity_scripts` is a `BTreeMap`, so iterating it
@@ -34,20 +34,14 @@ use mlua::{Lua, Table};
 
 use super::callbacks::{AWAKE, LATE_UPDATE, ON_ENABLE, START, UPDATE};
 use super::manager::{ScriptInstance, ScriptManager};
-use crate::api;
 
 impl ScriptManager {
-    /// Run `body` with the full API surface registered into a live-runtime
-    /// scope — the shared ceremony around every hook dispatch. No-op when the
-    /// runtime is not live.
-    pub(super) fn with_api_scope(&self, body: impl FnOnce(&Lua)) {
-        let Some(lua) = &self.lua else { return };
-        let ctx = self.make_ctx();
-        let _ = lua.scope(|scope| -> mlua::Result<()> {
-            api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
+    /// Run `body` against the live runtime, whose API surface was registered when
+    /// it started (#1709). No-op when the runtime is not live.
+    pub(super) fn with_lua(&self, body: impl FnOnce(&Lua)) {
+        if let Some(lua) = &self.lua {
             body(lua);
-            Ok(())
-        });
+        }
     }
 
     /// The generic hook call every dispatch loop shares: resolve the instance's
@@ -86,8 +80,8 @@ impl ScriptManager {
     }
 
     /// Ascending keys of instances passing `pred` whose owning entity is active —
-    /// the dispatch-eligible set, collected before the scope so no scene borrow is
-    /// held across dispatch (scripts re-borrow the scene).
+    /// the dispatch-eligible set, collected before dispatch so no scene borrow is
+    /// held across it (scripts re-borrow the scene).
     fn eligible_keys(&self, pred: impl Fn(&ScriptInstance) -> bool) -> Vec<(u32, usize)> {
         self.entity_scripts
             .iter()
@@ -96,15 +90,14 @@ impl ScriptManager {
             .collect()
     }
 
-    /// Call the single-arg hook `hook(id)` on `keys`, in the given order, inside
-    /// one API scope. The shared body behind every `(id)`-signature dispatch
+    /// Call the single-arg hook `hook(id)` on `keys`, in the given order. The shared body behind every `(id)`-signature dispatch
     /// (Awake/OnEnable/Start/OnDisable/OnDestroy); marking the instances is the
     /// caller's job so each phase records its own edge exactly once.
     fn dispatch_keys(&self, keys: &[(u32, usize)], hook: &str) {
         if keys.is_empty() {
             return;
         }
-        self.with_api_scope(|lua| {
+        self.with_lua(|lua| {
             for &key in keys {
                 self.call_hook(lua, key, hook, key.0);
             }
@@ -159,7 +152,7 @@ impl ScriptManager {
         if keys.is_empty() {
             return;
         }
-        self.with_api_scope(|lua| {
+        self.with_lua(|lua| {
             for &key in &keys {
                 self.call_hook(lua, key, UPDATE, (key.0, delta_time));
             }
@@ -179,7 +172,7 @@ impl ScriptManager {
         if keys.is_empty() {
             return;
         }
-        self.with_api_scope(|lua| {
+        self.with_lua(|lua| {
             for &key in &keys {
                 self.call_hook(lua, key, LATE_UPDATE, (key.0, delta_time));
             }

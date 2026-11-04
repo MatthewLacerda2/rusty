@@ -131,7 +131,7 @@ impl ScriptManager {
         if disable_keys.is_empty() && destroy_keys.is_empty() {
             return;
         }
-        self.with_api_scope(|lua| {
+        self.with_lua(|lua| {
             for &key in &disable_keys {
                 self.call_hook(lua, key, ON_DISABLE, key.0);
             }

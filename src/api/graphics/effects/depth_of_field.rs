@@ -3,58 +3,55 @@
 //! `authoring::rendering::post_processing` ops the Inspector card calls. The knobs
 //! come from its knob table, the one the tween paths read too.
 
-use std::cell::RefCell;
-
 use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
+use crate::api::ApiCell;
 use crate::components::DofMode;
 use crate::scene::authoring::rendering::post_processing as vc_ops;
 use crate::scene::Scene;
 
 /// The mode and every knob. Without an active volume the getters report what a new
 /// volume starts with.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetDepthOfFieldMode",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| {
             let mode = DofMode::parse(&name).ok_or_else(|| {
                 mlua::Error::RuntimeError(format!(
                     "Graphics.SetDepthOfFieldMode: unknown mode '{name}' (one of {})",
                     DofMode::names()
                 ))
             })?;
-            with_vc_mut(scene, |e| vc_ops::depth_of_field::set_mode(e, mode));
+            with_vc_mut(&*scene.get(lua)?, |e| {
+                vc_ops::depth_of_field::set_mode(e, mode)
+            });
             Ok(())
         }),
     )?;
     put(
         table,
         "GetDepthOfFieldMode",
-        scope.create_function(|_, ()| {
-            let mode = with_vc(scene, |vc| vc.depth_of_field.mode).unwrap_or_default();
+        lua.create_function(move |lua, ()| {
+            let mode = with_vc(&*scene.get(lua)?, |vc| vc.depth_of_field.mode).unwrap_or_default();
             Ok(mode.name().to_string())
         }),
     )?;
     super::knobs::register_quality(
-        scope,
+        lua,
         (table, scene),
         "DepthOfFieldQuality",
         |vc| vc.depth_of_field.quality,
         vc_ops::depth_of_field::set_quality,
     )?;
     super::knobs::register_count(
-        scope,
+        lua,
         (table, scene),
         "DepthOfFieldResolutionDivisor",
         |vc| vc.depth_of_field.resolution_divisor,
         vc_ops::depth_of_field::set_resolution_divisor,
     )?;
-    super::knobs::register(scope, table, scene, vc_ops::depth_of_field::EFFECT.knobs)
+    super::knobs::register(lua, table, scene, vc_ops::depth_of_field::EFFECT.knobs)
 }
 
 #[cfg(test)]

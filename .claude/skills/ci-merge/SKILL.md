@@ -52,7 +52,7 @@ human". Nothing for a human: no heading, or a sentence under it, never a
 **Failures land in `.lint/report.txt`** — read it rather than re-running the tool
 to see what it said.
 
-## The merge, one branch at a time
+## The merge, one tested tree at a time
 
 `make queue ARGS=--watch` (#664) is how a batch runs it, under its supervisor
 `make queue-daemon` (#908; `issue-batch` says how): started once, it takes
@@ -89,7 +89,10 @@ change) says "no push needed", and the watch takes it again once the pull
 request's body or labels change. One the issue refuses (it is labelled
 `planning`/`human`, has an open blocker, or is already closed) says "the issue
 blocks it": the watch asks about that issue each listing and takes the pull
-request again once it no longer refuses it (or the description changes). One for
+request again once it no longer refuses it (or the description changes). One with
+no review decision on record (#1764; what counts: `independent-review`, *Answering
+the findings*, step 2) says so before any push; the watch takes it again once
+such a comment appears, or its body or labels change. One for
 red CI, a conflict or an image says "push a fix, or re-run the failed jobs" and
 waits for the head to move or run again. A run is judged by its **latest attempt** (#881): when the runs listing still shows an older attempt than the run's jobs do, the jobs' attempt is the run, so a green re-run that landed before the verdict is not handed back. The watch **exits** on the machine failing (below), on its
 `--for` deadline, or when nothing is left (no open pull request, or only drafts,
@@ -129,9 +132,10 @@ see **`make queue` resolves one kind by itself**, under
 *Updating a branch from `main`, and its conflicts*). The board lines keep coming
 during a take's CI wait, one listing per poll, and `--since <ISO time>` limits
 them to pull requests opened since then: the batch's own. `make queue PRS="a b c"` takes named
-pull requests instead, in the order given. Either way, the loop is one pull
-request at a time — so no agent sits through a ten-minute run holding a
-worktree open:
+pull requests instead, in the order given. Either way, the loop is one tested
+tree at a time — so no agent sits through a ten-minute run holding a worktree
+open. Under `--watch` that tree is a **merge train** when it can be (below);
+otherwise, and always for named pull requests, it is one pull request:
 
 1. Merge the latest `origin/main` into the branch (`git merge --no-edit`, never
    a rebase, #1568), in a throwaway detached worktree it creates and removes
@@ -162,6 +166,8 @@ worktree open:
    commit the branch made with its merges of `main` left out (so `main` reads
    no `Merge remote-tracking branch` lines), and
    `--match-head-commit`, so a push after the verdict makes GitHub refuse.
+   GitHub's "Base branch was modified" is asked again three times, then the
+   pull request is taken again rather than handed back (#1785's review).
 
 It **hands back** — names why, skips that entry and carries on, named pull
 requests and `--watch` alike — on a
@@ -212,6 +218,9 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
 - **A watch ends itself when its own code changes on `main`** (#824, #967):
   before each take it compares the files it runs with `origin/main` and exits
   `relaunch: …` with status **5**; update its worktree to `origin/main` and start it again (the supervisor does both, by itself).
+- **Exit 9: `main`'s tree is not what a merge train proved** (#1785): the
+  supervisor gives up rather than relaunching. Compare `main` with the train's
+  members before merging anything more, by hand or with the queue.
 - **The supervisor's own exits** (#1450, `merging/watch/supervisor.py`): it
   passes a watch's status through when it gives up, returns **1** for a checkout
   it refuses to move, **7** when its worktree is gone (`supervisor: worktree <path>
@@ -230,11 +239,83 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   rewritten (a secret committed by mistake) and for the queue's own leased
   push (step 3); never anyone else's push in the normal flow.
 
+### The merge train (#1785)
+
+At each take the watch walks the line in its own order and builds a train of up
+to **4** (`train.group.CAP`, measured: about 5% of pull-request `ci` runs were red
+on 2026-11-03/04, where 4 is the best of 2, 4 and 8): a chain of single-parent
+commits on `origin/main`, one per member, each the tree `git merge-tree` writes for
+its head on the chain so far — what squash-merging them in order will leave. A pull
+request rides only if it is ready, labelled `queue`, its review decision recorded
+and its description passing (the take's own first checks), **its own head's
+`ci-gate` and `lint-gate` green**, and it merges cleanly onto the chain. One that
+conflicts with the chain, or whose own CI is not green, is passed over this round
+and keeps its place (`watch: #N waits …`); it is never updated for the train. These
+**go alone**, through the steps above: the first in line when it cannot ride (it
+conflicts with `main`, even in a `sorted` list the take resolves; its own CI is not
+green; Dependabot), a Markdown-only pull request as CI's `code` filter counts it
+(the Markdown code reads ride; alone it merges in about a minute), a pull request touching `.github/scripts/merging/`,
+`.github/workflows/`, `tools/lint/` (its code: the layer table and the component
+waivers ride, `train.group.RIDES`), `Makefile`, `merge-queue.py`, `queue-daemon.py`,
+`Cargo.toml` or `Cargo.lock` (`watch: #N goes alone: it changes …`), one whose head
+was in a red train, and a train that found nobody to ride with its first. A train's
+take counts as one pass for those behind it in the aging count, none for its members.
+
+The train's tip is pushed to `merge-train/<main>-<a>-<b>…` (never forced: one left
+behind is deleted first) and `ci.yml` and `lint.yml` are dispatched on it
+(`workflow_dispatch` runs every gating job; `lint.yml` first, so a dispatch that
+fails halfway leaves only the cheap run going); without `--no-check` the tip is
+compile-checked first, as step 2, and a checkout that fails stops the watch as a
+machine failure, not a red train. Its runs are read by the same rules as a pull
+request's (the grace, the runner re-run, the lagging jobs; a runner outage is
+stalled, never red). The branch is deleted once they settle. Then:
+
+- **Green:** if `main` moved while it ran, the train is stale: its members are
+  rebuilt first, on the new `main`, and none is marked red. If git cannot read
+  `main` (a fetch failed through its retries), nothing lands and the watch stops
+  as a machine failure (exit 3). Then every member is re-read before the first
+  squash: one that moved (its head, its label, draft, a description that refuses it
+  now) goes back in line (`watch: #N goes back in line: …`, said as it happens) and
+  the rest are rebuilt without it, nothing landed. Otherwise each member is squash-merged in order,
+  exactly as step 6, with `sha` = its own head; then `main`'s tree must equal the
+  train's and hold exactly that many new commits. If it does not, the watch prints
+  `watch: STOPPED: main's tree is not the train's …` and exits **9**, which the
+  supervisor never relaunches: look at `main` before merging anything more.
+- **A member refused, or whose merge was lost in transit**, ends the landing
+  there: it is handed back as today (an unknown merge says so), and every member
+  after it goes back in line (`watch: #N goes back in line: …`), to be retested on
+  the new `main`. One that moved in the seconds between the pre-landing read and its
+  squash goes back in line the same way. What did land is checked against the tree
+  the train built for it. A member whose description now refuses it (a stray
+  `closes #N`) goes back in line, and its next take hands it back. GitHub answering
+  "Base branch was modified" is asked again three times, then the member goes back
+  in line, never handed back. GitHub failing outright mid-landing settles what
+  landed, still checks `main`'s tree, and stops the watch with exit 3. If `main`
+  cannot be read for that check, it is asked again for about five minutes
+  (`watch.trains.CHECK_TRIES`); still unread, the watch exits 3 saying that landing
+  **was not compared** with the train's tree, and the relaunched watch remembers
+  nothing of it: compare `main` with the tree the stop names by hand. A poll that
+  fails while the train's runs are awaited is waited past, until the deadline.
+- **Red:** the train is split in half and each half is retested before any new
+  train, on the latest `main`; a green half lands, and a half of one goes alone, so
+  a pull request red on its own is handed back with its run linked. A flaky test
+  heals on the rerun. One real break in a train of 4 costs 5 rounds for those 4
+  (1 + 2·log₂ k); four breaks, 7 (2k − 1). A train that only **stalled** (no run,
+  the deadline, the runners twice) splits the same way without marking anyone red,
+  so its members ride again once their halves are done.
+
+A dry run prints the train it would form and pushes nothing; `--no-merge` stops a
+green train at green. A watch killed mid-train leaves a `merge-train/*` branch:
+the next watch deletes every one before its first take (none can be in flight, it
+holds the lock), and nothing about a train outlives the process. `main-health`
+reads only `main`'s runs, so a red train files nothing.
+
 Merging is serialized because rusty is **one compiled crate**: two branches can
 each be green alone and break `main` together. A rename, a changed signature, a
 moved module — no textual conflict catches any of them, and being a single crate
 makes it *more* likely, not less, because everything is in scope of everything.
-The queue does not change that; it only changes who waits.
+The queue does not change that: what merges is exactly a tree CI proved, one
+tree at a time. A train only lets several pull requests share that tree.
 
 ### The Markdown exception, and the file it does not cover
 

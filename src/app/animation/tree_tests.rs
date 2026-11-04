@@ -4,7 +4,7 @@
 
 use super::test_rig::*;
 use super::*;
-use crate::asset::animation_graph::{BlendChild1D, BlendTree, GraphNode};
+use crate::asset::animation_graph::{BlendChild1D, BlendTree, ChildMotion, GraphNode};
 use crate::components::Motion;
 
 /// A looping 1D tree node over `speed`: `(clip, threshold)` children.
@@ -12,9 +12,8 @@ pub fn tree_node(name: &str, children: &[(&str, f32)]) -> GraphNode {
     let children = children
         .iter()
         .map(|&(clip, threshold)| BlendChild1D {
-            clip: clip.to_string(),
+            motion: ChildMotion::clip(clip),
             threshold,
-            events: Vec::new(),
         })
         .collect();
     GraphNode {

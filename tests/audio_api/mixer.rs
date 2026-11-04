@@ -7,13 +7,9 @@ use mlua::Lua;
 fn run(script: &str, check: impl FnOnce(&Lua, &super::Fixture)) {
     let lua = Lua::new();
     let f = fixture();
-    lua.scope(|scope| {
-        register(&lua, scope, &f);
-        lua.load(script).exec().unwrap();
-        check(&lua, &f);
-        Ok(())
-    })
-    .unwrap();
+    register(&lua, &f);
+    lua.load(script).exec().unwrap();
+    check(&lua, &f);
 }
 
 fn eval<T: mlua::FromLua>(lua: &Lua, expr: &str) -> T {

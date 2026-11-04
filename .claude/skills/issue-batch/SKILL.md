@@ -13,9 +13,12 @@ This skill is how the orchestrator runs a batch on top of them.
 
 ## What runs together: file collision, not count
 
-Merging is serialized, so every branch behind another pays an update (a merge of
-`main` into it) per merge ahead of it. Over separate files that is seconds of `git`; over shared code it is
-a session of conflict resolution. **Before starting a branch, ask whether it edits
+Merging is serialized, one tested tree at a time, but the queue tests up to four
+pull requests together on one tree (a merge train, #1785, `ci-merge`): a branch that
+merges cleanly onto `main` and the others rides without being touched. One that
+conflicts with a branch merged ahead of it is not: it pays an update (a merge of
+`main` into it) and its own CI round alone. Over separate files that never happens;
+over shared code it is a session of conflict resolution. **Before starting a branch, ask whether it edits
 the same types as one in flight.** Spread across modules (physics, UI,
 navigation, audio, CI) at once; within one module, run one branch at a time.
 
@@ -225,7 +228,10 @@ Per pull request:
 1. **Read the description and the diff, then add the `queue` label** (#925).
    Check its decisions against the issue. Engine mechanism, a stored format,
    determinism, CI or the merge path, or a refactor gets the
-   `independent-review` skill first. What the read turns up goes back to the
+   `independent-review` skill first; any other code PR gets a `No review: <why>`
+   comment (a Markdown-only PR CI counts as non-code, and a Dependabot cargo
+   bump, need neither), since the queue takes neither without its record (`independent-review`,
+   *Answering the findings*, step 2). What the read turns up goes back to the
    coder unlabelled; removing the label pulls a PR out of line. File its
    "follow-up" notes as issues now. If it dispatched a scoped mutation run, read
    the report when it lands (`ci-merge`, *Triaging a survivor*).

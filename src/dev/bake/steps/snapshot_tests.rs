@@ -21,7 +21,7 @@ fn step_until(job: &mut LightingBake, scene: &mut Scene, until: impl Fn(Stage) -
 }
 
 fn staged_files(path: &str) -> usize {
-    let dir = std::path::Path::new(path).parent().unwrap();
+    let dir = crate::dev::bake::reflection::reflection_dir(path);
     let names = std::fs::read_dir(dir).unwrap().flatten();
     names
         .filter(|e| e.file_name().to_string_lossy().ends_with(".baking"))

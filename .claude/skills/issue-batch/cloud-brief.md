@@ -78,6 +78,17 @@ nothing to wait for.
   Dust2-sized level (memory held, work per frame, the first frame after a load or
   bake) and a malformed input file (truncated, a value out of range, a NaN):
   they are what independent reviews send back most.
+- **Before readying, list every path that reaches the state you changed**, and
+  test the ones your diff doesn't show: pause and resume, a bake capture, undo, a
+  scene load, Play/Stop, a recorded demo, a render-texture camera. Grep who writes
+  and who reads each field you touched. It is what independent reviews send back
+  most: on 2026-11-03 five of seven PRs passed their gates and broke on such a
+  path (a voice retuned while paused, a shadow fade inside a bake, a `require`
+  noted by the demo journal), because a test only covers what its author thought of.
+- **A PR that creates a seam tries it first** (a `Seam` section, below): write one
+  throwaway use of it as the next coder would, its awkward case included, and fix
+  what that shows before readying. Neither #1705's nor #1751's seam survived its
+  first outside read.
 - **Before readying, find every doc that restates what you changed** (#1650).
   A fact is told in several places: a module doc, a `docs/api/` page,
   `Debug.md`'s rows, `docs/testing.md`, a CLAUDE.md list, a skill,
@@ -239,7 +250,9 @@ Beyond what changed, why, the effect and the decisions:
   as, e.g. `Co-Authored-By: Claude <model> <noreply@anthropic.com>`.
 - Push often: a dead container takes its uncommitted work with it.
 - Green gates and a branch that holds the latest `main` → mark the PR **ready for review**, and end.
-- **Do NOT merge, and do not review your own PR.** The independent review is the
+- **Do NOT merge, and do not review your own PR**, nor write its
+  `Independent review` or `No review:` comment: the queue reads those as the
+  orchestrator's decision (#1764). The independent review is the
   orchestrator's (`independent-review`): it dispatches a reviewer that never saw
   your reasoning, which one you spawn cannot be. A brief that says the PR "gets an
   independent review" means the orchestrator will run one. PR #1184's coder ran its

@@ -9,8 +9,9 @@
 use glam::{Quat, Vec3};
 
 use crate::components::MaterialAsset;
-use crate::render::ibl::cube_sample::srgb_to_linear;
 use crate::render::ibl::cubemap::parse_ktx2_cubemap_mips;
+use crate::render::ibl::reflection_prefilter::source::decode_face;
+use crate::render::ibl::reflection_prefilter::TEXEL_BYTES;
 use crate::render::CubemapFace;
 use crate::scene::{MeshComponent, ReflectionProbe, Scene};
 
@@ -69,17 +70,16 @@ fn colored_room() -> Scene {
 }
 
 /// Mean luminance variance of a face — a blur lowers it.
-fn variance(face: &[u8], size: u32) -> f32 {
-    let lum: Vec<f32> = (0..(size * size))
-        .map(|i| {
-            let idx = (i * 4) as usize;
-            srgb_to_linear(face[idx])
-                + srgb_to_linear(face[idx + 1])
-                + srgb_to_linear(face[idx + 2])
-        })
-        .collect();
+fn variance(face: &[Vec3]) -> f32 {
+    let lum: Vec<f32> = face.iter().map(|c| c.element_sum()).collect();
     let mean = lum.iter().sum::<f32>() / lum.len() as f32;
     lum.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / lum.len() as f32
+}
+
+/// Face `face` of level `level` of a parsed cube, `size` texels wide.
+fn face_of(level: &[u8], face: CubemapFace, size: u32) -> Vec<Vec3> {
+    let len = (size * size) as usize * TEXEL_BYTES;
+    decode_face(&level[face as usize * len..][..len])
 }
 
 /// Baking a probe in the coloured room produces a cubemap whose faces show the room
@@ -98,35 +98,26 @@ fn gpu_bake_shows_room_and_mips_blur() {
     assert_eq!(mips.size, RES);
     assert!(mips.mips.len() >= 3, "expected a roughness mip chain");
 
-    // Face order packs six faces back-to-back; the +X face must carry red (the +X wall).
-    let face_bytes = (RES * RES * 4) as usize;
-    let posx0 = &mips.mips[0][CubemapFace::PosX as usize * face_bytes..][..face_bytes];
-    let (mut r, mut g, mut b) = (0.0f32, 0.0, 0.0);
-    for px in posx0.chunks(4) {
-        r += srgb_to_linear(px[0]);
-        g += srgb_to_linear(px[1]);
-        b += srgb_to_linear(px[2]);
-    }
+    // The +X face carries the +X wall: red, at the wall's own radiance of 9, not
+    // clipped at display white (#1696).
+    let posx0 = face_of(&mips.mips[0], CubemapFace::PosX, RES);
+    let mean = posx0.iter().sum::<Vec3>() / posx0.len() as f32;
     assert!(
-        r > g && r > b,
-        "expected +X face red, got r {r} g {g} b {b}"
+        (mean.x - 9.0).abs() < 0.1 && mean.y < 0.1 && mean.z < 0.1,
+        "expected the +X face red at 9, got {mean}"
     );
 
     // The roughest mip is smoother than the base level (roughness blur).
-    let v0 = variance(posx0, RES);
     let last = mips.mips.len() - 1;
-    let last_size = (RES >> last).max(1);
-    let posx_last = &mips.mips[last]
-        [CubemapFace::PosX as usize * (last_size * last_size * 4) as usize..]
-        [..(last_size * last_size * 4) as usize];
-    let v_last = variance(posx_last, last_size);
+    let posx_last = face_of(&mips.mips[last], CubemapFace::PosX, (RES >> last).max(1));
+    let (v0, v_last) = (variance(&posx0), variance(&posx_last));
     assert!(
         v_last <= v0,
         "expected roughest mip smoother: {v_last} vs {v0}"
     );
 }
 
-/// `bake_reflections` writes a KTX2 file next to the scene, points the probe at it, and the
+/// `bake_reflections` writes a KTX2 file into the folder it is given, points the probe at it, and the
 /// file loads back as a mipped cube (the bake -> write -> load round-trip). Skips with no
 /// adapter.
 #[test]

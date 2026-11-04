@@ -278,11 +278,15 @@ fn changed(before: Option<&Recorded>, after: Option<&Recorded>) -> bool {
 #[cfg(test)]
 mod bake_tests;
 #[cfg(test)]
+mod changes_tests;
+#[cfg(test)]
 mod destroy_tests;
 #[cfg(test)]
 mod ids_tests;
 #[cfg(test)]
 mod level_tests;
+#[cfg(test)]
+mod refs_tests;
 #[cfg(test)]
 mod shared_mesh_tests;
 #[cfg(test)]

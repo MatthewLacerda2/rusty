@@ -6,35 +6,32 @@
 //! section commits through. The collision matrix lives on `Physics` and a camera's
 //! culling mask on `Camera`, where Unity puts them.
 
-use std::cell::RefCell;
-
 use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::Scene;
 use crate::scene::LAYER_COUNT;
 
 /// Register the `Layers` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     put(
         &table,
         "GetLayer",
-        scope.create_function(|_, id: EntityArg| Ok(scene.borrow().world.layer(id.read()))),
+        lua.create_function(move |lua, id: EntityArg| {
+            Ok(scene.get(lua)?.borrow().world.layer(id.read()))
+        }),
     )?;
 
     put(
         &table,
         "SetLayer",
-        scope.create_function(|_, (id, layer): (EntityArg, u8)| {
+        lua.create_function(move |lua, (id, layer): (EntityArg, u8)| {
             let id = id.live("Layers", "SetLayer")?;
-            scene.borrow_mut().world.set_layer(id, layer);
+            scene.get(lua)?.borrow_mut().world.set_layer(id, layer);
             Ok(())
         }),
     )?;
@@ -42,7 +39,8 @@ pub fn register<'scope>(
     put(
         &table,
         "GetName",
-        scope.create_function(|_, index: u8| {
+        lua.create_function(move |lua, index: u8| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.layers.label(index))
         }),
@@ -52,9 +50,9 @@ pub fn register<'scope>(
     put(
         &table,
         "SetName",
-        scope.create_function(|_, (index, name): (u8, String)| {
+        lua.create_function(move |lua, (index, name): (u8, String)| {
             check_index(index)?;
-            scene.borrow_mut().layers.set_name(index, name);
+            scene.get(lua)?.borrow_mut().layers.set_name(index, name);
             Ok(())
         }),
     )?;
@@ -63,7 +61,8 @@ pub fn register<'scope>(
     put(
         &table,
         "NameToIndex",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.layers.index_of(&name))
         }),

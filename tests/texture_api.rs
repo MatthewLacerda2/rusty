@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use crate::temp::lua_path as tmp;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::scene::Scene;
 
 #[test]
@@ -17,24 +18,20 @@ fn baked_texture_feeds_a_material_slot() {
     let path = tmp("rusty_texture_api_albedo.png");
 
     rusty::api::texture::register(&lua).unwrap();
-    lua.scope(|s| {
-        rusty::api::material::register(&lua, s, &scene).unwrap();
-        let script = format!(
-            r#"
-            local out = Texture.Bake({{
-              resolution = 32, seed = 7,
-              nodes = {{
-                {{ id = "k", op = "checker", tiles = 4,
-                   color_a = {{0.1,0.1,0.1,1}}, color_b = {{0.8,0.8,0.8,1}} }},
-              }},
-            }}, "{path}", "base_color")
-            Material.SetTexture({id}, out)
-        "#
-        );
-        lua.load(&script).exec().unwrap();
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::material::register(&lua, bind(&lua, &scene)).unwrap();
+    let script = format!(
+        r#"
+        local out = Texture.Bake({{
+          resolution = 32, seed = 7,
+          nodes = {{
+            {{ id = "k", op = "checker", tiles = 4,
+               color_a = {{0.1,0.1,0.1,1}}, color_b = {{0.8,0.8,0.8,1}} }},
+          }},
+        }}, "{path}", "base_color")
+        Material.SetTexture({id}, out)
+    "#
+    );
+    lua.load(&script).exec().unwrap();
 
     // The slot now references the baked file, and the file is a real PNG.
     let sc = scene.borrow();

@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use super::lightmap::BakeSettings;
 use super::reflection_probe::clamp_resolution;
 
-/// Unity's Lighting Settings, the part rusty has: the lightmap bake's knobs and the
-/// reflection probes' defaults.
+/// Unity's Lighting Settings, the part rusty has: the lightmap bake's knobs, the
+/// reflection probes' defaults and the diffuse model every lit path shades with.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LightingSettings {
@@ -18,6 +18,76 @@ pub struct LightingSettings {
     pub lightmaps: BakeSettings,
     /// The reflection probes' default resolution and the memory they may hold.
     pub reflections: ReflectionSettings,
+    /// How a lamp's direct light falls off across a surface (#1698): realtime
+    /// shading, the lightmap bake and the light-probe bake all read it, so one lamp
+    /// lights the side facing it the same Baked or Realtime. Left out of the file at
+    /// Lambert, so a scene saved before it existed round-trips unchanged.
+    #[serde(skip_serializing_if = "DiffuseModel::is_lambert")]
+    pub diffuse_model: DiffuseModel,
+}
+
+/// The diffuse response to a lamp's direct light, scene-wide (#1698). It applies
+/// wherever a lamp lights a surface: realtime shading, lightmap texels, the surfaces
+/// a bake's bounce rays hit and those a probe capture renders, so global
+/// illumination gets brighter under [`DiffuseModel::HalfLambert`] too. Only the
+/// transfer between surfaces (a bounce lighting a texel) and the sky stay Lambert.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DiffuseModel {
+    /// The physical `max(N·L, 0)`, what every PBR engine shades with.
+    #[default]
+    Lambert,
+    /// The retro squared wrap `((N·L + 1) / 2)²` (GoldSrc's look): a quarter of the
+    /// light at the terminator, none only straight behind, and about a third more
+    /// diffuse energy than Lambert.
+    HalfLambert,
+}
+
+impl DiffuseModel {
+    /// Every model, in the editor's order.
+    pub const ALL: [Self; 2] = [Self::Lambert, Self::HalfLambert];
+
+    /// The name `Lighting.GetSettings` returns and `SetSettings` takes.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Lambert => "Lambert",
+            Self::HalfLambert => "HalfLambert",
+        }
+    }
+
+    /// The model called `name`, in any case, if any.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|m| m.name().eq_ignore_ascii_case(name))
+    }
+
+    /// True for the default, [`DiffuseModel::Lambert`]: the scene file leaves it out.
+    pub fn is_lambert(&self) -> bool {
+        *self == Self::Lambert
+    }
+
+    /// The share of a lamp's radiance a surface receives at `cos` = N·L, the
+    /// factor `calculate_pbr` (`forward/lighting.wgsl`) multiplies its diffuse by.
+    pub fn response(self, cos: f32) -> f32 {
+        match self {
+            Self::Lambert => cos.max(0.0),
+            Self::HalfLambert => {
+                let w = (cos * 0.5 + 0.5).clamp(0.0, 1.0);
+                w * w
+            }
+        }
+    }
+
+    /// Per SH band, what a lamp's delta must be scaled by so the probes' cosine-lobe
+    /// read-back (`Sh9::eval`) gives this model's response. The squared wrap is a
+    /// quadratic in N·L, so L2 holds it exactly: its zonal kernel is
+    /// (4π/3, 2π/3, 2π/15) against Lambert's (π, 2π/3, π/4).
+    pub fn sh_band_scale(self) -> [f32; 3] {
+        match self {
+            Self::Lambert => [1.0; 3],
+            Self::HalfLambert => [4.0 / 3.0, 1.0, 8.0 / 15.0],
+        }
+    }
 }
 
 impl LightingSettings {
@@ -44,14 +114,14 @@ pub struct ReflectionSettings {
 }
 
 impl Default for ReflectionSettings {
-    /// 512-texel cubes, one good size for every probe; a 128 MB budget holds 16 of
-    /// them (8 MB each with their mips): 14 shaded and 2 spare, enough for the rooms
-    /// around a player. 512
+    /// 512-texel cubes, one good size for every probe; a 256 MB budget holds 16 of
+    /// them (16 MB each in half floats with their mips, #1696): 14 shaded and 2 spare,
+    /// the rooms around a player (32, the cap, at 256 texels). 512
     /// probes cover a Dust2-sized level (200 m of 20 m rooms takes 400 at 12 m tiles).
     fn default() -> Self {
         Self {
             resolution: 512,
-            budget_mb: 128,
+            budget_mb: 256,
             max_probes: 512,
         }
     }
@@ -79,3 +149,7 @@ impl ReflectionSettings {
         u64::from(self.budget_mb) << 20
     }
 }
+
+#[cfg(test)]
+#[path = "diffuse_tests.rs"]
+mod diffuse_tests;

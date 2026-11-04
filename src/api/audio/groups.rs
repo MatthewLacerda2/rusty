@@ -12,6 +12,7 @@ use mlua::{Lua, Table};
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::audio::mixer::{Filter, GroupPatch, GroupState};
 use crate::audio::AudioMaestro;
 use crate::scene::authoring::audio::source as audio_ops;
@@ -28,15 +29,12 @@ fn set(audio: &RefCell<AudioMaestro>, name: &str, patch: GroupPatch) -> mlua::Re
 }
 
 /// `GetGroups` / `CreateGroup` / `GetGroupState`, then the setters.
-pub(super) fn register_groups<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    audio: &'scope RefCell<AudioMaestro>,
-) -> Reg {
+pub(super) fn register_groups(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) -> Reg {
     put(
         table,
         "GetGroups",
-        scope.create_function(|_, ()| {
+        lua.create_function(move |lua, ()| {
+            let audio = &*audio.get(lua)?;
             let mixer = audio.borrow();
             Ok(mixer
                 .mixer()
@@ -49,8 +47,9 @@ pub(super) fn register_groups<'scope>(
     put(
         table,
         "CreateGroup",
-        scope.create_function(|_, (name, parent): (String, Option<String>)| {
+        lua.create_function(move |lua, (name, parent): (String, Option<String>)| {
             audio
+                .get(lua)?
                 .borrow_mut()
                 .create_group(&name, parent.as_deref())
                 .map_err(err)
@@ -59,28 +58,25 @@ pub(super) fn register_groups<'scope>(
     put(
         table,
         "GetGroupState",
-        scope.create_function(|lua, name: String| {
+        lua.create_function(move |lua, name: String| {
+            let audio = &*audio.get(lua)?;
             let maestro = audio.borrow();
             let id = maestro.mixer().require(&name).map_err(err)?;
             state_table(lua, &maestro.mixer().state(id))
         }),
     )?;
-    register_levels(scope, table, audio)?;
-    register_filters(scope, table, audio)
+    register_levels(lua, table, audio)?;
+    register_filters(lua, table, audio)
 }
 
 /// `SetGroupVolume` / `SetGroupMute` / `SetGroupReverbSend`.
-fn register_levels<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    audio: &'scope RefCell<AudioMaestro>,
-) -> Reg {
+fn register_levels(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) -> Reg {
     put(
         table,
         "SetGroupVolume",
-        scope.create_function(|_, (name, v): (String, f32)| {
+        lua.create_function(move |lua, (name, v): (String, f32)| {
             set(
-                audio,
+                &*audio.get(lua)?,
                 &name,
                 GroupPatch {
                     volume: Some(v),
@@ -92,9 +88,9 @@ fn register_levels<'scope>(
     put(
         table,
         "SetGroupMute",
-        scope.create_function(|_, (name, mute): (String, bool)| {
+        lua.create_function(move |lua, (name, mute): (String, bool)| {
             set(
-                audio,
+                &*audio.get(lua)?,
                 &name,
                 GroupPatch {
                     mute: Some(mute),
@@ -106,9 +102,9 @@ fn register_levels<'scope>(
     put(
         table,
         "SetGroupReverbSend",
-        scope.create_function(|_, (name, v): (String, f32)| {
+        lua.create_function(move |lua, (name, v): (String, f32)| {
             set(
-                audio,
+                &*audio.get(lua)?,
                 &name,
                 GroupPatch {
                     reverb_send: Some(v),
@@ -120,18 +116,14 @@ fn register_levels<'scope>(
 }
 
 /// `SetGroupLowPass` / `SetGroupHighPass`.
-fn register_filters<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    audio: &'scope RefCell<AudioMaestro>,
-) -> Reg {
+fn register_filters(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) -> Reg {
     put(
         table,
         "SetGroupLowPass",
-        scope.create_function(|_, (name, hz, q): (String, f32, Option<f32>)| {
+        lua.create_function(move |lua, (name, hz, q): (String, f32, Option<f32>)| {
             let low_pass = Some(Filter::new(hz, q.unwrap_or(0.0)));
             set(
-                audio,
+                &*audio.get(lua)?,
                 &name,
                 GroupPatch {
                     low_pass,
@@ -143,10 +135,10 @@ fn register_filters<'scope>(
     put(
         table,
         "SetGroupHighPass",
-        scope.create_function(|_, (name, hz, q): (String, f32, Option<f32>)| {
+        lua.create_function(move |lua, (name, hz, q): (String, f32, Option<f32>)| {
             let high_pass = Some(Filter::new(hz, q.unwrap_or(0.0)));
             set(
-                audio,
+                &*audio.get(lua)?,
                 &name,
                 GroupPatch {
                     high_pass,
@@ -160,19 +152,25 @@ fn register_filters<'scope>(
 /// `SetOutputGroup` / `GetOutputGroup` — the mixer group an entity's `AudioSource`
 /// plays through (`""` is Master). Read when its voice starts, so a change reroutes
 /// the next `Play`.
-pub(super) fn register_output<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register_output(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    audio: &'scope RefCell<AudioMaestro>,
+    scene: ApiCell<Scene>,
+    audio: ApiCell<AudioMaestro>,
 ) -> Reg {
     put(
         table,
         "SetOutputGroup",
-        scope.create_function(|_, (id, group): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, group): (EntityArg, String)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Audio", "SetOutputGroup")?;
             if !group.is_empty() {
-                audio.borrow().mixer().require(&group).map_err(err)?;
+                audio
+                    .get(lua)?
+                    .borrow()
+                    .mixer()
+                    .require(&group)
+                    .map_err(err)?;
             }
             let mut scene = scene.borrow_mut();
             let mut source = scene
@@ -186,7 +184,8 @@ pub(super) fn register_output<'scope>(
     put(
         table,
         "GetOutputGroup",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.world.audio(id.read()).map(|a| a.output_group.clone()))
         }),

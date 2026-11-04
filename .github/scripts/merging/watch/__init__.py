@@ -24,8 +24,9 @@ the background is woken then. A hand-back is not one of those (#751):
   runner outage, or a flaky job re-run by hand, re-queues it without a push. **A hand-back no push fixes waits for what does**
   (#1279, [`handbacks`]): one for the description or labels comes back when they
   change ([`handbacks.CLAIMS_MEMORY`]), one the closed issue refuses when that
-  issue no longer does ([`handbacks.ISSUES_MEMORY`]); #1275 sat with a fixed
-  description until the daemon restarted. The starter still
+  issue no longer does ([`handbacks.ISSUES_MEMORY`]), and one no review
+  decision was recorded on when a comment records one ([`handbacks.REVIEWS_MEMORY`],
+  #1764); #1275 sat with a fixed description until the daemon restarted. The starter still
   hears at once: each hand-back prints one line beginning [`ending.HANDED_BACK_LINE`]
   (a `Monitor` on the output can wake on it), and the exit status at the end
   says one happened ([`ending.status`]), as scorsese's does (scorsese#615, #690).
@@ -119,6 +120,11 @@ listed once a poll (the `tick` [`queue.waiting.wait_for`] calls), `--since`
 keeps its lines to the batch's own pull requests ([`board.recent`]), `--for` with
 `--deadline` must fit in a background command's life ([`ending.over_budget`]),
 and the last line is always [`ending.RESUME`] and the command to start it again.
+
+**Several ready pull requests can share one take** (#1785): a merge train of
+up to four, tested on one combined tree and landed together when it is green
+([`train`], [`trains.Yard`]). Who rides, who goes alone and why, and what a red
+train costs: `merging/train/__init__.py`.
 
 The decisions are pure functions over plain dictionaries; [`loop.run`] takes every
 effect as an argument, so the loop is tested without a network.

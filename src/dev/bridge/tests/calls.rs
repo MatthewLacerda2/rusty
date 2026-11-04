@@ -8,7 +8,7 @@ use mlua::Lua;
 use crate::dev::harness::Harness;
 
 /// Game-script functions put on the player controller's instance in the
-/// gameplay VM: `self` fields, a Scene call (the API scope), a table return and
+/// gameplay VM: `self` fields, a Scene call (the gameplay VM's API), a table return and
 /// a gameplay error, loaded as the chunk `game_calls` so its frames are known.
 const GAME: &str = r#"
 local t = ...
@@ -29,10 +29,9 @@ fn run(scenario: &str) -> mlua::Result<()> {
     let harness = Rc::new(RefCell::new(Harness::new(out, "")));
     let world = Rc::clone(&harness.borrow().world);
     let cells = world.borrow().script_manager().api_cells();
-    let ctx = cells.ctx();
     let lua = Lua::new();
-    lua.scope(|scope| {
-        crate::api::register(&lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
+    cells.install(&lua).map_err(mlua::Error::RuntimeError)?;
+    crate::api::attempt(|| {
         super::super::register(&lua, &harness)?;
         lua.load("Harness.Step(2)").exec()?;
         lua.load(r#"ref = Scene.GetScript(Scene.FindEntityByName("Player"), "player_controller")"#)

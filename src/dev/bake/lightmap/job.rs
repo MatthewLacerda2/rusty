@@ -2,17 +2,26 @@
 //! button: the window stays live while the CPU path tracer runs.
 //!
 //! [`LightmapBakeJob::start`] gathers the owned `BakeScene` on the caller's thread
-//! (it borrows the ECS) and hands it to a worker; [`LightmapBakeJob::poll`], called
-//! each frame, applies the finished result back on the caller's thread through the
-//! same [`apply_lightmaps`] the synchronous `Lighting.BakeLightmaps()` uses. A
-//! cancelled bake applies nothing, so the scene keeps its previous lightmaps.
+//! (it borrows the ECS) and hands it to a worker, which bakes and then encodes the
+//! pages (`encode_pages`: BC6H and every mip, and the compressed PNG, #1694), so
+//! neither blocks a frame; [`LightmapBakeJob::poll`], called each frame, writes the
+//! finished bytes and points the scene at them on the caller's thread, through
+//! the same [`apply_encoded`] the synchronous `Lighting.BakeLightmaps()` uses. A
+//! cancelled bake applies nothing, so the scene keeps its previous lightmaps: a
+//! cancel lands during the trace, between two levels of the encode, or after it,
+//! up to the `poll` that would have applied it.
 
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
-use super::{apply_lightmaps, gather_bake_input, warn_missing_uvs, UNSAVED};
-use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeSettings, Lightmap};
+use super::UNSAVED;
+use super::{apply_encoded, encode_pages, gather_bake_input, warn_missing_uvs, EncodedPages};
+use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeSettings};
 use crate::scene::Scene;
+
+/// What the worker hands back: the encoded pages, `None` when cancelled, or why
+/// encoding failed.
+type Encoded = Result<Option<EncodedPages>, String>;
 
 /// How a finished bake ended, once [`LightmapBakeJob::poll`] has applied it.
 #[derive(Debug, PartialEq)]
@@ -28,7 +37,7 @@ pub enum BakeOutcome {
 /// A bake running on a worker thread.
 pub struct LightmapBakeJob {
     progress: Arc<BakeProgress>,
-    worker: Option<JoinHandle<Option<Vec<Lightmap>>>>,
+    worker: Option<JoinHandle<Encoded>>,
     scene_path: String,
     /// Static meshes the bake gathered, for the missing-lightmap-UV report (#831).
     static_meshes: usize,
@@ -49,7 +58,12 @@ impl LightmapBakeJob {
         let watch = Arc::clone(&progress);
         let worker = thread::Builder::new()
             .name("lightmap-bake".into())
-            .spawn(move || bake_with_progress(&input, &settings, &watch))
+            .spawn(
+                move || match bake_with_progress(&input, &settings, &watch) {
+                    Some(maps) => encode_pages(&maps, &watch),
+                    None => Ok(None),
+                },
+            )
             .map_err(|e| format!("start the bake: {e}"))?;
         Ok(Self {
             progress,
@@ -64,9 +78,16 @@ impl LightmapBakeJob {
         (self.progress.done(), self.progress.total())
     }
 
-    /// Fraction done, 0..=1, for a progress bar.
+    /// Pages encoded and the pages the encode makes, once the trace is done and
+    /// the encode has begun (#1694); `None` before.
+    pub fn pages(&self) -> Option<(u64, u64)> {
+        self.progress.pages()
+    }
+
+    /// Fraction done, 0..=1, for a progress bar: of the texels while tracing, of
+    /// the pages while encoding.
     pub fn fraction(&self) -> f32 {
-        let (done, total) = self.progress();
+        let (done, total) = self.pages().unwrap_or_else(|| self.progress());
         if total == 0 {
             0.0
         } else {
@@ -102,14 +123,17 @@ impl LightmapBakeJob {
         }
         let joined = self.worker.take()?.join();
         Some(match joined {
-            Ok(Some(maps)) => {
-                warn_missing_uvs(self.static_meshes, maps.len());
-                match apply_lightmaps(scene, &self.scene_path, &maps) {
+            // A cancel after the encode finished still applies nothing.
+            Ok(Ok(Some(_))) if self.progress.is_cancelled() => BakeOutcome::Cancelled,
+            Ok(Ok(Some(pages))) => {
+                warn_missing_uvs(self.static_meshes, pages.maps);
+                match apply_encoded(scene, &self.scene_path, &pages) {
                     Ok(n) => BakeOutcome::Baked(n),
                     Err(e) => BakeOutcome::Failed(e),
                 }
             }
-            Ok(None) => BakeOutcome::Cancelled,
+            Ok(Ok(None)) => BakeOutcome::Cancelled,
+            Ok(Err(e)) => BakeOutcome::Failed(e),
             Err(_) => BakeOutcome::Failed("the bake worker panicked".into()),
         })
     }

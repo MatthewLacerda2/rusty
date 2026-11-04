@@ -5,10 +5,11 @@
 //! queued-spawn contract (#322). A spawn verb (`Scene.Instantiate`,
 //! `Scene.CreateEntity`, …) usually runs *mid-dispatch*, inside another
 //! script's callback — loading (and `Awake`-ing) the new script synchronously
-//! there would re-enter the Lua scope. Instead the spawned entity just sits in
-//! the scene until the head of the next tick's script phase, when the scan
-//! loads every script slot with no prior load attempt; `init_scripts` then
-//! runs `Awake` + `Start` before any `Update` of that tick.
+//! there would run its chunk and hooks in the middle of the dispatch loop over
+//! the manager's instances. Instead the spawned entity just sits in the scene
+//! until the head of the next tick's script phase, when the scan loads every
+//! script slot with no prior load attempt; `init_scripts` then runs `Awake` +
+//! `Start` before any `Update` of that tick.
 
 use mlua::Table;
 use std::collections::BTreeMap;
@@ -52,8 +53,18 @@ impl ScriptManager {
 
         // Merge the inspector-set field values (#84) over the schema defaults onto
         // the lifecycle table, so `self.<field>` inside the script reads the
-        // configured value. Pure data assignment — determinism-clean.
-        super::schema::apply_field_values(&table, &script_code, field_values)
+        // configured value. Pure data assignment — determinism-clean. A schema
+        // the inspection VM can't read leaves the fields unset: say so, once.
+        let fields = super::schema::read_fields(&script_code).unwrap_or_else(|e| {
+            if self.schema_warned.insert(script_path.to_string()) {
+                self.cells.console.borrow_mut().warn(format!(
+                    "{script_path}: its `fields` could not be read, so the inspector \
+                     shows none and none are set: {e}"
+                ));
+            }
+            Vec::new()
+        });
+        super::schema::apply_field_values(&table, &fields, field_values)
             .map_err(|e| format!("Failed to apply script fields for {}: {}", script_path, e))?;
 
         // Index it by entity, so `Scene.GetScript` can hand it to other scripts.

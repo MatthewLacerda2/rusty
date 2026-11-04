@@ -7,7 +7,8 @@ and the local merge of `main`, and writes nothing to GitHub. `--watch` (#664) na
 none: it takes each ready pull request labelled `queue`, the go-ahead the
 orchestrator adds after reading the diff (#925), the one conflicting with the
 fewest others in line first, then by label priority (#753),
-and is still invoked, never a service — a hand-back skips that pull request
+testing up to four together on one tree when they merge cleanly (a merge
+train, #1785, `merging/train/`), and is still invoked, never a service — a hand-back skips that pull request
 and it carries on (#751); it exits on the machine failing, when nothing is
 left, or between pull requests once its `--for` deadline passes
 (`merging/watch/`).

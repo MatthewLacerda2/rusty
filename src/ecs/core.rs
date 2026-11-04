@@ -71,13 +71,10 @@ impl World {
         };
         if std::mem::replace(&mut core.active, active) != active {
             drop(core);
-            self.activity.invalidate_all();
-            // The shadow sweeps skip inactive entities, so a static one going dark or
-            // lit changes the static caster set. A toggle with no static in its subtree
-            // (a muzzle flash, a pickup) leaves the static bakes alone.
-            if self.self_and_descendants(id).any(|e| self.is_static(e)) {
-                self.static_revision += 1;
-            }
+            self.invalidate_activity_below(id);
+            // The subtree may go dark or lit; with no static in it (a muzzle flash, a
+            // pickup) the static bakes stay put.
+            self.stamp_hierarchy_below(id);
         }
         true
     }
@@ -94,18 +91,18 @@ impl World {
         };
         if std::mem::replace(&mut core.is_static, is_static) != is_static {
             drop(core);
-            self.static_revision += 1;
+            self.stamp_static(id);
         }
         true
     }
 
-    /// Moves whenever the set of static entities may have changed: a flag flipped, a
-    /// static entity (or an ancestor of one) activated or deactivated, a static entity
-    /// placed or removed, a row overwritten, the World cleared. Whoever
-    /// made the change (the inspector, a script in Play, a load), a cache of static
-    /// geometry keyed on it (the renderer's static shadow bakes) goes stale (#1496).
+    /// The [`StaticSet`](super::changes::StaticSet) channel's revision: it moves
+    /// whenever the set of static entities may have changed, the World cleared or
+    /// rewound included, so a cache of static geometry keyed on it (the renderer's
+    /// static shadow bakes) goes stale (#1496). A cache that wants *which* entities
+    /// moved opens a cursor on that channel.
     pub fn static_revision(&self) -> u64 {
-        self.static_revision
+        self.static_set_revision()
     }
 
     /// The entity's layer index (`0`, the default layer, for a dead id).
@@ -114,9 +111,13 @@ impl World {
     }
 
     pub fn set_layer(&mut self, id: u32, layer: u8) -> bool {
-        self.component_mut::<Core>(id)
-            .map(|mut c| c.layer = layer)
-            .is_some()
+        let Some(mut core) = self.component_mut::<Core>(id) else {
+            return false;
+        };
+        let changed = std::mem::replace(&mut core.layer, layer) != layer;
+        drop(core);
+        changed.then(|| self.stamp_layer(id));
+        true
     }
 
     /// The local Transform matrix and the parent, in one lookup — the hot read
@@ -152,11 +153,11 @@ impl World {
             .find(|&c| self.has_rigidbody(c) || self.has_character_controller(c))
     }
 
-    /// Write the raw parent link. Hierarchy INVARIANTS (cycle checks, the
-    /// parent's `children` list) are `Scene::set_parent`'s job; this is the
-    /// storage-level write it and scene rehydration route through.
-    /// The subtree moves in world space, so its world matrices go dirty and its
-    /// colliders' AABBs follow (`ecs::world_space`).
+    /// Write the raw parent link; cycle checks and `children` are `Scene::set_parent`'s.
+    /// ORDER: `add_child` first. A link to a parent whose `children` lacks `id` marks
+    /// the activity cache `unlisted`, every later invalidation a whole-store bump
+    /// until a `clear` (`ecs::activity`). The subtree moves in world space, so its
+    /// world matrices go dirty and its colliders' AABBs follow (`ecs::world_space`).
     pub fn set_parent_id(&mut self, id: u32, parent: Option<u32>) -> bool {
         let Some(mut core) = self.component_mut::<Core>(id) else {
             return false;
@@ -165,7 +166,8 @@ impl World {
         drop(core);
         self.moved(id);
         if relinked {
-            self.activity.invalidate_all();
+            self.relinked_activity(id, parent);
+            self.stamp_hierarchy_below(id); // under a new parent it may go dark or lit
         }
         true
     }
@@ -200,17 +202,17 @@ impl World {
         self.set_component(id, Some(asset))
     }
 
-    /// The one sanctioned split borrow: mutate an entity's animator and (when
-    /// present) its mesh together — the `animate` system's re-pose step. Now
-    /// that they're independent hecs columns (#345) this is two native
-    /// borrows under the hood. Returns `None` when the entity is missing or
-    /// has no animator.
-    pub fn with_animator_and_mesh_mut<R>(
+    /// The one sanctioned split borrow: mutate an entity's animator while reading
+    /// its mesh (when present) — the `animate` system's re-pose step. Only the
+    /// animator is stamped: the step reads the clips and skeleton, and the palette
+    /// it leads to is derived (`World::set_pose_palette`), so animated meshes do not
+    /// grow the despawn index's work (#1708). `None` when missing or animator-less.
+    pub fn with_animator_mut_and_mesh<R>(
         &mut self,
         id: u32,
-        f: impl FnOnce(&mut AnimatorComponent, Option<&mut MeshComponent>) -> R,
+        f: impl FnOnce(&mut AnimatorComponent, Option<&MeshComponent>) -> R,
     ) -> Option<R> {
-        self.with_pair_mut::<AnimatorComponent, MeshComponent, R>(id, f)
+        self.with_mut_and_ref::<AnimatorComponent, MeshComponent, R>(id, f)
     }
 
     /// Assemble one live entity's columns into a document (serialization).

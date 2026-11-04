@@ -7,22 +7,18 @@
 //! and the character sweep reads it per move, so it applies immediately, as in
 //! Unity.
 
-use std::cell::RefCell;
-
 use crate::api::layers::check_index;
+use crate::api::ApiCell;
 use crate::api::{put, Reg};
 use crate::scene::Scene;
 
 /// Register `IgnoreLayerCollision` / `GetIgnoreLayerCollision` onto `Physics`.
-pub fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "IgnoreLayerCollision",
-        scope.create_function(|_, (a, b, ignore): (u8, u8, Option<bool>)| {
+        lua.create_function(move |lua, (a, b, ignore): (u8, u8, Option<bool>)| {
+            let scene = &*scene.get(lua)?;
             check_index(a)?;
             check_index(b)?;
             let collide = !ignore.unwrap_or(true);
@@ -37,10 +33,10 @@ pub fn register<'scope>(
     put(
         table,
         "GetIgnoreLayerCollision",
-        scope.create_function(|_, (a, b): (u8, u8)| {
+        lua.create_function(move |lua, (a, b): (u8, u8)| {
             check_index(a)?;
             check_index(b)?;
-            Ok(!scene.borrow().collision_matrix.can_collide(a, b))
+            Ok(!scene.get(lua)?.borrow().collision_matrix.can_collide(a, b))
         }),
     )
 }

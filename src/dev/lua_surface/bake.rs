@@ -17,35 +17,29 @@ use super::super::{
     bake::reflection as reflection_bake,
 };
 use super::generate::Overrides;
-use crate::api::{global_table, put, ApiScopedCtx, Reg};
+use crate::api::{global_table, put, ApiCtx, Reg};
 use crate::scene::lighting::placement::MIN_REGION;
 
 /// Add `Bake` to the `Probe`, `Reflection` and `Lighting` tables.
-pub(super) fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
-    register_probe(lua, scope, ctx)?;
-    register_reflection(lua, scope, ctx)?;
-    register_lighting(lua, scope, ctx)?;
-    register_lightmaps(lua, scope, ctx)
+pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
+    register_probe(lua, ctx)?;
+    register_reflection(lua, ctx)?;
+    register_lighting(lua, ctx)?;
+    register_lightmaps(lua, ctx)
 }
 
 /// `Probe.Bake()`: capture each probe's static surroundings to a cubemap and project
 /// the bounce into SH (#241).
-fn register_probe<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+fn register_probe(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let (scene, console) = (ctx.scene, ctx.console);
     put(
         &global_table(lua, "Probe")?,
         "Bake",
-        scope.create_function(move |_, ()| {
+        lua.create_function(move |lua, ()| {
+            let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
             refuse_while_baking(&scene).map_err(mlua::Error::external)?;
+            let console = &*console.get(lua)?;
             let mut log = BakeLog::to_console(console);
             probe_bake::bake_scene_probes(&mut scene, &mut log).map_err(mlua::Error::external)
         }),
@@ -53,21 +47,22 @@ fn register_probe<'scope>(
 }
 
 /// `Reflection.Bake()` (#245): for each probe capture the static surroundings to a
-/// cubemap, GGX-prefilter it into a roughness mip chain, write the KTX2 next to the
-/// scene and point the probe at it. Errors when the scene is unsaved (nowhere to write).
-fn register_reflection<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+/// cubemap, GGX-prefilter it into a roughness mip chain, write the KTX2 into the
+/// scene's own `<scene>.reflections/` folder and point the probe at it; the folder's
+/// cubes past the probe count are removed, all of them when there are no probes.
+/// Errors when there are probes and the scene is unsaved (nowhere to write).
+fn register_reflection(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let (scene, scene_path, console) = (ctx.scene, ctx.scene_path, ctx.console);
     put(
         &global_table(lua, "Reflection")?,
         "Bake",
-        scope.create_function(move |_, ()| {
+        lua.create_function(move |lua, ()| {
+            let scene = &*scene.get(lua)?;
+            let scene_path = &*scene_path.get(lua)?;
             let mut scene = scene.borrow_mut();
             let path = scene_path.borrow();
             refuse_while_baking(&scene).map_err(mlua::Error::external)?;
+            let console = &*console.get(lua)?;
             let mut log = BakeLog::to_console(console);
             reflection_bake::bake_scene_reflections(&mut scene, path.as_deref(), &mut log)
                 .map_err(mlua::Error::external)
@@ -79,17 +74,17 @@ fn register_reflection<'scope>(
 /// both sets (#246), the probe step of the editor's Generate Lighting button (#832).
 /// `true` when at least one bake ran on the GPU; errors only when a bake's own
 /// contract fails (reflections need a saved scene path).
-fn register_lighting<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+fn register_lighting(lua: &Lua, ctx: &ApiCtx) -> Reg {
     type BakeArgs = (Option<f32>, Option<f32>);
     let (scene, scene_path, nav, console) = (ctx.scene, ctx.scene_path, ctx.nav, ctx.console);
     put(
         &global_table(lua, "Lighting")?,
         "Bake",
-        scope.create_function(move |_, (spacing, region): BakeArgs| {
+        lua.create_function(move |lua, (spacing, region): BakeArgs| {
+            let scene = &*scene.get(lua)?;
+            let scene_path = &*scene_path.get(lua)?;
+            let nav = &*nav.get(lua)?;
+            let console = &*console.get(lua)?;
             let mut scene = scene.borrow_mut();
             let path = scene_path.borrow();
             let nav = nav.borrow();
@@ -136,11 +131,7 @@ fn bake_params(
 /// settings (#832).
 /// `Lighting.ClearLightmaps()` drops them all, back to probe / ambient lighting. The
 /// lightmap step of the editor's Generate Lighting button (#832).
-fn register_lightmaps<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+fn register_lightmaps(lua: &Lua, ctx: &ApiCtx) -> Reg {
     type Args = (
         Option<f32>,
         Option<u32>,
@@ -153,8 +144,10 @@ fn register_lightmaps<'scope>(
     put(
         &table,
         "BakeLightmaps",
-        scope.create_function(
-            move |_, (texels_per_unit, samples, bounces, seed, directional): Args| {
+        lua.create_function(
+            move |lua, (texels_per_unit, samples, bounces, seed, directional): Args| {
+                let scene = &*scene.get(lua)?;
+                let scene_path = &*scene_path.get(lua)?;
                 let overrides = Overrides {
                     texels_per_unit,
                     samples,
@@ -166,6 +159,7 @@ fn register_lightmaps<'scope>(
                 let path = scene_path.borrow();
                 let mut scene = scene.borrow_mut();
                 refuse_while_baking(&scene).map_err(mlua::Error::external)?;
+                let console = &*console.get(lua)?;
                 let mut log = BakeLog::to_console(console);
                 let path = path.as_deref();
                 let baked = lightmap_bake::bake_scene_lightmaps_logged(
@@ -180,8 +174,8 @@ fn register_lightmaps<'scope>(
     put(
         &table,
         "ClearLightmaps",
-        scope.create_function(move |_, ()| {
-            scene.borrow_mut().lightmaps.clear();
+        lua.create_function(move |lua, ()| {
+            scene.get(lua)?.borrow_mut().lightmaps.clear();
             Ok(())
         }),
     )

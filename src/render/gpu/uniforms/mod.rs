@@ -38,12 +38,14 @@ pub(crate) struct CameraUniform {
     pub prev_view_proj: [f32; 16],
     /// `x`: this camera's index in its stack, bottom to top (#1436): the velocity
     /// target's `.a`, so motion blur orders a higher camera in front. `y`: last
-    /// frame's game time (#1524), for the vertex blocks' motion. `zw`: the transparent
-    /// SSR march (#1570), steps and step length, zero where the camera traces none.
+    /// frame's game time (#1524), for the vertex blocks' motion. `zw`: unused.
     pub stack: [f32; 4],
     /// `view_proj`'s inverse (#1523), what refraction and absorption rebuild the
     /// opaque depth's world point with.
     pub inv_view_proj: [f32; 16],
+    /// The transparent SSR trace (#1570, #1736): steps, step length and the minimum
+    /// smoothness it reflects down to, then a pad; zero where the camera traces none.
+    pub ssr: [f32; 4],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in
@@ -146,7 +148,9 @@ pub(crate) struct LightingUniform {
     // `env_reflection` (#1668) 1.0 when surfaces reflect the sky and the reflection
     // probes; 0.0 in a light-probe capture, which bakes no specular (as Unity's).
     pub env_reflection: f32,
-    pub _sky_pad: f32,
+    // `diffuse_wrap` (#1698) 1.0 under `DiffuseModel::HalfLambert`: the squared wrap
+    // replaces Lambert in `calculate_pbr`, as in the lightmap and probe bakes.
+    pub diffuse_wrap: f32,
     // The resident reflection probes (#1206): a draw's instance names the two it
     // blends (`InstanceData::reflection_probe`, #1584), and the shader box-projects
     // against each one's box and samples its cube's layer of the binding-4 cube array.

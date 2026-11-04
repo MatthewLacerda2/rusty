@@ -9,9 +9,8 @@
 //! player and the harness the value changes in memory only. Either way, every
 //! option the player hasn't set follows the new default. Render-only.
 
-use std::cell::RefCell;
-
 use super::super::{put, Reg};
+use crate::api::ApiCell;
 use crate::core::application::Application;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::core::settings::GraphicsSettings;
@@ -26,62 +25,75 @@ fn option(call: &str, name: &str) -> mlua::Result<GraphicsOption> {
     })
 }
 
-/// `GetOption` / `SetOption` / `ResetOptions` / `GetOptionNames` and the project
-/// defaults' `GetDefaultOption` / `SetDefaultOption`.
-pub(super) fn register_options<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+/// `GetOption` / `SetOption` / `ResetOptions` / `GetOptionNames`, then
+/// [`register_defaults`].
+pub(super) fn register_options(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    graphics: &'scope RefCell<GraphicsSettings>,
-    app: &'scope RefCell<Application>,
+    graphics: ApiCell<GraphicsSettings>,
+    app: ApiCell<Application>,
 ) -> Reg {
     put(
         table,
         "GetOption",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| {
             let option = option("GetOption", &name)?;
-            Ok(graphics.borrow().options.allows(option))
+            Ok(graphics.get(lua)?.borrow().options.allows(option))
         }),
     )?;
     put(
         table,
         "SetOption",
-        scope.create_function(|_, (name, on): (String, bool)| {
+        lua.create_function(move |lua, (name, on): (String, bool)| {
             let option = option("SetOption", &name)?;
-            graphics.borrow_mut().options.choose(option, on);
+            graphics.get(lua)?.borrow_mut().options.choose(option, on);
             Ok(())
         }),
     )?;
     put(
         table,
         "ResetOptions",
-        scope.create_function(|_, ()| {
-            let defaults = app.borrow().graphics_defaults();
-            graphics.borrow_mut().options.reset(defaults);
+        lua.create_function(move |lua, ()| {
+            let defaults = app.get(lua)?.borrow().graphics_defaults();
+            graphics.get(lua)?.borrow_mut().options.reset(defaults);
             Ok(())
         }),
     )?;
     put(
         table,
         "GetOptionNames",
-        scope.create_function(|_, ()| Ok(GraphicsOption::ALL.map(GraphicsOption::name).to_vec())),
+        lua.create_function(|_, ()| Ok(GraphicsOption::ALL.map(GraphicsOption::name).to_vec())),
     )?;
+    register_defaults(lua, table, graphics, app)
+}
+
+/// The project defaults' `GetDefaultOption` / `SetDefaultOption`.
+fn register_defaults(
+    lua: &mlua::Lua,
+    table: &mlua::Table,
+    graphics: ApiCell<GraphicsSettings>,
+    app: ApiCell<Application>,
+) -> Reg {
     put(
         table,
         "GetDefaultOption",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| {
             let option = option("GetDefaultOption", &name)?;
-            Ok(app.borrow().graphics_defaults().allows(option))
+            Ok(app.get(lua)?.borrow().graphics_defaults().allows(option))
         }),
     )?;
     put(
         table,
         "SetDefaultOption",
-        scope.create_function(|_, (name, on): (String, bool)| {
-            let option = option("SetDefaultOption", &name)?;
-            let live = &mut graphics.borrow_mut().options;
-            app.borrow_mut()
-                .set_default_option(option, on, live)
-                .map_err(mlua::Error::RuntimeError)
+        lua.create_function(move |lua, (name, on): (String, bool)| {
+            graphics.with(lua, |graphics| {
+                let option = option("SetDefaultOption", &name)?;
+                let live = &mut graphics.borrow_mut().options;
+                app.get(lua)?
+                    .borrow_mut()
+                    .set_default_option(option, on, live)
+                    .map_err(mlua::Error::RuntimeError)
+            })
         }),
     )
 }

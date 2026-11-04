@@ -1,8 +1,9 @@
 """The merge queue: do the waiting that serialized merging costs.
 
-Merging stays serialized, one branch at a time, because rusty is one compiled
+Merging stays serialized, one tested tree at a time, because rusty is one compiled
 crate: two pull requests can each be green alone and break `main` together (a
-rename, a changed signature, a moved module). Nothing here proposes otherwise.
+rename, a changed signature, a moved module). This is the tree of one pull
+request; [`train`] lets up to four share one, under the same rule (#1785).
 What this automates is **who sits through the ten minutes** — merge `main`
 into the branch ([`update.advance`], #1568: never a rebase, so the push is a
 fast-forward, leased on the head it took), compile-check the updated tree ([`checks.verify`]), push it, wait

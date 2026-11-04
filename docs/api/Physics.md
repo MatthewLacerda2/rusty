@@ -176,7 +176,7 @@ Sweeping costs more, so flag only what is important or fast-moving for its size 
 leave everything else Discrete. A kinematic body is a pure mover, so Continuous
 only helps rapier account for its fast motion against dynamic bodies; it never stops
 it at a wall. Walls stop a character only through `CharacterController.Move`. The mode is honoured at body build and re-applied
-every tick, so flipping it mid-play takes effect immediately.
+on the next step after the Rigidbody changes, so flipping it mid-play takes effect immediately.
 
 A rigidbody's **`use_gravity`** flag (authored in the inspector / serialized in the
 scene) controls whether a body is pulled by the world's gravity (Unity:
@@ -188,7 +188,7 @@ against walls (#451). A walking character that should be blocked, step up stairs
 and know it is grounded uses a [`CharacterController`](CharacterController.md),
 and its script applies gravity itself. An entity with a collider but **no
 rigidbody** is likewise a kinematic mover. The flag is honoured at body build and
-each tick, so toggling it at runtime takes effect.
+re-applied on the next step after the Rigidbody changes, so toggling it at runtime takes effect.
 
 ### Layer collision matrix (#827)
 

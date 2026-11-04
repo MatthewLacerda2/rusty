@@ -7,7 +7,7 @@ import subprocess
 
 import ghrest
 from merging.queue import outcomes
-from merging.verdict import closing, github, runlist
+from merging.verdict import closing, github, reviewed, runlist
 from merging.watch import board, handbacks
 
 
@@ -93,6 +93,14 @@ def issues_block(repo: str, numbers: tuple[int, ...]) -> list[int] | None:
             issue = {**issue, "blocked_by": blockers}
         closes[n] = issue
     return closing.blocking(closes)
+
+
+def review_decided(repo: str, number: int) -> bool | None:
+    """Whether a comment now records pull request `number`'s review decision
+    ([`verdict.reviewed.decided`]), `None` when GitHub failed: what re-admits an
+    `AWAITS_REVIEW` hand-back (#1764)."""
+    listed = ghrest.pages(lambda path: quietly("api", path), f"repos/{repo}/issues/{number}/comments")
+    return None if listed is None else reviewed.decided(listed)
 
 
 def head_of(repo: str, number: int) -> str | None:

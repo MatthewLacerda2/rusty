@@ -7,28 +7,23 @@
 //! read off the live physics world. Each takes the skinned entity or any ancestor
 //! of it — the `root` a raycast returns works.
 
-use std::cell::RefCell;
-
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::physics::PhysicsWorld;
 use crate::scene::skeleton::RagdollOptions;
 use crate::scene::Scene;
 
 /// Register the `Ragdoll` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>, physics: ApiCell<Option<PhysicsWorld>>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     put(
         &t,
         "Build",
-        scope.create_function(|lua, (id, opts): (EntityArg, Option<Table>)| {
+        lua.create_function(move |lua, (id, opts): (EntityArg, Option<Table>)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Ragdoll", "Build")?;
             let mut options = RagdollOptions::default();
             if let Some(mass) = opts.map(|o| o.get::<Option<f32>>("mass")).transpose()? {
@@ -46,20 +41,25 @@ pub fn register<'scope>(
         }),
     )?;
     for (name, on) in [("Enable", true), ("Disable", false)] {
-        let f = scope.create_function(move |_, id: EntityArg| {
-            let id = id.live("Ragdoll", name)?;
-            let velocity = |bone: u32| physics.borrow().as_ref()?.body_velocity(bone);
-            scene
-                .borrow_mut()
-                .set_ragdoll(id, on, velocity)
-                .map_err(mlua::Error::RuntimeError)
+        let f = lua.create_function(move |lua, id: EntityArg| {
+            physics.with(lua, |physics| {
+                let id = id.live("Ragdoll", name)?;
+                let velocity = |bone: u32| physics.borrow().as_ref()?.body_velocity(bone);
+                scene
+                    .get(lua)?
+                    .borrow_mut()
+                    .set_ragdoll(id, on, velocity)
+                    .map_err(mlua::Error::RuntimeError)
+            })
         });
         put(&t, name, f)?;
     }
     put(
         &t,
         "IsEnabled",
-        scope.create_function(|_, id: EntityArg| Ok(scene.borrow().ragdoll_enabled(id.read()))),
+        lua.create_function(move |lua, id: EntityArg| {
+            Ok(scene.get(lua)?.borrow().ragdoll_enabled(id.read()))
+        }),
     )?;
     lua.globals().set("Ragdoll", t).map_err(|e| e.to_string())
 }

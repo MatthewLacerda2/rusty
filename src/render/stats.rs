@@ -44,8 +44,9 @@ pub struct RenderCounters {
     /// Point/spot lights binned into at least one light cluster (#434), summed
     /// over the camera stack.
     pub lights_visible: u32,
-    /// Point/spot lights outside a camera's view, culled before binning so they
-    /// cost it nothing (#434), summed over the camera stack.
+    /// Point/spot lights listed in no cluster: outside a camera's view (#434), or
+    /// kept but contributing nothing or with a cone missing the view (#1712), so
+    /// no pixel shades them; summed over the camera stack.
     pub lights_culled: u32,
     /// Entries written to the cluster light lists (#434): how many (cluster,
     /// light) pairs the shaders may visit, summed over the camera stack.
@@ -129,6 +130,10 @@ pub struct RenderCounters {
     /// texture compression and *Max Size* shrink (#1574). Not a per-frame count:
     /// the resident total at the frame's end.
     pub texture_bytes: u64,
+    /// GPU bytes of every lightmap page array held (#1694): the bound colour and
+    /// direction arrays and any other page list cached, every mip. The resident
+    /// total at the frame's end, not a per-frame count.
+    pub lightmap_bytes: u64,
 }
 
 impl RenderCounters {
@@ -170,6 +175,7 @@ impl RenderCounters {
             ("sky_reflection_bakes", self.sky_reflection_bakes.into()),
             ("opaque_copies", self.opaque_copies.into()),
             ("texture_bytes", self.texture_bytes),
+            ("lightmap_bytes", self.lightmap_bytes),
         ]
     }
 
@@ -223,6 +229,7 @@ impl Renderer {
             .values()
             .chain(self.texture_fallbacks.values());
         c.texture_bytes = textures.map(|t| gpu_bytes(&t.texture)).sum();
+        c.lightmap_bytes = self.lightmaps.gpu_bytes();
     }
 }
 

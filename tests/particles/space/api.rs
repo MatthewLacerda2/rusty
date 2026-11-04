@@ -3,9 +3,11 @@
 //! surviving save / load.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::{Quat, Vec3};
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::particle::{EmitMode, ParticleEmitterComponent, SimulationSpace};
 use rusty::core::curve::Range;
 use rusty::scene::Scene;
@@ -13,10 +15,10 @@ use rusty::scene::Scene;
 use super::{burst, emitter, state};
 
 /// Run `code` against `scene` with the `Particles` namespace registered.
-fn lua<R: mlua::FromLuaMulti>(scene: &RefCell<Scene>, code: &str) -> mlua::Result<R> {
+fn lua<R: mlua::FromLuaMulti>(scene: &Rc<RefCell<Scene>>, code: &str) -> mlua::Result<R> {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::particle::register(&lua, scope, scene).unwrap();
+    crate::lua::attempt(|| {
+        rusty::api::particle::register(&lua, bind(&lua, scene)).unwrap();
         lua.load(code).eval::<R>()
     })
 }
@@ -28,7 +30,7 @@ fn set_and_get_round_trip_and_a_bad_name_is_refused() {
     scene
         .world
         .set_particles(id, Some(ParticleEmitterComponent::default()));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let get = format!("return Particles.GetSimulationSpace({id})");
     assert_eq!(lua::<String>(&scene, &get).unwrap(), "World");
     lua::<()>(
@@ -56,7 +58,7 @@ fn a_burst_after_a_move_is_born_on_the_emitter_and_carried_once() {
     let mut cfg = emitter(SimulationSpace::Local, 0.0);
     cfg.shape = rusty::components::particle::EmitShape::Point;
     scene.world.set_particles(id, Some(cfg));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     lua::<()>(&scene, &format!("Particles.Burst({id})")).unwrap();
     let to = Vec3::new(0.0, 3.0, -2.0);
     scene.borrow_mut().world.transform_mut(id).unwrap().position = to;

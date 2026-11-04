@@ -2,17 +2,20 @@
 //! the entity's mesh; a bad slot or key is a Lua error, never a panic.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
 
+use crate::api::bind;
 use crate::components::{MaterialAsset, MaterialComponent, MeshComponent};
 use crate::scene::Scene;
 
 /// Run `script` against `scene`, returning what it returns (or its error's text).
-fn eval(scene: &RefCell<Scene>, script: &str) -> Result<String, String> {
+fn eval(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<String, String> {
     let lua = Lua::new();
-    lua.scope(|s| {
-        crate::api::material::register(&lua, s, scene).map_err(mlua::Error::RuntimeError)?;
+    crate::api::attempt(|| {
+        crate::api::material::register(&lua, bind(&lua, scene))
+            .map_err(mlua::Error::RuntimeError)?;
         let value: mlua::Value = lua.load(script).eval()?;
         Ok(match value {
             mlua::Value::Table(t) => t
@@ -27,7 +30,7 @@ fn eval(scene: &RefCell<Scene>, script: &str) -> Result<String, String> {
 
 /// An entity whose mesh is two runs drawn with `red` and `blue`, and a third
 /// library material `green`.
-fn two_run_quad() -> (RefCell<Scene>, u32) {
+fn two_run_quad() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Quad".into());
     let mesh = MeshComponent {
@@ -42,7 +45,7 @@ fn two_run_quad() -> (RefCell<Scene>, u32) {
     for key in ["red", "blue", "green"] {
         scene.materials.insert(key.into(), MaterialAsset::default());
     }
-    (RefCell::new(scene), id)
+    (Rc::new(RefCell::new(scene)), id)
 }
 
 #[test]
@@ -88,7 +91,7 @@ fn a_slot_out_of_range_or_an_unknown_key_is_an_error_that_changes_nothing() {
 
 #[test]
 fn an_entity_without_a_material_gets_one_from_set() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let id = scene.borrow_mut().add_entity("E".into());
     scene
         .borrow_mut()

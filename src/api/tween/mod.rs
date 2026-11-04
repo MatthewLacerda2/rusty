@@ -17,6 +17,7 @@ use mlua::{Lua, Table, Value};
 use super::timer::runtime;
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::Scene;
 use crate::scripting::{TimerScheduler, Wait, Work};
 use spec::{Args, Spec};
@@ -25,17 +26,13 @@ use spec::{Args, Spec};
 type ToArgs = (EntityArg, String, Value, f64, Option<Table>);
 
 /// Register the `Tween` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    timers: &'scope RefCell<TimerScheduler>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>, timers: ApiCell<TimerScheduler>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(
         &table,
         "To",
-        scope.create_function(move |lua, (id, path, target, duration, opts): ToArgs| {
+        lua.create_function(move |lua, (id, path, target, duration, opts): ToArgs| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Tween", "To")?;
             let args = Args {
                 id,
@@ -44,13 +41,15 @@ pub fn register<'scope>(
                 duration,
             };
             let spec = spec::parse(lua, &scene.borrow(), args, opts, false)?;
-            Ok(schedule(scene, timers, spec, None))
+            Ok(schedule(scene, &*timers.get(lua)?, spec, None))
         }),
     )?;
     put(
         &table,
         "Sequence",
-        scope.create_function(move |lua, steps: Table| {
+        lua.create_function(move |lua, steps: Table| {
+            let scene = &*scene.get(lua)?;
+            let timers = &*timers.get(lua)?;
             let specs = sequence(lua, &scene.borrow(), steps)?;
             let group = timers.borrow_mut().alloc();
             for spec in specs {
@@ -59,26 +58,35 @@ pub fn register<'scope>(
             Ok(group)
         }),
     )?;
+    register_control(lua, &table, timers)?;
+    lua.globals().set("Tween", table).map_err(|e| e.to_string())
+}
+
+/// `Kill`, `KillAll` and `IsPlaying`: the running tweens, by handle or owner.
+fn register_control(lua: &Lua, table: &Table, timers: ApiCell<TimerScheduler>) -> Reg {
     put(
-        &table,
+        table,
         "Kill",
-        scope.create_function(|_, handle: u64| Ok(timers.borrow_mut().kill_tweens(handle))),
+        lua.create_function(move |lua, handle: u64| {
+            Ok(timers.get(lua)?.borrow_mut().kill_tweens(handle))
+        }),
     )?;
     put(
-        &table,
+        table,
         "KillAll",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
             let id = id.live("Tween", "KillAll")?;
-            timers.borrow_mut().kill_owner_tweens(id);
+            timers.get(lua)?.borrow_mut().kill_owner_tweens(id);
             Ok(())
         }),
     )?;
     put(
-        &table,
+        table,
         "IsPlaying",
-        scope.create_function(|_, handle: u64| Ok(timers.borrow().tween_playing(handle))),
-    )?;
-    lua.globals().set("Tween", table).map_err(|e| e.to_string())
+        lua.create_function(move |lua, handle: u64| {
+            Ok(timers.get(lua)?.borrow().tween_playing(handle))
+        }),
+    )
 }
 
 /// Start a validated tween: write its `from` at once (so a delayed fade-in is

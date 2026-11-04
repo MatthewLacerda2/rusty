@@ -3,25 +3,23 @@
 //! included), and all three components survive a scene save → load.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec4;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{
     CanvasGroupComponent, FillMethod, FillOrigin, ImageComponent, ImageType, RectMaskComponent,
 };
 use rusty::scene::Scene;
 
 /// Run `f` with the three graphics namespaces registered over `scene`.
-fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
+fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::image::register(&lua, scope, scene).unwrap();
-        rusty::api::canvas_group::register(&lua, scope, scene).unwrap();
-        rusty::api::rect_mask::register(&lua, scope, scene).unwrap();
-        f(&lua);
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::image::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::api::canvas_group::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::api::rect_mask::register(&lua, bind(&lua, scene)).unwrap();
+    f(&lua);
 }
 
 #[test]
@@ -29,7 +27,7 @@ fn image_setters_validate_and_round_trip() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Bar".to_string());
     scene.world.set_image(id, Some(ImageComponent::default()));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "Image.SetColor({id}, 2, 0.5, 0, 0.25)
@@ -81,7 +79,7 @@ fn group_and_mask_setters_write_through() {
     scene
         .world
         .set_rect_mask(id, Some(RectMaskComponent::default()));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "CanvasGroup.SetAlpha({id}, 1.5)
