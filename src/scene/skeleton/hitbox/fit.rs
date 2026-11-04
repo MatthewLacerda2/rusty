@@ -113,12 +113,12 @@ fn fit_slot(skin: &SkinData, slot: usize, pts: &[Vec3], min_size: f32) -> Option
         hi = hi.max(q);
     }
     let size = hi - lo;
-    // Joint units → model units: the bone's bind scale (a skeleton exported at
-    // 0.01 measures its bones in centimetres).
-    let unit = skin
-        .bind_global
-        .get(slot)
-        .map_or(1.0, |m| m.x_axis.truncate().length());
+    // Joint units → model units: the bone's bind scale in model space (a
+    // skeleton exported at 0.01 measures its bones in centimetres, and so does a
+    // mesh under a Blender export's 0.01 `Armature`, #1822).
+    let unit = skin.bind_global.get(slot).map_or(1.0, |m| {
+        (skin.mesh_to_model() * *m).x_axis.truncate().length()
+    });
     if size.max_element() * unit < min_size {
         return None;
     }

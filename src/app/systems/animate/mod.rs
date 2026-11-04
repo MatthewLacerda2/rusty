@@ -22,14 +22,19 @@
 //!   angular velocity about +Y, since the solver owns a dynamic body's pose;
 //! - else the **Transform** moves by it outright (a kinematic body follows).
 //!
-//! The turn is applied about the entity's own up axis. An unknown root bone
-//! warns once in the console and moves nothing.
+//! The step is measured in the model's Y-up space (`animation::root_motion`)
+//! and carried into the world through the skinned entity and whatever sits
+//! between its mesh and the model in the file ([`SkinData::mesh_to_model`]: a
+//! Blender export's Z-up, centimetre `Armature`, #1822), so the turn is about
+//! the model's up axis as the entity shows it. An unknown root bone warns once
+//! in the console and moves nothing.
 
-use glam::{Quat, Vec3};
+use glam::{Mat4, Quat, Vec3};
 
 use crate::app::animation;
 use crate::app::resources::Resources;
 use crate::app::world::World;
+use crate::asset::mesh_data::SkinData;
 use crate::components::{root_chain, AnimatorComponent, RootMotion};
 use crate::scene::Scene;
 use apply::apply_root_motion;
@@ -57,20 +62,21 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
         // helper (#344) — the animate system's re-pose step.
         let stepped = s.world.with_animator_mut_and_mesh(id, |anim, mesh| {
             let stepped = animation::step(anim, mesh, graph, dt);
+            let skin = mesh.and_then(|m| m.skin.as_ref());
+            let model = model_in_entity(skin);
             let motion = stepped
                 .root
-                .map_or(RootMotion::ZERO, |m| to_world(m, frame));
-            let skin = mesh.and_then(|m| m.skin.as_ref());
+                .map_or(RootMotion::ZERO, |m| to_world(m, frame, model));
             let drives = anim.drives_root_motion(skin);
-            let state = &mut anim.root_motion;
-            state.last = motion;
-            state.moved = Vec3::ZERO;
-            if !drives {
-                state.carried = Vec3::ZERO;
-            }
+            measured(anim, motion, drives);
             let unknown = skin.and_then(|skin| unknown_bone(anim, skin));
             let writes = mesh.map(|m| animation::bone_writes(anim, m, graph));
-            (stepped.events, writes, drives.then_some(motion), unknown)
+            (
+                stepped.events,
+                writes,
+                drives.then_some((motion, model)),
+                unknown,
+            )
         });
         let Some((crossed, writes, applied, unknown)) = stepped else {
             continue;
@@ -88,9 +94,21 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
                 *t = local;
             }
         }
-        if let Some(motion) = applied {
-            apply_root_motion(&mut s, res, id, motion, dt);
+        if let Some((motion, model)) = applied {
+            apply_root_motion(&mut s, res, id, motion, model, dt);
         }
+    }
+}
+
+/// Keep this step's world-space root `motion` on `anim`, before anything
+/// moves; travel carried for a CharacterController lapses when root motion
+/// no longer `drives` the entity.
+fn measured(anim: &mut AnimatorComponent, motion: RootMotion, drives: bool) {
+    let state = &mut anim.root_motion;
+    state.last = motion;
+    state.moved = Vec3::ZERO;
+    if !drives {
+        state.carried = Vec3::ZERO;
     }
 }
 
@@ -123,13 +141,26 @@ fn unknown_bone(
     Some(anim.root_bone.clone())
 }
 
-/// `motion`, measured in the skinned entity's space, in world space: its
-/// displacement under the entity's world rotation and scale. The yaw stays a
-/// turn about the entity's own up axis.
-/// A non-finite one (a clip keyed with a NaN) moves nothing.
-fn to_world(motion: RootMotion, (rotation, scale): (Quat, Vec3)) -> RootMotion {
+/// Model space in the skinned entity's own (mesh-local) space: `skin`'s
+/// [`SkinData::mesh_to_model_axes`] inverted, `None` when their axes coincide
+/// (a native Y-up rig, or no skin), so such a rig's motion is carried exactly
+/// as before.
+fn model_in_entity(skin: Option<&SkinData>) -> Option<Mat4> {
+    skin?.mesh_to_model_axes().map(|m| m.inverse())
+}
+
+/// `motion`, measured in model space, in world space: its displacement taken
+/// into the entity's space by `model` ([`model_in_entity`]), then under the
+/// entity's world rotation and scale. The yaw stays a turn about the model's
+/// up axis. A non-finite one (a clip keyed with a NaN) moves nothing.
+fn to_world(
+    motion: RootMotion,
+    (rotation, scale): (Quat, Vec3),
+    model: Option<Mat4>,
+) -> RootMotion {
+    let local = model.map_or(motion.position, |m| m.transform_vector3(motion.position));
     let world = RootMotion {
-        position: rotation * (scale * motion.position),
+        position: rotation * (scale * local),
         yaw: motion.yaw,
     };
     match world.position.is_finite() && world.yaw.is_finite() {
@@ -140,6 +171,8 @@ fn to_world(motion: RootMotion, (rotation, scale): (Quat, Vec3)) -> RootMotion {
 
 #[cfg(test)]
 mod agent_tests;
+#[cfg(test)]
+mod armature_tests;
 #[cfg(test)]
 mod body_tests;
 #[cfg(test)]
