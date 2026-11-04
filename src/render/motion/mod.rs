@@ -115,7 +115,8 @@ pub(crate) enum Velocity {
     /// A target of depths (and cameras), but no entity poses: only SSR reads it
     /// (#1526), so its motion may be the camera's alone.
     Depths,
-    /// A target with each entity's motion: motion blur or depth of field reads it.
+    /// A target with each entity's motion: motion blur, TAA or depth of field reads
+    /// it.
     Motion,
 }
 

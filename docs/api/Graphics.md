@@ -628,6 +628,16 @@ FXAA); the Game view, the player and a render-texture camera with `taa_active` a
 off. It runs at the view's render-scale size: a render scale below 1 is resolved,
 then upscaled like the rest of the scene.
 
+**Harness screenshots see one frame of it, not a player's settled image.** A
+headless capture (`Harness.Screenshot`, `Harness.Render`) draws one frame per shot
+through one kept view, and FXAA is skipped whenever the resolve ran. So with TAA on,
+the first shot, and the first after any cut (another scene, Play or Stop, a shot at
+another size), is the raw jittered frame: aliased, and shifted up to half a pixel.
+Each later shot blends 0.1 of its own frame into the history of the shots before
+it, however many sim steps apart they were, so two shots of an unchanged scene can
+differ. To compare shots pixel for pixel, or to judge a scene's edges, turn TAA off
+for the capture (`Graphics.SetTaaActive(false)`: FXAA then runs, if it is on).
+
 ### Lighting settings
 
 The volume also carries the sun's shadow cascades and the ambient occlusion, which
@@ -812,7 +822,7 @@ An option can only turn an effect off; it never turns on what a camera left off.
 | `motion_blur` | the camera's motion blur |
 | `ssao` | the volume's ambient occlusion |
 | `ssr` | the volume's screen-space reflections |
-| `taa` | the camera's TAA (FXAA runs instead when it is off) |
+| `taa` | the camera's TAA (when it is off, FXAA runs if the camera's `fxaa_active` and the `fxaa` option allow it) |
 | `vignette` | the volume's vignette |
 
 Names are snake_case; an unknown name raises an error listing the valid ones.

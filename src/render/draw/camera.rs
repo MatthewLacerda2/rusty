@@ -64,7 +64,6 @@ pub(crate) struct CameraCtx<'a> {
     pub is_last: bool,
     /// A `DepthOnly` camera stacked on another (a viewmodel): see [`is_overlay`].
     pub overlay: bool,
-    pub aspect: f32,
     /// This camera's view-projection as it draws: jittered on a TAA view (#1702).
     pub view_proj: glam::Mat4,
     /// The stack's base (first) camera's unjittered view-projection, for post-FX.
@@ -127,7 +126,6 @@ impl<'a> CameraCtx<'a> {
             is_first: idx == 0,
             is_last: idx + 1 == stack.stack.len(),
             overlay,
-            aspect: shared.aspect,
             view_proj,
             base_view_proj: shared.view_projs[0],
             frustum: Frustum::from_view_proj(unjittered),

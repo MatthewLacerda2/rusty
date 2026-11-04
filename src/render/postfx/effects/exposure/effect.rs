@@ -44,7 +44,7 @@ fn automatic<'a>(post: PostSource<'a>) -> Option<&'a AutoExposure> {
         .map(|vc| &vc.exposure.automatic)
 }
 
-/// Meter this view's scene, after depth of field and motion blur, and adapt, on the
+/// Meter this view's scene, after depth of field, TAA and motion blur, and adapt, on the
 /// GPU, when its volume is `Automatic` and the view runs full post-FX; otherwise the
 /// next metered frame snaps.
 fn meter(r: &Renderer, view: &mut RenderView, cx: &PassCx) {

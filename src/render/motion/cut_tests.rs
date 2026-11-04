@@ -94,7 +94,7 @@ fn reset_is_a_cut_under_the_same_key() {
 #[test]
 fn cut_names_every_frame_with_no_last_frame() {
     let (scene, mut h) = (Scene::new(), MotionHistory::default());
-    let mut cut = |h: &mut MotionHistory, key| {
+    let cut = |h: &mut MotionHistory, key| {
         h.begin(key, &one(at(0.0)));
         h.end();
         h.cut()

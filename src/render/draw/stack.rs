@@ -57,7 +57,7 @@ impl Renderer {
             .zip(view_projs.iter().copied())
             .collect();
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
-        // this view runs motion blur, depth of field (#1445) or SSR, which reads its
+        // this view runs motion blur, TAA (#1702), depth of field (#1445) or SSR, which reads its
         // depths beside its own surface targets (#1526). A view shading
         // with its own forward pipeline (the Inspector's shader preview) writes none.
         let graphics = self.graphics(pass.editor_mode);
@@ -103,8 +103,8 @@ impl Renderer {
     }
 
     /// Run the post-process chain over the view's composited HDR target: every
-    /// effect's scene pass in order (depth of field, motion blur, the exposure meter,
-    /// bloom, the lens flare), the grading LUT's bake when its inputs changed, then the composite and
+    /// effect's scene pass in order (depth of field, TAA, motion blur, the exposure
+    /// meter, bloom, the lens flare), the grading LUT's bake when its inputs changed, then the composite and
     /// the LDR passes, writing the corrected image to `output`.
     pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &CameraCtx) {
         use crate::render::postfx::PostFxContext;
