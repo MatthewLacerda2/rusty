@@ -99,3 +99,54 @@ fn a_set_with_a_bad_field_writes_nothing() {
         "the field before the bad one is untouched"
     );
 }
+
+#[test]
+fn added_probes_are_manual_and_set_can_change_it() {
+    let scene = empty_scene();
+    let lua = Lua::new();
+    lua.scope(|scope| {
+        register(&lua, scope, &scene).unwrap();
+        let manual: bool = lua
+            .load("Reflection.Add(0,0,0, 1,1,1) return Reflection.Get(0).manual")
+            .eval()?;
+        assert!(manual, "Add places by hand (#1737)");
+        lua.load("Reflection.Set(0, { manual = false })").exec()?;
+        Ok(())
+    })
+    .unwrap();
+    assert!(!scene.borrow().reflection_probes.probes[0].manual);
+}
+
+/// A hand edit makes a placed probe manual, so the next bake keeps it (#1737),
+/// a Get-modify-Set round trip included; `Set{ manual = false }` un-marks a
+/// probe that is manual already.
+#[test]
+fn hand_edits_make_a_placed_probe_manual() {
+    let scene = empty_scene();
+    let lua = Lua::new();
+    for edit in [
+        "Reflection.Move(0, 1, 2, 3)",
+        "Reflection.SetBox(0, -1,-1,-1, 2,2,2)",
+        "Reflection.Set(0, { intensity = 2 })",
+        "local p = Reflection.Get(0); p.boxMax.y = 6; Reflection.Set(0, p)",
+    ] {
+        scene.borrow_mut().reflection_probes = Default::default();
+        scene
+            .borrow_mut()
+            .reflection_probes
+            .add(Vec3::ZERO, Vec3::ONE);
+        lua.scope(|scope| {
+            register(&lua, scope, &scene).unwrap();
+            lua.load(edit).exec()
+        })
+        .unwrap();
+        assert!(scene.borrow().reflection_probes.probes[0].manual, "{edit}");
+    }
+    lua.scope(|scope| {
+        register(&lua, scope, &scene).unwrap();
+        lua.load("Reflection.Set(0, { manual = false, intensity = 3 })")
+            .exec()
+    })
+    .unwrap();
+    assert!(!scene.borrow().reflection_probes.probes[0].manual);
+}

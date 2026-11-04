@@ -77,6 +77,11 @@ pub struct ReflectionProbe {
     pub shadows: bool,
     /// Brightness of the reflection this probe gives, a multiplier on its cube.
     pub intensity: f32,
+    /// Placed by hand (#1737): the automatic placement keeps it as it is (position,
+    /// box and settings) and leaves the room it covers to it, replacing only the
+    /// probes without it. `Reflection.Add` and the Inspector's Add set it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub manual: bool,
 }
 
 impl Default for ReflectionProbe {
@@ -112,6 +117,7 @@ impl ReflectionProbe {
             far_clip: 1000.0,
             shadows: true,
             intensity: 1.0,
+            manual: false,
         }
     }
 
