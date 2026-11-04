@@ -12,7 +12,9 @@
 //! back is exactly `E / π`. A ray that escapes returns the sky; one that hits a front
 //! face returns that surface's emission plus `albedo / π` times its direct light (a
 //! shadow ray per light), and keeps bouncing, `bounces` surfaces deep. A back face
-//! returns nothing, so light never leaks through a closed wall.
+//! returns nothing, so light never leaks through a closed wall. A path's light is
+//! clamped at [`INDIRECT_CLAMP`] (Cycles' *Clamp Indirect*, #1699), so a lamp hung
+//! against a surface bakes no speckle; the texel's own direct light is not.
 //!
 //! Alongside each part the tracer sums where the light came from (#810): every ray's
 //! direction weighted by the luminance it brought back, so the bake can store the
@@ -33,6 +35,13 @@ use crate::core::color::luminance;
 const SURFACE_OFFSET: f32 = 1e-3;
 /// Nearest hit a ray accepts.
 pub(super) const T_MIN: f32 = 1e-4;
+/// The brightest one bounce path may come back (#1699), Blender Cycles' *Clamp
+/// Indirect* at its default of 10: a path is scaled down, hue kept, until its
+/// brightest channel is at most this. Inverse-square light has no ceiling, so a
+/// lamp hung 5 cm under a ceiling lights the spot beside it hundreds of times
+/// brighter than the rest; a path that happens to hit there would add a speckle
+/// the bake's filter only smears. The texel's own direct light is never clamped.
+pub(super) const INDIRECT_CLAMP: f32 = 10.0;
 /// The share of a texel's rays that may start out on back faces before the texel is
 /// judged to be inside geometry (Unity's backface tolerance, inverted).
 const BACKFACE_TOLERANCE: f32 = 0.5;
@@ -111,14 +120,15 @@ impl Tracer<'_> {
                 break;
             };
             let Some((point, hit_normal, m)) = self.surface(&hit, dir) else {
-                return (radiance, first, depth == 0); // back face: nothing comes through
+                // A back face: nothing comes through.
+                return (clamp_indirect(radiance), first, depth == 0);
             };
             let lit = self.direct(point, hit_normal, false, 1, rng).0;
             radiance += throughput * (m.emissive + m.albedo * lit / PI);
             throughput *= m.albedo;
             (origin, normal) = (point, hit_normal);
         }
-        (radiance, first, false)
+        (clamp_indirect(radiance), first, false)
     }
 
     /// The offset hit point, its shading normal and the material run it landed on
@@ -190,6 +200,16 @@ impl Tracer<'_> {
     /// its direction, breaking `|indirect_dir| <= luminance(indirect)` (#810).
     fn sky(&self, dir: Vec3) -> Vec3 {
         self.scene.sky.incoming(dir).max(Vec3::ZERO)
+    }
+}
+
+/// `radiance` scaled down, hue kept, so no channel passes [`INDIRECT_CLAMP`].
+pub(super) fn clamp_indirect(radiance: Vec3) -> Vec3 {
+    let peak = radiance.max_element();
+    if peak > INDIRECT_CLAMP {
+        radiance * (INDIRECT_CLAMP / peak)
+    } else {
+        radiance
     }
 }
 
