@@ -172,6 +172,41 @@ pub fn walk(skin: &SkinData) -> AnimationClip {
     clip
 }
 
+/// A one-second clip "Lunge" on `skin`: the hips travel `travel` and turn
+/// `turn` radians about their own model +Y, both in model space whatever the
+/// armature, linearly, and rise 0.1 model units halfway (#1822).
+pub fn lunge(skin: &SkinData, travel: Vec3, turn: f32) -> AnimationClip {
+    let parent = skin.mesh_to_model() * skin.root_offset(HIPS);
+    let rest = skin.local_bind[HIPS];
+    let (_, spin, _) = parent.to_scale_rotation_translation();
+    let times = vec![0.0, 0.5, 1.0];
+    let key = |t: f32| {
+        let lift = Vec3::Y * 0.1 * (1.0 - (2.0 * t - 1.0).abs());
+        let at = rest.translation + parent.inverse().transform_vector3(travel * t + lift);
+        let rotation = spin.inverse() * Quat::from_rotation_y(turn * t) * spin * rest.rotation;
+        (at, rotation)
+    };
+    let mut tracks = vec![JointTrack::default(); BONES.len()];
+    let keys: Vec<(Vec3, Quat)> = times.iter().map(|&t| key(t)).collect();
+    tracks[HIPS].translation = Track {
+        times: times.clone(),
+        values: keys.iter().map(|k| k.0).collect(),
+        interpolation: Interpolation::Linear,
+    };
+    tracks[HIPS].rotation = Track {
+        times: times.clone(),
+        values: keys.iter().map(|k| k.1).collect(),
+        interpolation: Interpolation::Linear,
+    };
+    let mut clip = AnimationClip {
+        name: "Lunge".into(),
+        tracks,
+        duration: 0.0,
+    };
+    clip.recompute_duration();
+    clip
+}
+
 /// `skin`'s model-space joint globals at `clip`'s key `k` (every keyed track
 /// has a value there, or one held), rests where unkeyed.
 pub fn posed(skin: &SkinData, clip: &AnimationClip, k: usize) -> Vec<Mat4> {

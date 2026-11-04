@@ -14,6 +14,10 @@ fn shape(kind: ShapeKind, softness: f32) -> Node {
         size: [0.7, 0.5],
         roundness: 0.4,
         softness: softness.into(),
+        sides: 6,
+        points: 5,
+        inner_radius: 0.5,
+        profile: Default::default(),
     });
     node("s", op, &[])
 }
@@ -60,6 +64,10 @@ fn hard_surface() -> Vec<(String, OpKind)> {
             size: [1.3, 0.4],
             roundness: 0.5,
             softness: 0.1.into(),
+            sides: 6,
+            points: 5,
+            inner_radius: 0.5,
+            profile: Default::default(),
         });
         ops.push((format!("shape {kind:?}"), op));
     }
@@ -93,6 +101,10 @@ fn tile_of_a_rect_panel_has_no_gaps_at_the_cell_borders() {
         size: [1.0, 1.0],
         roundness: 0.0,
         softness: 0.0.into(),
+        sides: 6,
+        points: 5,
+        inner_radius: 0.5,
+        profile: Default::default(),
     });
     let tile = OpKind::Tile(Tile {
         count: 3.0,

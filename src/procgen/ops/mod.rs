@@ -17,7 +17,8 @@
 //!   RGB→BW.
 //! - [`filter`] — neighbourhood ops: separable box or Gaussian blur, and the
 //!   height-derived masks cavity and curvature; [`distance`] — a mask's distance
-//!   from its edge, a bevel for any shape.
+//!   from its edge, a bevel for any shape; [`flood`] — a mask's islands, each with
+//!   its centroid and box, for the flood-fill ops.
 //!
 //! These are the ops' math. Each op itself (its params, catalog row and how it
 //! calls this math) is one file in [`super::catalog`] (#1751), and [`eval_node`]
@@ -32,6 +33,7 @@ pub mod distance;
 pub mod dummy;
 pub mod field;
 pub mod filter;
+pub mod flood;
 pub mod generators;
 pub mod math;
 pub mod tile;

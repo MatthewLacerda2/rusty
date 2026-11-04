@@ -166,14 +166,21 @@ impl Scene {
         dir.try_normalize().unwrap_or(Vec3::Y)
     }
 
-    /// `owner`'s front and side (its +Z and +X) as drawn, through its own mirror
-    /// (#1145).
+    /// `owner`'s front and side (the model's +Z and +X) as drawn, through its
+    /// own mirror (#1145). Read in model space, so a mesh under a Blender
+    /// export's turned `Armature` (its own +Z pointing down) still bends its
+    /// knees forward (#1822).
     fn front_and_side(&self, owner: u32) -> (Vec3, Vec3) {
         let w = &self.world;
-        (
-            w.transform_direction(owner, Vec3::Z),
-            w.transform_direction(owner, Vec3::X),
-        )
+        let model = w
+            .mesh(owner)
+            .and_then(|m| m.skin.as_ref()?.mesh_to_model_axes());
+        let to_mesh = model.map(|m| m.inverse());
+        let axis = |model: Vec3| {
+            let local = to_mesh.map_or(model, |m| m.transform_vector3(model).normalize());
+            w.transform_direction(owner, local)
+        };
+        (axis(Vec3::Z), axis(Vec3::X))
     }
 
     /// A collider's volume at its world scale — what its share of the mass is

@@ -3,8 +3,11 @@
 //!
 //! One bone (the Animator's `root_bone`, else the skeleton's first root joint)
 //! carries the character's travel. Each step, its **horizontal** displacement
-//! and its **yaw** (the twist about the entity's up axis), both measured in the
-//! skinned entity's space, are the step's [`RootMotion`]:
+//! and its **yaw** (the twist about the up axis), both measured in the model's
+//! Y-up space ([`SkinData::mesh_to_model`], #1822: a Blender export's Z-up,
+//! centimetre `Armature` above the mesh is undone, so its forward travel is not
+//! mistaken for vertical), are the step's [`RootMotion`] (the `animate` system
+//! carries it into the world through the skinned entity):
 //! - per clip, over the playhead's travel before any wrap: a loop's wrap splits
 //!   the travel at the seam and chains the pieces, so a looping walk keeps
 //!   walking instead of snapping back, and a clamped clip stops at its end;
@@ -37,7 +40,7 @@ use super::motion::Pose;
 /// absurd speed on a short clip can't spin the walk (the events' own cap).
 const MAX_CYCLES: usize = 16;
 
-/// Where the bone stands in the skinned entity's space and which way it faces.
+/// Where the bone stands in model space and which way it faces.
 #[derive(Clone, Copy, Debug)]
 struct Frame {
     position: Vec3,
@@ -50,7 +53,11 @@ pub struct RootBone {
     slot: usize,
     /// The bone's joint chain from its skeleton root down to it.
     chain: Vec<usize>,
-    /// Where the bone stands in the bind pose, in the skinned entity's space.
+    /// Mesh-local space into model space, `None` when their axes coincide (a
+    /// native Y-up rig), so such a rig's deltas are computed exactly as before
+    /// ([`SkinData::mesh_to_model_axes`]).
+    model: Option<Mat4>,
+    /// Where the bone stands in the bind pose, in model space.
     bind_position: Vec3,
     /// Its bind rotation there: yaw is measured relative to it, so a bone
     /// bound flipped (a Z-up rig's hips) still has a twist to measure.
@@ -67,11 +74,12 @@ impl RootBone {
         let mut bone = Self {
             slot,
             chain,
+            model: skin.mesh_to_model_axes(),
             bind_position: Vec3::ZERO,
             bind_rotation: Quat::IDENTITY,
         };
-        let bind = bone.entity_matrix(skin, bone.chain.len(), |s| skin.local_bind[s]);
-        // lint: allow(world-space) a joint chain in the skinned entity's space, rig data, not the scene hierarchy
+        let bind = bone.model_matrix(skin, bone.chain.len(), |s| skin.local_bind[s]);
+        // lint: allow(world-space) a joint chain in model space, rig data, not the scene hierarchy
         let (_, rotation, position) = bind.to_scale_rotation_translation();
         bone.bind_position = position;
         bone.bind_rotation = rotation.normalize();
@@ -92,15 +100,16 @@ impl RootBone {
         })
     }
 
-    /// The first `depth` joints of the chain composed in the skinned entity's
-    /// space, each joint's local from `local`.
-    fn entity_matrix(
+    /// The first `depth` joints of the chain composed in model space, each
+    /// joint's local from `local`.
+    fn model_matrix(
         &self,
         skin: &SkinData,
         depth: usize,
         local: impl Fn(usize) -> JointTransform,
     ) -> Mat4 {
         let offset = skin.root_offset(self.chain[0]);
+        let offset = self.model.map_or(offset, |model| model * offset);
         self.chain[..depth]
             .iter()
             .fold(offset, |m, &s| m * local(s).matrix())
@@ -109,13 +118,13 @@ impl RootBone {
     /// The bone's frame in `clip` at clip time `time`.
     fn at(&self, skin: &SkinData, clip: &AnimationClip, time: f32) -> Frame {
         let depth = self.chain.len();
-        self.frame(self.entity_matrix(skin, depth, |s| sample_joint(skin, clip, s, time)))
+        self.frame(self.model_matrix(skin, depth, |s| sample_joint(skin, clip, s, time)))
     }
 
-    /// Where the bone stands under the entity-space matrix `m`, and its yaw
+    /// Where the bone stands under the model-space matrix `m`, and its yaw
     /// away from its bind facing.
     fn frame(&self, m: Mat4) -> Frame {
-        // lint: allow(world-space) a joint chain in the skinned entity's space, rig data, not the scene hierarchy
+        // lint: allow(world-space) a joint chain in model space, rig data, not the scene hierarchy
         let (_, rotation, position) = m.to_scale_rotation_translation();
         Frame {
             position,
@@ -124,7 +133,7 @@ impl RootBone {
     }
 
     /// The twist about +Y that turns the bone's bind rotation into `rotation`
-    /// (applied in the entity's space, after the bind rotation).
+    /// (applied in model space, after the bind rotation).
     fn yaw(&self, rotation: Quat) -> f32 {
         yaw_of(rotation * self.bind_rotation.inverse())
     }
@@ -176,15 +185,15 @@ impl RootBone {
             return;
         }
         let local = |s: usize| pose.get(s).copied().flatten().unwrap_or(skin.local_bind[s]);
-        let parent = self.entity_matrix(skin, self.chain.len() - 1, local);
+        let parent = self.model_matrix(skin, self.chain.len() - 1, local);
         let posed = parent * local(self.slot).matrix();
-        // lint: allow(world-space) a joint chain in the skinned entity's space, rig data, not the scene hierarchy
+        // lint: allow(world-space) a joint chain in model space, rig data, not the scene hierarchy
         let (scale, rotation, position) = posed.to_scale_rotation_translation();
         let rotation = Quat::from_rotation_y(-self.yaw(rotation)) * rotation;
         let position = Vec3::new(self.bind_position.x, position.y, self.bind_position.z);
         let held = Mat4::from_scale_rotation_translation(scale, rotation.normalize(), position);
         let held = parent.inverse() * held;
-        // lint: allow(world-space) a joint chain in the skinned entity's space, rig data, not the scene hierarchy
+        // lint: allow(world-space) a joint chain in model space, rig data, not the scene hierarchy
         let (scale, rotation, translation) = held.to_scale_rotation_translation();
         if let Some(slot) = pose.get_mut(self.slot) {
             *slot = Some(JointTransform {
@@ -234,6 +243,8 @@ fn wrap_angle(angle: f32) -> f32 {
     }
 }
 
+#[cfg(test)]
+mod armature_tests;
 #[cfg(test)]
 mod bind_tests;
 #[cfg(test)]

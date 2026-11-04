@@ -12,7 +12,8 @@ use crate::procgen::recipe::{
 
 /// Voronoi / Worley cellular pattern; `randomness` jitters each cell's point (0 = a
 /// regular grid, 1 = anywhere in its cell); `metric` is how distance is measured.
-/// A linked `randomness` is read once per cell, at its centre.
+/// A linked `randomness` is read once per cell, at its centre. `smoothness` (0–1)
+/// rounds `smooth_f1`'s creases, Blender's *Smooth F1*; the other outputs ignore it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Voronoi {
     pub scale: f32,
@@ -22,6 +23,8 @@ pub struct Voronoi {
     pub metric: VoronoiMetric,
     #[serde(default = "one")]
     pub randomness: Param,
+    #[serde(default = "one_f32")]
+    pub smoothness: f32,
     #[serde(default)]
     pub seed: u32,
 }
@@ -35,13 +38,14 @@ impl Row for Voronoi {
             req("scale", "number"),
             OpParam {
                 default: Some(Lit::Text("distance")),
-                ..choice("output", &["distance", "cells", "f2", "edges"])
+                ..choice("output", &["distance", "cells", "f2", "edges", "smooth_f1"])
             },
             OpParam {
                 default: Some(Lit::Text("euclidean")),
                 ..choice("metric", &["euclidean", "manhattan", "chebyshev"])
             },
             socket(opt("randomness", "number", Lit::Number(1.0))),
+            opt("smoothness", "number", Lit::Number(1.0)),
             SEED,
         ],
     );
@@ -67,4 +71,8 @@ impl Op for Voronoi {
 
 fn one() -> Param {
     Param::Num(1.0)
+}
+
+fn one_f32() -> f32 {
+    1.0
 }
