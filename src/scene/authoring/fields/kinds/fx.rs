@@ -44,6 +44,8 @@ inspect! {
         op!("graph_enabled", animator::set_graph_enabled),
         ro!("layers", "Animator.SetLayerWeight writes a layer's weight"),
         ro!("ik", "Animator.AddTwoBoneIK / AddAimIK / SetIKWeight write them"),
+        op!("apply_root_motion", animator::set_apply_root_motion),
+        op!("root_bone", animator::set_root_bone),
     ];
     ParticleEmitterComponent => particles, particles_mut, &[
         op!("active", fx::set_active),
