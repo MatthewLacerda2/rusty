@@ -81,7 +81,8 @@ id and no mask.
 - `query_triggers` defaults to `true`: every query hits triggers, as Unity does
   with its *Queries Hit Triggers* setting on. Pass `false` to pass through them
   (a bullet through a smoke volume or a pickup zone). It takes an entity's
-  `Physics.IsTrigger` flag, and applies to every cast and volume query.
+  `Physics.IsTrigger` flag, except on a `CharacterController`, whose capsule stays solid
+  whatever its Collider says, and applies to every cast and volume query.
 
 ### Spatial queries (#311)
 

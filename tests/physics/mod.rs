@@ -1,3 +1,4 @@
+mod cast_character;
 mod cast_options;
 mod character;
 mod contacts;

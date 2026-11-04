@@ -36,12 +36,16 @@ impl Filter {
     /// Whether the collider owned by `id` counts: not the ignored entity,
     /// hittable ([`is_hittable`]), not a trigger when triggers are off, and on
     /// a layer the mask names. The trigger flag read is the scene's
-    /// `Collider.is_trigger`, which the live world's sensor flag follows.
+    /// `Collider.is_trigger`, which the live world's sensor flag follows, except
+    /// on a character: its capsule replaces that Collider and is never a sensor.
     pub fn accepts(self, scene: &Scene, id: u32) -> bool {
         if Some(id) == self.ignore || !is_hittable(scene, id) {
             return false;
         }
-        if !self.triggers && scene.world.collider(id).is_some_and(|c| c.is_trigger) {
+        let world = &scene.world;
+        let trigger =
+            world.collider(id).is_some_and(|c| c.is_trigger) && !world.has_character_controller(id);
+        if !self.triggers && trigger {
             return false;
         }
         self.mask
