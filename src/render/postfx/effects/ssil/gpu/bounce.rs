@@ -1,5 +1,6 @@
 //! What SSIL adds (#1750): a dynamic light's bounce off a red wall tints the white
-//! floor; a scene lit only by indirect light gains nothing; off draws as before.
+//! floor and no metal one; a scene lit only by indirect light gains nothing; off
+//! draws as before.
 
 use super::fixture::{energy, on, patch, renderer, scene, settled, FLOOR, LAMP};
 use crate::components::Ssil;
@@ -64,4 +65,29 @@ fn gpu_the_first_frame_with_ssil_adds_nothing() {
     let first = settled(&mut r, &scene(on(1.0), LAMP).0, 1);
     let off = settled(&mut r, &scene(Ssil::default(), LAMP).0, 1);
     assert!(first == off, "no smear before a history");
+}
+
+#[test]
+fn gpu_a_metal_floor_takes_no_bounce() {
+    let Some(mut r) = renderer() else { return };
+    // The bounce goes through the diffuse response, `(1 − metallic)`. Read a metre
+    // out from the wall, where the patch holds floor alone (at `FLOOR` it touches
+    // the wall's foot, which a metal floor's own lamp light lights).
+    let at = glam::Vec3::new(1.5, 0.0, -5.0);
+    let red = |r: &mut _, ssil, metallic| {
+        let (mut scene, _) = scene(ssil, LAMP);
+        scene.materials.get_mut("floor").unwrap().metallic = metallic;
+        patch(&settled(r, &scene, 4), at)[0]
+    };
+    let rough = (red(&mut r, Ssil::default(), 0.0), red(&mut r, on(4.0), 0.0));
+    let metal = (red(&mut r, Ssil::default(), 1.0), red(&mut r, on(4.0), 1.0));
+    eprintln!("[ssil] the floor's red off/on: rough {rough:?}, metal {metal:?}");
+    assert!(
+        rough.1 >= rough.0 * TINT,
+        "a rough floor there takes the bounce"
+    );
+    assert!(
+        metal.1 <= metal.0 * (1.0 + INDIRECT_GAIN),
+        "a metal takes none"
+    );
 }
