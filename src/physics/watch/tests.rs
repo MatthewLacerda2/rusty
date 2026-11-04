@@ -21,14 +21,11 @@ pub struct Twin {
 }
 
 impl Twin {
-    /// Both copies take one real step first: rapier panics when a world whose
-    /// first step had `dt` 0 then loses a body (#1795). Drop the step once fixed.
+    /// Both copies, built and never stepped.
     pub fn new() -> Self {
-        let (mut a, mut b) = (fixture(), fixture());
-        let (mut fast, mut full) = (PhysicsWorld::from_scene(&a), PhysicsWorld::from_scene(&b));
+        let (a, b) = (fixture(), fixture());
+        let (fast, mut full) = (PhysicsWorld::from_scene(&a), PhysicsWorld::from_scene(&b));
         full.tracked.always_full = true;
-        fast.step(&mut a, 1.0 / 60.0);
-        full.step(&mut b, 1.0 / 60.0);
         Self { a, b, fast, full }
     }
 
@@ -91,6 +88,15 @@ fn a_joint_from_a_fixed_body_to_a_disabled_one_steps() {
         Op::World(W::On(1, Edit::Overwrite(true, true))),
     ])
     .unwrap();
+}
+
+/// The sequence that panicked rapier's island manager (#1795): the world's first
+/// step has `dt` 0 (Play starting paused), a dynamic body is despawned, and the
+/// next real step steps on.
+#[test]
+fn a_paused_first_step_then_a_despawn_steps() {
+    use crate::ecs::changes::ops_tests::{Edit, Op as W};
+    agree(&[Op::Pause, Op::World(W::On(1, Edit::Despawn)), Op::Step]).unwrap();
 }
 
 /// Bodies at rest write back what they hold, which stamps nothing: once the

@@ -1,6 +1,7 @@
-//! src/scene/serialize_tests.rs — a loaded document's one-sided parent links
-//! (PR #1774's review, #1805): a child naming a parent whose `children` lacks it is
-//! listed there as it loads, so switching the parent off hides the child.
+//! src/scene/serialize_tests.rs — what applying a loaded document holds: a one-sided
+//! parent link (PR #1774's review, #1805): a child naming a parent whose `children`
+//! lacks it is listed there as it loads, so switching the parent off hides the child;
+//! and the bake settings are held to their ranges (#1704).
 
 use crate::scene::{apply_scene_data, to_scene_data, Scene};
 
@@ -44,4 +45,16 @@ fn a_file_with_both_sides_loads_its_children_once() {
     let mut loaded = Scene::new();
     apply_scene_data(&mut loaded, to_scene_data(&scene));
     assert_eq!(loaded.world.children(group), vec![child]);
+}
+
+#[test]
+fn a_hand_edited_max_lightmap_size_reads_back_as_the_page_it_bakes_at() {
+    let mut data = to_scene_data(&Scene::new());
+    data.lighting_settings.lightmaps.max_lightmap_size = 5000;
+    data.lighting_settings.lightmaps.samples = 0;
+    let mut loaded = Scene::new();
+    apply_scene_data(&mut loaded, data);
+    let held = loaded.lighting_settings.lightmaps;
+    assert_eq!(held.max_lightmap_size, 4096, "what GetSettings returns");
+    assert_eq!(held.samples, 1, "the other knobs are held the same way");
 }
