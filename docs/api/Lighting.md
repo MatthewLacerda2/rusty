@@ -84,34 +84,52 @@ The two individual verbs stay for a script that wants only one of them.
 `Lighting.Bake()` (#246) auto-places light probes and reflection probes from the static
 scene, then runs **both** probe bakes (`Probe.Bake` + `Reflection.Bake`) in one call: the
 probe half of Generate Lighting, and the orchestration over the `Probe` and `Reflection`
-namespaces, which stay available for manual placement.
+namespaces, which stay available for manual placement. The placement is planned into
+a copy: the scene keeps its old probes and their lighting until both bakes finish, and
+then the new sets replace them in one step (as Unity's bake applies only when it
+completes). A bake that is refused (no saved scene to write cubemaps beside), dropped
+(the probes edited midway), fails (a cubemap that cannot be written) or has no GPU
+adapter changes nothing.
 
 **Auto-placement** (deterministic — a pure function of the static scene, no RNG/clock,
 so the same level always yields the same layout). Both sets are planned from the same
 two pictures of the level (#1737):
 
 - the **floor plan**: where actors stand. With a baked **nav surface** it holds only
-  **reachable** floor: the largest area joined by walking, any area holding a
-  `NavMeshAgent` or `CharacterController`, and what off-mesh links (drops, jumps) lead
-  to from those. So wall tops, roof tops and crate tops no one reaches get no probe.
+  **reachable** floor: every area joined by walking that holds a `NavMeshAgent` or
+  `CharacterController`, or, with none of those on the surface, the largest area that
+  is not an **elevated top** (an area lying over at least half of another area: a roof
+  over its room, so an indoor level whose roof is larger than its room still probes
+  the room), and what off-mesh links (drops, jumps) lead to from those. So wall tops,
+  roof tops and crate tops no one reaches get no probe.
   Without a nav surface the plan is rasterized from the static colliders' bounds
   (each cell's lowest top) and has no connectivity to read, so every floor in it counts.
-  Either way, **a liquid is not floor**: a floor under a static, flat, `Transparent`
-  mesh with no solid collider (a pool's water plane) is dropped, so no probe captures
-  from at or under the water. A collider-less glass pane laid flat reads as a liquid
+  Either way, **a liquid is not floor**: under a static, flat, `Transparent` mesh with
+  no solid collider (a pool's water plane), the first floor below its surface is
+  dropped when it is at least 0.3 m down, so no probe captures from at or under the
+  water. A floor further down (the storey under a rooftop pool) stays, and so does the
+  floor under a puddle or grime quad laid just over it. A collider-less glass pane laid flat reads as a liquid
   too; give a skylight a collider.
-- an **occupancy grid**: the static colliders voxelized at **0.5 m** (their triangles;
-  convex shapes filled), one bit a cell: about 1.6 MB for a Dust2-sized level
-  (200 × 200 × 40 m); a level past 256 M cells is gridded coarser.
+- an **occupancy grid**: the static solids voxelized at **0.5 m**, one bit a cell: the
+  active solid colliders (their triangles; convex shapes filled), and the opaque
+  triangles of every static mesh whose entity has no solid collider (their surface;
+  so a ceiling built as a render mesh roofs its room). Transparent runs are left out,
+  so water and glass are not solid. About 1.6 MB for a Dust2-sized level
+  (200 × 200 × 40 m), built in about 2 s in a debug build (3.4 s when every wall is
+  also a collider-less mesh); a level past 256 M cells is gridded coarser.
 
 - **Light probes** — after Unity's Adaptive Probe Volumes: a lattice through the air
   over every reachable floor (each storey), from 1 m up to 3 m of headroom, never past
-  a ceiling or through a solid between the floor and the probe. Its coarse points, at
-  `probeSpacing` (default `4.0`), are always kept; the points between, at half the
-  spacing, only near geometry (a horizontal ray meets a wall or a crate within half
+  a ceiling, through a solid between the floor and the probe, or behind a wall from the
+  floor cell it was placed over. Its coarse points, at `probeSpacing` (default `4.0`,
+  held to at least `1.0`), are always kept; the points between, at half that, only
+  near geometry (a horizontal ray meets a wall or a crate within half
   the spacing). A probe closer than 0.3 m to geometry is pushed out of it, and one still
   inside a solid is dropped. The layout has no regular grid, so objects blend the
-  four nearest probes (`Probe.md`). With no static solid at all, a regular grid over
+  four nearest probes (`Probe.md`), found through a spatial index: about 1.3 µs a
+  sample in a release build over a Dust2-sized set of 7,680 probes, against 12 µs for
+  a scan of all of them. A moving Light Probe Proxy Volume samples each of its
+  points, so a 32³ one costs about 40 ms on every frame it moves. With no static solid at all, a regular grid over
   the nav surface's walkable extent is placed instead.
 - **Reflection probes** — **one per room** (#1584). The floor plan
   is cut into rooms where it narrows
@@ -127,12 +145,16 @@ two pictures of the level (#1737):
   A room wider than its region is split into probes no wider than it: the region is
   `reflectionRegion` (default `12.0`, at least `2.0`: a smaller one is
   an error) for an empty room, narrowed by its **clutter** (the solid fraction of the
-  air between 0.4 m and 1.8 m over its floor: a room a quarter full of crates takes
-  probes a quarter as wide). Open floor too narrow to hold a room
+  air between 0.4 m and 1.8 m over its floor, column by column from each one's own
+  floor, the blocked patches of up to 16 m² it encloses counted: a room a quarter
+  full of crates takes probes a quarter as wide, while the solid core a corridor wraps
+  is architecture, not clutter). Open floor too narrow to hold a room
   (a level of corridors narrower than a doorway, a lone ledge) is an area of its own and
   gets its probes the same way, unless it is under 9 m² (the top of a jump box or a
-  crate): that joins the room around it. A layout over `reflectionMaxProbes` is re-tiled wider,
-  with a console warning, until it fits (or every room is one probe). Without a nav
+  crate): that joins the room around it. `reflectionMaxProbes` is a ceiling the manual
+  probes count against: a layout over it is re-tiled wider, with a console warning,
+  until it fits or every room is one probe, and past that the rooms with the largest
+  boxes keep theirs. With the manual probes already at it, none is placed. Without a nav
   surface the floor plan is rasterized at 0.5 m, or coarser (with a warning) when the
   level would take more than 4 million cells. Triggers are not walls.
   A floor plan finds rooms on one floor per cell, so a room stacked under another (a
@@ -141,11 +163,14 @@ two pictures of the level (#1737):
 **Manual vs. placed** (#1737): every probe is either **manual** (`Probe.Add`,
 `Probe.FillGrid`, `Reflection.Add`, the Inspector's *Add probe*, or marked with
 `Probe.SetManual` / `Reflection.Set(i, { manual = true })` / the Inspector's *Manual*
-box) or **placed** by this bake. Each bake **replaces the placed probes and keeps every
-manual one as it is** (position, box, settings), and plans around them: a placed
-reflection probe whose capture point falls inside a manual probe's box is left out
-(that room is the manual probe's), and no placed light probe lands within half a step
-of a manual one. So a level can mix the two and still be regenerated after its static
+box) or **placed** by this bake. A hand edit makes a probe manual: `Probe.Move`,
+`Reflection.Move` / `SetBox` / `Set`, an Inspector field (except `Set{ manual = false }`
+and unticking *Manual*, which say otherwise), so a tuned box survives the next bake.
+Each bake **replaces the placed probes and keeps every manual one as it is** (position,
+box, settings), and plans around them: a placed reflection probe whose box a manual
+probe's box covers by at least half is left out (that room is the manual probe's), and
+no placed light probe lands within half a step of a manual one. A manual `FillGrid`
+keeps its trilinear grid through any number of bakes. So a level can mix the two and still be regenerated after its static
 geometry moves. A saved probe without the flag loads as placed. `Probe.Clear()` /
 `Reflection.Clear()` still remove both kinds.
 

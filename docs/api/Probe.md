@@ -75,4 +75,6 @@ where its captures escape the scene. Sampling is
 **trilinear** over a grid. For free-placed probes, the automatic placement's layout
 (which has no grid: its density follows the geometry) or a point outside the grid, it
 blends the **four nearest probes** by inverse squared distance, so an object moving
-between probes fades rather than pops.
+between probes fades rather than pops. The nearest probes are found through a spatial index the
+set builds when it is first sampled after a change, so a sample reads the probes near
+it, not the whole set.
