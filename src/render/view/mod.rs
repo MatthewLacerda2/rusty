@@ -19,7 +19,9 @@
 //! target, the UI, the projection's aspect) and its **scene** size
 //! ([`RenderView::scene_size`]: depth, the SSAO prepass, motion vectors, every post-FX
 //! target), the output at the view's [`RenderScale`]. They differ only on a scaled
-//! screen view, whose post-processed scene is upscaled to the output before the UI.
+//! screen view, whose post-processed scene is upscaled to the output before the UI,
+//! or, while TAA runs, upscaled by TAA inside the chain, whose later targets are
+//! then the output's size (`PostFx::chain_size`, #1702).
 
 use crate::core::settings::render_scale::RenderScale;
 use crate::render::gpu::shaders::ShaderRegistry;

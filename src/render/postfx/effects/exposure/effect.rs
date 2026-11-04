@@ -46,7 +46,9 @@ fn automatic<'a>(post: PostSource<'a>) -> Option<&'a AutoExposure> {
 
 /// Meter this view's scene, after depth of field, TAA and motion blur, and adapt, on the
 /// GPU, when its volume is `Automatic` and the view runs full post-FX; otherwise the
-/// next metered frame snaps.
+/// next metered frame snaps. On a view TAA upscales (#1702) the meter reads the
+/// resolved image at the output's size (`PostFx::chain_size`), never the jittered
+/// scene.
 fn meter(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let (meter, scene) = view.post_fx.exposure_and_scene();
     let Some(ae) = automatic(cx.stack.post).filter(|_| cx.effect.full) else {

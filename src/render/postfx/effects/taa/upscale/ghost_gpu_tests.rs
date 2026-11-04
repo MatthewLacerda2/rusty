@@ -13,6 +13,12 @@ use crate::render::postfx::effects::taa::gpu_fixture::{
     cube, diff, eye, frame, pixel, project, renderer, settle, taa_scene,
 };
 
+/// How far off the settled sky where the cube was may be on the first frame after
+/// the move and 4 frames on (lavapipe measures 15 and 4), with slack for another
+/// driver's rounding: a trail fades, it never sticks.
+const FIRST: u8 = 24;
+const AFTER_4: u8 = 6;
+
 #[test]
 fn gpu_a_moving_cube_leaves_no_trail_when_upscaled() {
     let Some(mut r) = renderer() else { return };
@@ -32,7 +38,8 @@ fn gpu_a_moving_cube_leaves_no_trail_when_upscaled() {
     let (d0, d4) = (diff(&first, &empty, was), diff(&last, &empty, was));
     eprintln!("[taau] where the cube was: {d0} off the sky the first frame, {d4} after 4");
     assert!(upscales(&v));
-    assert!(d4 <= 4, "the cube left a trail: {d4}");
+    assert!(d0 <= FIRST, "the first frame ghosts the cube: {d0}");
+    assert!(d4 <= AFTER_4 && d4 <= d0, "the cube left a trail: {d4}");
 }
 
 #[test]

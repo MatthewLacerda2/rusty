@@ -20,6 +20,10 @@
 //! landed, so a sample far from the pixel only nudges it.
 
 #[cfg(test)]
+mod bias_gpu_tests;
+#[cfg(test)]
+mod chain_gpu_tests;
+#[cfg(test)]
 mod ghost_gpu_tests;
 #[cfg(test)]
 mod gpu_tests;
