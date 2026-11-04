@@ -4,7 +4,7 @@
 //! pages are KTX2 files beside the scene (BC6H with mips, #1694; an RGBM PNG of the
 //! same name beside each), loaded by the renderer, never inlined.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +35,15 @@ pub struct LightmapSet {
     /// (#1708); saved as a list in entity order.
     #[serde(default, with = "as_list")]
     entries: BTreeMap<u32, LightmapEntry>,
+    /// The lights this bake took in, by entity (#1750, Unity's
+    /// `Light.bakingOutput`): the `Mixed` and `Baked` lights active when it ran,
+    /// whose bounce the pages hold, so SSIL gathers none of their light. A light
+    /// moved, retuned or destroyed since still reads as baked, as in Unity, until
+    /// the next bake; one spawned since (a script's muzzle flash) does not. Entity
+    /// ids are never handed out twice in a session (`ecs::World::spawn`), but an
+    /// Undo that takes a light's creation back gives its id back.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub lights: BTreeSet<u32>,
 }
 
 impl LightmapSet {
@@ -59,7 +68,12 @@ impl LightmapSet {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        self.entries.is_empty() && self.lights.is_empty()
+    }
+
+    /// Whether the bake took light `entity` in ([`Self::lights`]).
+    pub fn baked_light(&self, entity: u32) -> bool {
+        self.lights.contains(&entity)
     }
 
     /// Forget every lightmap: every mesh falls back to probe / ambient lighting.
@@ -67,6 +81,7 @@ impl LightmapSet {
         self.pages.clear();
         self.directions.clear();
         self.entries.clear();
+        self.lights.clear();
     }
 }
 
@@ -117,6 +132,8 @@ mod tests {
             ..LightmapSet::default()
         };
         set.extend([entry(5, 1), entry(3, 0)]);
+        set.lights.insert(7);
+        assert!(set.baked_light(7) && !set.baked_light(5));
         assert_eq!(set.get(5).map(|e| e.page), Some(1));
         assert!(set.get(9).is_none());
         let json = serde_json::to_string(&set).unwrap();
@@ -133,5 +150,6 @@ mod tests {
         assert!(set.get(3).is_none());
         set.clear();
         assert!(set.is_empty() && set.pages.is_empty() && set.directions.is_empty());
+        assert!(!set.baked_light(7), "a clear forgets the lights too");
     }
 }

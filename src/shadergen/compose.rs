@@ -22,6 +22,7 @@ pub use naga::Module;
 /// module names itself with `#define_import_path` (#1015).
 pub const MODULES: &[&str] = &[
     "fullscreen.wgsl",
+    "lighting/screen_space.wgsl",
     "numeric.wgsl",
     "lighting/sh.wgsl",
     "color/srgb.wgsl",
@@ -42,11 +43,11 @@ pub const MODULES: &[&str] = &[
     "forward/specular_aa.wgsl",
     "forward/motion.wgsl",
     "forward/proxy_volume.wgsl",
+    "forward/transparent.wgsl",
     "forward/lighting.wgsl",
     "forward/lightmap.wgsl",
     "forward/reflection.wgsl",
     "forward/local_shadow.wgsl",
-    "forward/transparent.wgsl",
     "postfx/params.wgsl",
     "postfx/frame.wgsl",
     "postfx/grade.wgsl",

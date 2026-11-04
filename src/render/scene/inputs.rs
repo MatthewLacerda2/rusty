@@ -13,7 +13,10 @@
 //!   (`material_entry_at`, `entity_params`) and the lightmap set (`solid_instance`)
 //!   by their `Revisioned` revisions, kept with a copy compared only when a revision
 //!   moved, so a write of the same value (a script setting a colour each frame)
-//!   re-derives nothing. The shader overrides are compared whole (a handful of
+//!   re-derives nothing. The instance's `in_bake` (#1750: SSIL gathers no emission a
+//!   bake took in) reads the static flag, activity, the light and mesh cursors and
+//!   the lightmap set, its baked-light record included: a re-bake that records
+//!   other lights changes the set's content, so it is seen. The shader overrides are compared whole (a handful of
 //!   entries; an override diff names its entities).
 //! - **On the renderer**, by value each frame: `lightmaps.resident()` and
 //!   `.directional()`, `capture.static_only` and `capture.probe_bounce`; and by

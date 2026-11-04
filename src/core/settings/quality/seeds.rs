@@ -5,10 +5,19 @@
 //! camera's). Every row moves between its levels (#1716): a test fails on one whose
 //! three levels are equal, unless it names the row with a reason.
 
-use super::{levels, QualityValues, SsaoQuality, SsrQuality};
+use super::{levels, QualityValues, SsaoQuality, SsilQuality, SsrQuality};
 
 const fn ssao(samples: u32, resolution_divisor: u32) -> SsaoQuality {
     SsaoQuality {
+        samples,
+        resolution_divisor,
+    }
+}
+
+/// SSIL's gather: Godot 4's levels run 4 to 16 samples at half resolution, which
+/// is where every level but the `High` preset's `High` stays (#1750's budget).
+const fn ssil(samples: u32, resolution_divisor: u32) -> SsilQuality {
+    SsilQuality {
         samples,
         resolution_divisor,
     }
@@ -26,6 +35,7 @@ const fn march(steps: u32, step_length: f32) -> SsrQuality {
 pub(super) fn low() -> QualityValues {
     QualityValues {
         ssao: levels(ssao(4, 2), ssao(6, 2), ssao(8, 2)),
+        ssil: levels(ssil(4, 2), ssil(6, 2), ssil(8, 2)),
         ssr: levels(march(16, 0.5), march(16, 0.5), march(32, 0.375)),
         bloom_resolution_divisor: levels(4, 4, 2),
         depth_of_field_resolution_divisor: levels(4, 2, 2),
@@ -38,6 +48,7 @@ pub(super) fn low() -> QualityValues {
 pub(super) fn medium() -> QualityValues {
     QualityValues {
         ssao: levels(ssao(6, 2), ssao(8, 2), ssao(16, 1)),
+        ssil: levels(ssil(6, 2), ssil(8, 2), ssil(12, 2)),
         ssr: levels(march(16, 0.5), march(32, 0.375), march(64, 0.25)),
         bloom_resolution_divisor: levels(4, 2, 2),
         depth_of_field_resolution_divisor: levels(2, 2, 1),
@@ -51,6 +62,7 @@ pub(super) fn medium() -> QualityValues {
 pub(super) fn high() -> QualityValues {
     QualityValues {
         ssao: levels(ssao(8, 2), ssao(16, 1), ssao(32, 1)),
+        ssil: levels(ssil(8, 2), ssil(12, 2), ssil(16, 1)),
         ssr: levels(march(32, 0.375), march(64, 0.25), march(128, 0.2)),
         bloom_resolution_divisor: levels(4, 3, 2),
         depth_of_field_resolution_divisor: levels(2, 1, 1),
