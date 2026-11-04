@@ -136,7 +136,7 @@ impl World {
             self.touch_entity(id, self.is_static(id));
             self.stamp_pose_below(id);
             self.world_space.forget(id);
-            self.activity.invalidate(id);
+            self.activity.forget_dead(id);
             if let Some(handle) = self.handles.remove(id) {
                 // lint: allow(ecs-write) the funnel: `touch_entity` stamped the removal above
                 let _ = self.inner.despawn(handle);

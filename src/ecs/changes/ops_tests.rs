@@ -67,10 +67,10 @@ fn reparent(w: &mut World, child: u32, parent: Option<u32>) {
     if let Some(old) = w.parent_id(child) {
         w.remove_child(old, child);
     }
-    w.set_parent_id(child, parent);
     if let Some(p) = parent {
-        w.add_child(p, child);
+        w.add_child(p, child); // first, as `Scene::set_parent` does
     }
+    w.set_parent_id(child, parent);
 }
 
 fn adopt(w: &mut World, child: u32, active: bool) {

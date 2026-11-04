@@ -15,11 +15,13 @@
 //! (O(1), a generation bump): a document can bring a parent link in any order, an
 //! orphan naming the new id from no `children` list.
 //!
-//! The subtree walks follow `children`, as the world-space store and the change
-//! channels do, so a parent link written without its `children` entry (only code
-//! bypassing `Scene::set_parent`, or a corrupt file) can leave a descendant's
-//! answer stale until the next document write. `activity_tests` keeps the lists in
-//! step, as every real writer does.
+//! The subtree walks follow `children`, so they hold only while every parent link
+//! has its `children` entry. `Scene::set_parent` writes the entry first, and the
+//! despawn's re-rooting clears both sides; a raw [`World::set_parent_id`] naming a
+//! parent whose list lacks the child (a test linking one side, code bypassing
+//! `Scene::set_parent`) marks the store `unlisted`, and from then until a `clear`
+//! every invalidation is the whole-store bump again. A document is trusted to carry
+//! both sides, as the world-space store trusts it.
 //!
 //! **Determinism.** An answer is a pure function of the `active` flags and parent links;
 //! stamps only gate the cache, never a result.
@@ -32,6 +34,9 @@ use super::world::World;
 /// lives on one thread, so the cell never contends.
 pub(in crate::ecs) struct ActivityStore {
     inner: RefCell<Flags>,
+    /// A parent link was written without its `children` entry: subtree walks can
+    /// miss a descendant, so every invalidation bumps the whole store.
+    unlisted: bool,
 }
 
 struct Flags {
@@ -47,6 +52,7 @@ impl Default for ActivityStore {
     fn default() -> Self {
         Self {
             inner: RefCell::new(Flags::new()),
+            unlisted: false,
         }
     }
 }
@@ -86,16 +92,31 @@ impl ActivityStore {
         }
     }
 
+    /// Dead `id`'s answer dirty; everything, when a one-sided link may hang a
+    /// descendant below it that no `children` list names.
+    pub(in crate::ecs) fn forget_dead(&self, id: u32) {
+        match self.unlisted {
+            true => self.invalidate_all(),
+            false => self.invalidate(id),
+        }
+    }
+
     /// `id`'s answer dirty: the next read climbs from it again.
-    pub(in crate::ecs) fn invalidate(&self, id: u32) {
+    fn invalidate(&self, id: u32) {
         if let Some(flag) = self.inner.borrow_mut().flags.get_mut(id as usize) {
             flag.0 = 0;
         }
     }
 
     /// Forget every answer (a `clear`, after which ids restart at 1).
-    pub(in crate::ecs) fn reset(&self) {
+    pub(in crate::ecs) fn reset(&mut self) {
         *self.inner.borrow_mut() = Flags::new();
+        self.unlisted = false;
+    }
+
+    /// A parent link without its `children` entry was written (see the module docs).
+    pub(in crate::ecs) fn mark_unlisted(&mut self) {
+        self.unlisted = true;
     }
 
     /// Whether live entity `id` and every ancestor are active, cleaning the dirty chain
@@ -141,9 +162,21 @@ impl World {
         self.activity.invalidate_all();
     }
 
+    /// `id`'s parent link was re-pointed at `parent`: its subtree goes dirty, and the
+    /// store is marked when `parent`'s `children` does not list it (module docs).
+    pub(in crate::ecs) fn relinked_activity(&mut self, id: u32, parent: Option<u32>) {
+        if parent.is_some_and(|p| !self.children(p).contains(&id)) {
+            self.activity.mark_unlisted();
+        }
+        self.invalidate_activity_below(id);
+    }
+
     /// `id`'s activity answer and every descendant's dirty (an `active` flag or a
     /// parent link changed there). See the module docs.
     pub(in crate::ecs) fn invalidate_activity_below(&self, id: u32) {
+        if self.activity.unlisted {
+            return self.activity.invalidate_all();
+        }
         for e in self.self_and_descendants(id) {
             self.activity.invalidate(e);
         }

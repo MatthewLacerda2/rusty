@@ -166,7 +166,7 @@ impl World {
         drop(core);
         self.moved(id);
         if relinked {
-            self.invalidate_activity_below(id);
+            self.relinked_activity(id, parent);
             self.stamp_hierarchy_below(id); // under a new parent it may go dark or lit
         }
         true
