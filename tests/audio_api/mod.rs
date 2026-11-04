@@ -4,6 +4,7 @@
 //! identically with or without hardware — exactly what the harness runs on.
 
 mod defaults;
+mod effects;
 mod global;
 mod mixer;
 mod occlusion;

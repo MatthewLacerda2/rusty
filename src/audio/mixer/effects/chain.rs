@@ -80,12 +80,15 @@ impl Mixer {
     }
 
     /// A snapshot's `effects` list for group `id`, slot by slot: each table names
-    /// the kind the group has in that slot now, and the values it changes. A
-    /// sidechain cannot be changed by a snapshot.
+    /// the kind the group has in that slot now, and the values it changes (`{}`
+    /// leaves the slot alone). A sidechain cannot be changed by a snapshot.
     pub fn parse_effect_patch(&self, id: GroupId, tables: &[Fields]) -> Result<ChainPatch, String> {
         let chain = self.effects(id);
         let mut patch = ChainPatch::default();
         for (slot, fields) in tables.iter().enumerate() {
+            if fields.is_empty() {
+                continue; // `{}` leaves this slot alone
+            }
             let kind = kind_of(fields)?;
             let Some(current) = chain.0.get(slot).copied().flatten() else {
                 return Err(format!("the group has no effect {} to patch", slot + 1));

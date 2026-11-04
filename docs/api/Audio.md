@@ -7,8 +7,8 @@ entity carries an `AudioSource` component (`clip`, `volume`, `loop`,
 through, `occlusion_enabled` and `doppler_level`); these verbs start/stop and retune it, fire
 one-shots, set the single master volume and the speaker mode, read a source's
 resolved 3D spatial state, tune [occlusion](#occlusion), and drive the
-[mixer](#mixer-groups-snapshots-and-ducking): groups (buses) with volume, filters and
-a reverb send, snapshots, and ducking, and read back the listener's
+[mixer](#mixer-groups-snapshots-and-ducking): groups (buses) with volume, filters,
+a reverb send and [effects](#group-effects), snapshots, and ducking, and read back the listener's
 [reverb zones](#reverb-zones). Decode is `.ogg` (Vorbis) / `.wav` / `.mp3`, path-cached;
 a clip that fails to decode logs one warning naming the file and plays nothing.
 
@@ -65,7 +65,9 @@ Dev builds read it back with `Debug.AudioEvents` and the live per-source roster 
 | `Audio.SetGroupHighPass` | `(group, cutoff [, resonance])` | — as `SetGroupLowPass`; 10 Hz is open |
 | `Audio.SetGroupReverbSend` | `(group, v)` | — linear send level to the reverb bus, `[0, 1]` (0 sends nothing) |
 | `Audio.GetGroupState` | `(group)` | table — `name`, `parent` (`nil` for Master), `volume`, `mute`, `low_pass`, `low_pass_resonance`, `high_pass`, `high_pass_resonance`, `reverb_send`, `duck` (the gain ducking applies now, 1 = none) and `effective_volume` (the group's and every ancestor's volume × mute × duck, before the master volume) |
-| `Audio.DefineSnapshot` | `(name, { [group] = { field = value, … }, … })` | — stores a snapshot (replacing one of that name). Fields: `volume`, `mute`, `low_pass`, `low_pass_resonance`, `high_pass`, `high_pass_resonance`, `reverb_send`; a field it leaves out is left alone by the transition. Unknown groups or fields, and a resonance without its cutoff, are errors |
+| `Audio.SetGroupEffects` | `(group, { { kind = …, param = value, … }, … })` | — replaces the group's [effects](#group-effects) with this ordered list (at most 8; `{}` removes them all). A parameter left out takes its default. An unknown kind, parameter or sidechain group, a value out of its range, or a NaN is an error |
+| `Audio.GetGroupEffects` | `(group)` | `{table}` — the group's effects in order, each with `kind` and every parameter (the EQ's `bands` nested; a `sidechain` only when set) |
+| `Audio.DefineSnapshot` | `(name, { [group] = { field = value, … }, … })` | — stores a snapshot (replacing one of that name). Fields: `volume`, `mute`, `low_pass`, `low_pass_resonance`, `high_pass`, `high_pass_resonance`, `reverb_send`, and `effects` (a list, slot by slot, of `{ kind = …, param = value }`: the kind the group has in that slot now, and the parameters to blend, `{}` to skip a slot; a sidechain cannot be changed); a field it leaves out is left alone by the transition. Unknown groups or fields, and a resonance without its cutoff, are errors |
 | `Audio.TransitionToSnapshot` | `(name, seconds)` | — blends every group toward the snapshot over `seconds` of unscaled sim time (`0` lands at once); an unknown snapshot is an error |
 | `Audio.GetSnapshot` | `()` | `(name, progress)` — the snapshot last transitioned to and how far along the blend is (`0..1`), or `nil` before any |
 | `Audio.AddDuck` | `(trigger, target, volume [, attack [, release]])` | — while `trigger` (or a group under it) has a live voice, `target`'s gain ramps to `volume` (linear, `[0, 1]`) over `attack` seconds (default 0.1), and back to 1 over `release` seconds (default 0.5) once it is silent; unknown groups are an error |
@@ -274,9 +276,74 @@ sounding, so it triggers its ducks too. `Audio.GetGroupState(...).duck` can then
 differently in a run recorded with `--record-audio` (or after `Harness.RecordAudio`)
 than in the same run unrecorded.
 
-**Stop** discards play-mode mixer changes (groups created, settings, snapshots,
-ducks), as it does the scene's. The device applies group changes with a 10 ms ramp,
-so a blend stepped once a frame never clicks.
+**Stop** discards play-mode mixer changes (groups created, settings, effects,
+snapshots, ducks), as it does the scene's; the mixer has no saved form, so a game
+sets its effects from a script at start. The device applies group changes with a
+10 ms ramp, so a blend stepped once a frame never clicks.
+
+### Group effects
+
+Unity's mixer effects and Godot's bus effects, a small fixed set: every group runs an
+ordered list of up to 8 effects after its filters and before its volume.
+`Audio.SetGroupEffects` replaces the list; a snapshot's `effects` entry blends the
+parameters of the effects already there, numbers linearly (frequencies in octaves)
+and names at once, as it blends the volume. On the device every parameter glides
+with the voices' 10 ms smoothing, so a retune never clicks; changing a slot's kind
+starts a fresh effect there (a delay's echoes, a compressor's envelope start over).
+
+**Master starts with a limiter at −0.3 dBFS**, so a pile-up of loud sounds never
+clips the output. It is an effect like any other: retune it, or remove it with
+`Audio.SetGroupEffects("Master", {})`. The reverb bus sums into the output beside
+Master, not through it, so a group's reverb send passes its limiter by.
+
+| Kind | Parameters (default) |
+|---|---|
+| `compressor` | `threshold` dB `[-60, 0]` (0: does nothing until set), `ratio` `[1, 48]` (4), `attack` ms `[0.1, 1000]` (50), `release` ms `[1, 5000]` (50), `makeup` dB `[0, 30]` (0), `sidechain` a group name (none) |
+| `limiter` | `ceiling` dB `[-24, 0]` (−0.3), `pre_gain` dB `[-24, 24]` (0), `release` ms `[10, 3000]` (100) |
+| `eq` | `bands`: six of `{ shape, frequency, gain, q }` — `shape` `"off"` (default), `"peak"`, `"low_shelf"` or `"high_shelf"`; `frequency` Hz `[20, 22000]` (32, 100, 320, 1000, 3200, 10000); `gain` dB `[-24, 24]` (0); `q` `[0.1, 10]` (0.707). A band left out stays off |
+| `distortion` | `mode` `"soft"` (default), `"hard"` or `"bitcrush"`; `drive` `[0, 1]` (0: a straight wire); `pre_gain` dB `[-60, 60]` (0); `post_gain` dB `[-80, 24]` (0) |
+| `delay` | `delay` ms `[10, 5000]` (500), `decay` `[0, 1]` (0.5: each echo feeds the next at half), `dry` `[0, 1]` (1), `wet` `[0, 1]` (1), `low_pass` Hz on the feedback `[20, 22000]` (22000: open) |
+
+- **compressor**: above `threshold` the level is cut by `ratio` (4:1 lets 1 dB in 4
+  through), measured on the louder channel's peak. With a **`sidechain`** it listens
+  to that group instead: `sidechain = "SFX"` on `Music` ducks the music under every
+  gunshot. The key is the other group's peak over the previous block (128 frames,
+  2.7 ms at 48 kHz).
+- **limiter**: a brickwall with an instant attack: no sample passes `ceiling`, and
+  under it the signal is untouched, bit for bit. A NaN sample comes out as silence.
+- **eq**: each band an RBJ-cookbook biquad; an EQ with every band off changes nothing.
+- **distortion**: *soft* is a `tanh` that keeps full scale at full scale, *hard* pushes
+  the signal up to 25× and clips it flat at full scale, *bitcrush* quantises it to
+  16 bits at no drive down to 1 bit at full drive.
+- **delay**: Unity's *Echo*; the `low_pass` darkens each repeat. Each delay holds a
+  5 s line (about 2 MB at 48 kHz).
+
+**Sidechain order and cycles.** A group's signal holds its children's, so children
+are processed before their parent, and a sidechain's key group before the group it
+keys. A key the keyed group's own output reaches — the group itself, one of its
+ancestors, or a loop of sidechains (`Music` keyed by `SFX` and `SFX` by `Music`) — is
+a **cycle**: `SetGroupEffects` keeps the compressor but drops that sidechain, with a
+warning in the console, and the compressor listens to its own input.
+
+**Cost.** COST_LINE
+
+There is no mixer panel in the editor: groups and their effects are set through this
+API.
+
+```lua
+Audio.SetGroupEffects("SFX", {
+  { kind = "compressor", threshold = -18, ratio = 4, attack = 5, release = 120 },
+  { kind = "eq", bands = { { shape = "low_shelf", frequency = 120, gain = 3 } } },
+})
+Audio.SetGroupEffects("Music", { { kind = "compressor", threshold = -30, ratio = 6, sidechain = "SFX" } })
+Audio.CreateGroup("Guns", "SFX")
+Audio.SetGroupEffects("Guns", {
+  { kind = "distortion", mode = "soft", drive = 0.15 },
+  { kind = "delay", delay = 90, decay = 0.2, wet = 0.25, low_pass = 3000 },  -- outdoor slapback
+})
+Audio.DefineSnapshot("Indoors", { Guns = { effects = { {}, { kind = "delay", wet = 0 } } } })
+print(Audio.GetGroupEffects("Master")[1].ceiling)   -- -0.3
+```
 
 ### Reverb zones
 
@@ -315,7 +382,7 @@ print(r.decay_time, r.wet, r.zones)    -- e.g. 2.8  0.55  1 inside "B Tunnels"
 
 **The agent cannot hear**, and the event log says only *which* sounds played and
 *when*. A capture writes the **final mix** to a WAV — every voice after gain, pan,
-occlusion, its group's volume and filters, the reverb bus and the
+occlusion, its group's volume, filters and [effects](#group-effects), the reverb bus and the
 [speaker mode](#speaker-mode)'s compressor and limiter, exactly what the device gets —
 so "the sound gets choppy when I walk into the next room" becomes a file
 [`Sound.Level`](Sound.md#how-loud-it-came-out-378) measures, before and after a fix.

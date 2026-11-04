@@ -189,5 +189,6 @@ pub fn gain(db: f32) -> f32 {
 }
 
 #[cfg(test)]
+#[cfg(test)]
 #[path = "effects_tests.rs"]
 mod effects_tests;

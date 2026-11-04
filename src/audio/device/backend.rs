@@ -7,7 +7,8 @@
 //! harness keeps the `NullBackend` until a capture runs this mixer offline (#1579).
 //!
 //! The graph: each voice is a [`ClipSound`] playing into its mixer group's track
-//! (`groups.rs`); group tracks nest as the group tree does and send to one reverb
+//! (`groups.rs`), whose rack runs the group's effects (`mixer/effects/rack.rs`,
+//! #1748); group tracks nest as the group tree does and send to one reverb
 //! bus; everything sums into kira's main track, whose [`OutputStage`] shapes the
 //! total for the speaker mode (#546). The maestro hands over a [`VoiceMix`] per
 //! voice each frame (#412) through the voice's shared [`VoiceControl`], and a
