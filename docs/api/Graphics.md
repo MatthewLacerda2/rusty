@@ -407,7 +407,9 @@ rest of the grade (#1701):
   along a line that keeps their hue, so a saturated orange lamp stays orange.
 - **`"AgX"`**: Blender 4's and Godot 4.4's filmic curve, a log encoding of about
   16.5 EV around middle grey and a sigmoid; contrastier than Neutral, and bright
-  saturated colours bleach towards white.
+  saturated colours bleach towards white. The sigmoid runs per channel, so like ACES
+  it turns a saturated orange towards yellow as it brightens: for warm lamps that
+  must stay orange, use Neutral.
 - **`"ACES"`**: Narkowicz's fit of the ACES film curve, at the original curve's
   exposure (his fit pre-exposes the input; rusty undoes that, so 1.0 maps to about
   0.67, not 0.8). Rich contrast, but applied per channel, so saturated highlights turn

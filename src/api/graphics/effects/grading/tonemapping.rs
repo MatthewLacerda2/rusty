@@ -9,8 +9,8 @@ use crate::components::Tonemap;
 use crate::scene::authoring::rendering::post_processing::grading::tonemapping;
 use crate::scene::Scene;
 
-/// The operator, by Unity's name (an unknown one is ignored; ACES without an
-/// active volume), and the knob.
+/// The operator, by Unity's name (an unknown one is ignored; Neutral, the default,
+/// without an active volume), and the knob.
 pub(in crate::api::graphics) fn register<'scope>(
     scope: &'scope mlua::Scope<'scope, '_>,
     table: &mlua::Table,

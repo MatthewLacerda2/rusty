@@ -2,7 +2,8 @@
 // operator that brings scene-linear HDR to the display (slot: x its index, mirroring
 // `Tonemap::to_index`: 0 none, 1 Reinhard, 2 ACES, 3 Neutral, 4 AgX), and, last in
 // the grade, the display-gamma tweak (slot: x the gamma). Both are baked into the
-// grading LUT, so a curve's cost is paid per texel of the table, never per pixel.
+// grading LUT, so a curve's cost is paid per texel of the table; per pixel every
+// mode costs the same LUT read (`postfx::grade::lut_sample`, four texel loads).
 
 #define_import_path postfx::effects::tonemapping
 

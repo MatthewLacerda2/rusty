@@ -17,7 +17,9 @@ crate::core::named_enum! {
         #[default]
         Neutral = "Neutral",
         /// AgX (Blender 4, Godot 4.4) — a filmic log curve in a slightly inset
-        /// gamut: saturated highlights desaturate towards white without skewing.
+        /// gamut, contrastier than Neutral. Its sigmoid runs per channel, so a
+        /// saturated orange turns towards yellow as ACES does (the hue test
+        /// measures it, #1701): pick Neutral to keep warm lamps orange.
         AgX = "AgX",
         /// Narkowicz's fit of the ACES RRT + sRGB ODT, at the original curve's
         /// exposure (#1701) — rich contrast, but per channel, so saturated

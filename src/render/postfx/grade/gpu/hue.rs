@@ -20,33 +20,59 @@ fn hue(c: [f32; 3]) -> f32 {
     60.0 * (c[1] - c[2]) / (c[0] - lo)
 }
 
-/// The worst hue turn over the ramp under `tonemap`, among pixels still coloured
-/// enough (16 levels between the largest and smallest channel) to have a hue.
-fn worst_turn(c: &mut Chain, tonemap: Tonemap) -> f32 {
-    let scale = |i: u32| 0.02 * 2000f32.powf(i as f32 / (W - 1) as f32);
-    let row: Vec<[f32; 3]> = (0..W).map(|i| ORANGE.map(|v| v * scale(i))).collect();
+/// The scene brightness the ramp's pixel `i` is scaled to (× the orange).
+fn scale(i: usize) -> f32 {
+    0.02 * 2000f32.powf(i as f32 / (W - 1) as f32)
+}
+
+/// The hue turn of each pixel of the ramp under `tonemap`, `None` where the pixel
+/// is no longer coloured enough (16 levels between the largest and smallest
+/// channel) to have a hue.
+fn turns(c: &mut Chain, tonemap: Tonemap) -> Vec<Option<f32>> {
+    let row: Vec<[f32; 3]> = (0..W as usize)
+        .map(|i| ORANGE.map(|v| v * scale(i)))
+        .collect();
     let mut vc = default_post_processing();
     vc.tonemapping.mode = tonemap;
     let out = c.run(&row, 0.0, Some(&vc));
     let want = hue(ORANGE);
     out.iter()
-        .filter(|p| p[0] >= p[2].saturating_add(16))
-        .map(|p| (hue([0, 1, 2].map(|k| srgb_to_linear(p[k]))) - want).abs())
-        .fold(0.0, f32::max)
+        .map(|p| {
+            let coloured = p[0] >= p[2].saturating_add(16);
+            coloured.then(|| (hue([0, 1, 2].map(|k| srgb_to_linear(p[k]))) - want).abs())
+        })
+        .collect()
+}
+
+/// The worst turn over the ramp, and the brightness at which the turn first passes
+/// [`BOUND`] (`None`: never). The worst turn tops out at 36.7°, orange's distance
+/// from pure yellow (60°): a per-channel curve clips red, then green, and what is
+/// left is yellow. So two modes at 36.7° both reach yellow; where they pass the
+/// bound is what tells them apart.
+fn measure(c: &mut Chain, tonemap: Tonemap) -> (f32, Option<f32>) {
+    let t = turns(c, tonemap);
+    let worst = t.iter().flatten().copied().fold(0.0, f32::max);
+    let breaks = t
+        .iter()
+        .position(|v| v.is_some_and(|v| v > BOUND))
+        .map(scale);
+    (worst, breaks)
 }
 
 #[test]
 fn gpu_a_saturated_orange_ramp_keeps_its_hue_through_the_default_tonemapper() {
     let Some(mut c) = chain() else { return };
     assert_eq!(default_post_processing().tonemapping.mode, Tonemap::Neutral);
-    let turns = Tonemap::ALL.map(|t| (t, worst_turn(&mut c, t)));
-    eprintln!("[hue] worst turn in degrees: {turns:?}");
-    let turn = |t: Tonemap| turns.iter().find(|(m, _)| *m == t).map_or(0.0, |p| p.1);
-    assert!(
-        turn(Tonemap::Neutral) <= BOUND,
-        "Neutral turned orange by {}°",
-        turn(Tonemap::Neutral)
-    );
+    let all = Tonemap::ALL.map(|t| (t, measure(&mut c, t)));
+    eprintln!("[hue] (worst turn in degrees, brightness it first passes {BOUND}°): {all:?}");
+    let of = |t: Tonemap| {
+        all.iter()
+            .find(|(m, _)| *m == t)
+            .map(|p| p.1)
+            .expect("listed")
+    };
+    let (neutral, _) = of(Tonemap::Neutral);
+    assert!(neutral <= BOUND, "Neutral turned orange by {neutral}°");
     // The test can tell: the per-channel fit turns the same ramp well past it.
-    assert!(turn(Tonemap::Aces) > 4.0 * BOUND, "{turns:?}");
+    assert!(of(Tonemap::Aces).0 > 4.0 * BOUND, "{all:?}");
 }
