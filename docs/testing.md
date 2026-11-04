@@ -292,8 +292,10 @@ cargo-nextest` (CI uses `taiki-e/install-action`). What it buys over `cargo test
 - **A fixed proptest seed in CI, a random one elsewhere** (#1800). `ci.yml` runs its
   gates on one `PROPTEST_RNG_SEED`, so a red proptest there comes from the commit under
   test: reproduce it with that seed, since a local `make test` draws random ones. The
-  nightly and local runs explore. Whichever finds a case, commit its `cc` line to the
-  test's `.proptest-regressions` file with the fix. A suite that pins its own seed in
+  nightly and local runs explore. Whichever finds a case, commit its `cc` line with the
+  fix, to the file proptest names when it fails: `proptest-regressions/<module
+  path>.txt` at the crate root (e.g. `proptest-regressions/physics/watch/tests.txt`,
+  #1798), which every later run replays first. A suite that pins its own seed in
   its config (`tests/proptest/world_space.rs`) doesn't explore.
 - **No retries.** A retried pass is still green, and a flaky test is a bug.
 
