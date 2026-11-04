@@ -29,6 +29,28 @@ entity has no light. A spotlight's cone half-angles have no verb here: write
 `SetType` and `SetMode` are case-insensitive; an unrecognized name is ignored (the
 current value is kept).
 
+**Falloff** (#1699). A point, spot or Area light fades as Unity URP's and
+Frostbite's *windowed inverse-square*: at distance `d` from the lamp it delivers
+`intensity × saturate(1 − (d/range)⁴)² / max(d², 0.0001)`. Close in that is plain
+inverse-square, and it reaches exactly zero at `range` with no visible edge, so
+`range` is how far the pool of light reaches, not where it is cut. A spotlight's
+cone is URP's squared ramp: full inside `inner_cone`, `t²` between the cones
+(`t` running 0 at `outer_cone` to 1 at `inner_cone`, in cosines), nothing outside.
+The forward shader, the lightmap bake and the light-probe bake all use this one
+curve. Before #1699 a light fell off as `1 / (d² + 1)` and was cut hard at its
+range, which left a bright ring at the edge. The new curve is brighter close in,
+`1/d²` instead of `1/(d² + 1)` (twice as bright at 1 m), and dimmer toward the edge.
+Where the two cross depends on the range: for a range of 4.4 the new curve is 1.15×
+the old at 2 m and drops below it past about 2.35 m. An existing scene's lamps want
+their intensity re-tuned, and a rebake; nothing is rescaled for you.
+Inverse-square has no ceiling close in, so four places bound it: a lit particle
+floors the distance at half its sprite's size; an Area light's stand-in in a probe
+or reflection capture floors it at `√(area / π)`, which gives the panel's true
+`π × intensity` up against it; the lightmap bake clamps each bounce path's light
+at 10 (Blender Cycles' *Clamp Indirect* default), never a texel's own direct
+light; and a drawn pixel is held below half-float's limit (60000), so bloom never
+reads an infinity.
+
 **Area lights** (#1674) are Unity's *Area (Rectangle)* light, and like Unity's
 built-in pipeline rusty bakes them only: an Area light acts as
 `Baked` whatever its stored mode (`GetMode` and `Component.Get` read `"Baked"`, and
@@ -38,8 +60,9 @@ emitter is a `width × height` rectangle (`SetAreaSize`) centred on the entity,
 spanning its local X and Y and shining from its front, local −Z, only. Intensity is
 per unit area: a 2 × 1 panel gives out twice what a 1 × 1 one of the same
 intensity does, and seen from far away it acts as a spot light of `intensity ×
-area` whose light fades as the cosine off the panel's facing. `range` cuts it off
-from its centre, like a point light's. The lightmap bake integrates the whole
+area` whose light fades as the cosine off the panel's facing. Its light fades to zero
+at `range`, measured from its centre, so no receiver that far from the centre is lit,
+like a point light's. The lightmap bake integrates the whole
 rectangle, so its shadows have soft edges that widen with the panel's size, and the
 light-probe bake adds its direct light (a fixed 8 × 8 grid of shadow rays per
 probe) for dynamic objects. It is never drawn live, so a surface without a lightmap
@@ -61,7 +84,7 @@ light outside the view costs nothing. One whose intensity or colour is zero (a
 blinking alarm in its off half: #1712) is listed in no cluster, so no pixel shades
 it; it still counts towards the camera's budget of 64 (by its range, as any light
 does) and, if it casts shadows, it may still take atlas tiles and draw its
-casters. A light's **range** is a hard cut-off, what the camera's budget ranks it
+casters. A light's **range** is where its light reaches zero, what the camera's budget ranks it
 by, and how far it reaches into the cluster grid, so a tight range is the cheap
 one; a spotlight is listed only in the clusters its cone touches, so a narrow beam
 costs fewer pixels than a point light of the same range. Up to **4** directional lights

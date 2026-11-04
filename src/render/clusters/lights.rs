@@ -12,6 +12,10 @@ use crate::scene::{LightType, Scene};
 pub(crate) const KIND_POINT: u32 = 0;
 /// `LocalLight::kind` for a spotlight (cone cosines apply).
 pub(crate) const KIND_SPOT: u32 = 1;
+/// `LocalLight::kind` for an Area light's stand-in in a bake capture (#1674): a
+/// spot shadowed as one, whose light fades as the Lambert `cos θ` off its facing
+/// instead of a spotlight's squared cone (#1699).
+pub(crate) const KIND_AREA: u32 = 2;
 /// `LocalLight::shadow` for a light with no tile in the shadow atlas (#468).
 pub(crate) const NO_SHADOW: u32 = u32::MAX;
 
@@ -39,7 +43,12 @@ pub(crate) struct LocalLight {
     /// The camera distance past which its shadow is not sampled (#1712,
     /// `LightComponent::shadow_fade_distance`); `0` never fades.
     pub shadow_fade: f32,
-    pub _pad: [f32; 3],
+    /// The distance its inverse square is floored at (`components::falloff_near`,
+    /// #1699): an Area light's stand-in's `sqrt(area / π)`, so a surface touching
+    /// the panel gets its true limit of `π × intensity`, not one point's
+    /// `intensity × area / ε²`; `0` for a point or spot light.
+    pub near: f32,
+    pub _pad: [f32; 2],
 }
 
 impl LocalLight {
@@ -48,20 +57,22 @@ impl LocalLight {
     ///
     /// An Area light (#1674) only ever gets here in a bake capture, being always
     /// `Baked`: it is drawn as its far field, a spot at its centre of intensity
-    /// `intensity × area` whose 0°–90° cone fades as `cos θ`, a one-sided
-    /// Lambertian emitter's falloff. The lightmap and the probes' direct term
+    /// `intensity × area` ([`KIND_AREA`]) whose light fades as `cos θ` off its
+    /// facing, a one-sided Lambertian emitter's falloff. The lightmap and the probes' direct term
     /// integrate the rectangle itself.
     pub(crate) fn new(position: Vec3, forward: Vec3, light: &LightComponent) -> Option<Self> {
-        let (kind, intensity, cones) = match light.light_type {
-            LightType::Point => (KIND_POINT, light.intensity, (0.0, 0.0)),
+        let (kind, intensity, cones, near) = match light.light_type {
+            LightType::Point => (KIND_POINT, light.intensity, (0.0, 0.0), 0.0),
             LightType::Spotlight => (
                 KIND_SPOT,
                 light.intensity,
                 (light.inner_cone, light.outer_cone),
+                0.0,
             ),
             LightType::Area => {
-                let area = light.area_size.x * light.area_size.y;
-                (KIND_SPOT, light.intensity * area, (0.0, 90.0))
+                let area = (light.area_size.x * light.area_size.y).max(0.0);
+                let near = (area / std::f32::consts::PI).sqrt();
+                (KIND_AREA, light.intensity * area, (0.0, 90.0), near)
             }
             LightType::Ambient | LightType::Directional => return None,
         };
@@ -79,7 +90,8 @@ impl LocalLight {
             shadow_fade: Some(light.shadow_fade_distance)
                 .filter(|d| d.is_finite() && *d > 0.0)
                 .unwrap_or(0.0),
-            _pad: [0.0; 3],
+            near: if near.is_finite() { near } else { 0.0 },
+            _pad: [0.0; 2],
         })
     }
 
@@ -87,6 +99,12 @@ impl LocalLight {
     /// times its colour's Rec. 709 luminance.
     pub(crate) fn brightness(&self) -> f32 {
         self.intensity * crate::core::color::luminance(self.color)
+    }
+
+    /// Whether it shadows through one spot frustum (a spotlight or an Area
+    /// light's stand-in) rather than a point light's six cube faces.
+    pub(crate) fn one_frustum(&self) -> bool {
+        self.kind != KIND_POINT
     }
 
     /// The light's range sphere: centre and range. What every per-camera cut
@@ -97,8 +115,8 @@ impl LocalLight {
 
     /// What the binner tests (#1712): the range [`Self::sphere`], and for a
     /// spotlight its [`Cone`], which decides which clusters list it once kept. A
-    /// cone wider than [`WIDEST_CULLED_CONE`] (an Area light's 90° stand-in among
-    /// them) gets no cone and lists by its range sphere alone.
+    /// cone wider than [`WIDEST_CULLED_CONE`], and an Area light's 90° stand-in,
+    /// get no cone and list by their range sphere alone.
     pub(crate) fn bounds(&self) -> Bounds {
         let (apex, range) = self.sphere();
         let axis = Vec3::from(self.direction);
