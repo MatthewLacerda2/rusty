@@ -1,7 +1,8 @@
 //! Which lightmap each static mesh wears (#438): the scene document's references to
 //! the baked atlas pages, and per entity the page and the scale/offset into it
 //! (Unity's `lightmapIndex` / `lightmapScaleOffset`). Paths and values only — the
-//! pages are PNG assets beside the scene, loaded by the renderer, never inlined.
+//! pages are KTX2 files beside the scene (BC6H with mips, #1694; an RGBM PNG of the
+//! same name beside each), loaded by the renderer, never inlined.
 
 use std::collections::BTreeMap;
 
@@ -21,7 +22,8 @@ pub struct LightmapEntry {
 /// added since the bake) keeps probe / ambient lighting.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct LightmapSet {
-    /// The atlas pages (RGBM PNGs, all the same size), in page order.
+    /// The atlas pages, all the same size, in page order: `.ktx2` (#1694), or the
+    /// `.png` of a scene baked before it.
     #[serde(default)]
     pub pages: Vec<String>,
     /// The direction pages of a directional bake (#810), one per colour page and

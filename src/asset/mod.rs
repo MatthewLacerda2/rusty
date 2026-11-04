@@ -31,6 +31,7 @@ pub mod convert;
 pub mod flat_normals;
 pub mod gltf;
 pub mod import_cache;
+pub mod lightmap_page;
 pub mod lightmap_uv;
 pub mod lod;
 pub mod lut;
