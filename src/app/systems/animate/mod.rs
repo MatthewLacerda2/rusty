@@ -68,20 +68,13 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
                 .root
                 .map_or(RootMotion::ZERO, |m| to_world(m, frame, model));
             let drives = anim.drives_root_motion(skin);
-            let state = &mut anim.root_motion;
-            state.last = motion;
-            state.moved = Vec3::ZERO;
-            if !drives {
-                state.carried = Vec3::ZERO;
-            }
+            measured(anim, motion, drives);
             let unknown = skin.and_then(|skin| unknown_bone(anim, skin));
             let writes = mesh.map(|m| animation::bone_writes(anim, m, graph));
-            // lint: allow(world-space) the model's axes in mesh-local space, rig data, not the scene hierarchy
-            let tilt = model.map(|m| m.to_scale_rotation_translation().1);
             (
                 stepped.events,
                 writes,
-                drives.then_some((motion, tilt)),
+                drives.then_some((motion, model)),
                 unknown,
             )
         });
@@ -101,9 +94,21 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
                 *t = local;
             }
         }
-        if let Some((motion, tilt)) = applied {
-            apply_root_motion(&mut s, res, id, motion, tilt, dt);
+        if let Some((motion, model)) = applied {
+            apply_root_motion(&mut s, res, id, motion, model, dt);
         }
+    }
+}
+
+/// Keep this step's world-space root `motion` on `anim`, before anything
+/// moves; travel carried for a CharacterController lapses when root motion
+/// no longer `drives` the entity.
+fn measured(anim: &mut AnimatorComponent, motion: RootMotion, drives: bool) {
+    let state = &mut anim.root_motion;
+    state.last = motion;
+    state.moved = Vec3::ZERO;
+    if !drives {
+        state.carried = Vec3::ZERO;
     }
 }
 
