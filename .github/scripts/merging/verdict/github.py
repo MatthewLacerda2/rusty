@@ -29,6 +29,7 @@ TRANSIENT = (
     "no such host",
     "temporary failure in name resolution",
     "network is unreachable",
+    "http 500",
     "http 502",
     "http 503",
     "http 504",

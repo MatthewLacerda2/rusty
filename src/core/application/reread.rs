@@ -1,5 +1,5 @@
-//! Re-reading the bound `project.rusty` (#1517, #1522, #1749): the decal budgets, the
-//! audio settings and the quality presets are read from the file at each Play, before every write and
+//! Re-reading the bound `project.rusty` (#1517, #1522, #1749, #1715): the decal
+//! budgets, the audio settings, the render-scale default and the quality presets are read from the file at each Play, before every write and
 //! before every preset edit, so an edit to the file (by hand or by the agent)
 //! reaches the running editor and a save never writes back a copy from before it.
 
@@ -27,6 +27,7 @@ impl Application {
                         self.decal_limits = file.decals;
                         self.quality = file.quality;
                         self.audio = file.audio;
+                        self.graphics = file.graphics;
                         return;
                     }
                     Err(err) => err,

@@ -21,7 +21,7 @@ fn run(scene: Scene, script: &str) -> (Scene, Option<String>) {
         rusty::api::graphics::register(
             &lua,
             bind(&lua, &scene),
-            bind(&lua, &graphics),
+            (bind(&lua, &graphics), rusty::api::ApiCell::default()),
             bind(&lua, &app),
         )
         .unwrap();

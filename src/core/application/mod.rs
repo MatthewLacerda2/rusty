@@ -12,6 +12,9 @@
 //! * **The project's graphics option defaults** — what a fresh install's player
 //!   graphics options start as (#1438), in the same file under `"graphics_options"`.
 //!   `Graphics.SetDefaultOption` and the Build Settings window edit them, the same way.
+//! * **The project's render-scale default** (#1715), under `"graphics"`: what runs
+//!   while the player has chosen no render scale. `Graphics.SetDefaultRenderScale`
+//!   and the Build Settings window edit it (`render_scale`).
 //! * **The project's quality presets** (#1522), under `"quality"`, and the one the
 //!   player selected (persisted in `Storage`, not the file): `quality`.
 //! * **The project's decal budgets** (#1517), under `"decals"`: read, never written
@@ -55,10 +58,12 @@ use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::demos::DemoSettings;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use crate::core::settings::quality::QualityPresets;
+use crate::core::settings::render_scale::ProjectGraphics;
 
 mod demo;
 mod host;
 mod quality;
+mod render_scale;
 mod reread;
 
 pub use demo::DemoRequest;
@@ -112,6 +117,8 @@ pub struct Application {
     build: BuildSettings,
     /// The project's default player graphics options (#1438).
     graphics_defaults: GraphicsOptions,
+    /// The project's `"graphics"` block: its render-scale default (#1715).
+    graphics: ProjectGraphics,
     /// The project's quality presets (#1522).
     quality: QualityPresets,
     /// The preset the player selected, by name; `None` (or a name no preset has
@@ -165,6 +172,7 @@ impl Application {
         self.read_from = text;
         let file = parsed.transpose()?.unwrap_or_default();
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
+        self.graphics = file.graphics;
         self.quality = file.quality;
         self.decal_limits = file.decals;
         self.demos = file.demos;
@@ -177,6 +185,7 @@ impl Application {
     pub fn run_with(&mut self, settings: ProjectSettings) {
         self.build = settings.build;
         self.graphics_defaults = settings.graphics_options;
+        self.graphics = settings.graphics;
         self.quality = settings.quality;
         self.decal_limits = settings.decals;
         self.demos = settings.demos;
@@ -189,6 +198,7 @@ impl Application {
         ProjectSettings {
             build: self.build.clone(),
             graphics_options: self.graphics_defaults,
+            graphics: self.graphics,
             quality: self.quality.clone(),
             decals: self.decal_limits,
             demos: self.demos,
@@ -254,6 +264,7 @@ impl Application {
         let mut file = ProjectFile::read(path)?.unwrap_or_default();
         file.build = self.build.clone();
         file.graphics_options = self.graphics_defaults;
+        file.graphics = self.graphics;
         file.quality = self.quality.clone();
         file.audio = self.audio;
         file.write(path)
