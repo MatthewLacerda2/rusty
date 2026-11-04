@@ -46,6 +46,27 @@ class Waiting(unittest.TestCase):
         self.assertTrue(ride.failed(tip, [run("ci", conclusion="failure"), run("lint")], {1: red, 2: built("lint")}))
 
 
+class FailedPolls(unittest.TestCase):
+    """One poll GitHub fails is a wait, never a stop that throws the round away (#1785's review)."""
+
+    def poll(self, evidence, clock):
+        with mock.patch.object(github, "evidence", side_effect=evidence), \
+                mock.patch.object(github, "rollup", return_value=[]), \
+                mock.patch.object(time, "sleep"), mock.patch.object(time, "monotonic", side_effect=clock):
+            return ride.wait("o/r", SHA, 3600.0, 30, say=lambda *a: None)
+
+    def test_a_failed_poll_waits_for_the_next(self):
+        green = ([run("ci"), run("lint")], {1: built("ci"), 2: built("lint")})
+        for down in (github.Unreachable("HTTP 500"), SystemExit(1)):
+            with self.subTest(down=down):
+                self.assertEqual(self.poll([down, green], [0.0, 0.0, 1200.0])[0], outcomes.GO)
+
+    def test_polls_failing_to_the_deadline_are_stalled(self):
+        state, lines = self.poll(github.Unreachable("HTTP 500"), [0.0, 0.0, 9999.0])
+        self.assertEqual(state, ride.STALLED)
+        self.assertIn("did not answer", lines[1])
+
+
 class Rails(unittest.TestCase):
     def test_dispatch_posts_both_gating_workflows_over_rest(self):
         calls = []

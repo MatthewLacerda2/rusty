@@ -2,8 +2,11 @@
 
 Each member is merged through the queue's own REST call ([`queue.landing.squash`]:
 `sha` = its head, its own title and message, the closing keywords in the title,
-#966). One that moved since the train formed, or that GitHub refuses, ends the
-landing there: the members after it are untested without it, so they go back in
+#966). Every member is read before the first squash ([`departed`]): one that moved
+since the train formed (its head, its label, its description) goes back in line
+and the rest are rebuilt without it, nothing landed. What can still end a
+landing partway is a move in the seconds between those reads and its squash, a
+refusal, or a transit failure. One of those ends the landing there: the members after it are untested without it, so they go back in
 line and are retested on the new `main` ([`outcomes.REQUEUED`]). A call that failed
 in transit is asked about ([`queue.landing.confirm`]): merged, it counts; never
 said merged, it is handed back as *unknown*, as today, and the rest go back in line.
@@ -63,6 +66,22 @@ def moved(pull: dict, car: build.Car) -> str | None:
     if refused:
         return f"its description refuses it now: {refused[0]}"
     return None
+
+
+def departed(train: build.Train, look) -> list[tuple[int, str]]:
+    """Each member that may no longer land with `train`, and why, read before the
+    first squash (#1785's review: #1 and #2 landed and only then was #3's moved
+    head found, leaving `main` on a tree CI never ran). GitHub failing to show a
+    member counts it as departed: nothing lands on a doubt."""
+    gone = []
+    for car in train.cars:
+        try:
+            why = moved(look(car.number), car)
+        except DOWN as down:
+            why = f"GitHub did not show it: {down_why(down)}"
+        if why:
+            gone.append((car.number, why))
+    return gone
 
 
 def land(train: build.Train, look, squash) -> tuple[list[tuple[int, str, str]], int, bool]:

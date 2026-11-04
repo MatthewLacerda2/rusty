@@ -6,6 +6,7 @@ import argparse
 import functools
 import os
 import tempfile
+import time
 
 import ghrest
 from merging.queue import checks, gitio, landing, pulls, outcomes, stopping, taking
@@ -16,10 +17,12 @@ from merging.verdict import decide, github, runlist
 def own_green(repo: str, number: int, head: str) -> bool:
     """Whether every gating workflow passed on `head` itself (#1785): the ruleset
     requires it for the merge call anyway (`strict: false`), and it keeps a
-    known-red pull request out of a train. GitHub not answering is *no*."""
+    known-red pull request out of a train. GitHub not answering, or a `gh`
+    refusal (`verdict.github.gh` exits on it), is *no*: an HTTP 500 while the
+    line was walked exited the watch with no `watch ended:` line (#1785's review)."""
     try:
         runs, jobs = github.evidence(repo, head)
-    except github.Unreachable:
+    except (github.Unreachable, SystemExit):
         return False
     tip = {"number": number, "headRefOid": head}
     return all(decide.assess(tip, w, runlist.runs_for(runs, head, w), jobs)[0] == decide.PASSED for w in runlist.WORKFLOWS)
@@ -120,6 +123,7 @@ def effects(repo: str, opts: argparse.Namespace, git) -> argparse.Namespace:
         squash=lambda pull, sha: landing.squash(repo, pull, sha, opts.root, opts.poll),
         main_state=functools.partial(main_state, git, opts.root),
         say=outcomes.say,
+        pause=time.sleep,
         bots=pulls.BOTS,
         dry_run=getattr(opts, "dry_run", False),
         no_merge=getattr(opts, "no_merge", False),

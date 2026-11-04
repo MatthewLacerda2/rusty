@@ -84,6 +84,11 @@ coder *changing* it must know.
   saved, `main`'s tree is still checked, and the watch exits 3. A `main` that
   cannot be read (`train.world.main_state` is `None`) neither lands nor reports a
   mismatch.
+- **Every member is re-read before the first squash** (`train.land.departed`), so a
+  move visible beforehand never leaves `main` on a half-landed tree; after a landing,
+  `main` is asked for several minutes (`watch.trains.CHECK_TRIES`) before the check is
+  given up, and the stop then says the landing was not compared. A poll that fails
+  during a train's wait is waited past (`train.ride.wait`), never a stop.
 - **Every rule is one the queue can read**; no model is asked anything. The cap is
   `train.group.CAP`, with its measurement beside it: change both together.
 

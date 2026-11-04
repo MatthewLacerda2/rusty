@@ -90,9 +90,15 @@ class Riding(unittest.TestCase):
         fx.squashes[2] = outcomes.HANDED_BACK  # refused
         self.assertEqual(go(fx)[1][2:], [(3, outcomes.REQUEUED), (4, outcomes.REQUEUED)])
 
-    def test_a_member_that_moved_does_not_land_and_nor_do_those_after_it(self):
+    def test_a_member_that_moved_mid_landing_does_not_land_and_nor_do_those_after_it(self):
         fx = Fx(LINE)
-        fx.by[3] = pr(3, head="pushed")
+        looks = []
+
+        def look(n):  # #3 moves after the pre-landing read (`land.departed`), before its squash
+            looks.append(n)
+            return pr(3, head="pushed") if looks.count(3) > 1 else fx.by[n]
+
+        fx.ns.look = look
         _, results, halt = go(fx)
         self.assertEqual((fx.merged, halt), ([1, 2], None))
         self.assertEqual(results[2:], [(3, outcomes.REQUEUED), (4, outcomes.REQUEUED)])

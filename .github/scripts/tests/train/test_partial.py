@@ -13,7 +13,7 @@ import unittest
 from merging.queue import landing, outcomes
 from merging.train import land, ride
 from merging.verdict import github
-from merging.watch import ending
+from merging.watch import ending, trains
 from tests.train.fakes import Fx, pr
 
 
@@ -26,10 +26,15 @@ def go(fx: Fx, line=LINE):
     return yard, [(n, state) for n, state, _ in results], halt
 
 
-def failing_look(fx: Fx, at: int, down: BaseException):
+def failing_look(fx: Fx, at: int, down: BaseException, reads: int = 1):
+    """`look` that raises for `at` after it has answered `reads` times (the
+    pre-landing read is one, [`land.departed`])."""
+    seen = []
+
     def look(n):
-        if n == at:
+        if n == at and seen.count(n) >= reads:
             raise down
+        seen.append(n)
         return fx.by[n]
     return look
 
@@ -63,21 +68,38 @@ class GitHubDown(unittest.TestCase):
         self.assertEqual((fx.merged, halt), ([], None))
         self.assertEqual(results, [(1, outcomes.STOPPED), *((n, outcomes.REQUEUED) for n in (2, 3, 4))])
 
-    def test_main_unreadable_after_landing_stops_as_the_machine_not_a_mismatch(self):
+    def test_main_unreadable_after_landing_is_asked_again_then_stops_uncompared(self):
         fx = Fx(LINE)
-        fx.unknown_at = {1}
+        fx.unknown_at = set(range(1, 1 + trains.CHECK_TRIES))
         _, results, halt = go(fx)
-        self.assertEqual(fx.merged, [1, 2, 3, 4])
+        self.assertEqual((fx.merged, fx.main_reads), ([1, 2, 3, 4], 1 + trains.CHECK_TRIES))
         self.assertEqual(halt[1], ending.MACHINE_STATUS)
         self.assertNotIn(land.MISMATCH, halt[0])
+        self.assertIn("not compared", halt[0])
+
+    def test_a_read_that_comes_back_within_the_tries_is_checked(self):
+        fx = Fx(LINE)
+        fx.unknown_at = {1, 2}
+        _, _, halt = go(fx)
+        self.assertEqual((halt, fx.main_reads), (None, 4))
 
 
 class Landing(unittest.TestCase):
-    def test_a_stray_keyword_added_while_the_train_ran_does_not_land(self):
+    def test_a_member_that_moved_is_found_before_the_first_squash(self):
+        for moved in ({**pr(3), "body": "This would close #12 by accident."}, pr(3, head="h3b")):
+            fx = Fx(LINE)
+            fx.by[3] = moved
+            yard, results, halt = go(fx)
+            self.assertEqual((fx.merged, halt), ([], None))  # `main` never sits on an untested tree
+            self.assertEqual({s for _, s in results}, {outcomes.REQUEUED})
+            self.assertTrue(any(line.startswith("watch: #3 goes back in line: not landed") for line in fx.said))
+            self.assertEqual(yard.waiting[0], [(1, "h1"), (2, "h2"), (4, "h4")])  # rebuilt without it
+
+    def test_a_look_failing_before_landing_lands_nothing(self):
         fx = Fx(LINE)
-        fx.by[3] = {**pr(3), "body": "This would close #12 by accident."}
+        fx.ns.look = failing_look(fx, 2, github.Unreachable("gh api: timeout"), reads=0)
         _, results, _ = go(fx)
-        self.assertEqual((fx.merged, results[2:]), ([1, 2], [(3, outcomes.REQUEUED), (4, outcomes.REQUEUED)]))
+        self.assertEqual((fx.merged, {s for _, s in results}), ([], {outcomes.REQUEUED}))
 
     def test_base_branch_modified_goes_back_in_line_not_handed_back(self):
         fx = Fx(LINE)

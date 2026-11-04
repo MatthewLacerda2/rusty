@@ -52,7 +52,7 @@ class Fx:
             green=lambda n, h: n not in self.red_own, claims=lambda n: None, check=lambda sha: self.broken,
             push=lambda t: self.pushed.append(t.numbers), dispatch=lambda name: None, wait=self.wait,
             delete=self.deleted.append, look=lambda n: self.by[n], squash=self.squash,
-            main_state=self.main_state, say=lambda *a: self.said.append(a[0]), bots=pulls.BOTS,
+            main_state=self.main_state, say=lambda *a: self.said.append(a[0]), pause=lambda s: None, bots=pulls.BOTS,
             dry_run=False, no_merge=False,
         )
         self.trains: list[list[int]] = []

@@ -75,6 +75,11 @@ class Effects(unittest.TestCase):
         with mock.patch.object(gitio, "git", return_value=failed), self.assertRaises(stopping.Stopped):
             world.compiles(SHA, opts)
 
+    def test_a_gh_refusal_reading_own_ci_is_not_green(self):
+        for down in (github.Unreachable("HTTP 500"), SystemExit(1)):
+            with self.subTest(down=down), mock.patch.object(github, "evidence", side_effect=down):
+                self.assertFalse(world.own_green("o/r", 1, SHA))
+
     def test_main_is_unknown_when_the_fetch_failed(self):
         git = lambda *a: (0, "tree\n") if a[0] == "rev-parse" else (0, "0\n")
         for fetch in (subprocess.CompletedProcess([], 1, "", "fatal"), github.Unreachable("git fetch: timeout")):
@@ -90,6 +95,23 @@ class Riders(unittest.TestCase):
     def test_the_lint_tools_data_rides_and_its_code_goes_alone(self):
         self.assertIsNone(group.alone(["tools/lint/src/layers/table.rs", "tools/lint/src/components/waivers.rs"]))
         self.assertIn("tools/lint/src/main.rs", group.alone(["tools/lint/src/main.rs"]))
+
+    def test_markdown_only_goes_alone_as_cis_code_filter_counts_it(self):
+        self.assertIn("Markdown-only", group.alone(["README.md", "docs/testing.md"]))
+        for rides in (["docs/api/Transform.md"], ["docs/game-agent.md"], ["README.md", "src/a.rs"]):
+            with self.subTest(files=rides):
+                self.assertIsNone(group.alone(rides))
+
+    def test_a_machine_stop_keeps_its_whole_diagnosis(self):
+        fx = Fx([pr(1), pr(2)])
+        fx.ns.check = lambda sha: (_ for _ in ()).throw(stopping.Stopped(["disk full", "cargo: tail", "free space"]))
+        yard = fx.yard()
+        results, _ = yard.ride(yard.form([pr(1), pr(2)])[1])
+        self.assertEqual(results, [(1, outcomes.STOPPED, "disk full")])
+        said = []
+        fx.ns.say = lambda *a: said.append(a)
+        yard.ride(yard.form([pr(1), pr(2)])[1])
+        self.assertEqual(said[-1][1:], ("cargo: tail", "free space"))
 
     def test_a_half_is_asked_its_claims_again(self):
         line = [pr(1), pr(2), pr(3), pr(4)]

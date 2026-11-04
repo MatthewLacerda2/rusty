@@ -11,6 +11,7 @@ train that found nobody to ride with it ("a group of one is just today's path").
 from __future__ import annotations
 
 from merging.train import build
+from merging.verdict import changes
 
 
 # The most pull requests one train carries. Measured 2026-11-04 over the 140
@@ -38,7 +39,15 @@ RIDES = ("tools/lint/src/layers/table.rs", "tools/lint/src/components/waivers.rs
 
 
 def alone(files: list[str]) -> str | None:
-    """Why a change to `files` must take its turn alone, or `None`."""
+    """Why a change to `files` must take its turn alone, or `None`.
+
+    A pull request CI's `code` filter counts as Markdown-only (every path
+    Markdown, none a doc the tests read: [`verdict.changes.inert`], the same list)
+    goes alone too: alone it merges in about a minute with its build steps
+    skipped, where a train costs it a `cargo check` and a full CI round, and a
+    broken code member could drag it through bisection (#1785's review)."""
+    if files and changes.inert(files):
+        return "it is Markdown-only, which merges in minutes alone"
     hit = next((f for f in files if f not in RIDES and (f in ALONE_FILES or f.startswith(ALONE_PREFIXES))), None)
     return f"it changes {hit}, which goes alone" if hit else None
 

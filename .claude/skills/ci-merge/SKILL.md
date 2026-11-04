@@ -253,7 +253,8 @@ conflicts with the chain, or whose own CI is not green, is passed over this roun
 and keeps its place (`watch: #N waits …`); it is never updated for the train. These
 **go alone**, through the steps above: the first in line when it cannot ride (it
 conflicts with `main`, even in a `sorted` list the take resolves; its own CI is not
-green; Dependabot), a pull request touching `.github/scripts/merging/`,
+green; Dependabot), a Markdown-only pull request as CI's `code` filter counts it
+(the Markdown code reads ride; alone it merges in about a minute), a pull request touching `.github/scripts/merging/`,
 `.github/workflows/`, `tools/lint/` (its code: the layer table and the component
 waivers ride, `train.group.RIDES`), `Makefile`, `merge-queue.py`, `queue-daemon.py`,
 `Cargo.toml` or `Cargo.lock` (`watch: #N goes alone: it changes …`), one whose head
@@ -272,27 +273,36 @@ stalled, never red). The branch is deleted once they settle. Then:
 - **Green:** if `main` moved while it ran, the train is stale: its members are
   rebuilt first, on the new `main`, and none is marked red. If git cannot read
   `main` (a fetch failed through its retries), nothing lands and the watch stops
-  as a machine failure (exit 3). Otherwise each member is squash-merged in order,
+  as a machine failure (exit 3). Then every member is re-read before the first
+  squash: one that moved (its head, its label, draft, a description that refuses it
+  now) goes back in line (`watch: #N goes back in line: …`, said as it happens) and
+  the rest are rebuilt without it, nothing landed. Otherwise each member is squash-merged in order,
   exactly as step 6, with `sha` = its own head; then `main`'s tree must equal the
   train's and hold exactly that many new commits. If it does not, the watch prints
   `watch: STOPPED: main's tree is not the train's …` and exits **9**, which the
   supervisor never relaunches: look at `main` before merging anything more.
-- **A member that moved, was refused, or whose merge was lost in transit** ends
-  the landing there: it is handed back as today (an unknown merge says so), and
-  every member after it goes back in line (`back in line`), to be retested on the
-  new `main`. What did land is checked against the tree the train built for it.
-  A member whose description now refuses it (a stray `closes #N`, re-read at
-  landing) goes back in line, and its next take hands it back. GitHub answering
+- **A member refused, or whose merge was lost in transit**, ends the landing
+  there: it is handed back as today (an unknown merge says so), and every member
+  after it goes back in line (`watch: #N goes back in line: …`), to be retested on
+  the new `main`. One that moved in the seconds between the pre-landing read and its
+  squash goes back in line the same way. What did land is checked against the tree
+  the train built for it. A member whose description now refuses it (a stray
+  `closes #N`) goes back in line, and its next take hands it back. GitHub answering
   "Base branch was modified" is asked again three times, then the member goes back
   in line, never handed back. GitHub failing outright mid-landing settles what
-  landed, still checks `main`'s tree, and stops the watch with exit 3; if `main`
-  cannot be read for that check, the stop says to look at `main` first.
+  landed, still checks `main`'s tree, and stops the watch with exit 3. If `main`
+  cannot be read for that check, it is asked again for about five minutes
+  (`watch.trains.CHECK_TRIES`); still unread, the watch exits 3 saying that landing
+  **was not compared** with the train's tree, and the relaunched watch remembers
+  nothing of it: compare `main` with the tree the stop names by hand. A poll that
+  fails while the train's runs are awaited is waited past, until the deadline.
 - **Red:** the train is split in half and each half is retested before any new
   train, on the latest `main`; a green half lands, and a half of one goes alone, so
   a pull request red on its own is handed back with its run linked. A flaky test
   heals on the rerun. One real break in a train of 4 costs 5 rounds for those 4
   (1 + 2·log₂ k); four breaks, 7 (2k − 1). A train that only **stalled** (no run,
-  the deadline, the runners twice) splits the same way without marking anyone red.
+  the deadline, the runners twice) splits the same way without marking anyone red,
+  so its members ride again once their halves are done.
 
 A dry run prints the train it would form and pushes nothing; `--no-merge` stops a
 green train at green. A watch killed mid-train leaves a `merge-train/*` branch:

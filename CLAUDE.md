@@ -151,14 +151,16 @@ is wrong.
   failure that needs a decision you can't make), mark it a **draft** and hand it to the
   user. Because Rust is compiled, two PRs can each be green alone yet break `main`
   together (a rename, a changed signature, a moved module — no textual conflict catches
-  it). So nothing merges on a tree CI did not prove: either one PR brought up to the
+  it). So every merge aims at a tree CI proved: either one PR brought up to the
   latest `main` → CI green on that updated state → merge, or a **merge train** (#1785,
   approved 2026-11-04): up to four PRs whose own heads are green and which merge
   cleanly onto `main` and each other, tested together on one combined tree and all
-  landed if it is green, then `main`'s tree checked equal to the train's. A red train
-  is split in half and each half retested; a PR red on its own is handed back. One
+  landed if it is green, then `main`'s tree checked equal to the train's. Every member
+  is re-read before the first squash, so what can still leave `main` briefly on a tree
+  no run built is only a refusal or a transit failure partway through a landing. A red
+  train is split in half and each half retested; a PR red on its own is handed back. One
   train or PR at a time, so merging is still serialized in the sense that matters; the
-  merge path, CI and the manifests always go alone. A PR branch is
+  merge path, CI, the manifests and Markdown-only PRs always go alone. A PR branch is
   updated by **merging `main` into it, never by rebasing** (#1568): nothing is
   rewritten, so no push rewrites history (the queue's own push only leases the head it
   took, a compare-and-swap), and a conflict is resolved once. PRs are

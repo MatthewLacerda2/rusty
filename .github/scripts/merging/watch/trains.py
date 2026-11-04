@@ -19,6 +19,11 @@ from merging.train import build, group, land, rails, ride
 from merging.watch import board, ending
 
 
+# How long `main` is asked for after a landing before its check is given up:
+# CHECK_TRIES reads CHECK_GAP seconds apart, each read itself retried (`gitio.remote`).
+CHECK_TRIES, CHECK_GAP = 10, 30.0
+
+
 def halves(train: build.Train) -> list[list[tuple[int, str]]]:
     """A red train's two halves, each `(number, head)` in landing order."""
     cars = [(car.number, car.head) for car in train.cars]
@@ -35,7 +40,7 @@ class Yard:
     compile, empty when it does or `--no-check`), `push(train)`, `dispatch(branch)`,
     `wait(sha, tick)` ([`train.ride.wait`]), `delete(branch)`, `look(number)`,
     `squash(pull, sha)`, `main_state(base)` (`main`'s tree and its first-parent count
-    since `base`), `say`, `bots`, `dry_run` and `no_merge`."""
+    since `base`), `pause(seconds)`, `say`, `bots`, `dry_run` and `no_merge`."""
 
     def __init__(self, fx):
         self.fx = fx
@@ -90,8 +95,11 @@ class Yard:
         try:
             state, lines = self.test(train, name, tick)
         except (*land.DOWN, stopping.Stopped) as down:
-            why = down.lines[0] if isinstance(down, stopping.Stopped) else land.down_why(down)
-            return [(train.numbers[0], outcomes.STOPPED, why)], None
+            # A machine stop keeps its whole diagnosis (a full disk's cargo tail and
+            # remedy), as `stopping.drain` prints it (#1785's review).
+            lines = down.lines if isinstance(down, stopping.Stopped) else [land.down_why(down)]
+            fx.say(f"watch: train {listed}: {lines[0]}", *lines[1:])
+            return [(train.numbers[0], outcomes.STOPPED, lines[0])], None
         fx.say(f"watch: train {listed}: {lines[0]}", *lines[1:])
         if state == outcomes.STOPPED:
             return [(train.numbers[0], outcomes.STOPPED, lines[0])], None
@@ -120,12 +128,22 @@ class Yard:
             self.waiting.insert(0, cars)
             fx.say(f"watch: `main` moved past {train.base[:7]} while the train ran; rebuilding it on the new `main`.")
             return [(n, outcomes.REQUEUED, "its train went stale; rebuilt on the new `main`.") for n in train.numbers], None
+        gone = land.departed(train, fx.look)
+        if gone:
+            return self.rebuild(train, dict(gone)), None
         results, landed, unknown = land.land(train, fx.look, fx.squash)
+        for number, state, why in results:
+            if state == outcomes.REQUEUED:
+                fx.say(f"watch: #{number} goes back in line: {why}")
         if not (landed or unknown):
             return results, None
-        now = fx.main_state(train.base)
+        now = self.landed_state(train.base)
         if now is None:
-            halt = f"{landed} member(s) of the train landed, and git could not read `main` to check its tree; look at `main` before merging anything more."
+            # Exit 3 relaunches with nothing remembered, so this landing is never
+            # compared: the line says so, for whoever reads the log (#1785's review).
+            halt = (f"{landed} member(s) of the train landed, and git could not read `main` for {CHECK_TRIES} tries"
+                    f" to check its tree, so that landing was not compared with the train's {train.tree_after(landed)[:12]}"
+                    " and the relaunched watch will not compare it either; compare `main` with it by hand before merging anything more.")
             fx.say(f"watch: STOPPED: {halt}")
             return results, (halt, ending.MACHINE_STATUS)
         halt = land.check(train, landed, unknown, *now)
@@ -133,6 +151,30 @@ class Yard:
             fx.say(f"watch: STOPPED: {halt}")
             return results, (halt, ending.MISMATCH_STATUS)
         return results, None
+
+    def landed_state(self, base: str) -> tuple[str, int] | None:
+        """`main` after a landing, asked again for several minutes: the tree check
+        must not vanish with one fetch failing through its retries (#1785's review)."""
+        for attempt in range(CHECK_TRIES):
+            now = self.fx.main_state(base)
+            if now is not None or attempt == CHECK_TRIES - 1:
+                return now
+            self.fx.say(f"watch: git could not read `main` to check the landing; asking again in {CHECK_GAP:.0f}s.")
+            self.fx.pause(CHECK_GAP)
+        return None
+
+    def rebuild(self, train: build.Train, gone: dict[int, str]) -> list[tuple[int, str, str]]:
+        """Members that departed before any squash go back in line, each said
+        when it happens; the rest are rebuilt first, on the latest `main`."""
+        stay = [(car.number, car.head) for car in train.cars if car.number not in gone]
+        if stay:
+            self.waiting.insert(0, stay)
+        results = []
+        for number in train.numbers:
+            why = f"not landed with its train: {gone[number]}." if number in gone else "a member left its train before landing; rebuilt without it."
+            self.fx.say(f"watch: #{number} goes back in line: {why}")
+            results.append((number, outcomes.REQUEUED, why))
+        return results
 
     def test(self, train: build.Train, name: str, tick) -> tuple[str, list[str]]:
         """The local check, the push, the dispatch and the wait; the branch is deleted after."""
