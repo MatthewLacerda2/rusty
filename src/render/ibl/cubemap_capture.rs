@@ -1,8 +1,16 @@
 //! src/render/ibl/cubemap_capture.rs — Static-scene cubemap capture from a point (#243).
 //!
 //! A reusable render primitive: given a world position, render the STATIC scene into
-//! a 6-face cubemap (offscreen, LDR RGBA8), reusing the forward lit pass. This is the
+//! a 6-face cubemap of linear HDR radiance, reusing the forward lit pass. This is the
 //! shared spine both probe bakes and reflection bakes stand on.
+//!
+//! The faces are read from the view's HDR scene target (`Rgba16Float`, the forward
+//! pass's own output) before the post-FX composite, so a capture carries no grade,
+//! no tonemap, no display encode and no clamp (#1696): a lamp of radiance 40 is 40
+//! in the cube, as Unity's HDR probes and UE's FP16 captures keep it. A texel the
+//! half float cannot hold (a NaN from a material, an emissive past 65504 overflowing
+//! to infinity) is filtered here, once, so it never reaches a mip or a probe's SH:
+//! [`sanitize`].
 //!
 //! Only `is_static` entities (plus, for a reflection capture, the skybox — the distant
 //! environment) are drawn; dynamic actors are excluded so they never bake into a
@@ -20,34 +28,59 @@ use glam::Vec3;
 use super::faces::mirror_rows;
 pub use super::faces::CubemapFace;
 pub(crate) use super::faces::{face_camera, face_view_projection};
+use crate::core::color::f16_to_f32;
 
+use crate::render::readback::read_texture_bytes;
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 
 use crate::scene::Camera;
 use crate::scene::Scene;
 
-/// Six LDR RGBA8 faces captured from one world point. Each face is `resolution ×
-/// resolution`, tightly packed (`resolution * resolution * 4` bytes), row-major top
-/// to bottom, laid out as a `texture_cube` samples it (#1615): uploaded as a cube's
-/// six layers, a direction reads what the capture saw along it. Indexed by
-/// `CubemapFace as usize` via [`CubemapCapture::face`].
+/// Six faces of linear HDR radiance captured from one world point (#1696). Each face
+/// is `resolution × resolution` texels, row-major top to bottom, laid out as a
+/// `texture_cube` samples it (#1615): uploaded as a cube's six layers, a direction
+/// reads what the capture saw along it. Every texel is finite and non-negative
+/// ([`sanitize`]). Indexed by `CubemapFace as usize` via [`CubemapCapture::face`].
 pub struct CubemapCapture {
     /// Edge length in pixels of every face.
     pub resolution: u32,
     /// The six faces in `CubemapFace::ALL` order.
-    pub faces: [Vec<u8>; 6],
+    pub faces: [Vec<Vec3>; 6],
 }
 
 impl CubemapCapture {
-    /// The packed RGBA8 bytes of one face.
-    pub fn face(&self, face: CubemapFace) -> &[u8] {
+    /// The texels of one face.
+    pub fn face(&self, face: CubemapFace) -> &[Vec3] {
         &self.faces[face as usize]
     }
 }
 
+/// The largest finite half float: what an emissive past it saturates to.
+pub(crate) const HALF_MAX: f32 = 65504.0;
+
+/// One captured channel as the bake may use it (#1696): a NaN is black, a negative
+/// is zero and anything past [`HALF_MAX`] (an overflowed `+inf`) is held there, so
+/// one bad texel stays one bright texel and never poisons a mip's average or a
+/// probe's SH.
+pub(crate) fn sanitize(c: f32) -> f32 {
+    if c.is_nan() {
+        0.0
+    } else {
+        c.clamp(0.0, HALF_MAX)
+    }
+}
+
+/// An `Rgba16Float` readback's RGB, sanitized; alpha is dropped.
+pub(crate) fn decode_half_texels(bytes: &[u8]) -> Vec<Vec3> {
+    let half = |b: &[u8]| sanitize(f16_to_f32(u16::from_le_bytes([b[0], b[1]])));
+    (bytes.chunks_exact(8))
+        .map(|t| Vec3::new(half(&t[..2]), half(&t[2..4]), half(&t[4..6])))
+        .collect()
+}
+
 impl Renderer {
     /// Render the STATIC scene into a 6-face cubemap centred on `position`, each face
-    /// `resolution × resolution` LDR RGBA8 (#243). Reuses the forward lit pass with a
+    /// `resolution × resolution` linear HDR radiance (#243, #1696). Reuses the forward lit pass with a
     /// 90° FOV per face; only `is_static` entities and the skybox are drawn. A light
     /// probe captures through [`Renderer::capture_light_probe`] instead, which draws
     /// no sky (#1668).
@@ -109,13 +142,10 @@ impl Renderer {
             let mut camera = face_camera(position, face);
             (camera.near, camera.far) = (lens.near, lens.far);
             self.render_capture_face(&mut render_view, scene, &camera, &output);
-            let mut pixels = crate::render::readback::read_texture_rgba8(
-                &self.device,
-                &self.queue,
-                &target,
-                resolution,
-                resolution,
-            );
+            let hdr = &render_view.post_fx.scene_hdr.texture;
+            let size = (resolution, resolution);
+            let bytes = read_texture_bytes(&self.device, &self.queue, hdr, size, 8);
+            let mut pixels = decode_half_texels(&bytes);
             mirror_rows(&mut pixels, resolution);
             if self.capture.ambient_sky {
                 open[face as usize] = self.read_open_texels(&render_view, resolution);
@@ -131,21 +161,17 @@ impl Renderer {
     /// still the far plane the scene pass cleared to. Mirrored as the colour is.
     fn read_open_texels(&self, view: &RenderView, resolution: u32) -> Vec<bool> {
         let size = (resolution, resolution);
-        let mut depth = crate::render::readback::read_texture_bytes(
-            &self.device,
-            &self.queue,
-            &view.depth_texture,
-            size,
-            4,
-        );
-        mirror_rows(&mut depth, resolution);
-        depth
-            .chunks_exact(4)
+        let depth = read_texture_bytes(&self.device, &self.queue, &view.depth_texture, size, 4);
+        let mut open: Vec<bool> = (depth.chunks_exact(4))
             .map(|d| f32::from_le_bytes([d[0], d[1], d[2], d[3]]) >= 1.0)
-            .collect()
+            .collect();
+        mirror_rows(&mut open, resolution);
+        open
     }
 
-    /// Build the per-face offscreen colour target (LDR RGBA8, copyable to CPU).
+    /// Build the per-face output the post-FX composite writes. The capture reads the
+    /// view's HDR scene target instead, ahead of the composite; this is only where
+    /// the shared frame path lands its display image.
     fn make_face_target(&self, resolution: u32) -> wgpu::Texture {
         self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Cubemap Face Target"),
@@ -158,7 +184,7 @@ impl Renderer {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: OFFSCREEN_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         })
     }

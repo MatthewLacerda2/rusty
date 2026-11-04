@@ -4,8 +4,9 @@
 //! reflection bake hand-rolls the encode over the same binary layout the crate's `Reader`
 //! validates and parses (`cubemap::parse_ktx2_cubemap_mips`, #244). A KTX2 file is a
 //! fixed 80-byte header, a level index (one 24-byte entry per mip, largest mip first), a
-//! Basic Data Format Descriptor, then the level data. We emit exactly that for an LDR
-//! RGBA8 cubemap with a full roughness mip chain, so the loader reads back what we wrote.
+//! Basic Data Format Descriptor, then the level data. We emit exactly that for an HDR
+//! `R16G16B16A16_SFLOAT` cubemap with a full roughness mip chain (#1696), so the loader
+//! reads back what we wrote. BC6H would quarter the size; it waits on a cube encoder.
 //!
 //! Output is plain baked-asset bytes — a pure function of the prefiltered faces, no
 //! wall-clock / RNG — so the encode is clean under the determinism guard.
@@ -18,10 +19,11 @@ const MAGIC: [u8; 12] = [
 ];
 const HEADER_LEN: usize = 80;
 const LEVEL_INDEX_ENTRY_LEN: usize = 24;
-/// `VK_FORMAT_R8G8B8A8_SRGB` — the LDR sRGB format the bake emits and the loader accepts.
-const VK_FORMAT_R8G8B8A8_SRGB: u32 = 43;
+/// `VK_FORMAT_R16G16B16A16_SFLOAT` — the half-float format the bake emits and the
+/// loader accepts (#1696).
+pub(crate) const VK_FORMAT_R16G16B16A16_SFLOAT: u32 = 97;
 
-/// Encode a prefiltered cubemap into KTX2 bytes: an `R8G8B8A8_SRGB` cubemap with one level
+/// Encode a prefiltered cubemap into KTX2 bytes: an `R16G16B16A16_SFLOAT` cubemap with one level
 /// per roughness mip (largest first), each level holding the six faces packed in
 /// `CubemapFace::ALL` order. The bytes parse with `ktx2::Reader` and
 /// `parse_ktx2_cubemap_mips`.
@@ -61,12 +63,12 @@ pub fn encode_cubemap(cube: &PrefilteredCubemap) -> Vec<u8> {
     buf
 }
 
-/// Write the 80-byte KTX2 header for a `size × size` RGBA8 SRGB cubemap (`face_count = 6`,
+/// Write the 80-byte KTX2 header for a `size × size` RGBA16F cubemap (`face_count = 6`,
 /// no array layers, no supercompression) with `levels` mips and the given DFD location.
 fn write_header(buf: &mut [u8], size: u32, levels: u32, dfd_offset: usize, dfd_len: usize) {
     buf[0..12].copy_from_slice(&MAGIC);
-    put_u32(buf, 12, VK_FORMAT_R8G8B8A8_SRGB); // vkFormat
-    put_u32(buf, 16, 1); // typeSize (1 byte per channel)
+    put_u32(buf, 12, VK_FORMAT_R16G16B16A16_SFLOAT); // vkFormat
+    put_u32(buf, 16, 2); // typeSize (2 bytes per channel)
     put_u32(buf, 20, size); // pixelWidth
     put_u32(buf, 24, size); // pixelHeight
     put_u32(buf, 28, 0); // pixelDepth (2D)
@@ -93,7 +95,7 @@ fn write_level_index(buf: &mut [u8], index: &[(u64, u64)]) {
     }
 }
 
-/// A minimal Basic Data Format Descriptor for `R8G8B8A8_SRGB`: the 4-byte total-size word
+/// A minimal Basic Data Format Descriptor: the 4-byte total-size word
 /// followed by a 24-byte basic-descriptor block header. The loader only checks the format
 /// enum (from the header) and the DFD's presence/bounds, so a compact-but-valid block —
 /// total size word + an empty basic block — satisfies `ktx2::Reader`'s integrity check.
