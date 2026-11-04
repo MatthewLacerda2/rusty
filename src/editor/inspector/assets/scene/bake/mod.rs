@@ -214,10 +214,12 @@ fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
         Step::Probes { job, .. } => return draw_probe_progress(ui, job.stage()),
     };
     let (done, total) = job.progress();
-    let text = match (job.is_cancelled(), total) {
-        (true, _) => "Cancelling…".to_string(),
-        (false, 0) => "Preparing…".to_string(),
-        (false, _) => format!("Lightmaps: {done} / {total} texels"),
+    let text = match (job.is_cancelled(), job.pages(), total) {
+        (true, ..) => "Cancelling…".to_string(),
+        // The page being encoded now, of them all (#1694).
+        (false, Some((done, n)), _) => format!("Encoding page {} of {n}", (done + 1).min(n)),
+        (false, None, 0) => "Preparing…".to_string(),
+        (false, None, _) => format!("Lightmaps: {done} / {total} texels"),
     };
     ui.horizontal(|ui| {
         let bar = egui::ProgressBar::new(job.fraction()).text(text);

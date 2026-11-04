@@ -11,6 +11,7 @@ use block_compression::{BC6HSettings, BC7Settings, CompressionVariant};
 use glam::Vec3;
 
 use super::{Page, PageFormat};
+use crate::asset::texture_import::banded;
 
 /// BC6H's profile. Lightmaps are smooth, so the very fast profile holds them within
 /// 5% (`tests`); a 2048² page with its mips took 1.9 s on four cores of the 2026
@@ -27,8 +28,18 @@ pub const BC6H_MAX: f32 = 65504.0;
 
 /// A BC6H page of linear HDR `levels` (level `l` is `(edge >> l)`² texels,
 /// row-major). A negative, NaN or overflowing channel is clamped into BC6H's range.
-pub fn encode_bc6h(edge: u32, levels: &[Vec<Vec3>], threads: usize) -> Page {
-    let encoded = levels.iter().enumerate().map(|(l, texels)| {
+/// `None` when `stop` answers true before a level.
+pub fn encode_bc6h(
+    edge: u32,
+    levels: &[Vec<Vec3>],
+    threads: usize,
+    stop: &dyn Fn() -> bool,
+) -> Option<Page> {
+    let mut encoded = Vec::with_capacity(levels.len());
+    for (l, texels) in levels.iter().enumerate() {
+        if stop() {
+            return None;
+        }
         let halves: Vec<f16> = texels
             .iter()
             .flat_map(|c| {
@@ -36,37 +47,44 @@ pub fn encode_bc6h(edge: u32, levels: &[Vec<Vec3>], threads: usize) -> Page {
                 [r, g, b, f16::ONE]
             })
             .collect();
-        banded(
-            edge >> l,
-            PageFormat::Bc6h,
-            threads,
-            |out, w, rows, row0| {
-                let start = (row0 * w * 4) as usize;
-                compress_rgba16(BC6H, &halves[start..], out, w, rows, w * 4);
-            },
-        )
-    });
-    Page {
+        let w = edge >> l;
+        encoded.push(banded(w, w, 16, threads, |out, rows, row0| {
+            let start = (row0 * w * 4) as usize;
+            compress_rgba16(BC6H, &halves[start..], out, w, rows, w * 4);
+        }));
+    }
+    Some(Page {
         format: PageFormat::Bc6h,
         edge,
-        levels: encoded.collect(),
-    }
+        levels: encoded,
+    })
 }
 
 /// A BC7 page of RGBA8 `levels` (level `l` is `(edge >> l)`² texels, row-major).
-pub fn encode_bc7(edge: u32, levels: &[Vec<[u8; 4]>], threads: usize) -> Page {
-    let encoded = levels.iter().enumerate().map(|(l, texels)| {
+/// `None` when `stop` answers true before a level.
+pub fn encode_bc7(
+    edge: u32,
+    levels: &[Vec<[u8; 4]>],
+    threads: usize,
+    stop: &dyn Fn() -> bool,
+) -> Option<Page> {
+    let mut encoded = Vec::with_capacity(levels.len());
+    for (l, texels) in levels.iter().enumerate() {
+        if stop() {
+            return None;
+        }
         let bytes: &[u8] = bytemuck_flat(texels);
-        banded(edge >> l, PageFormat::Bc7, threads, |out, w, rows, row0| {
+        let w = edge >> l;
+        encoded.push(banded(w, w, 16, threads, |out, rows, row0| {
             let start = (row0 * w * 4) as usize;
             compress_rgba8(BC7, &bytes[start..], out, w, rows, w * 4);
-        })
-    });
-    Page {
+        }));
+    }
+    Some(Page {
         format: PageFormat::Bc7,
         edge,
-        levels: encoded.collect(),
-    }
+        levels: encoded,
+    })
 }
 
 /// Level `level` of a BC6H `page` decoded back to linear HDR: what a GPU samples.
@@ -129,27 +147,4 @@ fn clean(v: f32) -> f32 {
 /// RGBA8 texels as their bytes.
 fn bytemuck_flat(texels: &[[u8; 4]]) -> &[u8] {
     block_compression::bytemuck::cast_slice(texels)
-}
-
-/// One `edge`² level's blocks, its block rows split in bands over `threads`:
-/// `encode(out, width, rows, first_row)` fills one band.
-fn banded(
-    edge: u32,
-    format: PageFormat,
-    threads: usize,
-    encode: impl Fn(&mut [u8], u32, u32, u32) + Sync,
-) -> Vec<u8> {
-    let mut blocks = vec![0u8; format.level_len(edge)];
-    let row_bytes = format.level_len(edge) / (edge / 4).max(1) as usize;
-    let block_rows = (edge / 4) as usize;
-    let band = block_rows.div_ceil(threads.max(1)).max(1);
-    let encode = &encode;
-    std::thread::scope(|scope| {
-        for (i, out) in blocks.chunks_mut(band * row_bytes).enumerate() {
-            let rows = (out.len() / row_bytes) as u32 * 4;
-            let row0 = (i * band * 4) as u32;
-            scope.spawn(move || encode(out, edge, rows, row0));
-        }
-    });
-    blocks
 }

@@ -59,7 +59,11 @@ fn the_bc6h_page_and_its_png_fallback_light_a_floor_alike() {
     std::fs::create_dir_all(&dir).unwrap();
     let texels = light();
     let ktx2 = dir.join("page.ktx2");
-    std::fs::write(&ktx2, lightmap_page::write(&colour_page(&texels, EDGE, 2))).unwrap();
+    std::fs::write(
+        &ktx2,
+        lightmap_page::write(&colour_page(&texels, EDGE, 2, &|| false).unwrap()),
+    )
+    .unwrap();
     let png = ktx2.with_extension("png");
     image::RgbaImage::from_raw(EDGE, EDGE, encode_texels(&texels))
         .unwrap()

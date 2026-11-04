@@ -5,8 +5,10 @@
 //! every mip) when the GPU has BC compression. Without it, or for a `.png` page (a
 //! scene baked before #1694), the PNG is decoded on the CPU: RGBM to linear
 //! `Rgba16Float` for irradiance, RGBA8 for directions, its mips made by the same
-//! `lightmap::levels` the bake made the KTX2's with. The shader then reads linear
-//! light either way, filtered linearly.
+//! `lightmap::levels` the bake made the KTX2's with. A `.png` page that stands
+//! alone (a scene baked before #1694) uploads its one level: its layout (a
+//! 1-texel ring, an unfilled background) cannot carry mips without bleeding. The
+//! shader then reads linear light either way, filtered linearly.
 
 use std::path::Path;
 
@@ -88,17 +90,28 @@ fn page(
         return Err("not a square page".into());
     }
     let texels = image.pixels().map(|p| p.0);
+    // A `.png` page is a scene baked before #1694: a 1-texel ring and no filled
+    // background, a layout whose mips would bleed, so it keeps its one level.
+    let mips = is_ktx2;
     Ok(match kind {
         Kind::Colour => {
             let light: Vec<_> = texels.map(decode_rgbm).collect();
-            let chain = levels(&light, edge);
+            let chain = match mips {
+                true => levels(&light, edge),
+                false => vec![light],
+            };
             let bytes = chain.iter().map(|l| lightmap_page::to_rgba16f(l)).collect();
             (wgpu::TextureFormat::Rgba16Float, edge, bytes)
         }
         Kind::Direction => {
-            let dirs: Vec<_> = texels.map(decode_direction).collect();
-            let chain = direction_levels(&dirs, edge);
-            let bytes = chain.into_iter().map(|l| l.concat()).collect();
+            let bytes = match mips {
+                true => {
+                    let dirs: Vec<_> = texels.map(decode_direction).collect();
+                    let chain = direction_levels(&dirs, edge);
+                    chain.into_iter().map(|l| l.concat()).collect()
+                }
+                false => vec![image.as_raw().clone()],
+            };
             (wgpu::TextureFormat::Rgba8Unorm, edge, bytes)
         }
     })

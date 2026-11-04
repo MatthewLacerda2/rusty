@@ -1,11 +1,13 @@
 //! The editor's background bake (#808): it applies what the synchronous bake would,
-//! reports progress, and a cancelled bake leaves the previous lightmaps alone.
+//! reports progress, and a bake cancelled while tracing or encoding leaves the
+//! previous lightmaps alone.
 
 use std::path::Path;
 use std::time::Duration;
 
 use super::tests::{quick, scene, scene_path};
 use super::*;
+use crate::scene::lighting::lightmap::BakeProgress;
 
 /// Poll `job` until its worker has finished (a debug-build bake of the test scene
 /// takes well under the bound).
@@ -37,6 +39,8 @@ fn a_background_bake_applies_what_the_synchronous_one_does() {
 
     let (done, total) = job.progress();
     assert!(total > 0 && done == total);
+    let (encoded, pages) = job.pages().expect("the encode ran");
+    assert!(pages > 0 && encoded == pages, "every page encoded");
     assert_eq!(job.fraction(), 1.0);
     assert_eq!(job.poll(&mut scene), None, "a spent job reports once");
 }
@@ -56,6 +60,39 @@ fn a_cancelled_bake_keeps_the_previous_lightmaps() {
     let mut job = LightmapBakeJob::start(&mut scene, Some(&path), heavy).unwrap();
     job.cancel();
     assert!(job.is_cancelled());
+    assert_eq!(finish(&mut job, &mut scene), BakeOutcome::Cancelled);
+    assert_eq!(scene.lightmaps, before);
+    assert!(
+        Path::new(&before.pages[0]).exists(),
+        "its pages stay on disk"
+    );
+}
+
+#[test]
+fn a_cancel_during_the_encode_keeps_the_previous_lightmaps() {
+    // The encode itself stops between two levels and makes nothing.
+    let input = gather_bake_input(&scene().0);
+    let maps = crate::scene::lighting::lightmap::bake(&input, &quick());
+    let cancelled = BakeProgress::default();
+    cancelled.cancel();
+    assert_eq!(encode_pages(&maps, &cancelled), Ok(None));
+    let (made, pages) = cancelled.pages().expect("it began");
+    assert!(pages > 0 && made == 0, "and made no page");
+
+    // A cancel that lands after the trace, before `poll` applies, applies nothing.
+    let (mut scene, _, _) = scene();
+    let path = scene_path("job_cancel_encode");
+    bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
+    let before = scene.lightmaps.clone();
+    let mut job = LightmapBakeJob::start(&mut scene, Some(&path), quick()).unwrap();
+    while !job.is_finished() {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        job.pages().is_some_and(|(k, n)| k == n),
+        "traced and encoded"
+    );
+    job.cancel();
     assert_eq!(finish(&mut job, &mut scene), BakeOutcome::Cancelled);
     assert_eq!(scene.lightmaps, before);
     assert!(

@@ -55,6 +55,7 @@ use std::path::{Path, PathBuf};
 
 use image::ImageReader;
 
+pub(crate) use encode::{banded, blocks_len};
 pub use encode::{full_chain_len, BlockFormat, Compressed};
 pub use refresh::{images, queue, queue_changed, refresh, refresh_all, Refreshed};
 pub use shrink::fit;

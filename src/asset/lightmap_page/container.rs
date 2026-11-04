@@ -1,5 +1,7 @@
 //! A lightmap page's container (#1694): KTX2, one 2D block-compressed texture with
-//! its mip chain, largest level first, no supercompression. Written by hand (the
+//! its mip chain, no supercompression. As the spec lays it out, the level index
+//! runs largest first and the level images smallest first, each 16-byte aligned,
+//! so other KTX2 tools open a page. Written by hand (the
 //! `ktx2` crate only reads) over the layout its `Reader` validates, and read back
 //! through that reader. A file that does not parse, names another format or size,
 //! or whose levels are not the lengths its format and size give, is refused with
@@ -14,6 +16,8 @@ const MAGIC: [u8; 12] = [
 ];
 const HEADER_LEN: usize = 80;
 const LEVEL_ENTRY_LEN: usize = 24;
+/// Where a level image may start: lcm(a 16-byte block, 4).
+const LEVEL_ALIGN: usize = 16;
 
 /// The KTX2 bytes of `page`.
 pub fn write(page: &Page) -> Vec<u8> {
@@ -41,17 +45,16 @@ pub fn write(page: &Page) -> Vec<u8> {
         put(&mut out, 12 + 4 * i, &w.to_le_bytes());
     }
     // sgdByteOffset and sgdByteLength stay 0.
-    let mut offset = data_at as u64;
-    for (i, level) in page.levels.iter().enumerate() {
+    out[dfd_at..data_at].copy_from_slice(&dfd);
+    // The level images run smallest first, each at a multiple of the block size
+    // (KTX 2.0 §3.9, `mipPadding`); the index stays largest first.
+    for (i, level) in page.levels.iter().enumerate().rev() {
+        out.resize(out.len().next_multiple_of(LEVEL_ALIGN), 0);
         let at = HEADER_LEN + i * LEVEL_ENTRY_LEN;
-        let len = level.len() as u64;
+        let (offset, len) = (out.len() as u64, level.len() as u64);
         put(&mut out, at, &offset.to_le_bytes());
         put(&mut out, at + 8, &len.to_le_bytes());
         put(&mut out, at + 16, &len.to_le_bytes());
-        offset += len;
-    }
-    out[dfd_at..data_at].copy_from_slice(&dfd);
-    for level in &page.levels {
         out.extend_from_slice(level);
     }
     out

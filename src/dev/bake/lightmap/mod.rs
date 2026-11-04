@@ -3,7 +3,7 @@
 //! The one path behind `Lighting.BakeLightmaps()` and the lightmap step of the
 //! editor's Generate Lighting button (#832), so the two never drift. It gathers the
 //! static scene, runs the CPU bake (`scene::lighting::lightmap`, pure and seeded),
-//! writes each lightmap as an RGBM PNG beside the scene, and points the scene's
+//! writes its atlas pages beside the scene, and points the scene's
 //! `lightmaps` at them. Saving the scene (or Generate Lighting, which writes them)
 //! then persists those references. Headless: no GPU is involved.
 //!
@@ -74,9 +74,9 @@ pub fn bake_scene_lightmaps_logged(
 ) -> Result<usize, String> {
     let scene_path = scene_path.ok_or(UNSAVED)?;
     let input = gather_bake_input(scene);
-    let maps = logged::bake_logged(&input, settings, log);
-    warn_missing_uvs(input.meshes.len(), maps.len());
-    apply_encoded(scene, scene_path, &encode_pages(&maps))
+    let encoded = logged::bake_logged(&input, settings, log)?;
+    warn_missing_uvs(input.meshes.len(), encoded.maps);
+    apply_encoded(scene, scene_path, &encoded)
 }
 
 /// The bake summary's one-time nudge (#831): how many static meshes got no lightmap

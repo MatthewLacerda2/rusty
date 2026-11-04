@@ -21,7 +21,7 @@ fn page(name: &str, edge: u32) -> String {
         .map(|i| Vec3::new(0.5 + (i % edge) as f32 / edge as f32, 1.0, 9.0))
         .collect();
     let ktx2 = dir.join(format!("{name}.ktx2"));
-    let page = colour_page(&light, edge, 2);
+    let page = colour_page(&light, edge, 2, &|| false).expect("never stopped");
     std::fs::write(&ktx2, lightmap_page::write(&page)).unwrap();
     image::RgbaImage::from_raw(edge, edge, encode_texels(&light))
         .unwrap()
@@ -55,7 +55,9 @@ fn gpu_a_ktx2_page_binds_compressed_with_its_mips_or_from_its_png() {
         "two pages, three levels"
     );
 
-    // A scene baked before #1694 references its PNGs: they bind as linear light.
+    // A scene baked before #1694 references its PNGs: they bind as linear light,
+    // one level. The list before it stays cached, and counts.
+    let ktx2_bytes = maps.gpu_bytes();
     let png = vec![Path::new(&pages[0])
         .with_extension("png")
         .to_string_lossy()
@@ -63,7 +65,14 @@ fn gpu_a_ktx2_page_binds_compressed_with_its_mips_or_from_its_png() {
     assert!(maps.bind(device, queue, &png, &[]));
     assert_eq!(
         maps.bound_format(),
-        Some((wgpu::TextureFormat::Rgba16Float, MIP_LEVELS))
+        Some((wgpu::TextureFormat::Rgba16Float, 1)),
+        "its old layout carries no mips"
+    );
+    let png_bytes = 64 * 64 * 8;
+    assert_eq!(
+        maps.gpu_bytes(),
+        ktx2_bytes + png_bytes,
+        "every cached list"
     );
 }
 
@@ -85,4 +94,21 @@ fn gpu_a_windowed_renderer_binds_once_the_read_lands() {
     }
     assert!(maps.resident(), "the worker's read landed and bound");
     assert!(!maps.bind(device, queue, &pages, &[]), "and then holds");
+}
+
+#[test]
+fn gpu_a_loader_that_died_is_a_failed_load_not_pending_forever() {
+    let Some(renderer) = headless_or_skip(4, 4) else {
+        return;
+    };
+    let (device, queue) = (&renderer.device, &renderer.queue);
+    let mut maps = Lightmaps::new(device, false);
+    let list = vec!["dead.ktx2".to_string()];
+    let (outbox, inbox) = std::sync::mpsc::channel();
+    drop(outbox); // the worker panicked before it answered
+    maps.cache
+        .insert(list.clone(), super::Entry::Pending(inbox));
+    maps.bind(device, queue, &list, &[]);
+    assert!(matches!(maps.cache[&list], super::Entry::Ready(None)));
+    assert!(!maps.resident());
 }

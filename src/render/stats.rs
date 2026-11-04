@@ -129,8 +129,9 @@ pub struct RenderCounters {
     /// texture compression and *Max Size* shrink (#1574). Not a per-frame count:
     /// the resident total at the frame's end.
     pub texture_bytes: u64,
-    /// GPU bytes of the bound lightmap pages (#1694), colour and direction arrays,
-    /// every mip: the resident total at the frame's end, not a per-frame count.
+    /// GPU bytes of every lightmap page array held (#1694): the bound colour and
+    /// direction arrays and any other page list cached, every mip. The resident
+    /// total at the frame's end, not a per-frame count.
     pub lightmap_bytes: u64,
 }
 

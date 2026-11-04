@@ -35,14 +35,26 @@ pub fn levels(page: &[Vec3], edge: u32) -> Vec<Vec<Vec3>> {
     chain
 }
 
-/// An irradiance page, every level, as BC6H.
-pub fn colour_page(page: &[Vec3], edge: u32, threads: usize) -> Page {
-    encode_bc6h(edge, &levels(page, edge), threads)
+/// An irradiance page, every level, as BC6H; `None` when `stop` answers true
+/// before a level.
+pub fn colour_page(
+    page: &[Vec3],
+    edge: u32,
+    threads: usize,
+    stop: &dyn Fn() -> bool,
+) -> Option<Page> {
+    encode_bc6h(edge, &levels(page, edge), threads, stop)
 }
 
-/// A direction page, every level, as BC7.
-pub fn direction_page(page: &[Vec3], edge: u32, threads: usize) -> Page {
-    encode_bc7(edge, &direction_levels(page, edge), threads)
+/// A direction page, every level, as BC7; `None` when `stop` answers true before
+/// a level.
+pub fn direction_page(
+    page: &[Vec3],
+    edge: u32,
+    threads: usize,
+    stop: &dyn Fn() -> bool,
+) -> Option<Page> {
+    encode_bc7(edge, &direction_levels(page, edge), threads, stop)
 }
 
 /// A direction page's levels as their RGBA8 texels (`encode::encode_direction`).

@@ -26,19 +26,15 @@ pub use container::{read, write};
 /// pages: `foo.scene` → `foo.scene.lightmaps/`.
 pub const DIR_SUFFIX: &str = ".lightmaps";
 
-/// Whether `path` lies in a scene's lightmap folder (a folder whose name ends in
-/// [`DIR_SUFFIX`]): a baked page the texture importer leaves alone. The one check
-/// every caller asks.
+/// Whether `path` lies directly in a scene's lightmap folder (its parent's name
+/// ends in [`DIR_SUFFIX`]): a baked page the texture importer leaves alone. The one
+/// check every caller asks. Only the direct parent counts, so a project kept under
+/// a folder that happens to end in `.lightmaps` is still imported.
 pub fn is_baked(path: &Path) -> bool {
-    let Some(parent) = path.parent() else {
-        return false;
-    };
-    parent.components().any(|c| match c {
-        std::path::Component::Normal(name) => name
-            .to_str()
-            .is_some_and(|n| n.len() > DIR_SUFFIX.len() && n.ends_with(DIR_SUFFIX)),
-        _ => false,
-    })
+    path.parent()
+        .and_then(Path::file_name)
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.len() > DIR_SUFFIX.len() && n.ends_with(DIR_SUFFIX))
 }
 
 /// A page's block format.
@@ -63,8 +59,7 @@ impl PageFormat {
 
     /// The bytes of one `edge`² level: 16 a 4×4 block.
     pub fn level_len(self, edge: u32) -> usize {
-        let blocks = edge.div_ceil(4) as usize;
-        blocks * blocks * 16
+        crate::asset::texture_import::blocks_len(edge, edge, 16)
     }
 }
 
@@ -101,7 +96,7 @@ mod name_tests {
     fn pages_under_a_scene_lightmap_folder_are_baked_and_nothing_else_is() {
         let baked = [
             "assets/scenes/kolvik.scene.lightmaps/lightmap_0_ab12cd34.png",
-            "assets/a.scene.lightmaps/deeper/page.png",
+            "/work/old.lightmaps/assets/a.scene.lightmaps/page.ktx2",
         ];
         for path in baked {
             assert!(is_baked(Path::new(path)), "{path}");
@@ -112,6 +107,8 @@ mod name_tests {
             "assets/.lightmaps/page.png",
             "assets/lightmaps/page.png",
             "assets/my.lightmaps.png",
+            "assets/a.scene.lightmaps/deeper/page.png",
+            "/work/old.lightmaps/assets/textures/floor.png",
         ];
         for path in not {
             assert!(!is_baked(Path::new(path)), "{path}");

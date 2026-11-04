@@ -35,7 +35,7 @@ fn every_compressed_level_of_a_map_reads_its_own_light() {
     ];
     let atlas = pack(&maps);
     let edge = atlas.page_size;
-    let page = colour_page(&atlas.pages[0], edge, 2);
+    let page = colour_page(&atlas.pages[0], edge, 2, &|| false).expect("never stopped");
     assert_eq!(page.levels.len(), 3, "the base and two mips");
     for l in 0..page.levels.len() {
         let (side, scale) = (edge >> l, 1u32 << l);

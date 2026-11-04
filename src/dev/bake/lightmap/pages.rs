@@ -1,49 +1,65 @@
 //! Writing a bake's pages (#438, #1694). The bake's lightmaps are packed
 //! (`lightmap::pack`) and each page encoded ([`encode_pages`]: BC6H irradiance and
-//! a BC7 direction page, every mip, plus the RGBM PNG fallback), which is the slow
-//! part and needs no scene, so the editor's job runs it on its worker; then
-//! [`apply_encoded`] writes the files and points the scene at them, on the caller's
-//! thread.
+//! a BC7 direction page, every mip, plus the RGBM PNG fallback, compressed), which
+//! is the slow part and needs no scene, so it runs on the bake's worker, counting
+//! its pages into the bake's `BakeProgress` and stopping between two levels when
+//! that is cancelled; then [`apply_encoded`] only writes the finished bytes and
+//! points the scene at them, on the caller's thread.
 
+use std::io::Cursor;
 use std::path::Path;
 
 use crate::asset::lightmap_page::{self, Page};
 use crate::scene::lighting::lightmap::{
-    colour_page, direction_page, encode_directions, encode_texels, pack, Lightmap, LightmapEntry,
-    LightmapSet,
+    colour_page, direction_page, encode_directions, encode_texels, pack, BakeProgress, Lightmap,
+    LightmapEntry, LightmapSet,
 };
 use crate::scene::Scene;
 
 use super::lightmap_dir;
 
 /// A bake's pages encoded, ready to write.
+#[derive(Debug, PartialEq)]
 pub struct EncodedPages {
     /// How many lightmaps they hold.
     pub maps: usize,
     pub page_size: u32,
-    /// Per colour page: its BC6H page and its RGBM PNG bytes (RGBA8).
+    /// Per colour page: its BC6H page and its RGBM PNG file's bytes.
     pub colour: Vec<(Page, Vec<u8>)>,
-    /// Per direction page (#810): its BC7 page and its RGBA8 PNG bytes.
+    /// Per direction page (#810): its BC7 page and its RGBA8 PNG file's bytes.
     pub directions: Vec<(Page, Vec<u8>)>,
     pub entries: Vec<LightmapEntry>,
 }
 
 /// Pack and encode `maps`, every page on every core (the bands of a level are
-/// split over them, so the blocks never depend on the machine).
-pub fn encode_pages(maps: &[Lightmap]) -> EncodedPages {
+/// split over them, so the blocks never depend on the machine), counting each
+/// finished page into `progress`. `Ok(None)` when `progress` is cancelled first:
+/// it is asked before every level of every page.
+pub fn encode_pages(
+    maps: &[Lightmap],
+    progress: &BakeProgress,
+) -> Result<Option<EncodedPages>, String> {
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
     let atlas = pack(maps);
     let size = atlas.page_size;
-    let colour = atlas
-        .pages
-        .iter()
-        .map(|t| (colour_page(t, size, threads), encode_texels(t)))
-        .collect();
-    let directions = atlas
-        .directions
-        .iter()
-        .map(|d| (direction_page(d, size, threads), encode_directions(d)))
-        .collect();
+    progress.start_pages((atlas.pages.len() + atlas.directions.len()) as u64);
+    let stop = || progress.is_cancelled();
+    let mut colour = Vec::with_capacity(atlas.pages.len());
+    for texels in &atlas.pages {
+        let Some(page) = colour_page(texels, size, threads, &stop) else {
+            return Ok(None);
+        };
+        colour.push((page, png(size, encode_texels(texels))?));
+        progress.page_done();
+    }
+    let mut directions = Vec::with_capacity(atlas.directions.len());
+    for dirs in &atlas.directions {
+        let Some(page) = direction_page(dirs, size, threads, &stop) else {
+            return Ok(None);
+        };
+        directions.push((page, png(size, encode_directions(dirs))?));
+        progress.page_done();
+    }
     let entries = atlas
         .placements
         .iter()
@@ -53,13 +69,24 @@ pub fn encode_pages(maps: &[Lightmap]) -> EncodedPages {
             scale_offset,
         })
         .collect();
-    EncodedPages {
+    Ok(Some(EncodedPages {
         maps: maps.len(),
         page_size: size,
         colour,
         directions,
         entries,
-    }
+    }))
+}
+
+/// A `size`² RGBA8 page as a PNG file's bytes.
+fn png(size: u32, rgba: Vec<u8>) -> Result<Vec<u8>, String> {
+    let image =
+        image::RgbaImage::from_raw(size, size, rgba).ok_or("lightmap page size mismatch")?;
+    let mut bytes = Cursor::new(Vec::new());
+    image
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .map_err(|e| format!("encode a lightmap PNG: {e}"))?;
+    Ok(bytes.into_inner())
 }
 
 /// [`encode_pages`] then [`apply_encoded`]: write `maps` beside `scene_path`.
@@ -68,7 +95,8 @@ pub fn apply_lightmaps(
     scene_path: &str,
     maps: &[Lightmap],
 ) -> Result<usize, String> {
-    apply_encoded(scene, scene_path, &encode_pages(maps))
+    let encoded = encode_pages(maps, &BakeProgress::default())?;
+    apply_encoded(scene, scene_path, &encoded.ok_or("never cancelled")?)
 }
 
 /// Write `encoded` beside `scene_path` and point the scene at it, replacing the
@@ -88,12 +116,11 @@ pub fn apply_encoded(
     let size = encoded.page_size;
     let mut set = LightmapSet::default();
     for (k, (page, png)) in encoded.colour.iter().enumerate() {
-        set.pages
-            .push(write_page(&dir, "lightmap", k, size, page, png)?);
+        set.pages.push(write_page(&dir, "lightmap", k, page, png)?);
     }
     for (k, (page, png)) in encoded.directions.iter().enumerate() {
         set.directions
-            .push(write_page(&dir, "lightmap_dir", k, size, page, png)?);
+            .push(write_page(&dir, "lightmap_dir", k, page, png)?);
     }
     set.entries = encoded.entries.clone();
     let bytes: usize = (encoded.colour.iter())
@@ -116,24 +143,19 @@ pub fn apply_encoded(
     Ok(encoded.maps)
 }
 
-/// Write one page as `<dir>/<prefix>_<k>_<tag>.ktx2` and its `size`² RGBA8 PNG
-/// fallback beside it, and return the KTX2 path the scene stores.
+/// Write one page as `<dir>/<prefix>_<k>_<tag>.ktx2` and its PNG fallback beside
+/// it, and return the KTX2 path the scene stores.
 fn write_page(
     dir: &Path,
     prefix: &str,
     k: usize,
-    size: u32,
     page: &Page,
     png: &[u8],
 ) -> Result<String, String> {
     let ktx2 = lightmap_page::write(page);
     let stem = dir.join(format!("{prefix}_{k}_{:08x}", content_tag(&ktx2)));
     let (ktx2_path, png_path) = (stem.with_extension("ktx2"), stem.with_extension("png"));
-    let image = image::RgbaImage::from_raw(size, size, png.to_vec())
-        .ok_or("lightmap page size mismatch")?;
-    image
-        .save(&png_path)
-        .map_err(|e| format!("write {}: {e}", png_path.display()))?;
+    std::fs::write(&png_path, png).map_err(|e| format!("write {}: {e}", png_path.display()))?;
     std::fs::write(&ktx2_path, &ktx2).map_err(|e| format!("write {}: {e}", ktx2_path.display()))?;
     for path in [&png_path, &ktx2_path] {
         crate::core::fs::written::note_written(&path.to_string_lossy());
@@ -158,6 +180,8 @@ fn clear_old_lightmaps(dir: &Path) -> Result<(), String> {
         let page = name.ends_with(".png") || name.ends_with(".ktx2");
         if name.starts_with("lightmap_") && page {
             std::fs::remove_file(entry.path()).map_err(|e| format!("remove {name}: {e}"))?;
+            // Noted like a write, so the renderer frees the arrays holding it.
+            crate::core::fs::written::note_written(&entry.path().to_string_lossy());
         }
     }
     Ok(())

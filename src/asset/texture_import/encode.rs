@@ -37,8 +37,7 @@ impl BlockFormat {
     /// The bytes a `width`×`height` level takes: whole blocks, so a level smaller
     /// than one still takes one.
     pub fn level_bytes(self, width: u32, height: u32) -> usize {
-        let blocks = width.div_ceil(4) as usize * height.div_ceil(4) as usize;
-        blocks * self.block_bytes() as usize
+        blocks_len(width, height, self.block_bytes())
     }
 }
 
@@ -154,16 +153,40 @@ fn compress(
     let padded = RgbaImage::from_fn(w, h, |x, y| {
         *level.get_pixel(x.min(level.width() - 1), y.min(level.height() - 1))
     });
-    let mut blocks = vec![0; format.level_bytes(w, h)];
-    let row_bytes = format.level_bytes(w, 4);
-    let block_rows = (h / 4) as usize;
-    let band = block_rows.div_ceil(threads).max(1);
     let texel_row = (w * 4) as usize;
+    banded(w, h, format.block_bytes(), threads, |out, rows, row0| {
+        let texels = &padded.as_raw()[row0 as usize * texel_row..];
+        compress_rgba8(variant, texels, out, w, rows, w * 4);
+    })
+}
+
+/// The bytes of a `width`×`height` level in 4×4 blocks of `block_bytes`: whole
+/// blocks, so a level smaller than one still takes one.
+pub(crate) fn blocks_len(width: u32, height: u32, block_bytes: u32) -> usize {
+    width.div_ceil(4) as usize * height.div_ceil(4) as usize * block_bytes as usize
+}
+
+/// A `width`×`height` level's blocks (both multiples of 4), its block rows split
+/// in bands over `threads`: `encode(out, rows, first_row)` fills one band, `rows`
+/// texel rows from texel row `first_row`. The blocks are the same whichever
+/// thread wrote them. The texture importer and the lightmap pages
+/// (`asset::lightmap_page`) both encode through it.
+pub(crate) fn banded(
+    width: u32,
+    height: u32,
+    block_bytes: u32,
+    threads: usize,
+    encode: impl Fn(&mut [u8], u32, u32) + Sync,
+) -> Vec<u8> {
+    let mut blocks = vec![0u8; blocks_len(width, height, block_bytes)];
+    let row_bytes = blocks_len(width, 4, block_bytes);
+    let band = ((height / 4) as usize).div_ceil(threads.max(1)).max(1);
+    let encode = &encode;
     std::thread::scope(|scope| {
         for (i, out) in blocks.chunks_mut(band * row_bytes).enumerate() {
-            let rows = (out.len() / row_bytes) as u32;
-            let texels = &padded.as_raw()[i * band * 4 * texel_row..];
-            scope.spawn(move || compress_rgba8(variant, texels, out, w, rows * 4, w * 4));
+            let rows = (out.len() / row_bytes) as u32 * 4;
+            let row0 = (i * band * 4) as u32;
+            scope.spawn(move || encode(out, rows, row0));
         }
     });
     blocks

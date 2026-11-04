@@ -35,7 +35,7 @@ mod upload;
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{channel, Receiver, TryRecvError};
 
 use crate::core::fs::written::{written_since, Stale};
 use load::{Kind, Loaded};
@@ -117,8 +117,11 @@ impl Lightmaps {
             let Entry::Pending(inbox) = entry else {
                 continue;
             };
-            let Ok(result) = inbox.try_recv() else {
-                continue;
+            let result = match inbox.try_recv() {
+                Ok(result) => result,
+                Err(TryRecvError::Empty) => continue,
+                // The loader died without an answer (it panicked): a failed load.
+                Err(TryRecvError::Disconnected) => Err("the page loader stopped".into()),
             };
             *entry = Entry::Ready(finish(device, queue, list, result));
             landed = true;
@@ -192,11 +195,21 @@ impl Lightmaps {
         Some((t.format(), t.mip_level_count()))
     }
 
-    /// The bytes the bound colour and direction arrays take on the GPU.
+    /// The bytes every array held takes on the GPU: the bound ones and every page
+    /// list cached beside them. A rebake's old pages are freed when it deletes
+    /// them (`core::fs::written`, which `drop_rewritten` reads).
     pub(crate) fn gpu_bytes(&self) -> u64 {
-        [&self.current, &self.directions]
-            .into_iter()
-            .flatten()
+        let cached = self.cache.values().filter_map(|e| match e {
+            Entry::Ready(Some(a)) => Some(a),
+            _ => None,
+        });
+        let cached: Vec<&Rc<LightmapArray>> = cached.collect();
+        let bound = [&self.current, &self.directions].into_iter().flatten();
+        let uncached = bound.filter(|b| !cached.iter().any(|c| Rc::ptr_eq(c, b)));
+        cached
+            .iter()
+            .copied()
+            .chain(uncached)
             .map(|a| a.bytes)
             .sum()
     }
