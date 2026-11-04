@@ -39,6 +39,8 @@ pub mod journal;
 mod journal_tests;
 mod placement;
 #[cfg(test)]
+mod placement_tests;
+#[cfg(test)]
 mod query_tests;
 #[cfg(test)]
 mod static_revision_tests;
