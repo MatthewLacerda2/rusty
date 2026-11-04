@@ -376,19 +376,23 @@ if hit and bone then
 end
 ```
 
-### When the physics world is rebuilt (#1797)
+### When rapier panics, and when Play starts paused (#1797, #1795)
 
-The rapier world is derived from the scene, so the engine throws it away and
-builds it again from the scene, as a scene load does, in two cases:
-
-- **rapier panics during a step.** In a shipped (release) build the game keeps
-  running: the console logs one error naming the play frame and the panic's
-  message, and the world is rebuilt at once. That step reports no physics
-  events; on the next one, every pair still touching or overlapping fires
-  `OnCollisionEnter` / `OnTriggerEnter` again and nothing exits, as after a
-  `Scene.Load`. Joints are re-anchored at the bodies' current poses. A debug
-  build (and every test) still panics, so the bug is seen rather than hidden.
-- **Play starts paused** (`Time.SetTimeScale(0)` before the first step). The
-  first step with time in it runs on a world rebuilt from the scene, keeping
-  the touching and overlapping pairs, so no enter fires twice; nothing moved
-  while paused, so it steps exactly as a world that never paused (#1795).
+- **A panic inside rapier's pipeline doesn't end the game.** In a shipped
+  (release) build the engine throws the rapier world away and builds it again from
+  the scene at once, as a scene load does, and the game keeps running. The console
+  logs one error naming the play frame and the panic's message; a cause that stays
+  in the scene panics every step, and each one after the first collapses into one
+  counted line (`Physics: rapier panicked again (…) (×N)`). That step reports no
+  physics events. The rebuild keeps each joint's rest pose and limits, and the
+  pairs that were touching or overlapping, so the next step fires `Enter` and
+  `Exit` from a real comparison: a pair still touching doesn't enter again, and
+  one that separated exits. Sleep and solver warm-starting start over. A debug
+  build (and every test) still panics, so the bug is seen rather than hidden. The
+  sync before the step and joint breaking run outside the catch.
+- **Play starting paused** (`Time.SetTimeScale(0)` before the first step): until
+  the first step with time in it, a paused frame runs no simulation and no
+  contact detection. It still pushes the scene into physics and writes the bodies
+  back, so `Physics.Raycast` and the overlap queries see the scene. A pair touching
+  from the start fires its `Enter` on the first unpaused step, once. The joints
+  stay as Play built them, so the game steps exactly as one that never paused.

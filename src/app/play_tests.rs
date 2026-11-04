@@ -86,31 +86,44 @@ fn the_navmesh_rebakes_only_when_static_geometry_changes() {
     assert_eq!(generation(&gw), entry + 1);
 }
 
-/// A step rapier panicked in, under the release behaviour, rebuilds the world and
-/// logs one console error naming the frame (#1797).
-#[test]
-fn a_caught_physics_panic_logs_one_error_with_the_frame() {
+/// The console lines a run of `panics` caught physics panics logs, from the
+/// frame it starts on (#1797).
+fn panic_lines(panics: usize) -> (u64, Vec<String>) {
     let mut gw = world_with_a_player();
     gw.set_playing(true);
     gw.tick(DT);
     gw.tick(DT);
     let frame = gw.play_frame();
-    if let Some(physics) = gw.resources.physics.borrow_mut().as_mut() {
-        physics.force_caught_panic();
+    for _ in 0..panics {
+        if let Some(physics) = gw.resources.physics.borrow_mut().as_mut() {
+            physics.force_caught_panic();
+        }
+        gw.tick(DT);
     }
     gw.tick(DT);
-    gw.tick(DT);
     let console = gw.console().borrow();
-    let errors: Vec<_> = console
-        .messages
-        .iter()
-        .filter(|(m, _)| m.starts_with("Physics:"))
-        .collect();
-    assert_eq!(errors.len(), 1, "{errors:?}");
-    assert!(
-        errors[0].0.contains(&format!("frame {frame}")),
-        "{}",
-        errors[0].0
-    );
-    assert!(errors[0].0.contains("a panic forced through the test seam"));
+    let lines = console.messages.iter().map(|(m, _)| m);
+    let lines = lines.filter(|m| m.starts_with("Physics:")).cloned();
+    (frame, lines.collect())
+}
+
+/// A step rapier panicked in, under the release behaviour, rebuilds the world and
+/// logs one console error naming the frame.
+#[test]
+fn a_caught_physics_panic_logs_one_error_with_the_frame() {
+    let (frame, lines) = panic_lines(1);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].contains(&format!("frame {frame}")), "{lines:?}");
+    assert!(lines[0].contains("a panic forced through the test seam"));
+}
+
+/// A cause that panics every step collapses into one counted line after the
+/// first, so it can't push the rest out of the console.
+#[test]
+fn a_panic_every_step_collapses_into_one_line() {
+    let (frame, lines) = panic_lines(6);
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    assert!(lines[0].contains(&format!("frame {frame}")), "{lines:?}");
+    assert!(lines[1].contains("panicked again"), "{lines:?}");
+    assert!(lines[1].ends_with("(×5)"), "{lines:?}");
 }

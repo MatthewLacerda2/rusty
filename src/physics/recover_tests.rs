@@ -1,7 +1,8 @@
 //! src/physics/recover_tests.rs — the rapier world rebuilt from the scene (#1797,
 //! `recover`): a panic forced through the test seam, under the release behaviour,
-//! rebuilds the world deterministically; a debug build still panics; and a first
-//! real step after a paused one (#1795) steps as a world that never paused.
+//! rebuilds the world deterministically and keeps the contact memory; a debug
+//! build still panics; and a paused start (#1795) steps as a world that never
+//! paused.
 
 use glam::Vec3;
 
@@ -20,7 +21,7 @@ fn run(steps: usize, panic_at: usize) -> (Scene, PhysicsWorld, Vec<Option<String
     let mut rebuilt = Vec::new();
     for n in 0..steps {
         world.recovery.panic_next = n == panic_at;
-        rebuilt.push(world.step(&mut scene, DT).rebuilt);
+        rebuilt.push(world.step(&mut scene, DT).rebuilt.map(|r| r.message));
     }
     (scene, world, rebuilt)
 }
@@ -50,6 +51,7 @@ fn the_same_inputs_reach_the_same_panic_and_the_same_rebuild() {
 }
 
 #[test]
+#[cfg(debug_assertions)]
 #[should_panic(expected = "a panic forced through the test seam")]
 fn a_debug_build_still_panics() {
     let mut scene = fixture();
@@ -104,11 +106,12 @@ fn a_contact_enters_once_across_a_paused_start() {
     assert_eq!(edges(&[0.0, 0.0, DT, 0.0, DT], None), (1, 0));
 }
 
-/// Contact state starts over after a rebuild, as after a scene load: the
-/// resting pair enters again and nothing exits.
+/// A rebuild keeps the contact memory, which scripts keep too: the resting pair
+/// doesn't enter again, and nothing exits.
 #[test]
-fn a_contact_enters_again_after_a_rebuild() {
-    assert_eq!(edges(&[DT, DT, DT, DT], Some(2)), (2, 0));
+fn a_contact_enters_once_across_a_rebuild() {
+    assert_eq!(edges(&[DT, DT, DT, DT], Some(2)), (1, 0));
+    assert_eq!(edges(&[0.0, DT, DT, 0.0, DT], Some(2)), (1, 0));
 }
 
 /// The frame after unpausing steps as a world that never paused (#1795).
@@ -125,4 +128,21 @@ fn a_paused_start_steps_as_one_that_never_paused() {
         assert_eq!(digest(&p), digest(&s));
         assert_eq!(scene_digest(&paused), scene_digest(&straight));
     }
+}
+
+/// A pair that separates across a rebuild exits on the step after it.
+#[test]
+fn a_contact_that_separates_across_a_rebuild_exits() {
+    let mut scene = resting_sphere();
+    let mut world = PhysicsWorld::from_scene(&scene);
+    world.recovery.catch = true;
+    let entered: usize = (0..3)
+        .map(|_| world.step(&mut scene, DT).collisions.entered.len())
+        .sum();
+    let ball = scene.world.ids()[1];
+    scene.world.rigidbody_mut(ball).unwrap().velocity = Vec3::Y * 60.0;
+    world.recovery.panic_next = true;
+    assert!(world.step(&mut scene, DT).rebuilt.is_some());
+    let ev = world.step(&mut scene, DT).collisions;
+    assert_eq!((entered, ev.entered.len(), ev.exited.len()), (1, 0, 1));
 }

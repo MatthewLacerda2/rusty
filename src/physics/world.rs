@@ -15,8 +15,8 @@
 //!      the entities, and return the trigger and collision events scripts expect.
 //!
 //! The world is derived state: `recover` rebuilds it from the scene when rapier
-//! panics in a release build (#1797) and before a first real step that only
-//! zero-length ones preceded (#1795).
+//! panics in a release build (#1797), and holds back rapier's pipeline on a
+//! zero-length step before the world's first real one (#1795).
 //!
 //! Engine-glam <-> rapier-math conversion is confined to `convert`.
 
@@ -76,7 +76,7 @@ pub struct PhysicsWorld {
     pub(super) world_body: Option<RigidBodyHandle>,
     /// What the sync before each step needs to sync only what changed (#1707).
     pub(super) tracked: Tracked,
-    /// What decides a rebuild from the scene (#1795, #1797, see `recover`).
+    /// What the world remembers about its own steps (#1795, #1797, see `recover`).
     pub(super) recovery: Recovery,
 }
 
@@ -158,18 +158,23 @@ impl PhysicsWorld {
     /// Advance the rapier world by `dt` and surface the tick's trigger and
     /// solid-contact events — enter/stay/exit distinctly (#310, #448) — and the
     /// joints that broke (#449), each list sorted for deterministic dispatch.
-    /// A panic inside rapier rebuilds the world instead, in a release build (#1797,
-    /// see `recover`).
+    /// A zero-length step before the first real one skips rapier (#1795), and a
+    /// panic inside rapier rebuilds the world instead, in a release build (#1797);
+    /// both are `recover`'s.
     pub fn step(&mut self, scene: &mut Scene, dt: f32) -> PhysicsEvents {
-        self.before_step(scene, dt);
         self.integration_parameters.dt = dt;
         let synced = self.sync_to_rapier(scene);
+        if self.dormant(dt) {
+            return self.dormant_step(scene, &synced);
+        }
         let awake_before = self.awake_owners();
         let pre_solve = self.snapshot_velocities();
 
         if let Err(message) = self.run_pipeline() {
             return self.recover(scene, message);
         }
+        self.recovery.bootstrapped |= dt > 0.0;
+        self.recovery.panics_in_a_row = 0;
 
         let overlaps = self.overlap_pairs();
         let triggers = TriggerEvents::from_overlap_sets(&self.prev_triggers, overlaps);
