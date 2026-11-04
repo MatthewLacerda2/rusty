@@ -93,3 +93,20 @@ fn an_undone_destroy_puts_its_decals_back_in_blend_order() {
     scene.undo();
     assert_eq!(order(&scene), ids);
 }
+
+/// The journal records the parent a destroy takes the child out of, so the Undo
+/// puts both links back, never only the child's (#1777): a one-sided link would
+/// keep the child lit when its parent is switched off.
+#[test]
+fn an_undone_destroy_of_a_child_puts_it_back_in_its_parents_children() {
+    let mut scene = Scene::new();
+    let parent = create_entity(&mut scene, "Parent", None);
+    let child = create_entity(&mut scene, "Child", None);
+    scene.set_parent(child, Some(parent)).expect("no cycle");
+    destroy(&mut scene, child);
+    scene.undo();
+    assert_eq!(scene.world.parent_id(child), Some(parent));
+    assert_eq!(scene.world.children(parent), [child]);
+    scene.world.set_active(parent, false);
+    assert!(!scene.world.is_active_in_hierarchy(child));
+}
