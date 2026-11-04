@@ -127,8 +127,7 @@ pub fn tile(img: &Image, s: &Scatter) -> Image {
     let reach = s.jitters.reach(size.max().clamp(0.0, MAX_SIZE));
     let draws = s.draws();
     let j = s.jitters;
-    let fields = [j.offset, j.rotation, j.scale, mask, size];
-    let stamps = PerCell::new(per, &fields, |cell| {
+    let stamps = PerCell::for_pixels(per, img.size().pixels(), |cell| {
         let (u, v) = centre(cell, n);
         let m = mask.at_uv(u, v);
         if m.is_nan() || m < 0.5 {
@@ -154,20 +153,11 @@ pub fn tile(img: &Image, s: &Scatter) -> Image {
                 if (0.0..1.0).contains(&su) && (0.0..1.0).contains(&sv) {
                     let p = img.sample_bilinear_wrapped(su, sv);
                     let colour = fill(p, stamp.value, grey);
-                    match s.blend {
-                        TileBlend::Max => out = std::array::from_fn(|c| out[c].max(colour[c])),
-                        TileBlend::Add => {
-                            out = std::array::from_fn(|c| match c {
-                                3 => out[3].max(colour[3]),
-                                _ => out[c] + colour[c],
-                            })
-                        }
-                        TileBlend::Over => {
-                            let order = [wrapped.1, wrapped.0, cy, cx];
-                            if let Some(hits) = &mut hits {
-                                hits.push(order, colour, coverage(p, grey));
-                            }
-                        }
+                    if let Some(hits) = &mut hits {
+                        let order = [wrapped.1, wrapped.0, cy, cx];
+                        hits.push(order, colour, coverage(p, grey));
+                    } else {
+                        fold(s.blend, &mut out, colour);
                     }
                 }
             }
@@ -177,6 +167,19 @@ pub fn tile(img: &Image, s: &Scatter) -> Image {
         }
         out
     })
+}
+
+/// Fold `colour` into `out` under `max` or `add` (`over` keeps its stamps in
+/// [`Hits`] instead): the brighter per channel, or the sum with alpha the larger.
+#[inline]
+fn fold(mode: TileBlend, out: &mut Rgba, colour: Rgba) {
+    *out = match mode {
+        TileBlend::Add => std::array::from_fn(|c| match c {
+            3 => out[3].max(colour[3]),
+            _ => out[c] + colour[c],
+        }),
+        _ => std::array::from_fn(|c| out[c].max(colour[c])),
+    };
 }
 
 /// A stamp's colour: the input times `value`, or its red times `value` as a grey;

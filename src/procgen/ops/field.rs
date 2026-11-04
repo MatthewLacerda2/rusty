@@ -101,7 +101,9 @@ impl Field<'_> {
 /// than once per pixel that looks at the cell (#1494): `tile`'s jitters and
 /// Voronoi's randomness read their links at each cell's centre. A grid finer than
 /// its linked images has no table, since its cells outnumber the pixels that would
-/// read them; with no link there is nothing to save, so each read is the closure.
+/// read them; with no link [`PerCell::new`] saves only the link reads, so each read
+/// is the closure. [`PerCell::for_pixels`] tables by the image instead, for a value
+/// costly to work out and read many times per cell.
 pub struct PerCell<T, F> {
     per: i64,
     table: Option<Vec<T>>,
@@ -115,6 +117,20 @@ impl<T: Copy, F: Fn((i64, i64)) -> T> PerCell<T, F> {
         let fits = per.checked_mul(per).is_some_and(|c| c as usize <= pixels);
         let tabled = fields.iter().any(Field::linked) && fits;
         let table = tabled.then(|| (0..per * per).map(|i| value((i % per, i / per))).collect());
+        Self { per, table, value }
+    }
+
+    /// The grid's `value` per (wrapped) cell, tabled whenever the grid has no more
+    /// cells than a quarter of the `pixels` that read it, link or not. For a
+    /// value each pixel reads once per neighbour cell it looks at (`tile`'s
+    /// stamps, #1742), working it out once per cell is cheaper; the quarter keeps
+    /// the table well under the image's own size.
+    pub fn for_pixels(per: i64, pixels: usize, value: F) -> Self {
+        let fits = per
+            .checked_mul(per)
+            .and_then(|c| c.checked_mul(4))
+            .is_some_and(|c| c as usize <= pixels);
+        let table = fits.then(|| (0..per * per).map(|i| value((i % per, i / per))).collect());
         Self { per, table, value }
     }
 
@@ -187,6 +203,14 @@ mod tests {
         assert!(
             PerCell::new(9, &link, read).table.is_none(),
             "81 cells don't"
+        );
+        assert!(
+            PerCell::for_pixels(4, 64, read).table.is_some(),
+            "16 × 4 ≤ 64"
+        );
+        assert!(
+            PerCell::for_pixels(5, 64, read).table.is_none(),
+            "25 × 4 > 64"
         );
     }
 }

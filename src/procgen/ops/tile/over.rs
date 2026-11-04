@@ -51,8 +51,8 @@ impl Hits {
         hits.sort_unstable_by_key(|h| h.order);
         for h in hits.iter() {
             let a = h.colour[3];
-            for c in 0..3 {
-                out[c] = h.colour[c] * a + out[c] * (1.0 - h.coverage);
+            for (o, c) in out[..3].iter_mut().zip(&h.colour[..3]) {
+                *o = c * a + *o * (1.0 - h.coverage);
             }
             out[3] = out[3].max(a);
         }
