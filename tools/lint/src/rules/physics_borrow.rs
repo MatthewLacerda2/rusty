@@ -5,7 +5,7 @@
 //! not, and that list's order is the order the next step meets new contact
 //! pairs, so the order the solver works them. A full sync that borrowed a body
 //! the incremental one skipped stepped differently from it.
-//! `physics::world::body_to_write` and `collider_to_write` borrow only when a
+//! `physics::writes::body_to_write` and `collider_to_write` borrow only when a
 //! value differs, so both paths borrow the same handles.
 //!
 //! A non-test line of `src/physics/` that names `bodies` or `colliders` and
@@ -42,7 +42,7 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
             line: i + 1,
             rule: RULE,
             message: "a raw mutable borrow marks the body or collider modified: borrow \
-                      through `body_to_write` / `collider_to_write` (`physics::world`)"
+                      through `body_to_write` / `collider_to_write` (`physics::writes`)"
                 .to_string(),
         })
         .collect()

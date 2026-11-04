@@ -43,6 +43,7 @@ mod shape;
 mod sync;
 mod watch;
 mod world;
+mod writes;
 
 pub use character::{can_stand, move_character, CharacterMove};
 pub use events::collision::{CollisionEvents, CollisionPair, Contact};
