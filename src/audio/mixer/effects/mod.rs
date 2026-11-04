@@ -124,7 +124,7 @@ impl EffectChain {
     }
 
     /// Master's default: one limiter at its −0.3 dBFS ceiling, so a loud moment
-    /// never clips the output.
+    /// never takes Master past it (the reverb bus adds after it, beside Master).
     pub fn master() -> EffectChain {
         let limiter = KindId::named("limiter").map(EffectParams::defaults);
         EffectChain::of(&limiter.into_iter().collect::<Vec<_>>()).unwrap_or_default()
@@ -168,9 +168,16 @@ pub trait Dsp: Send {
     /// Process `block` in place under `values` (its kind's, already glided), at
     /// `dt` seconds per frame.
     fn process(&mut self, values: &[f32; MAX_PARAMS], block: &mut [Frame], dt: f64);
+
+    /// Whether it still holds sound it will play over silent input (a delay's
+    /// echo): the device keeps the group awake while it does (`rack.rs`).
+    fn ringing(&self) -> bool {
+        false
+    }
 }
 
-/// A group's output peak over its last block: what a sidechain keys from.
+/// A group's output peak over its last block, after its volume: what a sidechain
+/// keys from.
 #[derive(Debug, Default)]
 pub struct KeyLevel(AtomicU32);
 
@@ -188,7 +195,6 @@ pub fn gain(db: f32) -> f32 {
     10f32.powf(db / 20.0)
 }
 
-#[cfg(test)]
 #[cfg(test)]
 #[path = "effects_tests.rs"]
 mod effects_tests;

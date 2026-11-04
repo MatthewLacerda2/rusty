@@ -68,6 +68,9 @@ pub struct Param {
     pub range: Range,
 }
 
+/// Turns a script's group name into its group (`""` names none), or refuses it.
+pub type Resolve<'a> = dyn Fn(&str) -> Result<Option<GroupId>, String> + 'a;
+
 /// A stored group parameter as the group it names.
 pub fn group(v: f32) -> Option<GroupId> {
     (v >= 0.0).then_some(GroupId(v as u16))
@@ -75,12 +78,13 @@ pub fn group(v: f32) -> Option<GroupId> {
 
 /// `fields` checked against `kind`'s parameters and written over `base`: the
 /// values and a bit mask of the parameters the fields named. `resolve` turns a
-/// group name into its id. A `kind` field is skipped (the caller read it).
+/// group name into its id (`""` into none). A `kind` field is skipped (the caller
+/// read it).
 pub fn parse(
     kind: KindId,
     fields: &Fields,
     base: &EffectParams,
-    resolve: &dyn Fn(&str) -> Result<GroupId, String>,
+    resolve: &Resolve,
 ) -> Result<(EffectParams, u32), String> {
     let row = kind.row();
     let mut out = *base;
@@ -123,12 +127,7 @@ fn flatten(row: &EffectKind, fields: &Fields) -> Fields {
 }
 
 /// `value` as parameter `p`'s stored number, or the error a script reads.
-fn check(
-    row: &EffectKind,
-    p: &Param,
-    value: &Value,
-    resolve: &dyn Fn(&str) -> Result<GroupId, String>,
-) -> Result<f32, String> {
+fn check(row: &EffectKind, p: &Param, value: &Value, resolve: &Resolve) -> Result<f32, String> {
     let at = format!("{}.{}", row.name, p.name);
     match (p.range, value) {
         (Range::Number { min, max, .. } | Range::Hz { min, max, .. }, Value::Number(n)) => {
@@ -144,8 +143,7 @@ fn check(
             .position(|n| n == s)
             .map(|i| i as f32)
             .ok_or_else(|| format!("{at} = '{s}' is not one of: {}", names.join(", "))),
-        (Range::Group, Value::Text(s)) if s.is_empty() => Ok(-1.0),
-        (Range::Group, Value::Text(s)) => Ok(f32::from(resolve(s)?.0)),
+        (Range::Group, Value::Text(s)) => Ok(resolve(s)?.map_or(-1.0, |g| f32::from(g.0))),
         (range, _) => Err(format!("{at} takes {}", expects(range))),
     }
 }

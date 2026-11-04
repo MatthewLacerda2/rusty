@@ -2,15 +2,17 @@
 //! chain from a script's tables, read it back, patch it from a snapshot, and keep
 //! sidechains acyclic (#1748).
 //!
-//! **The order groups are processed in.** A group's signal holds its children's,
-//! so children come before their parent (kira's mix tree), and a sidechain's key
-//! group comes before the group it keys. [`Mixer::processing_order`] is that order.
-//! A key the keyed group's own output reaches — the group itself, one of its
-//! ancestors, or a loop of sidechains — has no such order: it is a **cycle**, and
+//! **Sidechain cycles.** A key the keyed group's own output reaches — the group
+//! itself, one of its ancestors, or a loop of sidechains — is a **cycle**, and
 //! [`Mixer::set_effects`] drops that compressor's sidechain with a warning (it then
-//! compresses on its own input). On the device a compressor reads its key's peak
-//! from the block before (128 frames, 2.7 ms at 48 kHz, `rack.rs`), so which of
-//! two unrelated groups kira happens to run first never changes what it hears.
+//! compresses on its own input).
+//!
+//! **When a key is read.** kira runs a group's children before the group, but
+//! sibling tracks in its own order, which the engine does not choose. A compressor
+//! reads its key's [`KeyLevel`](super::KeyLevel) as the key's rack last published
+//! it: this block's peak when kira ran the key first, the previous block's
+//! otherwise. So a sidechain may lag by one block (128 frames, 2.7 ms at 48 kHz),
+//! always the same way for the same mixer, since kira's order is fixed by it.
 
 use serde::{Deserialize, Serialize};
 
@@ -67,7 +69,10 @@ impl Mixer {
     /// A script's effect tables as a chain: every parameter not named at its
     /// default. An unknown kind, field or group, or a value out of range, errs.
     pub fn parse_effects(&self, tables: &[Fields]) -> Result<EffectChain, String> {
-        let resolve = |name: &str| self.require(name);
+        let resolve = |name: &str| match name {
+            "" => Ok(None),
+            name => self.require(name).map(Some),
+        };
         let effects = tables
             .iter()
             .map(|fields| {
@@ -143,14 +148,9 @@ impl Mixer {
         self.set(id, &patch);
     }
 
-    /// Every group in the order they are processed: children and sidechain keys
-    /// before the groups that need them (module docs).
-    pub fn processing_order(&self) -> Vec<GroupId> {
-        self.order_with(&[]).unwrap_or_default()
-    }
-
-    /// The processing order with the `(key, keyed)` edges of `extra` added, or
-    /// `None` when there is none (a cycle). Kahn's algorithm, lowest id first.
+    /// An order of the groups with children before parents and keys before the
+    /// groups they key, the `(key, keyed)` edges of `extra` added, or `None` when
+    /// there is none (a cycle). Kahn's algorithm, lowest id first.
     fn order_with(&self, extra: &[(GroupId, GroupId)]) -> Option<Vec<GroupId>> {
         let n = self.groups.len();
         let mut edges: Vec<(usize, usize)> = extra

@@ -86,11 +86,11 @@ impl GroupTracks {
             .sound_capacity(VOICES_PER_GROUP)
             .with_send(self.reverb.id(), Decibels::SILENCE);
         let wake = Wake::default();
-        let gated = |mode, f| Gated(filter(mode, f), wake.clone());
+        let gated = |mode, f| Gated(filter(mode, f), wake.clone(), None);
         let low_pass = builder.add_effect(gated(FilterMode::LowPass, Filter::LOW_PASS_OPEN));
         let high_pass = builder.add_effect(gated(FilterMode::HighPass, Filter::HIGH_PASS_OPEN));
         let (effects, rack) = rack();
-        builder.add_effect(Gated(effects, wake.clone()));
+        builder.add_effect(Gated(effects, wake.clone(), Some(rack.tail())));
         let track = match parent {
             None => manager.add_sub_track(builder).ok(),
             Some(p) => self
@@ -137,6 +137,7 @@ impl GroupTracks {
         );
         let levels = &self.levels;
         group.rack.set(&mix.effects, &|g| levels.get(&g).cloned());
+        group.rack.set_output_gain(mix.volume);
         group.wake.ring();
     }
 

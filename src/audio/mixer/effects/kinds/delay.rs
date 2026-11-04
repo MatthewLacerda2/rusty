@@ -22,6 +22,8 @@ use super::super::{Dsp, DspContext, EffectKind, Param, Range, MAX_PARAMS};
 pub const MAX_SECONDS: f32 = 5.0;
 /// A feedback low-pass at or above this is open.
 const OPEN: f32 = 22_000.0;
+/// Below this a sample written to the line is silence (the device gate's −100 dB).
+const SILENT: f32 = 1e-5;
 
 const PARAMS: [Param; 5] = [
     Param {
@@ -79,6 +81,7 @@ fn build(ctx: &DspContext) -> Box<dyn Dsp> {
         line: vec![Frame::ZERO; frames],
         write: 0,
         low: Frame::ZERO,
+        quiet: frames,
     })
 }
 
@@ -87,6 +90,9 @@ struct Delay {
     write: usize,
     /// The feedback low-pass's state.
     low: Frame,
+    /// Frames written since the last one above [`SILENT`]: once it reaches the
+    /// line's length, nothing in the line is left to echo.
+    quiet: usize,
 }
 
 impl Delay {
@@ -118,21 +124,33 @@ impl Dsp for Delay {
                     self.low.right += a * (echo.right - self.low.right);
                     self.low
                 }
-                None => echo,
+                None => {
+                    self.low = echo;
+                    echo
+                }
             };
             // A NaN would ring in the line forever: it is fed in as silence.
             let finite = f.left.is_finite() && f.right.is_finite();
             let input = if finite { *f } else { Frame::ZERO };
-            self.line[self.write] = Frame::new(
+            let written = Frame::new(
                 input.left + decay * fed.left,
                 input.right + decay * fed.right,
             );
+            self.quiet = match written.left.abs().max(written.right.abs()) < SILENT {
+                true => self.quiet.saturating_add(1),
+                false => 0,
+            };
+            self.line[self.write] = written;
             self.write = (self.write + 1) % self.line.len();
             *f = Frame::new(
                 dry * input.left + wet * echo.left,
                 dry * input.right + wet * echo.right,
             );
         }
+    }
+
+    fn ringing(&self) -> bool {
+        self.quiet < self.line.len()
     }
 }
 

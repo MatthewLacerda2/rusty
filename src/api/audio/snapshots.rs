@@ -120,7 +120,7 @@ fn register_ducks(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) 
 fn group_patch(maestro: &AudioMaestro, group: &str, fields: &Table) -> mlua::Result<GroupPatch> {
     let mut patch = patch(fields)?;
     if let Some(list) = fields.get::<Option<Table>>("effects")? {
-        let tables = field_list(&list)?;
+        let tables = field_list(&list, "effects")?;
         let mixer = maestro.mixer();
         let id = mixer.require(group).map_err(err)?;
         patch.effect_params = Some(mixer.parse_effect_patch(id, &tables).map_err(err)?);

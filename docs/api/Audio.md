@@ -285,16 +285,21 @@ sets its effects from a script at start. The device applies group changes with a
 
 Unity's mixer effects and Godot's bus effects, a small fixed set: every group runs an
 ordered list of up to 8 effects after its filters and before its volume.
+A list is a Lua array: `Audio.SetGroupEffects("Master", { kind = "limiter" })`
+(the outer braces forgotten), a list with a hole, or a table nested deeper than an
+EQ's `bands` is an error naming the field, never a shorter list.
 `Audio.SetGroupEffects` replaces the list; a snapshot's `effects` entry blends the
 parameters of the effects already there, numbers linearly (frequencies in octaves)
 and names at once, as it blends the volume. On the device every parameter glides
 with the voices' 10 ms smoothing, so a retune never clicks; changing a slot's kind
 starts a fresh effect there (a delay's echoes, a compressor's envelope start over).
 
-**Master starts with a limiter at −0.3 dBFS**, so a pile-up of loud sounds never
-clips the output. It is an effect like any other: retune it, or remove it with
-`Audio.SetGroupEffects("Master", {})`. The reverb bus sums into the output beside
-Master, not through it, so a group's reverb send passes its limiter by.
+**Master starts with a limiter at −0.3 dBFS**, so a pile-up of loud sounds through
+the groups never takes Master's own output past it. It is an effect like any other:
+retune it, or remove it with `Audio.SetGroupEffects("Master", {})`. The reverb bus
+sums into the output beside Master, not through it: the wet signal of every group's
+reverb send adds after the limiter, so a loud moment in a big reverb zone can still
+pass the ceiling there.
 
 | Kind | Parameters (default) |
 |---|---|
@@ -307,30 +312,37 @@ Master, not through it, so a group's reverb send passes its limiter by.
 - **compressor**: above `threshold` the level is cut by `ratio` (4:1 lets 1 dB in 4
   through), measured on the louder channel's peak. With a **`sidechain`** it listens
   to that group instead: `sidechain = "SFX"` on `Music` ducks the music under every
-  gunshot. The key is the other group's peak over the previous block (128 frames,
-  2.7 ms at 48 kHz).
+  gunshot. The key is the other group's output peak after its volume, mute and duck
+  (a muted `SFX` ducks nothing), as of the last block it published: see *Sidechain
+  timing* below.
 - **limiter**: a brickwall with an instant attack: no sample passes `ceiling`, and
-  under it the signal is untouched, bit for bit. A NaN sample comes out as silence.
+  under it, once the gain has recovered from the last peak, the signal is untouched,
+  bit for bit. A NaN or infinite sample comes out as silence.
 - **eq**: each band an RBJ-cookbook biquad; an EQ with every band off changes nothing.
 - **distortion**: *soft* is a `tanh` that keeps full scale at full scale, *hard* pushes
   the signal up to 25× and clips it flat at full scale, *bitcrush* quantises it to
   16 bits at no drive down to 1 bit at full drive.
 - **delay**: Unity's *Echo*; the `low_pass` darkens each repeat. Each delay holds a
-  5 s line (about 2 MB at 48 kHz).
+  5 s line (about 2 MB at 48 kHz), and keeps its group awake (below) until its last
+  echo has played.
 
-**Sidechain order and cycles.** A group's signal holds its children's, so children
-are processed before their parent, and a sidechain's key group before the group it
-keys. A key the keyed group's own output reaches — the group itself, one of its
-ancestors, or a loop of sidechains (`Music` keyed by `SFX` and `SFX` by `Music`) — is
-a **cycle**: `SetGroupEffects` keeps the compressor but drops that sidechain, with a
-warning in the console, and the compressor listens to its own input.
+**Sidechain timing and cycles.** The device runs a group's children before the
+group, but sibling groups in an order of its own: a compressor reads its key as the
+key last published it, this block's peak if the key ran first and the previous
+block's if not. So a sidechain may lag by one block (128 frames, 2.7 ms at 48 kHz),
+the same way every time for the same mixer. A key the keyed group's own output
+reaches — the group itself, one of its ancestors, or a loop of sidechains (`Music`
+keyed by `SFX` and `SFX` by `Music`) — is a **cycle**: `SetGroupEffects` keeps the
+compressor but drops that sidechain, with a warning in the console, and the
+compressor listens to its own input.
 
 **Cost.** Measured in a release build on one x86_64 core, per group per 128-frame
 block (the callback's budget is 2.67 ms at 48 kHz): an empty chain 0.3 µs, a limiter
 1.7 µs, a delay 1.5 µs, an EQ with all six bands on 4 µs, a compressor 5 µs, a
 distortion 8.5 µs, and all five in one chain 20 µs, under 1 % of the budget. A
 group with no effects only measures its peak for sidechains, and an effect sleeps,
-with its group's filters, over a second of silence.
+with its group's filters, over a second of silence (a delay with an echo still to
+play stays awake for it).
 
 There is no mixer panel in the editor: groups and their effects are set through this
 API.
@@ -347,7 +359,7 @@ Audio.SetGroupEffects("Guns", {
   { kind = "delay", delay = 90, decay = 0.2, wet = 0.25, low_pass = 3000 },  -- outdoor slapback
 })
 Audio.DefineSnapshot("Indoors", { Guns = { effects = { {}, { kind = "delay", wet = 0 } } } })
-print(Audio.GetGroupEffects("Master")[1].ceiling)   -- -0.3
+print(Audio.GetGroupEffects("Master")[1].kind)   -- limiter
 ```
 
 ### Reverb zones

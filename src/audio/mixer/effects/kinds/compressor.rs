@@ -100,6 +100,8 @@ impl Dsp for Compressor {
         let key = self.key.as_ref().map(|k| k.get());
         for f in block {
             let level = key.unwrap_or_else(|| peak(f));
+            // An infinite level would leave the reduction infinite (then NaN) for good.
+            let level = if level.is_finite() { level } else { 0.0 };
             let target = reduction(20.0 * level.max(1e-9).log10(), threshold, ratio);
             let k = if target > self.reduction {
                 attack

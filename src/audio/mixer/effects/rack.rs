@@ -16,9 +16,14 @@
 //!     bounded channel; the one it replaces is sent back to be dropped on the game
 //!     thread. Until the new one lands, a slot whose DSP and parameters disagree on
 //!     the kind is skipped for that block.
-//!   * **The rack publishes its output peak** each block as the group's
-//!     [`KeyLevel`]: what a compressor elsewhere keyed on this group reads, one
-//!     block later (`chain.rs`).
+//!   * **The rack publishes its group's output peak** each block as the group's
+//!     [`KeyLevel`], scaled by the group's volume (its mute and duck included,
+//!     [`RackHandle::set_output_gain`]): what a compressor elsewhere keyed on
+//!     this group reads (`chain.rs`). A muted group keys nothing.
+//!   * **A tail holds it awake.** The device's silence gate (#1729) sleeps over a
+//!     second of silent input and output; an effect still holding sound for later
+//!     (a delay's echo) says so through [`Dsp::ringing`], and the rack raises its
+//!     [`RackHandle::tail`] flag until it has played.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -49,11 +54,24 @@ struct Install {
     dsp: Option<(KindId, Box<dyn Dsp>)>,
 }
 
-/// What the rack tells its handle: the device's rate, and whether it changed.
-#[derive(Default)]
+/// What the rack and its handle share: the device's rate and whether it changed,
+/// the group's output gain (`f32` bits), and whether an effect's tail still sounds.
 struct Shared {
     sample_rate: AtomicU32,
     stale: AtomicBool,
+    output_gain: AtomicU32,
+    tail: Arc<AtomicBool>,
+}
+
+impl Default for Shared {
+    fn default() -> Self {
+        Self {
+            sample_rate: AtomicU32::new(0),
+            stale: AtomicBool::new(false),
+            output_gain: AtomicU32::new(1f32.to_bits()),
+            tail: Arc::default(),
+        }
+    }
 }
 
 /// A rack's game-thread half and the builder kira takes.
@@ -103,6 +121,21 @@ impl RackHandle {
     /// This group's output peak, for a sidechain to key from.
     pub fn level(&self) -> Arc<KeyLevel> {
         Arc::clone(&self.level)
+    }
+
+    /// Set while an effect's tail still has sound to play over silent input: what
+    /// holds the device's silence gate awake (module docs).
+    pub fn tail(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.shared.tail)
+    }
+
+    /// The linear gain the group's track applies after the rack (its volume, mute
+    /// and duck): the published level is scaled by it.
+    pub fn set_output_gain(&self, gain: f32) {
+        let gain = if gain.is_finite() { gain.max(0.0) } else { 0.0 };
+        self.shared
+            .output_gain
+            .store(gain.to_bits(), Ordering::Relaxed);
     }
 
     /// Run `chain`, building a DSP for each slot whose shape changed; `key` finds
@@ -238,7 +271,10 @@ impl Effect for Rack {
             }
             peak = chunk.iter().fold(peak, |p, f| p.max(kinds::peak(f)));
         }
-        self.level.set(peak);
+        let gain = f32::from_bits(self.shared.output_gain.load(Ordering::Relaxed));
+        self.level.set(peak * gain);
+        let ringing = self.slots.iter().flatten().any(|(_, dsp)| dsp.ringing());
+        self.shared.tail.store(ringing, Ordering::Release);
     }
 }
 

@@ -3,7 +3,8 @@
 //! Godot's `AudioEffectHardLimiter`: `pre_gain` dB, then no sample past `ceiling`
 //! dB. The attack is instant — the gain drops on the very sample that would pass
 //! the ceiling, so nothing ever does — and recovers toward unity over `release`
-//! ms. Below the ceiling it is bit-transparent. A non-finite sample (a NaN out of
+//! ms, landing on it exactly. Below the ceiling, once recovered, it is
+//! bit-transparent. A non-finite sample (a NaN out of
 //! an effect upstream) is played as silence rather than handed to the device.
 //! Master runs one at −0.3 dBFS by default ([`EffectChain::master`]).
 //!
@@ -77,7 +78,12 @@ impl Dsp for Limiter {
             if need < self.gain {
                 self.gain = need;
             } else {
-                self.gain += release * (need - self.gain);
+                // A step too small to move an `f32`, or within a hair of the
+                // target, lands on it (as `rack::glide` does): a recovered
+                // limiter is bit-transparent again.
+                let next = self.gain + release * (need - self.gain);
+                let settled = next == self.gain || (need - next).abs() <= 1e-6;
+                self.gain = if settled { need } else { next };
             }
             *f = if self.gain == 1.0 {
                 x

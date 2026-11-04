@@ -72,3 +72,16 @@ fn a_sidechain_key_compresses_by_the_other_groups_level() {
     // The key at 0 dB is 30 over; 10:1 takes 27 dB off the music.
     assert!((loud - -47.0).abs() < 0.5, "a loud key ducks it to {loud}");
 }
+
+#[test]
+fn an_infinite_sample_does_not_poison_it() {
+    let v = values("compressor", &[("threshold", -20.0)], &[]);
+    let mut s = sine(200.0, 0.1, 9600);
+    s[10] = kira::Frame::new(f32::INFINITY, 0.0);
+    run("compressor", &v, &mut s);
+    let after = peak_db(&s[4800..]);
+    assert!(
+        (after - -20.0).abs() < 0.1,
+        "under the threshold again: {after}"
+    );
+}

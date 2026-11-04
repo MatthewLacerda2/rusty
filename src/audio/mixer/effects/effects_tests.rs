@@ -109,7 +109,7 @@ fn a_snapshot_glides_an_effect_parameter_and_checks_the_kind() {
 }
 
 #[test]
-fn a_sidechain_cycle_is_dropped_and_the_order_puts_keys_first() {
+fn a_sidechain_cycle_is_dropped() {
     let mut m = Mixer::default();
     let (id, music) = (sfx(&m), m.find("Music").expect("Music"));
     let keyed = |m: &Mixer, from: &str| {
@@ -127,8 +127,4 @@ fn a_sidechain_cycle_is_dropped_and_the_order_puts_keys_first() {
     let chain = keyed(&m, "Music");
     m.set_effects(id, chain);
     assert_eq!(m.effects(id).0[0].expect("kept").key(), None, "a loop");
-    let order = m.processing_order();
-    let at = |g: GroupId| order.iter().position(|o| *o == g).expect("listed");
-    assert!(at(id) < at(music), "the key first");
-    assert_eq!(order.last(), Some(&GroupId::MASTER), "the root last");
 }
