@@ -30,7 +30,7 @@ conversion wrote into the import cache is a reference (#1072).
 | Function | Signature |
 |---|---|
 | `Material.SetMetallic` | `(id, value)` — clamped to `[0,1]` (NaN or `math.huge` reads as 0) |
-| `Material.SetRoughness` | `(id, value)` — clamped to `[0,1]` (NaN or `math.huge` reads as 0). The renderer shades a curved surface a little rougher than this where one pixel covers a spread of normals (geometric specular anti-aliasing, as Filament and HDRP do), so a small, glossy, distant object's highlight does not sparkle as it moves; a flat surface keeps the value. Normal-map detail is not counted yet |
+| `Material.SetRoughness` | `(id, value)` — clamped to `[0,1]` (NaN or `math.huge` reads as 0). The renderer shades a curved surface a little rougher than this where one pixel covers a spread of normals (geometric specular anti-aliasing, HDRP's *Geometric Specular AA* with its default constants, on for every material), so a small, glossy, distant object's highlight does not sparkle as it moves; a flat surface keeps the value. Normal-map detail is not counted yet |
 | `Material.SetColor` | `(id, {r, g, b})` — the base-colour (albedo tint) factor, Unity's `material.color`; each channel clamped to `[0,1]`, and a colour with a NaN or infinite channel is ignored |
 | `Material.SetEmissive` | `(id, {r, g, b})` — the flat emissive factor (self-illumination; values >1.0 bloom on the HDR target; each channel floored at 0, and a colour with a NaN or infinite channel is ignored) |
 | `Material.SetMetallicMap` | `(id, path)` — sampled by the renderer; the map's blue channel scales the metallic value (glTF metallic-roughness convention) |

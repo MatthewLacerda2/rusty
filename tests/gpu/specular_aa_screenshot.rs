@@ -116,8 +116,18 @@ fn relative_temporal_variance(frames: &[Vec<f64>]) -> (f64, f64) {
     (variance / signal.max(1e-9), total)
 }
 
-/// Measured on lavapipe: 0.77 with the roughness left unwidened, 0.15 with the AA.
+/// Measured on lavapipe: 0.77 with the roughness left unwidened, 0.18 with the AA.
 const BOUND: f64 = 0.35;
+/// The brightest pixel's luma, averaged over the frames: the AA must keep a glossy
+/// highlight (and render one), so a `widen` that turned the metal matte fails. On
+/// lavapipe: 239 with the AA, 211 unwidened, 156 with `widen` returning 1.0.
+const PEAK_FLOOR: f64 = 200.0;
+
+/// Each frame's brightest luma, averaged over `frames`.
+fn mean_peak(frames: &[Vec<f64>]) -> f64 {
+    let peaks = frames.iter().map(|f| f.iter().cloned().fold(0.0, f64::max));
+    peaks.sum::<f64>() / frames.len() as f64
+}
 
 #[test]
 fn a_turning_glossy_bumpy_sphere_shimmers_less_than_the_bound() {
@@ -125,13 +135,14 @@ fn a_turning_glossy_bumpy_sphere_shimmers_less_than_the_bound() {
         return;
     };
     let (relative, total) = relative_temporal_variance(&frames);
-    eprintln!("[specular_aa] relative temporal variance {relative:.3} (summed luma {total:.0})");
-    assert!(
-        total > 1000.0,
-        "the highlight did not render (summed luma {total:.0})"
-    );
+    let peak = mean_peak(&frames);
+    eprintln!("[specular_aa] relative temporal variance {relative:.3} (summed luma {total:.0}, peak {peak:.1})");
     assert!(
         relative < BOUND,
         "the highlight shimmers: {relative:.3} >= {BOUND}"
+    );
+    assert!(
+        peak > PEAK_FLOOR,
+        "the highlight went matte: peak {peak:.1}"
     );
 }

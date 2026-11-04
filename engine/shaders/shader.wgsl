@@ -10,7 +10,7 @@
 #import forward::local_shadow::local_shadow
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 #import forward::specular_aa
-#import forward::motion
+#import forward::motion::{motion_texel}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
 // resources are `forward/bindings.wgsl`, its lighting helpers `forward/lighting.wgsl`.
@@ -250,9 +250,9 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
     return VelocityTargets(transparent::finite_hdr(surface_color(v)), velocity_texel(in));
 }
 
-// The velocity target's texel for `in` (`forward::motion::texel`).
+// The velocity target's texel for `in` (`forward::motion::motion_texel`).
 fn velocity_texel(in: VelocityVertex) -> vec4<f32> {
-    return motion::texel(in.clip_now, in.clip_prev, in.world_position);
+    return motion_texel(in.clip_now, in.clip_prev, in.world_position);
 }
 
 // ---- The transparent depth postpass (#1523) ----
@@ -304,8 +304,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // The lightmap's mip level (#1694), from derivatives: before any branch too.
     let lightmap_lod = lightmap_level(in.lightmap_uv);
     // What this pixel's spread of normals adds to the GGX lobe (#1702), before any
-    // branch too; `roughness` below is widened by it.
-    let specular_kernel = specular_aa::kernel(geometric);
+    // branch too; `roughness` below is widened by it. Taken before the two-sided flip:
+    // a flip inside a pixel quad (a pane seen edge-on) is not a curved surface.
+    let specular_kernel = specular_aa::kernel(normalize(in.world_normal));
     // Where every map below is read (#1573): UV0 tiled, or projected from world space.
     let maps = mapping::coords(in.tex_coords, in.world_position, geometric);
     var base_color = m.color_tint;

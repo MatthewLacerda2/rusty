@@ -10,7 +10,7 @@
 // The texel for a fragment at `world` whose clip position is `clip_now` this frame and
 // was `clip_prev` last frame: its screen motion in NDC, its view depth and its camera's
 // place in the stack.
-fn texel(clip_now: vec4<f32>, clip_prev: vec4<f32>, world: vec3<f32>) -> vec4<f32> {
+fn motion_texel(clip_now: vec4<f32>, clip_prev: vec4<f32>, world: vec3<f32>) -> vec4<f32> {
     // A surface behind the camera last frame (a projectile past the player's head)
     // had no place on screen to move from: it writes no motion, not a huge streak.
     var velocity = vec2<f32>(0.0);
