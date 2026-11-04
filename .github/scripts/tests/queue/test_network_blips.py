@@ -35,7 +35,7 @@ def answers(*replies: tuple[int, str]):
 
 class Transient(unittest.TestCase):
     def test_network_failures_are_transient(self):
-        for stderr in (TLS, "read tcp: i/o timeout", "connection reset by peer", "HTTP 502: Bad Gateway"):
+        for stderr in (TLS, "gh: HTTP 500", "read tcp: i/o timeout", "connection reset by peer", "HTTP 502: Bad Gateway"):
             self.assertTrue(github.transient(stderr), stderr)
 
     def test_request_failures_are_not(self):
