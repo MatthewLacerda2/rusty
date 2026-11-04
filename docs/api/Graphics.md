@@ -5,7 +5,7 @@ can drive its own settings logic. The per-volume getters/setters target the **ma
 camera**, Unity's `Camera.main`: the base of the screen stack, the lowest
 `render_order` active camera that renders to the screen (a render-texture camera never
 is). Its `PostProcessingComponent` (color/bloom/SSR/shadows/SSAO/custom effects and
-their params) and its `CameraComponent` (motion blur, FXAA) are what the window shows,
+their params) and its `CameraComponent` (motion blur, FXAA, TAA) are what the window shows,
 so a write takes effect there next frame. With no screen camera, or its volume missing
 or inactive, setters are no-ops and getters report what a new volume starts with (an
 effect's on/off switch reads `false`: nothing runs).
@@ -110,6 +110,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
+| `Graphics.GetTaaActive` / `SetTaaActive` | `()` / `(bool)` | `bool` (**default `false`**; `false` with no screen camera; see *TAA*) |
 | `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"Neutral"` / `"AgX"` / `"ACES"` / `"Reinhard"` / `"None"` (**default `"Neutral"`**; Unity's names; names are case-insensitive) |
 | `Graphics.GetVignetteActive` / `SetVignetteActive` | `()` / `(bool)` | `bool` (**default `false`**; see *Lens effects*) |
 | `Graphics.GetVignetteCenter` / `SetVignetteCenter` | `()` / `(x, y)` | `x, y` (screen uv, `0, 0` top-left, each clamped 0–1, **default `0.5, 0.5`**) |
@@ -126,15 +127,15 @@ set on that camera entity, in the inspector or the scene file.
 ### Post effects
 
 Each post effect is one module in every layer of the engine (#1467): its settings on
-the volume (motion blur and FXAA on the camera, as Unity keeps them), its ops, its
+the volume (motion blur, FXAA and TAA on the camera, as Unity keeps them), its ops, its
 `Graphics.*` functions, its Inspector section, its render functions or pass, and its
-section below. They run in this order: depth of field, motion blur, the exposure
+section below. They run in this order: depth of field, TAA, motion blur, the exposure
 meter, bloom's chain and the lens flare over the HDR scene; then the composite, which runs
 chromatic aberration, screen-space reflections, bloom's add, the lens flare's add and the
 exposure on the HDR colour, then the grading LUT (white balance, Lift / Gamma / Gain, the color
 adjustments, the tonemapper, the display gamma and the Color Lookup, baked into one
 table), then the vignette and film grain on the display colour; then the custom
-effects and FXAA. An effect that is off costs nothing and leaves the image
+effects and FXAA (skipped on a frame TAA ran). An effect that is off costs nothing and leaves the image
 byte-identical; one left on at a zero strength draws the same image, but may still
 run its passes (bloom at intensity `0` still runs its chain).
 
@@ -597,7 +598,45 @@ camera component at all, which is why `GetFxaaActive` returns `true` rather than
 `false` when there is no active camera. It has no quality knob (the player's `fxaa`
 option can turn it off): a cheap fullscreen pass is exactly the anti-aliasing an
 integrated GPU wants. Turning it off restores raw, stair-stepped
-edges — useful for a pixel-art look, or for diffing screenshots.
+edges — useful for a pixel-art look, or for diffing screenshots. While the camera's
+TAA runs, FXAA is skipped whatever `fxaa_active` says (see *TAA*).
+
+<!-- effect: taa -->
+#### TAA
+
+**TAA** (temporal anti-aliasing, #1702) is the camera's other anti-aliasing,
+**off by default** (as URP's camera is): it costs a history target and can ghost.
+With `taa_active` on, every camera of the stack draws with its projection moved a
+fraction of a pixel each frame (URP's Halton (2, 3) sequence), and a resolve after
+depth of field and before motion blur (URP's order) blends this frame into the
+view's history: last frame's image, reprojected through the motion vectors and
+clamped into the current pixel's 3×3 colour range, then mixed in with URP's
+defaults (the current frame weighs 0.1, the clamp spans the neighbours' mean ± 0.9
+deviations, no texture mip bias). Thin edges stop crawling and sub-pixel
+highlights stop sparkling under a moving camera; a still frame settles toward a
+supersampled one.
+
+Unity's camera has **one anti-aliasing mode**, so with both on, TAA runs and the
+FXAA pass is skipped; `fxaa_active` keeps its value for when TAA is turned off. TAA
+needs the velocity target, so a view running it pays for the motion-vector pass
+too. Transparent surfaces, sprite particles, ribbons and decals write no motion:
+the colour clamp is what keeps them from trailing. The first frame after a cut (a
+scene load, Play or Stop, a camera switch, a resize) is the current frame alone, so
+nothing of the last shot ghosts in. The editor's Scene view never runs TAA (it keeps
+FXAA); the Game view, the player and a render-texture camera with `taa_active` and
+`post_fx` on do, each with its own history. The player's `taa` option can turn it
+off. It runs at the view's render-scale size: a render scale below 1 is resolved,
+then upscaled like the rest of the scene.
+
+**Harness screenshots see one frame of it, not a player's settled image.** A
+headless capture (`Harness.Screenshot`, `Harness.Render`) draws one frame per shot
+through one kept view, and FXAA is skipped whenever the resolve ran. So with TAA on,
+the first shot, and the first after any cut (another scene, Play or Stop, a shot at
+another size), is the raw jittered frame: aliased, and shifted up to half a pixel.
+Each later shot blends 0.1 of its own frame into the history of the shots before
+it, however many sim steps apart they were, so two shots of an unchanged scene can
+differ. To compare shots pixel for pixel, or to judge a scene's edges, turn TAA off
+for the capture (`Graphics.SetTaaActive(false)`: FXAA then runs, if it is on).
 
 ### Lighting settings
 
@@ -783,6 +822,7 @@ An option can only turn an effect off; it never turns on what a camera left off.
 | `motion_blur` | the camera's motion blur |
 | `ssao` | the volume's ambient occlusion |
 | `ssr` | the volume's screen-space reflections |
+| `taa` | the camera's TAA (when it is off, FXAA runs if the camera's `fxaa_active` and the `fxaa` option allow it) |
 | `vignette` | the volume's vignette |
 
 Names are snake_case; an unknown name raises an error listing the valid ones.

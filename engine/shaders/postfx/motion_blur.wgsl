@@ -25,6 +25,7 @@
 // either side of its pixel.
 
 #import fullscreen
+#import numeric
 
 struct BlurParams {
     // x: intensity (shutter fraction), y: longest streak in pixels, z: samples,
@@ -46,19 +47,12 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32
     return fullscreen::triangle(vid);
 }
 
-// Whether both components are finite: an infinity or NaN has every exponent bit
-// set. Checked on the bits, since a shader compiler may fold away a NaN compare.
-fn finite(v: vec2<f32>) -> bool {
-    let exponent = bitcast<vec2<u32>>(v) & vec2<u32>(0x7f800000u);
-    return all(exponent != vec2<u32>(0x7f800000u));
-}
-
 // Pixel `p`'s streak: its motion in pixels over the open shutter, clamped. A
 // non-finite motion is none, so no `inf` or NaN reaches the blur or bloom.
 fn streak(p: vec2<i32>) -> vec2<f32> {
     let dims = vec2<f32>(textureDimensions(t_velocity));
     let ndc = textureLoad(t_velocity, p, 0).xy;
-    if (!finite(ndc)) {
+    if (!numeric::finite2(ndc)) {
         return vec2<f32>(0.0);
     }
     // NDC spans 2 units across the view, and its y points up where pixels count down.

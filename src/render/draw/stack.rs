@@ -9,7 +9,7 @@ use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::effects::ssr::{ssr_enabled, surface, transparent};
-use crate::render::postfx::effects::{self, EffectCx, PassCx};
+use crate::render::postfx::effects::{self, taa, EffectCx, PassCx};
 use crate::render::postfx::params::{frame_params, PostSource};
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -31,7 +31,7 @@ pub(crate) struct StackPass<'a> {
     /// Where post-FX writes the finished image.
     pub output: &'a wgpu::TextureView,
     pub editor_mode: bool,
-    /// Run `post`'s grading, bloom, SSR, motion blur and FXAA. Off, the image is
+    /// Run `post`'s grading, bloom, SSR, TAA, motion blur and FXAA. Off, the image is
     /// only brought from HDR to display (a render texture's `post_fx = false`).
     pub full_post_fx: bool,
     /// How many frames of motion this draw's velocities span: 1 for the screen, a
@@ -57,7 +57,7 @@ impl Renderer {
             .zip(view_projs.iter().copied())
             .collect();
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
-        // this view runs motion blur, depth of field (#1445) or SSR, which reads its
+        // this view runs motion blur, TAA (#1702), depth of field (#1445) or SSR, which reads its
         // depths beside its own surface targets (#1526). A view shading
         // with its own forward pipeline (the Inspector's shader preview) writes none.
         let graphics = self.graphics(pass.editor_mode);
@@ -79,11 +79,16 @@ impl Renderer {
                 .motion
                 .begin(&self.device, size, key, velocity, &cameras);
         let prev_time = view.post_fx.motion.history.game_time(scene.shader_time);
+        // TAA (#1702): the frame's sub-pixel jitter, every camera's alike; a cut
+        // forgets its history.
+        let taa_on = taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode);
+        let jitter = taa::begin(view, &self.device, taa_on && !own_pipeline);
         let shared = StackShared {
             aspect,
             view_projs,
             prev_view_projs,
             prev_time,
+            jitter,
             fog: FogUniform::from_settings(&scene.fog),
             ssao: SsaoPlan::for_volume(pass.post.volume, self.graphics(pass.editor_mode)),
             ssr_march: transparent::camera_march(pass.post, graphics, ssr),
@@ -98,8 +103,8 @@ impl Renderer {
     }
 
     /// Run the post-process chain over the view's composited HDR target: every
-    /// effect's scene pass in order (depth of field, motion blur, the exposure meter,
-    /// bloom, the lens flare), the grading LUT's bake when its inputs changed, then the composite and
+    /// effect's scene pass in order (depth of field, TAA, motion blur, the exposure
+    /// meter, bloom, the lens flare), the grading LUT's bake when its inputs changed, then the composite and
     /// the LDR passes, writing the corrected image to `output`.
     pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &CameraCtx) {
         use crate::render::postfx::PostFxContext;

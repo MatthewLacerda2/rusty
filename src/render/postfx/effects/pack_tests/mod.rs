@@ -14,6 +14,7 @@ use crate::render::postfx::params::borrow_post_source;
 use crate::scene::Scene;
 
 mod lens;
+mod taa;
 
 /// One entity carrying `vc` (and `cam`), and its id.
 fn scene_with_vc(vc: PostProcessingComponent, cam: Option<CameraComponent>) -> (Scene, u32) {

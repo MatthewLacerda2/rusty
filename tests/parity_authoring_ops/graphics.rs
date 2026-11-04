@@ -67,6 +67,7 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
     camera_ops::set_motion_blur_intensity(&mut cam, 2.0); // clamped to 1
     camera_ops::set_motion_blur_max_length(&mut cam, 0.1);
     camera_ops::set_fxaa_active(&mut cam, false);
+    camera_ops::set_taa_active(&mut cam, true);
 }
 
 /// The `Graphics.*` writes the parity test drives, mirrored by `apply_graphics_ops`.
@@ -98,6 +99,8 @@ Graphics.SetMotionBlurSamples(16)
 Graphics.SetMotionBlurIntensity(2.0)
 Graphics.SetMotionBlurMaxLength(0.1)
 Graphics.SetFxaaActive(false)
+Graphics.SetTaaActive(true)
+assert(Graphics.GetTaaActive())
 "#;
 
 #[test]
@@ -134,8 +137,8 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let ocam = os.world.camera(op_id).unwrap().clone();
     assert_eq!(format!("{lcam:?}"), format!("{ocam:?}"));
     assert!(
-        !lcam.fxaa_active,
-        "both paths turned the default-on knob off"
+        !lcam.fxaa_active && lcam.taa_active,
+        "both paths turned FXAA off and TAA on"
     );
     Ok(())
 }

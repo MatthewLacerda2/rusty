@@ -53,6 +53,7 @@ fn pass_names_are_stable_and_unique() {
             "ribbons",
             "particles",
             "depth_of_field",
+            "taa",
             "motion_blur",
             "lens_flare",
             "post_fx",

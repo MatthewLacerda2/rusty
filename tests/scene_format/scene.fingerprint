@@ -114,6 +114,7 @@ scene.entities[].camera.near: f32
 scene.entities[].camera.projection: enum Perspective|Orthographic
 scene.entities[].camera.projection<Orthographic>.size: f32
 scene.entities[].camera.render_order: i32
+scene.entities[].camera.taa_active: bool
 scene.entities[].camera.target_texture.height: u32
 scene.entities[].camera.target_texture.name: string
 scene.entities[].camera.target_texture.post_fx: bool

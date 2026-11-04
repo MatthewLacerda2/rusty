@@ -15,7 +15,9 @@ fn motion_texel(clip_now: vec4<f32>, clip_prev: vec4<f32>, world: vec3<f32>) -> 
     // had no place on screen to move from: it writes no motion, not a huge streak.
     var velocity = vec2<f32>(0.0);
     if (clip_prev.w > 1e-4) {
-        velocity = clip_now.xy / clip_now.w - clip_prev.xy / clip_prev.w;
+        // `clip_now` went through the jittered projection (`stack.zw`, TAA's, #1702):
+        // the jitter comes back out, so a still surface reads 0.
+        velocity = clip_now.xy / clip_now.w - camera.stack.zw - clip_prev.xy / clip_prev.w;
     }
     // Depth along this camera's view axis, not the straight-line distance: a plane
     // facing the camera has one depth, so depth of field focuses on a plane (#1445).

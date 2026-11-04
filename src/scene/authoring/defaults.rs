@@ -180,6 +180,7 @@ pub fn default_camera() -> CameraComponent {
         motion_blur_intensity: CameraComponent::DEFAULT_MOTION_BLUR_INTENSITY,
         motion_blur_max_length: CameraComponent::DEFAULT_MOTION_BLUR_MAX_LENGTH,
         fxaa_active: true,
+        taa_active: false,
         projection: Default::default(),
         target_texture: None,
     }

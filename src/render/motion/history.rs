@@ -59,6 +59,8 @@ pub(crate) struct MotionHistory {
     next: HashMap<u32, Pose>,
     /// The game time the last frame drew at (#1524).
     time: Option<f32>,
+    /// Whether this frame's [`MotionHistory::begin`] found no last frame (#1702).
+    cut: bool,
 }
 
 impl MotionHistory {
@@ -72,6 +74,7 @@ impl MotionHistory {
             self.key = Some(key);
         }
         self.next.clear();
+        self.cut = self.cameras.is_empty();
         let prev = cameras
             .iter()
             .map(|(id, now)| self.cameras.get(id).copied().unwrap_or(*now))
@@ -85,6 +88,13 @@ impl MotionHistory {
     /// next frame. Call after [`MotionHistory::begin`], which forgets it on a cut.
     pub(crate) fn game_time(&mut self, now: f32) -> f32 {
         self.time.replace(now).unwrap_or(now)
+    }
+
+    /// Whether this frame is a cut: its stack had no last frame (the view's first,
+    /// a changed [`HistoryKey`], a [`MotionHistory::clear`]). TAA drops its history
+    /// on one (#1702).
+    pub(crate) fn cut(&self) -> bool {
+        self.cut
     }
 
     /// Entity `id`'s pose last frame, if it was drawn then.

@@ -12,8 +12,9 @@ use crate::scene::{ClearFlags, Scene};
 
 /// A blue wall whose face is 0.35 m from the world camera, filling the right of
 /// the view, and a green gun 0.5–0.7 m ahead of a `DepthOnly` gun camera, over the
-/// centre and the wall's left edge: the gun's right side borders the wall.
-fn against_a_wall(blur: bool) -> Scene {
+/// centre and the wall's left edge: the gun's right side borders the wall. Returns
+/// the scene and the world camera (TAA's edge test turns its TAA on, #1702).
+pub(crate) fn against_a_wall(blur: bool) -> (Scene, u32) {
     let (mut scene, world) = streaky(blur);
     scene.world.camera_mut(world).unwrap().culling_mask = !(1 << VIEWMODEL);
     let wall = cube(&mut scene, Vec3::new(0.265, 0.0, -0.4));
@@ -32,19 +33,19 @@ fn against_a_wall(blur: bool) -> Scene {
     paint(&mut scene, gun, "gun", [0.1, 0.8, 0.1]);
     scene.world.set_layer(gun, VIEWMODEL);
     scene.set_parent(gun, Some(camera)).unwrap();
-    scene
+    (scene, world)
 }
 
 #[test]
 fn gpu_the_gun_stays_over_a_wall_nearer_to_its_own_camera() {
     let Some(mut r) = renderer() else { return };
     // The world camera turns 8 degrees; the gun camera holds still.
-    let mut scene = against_a_wall(true);
+    let (mut scene, _) = against_a_wall(true);
     let mut v = view(&r);
     frame(&mut r, &mut v, &scene, &eye(0.0));
     let blurred = frame(&mut r, &mut v, &scene, &eye(8.0));
     assert!(v.post_fx.holds_blur(), "the blur ran");
-    scene = against_a_wall(false);
+    (scene, _) = against_a_wall(false);
     let mut v = view(&r);
     let sharp = frame(&mut r, &mut v, &scene, &eye(8.0));
 
@@ -64,7 +65,7 @@ fn gpu_the_gun_stays_over_a_wall_nearer_to_its_own_camera() {
 
 /// The pixels of `frame` whose every pixel within two, across and down, is the
 /// green gun.
-fn gun_inside(frame: &[u8]) -> impl Iterator<Item = (u32, u32)> + '_ {
+pub(crate) fn gun_inside(frame: &[u8]) -> impl Iterator<Item = (u32, u32)> + '_ {
     let green = move |x: i32, y: i32| {
         let inside = (0..W as i32).contains(&x) && (0..H as i32).contains(&y);
         let i = ((y * W as i32 + x) * 4) as usize;

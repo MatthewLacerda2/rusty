@@ -211,7 +211,8 @@ impl DofTargets {
 impl PostFx {
     /// Blur this frame's scene by depth with `params`, or drop the targets when
     /// `params` is `None` or the view wrote no velocity target this frame.
-    /// Afterwards [`PostFx::focused_color`] is the image motion blur reads.
+    /// Afterwards [`PostFx::focused_color`] is the image TAA (or, without it, motion
+    /// blur) reads.
     pub(crate) fn run_depth_of_field(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),

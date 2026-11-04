@@ -21,7 +21,7 @@ use crate::scene::Scene;
 /// The components one view post-processes with, borrowed once per view (#1434).
 #[derive(Clone, Copy, Default)]
 pub(crate) struct PostSource<'a> {
-    /// The base camera's component: motion blur and FXAA.
+    /// The base camera's component: motion blur, FXAA and TAA.
     pub camera: Option<&'a CameraComponent>,
     /// Its post-processing volume, when active: grade, bloom, SSR, SSAO, shadows
     /// and the authored effects. `None` runs them neutral.
