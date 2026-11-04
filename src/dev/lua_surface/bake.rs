@@ -47,8 +47,10 @@ fn register_probe(lua: &Lua, ctx: &ApiCtx) -> Reg {
 }
 
 /// `Reflection.Bake()` (#245): for each probe capture the static surroundings to a
-/// cubemap, GGX-prefilter it into a roughness mip chain, write the KTX2 next to the
-/// scene and point the probe at it. Errors when the scene is unsaved (nowhere to write).
+/// cubemap, GGX-prefilter it into a roughness mip chain, write the KTX2 into the
+/// scene's own `<scene>.reflections/` folder and point the probe at it; the folder's
+/// cubes past the probe count are removed, all of them when there are no probes.
+/// Errors when there are probes and the scene is unsaved (nowhere to write).
 fn register_reflection(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let (scene, scene_path, console) = (ctx.scene, ctx.scene_path, ctx.console);
     put(

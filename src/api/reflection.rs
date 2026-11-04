@@ -23,7 +23,7 @@ use crate::scene::{ReflectionProbe, Scene};
 
 /// Register the `Reflection` namespace onto `lua`. `scene_path` is the saved scene file
 /// (if any) — the dev-only `Reflection.Bake()` (installed by `dev`, #737) writes its
-/// cubemaps next to it.
+/// cubemaps into its own `<scene>.reflections/` folder.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
