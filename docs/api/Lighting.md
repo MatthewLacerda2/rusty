@@ -317,7 +317,11 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   meshes reach the default 1016 cap, about 90 s (#1704); a 4096² page pair takes about 43 MiB of GPU memory, but filling many of them takes a density whose trace stops a bake long before memory does; the editor's Generate Lighting
   encodes the pages and compresses their PNGs on its worker and only writes the finished
   files on the frame, so the window stays live. The scene stores the page list and, per entity, its page and
-  scale/offset (Unity's lightmap index + scale/offset), so **save the scene** after
+  scale/offset (Unity's lightmap index + scale/offset), and the lights the bake took
+  in (every active `Mixed` and `Baked` light above intensity 0, Unity's
+  `Light.bakingOutput`), which
+  SSIL leaves out because their bounce is baked (`Graphics.md`, *Screen-space
+  indirect lighting*), so **save the scene** after
   `Lighting.BakeLightmaps()` to keep them (`Lighting.Generate()` writes them itself). Needs a saved scene path (errors otherwise). `Lighting.ClearLightmaps()`
   drops the references (the files stay until the next bake).
 - **Moving or editing static geometry** after a bake leaves its lightmap stale; rebake.

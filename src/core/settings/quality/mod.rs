@@ -73,6 +73,15 @@ pub struct SsaoQuality {
     pub resolution_divisor: u32,
 }
 
+/// The SSIL gather's cost (#1750): its sample count and working resolution.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SsilQuality {
+    /// Hemisphere samples gathered per texel.
+    pub samples: u32,
+    /// The gather runs at the view's size divided by this (1 = full).
+    pub resolution_divisor: u32,
+}
+
 /// The SSR ray march (#1521): how many steps, how long each in world units. Its
 /// reach is their product.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -88,6 +97,8 @@ pub struct SsrQuality {
 pub struct QualityValues {
     #[serde(deserialize_with = "partial::ssao")]
     pub ssao: Levels<SsaoQuality>,
+    #[serde(deserialize_with = "partial::ssil")]
+    pub ssil: Levels<SsilQuality>,
     #[serde(deserialize_with = "partial::ssr")]
     pub ssr: Levels<SsrQuality>,
     /// Bloom's buffer is the view's size divided by this.

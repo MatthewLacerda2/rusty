@@ -28,6 +28,7 @@ mod grading;
 mod lens;
 mod lens_flare;
 mod path_field;
+mod ssil;
 mod ssr;
 mod volume;
 
@@ -75,6 +76,7 @@ pub(crate) const SECTIONS: &[Section] = &[
     film_grain::SECTION,
     lens_flare::SECTION,
     lift_gamma_gain::SECTION,
+    ssil::SECTION,
     ssr::SECTION,
     tonemapping::SECTION,
     vignette::SECTION,

@@ -29,6 +29,9 @@ pub struct EncodedPages {
     /// Per direction page (#810): its BC7 page and its RGBA8 PNG file's bytes.
     pub directions: Vec<(Page, Vec<u8>)>,
     pub entries: Vec<LightmapEntry>,
+    /// The lights the bake took in (`LightmapSet::lights`, #1750), set by whoever
+    /// gathered its input (`taken_lights`); empty from [`encode_pages`].
+    pub lights: std::collections::BTreeSet<u32>,
 }
 
 /// Pack `maps` into pages of at most `max_page` texels a side (the bake's
@@ -80,6 +83,7 @@ pub fn encode_pages(
         colour,
         directions,
         entries,
+        lights: Default::default(),
     }))
 }
 
@@ -130,6 +134,7 @@ pub fn apply_encoded(
             .push(write_page(&dir, "lightmap_dir", k, page, png)?);
     }
     set.extend(encoded.entries.iter().cloned());
+    set.lights = encoded.lights.clone();
     let bytes: usize = (encoded.colour.iter())
         .chain(&encoded.directions)
         .map(|(p, _)| p.gpu_bytes())

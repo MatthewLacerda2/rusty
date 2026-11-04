@@ -566,6 +566,12 @@ scene.entities[].post_processing.ssao.quality: enum Low|Medium|High|Custom
 scene.entities[].post_processing.ssao.radius: f32
 scene.entities[].post_processing.ssao.resolution_divisor: u32
 scene.entities[].post_processing.ssao.samples: u32
+scene.entities[].post_processing.ssil.active: bool
+scene.entities[].post_processing.ssil.intensity: f32
+scene.entities[].post_processing.ssil.quality: enum Low|Medium|High|Custom
+scene.entities[].post_processing.ssil.radius: f32
+scene.entities[].post_processing.ssil.resolution_divisor: u32
+scene.entities[].post_processing.ssil.samples: u32
 scene.entities[].post_processing.ssr.active: bool
 scene.entities[].post_processing.ssr.min_smoothness: f32
 scene.entities[].post_processing.ssr.quality: enum Low|Medium|High|Custom
@@ -799,6 +805,8 @@ scene.lightmaps.entries[].entity: u32
 scene.lightmaps.entries[].page: u32
 scene.lightmaps.entries[].scale_offset: tuple(4)
 scene.lightmaps.entries[].scale_offset[]: f32
+scene.lightmaps.lights: seq
+scene.lightmaps.lights[]: u32
 scene.lightmaps.pages: seq
 scene.lightmaps.pages[]: string
 scene.materials: map

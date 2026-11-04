@@ -22,6 +22,7 @@ pub(super) mod knobs;
 mod lens;
 mod lens_flare;
 mod motion_blur;
+mod ssil;
 mod ssr;
 mod taa;
 
@@ -48,6 +49,7 @@ pub(crate) const REGISTRARS: &[(&str, Registrar)] = &[
     ("lens_flare", lens_flare::register),
     ("lift_gamma_gain", lift_gamma_gain::register),
     ("motion_blur", motion_blur::register),
+    ("ssil", ssil::register),
     ("ssr", ssr::register),
     ("taa", taa::register),
     ("tonemapping", tonemapping::register),

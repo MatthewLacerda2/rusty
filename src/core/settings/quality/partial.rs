@@ -7,7 +7,7 @@ use serde::de::{DeserializeOwned, Error};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use super::{seeds, Levels, SsaoQuality, SsrQuality};
+use super::{seeds, Levels, SsaoQuality, SsilQuality, SsrQuality};
 
 /// Write `patch` over `base` key by key, `path` naming where for a refusal. A key
 /// `base` doesn't have is refused, so a misspelled value never loads silently.
@@ -40,6 +40,10 @@ where
 
 pub(super) fn ssao<'de, D: Deserializer<'de>>(d: D) -> Result<Levels<SsaoQuality>, D::Error> {
     over(d, seeds::medium().ssao, "ssao.")
+}
+
+pub(super) fn ssil<'de, D: Deserializer<'de>>(d: D) -> Result<Levels<SsilQuality>, D::Error> {
+    over(d, seeds::medium().ssil, "ssil.")
 }
 
 pub(super) fn ssr<'de, D: Deserializer<'de>>(d: D) -> Result<Levels<SsrQuality>, D::Error> {

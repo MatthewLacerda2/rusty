@@ -106,6 +106,10 @@ pub struct RenderCounters {
     /// samples, summed over the camera stack; `0` with AO off. Its depth prepass is
     /// counted in `draw_calls` and `triangles`.
     pub ssao_samples: u64,
+    /// Samples the SSIL gather took (#1750): its texels times its quality's samples,
+    /// on the base camera of each view running it; `0` with SSIL off. The prepass it
+    /// draws on a camera without SSAO is counted in `draw_calls` and `triangles`.
+    pub ssil_samples: u64,
     /// Particles drawn: sprite instances plus mesh particles, summed over the stack
     /// (#440). Their draw calls are in `draw_calls` — one per merged sprite batch, and
     /// one per instanced run of mesh particles.
@@ -193,6 +197,7 @@ impl RenderCounters {
             ("ui_mask_passes", self.ui_mask_passes.into()),
             ("ui_blur_passes", self.ui_blur_passes.into()),
             ("ssao_samples", self.ssao_samples),
+            ("ssil_samples", self.ssil_samples),
             ("particles_drawn", self.particles_drawn.into()),
             ("render_texture_draws", self.render_texture_draws.into()),
             ("velocity_passes", self.velocity_passes.into()),

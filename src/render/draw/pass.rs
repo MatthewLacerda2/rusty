@@ -55,6 +55,8 @@ pub(crate) struct ScenePassFrame {
     pub clear: PassClear,
     /// This camera's SSAO (#436), recorded ahead of the scene pass; `None` when off.
     pub ssao: Option<SsaoFrame>,
+    /// This camera's SSIL (#1750), recorded after SSAO; the base camera's alone.
+    pub ssil: Option<crate::render::postfx::effects::ssil::SsilFrame>,
     /// Whether this is the stack's base camera. SSR reads only what the base camera
     /// wrote and runs before any overlay draws (#1526), so an overlay binds no SSR
     /// surface target and draws with the plain velocity pipelines.
@@ -123,10 +125,8 @@ impl Renderer {
         // The shadow maps were rendered once for the frame (`run_shadow_passes`).
         // Bind active skybox view & sampler into the global group for reflections.
         self.update_global_bind_group();
-        // A. SSAO (#436): prepass, occlusion and blur, which the scene pass samples.
-        if let Some(ssao) = &frame.ssao {
-            self.record_ssao(view, &mut encoder, ssao, solid_batches);
-        }
+        // A. SSAO (#436) and SSIL (#1750): what the scene pass samples.
+        self.record_screen_space(view, &mut encoder, &frame, solid_batches);
         // B. Main scene pass. The editor's gizmos draw after post-FX (`draw_handles`).
         self.record_scene_pass(view, &mut encoder, &frame, solid_batches);
         let velocity = view.post_fx.motion.target_view().is_some();
@@ -180,7 +180,7 @@ impl Renderer {
             None => SolidPass::Opaque(view.forward_pipeline(&self.render_pipeline), primed),
         };
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
-        render_pass.set_bind_group(3, self.scene_group3(view, frame.ssao.is_some()), &[]);
+        render_pass.set_bind_group(3, self.scene_group3(view, frame), &[]);
         // Solid entities (each batch binds its shader's pipeline).
         self.draw_batches(&mut render_pass, solid_batches, solid_pass);
 
@@ -204,7 +204,7 @@ impl Renderer {
     }
 
     /// Depth priming (#1499), Unity URP's *Auto* mode: when this camera ran the SSAO
-    /// prepass, which drew straight into the view's depth (#1578), the forward pass
+    /// prepass (or SSIL's, #1750), which drew straight into the view's depth (#1578), the forward pass
     /// starts from it and shades each lit pixel once. The prepass is the forward
     /// vertex stage at the view's size and format, clipping cutouts as `fs_main` does.
     /// A view shading with a pipeline of its own (the shader preview) is not primed:
@@ -215,9 +215,10 @@ impl Renderer {
         self.primes(view, frame).then_some(&self.primed_pipelines)
     }
 
-    /// Whether this camera's forward pass is primed ([`Self::prime_depth`]).
+    /// Whether this camera's forward pass is primed ([`Self::prime_depth`]): it
+    /// ran SSAO's prepass, or SSIL's, the same one (#1750).
     fn primes(&self, view: &RenderView, frame: &ScenePassFrame) -> bool {
-        let prepass = frame.ssao.is_some() && view.ssao.is_some();
+        let prepass = (frame.ssao.is_some() && view.ssao.is_some()) || frame.ssil.is_some();
         let on = self.depth_priming && self.priming_recommended;
         on && prepass && !view.has_forward_override()
     }

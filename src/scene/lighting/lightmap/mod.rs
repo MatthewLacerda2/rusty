@@ -50,6 +50,7 @@ pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
 pub use encode::{decode_direction, decode_rgbm, encode_directions, encode_texels};
 pub use input::{BakeLight, BakeMesh, BakeRun, BakeScene, LightShape};
 pub use lights::area::AreaShape;
+pub use lights::taken_lights;
 pub use pages::{colour_page, direction_levels, direction_page, level_count, levels};
 pub use probe_direct::baked_direct_sh;
 pub use progress::BakeProgress;

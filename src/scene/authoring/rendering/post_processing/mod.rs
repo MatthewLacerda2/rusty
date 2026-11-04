@@ -30,6 +30,7 @@ pub mod grading;
 mod knob;
 pub mod lens;
 pub mod lens_flare;
+pub mod ssil;
 pub mod ssr;
 pub mod volume;
 
@@ -54,6 +55,7 @@ pub const EFFECTS: &[Effect] = &[
     film_grain::EFFECT,
     lens_flare::EFFECT,
     lift_gamma_gain::EFFECT,
+    ssil::EFFECT,
     ssr::EFFECT,
     tonemapping::EFFECT,
     vignette::EFFECT,

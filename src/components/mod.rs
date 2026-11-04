@@ -74,8 +74,8 @@ pub use rendering::lod_group::{LodGroupComponent, LodLevel};
 pub use rendering::post_processing::{
     AutoExposure, Bloom, ChromaticAberration, ColorAdjustments, ColorLookup, ColorWheel,
     CustomEffects, DepthOfField, DofMode, Exposure, ExposureMode, FilmGrain, LiftGammaGain,
-    PostProcessingComponent, ShadowSettings, SsaoSettings, Ssr, Tonemap, Tonemapping, Vignette,
-    Wheel, WhiteBalance,
+    PostProcessingComponent, ShadowSettings, SsaoSettings, Ssil, Ssr, Tonemap, Tonemapping,
+    Vignette, Wheel, WhiteBalance,
 };
 pub use ribbon::{LineComponent, RibbonStyle, TextureMode, TrailComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};

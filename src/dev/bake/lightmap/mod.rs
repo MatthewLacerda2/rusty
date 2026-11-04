@@ -74,7 +74,8 @@ pub fn bake_scene_lightmaps_logged(
 ) -> Result<usize, String> {
     let scene_path = scene_path.ok_or(UNSAVED)?;
     let input = gather_bake_input(scene);
-    let encoded = logged::bake_logged(&input, settings, log)?;
+    let mut encoded = logged::bake_logged(&input, settings, log)?;
+    encoded.lights = crate::scene::lighting::lightmap::taken_lights(scene);
     warn_missing_uvs(lightmap_receivers(&input), encoded.maps);
     apply_encoded(scene, scene_path, &encoded)
 }
