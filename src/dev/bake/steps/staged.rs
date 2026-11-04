@@ -6,8 +6,9 @@ use std::path::{Path, PathBuf};
 
 use glam::Vec3;
 
+use crate::render::ibl::reflection_bake::cube_file;
 use crate::scene::lighting::reflection_probe::clamp_resolution;
-use crate::scene::{ReflectionProbe, Scene};
+use crate::scene::{ReflectionProbe, ReflectionProbeSet, Scene};
 
 /// The reflection probes a bake works on: copies taken at its start, each with the
 /// face size it bakes at (its own, or the scene's default then).
@@ -18,12 +19,18 @@ pub(super) struct ReflectionSnapshot {
 /// What a reflection probe's cube is baked from. A change to any of it, or to the
 /// count, makes the staged cubes stale; a change to anything else (its box, its
 /// intensity) does not, and survives the commit.
-type BakeInputs = (Vec3, u32, f32, f32, bool);
+/// Whether it is manual counts too: the bake re-places the placed ones (#1737).
+type BakeInputs = (Vec3, u32, f32, f32, bool, bool);
 
 impl ReflectionSnapshot {
     pub(super) fn take(scene: &Scene) -> Self {
         let default = scene.lighting_settings.reflections.resolution;
-        let probes = scene.reflection_probes.probes.iter();
+        Self::of(&scene.reflection_probes, default)
+    }
+
+    /// Copies of `set`'s probes, each baked at its own face size or `default`.
+    pub(super) fn of(set: &ReflectionProbeSet, default: u32) -> Self {
+        let probes = set.probes.iter();
         let probes = probes
             .map(|p| (p.clone(), clamp_resolution(p.resolution.unwrap_or(default))))
             .collect();
@@ -52,18 +59,25 @@ impl ReflectionSnapshot {
 }
 
 fn inputs((p, resolution): &(ReflectionProbe, u32)) -> BakeInputs {
-    (p.position, *resolution, p.near_clip, p.far_clip, p.shadows)
+    (
+        p.position,
+        *resolution,
+        p.near_clip,
+        p.far_clip,
+        p.shadows,
+        p.manual,
+    )
 }
 
 /// Cubemaps baked but not applied: each one at `<final>.baking`, moved over
-/// `reflection_probe_<i>.ktx2` on [`commit`](Self::commit). Whatever is still staged
+/// `<scene>.reflections/reflection_probe_<i>.ktx2` on [`commit`](Self::commit). Whatever is still staged
 /// when the bake is dropped is deleted, so a dropped bake leaves no file behind.
 #[derive(Default)]
 pub(super) struct StagedCubemaps {
     /// `(staged, final)` per probe baked, in probe order.
     files: Vec<(PathBuf, PathBuf)>,
-    /// Whether the files were moved into place: nothing is left to delete.
-    committed: bool,
+    /// How many of `files` are moved into place: a failed commit resumes there.
+    moved: usize,
 }
 
 impl StagedCubemaps {
@@ -74,9 +88,10 @@ impl StagedCubemaps {
 
     /// Stage the next probe's cube in `dir`.
     pub(super) fn write(&mut self, dir: &Path, bytes: &[u8]) -> Result<(), String> {
-        let name = format!("reflection_probe_{}.ktx2", self.files.len());
-        let target = dir.join(&name);
-        let staged = dir.join(format!("{name}.baking"));
+        let target = cube_file(dir, self.files.len());
+        let mut staged = target.clone().into_os_string();
+        staged.push(".baking");
+        let staged = PathBuf::from(staged);
         std::fs::write(&staged, bytes).map_err(|e| {
             format!(
                 "Failed to write reflection cubemap {}: {e}",
@@ -87,14 +102,12 @@ impl StagedCubemaps {
         Ok(())
     }
 
-    /// Move every staged cube into place and point its probe at it. The caller has
-    /// checked the probes are the ones baked.
-    pub(super) fn commit(&mut self, scene: &mut Scene) -> Result<(), String> {
-        if std::mem::replace(&mut self.committed, true) {
-            return Ok(());
-        }
-        for i in 0..self.files.len() {
-            let (staged, target) = &self.files[i];
+    /// Move every staged cube not yet moved into place, then point each probe of
+    /// `set` (the planned copy, not the scene's) at its cube. The caller has checked
+    /// the probes are the ones baked. On a failed move `set` is untouched and a
+    /// retry resumes at the cube that failed.
+    pub(super) fn commit(&mut self, set: &mut ReflectionProbeSet) -> Result<(), String> {
+        while let Some((staged, target)) = self.files.get(self.moved) {
             let path = target.to_string_lossy().into_owned();
             // Noted first, so the editor's follow never reads the engine's own write
             // as an outside edit.
@@ -102,7 +115,10 @@ impl StagedCubemaps {
             // lint: allow(atomic-write) publishes a cube staged whole beside its name at bake time
             std::fs::rename(staged, target)
                 .map_err(|e| format!("Failed to write reflection cubemap {path}: {e}"))?;
-            scene.reflection_probes.set_cubemap(i, path);
+            self.moved += 1;
+        }
+        for (i, (_, target)) in self.files.iter().enumerate() {
+            set.set_cubemap(i, target.to_string_lossy().into_owned());
         }
         Ok(())
     }
@@ -110,8 +126,8 @@ impl StagedCubemaps {
 
 impl Drop for StagedCubemaps {
     fn drop(&mut self) {
-        // After a commit the staged names are gone; a failed commit's rest remain.
-        for (staged, _) in &self.files {
+        // The moved ones' staged names are gone; a failed commit's rest remain.
+        for (staged, _) in &self.files[self.moved..] {
             // Best effort: a staged file that is already gone needs no removing.
             let _ = std::fs::remove_file(staged);
         }

@@ -20,9 +20,9 @@ fn probing(name: &str) -> (EditorUi, Scene, String) {
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let mut scene = Scene::new();
     for x in [0.0, 4.0] {
-        scene
-            .reflection_probes
-            .add(Vec3::new(x, 1.0, 0.0), Vec3::splat(2.0));
+        let set = &mut scene.reflection_probes;
+        let i = set.add(Vec3::new(x, 1.0, 0.0), Vec3::splat(2.0));
+        set.edit(i, |p| p.manual = true);
     }
     scene.lighting_settings.reflections.resolution = 16;
     let mut editor = EditorUi::new(Default::default());
@@ -86,6 +86,11 @@ fn gpu_a_replaced_scene_drops_the_bake_without_claiming_lightmaps() {
 fn gpu_saving_elsewhere_midway_drops_the_bake() {
     let (mut editor, mut scene, path) = probing("save_as");
     let mut console = ConsoleLogs::new();
+    // The first poll finishes the (empty) light-probe pass, the second stages a cube.
+    poll_once(&mut editor, &mut scene, &mut console);
+    poll_once(&mut editor, &mut scene, &mut console);
+    let dir = crate::dev::bake::reflection::reflection_dir(&path);
+    assert!(staged(&dir), "a cube is staged before the save");
     let elsewhere = path.replace("level.scene", "copy.scene");
     editor.set_current_scene_path(Some(elsewhere));
     poll_once(&mut editor, &mut scene, &mut console);
@@ -93,9 +98,13 @@ fn gpu_saving_elsewhere_midway_drops_the_bake() {
     let line = last_warning(&console);
     assert!(line.contains("saved elsewhere"), "{line}");
     assert!(line.contains("probes kept their old lighting"), "{line}");
-    let dir = std::path::Path::new(&path).parent().unwrap();
-    let left = std::fs::read_dir(dir).unwrap().flatten();
-    assert!(left
+    assert!(!staged(&dir), "the dropped bake's staged cubes are gone");
+}
+
+/// Whether `dir` holds a staged (`.baking`) cube.
+fn staged(dir: &std::path::Path) -> bool {
+    let entries = std::fs::read_dir(dir).unwrap().flatten();
+    entries
         .into_iter()
-        .all(|e| !e.file_name().to_string_lossy().ends_with(".baking")));
+        .any(|e| e.file_name().to_string_lossy().ends_with(".baking"))
 }

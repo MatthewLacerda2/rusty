@@ -35,6 +35,11 @@ pub struct FloorGrid {
     pub depth: usize,
     /// Each cell's open space; `None` where no one can stand.
     pub cells: Vec<Option<FloorCell>>,
+    /// Floors above a cell's lowest one, `(cell index, floor y)` in cell order: the
+    /// storeys of a building, a catwalk (#1737). Light probes fill the air over
+    /// them; rooms are found on the lowest floor alone. Empty for a plan rasterized
+    /// from the colliders.
+    pub upper: Vec<(usize, f32)>,
     /// How far the open cells stop short of the walls: the nav surface's agent
     /// radius, half a cell for a grid rasterized from the colliders. A room's box is
     /// grown by it so it meets the walls.
@@ -77,6 +82,7 @@ impl FloorGrid {
             width,
             depth,
             cells: vec![None; width * depth],
+            upper: Vec::new(),
             // Cells overlapping a wall are blocked, so the open ones stop about
             // half a cell short of its face.
             inset: cell * 0.5,
@@ -163,7 +169,7 @@ fn capped_cell(span: Vec2, cell: f32) -> f32 {
 
 /// The world bounds of the scene's static, active, solid colliders, in entity
 /// order: a trigger is not a wall, as the nav bake has it.
-fn static_boxes(scene: &Scene) -> Vec<(Vec3, Vec3)> {
+pub(super) fn static_boxes(scene: &Scene) -> Vec<(Vec3, Vec3)> {
     let world = &scene.world;
     (world.ids_with_collider().into_iter())
         .filter(|&id| world.is_static(id) && world.is_active_in_hierarchy(id))

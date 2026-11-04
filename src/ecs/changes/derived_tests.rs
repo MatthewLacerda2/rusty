@@ -9,7 +9,7 @@ use std::fmt::Debug;
 
 use proptest::prelude::*;
 
-use super::ops_tests::{apply, op, Op};
+use super::ops_tests::{apply, op, Edit, Op};
 use crate::components::TransformComponent;
 use crate::ecs::{Activity, Changes, Channel, Cursor, Layer, StaticSet, World, WorldPose};
 
@@ -103,4 +103,24 @@ proptest! {
         let local = |w: &World, id| w.transform(id).map(|t| bits(t.to_matrix()));
         kept_equals_rebuilt::<TransformComponent, _>(&ops, local)?;
     }
+}
+
+/// The flake of #1777: an Undo of a despawn put the child back without its place in
+/// the parent's `children`, so switching the parent off missed it.
+#[test]
+fn undoing_a_despawn_keeps_the_child_in_its_parents_subtree() {
+    use Edit::*;
+    let ops = [
+        Op::Spawn,
+        Op::Spawn,
+        Op::On(0, Adopt(true)),
+        Op::On(1, Despawn),
+        Op::On(0, Adopt(false)),
+        Op::On(0, UndoDespawn),
+        Op::Read,
+        Op::On(2, SetActive(true)),
+        Op::Read,
+    ];
+    kept_equals_rebuilt::<Activity, _>(&ops, |w, id| Some(w.is_active_in_hierarchy(id)))
+        .expect("kept equals rebuilt");
 }

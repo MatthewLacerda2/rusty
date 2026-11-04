@@ -34,7 +34,8 @@ pub enum Edit {
     Adopt(bool),
     /// An Undo of a flipped `active` flag (`restore_entity` of a live id) …
     UndoFlip,
-    /// … and of a despawn (`restore_entity` of a dead one).
+    /// … and of a despawn (`restore_entity` of a dead one, and of the live parent
+    /// and children the despawn unlinked, which the journal recorded too).
     UndoDespawn,
 }
 
@@ -118,15 +119,21 @@ pub fn apply(w: &mut World, op: &Op) {
             w.replace_entity(doc);
         }
         Edit::Adopt(a) => adopt(w, e, a),
-        Edit::UndoFlip | Edit::UndoDespawn => {
-            let before = w.record(e).expect("live");
-            match edit {
-                Edit::UndoFlip => {
-                    w.set_active(e, !w.is_active_self(e));
-                }
-                _ => w.despawn(e),
-            }
-            w.restore_entity(before.doc, before.seq);
-        }
+        Edit::UndoFlip => undo(w, |w| {
+            w.set_active(e, !w.is_active_self(e));
+        }),
+        Edit::UndoDespawn => undo(w, |w| w.despawn(e)),
+    }
+}
+
+/// Run `edit` under the journal and put back every entity it recorded, as
+/// `scene::undo` does: a despawn's parent and children come back with it (#1777).
+fn undo(w: &mut World, edit: impl FnOnce(&mut World)) {
+    w.journal_resume();
+    edit(w);
+    w.journal_pause();
+    let taken = w.journal_take().expect("the edit wrote");
+    for recorded in taken.before.into_values().flatten() {
+        w.restore_entity(recorded.doc, recorded.seq);
     }
 }
