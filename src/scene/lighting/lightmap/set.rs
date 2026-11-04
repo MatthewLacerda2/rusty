@@ -119,7 +119,10 @@ mod tests {
         assert!(set.get(9).is_none());
         let json = serde_json::to_string(&set).unwrap();
         assert_eq!(serde_json::from_str::<LightmapSet>(&json).unwrap(), set);
-        assert!(json.find("\"entity\":3") < json.find("\"entity\":5"), "entity order");
+        assert!(
+            json.find("\"entity\":3") < json.find("\"entity\":5"),
+            "entity order"
+        );
         let twice = r#"{"entries":[{"entity":3,"page":0,"scale_offset":[0,0,0,0]},
             {"entity":3,"page":1,"scale_offset":[0,0,0,0]}]}"#;
         let first = serde_json::from_str::<LightmapSet>(twice).unwrap();
