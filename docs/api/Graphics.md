@@ -311,11 +311,15 @@ fraction of the view's resolution its **quality** picks from the running preset 
 seeded `Medium` preset's levels: a quarter at `Low`, half at `Medium` and `High`; the
 `High` preset's `Medium` level is a third; `Custom` takes the `resolution_divisor`
 knob; see *Quality presets*), so each level changes what the chain costs. A lower level
-also widens the glow on screen, since every mip then covers twice the pixels, and at 4K
+also widens the glow on screen (at a quarter every mip covers twice the pixels it
+does at half), and at 4K
 the 8-mip cap leaves the widest glow at half the screen share it has at 1080p. Past
-half resolution the prefilter reads a denser 25-tap lattice instead of Jimenez's 13
-taps, so every scene pixel reaches the chain and a one-pixel spark moving across the
-view keeps its glow. Each mip below is half the one
+half resolution the prefilter still writes at half and a resample takes that down to
+the chain's size, so every scene pixel reaches the chain and a one-pixel spark moving
+across the view keeps its glow. That costs the prefilter's 13 taps per half-size
+texel (3.25 per scene pixel) at every level, plus the resample's 13 per first-mip
+texel (1.4 per scene pixel at a third, 0.8 at a quarter); what a lower level saves is
+in the chain below it, smaller at every mip, and its widest upsample. Each mip below is half the one
 above, down to a few texels across (at most 8 mips), and the chain is blended back up,
 each mip taking the **scatter**'s share of the wider glow below it (`0`: a tight glow,
 `1`: a wide, soft one). The composite adds the result times the **intensity**, before

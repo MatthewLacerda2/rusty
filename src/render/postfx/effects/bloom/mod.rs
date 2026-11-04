@@ -90,7 +90,7 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let (device, passes) = (&r.device, &r.post_passes.bloom);
     let (scene, sampler) = (pfx.full_size, &pfx.sampler);
     let make = || BloomTargets::new(device, passes, sampler, scene, divisor);
-    let t = pfx.targets.get_or(&make);
+    let t = pfx.targets.get_or(make);
     if t.divisor != divisor {
         *t = make();
     }
