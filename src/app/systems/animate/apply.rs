@@ -46,11 +46,15 @@ fn mover(s: &Scene, id: u32) -> Mover {
 
 /// Move entity `id` by the world-space root `motion` of a step of `dt`, and
 /// record on its animator what it really moved and any travel carried over.
+/// The turn is about the model's up axis: the entity's own +Y, or tipped by
+/// `tilt` (the model's rotation in the entity's space, when its mesh sits
+/// under a turned `Armature`, #1822).
 pub(super) fn apply_root_motion(
     s: &mut Scene,
     res: &Resources,
     id: u32,
     motion: RootMotion,
+    tilt: Option<Quat>,
     dt: f32,
 ) {
     let carried = s
@@ -90,7 +94,9 @@ pub(super) fn apply_root_motion(
         }
     };
     if turn && motion.yaw != 0.0 {
-        let facing = s.world.world_rotation(id) * Quat::from_rotation_y(motion.yaw);
+        let turn = Quat::from_rotation_y(motion.yaw);
+        let turn = tilt.map_or(turn, |t| t * turn * t.inverse());
+        let facing = s.world.world_rotation(id) * turn;
         s.world.set_world_rotation(id, facing);
     }
     let moved = moved.unwrap_or_else(|| s.world.world_position(id) - before);
