@@ -46,68 +46,46 @@ return { Update = function(id)\n\
   end\n\
 end }";
 
-#[test]
-fn a_cart_loses_its_mast_takes_a_hat_and_drives_through_a_switched_off_wall() {
-    let mut scene = Scene::new();
-    let floor = boxed(
-        &mut scene,
-        "Floor",
-        Vec3::new(0.0, -0.5, 0.0),
-        Vec3::new(40.0, 1.0, 40.0),
-    );
+/// The yard: a floor, a dynamic cart with a mast part, a hat floating above it,
+/// a wall under a `Gate` parent, and the director. Returns cart, hat, director.
+fn yard(scene: &mut Scene) -> (u32, u32, u32) {
+    let v = Vec3::new;
+    let floor = boxed(scene, "Floor", v(0.0, -0.5, 0.0), v(40.0, 1.0, 40.0));
     scene.world.set_static(floor, true);
-    let cart = boxed(
-        &mut scene,
-        "Cart",
-        Vec3::new(0.0, 0.25, 0.0),
-        Vec3::new(2.0, 0.5, 1.0),
-    );
+    let cart = boxed(scene, "Cart", v(0.0, 0.25, 0.0), v(2.0, 0.5, 1.0));
     scene.world.set_rigidbody(cart, Some(default_rigidbody()));
-    let mast = boxed(
-        &mut scene,
-        "Mast",
-        Vec3::new(0.8, 1.25, 0.0),
-        Vec3::new(0.2, 2.0, 0.2),
-    );
+    let mast = boxed(scene, "Mast", v(0.8, 1.25, 0.0), v(0.2, 2.0, 0.2));
     scene.set_parent(mast, Some(cart)).unwrap();
-    let hat = boxed(
-        &mut scene,
-        "Hat",
-        Vec3::new(0.0, 1.75, 0.0),
-        Vec3::splat(0.5),
-    );
+    let hat = boxed(scene, "Hat", v(0.0, 1.75, 0.0), Vec3::splat(0.5));
     let gate = scene.add_entity("Gate".to_string());
-    let wall = boxed(
-        &mut scene,
-        "Wall",
-        Vec3::new(1.5, 1.0, 0.0),
-        Vec3::new(0.2, 2.0, 4.0),
-    );
+    let wall = boxed(scene, "Wall", v(1.5, 1.0, 0.0), v(0.2, 2.0, 4.0));
     scene.set_parent(wall, Some(gate)).unwrap();
     scene.world.set_static(wall, true);
     let director = scene.add_entity("Director".to_string());
-    attach_script(&mut scene, director, "rusty_1707_director.lua", DIRECTOR);
+    attach_script(scene, director, "rusty_1707_director.lua", DIRECTOR);
+    (cart, hat, director)
+}
+
+#[test]
+fn a_cart_loses_its_mast_takes_a_hat_and_drives_through_a_switched_off_wall() {
+    let mut scene = Scene::new();
+    let (cart, hat, director) = yard(&mut scene);
     let scene = std::rc::Rc::new(std::cell::RefCell::new(scene));
     let mut game = playing(scene.clone(), 20.0);
     run(&mut game, 180);
     let s = scene.borrow();
     let rays = s.world.transform(director).unwrap().position;
+    let near = |a: f32, b: f32| (a - b).abs() < 0.05;
     assert!(
-        (rays.x - 2.5).abs() < 0.05,
+        near(rays.x, 2.5),
         "the ray stopped on the mast's top: {rays}"
     );
-    assert!(
-        (rays.y - 4.5).abs() < 0.05,
-        "then passed where it stood: {rays}"
-    );
+    assert!(near(rays.y, 4.5), "then passed where it stood: {rays}");
     let (c, h) = (s.world.world_position(cart), s.world.world_position(hat));
     assert!(
         c.x > 3.0,
         "the cart drove through the switched-off wall: {c}"
     );
-    assert!(
-        (h.x - c.x).abs() < 0.05,
-        "the hat rode on the cart: {h} over {c}"
-    );
+    assert!(near(h.x, c.x), "the hat rode on the cart: {h} over {c}");
     assert!(h.y > c.y + 1.0, "and stayed on top of it: {h} over {c}");
 }
