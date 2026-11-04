@@ -16,8 +16,10 @@ coder *changing* it must know.
   `merging/verdict/` answers "may this pull request merge?" (`make mergeable`, and the
   queue before every merge); `merging/queue/` merges `main` in, checks, pushes, waits
   and lands, and its `conflict/` resolves a conflict inside a `sorted` list and
-  records every conflict met (#1723); `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how
-  it ends). `mergeable.py` and `merge-queue.py` are only the command lines. A new
+  records every conflict met (#1723); `merging/train/` is the merge train (#1785:
+  forming a group, its chain of squash commits, its `merge-train/*` branch, its wait,
+  landing it and checking `main`'s tree); `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how
+  it ends, and the trains across passes, `watch/trains.py`). `mergeable.py` and `merge-queue.py` are only the command lines. A new
   concern is a new module, not a longer one.
 - **`.github/scripts/dispatch/` is the batch's dispatch steps** (#1569): the brief,
   the coder's routine, the routines API, the review level, the re-brief counts.
@@ -66,6 +68,19 @@ coder *changing* it must know.
   hand-back memory) is appended once per `(main, head)` pair; a record that cannot be
   written loses a line, not a merge. A dry run records nothing.
 
+## The merge train
+- **What merges is exactly the tree CI proved** (#1785, `merging/train/__init__.py`):
+  the train is a chain of single-parent commits on `main`, so each merge base is the
+  one GitHub's squash uses, and `main`'s tree is compared with the train's after
+  landing (`train.land.check`). Keep both: a train built of real merge commits, or a
+  landing that skips the check, loses the argument.
+- **Nothing is pushed to a member's head**, and nothing about a train outlives the
+  process: `merge-train/*` branches are the queue's own throwaways, swept at launch
+  (`train.rails.sweep`). Changing a member's head or persisting a half-built train
+  needs its own argument for what a relaunch then does.
+- **Every rule is one the queue can read**; no model is asked anything. The cap is
+  `train.group.CAP`, with its measurement beside it: change both together.
+
 ## The watch
 - **It ends itself when its own code changes on `main`** (#967,
   `merging/watch/freshness.py`). At launch it notes the blob of every module of the
@@ -83,7 +98,8 @@ coder *changing* it must know.
   (`lsof -a -p <pid> -d cwd`) and kill that PID.
 - **Its exit statuses are an interface**: 1 (read the hand-backs), 3 (the machine or
   GitHub failed), 4 (another watch holds the lock), 5 (relaunch), 6 (a stop was
-  requested, `make queue-stop`; `merging/watch/ending.py`), and a last line
+  requested, `make queue-stop`; `merging/watch/ending.py`), 9 (a merge train landed
+  and `main`'s tree is not the one it proved; never relaunched, #1785), and a last line
   `watch: resume: <command>`. The skills and the orchestrator read them, so a change
   to one updates `ci-merge` in the same pull request.
 - **The supervisor** (`queue-daemon.py`, #908) adds two statuses of its own, 7 (its

@@ -53,7 +53,8 @@ def parse(argv: list[str]) -> argparse.Namespace:
             f" ('{ending.HANDED_BACK_LINE} #N'); exit when nothing is left: 1 if anything was handed back,"
             f" {ending.MACHINE_STATUS} if the machine or GitHub failed,"
             f" {lock.LOCKED_STATUS} if another watch holds the lock, {ending.RELAUNCH_STATUS} if its own code changed on main"
-            " (update the checkout, then relaunch); the last line is '{ending.RESUME} <command>'"
+            f" (update the checkout, then relaunch), {ending.MISMATCH_STATUS} if a merge train landed and main's tree is not"
+            f" the one it proved; up to four ready PRs ride one merge train; the last line is '{ending.RESUME} <command>'"
         ),
     )
     parser.add_argument(

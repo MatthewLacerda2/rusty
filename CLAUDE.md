@@ -145,14 +145,20 @@ is wrong.
 - **Branch naming.** A PR that closes an issue uses `{issue_number}-short-slug` (e.g.
   `163-fix-coverage-scope`). An issue-less PR uses a readable short slug of its subject
   (e.g. `document-ai-parity`). Lowercase-hyphenated, brief.
-- **Merging — serialized, one at a time.** When a PR is ready, CI/CD runs; once it's
+- **Merging — serialized, one tested tree at a time.** When a PR is ready, CI/CD runs; once it's
   green you may merge to `main` right away. If it conflicts or fails, fix it until it
   passes; if it's taking too many iterations (≈3 fix attempts at the same failure, or a
   failure that needs a decision you can't make), mark it a **draft** and hand it to the
   user. Because Rust is compiled, two PRs can each be green alone yet break `main`
   together (a rename, a changed signature, a moved module — no textual conflict catches
-  it). So merging **cannot be parallelized**: bring each PR up to the latest `main` →
-  CI green on that updated state → merge → repeat, one PR at a time. A PR branch is
+  it). So nothing merges on a tree CI did not prove: either one PR brought up to the
+  latest `main` → CI green on that updated state → merge, or a **merge train** (#1785,
+  approved 2026-11-04): up to four PRs whose own heads are green and which merge
+  cleanly onto `main` and each other, tested together on one combined tree and all
+  landed if it is green, then `main`'s tree checked equal to the train's. A red train
+  is split in half and each half retested; a PR red on its own is handed back. One
+  train or PR at a time, so merging is still serialized in the sense that matters; the
+  merge path, CI and the manifests always go alone. A PR branch is
   updated by **merging `main` into it, never by rebasing** (#1568): nothing is
   rewritten, so no push rewrites history (the queue's own push only leases the head it
   took, a compare-and-swap), and a conflict is resolved once. PRs are
@@ -166,11 +172,11 @@ is wrong.
   them as code and a PR touching them is serialized like code.
 - **Coding parallelises; merging does not.** How many branches are written at once
   scales with **how separate their files are**: two branches appending to the same enum
-  or registry cost more than five in separate modules, because every branch behind
-  another in the merge queue pays an update per merge ahead of it, and only a colliding
-  update is expensive. **Three kinds of agent, three limits:** **cloud coders ≈10**,
+  or registry cost more than five in separate modules, because a branch that conflicts
+  with one merged ahead of it must be updated and taken alone, and only a colliding
+  update is expensive (a clean one rides a merge train without being touched, #1785). **Three kinds of agent, three limits:** **cloud coders ≈10**,
   paced by token spend and by how many diffs one orchestrator can read, not by
-  hardware; **local coders ≤2**, because the queue merges one PR per CI run and a third
+  hardware; **local coders ≤2**, because the queue lands one tested tree per CI run and a third
   local coder finishes nothing sooner; **read-only agents** (research, review,
   planning) without limit, since they build nothing. Merging stays **one at a time**,
   whatever the count. **One worktree per branch** under
@@ -195,7 +201,7 @@ is wrong.
   head and lets CI judge it, so merging costs this machine `git` and GitHub calls, not a
   build. Prefer it whenever the machine has other work. The price is that an update broken
   by a merge ahead (rare: a few in 126 PRs) is caught by CI a round later, not before
-  the push.
+  the push. Under it a merge train's tree goes unchecked too, and CI judges it.
 - **Dependencies (not batches).** Once an issue is written, record how it relates to the
   others using GitHub's native issue **relationships** — set `Blocked by` / `Blocks`
   directly on the issue, and use GitHub **sub-issues** when one issue is literal
