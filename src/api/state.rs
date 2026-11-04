@@ -13,7 +13,9 @@
 //! hook firing another hook) holds nothing the inner call could trip on.
 //!
 //! One cell per type: two cells of one type would alias. Every cell the surface
-//! reads has a distinct type today ([`ApiCtx`] lists them).
+//! reads has a distinct type ([`ApiCtx`] lists them), and
+//! `scripting::tests::cells_attach` fails on a cell left unattached, on two of
+//! one type, and on a registrar that reads a cell while registering.
 
 use std::cell::RefCell;
 use std::marker::PhantomData;

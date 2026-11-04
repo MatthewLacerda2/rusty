@@ -4,6 +4,7 @@
 mod active_gate;
 mod assets;
 mod awake;
+mod cells_attach;
 mod collider;
 mod collisions;
 mod console;

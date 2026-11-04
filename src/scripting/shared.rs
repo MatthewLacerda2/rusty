@@ -5,8 +5,9 @@
 //! `api::ApiCell` handle (#1709). A second VM that drives the same world from the
 //! outside (the dev layer's scenario VM) clones the bundle once
 //! ([`ScriptManager::api_cells`]) and attaches it to its own VM: the same `Rc`s, the
-//! same surface, a second caller. A new cell is added here, once, and to
-//! `api::ApiCtx`.
+//! same surface, a second caller. A new cell is added here, once, to
+//! [`ApiCells::attach`], to `api::ApiCtx`, and to the list in
+//! `tests::cells_attach`, which fails to compile until it is.
 
 use std::cell::RefCell;
 use std::rc::Rc;
