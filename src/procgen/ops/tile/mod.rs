@@ -132,7 +132,8 @@ pub fn tile(img: &Image, s: &Scatter) -> Image {
     let fields = [j.offset, j.rotation, j.scale, mask, size];
     let stamps = PerCell::new(per, &fields, |cell| {
         let (u, v) = centre(cell, n);
-        if !(mask.at_uv(u, v) >= 0.5) {
+        let m = mask.at_uv(u, v);
+        if m.is_nan() || m < 0.5 {
             return None;
         }
         Stamp::of(cell, per, j.at(cell, n), size.at_uv(u, v), draws, s.seed)

@@ -127,7 +127,7 @@ impl Stamp {
         seed: u64,
     ) -> Option<Self> {
         let unit = |ch| hash::unit2(cell.0, cell.1, ch, seed);
-        if !(unit(CHANCE) < d.probability) || !(size > 0.0) {
+        if unit(CHANCE) >= d.probability || size.is_nan() || size <= 0.0 {
             return None;
         }
         let size = size.min(MAX_SIZE);
