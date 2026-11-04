@@ -2,7 +2,8 @@
 //!
 //! One rapier body per plan owner (see `compound`), carrying one collider per
 //! attached collider entity, each at its pose relative to the owner. The plan is
-//! re-derived every tick; an owner whose collider set changed (reparent, a
+//! re-derived whenever the change log names an id whose collider membership or
+//! body carrier may have moved (`sync`, `watch`); an owner whose collider set changed (reparent, a
 //! collider or Rigidbody added/removed, an entity spawned or destroyed) has its
 //! body rebuilt, the others are left untouched so their contacts and sleep state
 //! survive.

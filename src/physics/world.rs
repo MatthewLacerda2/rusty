@@ -47,7 +47,7 @@ pub struct PhysicsWorld {
     pub(super) soft_bodies: SoftBodySet,
     ccd_solver: CCDSolver,
     /// The body layout last built (#445): owner entity id -> the collider
-    /// entities its body carries. Diffed each tick to rebuild changed bodies.
+    /// entities its body carries. Re-derived and diffed to rebuild changed bodies.
     pub(super) plan: BodyPlan,
     /// body-owner entity id -> rigid-body handle.
     pub(super) id_to_body: Map<u32, RigidBodyHandle>,
@@ -118,7 +118,7 @@ impl PhysicsWorld {
             body.set_body_type(class, true);
             body.set_position(to_pose(snap.pos, snap.rot), true);
         }
-        // Re-apply the CCD mode each tick so `Physics.SetCollisionDetection`
+        // Re-apply the CCD mode on every sync of the body so `Physics.SetCollisionDetection`
         // toggled mid-play takes effect (mirrors the `gravity_scale` re-apply).
         body.enable_ccd(snap.ccd_enabled);
         if snap.kinematic {

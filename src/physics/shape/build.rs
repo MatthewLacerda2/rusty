@@ -149,7 +149,7 @@ pub(in crate::physics) fn body_inputs(world: &World, id: u32) -> BodyInputs {
     }
 }
 
-/// The per-entity component state `sync_to_rapier` pushes into a body each tick.
+/// The per-entity component state `sync_to_rapier` pushes into a body it syncs.
 pub(in crate::physics) struct EntityBodyState {
     /// World-space pose (#445): the owner's local `Transform` resolved through
     /// its parents.

@@ -1,7 +1,7 @@
 //! src/ecs/changes/funnel_tests.rs — a write to a column the entity lacks names
-//! nothing (#1705's third review): physics borrows `rigidbody_mut` for every body
-//! owner, a static collider included, and the despawn walk borrows every reference
-//! column of every holder. One test per funnel in `ecs/funnel.rs`.
+//! nothing (#1705's third review): physics asked for `rigidbody_mut` on every body
+//! owner, a static collider included (it compares first since #1707), and the
+//! despawn walk borrows every reference column of every holder. One test per funnel in `ecs/funnel.rs`.
 
 use crate::components::{AnimatorComponent, JointComponent, LodGroupComponent, TransformComponent};
 use crate::ecs::{Changes, World};
