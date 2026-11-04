@@ -3,6 +3,7 @@
 //! through — shadows only its +X half. Skips with no adapter.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::{Quat, Vec3};
 
@@ -72,7 +73,7 @@ fn gpu_a_dissolving_caster_clips_its_atlas_shadow() {
         return;
     };
     let (scene, slab) = under_a_spotlight(Some(&d.shader));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     dissolve(&scene, slab, &d, 0.0);
     let whole = ground_halves(&mut r, &scene.borrow());
     dissolve(&scene, slab, &d, 0.5);

@@ -15,6 +15,7 @@ use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::physics::character_controller::{
     COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES,
 };
@@ -23,30 +24,23 @@ use crate::physics::{self, PhysicsWorld};
 use crate::scene::authoring::physics::character_controller as ops;
 use crate::scene::Scene;
 
-type SceneCell<'s> = &'s RefCell<Scene>;
-type PhysicsCell<'s> = &'s RefCell<Option<PhysicsWorld>>;
 /// A field's reader and its shared-op writer.
 type Field<T> = (fn(&Cc) -> T, fn(&mut Cc, T));
 /// `below, sides, above`.
 type Flags = (bool, bool, bool);
 
 /// Register the `CharacterController` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>, physics: ApiCell<Option<PhysicsWorld>>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
-    register_motion(scope, &t, scene, physics)?;
-    register_shape(scope, &t, scene)?;
+    register_motion(lua, &t, scene, physics)?;
+    register_shape(lua, &t, scene)?;
     lua.globals()
         .set("CharacterController", t)
         .map_err(|e| e.to_string())
 }
 
 /// `id`'s controller, cloned, or `None` without one.
-fn get(scene: SceneCell, id: u32) -> Option<Cc> {
+fn get(scene: &RefCell<Scene>, id: u32) -> Option<Cc> {
     scene
         .borrow()
         .world
@@ -64,13 +58,15 @@ fn flags(mask: u8) -> Flags {
 }
 
 /// `Move`, `IsGrounded`, `GetCollisionFlags`, `GetGroundNormal`, `CanStand`.
-fn register_motion<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_motion(
+    lua: &mlua::Lua,
     t: &Table,
-    scene: SceneCell<'scope>,
-    physics: PhysicsCell<'scope>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
-    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+    let f = lua.create_function(move |lua, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        let scene = &*scene.get(lua)?;
+        let physics = &*physics.get(lua)?;
         let id = id.live("CharacterController", "Move")?;
         let world = physics.borrow();
         let mut scene = scene.borrow_mut();
@@ -78,49 +74,56 @@ fn register_motion<'scope>(
         Ok(flags(hit.map_or(0, |m| m.flags)))
     });
     put(t, "Move", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(get(scene, id.read()).is_some_and(|c| c.is_grounded))
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).is_some_and(|c| c.is_grounded))
     });
     put(t, "IsGrounded", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
+    let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(flags(
-            get(scene, id.read()).map_or(0, |c| c.collision_flags),
+            get(&*scene.get(lua)?, id.read()).map_or(0, |c| c.collision_flags),
         ))
     });
     put(t, "GetCollisionFlags", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let n = get(scene, id.read()).map_or(Vec3::Y, |c| c.ground_normal);
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let n = get(&*scene.get(lua)?, id.read()).map_or(Vec3::Y, |c| c.ground_normal);
         Ok((n.x, n.y, n.z))
     });
     put(t, "GetGroundNormal", f)?;
-    let f = scope.create_function(move |_, (id, height): (EntityArg, f32)| {
-        let world = physics.borrow();
-        Ok(physics::can_stand(
-            world.as_ref(),
-            &scene.borrow(),
-            id.read(),
-            height,
-        ))
+    let f = lua.create_function(move |lua, (id, height): (EntityArg, f32)| {
+        physics.with(lua, |physics| {
+            let world = physics.borrow();
+            Ok(physics::can_stand(
+                world.as_ref(),
+                &scene.get(lua)?.borrow(),
+                id.read(),
+                height,
+            ))
+        })
     });
     put(t, "CanStand", f)
 }
 
 /// `Get<name>` / `Set<name>` over one `f32` field (`0` without a controller).
-fn f32_pair<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn f32_pair(
+    lua: &mlua::Lua,
     t: &Table,
-    scene: SceneCell<'scope>,
+    scene: ApiCell<Scene>,
     name: &str,
     (read, write): Field<f32>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(get(scene, id.read()).map_or(0.0, |c| read(&c)))
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map_or(0.0, |c| read(&c)))
     });
     put(t, &format!("Get{name}"), f)?;
     let verb = format!("Set{name}");
-    let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+    let f = lua.create_function(move |lua, (id, v): (EntityArg, f32)| {
         let id = id.live("CharacterController", &verb)?;
-        if let Some(mut c) = scene.borrow_mut().world.character_controller_mut(id) {
+        if let Some(mut c) = scene
+            .get(lua)?
+            .borrow_mut()
+            .world
+            .character_controller_mut(id)
+        {
             write(&mut c, v);
         }
         Ok(())
@@ -130,29 +133,30 @@ fn f32_pair<'scope>(
 
 /// The capsule (`Height`, `Radius`, `Center`) and its tuning (`StepOffset`,
 /// `SlopeLimit`, `SkinWidth`, `MinMoveDistance`).
-fn register_shape<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
-    f32_pair(scope, t, scene, "Height", (|c| c.height, ops::set_height))?;
-    f32_pair(scope, t, scene, "Radius", (|c| c.radius, ops::set_radius))?;
+fn register_shape(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    f32_pair(lua, t, scene, "Height", (|c| c.height, ops::set_height))?;
+    f32_pair(lua, t, scene, "Radius", (|c| c.radius, ops::set_radius))?;
     let step: Field<f32> = (|c| c.step_offset, ops::set_step_offset);
-    f32_pair(scope, t, scene, "StepOffset", step)?;
+    f32_pair(lua, t, scene, "StepOffset", step)?;
     let slope: Field<f32> = (|c| c.slope_limit, ops::set_slope_limit);
-    f32_pair(scope, t, scene, "SlopeLimit", slope)?;
+    f32_pair(lua, t, scene, "SlopeLimit", slope)?;
     let skin: Field<f32> = (|c| c.skin_width, ops::set_skin_width);
-    f32_pair(scope, t, scene, "SkinWidth", skin)?;
+    f32_pair(lua, t, scene, "SkinWidth", skin)?;
     let min_move: Field<f32> = (|c| c.min_move_distance, ops::set_min_move_distance);
-    f32_pair(scope, t, scene, "MinMoveDistance", min_move)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let v = get(scene, id.read()).map_or(Vec3::ZERO, |c| c.center);
+    f32_pair(lua, t, scene, "MinMoveDistance", min_move)?;
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let v = get(&*scene.get(lua)?, id.read()).map_or(Vec3::ZERO, |c| c.center);
         Ok((v.x, v.y, v.z))
     });
     put(t, "GetCenter", f)?;
-    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+    let f = lua.create_function(move |lua, (id, x, y, z): (EntityArg, f32, f32, f32)| {
         let id = id.live("CharacterController", "SetCenter")?;
-        if let Some(mut c) = scene.borrow_mut().world.character_controller_mut(id) {
+        if let Some(mut c) = scene
+            .get(lua)?
+            .borrow_mut()
+            .world
+            .character_controller_mut(id)
+        {
             ops::set_center(&mut c, Vec3::new(x, y, z));
         }
         Ok(())

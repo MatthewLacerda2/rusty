@@ -9,179 +9,175 @@
 //! clipboard (#612) is one pair in the readable half: a game copies with the same
 //! `SetClipboard` a bot uses to stage a paste.
 
-use std::cell::RefCell;
-
 use mlua::Lua;
 
 use super::{global_table, put, Reg};
+use crate::api::ApiCell;
 use crate::core::input::gamepad::{DeadZones, Rumble};
 use crate::core::input::InputState;
 
 /// Register the whole `Input` namespace: [`register_readable`], then
 /// [`register_writable`], which extends its table.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    input: &'scope RefCell<InputState>,
-) -> Reg {
-    register_readable(lua, scope, input)?;
-    register_writable(lua, scope, input)
+pub fn register(lua: &Lua, input: ApiCell<InputState>) -> Reg {
+    register_readable(lua, input)?;
+    register_writable(lua, input)
 }
 
 /// Register the readable half of `Input` and the cursor request onto `lua`,
 /// creating the `Input` global table.
-pub fn register_readable<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    input: &'scope RefCell<InputState>,
-) -> Reg {
+pub fn register_readable(lua: &Lua, input: ApiCell<InputState>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     put(
         &table,
         "IsKeyDown",
-        scope.create_function(|_, key: String| Ok(input.borrow().is_key_down(&key))),
+        lua.create_function(move |lua, key: String| Ok(input.get(lua)?.borrow().is_key_down(&key))),
     )?;
     put(
         &table,
         "GetKeyDown",
-        scope.create_function(|_, key: String| Ok(input.borrow().get_key_down(&key))),
+        lua.create_function(move |lua, key: String| {
+            Ok(input.get(lua)?.borrow().get_key_down(&key))
+        }),
     )?;
     put(
         &table,
         "GetKeyUp",
-        scope.create_function(|_, key: String| Ok(input.borrow().get_key_up(&key))),
+        lua.create_function(move |lua, key: String| Ok(input.get(lua)?.borrow().get_key_up(&key))),
     )?;
     put(
         &table,
         "GetMousePosition",
-        scope.create_function(|_, ()| Ok(input.borrow().mouse_position())),
+        lua.create_function(move |lua, ()| Ok(input.get(lua)?.borrow().mouse_position())),
     )?;
     put(
         &table,
         "GetMouseDelta",
-        scope.create_function(|_, ()| Ok(input.borrow().mouse_delta())),
+        lua.create_function(move |lua, ()| Ok(input.get(lua)?.borrow().mouse_delta())),
     )?;
     put(
         &table,
         "GetScrollDelta",
-        scope.create_function(|_, ()| Ok(input.borrow().scroll_delta())),
+        lua.create_function(move |lua, ()| Ok(input.get(lua)?.borrow().scroll_delta())),
     )?;
     put(
         &table,
         "GetTextInput",
-        scope.create_function(|_, ()| Ok(input.borrow().text_input().to_string())),
+        lua.create_function(move |lua, ()| Ok(input.get(lua)?.borrow().text_input().to_string())),
     )?;
-    register_cursor(scope, &table, input)?;
-    register_clipboard(scope, &table, input)?;
-    register_pad(scope, &table, input)?;
+    register_cursor(lua, &table, input)?;
+    register_clipboard(lua, &table, input)?;
+    register_pad(lua, &table, input)?;
 
     lua.globals().set("Input", table).map_err(|e| e.to_string())
 }
 
 /// The cursor request: the sim records it, the platform applies it to the OS cursor.
-fn register_cursor<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    input: &'scope RefCell<InputState>,
-) -> Reg {
+fn register_cursor(lua: &mlua::Lua, table: &mlua::Table, input: ApiCell<InputState>) -> Reg {
     put(
         table,
         "SetCursorLocked",
-        scope.create_function(|_, locked: bool| {
-            input.borrow_mut().set_cursor_locked(locked);
+        lua.create_function(move |lua, locked: bool| {
+            input.get(lua)?.borrow_mut().set_cursor_locked(locked);
             Ok(())
         }),
     )?;
     put(
         table,
         "SetCursorVisible",
-        scope.create_function(|_, visible: bool| {
-            input.borrow_mut().set_cursor_visible(visible);
+        lua.create_function(move |lua, visible: bool| {
+            input.get(lua)?.borrow_mut().set_cursor_visible(visible);
             Ok(())
         }),
     )?;
     put(
         table,
         "IsCursorLocked",
-        scope.create_function(|_, ()| Ok(input.borrow().cursor().locked)),
+        lua.create_function(move |lua, ()| Ok(input.get(lua)?.borrow().cursor().locked)),
     )?;
     put(
         table,
         "IsCursorVisible",
-        scope.create_function(|_, ()| Ok(input.borrow().cursor().visible)),
+        lua.create_function(move |lua, ()| Ok(input.get(lua)?.borrow().cursor().visible)),
     )
 }
 
 /// The clipboard: the text the platform captured (or the game last set), and the
 /// write the platform copies to the OS clipboard after the tick.
-fn register_clipboard<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    input: &'scope RefCell<InputState>,
-) -> Reg {
+fn register_clipboard(lua: &mlua::Lua, table: &mlua::Table, input: ApiCell<InputState>) -> Reg {
     put(
         table,
         "GetClipboard",
-        scope.create_function(|_, ()| Ok(input.borrow().clipboard.text().to_string())),
+        lua.create_function(move |lua, ()| {
+            Ok(input.get(lua)?.borrow().clipboard.text().to_string())
+        }),
     )?;
     put(
         table,
         "SetClipboard",
-        scope.create_function(|_, text: String| {
-            input.borrow_mut().clipboard.set(&text);
+        lua.create_function(move |lua, text: String| {
+            input.get(lua)?.borrow_mut().clipboard.set(&text);
             Ok(())
         }),
     )
 }
 
-/// The gamepad reads, and the one pad *output* (rumble): axes, connection, dead
-/// zones, and rumble requests the platform plays (a record headless).
-fn register_pad<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    input: &'scope RefCell<InputState>,
-) -> Reg {
+/// The gamepad reads: axes, connection and dead zones, then [`register_rumble`].
+fn register_pad(lua: &mlua::Lua, table: &mlua::Table, input: ApiCell<InputState>) -> Reg {
     put(
         table,
         "GetAxis",
-        scope.create_function(|_, axis: String| Ok(input.borrow().axis(&axis))),
+        lua.create_function(move |lua, axis: String| Ok(input.get(lua)?.borrow().axis(&axis))),
     )?;
     put(
         table,
         "IsPadConnected",
-        scope.create_function(|_, pad: usize| Ok(input.borrow().pads.is_connected(pad))),
+        lua.create_function(move |lua, pad: usize| {
+            Ok(input.get(lua)?.borrow().pads.is_connected(pad))
+        }),
     )?;
     put(
         table,
         "GetDeadZone",
-        scope.create_function(|_, ()| {
-            let zones = input.borrow().pads.dead_zones;
+        lua.create_function(move |lua, ()| {
+            let zones = input.get(lua)?.borrow().pads.dead_zones;
             Ok((zones.stick, zones.trigger))
         }),
     )?;
     put(
         table,
         "SetDeadZone",
-        scope.create_function(|_, (stick, trigger): (f32, f32)| {
-            input.borrow_mut().pads.dead_zones = DeadZones::clamped(stick, trigger);
+        lua.create_function(move |lua, (stick, trigger): (f32, f32)| {
+            input.get(lua)?.borrow_mut().pads.dead_zones = DeadZones::clamped(stick, trigger);
             Ok(())
         }),
     )?;
+    register_rumble(lua, table, input)
+}
+
+/// `SetRumble` / `GetRumble`: the one pad *output*, played by the platform (a record
+/// headless).
+fn register_rumble(lua: &mlua::Lua, table: &mlua::Table, input: ApiCell<InputState>) -> Reg {
     put(
         table,
         "SetRumble",
-        scope.create_function(|_, (pad, low, high, seconds): (usize, f32, f32, f32)| {
-            let rumble = Rumble::new(low, high, seconds);
-            input.borrow_mut().pads.request_rumble(pad, rumble);
-            Ok(())
-        }),
+        lua.create_function(
+            move |lua, (pad, low, high, seconds): (usize, f32, f32, f32)| {
+                let rumble = Rumble::new(low, high, seconds);
+                input
+                    .get(lua)?
+                    .borrow_mut()
+                    .pads
+                    .request_rumble(pad, rumble);
+                Ok(())
+            },
+        ),
     )?;
     put(
         table,
         "GetRumble",
-        scope.create_function(|_, pad: usize| {
-            let rumble = input.borrow().pads.last_rumble(pad);
+        lua.create_function(move |lua, pad: usize| {
+            let rumble = input.get(lua)?.borrow().pads.last_rumble(pad);
             Ok((rumble.low, rumble.high, rumble.seconds))
         }),
     )
@@ -189,84 +185,80 @@ fn register_pad<'scope>(
 
 /// Add the writable half of `Input`: injection that drives the shared input state
 /// so a script can play as the user. Extends the existing `Input` table.
-pub fn register_writable<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    input: &'scope RefCell<InputState>,
-) -> Reg {
+pub fn register_writable(lua: &Lua, input: ApiCell<InputState>) -> Reg {
     let table = global_table(lua, "Input")?;
 
     put(
         &table,
         "Press",
-        scope.create_function(|_, key: String| {
-            input.borrow_mut().press(&key);
+        lua.create_function(move |lua, key: String| {
+            input.get(lua)?.borrow_mut().press(&key);
             Ok(())
         }),
     )?;
     put(
         &table,
         "Release",
-        scope.create_function(|_, key: String| {
-            input.borrow_mut().release(&key);
+        lua.create_function(move |lua, key: String| {
+            input.get(lua)?.borrow_mut().release(&key);
             Ok(())
         }),
     )?;
     put(
         &table,
         "MoveMouse",
-        scope.create_function(|_, (x, y): (f64, f64)| {
-            input.borrow_mut().move_mouse(x, y);
+        lua.create_function(move |lua, (x, y): (f64, f64)| {
+            input.get(lua)?.borrow_mut().move_mouse(x, y);
             Ok(())
         }),
     )?;
     put(
         &table,
         "AddMouseDelta",
-        scope.create_function(|_, (dx, dy): (f64, f64)| {
-            input.borrow_mut().add_mouse_delta(dx, dy);
+        lua.create_function(move |lua, (dx, dy): (f64, f64)| {
+            input.get(lua)?.borrow_mut().add_mouse_delta(dx, dy);
             Ok(())
         }),
     )?;
     put(
         &table,
         "Scroll",
-        scope.create_function(|_, dy: f64| {
-            input.borrow_mut().scroll(dy);
+        lua.create_function(move |lua, dy: f64| {
+            input.get(lua)?.borrow_mut().scroll(dy);
             Ok(())
         }),
     )?;
     put(
         &table,
         "TypeText",
-        scope.create_function(|_, text: String| {
-            input.borrow_mut().type_text(&text);
+        lua.create_function(move |lua, text: String| {
+            input.get(lua)?.borrow_mut().type_text(&text);
             Ok(())
         }),
     )?;
-    register_pad_injection(scope, &table, input)
+    register_pad_injection(lua, &table, input)
 }
 
 /// Pad injection: axis values and pad (dis)connection, as a bot or the harness drives
 /// them. Logical, like `Press`: no dead zone, no keymap.
-fn register_pad_injection<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    input: &'scope RefCell<InputState>,
-) -> Reg {
+fn register_pad_injection(lua: &mlua::Lua, table: &mlua::Table, input: ApiCell<InputState>) -> Reg {
     put(
         table,
         "SetAxis",
-        scope.create_function(|_, (axis, value): (String, f32)| {
-            input.borrow_mut().set_axis(&axis, value);
+        lua.create_function(move |lua, (axis, value): (String, f32)| {
+            input.get(lua)?.borrow_mut().set_axis(&axis, value);
             Ok(())
         }),
     )?;
     put(
         table,
         "SetPadConnected",
-        scope.create_function(|_, (pad, connected): (usize, bool)| {
-            input.borrow_mut().pads.set_connected(pad, connected);
+        lua.create_function(move |lua, (pad, connected): (usize, bool)| {
+            input
+                .get(lua)?
+                .borrow_mut()
+                .pads
+                .set_connected(pad, connected);
             Ok(())
         }),
     )

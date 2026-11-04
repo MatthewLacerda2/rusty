@@ -15,151 +15,140 @@ use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 use crate::scene::authoring::nav::obstacle as ops;
 use crate::scene::Scene;
 
-type SceneCell<'s> = &'s RefCell<Scene>;
 /// A field's reader and its shared-op writer.
 type Field<T> = (fn(&Obstacle) -> T, fn(&mut Obstacle, T));
 
 /// Register the `NavMeshObstacle` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
-    register_shape(scope, &t, scene)?;
-    register_carving(scope, &t, scene)?;
+    register_shape(lua, &t, scene)?;
+    register_carving(lua, &t, scene)?;
     lua.globals()
         .set("NavMeshObstacle", t)
         .map_err(|e| e.to_string())
 }
 
 /// `id`'s obstacle, cloned, or `None` without one.
-fn get(scene: SceneCell, id: u32) -> Option<Obstacle> {
+fn get(scene: &RefCell<Scene>, id: u32) -> Option<Obstacle> {
     scene.borrow().world.nav_obstacle(id).map(|o| o.clone())
 }
 
 /// Apply a shared op to `id`'s obstacle, if it has one.
-fn write(scene: SceneCell, id: u32, op: impl FnOnce(&mut Obstacle)) {
+fn write(scene: &RefCell<Scene>, id: u32, op: impl FnOnce(&mut Obstacle)) {
     if let Some(mut o) = scene.borrow_mut().world.nav_obstacle_mut(id) {
         op(&mut o);
     }
 }
 
 /// `Get<name>` / `Set<name>` over one `f32` field (`0` without an obstacle).
-fn f32_pair<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn f32_pair(
+    lua: &mlua::Lua,
     t: &Table,
-    scene: SceneCell<'scope>,
+    scene: ApiCell<Scene>,
     name: &str,
     (read, set): Field<f32>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(get(scene, id.read()).map_or(0.0, |o| read(&o)))
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map_or(0.0, |o| read(&o)))
     });
     put(t, &format!("Get{name}"), f)?;
     let verb = format!("Set{name}");
-    let f = scope.create_function(move |_, (id, v): (EntityArg, f32)| {
+    let f = lua.create_function(move |lua, (id, v): (EntityArg, f32)| {
         let id = id.live("NavMeshObstacle", &verb)?;
-        write(scene, id, |o| set(o, v));
+        write(&*scene.get(lua)?, id, |o| set(o, v));
         Ok(())
     });
     put(t, &format!("Set{name}"), f)
 }
 
 /// `Get<name>` / `Set<name>` over one `bool` field (`false` without an obstacle).
-fn bool_pair<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn bool_pair(
+    lua: &mlua::Lua,
     t: &Table,
-    scene: SceneCell<'scope>,
+    scene: ApiCell<Scene>,
     name: &str,
     (read, set): Field<bool>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(get(scene, id.read()).is_some_and(|o| read(&o)))
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).is_some_and(|o| read(&o)))
     });
     put(t, &format!("Get{name}"), f)?;
     let verb = format!("Set{name}");
-    let f = scope.create_function(move |_, (id, v): (EntityArg, bool)| {
+    let f = lua.create_function(move |lua, (id, v): (EntityArg, bool)| {
         let id = id.live("NavMeshObstacle", &verb)?;
-        write(scene, id, |o| set(o, v));
+        write(&*scene.get(lua)?, id, |o| set(o, v));
         Ok(())
     });
     put(t, &format!("Set{name}"), f)
 }
 
 /// `Get<name>` / `Set<name>` over one `Vec3` field, as `x, y, z`.
-fn vec3_pair<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn vec3_pair(
+    lua: &mlua::Lua,
     t: &Table,
-    scene: SceneCell<'scope>,
+    scene: ApiCell<Scene>,
     name: &str,
     (read, set): Field<Vec3>,
 ) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let v = get(scene, id.read()).map_or(Vec3::ZERO, |o| read(&o));
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let v = get(&*scene.get(lua)?, id.read()).map_or(Vec3::ZERO, |o| read(&o));
         Ok((v.x, v.y, v.z))
     });
     put(t, &format!("Get{name}"), f)?;
     let verb = format!("Set{name}");
-    let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+    let f = lua.create_function(move |lua, (id, x, y, z): (EntityArg, f32, f32, f32)| {
         let id = id.live("NavMeshObstacle", &verb)?;
-        write(scene, id, |o| set(o, Vec3::new(x, y, z)));
+        write(&*scene.get(lua)?, id, |o| set(o, Vec3::new(x, y, z)));
         Ok(())
     });
     put(t, &format!("Set{name}"), f)
 }
 
 /// `Shape`, `Center`, `Size`, `Radius`, `Height`.
-fn register_shape<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
-    let f = scope
-        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map(|o| o.shape.name())));
+fn register_shape(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map(|o| o.shape.name()))
+    });
     put(t, "GetShape", f)?;
-    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+    let f = lua.create_function(move |lua, (id, name): (EntityArg, String)| {
         let id = id.live("NavMeshObstacle", "SetShape")?;
         let shape = ObstacleShape::parse(&name).ok_or_else(|| {
             mlua::Error::RuntimeError(format!(
                 "NavMeshObstacle.SetShape: unknown shape '{name}' (Box, Capsule)"
             ))
         })?;
-        write(scene, id, |o| ops::set_shape(o, shape));
+        write(&*scene.get(lua)?, id, |o| ops::set_shape(o, shape));
         Ok(())
     });
     put(t, "SetShape", f)?;
-    vec3_pair(scope, t, scene, "Center", (|o| o.center, ops::set_center))?;
-    vec3_pair(scope, t, scene, "Size", (|o| o.size, ops::set_size))?;
-    f32_pair(scope, t, scene, "Radius", (|o| o.radius, ops::set_radius))?;
-    f32_pair(scope, t, scene, "Height", (|o| o.height, ops::set_height))
+    vec3_pair(lua, t, scene, "Center", (|o| o.center, ops::set_center))?;
+    vec3_pair(lua, t, scene, "Size", (|o| o.size, ops::set_size))?;
+    f32_pair(lua, t, scene, "Radius", (|o| o.radius, ops::set_radius))?;
+    f32_pair(lua, t, scene, "Height", (|o| o.height, ops::set_height))
 }
 
 /// `Active`, `Carving`, `CarveOnlyStationary`, `MoveThreshold`,
 /// `TimeToStationary`, and the runtime `IsCarving` / `GetVelocity`.
-fn register_carving<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
-    bool_pair(scope, t, scene, "Active", (|o| o.active, ops::set_active))?;
-    bool_pair(scope, t, scene, "Carving", (|o| o.carve, ops::set_carve))?;
+fn register_carving(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    bool_pair(lua, t, scene, "Active", (|o| o.active, ops::set_active))?;
+    bool_pair(lua, t, scene, "Carving", (|o| o.carve, ops::set_carve))?;
     let only: Field<bool> = (|o| o.carve_only_stationary, ops::set_carve_only_stationary);
-    bool_pair(scope, t, scene, "CarveOnlyStationary", only)?;
+    bool_pair(lua, t, scene, "CarveOnlyStationary", only)?;
     let threshold: Field<f32> = (|o| o.move_threshold, ops::set_move_threshold);
-    f32_pair(scope, t, scene, "MoveThreshold", threshold)?;
+    f32_pair(lua, t, scene, "MoveThreshold", threshold)?;
     let wait: Field<f32> = (|o| o.time_to_stationary, ops::set_time_to_stationary);
-    f32_pair(scope, t, scene, "TimeToStationary", wait)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(get(scene, id.read()).is_some_and(|o| o.is_carving()))
+    f32_pair(lua, t, scene, "TimeToStationary", wait)?;
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).is_some_and(|o| o.is_carving()))
     });
     put(t, "IsCarving", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        let v = get(scene, id.read()).map_or(Vec3::ZERO, |o| o.velocity);
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let v = get(&*scene.get(lua)?, id.read()).map_or(Vec3::ZERO, |o| o.velocity);
         Ok((v.x, v.y, v.z))
     });
     put(t, "GetVelocity", f)

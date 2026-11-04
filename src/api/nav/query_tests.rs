@@ -2,17 +2,19 @@
 //! each binding reaches the navmesh query it names and returns the documented shape.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::register;
+use crate::api::bind;
 use crate::navigation::test_support::{add_floor, bake_pinned};
 use crate::navigation::NavigationGraph;
 use crate::scene::{NavMeshAgentComponent, Scene};
 
 /// An open floor over the pinned grid, with one agent at (2, 0, 2) headed to (8, 0, 2).
-fn world() -> (RefCell<Scene>, RefCell<NavigationGraph>, u32) {
+fn world() -> (Rc<RefCell<Scene>>, Rc<RefCell<NavigationGraph>>, u32) {
     let mut scene = Scene::new();
     add_floor(&mut scene, -5.0, 15.0, -5.0, 15.0);
     let nav = bake_pinned(&mut scene);
@@ -26,15 +28,15 @@ fn world() -> (RefCell<Scene>, RefCell<NavigationGraph>, u32) {
         ..Default::default()
     };
     scene.world.set_nav_agent(id, Some(agent));
-    (RefCell::new(scene), RefCell::new(nav), id)
+    (Rc::new(RefCell::new(scene)), Rc::new(RefCell::new(nav)), id)
 }
 
 #[test]
 fn navigation_queries_return_their_documented_shapes() {
     let (scene, nav, _) = world();
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene, &nav).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
         let path: Table = lua
             .load("return Navigation.CalculatePath(2, 0, 2, 8, 0, 7)")
             .eval()?;
@@ -68,8 +70,8 @@ fn agent_path_state_reads_warp_and_reset() {
     let (scene, nav, id) = world();
     let lua = Lua::new();
     lua.globals().set("id", id).unwrap();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene, &nav).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
         let before: (bool, String, f32) = lua
             .load("return NavMeshAgent.HasPath(id), NavMeshAgent.GetPathStatus(id), NavMeshAgent.RemainingDistance(id)")
             .eval()?;

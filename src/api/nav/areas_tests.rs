@@ -2,28 +2,30 @@
 //! agent's mask on `NavMeshAgent`, and the optional mask on the path queries.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::register;
+use crate::api::bind;
 use crate::navigation::test_support::{add_floor, add_modifier, bake_pinned};
 use crate::navigation::NavigationGraph;
 use crate::scene::{NavMeshAgentComponent, Scene};
 
 /// A floor with a wall of "Fire" (area 2) across the pinned grid at x 5, and an agent.
-fn fire_world() -> (RefCell<Scene>, RefCell<NavigationGraph>, u32) {
+fn fire_world() -> (Rc<RefCell<Scene>>, Rc<RefCell<NavigationGraph>>, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.agent_radius = 0.0;
     scene.nav_settings.define_area("Fire", 1.0);
     add_floor(&mut scene, -5.0, 15.0, -5.0, 15.0);
     let wall = Vec3::new(1.0, 2.0, 30.0);
     add_modifier(&mut scene, Vec3::new(5.0, 0.0, 5.0), wall, 2);
-    let nav = RefCell::new(bake_pinned(&mut scene));
+    let nav = Rc::new(RefCell::new(bake_pinned(&mut scene)));
     let id = scene.add_entity("agent".to_string());
     let agent = NavMeshAgentComponent::default();
     scene.world.set_nav_agent(id, Some(agent));
-    (RefCell::new(scene), nav, id)
+    (Rc::new(RefCell::new(scene)), nav, id)
 }
 
 #[test]
@@ -31,8 +33,8 @@ fn the_area_table_is_edited_by_name_without_a_rebake() {
     let (scene, nav, _) = fire_world();
     let generation = nav.borrow().bake_generation;
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene, &nav).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
         let ids: (i32, i32, u8) = lua
             .load(r#"return Navigation.GetAreaFromName("Fire"), Navigation.GetAreaFromName("Ice"), Navigation.DefineArea("Ice", 3)"#)
             .eval()?;
@@ -64,8 +66,8 @@ fn the_area_table_is_edited_by_name_without_a_rebake() {
 fn the_agent_mask_and_the_masked_queries_keep_out_of_an_area() {
     let (scene, nav, id) = fire_world();
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene, &nav).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
         lua.globals().set("id", id)?;
         let mask: i64 = lua.load("return NavMeshAgent.GetAreaMask(id)").eval()?;
         assert_eq!(mask, i64::from(u32::MAX), "every area by default");

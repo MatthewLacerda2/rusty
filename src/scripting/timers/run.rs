@@ -46,7 +46,7 @@ impl ScriptManager {
             .borrow_mut()
             .advance(f64::from(delta_time), f64::from(unscaled));
         if !due.is_empty() {
-            self.with_api_scope(|lua| {
+            self.with_lua(|lua| {
                 for handle in due {
                     self.run_job(lua, handle);
                 }

@@ -15,96 +15,90 @@ use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::LodGroupComponent;
 use crate::scene::authoring::rendering::lod_group as ops;
 use crate::scene::Scene;
 
-type SceneCell<'s> = &'s RefCell<Scene>;
-
 /// Register the `LODGroup` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
-    register_group(scope, &t, scene)?;
-    register_levels(scope, &t, scene)?;
+    register_group(lua, &t, scene)?;
+    register_levels(lua, &t, scene)?;
     lua.globals().set("LODGroup", t).map_err(|e| e.to_string())
 }
 
 /// `id`'s LODGroup, cloned, or `None` without one.
-fn get(scene: SceneCell, id: u32) -> Option<LodGroupComponent> {
+fn get(scene: &RefCell<Scene>, id: u32) -> Option<LodGroupComponent> {
     scene.borrow().world.lod_group(id).map(|g| g.clone())
 }
 
 /// Apply `f` to `id`'s LODGroup, when it has one; `None` without one.
-fn set<T>(scene: SceneCell, id: u32, f: impl FnOnce(&mut LodGroupComponent) -> T) -> Option<T> {
+fn set<T>(
+    scene: &RefCell<Scene>,
+    id: u32,
+    f: impl FnOnce(&mut LodGroupComponent) -> T,
+) -> Option<T> {
     let mut s = scene.borrow_mut();
     let mut g = s.world.lod_group_mut(id)?;
     Some(f(&mut g))
 }
 
 /// `Get/SetSize`, `GetLevelCount`, `AddLevel`, `RemoveLevel`.
-fn register_group<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
-    let f = scope
-        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map_or(0.0, |g| g.size)));
+fn register_group(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map_or(0.0, |g| g.size))
+    });
     put(t, "GetSize", f)?;
-    let f = scope.create_function(move |_, (id, size): (EntityArg, f32)| {
+    let f = lua.create_function(move |lua, (id, size): (EntityArg, f32)| {
         let id = id.live("LODGroup", "SetSize")?;
-        set(scene, id, |g| ops::set_size(g, size));
+        set(&*scene.get(lua)?, id, |g| ops::set_size(g, size));
         Ok(())
     });
     put(t, "SetSize", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(get(scene, id.read()).map_or(0, |g| g.levels.len()))
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map_or(0, |g| g.levels.len()))
     });
     put(t, "GetLevelCount", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
+    let f = lua.create_function(move |lua, id: EntityArg| {
         let id = id.live("LODGroup", "AddLevel")?;
-        Ok(set(scene, id, ops::add_level))
+        Ok(set(&*scene.get(lua)?, id, ops::add_level))
     });
     put(t, "AddLevel", f)?;
-    let f = scope.create_function(move |_, (id, level): (EntityArg, usize)| {
+    let f = lua.create_function(move |lua, (id, level): (EntityArg, usize)| {
         let id = id.live("LODGroup", "RemoveLevel")?;
-        set(scene, id, |g| ops::remove_level(g, level));
+        set(&*scene.get(lua)?, id, |g| ops::remove_level(g, level));
         Ok(())
     });
     put(t, "RemoveLevel", f)
 }
 
 /// `Get/SetLevelHeight`, `Get/SetRenderers`.
-fn register_levels<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
-    let f = scope.create_function(move |_, (id, level): (EntityArg, usize)| {
-        let g = get(scene, id.read());
+fn register_levels(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, (id, level): (EntityArg, usize)| {
+        let g = get(&*scene.get(lua)?, id.read());
         Ok(g.and_then(|g| g.levels.get(level).map(|l| l.screen_height)))
     });
     put(t, "GetLevelHeight", f)?;
-    let f = scope.create_function(move |_, (id, level, h): (EntityArg, usize, f32)| {
+    let f = lua.create_function(move |lua, (id, level, h): (EntityArg, usize, f32)| {
         let id = id.live("LODGroup", "SetLevelHeight")?;
-        set(scene, id, |g| ops::set_level_height(g, level, h));
+        set(&*scene.get(lua)?, id, |g| {
+            ops::set_level_height(g, level, h)
+        });
         Ok(())
     });
     put(t, "SetLevelHeight", f)?;
-    let f = scope.create_function(move |_, (id, level): (EntityArg, usize)| {
-        let g = get(scene, id.read());
+    let f = lua.create_function(move |lua, (id, level): (EntityArg, usize)| {
+        let g = get(&*scene.get(lua)?, id.read());
         Ok(
             g.and_then(|g| g.levels.get(level).map(|l| l.renderers.clone()))
                 .unwrap_or_default(),
         )
     });
     put(t, "GetRenderers", f)?;
-    let f = scope.create_function(move |_, (id, level, ids): (EntityArg, usize, Vec<u32>)| {
+    let f = lua.create_function(move |lua, (id, level, ids): (EntityArg, usize, Vec<u32>)| {
         let id = id.live("LODGroup", "SetRenderers")?;
-        set(scene, id, |g| ops::set_renderers(g, level, ids));
+        set(&*scene.get(lua)?, id, |g| ops::set_renderers(g, level, ids));
         Ok(())
     });
     put(t, "SetRenderers", f)

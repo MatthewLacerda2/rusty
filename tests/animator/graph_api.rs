@@ -5,6 +5,7 @@
 //! the active state back.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use rusty::asset::anim_data::AnimationClip;
 use rusty::asset::animation_graph::{self, AnimationGraph, GraphNode, StateMachine};
@@ -13,7 +14,7 @@ use rusty::scene::Scene;
 
 use super::{run, scene_with_animator};
 
-fn animator_of(scene: &RefCell<Scene>, id: u32) -> AnimatorComponent {
+fn animator_of(scene: &Rc<RefCell<Scene>>, id: u32) -> AnimatorComponent {
     scene.borrow().world.animator(id).unwrap().clone()
 }
 

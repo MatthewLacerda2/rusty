@@ -88,7 +88,7 @@ fn apply_uses_override_then_default() {
     let mut overrides = BTreeMap::new();
     overrides.insert("speed".to_string(), ScriptFieldValue::Number(2.0));
     overrides.insert("on".to_string(), ScriptFieldValue::Boolean(true));
-    apply_field_values(&table, code, &overrides).unwrap();
+    apply_field_values(&table, &parse_fields(code), &overrides).unwrap();
 
     // Overridden field wins; untouched field falls back to schema default.
     assert_eq!(table.get::<f64>("speed").unwrap(), 2.0);
@@ -101,7 +101,7 @@ fn apply_without_schema_is_a_noop() {
     let lua = Lua::new();
     let code = "return { Start = function() end }";
     let table: Table = lua.load(code).eval().unwrap();
-    apply_field_values(&table, code, &BTreeMap::new()).unwrap();
+    apply_field_values(&table, &parse_fields(code), &BTreeMap::new()).unwrap();
     assert!(table.get::<mlua::Value>("anything").unwrap().is_nil());
 }
 

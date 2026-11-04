@@ -4,23 +4,27 @@
 //! `SetQualityPreset` / `RemoveQualityPreset` author them.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::core::application::Application;
 use rusty::core::settings::quality::QualityPresets;
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::Scene;
 
 /// Run `f` with the `Graphics` namespace over a fresh cell and a seeded project.
-fn with_graphics(f: impl FnOnce(&Lua, &RefCell<GraphicsSettings>, &RefCell<Application>)) {
-    let (lua, scene) = (Lua::new(), RefCell::new(Scene::new()));
-    let (graphics, app) = (RefCell::default(), RefCell::default());
-    lua.scope(|scope| {
-        rusty::api::graphics::register(&lua, scope, &scene, &graphics, &app).unwrap();
-        f(&lua, &graphics, &app);
-        Ok(())
-    })
+fn with_graphics(f: impl FnOnce(&Lua, &Rc<RefCell<GraphicsSettings>>, &Rc<RefCell<Application>>)) {
+    let (lua, scene) = (Lua::new(), Rc::new(RefCell::new(Scene::new())));
+    let (graphics, app) = (Rc::default(), Rc::default());
+    rusty::api::graphics::register(
+        &lua,
+        bind(&lua, &scene),
+        bind(&lua, &graphics),
+        bind(&lua, &app),
+    )
     .unwrap();
+    f(&lua, &graphics, &app);
 }
 
 fn seeded(name: &str) -> rusty::core::settings::quality::QualityValues {

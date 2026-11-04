@@ -27,8 +27,6 @@
 //! per-volume setters route through the shared `authoring::{rendering::camera,
 //! post_processing}` ops the editor cards use, so panel and binding never drift.
 
-use std::cell::RefCell;
-
 pub(crate) mod effects;
 mod fog;
 mod options;
@@ -40,27 +38,27 @@ mod state;
 use mlua::Lua;
 
 use super::Reg;
+use crate::api::ApiCell;
 use crate::core::application::Application;
 use crate::core::settings::GraphicsSettings;
 use crate::scene::Scene;
 
 /// Register the `Graphics` namespace onto `lua`.
-pub fn register<'scope>(
+pub fn register(
     lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    graphics: &'scope RefCell<GraphicsSettings>,
-    app: &'scope RefCell<Application>,
+    scene: ApiCell<Scene>,
+    graphics: ApiCell<GraphicsSettings>,
+    app: ApiCell<Application>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    effects::register(scope, &table, scene)?;
-    quality::register_quality(scope, &table, graphics, app)?;
-    state::register_render_scale(scope, &table, graphics)?;
-    options::register_options(scope, &table, graphics, app)?;
-    shadows::register_shadows(scope, &table, scene)?;
-    fog::register_fog(scope, &table, scene)?;
-    ssao::register_ssao(scope, &table, scene)?;
+    effects::register(lua, &table, scene)?;
+    quality::register_quality(lua, &table, graphics, app)?;
+    state::register_render_scale(lua, &table, graphics)?;
+    options::register_options(lua, &table, graphics, app)?;
+    shadows::register_shadows(lua, &table, scene)?;
+    fog::register_fog(lua, &table, scene)?;
+    ssao::register_ssao(lua, &table, scene)?;
 
     lua.globals()
         .set("Graphics", table)

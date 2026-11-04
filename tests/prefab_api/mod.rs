@@ -9,9 +9,11 @@ mod rejections;
 mod revert_field;
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::scene::Scene;
 
 /// A scene whose root entity sits at (1, 2, 3), plus the tmp `.prefab` path this
@@ -19,33 +21,29 @@ use rusty::scene::Scene;
 /// interpolated into single-quoted Lua strings, where a Windows `\` would be
 /// taken as an escape sequence — so it is normalized to `/`, which `std::fs`
 /// accepts on every platform.
-fn fixture(tag: &str) -> (RefCell<Scene>, u32, String) {
+fn fixture(tag: &str) -> (Rc<RefCell<Scene>>, u32, String) {
     let mut scene = Scene::new();
     let root = scene.add_entity("Root".to_string());
     scene.world.transform_mut(root).unwrap().position = Vec3::new(1.0, 2.0, 3.0);
     let dir = crate::temp::dir();
     let file = format!("rusty_prefab_api_{tag}_{}.prefab", std::process::id());
     let path = dir.join(file).to_string_lossy().replace('\\', "/");
-    (RefCell::new(scene), root, path)
+    (Rc::new(RefCell::new(scene)), root, path)
 }
 
-fn run(scene: &RefCell<Scene>, body: impl FnOnce(&Lua)) {
+fn run(scene: &Rc<RefCell<Scene>>, body: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    let scene_path: RefCell<Option<String>> = RefCell::new(None);
-    lua.scope(|scope| {
-        rusty::api::scene::register(&lua, scope, scene, &scene_path).unwrap();
-        rusty::api::transform::register(&lua, scope, scene).unwrap();
-        body(&lua);
-        Ok(())
-    })
-    .unwrap();
+    let scene_path: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+    rusty::api::scene::register(&lua, bind(&lua, scene), bind(&lua, &scene_path)).unwrap();
+    rusty::api::transform::register(&lua, bind(&lua, scene)).unwrap();
+    body(&lua);
 }
 
-fn pos_of(scene: &RefCell<Scene>, id: u32) -> Vec3 {
+fn pos_of(scene: &Rc<RefCell<Scene>>, id: u32) -> Vec3 {
     scene.borrow().world.transform(id).unwrap().position
 }
 
-fn is_linked(scene: &RefCell<Scene>, id: u32) -> bool {
+fn is_linked(scene: &Rc<RefCell<Scene>>, id: u32) -> bool {
     scene.borrow().world.has_prefab_link(id)
 }
 

@@ -3,10 +3,9 @@
 //! names the pair, so the functions, the Inspector's sliders and the
 //! `Graphics.<effect>.<knob>` tween paths reach the same value through one op.
 
-use std::cell::RefCell;
-
 use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
+use crate::api::ApiCell;
 use crate::components::PostProcessingComponent;
 use crate::core::settings::quality::EffectQuality;
 use crate::scene::authoring::default_post_processing;
@@ -16,10 +15,10 @@ use crate::scene::Scene;
 /// Register `Set<api>(value)` / `Get<api>()` for each of `knobs` that names an
 /// `api`. Without an active volume the setter does nothing and the getter reports
 /// what a new volume starts with.
-pub(in crate::api::graphics) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(in crate::api::graphics) fn register(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     knobs: &'static [Knob],
 ) -> Reg {
     for knob in knobs {
@@ -27,16 +26,16 @@ pub(in crate::api::graphics) fn register<'scope>(
         put(
             table,
             &format!("Set{api}"),
-            scope.create_function(move |_, value: f32| {
-                with_vc_mut(scene, |vc| (knob.set)(vc, value));
+            lua.create_function(move |lua, value: f32| {
+                with_vc_mut(&*scene.get(lua)?, |vc| (knob.set)(vc, value));
                 Ok(())
             }),
         )?;
         put(
             table,
             &format!("Get{api}"),
-            scope.create_function(move |_, ()| {
-                let value = with_vc(scene, knob.get);
+            lua.create_function(move |lua, ()| {
+                let value = with_vc(&*scene.get(lua)?, knob.get);
                 Ok(value.unwrap_or_else(|| (knob.get)(&default_post_processing())))
             }),
         )?;
@@ -46,9 +45,9 @@ pub(in crate::api::graphics) fn register<'scope>(
 
 /// Register `Set<name>(bool)` / `Get<name>()` over an effect's switch: `false`
 /// without an active volume, since nothing runs then.
-pub(in crate::api::graphics) fn register_flag<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    (table, scene): (&mlua::Table, &'scope RefCell<Scene>),
+pub(in crate::api::graphics) fn register_flag(
+    lua: &mlua::Lua,
+    (table, scene): (&mlua::Table, ApiCell<Scene>),
     name: &str,
     get: fn(&PostProcessingComponent) -> bool,
     set: fn(&mut PostProcessingComponent, bool),
@@ -56,15 +55,15 @@ pub(in crate::api::graphics) fn register_flag<'scope>(
     put(
         table,
         &format!("Set{name}"),
-        scope.create_function(move |_, on: bool| {
-            with_vc_mut(scene, |vc| set(vc, on));
+        lua.create_function(move |lua, on: bool| {
+            with_vc_mut(&*scene.get(lua)?, |vc| set(vc, on));
             Ok(())
         }),
     )?;
     put(
         table,
         &format!("Get{name}"),
-        scope.create_function(move |_, ()| Ok(with_vc(scene, get).unwrap_or(false))),
+        lua.create_function(move |lua, ()| Ok(with_vc(&*scene.get(lua)?, get).unwrap_or(false))),
     )
 }
 
@@ -84,9 +83,9 @@ pub(in crate::api::graphics) fn parse_quality(
 /// Register `Set<name>(level)` / `Get<name>()` over an effect's quality level
 /// (#1522): `"Low"`, `"Medium"`, `"High"` or `"Custom"`, an unknown one refused.
 /// Without an active volume the getter reports a new volume's level.
-pub(in crate::api::graphics) fn register_quality<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    (table, scene): (&mlua::Table, &'scope RefCell<Scene>),
+pub(in crate::api::graphics) fn register_quality(
+    lua: &mlua::Lua,
+    (table, scene): (&mlua::Table, ApiCell<Scene>),
     name: &'static str,
     get: fn(&PostProcessingComponent) -> EffectQuality,
     set: fn(&mut PostProcessingComponent, EffectQuality),
@@ -94,17 +93,18 @@ pub(in crate::api::graphics) fn register_quality<'scope>(
     put(
         table,
         &format!("Set{name}"),
-        scope.create_function(move |_, level: String| {
+        lua.create_function(move |lua, level: String| {
             let quality = parse_quality(&format!("Set{name}"), &level)?;
-            with_vc_mut(scene, |vc| set(vc, quality));
+            with_vc_mut(&*scene.get(lua)?, |vc| set(vc, quality));
             Ok(())
         }),
     )?;
     put(
         table,
         &format!("Get{name}"),
-        scope.create_function(move |_, ()| {
-            let quality = with_vc(scene, get).unwrap_or_else(|| get(&default_post_processing()));
+        lua.create_function(move |lua, ()| {
+            let quality =
+                with_vc(&*scene.get(lua)?, get).unwrap_or_else(|| get(&default_post_processing()));
             Ok(quality.name())
         }),
     )
@@ -113,9 +113,9 @@ pub(in crate::api::graphics) fn register_quality<'scope>(
 /// Register `Set<name>(n)` / `Get<name>()` over a whole-number setting of the
 /// volume (a sample or step count, a resolution divisor: no tween), through its
 /// op. Without an active volume the getter reports a new volume's value.
-pub(in crate::api::graphics) fn register_count<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    (table, scene): (&mlua::Table, &'scope RefCell<Scene>),
+pub(in crate::api::graphics) fn register_count(
+    lua: &mlua::Lua,
+    (table, scene): (&mlua::Table, ApiCell<Scene>),
     name: &'static str,
     get: fn(&PostProcessingComponent) -> u32,
     set: fn(&mut PostProcessingComponent, u32),
@@ -123,16 +123,16 @@ pub(in crate::api::graphics) fn register_count<'scope>(
     put(
         table,
         &format!("Set{name}"),
-        scope.create_function(move |_, n: u32| {
-            with_vc_mut(scene, |vc| set(vc, n));
+        lua.create_function(move |lua, n: u32| {
+            with_vc_mut(&*scene.get(lua)?, |vc| set(vc, n));
             Ok(())
         }),
     )?;
     put(
         table,
         &format!("Get{name}"),
-        scope.create_function(move |_, ()| {
-            Ok(with_vc(scene, get).unwrap_or_else(|| get(&default_post_processing())))
+        lua.create_function(move |lua, ()| {
+            Ok(with_vc(&*scene.get(lua)?, get).unwrap_or_else(|| get(&default_post_processing())))
         }),
     )
 }

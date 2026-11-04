@@ -11,31 +11,27 @@ use std::path::Path;
 
 use mlua::Lua;
 
-use crate::api::{global_table, put, ApiScopedCtx, Reg};
+use crate::api::{global_table, put, ApiCtx, Reg};
 
 /// Add `StartCapture(path)` and `StopCapture()` to the `Audio` table. Both raise a
 /// Lua error on a refusal (a second start, a stop with nothing running, a file that
 /// cannot be written); `StopCapture` returns the path it wrote.
-pub(super) fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let table = global_table(lua, "Audio")?;
     let audio = ctx.audio;
     put(
         &table,
         "StartCapture",
-        scope.create_function(move |_, path: String| {
-            let started = audio.borrow_mut().start_capture(Path::new(&path));
+        lua.create_function(move |lua, path: String| {
+            let started = audio.get(lua)?.borrow_mut().start_capture(Path::new(&path));
             started.map_err(mlua::Error::RuntimeError)
         }),
     )?;
     put(
         &table,
         "StopCapture",
-        scope.create_function(move |_, ()| {
-            let path = audio.borrow_mut().stop_capture();
+        lua.create_function(move |lua, ()| {
+            let path = audio.get(lua)?.borrow_mut().stop_capture();
             let path = path.map_err(mlua::Error::RuntimeError)?;
             Ok(crate::core::paths::to_slash(&path))
         }),

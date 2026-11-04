@@ -11,28 +11,24 @@ use mlua::{Lua, Table};
 use super::super::providers::generated::{self, Realised};
 use super::super::providers::speech::{self, Context, Draft, ElevenLabs, SpeechError};
 use super::super::providers::{environment, ledger};
-use crate::api::{put, ApiScopedCtx, Reg};
+use crate::api::{put, ApiCtx, Reg};
 use crate::core::paths::to_slash;
 
 /// `Speech.Generate(brief)` → the generated WAV's path; or `nil, why` when the brief
 /// is not finished, so a loop over twenty lines loses none to one typo. Anything
 /// that would stop every line (Play, no key, the budget, the vendor) raises.
-pub(super) fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let scene = ctx.scene;
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(
         &table,
         "Generate",
-        scope.create_function(move |_, brief: Table| {
+        lua.create_function(move |lua, brief: Table| {
             let draft = draft_of(&brief)?;
             let (environment, ledger, today) = (environment(), ledger::path(), generated::today());
             let at = Context {
                 root: Path::new(""),
-                playing: scene.borrow().is_playing(),
+                playing: scene.get(lua)?.borrow().is_playing(),
                 environment: &environment,
                 ledger: &ledger,
                 today: &today,

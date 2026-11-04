@@ -9,14 +9,13 @@
 //! owner = id|nil}` (Unity's `OffMeshLinkData`); `GetOffMeshLinks` adds
 //! `bidirectional`.
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::super::{put, Reg};
 use super::settings::set_and_rebake;
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::OffMeshLinkData;
 use crate::navigation::{complete_off_mesh_link, NavMeshSettings, NavigationGraph};
 use crate::scene::authoring::nav::agent as nav_ops;
@@ -41,19 +40,26 @@ fn link_table(lua: &Lua, l: &OffMeshLinkData) -> mlua::Result<Table> {
 }
 
 /// The agent's link state and the script's two levers on it.
-pub(super) fn register_agent<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    let current = move |id: u32| scene.borrow().world.nav_agent(id)?.off_mesh_link;
-    let f = scope.create_function(move |_, id: EntityArg| Ok(current(id.read()).is_some()));
+pub(super) fn register_agent(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    let current = move |lua: &mlua::Lua, id: u32| -> mlua::Result<_> {
+        let scene = scene.get(lua)?;
+        let link = scene
+            .borrow()
+            .world
+            .nav_agent(id)
+            .and_then(|a| a.off_mesh_link);
+        Ok(link)
+    };
+    let f = lua.create_function(move |lua, id: EntityArg| Ok(current(lua, id.read())?.is_some()));
     put(t, "IsOnOffMeshLink", f)?;
-    let f = scope.create_function(move |lua, id: EntityArg| {
-        current(id.read()).map(|l| link_table(lua, &l)).transpose()
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        current(lua, id.read())?
+            .map(|l| link_table(lua, &l))
+            .transpose()
     });
     put(t, "GetCurrentOffMeshLink", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let scene = &*scene.get(lua)?;
         let id = id.live("NavMeshAgent", "CompleteOffMeshLink")?;
         let mut scene = scene.borrow_mut();
         let end = match scene.world.nav_agent_mut(id) {
@@ -66,7 +72,8 @@ pub(super) fn register_agent<'scope>(
         Ok(end.is_some())
     });
     put(t, "CompleteOffMeshLink", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let scene = &*scene.get(lua)?;
         let auto = scene
             .borrow()
             .world
@@ -75,9 +82,9 @@ pub(super) fn register_agent<'scope>(
         Ok(auto.unwrap_or(false))
     });
     put(t, "GetAutoTraverseOffMeshLink", f)?;
-    let f = scope.create_function(move |_, (id, auto): (EntityArg, bool)| {
+    let f = lua.create_function(move |lua, (id, auto): (EntityArg, bool)| {
         let id = id.live("NavMeshAgent", "SetAutoTraverseOffMeshLink")?;
-        if let Some(mut a) = scene.borrow_mut().world.nav_agent_mut(id) {
+        if let Some(mut a) = scene.get(lua)?.borrow_mut().world.nav_agent_mut(id) {
             nav_ops::set_auto_traverse_off_mesh_link(&mut a, auto);
         }
         Ok(())
@@ -87,15 +94,15 @@ pub(super) fn register_agent<'scope>(
 
 /// `Navigation.GetOffMeshLinks` and the generation settings' getters and setters
 /// (`DropHeight`, `JumpDistance`, `JumpHeight`, `LinkSpacing`), which re-bake.
-pub(super) fn register_navigation<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register_navigation(
+    lua: &mlua::Lua,
     t: &Table,
-    scene: &'scope RefCell<Scene>,
-    nav: &'scope RefCell<NavigationGraph>,
+    scene: ApiCell<Scene>,
+    nav: ApiCell<NavigationGraph>,
 ) -> Reg {
-    let f = scope.create_function(move |lua, ()| {
+    let f = lua.create_function(move |lua, ()| {
         let list = lua.create_table()?;
-        for (i, l) in nav.borrow().offmesh_links().enumerate() {
+        for (i, l) in nav.get(lua)?.borrow().offmesh_links().enumerate() {
             let row = link_table(lua, &l.data(true))?;
             row.set("bidirectional", l.bidirectional)?;
             list.set(i + 1, row)?;
@@ -117,9 +124,12 @@ pub(super) fn register_navigation<'scope>(
         ),
     ];
     for (name, (read, write)) in knobs {
-        let f = scope.create_function(move |_, ()| Ok(read(&scene.borrow().nav_settings)));
+        let f =
+            lua.create_function(move |lua, ()| Ok(read(&scene.get(lua)?.borrow().nav_settings)));
         put(t, &format!("Get{name}"), f)?;
-        let f = scope.create_function(move |_, v: f32| set_and_rebake(scene, nav, |s| write(s, v)));
+        let f = lua.create_function(move |lua, v: f32| {
+            set_and_rebake(&*scene.get(lua)?, &*nav.get(lua)?, |s| write(s, v))
+        });
         put(t, &format!("Set{name}"), f)?;
     }
     Ok(())

@@ -4,9 +4,11 @@
 //! catalog default.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
 
+use crate::api::bind;
 use crate::scene::authoring::defaults;
 use crate::scene::Scene;
 use crate::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
@@ -39,18 +41,24 @@ impl Drop for Baked {
 }
 
 /// Run `script` against the `Graphics` namespace, returning its error if any.
-fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
-    let (lua, graphics) = (Lua::new(), RefCell::new(Default::default()));
-    let app = RefCell::default();
-    lua.scope(|s| {
-        crate::api::graphics::register(&lua, s, scene, &graphics, &app).unwrap();
+fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
+    let (lua, graphics) = (Lua::new(), Rc::new(RefCell::new(Default::default())));
+    let app = Rc::default();
+    crate::api::attempt(|| {
+        crate::api::graphics::register(
+            &lua,
+            bind(&lua, scene),
+            bind(&lua, &graphics),
+            bind(&lua, &app),
+        )
+        .unwrap();
         lua.load(script).exec()
     })
     .map_err(|e| e.to_string())
 }
 
 /// A scene whose active volume runs `effect`.
-fn scene_running(effect: &str) -> RefCell<Scene> {
+fn scene_running(effect: &str) -> Rc<RefCell<Scene>> {
     let mut scene = Scene::new();
     let id = scene.add_entity("Volume".into());
     let mut vc = defaults::default_post_processing();
@@ -58,7 +66,7 @@ fn scene_running(effect: &str) -> RefCell<Scene> {
     scene.world.set_post_processing(id, Some(vc));
     // `Graphics.*` edits the main camera's volume (#1434).
     scene.world.set_camera(id, Some(defaults::default_camera()));
-    RefCell::new(scene)
+    Rc::new(RefCell::new(scene))
 }
 
 #[test]
@@ -104,7 +112,7 @@ fn a_param_the_effects_do_not_expose_is_an_error_naming_it() {
 
 #[test]
 fn without_a_volume_a_set_errors_and_a_get_is_the_catalog_default() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let err = run(
         &scene,
         r#"Graphics.SetPostParam("damage_vignette.intensity", 1)"#,

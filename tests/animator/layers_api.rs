@@ -4,6 +4,7 @@
 //! and `GetCurrentNode` / `PlayNode` per layer.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use rusty::asset::animation_graph::{self, AnimationGraph};
 use rusty::components::AnimatorComponent;
@@ -19,7 +20,7 @@ const GRAPH: &str = r#"{
 }"#;
 
 /// An entity whose animator references the layered graph, saved to a temp file.
-fn layered_scene() -> (RefCell<Scene>, u32) {
+fn layered_scene() -> (Rc<RefCell<Scene>>, u32) {
     let graph: AnimationGraph = serde_json::from_str(GRAPH).unwrap();
     let path = crate::temp::dir().join("rusty_457_layers_api.animgraph");
     animation_graph::save(&path, &graph).unwrap();
@@ -30,7 +31,7 @@ fn layered_scene() -> (RefCell<Scene>, u32) {
         ..Default::default()
     };
     scene.world.set_animator(id, Some(anim));
-    (RefCell::new(scene), id)
+    (Rc::new(RefCell::new(scene)), id)
 }
 
 #[test]
