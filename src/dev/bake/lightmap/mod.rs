@@ -38,12 +38,14 @@ pub mod job;
 mod logged;
 pub use job::{BakeOutcome, LightmapBakeJob};
 
-/// Suffix of the folder beside a scene file that holds its lightmaps.
-const LIGHTMAP_DIR_SUFFIX: &str = ".lightmaps";
-
-/// The lightmap folder for a scene: `foo.scene` → `foo.scene.lightmaps/`.
+/// The lightmap folder for a scene: `foo.scene` → `foo.scene.lightmaps/`. What
+/// lies in it is a baked page, which the texture importer leaves alone
+/// (`asset::lightmap_page::is_baked`, #1694).
 pub fn lightmap_dir(scene_path: &str) -> PathBuf {
-    PathBuf::from(format!("{scene_path}{LIGHTMAP_DIR_SUFFIX}"))
+    PathBuf::from(format!(
+        "{scene_path}{}",
+        crate::asset::lightmap_page::DIR_SUFFIX
+    ))
 }
 
 /// Bake every static mesh with a lightmap UV and point the scene at the new pages.
