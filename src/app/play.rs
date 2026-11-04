@@ -247,8 +247,8 @@ fn animate(world: &mut World, res: &mut Resources) {
         let graph = path.and_then(|p| res.animation_graphs.get_or_load(&p, &res.console));
         // The animator + mesh split borrow goes through the facade's sanctioned
         // helper (#344) — the animate system's re-pose step.
-        let stepped = s.world.with_animator_and_mesh_mut(id, |anim, mesh| {
-            let crossed = super::animation::advance(anim, mesh.as_deref(), graph, dt);
+        let stepped = s.world.with_animator_mut_and_mesh(id, |anim, mesh| {
+            let crossed = super::animation::advance(anim, mesh, graph, dt);
             (
                 crossed,
                 mesh.map(|m| super::animation::bone_writes(anim, m, graph)),

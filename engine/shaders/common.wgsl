@@ -104,7 +104,9 @@ struct LightingUniforms {
     // 1.0 when surfaces reflect the environment (sky and reflection probes); 0.0 in a
     // light-probe capture (#1668), which bakes no specular, as Unity's does.
     env_reflection: f32,
-    _sky_pad: f32,
+    // 1.0 under the scene's `HalfLambert` diffuse model (#1698): `calculate_pbr`
+    // shades a lamp with the squared wrap instead of Lambert, as the bakes do.
+    diffuse_wrap: f32,
     // The resident reflection probes (#1206); a draw's instance names the two it
     // blends (`InstanceData.reflection_probe`, packed indices + 1 and weights, #1584). Length is the Rust
     // `MAX_REFLECTION_PROBES`. Mirrors the Rust `LightingUniform` byte-for-byte.
@@ -127,6 +129,9 @@ struct LocalLight {
     shadow: u32,
     // 1.0 for a `Baked` light (#438): a lightmapped surface skips its direct light.
     baked: f32,
+    // Camera distance past which its shadow is not sampled (#1712); 0 never fades.
+    shadow_fade: f32,
+    _pad: vec2<f32>,
 };
 
 // The light cluster `world` falls in: its screen tile (from `view_proj`) and its

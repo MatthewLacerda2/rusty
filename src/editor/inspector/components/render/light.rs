@@ -84,6 +84,35 @@ fn draw_local_light(
         }
     });
     draw_cast_shadows(ui, world, id, light, is_dirty);
+    if light.cast_shadows {
+        draw_shadow_fade(ui, world, id, light, is_dirty);
+    }
+}
+
+/// A shadowed point or spot light's *Shadow Fade Distance* (#1712): `0` is off.
+fn draw_shadow_fade(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    light: &LightComponent,
+    is_dirty: &mut bool,
+) {
+    let mut fade = light.shadow_fade_distance;
+    ui.horizontal(|ui| {
+        ui.label("Shadow Fade Distance:").on_hover_text(
+            "Past this distance from the camera the shadow fades out and is no \
+             longer sampled. 0 never fades.",
+        );
+        if ui
+            .add(crate::editor::widgets::slider(&mut fade, 0.0..=500.0))
+            .changed()
+        {
+            if let Some(mut l) = world.light_mut(id) {
+                light_ops::set_shadow_fade_distance(&mut l, fade);
+            }
+            *is_dirty = true;
+        }
+    });
 }
 
 /// The *Cast Shadows* toggle a point, spot or Area light shows.

@@ -33,3 +33,17 @@ fn a_parented_spotlight_lights_from_its_world_pose() {
     let dir = Vec3::from(l.direction);
     assert!(dir.abs_diff_eq(Vec3::NEG_X, 1e-4), "{dir}");
 }
+
+#[test]
+fn a_bake_capture_takes_no_shadow_fade() {
+    let mut scene = Scene::new();
+    let lamp = scene.add_entity("Lamp".to_string());
+    let light = LightComponent {
+        light_type: LightType::Point,
+        shadow_fade_distance: 20.0,
+        ..crate::scene::authoring::default_light()
+    };
+    scene.world.set_light(lamp, Some(light));
+    let fade = |capture| local_lights(&scene, capture)[0].0.shadow_fade;
+    assert_eq!((fade(false), fade(true)), (20.0, 0.0));
+}

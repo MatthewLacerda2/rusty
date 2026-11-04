@@ -26,6 +26,7 @@ pub fn register<'scope>(
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     register_placement(scope, &table, scene)?;
+    register_manual(scope, &table, scene)?;
     register_fill(scope, &table, scene)?;
     register_query(scope, &table, scene)?;
 
@@ -43,7 +44,10 @@ fn register_placement<'scope>(
         "Add",
         scope.create_function(|_, (x, y, z): (f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
-            Ok(scene.probes.add_probe(Vec3::new(x, y, z)) as u32)
+            let i = scene.probes.add_probe(Vec3::new(x, y, z));
+            // Placed by hand: the bake's auto-placement keeps it (#1737).
+            scene.probes.set_manual(i, true);
+            Ok(i as u32)
         }),
     )?;
 
@@ -53,6 +57,8 @@ fn register_placement<'scope>(
         scope.create_function(|_, (index, x, y, z): (u32, f32, f32, f32)| {
             let mut scene = scene.borrow_mut();
             scene.probes.move_probe(index as usize, Vec3::new(x, y, z));
+            // A hand edit: the next bake keeps the probe where it was put (#1737).
+            scene.probes.set_manual(index as usize, true);
             Ok(())
         }),
     )?;
@@ -83,6 +89,35 @@ fn register_placement<'scope>(
     )
 }
 
+/// `SetManual` / `IsManual`: whether a bake's auto-placement keeps a probe (#1737).
+fn register_manual<'scope>(
+    scope: &'scope mlua::Scope<'scope, '_>,
+    table: &mlua::Table,
+    scene: &'scope RefCell<Scene>,
+) -> Reg {
+    put(
+        table,
+        "SetManual",
+        scope.create_function(|_, (index, manual): (u32, bool)| {
+            scene.borrow_mut().probes.set_manual(index as usize, manual);
+            Ok(())
+        }),
+    )?;
+
+    put(
+        table,
+        "IsManual",
+        scope.create_function(|_, index: u32| {
+            let scene = scene.borrow();
+            Ok(scene
+                .probes
+                .probes
+                .get(index as usize)
+                .is_some_and(|p| p.manual))
+        }),
+    )
+}
+
 /// `FillGrid` (bounds + spacing), `BakeAnalytic` (the deterministic stand-in fill),
 /// (the dev-only `Bake`, the real rendered-capture → SH bake of #241, is installed onto
 /// this table by `dev`, #737).
@@ -103,6 +138,8 @@ fn register_fill<'scope>(
                     Vec3::new(max_x, max_y, max_z),
                     spacing,
                 );
+                // A grid asked for by hand is manual, so a bake keeps it (#1737).
+                scene.probes.probes.iter_mut().for_each(|p| p.manual = true);
                 Ok(())
             },
         ),
@@ -169,6 +206,35 @@ mod tests {
             Ok(())
         })
         .unwrap();
+    }
+
+    #[test]
+    fn added_and_filled_probes_are_manual() {
+        let scene = empty_scene();
+        let lua = Lua::new();
+        lua.scope(|scope| {
+            register(&lua, scope, &scene).unwrap();
+            let manual: bool = lua
+                .load("Probe.Add(1, 2, 3) return Probe.IsManual(0)")
+                .eval()?;
+            assert!(manual, "Add places by hand (#1737)");
+            let after: bool = lua
+                .load("Probe.SetManual(0, false) return Probe.IsManual(0)")
+                .eval()?;
+            assert!(!after);
+            assert!(
+                !lua.load("return Probe.IsManual(9)").eval::<bool>()?,
+                "out of range"
+            );
+            let moved: bool = lua
+                .load("Probe.Move(0, 4, 4, 4) return Probe.IsManual(0)")
+                .eval()?;
+            assert!(moved, "a hand move makes it manual");
+            lua.load("Probe.FillGrid(0,0,0, 1,0,0, 1)").exec()?;
+            Ok(())
+        })
+        .unwrap();
+        assert!(scene.borrow().probes.probes.iter().all(|p| p.manual));
     }
 
     #[test]

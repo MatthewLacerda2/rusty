@@ -170,6 +170,7 @@ pub const LAYERS: &[Layer] = &[
             "core",
             "logging",
             "navigation",
+            "physics",
             "preview",
             "render",
             "scene",

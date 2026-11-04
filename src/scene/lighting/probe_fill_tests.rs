@@ -42,26 +42,27 @@ fn fill_is_position_dependent() {
     );
 }
 
-#[test]
-fn directional_sun_adds_directionality() {
-    // No ambient, so up outshining down can only be the sun.
+/// A scene with no ambient and one directional sun shining straight down.
+fn sun_from_above() -> Scene {
     let mut scene = scene_with_ambient(Vec3::ZERO, 0.0);
     let id = scene.add_entity("Sun".to_string());
     // Point the light's -Z straight down, so the sample direction is +Y.
     if let Some(mut transform) = scene.world.transform_mut(id) {
         transform.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     }
-    scene.world.set_light(
-        id,
-        Some(LightComponent {
-            light_type: LightType::Directional,
-            intensity: 5.0,
-            range: 0.0,
-            inner_cone: 0.0,
-            outer_cone: 0.0,
-            ..crate::scene::authoring::default_light()
-        }),
-    );
+    let light = LightComponent {
+        light_type: LightType::Directional,
+        intensity: 5.0,
+        ..crate::scene::authoring::default_light()
+    };
+    scene.world.set_light(id, Some(light));
+    scene
+}
+
+#[test]
+fn directional_sun_adds_directionality() {
+    // No ambient, so up outshining down can only be the sun.
+    let mut scene = sun_from_above();
     let (up, down) = (
         read_back(&mut scene, Vec3::Y),
         read_back(&mut scene, Vec3::NEG_Y),
@@ -70,6 +71,20 @@ fn directional_sun_adds_directionality() {
         up.x > 0.1 && up.x > down.x,
         "sun from above: {up} vs {down}"
     );
+}
+
+#[test]
+fn the_sun_reads_back_with_the_scenes_diffuse_model() {
+    // As `baked_direct_sh` does (#1698): under the wrap, a quarter at the side.
+    let mut scene = sun_from_above();
+    scene.lighting_settings.diffuse_model = crate::scene::lighting::DiffuseModel::HalfLambert;
+    let pi = std::f32::consts::PI;
+    let side = read_back(&mut scene, Vec3::X) * pi;
+    let below = read_back(&mut scene, Vec3::NEG_Y) * pi;
+    let above = read_back(&mut scene, Vec3::Y) * pi;
+    assert!((above.x - 5.0).abs() < 1e-2, "head-on {above}");
+    assert!((side.x - 1.25).abs() < 1e-2, "side {side}");
+    assert!(below.x.abs() < 1e-2, "behind {below}");
 }
 
 #[test]
