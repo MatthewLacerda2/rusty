@@ -20,6 +20,7 @@ use crate::core::project::PROJECT_FILE;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use crate::core::settings::render_scale::{RenderScale, RenderScaleDefault, RenderScaleSetting};
 use crate::core::settings::GraphicsSettings;
+use crate::editor::widgets::DragRange;
 use crate::editor::EditorUi;
 use crate::scripting::ConsoleLogs;
 
@@ -139,7 +140,7 @@ fn render_scale_default(
         let range = RenderScale::MIN..=RenderScale::MAX;
         let drag = ui.add_enabled(
             !matching,
-            egui::DragValue::new(&mut factor).range(range).speed(0.01),
+            egui::DragValue::new(&mut factor).ranged(range).speed(0.01),
         );
         if matching && ui.small_button("Fixed").clicked() {
             next = Some(RenderScaleDefault::Fixed(RenderScale::NATIVE));
