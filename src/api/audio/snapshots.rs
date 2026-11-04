@@ -1,12 +1,14 @@
 //! src/api/audio/snapshots.rs — the `Audio` snapshot and duck verbs (#465).
 //!
 //! Snapshots are named partial sets of group settings a script blends to over sim
-//! time (`Time.unscaledTime`, so a blend runs through slow-mo); ducks lower one
+//! time (`Time.unscaledTime`, so a blend runs through slow-mo), effect parameters
+//! included (#1748); ducks lower one
 //! group while another plays. Unknown snapshot, group or field names are errors.
 
 use mlua::Table;
 
 use super::super::{put, Reg};
+use super::effects::field_list;
 use super::groups::err;
 use crate::api::ApiCell;
 use crate::audio::mixer::{Filter, GroupPatch};
@@ -18,7 +20,8 @@ const DUCK_ATTACK: f32 = 0.1;
 const DUCK_RELEASE: f32 = 0.5;
 
 /// The fields a snapshot entry may name.
-const PATCH_FIELDS: [&str; 7] = [
+const PATCH_FIELDS: [&str; 8] = [
+    "effects",
     "volume",
     "mute",
     "low_pass",
@@ -38,16 +41,26 @@ pub(super) fn register_snapshots(
         table,
         "DefineSnapshot",
         lua.create_function(move |lua, (name, groups): (String, Table)| {
+            let audio = audio.get(lua)?;
             let mut patches = Vec::new();
             for pair in groups.pairs::<String, Table>() {
                 let (group, fields) = pair?;
-                patches.push((group, patch(&fields)?));
+                let mut patch = patch(&fields)?;
+                if let Some(list) = fields.get::<Option<Table>>("effects")? {
+                    let tables = field_list(&list)?;
+                    let maestro = audio.borrow();
+                    let mixer = maestro.mixer();
+                    let id = mixer.require(&group).map_err(err)?;
+                    let effects = mixer.parse_effect_patch(id, &tables).map_err(err)?;
+                    patch.effect_params = Some(effects);
+                }
+                patches.push((group, patch));
             }
             audio
-                .get(lua)?
                 .borrow_mut()
                 .define_snapshot(&name, &patches)
-                .map_err(err)
+                .map_err(err)?;
+            Ok(())
         }),
     )?;
     put(
@@ -136,5 +149,6 @@ fn patch(fields: &Table) -> mlua::Result<GroupPatch> {
         low_pass: filter("low_pass", "low_pass_resonance")?,
         high_pass: filter("high_pass", "high_pass_resonance")?,
         reverb_send: fields.get("reverb_send")?,
+        ..GroupPatch::default()
     })
 }

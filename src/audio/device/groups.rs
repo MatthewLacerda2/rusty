@@ -4,9 +4,13 @@
 //! track sums into its parent's, Master's into kira's main track). Each track runs
 //! a low-pass then a high-pass filter (kira's state-variable filter; an "open"
 //! filter is switched fully dry, so it is bit-transparent) and routes a send into
-//! the one reverb bus (`reverb.rs`, tuned by reverb zones, #469). Volume,
+//! the one reverb bus (`reverb.rs`, tuned by reverb zones, #469). After the
+//! filters, the group's effect chain runs in its rack (`mixer/effects/rack.rs`,
+//! #1748), which also publishes the group's level for sidechains. Volume,
 //! cutoffs and the send move with kira's 10 ms tween, so a snapshot stepped once a
 //! frame never clicks.
+
+use std::sync::Arc;
 
 use crate::core::collections::Map;
 
@@ -19,6 +23,8 @@ use super::gate::{Gated, Wake};
 use super::reverb::ReverbBus;
 use crate::components::ReverbParams;
 
+use crate::audio::mixer::effects::rack::{rack, RackHandle};
+use crate::audio::mixer::effects::KeyLevel;
 use crate::audio::mixer::settings::{HIGH_PASS_OFF, LOW_PASS_OFF};
 use crate::audio::mixer::{Filter, GroupId, GroupMix};
 
@@ -39,12 +45,15 @@ struct GroupTrack {
     pub track: TrackHandle,
     low_pass: FilterHandle,
     high_pass: FilterHandle,
+    rack: RackHandle,
     wake: Wake,
 }
 
 /// Every group's track plus the reverb bus they send to.
 pub struct GroupTracks {
     tracks: Map<GroupId, GroupTrack>,
+    /// Every group's output level, for the sidechains that key from it.
+    levels: Map<GroupId, Arc<KeyLevel>>,
     reverb: ReverbBus,
 }
 
@@ -53,6 +62,7 @@ impl GroupTracks {
     pub fn new<B: Backend>(manager: &mut AudioManager<B>) -> Option<Self> {
         Some(Self {
             tracks: Map::default(),
+            levels: Map::default(),
             reverb: ReverbBus::new(manager, &ReverbParams::DRY)?,
         })
     }
@@ -79,6 +89,8 @@ impl GroupTracks {
         let gated = |mode, f| Gated(filter(mode, f), wake.clone());
         let low_pass = builder.add_effect(gated(FilterMode::LowPass, Filter::LOW_PASS_OPEN));
         let high_pass = builder.add_effect(gated(FilterMode::HighPass, Filter::HIGH_PASS_OPEN));
+        let (effects, rack) = rack();
+        builder.add_effect(Gated(effects, wake.clone()));
         let track = match parent {
             None => manager.add_sub_track(builder).ok(),
             Some(p) => self
@@ -90,10 +102,12 @@ impl GroupTracks {
             log::warn!("[Audio] mixer group {id:?} got no track; its voices play silent");
             return;
         };
+        self.levels.insert(id, rack.level());
         let group = GroupTrack {
             track,
             low_pass,
             high_pass,
+            rack,
             wake,
         };
         self.tracks.insert(id, group);
@@ -121,7 +135,18 @@ impl GroupTracks {
             mix.high_pass,
             mix.high_pass.cutoff <= HIGH_PASS_OFF,
         );
+        let levels = &self.levels;
+        group.rack.set(&mix.effects, &|g| levels.get(&g).cloned());
         group.wake.ring();
+    }
+
+    /// Once a frame: let every rack drop what its audio thread handed back and
+    /// rebuild after a sample-rate change.
+    pub fn maintain(&mut self) {
+        let levels = &self.levels;
+        for group in self.tracks.values_mut() {
+            group.rack.maintain(&|g| levels.get(&g).cloned());
+        }
     }
 
     /// Group `id`'s track, if it was built.

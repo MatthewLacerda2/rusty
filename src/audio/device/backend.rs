@@ -159,6 +159,7 @@ impl<B: Backend + Clocked> AudioBackend for KiraBackend<B> {
     }
 
     fn advance(&mut self, seconds: f64) {
+        self.groups.maintain();
         self.manager.backend_mut().advance(seconds);
     }
 }

@@ -2,7 +2,8 @@
 //!
 //! Unity's `AudioMixer`, cut down. Every voice routes through one named **group**
 //! (a bus); groups form a tree under `Master`, and each has a volume, a mute, a
-//! low-pass and a high-pass filter and a reverb send ([`GroupSettings`]). A
+//! low-pass and a high-pass filter, a reverb send and a chain of effects
+//! (`effects/`, #1748; Master starts with a limiter) ([`GroupSettings`]). A
 //! **snapshot** is a named partial set of group settings the game transitions to
 //! over a duration ("BulletTime", "Flashbanged", "PauseMenu"); a **duck** lowers one
 //! group while another plays.
@@ -14,6 +15,7 @@
 //! state for read-back.
 
 mod duck;
+pub mod effects;
 mod maestro;
 pub mod settings;
 
@@ -22,6 +24,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 pub use duck::Duck;
+pub use effects::EffectChain;
 pub use settings::{Filter, GroupMix, GroupPatch, GroupSettings, GroupState};
 
 /// A group's index in the mixer. Stable for the mixer's life; `Master` is `0`.
@@ -82,7 +85,10 @@ impl Default for Mixer {
         let mut groups = vec![Group {
             name: DEFAULT_GROUPS[0].to_string(),
             parent: None,
-            settings: GroupSettings::default(),
+            settings: GroupSettings {
+                effects: EffectChain::master(),
+                ..GroupSettings::default()
+            },
         }];
         for name in &DEFAULT_GROUPS[1..] {
             // World sends fully into the reverb bus reverb zones tune (#469), as a
