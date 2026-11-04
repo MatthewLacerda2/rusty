@@ -11,8 +11,8 @@ use std::path::Path;
 
 use crate::asset::lightmap_page::{self, Page};
 use crate::scene::lighting::lightmap::{
-    colour_page, direction_page, encode_directions, encode_texels, pack, BakeProgress, Lightmap,
-    LightmapEntry, LightmapSet,
+    check_page_count, colour_page, direction_page, encode_directions, encode_texels, pack,
+    BakeProgress, Lightmap, LightmapEntry, LightmapSet, MAX_PAGES,
 };
 use crate::scene::Scene;
 
@@ -31,16 +31,21 @@ pub struct EncodedPages {
     pub entries: Vec<LightmapEntry>,
 }
 
-/// Pack and encode `maps`, every page on every core (the bands of a level are
+/// Pack `maps` into pages of at most `max_page` texels a side (the bake's
+/// `BakeSettings::page`, #1704) and encode them, every page on every core (the bands of a level are
 /// split over them, so the blocks never depend on the machine), counting each
 /// finished page into `progress`. `Ok(None)` when `progress` is cancelled first:
-/// it is asked before every level of every page.
+/// it is asked before every level of every page. `Err` before any page is drawn
+/// when the bake would make more than [`MAX_PAGES`] (`check_page_count`): the
+/// renderer could not load them, so the scene keeps its previous lightmaps.
 pub fn encode_pages(
     maps: &[Lightmap],
+    max_page: u32,
     progress: &BakeProgress,
 ) -> Result<Option<EncodedPages>, String> {
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
-    let atlas = pack(maps);
+    check_page_count(maps, max_page, MAX_PAGES)?;
+    let atlas = pack(maps, max_page);
     let size = atlas.page_size;
     progress.start_pages((atlas.pages.len() + atlas.directions.len()) as u64);
     let stop = || progress.is_cancelled();
@@ -89,13 +94,15 @@ fn png(size: u32, rgba: Vec<u8>) -> Result<Vec<u8>, String> {
     Ok(bytes.into_inner())
 }
 
-/// [`encode_pages`] then [`apply_encoded`]: write `maps` beside `scene_path`.
+/// [`encode_pages`] then [`apply_encoded`]: write `maps` beside `scene_path`, on
+/// pages of the scene's Max Lightmap Size.
 pub fn apply_lightmaps(
     scene: &mut Scene,
     scene_path: &str,
     maps: &[Lightmap],
 ) -> Result<usize, String> {
-    let encoded = encode_pages(maps, &BakeProgress::default())?;
+    let page = scene.lighting_settings.lightmaps.page();
+    let encoded = encode_pages(maps, page, &BakeProgress::default())?;
     apply_encoded(scene, scene_path, &encoded.ok_or("never cancelled")?)
 }
 

@@ -47,6 +47,7 @@ pub fn soldier() -> MeshComponent {
         asset_ref: None,
         subdivisions: 1,
         cast_shadows: Default::default(),
+        scale_in_lightmap: 1.0,
         vertices,
         indices,
         ranges: Vec::new(),

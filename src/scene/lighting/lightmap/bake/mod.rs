@@ -10,7 +10,7 @@ use std::thread;
 
 use glam::Vec3;
 
-use super::atlas::{max_map_edge, MAX_PAGE};
+use super::atlas::{max_map_edge, page_edge, MAX_PAGE, MIN_PAGE};
 use super::filter::smooth;
 use super::input::BakeScene;
 use super::progress::BakeProgress;
@@ -38,10 +38,12 @@ pub struct BakeSettings {
     pub bounces: u32,
     /// The seed every texel's sample stream derives from.
     pub seed: u64,
-    /// Largest lightmap edge, in texels. At most [`max_map_edge`] of the largest
-    /// page ([`MAX_PAGE`]), so the biggest maps still pair on a page (#1694); the
-    /// default is the largest that pairs on a 1024 page.
-    pub max_resolution: u32,
+    /// Unity's *Max Lightmap Size* (#1704): the atlas page's edge, in texels, a
+    /// power of two in [`Self::MAX_LIGHTMAP_SIZE`]. A mesh's lightmap follows its
+    /// area × `texels_per_unit` up to the largest map such a page holds
+    /// ([`max_map_edge`]); the packer picks the smallest page that holds the bake,
+    /// up to this edge, then adds pages. Read through [`Self::page`].
+    pub max_lightmap_size: u32,
     /// Radius, in texels, of the Gaussian that smooths the baked bounce (Unity's
     /// indirect filter); 0 leaves it raw. Baked direct light is never filtered.
     pub filter_radius: u32,
@@ -58,7 +60,7 @@ impl Default for BakeSettings {
             samples: 128,
             bounces: 3,
             seed: 0,
-            max_resolution: max_map_edge(1024),
+            max_lightmap_size: 1024,
             filter_radius: 3,
             directional: true,
         }
@@ -72,6 +74,15 @@ impl BakeSettings {
     pub const SAMPLES: RangeInclusive<u32> = 1..=4096;
     /// The bounces a bake takes.
     pub const BOUNCES: RangeInclusive<u32> = 1..=16;
+    /// The page edges a bake takes (Unity's 32–4096), each a power of two.
+    pub const MAX_LIGHTMAP_SIZE: RangeInclusive<u32> = MIN_PAGE..=MAX_PAGE;
+
+    /// The atlas page edge this bake packs into: [`Self::max_lightmap_size`] held
+    /// to a power of two in [`Self::MAX_LIGHTMAP_SIZE`] (a hand-edited file may
+    /// hold anything).
+    pub fn page(&self) -> u32 {
+        page_edge(self.max_lightmap_size)
+    }
 
     /// These settings with each authored knob clamped into its range: the one place
     /// those limits live, applied by `Lighting.SetSettings` / `BakeLightmaps` and
@@ -87,6 +98,7 @@ impl BakeSettings {
                 .clamp(*Self::TEXELS_PER_UNIT.start(), *Self::TEXELS_PER_UNIT.end()),
             samples: clamp(self.samples, Self::SAMPLES),
             bounces: clamp(self.bounces, Self::BOUNCES),
+            max_lightmap_size: self.page(),
             ..self
         }
     }
@@ -105,9 +117,11 @@ pub struct Lightmap {
     pub directions: Vec<Vec3>,
 }
 
-/// Bake every mesh in `scene` that has a usable lightmap UV and a camera sees (a
-/// `ShadowsOnly` one gets none, #1571). Meshes without one still occlude and bounce
-/// light; they just get no lightmap.
+/// Bake every mesh in `scene` that has a usable lightmap UV and receives a lightmap
+/// ([`BakeMesh::receives_lightmap`](super::input::BakeMesh::receives_lightmap): a `ShadowsOnly` one gets none, #1571, nor one
+/// at Scale In Lightmap 0, #1704), its texel density scaled by its Scale In
+/// Lightmap. Meshes without one still occlude and bounce light; they just get no
+/// lightmap.
 pub fn bake(scene: &BakeScene, settings: &BakeSettings) -> Vec<Lightmap> {
     // A progress nobody holds is never cancelled, so this always runs to the end.
     bake_with_progress(scene, settings, &BakeProgress::default()).unwrap_or_default()
@@ -136,16 +150,17 @@ pub(super) fn bake_on(
 ) -> Option<Vec<Lightmap>> {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer { scene, rays: &rays };
-    // Every lightmap must pair on the largest atlas page with its ring around it.
-    let max = settings.max_resolution.min(max_map_edge(MAX_PAGE));
+    // Every lightmap must fit a page with its ring around it.
+    let max = max_map_edge(settings.page());
     // Rasterize everything first, so the total is known before the first texel.
     let charts: Vec<(usize, u32, Vec<TexelPoint>)> = scene
         .meshes
         .iter()
         .enumerate()
-        .filter(|(_, mesh)| mesh.cast_shadows.is_visible())
+        .filter(|(_, mesh)| mesh.receives_lightmap())
         .filter_map(|(index, mesh)| {
-            let size = lightmap_size(mesh, settings.texels_per_unit, max)?;
+            let density = settings.texels_per_unit * mesh.scale_in_lightmap;
+            let size = lightmap_size(mesh, density, max)?;
             Some((index, size, rasterize(mesh, size)))
         })
         .collect();

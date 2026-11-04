@@ -223,6 +223,10 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     scene.lightmaps = data.lightmaps;
     scene.lighting_settings = data.lighting_settings;
     scene.lighting_settings.reflections.clamp();
+    // The bake's knobs too (#1704): a hand-edited Max Lightmap Size of 5000 reads
+    // back as the 4096 it bakes at.
+    let lightmaps = &mut scene.lighting_settings.lightmaps;
+    *lightmaps = lightmaps.sanitized();
 
     // Rebuild every skeleton from its model, then hang the saved attachments back
     // on their bones by name (#453) — before prefab propagation, which rebuilds a

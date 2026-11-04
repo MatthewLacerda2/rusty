@@ -17,6 +17,7 @@ impl MeshComponent {
             asset_ref: self.asset_ref.clone(),
             subdivisions: self.subdivisions,
             cast_shadows: self.cast_shadows,
+            scale_in_lightmap: self.scale_in_lightmap,
             vertices: Vec::new(),
             indices: Vec::new(),
             ranges: Vec::new(),
