@@ -20,7 +20,7 @@
 // since SSR stopped sampling the sky (#1526); without one it is the missing-texture
 // checker, never light.
 @group(0) @binding(6) var s_skybox: sampler;
-// The view's grading LUT (#1440): grade + tonemap, indexed by `lut_coord`.
+// The view's grading LUT (#1440): grade + tonemap, read by `lut_sample`.
 @group(0) @binding(7) var t_lut: texture_3d<f32>;
 // The view's adapted exposure (#1444): x is the EV, metered by `postfx/exposure.wgsl`.
 @group(0) @binding(8) var<uniform> adapted: vec4<f32>;
