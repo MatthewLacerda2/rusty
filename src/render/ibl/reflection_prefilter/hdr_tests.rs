@@ -3,9 +3,9 @@
 
 use glam::Vec3;
 
-use super::super::cpu::{convolve, prefilter, Taps};
-use super::super::source::source_chain;
-use super::super::SAMPLE_COUNT;
+use super::cpu::{convolve, prefilter, Taps};
+use super::source::source_chain;
+use super::SAMPLE_COUNT;
 use crate::render::ibl::cube_sample::{face_uv, FaceProjections};
 use crate::render::ibl::reflection_prefilter::source::decode_face as texels;
 use crate::render::{CubemapCapture, CubemapFace};

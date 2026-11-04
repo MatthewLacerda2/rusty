@@ -100,6 +100,3 @@ fn rough_mip_keeps_room_color() {
         );
     }
 }
-
-#[path = "reflection_prefilter_hdr_tests.rs"]
-mod hdr;

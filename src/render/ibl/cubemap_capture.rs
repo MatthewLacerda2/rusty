@@ -40,7 +40,7 @@ use crate::scene::Scene;
 /// is `resolution × resolution` texels, row-major top to bottom, laid out as a
 /// `texture_cube` samples it (#1615): uploaded as a cube's six layers, a direction
 /// reads what the capture saw along it. Every texel is finite and non-negative
-/// ([`sanitize`]). Indexed by `CubemapFace as usize` via [`CubemapCapture::face`].
+/// (`sanitize`). Indexed by `CubemapFace as usize` via [`CubemapCapture::face`].
 pub struct CubemapCapture {
     /// Edge length in pixels of every face.
     pub resolution: u32,

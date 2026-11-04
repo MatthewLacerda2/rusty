@@ -37,7 +37,11 @@ under a lightmap of the same surroundings render alike (#807).
 STATIC scene to a cubemap from the probe's position (dynamic actors excluded) and
 projects that rendered radiance into L2 irradiance SH — so probes pick up the actual
 coloured bounce off nearby static surfaces, directional and position-dependent (a probe
-by a red wall reads red; one across the room does not). Where a capture sees no
+by a red wall reads red; one across the room does not). The capture is HDR (#1696): a
+lamp's emissive and a wall lit well above 1 reach the SH at full strength, as they reach
+the lightmaps, so a dynamic object next to a bright lamp is lit as brightly as the
+lightmapped wall beside it. A texel the half float cannot hold (an emissive past 65504,
+a NaN) is held at 65504 or dropped at the capture, never spread through the SH. Where a capture sees no
 static surface, a direction that escapes the scene, it takes the scene's **ambient**
 (`Lighting.SetAmbientMode`'s `Color`, `Gradient` or `Skybox`, intensity applied), not
 the sky the camera draws: Unity bakes light probes against *Environment Lighting*,

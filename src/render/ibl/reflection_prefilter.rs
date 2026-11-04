@@ -39,7 +39,7 @@ pub(crate) const SAMPLE_COUNT: u32 = 128;
 /// sharp base (roughness 0); each later mip halves the edge length and raises roughness.
 /// This is exactly the layout the KTX2 encoder writes (largest level first).
 pub struct PrefilteredCubemap {
-    /// `mips[level][face]` is `mip_size(level)² *` [`TEXEL_BYTES`] bytes (four
+    /// `mips[level][face]` is `mip_size(level)² *` `TEXEL_BYTES` (8) bytes (four
     /// little-endian half floats per texel, alpha 1), row-major top-to-bottom, in
     /// `CubemapFace::ALL` order.
     pub mips: Vec<[Vec<u8>; 6]>,
@@ -70,7 +70,7 @@ pub fn roughness_to_mip(roughness: f32, level_count: u32) -> f32 {
 }
 
 /// Validate a prefiltered cube's mip layout: every level's six faces must be
-/// `level_size² *` [`TEXEL_BYTES`] bytes. The encoder relies on this; exposing it keeps the chain's
+/// `level_size² *` `TEXEL_BYTES` bytes. The encoder relies on this; exposing it keeps the chain's
 /// shape (and the `level_size`/`roughness_to_mip` accessors) a checkable invariant rather
 /// than an implicit assumption.
 pub fn validate_layout(cube: &PrefilteredCubemap) -> bool {
@@ -92,3 +92,7 @@ pub(crate) fn mip_count(base_size: u32) -> u32 {
 #[cfg(test)]
 #[path = "reflection_prefilter_tests.rs"]
 mod reflection_prefilter_tests;
+
+#[cfg(test)]
+#[path = "reflection_prefilter/hdr_tests.rs"]
+mod hdr_tests;
