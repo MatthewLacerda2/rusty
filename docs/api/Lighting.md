@@ -53,6 +53,10 @@ The two individual verbs stay for a script that wants only one of them.
   bar and **Cancel**; a cancelled run writes nothing and keeps the old lighting. When
   the lightmaps land they are applied (the probes are captured under them), then the
   probe step runs a step a frame and the console logs one summary line at the end.
+  The probe step's placement is planned whole in the frame it starts: about 0.75 s
+  in a release build on a Dust2-sized level (10 × 10 rooms of 20 m and a 40 m tower:
+  0.41 s for the occupancy grid and floor plan, 0.05 s for the reflection probes,
+  0.29 s for 7,638 light probes), so the editor stalls that long once.
 - **From a script it logs its progress** (#1667), as Unity's batch-mode bake does: the
   verb blocks its caller until it returns, so a `play` scenario or a `session-mcp` call
   cannot poll, and instead the bake prints a line to **stderr** at each step and every
@@ -130,10 +134,10 @@ two pictures of the level (#1737):
   near geometry (a horizontal ray meets a wall or a crate within half
   the spacing). A probe closer than 0.3 m to geometry is pushed out of it, and one still
   inside a solid is dropped. The layout has no regular grid, so objects blend the
-  four nearest probes (`Probe.md`), found through a spatial index: about 1.3 µs a
+  four nearest probes (`Probe.md`), found through a spatial index: about 1.5 µs a
   sample in a release build over a Dust2-sized set of 7,680 probes, against 12 µs for
   a scan of all of them. A moving Light Probe Proxy Volume samples each of its
-  points, so a 32³ one costs about 40 ms on every frame it moves. With no static solid at all, a regular grid over
+  points, so a 32³ one costs about 50 ms on every frame it moves. With no static solid at all, a regular grid over
   the nav surface's walkable extent is placed instead.
 - **Reflection probes** — **one per room** (#1584). The floor plan
   is cut into rooms where it narrows
