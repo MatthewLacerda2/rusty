@@ -50,6 +50,7 @@ mod frame_stats_render;
 mod fxaa_screenshot;
 mod harness_size_screenshot;
 mod instancing_budget;
+mod lightmap_formats_screenshot;
 mod lightmap_screenshot;
 mod linear_data_maps_screenshot;
 mod material_maps_screenshot;
