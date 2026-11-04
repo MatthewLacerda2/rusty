@@ -28,15 +28,16 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.SetTrigger` | `(id, on)` | — (Unity `Collider.isTrigger`: a trigger reports overlaps and blocks nothing) |
 | `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` \| `"Continuous"` |
 | `Physics.SetCollisionDetection` | `(id, mode)` | — (`mode` is `"Discrete"` or `"Continuous"`, case-insensitive; an unknown name is an error) |
-| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
-| `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
-| `Physics.RaycastAll` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask])` | array of `{id, distance, point = {x,y,z}, normal = {x,y,z}, bone, bone_name, root}`, nearest first |
-| `Physics.RaycastThrough` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask])` | array of `{id, bone, bone_name, root, thickness, enter = {distance, point, normal}, exit = {distance, point, normal} or nil}`, nearest entry first |
-| `Physics.OverlapSphere` | `(cx, cy, cz, radius [, layer_mask])` | array of entity ids |
-| `Physics.OverlapBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask])` | array of entity ids |
-| `Physics.OverlapCapsule` | `(x0, y0, z0, x1, y1, z1, radius [, layer_mask])` | array of entity ids |
-| `Physics.CheckSphere` | `(cx, cy, cz, radius [, layer_mask])` | `bool` |
-| `Physics.CheckBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask])` | `bool` |
+| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask [, max_distance [, query_triggers]]]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
+| `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask [, max_distance [, query_triggers]]]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
+| `Physics.RaycastAll` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | array of `{id, distance, point = {x,y,z}, normal = {x,y,z}, bone, bone_name, root}`, nearest first |
+| `Physics.RaycastAllNonAlloc` | `(results, ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | hit count; `results[1..count]` refilled with `RaycastAll`'s entries |
+| `Physics.RaycastThrough` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | array of `{id, bone, bone_name, root, thickness, enter = {distance, point, normal}, exit = {distance, point, normal} or nil}`, nearest entry first |
+| `Physics.OverlapSphere` | `(cx, cy, cz, radius [, layer_mask [, query_triggers]])` | array of entity ids |
+| `Physics.OverlapBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask [, query_triggers]])` | array of entity ids |
+| `Physics.OverlapCapsule` | `(x0, y0, z0, x1, y1, z1, radius [, layer_mask [, query_triggers]])` | array of entity ids |
+| `Physics.CheckSphere` | `(cx, cy, cz, radius [, layer_mask [, query_triggers]])` | `bool` |
+| `Physics.CheckBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask [, query_triggers]])` | `bool` |
 | `Physics.ClosestPoint` | `(id, x, y, z)` | `found, cx, cy, cz` |
 | `Physics.ContainsPoint` | `(id, x, y, z)` | `bool` |
 | `Physics.GetBounds` | `(id)` | `found, min_x, min_y, min_z, max_x, max_y, max_z` |
@@ -68,6 +69,20 @@ a layer name with `1 << Layers.NameToIndex("Enemy")`, or OR several together. Om
 it (or pass `nil`) to hit every layer. This is independent of the **Layer Collision
 Matrix** (Scene Settings), which governs which layers physically collide.
 
+**`max_distance` and `query_triggers` (#1720)** — Unity's `maxDistance` and
+`QueryTriggerInteraction`. Any optional argument may be `nil` to take its default,
+so `Physics.Raycast(ox,oy,oz, dx,dy,dz, nil, nil, 5)` is a 5 m cast with no ignore
+id and no mask.
+
+- `max_distance` on `Raycast` / `SphereCast` defaults to unlimited (`math.huge`
+  is the same). The cast's traversal stops there, so a short line-of-sight check
+  costs a short ray, not one across the level. A negative or NaN distance hits
+  nothing, on every cast that takes one, as Unity's PhysX casts reject it.
+- `query_triggers` defaults to `true`: every query hits triggers, as Unity does
+  with its *Queries Hit Triggers* setting on. Pass `false` to pass through them
+  (a bullet through a smoke volume or a pickup zone). It takes an entity's
+  `Physics.IsTrigger` flag, and applies to every cast and volume query.
+
 ### Spatial queries (#311)
 
 Every query except `GetBounds` asks the **live rapier world**, so it needs Play
@@ -94,6 +109,22 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
     end
   end
   ```
+- **`RaycastAllNonAlloc`** (#1720, Unity's `RaycastNonAlloc`) is `RaycastAll`
+  for hot paths: it writes the same entries into the caller's `results` table and
+  returns how many it wrote, so a table kept across calls feeds the garbage
+  collector nothing. Each slot that already holds a table is refilled in place
+  (its `point` / `normal` tables too; `bone` / `bone_name` are cleared off a
+  skeleton). Slots past the count keep what they held, as in Unity, so loop to the
+  count, not `#results`. Unlike Unity's fixed array, more hits than the table holds
+  grow it: a Lua table has no fixed size.
+
+  ```lua no-run
+  local hits = {}                         -- kept across frames
+  function Update(id)
+    local n = Physics.RaycastAllNonAlloc(hits, ox,oy,oz, dx,dy,dz, 30, SHOT, false)
+    for i = 1, n do Damage(hits[i].root, 10) end
+  end
+  ```
 - **`RaycastThrough`** (#830) is `RaycastAll` with exits: one entry per stretch
   of solid the ray passes through, with where it went in (`enter`), where it came
   out (`exit`) and the material between (`thickness`, metres along the ray) — what
@@ -113,8 +144,8 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   - A ray that **starts inside** one enters at distance `0`, at the origin, with
     the normal facing back along the ray (Unity's convention for a cast that
     starts in a collider).
-  - **Triggers** are listed like any collider (smoke blocks sight), so skip them
-    — or leave their layer out of the mask — when pricing bullets.
+  - **Triggers** are listed like any collider (smoke blocks sight) by default;
+    pass `query_triggers = false` when pricing bullets.
 
   ```lua no-run
   local power = 1.0                       -- penetration budget; game data, not engine
