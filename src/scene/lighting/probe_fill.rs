@@ -96,7 +96,7 @@ impl AnalyticEnv {
 /// stand-in shape — the real bake produces genuine spatial variation.
 pub fn analytic_fill(scene: &mut Scene) {
     let env = AnalyticEnv::from_scene(scene);
-    for probe in &mut scene.probes.probes {
+    for probe in scene.probes.probes_mut() {
         let mut local = env;
         // A gentle height gradient so the fill is non-uniform in space (the test
         // asserts position-dependence). Clamped to stay non-negative.

@@ -79,7 +79,9 @@ fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
     put(
         table,
         "Count",
-        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().probes.probes.len() as u32)),
+        lua.create_function(move |lua, ()| {
+            Ok(scene.get(lua)?.borrow().probes.probes().len() as u32)
+        }),
     )
 }
 
@@ -106,7 +108,7 @@ fn register_manual(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
             let scene = scene.borrow();
             Ok(scene
                 .probes
-                .probes
+                .probes()
                 .get(index as usize)
                 .is_some_and(|p| p.manual))
         }),
@@ -131,7 +133,11 @@ fn register_fill(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
                     spacing,
                 );
                 // A grid asked for by hand is manual, so a bake keeps it (#1737).
-                scene.probes.probes.iter_mut().for_each(|p| p.manual = true);
+                scene
+                    .probes
+                    .probes_mut()
+                    .iter_mut()
+                    .for_each(|p| p.manual = true);
                 Ok(())
             },
         ),
@@ -221,7 +227,7 @@ mod tests {
             Ok(())
         };
         run().unwrap();
-        assert!(scene.borrow().probes.probes.iter().all(|p| p.manual));
+        assert!(scene.borrow().probes.probes().iter().all(|p| p.manual));
     }
 
     #[test]

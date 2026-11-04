@@ -9,7 +9,6 @@ use super::tests::{is_outline, RES};
 use crate::render::postfx::HDR_FORMAT;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
-use crate::scene::lighting::probe::Probe;
 use crate::scene::{Camera, Scene};
 
 /// A unit box at `(0, 1, 0)`, selected, beside a light probe whose marker is in
@@ -20,8 +19,7 @@ fn selected_box() -> Scene {
     let id = create_entity(&mut scene, "Box", Some(Primitive::Box));
     scene.world.transform_mut(id).unwrap().position = Vec3::Y;
     scene.selected_entity_id = Some(id);
-    let probe = Probe::new(Vec3::new(-0.8, 1.6, 0.6));
-    scene.probes.probes.push(probe);
+    scene.probes.add_probe(Vec3::new(-0.8, 1.6, 0.6));
     scene
 }
 

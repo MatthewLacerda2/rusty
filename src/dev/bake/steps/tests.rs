@@ -82,7 +82,7 @@ fn gpu_stepping_bakes_what_one_call_bakes() {
     let mut job = start_lighting(&stepped, Some(&path), None, params).unwrap();
     while !job.step(&mut stepped, &mut |_| {}).unwrap() {}
     job.commit(&mut stepped).unwrap();
-    let sh = |s: &Scene| s.probes.probes.iter().map(|p| p.sh).collect::<Vec<_>>();
+    let sh = |s: &Scene| s.probes.probes().iter().map(|p| p.sh).collect::<Vec<_>>();
     assert_eq!(sh(&stepped), sh(&whole));
 }
 

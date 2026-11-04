@@ -79,6 +79,8 @@ impl Renderer {
             return;
         }
         self.materials.forget_groups();
+        // Every retained key naming a dropped group is re-built (#1706).
+        self.retained.touch();
         if is_stale(&self.skybox_path) {
             // An empty path makes the next frame reload the scene's skybox.
             self.skybox_path.clear();

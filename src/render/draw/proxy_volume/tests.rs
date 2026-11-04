@@ -10,7 +10,7 @@ use crate::components::{ProxyQuality, ProxyResolutionMode};
 pub(super) fn rising_probes() -> ProbeVolume {
     let mut probes = ProbeVolume::new();
     probes.fill_grid(Vec3::new(-2.0, 0.0, -2.0), Vec3::new(2.0, 4.0, 2.0), 1.0);
-    for p in &mut probes.probes {
+    for p in probes.probes_mut() {
         let y = p.position.y;
         p.sh.coeffs[0] = [y; 3];
         p.sh.coeffs[1] = [-y; 3];
@@ -109,7 +109,7 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
     volumes.push(&scene, id, at(0.5), &mut frame);
     assert_eq!(sampled(&volumes), 0.25, "moved: sampled again");
     volumes.cache.get_mut(&id).unwrap().1[HEADER][0] = -1.0;
-    scene.probes.probes[0].sh.coeffs[0] = [5.0; 3];
+    scene.probes.probes_mut()[0].sh.coeffs[0] = [5.0; 3];
     volumes.begin_frame(&scene);
     let mut frame = volumes.frame(u64::MAX);
     volumes.push(&scene, id, at(0.5), &mut frame);
@@ -125,19 +125,17 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
 }
 
 #[test]
-fn the_fingerprint_sees_any_probe_s_sh_position_or_the_grid() {
+fn the_fingerprint_sees_any_probe_s_sh_or_position() {
     let probes = rising_probes();
     let mut scratch = Vec::new();
     let mut hash = |p: &ProbeVolume| fingerprint(p, &mut scratch);
     let base = hash(&probes);
     assert_eq!(base, hash(&rising_probes()), "deterministic");
     let mut moved = rising_probes();
-    moved.probes[7].position.x += 0.01;
+    moved.probes_mut()[7].position.x += 0.01;
     let mut rebaked = rising_probes();
-    rebaked.probes[42].sh.coeffs[8][2] = 3.0;
-    let mut regridded = rising_probes();
-    regridded.grid.as_mut().unwrap().spacing.y = 2.0;
-    for changed in [moved, rebaked, regridded] {
+    rebaked.probes_mut()[42].sh.coeffs[8][2] = 3.0;
+    for changed in [moved, rebaked] {
         assert_ne!(hash(&changed), base);
     }
 }

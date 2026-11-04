@@ -58,7 +58,7 @@ fn bake(mode: Option<LightMode>) -> Option<Sh9> {
     let mut renderer = crate::render::test_gpu::headless_or_skip(RES, RES)?;
     let mut scene = floor_scene(mode);
     renderer.bake_probes(&mut scene, RES);
-    Some(scene.probes.probes[0].sh)
+    Some(scene.probes.probes()[0].sh)
 }
 
 #[test]

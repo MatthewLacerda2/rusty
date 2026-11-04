@@ -146,7 +146,7 @@ pub fn apply_encoded(
         bytes as f64 / (1024.0 * 1024.0),
         dir.display()
     );
-    scene.lightmaps = set;
+    scene.lightmaps = set.into();
     Ok(encoded.maps)
 }
 

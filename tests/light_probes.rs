@@ -59,8 +59,8 @@ fn positions_in_scene_sh_in_sidecar_round_trip() {
         .probes
         .fill_grid(Vec3::ZERO, Vec3::new(0.0, 4.0, 0.0), 2.0);
     analytic_fill(&mut scene);
-    let probe_count = scene.probes.probes.len();
-    let baked = scene.probes.probes[probe_count - 1].sh;
+    let probe_count = scene.probes.probes().len();
+    let baked = scene.probes.probes()[probe_count - 1].sh;
 
     let path = tmp("rusty_light_probes.scene");
     let sidecar = sidecar_path(&path);
@@ -81,13 +81,13 @@ fn positions_in_scene_sh_in_sidecar_round_trip() {
 
     let mut loaded = Scene::new();
     loaded.load_from_file(&path).unwrap();
-    assert_eq!(loaded.probes.probes.len(), probe_count);
+    assert_eq!(loaded.probes.probes().len(), probe_count);
     assert_eq!(
-        loaded.probes.probes[0].position,
-        scene.probes.probes[0].position
+        loaded.probes.probes()[0].position,
+        scene.probes.probes()[0].position
     );
     // SH merged back from the sidecar, index-aligned.
-    assert_eq!(loaded.probes.probes[probe_count - 1].sh, baked);
+    assert_eq!(loaded.probes.probes()[probe_count - 1].sh, baked);
 }
 
 /// A scene with placed-but-unbaked probes writes no sidecar (zero SH); load leaves
@@ -107,5 +107,5 @@ fn unbaked_probes_write_no_sidecar() {
 
     let mut loaded = Scene::new();
     loaded.load_from_file(&path).unwrap();
-    assert_eq!(loaded.probes.probes.len(), 1);
+    assert_eq!(loaded.probes.probes().len(), 1);
 }

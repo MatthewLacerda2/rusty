@@ -21,7 +21,7 @@ fn scene_with_probes() -> (Scene, u32) {
 fn bake(scene: &mut Scene, id: u32) {
     let mut sh = Sh9::zero();
     sh.coeffs[0] = [1.0, 0.5, 0.25];
-    for probe in &mut scene.probes.probes {
+    for probe in scene.probes.probes_mut() {
         probe.sh = sh;
     }
     scene
@@ -36,7 +36,11 @@ fn bake(scene: &mut Scene, id: u32) {
 }
 
 fn assert_baked(scene: &Scene, id: u32) {
-    assert!(scene.probes.probes.iter().all(|p| p.sh.coeffs[0][0] == 1.0));
+    assert!(scene
+        .probes
+        .probes()
+        .iter()
+        .all(|p| p.sh.coeffs[0][0] == 1.0));
     assert_eq!(
         scene.reflection_probes.probes[0].cubemap_path,
         "probe_0.ktx2"
@@ -56,20 +60,20 @@ fn undoing_a_setting_or_a_probe_move_after_a_bake_keeps_the_bake() {
     bake(&mut scene, id);
     scene.undo();
     assert_eq!(
-        scene.probes.probes[1].position,
+        scene.probes.probes()[1].position,
         Vec3::X,
         "the move is undone"
     );
     // The bake lit probe 1 at Y, not X: back at X it keeps what it had there
     // (#1737, matched by position).
-    assert_eq!(scene.probes.probes[1].sh, Sh9::zero());
-    scene.probes.probes[1].sh = scene.probes.probes[0].sh;
+    assert_eq!(scene.probes.probes()[1].sh, Sh9::zero());
+    scene.probes.probes_mut()[1].sh = scene.probes.probes()[0].sh;
     scene.undo();
     assert_ne!(scene.ambient_intensity, 0.25, "the setting is undone");
     assert_baked(&scene, id);
     scene.redo();
     scene.redo();
-    assert_eq!(scene.probes.probes[1].position, Vec3::Y);
+    assert_eq!(scene.probes.probes()[1].position, Vec3::Y);
     assert_baked(&scene, id);
 }
 
@@ -108,7 +112,7 @@ fn a_bake_landing_on_an_idle_frame_neither_joins_the_last_step_nor_clears_redo()
     scene.pause_edits();
     assert!(!scene.commit_follow_up(), "the bake is no edit");
     assert_eq!(scene.undo().as_deref(), Some("Edit Renamed"));
-    assert_eq!(scene.probes.probes.len(), 3, "the bake's probe stays");
+    assert_eq!(scene.probes.probes().len(), 3, "the bake's probe stays");
     assert_baked(&scene, id);
     // An idle frame's own follow-up after an Undo keeps it redoable.
     scene.begin_edits();
@@ -131,6 +135,6 @@ fn a_bake_landing_mid_drag_splits_the_drag_and_joins_neither_part() {
     assert_eq!(scene.ambient_intensity, 0.25);
     scene.undo();
     assert_eq!(scene.ambient_intensity, start);
-    assert_eq!(scene.probes.probes.len(), 3, "the bake's probe stays");
+    assert_eq!(scene.probes.probes().len(), 3, "the bake's probe stays");
     assert_eq!(scene.undo(), None);
 }

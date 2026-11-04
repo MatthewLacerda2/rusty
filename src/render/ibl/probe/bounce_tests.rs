@@ -145,7 +145,7 @@ fn gpu_multibounce_increases_color_bleed() {
     // Full multi-bounce solve.
     let mut scene = bleed_room(probe);
     let report = renderer.bake_probes_multibounce(&mut scene, RES);
-    let converged = scene.probes.probes[0].sh;
+    let converged = scene.probes.probes()[0].sh;
 
     assert!(report.bounces >= 2, "expected ≥2 bounces, got {report:?}");
     // Toward the red wall (+X), the converged irradiance is redder than bounce 1.
@@ -200,7 +200,8 @@ fn gpu_multibounce_is_deterministic() {
 
     assert_eq!(ra, rb, "bounce reports diverged: {ra:?} vs {rb:?}");
     assert_eq!(
-        a.probes.probes[0].sh, b.probes.probes[0].sh,
+        a.probes.probes()[0].sh,
+        b.probes.probes()[0].sh,
         "multi-bounce SH not deterministic across runs"
     );
 }
