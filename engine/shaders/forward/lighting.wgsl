@@ -115,12 +115,12 @@ fn calculate_pbr(
 ) -> vec3<f32> {
     let H = normalize(L + V);
     let NdotL_raw = dot(N, L);
-    
-    // Half-Lambert diffuse wrapping (retro CS 1.6 / GoldSrc look)
-    let half_lambert = pow(NdotL_raw * 0.5 + 0.5, 2.0);
-    
-    // Standard lighting factors for specular and math stability
     let NdotL = max(NdotL_raw, 0.0);
+    // The scene's diffuse model (#1698), the one the lightmap and probe bakes use too
+    // (`DiffuseModel::response`): Lambert, or the retro squared wrap. Specular is
+    // always the physical N·L.
+    let wrap = clamp(NdotL_raw * 0.5 + 0.5, 0.0, 1.0);
+    let diffuse_response = select(NdotL, wrap * wrap, lighting.diffuse_wrap > 0.5);
     let NdotV = max(dot(N, V), 0.0);
 
     let D = DistributionGGX(N, H, roughness);
@@ -137,7 +137,7 @@ fn calculate_pbr(
 
     let diffuse = kD * albedo / PI;
 
-    return diffuse * radiance * half_lambert + specular * radiance * NdotL;
+    return diffuse * radiance * diffuse_response + specular * radiance * NdotL;
 }
 
 // Percentage-closer filtering (PCF) kernel radius, in texels. The kernel is a

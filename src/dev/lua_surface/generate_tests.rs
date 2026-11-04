@@ -42,6 +42,33 @@ fn reflection_settings_read_back_and_clamp() {
 }
 
 #[test]
+fn the_diffuse_model_reads_back_sets_and_refuses_an_unknown_name() {
+    use crate::scene::lighting::DiffuseModel;
+    let s = session();
+    assert_eq!(
+        s.eval("return Lighting.GetSettings().diffuseModel")
+            .unwrap(),
+        "Lambert"
+    );
+    s.eval("Lighting.SetSettings{ diffuseModel = 'HalfLambert' }")
+        .unwrap();
+    let model = || s.world().scene().borrow().lighting_settings.diffuse_model;
+    assert_eq!(model(), DiffuseModel::HalfLambert);
+    let err = s
+        .eval("Lighting.SetSettings{ diffuseModel = 'Wrap', samples = 3 }")
+        .unwrap_err();
+    assert!(err.contains("unknown diffuseModel"), "{err}");
+    // A bad reflection field raises after the model is read: still nothing changes.
+    s.eval("Lighting.SetSettings{ diffuseModel = 'lambert', reflectionBudgetMB = 'x' }")
+        .unwrap_err();
+    assert_eq!(
+        model(),
+        DiffuseModel::HalfLambert,
+        "refused calls change nothing"
+    );
+}
+
+#[test]
 fn generate_needs_a_saved_scene() {
     let err = session().eval("return Lighting.Generate()").unwrap_err();
     assert!(err.contains("save the scene"), "{err}");

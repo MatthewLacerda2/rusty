@@ -14,16 +14,15 @@
 //! **A bake works on a snapshot and applies only when it completes** (Unity's shape).
 //! Placement happens when the job starts; then both probe sets are copied, the bakes
 //! read the copies, and their results are staged without touching the scene: the light
-//! probes' SH in the solve, the cubemaps in `<name>.baking` files.
+//! probes' SH in the solve, the cubemaps in `<name>.baking` files in the scene's `<scene>.reflections/` folder.
 //! [`LightingBake::commit`] applies both in one step. If either probe set changed since
 //! the start (one added, removed or moved, a reflection probe's resolution, clip
 //! planes or shadows), a step or the commit refuses with [`PROBES_CHANGED`] and
 //! nothing is applied; the staged files go with the job. The captures still render the
 //! live scene's meshes and lights at each step.
 
-use std::path::{Path, PathBuf};
-
 use super::lighting::LightingBakeReport;
+use super::reflection::{out_dir, prune_stale, reflection_dir, UNSAVED};
 use crate::render::ibl::probe::solve::BounceSolve;
 pub use crate::render::ibl::probe::solve::PROBES_CHANGED;
 use crate::render::{Renderer, DEFAULT_BAKE_RESOLUTION};
@@ -68,15 +67,16 @@ pub struct LightingBake {
 
 impl LightingBake {
     /// Start baking `scene`'s placed probes (`report` holds the placement), writing
-    /// reflection cubemaps beside `scene_path`. Refuses up front, before any probe is
-    /// captured, when there are reflection probes and no saved scene to write beside.
+    /// reflection cubemaps into `scene_path`'s own `<scene>.reflections/` folder.
+    /// Refuses up front, before any probe is captured, when there are reflection probes
+    /// and no saved scene to write them for.
     pub(super) fn start(
         scene: &Scene,
         scene_path: Option<&str>,
         mut report: LightingBakeReport,
     ) -> Result<Self, String> {
         if !scene.reflection_probes.is_empty() {
-            out_dir(scene_path)?;
+            scene_path.ok_or(UNSAVED)?;
         }
         let any = !scene.probes.is_empty() || !scene.reflection_probes.is_empty();
         let renderer = any
@@ -112,10 +112,10 @@ impl LightingBake {
         let Some((probe, resolution)) = self.reflections.get(i) else {
             return Ok(true);
         };
-        let out_dir = out_dir(self.scene_path.as_deref())?;
         let Some(renderer) = self.renderer.as_mut() else {
             return Ok(true);
         };
+        let out_dir = out_dir(self.scene_path.as_deref())?;
         say(format!("Baking reflection probe {} of {total}", i + 1));
         let bytes = renderer.bake_reflection(scene, probe, *resolution);
         self.staged.write(&out_dir, &bytes)?;
@@ -123,18 +123,24 @@ impl LightingBake {
     }
 
     /// Apply a finished bake to `scene` in one step: the light probes' SH and every
-    /// reflection probe's cube. Errors, applying nothing, when the bake has not
-    /// finished or the scene's probes changed since it started.
+    /// reflection probe's cube. A reflection bake that ran then removes the cubes in
+    /// the scene's folder past its probe count, all of them when it had no probes; a
+    /// bake dropped before its commit removes nothing. Errors, applying nothing, when
+    /// the bake has not finished or the scene's probes changed since it started.
     pub fn commit(&mut self, scene: &mut Scene) -> Result<(), String> {
         self.refuse_changed(scene)?;
         if self.stage() != Stage::Done {
             return Err("the probe bake has not finished".into());
         }
-        if self.renderer.is_none() {
-            return Ok(()); // nothing baked
+        if self.renderer.is_some() {
+            self.light.commit(scene)?;
+            self.staged.commit(scene)?;
         }
-        self.light.commit(scene)?;
-        self.staged.commit(scene)
+        // A reflection bake that ran leaves only its own cubes in the scene's folder.
+        match (self.report.ran_reflection_bake, self.scene_path.as_deref()) {
+            (true, Some(path)) => prune_stale(&reflection_dir(path), self.staged.len()),
+            _ => Ok(()),
+        }
     }
 
     /// [`PROBES_CHANGED`] when either probe set is not the one this bake started on.
@@ -189,15 +195,6 @@ impl LightingBake {
     pub fn report(&self) -> LightingBakeReport {
         self.report
     }
-}
-
-/// The directory reflection cubemaps are written to: the saved scene's.
-fn out_dir(scene_path: Option<&str>) -> Result<PathBuf, String> {
-    let path = scene_path.ok_or_else(|| "save the scene before baking reflections".to_string())?;
-    Ok(Path::new(path)
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .to_path_buf())
 }
 
 #[cfg(test)]
