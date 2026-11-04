@@ -1,10 +1,12 @@
 //! src/physics/joints/mod.rs — `Joint` components as rapier impulse joints (#449).
 //!
-//! Before a step, when the change log names a `Joint`, its entity or connected
-//! body, or the body plan changed (always on a full sync; `physics::sync`, #1707),
-//! [`PhysicsWorld::resync_joints`] (re)builds a joint when new, when its shape
-//! (kind, bodies, anchors, axes, limits, collision flag) changed, or when either
-//! body was rebuilt (rapier drops a removed body's joints). Break thresholds are read live.
+//! Before a step, when the change log names a `Joint`, its entity, its connected
+//! body or that body's owner, or the body plan changed (always on a full sync;
+//! `physics::sync`, #1707), [`PhysicsWorld::resync_joints`] (re)builds a joint
+//! when new, when its shape (kind, bodies, anchors, axes, limits, collision flag)
+//! changed, or when either body was rebuilt (rapier drops a removed body's
+//! joints), and drops one while either body is disabled (#1775). Break
+//! thresholds are read live.
 //!
 //! **Frames.** The joint's frame sits at `anchor` (this entity's local space,
 //! scaled like its geometry) with its X axis along `axis` and its Y axis along
@@ -35,16 +37,18 @@
 
 use std::collections::BTreeMap;
 
-use glam::{Mat3, Quat, Vec3};
+use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
 
 use super::compound::{body_owner, world_pose};
-use super::convert::to_pose;
 use super::events::collision::VelocitySnapshot;
 use super::world::PhysicsWorld;
-use crate::components::{JointComponent, JointKind};
+use crate::components::JointComponent;
 use crate::scene::Scene;
+use frame::{joint_basis, joint_builder, local_frame};
 
+#[cfg(test)]
+mod disabled_tests;
 mod frame;
 #[cfg(test)]
 mod frame_tests;
@@ -130,6 +134,13 @@ impl PhysicsWorld {
     /// Every buildable joint in the scene, keyed by its entity: an active entity
     /// with a `Joint` whose own body exists, and whose connected body (when it
     /// names one) exists too. A joint missing a body is inert, not an error.
+    ///
+    /// So is one whose body is disabled (its owner inactive in the hierarchy, as
+    /// `sync_enabled` sets it), and it comes back when the owner is reactivated
+    /// (#1775): rapier picks joints for its solver without checking `is_enabled`,
+    /// so a body built disabled joins one as a second world-attached side and a
+    /// fixed partner panics its solver (`unreachable!()`), and one disabled later
+    /// keeps a stale solver slot.
     fn wanted_joints(&self, scene: &Scene) -> BTreeMap<u32, JointKey> {
         let mut out = BTreeMap::new();
         for id in scene.world.ids_with_joint() {
@@ -139,7 +150,11 @@ impl PhysicsWorld {
             if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
-            let body = |e: u32| self.id_to_body.get(&body_owner(scene, e)).copied();
+            let body = |e: u32| {
+                let owner = body_owner(scene, e);
+                let enabled = scene.world.is_active_in_hierarchy(owner);
+                self.id_to_body.get(&owner).copied().filter(|_| enabled)
+            };
             let Some(body1) = body(id) else {
                 continue;
             };
@@ -247,54 +262,7 @@ impl PhysicsWorld {
     }
 }
 
-/// The world frame `(pos, rot)` expressed in the frame of a body at `body`.
-fn local_frame((bpos, brot): (Vec3, Quat), pos: Vec3, rot: Quat) -> Pose {
-    let inv = brot.inverse();
-    to_pose(inv * (pos - bpos), (inv * rot).normalize())
-}
-
-/// The rotation taking the joint frame to this entity's local space: X along
-/// `axis`, Y along `swing_axis`'s part perpendicular to it (any perpendicular
-/// when it has none), Z completing the right-handed frame.
-fn joint_basis(axis: Vec3, swing_axis: Vec3) -> Quat {
-    let x = axis.try_normalize().unwrap_or(Vec3::X);
-    let y = (swing_axis - x * swing_axis.dot(x))
-        .try_normalize()
-        .unwrap_or_else(|| x.any_orthonormal_vector());
-    Quat::from_mat3(&Mat3::from_cols(x, y, x.cross(y)))
-}
-
 /// Whether `load` breaks a joint rated `threshold` (`0`: unbreakable).
 fn exceeds(load: f32, threshold: f32) -> bool {
     threshold > 0.0 && load > threshold
-}
-
-/// The rapier joint for `j`'s kind: which axes are locked and the angle limits
-/// (degrees → radians) on the free ones. The joint X axis is `j.axis`, Y the
-/// swing axis and Z swing 2's (see [`joint_basis`]).
-fn joint_builder(j: &JointComponent) -> GenericJointBuilder {
-    let rad = |d: f32| d.to_radians();
-    let twist = [rad(j.limits.x), rad(j.limits.y)];
-    match j.kind {
-        JointKind::Fixed => GenericJointBuilder::new(JointAxesMask::LOCKED_FIXED_AXES),
-        JointKind::Hinge => {
-            let b = GenericJointBuilder::new(JointAxesMask::LOCKED_REVOLUTE_AXES);
-            match j.use_limits {
-                true => b.limits(JointAxis::AngX, twist),
-                false => b,
-            }
-        }
-        JointKind::Ball => {
-            let b = GenericJointBuilder::new(JointAxesMask::LOCKED_SPHERICAL_AXES);
-            let swing1 = [-rad(j.swing_limit), rad(j.swing_limit)];
-            let swing2 = [-rad(j.swing2_limit), rad(j.swing2_limit)];
-            match j.use_limits {
-                true => b
-                    .limits(JointAxis::AngX, twist)
-                    .limits(JointAxis::AngY, swing1)
-                    .limits(JointAxis::AngZ, swing2),
-                false => b,
-            }
-        }
-    }
 }

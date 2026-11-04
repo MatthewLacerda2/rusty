@@ -12,7 +12,7 @@
 //! | Pass | Reads | Seen on |
 //! |---|---|---|
 //! | body plan (`resync_topology`) | a Collider's presence and `active`, a CharacterController's presence, a Rigidbody's presence, the parent chain (`body_carrier`) | `ColliderComponent`, `CharacterControllerComponent`, `RigidBodyComponent`; a re-parent on `WorldPose` (subtree) |
-//! | joints (`resync_joints`) | every `Joint`, the joint entity's `activeInHierarchy`, both bodies' owners and handles | `JointComponent`; the joint and connected ids on `Activity`, `WorldPose`; a plan change |
+//! | joints (`resync_joints`) | every `Joint`, the joint entity's `activeInHierarchy`, both bodies' owners, handles and `activeInHierarchy` (a disabled body's joint is inert) | `JointComponent`; the joint and connected ids and the connected body's owner on `Activity`, `WorldPose`; a plan change |
 //! | `sync_enabled` | `activeInHierarchy` of the owner and each collider | `Activity` |
 //! | `sync_materials`, `sync_sensors` | the Collider's material and `is_trigger`, a CharacterController's presence | `ColliderComponent`, `CharacterControllerComponent` |
 //! | `sync_layers` | the entity's layer, **and the scene's collision matrix** | `Layer`; the matrix is not an entity column, so it is compared to the copy kept here and a change re-runs the pass over every collider |
@@ -39,7 +39,7 @@
 
 use std::collections::BTreeSet;
 
-use super::compound::BodyPlan;
+use super::compound::{body_owner, BodyPlan};
 use crate::components::{
     CharacterControllerComponent, ColliderComponent, JointComponent, RigidBodyComponent,
 };
@@ -199,14 +199,18 @@ pub(super) fn carriers(scene: &Scene) -> BTreeSet<u32> {
     out
 }
 
-/// Every `Joint` entity and the connected body it names: what `resync_joints` reads
-/// besides the plan.
+/// Every `Joint` entity, the connected body it names and that body's owner: what
+/// `resync_joints` reads besides the plan. The owner's `activeInHierarchy` is its
+/// body's enabled flag, which decides whether the joint is built (#1775), and it
+/// can flip without the connected entity's own (already inactive) flag moving.
 pub(super) fn joint_deps(scene: &Scene) -> BTreeSet<u32> {
     let w = &scene.world;
     let mut out = BTreeSet::new();
     for id in w.ids_with_joint() {
         out.insert(id);
-        out.extend(w.joint(id).and_then(|j| j.connected_body));
+        if let Some(other) = w.joint(id).and_then(|j| j.connected_body) {
+            out.extend([other, body_owner(scene, other)]);
+        }
     }
     out
 }

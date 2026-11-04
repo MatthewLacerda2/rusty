@@ -36,7 +36,9 @@ connected body is destroyed** (or left behind by a scene load) the joint holds t
 the world, as Unity's does.
 **Both bodies need a collider**: a body without one does not
 exist in the physics world, and a joint missing a body does nothing. A deactivated
-joint entity's joint is removed until it is active again. `enable_collision` (off
+joint entity's joint is removed until it is active again, and so is one whose
+connected body is deactivated (the GameObject carrying that body's Rigidbody, or
+one above it). `enable_collision` (off
 by default, as in Unity) lets the two joined bodies still collide.
 
 **Breaking.** A non-zero break force (newtons) or torque (newton-metres) breaks the

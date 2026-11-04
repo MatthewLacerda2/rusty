@@ -3,12 +3,10 @@
 //! change log, one in full every step, and rapier holds the same bits in both
 //! after every step, as do the scenes the bodies write back into.
 
-use std::panic::{catch_unwind, AssertUnwindSafe};
-
 use proptest::prelude::*;
 
 use super::fixture_tests::{digest, fixture, scene_digest};
-use super::ops_tests::{apply, op, Op, SETTLE_STEPS};
+use super::ops_tests::{apply, op, Op, Phys, SETTLE_STEPS};
 use crate::components::RigidBodyComponent;
 use crate::ecs::{Changes, WorldPose};
 use crate::physics::PhysicsWorld;
@@ -30,35 +28,21 @@ impl Twin {
         Self { a, b, fast, full }
     }
 
-    /// Apply `op` to both copies, which must agree after every step it takes;
-    /// `Ok(false)` when rapier panicked in both, which ends the run.
-    pub fn run(&mut self, op: &Op) -> Result<bool, TestCaseError> {
+    /// Apply `op` to both copies, which must agree after every step it takes.
+    pub fn run(&mut self, op: &Op) -> Result<(), TestCaseError> {
         if matches!(op, Op::Settle) {
             for _ in 0..SETTLE_STEPS {
-                if !self.run(&Op::Step)? {
-                    return Ok(false);
-                }
+                self.run(&Op::Step)?;
             }
-            return Ok(true);
+            return Ok(());
         }
-        // A joint between two bodies rapier cannot solve panics inside its step,
-        // on both syncs alike (#1775): that ends the run, and must end both.
-        let ran_a = catch_unwind(AssertUnwindSafe(|| apply(&mut self.a, &mut self.fast, op)));
-        let ran_b = catch_unwind(AssertUnwindSafe(|| apply(&mut self.b, &mut self.full, op)));
-        prop_assert_eq!(
-            ran_a.is_ok(),
-            ran_b.is_ok(),
-            "only one panicked at {:?}",
-            op
-        );
-        if ran_a.is_err() {
-            return Ok(false);
-        }
+        apply(&mut self.a, &mut self.fast, op);
+        apply(&mut self.b, &mut self.full, op);
         if matches!(op, Op::Step | Op::Pause) {
             same("rapier", &digest(&self.fast), &digest(&self.full))?;
             same("scene", &scene_digest(&self.a), &scene_digest(&self.b))?;
         }
-        Ok(true)
+        Ok(())
     }
 }
 
@@ -73,12 +57,8 @@ fn same(what: &str, l: &str, r: &str) -> Result<(), TestCaseError> {
 pub fn agree(ops: &[Op]) -> Result<(), TestCaseError> {
     let mut twin = Twin::new();
     for (n, op) in ops.iter().chain(&[Op::Step, Op::Step]).enumerate() {
-        let ran = twin
-            .run(op)
+        twin.run(op)
             .map_err(|e| TestCaseError::fail(format!("op {n}: {e}")))?;
-        if !ran {
-            return Ok(());
-        }
     }
     Ok(())
 }
@@ -90,6 +70,23 @@ proptest! {
     fn incremental_sync_equals_the_full_pass(ops in proptest::collection::vec(op(), 1..60)) {
         agree(&ops)?;
     }
+}
+
+/// The sequence that panicked rapier's solver (#1775): the ground is adopted by
+/// an inactive parent that then gets a dynamic Rigidbody (a body built
+/// disabled), a box is jointed to it, and the box turns static. The joint is
+/// inert, and both syncs step on.
+#[test]
+fn a_joint_from_a_fixed_body_to_a_disabled_one_steps() {
+    use crate::ecs::changes::ops_tests::{Edit, Op as W};
+    agree(&[
+        Op::World(W::On(0, Edit::Adopt(false))),
+        Op::On(5, Phys::Body(false)),
+        Op::Step,
+        Op::On(1, Phys::Joint(Some(5))),
+        Op::World(W::On(1, Edit::Overwrite(true, true))),
+    ])
+    .unwrap();
 }
 
 /// Bodies at rest write back what they hold, which stamps nothing: once the
