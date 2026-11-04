@@ -22,6 +22,12 @@ use super::watch::{carriers, Owners};
 use super::world::PhysicsWorld;
 use crate::scene::Scene;
 
+/// The body-type pairs a collider generates contacts for: every one but
+/// static↔static (#1779). rapier tests it against the bodies' types each step,
+/// so a body switched to or from static in Play is filtered by what it is now.
+pub(super) const ACTIVE_TYPES: ActiveCollisionTypes =
+    ActiveCollisionTypes::all().difference(ActiveCollisionTypes::FIXED_FIXED);
+
 impl PhysicsWorld {
     /// Re-derive the body plan and rebuild exactly the owners whose collider set
     /// changed since the last build; returns the owners built. Iterates the
@@ -151,8 +157,10 @@ impl PhysicsWorld {
         collider.set_active_events(ActiveEvents::COLLISION_EVENTS);
         // The demo's bodies are kinematic/static, so the default
         // "only-if-one-is-dynamic" filtering would suppress every player↔wall
-        // and player↔enemy pair. Enable all type combinations.
-        collider.set_active_collision_types(ActiveCollisionTypes::all());
+        // and player↔enemy pair. Enable every combination but static↔static:
+        // as in Unity, two static colliders never collide, and a wall standing
+        // on a floor would otherwise keep a solved pair every tick (#1779).
+        collider.set_active_collision_types(ACTIVE_TYPES);
         // The collision matrix (#91) decides which layers interact: a collider
         // is a member of its own layer and filters to the layers it may collide
         // with. Set on both collision and solver groups so contact generation
