@@ -155,9 +155,7 @@ impl CaptureHost {
     ) -> Result<Option<RenderedFrame>, String> {
         // A capture of the screen renders at its render scale (#1498), read as the
         // player and the Game view read it.
-        let scale = self
-            .renderer(width, height)
-            .map(|r| r.graphics(false).render_scale);
+        let scale = self.renderer(width, height).map(|r| r.render_scale(false));
         let Some((renderer, view)) = self.frame(width, height, scale.unwrap_or_default()) else {
             no_adapter("draw a capture")?;
             return Ok(None);

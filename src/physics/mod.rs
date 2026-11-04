@@ -22,6 +22,8 @@ mod compound_tests;
 mod convert;
 #[cfg(test)]
 mod degenerate_parent_tests;
+#[cfg(test)]
+mod differs_tests;
 mod events;
 mod follow;
 mod joints;
@@ -41,6 +43,7 @@ mod shape;
 mod sync;
 mod watch;
 mod world;
+mod writes;
 
 pub use character::{can_stand, move_character, CharacterMove};
 pub use events::collision::{CollisionEvents, CollisionPair, Contact};

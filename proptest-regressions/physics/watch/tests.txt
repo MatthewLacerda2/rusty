@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc baa8c075b455fc3cf3455aa3e1db86c62e50e3a358f180fb32a1f747586fc6d3 # #1798: incremental sync drifted from the full pass

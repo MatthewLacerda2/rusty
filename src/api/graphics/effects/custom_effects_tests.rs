@@ -48,7 +48,7 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
         crate::api::graphics::register(
             &lua,
             bind(&lua, scene),
-            bind(&lua, &graphics),
+            (bind(&lua, &graphics), crate::api::ApiCell::default()),
             bind(&lua, &app),
         )
         .unwrap();

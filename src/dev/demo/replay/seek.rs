@@ -28,6 +28,7 @@ pub struct Start {
     camera: Camera,
     time: Time,
     game_view: Option<(u32, u32)>,
+    display_scale: Option<f32>,
 }
 
 impl Start {
@@ -40,6 +41,7 @@ impl Start {
             camera: world.camera().borrow().clone(),
             time: world.time().borrow().clone(),
             game_view: world.resources.screen.borrow().game_view(),
+            display_scale: world.resources.screen.borrow().reported_display_scale(),
         }
     }
 
@@ -54,7 +56,10 @@ impl Start {
         *world.camera().borrow_mut() = self.camera;
         *world.time().borrow_mut() = self.time;
         // A tick past the start may have resized the Game view.
-        (world.resources.screen.borrow_mut()).restore_game_view(self.game_view);
+        let mut screen = world.resources.screen.borrow_mut();
+        screen.restore_game_view(self.game_view);
+        screen.restore_display_scale(self.display_scale);
+        drop(screen);
         world.set_playing(true);
     }
 }
