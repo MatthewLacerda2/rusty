@@ -146,7 +146,9 @@ pub(crate) struct LightingUniform {
     // `env_reflection` (#1668) 1.0 when surfaces reflect the sky and the reflection
     // probes; 0.0 in a light-probe capture, which bakes no specular (as Unity's).
     pub env_reflection: f32,
-    pub _sky_pad: f32,
+    // `diffuse_wrap` (#1698) 1.0 under `DiffuseModel::HalfLambert`: the squared wrap
+    // replaces Lambert in `calculate_pbr`, as in the lightmap and probe bakes.
+    pub diffuse_wrap: f32,
     // The resident reflection probes (#1206): a draw's instance names the two it
     // blends (`InstanceData::reflection_probe`, #1584), and the shader box-projects
     // against each one's box and samples its cube's layer of the binding-4 cube array.
