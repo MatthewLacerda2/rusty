@@ -9,7 +9,7 @@ use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::postfx::{PostFx, HDR_FORMAT};
+use crate::render::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::render::timing::{GpuPass, GpuTimer};
 
 /// The chain's three passes, shared by every view, and the lens dirt textures the
@@ -17,6 +17,7 @@ use crate::render::timing::{GpuPass, GpuTimer};
 pub(crate) struct BloomPasses {
     layout: wgpu::BindGroupLayout,
     prefilter: LazyPipeline,
+    resample: LazyPipeline,
     downsample: LazyPipeline,
     upsample: LazyPipeline,
     pub(crate) dirt: cache::DirtCache,
@@ -60,6 +61,7 @@ impl BloomPasses {
         };
         Self {
             prefilter: pass("fs_prefilter"),
+            resample: pass("fs_resample"),
             downsample: pass("fs_downsample"),
             upsample: pass("fs_upsample"),
             layout,
@@ -68,17 +70,65 @@ impl BloomPasses {
     }
 
     /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
-        [&self.prefilter, &self.downsample, &self.upsample]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
+        [
+            &self.prefilter,
+            &self.resample,
+            &self.downsample,
+            &self.upsample,
+        ]
     }
-}
 
-impl BloomPasses {
-    /// Encode `t`'s chain from `input` (the scene, and the sampler every pass reads
-    /// with) into `encoder`, after `t.params` was written: the prefilter (`input`
-    /// -> `down[0]`), each downsample (`down[i - 1]` -> `down[i]`), then each
-    /// upsample from the bottom (`up[i + 1]`, or the last down mip, over `down[i]`
-    /// -> `up[i]`).
+    /// One pass's group: `low` its input, `high` the upsample's own mip (the other
+    /// passes bind their input there again, never the target they write).
+    fn group(
+        &self,
+        device: &wgpu::Device,
+        (params, sampler): (&wgpu::Buffer, &wgpu::Sampler),
+        low: &wgpu::TextureView,
+        high: &wgpu::TextureView,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Bloom Bind Group"),
+            layout: &self.layout,
+            entries: &[
+                entry(0, params.as_entire_binding()),
+                entry(1, wgpu::BindingResource::TextureView(low)),
+                entry(2, wgpu::BindingResource::Sampler(sampler)),
+                entry(3, wgpu::BindingResource::TextureView(high)),
+            ],
+        })
+    }
+
+    /// The groups of a chain's resample (`pre` -> `down[0]`, when it has one), its
+    /// downsamples (`down[i - 1]` -> `down[i]`), then its upsamples from the bottom
+    /// (`up[i + 1]`, or the last down mip, over `down[i]` -> `up[i]`), made once with
+    /// the chain: none depends on the frame.
+    pub(super) fn chain_groups(
+        &self,
+        device: &wgpu::Device,
+        (pre, down, up): (Option<&PfxTarget>, &[PfxTarget], &[PfxTarget]),
+        params: &wgpu::Buffer,
+        sampler: &wgpu::Sampler,
+    ) -> Vec<wgpu::BindGroup> {
+        let bound = (params, sampler);
+        let mut groups = Vec::with_capacity(1 + down.len() + up.len());
+        if let Some(pre) = pre {
+            groups.push(self.group(device, bound, &pre.view, &pre.view));
+        }
+        for pair in down.windows(2) {
+            groups.push(self.group(device, bound, &pair[0].view, &pair[0].view));
+        }
+        for i in (0..up.len()).rev() {
+            let low = up.get(i + 1).unwrap_or(&down[i + 1]);
+            groups.push(self.group(device, bound, &low.view, &down[i].view));
+        }
+        groups
+    }
+
+    /// Encode `t`'s chain from `input` (the scene, and the sampler the prefilter
+    /// reads it with) into `encoder`, after `t.params` was written: the prefilter
+    /// (`input` -> `pre`, else `down[0]`), then the passes of `t.groups`.
     pub(super) fn encode(
         &self,
         device: &wgpu::Device,
@@ -87,31 +137,21 @@ impl BloomPasses {
         (input, sampler): (&wgpu::TextureView, &wgpu::Sampler),
         timer: &GpuTimer,
     ) {
-        // `high` is the upsample's own mip; the other passes bind their input there
-        // again, never the target they write.
-        let group = |low: &wgpu::TextureView, high: &wgpu::TextureView| {
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Bloom Bind Group"),
-                layout: &self.layout,
-                entries: &[
-                    entry(0, t.params.as_entire_binding()),
-                    entry(1, wgpu::BindingResource::TextureView(low)),
-                    entry(2, wgpu::BindingResource::Sampler(sampler)),
-                    entry(3, wgpu::BindingResource::TextureView(high)),
-                ],
-            })
-        };
-        let mut steps = vec![(&self.prefilter, group(input, input), &t.down[0])];
-        for pair in t.down.windows(2) {
-            let (above, below) = (&pair[0].view, &pair[1]);
-            steps.push((&self.downsample, group(above, above), below));
+        let prefilter = self.group(device, (&t.params, sampler), input, input);
+        let mut steps = vec![(&self.prefilter, &prefilter, t.prefilter_target())];
+        let mut groups = &t.groups[..];
+        if t.pre.is_some() {
+            steps.push((&self.resample, &groups[0], &t.down[0]));
+            groups = &groups[1..];
         }
-        for i in (0..t.up.len()).rev() {
-            let low = t.up.get(i + 1).unwrap_or(&t.down[i + 1]);
-            let bind = group(&low.view, &t.down[i].view);
-            steps.push((&self.upsample, bind, &t.up[i]));
+        let (down_groups, up_groups) = groups.split_at(t.down.len() - 1);
+        for (group, target) in down_groups.iter().zip(&t.down[1..]) {
+            steps.push((&self.downsample, group, target));
         }
-        for (pipeline, bind_group, target) in &steps {
+        for (group, i) in up_groups.iter().zip((0..t.up.len()).rev()) {
+            steps.push((&self.upsample, group, &t.up[i]));
+        }
+        for (pipeline, bind_group, target) in steps {
             let timed = (pipeline.get(), timer.writes(GpuPass::PostFx));
             PostFx::fullscreen(encoder, timed, &[bind_group], &target.view);
         }

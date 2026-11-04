@@ -63,7 +63,7 @@ impl PostFx {
             let bg = self.io_bind_group(
                 device,
                 &self.ldr.view,
-                self.bloom.view(),
+                self.bloom_view(),
                 ctx.depth_view,
                 ctx.skybox,
             );
@@ -96,11 +96,19 @@ impl PostFx {
         let io = self.io_bind_group(
             device,
             self.scene_color(),
-            self.bloom.view(),
+            self.bloom_view(),
             ctx.depth_view,
             ctx.skybox,
         );
         [io, self.effect_textures.bind_group(device, self)]
+    }
+
+    /// Bloom's result (io binding 3): the top of its chain while the view blooms,
+    /// else the composite textures' black texel, so a view that never blooms holds
+    /// no chain (#1700).
+    pub(crate) fn bloom_view(&self) -> &wgpu::TextureView {
+        let chain = self.targets.get::<effects::bloom::BloomTargets>();
+        chain.map_or(self.effect_textures.black(), |t| t.view())
     }
 
     /// The scene the composite and bloom read: motion-blurred (#1436), else focused.

@@ -1,8 +1,13 @@
 // engine/shaders/postfx/bloom.wgsl — bloom's mip chain, before the composite
 // (`render::postfx::effects::bloom`), after Jimenez's *Next-Generation Post Processing
 // in Call of Duty: Advanced Warfare* (SIGGRAPH 2014) with Unity URP's knobs:
-// - `fs_prefilter`: the scene down to the chain's first mip with the 13-tap filter, a
-//   Karis average (against fireflies), then URP's soft-knee threshold;
+// - `fs_prefilter`: the scene down to half its size (or the chain's first mip at ÷1)
+//   with the 13-tap filter, a Karis average (it damps how far a lone bright texel
+//   spreads into the texels around it), then URP's soft-knee threshold;
+// - `fs_resample`: at ÷3 and ÷4, that half-size image down to the chain's first
+//   mip with the 13-tap filter. Taken straight from the scene, the 13 taps one ÷3
+//   or ÷4 texel apart would skip scene pixels, so a spark moving across the view
+//   would switch its glow on and off;
 // - `fs_downsample`: each mip into the next, half its size, with the 13-tap filter;
 // - `fs_upsample`: back up, a 3×3 tent of the mip below blended over this one's by
 //   the scatter, as URP's `lerp(highMip, lowMip, Scatter)`.
@@ -16,13 +21,14 @@ struct BloomParams {
     // x: the threshold, y: its knee (half the threshold, as URP fixes it), z: the
     // upsample's blend, URP's `lerp(0.05, 0.95, scatter)`, w: the clamp on the input
     knobs: vec4<f32>,
-    // xy: one texel of the chain's first mip (the prefilter's step), zw: unused
+    // xy: one texel of the prefilter's target in uv (its step), zw: one texel of
+    // the chain's first mip (the resample's step)
     texel: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> params: BloomParams;
-// The pass's input: the scene (prefilter), the mip above (downsample), or the mip
-// below (upsample).
+// The pass's input: the scene (prefilter), the half-size image (resample), the mip
+// above (downsample), or the mip below (upsample).
 @group(0) @binding(1) var t_color: texture_2d<f32>;
 @group(0) @binding(2) var s_color: sampler;
 // The upsample's own mip, which the mip below blends over; unused elsewhere.
@@ -55,7 +61,8 @@ fn is_nan(x: f32) -> bool {
 
 // One scene sample made safe for the chain: NaN is black, inf and anything above the
 // clamp is the clamp (URP's `ClampMax`), negatives are zero. Only the prefilter reads
-// the scene, so nothing it lets through can spread down the chain.
+// the scene, so no NaN or inf reaches the chain. An inf a bilinear tap keeps is
+// clamped and still glows; one it weighs by 0 is NaN on some drivers, and dropped.
 fn safe_tap(uv: vec2<f32>) -> vec3<f32> {
     let c = tap(uv);
     let nan = is_nan(c.r) || is_nan(c.g) || is_nan(c.b);
@@ -131,12 +138,21 @@ fn fs_prefilter(in: VsOut) -> @location(0) vec4<f32> {
     return vec4<f32>(threshold(c), 1.0);
 }
 
-@fragment
-fn fs_downsample(in: VsOut) -> @location(0) vec4<f32> {
-    let step = 2.0 / vec2<f32>(textureDimensions(t_color));
-    let b = boxes(in.uv, step, false);
+// Jimenez's plain 13-tap reduction, taps one destination texel `step` apart.
+fn reduce(uv: vec2<f32>, step: vec2<f32>) -> vec4<f32> {
+    let b = boxes(uv, step, false);
     let c = b.inner * 0.5 + (b.a + b.b + b.c + b.d) * 0.125;
     return vec4<f32>(c, 1.0);
+}
+
+@fragment
+fn fs_resample(in: VsOut) -> @location(0) vec4<f32> {
+    return reduce(in.uv, params.texel.zw);
+}
+
+@fragment
+fn fs_downsample(in: VsOut) -> @location(0) vec4<f32> {
+    return reduce(in.uv, 2.0 / vec2<f32>(textureDimensions(t_color)));
 }
 
 @fragment

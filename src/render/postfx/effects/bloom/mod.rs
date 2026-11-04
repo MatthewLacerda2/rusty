@@ -19,6 +19,8 @@ mod dirt_tests;
 #[cfg(test)]
 mod gpu_tests;
 mod passes;
+#[cfg(test)]
+mod prefilter_gpu_tests;
 
 use chain::BloomParams;
 pub(crate) use chain::BloomTargets;
@@ -42,7 +44,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         slots: 1,
         textures: &[CompositeTexture {
             name: "dirt",
-            view: |pfx| pfx.bloom.dirt_view(),
+            view: |pfx| pfx.bloom_dirt.as_ref().map(|t| &t.view),
         }],
         pack,
     }],
@@ -71,33 +73,37 @@ fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     slots[0] = [b.intensity, dirt, 0.0, on];
 }
 
-/// The chain, when the view blooms, at its quality's divisor: the prefilter (scene
-/// -> `down[0]`), each downsample (`down[i - 1]` -> `down[i]`), then each upsample
-/// from the bottom (`up[i + 1]`, or the last down mip, over `down[i]` -> `up[i]`);
-/// with the lens dirt its volume names for the composite.
+/// The chain, when the view blooms, at its quality's divisor (made the first frame
+/// it does, dropped when it stops): the prefilter (scene -> `down[0]`), each
+/// downsample, then each upsample from the bottom (`BloomPasses::encode`); with the
+/// lens dirt its volume names for the composite.
 fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
+    let pfx = &mut view.post_fx;
     let Some(vc) = cx.effect.volume().filter(|_| blooms(&cx.effect)) else {
-        view.post_fx.bloom.dirt = None;
+        pfx.bloom_dirt = None;
+        pfx.targets.remove::<BloomTargets>();
         return;
     };
     let levels = &cx.effect.graphics.quality.bloom_resolution_divisor;
     let divisor = vc.bloom.quality.pick(levels, vc.bloom.resolution_divisor);
     let divisor = divisor.clamp(1, MAX_RESOLUTION_DIVISOR);
-    if view.post_fx.bloom.divisor != divisor {
-        let size = view.post_fx.full_size;
-        view.post_fx.bloom = BloomTargets::new(&r.device, size, divisor);
+    let (device, passes) = (&r.device, &r.post_passes.bloom);
+    let (scene, sampler) = (pfx.full_size, &pfx.sampler);
+    let make = || BloomTargets::new(device, passes, sampler, scene, divisor);
+    let t = pfx.targets.get_or(&make);
+    if t.divisor != divisor {
+        *t = make();
     }
-    view.post_fx.bloom.dirt = r.lens_dirt(vc);
-    let (pfx, passes) = (&view.post_fx, &r.post_passes.bloom);
-    let params = BloomParams::new(&vc.bloom, pfx.bloom.size);
+    pfx.bloom_dirt = r.lens_dirt(vc);
+    let pfx = &view.post_fx;
+    let t = pfx.targets.get::<BloomTargets>().expect("made above");
+    let params = BloomParams::new(&vc.bloom, t);
     r.queue
-        .write_buffer(&pfx.bloom.params, 0, bytemuck::bytes_of(&params));
-    let mut encoder = r
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Bloom Encoder"),
-        });
+        .write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("Bloom Encoder"),
+    });
     let input = (pfx.scene_color(), &pfx.sampler);
-    passes.encode(&r.device, &mut encoder, &pfx.bloom, input, &r.gpu_timer);
+    passes.encode(device, &mut encoder, t, input, &r.gpu_timer);
     r.queue.submit(std::iter::once(encoder.finish()));
 }

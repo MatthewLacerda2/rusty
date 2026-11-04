@@ -1,6 +1,6 @@
 //! Bloom's mip chain on lavapipe (#1700): a small lamp on a dark wall glows far past
 //! the old 5×5 gaussian's reach, the scatter widens it, and a view too small for a
-//! second mip still blooms.
+//! second mip renders no darker than without bloom.
 
 use glam::Vec3;
 
@@ -99,12 +99,21 @@ fn gpu_scatter_spreads_the_glow_wider() {
 }
 
 #[test]
-fn gpu_views_too_small_for_a_chain_still_bloom() {
+fn gpu_views_too_small_for_a_chain_render_no_darker_than_without_bloom() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(W, H) else {
         return;
     };
+    let sum = |frame: &[u8]| frame.iter().map(|&c| c as u32).sum::<u32>();
     for size in [(1, 1), (3, 2), (2, 300), (9, 9)] {
-        let frame = shot(&mut r, &scene(40.0, |_| ()), size);
-        assert_eq!(frame.len(), (size.0 * size.1 * 4) as usize, "{size:?}");
+        let on = shot(&mut r, &scene(40.0, |_| ()), size);
+        let off = shot(&mut r, &scene(40.0, |vc| vc.bloom.active = false), size);
+        assert_eq!(on.len(), (size.0 * size.1 * 4) as usize, "{size:?}");
+        // Bloom only adds light: a one-mip chain or a one-texel view never darkens.
+        assert!(
+            sum(&on) >= sum(&off),
+            "{size:?}: {} < {}",
+            sum(&on),
+            sum(&off)
+        );
     }
 }

@@ -310,12 +310,21 @@ the threshold wide either side, as URP fixes it) into the first mip of a chain, 
 fraction of the view's resolution its **quality** picks from the running preset (the
 seeded `Medium` preset's levels: a quarter at `Low`, half at `Medium` and `High`; the
 `High` preset's `Medium` level is a third; `Custom` takes the `resolution_divisor`
-knob; see *Quality presets*), so each level changes what the chain costs. Each mip below is half the one
+knob; see *Quality presets*), so each level changes what the chain costs. A lower level
+also widens the glow on screen, since every mip then covers twice the pixels, and at 4K
+the 8-mip cap leaves the widest glow at half the screen share it has at 1080p. Past
+half resolution the prefilter reads a denser 25-tap lattice instead of Jimenez's 13
+taps, so every scene pixel reaches the chain and a one-pixel spark moving across the
+view keeps its glow. Each mip below is half the one
 above, down to a few texels across (at most 8 mips), and the chain is blended back up,
 each mip taking the **scatter**'s share of the wider glow below it (`0`: a tight glow,
 `1`: a wide, soft one). The composite adds the result times the **intensity**, before
-the exposure. The prefilter averages bright texels so a lone specular sparkle doesn't
-flicker, and a NaN or infinite pixel in the scene never spreads through the chain. It
+the exposure. The prefilter's Karis average weighs each box of texels down by its
+brightness, which damps how far a lone specular sparkle spreads into the texels
+around it (not its own glow). A NaN pixel is dropped; an infinite one is clamped to
+65472 and still glows (or, where the driver's filtering makes it NaN, dropped), so
+neither reaches the chain as inf or NaN. The chain is allocated the first frame a
+view blooms and dropped when it stops, so bloom off costs nothing. It
 reads the scene after depth of field and motion blur, so a moving highlight blooms
 along its streak. The player's `bloom` option gates it. A new volume starts with bloom
 on at intensity `1`, threshold `0.8`, scatter `0.7`.
@@ -339,7 +348,8 @@ Tween paths: `Graphics.bloom.intensity`, `Graphics.bloom.threshold`,
 #### Lens flare
 
 **Lens flare** (#1443) is Unity URP's *Screen Space Lens Flare*: built from bloom's
-blurred bright pass, so **every** bright pixel (the sun, a muzzle flash, a fire)
+prefiltered first mip (thresholded, before the chain spreads it, so the scatter
+never reshapes it), so **every** bright pixel (the sun, a muzzle flash, a fire)
 flares with no per-light authoring. Each bright pixel throws **ghosts** mirrored
 through the screen centre (`ghost_count` of them, each at its own scale and lens
 tint, so a light left of the centre ghosts on the right), a **halo** ring around the
@@ -353,8 +363,9 @@ volume's chromatic aberration.
 **It runs only while bloom runs**, since it reads bloom's chain: bloom off, or the
 player's `bloom` option off, means no flare. The player's `lens_flare` option gates
 it. A new volume starts with it off; once on, four
-ghosts, a halo at `0.5` and no streaks. A frame with nothing above bloom's threshold
-is byte-identical with it on and off, and a flare that can add nothing (no ghosts,
+ghosts, a halo at `0.5` and no streaks. A frame with nothing reaching bloom's soft
+knee (half the threshold, `0.4` at the default `0.8`) is byte-identical with it on and
+off, and a flare that can add nothing (no ghosts,
 halo or streaks, or a black tint) costs no pass. Its GPU time is
 `Debug.Stats().gpu_passes.lens_flare`. Tween paths: `Graphics.lens_flare.intensity`,
 `Graphics.lens_flare.ghost_intensity`, `Graphics.lens_flare.halo_intensity`,
