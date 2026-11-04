@@ -30,7 +30,7 @@ fn reflection_settings_read_back_and_clamp() {
     let s = session();
     let read = "local s = Lighting.GetSettings() \
         return s.reflectionResolution .. ' ' .. s.reflectionBudgetMB .. ' ' .. s.reflectionMaxProbes";
-    assert_eq!(s.eval(read).unwrap(), "512 128 512");
+    assert_eq!(s.eval(read).unwrap(), "512 256 512");
     s.eval("Lighting.SetSettings{ reflectionResolution = 1000, reflectionBudgetMB = 1, reflectionMaxProbes = 0 }")
         .unwrap();
     let r = s.world().scene().borrow().lighting_settings.reflections;

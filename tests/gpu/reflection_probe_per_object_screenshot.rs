@@ -6,13 +6,15 @@
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
+use rusty::core::color::f32_to_f16;
 use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
 use rusty::scene::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
-/// A one-mip `size`² RGBA8 sRGB KTX2 cubemap, every face the solid `rgb`.
-fn solid_cube_ktx2(size: u32, rgb: [u8; 3]) -> Vec<u8> {
+/// A one-mip `size`² half-float KTX2 cubemap (what the bake writes, #1696), every
+/// face the solid linear `rgb`.
+fn solid_cube_ktx2(size: u32, rgb: [f32; 3]) -> Vec<u8> {
     const MAGIC: [u8; 12] = [
         0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
     ];
@@ -22,18 +24,22 @@ fn solid_cube_ktx2(size: u32, rgb: [u8; 3]) -> Vec<u8> {
     let mut buf = vec![0u8; level];
     buf[..12].copy_from_slice(&MAGIC);
     let put = |b: &mut [u8], at: usize, v: u32| b[at..at + 4].copy_from_slice(&v.to_le_bytes());
-    // vkFormat R8G8B8A8_SRGB, typeSize, width, height, depth, layers, faces, levels.
-    for (at, v) in [(12, 43), (16, 4), (20, size), (24, size), (36, 6), (40, 1)] {
+    // vkFormat R16G16B16A16_SFLOAT, typeSize, width, height, depth, layers, faces, levels.
+    for (at, v) in [(12, 97), (16, 2), (20, size), (24, size), (36, 6), (40, 1)] {
         put(&mut buf, at, v);
     }
     put(&mut buf, 48, (header + index) as u32);
     put(&mut buf, 52, dfd as u32);
-    let len = (texels * 4) as u64;
+    let len = (texels * 8) as u64;
     for (k, v) in [level as u64, len, len].into_iter().enumerate() {
         buf[header + 8 * k..header + 8 * k + 8].copy_from_slice(&v.to_le_bytes());
     }
+    let texel: Vec<u8> = [rgb[0], rgb[1], rgb[2], 1.0]
+        .into_iter()
+        .flat_map(|c| f32_to_f16(c).to_le_bytes())
+        .collect();
     for _ in 0..texels {
-        buf.extend_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
+        buf.extend_from_slice(&texel);
     }
     buf
 }
@@ -51,7 +57,10 @@ fn scene() -> Scene {
         ..MaterialAsset::default()
     };
     scene.materials.insert("metal".to_string(), metal);
-    for (x, rgb, name) in [(-2.0, [255, 0, 0], "red"), (2.0, [0, 255, 0], "green")] {
+    for (x, rgb, name) in [
+        (-2.0, [1.0, 0.0, 0.0], "red"),
+        (2.0, [0.0, 1.0, 0.0], "green"),
+    ] {
         let path = crate::temp::dir().join(format!("rusty_probe_{name}.ktx2"));
         std::fs::write(&path, solid_cube_ktx2(4, rgb)).expect("write the cube");
         let probes = &mut scene.reflection_probes;

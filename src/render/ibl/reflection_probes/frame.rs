@@ -114,10 +114,11 @@ impl ProbeArray {
     }
 }
 
-/// The bytes an array of `cubes` cubes at a `face`-texel face takes: six RGBA8
-/// faces each, and a third more for the mips.
+/// The bytes an array of `cubes` cubes at a `face`-texel face takes: six
+/// `Rgba16Float` faces each (8 bytes a texel, #1696), and a third more for the mips.
 pub(crate) fn array_bytes(face: u32, cubes: usize) -> u64 {
-    let level = u64::from(face) * u64::from(face) * 4 * 6;
+    let texel = crate::render::ibl::reflection_prefilter::TEXEL_BYTES as u64;
+    let level = u64::from(face) * u64::from(face) * texel * 6;
     level * 4 / 3 * cubes as u64
 }
 

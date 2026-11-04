@@ -2,7 +2,7 @@
 //!
 //! The CPU GGX prefilter (`reflection_prefilter::cpu`, the reference the bake's GPU
 //! one is held to, #1602) needs two pure operations over a
-//! captured cubemap: the world DIRECTION each output texel points down, and the COLOUR
+//! captured cubemap: the world DIRECTION each output texel points down, and the RADIANCE
 //! the captured environment shows along an arbitrary direction. Both must agree with the
 //! exact per-face orientation `capture_static_cubemap` stored (#243) — the faces
 //! carry `face_camera`'s exact lenses (its up vectors and the readback flip included,
@@ -15,10 +15,6 @@
 
 use glam::{Mat4, Vec3, Vec4, Vec4Swizzles};
 
-#[cfg(test)]
-use crate::core::color;
-#[cfg(test)]
-pub use crate::core::color::srgb_to_linear;
 use crate::render::ibl::cubemap_capture::face_view_projection;
 use crate::render::CubemapFace;
 
@@ -98,12 +94,13 @@ pub fn face_uv(px: u32, py: u32, res: u32) -> (f32, f32) {
     (u, v)
 }
 
-/// Sample the LDR RGBA8 faces of a captured cubemap along `dir`, returning linear RGB
-/// (sRGB-decoded). Nearest-texel lookup is plenty for the importance-sampled prefilter,
-/// which averages many taps. Black when the direction can't be located (only the zero
-/// vector). `faces[f]` is `res * res * 4` bytes, row-major top-to-bottom.
+/// The captured radiance along `dir`: the nearest texel of `faces` (each `res²`
+/// linear texels, row-major top-to-bottom). Nearest-texel lookup is plenty for the
+/// importance-sampled prefilter, which averages many taps, each from the source mip
+/// its solid angle picks. Black when the direction can't be located (only the zero
+/// vector).
 #[cfg(test)]
-pub fn sample_linear(proj: &FaceProjections, faces: &[Vec<u8>; 6], res: u32, dir: Vec3) -> Vec3 {
+pub fn sample(proj: &FaceProjections, faces: &[Vec<Vec3>; 6], res: u32, dir: Vec3) -> Vec3 {
     let Some((face, u, v)) = proj.locate(dir) else {
         return Vec3::ZERO;
     };
@@ -112,20 +109,25 @@ pub fn sample_linear(proj: &FaceProjections, faces: &[Vec<u8>; 6], res: u32, dir
     let fy = ((1.0 - (v * 0.5 + 0.5)) * res as f32).floor();
     let px = (fx as i64).clamp(0, res as i64 - 1) as u32;
     let py = (fy as i64).clamp(0, res as i64 - 1) as u32;
-    let idx = ((py * res + px) * 4) as usize;
-    let pixels = &faces[face as usize];
-    Vec3::new(
-        srgb_to_linear(pixels[idx]),
-        srgb_to_linear(pixels[idx + 1]),
-        srgb_to_linear(pixels[idx + 2]),
-    )
+    faces[face as usize][(py * res + px) as usize]
 }
 
-/// Forward-sRGB transfer: linear channel -> 8-bit byte, the encode side of the prefilter
-/// (the output KTX2 stores sRGB-encoded LDR, the same space the capture produced).
+/// [`sample`] of a source mip chain (`chain[level]`, the base `base` texels wide) at
+/// fractional level `lod`: the nearest texel of the two levels around it, blended.
+/// `probe_prefilter.wgsl`'s `capture` is this.
 #[cfg(test)]
-pub fn linear_to_srgb(c: f32) -> u8 {
-    (color::linear_to_srgb(c) * 255.0 + 0.5).clamp(0.0, 255.0) as u8
+pub fn sample_lod(
+    proj: &FaceProjections,
+    chain: &[[Vec<Vec3>; 6]],
+    base: u32,
+    dir: Vec3,
+    lod: f32,
+) -> Vec3 {
+    let last = chain.len() - 1;
+    let lo = (lod.floor() as usize).min(last);
+    let hi = (lo + 1).min(last);
+    let at = |level: usize| sample(proj, &chain[level], (base >> level).max(1), dir);
+    at(lo).lerp(at(hi), lod - lo as f32)
 }
 
 #[cfg(test)]
