@@ -9,6 +9,7 @@
 //! alone (#1487); 0 keeps the recipe seed.
 
 // sorted: one module per generator op; none reads another
+pub mod anisotropic_noise;
 pub mod brick;
 pub mod checker;
 pub mod constant;
