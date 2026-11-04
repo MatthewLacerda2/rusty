@@ -50,11 +50,13 @@ fn hard_left_silences_the_right_channel_and_retunes_in_place() {
         VoiceId(1),
         &PlayParams {
             mix: left,
+            looping: true,
             ..flat("clip")
         }
     ));
     assert_eq!(b.device().render(2), vec![(0.5, 0.0); 2]);
     b.set_mix(VoiceId(1), &VoiceMix { pan: 1.0, ..left });
+    b.device().render(RATE as usize / 5); // the pan glides over (#1693)
     assert_eq!(
         b.device().render(2),
         vec![(0.0, 0.5); 2],

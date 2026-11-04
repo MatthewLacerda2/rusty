@@ -1,6 +1,9 @@
-//! What the gameplay VM may read from disk (#1062): `require`, `dofile` and
+//! What a script VM may read from disk (#1062): `require`, `dofile` and
 //! `loadfile`, resolved against the project instead of the process's working
-//! directory.
+//! directory. The gameplay VM and the `play` harness's scenario VM both install
+//! it (#1717). The searchers call `package.searchpath` through the `package`
+//! table, so the demo journal's wrap (`dev::demo::calls`) skips that table: a
+//! recorded scenario's fall-through `require` is not noted as a game act.
 //!
 //! `require("ui.range_axis")` searches, in order:
 //! 1. `package.preload`, Lua's own first searcher;

@@ -13,8 +13,8 @@ import unittest
 from unittest import mock
 
 from merging.queue import cli, dependabot, gitio, landing, outcomes, pulls, taking, update, waiting
-from merging.verdict import decide, github
-from tests.queue.fixtures import READY, completed
+from merging.verdict import decide, github, reviewed
+from tests.queue.fixtures import READY, REVIEW, completed
 from tests.verdict.fixtures import SHA
 
 
@@ -58,6 +58,7 @@ class Taking(unittest.TestCase):
     def take(self, *argv: str, pull=READY, advance=(SHA, []), merge=completed(0), record=None, judged=(True, ["`ci` passed"])):
         opts = cli.parse(["524", "--poll", "0", *argv])
         with mock.patch.object(pulls, "look", return_value=pull), \
+            mock.patch.object(reviewed, "comments", return_value=REVIEW), \
             mock.patch.object(gitio, "git"), \
             mock.patch.object(update, "advance", return_value=advance) as rebased, \
             mock.patch.object(update, "on_tip", return_value=True), \

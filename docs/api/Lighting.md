@@ -71,7 +71,8 @@ The two individual verbs stay for a script that wants only one of them.
   but has no such entity, and the entry is ignored.
 - **Refused during Play**, as `Scene.Save` is (#1340): it writes the scene file, and the
   World then holds the play state. The editor's button is greyed out while playing.
-- **Needs a saved scene** (the bakes write beside its file); errors otherwise. The
+- **Needs a saved scene** (the bakes write into folders named after its file,
+  `<scene>.lightmaps/` and `<scene>.reflections/`); errors otherwise. The
   probe step needs a GPU/software adapter and skips gracefully without one, as
   `Lighting.Bake` does.
 - **In the editor** the lightmap step runs in the background (#808) with a progress
@@ -147,7 +148,9 @@ moving static geometry, `Probe.Clear()` / `Reflection.Clear()` first, then `Ligh
 
 Like the individual bakes, it is **dev-only** and needs a GPU/software adapter; with none
 the placement still runs but the bakes skip gracefully (returns `false`, never errors —
-except reflections need a saved scene path to write their cubemaps beside). Save the scene
+except reflections need a saved scene path: their cubemaps go in its own
+`<scene file>.reflections/` folder, and a reflection bake that runs removes that folder's
+cubes past the probe count, all of them when the scene has no reflection probes). Save the scene
 afterward to persist the baked SH (`<scene>.lighting.json`) and the cubemap paths, or use
 `Lighting.Generate()`, which writes them.
 
