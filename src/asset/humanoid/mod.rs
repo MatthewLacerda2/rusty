@@ -146,6 +146,6 @@ mod guess_tests;
 #[cfg(test)]
 mod retarget_tests;
 #[cfg(test)]
-mod rig_fixture;
+pub(crate) mod rig_fixture;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

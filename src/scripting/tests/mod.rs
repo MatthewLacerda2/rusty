@@ -17,6 +17,7 @@ mod effect_writes;
 mod files;
 mod held_from;
 mod hook_errors;
+mod humanoid;
 mod late_update;
 mod lifecycle;
 mod manager;

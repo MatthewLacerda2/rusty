@@ -10,7 +10,7 @@ use crate::asset::{import_file, imported, sidecar, ImportedAsset};
 
 /// `name`, a copy of the animated fixture whose one clip is `clip`, in `dir`,
 /// its sidecar mapping `Joint0` to the hips with `clips_from`.
-fn model(dir: &Path, name: &str, clip: &str, clips_from: &[&Path]) -> PathBuf {
+pub(crate) fn model(dir: &Path, name: &str, clip: &str, clips_from: &[&Path]) -> PathBuf {
     std::fs::create_dir_all(dir).unwrap();
     std::fs::write(dir.join("anim.bin"), animated_buffer()).unwrap();
     let path = dir.join(name);
