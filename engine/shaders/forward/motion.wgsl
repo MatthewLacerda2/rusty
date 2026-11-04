@@ -1,9 +1,9 @@
-// engine/shaders/forward/velocity.wgsl — the velocity target's texel (#1435): what
+// engine/shaders/forward/motion.wgsl — the velocity target's texel (#1435): what
 // `shader.wgsl`'s motion-vector entry points (`fs_velocity`, `fs_velocity_ssr`,
 // `fs_depth_postpass`) write at location 1. Moved out of `shader.wgsl` for its size
 // cap (#1702).
 
-#define_import_path forward::velocity
+#define_import_path forward::motion
 
 #import forward::bindings::camera
 

@@ -9,7 +9,7 @@
 #import forward::local_shadow::local_shadow
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 #import forward::specular_aa
-#import forward::velocity
+#import forward::motion
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
 // resources are `forward/bindings.wgsl`, its lighting helpers `forward/lighting.wgsl`.
@@ -249,9 +249,9 @@ fn velocity_targets(in: VelocityVertex) -> VelocityTargets {
     return VelocityTargets(transparent::finite_hdr(surface_color(v)), velocity_texel(in));
 }
 
-// The velocity target's texel for `in` (`forward::velocity::texel`).
+// The velocity target's texel for `in` (`forward::motion::texel`).
 fn velocity_texel(in: VelocityVertex) -> vec4<f32> {
-    return velocity::texel(in.clip_now, in.clip_prev, in.world_position);
+    return motion::texel(in.clip_now, in.clip_prev, in.world_position);
 }
 
 // ---- The transparent depth postpass (#1523) ----
