@@ -108,6 +108,7 @@ impl Rest {
 }
 
 fn rotation(m: Mat4) -> Quat {
+    // lint: allow(world-space) a skin's bind matrices, rig data, not the scene hierarchy
     m.to_scale_rotation_translation().1.normalize()
 }
 

@@ -1,4 +1,4 @@
-//! src/api/assets.rs — `Assets` namespace (#179).
+//! src/api/assets/ — `Assets` namespace (#179).
 //!
 //! The "see what I can place" half of authoring: surface the importer's per-file
 //! inventory as a project-wide, reference-ready manifest. `Assets.Manifest()` (and
@@ -44,17 +44,14 @@ const ASSET_ROOT: &str = crate::core::project::ASSETS_DIR;
 pub fn register(lua: &Lua) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    put(
-        &table,
-        "Manifest",
-        lua.create_function(|lua, ()| manifest_table(lua)),
-    )?;
     // `List` is an alias for `Manifest` — same data, the more discoverable name.
-    put(
-        &table,
-        "List",
-        lua.create_function(|lua, ()| manifest_table(lua)),
-    )?;
+    for name in ["Manifest", "List"] {
+        put(
+            &table,
+            name,
+            lua.create_function(|lua, ()| manifest_table(lua)),
+        )?;
+    }
 
     put(
         &table,
