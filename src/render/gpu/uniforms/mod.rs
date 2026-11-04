@@ -38,12 +38,14 @@ pub(crate) struct CameraUniform {
     pub prev_view_proj: [f32; 16],
     /// `x`: this camera's index in its stack, bottom to top (#1436): the velocity
     /// target's `.a`, so motion blur orders a higher camera in front. `y`: last
-    /// frame's game time (#1524), for the vertex blocks' motion. `zw`: the transparent
-    /// SSR march (#1570), steps and step length, zero where the camera traces none.
+    /// frame's game time (#1524), for the vertex blocks' motion. `zw`: unused.
     pub stack: [f32; 4],
     /// `view_proj`'s inverse (#1523), what refraction and absorption rebuild the
     /// opaque depth's world point with.
     pub inv_view_proj: [f32; 16],
+    /// The transparent SSR trace (#1570, #1736): steps, step length and the minimum
+    /// smoothness it reflects down to, then a pad; zero where the camera traces none.
+    pub ssr: [f32; 4],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in

@@ -1,9 +1,10 @@
 //! The SSR quality's march (#1521, #1522), off the GPU.
 
-use super::march;
+use super::{fade, march, ssr_enabled, SMOOTHEST};
 use crate::components::Ssr;
 use crate::core::settings::quality::{EffectQuality, QualityPresets};
 use crate::core::settings::GraphicsSettings;
+use crate::render::postfx::params::PostSource;
 
 /// On every seeded preset, Low marches fewer steps than Medium and Medium than
 /// High, and each reaches at least as far as the one below it.
@@ -50,4 +51,33 @@ fn custom_marches_as_authored() {
     };
     let m = march(&ssr, GraphicsSettings::default());
     assert_eq!((m.steps, m.step_length), (40, 0.3));
+}
+
+/// The fade (#1736): 0.2 of smoothness at the default, whole by 0.9 above that, so
+/// `min_smoothness` 0.8 is SSR before the knob (0.8 to 0.9), and never zero wide.
+#[test]
+fn ssr_fades_in_over_at_most_a_fifth_and_is_whole_by_point_nine() {
+    assert_eq!(fade(0.3), [0.3, Ssr::SMOOTHNESS_FADE]);
+    let [min, width] = fade(0.8);
+    assert!((min + width - 0.9).abs() < 1e-6, "{width}");
+    assert_eq!(fade(1.0)[1], 0.01, "a hard cut, never a division by zero");
+    assert_eq!(fade(-2.0), [0.0, Ssr::SMOOTHNESS_FADE]);
+}
+
+/// A minimum no surface reaches (the forward pass's roughness floor is 0.04) runs
+/// no SSR, so the view builds no pyramid for a pass that would discard every pixel.
+#[test]
+fn a_minimum_smoothness_nothing_reaches_runs_no_ssr() {
+    let mut vc = crate::scene::authoring::default_post_processing();
+    let runs = |vc: &crate::components::PostProcessingComponent| {
+        let post = PostSource {
+            volume: Some(vc),
+            ..Default::default()
+        };
+        ssr_enabled(post, GraphicsSettings::default(), true)
+    };
+    vc.ssr.min_smoothness = 0.95;
+    assert!(runs(&vc));
+    vc.ssr.min_smoothness = SMOOTHEST;
+    assert!(!runs(&vc));
 }

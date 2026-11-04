@@ -1,34 +1,28 @@
 //! `Light`'s shadow knobs: whether a point or spot light casts shadows through the
 //! shadow atlas (#468), and how far from the camera its shadow reaches (#1712).
 
-use std::cell::RefCell;
+use mlua::Lua;
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring::rendering::light as light_ops;
 use crate::scene::Scene;
 
 /// Register `Get/SetCastShadows` and `Get/SetShadowFadeDistance` onto `table`.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    register_cast_shadows(scope, table, scene)?;
-    register_fade_distance(scope, table, scene)
+pub(super) fn register(lua: &Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    register_cast_shadows(lua, table, scene)?;
+    register_fade_distance(lua, table, scene)
 }
 
 /// `GetCastShadows` / `SetCastShadows`: whether a point or spot light casts shadows
 /// through the shadow atlas (#468). The sun always casts; it ignores the flag.
-fn register_cast_shadows<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_cast_shadows(lua: &Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetCastShadows",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.world.light(id.read()).is_some_and(|l| l.cast_shadows))
         }),
@@ -37,7 +31,8 @@ fn register_cast_shadows<'scope>(
     put(
         table,
         "SetCastShadows",
-        scope.create_function(|_, (id, on): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, on): (EntityArg, bool)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Light", "SetCastShadows")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {
@@ -51,15 +46,12 @@ fn register_cast_shadows<'scope>(
 /// `GetShadowFadeDistance` / `SetShadowFadeDistance`: the camera distance past
 /// which a point or spot light's shadow is no longer sampled (#1712, HDRP's
 /// Shadow Fade Distance); `0` is no fade.
-fn register_fade_distance<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_fade_distance(lua: &Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetShadowFadeDistance",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let light = scene.world.light(id.read());
             Ok(light.map_or(0.0, |l| l.shadow_fade_distance))
@@ -69,7 +61,8 @@ fn register_fade_distance<'scope>(
     put(
         table,
         "SetShadowFadeDistance",
-        scope.create_function(|_, (id, d): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, d): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Light", "SetShadowFadeDistance")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.light_mut(id) {

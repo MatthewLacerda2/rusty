@@ -6,12 +6,11 @@
 //! acceptance test (`accepts`) with the volume and point queries, so every
 //! spatial query honours the same ignore / layer-mask rules (#91, #311).
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::Table;
 
 use super::super::{put, Reg};
+use crate::api::ApiCell;
 use crate::physics::{is_hittable, PhysicsWorld, RayHit};
 use crate::scene::{layer_in_mask, Scene};
 
@@ -118,29 +117,31 @@ fn hit_table(lua: &mlua::Lua, scene: &Scene, hit: &RayHit) -> mlua::Result<Table
 }
 
 /// Register `Raycast`, `SphereCast` and `RaycastAll` onto the `Physics` table.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
-    register_raycast(scope, table, scene, physics)?;
-    register_spherecast(scope, table, scene, physics)?;
-    register_raycast_all(scope, table, scene, physics)
+    register_raycast(lua, table, scene, physics)?;
+    register_spherecast(lua, table, scene, physics)?;
+    register_raycast_all(lua, table, scene, physics)
 }
 
 /// `Raycast` — query-only cast returning a [`CastResult`].
-fn register_raycast<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_raycast(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     type Args = (f32, f32, f32, f32, f32, f32, Option<u32>, Option<u32>);
     put(
         table,
         "Raycast",
-        scope.create_function(|_, (ox, oy, oz, dx, dy, dz, ignore, mask): Args| {
+        lua.create_function(move |lua, (ox, oy, oz, dx, dy, dz, ignore, mask): Args| {
+            let scene = &*scene.get(lua)?;
+            let physics = &*physics.get(lua)?;
             // The optional trailing `ignore` id is skipped (e.g. the shooter);
             // the optional `mask` limits hits to entities on those layers (#91).
             // Returns `None` (⇒ miss) when no physics world exists yet (edit
@@ -166,49 +167,55 @@ fn register_raycast<'scope>(
 /// first accepted collider touched by a sphere swept along the ray. Same
 /// [`CastResult`] as `Raycast`; distance is how far the sphere's center
 /// traveled before impact, the point is the contact on the struck surface.
-fn register_spherecast<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_spherecast(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     type Args = (f32, f32, f32, f32, f32, f32, f32, Option<u32>, Option<u32>);
     put(
         table,
         "SphereCast",
-        scope.create_function(|_, (ox, oy, oz, dx, dy, dz, radius, ignore, mask): Args| {
-            let physics = physics.borrow();
-            let scene = scene.borrow();
-            Ok(cast_result(
-                &scene,
-                physics.as_ref().and_then(|world| {
-                    world.sphere_cast_hit(
-                        Vec3::new(ox, oy, oz),
-                        Vec3::new(dx, dy, dz),
-                        radius,
-                        f32::MAX,
-                        |id| accepts(&scene, id, ignore, mask),
-                    )
-                }),
-            ))
-        }),
+        lua.create_function(
+            move |lua, (ox, oy, oz, dx, dy, dz, radius, ignore, mask): Args| {
+                let scene = &*scene.get(lua)?;
+                let physics = &*physics.get(lua)?;
+                let physics = physics.borrow();
+                let scene = scene.borrow();
+                Ok(cast_result(
+                    &scene,
+                    physics.as_ref().and_then(|world| {
+                        world.sphere_cast_hit(
+                            Vec3::new(ox, oy, oz),
+                            Vec3::new(dx, dy, dz),
+                            radius,
+                            f32::MAX,
+                            |id| accepts(&scene, id, ignore, mask),
+                        )
+                    }),
+                ))
+            },
+        ),
     )
 }
 
 /// `RaycastAll(ox,oy,oz, dx,dy,dz, max_distance [, layer_mask])` — every
 /// accepted collider along the ray, as an array of hit tables sorted by
 /// distance (ties by entity id). Empty with no live physics world.
-fn register_raycast_all<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_raycast_all(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     type Args = (f32, f32, f32, f32, f32, f32, f32, Option<u32>);
     put(
         table,
         "RaycastAll",
-        scope.create_function(|lua, (ox, oy, oz, dx, dy, dz, max, mask): Args| {
+        lua.create_function(move |lua, (ox, oy, oz, dx, dy, dz, max, mask): Args| {
+            let scene = &*scene.get(lua)?;
+            let physics = &*physics.get(lua)?;
             let physics = physics.borrow();
             let scene = scene.borrow();
             let hits = physics.as_ref().map_or_else(Vec::new, |world| {

@@ -29,9 +29,9 @@ mod files;
 
 pub(super) use files::install as install_file_access;
 
-/// `math.random` / `math.randomseed` rewritten over `Random`. Looked up at call
-/// time, so a script caching `local random = math.random` still works: `Random`
-/// is re-registered for every evaluation. Lua 5.4's argument rules are kept —
+/// `math.random` / `math.randomseed` rewritten over `Random`. The shims run before
+/// the API is registered on the VM (once, #1709), so they look `Random` up at call
+/// time; a script caching `local random = math.random` still works. Lua 5.4's argument rules are kept —
 /// `math.random(m, n)` is an integer in `[m, n]` (inclusive, unlike `Random.Range`).
 const MATH_SHIMS: &str = r#"
 local tointeger, maxinteger, mininteger = math.tointeger, math.maxinteger, math.mininteger
@@ -96,12 +96,28 @@ pub(crate) fn require_sim_vm(lua: &Lua, verb: &str) -> mlua::Result<()> {
 /// A throwaway VM for *reading* a script's returned table (its `fields` schema,
 /// its callbacks) without running it. `require` hands back an empty table, so a
 /// script that loads a helper module at its top level (#996) still evaluates
-/// here; nothing is read from disk.
+/// here; nothing is read from disk. Any other unknown global (the API surface,
+/// which this VM lacks) reads as a stub that indexes, calls and does arithmetic
+/// to another stub, so a chunk that reads the API at load (`local now =
+/// Time.time`) still yields its `fields` (#1709).
 pub(super) fn inspection_vm() -> Lua {
     let lua = Lua::new();
     let stub = lua.create_function(|lua, _: mlua::MultiValue| lua.create_table());
     if let Ok(stub) = stub {
         lua.globals().set("require", stub).ok();
     }
+    lua.load(STUB_GLOBALS).exec().ok();
     lua
 }
+
+/// Lays the stub [`inspection_vm`] hands back for an unknown global.
+const STUB_GLOBALS: &str = r#"
+local stub = {}
+local function give() return stub end
+local mt = { __index = give, __call = give, __newindex = function() end }
+for _, op in ipairs({ "add", "sub", "mul", "div", "mod", "pow", "unm", "idiv", "concat" }) do
+  mt["__" .. op] = give
+end
+setmetatable(stub, mt)
+setmetatable(_G, { __index = give })
+"#;

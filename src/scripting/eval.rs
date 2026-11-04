@@ -7,8 +7,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::api;
-
 use super::manager::ScriptManager;
 
 /// How much of a console line names its Undo step (`Editor.UndoName`).
@@ -43,28 +41,7 @@ impl ScriptManager {
             scene.commit_edits(None);
             scene.begin_edits();
         }
-        let ctx = self.make_ctx();
-        let result = lua
-            .scope(|scope| -> mlua::Result<String> {
-                api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
-
-                // Try as an expression first so REPL lines echo their value.
-                let values = match lua
-                    .load(format!("return {}", trimmed))
-                    .eval::<mlua::MultiValue>()
-                {
-                    Ok(v) => v,
-                    Err(_) => lua.load(trimmed).eval::<mlua::MultiValue>()?,
-                };
-
-                let rendered = values
-                    .iter()
-                    .map(value_to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                Ok(rendered)
-            })
-            .map_err(|e| e.to_string());
+        let result = eval_line(lua, trimmed).map_err(|e| e.to_string());
         let step: String = trimmed.chars().take(STEP_NAME_CHARS).collect();
         self.cells.scene.borrow_mut().commit_edits(Some(&step));
         result
@@ -72,8 +49,8 @@ impl ScriptManager {
 
     /// The live Lua API surface as `namespace → {function names}`.
     ///
-    /// Registers the whole `api::` surface into a fresh scope (the namespaces are
-    /// scope-tied closures), then walks the Lua globals: every global table that is
+    /// Walks the Lua globals of the live VM, where the whole `api::` surface was
+    /// registered when it started (#1709): every global table that is
     /// not a Lua 5.4 stdlib global contributes its function-valued keys. This is the
     /// ground truth the doc-drift gate checks `docs/api/` against, so it
     /// can never silently lie about *what exists* (#280). Empty when the runtime is
@@ -83,31 +60,54 @@ impl ScriptManager {
         let Some(lua) = self.lua.as_ref() else {
             return BTreeMap::new();
         };
-        let ctx = self.make_ctx();
         let mut surface = BTreeMap::new();
-        let _ = lua.scope(|scope| -> mlua::Result<()> {
-            api::register(lua, scope, &ctx).map_err(mlua::Error::RuntimeError)?;
-            for pair in lua.globals().pairs::<String, mlua::Value>() {
-                let (name, value) = pair?;
-                let mlua::Value::Table(table) = value else {
-                    continue;
-                };
-                if LUA_STDLIB_GLOBALS.contains(&name.as_str()) {
-                    continue;
-                }
-                let mut fns = BTreeSet::new();
-                for entry in table.pairs::<String, mlua::Value>() {
-                    let (key, val) = entry?;
-                    if matches!(val, mlua::Value::Function(_)) {
-                        fns.insert(key);
-                    }
-                }
-                surface.insert(name, fns);
-            }
-            Ok(())
-        });
+        let _ = walk_surface(lua, &mut surface);
         surface
     }
+}
+
+/// One REPL line: tried as an expression first, so it echoes its value, else run
+/// as a statement; the values comma-joined.
+fn eval_line(lua: &mlua::Lua, line: &str) -> mlua::Result<String> {
+    let values = match lua
+        .load(format!("return {}", line))
+        .eval::<mlua::MultiValue>()
+    {
+        Ok(v) => v,
+        Err(_) => lua.load(line).eval::<mlua::MultiValue>()?,
+    };
+    let rendered = values
+        .iter()
+        .map(value_to_string)
+        .collect::<Vec<_>>()
+        .join(", ");
+    Ok(rendered)
+}
+
+/// Every engine namespace of `lua`'s globals into `surface`, with its function
+/// names (see [`ScriptManager::api_surface`]).
+fn walk_surface(
+    lua: &mlua::Lua,
+    surface: &mut BTreeMap<String, BTreeSet<String>>,
+) -> mlua::Result<()> {
+    for pair in lua.globals().pairs::<String, mlua::Value>() {
+        let (name, value) = pair?;
+        let mlua::Value::Table(table) = value else {
+            continue;
+        };
+        if LUA_STDLIB_GLOBALS.contains(&name.as_str()) {
+            continue;
+        }
+        let mut fns = BTreeSet::new();
+        for entry in table.pairs::<String, mlua::Value>() {
+            let (key, val) = entry?;
+            if matches!(val, mlua::Value::Function(_)) {
+                fns.insert(key);
+            }
+        }
+        surface.insert(name, fns);
+    }
+    Ok(())
 }
 
 /// Lua 5.4 standard-library globals — excluded from the API surface walk so the

@@ -140,7 +140,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `ssao` | the SSAO occlusion pass, at its quality's resolution |
 | `ssao_blur` | the SSAO blur at the occlusion's resolution, and the depth-aware upsample to full resolution when that is lower |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
-| `ssr` | screen-space reflections (#1526): the march over the base camera's opaque image; the copy of that image it reads is recorded before the timed pass, so it isn't counted |
+| `ssr` | screen-space reflections (#1526): the march over the base camera's opaque image; the copy of that image it reads and its mip pyramid (#1736) are recorded before the timed pass, untimed, so they aren't counted |
 | `transparent` | translucent solids |
 | `ribbons` | trails and lines |
 | `particles` | particle systems |

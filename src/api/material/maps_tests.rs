@@ -4,9 +4,11 @@
 //! names its material after itself and the process, and removes what it wrote.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
 
+use crate::api::bind;
 use crate::scene::authoring::material::MAPS_DIR;
 use crate::scene::Scene;
 
@@ -17,10 +19,10 @@ const MAPS: &str = r#"{ resolution = 8, seed = 3,
     outputs = { base_color = "c", metallic_roughness = "c" } }"#;
 
 /// Run `script` against `scene` with the `Material` namespace; `Err` is the message.
-fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
+fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     let lua = Lua::new();
-    lua.scope(|s| {
-        super::super::register(&lua, s, scene).unwrap();
+    crate::api::attempt(|| {
+        super::super::register(&lua, bind(&lua, scene)).unwrap();
         Ok(lua.load(script).exec())
     })
     .unwrap()
@@ -43,7 +45,7 @@ fn cleanup(name: &str) {
 
 #[test]
 fn define_asset_bakes_maps_and_fills_the_map_paths() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let (name, path) = names("define");
     let result = run(
         &scene,
@@ -62,7 +64,7 @@ fn define_asset_bakes_maps_and_fills_the_map_paths() {
 
 #[test]
 fn rebake_takes_a_new_resolution_and_get_asset_returns_the_recipe() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let (name, path) = names("rebake");
     let result = run(
         &scene,
@@ -86,7 +88,7 @@ fn rebake_takes_a_new_resolution_and_get_asset_returns_the_recipe() {
 
 #[test]
 fn a_bad_maps_recipe_defines_nothing() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let err = run(
         &scene,
         r#"Material.DefineAsset("bad", { maps = { resolution = 8,

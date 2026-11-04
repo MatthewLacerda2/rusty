@@ -17,36 +17,35 @@ use std::cell::RefCell;
 
 use mlua::Lua;
 
-use crate::api::{put, ApiScopedCtx, Reg};
+use crate::api::ApiCell;
+use crate::api::{put, ApiCtx, Reg};
 use crate::core::application::{Application, DemoRequest};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the `Editor` namespace onto `lua` (dev builds only).
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     let (app, scene, console) = (ctx.application, ctx.scene, ctx.console);
     put(
         &table,
         "EnterPlay",
-        scope.create_function(move |_, ()| Ok(request(app, console, true))),
+        lua.create_function(move |lua, ()| Ok(request(&*app.get(lua)?, &*console.get(lua)?, true))),
     )?;
     put(
         &table,
         "ExitPlay",
-        scope.create_function(move |_, ()| Ok(request(app, console, false))),
+        lua.create_function(move |lua, ()| {
+            Ok(request(&*app.get(lua)?, &*console.get(lua)?, false))
+        }),
     )?;
     put(
         &table,
         "IsPlaying",
-        scope.create_function(move |_, ()| Ok(scene.borrow().is_playing())),
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().is_playing())),
     )?;
-    undo_verbs(&table, scope, scene)?;
-    demo_verbs(&table, scope, app, console)?;
+    undo_verbs(&table, lua, scene)?;
+    demo_verbs(&table, lua, app, console)?;
     lua.globals()
         .set("Editor", table)
         .map_err(|e| e.to_string())
@@ -75,30 +74,30 @@ fn request(app: &RefCell<Application>, console: &RefCell<ConsoleLogs>, playing: 
 
 /// Undo / Redo (#1631): the same history as Ctrl+Z / Ctrl+Shift+Z and Edit ▸ Undo
 /// (`scene::undo`), Unity's `Undo.PerformUndo` / `PerformRedo`.
-fn undo_verbs<'scope>(
-    table: &mlua::Table,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn undo_verbs(table: &mlua::Table, lua: &mlua::Lua, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "Undo",
-        scope.create_function(move |_, ()| Ok(scene.borrow_mut().undo())),
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow_mut().undo())),
     )?;
     put(
         table,
         "Redo",
-        scope.create_function(move |_, ()| Ok(scene.borrow_mut().redo())),
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow_mut().redo())),
     )?;
     put(
         table,
         "UndoName",
-        scope.create_function(move |_, ()| Ok(scene.borrow().undo_name().map(str::to_string))),
+        lua.create_function(move |lua, ()| {
+            Ok(scene.get(lua)?.borrow().undo_name().map(str::to_string))
+        }),
     )?;
     put(
         table,
         "RedoName",
-        scope.create_function(move |_, ()| Ok(scene.borrow().redo_name().map(str::to_string))),
+        lua.create_function(move |lua, ()| {
+            Ok(scene.get(lua)?.borrow().redo_name().map(str::to_string))
+        }),
     )?;
     Ok(())
 }
@@ -106,48 +105,53 @@ fn undo_verbs<'scope>(
 /// The demo timeline's verbs (#1598), each what the timeline's own control does:
 /// a request the editor window takes at the frame boundary. Only the editor window
 /// has a timeline, so any other host refuses with a console warning.
-fn demo_verbs<'scope>(
+fn demo_verbs(
     table: &mlua::Table,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    app: &'scope RefCell<Application>,
-    console: &'scope RefCell<ConsoleLogs>,
+    lua: &mlua::Lua,
+    app: ApiCell<Application>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
-    let ask = move |verb: &str, request: DemoRequest| -> bool {
+    let ask = move |lua: &mlua::Lua, verb: &str, request: DemoRequest| -> mlua::Result<bool> {
+        let app = app.get(lua)?;
         let mut app = app.borrow_mut();
         if !app.demo_viewer() {
-            console.borrow_mut().warn(format!(
+            console.get(lua)?.borrow_mut().warn(format!(
                 "Editor.{verb}: refused: only the editor window has a demo timeline"
             ));
-            return false;
+            return Ok(false);
         }
         app.request_demo(request);
-        true
+        Ok(true)
     };
     put(
         table,
         "OpenDemo",
-        scope.create_function(move |_, path: String| Ok(ask("OpenDemo", DemoRequest::Open(path)))),
+        lua.create_function(move |lua, path: String| ask(lua, "OpenDemo", DemoRequest::Open(path))),
     )?;
     put(
         table,
         "SeekDemo",
-        scope.create_function(move |_, tick: u64| Ok(ask("SeekDemo", DemoRequest::Seek(tick)))),
+        lua.create_function(move |lua, tick: u64| ask(lua, "SeekDemo", DemoRequest::Seek(tick))),
     )?;
     put(
         table,
         "PauseDemo",
-        scope.create_function(move |_, paused: Option<bool>| {
-            Ok(ask("PauseDemo", DemoRequest::Pause(paused.unwrap_or(true))))
+        lua.create_function(move |lua, paused: Option<bool>| {
+            ask(lua, "PauseDemo", DemoRequest::Pause(paused.unwrap_or(true)))
         }),
     )?;
     put(
         table,
         "DemoTick",
-        scope.create_function(move |_, ()| Ok(app.borrow().demo_tick().map(|(tick, _)| tick))),
+        lua.create_function(move |lua, ()| {
+            Ok(app.get(lua)?.borrow().demo_tick().map(|(tick, _)| tick))
+        }),
     )?;
     put(
         table,
         "DemoLength",
-        scope.create_function(move |_, ()| Ok(app.borrow().demo_tick().map(|(_, of)| of))),
+        lua.create_function(move |lua, ()| {
+            Ok(app.get(lua)?.borrow().demo_tick().map(|(_, of)| of))
+        }),
     )
 }

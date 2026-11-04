@@ -19,7 +19,7 @@ fn settings_and_style_write_through_and_read_back() {
         id,
         ComponentKind::parse("TrailRenderer").unwrap()
     ));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "Trail.SetEmitting({id}, false)
@@ -96,7 +96,7 @@ fn clear_and_the_point_readers() {
     trail.advance(Vec3::ZERO, 0.01);
     trail.advance(Vec3::X, 0.01);
     scene.world.set_trail(id, Some(trail));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         let got = eval(
             lua,

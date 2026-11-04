@@ -15,6 +15,7 @@ use mlua::Table;
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::navigation::{area_index, NavMeshSettings, NavigationGraph};
 use crate::scene::authoring::nav::agent as nav_ops;
 use crate::scene::Scene;
@@ -35,35 +36,41 @@ fn edit_areas(
 }
 
 /// The area table functions on `Navigation`.
-pub(super) fn register_navigation<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register_navigation(
+    lua: &mlua::Lua,
     t: &Table,
-    scene: &'scope RefCell<Scene>,
-    nav: &'scope RefCell<NavigationGraph>,
+    scene: ApiCell<Scene>,
+    nav: ApiCell<NavigationGraph>,
 ) -> Reg {
-    let lookup = move |name: &str| area_index(&scene.borrow().nav_settings.areas, name);
-    let f = scope.create_function(move |_, name: String| Ok(lookup(&name).map_or(-1, i32::from)));
+    let f = lua.create_function(move |lua, name: String| {
+        scene.with(lua, |scene| {
+            let index = area_index(&scene.borrow().nav_settings.areas, &name);
+            Ok(index.map_or(-1, i32::from))
+        })
+    });
     put(t, "GetAreaFromName", f)?;
-    let f = scope.create_function(move |_, name: String| {
+    let f = lua.create_function(move |lua, name: String| {
+        let scene = &*scene.get(lua)?;
         let areas = &scene.borrow().nav_settings.areas;
         let row = area_index(areas, &name).map(|i| &areas[i as usize]);
         Ok(row.map(|a| a.cost))
     });
     put(t, "GetAreaCost", f)?;
-    let f = scope.create_function(move |_, (name, cost): (String, f32)| {
+    let f = lua.create_function(move |lua, (name, cost): (String, f32)| {
         let err =
             || format!("Navigation.SetAreaCost: no area {name:?} (or cost {cost} is not finite)");
-        edit_areas(scene, nav, |s| s.set_area_cost(&name, cost), err).map(|_| ())
+        let (scene, nav) = (scene.get(lua)?, nav.get(lua)?);
+        edit_areas(&scene, &nav, |s| s.set_area_cost(&name, cost), err).map(|_| ())
     });
     put(t, "SetAreaCost", f)?;
-    let f = scope.create_function(move |_, (name, cost): (String, Option<f32>)| {
+    let f = lua.create_function(move |lua, (name, cost): (String, Option<f32>)| {
         let cost = cost.unwrap_or(1.0);
         let err = || format!("Navigation.DefineArea: cannot define {name:?} (empty name, non-finite cost, or 32 areas already)");
-        edit_areas(scene, nav, |s| s.define_area(&name, cost), err)
+        edit_areas(&*scene.get(lua)?, &*nav.get(lua)?, |s| s.define_area(&name, cost), err)
     });
     put(t, "DefineArea", f)?;
-    let f = scope.create_function(move |lua, ()| {
-        let list = lua.create_table()?;
+    let f = lua.create_function(move |lua, ()| {
+        let (list, scene) = (lua.create_table()?, scene.get(lua)?);
         for (i, a) in scene.borrow().nav_settings.areas.iter().enumerate() {
             let row = lua.create_table()?;
             row.set("index", i)?;
@@ -77,12 +84,9 @@ pub(super) fn register_navigation<'scope>(
 }
 
 /// `GetAreaMask` / `SetAreaMask` on `NavMeshAgent`.
-pub(super) fn register_agent<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
+pub(super) fn register_agent(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let scene = &*scene.get(lua)?;
         let mask = scene
             .borrow()
             .world
@@ -91,9 +95,9 @@ pub(super) fn register_agent<'scope>(
         Ok(i64::from(mask.unwrap_or(0)))
     });
     put(t, "GetAreaMask", f)?;
-    let f = scope.create_function(move |_, (id, mask): (EntityArg, i64)| {
+    let f = lua.create_function(move |lua, (id, mask): (EntityArg, i64)| {
         let id = id.live("NavMeshAgent", "SetAreaMask")?;
-        if let Some(mut a) = scene.borrow_mut().world.nav_agent_mut(id) {
+        if let Some(mut a) = scene.get(lua)?.borrow_mut().world.nav_agent_mut(id) {
             nav_ops::set_area_mask(&mut a, mask as u32);
         }
         Ok(())

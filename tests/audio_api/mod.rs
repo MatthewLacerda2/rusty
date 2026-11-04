@@ -12,6 +12,7 @@ mod reverb;
 mod voices;
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
@@ -22,10 +23,10 @@ use rusty::scene::Scene;
 use rusty::time::Time;
 
 struct Fixture {
-    scene: RefCell<Scene>,
-    audio: RefCell<AudioMaestro>,
-    time: RefCell<Time>,
-    camera: RefCell<Camera>,
+    scene: Rc<RefCell<Scene>>,
+    audio: Rc<RefCell<AudioMaestro>>,
+    time: Rc<RefCell<Time>>,
+    camera: Rc<RefCell<Camera>>,
     source_id: u32,
     bare_id: u32,
 }
@@ -45,15 +46,18 @@ fn fixture() -> Fixture {
     );
     let bare_id = scene.add_entity("Silent".to_string());
     Fixture {
-        scene: RefCell::new(scene),
-        audio: RefCell::new(AudioMaestro::default()),
-        time: RefCell::new(Time::default()),
-        camera: RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0)),
+        scene: Rc::new(RefCell::new(scene)),
+        audio: Rc::new(RefCell::new(AudioMaestro::default())),
+        time: Rc::new(RefCell::new(Time::default())),
+        camera: Rc::new(RefCell::new(Camera::new(Vec3::ZERO, 0.0, 0.0))),
         source_id,
         bare_id,
     }
 }
 
-fn register<'scope>(lua: &Lua, scope: &'scope mlua::Scope<'scope, '_>, f: &'scope Fixture) {
-    rusty::api::audio::register(lua, scope, &f.scene, &f.audio, &f.time, &f.camera).unwrap();
+fn register(lua: &Lua, f: &Fixture) {
+    use rusty::api::bind;
+    let (scene, audio) = (bind(lua, &f.scene), bind(lua, &f.audio));
+    rusty::api::audio::register(lua, scene, audio, bind(lua, &f.time), bind(lua, &f.camera))
+        .unwrap();
 }

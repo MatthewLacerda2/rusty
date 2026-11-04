@@ -3,10 +3,12 @@
 //! `nil` and its setters raise.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
 
 use super::register;
+use crate::api::bind;
 use crate::components::{LightProbeProxyVolumeComponent, ProxyBoundsMode, ProxyQuality};
 use crate::scene::Scene;
 
@@ -18,16 +20,16 @@ fn with_locker(body: impl FnOnce(&Lua) -> mlua::Result<()>) -> (Scene, u32, u32)
     let volume = Some(LightProbeProxyVolumeComponent::default());
     scene.world.set_light_probe_proxy_volume(id, volume);
     let bare = scene.add_entity("bare".to_string());
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene)).unwrap();
         lua.globals().set("id", id)?;
         lua.globals().set("bare", bare)?;
         body(&lua)
     })
     .unwrap();
-    (scene.into_inner(), id, bare)
+    (scene.take(), id, bare)
 }
 
 #[test]

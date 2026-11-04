@@ -56,12 +56,16 @@ pub struct ScriptField {
 /// declared fields sorted by name; an empty vec if the script has no schema or
 /// fails to compile (the inspector then simply shows no field controls).
 pub fn parse_fields(code: &str) -> Vec<ScriptField> {
+    read_fields(code).unwrap_or_default()
+}
+
+/// [`parse_fields`], but a chunk that fails to evaluate is an error (the loader
+/// warns on it, #1709) rather than an empty schema.
+pub(super) fn read_fields(code: &str) -> mlua::Result<Vec<ScriptField>> {
     let lua = super::sandbox::inspection_vm();
-    let Ok(table) = lua.load(code).eval::<Table>() else {
-        return Vec::new();
-    };
+    let table = lua.load(code).eval::<Table>()?;
     let Ok(fields) = table.get::<Table>("fields") else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let mut out: Vec<ScriptField> = fields
         .pairs::<String, Value>()
@@ -69,19 +73,19 @@ pub fn parse_fields(code: &str) -> Vec<ScriptField> {
         .filter_map(|(name, value)| parse_field(name, value))
         .collect();
     out.sort_by(|a, b| a.name.cmp(&b.name));
-    out
+    Ok(out)
 }
 
-/// Merge the inspector `overrides` over the schema `defaults` and write the
+/// Merge the inspector `overrides` over the schema `fields`' defaults and write the
 /// resulting field values onto the live script `table`, so `self.speed` inside
 /// the script reads the configured value. Schema defaults fill in any field the
 /// inspector left untouched. Pure data assignment — no clock/RNG.
 pub fn apply_field_values(
     table: &Table,
-    code: &str,
+    fields: &[ScriptField],
     overrides: &BTreeMap<String, ScriptFieldValue>,
 ) -> mlua::Result<()> {
-    for field in parse_fields(code) {
+    for field in fields {
         let key = field.name.as_str();
         match overrides.get(&field.name).unwrap_or(&field.default) {
             ScriptFieldValue::Number(n) => table.set(key, *n)?,

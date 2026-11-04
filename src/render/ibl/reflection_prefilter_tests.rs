@@ -5,53 +5,36 @@
 //! are progressively blurrier (higher roughness) than mip0 while keeping the room's mean
 //! colour. We measure "blurrier" as lower spatial variance across a face.
 
+use glam::Vec3;
+
 use super::cpu::prefilter;
+use super::source::{decode_face as texels, encode_face};
 use super::*;
-use crate::render::ibl::cube_sample::srgb_to_linear;
 use crate::render::{CubemapCapture, CubemapFace};
 
 /// A capture whose +X face is a sharp half-red / half-black split and the other faces a
 /// solid mid-grey — enough high-frequency contrast that the prefilter visibly smooths it.
 fn split_capture(res: u32) -> CubemapCapture {
-    let mut faces: [Vec<u8>; 6] = Default::default();
-    for f in &mut faces {
-        let mut buf = vec![0u8; (res * res * 4) as usize];
-        for px in buf.chunks_mut(4) {
-            px[0] = 80;
-            px[1] = 80;
-            px[2] = 80;
-            px[3] = 255;
-        }
-        *f = buf;
-    }
+    let mut faces: [Vec<Vec3>; 6] =
+        std::array::from_fn(|_| vec![Vec3::splat(0.08); (res * res) as usize]);
     // PosX: left half bright red, right half black — a hard edge.
-    let posx = &mut faces[CubemapFace::PosX as usize];
-    for y in 0..res {
-        for x in 0..res {
-            let idx = ((y * res + x) * 4) as usize;
-            let red = x < res / 2;
-            posx[idx] = if red { 255 } else { 0 };
-            posx[idx + 1] = 0;
-            posx[idx + 2] = 0;
-            posx[idx + 3] = 255;
+    let red = |i: u32| {
+        if i % res < res / 2 {
+            Vec3::X
+        } else {
+            Vec3::ZERO
         }
-    }
+    };
+    faces[CubemapFace::PosX as usize] = (0..res * res).map(red).collect();
     CubemapCapture {
         resolution: res,
         faces,
     }
 }
 
-/// Spatial variance of a face's luminance (a blur lowers it).
-fn face_variance(face: &[u8], res: u32) -> f32 {
-    let lum: Vec<f32> = (0..(res * res))
-        .map(|i| {
-            let idx = (i * 4) as usize;
-            srgb_to_linear(face[idx])
-                + srgb_to_linear(face[idx + 1])
-                + srgb_to_linear(face[idx + 2])
-        })
-        .collect();
+/// Spatial variance of a face's summed channels (a blur lowers it).
+fn face_variance(face: &[u8]) -> f32 {
+    let lum: Vec<f32> = texels(face).iter().map(|c| c.element_sum()).collect();
     let mean = lum.iter().sum::<f32>() / lum.len() as f32;
     lum.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / lum.len() as f32
 }
@@ -64,7 +47,7 @@ fn mip0_is_a_faithful_copy() {
     assert_eq!(cube.base_size, 16);
     assert_eq!(cube.level_size(0), 16);
     for face in CubemapFace::ALL {
-        assert_eq!(cube.mips[0][face as usize], capture.face(face));
+        assert_eq!(cube.mips[0][face as usize], encode_face(capture.face(face)));
     }
 }
 
@@ -77,9 +60,9 @@ fn higher_mips_are_blurrier_than_mip0() {
     assert!(cube.level_count() >= 3, "expected a mip chain");
 
     let f = CubemapFace::PosX as usize;
-    let var0 = face_variance(&cube.mips[0][f], cube.level_size(0));
+    let var0 = face_variance(&cube.mips[0][f]);
     let mid = cube.level_count() / 2;
-    let var_mid = face_variance(&cube.mips[mid][f], cube.level_size(mid));
+    let var_mid = face_variance(&cube.mips[mid][f]);
     assert!(
         var_mid < var0,
         "expected mip {mid} smoother than mip0: var {var_mid} vs {var0}"
@@ -107,24 +90,13 @@ fn roughness_maps_to_mip_level() {
 /// (the GGX lobe blurs but does not invent colour).
 #[test]
 fn rough_mip_keeps_room_color() {
-    let capture = split_capture(16);
-    let cube = prefilter(&capture);
+    let cube = prefilter(&split_capture(16));
     let f = CubemapFace::PosX as usize;
     for level in 0..cube.level_count() {
-        let size = cube.level_size(level);
-        let face = &cube.mips[level][f];
-        let mut r = 0.0;
-        let mut g = 0.0;
-        for px in face.chunks(4) {
-            r += srgb_to_linear(px[0]);
-            g += srgb_to_linear(px[1]);
-        }
-        let n = (size * size) as f32;
+        let sum: Vec3 = texels(&cube.mips[level][f]).iter().sum();
         assert!(
-            r / n >= g / n,
-            "mip {level}: expected red >= green, got r {} g {}",
-            r / n,
-            g / n
+            sum.x >= sum.y,
+            "mip {level}: expected red >= green, got {sum}"
         );
     }
 }

@@ -14,19 +14,20 @@ use mlua::Table;
 
 use super::super::{put, Reg};
 use super::cast::accepts;
+use crate::api::ApiCell;
 use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
 /// Register the overlap/check family onto the `Physics` table.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
-    register_sphere(scope, table, scene, physics)?;
-    register_box(scope, table, scene, physics)?;
-    register_capsule(scope, table, scene, physics)
+    register_sphere(lua, table, scene, physics)?;
+    register_box(lua, table, scene, physics)?;
+    register_capsule(lua, table, scene, physics)
 }
 
 /// Ids overlapping the sphere at `center`, mask-filtered; empty with no world.
@@ -62,46 +63,59 @@ fn box_ids(
 }
 
 /// `OverlapSphere` (id array) and `CheckSphere` (boolean fast-path).
-fn register_sphere<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_sphere(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     type Args = (f32, f32, f32, f32, Option<u32>);
     put(
         table,
         "OverlapSphere",
-        scope.create_function(|lua, (cx, cy, cz, radius, mask): Args| {
-            let ids = sphere_ids(physics, scene, Vec3::new(cx, cy, cz), radius, mask);
+        lua.create_function(move |lua, (cx, cy, cz, radius, mask): Args| {
+            let ids = sphere_ids(
+                &*physics.get(lua)?,
+                &*scene.get(lua)?,
+                Vec3::new(cx, cy, cz),
+                radius,
+                mask,
+            );
             lua.create_sequence_from(ids)
         }),
     )?;
     put(
         table,
         "CheckSphere",
-        scope.create_function(|_, (cx, cy, cz, radius, mask): Args| {
-            Ok(!sphere_ids(physics, scene, Vec3::new(cx, cy, cz), radius, mask).is_empty())
+        lua.create_function(move |lua, (cx, cy, cz, radius, mask): Args| {
+            Ok(!sphere_ids(
+                &*physics.get(lua)?,
+                &*scene.get(lua)?,
+                Vec3::new(cx, cy, cz),
+                radius,
+                mask,
+            )
+            .is_empty())
         }),
     )
 }
 
 /// `OverlapBox` (id array) and `CheckBox` (boolean fast-path). Half-extents,
 /// like Unity's `halfExtents`; the box is axis-aligned.
-fn register_box<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_box(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     type Args = (f32, f32, f32, f32, f32, f32, Option<u32>);
     put(
         table,
         "OverlapBox",
-        scope.create_function(|lua, (cx, cy, cz, hx, hy, hz, mask): Args| {
+        lua.create_function(move |lua, (cx, cy, cz, hx, hy, hz, mask): Args| {
             let ids = box_ids(
-                physics,
-                scene,
+                &*physics.get(lua)?,
+                &*scene.get(lua)?,
                 Vec3::new(cx, cy, cz),
                 Vec3::new(hx, hy, hz),
                 mask,
@@ -112,10 +126,10 @@ fn register_box<'scope>(
     put(
         table,
         "CheckBox",
-        scope.create_function(|_, (cx, cy, cz, hx, hy, hz, mask): Args| {
+        lua.create_function(move |lua, (cx, cy, cz, hx, hy, hz, mask): Args| {
             let ids = box_ids(
-                physics,
-                scene,
+                &*physics.get(lua)?,
+                &*scene.get(lua)?,
                 Vec3::new(cx, cy, cz),
                 Vec3::new(hx, hy, hz),
                 mask,
@@ -127,17 +141,19 @@ fn register_box<'scope>(
 
 /// `OverlapCapsule` — the capsule spans the two sphere centers `p0`→`p1` with
 /// `radius`, mirroring Unity's point0/point1/radius form.
-fn register_capsule<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_capsule(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     type Args = (f32, f32, f32, f32, f32, f32, f32, Option<u32>);
     put(
         table,
         "OverlapCapsule",
-        scope.create_function(|lua, (x0, y0, z0, x1, y1, z1, radius, mask): Args| {
+        lua.create_function(move |lua, (x0, y0, z0, x1, y1, z1, radius, mask): Args| {
+            let scene = &*scene.get(lua)?;
+            let physics = &*physics.get(lua)?;
             let ids = {
                 let physics = physics.borrow();
                 match physics.as_ref() {

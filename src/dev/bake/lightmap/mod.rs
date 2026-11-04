@@ -126,15 +126,16 @@ pub fn apply_lightmaps(
         let page = write_page(&dir, "lightmap_dir", k, size, encode_directions(dirs))?;
         set.directions.push(page);
     }
-    set.entries = atlas
-        .placements
-        .iter()
-        .map(|&(entity, page, scale_offset)| LightmapEntry {
-            entity,
-            page,
-            scale_offset,
-        })
-        .collect();
+    set.extend(
+        atlas
+            .placements
+            .iter()
+            .map(|&(entity, page, scale_offset)| LightmapEntry {
+                entity,
+                page,
+                scale_offset,
+            }),
+    );
     log::info!(
         "[LightmapBake] {} lightmaps in {} page(s) of {}²{} in {}",
         maps.len(),

@@ -14,21 +14,22 @@ use mlua::Table;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::{IkChain, IkConstraint, IkTarget};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
 /// Register the IK functions onto the `Animator` table.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
+    scene: ApiCell<Scene>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
-    register_add(scope, table, scene, console)?;
-    register_remove(scope, table, scene)?;
-    register_targets(scope, table, scene, console)?;
-    register_weight(scope, table, scene, console)
+    register_add(lua, table, scene, console)?;
+    register_remove(lua, table, scene)?;
+    register_targets(lua, table, scene, console)?;
+    register_weight(lua, table, scene, console)
 }
 
 /// Add (or replace) `constraint` on `id`'s animator once every bone it names
@@ -58,28 +59,34 @@ fn add(scene: &RefCell<Scene>, console: &RefCell<ConsoleLogs>, id: u32, c: IkCon
 
 /// `AddTwoBoneIK(id, name, root, mid, tip)` and
 /// `AddAimIK(id, name, bones [, { weights, axis, clamp, weight }])`.
-fn register_add<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_add(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
+    scene: ApiCell<Scene>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
     put(
         table,
         "AddTwoBoneIK",
-        scope.create_function(
-            |_, (id, name, root, mid, tip): (EntityArg, String, String, String, String)| {
+        lua.create_function(
+            move |lua, (id, name, root, mid, tip): (EntityArg, String, String, String, String)| {
                 let id = id.live("Animator", "AddTwoBoneIK")?;
                 let chain = IkChain::TwoBone { root, mid, tip };
-                Ok(add(scene, console, id, IkConstraint::new(name, chain)))
+                Ok(add(
+                    &*scene.get(lua)?,
+                    &*console.get(lua)?,
+                    id,
+                    IkConstraint::new(name, chain),
+                ))
             },
         ),
     )?;
     put(
         table,
         "AddAimIK",
-        scope.create_function(
-            |_, (id, name, bones, opts): (EntityArg, String, Vec<String>, Option<Table>)| {
+        lua.create_function(
+            move |lua, (id, name, bones, opts): (EntityArg, String, Vec<String>, Option<Table>)| {
+                let console = &*console.get(lua)?;
                 let id = id.live("Animator", "AddAimIK")?;
                 if bones.is_empty() {
                     console
@@ -91,7 +98,7 @@ fn register_add<'scope>(
                 if let Some(opts) = opts {
                     aim_options(&mut c, &opts)?;
                 }
-                Ok(add(scene, console, id, c))
+                Ok(add(&*scene.get(lua)?, console, id, c))
             },
         ),
     )
@@ -124,15 +131,12 @@ fn aim_options(c: &mut IkConstraint, t: &Table) -> mlua::Result<()> {
 }
 
 /// `RemoveIK(id, name)` — drop the constraint, putting back what it last wrote.
-fn register_remove<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_remove(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "RemoveIK",
-        scope.create_function(|_, (id, name): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Animator", "RemoveIK")?;
             let mut scene = scene.borrow_mut();
             let removed = scene.world.animator_mut(id).and_then(|mut a| {
@@ -166,11 +170,11 @@ fn with_ik(
 
 /// `SetIKTarget(id, name, x, y, z)`, `SetIKTargetEntity(id, name, target)`,
 /// `SetIKHint(id, name, x, y, z)`, `SetIKHintEntity(id, name, hint)`.
-fn register_targets<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_targets(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
+    scene: ApiCell<Scene>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
     for (func, hint) in [("SetIKTarget", false), ("SetIKHint", true)] {
         let set = move |c: &mut IkConstraint, t: IkTarget| {
@@ -180,13 +184,16 @@ fn register_targets<'scope>(
         put(
             table,
             func,
-            scope.create_function(
-                move |_, (id, name, x, y, z): (EntityArg, String, f32, f32, f32)| {
+            lua.create_function(
+                move |lua, (id, name, x, y, z): (EntityArg, String, f32, f32, f32)| {
                     let id = id.live("Animator", func)?;
                     let point = IkTarget::Point(Vec3::new(x, y, z));
-                    Ok(with_ik(scene, console, (func, id, &name), |c| {
-                        set(c, point)
-                    }))
+                    Ok(with_ik(
+                        &*scene.get(lua)?,
+                        &*console.get(lua)?,
+                        (func, id, &name),
+                        |c| set(c, point),
+                    ))
                 },
             ),
         )?;
@@ -198,14 +205,17 @@ fn register_targets<'scope>(
         put(
             table,
             entity_func,
-            scope.create_function(
-                move |_, (id, name, target): (EntityArg, String, EntityArg)| {
+            lua.create_function(
+                move |lua, (id, name, target): (EntityArg, String, EntityArg)| {
                     let id = id.live("Animator", entity_func)?;
                     let target = target.live("Animator", entity_func)?;
                     let to = IkTarget::Entity(target);
-                    Ok(with_ik(scene, console, (entity_func, id, &name), |c| {
-                        set(c, to)
-                    }))
+                    Ok(with_ik(
+                        &*scene.get(lua)?,
+                        &*console.get(lua)?,
+                        (entity_func, id, &name),
+                        |c| set(c, to),
+                    ))
                 },
             ),
         )?;
@@ -214,27 +224,31 @@ fn register_targets<'scope>(
 }
 
 /// `SetIKWeight(id, name, w)` (clamped to `[0, 1]`) and `GetIKWeight(id, name)`.
-fn register_weight<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_weight(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
+    scene: ApiCell<Scene>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
     put(
         table,
         "SetIKWeight",
-        scope.create_function(|_, (id, name, w): (EntityArg, String, f32)| {
+        lua.create_function(move |lua, (id, name, w): (EntityArg, String, f32)| {
             let id = id.live("Animator", "SetIKWeight")?;
             let w = w.clamp(0.0, 1.0);
-            Ok(with_ik(scene, console, ("SetIKWeight", id, &name), |c| {
-                c.weight = w
-            }))
+            Ok(with_ik(
+                &*scene.get(lua)?,
+                &*console.get(lua)?,
+                ("SetIKWeight", id, &name),
+                |c| c.weight = w,
+            ))
         }),
     )?;
     put(
         table,
         "GetIKWeight",
-        scope.create_function(|_, (id, name): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
+            let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
             let mut anim = scene.world.animator_mut(id.read());
             Ok(anim

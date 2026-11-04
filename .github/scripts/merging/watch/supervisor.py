@@ -67,6 +67,8 @@ def next_step(status: int, ended: str, failures: int) -> tuple[str, float, str]:
     ([`AGAIN`] after so many seconds, or [`GIVE_UP`]), and why."""
     if status == ending.STOPPED_STATUS:
         return GIVE_UP, 0, "a stop was requested"
+    if status == ending.MISMATCH_STATUS:
+        return GIVE_UP, 0, "main's tree is not what the merge train proved; look at main first"
     if status == lock.LOCKED_STATUS:
         return GIVE_UP, 0, "another watch holds the lock"
     if status == ending.MACHINE_STATUS:

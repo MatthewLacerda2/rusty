@@ -2,22 +2,18 @@
 //! deleting a material asset in Unity does, through the shared
 //! `authoring::material::delete_asset` op the editor's Material card calls too.
 
-use std::cell::RefCell;
-
 use super::{put, Reg};
+use crate::api::ApiCell;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
 /// Register `DeleteAsset` onto the `Material` `table`.
-pub fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "DeleteAsset",
-        scope.create_function(|_, (name, opts): (String, Option<mlua::Table>)| {
+        lua.create_function(move |lua, (name, opts): (String, Option<mlua::Table>)| {
+            let scene = &*scene.get(lua)?;
             let force = match opts {
                 Some(opts) => opts.get::<Option<bool>>("force")?.unwrap_or(false),
                 None => false,
@@ -37,21 +33,24 @@ pub fn register<'scope>(
 mod tests {
     use mlua::Lua;
 
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
     use super::*;
     use crate::components::MaterialComponent;
 
     /// Register the `Material` namespace against `scene` and evaluate `script`.
-    fn eval<T: mlua::FromLuaMulti>(scene: &RefCell<Scene>, script: &str) -> mlua::Result<T> {
+    fn eval<T: mlua::FromLuaMulti>(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<T> {
         let lua = Lua::new();
-        lua.scope(|s| {
-            super::super::register(&lua, s, scene).unwrap();
+        crate::api::attempt(|| {
+            super::super::register(&lua, crate::api::bind(&lua, scene)).unwrap();
             lua.load(script).eval()
         })
     }
 
     #[test]
     fn delete_asset_refuses_a_used_material_unless_forced() {
-        let scene = RefCell::new(Scene::new());
+        let scene = Rc::new(RefCell::new(Scene::new()));
         let id = scene.borrow_mut().add_entity("Pool".into());
         scene
             .borrow_mut()
@@ -81,7 +80,7 @@ mod tests {
 
     #[test]
     fn delete_asset_of_an_unused_material_returns_no_users() {
-        let scene = RefCell::new(Scene::new());
+        let scene = Rc::new(RefCell::new(Scene::new()));
         scene
             .borrow_mut()
             .materials

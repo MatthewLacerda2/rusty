@@ -1,13 +1,19 @@
-//! A reflection probe's GGX prefilter on the GPU (#1602): the captured cube uploaded
-//! as a texture array, every rough mip convolved in one compute pass
-//! (`ibl/probe_prefilter.wgsl`), and the chain read back for the KTX2 encode.
+//! A reflection probe's GGX prefilter on the GPU (#1602): the captured cube's source
+//! mip chain (`source::source_chain`) uploaded as an `Rgba16Float` texture array,
+//! every rough mip convolved in one compute pass (`ibl/probe_prefilter.wgsl`) into
+//! an `Rgba16Float` storage texture, and the chain read back for the KTX2 encode.
+//! `Rgba16Float` is a storage format WebGPU guarantees, so every adapter takes the
+//! write (lavapipe, Metal, Vulkan and DX12 GPUs alike).
 //!
 //! The CPU `cpu::prefilter` (test-only) stays the reference: the shader is it
-//! texel for texel (the same face matrices, nearest-texel lookup and sample count),
-//! and a GPU test holds the two within a written tolerance. At a probe's 512-texel
+//! texel for texel (the same face matrices, source chain, per-sample mip, nearest-texel
+//! lookup and sample count), and a GPU test holds the two within a written tolerance. At a probe's 512-texel
 //! default the CPU pass is ≈ 50 M samples on one core; here it is one compute pass.
 
-use super::{mip_count, PrefilteredCubemap, SAMPLE_COUNT};
+use glam::Vec3;
+
+use super::source::{encode_face, source_chain};
+use super::{mip_count, PrefilteredCubemap, SAMPLE_COUNT, TEXEL_BYTES};
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::ibl::cube_sample::FaceProjections;
 use crate::render::CubemapCapture;
@@ -45,13 +51,15 @@ impl ProbePrefilter {
     ) -> PrefilteredCubemap {
         let base = capture.resolution.max(1);
         let levels = mip_count(base);
-        let mut mips = vec![capture.faces.clone()];
+        let chain = source_chain(capture);
+        let mut mips = vec![chain[0].each_ref().map(|face| encode_face(face))];
         if levels > 1 {
             let sizes: Vec<u32> = (1..levels).map(|level| (base >> level).max(1)).collect();
-            let rough = self.filter(device, queue, capture, &sizes);
-            mips.extend(crate::render::readback::read_cube_mips_rgba8(
-                device, queue, &rough, &sizes,
-            ));
+            let rough = self.filter((device, queue), (&chain, base), &sizes);
+            let texel = TEXEL_BYTES as u32;
+            let read =
+                crate::render::readback::read_cube_mips(device, queue, (&rough, texel), &sizes);
+            mips.extend(read);
         }
         PrefilteredCubemap {
             mips,
@@ -63,13 +71,11 @@ impl ProbePrefilter {
     /// its own, in one submitted compute pass.
     fn filter(
         &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        capture: &CubemapCapture,
+        (device, queue): (&wgpu::Device, &wgpu::Queue),
+        (chain, base): (&[[Vec<Vec3>; 6]], u32),
         sizes: &[u32],
     ) -> wgpu::Texture {
-        let base = capture.resolution.max(1);
-        let source = upload(device, queue, capture).create_view(&wgpu::TextureViewDescriptor {
+        let source = upload(device, queue, chain, base).create_view(&wgpu::TextureViewDescriptor {
             dimension: Some(wgpu::TextureViewDimension::D2Array),
             ..Default::default()
         });
@@ -153,53 +159,62 @@ fn params(p: [f32; 3], projections: &FaceProjections) -> Vec<f32> {
     out
 }
 
-/// The captured faces as an sRGB texture array, so a load decodes to linear as the
-/// CPU's `sample_linear` does.
-fn upload(device: &wgpu::Device, queue: &wgpu::Queue, capture: &CubemapCapture) -> wgpu::Texture {
-    let res = capture.resolution.max(1);
+/// The source chain as an `Rgba16Float` texture array, one mip per level, the base
+/// `base` texels wide.
+fn upload(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    chain: &[[Vec<Vec3>; 6]],
+    base: u32,
+) -> wgpu::Texture {
     let size = wgpu::Extent3d {
-        width: res,
-        height: res,
+        width: base,
+        height: base,
         depth_or_array_layers: 6,
     };
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Reflection Probe Capture"),
         size,
-        mip_level_count: 1,
+        mip_level_count: chain.len() as u32,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        format: wgpu::TextureFormat::Rgba16Float,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    for (layer, face) in (0..).zip(&capture.faces) {
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d {
-                    x: 0,
-                    y: 0,
-                    z: layer,
+    for (mip_level, faces) in (0..).zip(chain) {
+        let edge = (base >> mip_level).max(1);
+        for (layer, face) in (0..).zip(faces) {
+            queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &texture,
+                    mip_level,
+                    origin: wgpu::Origin3d {
+                        x: 0,
+                        y: 0,
+                        z: layer,
+                    },
+                    aspect: wgpu::TextureAspect::All,
                 },
-                aspect: wgpu::TextureAspect::All,
-            },
-            face,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(res * 4),
-                rows_per_image: Some(res),
-            },
-            wgpu::Extent3d {
-                depth_or_array_layers: 1,
-                ..size
-            },
-        );
+                &encode_face(face),
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(edge * TEXEL_BYTES as u32),
+                    rows_per_image: Some(edge),
+                },
+                wgpu::Extent3d {
+                    width: edge,
+                    height: edge,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
     }
     texture
 }
 
-/// The rough mips' target: six RGBA8 layers, `sizes[0]` at its base, one level per size.
+/// The rough mips' target: six `Rgba16Float` layers, `sizes[0]` at its base, one
+/// level per size.
 fn rough_texture(device: &wgpu::Device, sizes: &[u32]) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Reflection Probe Rough Mips"),
@@ -211,7 +226,7 @@ fn rough_texture(device: &wgpu::Device, sizes: &[u32]) -> wgpu::Texture {
         mip_level_count: sizes.len() as u32,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8Unorm,
+        format: wgpu::TextureFormat::Rgba16Float,
         usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
     })

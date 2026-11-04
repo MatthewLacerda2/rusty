@@ -31,30 +31,28 @@ use std::cell::RefCell;
 
 use super::from_lua::{asset_from_lua, Validated};
 use super::{put, Reg};
+use crate::api::ApiCell;
 use crate::components::{MaterialAsset, RenderMode};
 use crate::core::paths::native;
 use crate::scene::authoring::material as mat_ops;
 use crate::scene::Scene;
 
 /// Register the standalone asset-authoring verbs onto the `Material` `table`.
-pub fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "DefineAsset",
-        scope.create_function(|_, (name, recipe): (String, mlua::Value)| {
+        lua.create_function(move |lua, (name, recipe): (String, mlua::Value)| {
             let (asset, validated) = asset_from_lua(&recipe).map_err(mlua::Error::RuntimeError)?;
-            define(scene, &name, asset, validated).map_err(mlua::Error::RuntimeError)
+            define(&*scene.get(lua)?, &name, asset, validated).map_err(mlua::Error::RuntimeError)
         }),
     )?;
 
     put(
         table,
         "GetAsset",
-        scope.create_function(|_, name: String| {
+        lua.create_function(move |lua, name: String| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(match scene.materials.get(&name) {
                 Some(asset) => Some(
@@ -69,7 +67,8 @@ pub fn register<'scope>(
     put(
         table,
         "Rebake",
-        scope.create_function(|_, (name, resolution): (String, Option<u32>)| {
+        lua.create_function(move |lua, (name, resolution): (String, Option<u32>)| {
+            let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
             let dir = &native(mat_ops::MAPS_DIR);
             let root = crate::core::project::root();
@@ -81,7 +80,9 @@ pub fn register<'scope>(
     put(
         table,
         "HasAsset",
-        scope.create_function(|_, name: String| Ok(scene.borrow().materials.contains_key(&name))),
+        lua.create_function(move |lua, name: String| {
+            Ok(scene.get(lua)?.borrow().materials.contains_key(&name))
+        }),
     )
 }
 
@@ -136,23 +137,21 @@ mod maps_tests;
 mod tests {
     use mlua::Lua;
 
+    use std::rc::Rc;
+
     use super::*;
     use crate::components::RenderMode;
 
     /// Register the full `Material` namespace against `scene` and run `script`.
-    fn run(scene: &RefCell<Scene>, script: &str) {
+    fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
         let lua = Lua::new();
-        lua.scope(|s| {
-            super::super::register(&lua, s, scene).unwrap();
-            lua.load(script).exec().unwrap();
-            Ok(())
-        })
-        .unwrap();
+        super::super::register(&lua, crate::api::bind(&lua, scene)).unwrap();
+        lua.load(script).exec().unwrap();
     }
 
     #[test]
     fn a_recipe_shader_and_set_shader_name_the_surface_shader() {
-        let scene = RefCell::new(Scene::new());
+        let scene = Rc::new(RefCell::new(Scene::new()));
         let id = scene.borrow_mut().add_entity("E".into());
         run(
             &scene,
@@ -177,7 +176,7 @@ mod tests {
 
     #[test]
     fn define_asset_writes_factors_and_maps_into_the_library() {
-        let scene = RefCell::new(Scene::new());
+        let scene = Rc::new(RefCell::new(Scene::new()));
         run(
             &scene,
             r#"Material.DefineAsset("brick", {
@@ -198,7 +197,7 @@ mod tests {
 
     #[test]
     fn validated_fields_route_through_the_shared_clamp_and_parse() {
-        let scene = RefCell::new(Scene::new());
+        let scene = Rc::new(RefCell::new(Scene::new()));
         run(
             &scene,
             r#"Material.DefineAsset("glass", {
@@ -220,7 +219,7 @@ mod tests {
 
     #[test]
     fn unknown_render_mode_degrades_to_opaque() {
-        let scene = RefCell::new(Scene::new());
+        let scene = Rc::new(RefCell::new(Scene::new()));
         run(
             &scene,
             r#"Material.DefineAsset("typo", { render_mode = "shiny" })"#,
@@ -233,39 +232,37 @@ mod tests {
 
     #[test]
     fn has_and_get_asset_observe_the_library() {
-        let scene = RefCell::new(Scene::new());
+        let scene = Rc::new(RefCell::new(Scene::new()));
         run(&scene, r#"Material.DefineAsset("m", { metallic = 0.3 })"#);
 
         let lua = Lua::new();
-        let (has, json): (bool, String) = lua
-            .scope(|s| {
-                super::super::register(&lua, s, &scene).unwrap();
-                Ok(lua
-                    .load(r#"return Material.HasAsset("m"), Material.GetAsset("m")"#)
-                    .eval()
-                    .unwrap())
-            })
-            .unwrap();
+        let (has, json): (bool, String) = crate::api::attempt(|| {
+            super::super::register(&lua, crate::api::bind(&lua, &scene)).unwrap();
+            Ok(lua
+                .load(r#"return Material.HasAsset("m"), Material.GetAsset("m")"#)
+                .eval()
+                .unwrap())
+        })
+        .unwrap();
         assert!(has);
         let back: MaterialAsset = serde_json::from_str(&json).expect("GetAsset returns valid JSON");
         assert_eq!(back.metallic, 0.3);
 
         // An absent name reports false / nil.
-        let absent: Option<String> = lua
-            .scope(|s| {
-                super::super::register(&lua, s, &scene).unwrap();
-                Ok(lua
-                    .load(r#"return Material.GetAsset("nope")"#)
-                    .eval()
-                    .unwrap())
-            })
-            .unwrap();
+        let absent: Option<String> = crate::api::attempt(|| {
+            super::super::register(&lua, crate::api::bind(&lua, &scene)).unwrap();
+            Ok(lua
+                .load(r#"return Material.GetAsset("nope")"#)
+                .eval()
+                .unwrap())
+        })
+        .unwrap();
         assert!(absent.is_none());
     }
 
     #[test]
     fn define_asset_accepts_a_json_string() {
-        let scene = RefCell::new(Scene::new());
+        let scene = Rc::new(RefCell::new(Scene::new()));
         run(
             &scene,
             r#"Material.DefineAsset("steel",

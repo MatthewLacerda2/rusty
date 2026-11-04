@@ -3,29 +3,31 @@
 //! needs to build a viewmodel camera over the world one.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{CameraComponent, ClearFlags};
 use rusty::scene::Scene;
 
-fn run(scene: &RefCell<Scene>, code: &str) -> mlua::Result<()> {
+fn run(scene: &Rc<RefCell<Scene>>, code: &str) -> mlua::Result<()> {
     let lua = Lua::new();
-    lua.scope(|scope| {
+    crate::lua::attempt(|| {
         let table = lua.create_table()?;
-        rusty::api::camera::component::register(scope, &table, scene).unwrap();
+        rusty::api::camera::component::register(&lua, &table, bind(&lua, scene)).unwrap();
         lua.globals().set("Camera", table)?;
         lua.load(code).exec()
     })
 }
 
-fn scene_with_camera() -> (RefCell<Scene>, u32, u32) {
+fn scene_with_camera() -> (Rc<RefCell<Scene>>, u32, u32) {
     let mut scene = Scene::new();
     let cam = scene.add_entity("Viewmodel".to_string());
     scene
         .world
         .set_camera(cam, Some(CameraComponent::default()));
     let bare = scene.add_entity("Bare".to_string());
-    (RefCell::new(scene), cam, bare)
+    (Rc::new(RefCell::new(scene)), cam, bare)
 }
 
 #[test]

@@ -1,4 +1,4 @@
-//! src/scene/lighting/probe.rs — Light-probe data model + trilinear sampling.
+//! src/scene/lighting/probe/ — Light-probe data model + trilinear sampling.
 //!
 //! A light probe captures the bounced/ambient light arriving at a point as an L2
 //! SH irradiance signal (see `sh.rs`). Probes are a SCENE-LEVEL DATASET, not a
@@ -13,16 +13,32 @@
 //!     (`LightingData`), keyed by probe index — heavy, regenerable data kept out
 //!     of the human-diffable scene file.
 //!
-//! Interpolation is TRILINEAR over the grid (no tetrahedral gold-plating). A free
-//! probe (placed outside any grid) contributes a nearest-probe fallback so manual
-//! placement still works.
+//! Interpolation is TRILINEAR over the grid (no tetrahedral gold-plating). Outside
+//! a grid, or for a set with none (the automatic placement's, #1737, whose density
+//! follows the geometry), the [`BLEND_PROBES`] nearest probes are blended by inverse
+//! squared distance less the next one's, so a probe's weight reaches zero just as it
+//! leaves the blend and a moving object fades from one probe to the next. They are
+//! found through a spatial index (`index.rs`) built when the set is first sampled
+//! after a change, so a sample reads the probes near it, not the whole set; edit
+//! positions through [`ProbeVolume`]'s methods, which drop the stale index.
 //!
 //! This module is pure data + math — deterministic, sim-reachable, no RNG/clock.
+
+mod index;
+
+use std::sync::OnceLock;
 
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 use crate::scene::lighting::sh::Sh9;
+use index::ProbeIndex;
+
+/// How many probes a point outside any grid blends: the four nearest, a
+/// tetrahedron's worth, as Unity's light-probe tetrahedra blend four.
+pub const BLEND_PROBES: usize = 4;
+/// A squared distance this small reads the probe it is on, unblended.
+const ON_PROBE: f32 = 1.0e-8;
 
 /// A single light probe: a world position plus the baked SH it carries. The SH is
 /// the heavy part; on disk the position lives in the scene and the SH in the
@@ -31,6 +47,11 @@ use crate::scene::lighting::sh::Sh9;
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Probe {
     pub position: Vec3,
+    /// Placed by hand (#1737): the automatic placement keeps it where it is and
+    /// plans around it, and replaces only the probes without it. `Probe.Add` and
+    /// `Probe.FillGrid` set it; a saved probe without the field reads as placed.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub manual: bool,
     #[serde(skip)]
     pub sh: Sh9,
 }
@@ -39,14 +60,15 @@ impl Probe {
     pub fn new(position: Vec3) -> Self {
         Self {
             position,
+            manual: false,
             sh: Sh9::zero(),
         }
     }
 }
 
 /// An optional regular grid describing how the probes are laid out. When present,
-/// sampling uses trilinear interpolation over the lattice; when absent, probes are
-/// sampled by nearest neighbour. `origin` is the min corner, `spacing` the cell
+/// sampling uses trilinear interpolation over the lattice; when absent, the
+/// [`BLEND_PROBES`] nearest probes are blended. `origin` is the min corner, `spacing` the cell
 /// size, `counts` the probe count along each axis (so `count.x*count.y*count.z`
 /// probes, ordered x-fastest then y then z).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -81,6 +103,9 @@ pub struct ProbeVolume {
     pub probes: Vec<Probe>,
     #[serde(default)]
     pub grid: Option<ProbeGrid>,
+    /// The nearest-probe index, built on the first sample after a change.
+    #[serde(skip)]
+    index: OnceLock<Option<ProbeIndex>>,
 }
 
 impl ProbeVolume {
@@ -94,6 +119,7 @@ impl ProbeVolume {
 
     /// Add a single free probe at `position`, returning its index.
     pub fn add_probe(&mut self, position: Vec3) -> usize {
+        self.reindex();
         self.probes.push(Probe::new(position));
         self.probes.len() - 1
     }
@@ -102,6 +128,7 @@ impl ProbeVolume {
     pub fn move_probe(&mut self, index: usize, position: Vec3) {
         if let Some(p) = self.probes.get_mut(index) {
             p.position = position;
+            self.reindex();
         }
     }
 
@@ -111,13 +138,43 @@ impl ProbeVolume {
         if index < self.probes.len() {
             self.probes.remove(index);
             self.grid = None;
+            self.reindex();
         }
+    }
+
+    /// Mark probe `index` as placed by hand or not (no-op if out of range).
+    pub fn set_manual(&mut self, index: usize, manual: bool) {
+        if let Some(p) = self.probes.get_mut(index) {
+            p.manual = manual;
+        }
+    }
+
+    /// Replace the probes the automatic placement made with `placed` (#1737): the
+    /// manual ones stay, in order, and the new ones follow them. The grid stays
+    /// when every probe it indexes (the first [`ProbeGrid::probe_count`]) is manual,
+    /// since they keep their indices; placed probes after it never shift them.
+    pub fn replace_placed(&mut self, placed: impl IntoIterator<Item = Vec3>) {
+        let gridded = self.grid.map_or(0, |g| g.probe_count());
+        let grid_manual =
+            gridded <= self.probes.len() && self.probes[..gridded].iter().all(|p| p.manual);
+        if !grid_manual {
+            self.grid = None;
+        }
+        self.probes.retain(|p| p.manual);
+        self.probes.extend(placed.into_iter().map(Probe::new));
+        self.reindex();
     }
 
     /// Drop every probe and the grid.
     pub fn clear(&mut self) {
         self.probes.clear();
         self.grid = None;
+        self.reindex();
+    }
+
+    /// Drop the nearest-probe index: the positions changed.
+    fn reindex(&mut self) {
+        self.index = OnceLock::new();
     }
 
     /// Replace the probe set with a regular grid spanning `[min, max]` at `spacing`
@@ -145,11 +202,13 @@ impl ProbeVolume {
             }
         }
         self.grid = Some(grid);
+        self.reindex();
     }
 
     /// Sample the interpolated SH irradiance at a world position. Trilinear over the
     /// grid when one is present and the point falls inside it; otherwise (free probes,
-    /// or a point outside the grid) the nearest probe. `None` when there are no probes.
+    /// or a point outside the grid) the [`BLEND_PROBES`] nearest blended. `None` when
+    /// there are no probes.
     pub fn sample(&self, position: Vec3) -> Option<Sh9> {
         if self.probes.is_empty() {
             return None;
@@ -192,59 +251,47 @@ impl ProbeVolume {
         Some(Sh9::lerp(&c0, &c1, frac.z))
     }
 
-    /// Nearest-probe SH (used for free probes or out-of-grid points).
+    /// The [`BLEND_PROBES`] nearest probes' SH, weighted by inverse squared
+    /// distance (used for free probes or out-of-grid points). A point on a probe
+    /// reads that probe; ties keep the lower index, so the answer is deterministic.
     fn sample_nearest(&self, position: Vec3) -> Sh9 {
-        let mut best = (f32::INFINITY, Sh9::zero());
-        for p in &self.probes {
-            let d = p.position.distance_squared(position);
-            if d < best.0 {
-                best = (d, p.sh);
+        let index = self.index.get_or_init(|| ProbeIndex::build(&self.probes));
+        let near = match index {
+            Some(index) => index.nearest(&self.probes, position),
+            None => index::scan(&self.probes, position),
+        };
+        self.blend(&near)
+    }
+
+    /// The first [`BLEND_PROBES`] of `near` blended by `1/d² − 1/d²ₙ`, where `dₙ`
+    /// is the next probe's distance: a probe's weight falls to zero as the next one
+    /// draws level and replaces it, so a swap never pops.
+    fn blend(&self, near: &index::Nearest) -> Sh9 {
+        let (blended, next) = near.split_at(BLEND_PROBES);
+        let found = || blended.iter().filter(|n| n.1 != usize::MAX);
+        if let Some(&(_, i)) = found().find(|n| n.0 <= ON_PROBE) {
+            return self.probes[i].sh;
+        }
+        // `1/dₙ²` is 0 with no next probe (an infinite distance); the plain weights
+        // are the fallback when every blended probe is as far as the next.
+        for fade in [1.0 / next[0].0, 0.0] {
+            let (mut sum, mut total) = (Sh9::zero(), 0.0);
+            for &(d, i) in found() {
+                let w = 1.0 / d - fade;
+                if w > 0.0 {
+                    sum = Sh9::lerp(&sum, &self.probes[i].sh, w / (total + w));
+                    total += w;
+                }
+            }
+            if total > 0.0 {
+                return sum;
             }
         }
-        best.1
+        Sh9::zero()
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn fill_grid_counts_and_positions() {
-        let mut vol = ProbeVolume::new();
-        vol.fill_grid(Vec3::ZERO, Vec3::new(2.0, 0.0, 2.0), 1.0);
-        // 3 along x, 1 along y, 3 along z = 9 probes.
-        assert_eq!(vol.probes.len(), 9);
-        let grid = vol.grid.unwrap();
-        assert_eq!(grid.counts, [3, 1, 3]);
-        assert_eq!(vol.probes[0].position, Vec3::ZERO);
-    }
-
-    #[test]
-    fn add_move_remove_probe() {
-        let mut vol = ProbeVolume::new();
-        let i = vol.add_probe(Vec3::X);
-        assert_eq!(vol.probes.len(), 1);
-        vol.move_probe(i, Vec3::Y);
-        assert_eq!(vol.probes[i].position, Vec3::Y);
-        vol.remove_probe(i);
-        assert!(vol.is_empty());
-    }
-
-    #[test]
-    fn sample_none_when_empty() {
-        let vol = ProbeVolume::new();
-        assert!(vol.sample(Vec3::ZERO).is_none());
-    }
-
-    #[test]
-    fn trilinear_blends_between_probes() {
-        let mut vol = ProbeVolume::new();
-        vol.fill_grid(Vec3::ZERO, Vec3::new(1.0, 0.0, 0.0), 1.0);
-        // Two probes along x. Set distinct DC terms.
-        vol.probes[0].sh.coeffs[0] = [0.0, 0.0, 0.0];
-        vol.probes[1].sh.coeffs[0] = [1.0, 0.0, 0.0];
-        let mid = vol.sample(Vec3::new(0.5, 0.0, 0.0)).unwrap();
-        assert!((mid.coeffs[0][0] - 0.5).abs() < 1.0e-5);
-    }
-}
+mod blend_tests;
+#[cfg(test)]
+mod tests;

@@ -55,7 +55,7 @@ fn every_kind(tag: &str) -> Scene {
     }
     scene.selected_entity_id = Some(c);
     scene.persistent.insert(g);
-    scene.lightmaps.entries.push(LightmapEntry {
+    scene.lightmaps.insert(LightmapEntry {
         entity: p,
         page: 0,
         scale_offset: [1.0, 1.0, 0.0, 0.0],
@@ -95,7 +95,7 @@ fn live_refs(scene: &Scene) -> Vec<u32> {
     out.extend(scene.selected_entity_id);
     out.extend(scene.persistent.iter().copied());
     out.extend(scene.pending_destroy.iter().copied());
-    out.extend(scene.lightmaps.entries.iter().map(|e| e.entity));
+    out.extend(scene.lightmaps.entries().map(|e| e.entity));
     out
 }
 
@@ -120,7 +120,7 @@ fn destroying_any_entity_leaves_no_reference_to_it() {
         let saved: BTreeSet<u32> = data.entities.iter().map(|e| e.id).collect();
         let mut named_saved: Vec<u32> = data.entities.iter().flat_map(named).collect();
         named_saved.extend(data.selected_entity_id);
-        named_saved.extend(data.lightmaps.entries.iter().map(|e| e.entity));
+        named_saved.extend(data.lightmaps.entries().map(|e| e.entity));
         named_saved.retain(|r| !saved.contains(r));
         assert!(
             named_saved.is_empty(),

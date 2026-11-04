@@ -3,10 +3,12 @@
 //! defaults and is never given one.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
 
 use super::register;
+use crate::api::bind;
 use crate::components::NavMeshModifierVolumeComponent;
 use crate::scene::Scene;
 
@@ -18,10 +20,10 @@ fn setters_write_through_the_shared_ops_and_getters_read_back() {
         .world
         .set_nav_modifier(id, Some(NavMeshModifierVolumeComponent::default()));
     let bare = scene.add_entity("bare".to_string());
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene)).unwrap();
         lua.globals().set("id", id)?;
         lua.globals().set("bare", bare)?;
         lua.load(

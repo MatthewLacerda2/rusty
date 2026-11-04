@@ -3,10 +3,12 @@
 //! and checked against the baked layout, and the errors say what to do.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
 
+use crate::api::bind;
 use crate::components::{ImageComponent, TextComponent};
 use crate::scene::{Camera, Scene};
 use crate::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
@@ -40,20 +42,28 @@ impl Drop for Baked {
 }
 
 /// Run `script` against the `UI` namespace, returning its error if any.
-fn run(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
-    let screen = RefCell::new(crate::ui::ScreenSize::default());
-    let video = RefCell::new(crate::core::settings::video::VideoSettings::default());
-    let camera = RefCell::new(Camera::new(Vec3::ZERO, -90.0, 0.0));
+fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
+    let screen = Rc::new(RefCell::new(crate::ui::ScreenSize::default()));
+    let video = Rc::new(RefCell::new(
+        crate::core::settings::video::VideoSettings::default(),
+    ));
+    let camera = Rc::new(RefCell::new(Camera::new(Vec3::ZERO, -90.0, 0.0)));
     let lua = Lua::new();
-    lua.scope(|s| {
-        super::super::register(&lua, s, scene, (&screen, &video), &camera).unwrap();
+    crate::api::attempt(|| {
+        super::super::register(
+            &lua,
+            bind(&lua, scene),
+            (bind(&lua, &screen), bind(&lua, &video)),
+            bind(&lua, &camera),
+        )
+        .unwrap();
         lua.load(script).exec()
     })
     .map_err(|e| e.to_string())
 }
 
 /// A scene with a labelled image (Image + Text) and a bare entity: `(scene, label, bare)`.
-fn scene() -> (RefCell<Scene>, u32, u32) {
+fn scene() -> (Rc<RefCell<Scene>>, u32, u32) {
     let mut scene = Scene::new();
     let label = scene.add_entity("Label".into());
     scene
@@ -61,7 +71,7 @@ fn scene() -> (RefCell<Scene>, u32, u32) {
         .set_image(label, Some(ImageComponent::default()));
     scene.world.set_text(label, Some(TextComponent::default()));
     let bare = scene.add_entity("Bare".into());
-    (RefCell::new(scene), label, bare)
+    (Rc::new(RefCell::new(scene)), label, bare)
 }
 
 #[test]

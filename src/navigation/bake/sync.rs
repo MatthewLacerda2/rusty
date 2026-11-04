@@ -1,9 +1,10 @@
 //! src/navigation/bake/sync.rs — rebake only what changed (#456).
 //!
-//! [`NavigationGraph::sync`] runs every play tick in place of the old full rebake
-//! every 60 frames. It diffs the scene against the inputs the last bake read
-//! (`inputs`): nothing changed costs one pass over the static colliders, the
-//! obstacles and the modifier volumes (#460). A changed one dirties the cells
+//! [`NavigationGraph::sync`] runs every play tick (through `sync_changes`, `still`)
+//! in place of the old full rebake every 60 frames. It diffs the scene against the
+//! inputs the last bake read (`inputs`): nothing changed costs one pass over the
+//! obstacles, the modifier volumes (#460) and the authored links, plus one over the
+//! static colliders unless the change log says none of them changed (#1707). A changed one dirties the cells
 //! its old and new footprints cover; overlapping dirty rectangles merge. Each rectangle's
 //! pre-erosion columns are rebuilt and spliced in, then erosion re-runs over the
 //! rectangles grown by its reach, and those cells of the final graph are spliced.
@@ -45,8 +46,16 @@ impl NavigationGraph {
     /// Area costs (#460) are not a bake input: a changed cost is adopted here
     /// without rebaking anything, and only makes cached agent paths stale.
     pub fn sync(&mut self, scene: &Scene) -> Rebake {
+        self.sync_inner(scene, false)
+    }
+
+    /// [`Self::sync`]; `statics_still` (the change log saw no static entity change
+    /// since the last sync, `still`) skips the static collider diff and the
+    /// reshape check, which read only that geometry and the settings.
+    pub(super) fn sync_inner(&mut self, scene: &Scene, statics_still: bool) -> Rebake {
         let current = self.bake_state.as_ref().is_some_and(|st| {
-            st.inputs.settings.bakes_like(&scene.nav_settings) && !self.needs_reshape(scene)
+            st.inputs.settings.bakes_like(&scene.nav_settings)
+                && (statics_still || !self.needs_reshape(scene))
         });
         if current {
             self.set_area_costs(&scene.nav_settings.areas);
@@ -55,7 +64,7 @@ impl NavigationGraph {
             self.bake(scene);
             return Rebake::Full;
         };
-        let dirty = st.update_inputs(scene);
+        let dirty = st.update_inputs(scene, statics_still);
         let link_dirty = st.update_links(scene, self);
         if dirty.is_empty() && link_dirty.is_empty() {
             self.bake_state = Some(st);
@@ -124,20 +133,23 @@ impl NavigationGraph {
 
 impl BakeState {
     /// Diff the recorded inputs against `scene`, record the current ones, and
-    /// return the cells whose inputs changed.
-    fn update_inputs(&mut self, scene: &Scene) -> Vec<CellRect> {
+    /// return the cells whose inputs changed. With `statics_still` the static
+    /// colliders are known unchanged and keep their records undiffed.
+    fn update_inputs(&mut self, scene: &Scene, statics_still: bool) -> Vec<CellRect> {
         let mut dirty = Vec::new();
         let raw = &self.raw;
-        let collider_rect = |id: u32, _: &_| {
-            let mesh = collider_world_triangles(scene, id)?;
-            raster::footprint(raw, &mesh.vertices)
-        };
-        let colliders = diff(
-            &self.inputs.colliders,
-            collider_keys(scene),
-            collider_rect,
-            &mut dirty,
-        );
+        if !statics_still {
+            let collider_rect = |id: u32, _: &_| {
+                let mesh = collider_world_triangles(scene, id)?;
+                raster::footprint(raw, &mesh.vertices)
+            };
+            self.inputs.colliders = diff(
+                &self.inputs.colliders,
+                collider_keys(scene),
+                collider_rect,
+                &mut dirty,
+            );
+        }
         let obstacle_rect =
             |_: u32, v: &ObstacleVolume| raster::footprint(raw, &v.triangles().concat());
         let obstacles = diff(
@@ -153,7 +165,6 @@ impl BakeState {
             modifier_rect,
             &mut dirty,
         );
-        self.inputs.colliders = colliders;
         self.inputs.obstacles = obstacles;
         self.inputs.modifiers = modifiers;
         dirty

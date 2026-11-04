@@ -8,10 +8,11 @@ use mlua::{Lua, Table};
 
 use super::super::bake::generate_lighting::generate_lighting;
 use super::super::bake::progress::BakeLog;
-use crate::api::{global_table, put, ApiScopedCtx, Reg};
+use crate::api::{global_table, put, ApiCell, ApiCtx, Reg};
 use crate::scene::lighting::lightmap::BakeSettings;
 use crate::scene::lighting::settings::ReflectionSettings;
 use crate::scene::lighting::DiffuseModel;
+use crate::scene::Scene;
 
 /// The knobs a script may override, each optional; `None` keeps `base`'s.
 #[derive(Default)]
@@ -50,24 +51,21 @@ impl Overrides {
 }
 
 /// Add `Generate`, `GetSettings` and `SetSettings` to the `Lighting` table.
-pub(super) fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let (scene, scene_path, nav, console) = (ctx.scene, ctx.scene_path, ctx.nav, ctx.console);
     let table = global_table(lua, "Lighting")?;
     put(
         &table,
         "Generate",
-        scope.create_function(move |lua, ()| {
-            let path = scene_path.borrow();
-            let nav = nav.borrow();
+        lua.create_function(move |lua, ()| {
+            let (scene, scene_path) = (scene.get(lua)?, scene_path.get(lua)?);
+            let (nav, console) = (nav.get(lua)?, console.get(lua)?);
+            let (path, nav) = (scene_path.borrow(), nav.borrow());
             let mut scene = scene.borrow_mut();
             let mut say = |line| console.borrow_mut().info(line);
-            let mut log = BakeLog::to_console(console);
-            let nav = Some(&*nav);
-            let report = generate_lighting(&mut scene, path.as_deref(), nav, &mut say, &mut log)
+            let mut log = BakeLog::to_console(&console);
+            let (path, nav) = (path.as_deref(), Some(&*nav));
+            let report = generate_lighting(&mut scene, path, nav, &mut say, &mut log)
                 .map_err(mlua::Error::external)?;
             let out = lua.create_table()?;
             out.set("lightmaps", report.lightmaps)?;
@@ -77,11 +75,16 @@ pub(super) fn register<'scope>(
             Ok(out)
         }),
     )?;
+    register_settings(lua, &table, scene)
+}
+
+/// `GetSettings` / `SetSettings`: the bake settings `Generate` uses.
+fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
-        &table,
+        table,
         "GetSettings",
-        scope.create_function(move |lua, ()| {
-            let settings = scene.borrow().lighting_settings;
+        lua.create_function(move |lua, ()| {
+            let settings = scene.get(lua)?.borrow().lighting_settings;
             let (s, r) = (settings.lightmaps, settings.reflections);
             let out = lua.create_table()?;
             out.set("texelsPerUnit", s.texels_per_unit)?;
@@ -95,9 +98,13 @@ pub(super) fn register<'scope>(
         }),
     )?;
     put(
-        &table,
+        table,
         "SetSettings",
-        scope.create_function(move |_, t: Table| set_settings(&mut scene.borrow_mut(), &t)),
+        lua.create_function(move |lua, t: Table| {
+            let scene = scene.get(lua)?;
+            let mut scene = scene.borrow_mut();
+            set_settings(&mut scene, &t)
+        }),
     )
 }
 

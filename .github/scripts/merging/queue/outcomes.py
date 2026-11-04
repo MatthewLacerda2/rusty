@@ -51,6 +51,11 @@ STOPPED, NOT_TAKEN = "stopped the queue", "not taken"
 # what [`taking.take`] says about one.
 NOT_READY = "not ready"
 
+# A merge train's member that goes back in line as it was: its train was red or
+# stalled (its half is tested next), or a member ahead of it did not land (#1785).
+# Nothing is remembered against it.
+REQUEUED = "back in line"
+
 NOT_OPEN, A_DRAFT = "it is {}.", "it is a draft; mark it ready first."
 
 

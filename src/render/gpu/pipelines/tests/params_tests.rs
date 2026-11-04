@@ -4,6 +4,7 @@
 //! Skips with no adapter.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
@@ -62,13 +63,10 @@ pub(super) fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
     id
 }
 
-pub(super) fn lua(scene: &RefCell<Scene>, script: &str) {
+pub(super) fn lua(scene: &Rc<RefCell<Scene>>, script: &str) {
     let lua = Lua::new();
-    lua.scope(|s| {
-        crate::api::material::register(&lua, s, scene).unwrap();
-        lua.load(script).exec()
-    })
-    .unwrap();
+    crate::api::material::register(&lua, crate::api::bind(&lua, scene)).unwrap();
+    lua.load(script).exec().unwrap();
 }
 
 /// The summed (red, blue) of the centre row's left and right halves.
@@ -101,7 +99,7 @@ fn gpu_a_hit_flash_set_from_lua_changes_the_next_frame_by_a_buffer_write() {
     create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
     let left = sphere(&mut scene, -1.2, &flash.0);
     sphere(&mut scene, 1.2, &flash.0);
-    let scene = RefCell::new(scene);
+    let scene = std::rc::Rc::new(RefCell::new(scene));
 
     let [l0, r0] = halves(&mut renderer, &scene.borrow());
     assert!(l0.1 > 0 && r0.1 > 0, "both lit, unflashed: {l0:?} {r0:?}");

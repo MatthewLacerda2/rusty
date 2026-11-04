@@ -149,7 +149,7 @@ pub(in crate::physics) fn body_inputs(world: &World, id: u32) -> BodyInputs {
     }
 }
 
-/// The per-entity component state `sync_to_rapier` pushes into a body each tick.
+/// The per-entity component state `sync_to_rapier` pushes into a body it syncs.
 pub(in crate::physics) struct EntityBodyState {
     /// World-space pose (#445): the owner's local `Transform` resolved through
     /// its parents.
@@ -160,8 +160,9 @@ pub(in crate::physics) struct EntityBodyState {
     pub kinematic: bool,
     pub is_static: bool,
     pub use_gravity: bool,
-    /// Whether CCD is on for this body — re-applied per tick so flipping the
-    /// mode mid-play (`Physics.SetCollisionDetection`) takes effect (#321).
+    /// Whether CCD is on for this body — re-applied whenever the body's Rigidbody
+    /// is written, so flipping the mode mid-play (`Physics.SetCollisionDetection`)
+    /// takes effect on the next step (#321, #1707).
     pub ccd_enabled: bool,
 }
 

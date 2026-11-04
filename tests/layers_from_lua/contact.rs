@@ -3,6 +3,7 @@
 //! layer stops colliding with the floor's.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
@@ -54,13 +55,13 @@ fn ignoring_a_pair_mid_play_drops_the_body_through_the_floor() {
         "it rests on the floor first"
     );
 
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load("Physics.IgnoreLayerCollision(5, 0)")
             .exec()
             .unwrap();
     });
-    let mut scene = scene.into_inner();
+    let mut scene = scene.take();
     for _ in 0..60 {
         world.step(&mut scene, DT);
     }
