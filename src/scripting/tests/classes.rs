@@ -61,7 +61,11 @@ fn a_script_that_does_not_compile_is_read_once_and_fails_every_instance() {
         let err = m.load_entity_script(id, 0, &path, &BTreeMap::new());
         let err = err.unwrap_err();
         assert!(err.starts_with("Syntax error compiling"), "{err}");
-        assert!(err.contains(&format!("{path}:1:")), "named after its file");
+        // Lua shortens a long chunk name from the front: the file name stays.
+        assert!(
+            err.contains("class_broken.lua:1:"),
+            "named after its file: {err}"
+        );
     }
     assert_eq!(m.classes.reads, 1);
 }
@@ -74,7 +78,7 @@ fn a_top_level_runtime_error_is_not_called_a_syntax_error() {
     let err = m.load_entity_script(id, 0, &path, &BTreeMap::new());
     let err = err.unwrap_err();
     assert!(err.starts_with(&format!("Error running {path}")), "{err}");
-    assert!(err.contains(&format!("{path}:1: boom")), "{err}");
+    assert!(err.contains("class_throws.lua:1: boom"), "{err}");
 }
 
 #[test]

@@ -30,7 +30,8 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use mlua::{ChunkMode, Function, Lua, Table};
+use mlua::chunk::ChunkMode;
+use mlua::{Function, Lua, Table};
 
 use crate::core::fs::written::{written_since, Stale};
 use crate::scripting::schema::{read_fields, ScriptField};
