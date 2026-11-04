@@ -4,8 +4,8 @@
 use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 
 /// The *worn, grimy painted metal* example (docs/api/Texture.md) plus a blur,
-/// warp, tile, mapping, bump, a distance bevel, a normal blend, the channel ops,
-/// two-image math, auto levels and the #1743 filters (occlusion, edges, highpass,
+/// warp, tile (also with a mask, a size map and the `over` and `add` blends),
+/// mapping, bump, a distance bevel, a normal blend, the channel ops, two-image math, auto levels and the #1743 filters (occlusion, edges, highpass,
 /// sharpen, histogram scan, levels), so every banded path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
@@ -23,6 +23,9 @@ const RECIPE: &str = r#"{
     { "id": "soft", "op": "blur", "radius": 0.07, "inputs": ["chips"] },
     { "id": "dots", "op": "shape", "kind": "circle", "size": [0.5, 0.5] },
     { "id": "rivets", "op": "tile", "count": 5, "jitter": 0.3, "inputs": ["dots"] },
+    { "id": "leaves", "op": "tile", "count": 6, "jitter": 0.8, "rotation_jitter": 1, "scale_jitter": 0.5,
+      "value_jitter": 0.6, "probability": 0.8, "output": "random", "blend": "over", "inputs": ["dots", "chips", "soft"] },
+    { "id": "piled", "op": "tile", "count": 7, "jitter": 1, "blend": "add", "inputs": ["dots"] },
     { "id": "bent", "op": "warp", "strength": 0.1, "inputs": ["rivets", "soft"] },
     { "id": "turned", "op": "mapping", "scale": [2, 1], "rotation": 0.1, "translation": [0.1, 0], "inputs": ["bent"] },
     { "id": "n", "op": "bump_to_normal", "strength": 0.4, "inputs": ["turned"] },
@@ -43,7 +46,8 @@ const RECIPE: &str = r#"{
     { "id": "lv", "op": "levels", "in_low": 0.1, "gamma": 1.4, "inputs": ["hs"] },
     { "id": "more", "op": "combine_rgb", "inputs": ["ao", "ed", "lv"] },
     { "id": "lt2", "op": "mix", "mode": "multiply", "factor": 0.5, "inputs": ["lt", "more"] },
-    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt2", "soft"] }
+    { "id": "lt3", "op": "combine_rgb", "inputs": ["leaves", "piled", "lt2"] },
+    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt3", "soft"] }
   ],
   "output": "out"
 }"#;
