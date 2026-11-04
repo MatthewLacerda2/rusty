@@ -164,7 +164,8 @@ unmaps it, `false` returns it to the guess), and `clipsFrom` replaces the list. 
 writes the sidecar and gives every skinned mesh in the open scene whose clips it shapes
 (instanced from that model, or from a model borrowing from it) its re-imported clips;
 its bones and rig are left as they are. Editing the sidecar by hand works too: the next
-import reads it.
+import reads it. A source model re-written while the scene is open (a re-export, a
+re-conversion) re-imports the models borrowing from it as well, as its own instances do.
 
 ```lua no-run
 Assets.SetHumanoid("assets/models/brute.glb", {
