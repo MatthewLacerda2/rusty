@@ -1,6 +1,10 @@
 //! Which atlas tiles still hold their static casters (#694), the atlas's version of
 //! the cascades' `static_cache` (#355). Pure CPU.
 //!
+//! The same list keeps which tiles of the *active* atlas hold nothing but their
+//! static copy (#1711): such a tile is left as it is while no dynamic caster
+//! reaches it.
+//!
 //! A tile is keyed by its scene's [`StaticsKey`] and the whole [`Tile`] — view-projection, origin and
 //! size — so it re-bakes exactly when its light moved or turned, the plan gave it
 //! another place or size, another scene drew over it, or the scene's statics changed,
@@ -22,16 +26,26 @@ impl StaticTiles {
     /// Indices of `tiles` whose statics for `scene` are not in the static atlas.
     pub(super) fn stale(&self, scene: StaticsKey, tiles: &[Tile]) -> Vec<usize> {
         (0..tiles.len())
-            .filter(|&i| !self.baked.contains(&(scene, tiles[i])))
+            .filter(|&i| !self.holds(scene, &tiles[i]))
             .collect()
+    }
+
+    /// Whether `tile`'s statics for `scene` are held.
+    pub(super) fn holds(&self, scene: StaticsKey, tile: &Tile) -> bool {
+        self.baked.contains(&(scene, *tile))
     }
 
     /// Record that `scene`'s `rebaked` tiles were baked, forgetting what they drew over.
     pub(super) fn commit(&mut self, scene: StaticsKey, rebaked: impl IntoIterator<Item = Tile>) {
         for tile in rebaked {
-            self.baked.retain(|(_, old)| !overlaps(old, &tile));
+            self.forget(&tile);
             self.baked.push((scene, tile));
         }
+    }
+
+    /// Forget whatever `tile` drew over.
+    pub(super) fn forget(&mut self, tile: &Tile) {
+        self.baked.retain(|(_, old)| !overlaps(old, tile));
     }
 
     /// Forget every bake, so each tile re-bakes on its next frame.
