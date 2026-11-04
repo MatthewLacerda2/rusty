@@ -98,9 +98,9 @@ impl ScriptManager {
     ///
     /// The queue is the World's `scripts` change log (#1705, #1710): only entities
     /// whose script list was written, or that were placed, since the last drain
-    /// are looked at, plus any [`ScriptManager::forget_entities`] dropped. The
-    /// first drain of a VM, and any the log cannot answer (a scene load, a Play
-    /// snapshot restored, an Undo), scan every entity.
+    /// are looked at, plus those whose load records a destroy or an unload
+    /// dropped. The first drain of a VM, and any the log cannot answer (a scene
+    /// load, a Play snapshot restored, an Undo), scan every entity.
     pub fn load_new_scripts(&mut self) {
         if self.lua.is_none() {
             return;
