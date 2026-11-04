@@ -311,7 +311,8 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   encodes the pages and compresses their PNGs on its worker and only writes the finished
   files on the frame, so the window stays live. The scene stores the page list and, per entity, its page and
   scale/offset (Unity's lightmap index + scale/offset), and the lights the bake took
-  in (every active `Mixed` and `Baked` light, Unity's `Light.bakingOutput`), which
+  in (every active `Mixed` and `Baked` light above intensity 0, Unity's
+  `Light.bakingOutput`), which
   SSIL leaves out because their bounce is baked (`Graphics.md`, *Screen-space
   indirect lighting*), so **save the scene** after
   `Lighting.BakeLightmaps()` to keep them (`Lighting.Generate()` writes them itself). Needs a saved scene path (errors otherwise). `Lighting.ClearLightmaps()`

@@ -14,6 +14,7 @@ use crate::render::gpu::uniforms::{MappingUniform, SurfaceUniform};
 use crate::render::postfx::effects::ssr;
 use crate::render::{InstanceData, MaterialData};
 use crate::scene::authoring::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
+use crate::scene::lighting::lightmap::BakeScene;
 use crate::scene::Scene;
 
 /// Compute the material record (tint, lit flag, PBR params, cutout) for a solid
@@ -184,6 +185,7 @@ pub(crate) fn solid_instance(
         // The draw sets its probe from its world bounds (`solid_draw_item`, #1206).
         reflection_probe: 0,
         lightmap_st: lightmap.map_or([0.0; 4], |l| l.scale_offset),
+        in_bake: u32::from(!scene.lightmaps.is_empty() && BakeScene::takes_mesh(scene, id)),
         sh,
         // No history until `motion::track` gives it one (#1435).
         ..InstanceData::IDENTITY

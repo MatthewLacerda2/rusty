@@ -294,14 +294,16 @@ one bounce off the surfaces on screen: a point light on a red wall tints the whi
 floor in front of it, a muzzle flash lights the corridor around it, a lit wall
 colours the enemy beside it. It is **off by default**; a volume turns it on. Each
 frame, before the base camera's opaque pass, a half-resolution pass (at the seeded
-`Medium` level) gathers a cosine-weighted hemisphere of samples around each surface
-point, sharing SSAO's depth prepass and sample pattern (it draws that prepass itself
+`Medium` level) gathers a cosine-distributed hemisphere of samples around each
+surface point, sharing SSAO's depth prepass and sample pattern (it draws that prepass itself
 when SSAO is off). Each sample lands on the surface on screen there and reads **last
-frame's** light at that surface, reprojected through last frame's camera, weighted
-by how squarely the two surfaces face each other and by distance within `radius`. A
-sample counts only where its surface stands off this one's plane by more than SSAO's
-slope-scaled bias (so a flat floor never lights itself) and nothing on screen stands
-between the two: three depth taps along the segment between them, so a lit wall's
+frame's** light at that surface, reprojected through last frame's camera, faded by
+distance over the last third of 1.5 × `radius`. Whether the two surfaces face each
+other is a yes/no test, not a weight: past it, a wall turned 85° from the point gives
+what a head-on wall gives, and the cosine comes only from how the samples are spread
+over the hemisphere. A sample counts only where the two face each other, its surface
+stands off this one's plane by more than SSAO's slope-scaled bias (so a flat floor
+never lights itself) and nothing on screen stands between the two: three depth taps along the segment between them, so a lit wall's
 top showing over a waist-high partition doesn't light the floor behind it.
 A depth-aware blur, a temporal accumulate (90% history, rejected where a surface's
 distance from the eye moved or its normal turned by more than about 25°, clamped to
@@ -313,11 +315,15 @@ or an overlay camera (a viewmodel) reads none.
 
 **It never gathers light a bake already bounced.** What the gather reads of each pixel
 is the share of its colour that is the direct light of lights **no lightmap bake took
-in**, plus emission no lightmap holds: not its indirect term (lightmap, light probe,
+in**, plus the emission of meshes no bake took in: not its indirect term (lightmap, light probe,
 flat ambient or SSIL itself), not its environment reflection. As Unity's
 `Light.bakingOutput`, a lightmap bake records the lights it took in (every active
-`Mixed` or `Baked` light, in the scene's lightmap set); their bounce is in the
-lightmap, so SSIL leaves them out, until the next bake. A light that moved since
+`Mixed` or `Baked` light above intensity 0, in the scene's lightmap set); their
+bounce is in the lightmap, so SSIL leaves them out, until the next bake. A bake
+also holds the emission of every active, static, unskinned mesh, lightmapped or
+not (one at *Scale In Lightmap* 0 or with no UV2 still emits in it), so once a
+scene has a bake no such mesh's glow is gathered; a mesh that isn't static (a
+moving prop, an enemy's glowing parts) bounces its glow as ever. A light that moved since
 still reads as baked, as in Unity; a light spawned since (a script's muzzle flash,
 in the default `Mixed` mode) was never baked and bounces. So a lightmapped scene
 whose lights were all baked brightens by **at most 0.5%** of its light with SSIL on
@@ -330,6 +336,12 @@ surface block that scales the colour per channel (`hit_flash`, `dissolve`, `tint
 scales the share with it, as it scales SSR's reflection; one that isn't such a
 scale (`toon_ramp`, `hologram`, `desaturate` above 0) feeds nothing, and the light one adds of its own
 (`fresnel_rim`, `emissive_boost`, `pulse_glow`) is not gathered.
+**Limits of the record.** It is per light, not per surface: one lightmapped prop
+makes the bake record every active `Mixed` light, so those lights feed SSIL
+nowhere, even over surfaces no lightmap holds their bounce for (too little light,
+silently); a dynamic light meant to bounce is spawned after the bake or set
+`Realtime`. A `Mixed` light placed at intensity 0 is not recorded, so a flash a
+script raises later bounces; one baked lit and dimmed to 0 since stays recorded.
 **The share is one number per pixel**, measured by the brightest channel: a pixel
 lit by both a baked red light and a realtime green one passes on its whole colour
 at the green's share, so some of the baked red bounces a second time. The source is

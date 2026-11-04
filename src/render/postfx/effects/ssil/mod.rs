@@ -24,8 +24,9 @@
 //! SSIL runs, the share of its final (fogged, block-folded) colour that is
 //! `forward::lighting::ssil_realtime`: the direct light of every light the scene's
 //! lightmap bake didn't take in (`LightmapSet::lights`, Unity's
-//! `Light.bakingOutput`; uploaded as each light's `bounce_baked`) and emission no
-//! lightmap holds. Not the indirect term (lightmap, probes, flat ambient, SSIL
+//! `Light.bakingOutput`; uploaded as each light's `bounce_baked`) and the emission
+//! of meshes the bake didn't take in (`BakeScene::takes_mesh`, uploaded as each
+//! instance's `in_bake`). Not the indirect term (lightmap, probes, flat ambient, SSIL
 //! itself), not the environment reflection. So a lightmapped scene whose lights were
 //! all baked gathers nothing; a light spawned after the bake bounces. Unlit
 //! surfaces and the sky feed nothing. A transparent surface reads none (its group 3
@@ -40,8 +41,10 @@
 //! of a view, never run it; a render texture's camera keeps its own view and runs it
 //! there when its `post_fx` is on.
 //!
-//! **Cost.** Off, nothing: no target, no pass, and the forward pass reads no
-//! bounce (`stack.z` is 0: a uniform branch, no texture read). On, per frame: the
+//! **Cost.** Off, no target, no pass and no texture read: the forward pass reads no
+//! bounce and writes no share (`stack.z` is 0: a uniform branch), and keeps only
+//! `ssil_realtime`'s sum, a multiply-add per light, and one multiply per surface
+//! block's factor, bound once. On, per frame: the
 //! prepass when SSAO doesn't run one (which then primes the forward pass), per
 //! gather texel `samples` taps of five depths, one colour and three occlusion
 //! depths each, a 49-tap blur (each tap rebuilds its depth: the place to look if

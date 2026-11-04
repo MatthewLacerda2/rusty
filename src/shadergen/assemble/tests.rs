@@ -84,3 +84,24 @@ fn assembly_is_deterministic() {
     let b = assemble(&recipe, "").unwrap();
     assert_eq!(a, b);
 }
+
+#[test]
+fn a_scaled_block_s_reflection_factor_runs_once() {
+    // `triplanar_detail`'s factor samples its mask three times: the SSR record and
+    // SSIL's realtime light both read one binding of it, never a second call.
+    let recipe = ShaderRecipe {
+        pass: PassKind::Surface,
+        name: "t".into(),
+        blocks: vec![BlockSel {
+            id: "triplanar_detail".into(),
+            params: BTreeMap::new(),
+        }],
+    };
+    let wgsl = assemble(&recipe, &surface_base()).unwrap();
+    assert_eq!(
+        wgsl.matches("srf_triplanar_detail(vec3<f32>(1.0)").count(),
+        1
+    );
+    assert!(wgsl.contains("ssr_surface::scale(ssr_texels, reflection_scale_0)"));
+    assert!(wgsl.contains("ssil_realtime *= reflection_scale_0;"));
+}

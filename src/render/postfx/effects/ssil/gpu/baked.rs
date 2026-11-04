@@ -12,12 +12,22 @@ use crate::scene::Scene;
 
 /// How much brighter a scene whose light is all baked may get with SSIL on, as a
 /// share of its light: `INDIRECT_GAIN` in `bounce`, the documented bound.
-const BAKED_GAIN: f32 = 0.005;
+pub(super) const BAKED_GAIN: f32 = 0.005;
 
 /// The fixture's scene with its lamp in `mode`, baked into a temp folder `name`.
 fn baked(mode: LightMode, name: &str) -> (Scene, u32) {
     let (mut scene, lamp) = scene(Ssil::default(), LAMP);
     scene.world.set_light(lamp, Some(point(LAMP, mode)));
+    let maps = bake(&mut scene, name);
+    assert!(
+        maps > 0 && scene.lightmaps.baked_light(lamp),
+        "the bake took the lamp in"
+    );
+    (scene, lamp)
+}
+
+/// Bake `scene` into a temp folder `name`; the lightmaps it wrote.
+pub(super) fn bake(scene: &mut Scene, name: &str) -> usize {
     let dir = crate::test_temp::dir().join(format!("rusty_ssil_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -31,16 +41,11 @@ fn baked(mode: LightMode, name: &str) -> (Scene, u32) {
         filter_radius: 1,
         directional: false,
     };
-    let maps = bake_scene_lightmaps(&mut scene, Some(&path), &settings).expect("baked");
-    assert!(
-        maps > 0 && scene.lightmaps.baked_light(lamp),
-        "the bake took the lamp in"
-    );
-    (scene, lamp)
+    bake_scene_lightmaps(scene, Some(&path), &settings).expect("baked")
 }
 
 /// The whole frame's light, settled, with SSIL off and on.
-fn off_and_on(r: &mut crate::render::Renderer, scene: &mut Scene) -> (f32, f32) {
+pub(super) fn off_and_on(r: &mut crate::render::Renderer, scene: &mut Scene) -> (f32, f32) {
     set_ssil(scene, Ssil::default());
     let off = energy(&settled(r, scene, 4));
     set_ssil(scene, on(4.0));

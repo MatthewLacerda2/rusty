@@ -6,6 +6,8 @@
 #[cfg(feature = "dev")]
 mod baked;
 mod bounce;
+#[cfg(feature = "dev")]
+mod emission;
 mod fixture;
 mod history;
 mod occlusion;

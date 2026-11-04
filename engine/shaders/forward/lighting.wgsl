@@ -48,7 +48,7 @@ fn indirect_bounce(frag: vec2<f32>) -> vec3<f32> {
 
 // The realtime light in the pixel's colour, which SSIL gathers next frame (#1750):
 // `surface_color` sums it at steps 2, 3 (`lamp`: the direct light of every light no
-// lightmap bake took in) and 6 (emission no lightmap holds), takes the fog off it at
+// lightmap bake took in) and 6 (emission of a mesh no bake took in), takes the fog off it at
 // step 7 as the fog takes it off the colour, and an authored surface block scales
 // it as it scales the colour (`shadergen::assemble`'s folds; a block that is no
 // per-channel scale zeroes it). An unlit surface leaves it zero: it feeds nothing.
@@ -79,8 +79,12 @@ fn realtime_share(lit: vec3<f32>, realtime: vec3<f32>) -> f32 {
 // pass alone: the translucents after it draw with it cleared, so their alpha still
 // blends) writes in its alpha the share of the final colour `c` that is
 // `ssil_realtime`, which SSIL's source keeps (`postfx/ssil.wgsl`).
+// Every other pass skips the division on the uniform flag.
 fn with_ssil_share(c: vec4<f32>) -> vec4<f32> {
-    return vec4<f32>(c.rgb, select(c.a, realtime_share(c.rgb, ssil_realtime), camera.stack.z > 0.5));
+    if (camera.stack.z <= 0.5) {
+        return c;
+    }
+    return vec4<f32>(c.rgb, realtime_share(c.rgb, ssil_realtime));
 }
 
 // The mip level of the lightmap pages that `uv` reads (#1694): the larger screen

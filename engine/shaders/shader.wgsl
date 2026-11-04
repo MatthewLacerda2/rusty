@@ -494,7 +494,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // A transparent surface with `receive_ssr` traces SSR over it here (#1570).
     let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, N, roughness, instances[in.instance].reflection_probe, baked_diffuse(ambient_irradiance, lightmap_page > 0u || instances[in.instance].use_sh == 1u)) * reflection_weight, reflection_weight, in.world_position, N, R, roughness);
     lighting_color += reflection;
-    ssr_texels = ssr_surface::encode(N, roughness, reflection, reflection_weight, fog_factor(camera.fog, in.world_position, camera.camera_pos));
+    // One fog value for the SSR record and SSIL's realtime light (step 6).
+    let surface_fog = fog_factor(camera.fog, in.world_position, camera.camera_pos);
+    ssr_texels = ssr_surface::encode(N, roughness, reflection, reflection_weight, surface_fog);
 
     // 6. Emissive (#222 factor, #207 map): self-illumination added on top of the lit
     // colour, independent of any light. The factor is modulated by the emissive map's
@@ -505,9 +507,10 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         emissive *= mapping::sample(t_emissive, s_emissive, maps).rgb;
     }
     lighting_color += emissive;
-    // A lightmap holds a static surface's emission; the fog (step 7) dims the rest.
-    ssil_realtime += emissive * f32(lightmap_page == 0u);
-    ssil_realtime *= (1.0 - fog_factor(camera.fog, in.world_position, camera.camera_pos));
+    // A bake holds the emission of every static mesh it took in, lightmap UVs or
+    // not (`in_bake`); the fog (step 7) dims the rest.
+    ssil_realtime += emissive * f32(lightmap_page == 0u && instances[in.instance].in_bake == 0u);
+    ssil_realtime *= (1.0 - surface_fog);
 
     // 7. Scene fog (#437), last, in linear HDR before post-FX, and how a transparent
     // surface composites (#1523). Authored surface blocks fold into `lighting_color`

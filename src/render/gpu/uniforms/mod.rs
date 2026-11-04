@@ -200,7 +200,10 @@ pub(crate) struct InstanceData {
     // The Light Probe Proxy Volume it reads (#1672): where it starts in the frame's
     // proxy array (`draw::proxy_volume`), plus one; 0 for none.
     pub proxy_volume: u32,
-    pub _motion_pad: u32,
+    // 1 when the scene holds a lightmap bake that took this mesh in
+    // (`BakeScene::takes_mesh`, #1750): its emission is in the bake, so SSIL
+    // gathers none of it, lightmap UVs or not.
+    pub in_bake: u32,
     pub sh: [[f32; 4]; 9],
 }
 
@@ -218,7 +221,7 @@ impl InstanceData {
         prev_bone_base: 0,
         motion: 0,
         proxy_volume: 0,
-        _motion_pad: 0,
+        in_bake: 0,
         sh: [[0.0; 4]; 9],
     };
 }

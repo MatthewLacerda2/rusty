@@ -4,6 +4,8 @@
 use glam::Vec3;
 
 pub(in crate::scene::lighting::lightmap) mod area;
+#[cfg(test)]
+mod tests;
 
 use super::input::BakeScene;
 use crate::components::LightType;
@@ -44,13 +46,17 @@ pub struct BakeLight {
 }
 
 /// The lights a bake of `scene` takes in, by entity (`LightmapSet::lights`,
-/// #1750): every active `Mixed` or `Baked` light [`BakeScene::gather`] keeps.
+/// #1750): every active `Mixed` or `Baked` light [`BakeScene::gather`] keeps, but
+/// one at intensity 0, which the bake holds nothing of: a flash lamp placed dark
+/// and raised by a script still bounces through SSIL.
 pub fn taken_lights(scene: &Scene) -> std::collections::BTreeSet<u32> {
     let takes = |id: &u32| {
         let light = scene.world.light(*id);
         scene.world.is_active_in_hierarchy(*id)
             && light.is_some_and(|l| {
-                l.light_type != LightType::Ambient && l.effective_mode().bakes_indirect()
+                l.light_type != LightType::Ambient
+                    && l.intensity > 0.0
+                    && l.effective_mode().bakes_indirect()
             })
     };
     scene

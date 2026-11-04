@@ -109,7 +109,9 @@ struct InstanceData {
     // The Light Probe Proxy Volume it reads its probe light from (#1672): where the
     // volume starts in `proxy_volumes`, plus one; 0 for none.
     proxy_volume: u32,
-    motion_pad_b: u32,
+    // 1 when the scene's lightmap bake took this mesh in (#1750): SSIL gathers
+    // none of its emission.
+    in_bake: u32,
     sh: array<vec4<f32>, 9>,
 };
 
