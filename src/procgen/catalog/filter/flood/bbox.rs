@@ -46,10 +46,11 @@ impl Row for FloodBbox {
 impl Op for FloodBbox {
     fn run(&self, cx: &Cx) -> Image {
         let islands = flood::of_label_image(cx.input(0));
-        flood::paint(&islands, |i, _, _| match self.output {
+        let value = |i: &flood::Island| match self.output {
             BboxOutput::Size => i.size[0].max(i.size[1]),
             BboxOutput::CenterX => i.centre()[0],
             BboxOutput::CenterY => i.centre()[1],
-        })
+        };
+        flood::paint(&islands, value, |g, _, _| *g)
     }
 }

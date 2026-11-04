@@ -11,19 +11,23 @@
 //! edge on that axis: its box spans the tile there, starting at 0, and its centre
 //! reads 0.5.
 //!
-//! Nothing an island reports depends on the order the scan meets it: a box, a
-//! centroid and an [`Island::random`] value are the same whichever pixel the flood
-//! starts from, so shifting a mask by a wrap shifts every island's box and centroid
-//! with it.
+//! An island's box and centroid don't depend on the order the scan meets it: they
+//! are the same whichever pixel the flood starts from, so shifting a mask by a wrap
+//! shifts every island's box and centroid with it. Its [`Island::random`] values
+//! come from its identity: the cell its centroid snaps to and its rank among the
+//! islands sharing that cell, in scan order.
+
+use std::collections::BTreeMap;
 
 use crate::procgen::hash;
 use crate::procgen::image_buf::{Image, Rgba, Size};
 
 /// How finely an island's centroid is snapped before it is hashed to its random
 /// values, in cells per tile. Coarse enough that the same island at another
-/// resolution (its centroid moves by a fraction of a pixel) mostly keeps its cell,
-/// fine enough that two islands share a cell only when both are specks a
-/// 1/`IDENTITY_GRID`-tile apart.
+/// resolution (its centroid moves by a fraction of a pixel) mostly keeps its cell.
+/// Islands that share a cell (small stones packed densely, a ring and the stone at
+/// its centre, bands that loop both axes and so all read centroid 0.5) are told
+/// apart by their [`Island::rank`] in it.
 const IDENTITY_GRID: f32 = 128.0;
 
 /// One island: its centroid, and its bounding box's start and size, in tile units.
@@ -35,6 +39,9 @@ pub struct Island {
     pub start: [f32; 2],
     /// The box's extent, at most 1 (an island that spans the axis).
     pub size: [f32; 2],
+    /// Its place, in scan order, among the islands whose centroid snaps to the same
+    /// identity cell: 0 for the first. An island in another cell never moves it.
+    pub rank: u32,
 }
 
 impl Island {
@@ -44,11 +51,19 @@ impl Island {
     }
 
     /// A uniform `[0, 1)` value for this island on `channel`, from `seed` and the
-    /// island's centroid snapped to a 1/128-tile grid: its identity, not the
-    /// number the scan gave it.
+    /// island's identity: its centroid's cell on a 1/128-tile grid and its
+    /// [`rank`](Island::rank) there, not the number the scan gave it.
     pub fn random(&self, channel: u64, seed: u64) -> f32 {
-        let [x, y] = self.centroid.map(|c| (c * IDENTITY_GRID).floor() as i64);
-        hash::unit2(x, y, channel, seed)
+        let [x, y] = self.cell();
+        // The rank is salted in as `rank + 1`, so the hash's input is never all
+        // zero (the mixer maps 0 to 0) even at seed 0, cell (0, 0), channel 0.
+        let salt = (channel << 32) ^ (u64::from(self.rank) + 1);
+        hash::unit2(x, y, salt, seed)
+    }
+
+    /// The identity cell its centroid snaps to.
+    fn cell(&self) -> [i64; 2] {
+        self.centroid.map(|c| (c * IDENTITY_GRID).floor() as i64)
     }
 }
 
@@ -104,6 +119,12 @@ pub fn label(img: &Image, on: impl Fn([f32; 4]) -> bool) -> Islands {
         }
         islands[id as usize - 1] = extent.island(size);
     }
+    let mut seen: BTreeMap<[i64; 2], u32> = BTreeMap::new();
+    for island in &mut islands {
+        let count = seen.entry(island.cell()).or_default();
+        island.rank = *count;
+        *count += 1;
+    }
     Islands {
         size,
         labels,
@@ -119,30 +140,38 @@ pub fn of_label_image(img: &Image) -> Islands {
     label(img, |p| p[3] > 0.5)
 }
 
-/// A grey image of `f(island, u, v)` over every island's pixels (`u`, `v` the
-/// pixel centre in tile units), 0 off them; alpha 1.
-pub fn paint(islands: &Islands, f: impl Fn(&Island, f32, f32) -> f32 + Sync) -> Image {
-    paint_rgba(islands, [0.0, 0.0, 0.0, 1.0], |i, u, v| {
-        let g = f(i, u, v);
+/// A grey image over every island's pixels, 0 off them; alpha 1. `per` runs once
+/// per island, before painting (where a hash belongs); `f(&its result, u, v)` runs
+/// per pixel, `u`, `v` the pixel centre in tile units.
+pub fn paint<P: Sync>(
+    islands: &Islands,
+    per: impl Fn(&Island) -> P,
+    f: impl Fn(&P, f32, f32) -> f32 + Sync,
+) -> Image {
+    paint_rgba(islands, [0.0, 0.0, 0.0, 1.0], per, |p, u, v| {
+        let g = f(p, u, v);
         [g, g, g, 1.0]
     })
 }
 
-/// [`paint`] in colour: `f(island, u, v)` on every island's pixels, `off` off them.
-pub fn paint_rgba(
+/// [`paint`] in colour: `f` on every island's pixels, `off` off them.
+pub fn paint_rgba<P: Sync>(
     islands: &Islands,
     off: Rgba,
-    f: impl Fn(&Island, f32, f32) -> Rgba + Sync,
+    per: impl Fn(&Island) -> P,
+    f: impl Fn(&P, f32, f32) -> Rgba + Sync,
 ) -> Image {
+    let table: Vec<P> = islands.islands.iter().map(per).collect();
     let size = islands.size;
     let (w, h) = (size.width as f32, size.height as f32);
     let mut out = Image::new(size);
     out.for_each_row(|y, row| {
         let v = (y as f32 + 0.5) / h;
-        for (x, p) in row.iter_mut().enumerate() {
-            *p = islands
-                .at(x, y)
-                .map_or(off, |i| f(i, (x as f32 + 0.5) / w, v));
+        let labels = &islands.labels[y * size.width as usize..][..row.len()];
+        for ((x, p), label) in row.iter_mut().enumerate().zip(labels) {
+            *p = label
+                .checked_sub(1)
+                .map_or(off, |k| f(&table[k as usize], (x as f32 + 0.5) / w, v));
         }
     });
     out
@@ -166,6 +195,7 @@ impl Default for Island {
             centroid: [0.5; 2],
             start: [0.0; 2],
             size: [1.0; 2],
+            rank: 0,
         }
     }
 }

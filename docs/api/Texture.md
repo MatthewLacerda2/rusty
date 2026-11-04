@@ -234,7 +234,7 @@ A few notes hold for a whole family. The colour ops are pixel to pixel. Noise us
 only part of the range (a 4-octave fBM spans about 0.35–0.64), so a ramp fed straight
 from it shows only its middle; `auto_levels` before the `color_ramp` uses the whole
 ramp, whatever the input's spread. The filters wrap, so a tiling input gives a tiling
-result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as height,
+result (but for `flood_gradient` on a band that loops the tile, below); `ambient_occlusion`, `cavity` and `curvature` read the input's red as height,
 and `flood_fill` reads it as a mask, its readers the islands it found.
 
 <!-- sorted: one bullet per op, so two branches adding ops land on different lines -->
@@ -333,16 +333,23 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   `flood_fill`'s): a 0→1 ramp across each island's bounding box, like Substance's
   *Flood Fill to Gradient*: along `angle` (turns; 0 runs left to right, 0.25 top to
   bottom), turned per island by up to ±`angle_jitter` turns; 0 off the islands.
-  Tilted stones, slanted planks; a box across the tile's edge ramps as one.
+  Tilted stones, slanted planks; a box across the tile's edge ramps as one. Each
+  island's tilt is drawn like `flood_random`'s grey, so with `angle_jitter` above 0 a
+  rolled mask or another resolution reshuffles the tilts; at 0 the ramps move with
+  the mask. An island that loops round the tile on an axis (a band across it) ramps
+  from the tile's edge and jumps back at the wrap: a ramp along a loop cannot tile.
 - `flood_random {seed=0}` (*filter*, 1 input: `flood_fill`'s): one flat random grey
   per island, uniform in `[0, 1)`, 0 off the islands, like Substance's *Flood Fill to
   Random Grayscale*: per-stone colour (through a `color_ramp`), height or roughness.
-  An island's grey comes from the seed and where its centroid sits (snapped to a
-  1/128-tile grid), never from the order the islands were found, so adding an island
-  elsewhere leaves the others' greys alone. Moving the mask moves the centroids, so it
-  reshuffles the greys, as in Substance. Across resolutions most islands keep their
-  grey (about 85% of Voronoi stones from 128² to 1024²): one whose centroid sits near
-  a grid line can land in the next cell and draw another.
+  An island's grey comes from the seed and its identity: the cell of a 1/128-tile
+  grid its centroid sits in, and its rank, in scan order, among the islands sharing
+  that cell (densely packed specks, a ring and the stone at its centre, bands that
+  loop the tile both ways), never from its number among all the islands. So every
+  island draws its own grey, and adding an island in another cell leaves the others'
+  greys alone. Moving the mask moves the centroids, so it reshuffles the greys, as in
+  Substance. Across resolutions most islands keep their grey (about 80% of Voronoi
+  stones from 128² to 1024²): one whose centroid sits near a grid line can land in
+  the next cell and draw another.
 - `gamma {gamma}` (*color*, 1 input).
 - `gradient {kind="linear"|"linear_tiling"|"radial"}` (*generator*).
 - `highpass {radius}` (*filter*, 1 input): `c − blur(c) + 0.5` per channel with a
@@ -572,6 +579,9 @@ the one generator that does **not** tile — it has a hard edge at the wrap; use
 a mask, or use `linear_tiling` (0→1→0) for a seamless ramp. `gradient radial` and
 `wave rings` meet the edge mirror-symmetrically: continuous across the seam, and so
 does `shape` (a shape larger than the tile is clipped at the edge, symmetrically).
+`flood_gradient` has a seam on one kind of island: one that loops round the tile on
+an axis (a band across it) has no edge there, so its ramp runs from the tile's edge
+and jumps back at the wrap; every other island ramps across the edge as one.
 `image` tiles exactly as well as its file does.
 
 ### Units

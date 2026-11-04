@@ -7,7 +7,6 @@
 //! an island and 0 off it, which the readers relabel (islands never touch, so the
 //! alpha gives back the same islands, at any float precision), and a colour per
 //! island in RGB that only a preview reads.
-
 //!
 //! A file is named for its op without the folder's `flood_` (`fill.rs` holds
 //! `flood_fill`), as the `prefix-group` rule asks.

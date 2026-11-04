@@ -11,7 +11,7 @@ its rows.
 
 - **Its file** — `catalog/<family>/<op>.rs`, the family being its menu category:
   `generators/` (no inputs), `color/`, `vector/`, `math/`, `filter/`. `filter/` is
-  clustered by what an op reads (`blurs/`, `mask/`, `relief/`, below), so a filter's
+  clustered by what an op reads (`blurs/`, `flood/`, `mask/`, `relief/`, below), so a filter's
   file is `catalog/filter/<cluster>/<op>.rs`, less a prefix every op of the cluster
   shares (`flood/fill.rs` holds `flood_fill`: the `prefix-group` rule). It holds:
   - the **params struct** (serde `Serialize`/`Deserialize`; the recipe's fields,

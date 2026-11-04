@@ -10,7 +10,8 @@ use crate::procgen::recipe::{op, OpInfo, ONE, SEED};
 
 /// `flood_fill`'s islands → one flat grey per island, uniform in `[0, 1)`, 0 off
 /// them: per-stone colour, height or roughness. An island's grey comes from the
-/// seed and where its centroid sits, never from the order the scan found it.
+/// seed and its identity (where its centroid sits, and its rank among islands
+/// whose centroid sits in the same small cell), never from its scan number.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FloodRandom {
     #[serde(default)]
@@ -24,7 +25,7 @@ impl Row for FloodRandom {
 impl Op for FloodRandom {
     fn run(&self, cx: &Cx) -> Image {
         let islands = flood::of_label_image(cx.input(0));
-        flood::paint(&islands, |i, _, _| i.random(0, cx.seed))
+        flood::paint(&islands, |i| i.random(0, cx.seed), |g, _, _| *g)
     }
 
     fn seed(&self) -> u32 {

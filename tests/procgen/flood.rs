@@ -68,8 +68,9 @@ fn thousands_of_islands_stay_apart() {
         "{flat} of {} flat",
         by_cell.len()
     );
+    // Every island draws its own grey: only chance collisions of a 24-bit value.
     assert!(
-        distinct * 100 >= by_cell.len() * 97,
+        distinct * 1000 >= by_cell.len() * 999,
         "{distinct} of {}",
         by_cell.len()
     );

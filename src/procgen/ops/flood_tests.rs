@@ -92,3 +92,59 @@ fn every_pixel_reads_its_own_island() {
     assert_ne!(all.at(0, 0), all.at(1, 2));
     assert_eq!(all.at(1, 1), None);
 }
+
+/// Whether two islands draw apart on two channels and seeds.
+fn apart(a: &Island, b: &Island) -> bool {
+    a.random(0, 0) != b.random(0, 0) && a.random(1, 9) != b.random(1, 9)
+}
+
+#[test]
+fn islands_sharing_a_cell_read_apart() {
+    let (o, d, x) = ("#####..", "#...#..", "#.#.#..");
+    let all = islands(&[o, d, x, d, o, ".......", "......."]);
+    assert_eq!(all.islands.len(), 2);
+    let [a, b] = [all.islands[0], all.islands[1]];
+    assert_eq!((a.centroid == b.centroid, a.rank, b.rank), (true, 0, 1));
+    assert!(apart(&a, &b), "a ring and the stone at its centre");
+    // Two diagonal stripes, x + y ≡ 0 (mod 4): both span the tile, centroid 0.5.
+    let stripes = Image::fill_uv(8, |u, v| {
+        let (x, y) = ((u * 8.0) as u32, (v * 8.0) as u32);
+        [f32::from(u8::from((x + y) % 4 == 0)), 0.0, 0.0, 1.0]
+    });
+    let all = label(&stripes, |p| p[0] > 0.5);
+    assert_eq!(all.islands.len(), 2);
+    assert!(apart(&all.islands[0], &all.islands[1]), "stripes");
+}
+
+#[test]
+fn a_dense_mask_gives_every_island_its_own_value() {
+    // Thresholded white noise at 512²: thousands of specks, several a 4 px cell.
+    let noise = Image::fill_uv(512, |u, v| {
+        let (x, y) = ((u * 512.0) as i64, (v * 512.0) as i64);
+        [hash::unit2(x, y, 0, 11), 0.0, 0.0, 1.0]
+    });
+    let all = label(&noise, |p| p[0] > 0.8);
+    assert!(
+        all.islands.iter().any(|i| i.rank >= 3),
+        "cells hold several"
+    );
+    let mut g: Vec<u32> = all
+        .islands
+        .iter()
+        .map(|i| i.random(0, 0).to_bits())
+        .collect();
+    g.sort_unstable();
+    g.dedup();
+    // Only chance collisions of a 24-bit value: about n² / 2²⁵, under 0.1%.
+    let n = all.islands.len();
+    assert!(g.len() * 1000 >= n * 999, "{} of {n}", g.len());
+}
+
+#[test]
+fn seed_zero_at_cell_zero_is_not_the_gaps_zero() {
+    let mut img = Image::new(Size::new(256, 256));
+    img.pixels_mut()[0][0] = 1.0;
+    let speck = label(&img, |p| p[0] > 0.5).islands[0];
+    assert_eq!(speck.cell(), [0, 0]);
+    assert_ne!(speck.random(0, 0), 0.0);
+}

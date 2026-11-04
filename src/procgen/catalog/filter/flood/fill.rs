@@ -34,9 +34,10 @@ impl Row for FloodFill {
 impl Op for FloodFill {
     fn run(&self, cx: &Cx) -> Image {
         let islands = flood::label(cx.input(0), |p| p[0] > self.threshold);
-        let tint = |i: &flood::Island, c| 0.2 + 0.8 * i.random(c, 0);
-        flood::paint_rgba(&islands, [0.0; 4], |i, _, _| {
-            [tint(i, 0), tint(i, 1), tint(i, 2), 1.0]
-        })
+        let tint = |i: &flood::Island| {
+            let c = |channel| 0.2 + 0.8 * i.random(channel, 0);
+            [c(0), c(1), c(2), 1.0]
+        };
+        flood::paint_rgba(&islands, [0.0; 4], tint, |t, _, _| *t)
     }
 }
