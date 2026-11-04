@@ -9,6 +9,7 @@ mod organic;
 mod resolution;
 mod seams;
 mod stones;
+mod tile_sampler;
 mod weathering;
 
 use rusty::procgen::recipe::{Constant, Node, OpKind, TextureRecipe};

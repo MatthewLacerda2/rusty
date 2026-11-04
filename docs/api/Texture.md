@@ -376,9 +376,13 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   `constant` as input 2. Both are read at the cell's centre, wrapped, so they don't
   vary with resolution. Placement draws never change when `probability` or
   `value_jitter` are added: each takes its own hash stream. Overlaps: `max` keeps the
-  brighter value per channel, `add` sums the colours, `over` lets the later stamp
-  cover wherever its input isn't black — later in row-major order of the cells (row
-  0 first, left to right), whatever the band split. A NaN `probability` or
+  brighter value per channel, `add` sums the colours, `over` lays each stamp on the
+  ones before it, premultiplied: `out = colour × alpha + out × (1 − coverage)`, in
+  row-major order of the cells (row 0 first, left to right), whatever the band
+  split. `over` reads a stamp's **brightness as its coverage** (its red under
+  `output = "random"` or `"index"`, its brightest channel under `"stamp"`, times its
+  alpha), so a soft edge stays soft over what is under it and a dark colour stamp is
+  thin; output alpha is left as `max` leaves it. A NaN `probability` or
   `value_jitter` is ignored, an out-of-range one clamped. Rivets are `shape circle`
   → `tile`.
 - `voronoi {scale, output="distance"|"cells"|"f2"|"edges",

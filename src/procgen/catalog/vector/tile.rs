@@ -33,7 +33,8 @@ pub enum TileBlend {
     Max,
     /// The colours summed (alpha keeps the larger).
     Add,
-    /// The later stamp in row-major cell order covers wherever it isn't black.
+    /// Each stamp laid over the ones before it in row-major cell order,
+    /// premultiplied, its brightness (times its alpha) read as its coverage.
     Over,
 }
 

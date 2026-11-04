@@ -2,6 +2,7 @@
 //! its hash — where its stamp sits, how it is turned and sized, the value it is
 //! filled with, and whether it is drawn at all.
 
+use super::super::super::catalog::vector::tile::TileOutput;
 use super::super::super::hash;
 use super::super::field::Field;
 
@@ -17,6 +18,9 @@ const CHANCE: u64 = CHANNEL + 6;
 /// The largest a size map scales a stamp: past it a stamp would cover cells far
 /// enough away to multiply the neighbours each pixel looks at.
 pub(super) const MAX_SIZE: f32 = 2.0;
+
+/// The widest [`Jitter::reach`] any clamped jitter takes at [`MAX_SIZE`].
+pub(super) const MAX_REACH: i64 = 3;
 
 /// The per-cell randomness ranges, clamped: `jitter` moves a stamp up to half a cell
 /// either way at 1, `rotation` turns it up to half a turn either way at 1, `scale`
@@ -88,31 +92,22 @@ impl<'a> Jitters<'a> {
 }
 
 /// One cell's stamp: centre offset (cells), `(cos, sin)` of its turn, `1 / scale`,
-/// the value its colour is multiplied by, and its wrapped cell (the draw order).
+/// and the value its colour is multiplied by.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Stamp {
     offset: [f32; 2],
     turn: (f32, f32),
     inv_scale: f32,
     pub value: f32,
-    pub cell: (i64, i64),
 }
 
-/// The per-cell draws besides placement: the base value (1, a grey or an index),
-/// the `value_jitter` range, and the fill probability.
+/// The per-cell draws besides placement: what a stamp is filled with (its base
+/// value: 1, a grey or an index), the `value_jitter` range, and the fill probability.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Draws {
-    pub base: Base,
+    pub output: TileOutput,
     pub value_jitter: f32,
     pub probability: f32,
-}
-
-/// The value a stamp starts from, before `value_jitter`.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) enum Base {
-    One,
-    Random,
-    Index,
 }
 
 impl Stamp {
@@ -127,23 +122,31 @@ impl Stamp {
         seed: u64,
     ) -> Option<Self> {
         let unit = |ch| hash::unit2(cell.0, cell.1, ch, seed);
-        if unit(CHANCE) >= d.probability || size.is_nan() || size <= 0.0 {
+        if size.is_nan() || size <= 0.0 {
+            return None;
+        }
+        // At the defaults neither draw can change the stamp (`unit2` stays below
+        // 1), so neither is hashed: every plain scatter would pay for both.
+        if d.probability < 1.0 && unit(CHANCE) >= d.probability {
             return None;
         }
         let size = size.min(MAX_SIZE);
         let r = |ch| unit(CHANNEL + ch) - 0.5;
         let angle = j.rotation * r(2) * std::f32::consts::TAU;
-        let base = match d.base {
-            Base::One => 1.0,
-            Base::Random => unit(GREY),
-            Base::Index => index(cell, per),
+        let base = match d.output {
+            TileOutput::Stamp => 1.0,
+            TileOutput::Random => unit(GREY),
+            TileOutput::Index => index(cell, per),
+        };
+        let value = match d.value_jitter > 0.0 {
+            true => base * (1.0 + d.value_jitter * (unit(VALUE) - 0.5)),
+            false => base,
         };
         Some(Self {
             offset: [j.offset * r(0), j.offset * r(1)],
             turn: (angle.cos(), angle.sin()),
             inv_scale: 1.0 / ((1.0 + j.scale * r(3)) * size),
-            value: base * (1.0 + d.value_jitter * (unit(VALUE) - 0.5)),
-            cell,
+            value,
         })
     }
 
@@ -180,6 +183,7 @@ mod tests {
         assert_eq!(Jitter::new(1.0, 0.0, 0.0).reach(1.0), 1);
         assert_eq!(Jitter::new(1.0, 1.0, 1.0).reach(1.0), 2);
         assert_eq!(Jitter::new(0.0, 0.0, 0.0).reach(2.0), 1);
+        assert_eq!(Jitter::new(1.0, 1.0, 1.0).reach(MAX_SIZE), MAX_REACH);
     }
 
     #[test]

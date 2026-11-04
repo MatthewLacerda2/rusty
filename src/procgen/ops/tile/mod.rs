@@ -11,17 +11,20 @@
 //! too rather than cut off. Overlapping stamps keep the brighter value per channel
 //! by default — the right blend for masks and heights.
 //!
-//! **Draw order.** `over` lets the later stamp cover: later is row-major order of
-//! the stamps' wrapped cells (row 0 first, left to right), a property of the two
-//! stamps alone. So neither the band split nor which pixel looks decides what
-//! covers what, and a stamp crossing the tile edge covers the same stamps on both
-//! sides of it.
+//! **Draw order.** `over` composites the stamps at a pixel one on another,
+//! premultiplied, in row-major order of their wrapped cells (row 0 first, left to
+//! right); a stamp meeting its own copy across the wrap (a small `count`) breaks
+//! the tie by its unwrapped cell. The order is a property of the stamps alone, so
+//! neither the band split nor which pixel looks decides what covers what, and a
+//! stamp crossing the tile edge covers the same stamps on both sides of it.
 
+mod over;
 mod stamp;
 
 pub use stamp::{Jitter, Jitters};
 
-use stamp::{centre, Base, Draws, Stamp, MAX_SIZE};
+use over::Hits;
+use stamp::{centre, Draws, Stamp, MAX_SIZE};
 
 use super::super::catalog::vector::tile::{TileBlend, TileOutput};
 use super::super::image_buf::{Image, Rgba};
@@ -90,13 +93,8 @@ impl<'a> Scatter<'a> {
     }
 
     fn draws(&self) -> Draws {
-        let base = match self.output {
-            TileOutput::Stamp => Base::One,
-            TileOutput::Random => Base::Random,
-            TileOutput::Index => Base::Index,
-        };
         Draws {
-            base,
+            output: self.output,
             value_jitter: self.value_jitter,
             probability: self.probability,
         }
@@ -138,25 +136,44 @@ pub fn tile(img: &Image, s: &Scatter) -> Image {
         }
         Stamp::of(cell, per, j.at(cell, n), size.at_uv(u, v), draws, s.seed)
     });
-    let grey = draws.base != Base::One;
+    let grey = draws.output != TileOutput::Stamp;
     Image::fill_uv(img.size(), |u, v| {
         let (px, py) = (u * n, v * n);
         let (gx, gy) = (px.floor() as i64, py.floor() as i64);
         let mut out: Rgba = [0.0, 0.0, 0.0, 1.0];
-        let mut top: Option<(i64, i64)> = None;
+        // Only `over` keeps the stamps it meets; `max` and `add` fold as they go.
+        let mut hits = (s.blend == TileBlend::Over).then(Hits::default);
         for dy in -reach..=reach {
             for dx in -reach..=reach {
                 let (cx, cy) = (gx + dx, gy + dy);
-                let Some(stamp) = stamps.get((cx.rem_euclid(per), cy.rem_euclid(per))) else {
+                let wrapped = (cx.rem_euclid(per), cy.rem_euclid(per));
+                let Some(stamp) = stamps.get(wrapped) else {
                     continue;
                 };
                 let (su, sv) = stamp.local(px - cx as f32 - 0.5, py - cy as f32 - 0.5);
                 if (0.0..1.0).contains(&su) && (0.0..1.0).contains(&sv) {
                     let p = img.sample_bilinear_wrapped(su, sv);
                     let colour = fill(p, stamp.value, grey);
-                    blend(s.blend, &mut out, &mut top, p, colour, stamp.cell);
+                    match s.blend {
+                        TileBlend::Max => out = std::array::from_fn(|c| out[c].max(colour[c])),
+                        TileBlend::Add => {
+                            out = std::array::from_fn(|c| match c {
+                                3 => out[3].max(colour[3]),
+                                _ => out[c] + colour[c],
+                            })
+                        }
+                        TileBlend::Over => {
+                            let order = [wrapped.1, wrapped.0, cy, cx];
+                            if let Some(hits) = &mut hits {
+                                hits.push(order, colour, coverage(p, grey));
+                            }
+                        }
+                    }
                 }
             }
+        }
+        if let Some(hits) = &mut hits {
+            hits.composite(&mut out);
         }
         out
     })
@@ -171,34 +188,15 @@ fn fill(p: Rgba, value: f32, grey: bool) -> Rgba {
     }
 }
 
-/// Lay `colour` (sampled as `p` from the stamp of wrapped cell `cell`) onto `out`.
-/// `top` is the latest cell `over` has drawn here.
-fn blend(
-    mode: TileBlend,
-    out: &mut Rgba,
-    top: &mut Option<(i64, i64)>,
-    p: Rgba,
-    colour: Rgba,
-    cell: (i64, i64),
-) {
-    match mode {
-        TileBlend::Max => *out = std::array::from_fn(|c| out[c].max(colour[c])),
-        TileBlend::Add => {
-            *out = std::array::from_fn(|c| match c {
-                3 => out[3].max(colour[3]),
-                _ => out[c] + colour[c],
-            })
-        }
-        TileBlend::Over => {
-            // Row-major: compare (row, column).
-            let order = (cell.1, cell.0);
-            let covers = p[..3].iter().any(|&c| c > 0.0);
-            if covers && top.is_none_or(|t| order > t) {
-                *out = colour;
-                *top = Some(order);
-            }
-        }
-    }
+/// How much of what is under a stamp sample `p` covers under `over`: its red in
+/// the grey outputs (the colour comes from red alone), its brightest channel in
+/// `output = "stamp"`, times its alpha, in 0–1.
+fn coverage(p: Rgba, grey: bool) -> f32 {
+    let bright = match grey {
+        true => p[0],
+        false => p[0].max(p[1]).max(p[2]),
+    };
+    (bright * p[3]).clamp(0.0, 1.0)
 }
 
 #[cfg(test)]
