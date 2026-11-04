@@ -6,34 +6,17 @@
 
 use serde_json::{json, Value};
 
+pub(crate) use super::mesh::mesh_value;
 use super::vec3;
 use crate::components::{
     AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, LayerState,
-    LightComponent, MaterialAsset, MeshComponent, NavMeshAgentComponent, ParticleEmitterComponent,
+    LightComponent, MaterialAsset, NavMeshAgentComponent, ParticleEmitterComponent,
     RigidBodyComponent,
 };
 use crate::components::{
     CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent, RibbonStyle,
     TrailComponent,
 };
-
-/// Mesh identity: the primitive kind and, for imported meshes, the
-/// `path::sub_object` asset reference, plus a `Plane`'s `subdivisions` when it isn't
-/// the single quad (#1524), `cast_shadows` when it isn't `On` (#1571) and
-/// `scale_in_lightmap` when it isn't 1 (#1704). Never the GPU geometry.
-pub(crate) fn mesh_value(m: &MeshComponent) -> Value {
-    let mut v = json!({ "primitive_type": m.primitive_type, "asset_ref": m.asset_ref });
-    if m.subdivisions != 1 {
-        v["subdivisions"] = json!(m.subdivisions);
-    }
-    if !m.cast_shadows.is_on() {
-        v["cast_shadows"] = json!(m.cast_shadows.name());
-    }
-    if m.scale_in_lightmap != 1.0 {
-        v["scale_in_lightmap"] = json!(m.scale_in_lightmap);
-    }
-    v
-}
 
 /// Material (PBR) params + texture references, read from the resolved library
 /// `MaterialAsset`. The albedo map is surfaced under the `"texture"` key (empty

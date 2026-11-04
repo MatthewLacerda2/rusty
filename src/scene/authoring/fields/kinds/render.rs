@@ -39,7 +39,9 @@ inspect! {
             op!("scale_in_lightmap", mesh::set_scale_in_lightmap)
         ),
         ro!("skeleton", MESH),
-    ];
+        op!("max_draw_distance", mesh::set_max_draw_distance),
+        op!("min_screen_size", mesh::set_min_screen_size),
+    ], shown mesh::shown;
     MaterialComponent => material, material_mut, &[
         ro!("materials", "Material.Set points a slot at a library material"),
     ];

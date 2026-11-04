@@ -26,6 +26,8 @@ impl MeshComponent {
             clips: Vec::new(),
             pose_palette: Vec::new(),
             skeleton: self.skeleton.clone(),
+            max_draw_distance: self.max_draw_distance,
+            min_screen_size: self.min_screen_size,
             revision: self.revision,
         }
     }

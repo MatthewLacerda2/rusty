@@ -319,6 +319,8 @@ scene.entities[].material: option
 scene.entities[].mesh.asset_ref: option
 scene.entities[].mesh.asset_ref: string
 scene.entities[].mesh.cast_shadows: enum On|Off|TwoSided|ShadowsOnly
+scene.entities[].mesh.max_draw_distance: f32
+scene.entities[].mesh.min_screen_size: f32
 scene.entities[].mesh.primitive_type: string
 scene.entities[].mesh.scale_in_lightmap: f32
 scene.entities[].mesh.skeleton.bodies: map

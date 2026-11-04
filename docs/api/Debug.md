@@ -98,7 +98,9 @@ end
 | `changes_<channel>` | per change channel the World keeps a log for (`ecs::changes`, #1705), the entities its log took in this frame: with a system reading it every tick, the distinct entities dirtied on it (one already waiting unread is not counted again). Channels: `world_pose`, `activity`, `layer`, `static_set` and the component columns (`transform`, `collider`, `scripts`, …). `changes_static_set` is always present (`0` until something reads it); the others appear once a system opens a cursor on them |
 | `draw_calls` | geometry draw calls: solids (mesh particles among them), transparents, shadow casters, the SSAO depth prepass, sprite-particle batches, UI batches (post-FX and skybox excluded; decals draw nothing of their own, #638). Copies of one mesh + material are **one instanced call** (#470), so this tracks distinct looks, not entity count |
 | `triangles` | triangles submitted by the solid, transparent, shadow and SSAO-prepass draws, every instance counted |
-| `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera stack |
+| `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera views (the stack and render-texture cameras) |
+| `cull_tested` / `size_culled_entities` | mesh entities tested against a camera's frustum (every one the camera draws at all whose LOD level it shows) / kept by the frustum but past their max draw distance or under their min screen size (#1714, [`Mesh`](Mesh.md)), summed over the camera views |
+| `shadow_cull_tested` / `shadow_frustum_culled` / `shadow_size_culled` | shadow casters tested against a light volume (a cascade or an atlas tile), one per entity per volume / outside it / inside it but too far or too small from the main camera (#1714), summed over every shadow view the frame drew: the per-frame passes, and the cached static bakes on a frame they re-bake |
 | `lod_hidden_entities` | mesh entities skipped because their `LODGroup` showed another level (#472), summed over the camera stack |
 | `lights` / `lights_dropped` | active lights, and those left unlit: realtime directional lights past 4, every ambient but the last, and per camera the point/spot lights in view past the clustered budget of 64 (the least contributing go first, #434, #834) |
 | `cluster_lights_dropped` | (cluster, light) entries cut because more than 32 point/spot lights reached one cluster, the least contributing there first (#834); non-zero means some corner of the view is over the per-pixel budget |
@@ -260,6 +262,7 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
   "scripts": ["assets/scripts/foo.lua"],
   "mesh":      { "primitive_type": "Box", "asset_ref": "models/crates.glb::Barrel" },
                                 // + "subdivisions" when not 1, "cast_shadows" when not "On",
+                                // "max_draw_distance" / "min_screen_size" when set
                                 //   "scale_in_lightmap" when not 1
   "material":  { "color": [r,g,b], "metallic": .., "roughness": .., "texture": "..",
                  "metallic_map": null, "roughness_map": null },
