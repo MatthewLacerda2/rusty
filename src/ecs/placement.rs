@@ -21,7 +21,7 @@ impl World {
     /// Place `entity` with sequence stamp `seq` at index `slot` of the insertion
     /// order (the caller keeps `order` sorted by `seq`).
     fn place_at(&mut self, entity: Entity, seq: u64, slot: usize) {
-        let id = entity.id;
+        let (id, parent) = (entity.id, entity.parent_id);
         self.next_seq = self.next_seq.max(seq + 1);
         self.touch_entity(id, entity.is_static);
         let mut builder = build_bundle(entity, seq);
@@ -30,6 +30,8 @@ impl World {
         self.handles.insert(id, handle);
         self.order.insert(slot, id);
         self.moved(id); // a carried document (a re-rooted load survivor) brings a stale box
+        self.placed_activity(id, parent); // a parent not here yet is waited for
+        self.arrived_activity(id); // and this may be one a placed child waits for
     }
 
     /// Put a removed entity back as it was recorded (`World::record`): its id, and
@@ -69,11 +71,13 @@ impl World {
         self.touch_entity(id, entity.is_static);
         // lint: allow(ecs-write) the funnel: `touch_entity` stamped the overwrite above
         let _ = self.inner.despawn(old_handle);
+        let parent = entity.parent_id;
         let mut builder = build_bundle(entity, seq);
         // lint: allow(ecs-write) the same overwrite's respawn
         let new_handle = self.inner.spawn(builder.build());
         self.handles.insert(id, new_handle);
         self.moved(id);
+        self.placed_activity(id, parent);
         self.invalidate_caches(); // its transform, parent and flag may all differ
         self.stamp_hierarchy_below(id);
         true
