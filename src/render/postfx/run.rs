@@ -114,13 +114,17 @@ impl PostFx {
         scene_of(None, self.targets.get(), &self.scene_hdr)
     }
 
-    /// The exposure meter and [`PostFx::scene_color`] at once, so the meter reads
+    /// The exposure meter and [`PostFx::scene_color`] (with its size) at once, so the meter reads
     /// the image after depth of field and motion blur (#1444) without a borrow clash.
     pub(crate) fn exposure_and_scene(
         &mut self,
-    ) -> (&mut effects::exposure::ExposureMeter, &wgpu::TextureView) {
+    ) -> (
+        &mut effects::exposure::ExposureMeter,
+        (&wgpu::TextureView, [u32; 2]),
+    ) {
+        let size = self.scene_hdr.texture.size();
         let scene = scene_of(self.targets.get(), self.targets.get(), &self.scene_hdr);
-        (&mut self.exposure, scene)
+        (&mut self.exposure, (scene, [size.width, size.height]))
     }
 
     /// The format the chain writes its output in (what [`PostFx::composite_into`]

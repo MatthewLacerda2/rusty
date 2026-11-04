@@ -2,13 +2,14 @@
 //! URP has it, with a channel pushed below zero held at black.
 
 use super::{chain, W};
-use crate::components::PostProcessingComponent;
+use crate::components::{PostProcessingComponent, Tonemap};
 use crate::scene::authoring::default_post_processing;
 use crate::scene::authoring::rendering::post_processing as ops;
 
-/// The default (ACES) volume at `saturation`.
+/// The default volume under ACES at `saturation`: a per-channel curve, so a channel the grade emptied stays black (Neutral's highlight rolloff lifts it towards white).
 fn at(saturation: f32) -> PostProcessingComponent {
     let mut vc = default_post_processing();
+    vc.tonemapping.mode = Tonemap::Aces;
     ops::grading::color_adjustments::set_saturation(&mut vc, saturation);
     vc
 }

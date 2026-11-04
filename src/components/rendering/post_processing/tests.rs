@@ -42,7 +42,11 @@ fn the_grade_loads_neutral_and_round_trips() {
     let vc = load("{}");
     assert!(vc.white_balance.is_neutral() && vc.color_adjustments.hue_shift == 0.0);
     assert_eq!(vc.color_lookup, ColorLookup::default());
-    assert_eq!(vc.tonemapping.mode, Tonemap::Aces);
+    assert_eq!(
+        vc.tonemapping.mode,
+        Tonemap::Neutral,
+        "a volume with no stored mode"
+    );
     let vc = load(
         r#"{"tonemapping": {"display_gamma": 1.3},
         "lift_gamma_gain": {"gain": {"offset": 0.5}}}"#,

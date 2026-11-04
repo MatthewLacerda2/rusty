@@ -1,11 +1,13 @@
 //! The grading LUT's GPU tests (`knobs`, `clamp`, #1440; `lookup`, #1441; `contrast`,
-//! `saturation`, #1479) and what they share with the exposure meter's (#1444): the post-FX chain
+//! `saturation`, #1479; `hue`, #1701) and what they share with the exposure meter's (#1444): the post-FX chain
 //! alone, fed a synthetic HDR row. The scene target is written
 //! directly, so a test chooses the exact HDR colour each pixel's grade starts from,
 //! and reads the display colour the composite wrote.
 
+mod analytic;
 mod clamp;
 mod contrast;
+mod hue;
 mod knobs;
 mod lookup;
 mod saturation;
@@ -165,7 +167,7 @@ fn f16_value(v: f32) -> f32 {
 
 /// `v` as an IEEE half float, for the zero and positive normal values the tests
 /// write (the mantissa truncated).
-fn f16(v: f32) -> u16 {
+pub(in crate::render::postfx) fn f16(v: f32) -> u16 {
     if v == 0.0 {
         return 0;
     }
