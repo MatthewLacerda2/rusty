@@ -60,6 +60,8 @@ mod inputs;
 mod object;
 #[cfg(test)]
 mod shadow_ops;
+#[cfg(test)]
+mod stack_gpu_tests;
 mod table;
 
 use std::collections::{BTreeMap, BTreeSet};

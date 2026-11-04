@@ -17,9 +17,10 @@ use std::ops::Range;
 
 use crate::render::gpu::uniforms::ObjectData;
 
-/// How many clean slots a dirty run may span to join the next one: 16 records are
-/// 3.75 KB, about what one more `write_buffer` call costs in staging and recording
-/// (the PR measured it, #1706).
+/// How many clean slots a dirty run may span to join the next one. Measured on
+/// lavapipe in release (#1706): one `write_buffer` call costs about 1.2 µs over its
+/// bytes, about what 8 KB of copy costs, so a gap of 16 records (3.75 KB) is cheaper
+/// rewritten than split, with room to spare for a GPU whose copies cost more.
 pub(crate) const JOIN_GAP: u32 = 16;
 
 pub(crate) struct ObjectTable {
