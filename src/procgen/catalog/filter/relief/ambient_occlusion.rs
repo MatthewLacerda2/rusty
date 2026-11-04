@@ -18,8 +18,9 @@ use crate::procgen::recipe::{op, opt, req, Lit, OpInfo, ONE};
 /// Height (red) → occlusion: white where a pixel sees the whole sky, darker the
 /// more of it the relief within `radius` (tiles) hides. `depth` is how tall white
 /// stands, in tiles; `quality` is how many directions are searched (1 to
-/// 64). Wraps, so it tiles; samples land in tile units, so it looks the
-/// same at any resolution.
+/// 64). Reads the input's red; writes grey with alpha 1. `radius` caps at half a
+/// tile. Wraps, so it tiles; samples land in tile units, so it looks the same at
+/// any resolution.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AmbientOcclusion {
     pub radius: f32,
@@ -57,11 +58,13 @@ impl Op for AmbientOcclusion {
 
 /// The occlusion of `img`'s red as a height `depth` tiles tall at 1, searched
 /// `radius` tiles out in `quality` directions. A radius or depth of 0 or less
-/// (or NaN) sees the whole sky: white.
+/// (or NaN) sees the whole sky: white. The radius caps at half a tile, as
+/// `blur`'s does: past it the search only wraps onto what it has read.
 pub fn occlusion(img: &Image, radius: f32, depth: f32, quality: u32) -> Image {
     if !(radius > 0.0 && depth > 0.0) {
         return Image::filled(img.size(), [1.0; 4]);
     }
+    let radius = radius.min(0.5);
     let dirs = quality.clamp(1, MAX_QUALITY);
     let rays: Vec<(f32, f32)> = (0..dirs)
         .map(|k| {

@@ -36,13 +36,13 @@ const RADIUS: f32 = 0.004;
 impl Op for Sharpen {
     fn run(&self, cx: &Cx) -> Image {
         let img = cx.input(0);
-        let low = filter::blur(img, cx.px(self.radius), BlurKind::Gaussian);
         let k = self.intensity;
-        let mut out = cx.own();
+        // The blur is a private buffer: the result is written into it.
+        let mut out = filter::blur(img, cx.px(self.radius), BlurKind::Gaussian);
         out.for_each_row(|y, row| {
-            for (p, b) in row.iter_mut().zip(low.row(y)) {
+            for (b, p) in row.iter_mut().zip(img.row(y)) {
                 let f = |c: usize| p[c] + k * (p[c] - b[c]);
-                *p = [f(0), f(1), f(2), p[3]];
+                *b = [f(0), f(1), f(2), p[3]];
             }
         });
         out

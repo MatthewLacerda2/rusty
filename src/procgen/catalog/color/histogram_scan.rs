@@ -1,5 +1,5 @@
-//! The `histogram_scan` op: a threshold that slides through the input's range
-//! (Substance Designer's *Histogram Scan*, #1743).
+//! The `histogram_scan` op: a threshold that slides through the absolute `[0, 1]`
+//! scale (Substance Designer's *Histogram Scan*, #1743).
 
 use serde::{Deserialize, Serialize};
 
@@ -9,8 +9,9 @@ use crate::procgen::recipe::{op, opt, req, socket, Lit, OpInfo, Param, ONE};
 
 /// A threshold per RGB channel: `position` slides it from all black (0) to all white
 /// (1), and `contrast` sets its edge from the input's own gradient (0) to a hard step
-/// (1). At `position = 0.5`, `contrast = 0` the input passes through. The one-knob
-/// way to turn a noise into a mask of a chosen coverage. Alpha untouched.
+/// (1). At `position = 0.5`, `contrast = 0` the input passes through. It scans the
+/// absolute `[0, 1]` scale, not the input's own range, as Substance's does: behind
+/// `auto_levels` it turns a noise into a mask of a chosen coverage. Alpha untouched.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HistogramScan {
     pub position: Param,
@@ -49,9 +50,12 @@ impl Op for HistogramScan {
 /// One channel through the scan. The ramp is `1 − contrast` wide and its low end
 /// sits at `1 − position × (1 + width)`, so it starts wholly above 1 (black) at
 /// position 0 and ends wholly below 0 (white) at position 1, whatever the
-/// contrast. Both knobs clamp to `[0, 1]`; at full contrast the ramp has no width,
-/// and the scan is a hard step, white above `1 − position` (all of it at 1).
+/// contrast. The value and both knobs clamp to `[0, 1]`, so a value past either end
+/// (a `sharpen`'s overshoot) is black at position 0 and white at 1; at full contrast
+/// the ramp has no width, and the scan is a hard step, white above `1 − position`
+/// (all of it at 1).
 fn scan(c: f32, position: f32, contrast: f32) -> f32 {
+    let c = c.clamp(0.0, 1.0);
     let (position, width) = (position.clamp(0.0, 1.0), 1.0 - contrast.clamp(0.0, 1.0));
     let low = 1.0 - position * (1.0 + width);
     if width < 1e-6 {

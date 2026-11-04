@@ -80,3 +80,12 @@ fn it_wraps_and_bakes_the_same_twice() {
     assert_wraps(&ao(0.1), &img);
     assert_eq!(run(&ao(0.1), &img), run(&ao(0.1), &img));
 }
+
+#[test]
+fn a_huge_radius_caps_at_half_a_tile_rather_than_panicking() {
+    let img = band(16);
+    let half = run(&ao(0.5), &img);
+    for radius in [f32::INFINITY, 1e17] {
+        assert_eq!(run(&ao(radius), &img).pixels(), half.pixels(), "{radius}");
+    }
+}

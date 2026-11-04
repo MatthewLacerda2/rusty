@@ -23,11 +23,11 @@ impl Row for Highpass {
 impl Op for Highpass {
     fn run(&self, cx: &Cx) -> Image {
         let img = cx.input(0);
-        let low = filter::blur(img, cx.px(self.radius), BlurKind::Gaussian);
-        let mut out = cx.own();
+        // The blur is a private buffer: the result is written into it.
+        let mut out = filter::blur(img, cx.px(self.radius), BlurKind::Gaussian);
         out.for_each_row(|y, row| {
-            for (p, b) in row.iter_mut().zip(low.row(y)) {
-                *p = [
+            for (b, p) in row.iter_mut().zip(img.row(y)) {
+                *b = [
                     p[0] - b[0] + 0.5,
                     p[1] - b[1] + 0.5,
                     p[2] - b[2] + 0.5,

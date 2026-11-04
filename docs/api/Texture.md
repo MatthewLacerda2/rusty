@@ -234,7 +234,7 @@ A few notes hold for a whole family. The colour ops are pixel to pixel. Noise us
 only part of the range (a 4-octave fBM spans about 0.35–0.64), so a ramp fed straight
 from it shows only its middle; `auto_levels` before the `color_ramp` uses the whole
 ramp, whatever the input's spread. The filters wrap, so a tiling input gives a tiling
-result; `cavity` and `curvature` read the input's red as height.
+result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as height.
 
 <!-- sorted: one bullet per op, so two branches adding ops land on different lines -->
 - `ambient_occlusion {radius, depth=0.1, quality=8}` (*filter*, 1 input): height →
@@ -292,7 +292,9 @@ result; `cavity` and `curvature` read the input's red as height.
   Substance's *Edge Detect*: red above 0.5 is inside (as `distance`), and a line
   `width` tiles wide straddles every edge. `roundness` 0 is a flat-topped line, 1 a
   round bead that bevels through `bump_to_normal`: grout from tiles, panel seams,
-  crack rims. A mask with no edge reads black.
+  crack rims. A pixel the line only partly covers reads the share it covers, so a
+  line thinner than a pixel at a low `resolution` fades rather than vanishing, and
+  the map's mean holds across resolutions. A mask with no edge reads black.
 - `gamma {gamma}` (*color*, 1 input).
 - `gradient {kind="linear"|"linear_tiling"|"radial"}` (*generator*).
 - `highpass {radius}` (*filter*, 1 input): `c − blur(c) + 0.5` per channel with a
@@ -302,8 +304,11 @@ result; `cavity` and `curvature` read the input's red as height.
 - `histogram_scan {position, contrast=0}` (*color*, 1 input): a threshold per channel,
   like Substance's *Histogram Scan*: `position` slides it from all black (0) to all
   white (1), `contrast` sets its edge from the input's own gradient (0) to a hard step
-  (1); `position = 0.5` with `contrast = 0` passes the input through. Turns a noise
-  into a mask of a chosen coverage in one node.
+  (1); `position = 0.5` with `contrast = 0` passes the input through. It scans the
+  **absolute** `[0, 1]` scale, not the input's own range (values outside it clamp
+  first), so put `auto_levels` in front of a noise: a 4-octave fBM spans about
+  0.35–0.64 and, straight in, bakes all black at `position = 0.25`, `contrast = 1`.
+  `auto_levels` → `histogram_scan` turns a noise into a mask of a chosen coverage.
 - `hue_sat_value {hue, sat, value}` (*color*, 1 input).
 - `image {path, encoding="srgb"|"linear"}` (*generator*): an image file, see *Image
   files* below.

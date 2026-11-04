@@ -23,7 +23,8 @@ pub fn rolled(img: &Image, dx: i64, dy: i64) -> Image {
     out
 }
 
-/// A busy, tiling height at `n²`: two whole periods of a sine pair, plus a bump.
+/// A busy, tiling height at `n²`: a sine across times a cosine down, two whole
+/// periods across and three down, in red (green and blue are functions of it).
 pub fn relief(n: u32) -> Image {
     Image::fill_uv(n, |u, v| {
         let tau = std::f32::consts::TAU;

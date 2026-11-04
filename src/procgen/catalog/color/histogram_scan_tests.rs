@@ -32,3 +32,13 @@ fn coverage_grows_with_position() {
     let white = |p| scanned(p, 0.8).iter().sum::<f32>();
     assert!(white(0.3) < white(0.5) && white(0.5) < white(0.7));
 }
+
+#[test]
+fn values_past_either_end_still_go_black_at_zero_and_white_at_one() {
+    for c in [-0.5, 1.5] {
+        for contrast in [0.0, 0.5, 1.0] {
+            assert_eq!(scan(c, 0.0, contrast), 0.0, "{c} at contrast {contrast}");
+            assert_eq!(scan(c, 1.0, contrast), 1.0, "{c} at contrast {contrast}");
+        }
+    }
+}
