@@ -46,7 +46,7 @@ fn gpu_a_moving_cube_leaves_no_trail() {
 
 /// A white sprite in the temp dir, so a particle shows its tint.
 fn white_sprite() -> String {
-    let path = std::env::temp_dir().join("rusty_1702_taa_white.png");
+    let path = crate::test_temp::dir().join("rusty_1702_taa_white.png");
     image::RgbaImage::from_pixel(4, 4, image::Rgba([255; 4]))
         .save(&path)
         .unwrap();

@@ -35,7 +35,6 @@ pub(crate) use effect::{wanted, EFFECT};
 
 use glam::Vec2;
 
-use super::Targets;
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
@@ -43,7 +42,7 @@ use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::render::timing::{GpuPass, GpuTimer};
-use crate::render::{PixelSize, RenderView};
+use crate::render::RenderView;
 
 /// URP's frame influence: the current frame's weight in the blend.
 pub(crate) const FRAME_INFLUENCE: f32 = 0.1;
@@ -176,16 +175,15 @@ impl TaaHistory {
     }
 }
 
-/// Start a stack's frame: with `on`, fit the view's history to `size` and return
-/// this frame's jitter in NDC; without, drop the history and return none. A view
-/// that runs no TAA draws with the unjittered projection, bit for bit. On a `cut`
-/// (the motion history starts over) the history is forgotten and the sequence
-/// restarts, so the frame is exactly a new view's first.
-pub(crate) fn begin(
-    targets: &mut Targets,
-    device: &wgpu::Device,
-    (size, on, cut): (PixelSize, bool, bool),
-) -> Vec2 {
+/// Start a stack's frame, after the motion history's `begin`: with `on`, fit the
+/// view's history to its scene size and return this frame's jitter in NDC;
+/// without, drop the history and return none. A view that runs no TAA draws with
+/// the unjittered projection, bit for bit. On a cut (the motion history starts
+/// over) the history is forgotten and the sequence restarts, so the frame is
+/// exactly a new view's first.
+pub(crate) fn begin(view: &mut RenderView, device: &wgpu::Device, on: bool) -> Vec2 {
+    let (size, cut) = (view.scene_size(), view.post_fx.motion.history.cut());
+    let targets = &mut view.post_fx.targets;
     if !on {
         targets.remove::<TaaHistory>();
         return Vec2::ZERO;

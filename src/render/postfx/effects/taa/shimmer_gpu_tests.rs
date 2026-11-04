@@ -35,7 +35,7 @@ fn bumpy_normal_map() -> String {
         let (x, y) = (64 + next() / 2, 64 + next() / 2);
         image::Rgba([x, y, 255, 255])
     });
-    let path = std::env::temp_dir().join("rusty_1702_taa_bumps.png");
+    let path = crate::test_temp::dir().join("rusty_1702_taa_bumps.png");
     img.save(&path).unwrap();
     path.to_string_lossy().into_owned()
 }
@@ -44,7 +44,7 @@ fn bumpy_normal_map() -> String {
 fn sphere_scene(taa: bool) -> (Scene, u32) {
     let (mut scene, _) = taa_scene(taa, true);
     // A black sky, so the measure is the sphere's.
-    let sky = std::env::temp_dir().join("rusty_1702_taa_black_sky.png");
+    let sky = crate::test_temp::dir().join("rusty_1702_taa_black_sky.png");
     image::RgbaImage::from_pixel(2, 1, image::Rgba([0, 0, 0, 255]))
         .save(&sky)
         .unwrap();
