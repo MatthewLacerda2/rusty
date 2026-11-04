@@ -43,7 +43,8 @@ concurrency:
 # A gate proves this commit, so its proptests run on a fixed seed: a red one was
 # caused by what is under test, not by a seed finding something old on an unrelated
 # branch (#1777, #1798). The nightly explores instead: empty is proptest's random
-# seed, and a finding there goes through `main-health` to the board.
+# seed, and a finding there goes through `main-health` to the board, whose run link
+# holds its `cc` line. `docs/testing.md` says how to reproduce one.
 env:
   PROPTEST_RNG_SEED: ${{ github.event_name != 'schedule' && '1784' || '' }}
 
