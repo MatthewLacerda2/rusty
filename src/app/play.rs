@@ -23,6 +23,7 @@ use super::game::GameWorld;
 use super::registry::App;
 use super::resources::Resources;
 use super::stage::Stage;
+use super::systems::physics;
 use super::world::World;
 
 /// Play-enter helpers, split out of `GameWorld::enter_play` so each phase stays
@@ -102,10 +103,10 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::systems::ui::dispatch_ui_events)
         .add_system(Stage::FixedUpdate, update_scripts)
         .add_system(Stage::FixedUpdate, tick_nav)
-        .add_system(Stage::FixedUpdate, step_physics)
+        .add_system(Stage::FixedUpdate, physics::step_physics)
         .add_system(Stage::FixedUpdate, super::animation::graph::evaluate_graphs)
         .add_system(Stage::FixedUpdate, super::systems::animate::animate)
-        .add_system(Stage::FixedUpdate, pose_ragdolls)
+        .add_system(Stage::FixedUpdate, physics::pose_ragdolls)
         .add_system(Stage::FixedUpdate, dispatch_animation_events)
         .add_system(
             Stage::FixedUpdate,
@@ -113,7 +114,7 @@ pub(super) fn register(app: &mut App) {
         )
         .add_system(Stage::FixedUpdate, late_update_scripts)
         .add_system(Stage::FixedUpdate, solve_ik)
-        .add_system(Stage::FixedUpdate, follow_bones)
+        .add_system(Stage::FixedUpdate, physics::follow_bones)
         .add_system(
             Stage::FixedUpdate,
             super::systems::particles::carry_local_particles,
@@ -163,37 +164,6 @@ fn apply_destroys(_world: &mut World, res: &mut Resources) {
     let removed = res.script_manager.apply_pending_destroys();
     let tick = res.play_frame();
     res.audio.borrow_mut().stop_sources(removed, tick);
-}
-
-/// Step the rapier world and dispatch the resulting trigger and collision
-/// events to scripts.
-fn step_physics(world: &mut World, res: &mut Resources) {
-    let dt = res.frame_dt;
-    let events = {
-        let mut s = world.scene.borrow_mut();
-        match res.physics.borrow_mut().as_mut() {
-            Some(physics) => physics.step(&mut s, dt),
-            None => crate::physics::PhysicsEvents::default(),
-        }
-    };
-    res.script_manager.dispatch_physics_events(events);
-}
-
-/// Move every collider hanging from a bone (a hitbox) to the pose the Animator
-/// and `LateUpdate` left it in, so the next tick's casts hit what was rendered
-/// (#464, see `physics::follow`).
-fn follow_bones(world: &mut World, res: &mut Resources) {
-    if let Some(physics) = res.physics.borrow_mut().as_mut() {
-        physics.follow_bones(&world.scene.borrow());
-    }
-}
-
-/// Override the Animator on every bone a dynamic body carries — a ragdoll's —
-/// with the pose this tick's step solved (#466, see `physics::joints::ragdoll`).
-fn pose_ragdolls(world: &mut World, res: &mut Resources) {
-    if let Some(physics) = res.physics.borrow().as_ref() {
-        physics.pose_bones(&mut world.scene.borrow_mut());
-    }
 }
 
 /// Bend the posed bones toward their IK targets (#461, `scene::skeleton::ik`):

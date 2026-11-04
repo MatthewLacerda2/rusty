@@ -87,11 +87,14 @@ pub(super) struct JointKey {
     body2: Option<RigidBodyHandle>,
 }
 
-/// A joint live in rapier.
+/// A joint live in rapier, and the frames it was built on (its rest pose), kept
+/// here rather than read from rapier so a rebuild after a panic can reuse them
+/// (#1797, `recover`).
 #[derive(Debug)]
 pub(super) struct BuiltJoint {
     pub(super) key: JointKey,
     pub(super) handle: ImpulseJointHandle,
+    pub(super) frames: [Pose; 2],
 }
 
 /// Joint entity id → its live joint.
@@ -207,7 +210,32 @@ impl PhysicsWorld {
             .contacts_enabled(j.enable_collision)
             .build();
         let handle = self.impulse_joints.insert(key.body1, body2, data, true);
-        Some(BuiltJoint { key, handle })
+        let frames = [frame1, frame2];
+        Some(BuiltJoint {
+            key,
+            handle,
+            frames,
+        })
+    }
+
+    /// Put back the frames `old`'s joints were built on, on each joint built from
+    /// the same shape and the same kind of partner (a body or the world): a world
+    /// rebuilt after a panic keeps every joint's rest pose (#1797).
+    pub(super) fn keep_joint_frames(&mut self, old: &JointMap) {
+        for (id, built) in &mut self.joints {
+            let same = |was: &&BuiltJoint| {
+                was.key.shape == built.key.shape
+                    && was.key.body2.is_some() == built.key.body2.is_some()
+            };
+            let Some(was) = old.get(id).filter(same) else {
+                continue;
+            };
+            built.frames = was.frames;
+            if let Some(live) = self.impulse_joints.get_mut(built.handle, false) {
+                let [frame1, frame2] = was.frames;
+                live.data.set_local_frame1(frame1).set_local_frame2(frame2);
+            }
+        }
     }
 
     /// The shared fixed body joints with no connected body attach to, created on
