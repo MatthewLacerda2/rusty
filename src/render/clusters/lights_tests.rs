@@ -61,11 +61,18 @@ fn an_area_light_stands_in_as_its_own_one_frustum_kind() {
     let l = LocalLight::new(Vec3::ZERO, Vec3::NEG_Z, &light).expect("a local light");
     assert_eq!(l.kind, KIND_AREA);
     assert!(l.one_frustum());
+    // Touching the panel, its stand-in gives the true limit, `π × intensity`,
+    // not one point's `intensity × area / ε²` (#1699).
+    let touching = l.intensity * crate::components::falloff_near(0.0, l.range, l.near);
+    let limit = std::f32::consts::PI * light.intensity;
+    assert!(
+        (touching - limit).abs() < limit * 1e-5,
+        "{touching} vs {limit}"
+    );
     let point = LightComponent {
         light_type: LightType::Point,
         ..crate::scene::authoring::default_light()
     };
-    assert!(!LocalLight::new(Vec3::ZERO, Vec3::NEG_Z, &point)
-        .unwrap()
-        .one_frustum());
+    let p = LocalLight::new(Vec3::ZERO, Vec3::NEG_Z, &point).unwrap();
+    assert!(!p.one_frustum() && p.near == 0.0);
 }

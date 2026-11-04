@@ -43,7 +43,12 @@ pub(crate) struct LocalLight {
     /// The camera distance past which its shadow is not sampled (#1712,
     /// `LightComponent::shadow_fade_distance`); `0` never fades.
     pub shadow_fade: f32,
-    pub _pad: [f32; 3],
+    /// The distance its inverse square is floored at (`components::falloff_near`,
+    /// #1699): an Area light's stand-in's `sqrt(area / π)`, so a surface touching
+    /// the panel gets its true limit of `π × intensity`, not one point's
+    /// `intensity × area / ε²`; `0` for a point or spot light.
+    pub near: f32,
+    pub _pad: [f32; 2],
 }
 
 impl LocalLight {
@@ -56,16 +61,18 @@ impl LocalLight {
     /// facing, a one-sided Lambertian emitter's falloff. The lightmap and the probes' direct term
     /// integrate the rectangle itself.
     pub(crate) fn new(position: Vec3, forward: Vec3, light: &LightComponent) -> Option<Self> {
-        let (kind, intensity, cones) = match light.light_type {
-            LightType::Point => (KIND_POINT, light.intensity, (0.0, 0.0)),
+        let (kind, intensity, cones, near) = match light.light_type {
+            LightType::Point => (KIND_POINT, light.intensity, (0.0, 0.0), 0.0),
             LightType::Spotlight => (
                 KIND_SPOT,
                 light.intensity,
                 (light.inner_cone, light.outer_cone),
+                0.0,
             ),
             LightType::Area => {
-                let area = light.area_size.x * light.area_size.y;
-                (KIND_AREA, light.intensity * area, (0.0, 90.0))
+                let area = (light.area_size.x * light.area_size.y).max(0.0);
+                let near = (area / std::f32::consts::PI).sqrt();
+                (KIND_AREA, light.intensity * area, (0.0, 90.0), near)
             }
             LightType::Ambient | LightType::Directional => return None,
         };
@@ -83,7 +90,8 @@ impl LocalLight {
             shadow_fade: Some(light.shadow_fade_distance)
                 .filter(|d| d.is_finite() && *d > 0.0)
                 .unwrap_or(0.0),
-            _pad: [0.0; 3],
+            near: if near.is_finite() { near } else { 0.0 },
+            _pad: [0.0; 2],
         })
     }
 

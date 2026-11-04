@@ -79,5 +79,8 @@ mod gpu_tests;
 #[path = "lights_tests.rs"]
 mod lights_tests;
 #[cfg(test)]
+#[path = "score_tests.rs"]
+mod score_tests;
+#[cfg(test)]
 #[path = "spheres_tests.rs"]
 mod spheres_tests;

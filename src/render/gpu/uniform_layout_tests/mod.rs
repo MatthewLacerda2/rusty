@@ -159,6 +159,7 @@ fn local_light_matches_wgsl_layout() {
         ("outer_cone", offset_of!(LocalLight, outer_cone)),
         ("shadow", offset_of!(LocalLight, shadow)),
         ("shadow_fade", offset_of!(LocalLight, shadow_fade)),
+        ("near", offset_of!(LocalLight, near)),
     ];
     assert_layout("LocalLight", &pairs, size_of::<LocalLight>());
 }

@@ -447,7 +447,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         if (skip_baked && light.baked > 0.5) {
             continue;
         }
-        let radiance = local_light_radiance(light, in.world_position);
+        let radiance = local_light_radiance(light, in.world_position, 0.0);
         if (all(radiance == vec3<f32>(0.0))) {
             continue;
         }
