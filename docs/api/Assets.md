@@ -183,8 +183,8 @@ them. A source rig's bone name there is simply not in the skeleton (a mask ignor
 `SetRootBone` warns). Root motion reads the target's root bone, so it follows the
 scaled hips when that bone is the mapped `Hips`; a root bone above the hips that the
 map doesn't cover is not driven by a borrowed clip. On a Z-up Blender export (an
-`Armature` node turned and scaled above the mesh) root motion itself, own clips
-included, loses the travel today (#1822); the retargeted pose is right.
+`Armature` node turned and scaled above the mesh) root motion is measured in the
+model's Y-up space, so own and borrowed clips travel in metres alike (#1822).
 
 An explicit `bones` entry takes its joint from whichever bone a guess gave it to: that
 bone is guessed again over the joints left, and the problem list says so (`'leg.L'` named
