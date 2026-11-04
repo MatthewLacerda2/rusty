@@ -5,10 +5,11 @@
 //! index + scale/offset).
 //!
 //! **What is uploaded** (`load`): a `.ktx2` page as stored, BC6H irradiance and a
-//! BC7 direction page with their mips, when the GPU has BC compression; else (or
-//! for a `.png` page of a scene baked before #1694) the RGBM PNG beside it, decoded
-//! on the CPU to linear `Rgba16Float` with the same mips. Either way the shader
-//! reads linear light and picks its level from the UV's screen derivatives.
+//! BC7 direction page with their mips, when the GPU has BC compression; else the
+//! RGBM PNG beside it, decoded on the CPU to linear `Rgba16Float` with the same
+//! mips. A `.png` page of a scene baked before #1694 uploads its one level: its
+//! layout bleeds under mips. Either way the shader reads linear light and picks
+//! its level from the UV's screen derivatives.
 //!
 //! **Where it loads.** A page list is read on a worker thread in a windowed
 //! renderer, so a scene load never stalls a frame on disk; the frames before it

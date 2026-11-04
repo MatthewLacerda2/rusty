@@ -83,7 +83,8 @@ The two individual verbs stay for a script that wants only one of them.
   verb blocks its caller until it returns, so a `play` scenario or a `session-mcp` call
   cannot poll, and instead the bake prints a line to **stderr** at each step and every
   5 s within one, with an ETA from the step's own rate, then the total time:
-  `[Lighting] lightmaps 41% (612/1501 meshes, 3.1M/7.6M texels), ~38 min left`, then
+  `[Lighting] lightmaps 41% (612/1501 meshes, 3.1M/7.6M texels), ~38 min left`, then a
+  line per lightmap page encoded (`lightmap pages 50% (6/12 pages encoded), ~30 s left`),
   `light probes, bounce 2 of at most 5: …, ~1 min left in this bounce` and
   `reflection probes 19% (3/16 probes), ~4 min left`, and `[Lighting] done in 1 h 4 min`.
   The lightmap step's first line and the total also go to the console (so `play`'s
@@ -160,8 +161,9 @@ afterward to persist the baked SH (`<scene>.lighting.json`) and the cubemap path
 light, the sky, emissive surfaces, and the direct light of `Baked` lights (see the light
 **Mode** in [`Light`](Light.md)). It is the lightmap half of Generate Lighting; the
 editor's button runs this exact path as its first step, in the background (#808): the
-window stays live, a progress bar counts texels done, and **Cancel** stops the bake and
-keeps the previous lightmaps. The result is applied when the bake finishes,
+window stays live, a progress bar counts texels done and then the pages it encodes
+("Encoding page k of n"), and **Cancel** stops the bake, during the trace or the encode,
+and keeps the previous lightmaps. The result is applied when the bake finishes,
 byte-identical to the script verb's; a bake whose scene was swapped out meanwhile is
 dropped. The script verb itself stays synchronous. An argument left out takes the
 scene's lighting settings (above), whose defaults are the ones listed here.
@@ -218,7 +220,8 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   packed exactly like its colour page. The texture importer leaves that folder alone
   (`Assets.md`). Encoding takes time: about 6 s a 2048² page pair on four cores, after
   the trace (a level-sized bake of six page pairs, about 45 s); the editor's Generate Lighting
-  encodes on its worker, so the window stays live. The scene stores the page list and, per entity, its page and
+  encodes the pages and compresses their PNGs on its worker and only writes the finished
+  files on the frame, so the window stays live. The scene stores the page list and, per entity, its page and
   scale/offset (Unity's lightmap index + scale/offset), so **save the scene** after
   `Lighting.BakeLightmaps()` to keep them (`Lighting.Generate()` writes them itself). Needs a saved scene path (errors otherwise). `Lighting.ClearLightmaps()`
   drops the references (the files stay until the next bake).
