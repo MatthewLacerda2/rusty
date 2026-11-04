@@ -4,25 +4,20 @@
 //! active camera, blended. Zones themselves are authored through
 //! `AudioReverbZone.*`.
 
-use std::cell::RefCell;
-
 use mlua::Table;
 
 use super::super::reverb_zone::params_table;
 use super::super::{put, Reg};
+use crate::api::ApiCell;
 use crate::audio::AudioMaestro;
 
 /// `GetReverbState`.
-pub(super) fn register_reverb<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    audio: &'scope RefCell<AudioMaestro>,
-) -> Reg {
+pub(super) fn register_reverb(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) -> Reg {
     put(
         table,
         "GetReverbState",
-        scope.create_function(|lua, ()| {
-            let state = audio.borrow().reverb_state();
+        lua.create_function(move |lua, ()| {
+            let state = audio.get(lua)?.borrow().reverb_state();
             let t = params_table(lua, &state.params)?;
             t.set("weight", state.weight)?;
             t.set("zones", state.zones)?;

@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{CameraComponent, ExposureMode, PostProcessingComponent, Tonemap, Wheel};
 use rusty::core::settings::quality::EffectQuality;
 use rusty::core::settings::GraphicsSettings;
@@ -107,14 +108,17 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let (lua_scene, lua_id) = scene_with_volume_and_cam();
     let (op_scene, op_id) = scene_with_volume_and_cam();
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
-    let app = RefCell::default();
+    let app = Rc::default();
 
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::graphics::register(&lua, s, &lua_scene, &quality, &app).unwrap();
-        lua.load(GRAPHICS_SCRIPT).exec().unwrap();
-        Ok(())
-    })?;
+    rusty::api::graphics::register(
+        &lua,
+        bind(&lua, &lua_scene),
+        bind(&lua, &quality),
+        bind(&lua, &app),
+    )
+    .unwrap();
+    lua.load(GRAPHICS_SCRIPT).exec().unwrap();
 
     apply_graphics_ops(&op_scene, op_id);
 

@@ -3,8 +3,10 @@
 //! they wrote, and read neutral without a volume; so does the Color Lookup (#1441).
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::CameraComponent;
 use rusty::scene::authoring::default_post_processing;
 use rusty::scene::Scene;
@@ -12,14 +14,16 @@ use rusty::scene::Scene;
 /// Run `script` against `scene` with the `Graphics` namespace registered.
 fn run(scene: Scene, script: &str) -> Scene {
     let lua = Lua::new();
-    let (scene, graphics, app) = (RefCell::new(scene), RefCell::default(), RefCell::default());
-    lua.scope(|s| {
-        rusty::api::graphics::register(&lua, s, &scene, &graphics, &app).unwrap();
-        lua.load(script).exec().unwrap();
-        Ok(())
-    })
+    let (scene, graphics, app) = (Rc::new(RefCell::new(scene)), Rc::default(), Rc::default());
+    rusty::api::graphics::register(
+        &lua,
+        bind(&lua, &scene),
+        bind(&lua, &graphics),
+        bind(&lua, &app),
+    )
     .unwrap();
-    scene.into_inner()
+    lua.load(script).exec().unwrap();
+    scene.take()
 }
 
 #[test]

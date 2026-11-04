@@ -5,8 +5,10 @@
 //! bake generation, which a neighbouring test's bake moves (#794).
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::core::settings::GraphicsSettings;
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
@@ -17,7 +19,7 @@ use super::super::fog::scene::{shot, srgb8, wall_scene};
 const NAME: &str = "t671_hurt";
 
 /// A grey wall whose volume runs a red damage vignette that does not pulse.
-fn scene() -> RefCell<Scene> {
+fn scene() -> Rc<RefCell<Scene>> {
     let json = format!(
         r#"{{"pass":"postfx","name":"{NAME}","blocks":[{{"id":"damage_vignette","params":{{"color":[1,0,0]}}}}]}}"#
     );
@@ -35,7 +37,7 @@ fn scene() -> RefCell<Scene> {
         .unwrap()
         .custom_effects
         .names = vec![NAME.into()];
-    RefCell::new(scene)
+    Rc::new(RefCell::new(scene))
 }
 
 /// When the module and its params sidecar were last written: a bake rewrites both.
@@ -47,18 +49,31 @@ fn written() -> impl PartialEq + std::fmt::Debug {
 }
 
 /// Run `script` against the `Graphics` namespace.
-fn run(scene: &RefCell<Scene>, script: &str) {
-    let (lua, quality) = (Lua::new(), RefCell::new(GraphicsSettings::default()));
-    let app = RefCell::default();
-    lua.scope(|s| {
-        rusty::api::graphics::register(&lua, s, scene, &quality, &app).unwrap();
+fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
+    let (lua, quality) = (
+        Lua::new(),
+        Rc::new(RefCell::new(GraphicsSettings::default())),
+    );
+    let app = Rc::default();
+    crate::lua::attempt(|| {
+        rusty::api::graphics::register(
+            &lua,
+            bind(&lua, scene),
+            bind(&lua, &quality),
+            bind(&lua, &app),
+        )
+        .unwrap();
         lua.load(script).exec()
     })
     .expect("script");
 }
 
 /// Set the intensity from a script, render, and return the top-left corner pixel.
-fn corner_at(host: &mut CaptureHost, scene: &RefCell<Scene>, intensity: f32) -> Option<[u8; 3]> {
+fn corner_at(
+    host: &mut CaptureHost,
+    scene: &Rc<RefCell<Scene>>,
+    intensity: f32,
+) -> Option<[u8; 3]> {
     run(
         scene,
         &format!(r#"Graphics.SetPostParam("damage_vignette.intensity", {intensity})"#),

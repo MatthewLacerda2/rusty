@@ -2,8 +2,10 @@
 //! lens ops (#1439): the same writes through both reach the same component.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::components::{CameraComponent, PostProcessingComponent};
 use rusty::scene::authoring::{default_post_processing, rendering::post_processing as vc_ops};
 use rusty::scene::Scene;
@@ -48,11 +50,17 @@ fn apply_ops(vc: &mut PostProcessingComponent) {
 #[test]
 fn lens_api_and_shared_op_converge() {
     let (lua_scene, id) = scene();
-    let lua_scene = RefCell::new(lua_scene);
-    let (graphics, app) = (RefCell::default(), RefCell::default());
+    let lua_scene = Rc::new(RefCell::new(lua_scene));
+    let (graphics, app) = (Rc::default(), Rc::default());
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::graphics::register(&lua, s, &lua_scene, &graphics, &app).unwrap();
+    crate::lua::attempt(|| {
+        rusty::api::graphics::register(
+            &lua,
+            bind(&lua, &lua_scene),
+            bind(&lua, &graphics),
+            bind(&lua, &app),
+        )
+        .unwrap();
         lua.load(SCRIPT).exec()
     })
     .unwrap();

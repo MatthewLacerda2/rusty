@@ -66,7 +66,7 @@ struct MaterialData {
     // Thin translucency: rgb colour * amount, w the amount.
     transmission: vec4<f32>,
     // 1 when the surface traces screen-space reflections (#1570) where the camera
-    // marches (`camera.stack.z`).
+    // marches (`camera.ssr.x`).
     receive_ssr: u32,
     surface_pad_a: u32,
     surface_pad_b: u32,

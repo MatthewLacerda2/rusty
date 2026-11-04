@@ -9,20 +9,18 @@
 //! Enum values travel as their names (case-insensitive; unknown names ignored).
 //! The placed rects are read with `UI.GetRect`.
 
-use std::cell::RefCell;
-
 use glam::{Vec2, Vec4};
 use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::{
     LayoutConstraint, LayoutCorner, LayoutGroupComponent, LayoutKind, TextAlignment,
 };
 use crate::scene::authoring::ui::layout::group as ops;
 use crate::scene::Scene;
 
-type Cell<'s> = &'s RefCell<Scene>;
 type G = LayoutGroupComponent;
 type NameGet = fn(&G) -> &'static str;
 type NameSet = fn(&mut G, &str);
@@ -68,79 +66,66 @@ const NAMES: [(&str, NameGet, NameSet); 4] = [
 ];
 
 /// Register the `LayoutGroup` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: Cell<'scope>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     for (suffix, get, set) in NAMES {
-        pair(scope, &t, scene, suffix, get, move |g, n: String| {
-            set(g, &n)
-        })?;
+        pair(lua, &t, scene, suffix, get, move |g, n: String| set(g, &n))?;
     }
-    register_numbers(scope, &t, scene)?;
-    register_flags(scope, &t, scene)?;
+    register_numbers(lua, &t, scene)?;
+    register_flags(lua, &t, scene)?;
     lua.globals()
         .set("LayoutGroup", t)
         .map_err(|e| e.to_string())
 }
 
 /// `Get/SetPadding`, `Get/SetSpacing`, `Get/SetCellSize`, `Get/SetConstraintCount`.
-fn register_numbers<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: Cell<'scope>,
-) -> Reg {
+fn register_numbers(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Lbrt = (f32, f32, f32, f32);
     let padding = |g: &G| (g.padding.x, g.padding.y, g.padding.z, g.padding.w);
     let set_padding = |g: &mut G, (l, b, r, t): Lbrt| ops::set_padding(g, Vec4::new(l, b, r, t));
-    pair(scope, t, scene, "Padding", padding, set_padding)?;
+    pair(lua, t, scene, "Padding", padding, set_padding)?;
     let spacing = |g: &G| (g.spacing.x, g.spacing.y);
     let set_spacing = |g: &mut G, (x, y): (f32, f32)| ops::set_spacing(g, Vec2::new(x, y));
-    pair(scope, t, scene, "Spacing", spacing, set_spacing)?;
+    pair(lua, t, scene, "Spacing", spacing, set_spacing)?;
     let cell = |g: &G| (g.cell_size.x, g.cell_size.y);
     let set_cell = |g: &mut G, (x, y): (f32, f32)| ops::set_cell_size(g, Vec2::new(x, y));
-    pair(scope, t, scene, "CellSize", cell, set_cell)?;
+    pair(lua, t, scene, "CellSize", cell, set_cell)?;
     let count = |g: &G| g.constraint_count;
     let set_count = |g: &mut G, n: u32| ops::set_constraint_count(g, n);
-    pair(scope, t, scene, "ConstraintCount", count, set_count)
+    pair(lua, t, scene, "ConstraintCount", count, set_count)
 }
 
 /// `Get/SetControlChildSize`, `Get/SetChildForceExpand` (width, height) and
 /// `Get/SetStartVertical`.
-fn register_flags<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: Cell<'scope>,
-) -> Reg {
+fn register_flags(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let control = |g: &G| (g.control_child_width, g.control_child_height);
     let set_control = |g: &mut G, (w, h): (bool, bool)| ops::set_control_child_size(g, w, h);
-    pair(scope, t, scene, "ControlChildSize", control, set_control)?;
+    pair(lua, t, scene, "ControlChildSize", control, set_control)?;
     let expand = |g: &G| (g.child_force_expand_width, g.child_force_expand_height);
     let set_expand = |g: &mut G, (w, h): (bool, bool)| ops::set_child_force_expand(g, w, h);
-    pair(scope, t, scene, "ChildForceExpand", expand, set_expand)?;
+    pair(lua, t, scene, "ChildForceExpand", expand, set_expand)?;
     let vertical = |g: &G| g.start_vertical;
     let set_vertical = |g: &mut G, v: bool| ops::set_start_vertical(g, v);
-    pair(scope, t, scene, "StartVertical", vertical, set_vertical)
+    pair(lua, t, scene, "StartVertical", vertical, set_vertical)
 }
 
 /// Register `Get<suffix>(id)` → `get(group)` (Lua's defaults without a group) and
 /// `Set<suffix>(id, …)` → `set(group, …)` (a no-op without one).
-fn pair<'scope, R, A>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn pair<R, A>(
+    lua: &mlua::Lua,
     t: &Table,
-    scene: Cell<'scope>,
+    scene: ApiCell<Scene>,
     suffix: &str,
-    get: impl Fn(&G) -> R + 'scope,
-    set: impl Fn(&mut G, A) + 'scope,
+    get: impl Fn(&G) -> R + 'static,
+    set: impl Fn(&mut G, A) + 'static,
 ) -> Reg
 where
     R: IntoLuaMulti + Default,
     A: FromLuaMulti,
 {
-    let f = scope.create_function(move |_, id: EntityArg| {
+    let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(scene
+            .get(lua)?
             .borrow()
             .world
             .layout_group(id.read())
@@ -149,10 +134,10 @@ where
     });
     put(t, &format!("Get{suffix}"), f)?;
     let verb = format!("Set{suffix}");
-    let f = scope.create_function(move |lua, (id, rest): (EntityArg, mlua::MultiValue)| {
+    let f = lua.create_function(move |lua, (id, rest): (EntityArg, mlua::MultiValue)| {
         let id = id.live("LayoutGroup", &verb)?;
         let value = A::from_lua_multi(rest, lua)?;
-        if let Some(mut g) = scene.borrow_mut().world.layout_group_mut(id) {
+        if let Some(mut g) = scene.get(lua)?.borrow_mut().world.layout_group_mut(id) {
             set(&mut g, value);
         }
         Ok(())

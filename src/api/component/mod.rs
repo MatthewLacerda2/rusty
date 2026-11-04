@@ -28,13 +28,12 @@ mod set_tests;
 #[cfg(test)]
 mod since_get_tests;
 
-use std::cell::RefCell;
-
 use mlua::{Lua, Table};
 use serde_json::Value;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring;
 use crate::scene::authoring::fields::{self as kinds, Kind, Skip};
 use crate::scene::Scene;
@@ -49,16 +48,12 @@ fn err(msg: String) -> mlua::Error {
 }
 
 /// Register the `Component` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
-    let get = scope.create_function(move |lua, (id, name): (EntityArg, String)| {
+    let get = lua.create_function(move |lua, (id, name): (EntityArg, String)| {
         let id = id.read();
         let kind = kinds::find(&name).map_err(err)?;
-        let value = (kind.read)(&scene.borrow().world, id)
+        let value = (kind.read)(&scene.get(lua)?.borrow().world, id)
             .transpose()
             .map_err(err)?;
         let Some(value) = value else {
@@ -71,7 +66,7 @@ pub fn register<'scope>(
         Ok(table)
     });
     put(&t, "Get", get)?;
-    let set = scope.create_function(move |lua, (id, name, fields): (EntityArg, String, Table)| {
+    let set = lua.create_function(move |lua, (id, name, fields): (EntityArg, String, Table)| {
         let id = id.live("Component", "Set")?;
         let kind = kinds::find(&name).map_err(err)?;
         let got = recall(&fields, id, kind);
@@ -87,7 +82,7 @@ pub fn register<'scope>(
                 )))
             }
         };
-        let written = (kind.write)(&mut scene.borrow_mut().world, id, &changes, skip)
+        let written = (kind.write)(&mut scene.get(lua)?.borrow_mut().world, id, &changes, skip)
             .map_err(|e| err(format!("Component.Set: {}: {e}", kind.name)))?;
         if !written {
             return Err(err(format!(
@@ -98,7 +93,7 @@ pub fn register<'scope>(
         Ok(())
     });
     put(&t, "Set", set)?;
-    let fields = scope.create_function(|lua, name: String| {
+    let fields = lua.create_function(|lua, name: String| {
         let kind = kinds::find(&name).map_err(err)?;
         fields_table(lua, kind)
     });

@@ -1,6 +1,7 @@
 //! Each setter writes the scene the editor reads, and the scene round-trips it.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use rusty::components::CameraComponent;
 use rusty::scene::Scene;
@@ -17,7 +18,7 @@ fn save_load(scene: &Scene, name: &str) -> Scene {
 
 #[test]
 fn layer_names_set_from_lua_and_persist() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     with_api(&scene, |lua| {
         lua.load(
             r#"
@@ -42,7 +43,7 @@ fn layer_names_set_from_lua_and_persist() {
 
 #[test]
 fn ignore_layer_collision_is_symmetric_and_persists() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     with_api(&scene, |lua| {
         lua.load(
             r#"
@@ -78,7 +79,7 @@ fn culling_mask_set_from_lua_and_persists() {
         .world
         .set_camera(cam, Some(CameraComponent::default()));
     let bare = scene.add_entity("Bare".to_string());
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         let code = format!(
             r#"

@@ -9,6 +9,7 @@ use super::fixture::{
     frame, linear, pixel, renderer, rgb, tuned, Surface, MIRROR, RED, REFLECTING,
 };
 use crate::render::ibl::ktx2_encode::encode_cubemap;
+use crate::render::ibl::reflection_prefilter::source::encode_face;
 use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
 use crate::scene::{FogMode, Scene};
 
@@ -75,13 +76,12 @@ fn gpu_a_gold_mirrors_hit_is_tinted_by_its_f0() {
     assert!(gained[2] < gained[0] * 0.7, "the hit is tinted by F0");
 }
 
-/// The probe's texel, sRGB: linear [`PROBE_LINEAR`].
-const PROBE: u8 = 128;
+/// The probe's texel, linear radiance (a half float holds it to 0.2158).
 const PROBE_LINEAR: f32 = 0.2158;
 
-/// A one-mip cube file, every texel [`PROBE`] grey; returns its path.
+/// A one-mip cube file, every texel [`PROBE_LINEAR`] grey; returns its path.
 fn white_cube() -> String {
-    let face = vec![PROBE; 4 * 4 * 4];
+    let face = encode_face(&[Vec3::splat(PROBE_LINEAR); 4 * 4]);
     let cube = PrefilteredCubemap {
         mips: vec![std::array::from_fn(|_| face.clone())],
         base_size: 4,

@@ -1,6 +1,7 @@
 //! `Line`: points, flags and style through the API, and the scene round-trip.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use rusty::components::{LineComponent, TextureMode};
@@ -18,7 +19,7 @@ fn points_write_through_and_read_back() {
         id,
         ComponentKind::parse("line").unwrap()
     ));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "Line.SetPositions({id}, {{{{0, 0, 0}}, {{1, 2, 3}}, {{0/0, 0, 0}}, {{4, 5, 6}}}})
@@ -64,7 +65,7 @@ fn style_verbs_share_one_surface_and_the_line_round_trips() {
     let mut scene = Scene::new();
     let id = scene.add_entity("Arc".to_string());
     scene.world.set_line(id, Some(LineComponent::default()));
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     with_api(&scene, |lua| {
         lua.load(format!(
             "Line.SetWidthCurve({id}, {{{{0, 0.25}}, {{0.5, -1}}, {{1, 0.125}}}})

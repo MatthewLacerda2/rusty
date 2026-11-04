@@ -4,8 +4,10 @@
 //! infinity raise a Lua error, and a missing animator reads `nil`.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::scene::Scene;
 use rusty::scripting::ConsoleLogs;
 
@@ -27,12 +29,12 @@ fn set_speed_writes_the_component_multiplier() {
 
 #[test]
 fn add_component_starts_at_authored_speed() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let id = scene.borrow_mut().add_entity("Rig".to_string());
-    let path = RefCell::new(None);
+    let path = Rc::new(RefCell::new(None));
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::scene::register(&lua, s, &scene, &path).unwrap();
+    crate::lua::attempt(|| {
+        rusty::api::scene::register(&lua, bind(&lua, &scene), bind(&lua, &path)).unwrap();
         lua.load(format!("Scene.AddComponent({id}, 'Animator')"))
             .exec()
     })
@@ -61,7 +63,7 @@ fn non_finite_speeds_raise_and_leave_the_speed_alone() {
 
 #[test]
 fn a_missing_animator_reads_nil_and_ignores_writes() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let id = scene.borrow_mut().add_entity("Bare".to_string());
     assert_eq!(run(&scene, &format!("Animator.SetSpeed({id}, 2)")), "nil");
     assert_eq!(run(&scene, &format!("Animator.GetSpeed({id})")), "nil");
@@ -69,11 +71,11 @@ fn a_missing_animator_reads_nil_and_ignores_writes() {
 }
 
 /// Run `script` against `scene`, returning the Lua error's message on failure.
-fn eval(scene: &RefCell<Scene>, script: &str) -> Result<(), String> {
-    let console = RefCell::new(ConsoleLogs::new());
+fn eval(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
+    let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::animator::register(&lua, s, scene, &console).unwrap();
+    crate::lua::attempt(|| {
+        rusty::api::animator::register(&lua, bind(&lua, scene), bind(&lua, &console)).unwrap();
         lua.load(script).exec()
     })
     .map_err(|e| e.to_string())

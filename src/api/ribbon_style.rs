@@ -11,6 +11,7 @@ use mlua::Table;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::asset::MapRef;
 use crate::components::{ParticleBlend, RibbonStyle, TextureMode};
 use crate::core::curve::{Curve, Gradient};
@@ -64,41 +65,37 @@ impl Ribbon {
 }
 
 /// Register the shared style verbs onto `t` for `which` component.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: &'scope RefCell<Scene>,
-    which: Ribbon,
-) -> Reg {
-    register_width(scope, t, scene, which)?;
-    register_color(scope, t, scene, which)?;
-    register_look(scope, t, scene, which)
+pub(super) fn register(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>, which: Ribbon) -> Reg {
+    register_width(lua, t, scene, which)?;
+    register_color(lua, t, scene, which)?;
+    register_look(lua, t, scene, which)
 }
 
 /// `GetWidth(id, t?)`, `SetWidth(id, start, end?)`, `SetWidthCurve(id, {{t, w}, …})`.
-fn register_width<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: &'scope RefCell<Scene>,
-    which: Ribbon,
-) -> Reg {
-    let f = scope.create_function(move |_, (id, at): (EntityArg, Option<f32>)| {
+fn register_width(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>, which: Ribbon) -> Reg {
+    let f = lua.create_function(move |lua, (id, at): (EntityArg, Option<f32>)| {
         Ok(which
-            .read(scene, id.read(), |s| s.width.evaluate(at.unwrap_or(0.0)))
+            .read(&*scene.get(lua)?, id.read(), |s| {
+                s.width.evaluate(at.unwrap_or(0.0))
+            })
             .unwrap_or(0.0))
     });
     put(t, "GetWidth", f)?;
-    let f = scope.create_function(move |_, (id, start, end): (EntityArg, f32, Option<f32>)| {
-        let id = id.live(which.name(), "SetWidth")?;
-        let curve = Curve::linear(start, end.unwrap_or(start));
-        which.write(scene, id, |s| ops::set_width(s, curve));
-        Ok(())
-    });
+    let f = lua.create_function(
+        move |lua, (id, start, end): (EntityArg, f32, Option<f32>)| {
+            let id = id.live(which.name(), "SetWidth")?;
+            let curve = Curve::linear(start, end.unwrap_or(start));
+            which.write(&*scene.get(lua)?, id, |s| ops::set_width(s, curve));
+            Ok(())
+        },
+    );
     put(t, "SetWidth", f)?;
-    let f = scope.create_function(move |_, (id, keys): (EntityArg, Vec<[f32; 2]>)| {
+    let f = lua.create_function(move |lua, (id, keys): (EntityArg, Vec<[f32; 2]>)| {
         let id = id.live(which.name(), "SetWidthCurve")?;
         let pairs: Vec<(f32, f32)> = keys.iter().map(|&[k, v]| (k, v)).collect();
-        which.write(scene, id, |s| ops::set_width(s, Curve::from_keys(&pairs)));
+        which.write(&*scene.get(lua)?, id, |s| {
+            ops::set_width(s, Curve::from_keys(&pairs))
+        });
         Ok(())
     });
     put(t, "SetWidthCurve", f)
@@ -106,29 +103,26 @@ fn register_width<'scope>(
 
 /// `GetColor(id, t?)` → r, g, b, a; `SetColor(id, r, g, b, a?)`;
 /// `SetColors(id, start rgba, end rgba)`.
-fn register_color<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: &'scope RefCell<Scene>,
-    which: Ribbon,
-) -> Reg {
-    let f = scope.create_function(move |_, (id, at): (EntityArg, Option<f32>)| {
-        let c = which.read(scene, id.read(), |s| s.color.evaluate(at.unwrap_or(0.0)));
+fn register_color(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>, which: Ribbon) -> Reg {
+    let f = lua.create_function(move |lua, (id, at): (EntityArg, Option<f32>)| {
+        let c = which.read(&*scene.get(lua)?, id.read(), |s| {
+            s.color.evaluate(at.unwrap_or(0.0))
+        });
         let [r, g, b, a] = c.unwrap_or([0.0; 4]);
         Ok::<Rgba, _>((r, g, b, a))
     });
     put(t, "GetColor", f)?;
-    let f = scope.create_function(move |_, (id, r, g, b, a): IdColor| {
+    let f = lua.create_function(move |lua, (id, r, g, b, a): IdColor| {
         let id = id.live(which.name(), "SetColor")?;
         let gradient = Gradient::solid([r, g, b, a.unwrap_or(1.0)]);
-        which.write(scene, id, |s| ops::set_color(s, gradient));
+        which.write(&*scene.get(lua)?, id, |s| ops::set_color(s, gradient));
         Ok(())
     });
     put(t, "SetColor", f)?;
-    let f = scope.create_function(move |_, c: IdColors| {
+    let f = lua.create_function(move |lua, c: IdColors| {
         let id = c.0.live(which.name(), "SetColors")?;
         let gradient = Gradient::linear([c.1, c.2, c.3, c.4], [c.5, c.6, c.7, c.8]);
-        which.write(scene, id, |s| ops::set_color(s, gradient));
+        which.write(&*scene.get(lua)?, id, |s| ops::set_color(s, gradient));
         Ok(())
     });
     put(t, "SetColors", f)
@@ -136,46 +130,43 @@ fn register_color<'scope>(
 
 /// `Get/SetTexture` (a path, `nil` clears), `Get/SetTextureMode` (`"Stretch"` /
 /// `"Tile"`), `Get/SetBlend` (`"Alpha"` / `"Additive"`). Unknown names are ignored.
-fn register_look<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: &'scope RefCell<Scene>,
-    which: Ribbon,
-) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
+fn register_look(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>, which: Ribbon) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(which
-            .read(scene, id.read(), |s| {
+            .read(&*scene.get(lua)?, id.read(), |s| {
                 s.texture.as_ref().map(MapRef::to_string)
             })
             .flatten())
     });
     put(t, "GetTexture", f)?;
-    let f = scope.create_function(move |_, (id, path): (EntityArg, Option<String>)| {
+    let f = lua.create_function(move |lua, (id, path): (EntityArg, Option<String>)| {
         let id = id.live(which.name(), "SetTexture")?;
-        which.write(scene, id, |s| ops::set_texture(s, path.unwrap_or_default()));
+        which.write(&*scene.get(lua)?, id, |s| {
+            ops::set_texture(s, path.unwrap_or_default())
+        });
         Ok(())
     });
     put(t, "SetTexture", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(which.read(scene, id.read(), |s| s.texture_mode.name()))
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(which.read(&*scene.get(lua)?, id.read(), |s| s.texture_mode.name()))
     });
     put(t, "GetTextureMode", f)?;
-    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+    let f = lua.create_function(move |lua, (id, name): (EntityArg, String)| {
         let id = id.live(which.name(), "SetTextureMode")?;
         if let Some(mode) = TextureMode::parse(&name) {
-            which.write(scene, id, |s| ops::set_texture_mode(s, mode));
+            which.write(&*scene.get(lua)?, id, |s| ops::set_texture_mode(s, mode));
         }
         Ok(())
     });
     put(t, "SetTextureMode", f)?;
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(which.read(scene, id.read(), |s| s.blend.name()))
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(which.read(&*scene.get(lua)?, id.read(), |s| s.blend.name()))
     });
     put(t, "GetBlend", f)?;
-    let f = scope.create_function(move |_, (id, name): (EntityArg, String)| {
+    let f = lua.create_function(move |lua, (id, name): (EntityArg, String)| {
         let id = id.live(which.name(), "SetBlend")?;
         if let Some(blend) = ParticleBlend::parse(&name) {
-            which.write(scene, id, |s| ops::set_blend(s, blend));
+            which.write(&*scene.get(lua)?, id, |s| ops::set_blend(s, blend));
         }
         Ok(())
     });

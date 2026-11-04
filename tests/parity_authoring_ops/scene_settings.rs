@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::core::settings::GraphicsSettings;
 use rusty::scene::authoring::environment as env_ops;
 use rusty::scene::authoring::fog as fog_ops;
@@ -17,10 +18,16 @@ fn fog_api_and_shared_op_converge_without_a_volume() -> Result<(), Box<dyn std::
     // Scene fog is scene-level: a bare scene (no post-processing volume) takes it.
     let lua_scene = Rc::new(RefCell::new(Scene::new()));
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
-    let app = RefCell::default();
+    let app = Rc::default();
     let lua = Lua::new();
-    let read: (String, f32, f32, f32, f32) = lua.scope(|s| {
-        rusty::api::graphics::register(&lua, s, &lua_scene, &quality, &app).unwrap();
+    let read: (String, f32, f32, f32, f32) = crate::lua::attempt(|| {
+        rusty::api::graphics::register(
+            &lua,
+            bind(&lua, &lua_scene),
+            bind(&lua, &quality),
+            bind(&lua, &app),
+        )
+        .unwrap();
         lua.load(
             r#"
             Graphics.SetFogMode("ExponentialSquared")
@@ -64,10 +71,10 @@ fn fog_api_and_shared_op_converge_without_a_volume() -> Result<(), Box<dyn std::
 
 #[test]
 fn environment_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    let lua_scene = RefCell::new(Scene::new());
+    let lua_scene = Rc::new(RefCell::new(Scene::new()));
     let lua = Lua::new();
-    let read: (String, f32, f32, String) = lua.scope(|s| {
-        rusty::api::lighting::register(&lua, s, &lua_scene).unwrap();
+    let read: (String, f32, f32, String) = crate::lua::attempt(|| {
+        rusty::api::lighting::register(&lua, bind(&lua, &lua_scene)).unwrap();
         lua.load(
             r#"
             Lighting.SetSkybox("sky/sunset.hdr")

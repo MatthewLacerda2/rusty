@@ -11,40 +11,39 @@
 //! Backed by the scripting layer's [`TimerScheduler`]; the scheduler is stepped
 //! once per fixed tick right after `Update`, so everything here is deterministic.
 
-use std::cell::RefCell;
-
 use mlua::{Function, Lua, MultiValue, Table, Value};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::Scene;
 use crate::scripting::{require_sim_vm, wait, ConsoleLogs, Target, TimerScheduler, Wait, Work};
 
 /// Register the `Timer` namespace onto `lua`.
-pub fn register<'scope>(
+pub fn register(
     lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    timers: &'scope RefCell<TimerScheduler>,
-    console: &'scope RefCell<ConsoleLogs>,
+    scene: ApiCell<Scene>,
+    timers: ApiCell<TimerScheduler>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
-    register_invoke(scope, &table, scene, timers)?;
-    register_handles(scope, &table, timers)?;
-    register_coroutines(scope, &table, scene, timers, console)?;
+    register_invoke(lua, &table, scene, timers)?;
+    register_handles(lua, &table, timers)?;
+    register_coroutines(lua, &table, scene, timers, console)?;
     register_waits(lua, &table)?;
     lua.globals().set("Timer", table).map_err(|e| e.to_string())
 }
 
 /// `Invoke` / `InvokeRepeating`, then the queries.
-fn register_invoke<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_invoke(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    timers: &'scope RefCell<TimerScheduler>,
+    scene: ApiCell<Scene>,
+    timers: ApiCell<TimerScheduler>,
 ) -> Reg {
     let schedule = move |lua: &Lua, id: u32, target: Value, delay: f64, interval: Option<f64>| {
         let verb = ["Timer.Invoke", "Timer.InvokeRepeating"][usize::from(interval.is_some())];
+        let (scene, timers) = (scene.get(lua)?, timers.get(lua)?);
         require_active(&scene.borrow(), id)?;
         let target = to_target(lua, target, verb)?;
         let mut t = timers.borrow_mut();
@@ -60,7 +59,7 @@ fn register_invoke<'scope>(
     put(
         table,
         "Invoke",
-        scope.create_function(move |lua, (id, target, delay): (EntityArg, Value, f64)| {
+        lua.create_function(move |lua, (id, target, delay): (EntityArg, Value, f64)| {
             let id = id.live("Timer", "Invoke")?;
             schedule(lua, id, target, delay, None)
         }),
@@ -68,7 +67,7 @@ fn register_invoke<'scope>(
     put(
         table,
         "InvokeRepeating",
-        scope.create_function(
+        lua.create_function(
             move |lua, (id, target, delay, every): (EntityArg, Value, f64, f64)| {
                 let id = id.live("Timer", "InvokeRepeating")?;
                 if every <= 0.0 {
@@ -78,104 +77,108 @@ fn register_invoke<'scope>(
             },
         ),
     )?;
-    register_invoke_queries(scope, table, timers)
+    register_invoke_queries(lua, table, timers)
 }
 
 /// `CancelInvoke` / `IsInvoking`.
-fn register_invoke_queries<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    timers: &'scope RefCell<TimerScheduler>,
-) -> Reg {
+fn register_invoke_queries(lua: &mlua::Lua, table: &Table, timers: ApiCell<TimerScheduler>) -> Reg {
     put(
         table,
         "CancelInvoke",
-        scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, Option<String>)| {
             let id = id.live("Timer", "CancelInvoke")?;
-            timers.borrow_mut().cancel_invokes(id, name.as_deref());
+            timers
+                .get(lua)?
+                .borrow_mut()
+                .cancel_invokes(id, name.as_deref());
             Ok(())
         }),
     )?;
     put(
         table,
         "IsInvoking",
-        scope.create_function(|_, (id, name): (EntityArg, Option<String>)| {
-            Ok(timers.borrow().is_invoking(id.read(), name.as_deref()))
+        lua.create_function(move |lua, (id, name): (EntityArg, Option<String>)| {
+            Ok(timers
+                .get(lua)?
+                .borrow()
+                .is_invoking(id.read(), name.as_deref()))
         }),
     )
 }
 
 /// `Cancel` / `IsPending`: the handle-level verbs, for invokes and coroutines alike.
-fn register_handles<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    timers: &'scope RefCell<TimerScheduler>,
-) -> Reg {
+fn register_handles(lua: &mlua::Lua, table: &Table, timers: ApiCell<TimerScheduler>) -> Reg {
     put(
         table,
         "Cancel",
-        scope.create_function(|_, handle: u64| Ok(timers.borrow_mut().cancel(handle))),
+        lua.create_function(move |lua, handle: u64| {
+            Ok(timers.get(lua)?.borrow_mut().cancel(handle))
+        }),
     )?;
     put(
         table,
         "IsPending",
-        scope.create_function(|_, handle: u64| Ok(timers.borrow().get(handle).is_some())),
+        lua.create_function(move |lua, handle: u64| {
+            Ok(timers.get(lua)?.borrow().get(handle).is_some())
+        }),
     )
 }
 
 /// `StartCoroutine` / `StopAllCoroutines`. A started coroutine runs at once, up to
 /// its first yield (Unity's contract), and the scheduler resumes it from there.
-fn register_coroutines<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_coroutines(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    timers: &'scope RefCell<TimerScheduler>,
-    console: &'scope RefCell<ConsoleLogs>,
+    scene: ApiCell<Scene>,
+    timers: ApiCell<TimerScheduler>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
     put(
         table,
         "StartCoroutine",
-        scope.create_function(
+        lua.create_function(
             move |lua, (id, f, args): (EntityArg, Function, MultiValue)| {
-                let id = id.live("Timer", "StartCoroutine")?;
-                require_active(&scene.borrow(), id)?;
-                require_sim_vm(lua, "Timer.StartCoroutine")?;
-                let thread = lua.create_thread(f)?;
-                let handle = timers.borrow_mut().alloc();
-                let mut call = args.into_vec();
-                call.insert(0, Value::Integer(i64::from(id)));
-                let first = match thread.resume::<MultiValue>(MultiValue::from_vec(call)) {
-                    Err(e) => Err(e.to_string()),
-                    Ok(_) if !thread.is_resumable() => return Ok(handle),
-                    Ok(y) => wait::parse(lua, y.into_iter().next().unwrap_or(Value::Nil)),
-                };
-                match first {
-                    Ok(next) => {
-                        let key = lua.create_registry_value(thread)?;
-                        let work = Work::Coroutine { thread: key };
-                        timers.borrow_mut().insert(handle, id, work, next);
+                timers.with(lua, |timers| {
+                    let id = id.live("Timer", "StartCoroutine")?;
+                    require_active(&scene.get(lua)?.borrow(), id)?;
+                    require_sim_vm(lua, "Timer.StartCoroutine")?;
+                    let thread = lua.create_thread(f)?;
+                    let handle = timers.borrow_mut().alloc();
+                    let mut call = args.into_vec();
+                    call.insert(0, Value::Integer(i64::from(id)));
+                    let first = match thread.resume::<MultiValue>(MultiValue::from_vec(call)) {
+                        Err(e) => Err(e.to_string()),
+                        Ok(_) if !thread.is_resumable() => return Ok(handle),
+                        Ok(y) => wait::parse(lua, y.into_iter().next().unwrap_or(Value::Nil)),
+                    };
+                    match first {
+                        Ok(next) => {
+                            let key = lua.create_registry_value(thread)?;
+                            let work = Work::Coroutine { thread: key };
+                            timers.borrow_mut().insert(handle, id, work, next);
+                        }
+                        Err(e) => console
+                            .get(lua)?
+                            .borrow_mut()
+                            .error(format!("[Lua Error] Coroutine on entity {id} failed: {e}")),
                     }
-                    Err(e) => console
-                        .borrow_mut()
-                        .error(format!("[Lua Error] Coroutine on entity {id} failed: {e}")),
-                }
-                Ok(handle)
+                    Ok(handle)
+                })
             },
         ),
     )?;
     put(
         table,
         "StopAllCoroutines",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
             let id = id.live("Timer", "StopAllCoroutines")?;
-            timers.borrow_mut().cancel_coroutines(id);
+            timers.get(lua)?.borrow_mut().cancel_coroutines(id);
             Ok(())
         }),
     )
 }
 
-/// The yield instructions. They borrow no engine state, so they are plain
-/// functions rather than scope-tied ones.
+/// The yield instructions. They read no engine state.
 fn register_waits(lua: &Lua, table: &Table) -> Reg {
     put(
         table,

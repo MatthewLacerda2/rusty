@@ -3,7 +3,10 @@
 
 use std::cell::RefCell;
 
+use mlua::Lua;
+
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::Scene;
 use crate::scripting::{ConsoleLogs, LogLevel};
 
@@ -15,19 +18,20 @@ use super::{put, Reg};
 /// resets the playhead (a clip that resolves late, #1386). A normal call logs
 /// nothing, as Unity's does (#1718), so a weapon restarting its fire clip 20 times a
 /// second cannot flood the console; a name the entity's mesh lacks warns.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register(
+    lua: &Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    console: &'scope RefCell<ConsoleLogs>,
+    scene: ApiCell<Scene>,
+    console: ApiCell<ConsoleLogs>,
 ) -> Reg {
     put(
         table,
         "Play",
-        scope.create_function(|_, (id, clip): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, clip): (EntityArg, String)| {
             let id = id.live("Animator", "Play")?;
+            let (scene, console) = (scene.get(lua)?, console.get(lua)?);
             let mut scene = scene.borrow_mut();
-            warn_unknown_clip(&scene, id, &clip, "Play", console);
+            warn_unknown_clip(&scene, id, &clip, "Play", &console);
             if let Some(mut anim) = scene.world.animator_mut(id) {
                 anim.play(clip);
             }
@@ -38,10 +42,11 @@ pub(super) fn register<'scope>(
     put(
         table,
         "Crossfade",
-        scope.create_function(|_, (id, clip, duration): (EntityArg, String, f32)| {
+        lua.create_function(move |lua, (id, clip, duration): (EntityArg, String, f32)| {
             let id = id.live("Animator", "Crossfade")?;
+            let (scene, console) = (scene.get(lua)?, console.get(lua)?);
             let mut scene = scene.borrow_mut();
-            warn_unknown_clip(&scene, id, &clip, "Crossfade", console);
+            warn_unknown_clip(&scene, id, &clip, "Crossfade", &console);
             if let Some(mut anim) = scene.world.animator_mut(id) {
                 anim.crossfade(clip, duration);
             }

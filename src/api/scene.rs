@@ -22,48 +22,41 @@
 //! mutably (and logs the returned value), so a second borrow here would panic.
 //! Each verb returns its outcome instead, which the REPL echoes.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::ScriptFieldValue;
 use crate::scene::authoring::{self, ComponentKind, Primitive};
 use crate::scene::Scene;
 
 /// Register the `Scene` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-    scene_path: &'scope RefCell<Option<String>>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>, scene_path: ApiCell<Option<String>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_lookup_create(scope, &table, scene)?;
-    register_destroy(scope, &table, scene)?;
-    register_components(scope, &table, scene)?;
-    register_parenting(scope, &table, scene)?;
-    register_save(scope, &table, scene, scene_path)?;
-    crate::api::scene_prefab::register(scope, &table, scene)?;
-    crate::api::scene_load::register(scope, &table, scene, scene_path)?;
-    crate::api::scene_hierarchy::register(scope, &table, scene)?;
+    register_lookup_create(lua, &table, scene)?;
+    register_destroy(lua, &table, scene)?;
+    register_components(lua, &table, scene)?;
+    register_parenting(lua, &table, scene)?;
+    register_save(lua, &table, scene, scene_path)?;
+    crate::api::scene_prefab::register(lua, &table, scene)?;
+    crate::api::scene_load::register(lua, &table, scene, scene_path)?;
+    crate::api::scene_hierarchy::register(lua, &table, scene)?;
 
     lua.globals().set("Scene", table).map_err(|e| e.to_string())
 }
 
 /// `FindEntityByName` + `CreateEntity`.
-fn register_lookup_create<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_lookup_create(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "FindEntityByName",
-        scope.create_function(|_, name: String| Ok(scene.borrow().find_entity_by_name(&name))),
+        lua.create_function(move |lua, name: String| {
+            Ok(scene.get(lua)?.borrow().find_entity_by_name(&name))
+        }),
     )?;
 
     // `CreateEntity(name, [primitive])`: an absent/empty/unknown primitive name
@@ -72,10 +65,10 @@ fn register_lookup_create<'scope>(
     put(
         table,
         "CreateEntity",
-        scope.create_function(|_, (name, primitive): (String, Option<String>)| {
+        lua.create_function(move |lua, (name, primitive): (String, Option<String>)| {
             let primitive = primitive.as_deref().and_then(Primitive::parse);
             Ok(authoring::create_entity(
-                &mut scene.borrow_mut(),
+                &mut scene.get(lua)?.borrow_mut(),
                 &name,
                 primitive,
             ))
@@ -84,20 +77,16 @@ fn register_lookup_create<'scope>(
 }
 
 /// `Deactivate` (Unity's deferred destroy) + `DestroyEntity` (real removal).
-fn register_destroy<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_destroy(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     // Soft delete — mirrors Unity's deferred `Object.Destroy`. The entity stays in
     // the scene but inactive; this is the historical `DestroyEntity` behaviour,
     // renamed so the destructive verb can own the `DestroyEntity` name.
     put(
         table,
         "Deactivate",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
             let id = id.live("Scene", "Deactivate")?;
-            scene.borrow_mut().world.set_active(id, false);
+            scene.get(lua)?.borrow_mut().world.set_active(id, false);
             Ok(())
         }),
     )?;
@@ -115,7 +104,8 @@ fn register_destroy<'scope>(
     put(
         table,
         "DestroyEntity",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Scene", "DestroyEntity")?;
             let mut s = scene.borrow_mut();
             let existed = s.world.contains(id);
@@ -129,19 +119,15 @@ fn register_destroy<'scope>(
 
 /// `AddComponent` / `RemoveComponent` over the Add Component menu's set, and
 /// `AddScript` for its script entries.
-fn register_components<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_components(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "AddComponent",
-        scope.create_function(|_, (id, kind): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, kind): (EntityArg, String)| {
             let id = id.live("Scene", "AddComponent")?;
             let parsed = ComponentKind::parse_or_list(&kind).map_err(mlua::Error::RuntimeError)?;
             Ok(authoring::add_component(
-                &mut scene.borrow_mut(),
+                &mut scene.get(lua)?.borrow_mut(),
                 id,
                 parsed,
             ))
@@ -151,11 +137,11 @@ fn register_components<'scope>(
     put(
         table,
         "RemoveComponent",
-        scope.create_function(|_, (id, kind): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, kind): (EntityArg, String)| {
             let id = id.live("Scene", "RemoveComponent")?;
             let parsed = ComponentKind::parse_or_list(&kind).map_err(mlua::Error::RuntimeError)?;
             Ok(authoring::remove_component(
-                &mut scene.borrow_mut(),
+                &mut scene.get(lua)?.borrow_mut(),
                 id,
                 parsed,
             ))
@@ -165,12 +151,12 @@ fn register_components<'scope>(
     put(
         table,
         "AddScript",
-        scope.create_function(
-            |_, (id, path, fields): (EntityArg, String, Option<mlua::Table>)| {
+        lua.create_function(
+            move |lua, (id, path, fields): (EntityArg, String, Option<mlua::Table>)| {
                 let id = id.live("Scene", "AddScript")?;
                 let values = field_values(fields)?;
                 Ok(authoring::add_script(
-                    &mut scene.borrow_mut().world,
+                    &mut scene.get(lua)?.borrow_mut().world,
                     id,
                     &path,
                     values,
@@ -207,18 +193,15 @@ fn field_values(fields: Option<mlua::Table>) -> mlua::Result<BTreeMap<String, Sc
 }
 
 /// `SetParent` / `ClearParent` (the `parent_id` graph, cycle-checked by `Scene`).
-fn register_parenting<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_parenting(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetParent",
-        scope.create_function(|_, (id, parent): (EntityArg, EntityArg)| {
+        lua.create_function(move |lua, (id, parent): (EntityArg, EntityArg)| {
             let id = id.live("Scene", "SetParent")?;
             // `nil` unparents, Unity's `SetParent(null)`.
             scene
+                .get(lua)?
                 .borrow_mut()
                 .reparent(id, parent.get())
                 .map_err(mlua::Error::RuntimeError)
@@ -228,9 +211,10 @@ fn register_parenting<'scope>(
     put(
         table,
         "ClearParent",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
             let id = id.live("Scene", "ClearParent")?;
             scene
+                .get(lua)?
                 .borrow_mut()
                 .reparent(id, None)
                 .map_err(mlua::Error::RuntimeError)
@@ -242,16 +226,18 @@ fn register_parenting<'scope>(
 /// scene file (the shared `scene_path` cell); an explicit path writes there and
 /// also becomes the new current scene file (mirroring the editor's Save As).
 /// Refused during Play by the scene layer (#1340).
-fn register_save<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_save(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-    scene_path: &'scope RefCell<Option<String>>,
+    scene: ApiCell<Scene>,
+    scene_path: ApiCell<Option<String>>,
 ) -> Reg {
     put(
         table,
         "Save",
-        scope.create_function(|_, path: Option<String>| {
+        lua.create_function(move |lua, path: Option<String>| {
+            let scene = &*scene.get(lua)?;
+            let scene_path = &*scene_path.get(lua)?;
             let target = match path.or_else(|| scene_path.borrow().clone()) {
                 Some(p) => p,
                 None => {

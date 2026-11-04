@@ -3,6 +3,7 @@
 //! black backdrop (one reference unit per pixel), and render it to pixels.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::{Vec2, Vec3, Vec4};
 use mlua::Lua;
@@ -103,16 +104,21 @@ pub(super) fn shade(scene: &mut Scene, id: u32, shader: Option<&str>) {
 }
 
 /// Run `script` against the `UI` namespace (a throwaway screen and camera).
-pub(super) fn lua(scene: &RefCell<Scene>, script: &str) {
-    let screen = RefCell::new(crate::ui::ScreenSize::default());
-    let video = RefCell::new(crate::core::settings::video::VideoSettings::default());
-    let camera = RefCell::new(Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0));
+pub(super) fn lua(scene: &Rc<RefCell<Scene>>, script: &str) {
+    let screen = Rc::new(RefCell::new(crate::ui::ScreenSize::default()));
+    let video = Rc::new(RefCell::new(
+        crate::core::settings::video::VideoSettings::default(),
+    ));
+    let camera = Rc::new(RefCell::new(Camera::new(
+        Vec3::new(0.0, 0.0, 5.0),
+        -90.0,
+        0.0,
+    )));
     let lua = Lua::new();
-    lua.scope(|s| {
-        crate::api::ui::register(&lua, s, scene, (&screen, &video), &camera).unwrap();
-        lua.load(script).exec()
-    })
-    .unwrap();
+    use crate::api::bind;
+    let view = (bind(&lua, &screen), bind(&lua, &video));
+    crate::api::ui::register(&lua, bind(&lua, scene), view, bind(&lua, &camera)).unwrap();
+    lua.load(script).exec().unwrap();
 }
 
 /// A rendered frame's pixels, RGBA, addressed bottom-up like the canvas.
