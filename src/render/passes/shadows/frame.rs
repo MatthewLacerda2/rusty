@@ -43,7 +43,7 @@ impl Renderer {
         self.shadow_renderer.update_cascades(&self.queue, fitted);
         self.shadow_renderer
             .set_time(&self.queue, scene.shader_time);
-        self.plan_shadow_atlas(camera, aspect);
+        self.plan_shadow_atlas(scene, camera, aspect);
 
         let mut encoder = self
             .device
@@ -77,15 +77,30 @@ impl Renderer {
 impl Renderer {
     /// Place the staged local lights' shadows in the atlas as `camera` (at `aspect`)
     /// sees them, upload the lights with their tiles, and count what fit (#468).
-    /// Only lights the camera's light budget keeps are planned (#873).
-    fn plan_shadow_atlas(&mut self, camera: &Camera, aspect: f32) {
+    /// Only lights the camera's light budget keeps are planned (#873). Each light
+    /// keeps its tiles from frame to frame (#1711); a bake capture plans on its own,
+    /// so it never moves them.
+    fn plan_shadow_atlas(&mut self, scene: &Scene, camera: &Camera, aspect: f32) {
         let view_proj = camera.build_view_projection(aspect);
         let grid = ClusterGrid::new(camera, aspect);
         let mut requests = clusters::shadow_requests(&grid, &self.clusters.staged());
         if !self.capture.shadows {
             requests.clear(); // a probe captured without shadows plans no tile
         }
-        let plan = atlas::plan(&requests, view_proj, camera.position);
+        let plan = if self.capture.static_only {
+            atlas::plan(&requests, view_proj, camera.position)
+        } else {
+            let ids = local_light_ids(scene, false);
+            debug_assert_eq!(ids.len(), requests.len(), "an id per staged light");
+            let frame = atlas::Frame {
+                lights: &requests,
+                ids: &ids,
+                view_proj,
+                eye: camera.position,
+            };
+            let slots = &mut self.shadow_renderer.atlas.slots;
+            slots.plan(Some(scene.id()), &frame, |id| scene.world.contains(id))
+        };
         for &(light, first_tile) in &plan.shadows {
             self.clusters.set_shadow(light, first_tile);
         }
@@ -97,6 +112,25 @@ impl Renderer {
         c.shadow_atlas_texels = plan.texels();
         self.shadow_renderer.atlas.update(&self.queue, plan.tiles);
     }
+}
+
+/// The entity ids of the lights `clusters::local_lights(scene, capture)` stages, in
+/// its order: the key each light's atlas tiles are kept under (#1711).
+/// `frame_tests` holds the two in step.
+pub(super) fn local_light_ids(scene: &Scene, capture: bool) -> Vec<u32> {
+    let world = &scene.world;
+    (world.ids_with_light().into_iter())
+        .filter(|&id| world.is_active_in_hierarchy(id))
+        .filter(|&id| {
+            world.light(id).is_some_and(|light| {
+                light.effective_mode().renders_live(capture)
+                    && matches!(
+                        light.light_type,
+                        LightType::Point | LightType::Spotlight | LightType::Area
+                    )
+            })
+        })
+        .collect()
 }
 
 /// The direction the scene's (last) active directional light shines, or the default

@@ -22,6 +22,7 @@ agent can read exactly what failed.
 | Editor↔API parity per op | `tools/lint -- --rules` (`api-parity`) | **hard gate**: every `scene::authoring::<module>::set_*` op a non-test line of `src/editor/` names is also named from the API side — a named setter's call in `src/api/`, an `op!`/`with!`/`group!` row of the field table `Component.Set` writes through (`scene::authoring::fields`), or a post effect's own row or knob table (#1467) — so anything the inspector writes, Lua can; an editor-only op takes `// lint: allow(api-parity) <why>` at its `fn`, and an allow on an op Lua reaches or no inspector names is stale and fails (#1368) |
 | Editor↔shared-op parity | `tools/lint -- --parity` | every first-class component's inspector card routes its mutations through a shared `scene::authoring` op (never direct field writes through the #344 accessor guard) |
 | Entity ids from Lua | `tools/lint -- --rules` (`entity-arg`) | **hard gate**: in `src/api/`, a Lua callback never takes an entity (`id`, `…_id`, `parent`, `child`, `target`, `entity`, `body`, `canvas`) as a bare `u32` or `Option<u32>`: it takes `api::entity_arg::EntityArg`, so a `nil` id reads as a missing entity and fails a write with the verb's name (#1383) |
+| Every ECS write is stamped | `tools/lint -- --rules` (`ecs-write`) | **hard gate**: a non-test line of `src/ecs/` that borrows a hecs column mutably (`get::<&mut …>`, `query_one::<(&mut …)>`, `query_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`, `insert`, `remove`, `clear`, …) fails, since a write that skips `World::touch` stamps no change and every change-log consumer misses it; each funnel line, and `World::derived_mut`, takes `// lint: allow(ecs-write) <why>` (#1705) |
 | File length | `tools/lint` | <= 300 lines: every line of a `.rs` file, the lines of code of a `.py`, `.lua` or `.wgsl` one (docstrings, comments and blank lines free, #926, #1015); nothing grandfathered |
 | Finite authoring floats | `tools/lint -- --rules` (`sanitize`) | **hard gate**: every `pub fn set_*` under `src/scene/authoring/` that takes a float (an `f32`/`f64`, a glam vector, or a float struct such as `Curve`) passes it to a `scene::authoring::sanitize` helper (or a sibling setter of its file), so NaN and `±inf` from Lua or the editor take the field's fallback and never reach a field; a value checked another way takes `// lint: allow(sanitize) <why>` (#1361) |
 | Folder grouping | `tools/lint -- --rules` | **hard gate** (`prefix-group`): no three sibling `.rs` files share a first word (`nav_agent.rs`, `nav_obstacle.rs`, …); make it a subfolder and drop the prefix (#934) |
@@ -303,6 +304,20 @@ new flag, gate, CI step or baseline.
   `editor::widgets::slider`, which clamp only what the user edits. The helpers
   themselves carry the inline allow; any other need takes
   `// lint: allow(drag-range) <why>` (`rules/drag_range.rs`).
+- **`ecs-write`** (#1705) — the change log (`ecs::changes`) reports a write only
+  because the write funnel calls `World::touch` (or `touch_entity`) on its way in.
+  `World::inner` is visible to all of `src/ecs/`, so a raw `self.inner.get::<&mut T>`
+  written beside the funnel compiles, and every consumer then misses that write. A
+  non-test line of `src/ecs/` that borrows a column mutably through a turbofish
+  (`get::<`, `query::<` or `query_one::<` with `&mut` after it, or `query_mut` /
+  `query_one_mut`) or reshapes the store through `inner.` (`spawn`, `despawn`,
+  `insert`, `remove`, `exchange`, `clear` and their `_one` / `_at` forms) fails. The
+  funnel's own lines (`ecs/funnel.rs`, `placement.rs`, `World::remove_rows` and
+  `World::clear`) and `World::derived_mut`, the one write that stamps nothing on
+  purpose, carry `// lint: allow(ecs-write) <why>`. The turbofish is matched without
+  its receiver, so a call split as `self` / `.inner` / `.query_one::<(&mut …)>`
+  still counts; a structural call must keep `inner.` on its own line
+  (`rules/ecs_write.rs`).
 - **`entity-arg`** (#1383) — a script passes `nil` for "no entity" (a failed
   `Scene.FindEntityByName`). Bindings that took `id: u32` threw `error converting
   Lua nil to u32` where their neighbours answered the missing-entity default, and

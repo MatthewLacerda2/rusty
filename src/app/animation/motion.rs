@@ -1,20 +1,23 @@
 //! src/app/animation/motion.rs — sampling and timing one layer's playback (#457).
 //!
-//! A [`Playback`] plays a motion — one clip, or a blend tree of clips — and,
+//! A [`Playback`] plays a motion — one clip, or a blend tree of clips and
+//! nested trees (#1746) — and,
 //! during a crossfade, fades out another. This turns that into a [`Pose`]: per
 //! joint slot the local TRS, or `None` where nothing playing keys the joint. A
-//! blend tree samples every weighted child at the **same normalized phase**
-//! (`phase × child length`), so cycles of different lengths stay in step, and
-//! blends them in TRS space like a crossfade does.
+//! blend tree samples every weighted leaf clip at the **same normalized phase**
+//! (`phase × clip length`), so cycles of different lengths stay in step, and
+//! blends them in TRS space like a crossfade does, through one reusable buffer
+//! rather than a pose per leaf.
 
 use crate::asset::anim_data::AnimationClip;
 use crate::asset::animation_graph::{GraphNode, StateMachine};
 use crate::asset::mesh_data::{JointTransform, SkinData};
 use crate::components::{AnimatorParameters, Motion, Playback, Playhead};
 
+use super::blend_joint;
 use super::blend_poses;
-use super::blend_tree::tree_weights;
-use super::clip::{driven_slots, sampled_locals};
+use super::blend_tree::for_each_leaf;
+use super::clip::{driven_slots, mark_driven, sample_into, sampled_locals};
 use super::events::Crossed;
 
 /// Per joint slot, the local TRS a layer gives it, or `None` where it is not
@@ -93,43 +96,44 @@ impl MotionContext<'_> {
                 })
             }
             Motion::Tree(node) => {
-                let node = self.tree_node(node)?;
                 let phase = Playhead::tree(0.0).bounds(looping).apply(time);
                 let mut blended: Option<Sampled> = None;
+                let mut scratch = Vec::new();
                 let mut total = 0.0;
-                for (clip, weight) in self.weighted_children(node) {
-                    let child = Sampled {
-                        locals: sampled_locals(skin, clip, phase * clip.duration),
-                        driven: driven_slots(clip, joints),
-                    };
+                self.for_each_leaf_clip(node, |clip, weight| {
                     total += weight;
-                    blended = Some(match blended {
-                        None => child,
-                        Some(mut acc) => {
-                            acc.locals = blend_poses(&acc.locals, &child.locals, weight / total);
-                            for (d, c) in acc.driven.iter_mut().zip(child.driven) {
-                                *d |= c;
-                            }
-                            acc
-                        }
-                    });
-                }
+                    sample_into(skin, clip, phase * clip.duration, &mut scratch);
+                    let Some(acc) = &mut blended else {
+                        // The first leaf is the pose as sampled; its buffer
+                        // becomes the output, and later leaves reuse a fresh one.
+                        let mut driven = vec![false; joints];
+                        mark_driven(clip, &mut driven);
+                        let locals = std::mem::take(&mut scratch);
+                        blended = Some(Sampled { locals, driven });
+                        return;
+                    };
+                    let t = weight / total;
+                    for (a, &b) in acc.locals.iter_mut().zip(&scratch) {
+                        *a = blend_joint(*a, b, t);
+                    }
+                    mark_driven(clip, &mut acc.driven);
+                });
                 blended
             }
         }
     }
 
-    /// A blend-tree node's resolvable children with a positive weight.
-    fn weighted_children(&self, node: &GraphNode) -> Vec<(&AnimationClip, f32)> {
-        let Some(tree) = &node.blend_tree else {
-            return Vec::new();
+    /// Call `visit` with every resolvable leaf clip of the blend-tree node
+    /// `node` that has a positive weight, depth first in authored order.
+    fn for_each_leaf_clip(&self, node: &str, mut visit: impl FnMut(&AnimationClip, f32)) {
+        let Some(tree) = self.tree_node(node).and_then(|n| n.blend_tree.as_ref()) else {
+            return;
         };
-        tree.clips()
-            .into_iter()
-            .zip(tree_weights(tree, self.parameters))
-            .filter(|&(_, w)| w > 0.0)
-            .filter_map(|(name, w)| Some((self.clip(name)?, w)))
-            .collect()
+        for_each_leaf(tree, self.parameters, &mut |leaf| {
+            if let Some(clip) = self.clip(leaf.clip) {
+                visit(clip, leaf.weight);
+            }
+        });
     }
 
     /// How `motion`'s playhead moves: a clip in seconds wrapping at its duration
@@ -142,13 +146,11 @@ impl MotionContext<'_> {
                 .clip(name)
                 .map_or(Playhead::unresolved(), |c| Playhead::clip(c.duration)),
             Motion::Tree(node) => {
-                let children = self.tree_node(node).map(|n| self.weighted_children(n));
-                let (sum, total) = children
-                    .unwrap_or_default()
-                    .iter()
-                    .fold((0.0, 0.0), |(sum, total), (clip, w)| {
-                        (sum + clip.duration * w, total + w)
-                    });
+                let (mut sum, mut total) = (0.0, 0.0);
+                self.for_each_leaf_clip(node, |clip, w| {
+                    sum += clip.duration * w;
+                    total += w;
+                });
                 let length = if total > 0.0 { sum / total } else { 0.0 };
                 Playhead::tree(if length > 0.0 { 1.0 / length } else { 0.0 })
             }

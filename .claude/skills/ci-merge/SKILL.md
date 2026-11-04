@@ -89,7 +89,10 @@ change) says "no push needed", and the watch takes it again once the pull
 request's body or labels change. One the issue refuses (it is labelled
 `planning`/`human`, has an open blocker, or is already closed) says "the issue
 blocks it": the watch asks about that issue each listing and takes the pull
-request again once it no longer refuses it (or the description changes). One for
+request again once it no longer refuses it (or the description changes). One with
+no review decision on record (#1764; what counts: `independent-review`, *Answering
+the findings*, step 2) says so before any push; the watch takes it again once
+such a comment appears, or its body or labels change. One for
 red CI, a conflict or an image says "push a fix, or re-run the failed jobs" and
 waits for the head to move or run again. A run is judged by its **latest attempt** (#881): when the runs listing still shows an older attempt than the run's jobs do, the jobs' attempt is the run, so a green re-run that landed before the verdict is not handed back. The watch **exits** on the machine failing (below), on its
 `--for` deadline, or when nothing is left (no open pull request, or only drafts,

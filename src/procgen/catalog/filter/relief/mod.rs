@@ -1,0 +1,6 @@
+//! src/procgen/catalog/filter/relief/mod.rs — the filters that read the input's red
+//! as a height and write a mask from its relief: crevices, edges, occlusion.
+
+// sorted: one module per op; none reads another
+pub mod cavity;
+pub mod curvature;

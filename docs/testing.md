@@ -52,9 +52,15 @@ things follow:
 - The scenario VM is built from the gameplay VM's sandbox (#1408): no `os` or
   `io` (write results through `Harness.*`), and `math.random` draws from (and
   `math.randomseed` reseeds) the world's one seeded `Random`, so a scenario's
-  draws move the game's stream as `Random.*` calls do. Its `require` is Lua's
-  stock one, read relative to the working directory, not the project's
-  (the gameplay VM's project-relative `require` is not installed here).
+  draws move the game's stream as `Random.*` calls do. `require`, `dofile` and
+  `loadfile` are the gameplay VM's too (#1717): `require("lib.game")` searches
+  the project's `assets/scripts`, then the engine's bundled scripts, then
+  `package.path`; a relative `dofile` path is taken from the project root; a
+  file outside the project still loads but warns once in the console. So a game
+  script's `require`s of its shared modules resolve in a scenario as in Play.
+  Only the file access is shared: the scenario VM's `print` is Lua's own and
+  writes to the `play` process's stdout, not to the console log a gameplay
+  script's `print` reaches.
 - A scenario is a test, so the paid provider verbs (`Sfx.Generate`, `Speech.*`)
   are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
   *Provider calls are authoring, never gameplay*).
@@ -628,14 +634,18 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   Player stands 3 m in from its spawn, so the camera looks down the whole yard.
 - **the run** — 60 warm-up frames, then 600 measured ones, each stepped and rendered
   at 1280x720 (`Harness.LoadStress{…}` then `Harness.Bench(600)`).
-- **the report** — per row the average and p95: `frame_ms` (the sim's CPU time),
-  `renderer_ms` (CPU time recording the frame), `gpu_ms` and `gpu.<pass>` (GPU time
+- **the report** — per row the average and p95: `frame_ms` (the sim's CPU time as
+  measured), `cpu_ms` (the same at a fixed reference CPU clock, below) and
+  `cpu_clock_pct` (the CPU clock it ran at), `renderer_ms` (CPU time recording the
+  frame, as measured), `gpu_ms` and `gpu.<pass>` (GPU time
   at a fixed reference clock, below), `gpu_raw_ms` (GPU time as measured) and
   `gpu_clock_pct` (the clock it ran at, % of the reference), `draw_calls`,
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
   `decals_visible`, `decal_cluster_refs`, and the systems
-  `update_scripts`, `tick_nav`, `step_physics`, `animate`. Every GPU pass prints
-  every run (0 when it did not run), so the rows are stable.
+  `cpu.update_scripts`, `cpu.tick_nav`, `cpu.step_physics`, `cpu.animate` (at the
+  reference CPU clock). Every GPU pass prints
+  every run (0 when it did not run), so the rows are stable. Under the table come
+  the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To
   measure an optimisation: `make bench`, change, `make bench`.
@@ -653,7 +663,7 @@ timestamp queries the GPU rows are absent and the report says so.
 error) and must run before the first `Step`, so the spawned scripts load when play
 starts. `Harness.Bench(n)` works on any scenario: it steps and renders `n` frames,
 prints the report, keeps it in the run's out dir and returns `{ frames, metrics =
-{ <row> = { avg, p95 } } }`.
+{ <row> = { avg, p95 } }, warnings = { <text>, … } }`.
 
 ### GPU time and the GPU clock (#862)
 A laptop GPU does not run at one speed. On Apple silicon the governor re-picks the
@@ -683,6 +693,31 @@ On another GPU the reference ms are that machine's own unit: compare them only w
 runs on the same machine. Pinning the clock does not work: there is no user API
 for it, and keeping the GPU fully busy only holds the top clock for a second or two
 before the power limit pulls it back.
+
+### CPU time and the CPU clock (#1719)
+The CPU clock moves too, and the GPU moves it: on Apple silicon the two share one
+power budget, so a Retina-size harness frame that keeps the GPU at full clock pulls
+the CPU's down. In infinity-shout's perf audit the same sim read 1.4 to 4.9 ms a
+tick across runs at a large frame, and 1.43 to 1.48 ms at 720p.
+
+So the bench divides the CPU clock out the same way: a fixed chain of dependent
+integer steps (the CPU probe, `dev::bench::clock`, ~0.1 ms) is timed right before
+and right after each sim step, and the step's times are scaled by
+`reference ÷ probe`. The reference is the chain's nominal time on an M4 performance
+core at its top clock (4.4 GHz); it is derived, not measured there, so
+`cpu_clock_pct` may read above 100, and on any machine `cpu_ms` is that machine's
+own unit. The probe runs on the thread that steps the sim, and the chain does
+not touch memory, so a frame bound by memory or cache does not scale with it.
+
+**Where to read CPU numbers from:** compare `cpu_ms` and `cpu.<system>` before and
+after a change, never raw `frame_ms`, and prefer a small-frame run (the bench's
+1280x720) for CPU work: the smaller the frame, the less the GPU takes from the
+CPU's budget. The report warns in words when its CPU numbers need care:
+- the CPU clock spread more than 15% (p5 to p95, over the median) across the
+  window: the clock changed under the run, so `frame_ms` is unreliable;
+- `cpu_ms` spread more than 50% across the window: compare p95 with care;
+- the average CPU clock moved more than 10% since the last run: the two runs'
+  `frame_ms` rows measure the clock, not the work.
 
 ## API-doc drift gate
 `tests/api_doc_drift.rs` (dev-only, #280) is a **hard gate** that keeps
