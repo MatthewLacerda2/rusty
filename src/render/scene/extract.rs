@@ -51,12 +51,13 @@ impl Renderer {
         };
         let inputs = rs.inputs.as_mut().expect("opened above");
         inputs.uploads_seen = self.retained.meshes.uploads();
+        inputs.render_textures_seen = self.retained.render_textures;
         stats
     }
 
     /// Every mesh entity re-derived: the first frame, a load, an Undo, a renderer
     /// input. The one walk of the World an extract takes.
-    fn rebuild_objects(&mut self, scene: &Scene, rs: &mut RenderScene) -> ExtractStats {
+    pub(super) fn rebuild_objects(&mut self, scene: &Scene, rs: &mut RenderScene) -> ExtractStats {
         let ids = scene.world.ids_with_mesh();
         self.upload_meshes_of(scene, &ids);
         self.load_maps_of(scene, &ids);
@@ -90,6 +91,15 @@ impl Renderer {
             let reshaped = rs.objects.iter();
             let reshaped = reshaped.filter(|(_, o)| meshes.uploaded_since(o.mesh, seen));
             whole.extend(reshaped.map(|(&id, _)| id));
+        }
+        // The views re-registered their render textures: re-key what binds one.
+        if rs
+            .inputs
+            .as_ref()
+            .is_some_and(|i| i.render_textures_seen != self.retained.render_textures)
+        {
+            let reads = rs.objects.iter().filter(|(_, o)| o.reads_render_texture);
+            whole.extend(reads.map(|(&id, _)| id));
         }
         let whole: Vec<u32> = whole.into_iter().collect();
         self.load_maps_of(scene, &whole);

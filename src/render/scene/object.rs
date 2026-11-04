@@ -6,9 +6,11 @@ use glam::{Mat4, Vec3};
 
 use crate::components::{MaterialAsset, RenderFace};
 use crate::render::draw::batch::BatchKey;
+use crate::render::draw::materials::material_texture_paths;
 use crate::render::draw::uniforms::solid_instance;
 use crate::render::frustum::transform_aabb;
 use crate::render::gpu::pipelines::Facing;
+use crate::render::render_texture::is_render_texture;
 use crate::render::{InstanceData, MeshId, Renderer, SmallLimits};
 use crate::scene::Scene;
 
@@ -46,6 +48,9 @@ pub(crate) struct RenderObject {
     pub is_static: bool,
     pub layer: u8,
     pub small: SmallLimits,
+    /// A material map names a render texture (#430): its group's key names that
+    /// texture's allocation, which the frame's views re-register.
+    pub reads_render_texture: bool,
     /// Its instance, but for what a camera sets per frame: the reflection probe,
     /// the proxy volume and the motion history.
     pub instance: InstanceData,
@@ -91,6 +96,7 @@ impl Renderer {
             is_static: world.is_static(id),
             layer: world.layer(id),
             small: SmallLimits::of(&mesh),
+            reads_render_texture: false,
             instance: InstanceData::IDENTITY,
             slots: Vec::with_capacity(runs.len()),
         };
@@ -99,6 +105,8 @@ impl Renderer {
             let entry = scene.material_entry_at(id, slot);
             let material = entry.map(|(_, asset)| asset);
             let (key, transparent) = self.slot_key(scene, id, (slot, indices), (model, handle));
+            let maps = material_texture_paths(material).into_iter().flatten();
+            object.reads_render_texture |= maps.into_iter().any(|m| is_render_texture(m.as_str()));
             object.slots.push(SlotDraw {
                 key,
                 transparent,

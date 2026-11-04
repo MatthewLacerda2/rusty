@@ -67,9 +67,9 @@ impl Renderer {
             self.render_texture_ids.0.insert(path.clone(), slot.id);
         }
         // A material group binding an `rt:` map names its allocation: a new set
-        // re-keys every retained object (#1706).
+        // re-keys the retained objects whose maps name one (#1706).
         if self.render_texture_ids.0 != before {
-            self.retained.touch();
+            self.retained.render_textures += 1;
         }
     }
 

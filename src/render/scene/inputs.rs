@@ -73,6 +73,8 @@ pub(super) struct Inputs {
     renderer: RendererInputs,
     /// The mesh upload count it has seen (`MeshHandles::uploads`).
     pub uploads_seen: u64,
+    /// The render-texture revision it has seen (`Retained::render_textures`).
+    pub render_textures_seen: u64,
 }
 
 impl Inputs {
@@ -95,6 +97,7 @@ impl Inputs {
             scratch,
             renderer,
             uploads_seen: 0,
+            render_textures_seen: 0,
         }
     }
 

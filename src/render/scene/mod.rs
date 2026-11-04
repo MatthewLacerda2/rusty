@@ -35,8 +35,16 @@
 //! table onto these objects; they still walk the ECS themselves.
 
 mod draw;
+#[cfg(test)]
+mod equivalence_tests;
 mod extract;
+#[cfg(test)]
+mod fixture;
+#[cfg(test)]
+mod gpu_tests;
 mod handles;
+#[cfg(test)]
+mod idle_tests;
 mod inputs;
 mod object;
 
@@ -62,6 +70,10 @@ pub(crate) struct Retained {
     /// read changes (a material group dropped, a surface shader re-built, a render
     /// texture re-allocated): each scene re-derives all its objects on its next frame.
     inputs: u64,
+    /// Bumped whenever the render textures registered change (`sync_render_textures`):
+    /// each scene re-derives the objects whose materials name one. The editor's Scene
+    /// and Game views register different sets, so this moves on every switch.
+    pub render_textures: u64,
     /// The scenes, least recently drawn first.
     scenes: Vec<(SceneId, RenderScene)>,
 }

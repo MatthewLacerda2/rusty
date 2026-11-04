@@ -1,4 +1,4 @@
-//! src/render/stats.rs — what one rendered frame submitted (#433).
+//! src/render/stats/ — what one rendered frame submitted (#433).
 //!
 //! `Renderer::render` fills a [`RenderCounters`] per frame so an agent can measure a
 //! rendering change (instancing, LODs, clustered lights) instead of guessing. The
