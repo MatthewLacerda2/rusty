@@ -219,7 +219,7 @@ impl ShadowRenderer {
             let bone_base = (!small).then(|| push_palette(&mut joints, palette));
             let bone_base = bone_base.unwrap_or(0);
             let two_sided = object.cast == ShadowCasting::TwoSided;
-            for (indices, (clip, face)) in &object.shadow_runs {
+            for (indices, (clip, face)) in object.shadow_runs.iter().cloned() {
                 let mut caster = CasterData::new(world, bone_base);
                 if let Some(cut) = clip.and_then(|c| c.cutout) {
                     caster = caster.cutout(cut);
