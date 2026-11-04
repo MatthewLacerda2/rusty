@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 use super::inputs::{Dirty, Inputs, RendererInputs};
 use super::{ExtractStats, RenderScene};
 use crate::render::draw::materials::material_maps;
+use crate::render::passes::shadows::UnbakedCasters;
 use crate::render::Renderer;
 use crate::scene::Scene;
 
@@ -51,6 +52,10 @@ impl Renderer {
         let inputs = rs.inputs.as_mut().expect("opened above");
         inputs.uploads_seen = self.retained.meshes.uploads();
         inputs.render_textures_seen = self.retained.render_textures;
+        if inputs.regroup {
+            rs.regroup(UnbakedCasters::of(scene));
+        }
+        rs.refold_casting();
         stats
     }
 
@@ -62,6 +67,7 @@ impl Renderer {
         self.load_maps_of(scene, &ids);
         rs.objects.clear();
         rs.order.clear();
+        rs.casting = None;
         ExtractStats {
             extracted: self.derive_objects(scene, rs, &ids),
             posed: 0,

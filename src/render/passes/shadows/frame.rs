@@ -9,7 +9,7 @@ use glam::Vec3;
 
 use super::cascades::Cascade;
 use super::casters::CasterFrame;
-use super::{atlas, cascades, statics_key, CascadeUniform, ShadowRenderer, UnbakedCasters};
+use super::{atlas, cascades, CascadeUniform, ShadowRenderer};
 use crate::components::{LightType, ShadowSettings};
 use crate::render::clusters::{self, ClusterGrid};
 use crate::render::lod::LodSelection;
@@ -47,21 +47,26 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Shadow Encoder"),
             });
-        let clips = self.shadow_clips(scene);
+        // Measured from the base camera, never the light (#1714); a capture culls
+        // nothing.
+        let small = self.small_object_cull(camera);
+        // `prepare_frame`, which every caller runs first, extracted the scene.
+        let objects = self
+            .retained
+            .scene(scene.id())
+            .expect("prepare_frame extracts");
         let frame = CasterFrame {
             device: &self.device,
             queue: &self.queue,
             scene,
+            objects,
             gpu_meshes: &self.gpu_meshes,
-            clips: &clips,
+            meshes: &self.retained.meshes,
             materials: &self.materials,
             surfaces: &self.surface_shaders,
             timer: &self.gpu_timer,
-            statics: statics_key(scene),
-            // Measured from the base camera, never the light (#1714); a capture
-            // culls nothing.
-            small: self.small_object_cull(camera),
-            unbaked: UnbakedCasters::of(scene),
+            statics: objects.statics_key(scene),
+            small,
         };
         if self.capture.shadows {
             // a probe captured without shadows samples no cascade, so draws none;

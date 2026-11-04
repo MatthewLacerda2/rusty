@@ -2,13 +2,16 @@
 //! sequence equal a build from scratch (#1706), as `ecs/changes/derived_tests.rs`
 //! proves the change log's consumers: the ECS write paths of `ops_tests`, then the
 //! inputs the log does not cover (the material library, overrides, lightmaps,
-//! probes, a capture, a re-uploaded shared mesh). One renderer for every case.
+//! probes, a capture, a re-uploaded shared mesh), and what the shadow sweeps read
+//! (`shadow_ops`): each frame the static bakes' key equals a from-scratch digest. One
+//! renderer for every case.
 
 use glam::Vec3;
 use proptest::prelude::*;
 use proptest::test_runner::{Config, TestRunner};
 
 use super::fixture::{fresh, held, yard, RES};
+use super::shadow_ops::{self, s_op, S};
 use crate::components::mesh::MeshRevision;
 use crate::components::{LightComponent, MaterialComponent};
 use crate::ecs::changes::ops_tests::{apply, op, Op};
@@ -31,6 +34,7 @@ enum R {
     Unmesh(usize),
     Reshape(usize),
     Rewind,
+    Shadow(S),
     Frame,
 }
 
@@ -49,6 +53,7 @@ fn r_op() -> impl Strategy<Value = R> {
         1 => at().prop_map(R::Unmesh),
         1 => at().prop_map(R::Reshape),
         1 => Just(R::Rewind),
+        3 => s_op().prop_map(R::Shadow),
         4 => Just(R::Frame),
     ]
 }
@@ -68,6 +73,7 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         }
         R::Capture(on) => r.capture.static_only = on,
         R::Rewind => scene.world.rewind_changes(),
+        R::Shadow(ref op) => shadow_ops::edit(scene, op),
         R::Frame => {}
         R::Material(i, m) => on(scene, pick(scene, i), |s, id| {
             let name = m.map(|red| if red { "red" } else { "glass" }.to_string());
@@ -120,6 +126,8 @@ fn holds(r: &mut Renderer, ops: &[R]) -> Result<(), TestCaseError> {
             r.extract_scene(&scene);
             let kept = held(r, &scene);
             prop_assert_eq!(kept, fresh(r, &scene), "after {:?}", ops);
+            let shadows = shadow_ops::kept_equals_fresh(r, &scene);
+            prop_assert!(shadows.is_ok(), "{:?} after {:?}", shadows, ops);
         }
     }
     Ok(())

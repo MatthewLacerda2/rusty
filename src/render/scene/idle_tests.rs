@@ -1,5 +1,6 @@
 //! src/render/scene/idle_tests.rs — what an extract costs (#1706): a frame that
-//! changed nothing walks no object (probe field, library and lightmaps included), a
+//! changed nothing walks no object and no mesh column, shadows included (probe
+//! field, library and lightmaps included), a
 //! move re-places only what moved, and a load, an Undo or a Play restore rebuilds,
 //! then holds what a fresh build holds.
 
@@ -26,8 +27,15 @@ fn gpu_a_frame_with_nothing_changed_walks_no_object() {
         (6, 0),
         "the first frame builds every object"
     );
+    let walks = crate::ecs::world::walks::of::<crate::components::MeshComponent>;
+    let before = walks();
     let (again, idle) = frame(&mut r, &scene);
     assert_eq!(extracted(&idle), (0, 0), "nothing changed: {idle:?}");
+    assert_eq!(
+        walks(),
+        before,
+        "the frame, its shadow sweeps included, walks no mesh"
+    );
     assert_eq!(idle.visible_entities, at_first.visible_entities);
     assert_eq!(first, again, "the retained frame draws the same pixels");
     // A write of what the library already holds re-derives nothing.

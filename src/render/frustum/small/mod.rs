@@ -44,12 +44,8 @@ impl SmallObjectCull {
         Self { lens: None }
     }
 
-    /// Whether `mesh` is too far or too small for this view: past its
-    /// `max_draw_distance` from the eye to `centre` (its world bounds' centre), or
-    /// below its `min_screen_size` ([`relative_height`] at that distance of its size:
-    /// `local`'s largest extent times `world`'s largest axis scale). `false` when it
-    /// sets neither, or when measured from nowhere. "Too far" is tested first, so a
-    /// mesh both culls counts once.
+    /// [`Self::culls_by`] for `mesh`'s limits, read now.
+    #[cfg(test)]
     pub(crate) fn culls(
         &self,
         mesh: &MeshComponent,
@@ -60,8 +56,13 @@ impl SmallObjectCull {
         self.culls_by(SmallLimits::of(mesh), centre, local, world)
     }
 
-    /// [`Self::culls`] for a mesh whose two limits are `limits`, read once and kept
-    /// (the retained scene's objects, `render::scene`, #1706).
+    /// Whether a mesh whose two limits are `limits` (read once and kept by the
+    /// retained scene's objects, `render::scene`, #1706) is too far or too small for
+    /// this view: past its `max_draw_distance` from the eye to `centre` (its world
+    /// bounds' centre), or below its `min_screen_size` ([`relative_height`] at that
+    /// distance of its size: `local`'s largest extent times `world`'s largest axis
+    /// scale). `false` when it sets neither, or when measured from nowhere. "Too far"
+    /// is tested first, so a mesh both culls counts once.
     pub(crate) fn culls_by(
         &self,
         limits: SmallLimits,

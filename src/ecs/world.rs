@@ -229,6 +229,8 @@ impl World {
     /// `Core::seq` (O(k log k)) restores the insertion order hecs's
     /// per-archetype iteration doesn't provide.
     pub(in crate::ecs) fn ids_with_component<T: hecs::Component>(&self) -> Vec<u32> {
+        #[cfg(test)]
+        walks::count(std::any::type_name::<T>());
         let mut matches: Vec<(u64, u32)> = self
             .inner
             .query::<&Core>()
@@ -266,4 +268,27 @@ fn drop_slots(order: &mut Vec<u32>, slots: &[usize]) {
         write += end - slot - 1;
     }
     order.truncate(write);
+}
+
+/// How many times each column was walked (`ids_with_*`) on this thread, in test
+/// builds only: what lets a test hold that a frame walks no column it should not
+/// (the retained render scene's idle frame, #1706).
+#[cfg(test)]
+pub(crate) mod walks {
+    use std::cell::RefCell;
+    use std::collections::BTreeMap;
+
+    thread_local! {
+        static WALKS: RefCell<BTreeMap<&'static str, u64>> = RefCell::default();
+    }
+
+    pub(in crate::ecs) fn count(column: &'static str) {
+        WALKS.with(|w| *w.borrow_mut().entry(column).or_default() += 1);
+    }
+
+    /// Walks of `T`'s column so far on this thread.
+    pub(crate) fn of<T>() -> u64 {
+        let column = std::any::type_name::<T>();
+        WALKS.with(|w| w.borrow().get(column).copied().unwrap_or(0))
+    }
 }
