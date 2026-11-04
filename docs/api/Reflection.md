@@ -21,15 +21,27 @@ the scene's **fallback probe** when it names one (below).
 
 **Normalised by the baked light (#1697).** A probe's cube shows its room as lit at the
 capture point, so on its own a glossy floor in a dark corner would reflect the bright
-room at full strength. Each bake therefore also stores the **irradiance** the cube gives
-at the probe (its L2 SH, plus the direct light of `Baked` lights there: what a light
-probe at that point would hold), and each pixel scales a probe's reflection by
-*luminance of its own baked diffuse* ÷ *luminance of the probe's stored irradiance along
-its normal*, held to 0–1.5 (UE's lightmap mixing, Frostbite's probe normalisation). The
-pixel's baked diffuse is its lightmap on a lightmapped surface and its light-probe SH on
-a dynamic object. Where there is neither (no bake), or the probe was baked without the
-irradiance, the scale is 1; the sky is never scaled. A bake capture never normalises, so
-what one probe's capture sees does not depend on another probe's stored irradiance.
+room at full strength. Each bake therefore also stores the **irradiance** at the probe,
+measured as a light probe there measures it: its capture's L2 SH, with the scene's
+ambient (not the drawn sky) where the view escapes, which is what the lightmap's
+escaping rays see too. The direct light of `Baked` lamps is not in it (the capture
+sees what they light, never the lamps), so where a probe sits beside a lamp does not
+change the room's reflections. Each pixel scales a probe's reflection by *luminance
+of its own baked diffuse* ÷ *luminance of the probe's stored irradiance along its
+normal*, held to **0–1** (UE's lightmap mixing, Frostbite's probe normalisation): it
+removes leaks and never brightens, so a floor lit brighter than the light the probe
+saw keeps its reflection whole. The stored side is floored at a quarter of the
+probe's mean, so an L2 SH ringing below zero on the far side of one bright lamp
+never saturates the scale, and both sides add a small bias, so a pixel and a probe
+that both hold no light scale by 1. The pixel's baked diffuse is its lightmap on a
+lightmapped surface and its light-probe SH on a dynamic object. Where there is neither
+(no bake), or the probe was baked without the irradiance, the scale is 1; the sky is
+never scaled. A bake capture never normalises, so what one probe's capture sees does
+not depend on another probe's stored irradiance. Pointing a probe at another cube
+(`SetCubemap`, `Set{ cubemap }`) drops its stored irradiance until it is baked again.
+With no ambient at all, an upward floor under an open sky still darkens its sky
+reflection, since only the surfaces' sheen of the sky is stored and the lightmap holds
+none of it.
 Light from `Mixed` and `Realtime` lights is in neither side: it shades live.
 
 **Specular occlusion.** The whole environment reflection (probes, sky and SSR's hit)
@@ -41,9 +53,12 @@ normalisation above is what darkens a corner.
 **The fallback probe** (Unity's default reflection probe, `SetFallback`): one baked
 probe a scene names takes the share the sky took: everything an object's probes leave,
 all of it for an object outside every box. It stays resident wherever the camera is
-(it is taken first, inside the budget) and is always slot 0 of the resident probes.
+(it is taken first, whatever the budget, and so is the nearest probe after it, so a
+large fallback never evicts the camera's own room's probe) and is always slot 0 of
+the resident probes.
 With none named, or the named one not baked, that share is the sky's. Naming a probe
-makes it manual, so Generate Lighting keeps it; removing it, `Clear`, or loading a
+makes it manual, and it stays manual through any edit (`Set{ manual = false }`, the
+Inspector's *Manual*), so Generate Lighting keeps it; removing it, `Clear`, or loading a
 scene that names none leaves the scene without one. A file naming two keeps the first.
 
 **Settings per probe** (`Reflection.Set` / `Reflection.Get`, the scene Inspector's
@@ -71,7 +86,8 @@ without its own bakes at (**512**), the **memory budget** of resident cubes
 (**256 MB**) and the most probes `Lighting.Generate()` places (**512**). Each frame keeps the baked probes whose boxes are nearest the camera (a
 box the camera stands in counts as distance zero; ties go to the lower index), at most
 32, while the cubes stay within the budget: a cube that would pass it is skipped and
-farther ones that fit are still taken; the nearest is always kept. They share one
+farther ones that fit are still taken; the nearest is always kept, and so is the
+fallback probe (above). They share one
 texture whose face is the largest resident cube's, so a 512 cube costs 16 MB there
 (half-float texels, with their mips) and a smaller cube rides in its lower mips. That
 texture is the only copy of a resident cube (a file is read, copied in and dropped), and

@@ -83,12 +83,13 @@ pub struct ReflectionProbe {
     /// probes without it. `Reflection.Add` and the Inspector's Add set it.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub manual: bool,
-    /// The irradiance the baked cube gives at the probe (#1697), stored by the bake
-    /// beside [`Self::cubemap_path`]: the cube's own SH plus the direct light of
-    /// `Baked` lights there, the quantity a light probe at its position would hold.
-    /// The forward pass scales the probe's reflection at a pixel by the baked
-    /// diffuse there over this along the normal (probe normalisation); `None` (not
-    /// baked, or baked before it was stored) scales by 1.
+    /// The irradiance at the probe (#1697), stored by the bake beside
+    /// [`Self::cubemap_path`]: its capture projected as a light probe's, the
+    /// ambient where the view escapes (`reflection_bake::stored_irradiance`). The
+    /// forward pass scales the probe's reflection at a pixel by the baked diffuse
+    /// there over this along the normal, held to [0, 1] (probe normalisation);
+    /// `None` (not baked, baked before it was stored, or pointed at another cube
+    /// since) scales by 1.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub irradiance: Option<Sh9>,
     /// Unity's default reflection probe (#1697): what an object no probe box
