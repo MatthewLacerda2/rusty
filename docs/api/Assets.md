@@ -29,6 +29,8 @@ one by its source path still works.
 | `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetModelImportSettings` | `(path)` | `{ scaleFactor }` — a model's Scale Factor (below) |
 | `Assets.SetModelImportSettings` | `(path, { scaleFactor? })` | how many of the scene's meshes it re-imported |
+| `Assets.GetHumanoid` | `(path)` | `{ bones = { Hips = name, ... }, clipsFrom = { path, ... }, problems = { text, ... } }` — a model's humanoid map, resolved (below) |
+| `Assets.SetHumanoid` | `(path, { bones?, clipsFrom? })` | how many of the scene's meshes took new clips |
 | `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize }` — an image's import settings (below) |
 | `Assets.SetTextureImportSettings` | `(path, { wrapMode?, filterMode?, generateMipmaps?, textureType?, sRGB?, compression?, maxSize? })` | nothing |
 
@@ -118,6 +120,58 @@ reaches it the same way.
 ```lua no-run
 Assets.SetModelImportSettings("project/models/crate_cm.glb", { scaleFactor = 0.01 })
 print(Assets.GetModelImportSettings("project/models/crate_cm.glb").scaleFactor)  -- 0.0099999997764826: an f32
+```
+
+### Humanoid retargeting
+
+Godot 4's `BoneMap` and Unity's Humanoid avatar, in a simpler form (#1747): rigs of
+different heights and proportions with the same humanoid layout share one set of
+clips. Each model's `<file>.meta` sidecar may carry a `humanoid` entry:
+
+- `bones` — the canonical humanoid bones (Unity's names: `Hips`, `Spine`, `Chest`,
+  `UpperChest`, `Neck`, `Head`, `Left`/`Right` + `Shoulder`, `UpperArm`, `LowerArm`,
+  `Hand`, `UpperLeg`, `LowerLeg`, `Foot`, `Toes`) mapped to the model's own bone names.
+  A bone it doesn't name is guessed from common spellings (`mixamorig:LeftUpLeg`,
+  `thigh.L`, `forearm_r`, `LeftHand`); what neither finds is left unmapped, and the
+  import says so once in the console (a required bone missing, an explicit name not in
+  the skeleton).
+- `clipsFrom` — model files (project-relative, as references are) whose clips are
+  retargeted onto this model when it imports and added to its clips, in order. A clip
+  whose name the model already has (its own, or an earlier source's) is skipped with a
+  warning; a source that can't be read or has no animated skeleton is warned of.
+
+The retarget happens once per import and is cached with it, so a borrowed clip is an
+ordinary clip of the model: blend trees, layers, avatar masks, IK and root motion see it
+like any other, and a clip on its own rig is never touched. Rotations transfer in
+rest-relative space (Godot's rest-fixer composition): each bone's turn away from its rest,
+in model space, is given to the mapped bone, so differing bone axes and rest poses carry
+the motion. Translations are dropped (the target's bone lengths hold) except the hips',
+whose offset from rest is scaled by the target over source hip height, so a 20 % taller
+rig's feet stay on the ground and its root motion travels 20 % farther. Scale keys are
+dropped. Not handled: fingers, twist bones, a turn on a source bone the map leaves out,
+and A-pose vs T-pose correction beyond the rest-relative transfer.
+
+A mask or `Animator.SetRootBone` names the **target** rig's bones: the clip is keyed on
+them. A source rig's bone name there is simply not in the skeleton (a mask ignores it,
+`SetRootBone` warns). Root motion reads the target's root bone, so it follows the
+scaled hips when that bone is the mapped `Hips`; a root bone above the hips that the
+map doesn't cover is not driven by a borrowed clip.
+
+`GetHumanoid` returns the map as resolved on the model's first skinned mesh (overrides
+and guesses together), the sources, and what resolving found wrong. `SetHumanoid`
+changes only the keys it is given: each `bones` entry sets its canonical bone (`""`
+unmaps it, `false` returns it to the guess), and `clipsFrom` replaces the list. It
+writes the sidecar and gives every skinned mesh in the open scene whose clips it shapes
+(instanced from that model, or from a model borrowing from it) its re-imported clips;
+its bones and rig are left as they are. Editing the sidecar by hand works too: the next
+import reads it.
+
+```lua no-run
+Assets.SetHumanoid("assets/models/brute.glb", {
+  clipsFrom = { "assets/models/grunt.glb" },
+  bones = { Hips = "pelvis_main" },
+})
+print(Assets.GetHumanoid("assets/models/brute.glb").bones.LeftFoot)
 ```
 
 ### Generate Lightmap UVs

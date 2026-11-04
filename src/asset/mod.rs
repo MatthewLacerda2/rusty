@@ -30,6 +30,7 @@ pub mod audio;
 pub mod convert;
 pub mod flat_normals;
 pub mod gltf;
+pub mod humanoid;
 pub mod import_cache;
 pub mod lightmap_page;
 pub mod lightmap_uv;
@@ -123,7 +124,8 @@ pub fn is_image_path(path: impl AsRef<Path>) -> bool {
 /// Import a whole source file into its addressable sub-meshes + materials,
 /// dispatching on the extension, then apply the import settings its `.meta` sidecar
 /// records: the Scale Factor (#1398), then Generate Lightmap UVs (#831), so the
-/// unwrap sees the scaled model. Reads the sidecar, never writes it (see
+/// unwrap sees the scaled model, and last the clips it borrows from other rigs,
+/// retargeted onto its own (`humanoid`, #1747). Reads the sidecar, never writes it (see
 /// [`import_and_sync_sidecar`] for the variant that maintains the `.meta` cache); a
 /// file with no sidecar imports with the defaults.
 ///
@@ -162,6 +164,18 @@ fn import_with(
     read: &Path,
     settings: &ImportSettings,
 ) -> Result<ImportedAsset, ImportError> {
+    let mut asset = import_own(path, read, settings)?;
+    humanoid::borrow_clips(path, &mut asset, &settings.humanoid, borrowed_source);
+    Ok(asset)
+}
+
+/// [`import_with`] without the clips borrowed from other models (#1747): the
+/// file's own data with its settings applied.
+fn import_own(
+    path: &Path,
+    read: &Path,
+    settings: &ImportSettings,
+) -> Result<ImportedAsset, ImportError> {
     let mut asset = parse_file(path, read)?;
     scale_factor::apply(&mut asset, scale_factor::sanitize(settings.scale, 1.0));
     if settings.lightmap_uvs.generate {
@@ -170,6 +184,19 @@ fn import_with(
         }
     }
     Ok(asset)
+}
+
+/// The model at `from` as a clip source (#1747): its own import, with its
+/// Scale Factor and its humanoid map, never its own borrowed clips.
+fn borrowed_source(from: &str) -> Result<Option<humanoid::borrow::Source>, ImportError> {
+    let path = Path::new(from);
+    let settings = settings_of(path);
+    let asset = import_own(path, &read_target(path)?, &settings)?;
+    Ok(humanoid::borrow::Source::of(
+        from,
+        asset,
+        &settings.humanoid,
+    ))
 }
 
 /// Parse a source file into sub-meshes + materials by its extension, as authored,

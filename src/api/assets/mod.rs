@@ -16,12 +16,16 @@
 //! `Assets.GetTextureImportSettings` / `SetTextureImportSettings` (#1323) read and
 //! write an image's wrap, filter, mipmap, texture type, compression and max-size
 //! settings (#1574), the image inspector's card.
+//! `Assets.GetHumanoid` / `SetHumanoid` (#1747, `humanoid`) read and write a
+//! model's humanoid bone map and the models it borrows clips from.
 
 use std::path::Path;
 
 use mlua::{Lua, Table};
 
 use super::{global_table, put, Reg};
+
+mod humanoid;
 use crate::api::ApiCell;
 use crate::asset::audio::{refresh, Refresh};
 use crate::asset::sidecar::{
@@ -92,6 +96,7 @@ pub fn register(lua: &Lua) -> Reg {
         }),
     )?;
 
+    humanoid::register(lua, &table)?;
     lua.globals()
         .set("Assets", table)
         .map_err(|e| e.to_string())
@@ -130,7 +135,8 @@ pub fn register_reimport(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
             crate::scene::asset_instance::set_model_scale_factor(&mut scene, &path, scale)
                 .map_err(mlua::Error::RuntimeError)
         }),
-    )
+    )?;
+    humanoid::register_set(lua, &table, scene)
 }
 
 /// `{ generate, hardAngle, packMargin }`.
@@ -280,5 +286,4 @@ fn vec3_table(lua: &Lua, x: f32, y: f32, z: f32) -> mlua::Result<Table> {
 }
 
 #[cfg(test)]
-#[path = "assets_tests.rs"]
 mod tests;
