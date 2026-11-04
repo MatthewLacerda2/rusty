@@ -139,23 +139,36 @@ impl Renderer {
             shadow_runs: Vec::new(),
         };
         drop(mesh);
-        for (slot, indices) in runs {
-            let entry = scene.material_entry_at(id, slot);
-            let material = entry.map(|(_, asset)| asset);
-            let (key, transparent) = self.slot_key(scene, id, (slot, indices), (model, handle));
-            let maps = material_texture_paths(material).into_iter().flatten();
-            object.reads_render_texture |= maps.into_iter().any(|m| is_render_texture(m.as_str()));
-            let clip = material.and_then(|m| slot_clip(&self.surface_shaders, &key, m));
-            object.slots.push(SlotDraw {
-                key,
-                transparent,
-                face: material.map_or(RenderFace::Front, |m: &MaterialAsset| m.render_face),
-                clip,
-            });
+        for run in runs {
+            self.push_slot(scene, id, run, &mut object);
         }
         object.shadow_runs = shadow_runs(&object.slots);
         self.pose_object(scene, id, &mut object);
         Some(object)
+    }
+
+    /// Add material slot `slot` (drawing `indices`) of entity `id` to `object`: its
+    /// key, whether it is transparent, its face and its shadow clip.
+    fn push_slot(
+        &mut self,
+        scene: &Scene,
+        id: u32,
+        (slot, indices): (usize, std::ops::Range<u32>),
+        object: &mut RenderObject,
+    ) {
+        let entry = scene.material_entry_at(id, slot);
+        let material = entry.map(|(_, asset)| asset);
+        let at = (object.world, object.mesh);
+        let (key, transparent) = self.slot_key(scene, id, (slot, indices), at);
+        let maps = material_texture_paths(material).into_iter().flatten();
+        object.reads_render_texture |= maps.into_iter().any(|m| is_render_texture(m.as_str()));
+        let clip = material.and_then(|m| slot_clip(&self.surface_shaders, &key, m));
+        object.slots.push(SlotDraw {
+            key,
+            transparent,
+            face: material.map_or(RenderFace::Front, |m: &MaterialAsset| m.render_face),
+            clip,
+        });
     }
 
     /// Whether a surface variant whose cut moves cuts any of entity `id`'s material

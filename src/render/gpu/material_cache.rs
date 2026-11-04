@@ -123,7 +123,7 @@ impl MaterialCache {
         self.params.retain(|owner, _| !stale(owner));
         let (groups, free) = (&mut self.groups, &mut self.free);
         self.index.retain(|(_, owner), i| {
-            let keep = !owner.as_ref().is_some_and(|o| stale(o));
+            let keep = !owner.as_ref().is_some_and(&stale);
             if !keep {
                 groups[*i] = None;
                 free.push(*i);
