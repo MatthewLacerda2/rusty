@@ -140,11 +140,30 @@ fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
         "Bounces",
         "Surfaces a path bounces off before it stops",
     );
+    changed |= draw_max_lightmap_size(ui, &mut s.max_lightmap_size);
     changed |= ui
         .checkbox(&mut s.directional, "Directional lightmaps")
         .on_hover_text("Bake light directions too, so normal maps show under baked light (#810)")
         .changed();
     changed
+}
+
+/// Unity's *Max Lightmap Size* (#1704): the atlas page edge, a power of two from
+/// [`BakeSettings::MAX_LIGHTMAP_SIZE`]; returns whether it changed.
+fn draw_max_lightmap_size(ui: &mut egui::Ui, size: &mut u32) -> bool {
+    let before = *size;
+    let (low, high) = BakeSettings::MAX_LIGHTMAP_SIZE.into_inner();
+    let edges = std::iter::successors(Some(low), |e| Some(e * 2)).take_while(|&e| e <= high);
+    egui::ComboBox::from_label("Max Lightmap Size")
+        .selected_text(size.to_string())
+        .show_ui(ui, |ui| {
+            for edge in edges {
+                ui.selectable_value(size, edge, edge.to_string());
+            }
+        })
+        .response
+        .on_hover_text("Atlas page edge in texels; the largest lightmap a mesh can get");
+    *size != before
 }
 
 /// The scene's diffuse model (#1698); returns whether it changed. Live lights follow

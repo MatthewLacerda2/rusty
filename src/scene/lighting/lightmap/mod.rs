@@ -42,7 +42,9 @@ mod rng;
 mod set;
 mod trace;
 
-pub use atlas::{max_map_edge, pack, LightmapAtlas, MAX_PAGE, MIP_LEVELS, PAD};
+pub use atlas::{
+    max_map_edge, pack, page_edge, LightmapAtlas, MAX_PAGE, MIN_PAGE, MIP_LEVELS, PAD,
+};
 pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
 pub use encode::{decode_direction, decode_rgbm, encode_directions, encode_texels};
 pub use input::{BakeLight, BakeMesh, BakeRun, BakeScene, LightShape};
@@ -85,6 +87,8 @@ mod rays_tests;
 mod run_bake_tests;
 #[cfg(test)]
 mod run_tests;
+#[cfg(test)]
+mod scale_tests;
 #[cfg(test)]
 mod skybox_tests;
 #[cfg(test)]

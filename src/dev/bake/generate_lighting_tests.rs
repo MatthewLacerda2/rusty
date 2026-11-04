@@ -31,7 +31,7 @@ fn saved_floor(name: &str) -> (Scene, String) {
     };
     scene.world.set_collider(floor, Some(collider));
     let s = &mut scene.lighting_settings.lightmaps;
-    (s.texels_per_unit, s.samples, s.bounces, s.max_resolution) = (2.0, 4, 1, 16);
+    (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (2.0, 4, 1, 32);
     scene.save_to_file(&path).unwrap();
     (scene, path)
 }

@@ -14,8 +14,8 @@ The two individual verbs stay for a script that wants only one of them.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, saved }` |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, diffuseModel, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, diffuseModel?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, diffuseModel, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, diffuseModel?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
@@ -242,14 +242,30 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   Every static mesh still shades and bounces light onto the others, as its Mesh
   `cast_shadows` allows ([`Light`](Light.md#cast-shadows), one rule for every bake):
   an `"Off"` mesh blocks no light but still bounces, emits and is lightmapped; a
-  `"ShadowsOnly"` one blocks light but bounces, emits and receives nothing. Dynamic objects keep
+  `"ShadowsOnly"` one blocks light but bounces, emits and receives nothing. A mesh at
+  Scale In Lightmap `0` (below) gets no lightmap and reads the light probes. Dynamic objects keep
   the light probes; bake those with `Lighting.Bake()` so both read the same lights.
 - **What it bakes.** A deterministic CPU path tracer: `samples` (default `128`) paths
   per texel, `bounces` (default `3`) surfaces deep, seeded by `seed` (default `0`) — the
   same scene and seed always write byte-identical lightmaps, however many cores ran it.
-  `texelsPerUnit` (default `8`) is the lightmap resolution per world unit (each mesh's
-  lightmap is 4–504 texels square: the largest that two of fit side by side on a 1024
-  page with their rings, #1694). The bounce is smoothed with a 3-texel edge-aware
+  `texelsPerUnit` (default `8`) is the lightmap resolution per world unit, times each
+  mesh's **Scale In Lightmap** (below). A mesh's lightmap follows its surface area at that
+  density, from 4 texels square up to the largest map one atlas page holds with its
+  ring: `maxLightmapSize − 8` (1016 at the default 1024, #1704). A map above half the page
+  leaves the rest of it to smaller maps.
+- **Max Lightmap Size** (`maxLightmapSize`, Unity's setting; the editor's
+  **"Max Lightmap Size"** under the Generate Lighting button). The atlas page's edge in
+  texels, a power of two from `32` to `4096`, default `1024`; any other value is held to
+  the next power of two in that range. It caps both the page and, through it, the largest
+  lightmap a mesh can get.
+- **Scale In Lightmap** (Unity's *MeshRenderer* setting, #1704): a per-mesh multiplier
+  on `texelsPerUnit`, the Mesh component's `scale_in_lightmap` field (default `1`, `0`–`64`),
+  written with `Component.Set(id, "Mesh", { scale_in_lightmap = 2 })`
+  ([`Component`](Component.md)), read with `Component.Get`, shown in the Inspector's Mesh
+  card and saved with the scene and its prefabs (a file without it reads `1`). A hero
+  prop takes more texels, clutter fewer, without changing the scene's density. At `0`
+  the mesh gets **no lightmap** and reads the **light probes** at runtime, as in Unity,
+  while still blocking and bouncing light in the bake as its `cast_shadows` says. The bounce is smoothed with a 3-texel edge-aware
   Gaussian (Unity's indirect filter) that never crosses a crease; baked direct light is
   not filtered, so a point, spot or directional light's shadows stay sharp; an Area
   light's (#1674) are soft, its rectangle integrated over `samples` or more jittered
@@ -271,8 +287,8 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   lights (it is in the map). `Mixed` lights stay realtime on it; their bounce is baked.
   Lightmapped copies of one prop still draw as one instanced call.
 - **Where the files go.** The lightmaps are packed into square **atlas pages** (the
-  smallest power of two that holds them all, up to 2048², then as many 2048² pages as it
-  takes; a gap in a page is filled before another opens, #1694). Each page is a
+  smallest power of two that holds them all, up to Max Lightmap Size, then as many pages
+  of that size as it takes; a gap in a page is filled before another opens, #1694). Each page is a
   `lightmap_<page>_<tag>.ktx2` in `<scene file>.lightmaps/` (old pages there are removed
   first): BC6H HDR light, a byte a texel, with two mips, which the renderer picks between
   by distance; each lightmap sits in a 4-texel ring of its own edge light, in a cell
@@ -282,8 +298,9 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   can open. A directional bake writes a `lightmap_dir_<page>_<tag>.ktx2` (BC7) and
   `.png` beside each page: RGB the direction mapped to 0–1 and A the directionality,
   packed exactly like its colour page. The texture importer leaves that folder alone
-  (`Assets.md`). Encoding takes time: about 6 s a 2048² page pair on four cores, after
-  the trace (a level-sized bake of six page pairs, about 45 s); the editor's Generate Lighting
+  (`Assets.md`). Encoding takes time, about 2 s per million texels on four cores, after
+  the trace: a 2048² page pair about 8 s, a 4096² pair about 30 s; a level whose biggest
+  meshes reach the default 1016 cap, about 90 s (#1704); the editor's Generate Lighting
   encodes the pages and compresses their PNGs on its worker and only writes the finished
   files on the frame, so the window stays live. The scene stores the page list and, per entity, its page and
   scale/offset (Unity's lightmap index + scale/offset), so **save the scene** after

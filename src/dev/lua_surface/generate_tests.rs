@@ -10,18 +10,18 @@ fn session() -> Session {
 #[test]
 fn settings_read_back_the_scenes_defaults() {
     let read = "local s = Lighting.GetSettings() \
-        return table.concat({s.texelsPerUnit, s.samples, s.bounces, s.seed, tostring(s.directional)}, ' ')";
-    assert_eq!(session().eval(read).unwrap(), "8.0 128 3 0 true");
+        return table.concat({s.texelsPerUnit, s.samples, s.bounces, s.seed, tostring(s.directional), s.maxLightmapSize}, ' ')";
+    assert_eq!(session().eval(read).unwrap(), "8.0 128 3 0 true 1024");
 }
 
 #[test]
 fn set_settings_changes_only_the_named_fields_and_clamps() {
     let s = session();
-    s.eval("Lighting.SetSettings{ samples = 0, directional = false }")
-        .unwrap();
+    let set = "Lighting.SetSettings{ samples = 0, directional = false, maxLightmapSize = 700 }";
+    s.eval(set).unwrap();
     let settings = s.world().scene().borrow().lighting_settings.lightmaps;
     assert_eq!(settings.samples, 1, "clamped to one sample");
-    assert!(!settings.directional);
+    assert!(!settings.directional && settings.max_lightmap_size == 1024);
     assert_eq!(settings.bounces, 3, "unnamed fields keep their value");
 }
 
@@ -93,16 +93,14 @@ fn bake_lightmaps_takes_the_scenes_settings_for_missing_arguments() {
 fn bake_lightmaps_applies_every_named_argument_and_clamps() {
     use super::Overrides;
     use crate::scene::lighting::lightmap::BakeSettings;
-    let base = BakeSettings {
-        directional: true,
-        ..Default::default()
-    };
+    let base = BakeSettings::default();
     let named = Overrides {
         texels_per_unit: Some(3.0),
         samples: Some(7),
         bounces: Some(2),
         seed: Some(11),
         directional: Some(false),
+        max_lightmap_size: None,
     }
     .apply(base);
     let got = (named.texels_per_unit, named.samples, named.bounces);

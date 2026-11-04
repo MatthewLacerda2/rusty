@@ -95,7 +95,10 @@ fn turning_it_off_drops_directions_and_keeps_the_colour() {
         assert_eq!(a.directions.len(), a.texels.len());
         assert!(b.directions.is_empty());
     }
-    assert!(pack(&off).directions.is_empty(), "no direction pages");
+    assert!(
+        pack(&off, MAX_PAGE).directions.is_empty(),
+        "no direction pages"
+    );
 }
 
 #[test]
@@ -106,7 +109,7 @@ fn direction_pages_share_the_colour_pages_layout() {
         texels: vec![Vec3::splat(value); (size * size) as usize],
         directions: vec![Vec3::Y * value; (size * size) as usize],
     };
-    let atlas = pack(&[map(1, 16, 0.25), map(2, 8, 0.75)]);
+    let atlas = pack(&[map(1, 16, 0.25), map(2, 8, 0.75)], MAX_PAGE);
     assert_eq!(atlas.directions.len(), atlas.pages.len());
     for (colour, dirs) in atlas.pages.iter().zip(&atlas.directions) {
         for (c, d) in colour.iter().zip(dirs) {

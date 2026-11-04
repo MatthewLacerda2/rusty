@@ -34,6 +34,7 @@ inspect! {
             with!("subdivisions", |m, n: u32| mesh::set_subdivisions(m, n)?)
         ),
         op!("cast_shadows", mesh::set_cast_shadows),
+        op!("scale_in_lightmap", mesh::set_scale_in_lightmap),
         ro!("skeleton", MESH),
     ];
     MaterialComponent => material, material_mut, &[

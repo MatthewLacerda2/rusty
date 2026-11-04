@@ -5,8 +5,9 @@
 //! renderer binds them all as one texture array and each mesh carries only a page
 //! index and a scale/offset into it (its `LightmapEntry`). Lightmapped copies of a
 //! prop then still draw as one instanced call. Pages are the smallest power of two
-//! that holds everything in one page, up to [`MAX_PAGE`]; past that, as many
-//! [`MAX_PAGE`] pages as it takes.
+//! that holds everything in one page, up to the bake's page edge (Unity's *Max
+//! Lightmap Size*, `BakeSettings::max_lightmap_size`, at most [`MAX_PAGE`]); past
+//! that, as many pages of that edge as it takes.
 //!
 //! **The cell.** Each lightmap sits in a square cell: the map, a [`PAD`]-texel ring
 //! copied from its own edge, and the cell rounded up to a multiple of [`GRID`], at a
@@ -28,9 +29,10 @@
 //! filled before a new page opens). Deterministic: the same bake always yields the
 //! same atlas.
 //!
-//! **The largest map** is [`max_map_edge`] of the page: half a page less its ring,
-//! so maps at the cap pack two by two on a page instead of one each (a 512 cap
-//! on a 1024 page left 28 of a game's 51 pages a quarter full).
+//! **The largest map** is [`max_map_edge`] of the page: the whole page less its
+//! ring, as in Unity, where a mesh's lightmap follows its area up to Max Lightmap
+//! Size (#1704). A map above half the page does not strand the rest of it: MaxRects
+//! fills the L beside it with smaller maps (`tests`).
 //!
 //! A directional bake (#810) packs its direction maps into a second page set with the
 //! very same layout, so one page index and scale/offset address both.
@@ -41,8 +43,8 @@ use glam::Vec3;
 
 use super::bake::Lightmap;
 
-/// The largest atlas page edge, in texels.
-pub const MAX_PAGE: u32 = 2048;
+/// The largest atlas page edge, in texels: Unity's largest Max Lightmap Size.
+pub const MAX_PAGE: u32 = 4096;
 /// The mip levels a page's layout keeps apart (see the module doc): the base and
 /// two halvings.
 pub const MIP_LEVELS: u32 = 3;
@@ -52,13 +54,14 @@ pub const PAD: u32 = 1 << (MIP_LEVELS - 1);
 /// The grid cells are aligned to, in texels: a 4×4 BC block of the last mip
 /// level, so no block of any kept level spans two cells.
 pub const GRID: u32 = 4 << (MIP_LEVELS - 1);
-/// The smallest page tried.
-const MIN_PAGE: u32 = 32;
+/// The smallest page tried: Unity's smallest Max Lightmap Size.
+pub const MIN_PAGE: u32 = 32;
 
-/// The largest lightmap edge a `page`-edge atlas takes so that two such maps,
-/// with their rings, sit side by side: `page / 2 - 2 * PAD`.
+/// The largest lightmap edge a `page`-edge atlas takes: the page less the ring on
+/// both sides, so its cell is exactly the page (`page` is a multiple of [`GRID`]).
+/// The one definition of a map's cap (#1704).
 pub const fn max_map_edge(page: u32) -> u32 {
-    page / 2 - 2 * PAD
+    page - 2 * PAD
 }
 
 /// The packed pages and where each lightmap went.
@@ -75,19 +78,22 @@ pub struct LightmapAtlas {
     pub placements: Vec<(u32, u32, [f32; 4])>,
 }
 
-/// Pack `maps` into pages. No lightmaps, no pages. A map wider than
-/// [`max_map_edge`] of [`MAX_PAGE`] keeps only its top-left corner of that size.
-pub fn pack(maps: &[Lightmap]) -> LightmapAtlas {
+/// Pack `maps` into pages of at most `max_page` texels a side (a power of two in
+/// [`MIN_PAGE`]`..=`[`MAX_PAGE`]; anything else is first held there by
+/// [`page_edge`]). No lightmaps, no pages. A map wider than [`max_map_edge`] of
+/// that page keeps only its top-left corner of that size.
+pub fn pack(maps: &[Lightmap], max_page: u32) -> LightmapAtlas {
+    let max_page = page_edge(max_page);
     let sizes: Vec<u32> = maps
         .iter()
-        .map(|m| m.size.min(max_map_edge(MAX_PAGE)))
+        .map(|m| m.size.min(max_map_edge(max_page)))
         .collect();
     let mut order: Vec<usize> = (0..maps.len()).collect();
     order.sort_by(|&a, &b| sizes[b].cmp(&sizes[a]).then(a.cmp(&b)));
     let mut page_size = MIN_PAGE;
     let (corners, page_count) = loop {
         let (corners, count) = place(&order, &sizes, page_size);
-        if count <= 1 || page_size >= MAX_PAGE {
+        if count <= 1 || page_size >= max_page {
             break (corners, count);
         }
         page_size *= 2;
@@ -121,6 +127,12 @@ pub fn pack(maps: &[Lightmap]) -> LightmapAtlas {
         directions,
         placements,
     }
+}
+
+/// `edge` held to a page edge the packer takes: the next power of two, inside
+/// [`MIN_PAGE`]`..=`[`MAX_PAGE`]. What a hand-edited Max Lightmap Size becomes.
+pub fn page_edge(edge: u32) -> u32 {
+    edge.clamp(MIN_PAGE, MAX_PAGE).next_power_of_two()
 }
 
 /// A map's cell edge: the map, its ring, rounded up to the grid.

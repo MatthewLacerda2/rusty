@@ -36,7 +36,7 @@ pub(super) fn quick() -> BakeSettings {
         samples: 8,
         bounces: 1,
         seed: 1,
-        max_resolution: 16,
+        max_lightmap_size: 32,
         filter_radius: 1,
         directional: true,
     }

@@ -60,7 +60,7 @@ impl LightmapBakeJob {
             .name("lightmap-bake".into())
             .spawn(
                 move || match bake_with_progress(&input, &settings, &watch) {
-                    Some(maps) => encode_pages(&maps, &watch),
+                    Some(maps) => encode_pages(&maps, settings.page(), &watch),
                     None => Ok(None),
                 },
             )

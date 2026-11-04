@@ -2,7 +2,8 @@
 //!
 //! A mesh's geometry comes from the model or primitive it was made from; the values
 //! authored on it are a `Plane`'s subdivisions, the grid a vertex block
-//! (`vertex_waves`) needs to move, and how it casts shadows (#1571). The Inspector's
+//! (`vertex_waves`) needs to move, how it casts shadows (#1571), and its Scale In
+//! Lightmap (#1704). The Inspector's
 //! Mesh card and `Component.Set` both write them here.
 //!
 //! Pure.
@@ -46,6 +47,17 @@ pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(
 /// frame or bake, a static one's cached shadow included.
 pub fn set_cast_shadows(mesh: &mut MeshComponent, mode: ShadowCasting) {
     mesh.cast_shadows = mode;
+}
+
+/// Set the mesh's Scale In Lightmap (#1704), held in
+/// [`MeshComponent::SCALE_IN_LIGHTMAP`]; a non-finite value keeps the default 1.
+/// The next bake reads it. A load runs this too, so a hand-edited file is held.
+pub fn set_scale_in_lightmap(mesh: &mut MeshComponent, scale: f32) {
+    let range = MeshComponent::SCALE_IN_LIGHTMAP;
+    mesh.scale_in_lightmap = match scale.is_finite() {
+        true => scale.clamp(*range.start(), *range.end()),
+        false => 1.0,
+    };
 }
 
 /// Hold a count read from a file (#1524), so the field agrees with the grid the
@@ -121,5 +133,17 @@ mod tests {
         cube.subdivisions = 4;
         assert!(hold_subdivisions(&mut cube).unwrap().contains("Box"));
         assert_eq!(cube.subdivisions, 1);
+    }
+
+    #[test]
+    fn scale_in_lightmap_is_held_in_its_range() {
+        let mut cube = primitive_mesh_component(Primitive::Box).unwrap();
+        assert_eq!(cube.scale_in_lightmap, 1.0);
+        for (set, held) in [(2.5, 2.5), (-1.0, 0.0), (1e9, 64.0), (f32::NAN, 1.0)] {
+            set_scale_in_lightmap(&mut cube, set);
+            assert_eq!(cube.scale_in_lightmap, held, "{set}");
+        }
+        set_scale_in_lightmap(&mut cube, 0.0);
+        assert!(cube.reads_probes(), "0 reads light probes");
     }
 }
