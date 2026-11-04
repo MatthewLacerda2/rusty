@@ -15,8 +15,14 @@
 //! so a retune taken asleep would still be gliding when the next sound woke the effect:
 //! a compressor switched off during silence would clip that sound's start. Woken, the
 //! effect runs over silence for another hang, and the tween ends before anything hears it.
+//! The ring is a generation count, not a flag one gate takes, so every gate sharing a
+//! [`Wake`] (a group's two filters and its effect rack) sees each ring.
+//!
+//! An effect whose tail outlasts the hang (a 2 s delay's echo, still in its line while
+//! input and output are both silent) holds the gate awake through its [`Hold`] until the
+//! tail has played.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use kira::effect::{Effect, EffectBuilder};
@@ -37,19 +43,28 @@ pub(super) fn is_silent(frames: &[Frame]) -> bool {
 }
 
 /// What a retune rings, after telling the effect's handle: the effect's parameters are
-/// about to move, so it stays awake for them.
+/// about to move, so it stays awake for them. Each ring bumps a generation every gate
+/// sharing it compares with the last it saw.
 #[derive(Clone, Default)]
-pub(super) struct Wake(Arc<AtomicBool>);
+pub(super) struct Wake(Arc<AtomicU64>);
 
 impl Wake {
     pub(super) fn ring(&self) {
-        self.0.store(true, Ordering::Release);
+        self.0.fetch_add(1, Ordering::AcqRel);
+    }
+
+    fn generation(&self) -> u64 {
+        self.0.load(Ordering::Acquire)
     }
 }
 
-/// Build effect `B` so that it sleeps over silence, woken by the [`Wake`] too. Its handle
-/// is `B`'s own.
-pub(super) struct Gated<B>(pub B, pub Wake);
+/// What an effect with a tail sets while it still has sound to play over silent input;
+/// its gate stays awake while it is set.
+pub(super) type Hold = Arc<AtomicBool>;
+
+/// Build effect `B` so that it sleeps over silence, woken by the [`Wake`] too, and held
+/// awake by its [`Hold`] if it has one. Its handle is `B`'s own.
+pub(super) struct Gated<B>(pub B, pub Wake, pub Option<Hold>);
 
 impl<B: EffectBuilder> EffectBuilder for Gated<B> {
     type Handle = B::Handle;
@@ -58,17 +73,22 @@ impl<B: EffectBuilder> EffectBuilder for Gated<B> {
         let (inner, handle) = self.0.build();
         let gate = Gate {
             inner,
+            seen: self.1.generation(),
             wake: self.1,
+            hold: self.2,
             quiet: 0.0,
         };
         (Box::new(gate), handle)
     }
 }
 
-/// An effect, what wakes it, and how long it has been silent, in seconds.
+/// An effect, what wakes it, the last ring it saw, what holds it, and how long it has
+/// been silent, in seconds.
 struct Gate {
     inner: Box<dyn Effect>,
     wake: Wake,
+    seen: u64,
+    hold: Option<Hold>,
     quiet: f64,
 }
 
@@ -84,7 +104,9 @@ impl Effect for Gate {
     /// Always, asleep too: this is where an effect takes its handle's latest command.
     fn on_start_processing(&mut self) {
         self.inner.on_start_processing();
-        if self.wake.0.swap(false, Ordering::AcqRel) {
+        let generation = self.wake.generation();
+        if generation != self.seen {
+            self.seen = generation;
             self.quiet = 0.0;
         }
     }
@@ -95,7 +117,11 @@ impl Effect for Gate {
             return;
         }
         self.inner.process(input, dt, info);
-        self.quiet = match silent_in && is_silent(input) {
+        let held = self
+            .hold
+            .as_ref()
+            .is_some_and(|h| h.load(Ordering::Acquire));
+        self.quiet = match silent_in && !held && is_silent(input) {
             true => self.quiet + dt * input.len() as f64,
             false => 0.0,
         };
@@ -105,3 +131,7 @@ impl Effect for Gate {
 #[cfg(test)]
 #[path = "gate_tests.rs"]
 mod gate_tests;
+
+#[cfg(test)]
+#[path = "rack_gate_tests.rs"]
+mod rack_gate_tests;

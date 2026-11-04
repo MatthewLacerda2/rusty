@@ -7,7 +7,8 @@
 //! (3D rolloff + pan from #213, `Time.timeScale` / pause) and handing the resulting
 //! [`VoiceMix`] to the backend (`mix.rs`, #412); the real device pans each voice
 //! through `device/voice.rs`. Every voice routes through a group of the [`Mixer`]
-//! (`mixer/`, #465): buses with volume, filters and a reverb send, snapshots and
+//! (`mixer/`, #465): buses with volume, filters, a reverb send and effects
+//! (`mixer/effects/`, #1748: Master starts with a limiter), snapshots and
 //! ducking, stepped by sim time; every group sends into one reverb bus that reverb
 //! zones tune from the listener's position (`reverb/`, #469). The speaker mode (#546, `speaker.rs`) shapes the
 //! output for the listening setup: per voice here, on the summed signal at the

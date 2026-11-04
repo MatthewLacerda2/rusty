@@ -4,7 +4,8 @@
 //! `AudioSource` (`Play`/`Stop`), set its volume (`SetVolume`/`GetVolume`), fire a
 //! fire-and-forget one-shot at a world position (`PlayAt`), and read/set the single
 //! master volume and the speaker mode (#546) on the `AudioMaestro`, and drive the
-//! mixer's groups, snapshots and ducks (`groups.rs`, `snapshots.rs`, #465) and
+//! mixer's groups, their effects, snapshots and ducks (`groups.rs`, `effects.rs`,
+//! `snapshots.rs`, #465, #1748) and
 //! occlusion (`occlusion.rs`, #467) and doppler (`doppler.rs`, #1749), and read back the listener's blended reverb
 //! zones (`reverb.rs`, #469). One surface, three callers — the same verbs
 //! the editor's play-state and the play-mode systems drive.
@@ -20,6 +21,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 mod doppler;
+mod effects;
 mod frame;
 mod groups;
 mod occlusion;
@@ -52,6 +54,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     register_speaker_mode(lua, &table, audio)?;
     groups::register_groups(lua, &table, audio)?;
     groups::register_output(lua, &table, scene, audio)?;
+    effects::register_effects(lua, &table, audio)?;
     snapshots::register_snapshots(lua, &table, audio, time)?;
     occlusion::register_occlusion(lua, &table, scene, audio)?;
     doppler::register_doppler(lua, &table, scene, audio)?;

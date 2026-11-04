@@ -45,7 +45,12 @@ impl EffectBuilder for ProbeBuilder {
 
 fn gate(ring: usize) -> (Box<dyn Effect>, Arc<Counts>) {
     let counts = Arc::new(Counts::default());
-    let (effect, ()) = Gated(ProbeBuilder(Arc::clone(&counts), ring), Wake::default()).build();
+    let (effect, ()) = Gated(
+        ProbeBuilder(Arc::clone(&counts), ring),
+        Wake::default(),
+        None,
+    )
+    .build();
     (effect, counts)
 }
 
@@ -132,7 +137,7 @@ fn an_effect_asleep_still_takes_its_commands_and_passes_silence_on() {
 fn a_ring_runs_it_over_silence_for_another_hang_and_then_it_sleeps() {
     let wake = Wake::default();
     let counts = Arc::new(Counts::default());
-    let builder = Gated(ProbeBuilder(Arc::clone(&counts), 0), wake.clone());
+    let builder = Gated(ProbeBuilder(Arc::clone(&counts), 0), wake.clone(), None);
     let (mut effect, ()) = builder.build();
     run(&mut effect, 0.0, PAST_HANG);
     let slept_at = processed(&counts);
