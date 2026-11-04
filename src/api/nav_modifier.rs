@@ -16,59 +16,50 @@ use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::NavMeshModifierVolumeComponent as Volume;
 use crate::scene::authoring::nav::modifier as ops;
 use crate::scene::Scene;
 
-type SceneCell<'s> = &'s RefCell<Scene>;
-
 /// Register the `NavMeshModifierVolume` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
-    register_box(scope, &t, scene)?;
-    register_options(scope, &t, scene)?;
+    register_box(lua, &t, scene)?;
+    register_options(lua, &t, scene)?;
     lua.globals()
         .set("NavMeshModifierVolume", t)
         .map_err(|e| e.to_string())
 }
 
 /// `id`'s volume, cloned, or `None` without one.
-fn get(scene: SceneCell, id: u32) -> Option<Volume> {
+fn get(scene: &RefCell<Scene>, id: u32) -> Option<Volume> {
     scene.borrow().world.nav_modifier(id).map(|v| v.clone())
 }
 
 /// Apply a shared op to `id`'s volume, if it has one.
-fn write(scene: SceneCell, id: u32, op: impl FnOnce(&mut Volume)) {
+fn write(scene: &RefCell<Scene>, id: u32, op: impl FnOnce(&mut Volume)) {
     if let Some(mut v) = scene.borrow_mut().world.nav_modifier_mut(id) {
         op(&mut v);
     }
 }
 
 /// `GetCenter` / `SetCenter` and `GetSize` / `SetSize`, as `x, y, z`.
-fn register_box<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
+fn register_box(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Field = (fn(&Volume) -> Vec3, fn(&mut Volume, Vec3));
     let fields: [(&str, Field); 2] = [
         ("Center", (|v| v.center, ops::set_center)),
         ("Size", (|v| v.size, ops::set_size)),
     ];
     for (name, (read, set)) in fields {
-        let f = scope.create_function(move |_, id: EntityArg| {
-            let v = get(scene, id.read()).map_or(Vec3::ZERO, |v| read(&v));
+        let f = lua.create_function(move |lua, id: EntityArg| {
+            let v = get(&*scene.get(lua)?, id.read()).map_or(Vec3::ZERO, |v| read(&v));
             Ok((v.x, v.y, v.z))
         });
         put(t, &format!("Get{name}"), f)?;
         let verb = format!("Set{name}");
-        let f = scope.create_function(move |_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        let f = lua.create_function(move |lua, (id, x, y, z): (EntityArg, f32, f32, f32)| {
             let id = id.live("NavMeshModifierVolume", &verb)?;
-            write(scene, id, |v| set(v, Vec3::new(x, y, z)));
+            write(&*scene.get(lua)?, id, |v| set(v, Vec3::new(x, y, z)));
             Ok(())
         });
         put(t, &format!("Set{name}"), f)?;
@@ -77,27 +68,24 @@ fn register_box<'scope>(
 }
 
 /// `Active` and `Area` (an area id; `0` without a volume).
-fn register_options<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    t: &Table,
-    scene: SceneCell<'scope>,
-) -> Reg {
-    let f = scope.create_function(move |_, id: EntityArg| {
-        Ok(get(scene, id.read()).is_some_and(|v| v.active))
+fn register_options(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).is_some_and(|v| v.active))
     });
     put(t, "GetActive", f)?;
-    let f = scope.create_function(move |_, (id, on): (EntityArg, bool)| {
+    let f = lua.create_function(move |lua, (id, on): (EntityArg, bool)| {
         let id = id.live("NavMeshModifierVolume", "SetActive")?;
-        write(scene, id, |v| ops::set_active(v, on));
+        write(&*scene.get(lua)?, id, |v| ops::set_active(v, on));
         Ok(())
     });
     put(t, "SetActive", f)?;
-    let f = scope
-        .create_function(move |_, id: EntityArg| Ok(get(scene, id.read()).map_or(0, |v| v.area)));
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        Ok(get(&*scene.get(lua)?, id.read()).map_or(0, |v| v.area))
+    });
     put(t, "GetArea", f)?;
-    let f = scope.create_function(move |_, (id, area): (EntityArg, i64)| {
+    let f = lua.create_function(move |lua, (id, area): (EntityArg, i64)| {
         let id = id.live("NavMeshModifierVolume", "SetArea")?;
-        write(scene, id, |v| ops::set_area(v, area));
+        write(&*scene.get(lua)?, id, |v| ops::set_area(v, area));
         Ok(())
     });
     put(t, "SetArea", f)

@@ -14,48 +14,41 @@
 //! can be placed and pointed at a not-yet-baked path, and the runtime falls back to the
 //! skybox.
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::{Lua, Table};
 
 use super::{put, Reg};
+use crate::api::ApiCell;
 use crate::scene::{ReflectionProbe, Scene};
 
 /// Register the `Reflection` namespace onto `lua`. `scene_path` is the saved scene file
 /// (if any) — the dev-only `Reflection.Bake()` (installed by `dev`, #737) writes its
 /// cubemaps into its own `<scene>.reflections/` folder.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_placement(scope, &table, scene)?;
-    register_config(scope, &table, scene)?;
-    register_settings(scope, &table, scene)?;
+    register_placement(lua, &table, scene)?;
+    register_config(lua, &table, scene)?;
+    register_settings(lua, &table, scene)?;
 
     lua.globals()
         .set("Reflection", table)
         .map_err(|e| e.to_string())
 }
 
-/// `Add` / `Move` / `Remove` / `Clear` / `Count` over single probes.
-fn register_placement<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+/// `Add` / `Move` over single probes, then [`register_list`].
+fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type AddArgs = (f32, f32, f32, f32, f32, f32);
     put(
         table,
         "Add",
-        scope.create_function(|_, (x, y, z, hx, hy, hz): AddArgs| {
+        lua.create_function(move |lua, (x, y, z, hx, hy, hz): AddArgs| {
+            let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
-            let i = scene
-                .reflection_probes
-                .add(Vec3::new(x, y, z), Vec3::new(hx, hy, hz));
+            let set = &mut scene.reflection_probes;
+            let i = set.add(Vec3::new(x, y, z), Vec3::new(hx, hy, hz));
+            // Placed by hand: the bake's auto-placement keeps it (#1737).
+            set.edit(i, |p| p.manual = true);
             Ok(i as u32)
         }),
     )?;
@@ -63,20 +56,29 @@ fn register_placement<'scope>(
     put(
         table,
         "Move",
-        scope.create_function(|_, (index, x, y, z): (u32, f32, f32, f32)| {
-            scene
-                .borrow_mut()
-                .reflection_probes
-                .move_probe(index as usize, Vec3::new(x, y, z));
+        lua.create_function(move |lua, (index, x, y, z): (u32, f32, f32, f32)| {
+            let scene = &*scene.get(lua)?;
+            let mut scene = scene.borrow_mut();
+            let set = &mut scene.reflection_probes;
+            set.move_probe(index as usize, Vec3::new(x, y, z));
+            hand_edited(set, index);
             Ok(())
         }),
     )?;
+    register_list(lua, table, scene)
+}
 
+/// `Remove` / `Clear` / `Count`: the probe list itself.
+fn register_list(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "Remove",
-        scope.create_function(|_, index: u32| {
-            scene.borrow_mut().reflection_probes.remove(index as usize);
+        lua.create_function(move |lua, index: u32| {
+            scene
+                .get(lua)?
+                .borrow_mut()
+                .reflection_probes
+                .remove(index as usize);
             Ok(())
         }),
     )?;
@@ -84,8 +86,8 @@ fn register_placement<'scope>(
     put(
         table,
         "Clear",
-        scope.create_function(|_, ()| {
-            scene.borrow_mut().reflection_probes.clear();
+        lua.create_function(move |lua, ()| {
+            scene.get(lua)?.borrow_mut().reflection_probes.clear();
             Ok(())
         }),
     )?;
@@ -93,27 +95,29 @@ fn register_placement<'scope>(
     put(
         table,
         "Count",
-        scope.create_function(|_, ()| Ok(scene.borrow().reflection_probes.len() as u32)),
+        lua.create_function(move |lua, ()| {
+            Ok(scene.get(lua)?.borrow().reflection_probes.len() as u32)
+        }),
     )
 }
 
 /// `SetBox` (explicit parallax corners) and `SetCubemap` (point at a baked KTX2).
-fn register_config<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_config(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type BoxArgs = (u32, f32, f32, f32, f32, f32, f32);
     put(
         table,
         "SetBox",
-        scope.create_function(
-            |_, (index, min_x, min_y, min_z, max_x, max_y, max_z): BoxArgs| {
-                scene.borrow_mut().reflection_probes.set_box(
-                    index as usize,
+        lua.create_function(
+            move |lua, (index, min_x, min_y, min_z, max_x, max_y, max_z): BoxArgs| {
+                let scene = &*scene.get(lua)?;
+                let mut scene = scene.borrow_mut();
+                let set = &mut scene.reflection_probes;
+                let (min, max) = (
                     Vec3::new(min_x, min_y, min_z),
                     Vec3::new(max_x, max_y, max_z),
                 );
+                set.set_box(index as usize, min, max);
+                hand_edited(set, index);
                 Ok(())
             },
         ),
@@ -122,7 +126,8 @@ fn register_config<'scope>(
     put(
         table,
         "SetCubemap",
-        scope.create_function(|_, (index, path): (u32, String)| {
+        lua.create_function(move |lua, (index, path): (u32, String)| {
+            let scene = &*scene.get(lua)?;
             scene
                 .borrow_mut()
                 .reflection_probes
@@ -134,22 +139,24 @@ fn register_config<'scope>(
 
 /// `Set(index, {…})` / `Get(index)`: every field of one probe (#1584), Unity's
 /// Reflection Probe settings among them.
-fn register_settings<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_settings(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "Set",
-        scope.create_function(|_, (index, t): (u32, Table)| {
+        lua.create_function(move |lua, (index, t): (u32, Table)| {
+            let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
             let set = &mut scene.reflection_probes;
             let Some(mut probe) = set.probes.get(index as usize).cloned() else {
                 return Ok(());
             };
             // Every field is read before any is written: a bad one changes nothing.
+            // A hand edit makes the probe manual (#1737). `manual = false` un-marks
+            // only a probe that was manual already: a Get-modify-Set round trip of a
+            // placed probe carries the `false` it read, and must keep the edit.
+            let was_manual = probe.manual;
             write_fields(&mut probe, &t)?;
+            probe.manual |= !was_manual;
             set.edit(index as usize, |p| *p = probe);
             Ok(())
         }),
@@ -157,7 +164,8 @@ fn register_settings<'scope>(
     put(
         table,
         "Get",
-        scope.create_function(|lua, index: u32| {
+        lua.create_function(move |lua, index: u32| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             match scene.reflection_probes.probes.get(index as usize) {
                 Some(p) => read_fields(lua, p).map(Some),
@@ -165,6 +173,12 @@ fn register_settings<'scope>(
             }
         }),
     )
+}
+
+/// Mark probe `index` manual after a hand edit: the next bake keeps it as it was
+/// left (#1737). The bake's own writes never come through here.
+fn hand_edited(set: &mut crate::scene::ReflectionProbeSet, index: u32) {
+    set.edit(index as usize, |p| p.manual = true);
 }
 
 /// The `{ x, y, z }` table of `v`.
@@ -199,6 +213,7 @@ fn read_fields(lua: &Lua, p: &ReflectionProbe) -> mlua::Result<Table> {
     t.set("farClip", p.far_clip)?;
     t.set("shadows", p.shadows)?;
     t.set("intensity", p.intensity)?;
+    t.set("manual", p.manual)?;
     Ok(t)
 }
 
@@ -226,6 +241,7 @@ fn write_fields(p: &mut ReflectionProbe, t: &Table) -> mlua::Result<()> {
     set(t, "nearClip", &mut p.near_clip)?;
     set(t, "farClip", &mut p.far_clip)?;
     set(t, "shadows", &mut p.shadows)?;
+    set(t, "manual", &mut p.manual)?;
     set(t, "intensity", &mut p.intensity)
 }
 

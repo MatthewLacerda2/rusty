@@ -20,14 +20,14 @@ fn destroy(scene: &mut Scene, id: u32) {
 }
 
 #[test]
-fn an_undone_destroy_puts_the_lightmap_entry_back_in_its_slot() {
+fn an_undone_destroy_puts_the_lightmap_entry_back() {
     let mut scene = Scene::new();
     let ids: Vec<u32> = ["A", "B", "C"]
         .iter()
         .map(|n| create_entity(&mut scene, n, Some(Primitive::Box)))
         .collect();
     for (page, &entity) in (0u32..).zip(&ids) {
-        scene.lightmaps.entries.push(LightmapEntry {
+        scene.lightmaps.insert(LightmapEntry {
             entity,
             page,
             scale_offset: [1.0, 1.0, 0.0, 0.0],
@@ -92,4 +92,21 @@ fn an_undone_destroy_puts_its_decals_back_in_blend_order() {
     assert_eq!(order(&scene), [ids[0], ids[2]]);
     scene.undo();
     assert_eq!(order(&scene), ids);
+}
+
+/// The journal records the parent a destroy takes the child out of, so the Undo
+/// puts both links back, never only the child's (#1777): a one-sided link would
+/// keep the child lit when its parent is switched off.
+#[test]
+fn an_undone_destroy_of_a_child_puts_it_back_in_its_parents_children() {
+    let mut scene = Scene::new();
+    let parent = create_entity(&mut scene, "Parent", None);
+    let child = create_entity(&mut scene, "Child", None);
+    scene.set_parent(child, Some(parent)).expect("no cycle");
+    destroy(&mut scene, child);
+    scene.undo();
+    assert_eq!(scene.world.parent_id(child), Some(parent));
+    assert_eq!(scene.world.children(parent), [child]);
+    scene.world.set_active(parent, false);
+    assert!(!scene.world.is_active_in_hierarchy(child));
 }

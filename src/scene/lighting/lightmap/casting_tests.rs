@@ -26,6 +26,7 @@ fn under(panel: BakeMesh, lights: Vec<BakeLight>) -> BakeScene {
         meshes: vec![floor(), panel],
         lights,
         sky: Vec3::ZERO.into(),
+        diffuse: Default::default(),
     }
 }
 

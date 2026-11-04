@@ -14,8 +14,8 @@ The two individual verbs stay for a script that wants only one of them.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, saved }` |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, diffuseModel, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, diffuseModel?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
@@ -30,11 +30,36 @@ The two individual verbs stay for a script that wants only one of them.
   bounces; a NaN or infinite density takes the default `8`); the editor's card edits the
   same fields under the button. The reflection probes' defaults sit beside them:
   `reflectionResolution` (default `512`, a power of two in 16–2048) and
-  `reflectionBudgetMB` (default `128`, `8`–`2048`) and `reflectionMaxProbes` (default
+  `reflectionBudgetMB` (default `256`, `8`–`2048`) and `reflectionMaxProbes` (default
   `512`, `1`–`4096`, the most probes auto-placement makes), edited in the scene Inspector's
   *Reflection Probes* section (see `Reflection.md`). A scene whose settings are all
   at their defaults leaves the block out of its file. `Lighting.BakeLightmaps` takes the
   same settings for every argument it is not given.
+- **The diffuse model** (`diffuseModel`, #1698) is how a lamp's direct light falls off
+  across a surface, scene-wide: `"Lambert"` (the default, the physical `max(N·L, 0)`)
+  or `"HalfLambert"` (the retro squared wrap `((N·L + 1) / 2)²`: a quarter of the light
+  at the terminator, none only straight behind, and about a third more diffuse
+  overall). The name is read in any case; an unknown one is an error, and a
+  `SetSettings` call that raises changes nothing. The editor's card edits it under the
+  bake knobs, greyed out while a bake runs. It is left out of the file at `Lambert`.
+  - **Where it applies:** wherever a lamp lights a surface. Realtime shading, lightmap
+    texels, the light probes' baked lamps (and `Probe.BakeAnalytic`'s sun), the surfaces
+    a bake's bounce rays hit and those a probe capture renders. So global illumination
+    gets brighter under `HalfLambert` too; only the transfer from one surface to the
+    next, and the sky, stay Lambert. Live lights follow a change at once, baked light at
+    the next bake.
+  - **Baked vs Realtime:** one lamp lights the side of a surface facing it the same
+    either way. Past the terminator, under `HalfLambert`, they agree only when the live
+    lamp casts shadows: a bake always traces a shadow ray, and from a point facing away
+    from the lamp that ray hits the surface's own mesh, as a shadow-casting live lamp's
+    shadow map does. A live point or spot lamp without shadows (`Light.SetCastShadows`,
+    off by default; the sun always casts them) keeps the wrap's back-side light (fading
+    from a quarter at the terminator to none straight behind); a baked or shadowed
+    one cuts it to dark at N·L = 0, a hard step where the wrap still gives a
+    quarter. A dynamic object lit through the probes beside it keeps the back-side
+    light: a probe stores the lamp unshadowed at its own position. This step is a known
+    limit of the opt-in retro mode; under `Lambert` there is nothing past the
+    terminator to lose, and every path agrees.
 - **The result is written at once**, as Unity writes its lighting data asset: the
   lightmap pages, the probes' baked SH (`<scene>.lighting.json`), and the scene file's
   lighting fields (probe layout, reflection probes, lightmap set, settings). Only those
@@ -54,11 +79,16 @@ The two individual verbs stay for a script that wants only one of them.
   bar and **Cancel**; a cancelled run writes nothing and keeps the old lighting. When
   the lightmaps land they are applied (the probes are captured under them), then the
   probe step runs a step a frame and the console logs one summary line at the end.
+  The probe step's placement is planned whole in the frame it starts: about 0.75 s
+  in a release build on a Dust2-sized level (10 × 10 rooms of 20 m and a 40 m tower:
+  0.41 s for the occupancy grid and floor plan, 0.05 s for the reflection probes,
+  0.29 s for 7,638 light probes), so the editor stalls that long once.
 - **From a script it logs its progress** (#1667), as Unity's batch-mode bake does: the
   verb blocks its caller until it returns, so a `play` scenario or a `session-mcp` call
   cannot poll, and instead the bake prints a line to **stderr** at each step and every
   5 s within one, with an ETA from the step's own rate, then the total time:
-  `[Lighting] lightmaps 41% (612/1501 meshes, 3.1M/7.6M texels), ~38 min left`, then
+  `[Lighting] lightmaps 41% (612/1501 meshes, 3.1M/7.6M texels), ~38 min left`, then a
+  line per lightmap page encoded (`lightmap pages 50% (6/12 pages encoded), ~30 s left`),
   `light probes, bounce 2 of at most 5: …, ~1 min left in this bounce` and
   `reflection probes 19% (3/16 probes), ~4 min left`, and `[Lighting] done in 1 h 4 min`.
   The lightmap step's first line and the total also go to the console (so `play`'s
@@ -85,41 +115,101 @@ The two individual verbs stay for a script that wants only one of them.
 `Lighting.Bake()` (#246) auto-places light probes and reflection probes from the static
 scene, then runs **both** probe bakes (`Probe.Bake` + `Reflection.Bake`) in one call: the
 probe half of Generate Lighting, and the orchestration over the `Probe` and `Reflection`
-namespaces, which stay available for manual placement.
+namespaces, which stay available for manual placement. The placement is planned into
+a copy: the scene keeps its old probes and their lighting until both bakes finish, and
+then the new sets replace them in one step (as Unity's bake applies only when it
+completes). A bake that is refused (no saved scene to write cubemaps beside), dropped
+(the probes edited midway), fails (a cubemap that cannot be written) or has no GPU
+adapter changes nothing.
 
 **Auto-placement** (deterministic — a pure function of the static scene, no RNG/clock,
-so the same level always yields the same layout):
+so the same level always yields the same layout). Both sets are planned from the same
+two pictures of the level (#1737):
 
-- **Light probes** — a regular grid through the navigable volume. The bounds are the
-  baked **nav surface**'s walkable XZ extent (raised by a few units of headroom so probes
-  cover the air actors move through), intersected with the static-geometry AABB. When no
-  nav surface has been baked, it **falls back to the static-geometry AABB** alone.
-  `probeSpacing` (default `4.0`) is the grid cell size in world units; a smaller one
-  (or NaN) is held to `0.5`.
-- **Reflection probes** — **one per room** (#1584). The floor plan comes from the baked
-  **nav surface** (each cell's lowest walkable floor and the underside above it), or,
-  with none, from the static colliders' bounds. It is cut into rooms where it narrows
+- the **floor plan**: where actors stand. With a baked **nav surface** it holds only
+  **reachable** floor: the **main floor**, always, which is the largest area joined
+  by walking that is not an **elevated top** (an area lying over at least half of
+  another area at least a quarter its size: a roof over its room, so an indoor level
+  whose roof is larger than its room still probes the room, while a small sealed
+  nook under the floor does not lift it); plus every area that holds a `NavMeshAgent`
+  or `CharacterController` (a sentry on a roof adds the roof, never removes the
+  floor); and what off-mesh links (drops, jumps) lead to from those. So wall tops,
+  roof tops and crate tops no one reaches get no probe. The rule still misreads a
+  main floor over a basement at least a quarter its size as a top; an actor start
+  on that floor adds it back.
+  Without a nav surface the plan is rasterized from the static colliders' bounds
+  (each cell's lowest top) and has no connectivity to read, so every floor in it counts.
+  Either way, **a liquid is not floor**: under a static, flat, `Transparent` mesh with
+  no solid collider (a pool's water plane), the first floor below its surface is
+  dropped when it is at least 0.3 m down, so no probe captures from at or under the
+  water. A floor further down (the storey under a rooftop pool) stays, and so does the
+  floor under a puddle or grime quad laid just over it. A collider-less glass pane laid flat reads as a liquid
+  too; give a skylight a collider.
+- an **occupancy grid**: the static solids voxelized at **0.5 m**, one bit a cell: the
+  active solid colliders (their triangles; convex shapes filled), and the opaque
+  triangles of every static mesh whose entity has no solid collider (their surface;
+  so a ceiling built as a render mesh roofs its room). Transparent runs are left out,
+  so water and glass are not solid. About 1.6 MB for a Dust2-sized level
+  (200 × 200 × 40 m), built in about 2 s in a debug build (3.4 s when every wall is
+  also a collider-less mesh); a level past 256 M cells is gridded coarser.
+
+- **Light probes** — after Unity's Adaptive Probe Volumes: a lattice through the air
+  over every reachable floor (each storey), from 1 m up to 3 m of headroom, never past
+  a ceiling, through a solid between the floor and the probe, or behind a wall from the
+  floor cell it was placed over. Its coarse points, at `probeSpacing` (default `4.0`,
+  held to at least `1.0`), are always kept; the points between, at half that, only
+  near geometry (a horizontal ray meets a wall or a crate within half
+  the spacing). A probe closer than 0.3 m to geometry is pushed out of it, and one still
+  inside a solid is dropped. The layout has no regular grid, so objects blend the
+  four nearest probes (`Probe.md`), found through a spatial index: about 1.5 µs a
+  sample in a release build over a Dust2-sized set of 7,680 probes, against 12 µs for
+  a scan of all of them. A moving Light Probe Proxy Volume samples each of its
+  points, so a 32³ one costs about 50 ms on every frame it moves. With no static solid at all, a regular grid over
+  the nav surface's walkable extent is placed instead.
+- **Reflection probes** — **one per room** (#1584). The floor plan
+  is cut into rooms where it narrows
   below **2.5 m** (a doorway, an arch, a corridor mouth) or steps by more than 0.5 m.
   Each room's probe captures from **eye height (1.6 m) over the room's middle**,
-  standing on open floor (never inside geometry), with its box **fitted to the room's
-  walls, floor and ceiling** (the top of the level when the room is open to the sky).
-  A room wider than `reflectionRegion` (default `12.0`, at least `2.0`: a smaller one is
-  an error) is split into probes no wider than it. Open floor too narrow to hold a room
+  standing on open floor at least 0.5 m clear of geometry where it can, with its box
+  **fitted to the room's walls, floor and ceiling** (lowered to the first solid
+  straight above the capture point). A room where most of its probes' upward rays
+  (straight up and a ring at 30°) reach the sky is **open air**: it gets **one probe
+  without box projection**, not a box under an invented ceiling, at importance `0`:
+  its box spans the room's whole footprint, so the room probes inside it (importance
+  `1`) draw over it. It captures from the clear point nearest the room's middle that
+  is itself open to the sky, so a yard round a house never captures from the house's
+  doorway.
+  A room wider than its region is split into probes no wider than it: the region is
+  `reflectionRegion` (default `12.0`, at least `2.0`: a smaller one is
+  an error) for an empty room, narrowed by its **clutter** (the solid fraction of the
+  air between 0.4 m and 1.8 m over its floor, column by column from each one's own
+  floor, the blocked patches of up to 16 m² it encloses counted: a room a quarter
+  full of crates takes probes a quarter as wide, while the solid core a corridor wraps
+  is architecture, not clutter). Open floor too narrow to hold a room
   (a level of corridors narrower than a doorway, a lone ledge) is an area of its own and
   gets its probes the same way, unless it is under 9 m² (the top of a jump box or a
-  crate): that joins the room around it. A layout over `reflectionMaxProbes` is re-tiled wider,
-  with a console warning, until it fits (or every room is one probe). Without a nav
+  crate): that joins the room around it. `reflectionMaxProbes` is a ceiling the manual
+  probes count against: a layout over it is re-tiled wider, with a console warning,
+  until it fits or every room is one probe, and past that the rooms with the largest
+  boxes keep theirs. With the manual probes already at it, none is placed. Without a nav
   surface the floor plan is rasterized at 0.5 m, or coarser (with a warning) when the
   level would take more than 4 million cells. Triggers are not walls.
-  A floor plan holds one floor per cell, so a room stacked under another (a tunnel
-  under a catwalk) shares the lower floor's probes.
+  A floor plan finds rooms on one floor per cell, so a room stacked under another (a
+  tunnel under a catwalk) shares the lower floor's probes.
 
-**Manual-vs-auto rule** (decided **per set**): if the scene already carries any light
-probes, their layout is **kept and only rebaked** — auto-placement runs only for a set
-that is currently empty; the reflection set is judged independently the same way. So a
-level with no probes gets a full auto-place + bake, while one with hand-authored probes
-is a pure rebake — **manual placement is never clobbered**. To force a re-auto-place after
-moving static geometry, `Probe.Clear()` / `Reflection.Clear()` first, then `Lighting.Bake()`.
+**Manual vs. placed** (#1737): every probe is either **manual** (`Probe.Add`,
+`Probe.FillGrid`, `Reflection.Add`, the Inspector's *Add probe*, or marked with
+`Probe.SetManual` / `Reflection.Set(i, { manual = true })` / the Inspector's *Manual*
+box) or **placed** by this bake. A hand edit makes a probe manual: `Probe.Move`,
+`Reflection.Move` / `SetBox` / `Set`, an Inspector field (except `Set{ manual = false }`
+and unticking *Manual*, which say otherwise), so a tuned box survives the next bake.
+Each bake **replaces the placed probes and keeps every manual one as it is** (position,
+box, settings), and plans around them: a placed reflection probe whose box a manual
+probe's box covers by at least half is left out (that room is the manual probe's), and
+no placed light probe lands within half a step of a manual one. A manual `FillGrid`
+keeps its trilinear grid through any number of bakes. So a level can mix the two and still be regenerated after its static
+geometry moves. A saved probe without the flag loads as placed. `Probe.Clear()` /
+`Reflection.Clear()` still remove both kinds.
 
 Like the individual bakes, it is **dev-only** and needs a GPU/software adapter; with none
 the placement still runs but the bakes skip gracefully (returns `false`, never errors —
@@ -135,8 +225,9 @@ afterward to persist the baked SH (`<scene>.lighting.json`) and the cubemap path
 light, the sky, emissive surfaces, and the direct light of `Baked` lights (see the light
 **Mode** in [`Light`](Light.md)). It is the lightmap half of Generate Lighting; the
 editor's button runs this exact path as its first step, in the background (#808): the
-window stays live, a progress bar counts texels done, and **Cancel** stops the bake and
-keeps the previous lightmaps. The result is applied when the bake finishes,
+window stays live, a progress bar counts texels done and then the pages it encodes
+("Encoding page k of n"), and **Cancel** stops the bake, during the trace or the encode,
+and keeps the previous lightmaps. The result is applied when the bake finishes,
 byte-identical to the script verb's; a bake whose scene was swapped out meanwhile is
 dropped. The script verb itself stays synchronous. An argument left out takes the
 scene's lighting settings (above), whose defaults are the ones listed here.
@@ -157,7 +248,8 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   per texel, `bounces` (default `3`) surfaces deep, seeded by `seed` (default `0`) — the
   same scene and seed always write byte-identical lightmaps, however many cores ran it.
   `texelsPerUnit` (default `8`) is the lightmap resolution per world unit (each mesh's
-  lightmap is 4–512 texels square). The bounce is smoothed with a 3-texel edge-aware
+  lightmap is 4–504 texels square: the largest that two of fit side by side on a 1024
+  page with their rings, #1694). The bounce is smoothed with a 3-texel edge-aware
   Gaussian (Unity's indirect filter) that never crosses a crease; baked direct light is
   not filtered, so a point, spot or directional light's shadows stay sharp; an Area
   light's (#1674) are soft, its rectangle integrated over `samples` or more jittered
@@ -179,11 +271,21 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   lights (it is in the map). `Mixed` lights stay realtime on it; their bounce is baked.
   Lightmapped copies of one prop still draw as one instanced call.
 - **Where the files go.** The lightmaps are packed into square **atlas pages** (the
-  smallest power of two that holds them all, up to 1024², then as many 1024² pages as it
-  takes), each an RGBM-encoded PNG in `<scene file>.lightmaps/` (old pages there are
-  removed first). A directional bake writes a `lightmap_dir_<page>_*.png` beside each
-  page: plain RGBA8, RGB the direction mapped to 0–1 and A the directionality, packed
-  exactly like its colour page. The scene stores the page list and, per entity, its page and
+  smallest power of two that holds them all, up to 2048², then as many 2048² pages as it
+  takes; a gap in a page is filled before another opens, #1694). Each page is a
+  `lightmap_<page>_<tag>.ktx2` in `<scene file>.lightmaps/` (old pages there are removed
+  first): BC6H HDR light, a byte a texel, with two mips, which the renderer picks between
+  by distance; each lightmap sits in a 4-texel ring of its own edge light, in a cell
+  aligned to 16 texels, so no compressed block and no texel of any of the three levels
+  ever mixes two lightmaps. An RGBM-encoded PNG of the same
+  name sits beside it: what a GPU without BC compression loads, and a picture an agent
+  can open. A directional bake writes a `lightmap_dir_<page>_<tag>.ktx2` (BC7) and
+  `.png` beside each page: RGB the direction mapped to 0–1 and A the directionality,
+  packed exactly like its colour page. The texture importer leaves that folder alone
+  (`Assets.md`). Encoding takes time: about 6 s a 2048² page pair on four cores, after
+  the trace (a level-sized bake of six page pairs, about 45 s); the editor's Generate Lighting
+  encodes the pages and compresses their PNGs on its worker and only writes the finished
+  files on the frame, so the window stays live. The scene stores the page list and, per entity, its page and
   scale/offset (Unity's lightmap index + scale/offset), so **save the scene** after
   `Lighting.BakeLightmaps()` to keep them (`Lighting.Generate()` writes them itself). Needs a saved scene path (errors otherwise). `Lighting.ClearLightmaps()`
   drops the references (the files stay until the next bake).

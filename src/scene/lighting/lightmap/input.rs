@@ -68,18 +68,23 @@ pub struct BakeScene {
     /// sees its `incoming` radiance, so an open texel bakes to the `at` the forward
     /// shader shades an unbaked surface with.
     pub sky: crate::scene::AmbientRadiance,
+    /// The scene's diffuse model (`LightingSettings::diffuse_model`, #1698): how a
+    /// baked lamp's direct light falls off across a texel or a bounce surface, and how
+    /// it lands in a probe, as the forward shader shades a live one.
+    pub diffuse: crate::scene::lighting::DiffuseModel,
 }
 
 impl BakeScene {
     /// Flatten `scene`: the drawn runs of every active static mesh that is not a light
     /// gizmo, each with its own material (#1290) and the mesh's *Cast Shadows*
     /// (#1571), the active `Mixed` / `Baked` lights,
-    /// and the ambient sky. `map_average` turns a texture path into its average linear
+    /// the ambient sky and the diffuse model. `map_average` turns a texture path into its average linear
     /// colour (`None` when it cannot be read); it is asked once per path.
     pub fn gather(scene: &Scene, map_average: &dyn Fn(&MapRef) -> Option<Vec3>) -> Self {
         let map_average = once_per_path(map_average);
         let mut out = BakeScene {
             sky: scene.drawn_ambient().radiance(),
+            diffuse: scene.lighting_settings.diffuse_model,
             ..Default::default()
         };
         for id in scene.world.ids_with_mesh() {

@@ -9,20 +9,18 @@
 //! neutral default without a Shape; setters are then no-ops. Whether a shape exists
 //! is `Scene.AddComponent(id, "Shape")` / `RemoveComponent`.
 
-use std::cell::RefCell;
-
 use glam::{Vec2, Vec4};
 use mlua::{Lua, Table, Variadic};
 
 use super::ui_look::{register_blend, register_gradient, BlendAccess, GradientAccess};
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::ShapeComponent;
 use crate::components::{ShapeCorner, ShapeKind};
 use crate::scene::authoring::ui::shape as ops;
 use crate::scene::Scene;
 
-type Scoped<'s> = &'s RefCell<Scene>;
 type NumsGet = fn(&ShapeComponent) -> Vec<f32>;
 type NumsSet = fn(&mut ShapeComponent, &[f32]);
 
@@ -100,18 +98,14 @@ fn lead(scalars: &[f32], color: Vec4) -> Vec<f32> {
 }
 
 /// Register the `Shape` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: Scoped<'scope>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     for (suffix, count, get, set) in NUMS {
-        register_nums(scope, &table, scene, (suffix, count), get, set)?;
+        register_nums(lua, &table, scene, (suffix, count), get, set)?;
     }
-    register_names(scope, &table, scene)?;
-    register_blend(scope, &table, scene, ("Shape", BLEND))?;
-    register_gradient(scope, &table, scene, ("Shape", GRADIENT))?;
+    register_names(lua, &table, scene)?;
+    register_blend(lua, &table, scene, ("Shape", BLEND))?;
+    register_gradient(lua, &table, scene, ("Shape", GRADIENT))?;
     lua.globals().set("Shape", table).map_err(|e| e.to_string())
 }
 
@@ -134,10 +128,10 @@ const GRADIENT: GradientAccess = GradientAccess {
 
 /// `Get<suffix>(id) -> …` (zeros without a Shape) / `Set<suffix>(id, …)`, which
 /// needs all `count` numbers.
-fn register_nums<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_nums(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: Scoped<'scope>,
+    scene: ApiCell<Scene>,
     (suffix, count): (&'static str, usize),
     get: NumsGet,
     set: NumsSet,
@@ -145,7 +139,8 @@ fn register_nums<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let s = scene.borrow();
             let v = s
                 .world
@@ -158,13 +153,13 @@ fn register_nums<'scope>(
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, args): (EntityArg, Variadic<f32>)| {
+        lua.create_function(move |lua, (id, args): (EntityArg, Variadic<f32>)| {
             let id = id.live("Shape", &verb)?;
             if args.len() < count {
                 let msg = format!("Shape.Set{suffix} expects {count} numbers");
                 return Err(mlua::Error::RuntimeError(msg));
             }
-            with_shape(&mut scene.borrow_mut(), id, |c| set(c, &args));
+            with_shape(&mut scene.get(lua)?.borrow_mut(), id, |c| set(c, &args));
             Ok(())
         }),
     )
@@ -196,33 +191,31 @@ const NAMES: [(&str, NameGet, NameSet); 2] = [
 ];
 
 /// The [`NAMES`] accessors (`"None"` without a Shape) and `Get/SetRaycastTarget`.
-fn register_names<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    scene: Scoped<'scope>,
-) -> Reg {
+fn register_names(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     for (suffix, get, set) in NAMES {
-        let read = move |_: &Lua, id: EntityArg| {
+        let read = move |lua: &Lua, id: EntityArg| {
+            let scene = scene.get(lua)?;
             let s = scene.borrow();
             Ok(s.world
                 .shape(id.read())
                 .map_or("None", |c| get(&c))
                 .to_string())
         };
-        put(table, &format!("Get{suffix}"), scope.create_function(read))?;
+        put(table, &format!("Get{suffix}"), lua.create_function(read))?;
         let verb = format!("Set{suffix}");
-        let write = move |_: &Lua, (id, name): (EntityArg, String)| {
+        let write = move |lua: &Lua, (id, name): (EntityArg, String)| {
             let id = id.live("Shape", &verb)?;
-            with_shape(&mut scene.borrow_mut(), id, |c| set(c, &name));
+            with_shape(&mut scene.get(lua)?.borrow_mut(), id, |c| set(c, &name));
             Ok(())
         };
-        put(table, &format!("Set{suffix}"), scope.create_function(write))?;
+        put(table, &format!("Set{suffix}"), lua.create_function(write))?;
     }
     put(
         table,
         "GetRaycastTarget",
-        scope.create_function(move |_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
             Ok(scene
+                .get(lua)?
                 .borrow()
                 .world
                 .shape(id.read())
@@ -232,9 +225,9 @@ fn register_names<'scope>(
     put(
         table,
         "SetRaycastTarget",
-        scope.create_function(move |_, (id, on): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, on): (EntityArg, bool)| {
             let id = id.live("Shape", "SetRaycastTarget")?;
-            with_shape(&mut scene.borrow_mut(), id, |c| {
+            with_shape(&mut scene.get(lua)?.borrow_mut(), id, |c| {
                 ops::set_raycast_target(c, on)
             });
             Ok(())

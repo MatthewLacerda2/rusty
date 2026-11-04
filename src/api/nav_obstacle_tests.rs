@@ -3,29 +3,31 @@
 //! reads neutral defaults.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
 
 use super::register;
+use crate::api::bind;
 use crate::components::NavMeshObstacleComponent;
 use crate::scene::Scene;
 
-fn scene_with_obstacle() -> (RefCell<Scene>, u32, u32) {
+fn scene_with_obstacle() -> (Rc<RefCell<Scene>>, u32, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("door".to_string());
     scene
         .world
         .set_nav_obstacle(id, Some(NavMeshObstacleComponent::default()));
     let bare = scene.add_entity("bare".to_string());
-    (RefCell::new(scene), id, bare)
+    (Rc::new(RefCell::new(scene)), id, bare)
 }
 
 #[test]
 fn setters_write_through_the_shared_ops_and_getters_read_back() {
     let (scene, id, _) = scene_with_obstacle();
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene)).unwrap();
         lua.globals().set("id", id)?;
         lua.load(
             "NavMeshObstacle.SetShape(id, 'capsule')
@@ -65,8 +67,8 @@ fn setters_write_through_the_shared_ops_and_getters_read_back() {
 fn an_entity_without_an_obstacle_reads_defaults() {
     let (scene, _, bare) = scene_with_obstacle();
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene)).unwrap();
         lua.globals().set("bare", bare)?;
         lua.load("NavMeshObstacle.SetCarving(bare, true)").exec()?;
         let (carving, active): (bool, bool) = lua

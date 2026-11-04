@@ -70,18 +70,18 @@ fn no_double_jump_mid_air() {
 }
 
 /// Drives the bundled controller (the harness workspace's copy, #782), counting the
-/// casts it fires into `SHOTS`. The API is registered afresh each tick, so the wrap
-/// is laid inside `Update`.
+/// casts it fires into `SHOTS`. The API is the VM's for its life (#1709), so the
+/// wrap is laid once, in `Start`.
 const SHOT_PROBE: &str = r#"
 local Controller = dofile("WORKSPACE/assets/scripts/player_controller.lua")
 local Probe = {}
 SHOTS = 0
-function Probe.Start(id) Controller.Start(id) end
-function Probe.Update(id, dt)
+function Probe.Start(id)
     local cast = Physics.Raycast
     Physics.Raycast = function(...) SHOTS = SHOTS + 1; return cast(...) end
-    Controller.drive(Controller, id, dt)
+    Controller.Start(id)
 end
+function Probe.Update(id, dt) Controller.drive(Controller, id, dt) end
 return Probe
 "#;
 

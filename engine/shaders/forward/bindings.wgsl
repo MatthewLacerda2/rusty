@@ -66,7 +66,7 @@ struct MaterialData {
     // Thin translucency: rgb colour * amount, w the amount.
     transmission: vec4<f32>,
     // 1 when the surface traces screen-space reflections (#1570) where the camera
-    // marches (`camera.stack.z`).
+    // marches (`camera.ssr.x`).
     receive_ssr: u32,
     surface_pad_a: u32,
     surface_pad_b: u32,
@@ -158,8 +158,9 @@ var t_decal_data: texture_2d_array<f32>;
 @group(0) @binding(13)
 var s_decal: sampler;
 
-// Baked lightmap atlas pages (#438): linear RGBM, one layer per page, read at the
-// instance's page through its scale/offset; a 1x1 black page when none are baked.
+// Baked lightmap atlas pages (#438): linear light (BC6H, or Rgba16Float decoded from
+// the RGBM PNG, #1694), one layer per page with its mips, read at the instance's
+// page through its scale/offset; a 1x1 black page when none are baked.
 @group(0) @binding(14)
 var t_lightmaps: texture_2d_array<f32>;
 @group(0) @binding(15)

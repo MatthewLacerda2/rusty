@@ -28,11 +28,11 @@ fn bake(scene: &mut Scene, id: u32) {
         .reflection_probes
         .set_cubemap(0, "probe_0.ktx2".into());
     scene.lightmaps.pages = vec!["lightmap_0.png".into()];
-    scene.lightmaps.entries = vec![LightmapEntry {
+    scene.lightmaps.insert(LightmapEntry {
         entity: id,
         page: 0,
         scale_offset: [1.0, 1.0, 0.0, 0.0],
-    }];
+    });
 }
 
 fn assert_baked(scene: &Scene, id: u32) {
@@ -60,6 +60,10 @@ fn undoing_a_setting_or_a_probe_move_after_a_bake_keeps_the_bake() {
         Vec3::X,
         "the move is undone"
     );
+    // The bake lit probe 1 at Y, not X: back at X it keeps what it had there
+    // (#1737, matched by position).
+    assert_eq!(scene.probes.probes[1].sh, Sh9::zero());
+    scene.probes.probes[1].sh = scene.probes.probes[0].sh;
     scene.undo();
     assert_ne!(scene.ambient_intensity, 0.25, "the setting is undone");
     assert_baked(&scene, id);

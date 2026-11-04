@@ -17,7 +17,9 @@ pub(super) fn probed(probes: usize, x: f32) -> Scene {
     let mut scene = Scene::new();
     for i in 0..probes {
         let at = Vec3::new(x + i as f32 * 4.0, 1.0, 0.0);
-        scene.reflection_probes.add(at, Vec3::splat(2.0));
+        let i = scene.reflection_probes.add(at, Vec3::splat(2.0));
+        // Placed by hand: a bake keeps it rather than re-placing it (#1737).
+        scene.reflection_probes.edit(i, |p| p.manual = true);
     }
     scene.lighting_settings.reflections.resolution = 16;
     scene

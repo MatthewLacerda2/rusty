@@ -1,8 +1,10 @@
 //! The Lua `Material.*` surface and the shared `authoring::material` ops converge (#287).
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::scene::authoring::material as mat_ops;
 use rusty::scene::{RenderMode, Scene};
 
@@ -15,29 +17,26 @@ fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::E
     // second, then asserting the two resolved materials are equal. The clamp on
     // `SetAlpha`/`SetAlphaCutoff` is exercised (2.0 / -1.0 -> 1.0 / 0.0), proving the
     // validation is single-sourced in the shared op the binding calls.
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let via_lua = scene.borrow_mut().add_entity("ViaLua".to_string());
     let via_op = scene.borrow_mut().add_entity("ViaOp".to_string());
 
     let lua = Lua::new();
-    lua.scope(|s| {
-        rusty::api::material::register(&lua, s, &scene).unwrap();
-        lua.load(format!(
-            r#"
-            Material.SetMetallic({via_lua}, 0.7)
-            Material.SetRoughness({via_lua}, 0.2)
-            Material.SetEmissive({via_lua}, {{1.0, 0.5, 0.0}})
-            Material.SetColor({via_lua}, {{0.25, 2.0, 0.5}})
-            Material.SetTexture({via_lua}, "albedo.png")
-            Material.SetRenderMode({via_lua}, "transparent")
-            Material.SetAlpha({via_lua}, 2.0)
-            Material.SetAlphaCutoff({via_lua}, -1.0)
-        "#
-        ))
-        .exec()
-        .unwrap();
-        Ok(())
-    })?;
+    rusty::api::material::register(&lua, bind(&lua, &scene)).unwrap();
+    lua.load(format!(
+        r#"
+        Material.SetMetallic({via_lua}, 0.7)
+        Material.SetRoughness({via_lua}, 0.2)
+        Material.SetEmissive({via_lua}, {{1.0, 0.5, 0.0}})
+        Material.SetColor({via_lua}, {{0.25, 2.0, 0.5}})
+        Material.SetTexture({via_lua}, "albedo.png")
+        Material.SetRenderMode({via_lua}, "transparent")
+        Material.SetAlpha({via_lua}, 2.0)
+        Material.SetAlphaCutoff({via_lua}, -1.0)
+    "#
+    ))
+    .exec()
+    .unwrap();
 
     // The shared op path: resolve-or-create the key (same verb the API uses), then call
     // the same ops the editor card calls, with the same inputs.

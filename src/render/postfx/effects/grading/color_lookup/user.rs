@@ -1,6 +1,6 @@
 //! The volume's Color Lookup (#1441): a user LUT (`asset::lut`, a `.cube` or a
 //! Unity strip `.png`) uploaded as a 3D texture the grading bake reads, so the
-//! composite still grades a pixel with one fetch. Unity's *Color Lookup* override,
+//! composite still grades a pixel with one read of the grading LUT. Unity's *Color Lookup* override,
 //! applied as URP applies it: last, on the display colour, sRGB-encoded.
 //!
 //! Uploads are cached by path ([`UserLuts`]) and kept in step with the disk the way

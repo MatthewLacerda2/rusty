@@ -174,11 +174,9 @@ impl PhysicsWorld {
         &self,
         pre: &VelocitySnapshot,
     ) -> Vec<CollisionPair> {
-        let body_owner: Map<RigidBodyHandle, u32> =
-            self.id_to_body.iter().map(|(&id, &h)| (h, id)).collect();
         let owner_of = |c: ColliderHandle| {
             let parent = self.colliders.get(c).and_then(|c| c.parent());
-            parent.and_then(|h| body_owner.get(&h).copied())
+            parent.and_then(|h| self.body_to_id.get(&h).copied())
         };
         let mut pairs = Vec::new();
         for pair in self.narrow_phase.contact_pairs() {

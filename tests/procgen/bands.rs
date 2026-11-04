@@ -5,7 +5,8 @@ use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 
 /// The *worn, grimy painted metal* example (docs/api/Texture.md) plus a blur,
 /// warp, tile, mapping, bump, a distance bevel, a normal blend, the channel ops,
-/// two-image math and auto levels, so every banded path runs.
+/// two-image math, auto levels and the #1743 filters (occlusion, edges, highpass,
+/// sharpen, histogram scan, levels), so every banded path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
   "nodes": [
@@ -34,7 +35,15 @@ const RECIPE: &str = r#"{
     { "id": "top", "op": "math", "func": "max", "value": 0, "inputs": ["lit", "chips"] },
     { "id": "lev", "op": "auto_levels", "inputs": ["top"] },
     { "id": "lt", "op": "mix", "mode": "lighten", "inputs": ["lev", "cav"] },
-    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt", "soft"] }
+    { "id": "ao", "op": "ambient_occlusion", "radius": 0.05, "quality": 4, "inputs": ["h"] },
+    { "id": "ed", "op": "edge_detect", "width": 0.03, "roundness": 0.5, "inputs": ["h"] },
+    { "id": "hp", "op": "highpass", "radius": 0.05, "inputs": ["chips"] },
+    { "id": "sh", "op": "sharpen", "intensity": 1.5, "radius": 0.02, "inputs": ["hp"] },
+    { "id": "hs", "op": "histogram_scan", "position": 0.4, "contrast": 0.6, "inputs": ["sh"] },
+    { "id": "lv", "op": "levels", "in_low": 0.1, "gamma": 1.4, "inputs": ["hs"] },
+    { "id": "more", "op": "combine_rgb", "inputs": ["ao", "ed", "lv"] },
+    { "id": "lt2", "op": "mix", "mode": "multiply", "factor": 0.5, "inputs": ["lt", "more"] },
+    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt2", "soft"] }
   ],
   "output": "out"
 }"#;

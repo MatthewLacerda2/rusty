@@ -5,21 +5,19 @@ mod line;
 mod trail;
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::lua::eval;
 use mlua::Lua;
+use rusty::api::bind;
 use rusty::scene::Scene;
 
 /// Run `f` with the `Trail` and `Line` namespaces registered over `scene`.
-fn with_api(scene: &RefCell<Scene>, f: impl FnOnce(&Lua)) {
+fn with_api(scene: &Rc<RefCell<Scene>>, f: impl FnOnce(&Lua)) {
     let lua = Lua::new();
-    lua.scope(|scope| {
-        rusty::api::trail::register(&lua, scope, scene).unwrap();
-        rusty::api::line::register(&lua, scope, scene).unwrap();
-        f(&lua);
-        Ok(())
-    })
-    .unwrap();
+    rusty::api::trail::register(&lua, bind(&lua, scene)).unwrap();
+    rusty::api::line::register(&lua, bind(&lua, scene)).unwrap();
+    f(&lua);
 }
 
 /// Save `scene` to a temp file and load it back.

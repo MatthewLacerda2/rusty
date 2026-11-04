@@ -16,6 +16,7 @@ use mlua::Lua;
 use super::ui_look::{BlendAccess, GradientAccess};
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::asset::MapRef;
 use crate::components::ImageComponent;
 use crate::components::{FillMethod, FillOrigin, ImageType};
@@ -106,24 +107,20 @@ const GRADIENT: GradientAccess = GradientAccess {
 };
 
 /// Register the `Image` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     for (suffix, get, set) in VEC4S {
-        register_vec4(scope, &table, scene, suffix, get, set)?;
+        register_vec4(lua, &table, scene, suffix, get, set)?;
     }
     for (suffix, get, set) in NAMES {
-        register_name(scope, &table, scene, suffix, get, set)?;
+        register_name(lua, &table, scene, suffix, get, set)?;
     }
     for (suffix, get, set) in BOOLS {
-        register_bool(scope, &table, scene, suffix, get, set)?;
+        register_bool(lua, &table, scene, suffix, get, set)?;
     }
-    register_texture_and_amount(scope, &table, scene)?;
-    super::ui_look::register_blend(scope, &table, scene, ("Image", BLEND))?;
-    super::ui_look::register_gradient(scope, &table, scene, ("Image", GRADIENT))?;
+    register_texture_and_amount(lua, &table, scene)?;
+    super::ui_look::register_blend(lua, &table, scene, ("Image", BLEND))?;
+    super::ui_look::register_gradient(lua, &table, scene, ("Image", GRADIENT))?;
     lua.globals().set("Image", table).map_err(|e| e.to_string())
 }
 
@@ -135,10 +132,10 @@ fn with_image(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&mut ImageComponen
 }
 
 /// `Get<suffix>(id) -> x, y, z, w` (zeros without an Image) / `Set<suffix>(id, x, y, z, w)`.
-fn register_vec4<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_vec4(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     suffix: &str,
     get: Vec4Get,
     set: Vec4Set,
@@ -146,7 +143,8 @@ fn register_vec4<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let v = scene
                 .world
@@ -160,10 +158,10 @@ fn register_vec4<'scope>(
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(
-            move |_, (id, x, y, z, w): (EntityArg, f32, f32, f32, f32)| {
+        lua.create_function(
+            move |lua, (id, x, y, z, w): (EntityArg, f32, f32, f32, f32)| {
                 let id = id.live("Image", &verb)?;
-                with_image(scene, id, |i| set(i, Vec4::new(x, y, z, w)));
+                with_image(&*scene.get(lua)?, id, |i| set(i, Vec4::new(x, y, z, w)));
                 Ok(())
             },
         ),
@@ -171,10 +169,10 @@ fn register_vec4<'scope>(
 }
 
 /// `Get<suffix>(id) -> name` (`"None"` without an Image) / `Set<suffix>(id, name)`.
-fn register_name<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_name(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     suffix: &str,
     get: NameGet,
     set: NameSet,
@@ -182,7 +180,8 @@ fn register_name<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene
                 .world
@@ -195,19 +194,19 @@ fn register_name<'scope>(
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, name): (EntityArg, String)| {
+        lua.create_function(move |lua, (id, name): (EntityArg, String)| {
             let id = id.live("Image", &verb)?;
-            with_image(scene, id, |i| set(i, &name));
+            with_image(&*scene.get(lua)?, id, |i| set(i, &name));
             Ok(())
         }),
     )
 }
 
 /// `Get<suffix>(id) -> bool` (`false` without an Image) / `Set<suffix>(id, bool)`.
-fn register_bool<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_bool(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     suffix: &str,
     get: BoolGet,
     set: BoolSet,
@@ -215,7 +214,8 @@ fn register_bool<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.world.image(id.read()).is_some_and(|i| get(&i)))
         }),
@@ -224,24 +224,21 @@ fn register_bool<'scope>(
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, value): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, value): (EntityArg, bool)| {
             let id = id.live("Image", &verb)?;
-            with_image(scene, id, |i| set(i, value));
+            with_image(&*scene.get(lua)?, id, |i| set(i, value));
             Ok(())
         }),
     )
 }
 
 /// `Get/SetTexture` (a path, or `nil` for a solid colour) and `Get/SetFillAmount`.
-fn register_texture_and_amount<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_texture_and_amount(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GetTexture",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene
                 .world
@@ -252,16 +249,17 @@ fn register_texture_and_amount<'scope>(
     put(
         table,
         "SetTexture",
-        scope.create_function(|_, (id, path): (EntityArg, Option<String>)| {
+        lua.create_function(move |lua, (id, path): (EntityArg, Option<String>)| {
             let id = id.live("Image", "SetTexture")?;
-            with_image(scene, id, |i| image_ops::set_texture(i, path));
+            with_image(&*scene.get(lua)?, id, |i| image_ops::set_texture(i, path));
             Ok(())
         }),
     )?;
     put(
         table,
         "GetFillAmount",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.world.image(id.read()).map_or(0.0, |i| i.fill_amount))
         }),
@@ -269,9 +267,11 @@ fn register_texture_and_amount<'scope>(
     put(
         table,
         "SetFillAmount",
-        scope.create_function(|_, (id, amount): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, amount): (EntityArg, f32)| {
             let id = id.live("Image", "SetFillAmount")?;
-            with_image(scene, id, |i| image_ops::set_fill_amount(i, amount));
+            with_image(&*scene.get(lua)?, id, |i| {
+                image_ops::set_fill_amount(i, amount)
+            });
             Ok(())
         }),
     )

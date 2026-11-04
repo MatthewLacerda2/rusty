@@ -1,47 +1,41 @@
 //! Tests for the `Reflection` namespace (`reflection.rs`).
 
+use crate::api::bind;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use super::*;
 
-fn empty_scene() -> RefCell<Scene> {
-    RefCell::new(Scene::default())
+fn empty_scene() -> Rc<RefCell<Scene>> {
+    Rc::new(RefCell::new(Scene::default()))
 }
 
 #[test]
 fn add_count_remove() {
     let scene = empty_scene();
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene).unwrap();
-        lua.load("Reflection.Add(0,0,0, 5,5,5)").exec().unwrap();
-        lua.load("Reflection.Add(10,0,0, 5,5,5)").exec().unwrap();
-        let n: u32 = lua.load("return Reflection.Count()").eval().unwrap();
-        assert_eq!(n, 2);
-        lua.load("Reflection.Remove(0)").exec().unwrap();
-        let n: u32 = lua.load("return Reflection.Count()").eval().unwrap();
-        assert_eq!(n, 1);
-        Ok(())
-    })
-    .unwrap();
+    register(&lua, bind(&lua, &scene)).unwrap();
+    lua.load("Reflection.Add(0,0,0, 5,5,5)").exec().unwrap();
+    lua.load("Reflection.Add(10,0,0, 5,5,5)").exec().unwrap();
+    let n: u32 = lua.load("return Reflection.Count()").eval().unwrap();
+    assert_eq!(n, 2);
+    lua.load("Reflection.Remove(0)").exec().unwrap();
+    let n: u32 = lua.load("return Reflection.Count()").eval().unwrap();
+    assert_eq!(n, 1);
 }
 
 #[test]
 fn set_box_and_cubemap() {
     let scene = empty_scene();
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene).unwrap();
-        lua.load("Reflection.Add(0,0,0, 1,1,1)").exec().unwrap();
-        lua.load("Reflection.SetBox(0, -3,-3,-3, 3,3,3)")
-            .exec()
-            .unwrap();
-        lua.load("Reflection.SetCubemap(0, 'room.ktx2')")
-            .exec()
-            .unwrap();
-        Ok(())
-    })
-    .unwrap();
+    register(&lua, bind(&lua, &scene)).unwrap();
+    lua.load("Reflection.Add(0,0,0, 1,1,1)").exec().unwrap();
+    lua.load("Reflection.SetBox(0, -3,-3,-3, 3,3,3)")
+        .exec()
+        .unwrap();
+    lua.load("Reflection.SetCubemap(0, 'room.ktx2')")
+        .exec()
+        .unwrap();
     let s = scene.borrow();
     let p = &s.reflection_probes.probes[0];
     assert_eq!(p.box_min, Vec3::splat(-3.0));
@@ -53,25 +47,23 @@ fn set_box_and_cubemap() {
 fn set_and_get_every_setting() {
     let scene = empty_scene();
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene).unwrap();
-        lua.load(
-            "Reflection.Add(0,0,0, 1,1,1)
-             Reflection.Set(0, { boxProjection = false, blendDistance = 2,
-               importance = 3, resolution = 300, nearClip = 0.2, farClip = 50,
-               shadows = false, intensity = 1.5, position = { x = 1, y = 2, z = 3 } })",
-        )
+    register(&lua, bind(&lua, &scene)).unwrap();
+    lua.load(
+        "Reflection.Add(0,0,0, 1,1,1)
+         Reflection.Set(0, { boxProjection = false, blendDistance = 2,
+           importance = 3, resolution = 300, nearClip = 0.2, farClip = 50,
+           shadows = false, intensity = 1.5, position = { x = 1, y = 2, z = 3 } })",
+    )
+    .exec()
+    .unwrap();
+    let r: (bool, u32, f32, f32, bool) = lua
+        .load("local p = Reflection.Get(0) return p.boxProjection, p.resolution, p.farClip, p.position.y, Reflection.Get(4) == nil")
+        .eval()
+        .unwrap();
+    assert_eq!(r, (false, 256, 50.0, 2.0, true));
+    lua.load("Reflection.Set(0, { resolution = 0 })")
         .exec()
         .unwrap();
-        let r: (bool, u32, f32, f32, bool) = lua
-            .load("local p = Reflection.Get(0) return p.boxProjection, p.resolution, p.farClip, p.position.y, Reflection.Get(4) == nil")
-            .eval()
-            .unwrap();
-        assert_eq!(r, (false, 256, 50.0, 2.0, true));
-        lua.load("Reflection.Set(0, { resolution = 0 })").exec().unwrap();
-        Ok(())
-    })
-    .unwrap();
     let s = scene.borrow();
     let p = &s.reflection_probes.probes[0];
     assert_eq!((p.importance, p.resolution, p.intensity), (3, None, 1.5));
@@ -85,17 +77,57 @@ fn set_and_get_every_setting() {
 fn a_set_with_a_bad_field_writes_nothing() {
     let scene = empty_scene();
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene).unwrap();
-        lua.load("Reflection.Add(0,0,0, 1,1,1)").exec().unwrap();
-        let bad = "Reflection.Set(0, { blendDistance = 4, intensity = 'bright' })";
-        assert!(lua.load(bad).exec().is_err());
-        Ok(())
-    })
-    .unwrap();
+    register(&lua, bind(&lua, &scene)).unwrap();
+    lua.load("Reflection.Add(0,0,0, 1,1,1)").exec().unwrap();
+    let bad = "Reflection.Set(0, { blendDistance = 4, intensity = 'bright' })";
+    assert!(lua.load(bad).exec().is_err());
     let p = &scene.borrow().reflection_probes.probes[0];
     assert_eq!(
         p.blend_distance, 1.0,
         "the field before the bad one is untouched"
     );
+}
+
+#[test]
+fn added_probes_are_manual_and_set_can_change_it() {
+    let scene = empty_scene();
+    let lua = Lua::new();
+    register(&lua, bind(&lua, &scene)).unwrap();
+    let manual: bool = lua
+        .load("Reflection.Add(0,0,0, 1,1,1) return Reflection.Get(0).manual")
+        .eval()
+        .unwrap();
+    assert!(manual, "Add places by hand (#1737)");
+    lua.load("Reflection.Set(0, { manual = false })")
+        .exec()
+        .unwrap();
+    assert!(!scene.borrow().reflection_probes.probes[0].manual);
+}
+
+/// A hand edit makes a placed probe manual, so the next bake keeps it (#1737),
+/// a Get-modify-Set round trip included; `Set{ manual = false }` un-marks a
+/// probe that is manual already.
+#[test]
+fn hand_edits_make_a_placed_probe_manual() {
+    let scene = empty_scene();
+    let lua = Lua::new();
+    register(&lua, bind(&lua, &scene)).unwrap();
+    for edit in [
+        "Reflection.Move(0, 1, 2, 3)",
+        "Reflection.SetBox(0, -1,-1,-1, 2,2,2)",
+        "Reflection.Set(0, { intensity = 2 })",
+        "local p = Reflection.Get(0); p.boxMax.y = 6; Reflection.Set(0, p)",
+    ] {
+        scene.borrow_mut().reflection_probes = Default::default();
+        scene
+            .borrow_mut()
+            .reflection_probes
+            .add(Vec3::ZERO, Vec3::ONE);
+        lua.load(edit).exec().unwrap();
+        assert!(scene.borrow().reflection_probes.probes[0].manual, "{edit}");
+    }
+    lua.load("Reflection.Set(0, { manual = false, intensity = 3 })")
+        .exec()
+        .unwrap();
+    assert!(!scene.borrow().reflection_probes.probes[0].manual);
 }

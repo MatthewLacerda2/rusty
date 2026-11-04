@@ -56,12 +56,14 @@ pub const LAYERS: &[Layer] = &[
     sim("time", &[]),
     // Decoding is the asset pipeline's: models, clips through symphonia (#545; only
     // `audio` plays them) and colour lookups through `image` (#1441); textures are
-    // block-compressed at import (#1574).
+    // block-compressed at import (#1574), and baked lightmap pages
+    // are stored as KTX2 (#1694).
     sim("asset", &["core"]).uses(&[
         "bevy_mikktspace",
         "block_compression",
         "gltf",
         "image",
+        "ktx2",
         "symphonia",
         "tobj",
         "ufbx",
@@ -84,7 +86,10 @@ pub const LAYERS: &[Layer] = &[
     sim("ui", &["asset", "components", "core", "ecs", "scene"])
         .uses(&["harfrust", "image", "skrifa"]),
     sim("physics", &["components", "core", "ecs", "scene", "time"]).uses(&["rapier3d"]),
-    sim("navigation", &["components", "core", "physics", "scene"]),
+    sim(
+        "navigation",
+        &["components", "core", "ecs", "physics", "scene"],
+    ),
     // `scripting` and `api` are one layer (see PEERS): scripting installs the Lua
     // surface, and the surface reads runtime state scripting owns.
     sim(
@@ -167,6 +172,7 @@ pub const LAYERS: &[Layer] = &[
             "core",
             "logging",
             "navigation",
+            "physics",
             "preview",
             "render",
             "scene",

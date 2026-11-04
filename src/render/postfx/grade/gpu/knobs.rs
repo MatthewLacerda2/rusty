@@ -4,6 +4,7 @@
 
 use glam::Vec3;
 
+use super::analytic::analytic;
 use super::{chain, W};
 use crate::components::{PostProcessingComponent, Tonemap, Wheel};
 use crate::core::color::linear_to_srgb;
@@ -11,18 +12,6 @@ use crate::render::{RenderView, OFFSCREEN_FORMAT};
 use crate::scene::authoring::default_post_processing;
 use crate::scene::authoring::rendering::post_processing as ops;
 use crate::scene::{Camera, Scene};
-
-/// The composite's grade before the LUT (as it was at #1438): exposure, then
-/// the tonemap, at neutral contrast, saturation and gamma.
-pub(super) fn analytic(x: f32, ev: f32, tonemap: Tonemap) -> f32 {
-    let h = x * ev.exp2();
-    let aces = (h * (2.51 * h + 0.03)) / (h * (2.43 * h + 0.59) + 0.14);
-    match tonemap {
-        Tonemap::None => h,
-        Tonemap::Reinhard => h / (h + 1.0),
-        Tonemap::Aces => aces,
-    }
-}
 
 /// A grey ramp over the HDR range a frame holds: 0, then 0.001 to 40, log-spaced.
 fn ramp() -> Vec<f32> {
@@ -45,7 +34,7 @@ fn gpu_neutral_knobs_through_the_lut_match_the_analytic_tonemap() {
     let Some(mut c) = chain() else { return };
     let ramp = ramp();
     let row: Vec<[f32; 3]> = ramp.iter().map(|&x| [x; 3]).collect();
-    for tonemap in [Tonemap::Aces, Tonemap::Reinhard, Tonemap::None] {
+    for tonemap in Tonemap::ALL {
         for ev in [0.0, 1.5] {
             let grade = volume(tonemap);
             let out = c.run(&row, ev, Some(&grade));

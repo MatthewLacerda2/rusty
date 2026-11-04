@@ -12,21 +12,18 @@ use mlua::{Table, Value};
 
 use crate::api::audio::{emitter, listener};
 use crate::api::lua_json::to_lua;
-use crate::api::{put, ApiScopedCtx, Reg};
+use crate::api::{put, ApiCtx, Reg};
 
 /// Register both audio reads on the `Debug` table.
-pub fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    ctx: &ApiScopedCtx<'scope>,
-) -> Reg {
+pub fn register(lua: &mlua::Lua, table: &Table, ctx: &ApiCtx) -> Reg {
     let audio = ctx.audio;
     // The cursor is the last `seq` a reader saw; the second return is the oldest
     // `seq` still held, so a reader can tell when events rolled off past its cursor.
     put(
         table,
         "AudioEvents",
-        scope.create_function(move |lua, after_seq: Option<u64>| {
+        lua.create_function(move |lua, after_seq: Option<u64>| {
+            let audio = &*audio.get(lua)?;
             let audio = audio.borrow();
             let (events, oldest) = audio.events_after(after_seq.unwrap_or(0));
             Ok((to_lua(lua, events)?, oldest))
@@ -37,9 +34,11 @@ pub fn register<'scope>(
     put(
         table,
         "AudioVoices",
-        scope.create_function(move |lua, ()| -> mlua::Result<Value> {
+        lua.create_function(move |lua, ()| -> mlua::Result<Value> {
+            let audio = &*audio.get(lua)?;
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
-            let (audio, heard_by) = (audio.borrow(), listener(camera, &scene));
+            let (audio, heard_by) = (audio.borrow(), listener(&*camera.get(lua)?, &scene));
             let voices: Vec<_> = scene
                 .world
                 .ids_with_audio()

@@ -7,58 +7,56 @@
 //! and `Collider.isTrigger`. Getters answer a neutral default without the
 //! component; setters are then no-ops.
 
-use std::cell::RefCell;
-
 use mlua::Table;
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::authoring::{physics::collider as collider_ops, physics::rigidbody as rb_ops};
 use crate::scene::Scene;
 
 /// Register the mass, gravity and trigger accessors onto the `Physics` table.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
-    let f = scope.create_function(|_, id: EntityArg| {
+pub(super) fn register(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
+    let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(scene
+            .get(lua)?
             .borrow()
             .world
             .rigidbody(id.read())
             .map_or(0.0, |rb| rb.mass))
     });
     put(table, "GetMass", f)?;
-    let f = scope.create_function(|_, (id, mass): (EntityArg, f32)| {
+    let f = lua.create_function(move |lua, (id, mass): (EntityArg, f32)| {
         let id = id.live("Physics", "SetMass")?;
-        if let Some(mut rb) = scene.borrow_mut().world.rigidbody_mut(id) {
+        if let Some(mut rb) = scene.get(lua)?.borrow_mut().world.rigidbody_mut(id) {
             rb_ops::set_mass(&mut rb, mass);
         }
         Ok(())
     });
     put(table, "SetMass", f)?;
-    let f = scope.create_function(|_, id: EntityArg| {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let scene = &*scene.get(lua)?;
         let world = &scene.borrow().world;
         Ok(world.rigidbody(id.read()).is_some_and(|rb| rb.use_gravity))
     });
     put(table, "GetUseGravity", f)?;
-    let f = scope.create_function(|_, (id, on): (EntityArg, bool)| {
+    let f = lua.create_function(move |lua, (id, on): (EntityArg, bool)| {
         let id = id.live("Physics", "SetUseGravity")?;
-        if let Some(mut rb) = scene.borrow_mut().world.rigidbody_mut(id) {
+        if let Some(mut rb) = scene.get(lua)?.borrow_mut().world.rigidbody_mut(id) {
             rb_ops::set_use_gravity(&mut rb, on);
         }
         Ok(())
     });
     put(table, "SetUseGravity", f)?;
-    let f = scope.create_function(|_, id: EntityArg| {
+    let f = lua.create_function(move |lua, id: EntityArg| {
+        let scene = &*scene.get(lua)?;
         let world = &scene.borrow().world;
         Ok(world.collider(id.read()).is_some_and(|c| c.is_trigger))
     });
     put(table, "IsTrigger", f)?;
-    let f = scope.create_function(|_, (id, on): (EntityArg, bool)| {
+    let f = lua.create_function(move |lua, (id, on): (EntityArg, bool)| {
         let id = id.live("Physics", "SetTrigger")?;
-        if let Some(mut c) = scene.borrow_mut().world.collider_mut(id) {
+        if let Some(mut c) = scene.get(lua)?.borrow_mut().world.collider_mut(id) {
             collider_ops::set_trigger(&mut c, on);
         }
         Ok(())

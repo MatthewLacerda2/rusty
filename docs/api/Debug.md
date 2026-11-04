@@ -102,7 +102,7 @@ end
 | `lod_hidden_entities` | mesh entities skipped because their `LODGroup` showed another level (#472), summed over the camera stack |
 | `lights` / `lights_dropped` | active lights, and those left unlit: realtime directional lights past 4, every ambient but the last, and per camera the point/spot lights in view past the clustered budget of 64 (the least contributing go first, #434, #834) |
 | `cluster_lights_dropped` | (cluster, light) entries cut because more than 32 point/spot lights reached one cluster, the least contributing there first (#834); non-zero means some corner of the view is over the per-pixel budget |
-| `lights_visible` / `lights_culled` | point/spot lights binned into at least one light cluster / outside a camera's view and skipped before binning, so they cost nothing (#434); summed over the camera stack |
+| `lights_visible` / `lights_culled` | point/spot lights binned into at least one light cluster / listed in none: outside a camera's view and skipped before binning (#434), or kept but contributing nothing (zero intensity or colour, #1712) or with a cone that misses the view, so no pixel shades them; summed over the camera stack |
 | `light_cluster_refs` | entries in the cluster light lists (#434): the (cluster, light) pairs shaders may visit, summed over the camera stack — the clustered lighting's workload |
 | `light_bin_us` | CPU **microseconds** spent binning lights and decals into clusters (#434, #638), summed over the camera stack — wall-clock |
 | `decals_visible` / `decal_cluster_refs` | decals binned into at least one cluster / the (cluster, decal) pairs shaders may visit (#638), summed over the camera stack; a stacked `DepthOnly` camera (a viewmodel) bins none |
@@ -120,6 +120,7 @@ end
 | `ssr_surface_passes` | opaque scene passes that wrote SSR's surface targets (#1526): one per view whose base camera runs SSR; a stacked overlay camera (a viewmodel) draws with the plain pipelines and writes none, so it never counts |
 | `opaque_copies` | opaque copies made this frame (#1523), Unity's *Opaque Texture*: one per camera whose visible translucents refract or absorb (`Material.SetRefractionModel`, `SetTransmittanceColor`) or trace SSR (`Material.SetReceiveSsr`, on a base camera running SSR, #1570), drawn after its opaque pass and SSR; `0` on a frame showing none, which skips the copy |
 | `texture_bytes` | GPU bytes of the image textures the renderer holds (material maps, UI images, particle and render textures, and the uncompressed copy a slot that cannot read a compressed one gets), every mip included (#1574): the resident total, not a per-frame count. What *Compression* and *Max Size* (`Assets.SetTextureImportSettings`) shrink: a 2048² map is 21.3 MiB uncompressed with mips, 2.7 MiB as BC4, 5.3 MiB as BC5 or BC7 |
+| `lightmap_bytes` | GPU bytes of every lightmap page array the renderer holds (#1694): the scene's bound colour and direction arrays with every mip, and another scene's page list still cached beside them (a rebake's old pages are freed as it deletes them). The resident total, not a per-frame count. A page is BC6H (irradiance) or BC7 (directions), a byte a texel, plus 5/16 of that for its two mips: a directional 2048² page pair is 10.5 MiB. On a GPU without BC compression the pages upload from their PNGs, as `Rgba16Float` and RGBA8 (six times that). Pages still loading in a windowed editor or game are not counted until they land |
 | `grade_lut_bakes` | views whose colour-grading LUT was rebaked this frame (#1440): a grading knob or the tonemap changed, or the view is new; `0` on every frame the grade holds |
 | `ui_mask_passes` / `ui_blur_passes` | UI `Mask` coverage textures rendered (#428) / fullscreen passes of the UI backdrop blur, its composite included — `0` with no backdrop visible (#426) |
 | `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
@@ -140,7 +141,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `ssao` | the SSAO occlusion pass, at its quality's resolution |
 | `ssao_blur` | the SSAO blur at the occlusion's resolution, and the depth-aware upsample to full resolution when that is lower |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
-| `ssr` | screen-space reflections (#1526): the march over the base camera's opaque image; the copy of that image it reads is recorded before the timed pass, so it isn't counted |
+| `ssr` | screen-space reflections (#1526): the march over the base camera's opaque image; the copy of that image it reads and its mip pyramid (#1736) are recorded before the timed pass, untimed, so they aren't counted |
 | `transparent` | translucent solids |
 | `ribbons` | trails and lines |
 | `particles` | particle systems |

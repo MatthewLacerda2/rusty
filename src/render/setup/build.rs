@@ -197,7 +197,7 @@ fn create_global_bindings(
     let reflection_probes = ProbeArray::new(device);
     let clusters = ClusterBuffers::new(device);
     let decals = DecalBuffers::new(device);
-    let lightmaps = Lightmaps::new(device);
+    let lightmaps = Lightmaps::new(device, false);
     let sky_reflection = SkyReflection::new(device, registry);
     let global_bind_group = GlobalGroup {
         camera: &camera_buffer,

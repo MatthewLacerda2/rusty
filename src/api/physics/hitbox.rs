@@ -5,25 +5,21 @@
 //! Unity has no runtime equivalent (its Ragdoll Wizard is editor-only); here the
 //! agent can do anything the editor can.
 
-use std::cell::RefCell;
-
 use mlua::Table;
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::scene::skeleton::HitboxOptions;
 use crate::scene::Scene;
 
 /// Register `GenerateHitboxes` onto the `Physics` table.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub(super) fn register(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "GenerateHitboxes",
-        scope.create_function(|lua, (id, opts): (EntityArg, Option<Table>)| {
+        lua.create_function(move |lua, (id, opts): (EntityArg, Option<Table>)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Physics", "GenerateHitboxes")?;
             let opts = options(opts)?;
             let made = scene

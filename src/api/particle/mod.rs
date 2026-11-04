@@ -18,6 +18,7 @@ use std::cell::RefCell;
 use mlua::Lua;
 
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::api::{put, Reg};
 use crate::components::{EmitFrom, EmitShape, SubEmitTrigger};
 use crate::core::curve::{ColorRange, Range};
@@ -25,20 +26,16 @@ use crate::scene::authoring::particles as particle_ops;
 use crate::scene::Scene;
 
 /// Register the `Particles` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    register_emission(scope, &table, scene)?;
-    register_tuning(scope, &table, scene)?;
-    register_shape(scope, &table, scene)?;
-    register_start(scope, &table, scene)?;
-    register_state(scope, &table, scene)?;
-    render::register(scope, &table, scene)?;
-    space::register(scope, &table, scene)?;
+    register_emission(lua, &table, scene)?;
+    register_tuning(lua, &table, scene)?;
+    register_shape(lua, &table, scene)?;
+    register_start(lua, &table, scene)?;
+    register_state(lua, &table, scene)?;
+    render::register(lua, &table, scene)?;
+    space::register(lua, &table, scene)?;
 
     lua.globals()
         .set("Particles", table)
@@ -46,17 +43,14 @@ pub fn register<'scope>(
 }
 
 /// One-off emissions: `Emit` (count) and `Burst` (the configured burst count).
-fn register_emission<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_emission(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     // Emit `count` particles at the entity's world position, right now. Returns the
     // number actually spawned (the max-particle cap may swallow some).
     put(
         table,
         "Emit",
-        scope.create_function(|_, (id, count): (EntityArg, u32)| {
+        lua.create_function(move |lua, (id, count): (EntityArg, u32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Particles", "Emit")?;
             let mut scene = scene.borrow_mut();
             let origin = scene.world.emitter_frame(id);
@@ -73,7 +67,8 @@ fn register_emission<'scope>(
     put(
         table,
         "Burst",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Particles", "Burst")?;
             let mut scene = scene.borrow_mut();
             let origin = scene.world.emitter_frame(id);
@@ -87,15 +82,12 @@ fn register_emission<'scope>(
 }
 
 /// Emitter tuning: `SetActive` (gate) and `SetRate` (continuous rate).
-fn register_tuning<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_tuning(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "SetActive",
-        scope.create_function(|_, (id, active): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, active): (EntityArg, bool)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Particles", "SetActive")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.particles_mut(id) {
@@ -108,7 +100,8 @@ fn register_tuning<'scope>(
     put(
         table,
         "SetRate",
-        scope.create_function(|_, (id, rate): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, rate): (EntityArg, f32)| {
+            let scene = &*scene.get(lua)?;
             let id = id.live("Particles", "SetRate")?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.particles_mut(id) {
@@ -120,18 +113,14 @@ fn register_tuning<'scope>(
 }
 
 /// The #439 shape setters: `SetShape` and `SetDirection` (the shape's axis).
-fn register_shape<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_shape(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     // `SetShape(id, kind, opts?)` — opts: radius, angle (cone, degrees), x/y/z (box
     // size), surface. Returns false (and changes nothing) for an unknown kind.
     put(
         table,
         "SetShape",
-        scope.create_function(
-            |_, (id, kind, opts): (EntityArg, String, Option<mlua::Table>)| {
+        lua.create_function(
+            move |lua, (id, kind, opts): (EntityArg, String, Option<mlua::Table>)| {
                 let id = id.live("Particles", "SetShape")?;
                 let get = |k: &str, d: f32| opts.as_ref().and_then(|o| o.get(k).ok()).unwrap_or(d);
                 let size = glam::Vec3::new(get("x", 1.0), get("y", 1.0), get("z", 1.0));
@@ -149,7 +138,7 @@ fn register_shape<'scope>(
                 else {
                     return Ok(false);
                 };
-                with_emitter(scene, id, |p| {
+                with_emitter(&*scene.get(lua)?, id, |p| {
                     particle_ops::set_shape(p, shape);
                     particle_ops::set_emit_from(p, from);
                 });
@@ -160,21 +149,19 @@ fn register_shape<'scope>(
     put(
         table,
         "SetDirection",
-        scope.create_function(|_, (id, x, y, z): (EntityArg, f32, f32, f32)| {
+        lua.create_function(move |lua, (id, x, y, z): (EntityArg, f32, f32, f32)| {
             let id = id.live("Particles", "SetDirection")?;
             let dir = glam::Vec3::new(x, y, z);
-            with_emitter(scene, id, |p| particle_ops::set_direction(p, dir));
+            with_emitter(&*scene.get(lua)?, id, |p| {
+                particle_ops::set_direction(p, dir)
+            });
             Ok(())
         }),
     )
 }
 
 /// The #439 start-value setters: ranges, colour, and sub-emitters.
-fn register_start<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_start(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     // `SetLifetime` / `SetSpeed` / `SetSize(id, min, max?)` — `max` omitted is a
     // constant.
     type RangeOp = fn(&mut crate::scene::ParticleEmitterComponent, Range);
@@ -187,10 +174,10 @@ fn register_start<'scope>(
         put(
             table,
             name,
-            scope.create_function(move |_, (id, min, max): (EntityArg, f32, Option<f32>)| {
+            lua.create_function(move |lua, (id, min, max): (EntityArg, f32, Option<f32>)| {
                 let id = id.live("Particles", name)?;
                 let range = Range::new(min, max.unwrap_or(min));
-                with_emitter(scene, id, |p| op(p, range));
+                with_emitter(&*scene.get(lua)?, id, |p| op(p, range));
                 Ok(())
             }),
         )?;
@@ -198,11 +185,11 @@ fn register_start<'scope>(
     put(
         table,
         "SetColor",
-        scope.create_function(
-            |_, (id, r, g, b, a): (EntityArg, f32, f32, f32, Option<f32>)| {
+        lua.create_function(
+            move |lua, (id, r, g, b, a): (EntityArg, f32, f32, f32, Option<f32>)| {
                 let id = id.live("Particles", "SetColor")?;
                 let color = ColorRange::constant([r, g, b, a.unwrap_or(1.0)]);
-                with_emitter(scene, id, |p| particle_ops::set_color(p, color));
+                with_emitter(&*scene.get(lua)?, id, |p| particle_ops::set_color(p, color));
                 Ok(())
             },
         ),
@@ -211,30 +198,29 @@ fn register_start<'scope>(
     put(
         table,
         "SetSubEmitter",
-        scope.create_function(|_, (id, trigger, target): (EntityArg, String, EntityArg)| {
-            let id = id.live("Particles", "SetSubEmitter")?;
-            let target = target.get();
-            let Some(trigger) = SubEmitTrigger::parse(&trigger) else {
-                return Ok(false);
-            };
-            with_emitter(scene, id, |p| {
-                particle_ops::set_sub_emitter(p, trigger, target)
-            });
-            Ok(true)
-        }),
+        lua.create_function(
+            move |lua, (id, trigger, target): (EntityArg, String, EntityArg)| {
+                let id = id.live("Particles", "SetSubEmitter")?;
+                let target = target.get();
+                let Some(trigger) = SubEmitTrigger::parse(&trigger) else {
+                    return Ok(false);
+                };
+                with_emitter(&*scene.get(lua)?, id, |p| {
+                    particle_ops::set_sub_emitter(p, trigger, target)
+                });
+                Ok(true)
+            },
+        ),
     )
 }
 
 /// Live state: `IsActive`, `GetCount`, and `Clear`.
-fn register_state<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
-    table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+fn register_state(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
         "IsActive",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let active = scene.world.particles(id.read()).map(|p| p.active);
             Ok(active.unwrap_or(false))
@@ -244,7 +230,8 @@ fn register_state<'scope>(
     put(
         table,
         "GetCount",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let count = scene
                 .world
@@ -257,9 +244,9 @@ fn register_state<'scope>(
     put(
         table,
         "Clear",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
             let id = id.live("Particles", "Clear")?;
-            with_emitter(scene, id, |p| p.runtime.particles.clear());
+            with_emitter(&*scene.get(lua)?, id, |p| p.runtime.particles.clear());
             Ok(())
         }),
     )

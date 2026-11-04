@@ -3,24 +3,26 @@
 //! real Lua VM.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
 
+use crate::api::bind;
 use crate::components::BlendMode;
 use crate::scene::Scene;
 
 /// Run `script` with the `Material` namespace over `scene`, returning its value.
-fn eval<T: mlua::FromLuaMulti>(scene: &RefCell<Scene>, script: &str) -> mlua::Result<T> {
+fn eval<T: mlua::FromLuaMulti>(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<T> {
     let lua = Lua::new();
-    lua.scope(|s| {
-        super::super::register(&lua, s, scene).map_err(mlua::Error::RuntimeError)?;
+    crate::api::attempt(|| {
+        super::super::register(&lua, bind(&lua, scene)).map_err(mlua::Error::RuntimeError)?;
         lua.load(script).eval()
     })
 }
 
 #[test]
 fn every_field_sets_and_gets_through_lua() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let id = scene.borrow_mut().add_entity("E".into());
     let (blend, shadows, preserve): (String, bool, bool) = eval(
         &scene,
@@ -43,7 +45,7 @@ fn every_field_sets_and_gets_through_lua() {
 
 #[test]
 fn a_bad_value_is_a_lua_error_naming_what_the_field_takes() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let id = scene.borrow_mut().add_entity("E".into());
     let err = eval::<()>(&scene, &format!(r#"Material.SetBlendMode({id}, "glow")"#));
     assert!(err.unwrap_err().to_string().contains("Premultiply"));
@@ -53,7 +55,7 @@ fn a_bad_value_is_a_lua_error_naming_what_the_field_takes() {
 
 #[test]
 fn a_getter_on_an_entity_without_a_material_is_nil() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let id = scene.borrow_mut().add_entity("E".into());
     let got: Option<String> = eval(&scene, &format!("return Material.GetBlendMode({id})")).unwrap();
     assert_eq!(got, None);
@@ -61,7 +63,7 @@ fn a_getter_on_an_entity_without_a_material_is_nil() {
 
 #[test]
 fn a_recipe_carries_the_surface_keys_and_refuses_a_bad_one() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     eval::<()>(
         &scene,
         r#"Material.DefineAsset("water", { render_mode = "Transparent",
@@ -81,7 +83,7 @@ fn a_recipe_carries_the_surface_keys_and_refuses_a_bad_one() {
 
 #[test]
 fn map_coordinates_take_pairs_by_position_or_name() {
-    let scene = RefCell::new(Scene::new());
+    let scene = Rc::new(RefCell::new(Scene::new()));
     let id = scene.borrow_mut().add_entity("E".into());
     let (x, y, mode): (f32, f32, String) = eval(
         &scene,

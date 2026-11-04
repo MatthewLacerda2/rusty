@@ -4,11 +4,12 @@
 //! `Probe.Bake()` and `Reflection.Bake()` block the script (and the `session-mcp`
 //! session) that calls them, so a getter could never be polled mid-bake. Instead the
 //! bake hands a [`BakeLog`] where it is ([`Progress`]); the log prints a line at each
-//! step change and every [`INTERVAL`] in between, with an ETA from the step's own
-//! rate, and the total time at the end:
+//! step change, every [`INTERVAL`] in between and for each lightmap page encoded,
+//! with an ETA from the step's own rate, and the total time at the end:
 //!
 //! ```text
 //! [Lighting] lightmaps 41% (612/1501 meshes, 3.1M/7.6M texels), ~38 min left
+//! [Lighting] lightmap pages 50% (6/12 pages encoded), ~30 s left
 //! [Lighting] light probes, bounce 2 of at most 5: 40% (48/120 probes), ~1 min left in this bounce
 //! [Lighting] reflection probes 19% (3/16 probes), ~4 min left
 //! [Lighting] done in 1 h 4 min
@@ -31,6 +32,8 @@ use crate::scripting::ConsoleLogs;
 
 mod format;
 #[cfg(test)]
+mod pages_tests;
+#[cfg(test)]
 mod stage_tests;
 #[cfg(test)]
 mod tests;
@@ -42,6 +45,8 @@ pub const INTERVAL: Duration = Duration::from_secs(5);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Step {
     Lightmaps,
+    /// The lightmap pages being encoded after the trace (#1694): a line per page.
+    LightmapPages,
     /// One pass of the light-probe solve, which stops at `max` or when it converges.
     LightProbes {
         bounce: u32,
@@ -72,6 +77,8 @@ pub struct Line {
 struct Since {
     step: Step,
     rate_from: Option<(Duration, u64)>,
+    /// The work done at the last observation.
+    done: u64,
 }
 
 type Clock<'a> = Box<dyn FnMut() -> Duration + 'a>;
@@ -134,6 +141,9 @@ impl<'a> BakeLog<'a> {
         let now = clock();
         self.started.get_or_insert(now);
         let changed = self.since.as_ref().is_none_or(|s| s.step != p.step);
+        // Encoding a page takes seconds, and each one is said as it finishes.
+        let ticked =
+            p.step == Step::LightmapPages && self.since.as_ref().is_some_and(|s| s.done != p.done);
         // `Lighting.Bake()` / `Generate()` already say each probe step in the console
         // (`LightingBake::step`'s own lines), so only the lightmaps' start is kept there.
         let milestone = changed && p.step == Step::Lightmaps;
@@ -141,15 +151,17 @@ impl<'a> BakeLog<'a> {
             self.since = Some(Since {
                 step: p.step,
                 rate_from: None,
+                done: p.done,
             });
         }
         let Some(since) = self.since.as_mut() else {
             return;
         };
+        since.done = p.done;
         if p.total > 0 && since.rate_from.is_none() {
             since.rate_from = Some((now, p.done));
         }
-        if !changed && now.saturating_sub(self.last_line) < INTERVAL {
+        if !changed && !ticked && now.saturating_sub(self.last_line) < INTERVAL {
             return;
         }
         self.last_line = now;

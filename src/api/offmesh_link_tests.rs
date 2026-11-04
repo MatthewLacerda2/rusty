@@ -3,11 +3,13 @@
 //! entity without a link reads neutral defaults.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use glam::Vec3;
 use mlua::Lua;
 
 use super::register;
+use crate::api::bind;
 use crate::components::OffMeshLinkComponent;
 use crate::navigation::{NavBounds, NavigationGraph};
 use crate::scene::{ColliderComponent, ColliderShape, Scene};
@@ -36,12 +38,12 @@ fn scene_with_link() -> (Scene, u32, u32) {
 #[test]
 fn setters_write_through_the_shared_ops_and_getters_read_back() {
     let (scene, id, bare) = scene_with_link();
-    let nav = RefCell::new(NavigationGraph::from_scene(&scene));
+    let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene)));
     nav.borrow_mut().bake(&scene);
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
-    lua.scope(|scope| {
-        register(&lua, scope, &scene, &nav).unwrap();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
         lua.globals().set("id", id)?;
         lua.globals().set("bare", bare)?;
         let connected: bool = lua.load("return OffMeshLink.IsConnected(id)").eval()?;

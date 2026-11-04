@@ -2,13 +2,12 @@
 //! ray crosses as an enter/exit pair, the wallbang query. The penetration
 //! counterpart to `RaycastAll`, with its hit shape and layer-mask handling.
 
-use std::cell::RefCell;
-
 use glam::Vec3;
 use mlua::Table;
 
 use super::super::{put, Reg};
 use super::cast::{accepts, set_owner, set_surface};
+use crate::api::ApiCell;
 use crate::physics::{PhysicsWorld, RayCrossing};
 use crate::scene::Scene;
 
@@ -32,17 +31,19 @@ fn crossing_table(lua: &mlua::Lua, scene: &Scene, c: &RayCrossing) -> mlua::Resu
 /// `RaycastThrough(ox,oy,oz, dx,dy,dz, max_distance [, layer_mask])` — an array
 /// of crossings sorted by entry distance (ties by entity id). Empty with no
 /// live physics world.
-pub(super) fn register<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+pub(super) fn register(
+    lua: &mlua::Lua,
     table: &Table,
-    scene: &'scope RefCell<Scene>,
-    physics: &'scope RefCell<Option<PhysicsWorld>>,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     type Args = (f32, f32, f32, f32, f32, f32, f32, Option<u32>);
     put(
         table,
         "RaycastThrough",
-        scope.create_function(|lua, (ox, oy, oz, dx, dy, dz, max, mask): Args| {
+        lua.create_function(move |lua, (ox, oy, oz, dx, dy, dz, max, mask): Args| {
+            let scene = &*scene.get(lua)?;
+            let physics = &*physics.get(lua)?;
             let physics = physics.borrow();
             let scene = scene.borrow();
             let crossings = physics.as_ref().map_or_else(Vec::new, |world| {

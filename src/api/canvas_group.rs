@@ -6,12 +6,11 @@
 //! `scene::authoring::ui::layout::canvas_group` ops the inspector card uses. Getters return
 //! `1` / `false` without a CanvasGroup; setters are then no-ops.
 
-use std::cell::RefCell;
-
 use mlua::Lua;
 
 use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
+use crate::api::ApiCell;
 use crate::components::CanvasGroupComponent;
 use crate::scene::authoring::ui::layout::canvas_group as group_ops;
 use crate::scene::Scene;
@@ -34,16 +33,13 @@ const BOOLS: [(&str, BoolGet, BoolSet); 2] = [
 ];
 
 /// Register the `CanvasGroup` namespace onto `lua`.
-pub fn register<'scope>(
-    lua: &Lua,
-    scope: &'scope mlua::Scope<'scope, '_>,
-    scene: &'scope RefCell<Scene>,
-) -> Reg {
+pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(
         &table,
         "GetAlpha",
-        scope.create_function(|_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.world.canvas_group(id.read()).map_or(1.0, |g| g.alpha))
         }),
@@ -51,16 +47,16 @@ pub fn register<'scope>(
     put(
         &table,
         "SetAlpha",
-        scope.create_function(|_, (id, alpha): (EntityArg, f32)| {
+        lua.create_function(move |lua, (id, alpha): (EntityArg, f32)| {
             let id = id.live("CanvasGroup", "SetAlpha")?;
-            if let Some(mut g) = scene.borrow_mut().world.canvas_group_mut(id) {
+            if let Some(mut g) = scene.get(lua)?.borrow_mut().world.canvas_group_mut(id) {
                 group_ops::set_alpha(&mut g, alpha);
             }
             Ok(())
         }),
     )?;
     for (suffix, get, set) in BOOLS {
-        register_bool(scope, &table, scene, suffix, get, set)?;
+        register_bool(lua, &table, scene, suffix, get, set)?;
     }
     lua.globals()
         .set("CanvasGroup", table)
@@ -68,10 +64,10 @@ pub fn register<'scope>(
 }
 
 /// `Get<suffix>(id) -> bool` / `Set<suffix>(id, bool)`.
-fn register_bool<'scope>(
-    scope: &'scope mlua::Scope<'scope, '_>,
+fn register_bool(
+    lua: &mlua::Lua,
     table: &mlua::Table,
-    scene: &'scope RefCell<Scene>,
+    scene: ApiCell<Scene>,
     suffix: &str,
     get: BoolGet,
     set: BoolSet,
@@ -79,7 +75,8 @@ fn register_bool<'scope>(
     put(
         table,
         &format!("Get{suffix}"),
-        scope.create_function(move |_, id: EntityArg| {
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             Ok(scene.world.canvas_group(id.read()).is_some_and(|g| get(&g)))
         }),
@@ -88,9 +85,9 @@ fn register_bool<'scope>(
     put(
         table,
         &format!("Set{suffix}"),
-        scope.create_function(move |_, (id, value): (EntityArg, bool)| {
+        lua.create_function(move |lua, (id, value): (EntityArg, bool)| {
             let id = id.live("CanvasGroup", &verb)?;
-            if let Some(mut g) = scene.borrow_mut().world.canvas_group_mut(id) {
+            if let Some(mut g) = scene.get(lua)?.borrow_mut().world.canvas_group_mut(id) {
                 set(&mut g, value);
             }
             Ok(())

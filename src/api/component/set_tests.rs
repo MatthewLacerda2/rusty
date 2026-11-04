@@ -2,10 +2,12 @@
 //! review): paired fields, holed lists, unchanged keys and number coercion.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use mlua::Lua;
 
 use super::register;
+use crate::api::bind;
 use crate::scene::authoring::{add_component, ComponentKind};
 use crate::scene::Scene;
 
@@ -17,14 +19,14 @@ fn run<R: mlua::FromLuaMulti>(prep: impl FnOnce(&mut Scene, u32), chunk: &str) -
         add_component(&mut scene, id, *add);
     }
     prep(&mut scene, id);
-    let scene = RefCell::new(scene);
+    let scene = Rc::new(RefCell::new(scene));
     let lua = Lua::new();
     lua.globals().set("id", id).unwrap();
-    let out = lua.scope(|s| {
-        register(&lua, s, &scene).unwrap();
+    let out = crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene)).unwrap();
         lua.load(chunk).eval::<R>()
     });
-    (scene.into_inner(), out.unwrap_or_else(|e| panic!("{e}")))
+    (scene.take(), out.unwrap_or_else(|e| panic!("{e}")))
 }
 
 #[test]

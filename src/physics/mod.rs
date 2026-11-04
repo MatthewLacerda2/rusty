@@ -33,6 +33,8 @@ mod material;
 mod material_tests;
 mod query;
 mod shape;
+mod sync;
+mod watch;
 mod world;
 
 pub use character::{can_stand, move_character, CharacterMove};

@@ -33,7 +33,7 @@ fn gpu_an_override_flashes_one_of_two_entities_sharing_a_material() {
         return;
     };
     let (scene, ids) = shared(2, &flash.0);
-    let scene = std::cell::RefCell::new(scene);
+    let scene = std::rc::Rc::new(std::cell::RefCell::new(scene));
     let [l0, r0] = halves(&mut renderer, &scene.borrow());
     assert!(l0.1 > 0 && r0.1 > 0, "both lit, unflashed: {l0:?} {r0:?}");
     let groups = renderer.material_group_count();
@@ -89,7 +89,7 @@ fn gpu_twenty_enemies_five_flashing_cost_five_draws_and_the_rest_still_batch() {
         return;
     };
     let (scene, ids) = shared(20, &flash.0);
-    let scene = std::cell::RefCell::new(scene);
+    let scene = std::rc::Rc::new(std::cell::RefCell::new(scene));
     let calm = counters(&mut renderer, &scene.borrow());
     for id in &ids[..5] {
         lua(

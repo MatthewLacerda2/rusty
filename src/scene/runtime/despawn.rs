@@ -96,8 +96,10 @@ impl Scene {
         if self.selected_entity_id.is_some_and(|s| ids.contains(&s)) {
             self.selected_entity_id = None;
         }
-        self.persistent.retain(|id| !ids.contains(id));
+        for id in ids {
+            self.persistent.remove(id);
+            self.lightmaps.remove(*id);
+        }
         self.pending_destroy.retain(|e| !ids.contains(e));
-        self.lightmaps.entries.retain(|e| !ids.contains(&e.entity));
     }
 }

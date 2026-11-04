@@ -104,10 +104,11 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsaoResolutionDivisor` / `SetSsaoResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` occlusion target is the view's size over this (clamped 1–4, **default `2`**) |
 | `Graphics.GetSsaoSamples` / `SetSsaoSamples` | `()` / `(n)` | `number`: the `Custom` samples per texel (clamped 1–64, **default `8`**) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
+| `Graphics.GetSsrMinSmoothness` / `SetSsrMinSmoothness` | `()` / `(smoothness)` | `number`: HDRP's *Minimum Smoothness*, below which a surface keeps its probe or sky reflection (clamped 0–1, **default `0.3`**: reflects up to roughness 0.7, fully to 0.5; whole by smoothness 0.9 whatever the minimum; from `0.96` no surface reflects and SSR does not run) |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
-| `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"None"` / `"Reinhard"` / `"ACES"` (Unity's name; names are case-insensitive) |
+| `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"Neutral"` / `"AgX"` / `"ACES"` / `"Reinhard"` / `"None"` (**default `"Neutral"`**; Unity's names; names are case-insensitive) |
 | `Graphics.GetVignetteActive` / `SetVignetteActive` | `()` / `(bool)` | `bool` (**default `false`**; see *Lens effects*) |
 | `Graphics.GetVignetteCenter` / `SetVignetteCenter` | `()` / `(x, y)` | `x, y` (screen uv, `0, 0` top-left, each clamped 0–1, **default `0.5, 0.5`**) |
 | `Graphics.GetVignetteColor` / `SetVignetteColor` | `()` / `(r, g, b)` | `r, g, b` (linear, each clamped 0–1, **default black**) |
@@ -223,8 +224,11 @@ the metered one. A new volume starts `Fixed` at `0`.
 **Automatic exposure** (#1444) is Unity HDRP's *Automatic Histogram*: eye
 adaptation, so stepping from a dark corridor into daylight blinds you for a moment and
 a dark room becomes readable once you're in it. With the mode `"Automatic"`, each frame
-the renderer meters its view's HDR scene into a 64-bin log-luminance histogram (a fixed
-64 × 64 sample, on the GPU), averages the bins between the **low** and **high
+the renderer meters its view's HDR scene into a 64-bin log-luminance histogram (on the
+GPU, from the scene downsampled to a quarter of its size, so every pixel counts by its
+area and a small bright lamp doesn't flicker the exposure as the camera moves, and
+weighted towards the centre of the picture, a corner counting a quarter as much as the
+middle, as HDRP's *Center Weighted* metering does), averages the bins between the **low** and **high
 percentiles** (the darkest and brightest pixels ignored), and computes the exposure
 that brings that average to middle grey, plus the **compensation**, held to the
 **limits**. The applied exposure eases towards it at **speed up** EV per second while
@@ -276,15 +280,30 @@ player's `chromatic_aberration` option gates it. Tween paths: `Graphics.chromati
 <!-- effect: ssr -->
 #### Screen-space reflections
 
-**SSR** marches each smooth surface pixel's reflected ray against the scene and, where
-it hits something on screen, puts that in place of the sky or reflection probe the
-surface was reflecting. Only smooth surfaces reflect: none below a smoothness of 0.8
-(roughness 0.2), all of it from 0.9, weighted by the material's Fresnel (its metallic
-and base colour) at the shading normal, its SSAO and its fog. A miss keeps the sky or
-probe reflection. It runs on the base camera's opaque image, right after its opaque
+**SSR** marches each smooth enough surface pixel's reflected ray against the scene and,
+where it hits something on screen, puts that in place of the sky or reflection probe
+the surface was reflecting. A surface reflects from its `min_smoothness` (HDRP's
+*Minimum Smoothness*, smoothness being 1 − roughness; default 0.3, so roughness 0.7)
+and all of it from 0.2 of smoothness above that (roughness 0.5 by default), or from
+0.9 when that comes sooner (HDRP's default *Smoothness Fade Start*: a `min_smoothness`
+of 0.8 fades in over 0.1); from 0.96, the smoothest any surface gets (roughness is at
+least 0.04), no surface reflects and the view runs no SSR at all. It is weighted
+by the material's Fresnel (its metallic and base colour) at the shading normal, its
+SSAO and its fog. A rough surface reflects a blur (#1736): the hit is read from a mip
+pyramid of the opaque image at the width of the surface's GGX lobe there, so a
+satin floor shows a soft reflection of what stands on it and a mirror a sharp one
+(up to roughness 0.05 the hit is read sharp at any resolution, widening to the full
+lobe by 0.1)
+(cone-traced SSR: no history, so it is stable with no accumulation; the pyramid adds
+a third of an `Rgba16Float` frame to the copy SSR already held). A hit fades by its
+confidence (the screen's edge, wider the blurrier it is, and the march's last fifth of
+reach) and a miss keeps the sky or probe reflection, so a weak hit falls back to it
+without a seam. A ray a normal map tilts below the surface's own geometry (a rough,
+bumpy floor seen at a grazing angle) keeps the probe reflection too, rather than
+reflecting the floor it leaves. It runs on the base camera's opaque image, right after its opaque
 pass (HDRP's order): translucent surfaces, particles, ribbons and world canvases blend
 over the reflection (a `Transparent` material with `receive_ssr` traces its own in
-its pass, against that opaque image; see `Material.SetReceiveSsr`), depth of field and motion blur blur it, and a `DepthOnly` overlay
+its pass, against that opaque image, sharp and so never below a smoothness of 0.7; see `Material.SetReceiveSsr`), depth of field and motion blur blur it, and a `DepthOnly` overlay
 camera (a viewmodel) draws over it and gets none. An authored surface block that
 restyles the colour scales the reflection with it (`hit_flash` at amount 1 shows
 none); one that isn't a per-channel scale of it (`toon_ramp`, `hologram`, `desaturate`)
@@ -297,7 +316,8 @@ the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and
 preset 32, 64 and 128, reaching 25.6 m), and `Custom` marches `steps` steps of
 `step_length` world units. No preset turns it off. The player's `ssr` option gates
 it. A new volume starts with SSR on at the `Medium` quality.
-Tween paths: `Graphics.ssr.step_length` (a count, as `steps`, does not tween).
+Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness` (a count, as
+`steps`, does not tween).
 
 <!-- effect: bloom -->
 #### Bloom
@@ -362,7 +382,8 @@ and saturation. Exposure stays a plain HDR scale ahead of all of it. Everything 
 the display gamma acts on the scene's linear HDR colour, before the tonemap, in
 URP's order: white balance, contrast, Lift / Gamma / Gain, the hue shift,
 saturation; the display gamma acts on the tonemapped colour. The renderer bakes the whole grade and the tonemap into a 32³ lookup table
-per view and grades each pixel with one fetch from it; the table is rebaked only on
+per view and grades each pixel with one read of it (tetrahedral interpolation, so a grey
+reads only grey entries and stays exact under a tonemapper that mixes the channels); the table is rebaked only on
 a frame where one of those knobs or the tonemap changed, which `Debug.Stats()`
 counts as `grade_lut_bakes`. Each view grades with its base camera's volume, like
 the rest of its post-FX. The Inspector's **Color Correction** section edits the
@@ -394,8 +415,27 @@ Tween paths: `Graphics.color_adjustments.contrast`, `Graphics.color_adjustments.
 <!-- effect: tonemapping -->
 #### Tonemapping
 
-The operator (`"ACES"`, the default, `"Reinhard"` or `"None"`) that brings HDR to the
-display, and the display-gamma tweak after the rest of the grade.
+The operator that brings HDR to the display, and the display-gamma tweak after the
+rest of the grade (#1701):
+
+- **`"Neutral"`**, the default: Khronos PBR Neutral (Unity's mode of that name is the
+  same idea). Colours below about 0.76 pass through 1:1 with their hue and saturation,
+  so an author's albedo and light colours survive; brighter ones roll off to white
+  along a line that keeps their hue, so a saturated orange lamp stays orange.
+- **`"AgX"`**: Blender 4's and Godot 4.4's filmic curve, a log encoding of about
+  16.5 EV around middle grey and a sigmoid; contrastier than Neutral, and bright
+  saturated colours bleach towards white. The sigmoid runs per channel, so like ACES
+  it turns a saturated orange towards yellow as it brightens: for warm lamps that
+  must stay orange, use Neutral.
+- **`"ACES"`**: Narkowicz's fit of the ACES film curve, at the original curve's
+  exposure (his fit pre-exposes the input; rusty undoes that, so 1.0 maps to about
+  0.67, not 0.8). Rich contrast, but applied per channel, so saturated highlights turn
+  in hue (orange goes yellow) and clip to flat white-yellow.
+- **`"Reinhard"`**: `c / (1 + c)` per channel, a soft, flat rolloff.
+- **`"None"`**: clamp only, for debugging.
+
+A volume saved without a mode reads as `"Neutral"`; one that saved `"ACES"` keeps it.
+Contrast works in ACEScc under ACES and in LogC under every other mode (URP's split).
 
 **Gamma** is a display-gamma *tweak*, not the output encode: the render target
 (window, Game view, and headless screenshot alike) is sRGB and encodes linear →

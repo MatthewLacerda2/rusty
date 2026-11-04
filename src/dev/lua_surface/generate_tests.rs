@@ -30,7 +30,7 @@ fn reflection_settings_read_back_and_clamp() {
     let s = session();
     let read = "local s = Lighting.GetSettings() \
         return s.reflectionResolution .. ' ' .. s.reflectionBudgetMB .. ' ' .. s.reflectionMaxProbes";
-    assert_eq!(s.eval(read).unwrap(), "512 128 512");
+    assert_eq!(s.eval(read).unwrap(), "512 256 512");
     s.eval("Lighting.SetSettings{ reflectionResolution = 1000, reflectionBudgetMB = 1, reflectionMaxProbes = 0 }")
         .unwrap();
     let r = s.world().scene().borrow().lighting_settings.reflections;
@@ -38,6 +38,33 @@ fn reflection_settings_read_back_and_clamp() {
         (r.resolution, r.budget_mb, r.max_probes),
         (1024, 8, 1),
         "a power of two; the least budget and ceiling"
+    );
+}
+
+#[test]
+fn the_diffuse_model_reads_back_sets_and_refuses_an_unknown_name() {
+    use crate::scene::lighting::DiffuseModel;
+    let s = session();
+    assert_eq!(
+        s.eval("return Lighting.GetSettings().diffuseModel")
+            .unwrap(),
+        "Lambert"
+    );
+    s.eval("Lighting.SetSettings{ diffuseModel = 'HalfLambert' }")
+        .unwrap();
+    let model = || s.world().scene().borrow().lighting_settings.diffuse_model;
+    assert_eq!(model(), DiffuseModel::HalfLambert);
+    let err = s
+        .eval("Lighting.SetSettings{ diffuseModel = 'Wrap', samples = 3 }")
+        .unwrap_err();
+    assert!(err.contains("unknown diffuseModel"), "{err}");
+    // A bad reflection field raises after the model is read: still nothing changes.
+    s.eval("Lighting.SetSettings{ diffuseModel = 'lambert', reflectionBudgetMB = 'x' }")
+        .unwrap_err();
+    assert_eq!(
+        model(),
+        DiffuseModel::HalfLambert,
+        "refused calls change nothing"
     );
 }
 
