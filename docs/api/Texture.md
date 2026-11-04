@@ -245,6 +245,17 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   groove. Multiply it into albedo or bake it as the occlusion map. Its cost is
   `pixels × quality × 16` samples, whatever the radius: at 2048² and quality 8, about
   15 s of one core, split across cores by rows; iterate at a low `resolution`.
+- `anisotropic_noise {scale, anisotropy=8, angle=0, seed=0}` (*generator*): value
+  noise stretched into fibres, like Substance's *Anisotropic Noise* (Blender's *Gabor
+  Texture* look): about `scale` fibres across the tile, each `anisotropy` (at least
+  1) times longer than wide, running at `angle` turns (0 along `u`, 0.25 down `v`).
+  Brushed metal, wood grain, fabric, scratches, at any angle, without stretching a
+  noise through `mapping`. To tile, the angle **snaps** to the nearest direction of
+  whole steps `(a, b)` (both at most 8) no longer than `scale / anisotropy` (a longer
+  step would cut the fibres shorter than asked; the axes and diagonals always fit):
+  within 3.6° of `angle` once `scale / anisotropy` is 8 or more, 5.7° at 6, 9.2° at
+  3.2, and 22.5° (axes and diagonals only) under 2.3. Raise `scale` for a truer
+  angle. Cost: about 0.2 s of one core at 2048², under a one-octave `noise`.
 - `auto_levels` (*color*, 1 input): stretches RGB so the input's minimum maps to 0 and
   its maximum to 1 — one range across R, G and B, so a colour keeps its hue, like
   Substance's Auto Levels; alpha untouched, a flat input unchanged.
@@ -335,10 +346,14 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   where `add` overshoots; `divide` is `a / b`, and a channel of `b` at (near) 0 leaves
   `a`.
 - `noise {kind="perlin"|"fbm"|"ridged"|"turbulence", scale, octaves=1, lacunarity=2,
-  gain=0.5, seed=0}` (*generator*): `ridged` is `1 − |n|` squared — rock veins,
-  scratches; `turbulence` is `|n|` — smoke, grime; the fBM family stacks `octaves`,
-  each `lacunarity`× the frequency and `gain`× the amplitude of the last; `perlin` is
-  one octave.
+  gain=0.5, distortion=0, seed=0}` (*generator*): `ridged` is `1 − |n|` squared — rock
+  veins, scratches; `turbulence` is `|n|` — smoke, grime; the fBM family stacks
+  `octaves`, each `lacunarity`× the frequency and `gain`× the amplitude of the last;
+  `perlin` is one octave. `distortion` is Blender's Noise Texture *Distortion*: a
+  domain warp built in, pushing each point by up to about that many lattice cells
+  along two more tiling noises before reading it (swirled smoke, marbled stone)
+  without a `warp` chain; it still tiles, and costs about 0.5 s of one core at
+  2048² over the noise itself. Capped at ±1000; a NaN reads 0.
 - `normal_blend {strength=1}` (*vector*, 2 inputs: base, detail): two normal maps, as
   `bump_to_normal` writes them, combined by Reoriented Normal Mapping: the base is
   turned by the detail's tilt, so scratches over a panel follow the panel's bevel.
@@ -347,12 +362,24 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   flattens them.
 - `rgb_to_bw` (*math*, 1 input).
 - `separate_rgb {channel=0..3}` (*vector*, 1 input).
-- `shape {kind="circle"|"rect"|"rounded_rect"|"line", size=[w,h], roundness=0.25,
-  softness=0}` (*generator*): one shape centred in the tile, 1 inside and 0 outside:
-  `circle` is the ellipse filling `size`, `line` a horizontal stroke `w` long and `h`
-  thick with round caps — turn it with `mapping {rotation = 0.25}`; `roundness` 0–1
-  rounds a `rounded_rect`'s corners; `softness > 0` ramps the edge from 0 to 1 that
-  far inside, a bevel profile for `bump_to_normal`.
+- `shape {kind="circle"|"rect"|"rounded_rect"|"line"|"polygon"|"star", size=[w,h],
+  roundness=0.25, softness=0, sides=6, points=5, inner_radius=0.5,
+  profile="flat"|"cone"|"paraboloid"|"hemisphere"}` (*generator*): one shape centred
+  in the tile, 1 inside and 0 outside: `circle` is the ellipse filling `size`, `line`
+  a horizontal stroke `w` long and `h` thick with round caps — turn it with `mapping
+  {rotation = 0.25}`; `polygon` is a regular polygon of `sides` (3–64) and `star` one
+  of `points` (3–64) with its inner vertices at `inner_radius` (0–1) of the outer,
+  both inscribed in the ellipse of `size` with a vertex straight up (hex bolts,
+  rivets, stars); `roundness` 0–1 rounds a `rounded_rect`'s corners; `softness > 0`
+  ramps the edge from 0 to 1 that far inside, a bevel profile for `bump_to_normal`.
+  `profile` turns any shape into a ready height stamp, Substance's *Shape* heights:
+  `flat` is the mask, the others rise from 0 at the edge to 1 at the deepest point
+  (the centre): `cone` straight (a cone on a circle, a pyramid on a rect),
+  `paraboloid` round on top, `hemisphere` a dome. Feed one to `tile` →
+  `bump_to_normal` for studs, rivets, bolts and pebbles; `softness` applies to `flat`
+  only. A polygon or star with a NaN `size` reads 0. Cost: about 0.3 s of one core at
+  2048² for a star; one larger than the tile unions its neighbours' copies (9 for
+  up to 1.5 tiles across, about 2 s; at most 81).
 - `sharpen {intensity=1, radius=0.004}` (*filter*, 1 input): an unsharp mask,
   `c + intensity × (c − blur(c))` with a Gaussian of `radius` (a tile fraction, about
   two pixels at 512²): crisps an `image` input or a blurred chain. Unclamped, so a
@@ -372,12 +399,25 @@ result; `ambient_occlusion`, `cavity` and `curvature` read the input's red as he
   borders: cracks, dried mud, cobble outlines; `metric` is how distance is measured:
   `euclidean` gives round cells, `manhattan` (`|dx| + |dy|`) diamond-cut ones,
   `chebyshev` (`max(|dx|, |dy|)`) blocky, straight-edged ones — stones, tiles,
-  flagstones; `randomness` 0 is a regular grid, 1 full jitter.
+  flagstones; `randomness` 0 is a regular grid, 1 full jitter. `smooth_f1` is
+  Blender's *Smooth F1*: F1 with its creases rounded over `smoothness` (0–1, default
+  1; the other outputs ignore it) — rounded, blobby cells for pebbles, scales and
+  dried paint, and the soft minimum the hard F1 lacks; it searches two rings of
+  cells, so it costs about 2 s of one core at 2048², against 0.6 s for `distance`. `smoothness`
+  0 is F1; a NaN reads 0.
 - `warp {strength}` (*vector*, 2 inputs): samples input 1 displaced by input 2's R/G,
   centred on 0.5 so mid-grey moves nothing; `strength` is in tile units; feed input 2
   a `combine_rgb` of two different noises — a grayscale one has R = G and only pushes
   along the diagonal.
-- `wave {kind="bands"|"rings", frequency}` (*generator*).
+- `wave {kind="bands"|"rings", frequency, profile="sine"|"saw"|"triangle",
+  distortion=0, detail=2, seed=0}` (*generator*): `frequency` cycles across the tile,
+  as Blender's *Wave Texture*: `saw` ramps up and drops (planks, shingles, terraces),
+  `triangle` rises and falls in straight lines (corrugation, ridges). `distortion`
+  pushes the phase by a tiling fBM of `detail + 1` octaves (`detail` 0–15) at the
+  wave's own frequency, in radians of phase as Blender's: wood rings and marble with
+  no `warp` chain. It costs about 0.85 s of one core at 2048² with `detail = 2`; 0 costs
+  nothing.
+  Capped at ±1000; a NaN reads 0.
 - `white_noise {seed=0}` (*generator*).
 
 ### Linked params — a node drives a value
@@ -496,6 +536,8 @@ field stays a number, so `4.5` is accepted — it bakes as `5`):
 | noise, voronoi | `scale` | nearest whole number ≥ 1 |
 | noise (fBM family) | each octave's `scale × lacunarity^octave` | nearest whole number ≥ 1 (so a fractional `lacunarity` still tiles) |
 | wave | `frequency` | nearest whole number ≥ 1 |
+| anisotropic_noise | `scale`, and `scale ÷ anisotropy` along the fibres | nearest whole number ≥ 1, at most 4096, per lattice direction |
+| anisotropic_noise | `angle` | the nearest tiling direction, see its bullet |
 | brick | `cols` | nearest whole number ≥ 1 |
 | brick | `rows` | nearest **even** number ≥ 2 (the half-brick offset must close at the wrap) |
 | tile | `count` | nearest whole number ≥ 1 |
@@ -508,7 +550,9 @@ maps that are never tiled; it opens a seam. `gradient linear` (0→1 left to rig
 the one generator that does **not** tile — it has a hard edge at the wrap; use it under
 a mask, or use `linear_tiling` (0→1→0) for a seamless ramp. `gradient radial` and
 `wave rings` meet the edge mirror-symmetrically: continuous across the seam, and so
-does `shape` (a shape larger than the tile is clipped at the edge, symmetrically).
+does `shape` (a shape larger than the tile is clipped at the edge, symmetrically;
+a `polygon` or `star`, which an odd count leaves lopsided top to bottom, is instead
+joined to its copies in the neighbouring tiles, so it tiles).
 `image` tiles exactly as well as its file does.
 
 ### Units
@@ -533,6 +577,9 @@ and 2048² (iterate at a low `resolution`, ship at a high one):
 - `ambient_occlusion.radius` and `.depth` are in tiles; `edge_detect.width` is the
   line's whole width in tiles; `highpass.radius` and `sharpen.radius` are tile
   fractions like `blur.radius`.
+- `noise.distortion` is in lattice cells (one cell is `1 / scale` of the tile);
+  `wave.distortion` in radians of phase (`2π` is one cycle); `anisotropic_noise.angle`
+  in turns, like `mapping.rotation`; `shape.inner_radius` a fraction of the outer.
 - `white_noise` is the exception: its grain is one pixel by definition (on each axis).
 
 ### Non-square bakes — `size`

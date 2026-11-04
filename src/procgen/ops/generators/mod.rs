@@ -7,7 +7,9 @@
 //! ([`count`]): noise/Voronoi wrap an integer lattice through [`super::super::hash`]
 //! (the `noise` and `voronoi` families, #406), and wave/brick/checker repeat a whole
 //! number of times (#392); `shape` is symmetric about the tile centre, so it meets
-//! itself at the wrap (#407). Two generators are the documented exceptions:
+//! itself at the wrap (#407), or joins its neighbours' copies (`polygon`, `star`);
+//! `anisotropic_noise` runs along a whole-step lattice direction, and every
+//! distortion is itself a tiling noise (#1740). Two generators are the documented exceptions:
 //! `gradient linear` is a one-way ramp (use `linear_tiling` for a seamless one), and
 //! the radial shapes (`gradient radial`, `wave rings`) meet the edge
 //! mirror-symmetrically — continuous across the seam, not periodic beyond it.

@@ -6,7 +6,9 @@ use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 /// The *worn, grimy painted metal* example (docs/api/Texture.md) plus a blur,
 /// warp, tile, mapping, bump, a distance bevel, a normal blend, the channel ops,
 /// two-image math, auto levels and the #1743 filters (occlusion, edges, highpass,
-/// sharpen, histogram scan, levels), so every banded path runs.
+/// sharpen, histogram scan, levels) and #1740's generators (fibres, a distorted saw
+/// wave, a distorted noise, smooth F1, a star and a polygon with heights), so every
+/// banded path runs.
 const RECIPE: &str = r#"{
   "resolution": 100, "seed": 4,
   "nodes": [
@@ -43,7 +45,17 @@ const RECIPE: &str = r#"{
     { "id": "lv", "op": "levels", "in_low": 0.1, "gamma": 1.4, "inputs": ["hs"] },
     { "id": "more", "op": "combine_rgb", "inputs": ["ao", "ed", "lv"] },
     { "id": "lt2", "op": "mix", "mode": "multiply", "factor": 0.5, "inputs": ["lt", "more"] },
-    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt2", "soft"] }
+    { "id": "fib", "op": "anisotropic_noise", "scale": 24, "anisotropy": 6, "angle": 0.1, "seed": 2 },
+    { "id": "saw", "op": "wave", "kind": "bands", "frequency": 5, "profile": "saw", "distortion": 4, "detail": 3 },
+    { "id": "dn", "op": "noise", "kind": "fbm", "scale": 4, "octaves": 3, "distortion": 1.5 },
+    { "id": "sf", "op": "voronoi", "scale": 6, "output": "smooth_f1", "smoothness": 0.6 },
+    { "id": "st", "op": "shape", "kind": "star", "size": [1.2, 1.2], "points": 5, "profile": "cone" },
+    { "id": "pg", "op": "shape", "kind": "polygon", "size": [0.6, 0.5], "sides": 7, "profile": "hemisphere" },
+    { "id": "gen", "op": "combine_rgb", "inputs": ["fib", "saw", "dn"] },
+    { "id": "gen2", "op": "combine_rgb", "inputs": ["sf", "st", "pg"] },
+    { "id": "gens", "op": "mix", "mode": "screen", "inputs": ["gen", "gen2"] },
+    { "id": "lt3", "op": "mix", "mode": "overlay", "factor": 0.5, "inputs": ["lt2", "gens"] },
+    { "id": "out", "op": "mix", "mode": "divide", "factor": 0.3, "inputs": ["lt3", "soft"] }
   ],
   "output": "out"
 }"#;

@@ -5,7 +5,6 @@
 
 use rusty::procgen::recipe::{
     Brick, Cavity, Curvature, Gradient, GradientKind, Mapping, Node, Noise, NoiseKind, OpKind,
-    Voronoi, VoronoiMetric, Wave,
 };
 use rusty::procgen::recipe::{NoiseKind::*, VoronoiOutput::*, WaveKind};
 use rusty::procgen::Image;
