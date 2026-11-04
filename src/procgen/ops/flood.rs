@@ -44,7 +44,7 @@ impl Island {
     }
 
     /// A uniform `[0, 1)` value for this island on `channel`, from `seed` and the
-    /// island's centroid snapped to [`IDENTITY_GRID`]: its identity, not the
+    /// island's centroid snapped to a 1/128-tile grid: its identity, not the
     /// number the scan gave it.
     pub fn random(&self, channel: u64, seed: u64) -> f32 {
         let [x, y] = self.centroid.map(|c| (c * IDENTITY_GRID).floor() as i64);

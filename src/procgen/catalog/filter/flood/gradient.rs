@@ -59,7 +59,7 @@ fn ramp(island: &Island, u: f32, v: f32, theta: f32) -> f32 {
     let wrap = |d: f32| d - (d + 0.5).floor();
     let along = wrap(u - cu) * dx + wrap(v - cv) * dy;
     let reach = island.size[0] * dx.abs() + island.size[1] * dy.abs();
-    if !(reach > 0.0) || !along.is_finite() {
+    if reach.is_nan() || reach <= 0.0 || !along.is_finite() {
         return 0.5;
     }
     (0.5 + along / reach).clamp(0.0, 1.0)

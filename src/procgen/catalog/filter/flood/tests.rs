@@ -21,8 +21,8 @@ fn squares() -> Image {
     Image::fill_uv(32, |u, v| {
         let box_ = |a: f32, b: f32, x: f32| (a..b).contains(&x);
         let mid = box_(0.3, 0.5, u) && box_(0.3, 0.6, v);
-        let edge = (u > 0.9 || u < 0.1) && box_(0.6, 0.8, v);
-        let corner = (u > 0.85 || u < 0.05) && (v > 0.9 || v < 0.1);
+        let edge = !(0.1..=0.9).contains(&u) && box_(0.6, 0.8, v);
+        let corner = !(0.05..=0.85).contains(&u) && !(0.1..=0.9).contains(&v);
         [f32::from(u8::from(mid || edge || corner)), 0.0, 0.0, 1.0]
     })
 }
@@ -92,7 +92,7 @@ fn a_box_across_the_edge_is_one_box() {
     let bbox = |output| after_fill(&OpKind::FloodBbox(FloodBbox { output }), &squares());
     let centre = bbox(BboxOutput::CenterX);
     let x = at(&centre, 0, 22);
-    assert!(x < 0.01 || x > 0.99, "centre wraps to the edge: {x}");
+    assert!(!(0.01..=0.99).contains(&x), "centre wraps to the edge: {x}");
     assert_eq!(at(&centre, 31, 22), x);
     let size = bbox(BboxOutput::Size);
     assert_eq!(
