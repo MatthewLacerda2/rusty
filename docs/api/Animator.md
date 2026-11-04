@@ -1,7 +1,9 @@
 ## `Animator`
 
 Drive an entity's animation clips. Clips are imported from the entity's skinned
-glTF mesh (its `animations`); the named `clip` selects one to play. A keyframe
+glTF mesh (its `animations`), plus any its model borrows from another humanoid
+rig, retargeted at import ([`Assets.SetHumanoid`](Assets.md#humanoid-retargeting));
+the named `clip` selects one to play. A keyframe
 sampler poses the skeleton each fixed step, so playback — including a looping
 clip's wrap — is deterministic. A non-looping clip's playhead stops at its ends
 (#1362): it holds the last frame, and played in reverse (a negative speed) it
