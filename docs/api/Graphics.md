@@ -593,7 +593,9 @@ Fog is render-only, so it cannot affect the deterministic sim.
 geometry crowds a point — the strip of floor at a crate's foot, the inside corner of
 a room, the gap behind a door frame — which probes are too sparse to see. It touches
 only the ambient term and the environment reflection, never the sun, a lamp or a
-spotlight, so a lit wall stays lit; it is computed before the forward pass, not over
+spotlight, so a lit wall stays lit; the reflection takes it as *specular occlusion*
+(Frostbite's, as HDRP has it, #1697), so a glossy surface seen head-on is occluded
+less than a rough one; it is computed before the forward pass, not over
 the finished image, so fog (applied after lighting) fogs the occluded colour rather
 than AO darkening the fog. **Radius** is how far (world units) another surface can be and
 still shade a point; **intensity** is the strength (`0` none, `1` natural, up to `4`

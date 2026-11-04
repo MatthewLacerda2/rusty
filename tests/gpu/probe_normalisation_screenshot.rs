@@ -60,7 +60,12 @@ fn scene(name: &str, stored: Option<Sh9>) -> Scene {
     };
     scene.world.set_light(lamp, Some(light));
     scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.0, 1.5, 0.0);
+    probe_and_bake(&mut scene, name, stored);
+    scene
+}
 
+/// The white probe over both floors storing `stored`, then the lightmap bake.
+fn probe_and_bake(scene: &mut Scene, name: &str, stored: Option<Sh9>) {
     let dir = crate::temp::dir().join(format!("rusty_gpu_1697_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -86,8 +91,7 @@ fn scene(name: &str, stored: Option<Sh9>) -> Scene {
         directional: false,
     };
     let path = dir.join("level.scene").to_string_lossy().into_owned();
-    bake_scene_lightmaps(&mut scene, Some(&path), &settings).unwrap();
-    scene
+    bake_scene_lightmaps(scene, Some(&path), &settings).unwrap();
 }
 
 /// The mean of the floor at `x`, seen from above; `None` without an adapter.

@@ -189,5 +189,5 @@ pub fn with_baked_direct(
 mod reflection_bake_tests;
 
 #[cfg(test)]
-#[path = "reflection_irradiance_tests.rs"]
-mod reflection_irradiance_tests;
+#[path = "stored_irradiance_tests.rs"]
+mod stored_irradiance_tests;
