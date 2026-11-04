@@ -19,12 +19,11 @@
 //!   `MotionVectors::reset`), so the first frame after one is the current frame
 //!   alone, with no ghost of the last.
 //!
-//! **Upscaling (TAAU, part 3).** With a render scale below 1 the view upscales
-//! inside TAA instead of bilinearly ([`upscale`]): the post chain runs at the
-//! scene's size as it always did, and the resolve then reconstructs the
-//! post-processed image at the output's size from the jittered samples of many
-//! frames, in place of the bilinear upscale. [`history`] says which path a view
-//! takes.
+//! **Upscaling (TAAU, part 3).** With a render scale below 1 the resolve
+//! upscales ([`upscale`]): it reconstructs the output-size image from the jittered
+//! scene-size frames, at the same place in the chain, and what follows it runs at
+//! the output's size, Unity's order (URP's STP, HDRP's FSR2). [`history`] says
+//! which path a view takes.
 //!
 //! **Defaults (URP's `TemporalAA.Settings`).** Frame influence 0.1 (*Base Blend
 //! Factor* 0.9), variance clamp scale 0.9, jitter scale 1, mip bias 0 when not
@@ -37,7 +36,7 @@ pub(crate) mod jitter;
 mod upscale;
 
 pub(crate) use effect::{wanted, EFFECT};
-pub(crate) use history::{begin, TaaFrame, TaaHistory};
+pub(crate) use history::{begin, chain_size, TaaFrame, TaaHistory};
 
 use glam::Vec2;
 
@@ -177,9 +176,9 @@ impl TaaPasses {
 }
 
 impl PostFx {
-    /// Resolve this frame against the history. `draw_stack` gates the history
-    /// and the velocity target on the same `taa::wanted`, so a view holds both or
-    /// neither.
+    /// Resolve this frame against the history: at the scene's size, or upscaling
+    /// it to the output's (TAAU). `draw_stack` gates the history and the velocity
+    /// target on the same `taa::wanted`, so a view holds both or neither.
     pub(crate) fn run_taa(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -191,31 +190,36 @@ impl PostFx {
         else {
             return;
         };
-        // An upscaling view resolves after the post chain instead (`taa_upscale`).
-        if h.upscale {
-            return;
-        }
         let (read, write) = (h.latest, 1 - h.latest);
-        let params = TaaParams::new(h.size, h.size, h.valid, h.pixels);
+        let params = TaaParams::new(h.size, self.full_size, h.valid, h.pixels);
         queue.write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
         let current = self.focused_color();
         let group = passes.group(device, h, read, current, velocity);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("TAA Encoder"),
         });
-        let timed = (passes.resolve.get(), timer.writes(GpuPass::Taa));
+        let pipeline = if h.upscale {
+            &passes.upscale
+        } else {
+            &passes.resolve
+        };
+        let timed = (pipeline.get(), timer.writes(GpuPass::Taa));
         Self::fullscreen(&mut encoder, timed, &[&group], &h.frames[write].view);
         queue.submit(std::iter::once(encoder.finish()));
         let h = self.targets.get_mut::<TaaHistory>().expect("held above");
         (h.latest, h.valid, h.ran) = (write, true, true);
     }
 
-    /// Whether TAA anti-aliases this frame: its scene-size resolve ran, or the view
-    /// upscales through it after the chain. FXAA then skips: one anti-aliasing.
+    /// Whether TAA anti-aliased this frame: FXAA then skips, one anti-aliasing.
     pub(crate) fn taa_ran(&self) -> bool {
-        self.targets
-            .get::<TaaHistory>()
-            .is_some_and(|h| h.ran || h.upscale)
+        self.targets.get::<TaaHistory>().is_some_and(|h| h.ran)
+    }
+
+    /// Whether TAA upscaled this frame to the output (TAAU): the chain then wrote
+    /// the output itself, and no bilinear upscale follows.
+    pub(crate) fn taa_upscaled(&self) -> bool {
+        let history = self.targets.get::<TaaHistory>();
+        history.is_some_and(|h| h.ran && h.upscale)
     }
 }
 

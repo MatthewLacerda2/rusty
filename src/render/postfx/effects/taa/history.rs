@@ -1,15 +1,16 @@
 //! A view's TAA history ([`TaaHistory`]) and the frame's start ([`begin`]): which
 //! of TAA's two paths the view takes, and the jitter and mip bias it draws with.
 //!
-//! **Two paths, by the view's sizes** (#1702):
+//! **Two paths, by the view's sizes** (#1702), both a scene pass after depth of
+//! field and before motion blur (URP's order):
 //! - **Resolve** (scene size equals output, or the scene is supersampled): the
-//!   history is at the scene size and the resolve is a scene pass, after depth of
-//!   field and before motion blur (URP's order). What TAA always did.
+//!   history is at the scene size. What TAA always did.
 //! - **Upscale** (TAAU: the scene is smaller than the output, a render scale below
-//!   1): the history is at the **output** size and the resolve runs after the post
-//!   chain, in place of the bilinear upscale (`Renderer::taa_upscale`). The scene
-//!   pass then skips, so nothing resolves or upscales twice. The jitter runs FSR2's
-//!   longer sequence and the material maps read with a negative mip bias.
+//!   1): the history is at the **output** size and the resolve reconstructs it
+//!   from the scene-size frame (`fs_upscale`), as URP's STP and HDRP's FSR2 sit.
+//!   The rest of the chain then runs at the output's size ([`chain_size`]) and
+//!   writes the output itself, so no bilinear upscale follows. The jitter runs
+//!   FSR2's longer sequence and the material maps read with a negative mip bias.
 
 use glam::Vec2;
 
@@ -46,8 +47,8 @@ pub(crate) struct TaaHistory {
     pub(super) valid: bool,
     /// The jitter sequence's frame counter.
     pub(super) frame: u32,
-    /// Whether the scene-size resolve ran this frame: its output is then the scene.
-    /// Never set while upscaling, whose output is past the post chain.
+    /// Whether the resolve ran this frame: its output is then the image the rest of
+    /// the chain reads, at the output's size when `upscale`.
     pub(super) ran: bool,
 }
 
@@ -73,10 +74,22 @@ impl TaaHistory {
         }
     }
 
-    /// This frame's scene-size resolve, when it ran: what the rest of the chain reads.
+    /// This frame's resolve, when it ran: what the rest of the chain reads.
     pub(crate) fn output(&self) -> Option<&PfxTarget> {
         self.ran.then(|| &self.frames[self.latest])
     }
+}
+
+/// The size the chain runs at after TAA this frame ([`PostFx::fit_chain`]): the
+/// output's when `on` and the view upscales through TAA, else the scene's.
+pub(crate) fn chain_size(view: &RenderView, on: bool) -> (u32, u32) {
+    let (scene, output) = (view.scene_size(), view.size());
+    let size = if on && jitter::upscales(scene, output) {
+        output
+    } else {
+        scene
+    };
+    (size.width, size.height)
 }
 
 /// Start a stack's frame, after the motion history's `begin`: with `on`, fit the

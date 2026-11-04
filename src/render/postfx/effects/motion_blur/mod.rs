@@ -181,7 +181,7 @@ impl PostFx {
             self.targets.remove::<BlurTargets>();
             return;
         };
-        BlurTargets::fit(&mut self.targets, device, self.full_size, params.tile());
+        BlurTargets::fit(&mut self.targets, device, self.chain_size, params.tile());
         let targets = self.targets.get::<BlurTargets>().expect("fitted above");
         let tiles = &targets.tiles;
         queue.write_buffer(&targets.params, 0, bytemuck::bytes_of(&params));

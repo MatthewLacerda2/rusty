@@ -10,9 +10,11 @@
 // control flow.
 //
 // The mip bias (#1702) is TAA's while it upscales the view (`camera.lod.x`,
-// `log2(scene/output)`): only the material maps read through here take it, never the
-// lightmap, the AO target or the specular AA's derivatives. At 0 the lookup is the
-// plain `textureSample`, so a view that doesn't upscale samples as it always did.
+// `log2(scene/output)`): every material map takes it through [`lookup`] (the
+// maps read here and the surface blocks' `t_mask`), and the decals through their
+// sampling footprint (`forward::lighting::fold_decals`); the lightmap, the AO
+// target and the specular AA's derivatives never do. At 0 the lookup is the plain
+// `textureSample`, so a view that doesn't upscale samples as it always did.
 
 #define_import_path forward::mapping
 

@@ -11,10 +11,11 @@
 //     a bright highlight cannot dominate the average.
 // Its output is both what the rest of the chain reads and next frame's history.
 // `fs_upscale` is the same resolve upscaling (TAAU, #1702 part 3,
-// `taa/upscale.rs`): a scaled view's post-processed scene into an output-size
-// history. The
-// current pixel is the jittered frame's own, not re-filtered (URP's `High`; its
-// `VeryHigh` adds the filter), so a still frame converges to the jitter's average:
+// `render/postfx/effects/taa/upscale/`): a scaled view's scene-size frame into an
+// output-size history, at the same place in the chain, so what follows it runs at
+// the output's size. The current pixel is the jittered frame's own, not re-filtered
+// (URP's `High`; its `VeryHigh` adds the filter), so a still frame converges to the
+// jitter's average:
 // a supersampled pixel.
 //
 // Units. The velocity target holds `ndc_now - ndc_prev` in `.xy`, both unjittered,
@@ -157,24 +158,42 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     lo = max(lo, mean - spread);
     hi = min(hi, mean + spread);
 
-    // Last frame's resolve where this pixel's surface was. NDC y points up, uv down.
     let uv = pos.xy * taa.size.zw;
-    let prev_uv = uv - nearest_motion(p) * vec2<f32>(0.5, -0.5);
+    let frame = Frame(here, lo, hi, taa.knobs.x);
+    return blend(frame, uv, nearest_motion(p));
+}
+
+// One pixel's current frame for [`blend`]: its colour, the box its history is
+// clamped into (YCoCg) and the weight it takes in the blend.
+struct Frame {
+    here: vec4<f32>,
+    lo: vec3<f32>,
+    hi: vec3<f32>,
+    weight: f32,
+};
+
+// The pixel at history `uv`, whose surface moved by `motion` (NDC): last frame's
+// resolve where that surface was, clamped into the frame's box and lerped toward
+// the frame by its weight in URP's perceptual space; the frame alone, exactly, with
+// no history to blend.
+fn blend(frame: Frame, uv: vec2<f32>, motion: vec2<f32>) -> vec4<f32> {
+    // NDC y points up, uv down.
+    let prev_uv = uv - motion * vec2<f32>(0.5, -0.5);
     let sampled = history_bicubic(prev_uv);
     let inside = all(abs(prev_uv - 0.5) <= vec2<f32>(0.5));
     if (taa.knobs.z < 0.5 || !inside || !numeric::finite3(sampled)) {
-        // No history to blend: the current frame alone, exactly.
-        return here;
+        return frame.here;
     }
-    let history = clamp(rgb_to_ycocg(max(sampled, vec3<f32>(0.0))), lo, hi);
+    let center = rgb_to_ycocg(frame.here.rgb);
+    let history = clamp(rgb_to_ycocg(max(sampled, vec3<f32>(0.0))), frame.lo, frame.hi);
 
     // Lerp in perceptual space: each colour over 1 + its luma, and back.
     let a = history / (1.0 + history.x);
     let b = center / (1.0 + center.x);
-    let mixed = mix(a, b, taa.knobs.x);
+    let mixed = mix(a, b, frame.weight);
     let rgb = ycocg_to_rgb(mixed / max(1.0 - mixed.x, 1.0 / MAX_HDR));
     let out = clamp(rgb, vec3<f32>(0.0), vec3<f32>(MAX_HDR));
-    return vec4<f32>(select(here.rgb, out, numeric::finite3(rgb)), here.a);
+    return vec4<f32>(select(frame.here.rgb, out, numeric::finite3(rgb)), frame.here.a);
 }
 
 // The weight of a sample `d` scene pixels from where it should land: URP's
@@ -184,8 +203,8 @@ fn sample_weight(d: vec2<f32>) -> f32 {
     return exp(-2.29 * dot(d, d));
 }
 
-// TAAU: output pixel `pos` of a scaled view, from the scene-size, post-processed
-// `t_current` and the output-size history. The 3x3 scene pixels around the output
+// TAAU: output pixel `pos` of a scaled view, from the scene-size `t_current` (the
+// scene, or depth of field's result) and the output-size history. The 3x3 scene pixels around the output
 // pixel's centre each sampled the unjittered image `jitter` away from their own
 // centre (the projection moved the image by `jitter`, y flipped into pixel rows);
 // each is weighted by where its sample landed, the history is clamped into their
@@ -220,25 +239,11 @@ fn fs_upscale(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
             m2 += ycocg * ycocg;
         }
     }
-    let here = sum / max(weights, 1e-6);
-    let alpha = current(base).a;
+    let here = vec4<f32>(sum / max(weights, 1e-6), current(base).a);
     let mean = m1 / 9.0;
     let spread = taa.knobs.y * sqrt(abs(m2 / 9.0 - mean * mean));
     lo = max(lo, mean - spread);
     hi = min(hi, mean + spread);
-
-    let prev_uv = uv - nearest_motion(base) * vec2<f32>(0.5, -0.5);
-    let sampled = history_bicubic(prev_uv);
-    let inside = all(abs(prev_uv - 0.5) <= vec2<f32>(0.5));
-    if (taa.knobs.z < 0.5 || !inside || !numeric::finite3(sampled)) {
-        return vec4<f32>(here, alpha);
-    }
-    let center = rgb_to_ycocg(here);
-    let history = clamp(rgb_to_ycocg(max(sampled, vec3<f32>(0.0))), lo, hi);
-    let a = history / (1.0 + history.x);
-    let b = center / (1.0 + center.x);
-    let mixed = mix(a, b, taa.knobs.x * nearest);
-    let rgb = ycocg_to_rgb(mixed / max(1.0 - mixed.x, 1.0 / MAX_HDR));
-    let out = clamp(rgb, vec3<f32>(0.0), vec3<f32>(MAX_HDR));
-    return vec4<f32>(select(here, out, numeric::finite3(rgb)), alpha);
+    let frame = Frame(here, lo, hi, taa.knobs.x * nearest);
+    return blend(frame, uv, nearest_motion(base));
 }

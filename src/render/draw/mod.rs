@@ -125,8 +125,9 @@ impl Renderer {
         // canvases draw inside each camera's pass below, screen canvases after it.
         self.prepare_ui(view, scene, &stack[0], editor_mode);
         // A scaled view composites into its own scene-sized target and upscales it to
-        // `output` after post-FX, before the UI (#1498): through TAA when the view
-        // runs it (TAAU, #1702), else bilinearly.
+        // `output` after post-FX, before the UI (#1498), bilinearly. A view running
+        // TAA upscales inside the chain instead (TAAU, #1702), at TAA's place, and
+        // the chain writes `output` itself.
         let scaled = view.scaled_output();
         let pass = StackPass {
             stack: &stack,
@@ -134,15 +135,14 @@ impl Renderer {
             base_id: screen.base_id,
             post,
             output: scaled.as_ref().unwrap_or(output),
+            upscaled: scaled.is_some().then_some(output),
             editor_mode,
             full_post_fx: true,
             motion_frames: 1,
         };
         self.draw_stack(view, scene, pass);
-        if let Some(scaled) = &scaled {
-            if !self.taa_upscale(view, scaled, output) {
-                self.upscale_scene(view, scaled, output);
-            }
+        if let Some(scaled) = scaled.as_ref().filter(|_| !view.post_fx.taa_upscaled()) {
+            self.upscale_scene(view, scaled, output);
         }
 
         // The in-game UI over the finished frame (#418): after post-FX, so a HUD
@@ -183,6 +183,7 @@ impl Renderer {
             base_id: None,
             post: Default::default(),
             output,
+            upscaled: None,
             editor_mode: false,
             full_post_fx: false,
             motion_frames: 1,

@@ -29,8 +29,13 @@ pub(crate) struct StackPass<'a> {
     /// The camera and volume settings that drive this view's post-FX and SSAO: the
     /// stack's base camera's (#1434, Unity URP's rule), borrowed once per view.
     pub post: PostSource<'a>,
-    /// Where post-FX writes the finished image.
+    /// Where post-FX writes the finished image, and the editor's overlays draw: a
+    /// scaled view's scene-size target ([`RenderView::scaled_output`]), else the
+    /// output.
     pub output: &'a wgpu::TextureView,
+    /// A scaled view's real output, which the chain writes instead of `output`
+    /// when TAA upscales the view (TAAU, #1702); `None` on a native view.
+    pub upscaled: Option<&'a wgpu::TextureView>,
     pub editor_mode: bool,
     /// Run `post`'s grading, bloom, SSR, TAA, motion blur and FXAA. Off, the image is
     /// only brought from HDR to display (a render texture's `post_fx = false`).
@@ -68,6 +73,12 @@ impl Renderer {
             motion::target_wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode)
                 && !own_pipeline;
         let velocity = velocity_target(moving, ssr);
+        // TAA (#1702): whether it runs, and so the size the chain after it runs at,
+        // before any effect fits its targets this frame.
+        let taa_on =
+            taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode) && !own_pipeline;
+        let chain = taa::chain_size(view, taa_on);
+        view.post_fx.fit_chain(&self.device, chain);
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.scene_size();
         surface::begin(&mut view.post_fx.targets, &self.device, size, ssr);
@@ -81,8 +92,7 @@ impl Renderer {
         let keeps = !own_pipeline && !self.capture.static_only;
         // TAA (#1702): the frame's sub-pixel jitter, every camera's alike, and the
         // material maps' mip bias while it upscales; a cut forgets its history.
-        let taa_on = taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode);
-        let taa = taa::begin(view, &self.device, taa_on && !own_pipeline);
+        let taa = taa::begin(view, &self.device, taa_on);
         let shared = StackShared {
             aspect,
             view_projs,
@@ -105,8 +115,11 @@ impl Renderer {
 
     /// Run the post-process chain over the view's composited HDR target: every
     /// effect's scene pass in order (depth of field, TAA, motion blur, the exposure
-    /// meter, bloom, the lens flare), the grading LUT's bake when its inputs changed, then the composite and
-    /// the LDR passes, writing the corrected image to `output`.
+    /// meter, bloom, the lens flare), the grading LUT's bake when its inputs changed,
+    /// then the composite and the LDR passes, writing the corrected image to
+    /// `StackPass::output`. When TAA upscaled the view (TAAU, #1702), everything
+    /// after it runs at the output's size and writes `StackPass::upscaled`, the real
+    /// output, so the caller skips the bilinear upscale.
     pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &CameraCtx) {
         use crate::render::postfx::PostFxContext;
 
@@ -140,7 +153,10 @@ impl Renderer {
         let chain = PostFxContext {
             depth_view: &view.depth_view,
             skybox: (&sky.view, &sky.sampler),
-            output: stack.output,
+            output: match stack.upscaled {
+                Some(output) if view.post_fx.taa_upscaled() => output,
+                _ => stack.output,
+            },
             timer: &self.gpu_timer,
         };
         view.post_fx

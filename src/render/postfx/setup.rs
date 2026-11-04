@@ -61,6 +61,7 @@ impl PostFx {
             bloom_dirt: None,
             ldr,
             full_size,
+            chain_size: full_size,
             output_format,
             motion: Default::default(),
             targets: Default::default(),
@@ -139,7 +140,7 @@ impl PostFx {
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
         let (full_size, scene_hdr, ldr) =
             Self::create_targets(device, width, height, self.output_format);
-        self.full_size = full_size;
+        (self.full_size, self.chain_size) = (full_size, full_size);
         self.scene_hdr = scene_hdr;
         self.ldr = ldr;
         self.custom.resize(device, full_size.0, full_size.1);
@@ -148,6 +149,21 @@ impl PostFx {
         self.motion.reset();
         self.exposure.cut();
         // Every effect's own targets refit at the new size the next frame it runs.
+        self.targets.clear();
+    }
+
+    /// Run the chain after TAA at `size` from this frame on (#1702): the scene's
+    /// size, or the output's while TAA upscales the view. Another size than the
+    /// last frame's remakes the LDR targets and drops every effect's own, so each
+    /// refits at the new size; the same size is a no-op.
+    pub(crate) fn fit_chain(&mut self, device: &wgpu::Device, size: (u32, u32)) {
+        let size = (size.0.max(1), size.1.max(1));
+        if size == self.chain_size {
+            return;
+        }
+        self.chain_size = size;
+        self.ldr = Self::target(device, size.0, size.1, "PostFX LDR", self.output_format);
+        self.custom.resize(device, size.0, size.1);
         self.targets.clear();
     }
 
