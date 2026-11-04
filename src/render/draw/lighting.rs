@@ -5,6 +5,7 @@
 use glam::Vec3;
 
 use crate::render::gpu::uniforms::{ProceduralSkyUniform, MAX_DIRECTIONAL_LIGHTS};
+use crate::render::ibl::cubemap_capture::CaptureMode;
 use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::render::{AmbientLightUniform, DirectionalLightUniform, LightingUniform};
 use crate::scene::lighting::DiffuseModel;
@@ -138,21 +139,28 @@ impl crate::render::Renderer {
         let mut lighting_uniform = default_lighting_uniform(scene);
         apply_scene_lights(&mut lighting_uniform, scene, self.capture.static_only);
         lighting_uniform.refl_probes = *self.reflection_probes.uniforms();
-        if self.capture.static_only {
-            // No bake capture sees the directional lightmap's specular lobe (#1695):
-            // it depends on the view, and a probe is seen from everywhere.
-            lighting_uniform.baked_specular = 0.0;
-            for probe in &mut lighting_uniform.refl_probes {
-                probe.params[3] = 0.0;
-            }
-        }
+        apply_capture(&mut lighting_uniform, self.capture);
         if self.skybox_texture.is_some() {
             lighting_uniform.sky_textured = 1.0;
         }
-        if self.capture.ambient_sky {
-            lighting_uniform.env_reflection = 0.0;
-        }
         lighting_uniform
+    }
+}
+
+/// What a bake capture turns off in the lighting uniform (`capture`; a frame's
+/// default mode changes nothing). Every bake capture leaves the probes' normalisation
+/// out (#1697) and the directional lightmap's specular lobe (#1695: it depends on the
+/// view, and a probe is seen from everywhere); a light-probe capture reflects nothing
+/// (#1668).
+pub(crate) fn apply_capture(uniform: &mut LightingUniform, capture: CaptureMode) {
+    if capture.static_only {
+        uniform.baked_specular = 0.0;
+        for probe in &mut uniform.refl_probes {
+            probe.params[3] = 0.0;
+        }
+    }
+    if capture.ambient_sky {
+        uniform.env_reflection = 0.0;
     }
 }
 
