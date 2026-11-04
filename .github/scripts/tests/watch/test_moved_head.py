@@ -12,10 +12,11 @@ import tempfile
 import unittest
 from unittest import mock
 
-from merging.queue import cli, gitio, outcomes, pulls, taking, update, waiting
+from merging.queue import cli, gitio, landing, outcomes, pulls, taking, update, waiting
 from merging.verdict import reviewed
 from merging.watch import handbacks, loop
 from tests.queue.fixtures import READY, REVIEW
+from tests.queue.test_listing_flicker import PULL, RUNNING, waited
 from tests.verdict.fixtures import SHA
 from tests.watch import fakes
 from tests.watch.fakes import pr
@@ -49,7 +50,9 @@ class Watched(unittest.TestCase):
         self.assertTrue(any(s.startswith("watch: #1 goes back in line: the head is fixed11") for s in said))
 
     def test_every_other_hand_back_still_remembers_its_head(self):
-        world, _, memory = self.run_watch([outcomes.HANDED_BACK], [[pr(1, head="pushed1")]])
+        # The listing's head differs from what GitHub reports now (#1645: that one is kept).
+        listings = [[pr(1, head="listed1")], [pr(1, head="pushed1")]]
+        world, _, memory = self.run_watch([outcomes.HANDED_BACK], listings)
         self.assertEqual((world.taken, memory), ([1], {1: "pushed1"}))
 
 
@@ -69,10 +72,38 @@ class Taken(unittest.TestCase):
     def test_under_the_watch_a_moved_head_goes_back_in_line(self):
         state, why = self.take(True)
         self.assertEqual(state, outcomes.REQUEUED)
-        self.assertIn("Taken again on its new head", why)
+        self.assertIn("Back in line on its new head", why)
 
     def test_a_named_take_still_hands_it_back(self):
         self.assertEqual(self.take(False)[0], outcomes.HANDED_BACK)
+
+
+class LabelOff(unittest.TestCase):
+    def take(self, watch, labels):
+        opts = cli.parse(["524", "--poll", "0"])
+        opts.watch = watch
+        now = {**READY, "labels": labels}
+        with mock.patch.object(pulls, "look", side_effect=[{**READY, "labels": [{"name": "queue"}]}, now]), \
+            mock.patch.object(reviewed, "comments", return_value=REVIEW), \
+            mock.patch.object(gitio, "git"), mock.patch.object(gitio, "remote"), \
+            mock.patch.object(update, "advance", return_value=(SHA, [])), \
+            mock.patch.object(waiting, "wait_for", return_value=(outcomes.GO, ["ci passed"])), \
+            mock.patch.object(landing, "squash", return_value=(outcomes.MERGED, "")) as squash, \
+            mock.patch("builtins.print"):
+            _, state, _ = taking.take("o/r", 524, opts)
+        return state, squash.called
+
+    def test_a_label_taken_off_during_the_wait_stops_the_merge(self):
+        self.assertEqual(self.take(True, []), (outcomes.REQUEUED, False))
+
+    def test_a_label_kept_merges(self):
+        self.assertEqual(self.take(True, [{"name": "queue"}]), (outcomes.MERGED, True))
+
+
+class Waiting(unittest.TestCase):
+    def test_a_third_sha_ends_the_wait_as_moved(self):
+        state, lines = waited([RUNNING], {**PULL, "headRefOid": "9" * 40})
+        self.assertEqual(state, outcomes.HEAD_MOVED, lines)
 
 
 if __name__ == "__main__":
