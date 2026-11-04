@@ -20,14 +20,14 @@ fn destroy(scene: &mut Scene, id: u32) {
 }
 
 #[test]
-fn an_undone_destroy_puts_the_lightmap_entry_back_in_its_slot() {
+fn an_undone_destroy_puts_the_lightmap_entry_back() {
     let mut scene = Scene::new();
     let ids: Vec<u32> = ["A", "B", "C"]
         .iter()
         .map(|n| create_entity(&mut scene, n, Some(Primitive::Box)))
         .collect();
     for (page, &entity) in (0u32..).zip(&ids) {
-        scene.lightmaps.entries.push(LightmapEntry {
+        scene.lightmaps.insert(LightmapEntry {
             entity,
             page,
             scale_offset: [1.0, 1.0, 0.0, 0.0],
