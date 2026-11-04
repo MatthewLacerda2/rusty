@@ -70,6 +70,9 @@ pub(crate) struct DrawBuffers {
     proxies: GrowBuffer,
     /// Every kept object's record, by slot (`objects.rs`).
     objects: GrowBuffer,
+    /// Bytes written since the last [`Self::take_written`] (`Debug.Stats`'
+    /// `render_upload_bytes`).
+    written: u64,
     /// The material bytes last written, so an unchanged array is not rewritten.
     last_materials: Vec<u8>,
     bind_group: wgpu::BindGroup,
@@ -126,6 +129,7 @@ impl DrawBuffers {
             materials,
             proxies,
             objects,
+            written: 0,
             last_materials: Vec::new(),
             bind_group,
             default_bones,
@@ -154,12 +158,16 @@ impl DrawBuffers {
         let bone_bytes = joint_array_bytes(joints);
         let material_bytes: &[u8] = bytemuck::cast_slice(materials);
         // Equal bytes are an equal length, so a skipped write never misses a growth.
-        let materials_grew = material_bytes != self.last_materials.as_slice() && {
+        let materials_changed = material_bytes != self.last_materials.as_slice();
+        let materials_grew = materials_changed && {
             self.last_materials.clear();
             self.last_materials.extend_from_slice(material_bytes);
+            self.written += material_bytes.len() as u64;
             self.materials.upload(device, queue, material_bytes)
         };
 
+        self.written += (uniform_bytes.len() + bone_bytes.len()) as u64;
+        self.written += (std::mem::size_of_val(instances) + std::mem::size_of_val(proxies)) as u64;
         let grew = [
             self.uniforms.upload(device, queue, &uniform_bytes),
             self.bones.upload(device, queue, &bone_bytes),
@@ -190,6 +198,11 @@ impl DrawBuffers {
                 self.objects.buffer(),
             ],
         );
+    }
+
+    /// The bytes written since the last call.
+    pub(crate) fn take_written(&mut self) -> u64 {
+        std::mem::take(&mut self.written)
     }
 
     /// The one group-1 bind group every solid draw binds, at [`Self::offsets`].

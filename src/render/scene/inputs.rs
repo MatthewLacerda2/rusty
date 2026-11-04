@@ -55,17 +55,15 @@
 //! frame, so its record is rebuilt per frame and uploaded only when the records
 //! differ from what the buffer holds.
 //!
-//! **Known gaps, for part 3** (the persistent material table):
-//! - A material's shared param buffer (`ParamOwner::Material`) is keyed by library
-//!   name across scenes, and `write_params` runs only when an object is re-derived,
-//!   so scene A can draw with scene B's values for a same-named material whose
-//!   surface shader has runtime params. No shipping path reaches it today. Part 2
-//!   widened it: the per-frame shadow clip walk (`shadow_clips`) called
-//!   `write_params` for every clipped slot, which hid the gap for cutting
-//!   materials. With a preview tab beside the main scene, a same-named cutting
-//!   material with other runtime params now has the main scene's shadow cut and
-//!   camera draw read the preview's values until the main scene's object is
-//!   re-derived.
+//! **The material library** (part 3): an edit re-derives the objects whose material
+//! slots name an edited, added or removed material (`RenderScene::by_material`),
+//! no others. Finding the edited names compares the library entry by entry once its
+//! revision moved, so a script animating one colour each frame pays that compare
+//! and its material's users, not a rebuild. A runtime param buffer is keyed by scene
+//! and name (`ParamOwner::Material`), so two kept scenes holding a same-named
+//! material each draw their own values.
+//!
+//! **Known gaps:**
 //! - Any change to the lightmap set rebuilds every object, and a despawn removes the
 //!   entity's lightmap entry: destroying one lightmapped prop re-derives the World.
 

@@ -159,6 +159,7 @@ impl Renderer {
             },
         );
         self.retained.objects.end_camera();
+        self.frame_counters.render_upload_bytes += self.draw_buffers.take_written();
         draws
     }
 }

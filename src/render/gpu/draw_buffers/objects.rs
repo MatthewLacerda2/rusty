@@ -12,7 +12,7 @@ impl DrawBuffers {
     /// Bring the GPU's object array up to `table`: its dirty slots, in runs, then the
     /// current camera's transient ones past the kept slots. When the array must grow,
     /// the new buffer gets every slot instead, and this returns `true` so the bind
-    /// group is rebuilt over it.
+    /// group is rebuilt over it. Adds the bytes it wrote to `written`.
     pub(super) fn sync_objects(
         &mut self,
         device: &wgpu::Device,
