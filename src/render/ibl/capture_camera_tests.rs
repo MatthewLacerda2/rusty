@@ -32,11 +32,11 @@ fn gpu_a_scene_s_cameras_leave_a_baked_cube_unchanged() {
         return;
     };
     let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(5.0));
-    let bare = r.bake_reflection(&patched_room(), &probe, RES);
+    let bare = r.bake_reflection(&patched_room(), &probe, RES).bytes;
     let mut scene = patched_room();
     add_camera(&mut scene, "Main", Vec3::new(2.0, 1.0, 3.0), 45.0, 0);
     add_camera(&mut scene, "Overlay", Vec3::new(-3.0, 0.0, 1.0), 30.0, 1);
-    let with_cameras = r.bake_reflection(&scene, &probe, RES);
+    let with_cameras = r.bake_reflection(&scene, &probe, RES).bytes;
     assert!(
         bare == with_cameras,
         "the scene's cameras changed the baked cube"

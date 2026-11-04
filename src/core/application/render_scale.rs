@@ -11,7 +11,8 @@ impl Application {
         self.graphics.render_scale
     }
 
-    /// Set the project's render-scale default, writing the bound file (if any). The
+    /// Set the project's render-scale default, writing the bound file (if any) over
+    /// the file as it stands ([`reread`](Self::reread) first). The
     /// `live` setting takes it too, so it runs at once wherever the player hasn't
     /// chosen a scale (the editor previews what a fresh install sees).
     pub fn set_default_render_scale(
@@ -19,6 +20,7 @@ impl Application {
         default: RenderScaleDefault,
         live: &mut RenderScaleSetting,
     ) -> Result<(), String> {
+        self.reread();
         self.graphics.render_scale = default;
         live.default = default;
         self.save()

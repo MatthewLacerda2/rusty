@@ -51,8 +51,9 @@ const COSINE_LOBE: [f32; SH_COEFFS] = {
     [a0, a1, a1, a1, a2, a2, a2, a2, a2]
 };
 
-/// One L2 SH irradiance probe: 9 coefficients × RGB. Serialized into the lighting
-/// sidecar (`<scene>.lighting.json`), never into the scene document itself.
+/// One L2 SH irradiance probe: 9 coefficients × RGB. A light probe's is serialized
+/// into the lighting sidecar (`<scene>.lighting.json`); a reflection probe's stored
+/// irradiance (#1697) goes into the scene document beside its cube's path.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Sh9 {
     /// 9 basis coefficients, each an RGB radiance triple.

@@ -8,10 +8,16 @@
 //! per option, each written to `project.rusty` the moment it changes through
 //! `Application::set_default_option`, the op `Graphics.SetDefaultOption` calls; the
 //! live options follow it where the player hasn't chosen, to preview a fresh install.
+//!
 //! Then the project's render-scale default (#1715), a factor or *Match display*,
 //! through `Application::set_default_render_scale`, the op
 //! `Graphics.SetDefaultRenderScale` calls; it runs at once unless the player chose a
 //! scale.
+//!
+//! Last, the project's audio settings (#1749): the speed of sound doppler resolves
+//! with, written through `Application::set_speed_of_sound` (the op
+//! `Audio.SetDefaultSpeedOfSound` calls) once a drag or a typed edit ends, and
+//! applied to the audio on entering Play.
 
 use egui_phosphor::regular as icon;
 
@@ -55,6 +61,8 @@ pub fn draw(
             graphics_defaults(ui, app, &mut live.options, console);
             ui.separator();
             render_scale_default(ui, app, &mut live.render_scale, console);
+            ui.separator();
+            audio(ui, app, console);
         });
     if save {
         match app.set_build(draft.clone()) {
@@ -118,7 +126,8 @@ fn graphics_defaults(
 }
 
 /// The project's render-scale default: a factor, or *Match display* (`1 / display
-/// scale`). Written at once, like the options above.
+/// scale`). A drag or a typed factor is held as a draft, as [`audio`]'s is, and
+/// written once it ends.
 fn render_scale_default(
     ui: &mut egui::Ui,
     app: &mut Application,
@@ -126,6 +135,8 @@ fn render_scale_default(
     console: &mut ConsoleLogs,
 ) {
     let current = app.render_scale_default();
+    let id = ui.id().with("render_scale_default");
+    let draft = ui.data(|d| d.get_temp::<f32>(id));
     let mut next = None;
     ui.horizontal(|ui| {
         ui.label("Default render scale");
@@ -133,19 +144,21 @@ fn render_scale_default(
         if ui.selectable_label(matching, "Match display").clicked() && !matching {
             next = Some(RenderScaleDefault::MatchDisplay);
         }
-        let mut factor = match current {
+        let mut factor = draft.unwrap_or(match current {
             RenderScaleDefault::Fixed(scale) => scale.get(),
             RenderScaleDefault::MatchDisplay => 1.0,
-        };
+        });
         let range = RenderScale::MIN..=RenderScale::MAX;
-        let drag = ui.add_enabled(
-            !matching,
-            egui::DragValue::new(&mut factor).ranged(range).speed(0.01),
-        );
+        let drag = egui::DragValue::new(&mut factor).speed(0.01).ranged(range);
+        let r = ui.add_enabled(!matching, drag);
         if matching && ui.small_button("Fixed").clicked() {
             next = Some(RenderScaleDefault::Fixed(RenderScale::NATIVE));
         }
-        if drag.changed() {
+        let editing = r.dragged() || r.has_focus();
+        if r.changed() && editing {
+            ui.data_mut(|d| d.insert_temp(id, factor));
+        } else if r.changed() || (!editing && draft.is_some()) {
+            ui.data_mut(|d| d.remove::<f32>(id));
             next = Some(RenderScaleDefault::Fixed(RenderScale::new(factor)));
         }
     });
@@ -157,4 +170,29 @@ fn render_scale_default(
             console.error(err);
         }
     }
+}
+
+/// The project's audio settings: the speed of sound (m/s). A drag or a typed edit
+/// is held as a draft in egui's memory and written once, when it ends, not on every
+/// frame it changes.
+fn audio(ui: &mut egui::Ui, app: &mut Application, console: &mut ConsoleLogs) {
+    let id = ui.id().with("speed_of_sound");
+    let draft = ui.data(|d| d.get_temp::<f32>(id));
+    let mut c = draft.unwrap_or(app.audio_settings().speed_of_sound);
+    ui.horizontal(|ui| {
+        ui.label("Speed of sound (m/s)");
+        let drag = egui::DragValue::new(&mut c)
+            .speed(1.0)
+            .ranged(1.0..=10_000.0);
+        let r = ui.add(drag);
+        let editing = r.dragged() || r.has_focus();
+        if r.changed() && editing {
+            ui.data_mut(|d| d.insert_temp(id, c));
+        } else if r.changed() || (!editing && draft.is_some()) {
+            ui.data_mut(|d| d.remove::<f32>(id));
+            if let Err(err) = app.set_speed_of_sound(c) {
+                console.error(err);
+            }
+        }
+    });
 }

@@ -8,7 +8,7 @@
 //!   "graphics_options": { "motion_blur": true, … }, "graphics": { "render_scale": 1 },
 //!   "quality": { "default": "Medium", "presets": [ { "name": "Low", … }, … ] },
 //!   "decals": { "max_per_owner": 256, "max_world": 1024, "max_total": 4096 },
-//!   "demos": { "keep": 20 } }
+//!   "demos": { "keep": 20 }, "audio": { "speed_of_sound": 343 } }
 //! ```
 //!
 //! * **`engine_commit`** — the engine build the project was last opened with, so a
@@ -32,6 +32,8 @@
 //!   the scene on entering Play.
 //! * **`demos`** — how many play demos a dev build keeps in `saved/demos/`
 //!   ([`DemoSettings`], #1581; default 20).
+//! * **`audio`** — the speed of sound doppler resolves with ([`AudioSettings`],
+//!   #1749), applied to the audio on entering Play.
 
 use std::path::Path;
 
@@ -40,6 +42,7 @@ use serde::{Deserialize, Serialize};
 use super::engine::commit::{engine_commit, engine_order, UNKNOWN_COMMIT};
 use super::engine::{base, EngineCheck};
 use crate::core::application::BuildSettings;
+use crate::core::settings::audio::AudioSettings;
 use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::demos::DemoSettings;
 use crate::core::settings::graphics_options::GraphicsOptions;
@@ -73,6 +76,8 @@ pub struct ProjectFile {
     pub decals: DecalLimits,
     /// How many play demos `saved/demos/` keeps (#1581).
     pub demos: DemoSettings,
+    /// The game's audio settings (#1749).
+    pub audio: AudioSettings,
 }
 
 impl Default for ProjectFile {
@@ -86,6 +91,7 @@ impl Default for ProjectFile {
             quality: QualityPresets::default(),
             decals: DecalLimits::default(),
             demos: DemoSettings::default(),
+            audio: AudioSettings::default(),
         }
     }
 }
@@ -104,6 +110,7 @@ pub struct ProjectSettings {
     pub quality: QualityPresets,
     pub decals: DecalLimits,
     pub demos: DemoSettings,
+    pub audio: AudioSettings,
 }
 
 impl From<ProjectFile> for ProjectSettings {
@@ -115,6 +122,7 @@ impl From<ProjectFile> for ProjectSettings {
             quality: file.quality,
             decals: file.decals,
             demos: file.demos,
+            audio: file.audio,
         }
     }
 }

@@ -174,8 +174,8 @@ impl LightingBake {
         };
         let out_dir = out_dir(self.scene_path.as_deref())?;
         say(format!("Baking reflection probe {} of {total}", i + 1));
-        let bytes = renderer.bake_reflection(scene, probe, *resolution);
-        self.staged.write(&out_dir, &bytes)?;
+        let baked = renderer.bake_reflection(scene, probe, *resolution);
+        self.staged.write(&out_dir, &baked)?;
         Ok(self.staged.len() >= total)
     }
 

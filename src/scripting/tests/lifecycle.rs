@@ -29,10 +29,11 @@ pub(super) fn manager_with_entity() -> (ScriptManager, u32) {
     (m, id)
 }
 
+/// Write `code` to `<name>.lua` in the running test's own temp dir.
 pub(super) fn write_script(name: &str, code: &str) -> String {
-    let path = format!("/tmp/rusty_lifecycle_{}.lua", name);
+    let path = crate::test_temp::dir().join(format!("{name}.lua"));
     std::fs::write(&path, code).unwrap();
-    path
+    path.to_string_lossy().into_owned()
 }
 
 #[test]

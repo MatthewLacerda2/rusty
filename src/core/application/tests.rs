@@ -82,6 +82,13 @@ fn the_render_scale_default_writes_through_the_bound_file() {
     reopened.open(&path).unwrap();
     assert_eq!(reopened.render_scale_default(), matching);
     assert_eq!(reopened.settings().graphics.render_scale, matching);
+    // A hand edit survives an unrelated save: the write rereads the file first.
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::write(&path, text.replace("\"match_display\"", "0.5")).unwrap();
+    app.update(|b| b.product_name = "Neon".into()).unwrap();
+    let half =
+        RenderScaleDefault::Fixed(crate::core::settings::render_scale::RenderScale::new(0.5));
+    assert_eq!(app.render_scale_default(), half);
     let _ = std::fs::remove_file(&path);
 }
 

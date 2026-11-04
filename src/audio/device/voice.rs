@@ -1,8 +1,8 @@
 //! src/audio/device/voice.rs — one playing voice, as a kira `Sound` (#212, #412, #465).
 //!
 //! Each voice is a [`ClipSound`] playing a cached clip into its mixer group's kira
-//! track. It reads its live mix (gain, pan, `spatial_blend`, rate, pause, stop) from
-//! a shared [`VoiceControl`] of atomics: the backend retunes the control each frame
+//! track. It reads its live mix (gain, pan, `spatial_blend`, rate, doppler, pause,
+//! stop) from a shared [`VoiceControl`] of atomics (`device/control.rs`): the backend retunes the control each frame
 //! and the audio thread picks the values up on its next buffer (a few ms) and
 //! glides to them (below), so a moving source pans smoothly and the voice is
 //! never restarted.
@@ -17,14 +17,15 @@
 //! Occlusion (#467) closes the voice's own low-pass ([`LowPass`]) after the pan.
 //!
 //! **Parameters glide, per sample** (#1693). The game retunes a voice once per
-//! frame (every 25–40 ms at a low frame rate), so a gain, pan, blend or low-pass
-//! applied flat would jump at that rate: zipper noise. Each of the four instead
+//! frame (every 25–40 ms at a low frame rate), so a gain, pan, blend, low-pass or
+//! doppler rate (#1749) applied flat would jump at that rate: zipper noise, or a
+//! chirp when a body's velocity steps. Each of the five instead
 //! follows its target through a one-pole smoother with a [`SMOOTHING`] time
 //! constant, as FMOD and Wwise ramp theirs. A voice's first sample plays at its
 //! targets, with no fade-in, so a one-shot keeps its attack; a value that holds
 //! still is played exactly, so an open filter stays bit-transparent and a voice
-//! faded to zero gain is exact silence an effect can sleep over (#1729). Rate,
-//! pause and stop apply at once, and a voice resumed from a pause starts on its
+//! faded to zero gain is exact silence an effect can sleep over (#1729). The
+//! time-scale rate, pause and stop apply at once, and a voice resumed from a pause starts on its
 //! targets, like a new one.
 //!
 //! Pan is a **balance** law: the far channel fades linearly to silence, the near one
@@ -33,78 +34,20 @@
 //! count, which is why the voice is ours: kira does everything downstream of it
 //! (groups, filters, sends, the speaker-mode stage, the device).
 //!
-//! The playhead advances `rate × clip rate` frames per second of output, with linear
-//! interpolation between frames, so a clip at any sample rate plays at its pitch on
-//! any device and `Time.timeScale` bends the pitch with the rate.
+//! The playhead advances `rate × doppler × clip rate` frames per second of output,
+//! with linear interpolation between frames, so a clip at any sample rate plays at
+//! its pitch on any device, and `Time.timeScale` and doppler bend the pitch.
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use kira::info::Info;
 use kira::sound::{Sound, SoundData};
 use kira::Frame;
 
+pub use super::control::VoiceControl;
 use super::decode::CachedClip;
 use super::lowpass::LowPass;
-use crate::audio::backend::VoiceMix;
-
-/// An `f32` shared between the backend (writer) and the audio thread (reader).
-#[derive(Debug, Default)]
-struct AtomicF32(AtomicU32);
-
-impl AtomicF32 {
-    fn set(&self, v: f32) {
-        self.0.store(v.to_bits(), Ordering::Relaxed);
-    }
-    fn get(&self) -> f32 {
-        f32::from_bits(self.0.load(Ordering::Relaxed))
-    }
-}
-
-/// The live state of one voice, shared between the backend and the audio thread.
-#[derive(Debug, Default)]
-pub struct VoiceControl {
-    gain: AtomicF32,
-    pan: AtomicF32,
-    spatial_blend: AtomicF32,
-    speed: AtomicF32,
-    paused: AtomicBool,
-    /// The voice's low-pass cutoff in Hz (occlusion, #467).
-    low_pass: AtomicF32,
-    /// Set by the backend to end the voice; kira then unloads it.
-    stopped: AtomicBool,
-    /// Set by the audio thread when a one-shot reaches its end.
-    finished: AtomicBool,
-}
-
-impl VoiceControl {
-    /// A control starting at `mix`.
-    pub fn new(mix: &VoiceMix) -> Arc<Self> {
-        let control = Arc::new(Self::default());
-        control.set(mix);
-        control
-    }
-
-    /// Retune the voice; clamps every field into range.
-    pub fn set(&self, mix: &VoiceMix) {
-        self.gain.set(mix.gain.max(0.0));
-        self.pan.set(mix.pan.clamp(-1.0, 1.0));
-        self.spatial_blend.set(mix.spatial_blend.clamp(0.0, 1.0));
-        self.speed.set(mix.speed.max(0.0));
-        self.paused.store(mix.paused, Ordering::Relaxed);
-        self.low_pass.set(mix.low_pass);
-    }
-
-    /// End the voice at the audio thread's next buffer.
-    pub fn stop(&self) {
-        self.stopped.store(true, Ordering::Relaxed);
-    }
-
-    /// Whether the voice is still producing sound (not stopped, not run out).
-    pub fn is_live(&self) -> bool {
-        !self.stopped.load(Ordering::Relaxed) && !self.finished.load(Ordering::Relaxed)
-    }
-}
 
 /// Mix one input frame to a stereo `(left, right)` pair under the stereo rule and
 /// balance pan law described in the module docs.
@@ -138,7 +81,7 @@ pub const SMOOTHING: f64 = 0.010;
 /// does, never carrying the NaN for the voice's life.
 const SNAP: f32 = 1e-6;
 
-/// The parameters a voice glides (#1693). `low_pass` is the filter's one-pole
+/// The parameters a voice glides (#1693, the doppler rate #1749). `low_pass` is the filter's one-pole
 /// coefficient; `1.0` is open (the filter bypassed).
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Glide {
@@ -146,6 +89,8 @@ struct Glide {
     pan: f32,
     blend: f32,
     low_pass: f32,
+    /// The doppler rate (#1749): glided so a velocity step never clicks.
+    doppler: f32,
 }
 
 impl Glide {
@@ -156,6 +101,7 @@ impl Glide {
             (&mut self.pan, target.pan),
             (&mut self.blend, target.blend),
             (&mut self.low_pass, target.low_pass),
+            (&mut self.doppler, target.doppler),
         ] {
             let next = *v + k * (t - *v);
             *v = if next == *v || !next.is_finite() || (t - next).abs() <= SNAP {
@@ -237,6 +183,7 @@ impl Sound for ClipSound {
             pan: c.pan.get(),
             blend: c.spatial_blend.get(),
             low_pass: LowPass::coefficient(c.low_pass.get(), dt).unwrap_or(1.0),
+            doppler: c.doppler.get(),
         };
         let step = f64::from(c.speed.get()) * f64::from(self.clip.sample_rate()) * dt;
         if c.paused.load(Ordering::Relaxed) || c.stopped.load(Ordering::Relaxed) {
@@ -259,7 +206,7 @@ impl Sound for ClipSound {
             let mixed = mix_frame(&self.frame, glide.pan, glide.blend);
             let (l, r) = self.filter.process(glide.filter(), mixed);
             *frame = Frame::new(l * glide.gain, r * glide.gain);
-            self.position += step;
+            self.position += step * f64::from(glide.doppler);
         }
         self.glide = Some(glide);
         if self.looping && self.clip.frames() > 0 {
@@ -295,3 +242,7 @@ mod voice_tests;
 #[cfg(test)]
 #[path = "glide_tests.rs"]
 mod glide_tests;
+
+#[cfg(test)]
+#[path = "doppler_glide_tests.rs"]
+mod doppler_glide_tests;
