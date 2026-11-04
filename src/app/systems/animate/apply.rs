@@ -94,6 +94,12 @@ pub(super) fn apply_root_motion(
         s.world.set_world_rotation(id, facing);
     }
     let moved = moved.unwrap_or_else(|| s.world.world_position(id) - before);
+    record(s, id, moved, carry);
+}
+
+/// Keep on `id`'s animator what it really `moved` and the travel `carry`
+/// still owed, compared first: a borrow stamps the animator as edited.
+fn record(s: &mut Scene, id: u32, moved: Vec3, carry: Vec3) {
     let unchanged = s
         .world
         .animator(id)
