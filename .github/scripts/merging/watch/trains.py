@@ -94,6 +94,10 @@ class Yard:
             return [(n, outcomes.REQUEUED, f"its train was {state}; its half is tested next.") for n in train.numbers], None
         if fx.no_merge:
             return [(n, outcomes.GREEN, f"its train {train.tip[:7]} is green.") for n in train.numbers], None
+        if fx.main_state(train.base)[1] != 0:
+            # `main` moved while the train ran: its tree is not what landing now leaves.
+            fx.say(f"watch: `main` moved past {train.base[:7]} while the train ran; rebuilding it on the new `main`.")
+            return [(n, outcomes.REQUEUED, "its train went stale; rebuilt on the new `main`.") for n in train.numbers], None
         results, landed, unknown = land.land(train, fx.look, fx.squash)
         if landed or unknown:
             halt = land.check(train, landed, unknown, *fx.main_state(train.base))

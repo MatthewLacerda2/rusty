@@ -26,6 +26,7 @@ class NextStep(unittest.TestCase):
         self.assertEqual(sv.next_step(ending.RELAUNCH_STATUS, "relaunch: …", 0)[:2], (sv.AGAIN, 0))
         self.assertEqual(sv.next_step(ending.STOPPED_STATUS, "", 0)[0], sv.GIVE_UP)
         self.assertEqual(sv.next_step(lock.LOCKED_STATUS, "", 0)[0], sv.GIVE_UP)
+        self.assertEqual(sv.next_step(ending.MISMATCH_STATUS, "", 0)[0], sv.GIVE_UP)  # look at `main` first (#1785)
         self.assertEqual(sv.next_step(2, "", 0)[0], sv.GIVE_UP)
 
     def test_the_machine_failing_backs_off_then_gives_up(self):

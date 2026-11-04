@@ -15,13 +15,23 @@ from __future__ import annotations
 import time
 
 from merging.queue import outcomes, polling, waiting
-from merging.verdict import github, runners
+from merging.verdict import decide, github, runlist, runners
 
 
 # How a train's wait ends besides [`outcomes.GO`]: its gates said no (the halves
 # are tested), or nothing said anything in time (its members go back in line, as
 # they were: a runner outage or a deadline is not the trees' fault).
 RED, STALLED = "red", "stalled"
+
+
+def failed(tip: dict, runs: list[dict], jobs: dict[int, list[dict]]) -> bool:
+    """Whether a gating workflow's run on the tip failed for the code's reasons."""
+    sha = tip["headRefOid"]
+    return any(
+        decide.assess(tip, w, runlist.runs_for(runs, sha, w), jobs)[0] == decide.FAILED
+        and not runners.outage(tip, runs, jobs)
+        for w in runlist.WORKFLOWS
+    )
 
 
 def wait(repo: str, sha: str, deadline: float, poll: float, tick=None, say=outcomes.say) -> tuple[str, list[str]]:
@@ -41,8 +51,9 @@ def wait(repo: str, sha: str, deadline: float, poll: float, tick=None, say=outco
         elif state == outcomes.GO:
             return state, lines
         elif state != outcomes.WAIT:
-            # Cancelled again after its one re-run: the runners', not the tree's (#869).
-            return (STALLED if lines[0].startswith(outcomes.RUNNERS) else RED), lines
+            # Red only for a run that failed: a run cancelled again after its one
+            # re-run (#869), or none that ever built the tip, is not the tree's.
+            return (RED if failed(tip, runs, jobs) else STALLED), lines
         if waited > deadline:
             return STALLED, [f"still waiting on the train {sha[:7]} after {waited / 60:.0f} minutes.", *lines]
         say(f"train {sha[:7]}: {lines[0]}")
