@@ -16,26 +16,19 @@
 //! orphan naming the new id from no `children` list.
 //!
 //! The subtree walks follow `children`, so they hold only while every parent link
-//! has its `children` entry. `Scene::set_parent` writes the entry first, and the
-//! despawn's re-rooting clears both sides; a raw [`World::set_parent_id`] naming a
-//! parent whose list lacks the child (a test linking one side, code bypassing
-//! `Scene::set_parent`) marks the store `unlisted`, and from then until a `clear`
-//! every invalidation is the whole-store bump again. A loaded document is checked
-//! once ([`World::one_sided_links`], which a scene load calls and warns on), since
-//! a hand-written file can carry one side only.
-//!
-//! **A parent that arrives late** (#1805). A document can name a parent id that is
-//! not live (a scene or prefab file naming an id it lacks, or Undo putting a step's
-//! entities back in id order, a child before its parent). The child is remembered
-//! under that id; when the id arrives (a spawn reaching it, a document put back),
-//! a waiting child its `children` does not list is a one-sided link, and marks the
-//! store `unlisted`. The cost is one map lookup per arrival, never per frame.
+//! has its `children` entry. `Scene::set_parent` writes the entry first, the
+//! despawn's re-rooting clears both sides, and a placed document's link gets its
+//! missing side, at once or when the parent arrives (`ecs::placement`, #1805), so a
+//! hand-written file or prefab carrying one side is repaired as it loads. A raw
+//! [`World::set_parent_id`] naming a parent whose list lacks the child (a test
+//! linking one side, code bypassing `Scene::set_parent`) marks the store
+//! `unlisted`, and from then until a `clear` every invalidation is the whole-store
+//! bump again.
 //!
 //! **Determinism.** An answer is a pure function of the `active` flags and parent links;
 //! stamps only gate the cache, never a result.
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
 
 use super::bundle::Core;
 use super::world::World;
@@ -47,8 +40,6 @@ pub(in crate::ecs) struct ActivityStore {
     /// A parent link was written without its `children` entry: subtree walks can
     /// miss a descendant, so every invalidation bumps the whole store.
     unlisted: bool,
-    /// Absent parent id -> the children that named it when they were placed.
-    awaited: BTreeMap<u32, Vec<u32>>,
 }
 
 struct Flags {
@@ -65,7 +56,6 @@ impl Default for ActivityStore {
         Self {
             inner: RefCell::new(Flags::new()),
             unlisted: false,
-            awaited: BTreeMap::new(),
         }
     }
 }
@@ -137,7 +127,6 @@ impl ActivityStore {
     pub(in crate::ecs) fn reset(&mut self) {
         *self.inner.borrow_mut() = Flags::new();
         self.unlisted = false;
-        self.awaited.clear();
     }
 
     /// A parent link without its `children` entry was written (see the module docs).
@@ -197,47 +186,10 @@ impl World {
         self.invalidate_activity_below(id);
     }
 
-    /// Placed `id` names `parent`: when that parent is not live, remember `id`
-    /// under it, for [`World::arrived_activity`] to check (module docs).
-    pub(in crate::ecs) fn placed_activity(&mut self, id: u32, parent: Option<u32>) {
-        if let Some(p) = parent.filter(|&p| !self.contains(p)) {
-            self.activity.awaited.entry(p).or_default().push(id);
-        }
-    }
-
-    /// `id` arrived: a child that named it while it was absent, and still does,
-    /// but which `id`'s `children` lacks, is a one-sided link (module docs).
-    pub(in crate::ecs) fn arrived_activity(&mut self, id: u32) {
-        let Some(waiting) = self.activity.awaited.remove(&id) else {
-            return;
-        };
-        let one_sided = |&c: &u32| self.parent_id(c) == Some(id) && !self.lists_child(id, c);
-        if waiting.iter().any(one_sided) {
-            self.activity.mark_unlisted();
-            self.activity.invalidate_all();
-        }
-    }
-
     /// Whether `parent`'s `children` names `child`, read in place.
-    fn lists_child(&self, parent: u32, child: u32) -> bool {
+    pub(in crate::ecs) fn lists_child(&self, parent: u32, child: u32) -> bool {
         self.component::<Core>(parent)
             .is_some_and(|c| c.children.contains(&child))
-    }
-
-    /// Check every parent link of a freshly loaded World once: a child naming a
-    /// live parent whose `children` lacks it (a hand-written document can carry one
-    /// side) marks the store `unlisted`. Returns those children, ascending.
-    pub fn one_sided_links(&mut self) -> Vec<u32> {
-        let one_sided = |&c: &u32| {
-            let parent = self.parent_id(c).filter(|&p| self.contains(p));
-            parent.is_some_and(|p| !self.lists_child(p, c))
-        };
-        let mut found: Vec<u32> = self.ids().iter().copied().filter(one_sided).collect();
-        found.sort_unstable();
-        if !found.is_empty() {
-            self.activity.mark_unlisted();
-        }
-        found
     }
 
     /// `id`'s activity answer and every descendant's dirty (an `active` flag or a

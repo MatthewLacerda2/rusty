@@ -22,8 +22,6 @@ pub mod access;
 mod active_tests;
 mod activity;
 #[cfg(test)]
-mod activity_arrival_tests;
-#[cfg(test)]
 mod activity_tests;
 #[cfg(test)]
 mod ancestors_tests;
@@ -40,6 +38,8 @@ pub mod journal;
 #[cfg(test)]
 mod journal_tests;
 mod placement;
+#[cfg(test)]
+mod placement_tests;
 #[cfg(test)]
 mod query_tests;
 #[cfg(test)]
