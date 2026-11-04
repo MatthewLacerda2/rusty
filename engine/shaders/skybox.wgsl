@@ -1,8 +1,21 @@
 #import common::{CameraUniforms, VertexInput, equirect_uv, sky_fog}
+#import fog::volumetric::{through_volume, volumetric_sky}
 #import sky::motion::{SkyTargets, sky_targets}
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
+
+// The integrated volumetric fog (#1703): group 0's, as the forward pass binds it.
+@group(0) @binding(17)
+var t_fog_volume: texture_3d<f32>;
+@group(0) @binding(18)
+var s_fog_volume: sampler;
+
+// `color` behind the whole volumetric fog along `dir`, where the camera reads it.
+fn through_air(color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    let air = volumetric_sky(t_fog_volume, s_fog_volume, camera.volumetric, camera.view_proj, camera.camera_pos, dir);
+    return through_volume(color, air);
+}
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
@@ -37,6 +50,8 @@ fn fs_main(in: VertexOutput) -> SkyTargets {
     let sky = textureSampleLevel(t_skybox, s_skybox, equirect_uv(dir), 0.0);
     // Blend toward the scene fog at the horizon (#437) so fogged geometry doesn't
     // silhouette against a clear sky.
-    let color = vec4<f32>(sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos), sky.a);
+    // Then the volumetric fog's whole depth (#1703).
+    let fogged = sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos);
+    let color = vec4<f32>(through_air(fogged, dir), sky.a);
     return sky_targets(camera, color, dir);
 }

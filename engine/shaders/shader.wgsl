@@ -328,7 +328,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // Unlit rendering (e.g. path highlights, a light's own mesh). Still fogged: an
     // unlit sign down a smoky corridor fades like the wall it hangs on (#437).
     if (m.is_lit == 0u) {
-        return vec4<f32>(apply_fog(camera.fog, base_color.rgb, in.world_position, camera.camera_pos), base_color.a);
+        return vec4<f32>(transparent::fogged(base_color.rgb, in.world_position), base_color.a);
     }
 
     // Geometric normal, optionally perturbed by a tangent-space normal map (#207; z
@@ -494,8 +494,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // A transparent surface with `receive_ssr` traces SSR over it here (#1570).
     let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, N, roughness, instances[in.instance].reflection_probe, baked_diffuse(ambient_irradiance, lightmap_page > 0u || instances[in.instance].use_sh == 1u)) * reflection_weight, reflection_weight, in.world_position, N, R, roughness);
     lighting_color += reflection;
-    // One fog value for the SSR record and SSIL's realtime light (step 6).
-    let surface_fog = fog_factor(camera.fog, in.world_position, camera.camera_pos);
+    // One fog value for the SSR record and SSIL's realtime light (step 6): the
+    // distance fog's and the volumetric fog's together (#1703).
+    let surface_fog = transparent::surface_fog(in.world_position);
     ssr_texels = ssr_surface::encode(N, roughness, reflection, reflection_weight, surface_fog);
 
     // 6. Emissive (#222 factor, #207 map): self-illumination added on top of the lit

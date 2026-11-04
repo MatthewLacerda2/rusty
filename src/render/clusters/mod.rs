@@ -27,6 +27,7 @@
 //! surface shader and the transparent pass) and lit particles (`particles.wgsl`)
 //! read lights only through the cluster lookup.
 
+mod baked;
 mod bin;
 mod cone;
 mod footprint;
@@ -35,6 +36,7 @@ mod grid;
 mod lights;
 mod lists;
 
+pub(crate) use baked::BakedLamps;
 pub(crate) use bin::{bin, shadow_requests};
 pub(crate) use gpu::ClusterBuffers;
 pub(crate) use grid::ClusterGrid;

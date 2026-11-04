@@ -92,7 +92,7 @@ impl Renderer {
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 required_features: features,
-                required_limits: wgpu::Limits::default(),
+                required_limits: super::limits::device_limits(),
                 label: Some("Headless Screenshot Device"),
                 ..Default::default()
             })

@@ -63,6 +63,9 @@ crate::core::named_enum! {
         /// upsample before the base camera's forward pass, and the source it keeps
         /// after it.
         Ssil = "ssil",
+        /// Volumetric fog (#1703): its froxels' scatter and integrate, before the
+        /// base camera draws.
+        VolumetricFog = "volumetric_fog",
         /// The opaque scene pass: solids, skybox.
         Forward = "forward",
         /// Screen-space reflections (#1526): the copy of the opaque image and the

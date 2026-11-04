@@ -50,6 +50,7 @@ pub(crate) mod motion_blur;
 pub(crate) mod ssil;
 pub(crate) mod ssr;
 pub(crate) mod taa;
+pub(crate) mod volumetric_fog;
 
 pub(crate) use layout::{
     composite_layout, composite_slots, composite_slots_len, grade_layout, grade_slots,
@@ -84,6 +85,7 @@ pub(crate) const POST_EFFECTS: &[PostEffect] = &[
     taa::EFFECT,
     tonemapping::EFFECT,
     vignette::EFFECT,
+    volumetric_fog::EFFECT,
     white_balance::EFFECT,
 ];
 

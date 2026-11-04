@@ -25,6 +25,7 @@ mod motion_blur;
 mod ssil;
 mod ssr;
 mod taa;
+mod volumetric_fog;
 
 use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, white_balance};
 use lens::{chromatic_aberration, film_grain, vignette};
@@ -54,6 +55,7 @@ pub(crate) const REGISTRARS: &[(&str, Registrar)] = &[
     ("taa", taa::register),
     ("tonemapping", tonemapping::register),
     ("vignette", vignette::register),
+    ("volumetric_fog", volumetric_fog::register),
     ("white_balance", white_balance::register),
 ];
 

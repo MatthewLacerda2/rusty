@@ -106,6 +106,9 @@ pub struct RenderCounters {
     /// on the base camera of each view running it; `0` with SSIL off. The prepass it
     /// draws on a camera without SSAO is counted in `draw_calls` and `triangles`.
     pub ssil_samples: u64,
+    /// Froxels the volumetric fog lit (#1703): its grid, on the base camera of each
+    /// view running it; `0` with it off.
+    pub volumetric_froxels: u64,
     /// Particles drawn: sprite instances plus mesh particles, summed over the stack
     /// (#440). Their draw calls are in `draw_calls` — one per merged sprite batch, and
     /// one per instanced run of mesh particles.
@@ -193,6 +196,7 @@ impl RenderCounters {
             ("ui_blur_passes", self.ui_blur_passes.into()),
             ("ssao_samples", self.ssao_samples),
             ("ssil_samples", self.ssil_samples),
+            ("volumetric_froxels", self.volumetric_froxels),
             ("particles_drawn", self.particles_drawn.into()),
             ("render_texture_draws", self.render_texture_draws.into()),
             ("velocity_passes", self.velocity_passes.into()),

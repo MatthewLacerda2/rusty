@@ -1,5 +1,6 @@
 // engine/shaders/forward/transparent.wgsl — the forward shader's transparent-surface
-// terms (#1523): how a surface's lit colour leaves it (the scene fog, and for a
+// terms (#1523): how a surface's lit colour leaves it (the scene fog and the
+// volumetric fog, #1703, and for a
 // transparent surface the alpha its blend mode reads and, when it refracts or
 // absorbs, what is behind it), and thin translucency's back-lit light. Every colour
 // entry point returns through `composite`; an opaque surface leaves it exactly as
@@ -8,10 +9,36 @@
 
 #define_import_path forward::transparent
 
-#import forward::bindings::{camera, material, s_opaque, t_opaque}
+#import forward::bindings::{camera, material, s_fog_volume, s_opaque, t_fog_volume, t_opaque}
 #import common::{PI, fog_factor}
+#import fog::volumetric::{through_volume, volumetric_fog}
 #import lighting::ssr_march
 #import lighting::ssr_surface
+
+// The volumetric fog between the eye and `world` (#1703): rgb the light it adds,
+// a what gets through. No fetch where the camera reads no volume.
+fn volumetric(world: vec3<f32>) -> vec4<f32> {
+    return volumetric_fog(t_fog_volume, s_fog_volume, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
+}
+
+// `lit` behind both fogs: the distance and height fog, then the volumetric fog.
+// Opaque and unlit surfaces return through it.
+fn fogged(lit: vec3<f32>, world: vec3<f32>) -> vec3<f32> {
+    let fog = fog_factor(camera.fog, world, camera.camera_pos);
+    return through_volume(mix(lit, camera.fog.color, fog), volumetric(world));
+}
+
+// How much of a surface's own light the fogs take, as one factor: the distance
+// and height fog's, and with the volumetric fog `1 - (1 - fog) * transmittance`.
+// What SSR's record and SSIL's realtime share are dimmed by, so neither adds light
+// the fog took (#1703). Exactly `fog_factor` where the camera reads no volume.
+fn surface_fog(world: vec3<f32>) -> f32 {
+    let fog = fog_factor(camera.fog, world, camera.camera_pos);
+    if (camera.volumetric.x < 0.5) {
+        return fog;
+    }
+    return 1.0 - (1.0 - fog) * volumetric(world).a;
+}
 
 // `lit` fogged, with the alpha the pipeline blends with. Preserve specular (URP's
 // `_ALPHAPREMULTIPLY_ON`) already multiplied the diffuse by `alpha` and blends
@@ -26,8 +53,9 @@
 fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec4<f32> {
     let m = material();
     let fog = fog_factor(camera.fog, world, camera.camera_pos);
+    let air = volumetric(world);
     if (m.premultiply_diffuse == 0u && m.uses_opaque == 0u) {
-        return vec4<f32>(mix(lit, camera.fog.color, fog), alpha);
+        return vec4<f32>(through_volume(mix(lit, camera.fog.color, fog), air), alpha);
     }
     var opacity = alpha;
     var color = lit;
@@ -39,6 +67,9 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
         color = lit * alpha;
     }
     color = mix(color, camera.fog.color * opacity, fog);
+    // Premultiplied: the air's light in front of the surface, as much of it as the
+    // surface covers (what is behind it already carries its own, further fog).
+    color = color * air.a + air.rgb * opacity;
     if (m.uses_opaque == 0u) {
         return vec4<f32>(color, opacity);
     }

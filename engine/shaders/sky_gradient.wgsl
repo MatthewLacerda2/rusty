@@ -15,10 +15,23 @@
 // the surfaces only: the sky never follows them (#1647, as Unity's skybox).
 
 #import common::{AmbientLight, CameraUniforms, ProceduralSky, VertexInput, procedural_sky, sky_fog}
+#import fog::volumetric::{through_volume, volumetric_sky}
 #import sky::motion::{SkyTargets, sky_targets}
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniforms;
+
+// The integrated volumetric fog (#1703): group 0's, as the forward pass binds it.
+@group(0) @binding(17)
+var t_fog_volume: texture_3d<f32>;
+@group(0) @binding(18)
+var s_fog_volume: sampler;
+
+// `color` behind the whole volumetric fog along `dir`, where the camera reads it.
+fn through_air(color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    let air = volumetric_sky(t_fog_volume, s_fog_volume, camera.volumetric, camera.view_proj, camera.camera_pos, dir);
+    return through_volume(color, air);
+}
 
 // A prefix of the forward pass's `LightingUniforms`: we only need the leading
 // `ambient` term and the procedural sky's settings (#1620), and a uniform binding
@@ -57,6 +70,8 @@ fn fs_main(in: VertexOutput) -> SkyTargets {
     let color = procedural_sky(lighting.sky, lighting.ambient.color, dir);
 
     // Blend toward the scene fog at the horizon (#437), as the panorama sky does.
-    let fogged = vec4<f32>(sky_fog(camera.fog, color, dir, camera.camera_pos), 1.0);
+    // Then the volumetric fog's whole depth (#1703).
+    let hazed = sky_fog(camera.fog, color, dir, camera.camera_pos);
+    let fogged = vec4<f32>(through_air(hazed, dir), 1.0);
     return sky_targets(camera, fogged, dir);
 }
