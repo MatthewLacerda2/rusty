@@ -72,16 +72,17 @@ impl SmallObjectCull {
         let Some((eye, fov, projection)) = self.lens else {
             return false;
         };
-        if !limits.any() {
-            return false;
-        }
+        // Each limit culls only when set, so this culls only a mesh whose
+        // `MeshComponent::culls_when_small` holds: the shadow caches and the camera
+        // read one rule.
         let distance = centre.distance(eye);
         if limits.max_draw_distance > 0.0 && distance > limits.max_draw_distance {
             return true;
         }
-        let size = (max - min).max_element() * max_scale(world);
-        limits.min_screen_size > 0.0
-            && relative_height(size, distance, fov, projection) < limits.min_screen_size
+        limits.min_screen_size > 0.0 && {
+            let size = (max - min).max_element() * max_scale(world);
+            relative_height(size, distance, fov, projection) < limits.min_screen_size
+        }
     }
 }
 
@@ -99,11 +100,6 @@ impl SmallLimits {
             max_draw_distance: mesh.max_draw_distance,
             min_screen_size: mesh.min_screen_size,
         }
-    }
-
-    /// Whether either is set: `MeshComponent::culls_when_small`.
-    pub(crate) fn any(self) -> bool {
-        self.max_draw_distance > 0.0 || self.min_screen_size > 0.0
     }
 }
 

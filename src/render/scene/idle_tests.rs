@@ -1,6 +1,7 @@
 //! src/render/scene/idle_tests.rs — what an extract costs (#1706): a frame that
-//! changed nothing walks no object, a move re-places only what moved, and a load,
-//! an Undo or a Play restore rebuilds, then holds what a fresh build holds.
+//! changed nothing walks no object (probe field, library and lightmaps included), a
+//! move re-places only what moved, and a load, an Undo or a Play restore rebuilds,
+//! then holds what a fresh build holds.
 
 use glam::Vec3;
 
@@ -17,7 +18,8 @@ fn gpu_a_frame_with_nothing_changed_walks_no_object() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    let scene = yard(6);
+    let mut scene = yard(6);
+    scene.probes.add_probe(Vec3::new(0.0, 1.0, -4.0));
     let (first, at_first) = frame(&mut r, &scene);
     assert_eq!(
         extracted(&at_first),
@@ -28,6 +30,14 @@ fn gpu_a_frame_with_nothing_changed_walks_no_object() {
     assert_eq!(extracted(&idle), (0, 0), "nothing changed: {idle:?}");
     assert_eq!(idle.visible_entities, at_first.visible_entities);
     assert_eq!(first, again, "the retained frame draws the same pixels");
+    // A write of what the library already holds re-derives nothing.
+    let red = scene.materials["red"].clone();
+    scene.materials.insert("red".into(), red);
+    assert_eq!(extracted(&frame(&mut r, &scene).1), (0, 0), "same value");
+    // A re-baked probe re-samples every object.
+    scene.probes.probes_mut()[0].sh.coeffs[0] = [0.5; 3];
+    assert_eq!(extracted(&frame(&mut r, &scene).1), (6, 0), "a probe bake");
+    assert_eq!(held(&r, &scene), fresh(&mut r, &scene));
 }
 
 #[test]

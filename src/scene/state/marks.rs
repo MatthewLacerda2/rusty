@@ -88,9 +88,9 @@ pub const MARKS: &[Mark] = marks! {
         }),
         s.decals.iter().any(|d| d.owner.is_some_and(|o| o.entity == b));
     "probes" => |s, _| s.probes.move_probe(0, Vec3::new(1.5, 0.0, 0.0)),
-        s.probes.probes.first().is_some_and(|p| p.position.x == 1.5);
-    "probes.sh" as BakeOutput => |s, _| s.probes.probes[0].sh.coeffs[0] = [0.5; 3],
-        s.probes.probes.first().is_some_and(|p| p.sh.coeffs[0] == [0.5; 3]);
+        s.probes.probes().first().is_some_and(|p| p.position.x == 1.5);
+    "probes.sh" as BakeOutput => |s, _| s.probes.probes_mut()[0].sh.coeffs[0] = [0.5; 3],
+        s.probes.probes().first().is_some_and(|p| p.sh.coeffs[0] == [0.5; 3]);
     "reflection_probes" => |s, _| s.reflection_probes.probes[0].importance = 3,
         s.reflection_probes.probes.first().is_some_and(|p| p.importance == 3);
     "reflection_probes.cubemap" as BakeOutput

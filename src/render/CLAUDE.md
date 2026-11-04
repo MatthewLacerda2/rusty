@@ -24,7 +24,8 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   `Renderer::gpu_mesh_of` resolves one.
 - **A new per-object input is kept or read per camera, on purpose.** Kept: derive it
   in `extract_object` or `pose_object`, and make sure whatever changes it re-derives
-  the object (a change channel, a scene copy compared in `scene/inputs.rs`, or
+  the object (a change channel, a scene value's revision read in `scene/inputs.rs`
+  (`scene::revision`), or
   `Retained::touch` at the renderer-side write, for an input every key reads). Per
   camera: read it in `scene/draw.rs`. `scene/inputs.rs` lists every input by which
   way it is held. Add a case to `scene/equivalence_tests.rs`, which holds that an

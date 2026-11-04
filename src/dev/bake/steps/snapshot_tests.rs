@@ -35,7 +35,7 @@ fn gpu_nothing_reaches_the_scene_until_the_commit() {
         return;
     };
     step_until(&mut job, &mut scene, |s| s == Stage::Done);
-    assert!(scene.probes.probes.iter().all(|p| p.sh == Sh9::zero()));
+    assert!(scene.probes.probes().iter().all(|p| p.sh == Sh9::zero()));
     assert!(scene
         .reflection_probes
         .probes
@@ -43,7 +43,7 @@ fn gpu_nothing_reaches_the_scene_until_the_commit() {
         .all(|p| p.cubemap_path.is_empty()));
     assert_eq!(staged_files(&path), 2, "both cubes staged");
     job.commit(&mut scene).unwrap();
-    assert!(scene.probes.probes.iter().all(|p| p.sh != Sh9::zero()));
+    assert!(scene.probes.probes().iter().all(|p| p.sh != Sh9::zero()));
     let baked = &scene.reflection_probes.probes;
     assert!(baked
         .iter()
@@ -76,7 +76,7 @@ fn gpu_a_reflection_probe_removed_midway_drops_the_bake() {
         .iter()
         .all(|p| p.cubemap_path.is_empty()));
     assert!(
-        scene.probes.probes.iter().all(|p| p.sh == Sh9::zero()),
+        scene.probes.probes().iter().all(|p| p.sh == Sh9::zero()),
         "nothing applied"
     );
 }
@@ -98,7 +98,7 @@ fn gpu_a_light_probe_removed_or_regridded_midway_drops_the_bake() {
             job.step(&mut scene, &mut |_| {}),
             Err(PROBES_CHANGED.into())
         );
-        assert!(scene.probes.probes.iter().all(|p| p.sh == Sh9::zero()));
+        assert!(scene.probes.probes().iter().all(|p| p.sh == Sh9::zero()));
     }
 }
 

@@ -129,10 +129,10 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         sky: scene.sky,
         layers: scene.layers.clone(),
         collision_matrix: scene.collision_matrix.clone(),
-        materials: scene.materials.clone(),
+        materials: (*scene.materials).clone(),
         probes: scene.probes.clone(),
         reflection_probes: scene.reflection_probes.clone(),
-        lightmaps: scene.lightmaps.clone(),
+        lightmaps: (*scene.lightmaps).clone(),
         lighting_settings: scene.lighting_settings,
     }
 }
@@ -166,7 +166,7 @@ pub fn apply_world_data(scene: &mut Scene, data: SceneData) {
 /// folded it in); an authored asset already under the key is kept (#997). Done
 /// before spawning so each entity's reference resolves.
 fn take_materials(scene: &mut Scene, data: &mut SceneData) {
-    scene.materials = std::mem::take(&mut data.materials);
+    scene.materials = std::mem::take(&mut data.materials).into();
     for entity in &mut data.entities {
         if let Some(pending) = entity.pending_material.take() {
             if let Some(reference) = &entity.material {
@@ -220,7 +220,7 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     // probe array, `Reflection.Get`, the Inspector) sees the same values.
     scene.reflection_probes = data.reflection_probes;
     scene.reflection_probes.hold();
-    scene.lightmaps = data.lightmaps;
+    scene.lightmaps = data.lightmaps.into();
     scene.lighting_settings = data.lighting_settings;
     scene.lighting_settings.reflections.clamp();
     // The bake's knobs too (#1704): a hand-edited Max Lightmap Size of 5000 reads

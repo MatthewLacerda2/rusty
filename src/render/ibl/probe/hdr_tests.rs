@@ -89,7 +89,7 @@ fn gpu_bounces_in_a_bright_closed_room_shrink_each_pass() {
         let next = vec![project_cubemap(&capture.cube)];
         assert!(finite(&next[0]), "pass {pass}");
         deltas.push(field_delta(&field, &next));
-        scene.probes.probes[0].sh = next[0];
+        scene.probes.probes_mut()[0].sh = next[0];
         field = next;
     }
     assert!(

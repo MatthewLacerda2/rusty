@@ -18,7 +18,6 @@ impl Renderer {
         let start = std::time::Instant::now();
         let mut retained = self.retained.take(scene.id());
         let last = self.update_objects(scene, &mut retained);
-        retained.last = last;
         self.retained.put(scene.id(), retained);
         self.frame_counters.render_extracted += last.extracted;
         self.frame_counters.render_posed += last.posed;
@@ -63,14 +62,9 @@ impl Renderer {
         self.load_maps_of(scene, &ids);
         rs.objects.clear();
         rs.order.clear();
-        for &id in &ids {
-            let object = self.extract_object(scene, id);
-            rs.set(id, object);
-        }
         ExtractStats {
-            extracted: ids.len() as u32,
+            extracted: self.derive_objects(scene, rs, &ids),
             posed: 0,
-            rebuilt: true,
         }
     }
 
@@ -103,10 +97,7 @@ impl Renderer {
         }
         let whole: Vec<u32> = whole.into_iter().collect();
         self.load_maps_of(scene, &whole);
-        for &id in &whole {
-            let object = self.extract_object(scene, id);
-            rs.set(id, object);
-        }
+        let extracted = self.derive_objects(scene, rs, &whole);
         let mut moved = 0;
         for id in posed
             .into_iter()
@@ -118,10 +109,21 @@ impl Renderer {
             }
         }
         ExtractStats {
-            extracted: whole.len() as u32,
+            extracted,
             posed: moved,
-            rebuilt: false,
         }
+    }
+
+    /// Re-derive the objects of `ids` (an id without a mesh drops its object); how
+    /// many were derived.
+    fn derive_objects(&mut self, scene: &Scene, rs: &mut RenderScene, ids: &[u32]) -> u32 {
+        let mut derived = 0;
+        for &id in ids {
+            let object = self.extract_object(scene, id);
+            derived += u32::from(object.is_some());
+            rs.set(id, object);
+        }
+        derived
     }
 
     /// Load every map the materials of `entities` sample (albedo #201, metallic and

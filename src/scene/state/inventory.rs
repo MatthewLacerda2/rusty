@@ -33,7 +33,7 @@ macro_rules! authored_fields {
                 fog: crate::scene::FogSettings => eq_or_bytes, assign;
                 layers: crate::scene::LayerRegistry => eq_or_bytes, assign;
                 collision_matrix: crate::scene::CollisionMatrix => eq_or_bytes, assign;
-                materials: std::collections::BTreeMap<String, crate::scene::MaterialAsset>
+                materials: crate::scene::revision::Revisioned<std::collections::BTreeMap<String, crate::scene::MaterialAsset>>
                     => eq_or_bytes, assign;
                 // Placement around bake output: compared and put back without the
                 // baked SH, which the sidecar saves and Stop's snapshot carries.

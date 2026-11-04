@@ -26,7 +26,8 @@
 //!
 //! **A new per-object input** joins in one of two ways: kept on the object (derive it
 //! in `extract_object` or `pose_object`, and make sure whatever changes it makes the
-//! extract re-derive the object: a change channel, a scene snapshot in `inputs.rs`, or
+//! extract re-derive the object: a change channel, a scene value's revision in
+//! `inputs.rs` (`scene::revision`), or
 //! [`Retained::touch`] at the renderer-side write), or read per camera in `draw.rs`.
 //! The equivalence tests (`equivalence_tests.rs`) hold that an incrementally updated
 //! scene equals one built from scratch; a new input gets a case there.
@@ -67,8 +68,9 @@ const MAX_SCENES: usize = 4;
 pub(crate) struct Retained {
     pub meshes: MeshHandles,
     /// Bumped by [`Self::touch`] whenever a renderer-side input every object's keys
-    /// read changes (a material group dropped, a surface shader re-built, a render
-    /// texture re-allocated): each scene re-derives all its objects on its next frame.
+    /// read changes (a material group dropped, a surface shader re-built): each scene
+    /// re-derives all its objects on its next frame. Render textures have their own
+    /// revision, [`Self::render_textures`], so a view switch re-keys only their readers.
     inputs: u64,
     /// Bumped whenever the render textures registered change (`sync_render_textures`):
     /// each scene re-derives the objects whose materials name one. The editor's Scene
@@ -116,8 +118,6 @@ pub(crate) struct RenderScene {
     objects: BTreeMap<u32, RenderObject>,
     /// Ids by insertion sequence: `ids_with_mesh`'s order.
     order: BTreeMap<u64, u32>,
-    /// What the last extract did.
-    pub last: ExtractStats,
 }
 
 impl RenderScene {
@@ -138,17 +138,15 @@ impl RenderScene {
     }
 }
 
-/// What one extract did: `Debug.Stats`'s `render_extracted` and `render_posed`
-/// (`render::stats`).
+/// What one extract did. `extract_scene` adds it to the frame's
+/// `RenderCounters`, which `Debug.Stats` reports as `render_extracted` and
+/// `render_posed` (`render::stats`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ExtractStats {
-    /// Objects re-derived whole.
+    /// Objects re-derived whole: ids the extract re-read that still have a mesh.
     pub extracted: u32,
     /// Objects only re-placed (a move).
     pub posed: u32,
-    /// Whether every object was rebuilt (a first frame, a load, an Undo, a
-    /// renderer-side input).
-    pub rebuilt: bool,
 }
 
 impl Renderer {

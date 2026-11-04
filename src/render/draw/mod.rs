@@ -189,8 +189,9 @@ impl Renderer {
         self.gpu_timer.end_frame(&self.device, &self.queue);
     }
 
-    /// Upload/refresh per-frame GPU assets (meshes, textures, skybox) shared by every
-    /// camera in the stack, and mark re-baked surface shaders for a rebuild (#396).
+    /// Refresh the per-frame GPU assets every camera in the stack shares (textures,
+    /// colour lookups, lens dirt, skybox; the meshes are the extract's), and mark
+    /// re-baked surface shaders for a rebuild (#396).
     fn upload_scene_assets(&mut self, scene: &Scene) {
         // Re-baked or newly present texture files drop their stale uploads (#689).
         self.refresh_textures();

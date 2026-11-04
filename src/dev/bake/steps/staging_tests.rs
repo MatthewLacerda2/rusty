@@ -24,7 +24,7 @@ pub(super) fn lit_room() -> Scene {
     scene.world.set_collider(id, Some(collider));
     for x in [-2.0, 2.0] {
         let i = scene.probes.add_probe(Vec3::new(x, 4.0, 0.0));
-        scene.probes.probes[i].sh.coeffs[0] = [0.5, 0.4, 0.3];
+        scene.probes.probes_mut()[i].sh.coeffs[0] = [0.5, 0.4, 0.3];
     }
     let r = scene
         .reflection_probes
@@ -46,7 +46,7 @@ pub(super) fn params() -> LightingBakeParams {
 /// The scene's probes are the ones `lit_room` gave it, lighting and all.
 pub(super) fn assert_old_lighting(scene: &Scene, old: &(ProbeVolume, ReflectionProbeSet)) {
     let light = |v: &ProbeVolume| {
-        v.probes
+        v.probes()
             .iter()
             .map(|p| (p.position, p.sh))
             .collect::<Vec<_>>()
