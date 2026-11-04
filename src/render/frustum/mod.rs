@@ -92,7 +92,4 @@ pub(crate) use small::SmallObjectCull;
 #[cfg(test)]
 mod gpu_tests;
 #[cfg(test)]
-#[path = "small_gpu_tests.rs"]
-mod small_gpu_tests;
-#[cfg(test)]
 mod tests;

@@ -59,13 +59,7 @@ impl Renderer {
             culls.culled += 1;
             return None;
         }
-        let small = |b| {
-            scene
-                .world
-                .mesh(id)
-                .is_some_and(|m| view.small.culls(&m, b))
-        };
-        if bounds.is_some_and(small) {
+        if bounds.is_some_and(|b| self.too_small(scene, id, view.small, b)) {
             culls.size_culled += 1;
             return None;
         }
@@ -89,6 +83,28 @@ impl Renderer {
         crate::scene::layer_in_mask(scene.world.layer(id), mask)
     }
 
+    /// Whether `small` culls mesh entity `id`, whose world bounds are `(min, max)`:
+    /// measured to their centre, sized by its mesh's local box (#1714).
+    fn too_small(
+        &self,
+        scene: &Scene,
+        id: u32,
+        small: SmallObjectCull,
+        (min, max): (Vec3, Vec3),
+    ) -> bool {
+        let Some(mesh) = scene.world.mesh(id) else {
+            return false;
+        };
+        if !mesh.culls_when_small() {
+            return false;
+        }
+        let Some(gpu_mesh) = self.gpu_meshes.get(&MeshId::from_mesh(&mesh)) else {
+            return false;
+        };
+        let world = scene.world.local_to_world(id);
+        small.culls(&mesh, (min + max) * 0.5, gpu_mesh.local_aabb, world)
+    }
+
     /// The entity's world bounds `(min, max)`: its mesh's cached local AABB under the
     /// entity's world matrix, or its animated bound when skinned (#833). The frustum
     /// cull (#330) tests them and the draw picks its reflection probe at their centre
@@ -104,7 +120,7 @@ impl Renderer {
 
     /// Where `cam`'s small-object cull measures from (#1714): `cam` itself, or
     /// nowhere during a capture, whose bake sees every prop whatever its size.
-    pub(super) fn small_object_cull(&self, cam: &crate::scene::Camera) -> SmallObjectCull {
+    pub(crate) fn small_object_cull(&self, cam: &crate::scene::Camera) -> SmallObjectCull {
         match self.capture.static_only {
             true => SmallObjectCull::off(),
             false => SmallObjectCull::from_camera(cam),

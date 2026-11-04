@@ -16,9 +16,10 @@
 //! carries its `bone_base` per instance. The base rides the instance, not the draw, so
 //! skinned copies of one mesh still share one instanced draw.
 //!
-//! A caster the camera may cull as too far or too small (#1714, `cull`) is never
-//! cached in a static bake: it casts from the per-frame sweeps, with the base
-//! camera's verdict, so its shadow goes when it does.
+//! A caster the camera may cull as too far or too small (#1714, `cull`), and every
+//! renderer of its `LODGroup` (`UnbakedCasters`), is never cached in a static bake:
+//! it casts from the per-frame sweeps, with the base camera's verdict, so its shadow
+//! goes when it does.
 //!
 //! Casters are gathered once per sweep and culled per light volume — a cascade (#435)
 //! or an atlas tile (#468) — so a prop inside two volumes is drawn into both. The
@@ -112,6 +113,8 @@ pub(super) struct CasterFrame<'a> {
     pub timer: &'a crate::render::timing::GpuTimer,
     /// The base camera's small-object cull (#1714): a shadow goes with its prop.
     pub small: SmallObjectCull,
+    /// The casters that cull as small, and their LOD groups, kept out of the bakes.
+    pub unbaked: super::UnbakedCasters,
 }
 
 impl ShadowRenderer {
@@ -194,7 +197,8 @@ impl ShadowRenderer {
                     .is_some_and(|c| c.clip.is_variant())
             });
             // One a camera may cull as small casts per frame, never from a bake (#1714).
-            if !sweep.takes(scene.world.is_static(id) && !moving && !mesh.culls_when_small()) {
+            let unbaked = frame.unbaked.contains(id, &mesh);
+            if !sweep.takes(scene.world.is_static(id) && !moving && !unbaked) {
                 continue;
             }
             let material = material.as_deref();
@@ -203,8 +207,16 @@ impl ShadowRenderer {
             // A skinned caster is bounded by its posed skeleton (#833); one whose pose
             // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.
             let bounds = gpu_mesh.world_bounds(&mesh, world);
-            let small = bounds.is_some_and(|b| frame.small.culls(&mesh, b));
-            let bone_base = push_palette(&mut joints, mesh.active_palette());
+            let small = bounds.is_some_and(|(lo, hi)| {
+                frame
+                    .small
+                    .culls(&mesh, (lo + hi) * 0.5, gpu_mesh.local_aabb, world)
+            });
+            // A culled caster never draws: no palette to upload for it.
+            let bone_base = match small {
+                true => 0,
+                false => push_palette(&mut joints, mesh.active_palette()),
+            };
             let two_sided = mesh.cast_shadows == ShadowCasting::TwoSided;
             for (indices, (clip, face)) in runs {
                 let mut caster = CasterData::new(world, bone_base);

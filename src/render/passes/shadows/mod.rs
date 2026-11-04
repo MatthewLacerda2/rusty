@@ -32,7 +32,7 @@ use clips::Clip;
 use glam::Mat4;
 
 pub(crate) use setup::{depth_pipeline, lazy_depth_pipeline};
-pub(crate) use statics::{statics_key, StaticsKey};
+pub(crate) use statics::{statics_key, StaticsKey, UnbakedCasters};
 pub(crate) use uniform::CascadeUniform;
 
 /// Byte stride between the cascades' light-space matrices in the depth pass's uniform

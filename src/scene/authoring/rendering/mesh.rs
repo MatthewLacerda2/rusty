@@ -64,6 +64,14 @@ pub fn set_min_screen_size(mesh: &mut MeshComponent, height: f32) {
     mesh.min_screen_size = clamped(height, 0.0, 1.0);
 }
 
+/// What `Component.Get(id, "Mesh")` reports beyond the stored value: the
+/// small-object cull's two settings, which the file leaves out while `0` (#1714),
+/// so a script reads `0` there as `Mesh.Get*` does, never `nil`.
+pub fn shown(m: &MeshComponent, value: &mut serde_json::Value) {
+    value["max_draw_distance"] = serde_json::json!(m.max_draw_distance);
+    value["min_screen_size"] = serde_json::json!(m.min_screen_size);
+}
+
 /// Hold a count read from a file (#1524), so the field agrees with the grid the
 /// rehydrated mesh is built from: out of range clamps into `1..=`
 /// [`MAX_PLANE_SUBDIVISIONS`], and a count on a mesh that isn't a `Plane` resets to
@@ -145,8 +153,10 @@ mod tests {
                 "{bad}"
             );
         }
-        let saved = serde_json::to_value(&m).unwrap();
+        let mut saved = serde_json::to_value(&m).unwrap();
         assert!(saved.get("max_draw_distance").is_none(), "off is not saved");
+        shown(&m, &mut saved);
+        assert_eq!(saved["max_draw_distance"], 0.0, "but is read as 0");
         set_max_draw_distance(&mut m, 30.0);
         assert_eq!(serde_json::to_value(&m).unwrap()["max_draw_distance"], 30.0);
     }

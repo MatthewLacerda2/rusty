@@ -92,8 +92,9 @@ pub(crate) fn relative_height(size: f32, distance: f32, fov: f32, projection: Pr
     }
 }
 
-/// The largest axis scale in `world` — how much the group's authored size grows.
-fn max_scale(world: Mat4) -> f32 {
+/// The largest axis scale in `world` — how much a group's authored size, or a mesh's
+/// local extent (#1714), grows.
+pub(crate) fn max_scale(world: Mat4) -> f32 {
     let axes = [world.x_axis, world.y_axis, world.z_axis];
     axes.iter()
         .map(|a| a.truncate().length())

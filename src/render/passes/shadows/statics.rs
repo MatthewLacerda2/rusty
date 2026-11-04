@@ -1,8 +1,10 @@
 //! When the static casters' cached bake is stale: the key a cascade layer or an atlas
 //! tile keeps beside what it baked, compared each frame (#355, #694).
 
+use std::collections::HashSet;
+
 use crate::asset::MapRef;
-use crate::components::{RenderFace, ShadowCasting};
+use crate::components::{MeshComponent, RenderFace, ShadowCasting};
 use crate::render::passes::shadows::clips::Cutout;
 use crate::scene::{Scene, SceneId};
 
@@ -24,6 +26,39 @@ pub(crate) fn statics_key(scene: &Scene) -> StaticsKey {
     )
 }
 
+/// The meshes whose shadow never enters a cached static bake because a camera may
+/// cull them as too far or too small (#1714): each that sets a small-object cull,
+/// and **every** renderer of a `LODGroup` any of whose renderers sets one. A bake
+/// draws a group at LOD0 (`LodSelection::finest`), so a group split between the
+/// bake and the per-frame sweep would leave one level with no shadow, or two.
+pub(crate) struct UnbakedCasters {
+    /// The renderers of the groups that hold such a mesh.
+    grouped: HashSet<u32>,
+}
+
+impl UnbakedCasters {
+    /// `scene`'s groups that hold a mesh with a small-object cull, read now.
+    pub(crate) fn of(scene: &Scene) -> Self {
+        let world = &scene.world;
+        let mut grouped = HashSet::new();
+        for id in world.ids_with_lod_group() {
+            let Some(group) = world.lod_group(id) else {
+                continue;
+            };
+            let culls = |r: u32| world.mesh(r).is_some_and(|m| m.culls_when_small());
+            if group.renderers().any(culls) {
+                grouped.extend(group.renderers());
+            }
+        }
+        Self { grouped }
+    }
+
+    /// Whether mesh entity `id` (`mesh`) casts from the per-frame sweep only.
+    pub(crate) fn contains(&self, id: u32, mesh: &MeshComponent) -> bool {
+        mesh.culls_when_small() || self.grouped.contains(&id)
+    }
+}
+
 /// One FNV-1a-style step of a digest.
 fn mix(key: u64, word: u64) -> u64 {
     key.wrapping_mul(0x100_0000_01b3).wrapping_add(word + 1)
@@ -32,13 +67,14 @@ fn mix(key: u64, word: u64) -> u64 {
 /// A digest, by entity in scene order, of what shapes each static mesh's shadow that
 /// no revision tracks: a `cast_shadows` that changes it (`Off`, `TwoSided`, #1571;
 /// `ShadowsOnly` casts exactly as `On`, so switching between them keeps the bake),
-/// whether it sets a small-object cull (#1714: such a caster leaves the bake),
+/// whether it leaves the bake for a small-object cull ([`UnbakedCasters`], #1714),
 /// each slot's Render Face other than `Front` (the faces it casts from, #1615),
 /// and each Cutout slot's test — cutoff, albedo map and mapping (#1594), the terms
 /// its clip reads. It moves when one of them changes.
 fn casting_key(scene: &Scene) -> u64 {
     let world = &scene.world;
     let mut key = 0u64;
+    let unbaked = UnbakedCasters::of(scene);
     for id in world.ids_with_mesh() {
         if !world.is_static(id) {
             continue;
@@ -49,7 +85,7 @@ fn casting_key(scene: &Scene) -> u64 {
             key = mix(key, (u64::from(id) << 2) | mode as u64);
         }
         // A mesh a camera may cull as small casts from the per-frame sweep (#1714).
-        if mesh.is_some_and(|m| m.culls_when_small()) {
+        if mesh.is_some_and(|m| unbaked.contains(id, &m)) {
             key = mix(key, (u64::from(id) << 3) | 0b111);
         }
         // By slot index, unresolved keys included, so the digest names the slot

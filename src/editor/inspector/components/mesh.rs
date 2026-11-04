@@ -6,7 +6,7 @@
 use egui_phosphor::regular as icon;
 
 use super::card::{component_card, remove_component};
-use super::particles::widgets::{clamped, combo};
+use super::particles::widgets::combo;
 use crate::components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
 use crate::components::ShadowCasting;
 use crate::editor::widgets::DragRange;
@@ -84,11 +84,29 @@ pub fn draw_mesh(
 
 /// The small-object cull (#1714): *Max Draw Distance* (metres, 0 unlimited) and *Min
 /// Screen Size* (screen-relative height, 0 off). Both values when either changed.
+/// Each drags at its own speed: a metre a point, and a thousandth of the screen,
+/// since useful sizes sit around 0.01–0.02.
 fn draw_culling(ui: &mut egui::Ui, distance: f32, size: f32) -> Option<(f32, f32)> {
     let (mut d, mut s) = (distance, size);
-    let changed = clamped(ui, "Max Draw Distance", &mut d, 0.0..=f32::MAX)
-        | clamped(ui, "Min Screen Size", &mut s, 0.0..=1.0);
+    let changed = drag_row(ui, "Max Draw Distance", &mut d, 1.0, 0.0..=f32::MAX)
+        | drag_row(ui, "Min Screen Size", &mut s, 0.001, 0.0..=1.0);
     changed.then_some((d, s))
+}
+
+/// A labelled `f32` drag row held to `range`, moving `speed` per point dragged.
+fn drag_row(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: &mut f32,
+    speed: f64,
+    range: std::ops::RangeInclusive<f32>,
+) -> bool {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        ui.add(egui::DragValue::new(value).speed(speed).ranged(range))
+            .changed()
+    })
+    .inner
 }
 
 /// *Generate Hitboxes* and *Build Ragdoll*, deferred into `skin_tool`.

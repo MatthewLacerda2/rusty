@@ -88,8 +88,8 @@ pub struct MeshComponent {
     /// Saved only when set. `render::SmallObjectCull` reads it.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub max_draw_distance: f32,
-    /// Below this screen-relative height (`0..1`: its bounds' largest extent over
-    /// the view's height at its distance, the measure Unity's `LODGroup` picks its
+    /// Below this screen-relative height (`0..1`: its local bounds' largest extent
+    /// times its largest axis scale, over the view's height at its distance, the measure Unity's `LODGroup` picks its
     /// levels and its *Culled* share by) the mesh is not drawn (#1714): Unreal's
     /// min screen radius. `0`, the default, is off. Saved only when set.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -173,8 +173,9 @@ impl MeshComponent {
 
     /// Whether a camera may cull this mesh for its distance or its size on screen
     /// (#1714): either of `max_draw_distance` and `min_screen_size` is set. Such a
-    /// mesh's shadow is drawn every frame with the camera's verdict, never baked into
-    /// a cached static shadow (`render::passes::shadows`).
+    /// mesh's shadow, and every renderer's of a `LODGroup` holding one, is drawn
+    /// every frame with the camera's verdict, never baked into a cached static
+    /// shadow (`render::passes::shadows::UnbakedCasters`).
     pub fn culls_when_small(&self) -> bool {
         self.max_draw_distance > 0.0 || self.min_screen_size > 0.0
     }
