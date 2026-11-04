@@ -16,7 +16,7 @@ fn destroying_one_entity_leaves_a_sibling_running() {
     // `!ids.contains` predicates keep every *surviving* entity's script instance
     // (entity_scripts) AND its load record (load_attempted). Drop the `!` on the
     // first and B's instance is evicted — B goes silent, no more Update. Drop it on
-    // the second and B is dropped from load_attempted, so the next spawn scan
+    // the second and B is dropped from load_attempted, so the next spawn drain
     // reloads it — B re-runs Awake/OnEnable/Start on a fresh instance mid-play. A
     // lone-entity destroy triangulates neither; it needs a surviving sibling, and
     // the sibling must carry a real ScriptComponent so the reload path is live.
@@ -36,7 +36,7 @@ fn destroying_one_entity_leaves_a_sibling_running() {
                 ..Default::default()
             });
     }
-    // The spawn scan owns loading (sets load_attempted); both come alive and run one
+    // The spawn drain owns loading (sets load_attempted); both come alive and run one
     // active tick together.
     m.load_new_scripts();
     m.init_scripts();
@@ -45,7 +45,7 @@ fn destroying_one_entity_leaves_a_sibling_running() {
     m.eval("__log = ''").unwrap();
     m.cells.scene.borrow_mut().request_destroy(a);
     m.apply_pending_destroys();
-    // A full next tick: the spawn scan (the reload path), init, then update.
+    // A full next tick: the spawn drain (the reload path), init, then update.
     m.load_new_scripts();
     m.init_scripts();
     m.update_scripts(DT);

@@ -78,6 +78,7 @@ scene.entities[].animator.speed: f32
 scene.entities[].animator.time: f32
 scene.entities[].animator: option
 scene.entities[].audio.clip: string
+scene.entities[].audio.doppler_level: f32
 scene.entities[].audio.final_distance: f32
 scene.entities[].audio.initial_distance: f32
 scene.entities[].audio.is_time_scaled: bool
@@ -906,9 +907,14 @@ scene.reflection_probes.probes[].box_min: tuple(3)
 scene.reflection_probes.probes[].box_min[]: f32
 scene.reflection_probes.probes[].box_projection: bool
 scene.reflection_probes.probes[].cubemap_path: string
+scene.reflection_probes.probes[].fallback: bool
 scene.reflection_probes.probes[].far_clip: f32
 scene.reflection_probes.probes[].importance: i32
 scene.reflection_probes.probes[].intensity: f32
+scene.reflection_probes.probes[].irradiance.coeffs: tuple(9)
+scene.reflection_probes.probes[].irradiance.coeffs[]: tuple(3)
+scene.reflection_probes.probes[].irradiance.coeffs[][]: f32
+scene.reflection_probes.probes[].irradiance: option
 scene.reflection_probes.probes[].manual: bool
 scene.reflection_probes.probes[].near_clip: f32
 scene.reflection_probes.probes[].position: tuple(3)

@@ -206,6 +206,12 @@ pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
         "graph_enabled": a.graph_enabled,
         "node": a.base.current_node,
         "layers": a.layers.iter().map(layer_value).collect::<Vec<_>>(),
+        "apply_root_motion": a.apply_root_motion,
+        "root_bone": a.root_bone,
+        "root_motion": {
+            "position": a.root_motion.last.position.to_array(),
+            "yaw": a.root_motion.last.yaw.to_degrees(),
+        },
     })
 }
 fn layer_value(l: &LayerState) -> Value {

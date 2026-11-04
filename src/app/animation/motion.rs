@@ -12,7 +12,7 @@
 use crate::asset::anim_data::AnimationClip;
 use crate::asset::animation_graph::{GraphNode, StateMachine};
 use crate::asset::mesh_data::{JointTransform, SkinData};
-use crate::components::{AnimatorParameters, Motion, Playback, Playhead};
+use crate::components::{AnimatorParameters, Motion, Playback, Playhead, Step};
 
 use super::blend_joint;
 use super::blend_poses;
@@ -125,7 +125,11 @@ impl MotionContext<'_> {
 
     /// Call `visit` with every resolvable leaf clip of the blend-tree node
     /// `node` that has a positive weight, depth first in authored order.
-    fn for_each_leaf_clip(&self, node: &str, mut visit: impl FnMut(&AnimationClip, f32)) {
+    pub(super) fn for_each_leaf_clip(
+        &self,
+        node: &str,
+        mut visit: impl FnMut(&AnimationClip, f32),
+    ) {
         let Some(tree) = self.tree_node(node).and_then(|n| n.blend_tree.as_ref()) else {
             return;
         };
@@ -159,19 +163,20 @@ impl MotionContext<'_> {
 
     /// Advance `playback` by `dt` at `speed`, each playhead at its motion's rate,
     /// and return the animation events (#459) the current motion crossed, tagged
-    /// with `layer`.
+    /// with `layer`, and the current playhead's [`Step`] (what root motion is
+    /// measured over, #1745).
     pub fn advance(
         &self,
         playback: &mut Playback,
         dt: f32,
         speed: f32,
         layer: usize,
-    ) -> Vec<Crossed> {
+    ) -> (Vec<Crossed>, Step) {
         let current = self.playhead(playback.motion());
         let previous = playback
             .previous_motion()
             .map_or(1.0, |m| self.playhead(m).per_second);
         let step = playback.advance(dt, speed, current, previous);
-        self.crossed(playback, current, step, layer)
+        (self.crossed(playback, current, step, layer), step)
     }
 }

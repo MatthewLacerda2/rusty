@@ -8,12 +8,18 @@
 //! per option, each written to `project.rusty` the moment it changes through
 //! `Application::set_default_option`, the op `Graphics.SetDefaultOption` calls; the
 //! live options follow it where the player hasn't chosen, to preview a fresh install.
+//!
+//! Last, the project's audio settings (#1749): the speed of sound doppler resolves
+//! with, written through `Application::set_speed_of_sound` (the op
+//! `Audio.SetDefaultSpeedOfSound` calls) once a drag or a typed edit ends, and
+//! applied to the audio on entering Play.
 
 use egui_phosphor::regular as icon;
 
 use crate::core::application::{Application, BuildSettings, WindowMode};
 use crate::core::project::PROJECT_FILE;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+use crate::editor::widgets::DragRange;
 use crate::editor::EditorUi;
 use crate::scripting::ConsoleLogs;
 
@@ -46,6 +52,8 @@ pub fn draw(
             save = ui.button(format!("{}  Save", icon::FLOPPY_DISK)).clicked();
             ui.separator();
             graphics_defaults(ui, app, live, console);
+            ui.separator();
+            audio(ui, app, console);
         });
     if save {
         match app.set_build(draft.clone()) {
@@ -106,4 +114,29 @@ fn graphics_defaults(
             }
         }
     }
+}
+
+/// The project's audio settings: the speed of sound (m/s). A drag or a typed edit
+/// is held as a draft in egui's memory and written once, when it ends, not on every
+/// frame it changes.
+fn audio(ui: &mut egui::Ui, app: &mut Application, console: &mut ConsoleLogs) {
+    let id = ui.id().with("speed_of_sound");
+    let draft = ui.data(|d| d.get_temp::<f32>(id));
+    let mut c = draft.unwrap_or(app.audio_settings().speed_of_sound);
+    ui.horizontal(|ui| {
+        ui.label("Speed of sound (m/s)");
+        let drag = egui::DragValue::new(&mut c)
+            .speed(1.0)
+            .ranged(1.0..=10_000.0);
+        let r = ui.add(drag);
+        let editing = r.dragged() || r.has_focus();
+        if r.changed() && editing {
+            ui.data_mut(|d| d.insert_temp(id, c));
+        } else if r.changed() || (!editing && draft.is_some()) {
+            ui.data_mut(|d| d.remove::<f32>(id));
+            if let Err(err) = app.set_speed_of_sound(c) {
+                console.error(err);
+            }
+        }
+    });
 }

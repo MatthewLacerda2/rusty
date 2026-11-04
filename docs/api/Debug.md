@@ -282,11 +282,13 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "loop": false, "paused": false,
                  "parameters": { "Jump": { "Trigger": false }, "speed": { "Float": 4.2 } },
                  "graph": "guard.animgraph", "graph_enabled": true, "node": "Locomotion",
-                 "layers": [ { "name": "UpperBody", "weight": 1.0, "node": "Aim" } ] },
+                 "layers": [ { "name": "UpperBody", "weight": 1.0, "node": "Aim" } ],
+                 "apply_root_motion": false, "root_bone": "",         // #1745
+                 "root_motion": { "position": [x,y,z], "yaw": .. } }, // last step, degrees
   "audio":     { "clip": "music/theme.ogg", "volume": .., "loop": false,
                  "play_on_start": false, "is_time_scaled": true,
                  "spatial_blend": 0.0, "initial_distance": .., "final_distance": ..,
-                 "output_group": "", "occlusion_enabled": true },
+                 "output_group": "", "occlusion_enabled": true, "doppler_level": 1.0 },
   "reverb_zone": { "min_distance": 10.0, "max_distance": 15.0, "preset": "Room",
                    "decay_time": .., "pre_delay": .., "damping": .., "wet": .. },
   "canvas":    { "render_mode": "ScreenSpaceOverlay", "sort_order": 0,

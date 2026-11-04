@@ -5,16 +5,17 @@
 use super::{changes, Backend, Root, Watch};
 
 mod events;
+mod scripts;
 use crate::core::fs::written::written_since;
 use crate::core::paths::native;
 use notify::event::{AccessKind, AccessMode, CreateKind, EventKind, ModifyKind};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-const POLL: Backend = Backend::Poll(Duration::from_millis(20));
+pub(super) const POLL: Backend = Backend::Poll(Duration::from_millis(20));
 
 /// Collect until `path` is pending, or give up after a few seconds.
-fn waits_for(watch: &mut Watch, path: &Path) -> bool {
+pub(super) fn waits_for(watch: &mut Watch, path: &Path) -> bool {
     let key = path.to_string_lossy().into_owned();
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {

@@ -20,6 +20,7 @@ pub(crate) fn audio_value(a: &AudioSourceComponent) -> Value {
         "final_distance": a.final_distance,
         "output_group": a.output_group,
         "occlusion_enabled": a.occlusion_enabled,
+        "doppler_level": a.doppler_level,
     })
 }
 

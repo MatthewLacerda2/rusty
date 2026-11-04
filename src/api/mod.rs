@@ -139,7 +139,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // (#831) reach the scene.
     assets::register(lua)?;
     assets::register_reimport(lua, ctx.scene)?;
-    audio::register(lua, ctx.scene, ctx.audio, ctx.time, ctx.camera)?;
+    audio::register(lua, ctx)?;
     camera::register(lua, ctx)?;
     canvas::register(lua, ctx.scene, ctx.screen, ctx.video)?;
     character_controller::register(lua, ctx.scene, ctx.physics)?;

@@ -172,3 +172,7 @@ mod audio_activity_tests;
 #[cfg(test)]
 #[path = "push_tests.rs"]
 mod audio_push_tests;
+
+#[cfg(test)]
+#[path = "doppler_tests.rs"]
+mod audio_doppler_tests;

@@ -33,17 +33,27 @@ pub(super) fn bake_logged(
     if !log.is_on() {
         return run(&progress);
     }
-    let watched = &progress;
+    watch(&progress, log, run)
+}
+
+/// Run `work` on a scoped worker while this thread logs `progress`. The step's
+/// first line is logged before the worker exists (#1808): a trace short enough to
+/// reach its pages before the first poll would otherwise never say it started.
+pub(super) fn watch<T: Send>(
+    progress: &BakeProgress,
+    log: &mut BakeLog,
+    work: impl FnOnce(&BakeProgress) -> Result<T, String> + Send,
+) -> Result<T, String> {
+    log.observe(read(progress));
     let (sent, result) = mpsc::channel();
-    let encoded = thread::scope(|scope| {
+    let done = thread::scope(|scope| {
         let worker = scope.spawn(move || {
-            let _ = sent.send(run(watched));
+            let _ = sent.send(work(progress));
         });
         loop {
-            log.observe(read(&progress));
             match result.recv_timeout(POLL) {
-                Ok(encoded) => break encoded,
-                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Ok(done) => break done,
+                Err(mpsc::RecvTimeoutError::Timeout) => log.observe(read(progress)),
                 // The worker panicked before sending: re-raise it here.
                 Err(mpsc::RecvTimeoutError::Disconnected) => match worker.join() {
                     Ok(()) => break Err("the bake worker stopped".into()),
@@ -52,8 +62,8 @@ pub(super) fn bake_logged(
             }
         }
     });
-    log.observe(read(&progress));
-    encoded
+    log.observe(read(progress));
+    done
 }
 
 /// The bake's counters as the log reads them: the trace's, then the encode's.

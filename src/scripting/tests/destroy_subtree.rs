@@ -33,7 +33,7 @@ pub(super) fn scripted(
     m.load_entity_script(child, 0, &path, &BTreeMap::new())
         .unwrap();
     tick(&mut m, 1);
-    let stem = format!("rusty_lifecycle_{name}_child");
+    let stem = format!("{name}_child");
     let live = crate::scripting::instances::find(m.lua.as_ref().unwrap(), child, &stem);
     assert!(live.unwrap().is_some(), "the child's Lua table is indexed");
     assert!(
@@ -91,7 +91,7 @@ fn destroying_a_rig_tears_down_the_script_on_its_bone() {
     let rig = m.cells.scene.borrow().world.children(holder)[0];
     destroy(&mut m, rig);
     assert_eq!(m.eval("__log").unwrap(), format!("D{gun}X{gun}"));
-    assert_forgotten(&m, gun, "rusty_lifecycle_destroy_rig_child");
+    assert_forgotten(&m, gun, "destroy_rig_child");
     assert!(
         m.cells.scene.borrow().world.contains(holder),
         "the rig's parent stays"
@@ -103,7 +103,7 @@ fn destroying_a_bone_tears_down_the_script_hanging_from_it() {
     let (mut m, _, gun, bones) = rig_with_scripted_gun("destroy_bone");
     destroy(&mut m, bones[1]); // spine, and head under it
     assert_eq!(m.eval("__log").unwrap(), format!("D{gun}X{gun}"));
-    assert_forgotten(&m, gun, "rusty_lifecycle_destroy_bone_child");
+    assert_forgotten(&m, gun, "destroy_bone_child");
 }
 
 #[test]
@@ -119,6 +119,6 @@ fn destroying_a_parent_takes_its_child_and_tears_it_down_first() {
         format!("D{child}D{parent}X{child}X{parent}"),
         "OnDisable then OnDestroy, each child before its parent"
     );
-    assert_forgotten(&m, child, "rusty_lifecycle_destroy_plain_child");
-    assert_forgotten(&m, parent, "rusty_lifecycle_destroy_plain");
+    assert_forgotten(&m, child, "destroy_plain_child");
+    assert_forgotten(&m, parent, "destroy_plain");
 }
