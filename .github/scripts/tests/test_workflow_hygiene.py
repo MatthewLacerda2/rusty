@@ -23,11 +23,25 @@ WORKFLOW_DIR = SCRIPTS.parent / "workflows"
 GATING = ("ci.yml", "lint.yml")
 
 
+#: A gate proves its commit on a fixed proptest seed; the nightly explores (#1800).
+SEED_POLICY = r"(?m)^  PROPTEST_RNG_SEED: \$\{\{ github\.event_name != 'schedule' && '\d+' \|\| '' \}\}$"
+
+
 def jobs(workflow: str) -> dict[str, str]:
     """Each top-level job's name and its body, from the workflow's text."""
     text = (WORKFLOW_DIR / workflow).read_text().split("\njobs:\n", 1)[1]
     parts = re.split(r"^  ([\w-]+):\n", text, flags=re.M)
     return dict(zip(parts[1::2], parts[2::2]))
+
+
+class ProptestSeed(unittest.TestCase):
+    def test_the_gates_fix_it_and_the_nightly_leaves_it_random(self):
+        self.assertRegex((WORKFLOW_DIR / "ci.yml").read_text(), SEED_POLICY)
+
+    def test_a_seed_with_no_nightly_or_no_number_is_flagged(self):
+        for line in ("  PROPTEST_RNG_SEED: 1784", "  PROPTEST_RNG_SEED: ${{ github.event_name != 'schedule' && '' || '' }}"):
+            with self.subTest(line=line):
+                self.assertNotRegex(line, SEED_POLICY)
 
 
 class Runners(unittest.TestCase):

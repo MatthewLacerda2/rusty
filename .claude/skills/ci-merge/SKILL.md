@@ -157,9 +157,14 @@ otherwise, and always for named pull requests, it is one pull request:
    its new head (`not ready — its branch moved during the take`); named pull
    requests are never retaken, so there it is reported *not merged* and counts
    as a hand-back in the exit status. A refusal whose remote head could not be
-   read is a plain hand-back, never "moved". Only this push refusal is retaken:
-   a push that lands during the CI wait (step 4) is a hand-back.
-4. Wait for the runs **on the updated head** to exist and conclude.
+   read is a plain hand-back, never "moved".
+4. Wait for the runs **on the updated head** to exist and conclude. A push that
+   lands during this wait (a head this queue never pushed) is not a refusal:
+   nothing was judged about it. Under `--watch` the pull request goes **back in
+   line**, remembered against nothing (`watch: #N goes back in line: …`, #1799),
+   and its next take merges `main` in and waits on the new head's own CI; a
+   named pull request is handed back. A pushed head GitHub still hasn't shown
+   after the grace is a hand-back either way.
 5. Ask `make mergeable`'s judgement of that head — see the next section.
 6. Squash-merge with the house-style title (`Title (#issue) (#pr)`; the queue
    adds each closed issue the title lacks, #966), a body of one bullet per
@@ -174,7 +179,7 @@ requests and `--watch` alike — on a
 conflict (naming the paths; it resolves only a conflict inside a `sorted` list
 where both sides only added entries, below), an updated head that fails
 the local check (never pushed), a red run, a run that never
-appears, a head somebody else moved, a draft, a description that claims what it
+appears, a head somebody else moved (named pull requests only; the watch puts it back in line), a draft, a description that claims what it
 may not (next section; checked before any push), or a merge GitHub refused. A 502 on
 the merge call is followed by asking whether it merged. Exit status is non-zero
 if anything was handed back. **A runner outage is not a red run** (#869): when the

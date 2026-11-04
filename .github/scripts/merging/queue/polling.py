@@ -44,16 +44,23 @@ def head_state(seen: str, pushed: str, before: str, waited: float) -> tuple[str,
     The pushed head goes; the pre-push head waits while the grace lasts
     (GitHub's view lags the push); a third sha is somebody else and stops —
     merging a commit this queue never watched is not given the benefit of the
-    doubt.
+    doubt. That third sha is [`outcomes.HEAD_MOVED`], not a refusal: nothing
+    was judged about it, so the watch puts it back in line (#1799).
     """
     if seen == pushed:
         return outcomes.GO, []
-    if seen == before and waited < RUN_APPEARS_SECONDS:
-        return outcomes.WAIT, [f"GitHub still reports {before[:7]}; it has not caught up with the push yet."]
-    return outcomes.STOP, [
+    if seen == before:
+        if waited < RUN_APPEARS_SECONDS:
+            return outcomes.WAIT, [f"GitHub still reports {before[:7]}; it has not caught up with the push yet."]
+        # Not a move: the push itself never showed, so it is a hand-back as ever.
+        return outcomes.STOP, [
+            f"the head is still {before[:7]}, not the {pushed[:7]} this queue pushed,"
+            f" after {waited / 60:.0f} minutes.",
+            "Handed back rather than merging a commit this queue never watched.",
+        ]
+    return outcomes.HEAD_MOVED, [
         f"the head is {seen[:7]}, not the {pushed[:7]} this queue is watching.",
-        "Somebody else pushed. Handed back rather than merging a commit this"
-        " queue never watched.",
+        "Somebody else pushed. Not merging a commit this queue never watched.",
     ]
 
 

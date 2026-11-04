@@ -175,9 +175,10 @@ queue's). That looked like "half never wake", and it is also why they never
 race the fresh session. So never put the re-brief, or a pointer to it, on the PR: every session
 subscribed to it would act on it, and a PR re-briefed twice has two. **Take the
 `queue` label off when you re-brief**, and before you push to a queued PR
-yourself: the queue merges `main` into the head it took and hands back a head
-that moved under it (#1645, 2026-10-31), and put it back only after reading the
-fix. A re-briefed PR that keeps the label is merged as soon as its coder readies
+yourself, and put it back only after reading the fix (#1645, 2026-10-31). With
+the label off the push is safe: a head that moves during the watch's CI wait
+goes back in line, remembered against nothing (#1799), and waits there for the
+label, then its own CI. A re-briefed PR that keeps the label is merged as soon as its coder readies
 it, unread (#1255, 2026-10-23).
 
 **The pull request is the report.** A cloud coder cannot message back; it opens a
