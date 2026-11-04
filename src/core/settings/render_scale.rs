@@ -118,17 +118,20 @@ impl RenderScaleDefault {
             v => match v.as_f64().map(|v| v as f32) {
                 Some(f) if f.is_finite() && f > 0.0 => Ok(Self::Fixed(RenderScale::new(f))),
                 _ => Err(format!(
-                    "render_scale is {value}, not a positive number or \"{MATCH_DISPLAY}\""
+                    "{value} is not a positive number or \"{MATCH_DISPLAY}\""
                 )),
             },
         }
     }
+}
 
-    /// The JSON the project file holds: the factor, or `"match_display"`.
-    pub fn to_json(self) -> Value {
+/// The factor as an `f32`, so `0.7` is written `0.7` (an `f64` widening would write
+/// `0.699999988079071` into a hand-edited file), or `"match_display"`.
+impl Serialize for RenderScaleDefault {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Self::Fixed(scale) => Value::from(f64::from(scale.get())),
-            Self::MatchDisplay => Value::from(MATCH_DISPLAY),
+            Self::Fixed(scale) => serializer.serialize_f32(scale.get()),
+            Self::MatchDisplay => serializer.serialize_str(MATCH_DISPLAY),
         }
     }
 }
@@ -144,14 +147,6 @@ pub struct RenderScaleSetting {
 }
 
 impl RenderScaleSetting {
-    /// A choice of `scale`, the default left native: a test's or a capture's.
-    pub fn fixed(scale: RenderScale) -> Self {
-        Self {
-            chosen: Some(scale),
-            ..Self::default()
-        }
-    }
-
     /// The factor that runs on a display of `display_scale`.
     pub fn resolve(self, display_scale: f32) -> RenderScale {
         (self.chosen).unwrap_or_else(|| self.default.resolve(display_scale))
@@ -178,7 +173,7 @@ impl RenderScaleSetting {
 /// `project.rusty`'s `"graphics"` block (#1715): the project's render-scale default.
 /// A missing or bad value keeps native, with a warning ([`ProjectGraphics::read_json`]),
 /// so the project still opens.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct ProjectGraphics {
     pub render_scale: RenderScaleDefault,
 }
@@ -199,18 +194,10 @@ impl ProjectGraphics {
             }
             match RenderScaleDefault::read_json(value) {
                 Ok(default) => settings.render_scale = default,
-                Err(why) => ignored.push(format!("{why}; using 1")),
+                Err(why) => ignored.push(format!("{RENDER_SCALE_KEY}: {why}; using 1")),
             }
         }
         (settings, ignored)
-    }
-}
-
-impl Serialize for ProjectGraphics {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serde_json::Map::new();
-        map.insert(RENDER_SCALE_KEY.to_string(), self.render_scale.to_json());
-        Value::Object(map).serialize(serializer)
     }
 }
 

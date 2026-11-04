@@ -78,15 +78,10 @@ fn register_default(
         table,
         "SetDefaultRenderScale",
         lua.create_function(move |lua, value: mlua::Value| {
-            let json = match value {
-                mlua::Value::Integer(i) => serde_json::Value::from(i),
-                mlua::Value::Number(n) => serde_json::Value::from(n),
-                mlua::Value::String(s) => serde_json::Value::from(s.to_str()?.to_string()),
-                other => serde_json::Value::from(other.type_name()),
-            };
-            let default = RenderScaleDefault::read_json(&json).map_err(|why| {
-                mlua::Error::RuntimeError(format!("Graphics.SetDefaultRenderScale: {why}"))
-            })?;
+            let refused =
+                |why| mlua::Error::RuntimeError(format!("Graphics.SetDefaultRenderScale: {why}"));
+            let json = crate::api::lua_json::lua_to_json(&value).map_err(refused)?;
+            let default = RenderScaleDefault::read_json(&json).map_err(refused)?;
             graphics.with(lua, |graphics| {
                 let live = &mut graphics.borrow_mut().render_scale;
                 (app.get(lua)?.borrow_mut())

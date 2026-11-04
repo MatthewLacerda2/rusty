@@ -114,6 +114,11 @@ fn the_graphics_block_round_trips_through_the_project_file() {
         let back = ProjectFile::from_json(&file.to_json()).unwrap();
         assert_eq!(back.graphics.render_scale, default);
     }
+    // The factor is written as the `f32` it is: a hand-edited file reads `0.7`.
+    let mut file = ProjectFile::default();
+    file.graphics.render_scale = RenderScaleDefault::Fixed(RenderScale::new(0.7));
+    let text = file.to_json();
+    assert!(text.contains(r#""render_scale": 0.7"#), "{text}");
     // A bad value still opens the project, on the default.
     let file = ProjectFile::from_json(r#"{"graphics": {"render_scale": "big"}}"#).unwrap();
     assert_eq!(file.graphics, ProjectGraphics::default());

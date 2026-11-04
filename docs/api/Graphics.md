@@ -754,7 +754,10 @@ monitor the next frame. A value in the file that is neither (a string, `null`,
 zero or below) keeps `1` and warns; out of range clamps. Changing the default
 applies at once unless the player chose a scale. `ResetRenderScale` is an options
 menu's "Default": it forgets the choice (deleting the `Storage` key at the next
-Stop or quit), so the default runs again, display-matched if it is. Per-preset
+Stop or quit), so the default runs again, display-matched if it is. During a run it
+is the only way back: Stop and quit write the running choice back to `Storage`, so
+a script's `Storage.Delete("graphics", "render_scale")` does not bring the default
+back. A hand edit of `project.rusty`'s default runs from the next Play. Per-preset
 render scales are not part of the quality presets yet. Screen sizes stay the surface's: `UI.GetScreenSize`, the UI's layout and
 `Camera.ScreenToWorldRay` speak surface pixels whatever the scale. The editor's **Scene
 view** ignores it, as Unity's Scene view does; so do render textures, which keep

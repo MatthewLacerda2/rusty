@@ -55,22 +55,22 @@ fn set_render_scale_writes_the_cell_clamped_and_reads_back() {
 #[test]
 fn the_default_runs_until_the_player_chooses_and_after_a_reset() {
     let (lua, (graphics, _, app)) = vm();
-    lua.load("Graphics.SetDefaultRenderScale(0.75)")
+    lua.load("Graphics.SetDefaultRenderScale(0.7)")
         .exec()
         .unwrap();
-    let fixed = RenderScaleDefault::Fixed(RenderScale::new(0.75));
+    let fixed = RenderScaleDefault::Fixed(RenderScale::new(0.7));
     assert_eq!(app.borrow().render_scale_default(), fixed);
-    assert_eq!(get(&lua), 0.75, "no choice: the default runs at once");
+    assert_eq!(get(&lua), 0.7, "no choice: the default runs at once");
     let read: f32 = lua
         .load("return Graphics.GetDefaultRenderScale()")
         .eval()
         .unwrap();
-    assert_eq!(read, 0.75);
+    assert_eq!(read, 0.7);
     lua.load("Graphics.SetRenderScale(0.5)").exec().unwrap();
     assert_eq!(get(&lua), 0.5, "the player's choice wins");
     lua.load("Graphics.ResetRenderScale()").exec().unwrap();
     assert_eq!(graphics.borrow().render_scale.chosen, None);
-    assert_eq!(get(&lua), 0.75, "a reset brings the default back");
+    assert_eq!(get(&lua), 0.7, "a reset brings the default back");
 }
 
 #[test]
@@ -108,7 +108,12 @@ fn a_bad_default_is_an_error_and_changes_nothing() {
     let (lua, (_, _, app)) = vm();
     for bad in ["0", "-1", "'half'", "true", "nil"] {
         let set = format!("Graphics.SetDefaultRenderScale({bad})");
-        assert!(lua.load(&set).exec().is_err(), "{bad}");
+        let err = lua.load(&set).exec().unwrap_err().to_string();
+        let said = format!(
+            "Graphics.SetDefaultRenderScale: {} is not",
+            bad.replace('\'', "\"")
+        );
+        assert!(err.contains(&said.replace("nil", "null")), "{bad}: {err}");
     }
     assert_eq!(
         app.borrow().render_scale_default(),

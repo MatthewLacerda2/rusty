@@ -153,6 +153,11 @@ impl EditorFrontend {
         if paint::take_edits(&mut self.editor_ui, game) {
             shell.renderer.shadow_renderer.invalidate_static_cache();
         }
+        if self.demo_size().is_none() {
+            // Before `sync_quality` resolves the render scale on it (#1715); an open
+            // demo replays the scale it recorded.
+            crate::shell::settings::report_display_scale(shell, game);
+        }
         self.sync_quality(shell, game);
         self.sync_speaker_mode(game);
         #[cfg(feature = "dev")]

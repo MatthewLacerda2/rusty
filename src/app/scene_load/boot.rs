@@ -68,14 +68,9 @@ impl GameWorld {
         if let Err(err) = opened {
             log::error!("[Project] {err}; running on the default settings");
         }
-        let app = self.resources.application.borrow();
-        let (defaults, render_scale) = (app.graphics_defaults(), app.render_scale_default());
-        drop(app);
+        let defaults = self.resources.application.borrow().graphics_defaults();
         let graphics = self.resources.script_manager.graphics_cell();
-        let mut live = graphics.borrow_mut();
-        live.options.rebase(defaults);
-        live.render_scale.default = render_scale;
-        drop(live);
+        graphics.borrow_mut().options.rebase(defaults);
         self.apply_project_settings();
     }
 }

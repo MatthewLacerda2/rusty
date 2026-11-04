@@ -38,14 +38,18 @@ impl Frontend for PlayerFrontend {
         frame: &wgpu::Texture,
         target: &wgpu::TextureView,
     ) {
-        // The UI lays out on the game view's pixel size (#417): here, the whole window.
-        let (width, height) = (shell.renderer.config.width, shell.renderer.config.height);
-        super::settings::report_screen(shell, game, (width, height));
+        super::settings::report_display_scale(shell, game);
         // `Graphics.SetQuality` / `SetOption` reach the renderer here — there is no
         // editor dropdown to reconcile with.
         super::settings::apply_graphics(shell, game);
 
         let device = &shell.renderer.device;
+        let (width, height) = (shell.renderer.config.width, shell.renderer.config.height);
+        // The UI lays out on the game view's pixel size (#417): here, the whole window.
+        game.resources
+            .screen
+            .borrow_mut()
+            .set_game_view(width, height);
         let view = match &mut self.view {
             Some(view) => view,
             slot @ None => slot.insert(RenderView::targetless(

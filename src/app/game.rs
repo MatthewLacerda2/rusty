@@ -274,11 +274,10 @@ impl GameWorld {
         self.restore_edit_runtime(); // after the restore: it binds the edit scene (#1339)
     }
 
-    /// Run on the project file as it stands (#1517, #1522, #1749): hold the scene's
-    /// decals to its budgets, render with its quality presets' running values and
-    /// resolve doppler with its speed of sound. On
-    /// entering Play, on Stop (Unity reverts play-mode changes) and when the editor
-    /// opens, so a hand edit to `project.rusty` reaches the next Play.
+    /// Run on the project file as it stands (#1517, #1522, #1749, #1715): its decal
+    /// budgets, its quality presets' running values, its render-scale default and its
+    /// speed of sound. On entering Play, on Stop (Unity reverts play-mode changes) and
+    /// when the editor opens, so a hand edit to `project.rusty` reaches the next Play.
     pub fn apply_project_settings(&self) {
         let mut app = self.resources.application.borrow_mut();
         let limits = app.decal_limits();
@@ -286,7 +285,9 @@ impl GameWorld {
         let c = app.audio_settings().speed_of_sound; // reread by `decal_limits`
         self.resources.audio.borrow_mut().set_speed_of_sound(c);
         let graphics = self.resources.script_manager.graphics_cell();
-        graphics.borrow_mut().quality = app.quality_values();
+        let mut live = graphics.borrow_mut();
+        live.quality = app.quality_values();
+        live.render_scale.default = app.render_scale_default();
     }
 }
 
