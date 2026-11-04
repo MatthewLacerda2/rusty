@@ -51,17 +51,7 @@ impl Renderer {
     /// camera runs the [`CAMERA_PASSES`] table in order.
     pub(crate) fn draw_stack(&mut self, view: &mut RenderView, scene: &Scene, pass: StackPass) {
         let aspect = view.aspect();
-        let view_projs: Vec<_> = pass
-            .stack
-            .iter()
-            .map(|c| c.build_view_projection(aspect))
-            .collect();
-        let cameras: Vec<_> = pass
-            .entities
-            .iter()
-            .copied()
-            .zip(view_projs.iter().copied())
-            .collect();
+        let (view_projs, cameras) = matrices(&pass, aspect);
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
         // this view runs motion blur, TAA (#1702), depth of field (#1445) or SSR, which reads its
         // depths beside its own surface targets (#1526). A view shading
@@ -73,12 +63,11 @@ impl Renderer {
             motion::target_wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode)
                 && !own_pipeline;
         let velocity = velocity_target(moving, ssr);
-        // TAA (#1702): whether it runs, and so the size the chain after it runs at,
-        // before any effect fits its targets this frame.
+        // TAA (#1702): whether it runs, so the chain's size, before any effect fits.
         let taa_on =
             taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode) && !own_pipeline;
-        let chain = taa::chain_size(view, taa_on);
-        view.post_fx.fit_chain(&self.device, chain);
+        view.post_fx
+            .fit_chain(&self.device, taa::chain_size(view, taa_on));
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.scene_size();
         surface::begin(&mut view.post_fx.targets, &self.device, size, ssr);
@@ -162,6 +151,17 @@ impl Renderer {
         view.post_fx
             .run((&self.device, &self.queue), chain, &effect, params);
     }
+}
+
+/// Each camera's view-projection at `aspect`, and beside it each one's entity, which
+/// keeps its motion history (#1435).
+fn matrices(pass: &StackPass, aspect: f32) -> (Vec<glam::Mat4>, Vec<(Option<u32>, glam::Mat4)>) {
+    let view_projs: Vec<_> = (pass.stack.iter())
+        .map(|c| c.build_view_projection(aspect))
+        .collect();
+    let cameras = pass.entities.iter().copied();
+    let cameras = cameras.zip(view_projs.iter().copied()).collect();
+    (view_projs, cameras)
 }
 
 /// The velocity target a view writes: motion vectors when an effect reads motion,
