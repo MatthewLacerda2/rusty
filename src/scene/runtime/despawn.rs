@@ -96,8 +96,12 @@ impl Scene {
         if self.selected_entity_id.is_some_and(|s| ids.contains(&s)) {
             self.selected_entity_id = None;
         }
-        self.persistent.retain(|id| !ids.contains(id));
-        self.pending_destroy.retain(|e| !ids.contains(e));
-        self.lightmaps.entries.retain(|e| !ids.contains(&e.entity));
+        for id in ids {
+            self.persistent.remove(id);
+            self.lightmaps.remove(*id);
+        }
+        if !self.pending_destroy.is_empty() {
+            self.pending_destroy.retain(|e| !ids.contains(e)); // the queue, not the level
+        }
     }
 }

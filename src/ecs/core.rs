@@ -71,7 +71,7 @@ impl World {
         };
         if std::mem::replace(&mut core.active, active) != active {
             drop(core);
-            self.activity.invalidate_all();
+            self.invalidate_activity_below(id);
             // The subtree may go dark or lit; with no static in it (a muzzle flash, a
             // pickup) the static bakes stay put.
             self.stamp_hierarchy_below(id);
@@ -166,7 +166,7 @@ impl World {
         drop(core);
         self.moved(id);
         if relinked {
-            self.activity.invalidate_all();
+            self.invalidate_activity_below(id);
             self.stamp_hierarchy_below(id); // under a new parent it may go dark or lit
         }
         true

@@ -25,6 +25,7 @@ use crate::components::Entity;
 use super::activity::ActivityStore;
 use super::bundle::Core;
 use super::changes::ChangeLogs;
+use super::despawn::RefIndex;
 use super::handles::Handles;
 use super::journal::Journal;
 use super::world_space::{BoundsQueue, WorldStore};
@@ -52,6 +53,8 @@ pub struct World {
     pub(super) changes: ChangeLogs,
     /// The edit-mode change journal the editor's Undo reads (`ecs::journal`, #1631).
     pub(super) journal: Journal,
+    /// Who names whom, opened by the first despawn (`ecs::despawn`, #1708).
+    pub(super) refs: Option<RefIndex>,
 }
 
 impl Default for World {
@@ -73,6 +76,7 @@ impl World {
             activity: ActivityStore::default(),
             changes: ChangeLogs::default(),
             journal: Journal::default(),
+            refs: None,
         }
     }
 
@@ -123,18 +127,35 @@ impl World {
     }
 
     /// Drop the rows of `ids`, whose references `World::despawn_all` cleared first.
+    /// Each costs its own work, not the level's: its slot in `order` is found by its
+    /// sequence stamp, and only its own kept activity answer goes dirty (its children
+    /// were re-rooted, and their subtrees dirtied, by `forget_references`).
     pub(super) fn remove_rows(&mut self, ids: &std::collections::BTreeSet<u32>) {
+        let mut slots: Vec<usize> = ids.iter().filter_map(|&id| self.order_slot(id)).collect();
         for &id in ids {
             self.touch_entity(id, self.is_static(id));
             self.stamp_pose_below(id);
             self.world_space.forget(id);
+            self.activity.invalidate(id);
             if let Some(handle) = self.handles.remove(id) {
                 // lint: allow(ecs-write) the funnel: `touch_entity` stamped the removal above
                 let _ = self.inner.despawn(handle);
             }
         }
-        self.order.retain(|e| !ids.contains(e));
-        self.activity.invalidate_all();
+        slots.sort_unstable();
+        drop_slots(&mut self.order, &slots);
+    }
+
+    /// Live `id`'s index in `order`, by a binary search on `Core::seq` (`order` is
+    /// sorted by it, `placement.rs`).
+    fn order_slot(&self, id: u32) -> Option<usize> {
+        let seq_of = |e: u32| self.component::<Core>(e).map_or(0, |c| c.seq);
+        let seq = self.component::<Core>(id)?.seq;
+        let at = self.order.partition_point(|&e| seq_of(e) < seq);
+        match self.order.get(at) == Some(&id) {
+            true => Some(at),
+            false => self.order.iter().position(|&e| e == id), // never, while sorted
+        }
     }
 
     /// Remove all entities and reset the id allocator (used on scene load).
@@ -220,4 +241,19 @@ impl World {
         let (a, b) = query.get()?;
         Some(f(a, b))
     }
+}
+
+/// Remove the elements at `slots` (ascending, distinct) from `order` in one pass:
+/// everything past the first slot shifts down once.
+fn drop_slots(order: &mut Vec<u32>, slots: &[usize]) {
+    let Some(&first) = slots.first() else {
+        return;
+    };
+    let mut write = first;
+    for (k, &slot) in slots.iter().enumerate() {
+        let end = slots.get(k + 1).copied().unwrap_or(order.len());
+        order.copy_within(slot + 1..end, write);
+        write += end - slot - 1;
+    }
+    order.truncate(write);
 }

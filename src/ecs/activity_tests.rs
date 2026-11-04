@@ -1,7 +1,8 @@
 //! src/ecs/activity_tests.rs — the kept `activeInHierarchy` answers against the walk
 //! they replaced (#1388): after any sequence of `Core` writes, every live id's answer
 //! is `self_and_ancestors(id).all(is_active_self)`. A future writer that forgets to
-//! invalidate breaks this.
+//! invalidate breaks this. Parent links are written with their `children` entries,
+//! as `Scene::set_parent` writes them: the subtree invalidation walks those (#1708).
 
 use proptest::prelude::*;
 
@@ -60,7 +61,7 @@ fn apply(w: &mut World, op: &Op) {
         }
         Op::SetParent(i, p) => {
             let parent = p.map(|p| pick(w, p));
-            w.set_parent_id(pick(w, i), parent);
+            relink(w, pick(w, i), parent);
         }
         Op::Despawn(i) => {
             let id = pick(w, i);
@@ -77,12 +78,25 @@ fn apply(w: &mut World, op: &Op) {
         Op::Overwrite(i, a, p) => {
             let parent = p.map(|p| pick(w, p));
             if let Some(mut doc) = w.entity_document(pick(w, i)) {
+                let id = doc.id;
+                relink(w, id, None);
                 (doc.active, doc.parent_id) = (a, parent);
                 w.overwrite(doc);
+                parent.map(|p| w.add_child(p, id));
             }
         }
         Op::Clear => w.clear(),
         Op::Read(_) | Op::ReadAll => {}
+    }
+}
+
+/// Re-parent `id`, its old and new parents' `children` kept in step.
+fn relink(w: &mut World, id: u32, parent: Option<u32>) {
+    if let Some(old) = w.parent_id(id) {
+        w.remove_child(old, id);
+    }
+    if w.set_parent_id(id, parent) {
+        parent.map(|p| w.add_child(p, id));
     }
 }
 

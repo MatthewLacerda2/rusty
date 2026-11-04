@@ -6,14 +6,20 @@
 //! stamp is the store's current `generation`; a read cleans the chain above an entity
 //! top-down, so every ancestor it passes is answered for the next read too.
 //!
-//! **What invalidates.** Anything that can change an answer bumps the generation, O(1),
-//! and every flag goes dirty at once: an `active` flag that changed, a parent link
-//! changed, a despawn (a dead parent ends its children's chains), a document inserted
-//! or overwritten, a `clear`. These are rare next to the reads, and after one the next
-//! pass re-resolves each entity once, its ancestors already answered. A per-subtree
-//! dirty walk (as `world_space` does) would follow `children`, which a raw
-//! `set_parent_id` does not keep in step; the bump reads only parent links, so it is
-//! never stale.
+//! **What invalidates.** Only what can change an answer. An `active` flag that
+//! changed, or a parent link, dirties that entity and its subtree (a walk down the
+//! `children` lists, bounded like every subtree walk); a despawn dirties the dead
+//! ids and, through the re-parent that makes them roots, each surviving child's
+//! subtree, so a leaf's death touches its own answer alone (#1708). A document
+//! inserted, overwritten or put back, and a `clear`, still dirty everything at once
+//! (O(1), a generation bump): a document can bring a parent link in any order, an
+//! orphan naming the new id from no `children` list.
+//!
+//! The subtree walks follow `children`, as the world-space store and the change
+//! channels do, so a parent link written without its `children` entry (only code
+//! bypassing `Scene::set_parent`, or a corrupt file) can leave a descendant's
+//! answer stale until the next document write. `activity_tests` keeps the lists in
+//! step, as every real writer does.
 //!
 //! **Determinism.** An answer is a pure function of the `active` flags and parent links;
 //! stamps only gate the cache, never a result.
@@ -80,6 +86,13 @@ impl ActivityStore {
         }
     }
 
+    /// `id`'s answer dirty: the next read climbs from it again.
+    pub(in crate::ecs) fn invalidate(&self, id: u32) {
+        if let Some(flag) = self.inner.borrow_mut().flags.get_mut(id as usize) {
+            flag.0 = 0;
+        }
+    }
+
     /// Forget every answer (a `clear`, after which ids restart at 1).
     pub(in crate::ecs) fn reset(&self) {
         *self.inner.borrow_mut() = Flags::new();
@@ -126,6 +139,14 @@ impl World {
     pub(in crate::ecs) fn invalidate_caches(&self) {
         self.world_space.invalidate_all();
         self.activity.invalidate_all();
+    }
+
+    /// `id`'s activity answer and every descendant's dirty (an `active` flag or a
+    /// parent link changed there). See the module docs.
+    pub(in crate::ecs) fn invalidate_activity_below(&self, id: u32) {
+        for e in self.self_and_descendants(id) {
+            self.activity.invalidate(e);
+        }
     }
 
     /// Every cached world matrix and activity answer forgotten (a `clear`; the change

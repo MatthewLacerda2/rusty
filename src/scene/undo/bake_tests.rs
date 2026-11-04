@@ -28,11 +28,11 @@ fn bake(scene: &mut Scene, id: u32) {
         .reflection_probes
         .set_cubemap(0, "probe_0.ktx2".into());
     scene.lightmaps.pages = vec!["lightmap_0.png".into()];
-    scene.lightmaps.entries = vec![LightmapEntry {
+    scene.lightmaps.insert(LightmapEntry {
         entity: id,
         page: 0,
         scale_offset: [1.0, 1.0, 0.0, 0.0],
-    }];
+    });
 }
 
 fn assert_baked(scene: &Scene, id: u32) {

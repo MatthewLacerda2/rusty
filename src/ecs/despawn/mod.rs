@@ -1,4 +1,5 @@
-//! src/ecs/despawn.rs — what a despawn clears, so no dead id survives (#1264).
+//! src/ecs/despawn/ — what a despawn clears, so no dead id survives (#1264), found
+//! without scanning the level (#1708).
 //!
 //! An entity id is held in more places than its own row. [`World::despawn`] (one
 //! entity) and [`World::despawn_all`] (a batch, in one pass) run
@@ -21,12 +22,27 @@
 //! ([`with_ref_components`]), so the two cannot disagree. Scene-level references
 //! (the selection, `DontDestroyOnLoad`, lightmap entries, shader overrides) are
 //! `Scene::despawn_batch`'s.
+//!
+//! **Cost.** A despawn pays for what it kills, not for the level: the components
+//! naming a dead id come from the reverse index (`index.rs`), not a walk over every
+//! holder; only the dead ids and their children's subtrees lose their kept
+//! `activeInHierarchy` (`ecs::activity`); and each leaves `World::order` by its
+//! slot, found by its sequence stamp (`World::remove_rows`).
+
+#[cfg(test)]
+mod cost_tests;
+mod index;
+#[cfg(test)]
+mod index_tests;
+#[cfg(test)]
+mod tests;
 
 use std::collections::BTreeSet;
 
 use crate::components::{with_ref_components, EntityRefs, RefVisit, TransformComponent};
 
 use super::world::World;
+pub(in crate::ecs) use index::RefIndex;
 
 macro_rules! world_walk {
     ($($field:ident: $ty:ty,)*) => {
@@ -38,11 +54,6 @@ macro_rules! world_walk {
                     let prefix = concat!("/", stringify!($field));
                     c.visit_refs(&mut |p, r| visit(&format!("{prefix}{p}"), r));
                 })*
-            }
-
-            /// Whether any component of entity `id` names an entity `dead` holds for.
-            fn names_any(&self, id: u32, dead: &dyn Fn(u32) -> bool) -> bool {
-                false $(|| self.component::<$ty>(id).is_some_and(|c| c.names_any(dead)))*
             }
 
             /// [`EntityRefs::forget`] on every component of entity `id`.
@@ -79,9 +90,9 @@ impl World {
 
     /// Clear every reference the World holds to the entities of `dead`, which are
     /// about to be despawned together. See the module docs. One pass serves the
-    /// whole batch: the holders are listed once and read first, so a despawn nothing
-    /// points at takes no mutable borrow, and a child dying with its parent is not
-    /// re-rooted.
+    /// whole batch: the holders naming any of them come from the index at once, so
+    /// a despawn nothing points at takes no mutable borrow of a holder, and a child
+    /// dying with its parent is not re-rooted.
     fn forget_references(&mut self, dead: &BTreeSet<u32>) {
         for &id in dead {
             if let Some(parent) = self.parent_id(id).filter(|p| !dead.contains(p)) {
@@ -99,13 +110,36 @@ impl World {
             }
         }
         let is_dead = |r: u32| dead.contains(&r);
-        let naming: Vec<u32> = self
-            .ref_holders()
-            .into_iter()
-            .filter(|e| !dead.contains(e) && self.names_any(*e, &is_dead))
-            .collect();
-        for e in naming {
+        for e in self.with_ref_index(|index, _| index.take_naming(dead)) {
             self.forget_in(e, &is_dead);
         }
+    }
+
+    /// Run `f` on the reverse index, caught up with every write since the last
+    /// despawn (opened, and every holder indexed, the first time).
+    pub(in crate::ecs) fn with_ref_index<R>(
+        &mut self,
+        f: impl FnOnce(&mut RefIndex, &World) -> R,
+    ) -> R {
+        let mut index = match self.refs.take() {
+            Some(mut index) => {
+                index.refresh(self);
+                index
+            }
+            None => RefIndex::open(self),
+        };
+        let out = f(&mut index, self);
+        self.refs = Some(index);
+        out
+    }
+
+    /// Which live entities outside `dead` name one of its ids, by the full scan
+    /// every despawn ran before the index (#1708): what `index_tests` holds the
+    /// index to.
+    #[cfg(test)]
+    pub(in crate::ecs) fn naming_by_scan(&self, dead: &BTreeSet<u32>) -> Vec<u32> {
+        let named = |e: &u32| self.held_by(*e).iter().any(|r| dead.contains(r));
+        let holders = self.ref_holders().into_iter();
+        holders.filter(|e| !dead.contains(e) && named(e)).collect()
     }
 }
