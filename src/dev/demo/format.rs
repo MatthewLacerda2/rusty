@@ -95,6 +95,10 @@ pub struct Header {
     pub storage: Value,
     /// The Game view's pixel size when Play started, if a platform had set one.
     pub size: Option<(u32, u32)>,
+    /// The display scale when Play started (`Video.GetDisplayScale`, #1715), if a
+    /// platform had set one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_scale: Option<f32>,
     /// `Time.timeScale` as edit mode left it: entering Play keeps it.
     pub time_scale: Exact,
     /// `Time.paused` and the queued `Time.Step`s as edit mode left them: entering
@@ -121,6 +125,7 @@ impl Header {
             settings: world.resources.application.borrow().settings(),
             storage: world.resources.storage.borrow().data(),
             size: world.resources.screen.borrow().game_view(),
+            display_scale: world.resources.screen.borrow().reported_display_scale(),
             time_scale: Exact(f64::from(time.time_scale)),
             paused: time.paused,
             pending_steps: time.pending_steps,
@@ -146,6 +151,9 @@ pub struct Entry {
     /// The Game view's new size, from this tick on.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<(u32, u32)>,
+    /// The display's new scale, from this tick on (#1715).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_scale: Option<f32>,
     /// The state digest after this tick (`digest::of`), in hex.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub digest: Option<String>,
@@ -158,6 +166,7 @@ impl Entry {
             && self.dt.is_none()
             && self.host.is_empty()
             && self.size.is_none()
+            && self.display_scale.is_none()
             && self.digest.is_none()
     }
 }

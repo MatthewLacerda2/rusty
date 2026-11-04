@@ -133,7 +133,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     canvas::register(lua, ctx.scene, ctx.screen, ctx.video)?;
     character_controller::register(lua, ctx.scene, ctx.physics)?;
     decals::register(lua, ctx.scene)?;
-    graphics::register(lua, ctx.scene, ctx.graphics, ctx.application)?;
+    graphics::register(lua, ctx.scene, (ctx.graphics, ctx.screen), ctx.application)?;
     input::register(lua, ctx.input)?;
     joint::register(lua, ctx.scene)?;
     layers::register(lua, ctx.scene)?;
@@ -174,7 +174,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     tween::register(lua, ctx.scene, ctx.timers)?;
     ui::register(lua, ctx.scene, (ctx.screen, ctx.video), ctx.camera)?;
     ui::register_events(lua, ctx)?;
-    video::register(lua, ctx.video)?;
+    video::register(lua, ctx.video, ctx.screen)?;
 
     // Last, so an extension can add verbs to a namespace registered above.
     for ext in EXTENSIONS.read().map_err(|e| e.to_string())?.iter() {

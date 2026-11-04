@@ -7,6 +7,7 @@ same split Unity draws between `Screen` and `QualitySettings`.
 
 | Function | Signature | Returns |
 |---|---|---|
+| `Video.GetDisplayScale` | `()` | `number`: the display's backing scale, physical pixels per point (`2` on a Retina display; `1` headless) |
 | `Video.GetResolution` / `SetResolution` | `()` / `(width, height)` | `width, height` (each clamped ≥ 1) |
 | `Video.GetVsync` / `SetVsync` | `()` / `(bool)` | `bool` |
 | `Video.GetFullscreen` / `SetFullscreen` | `()` / `(bool)` | `bool` |
@@ -25,7 +26,15 @@ window cannot resize, so it reconfigures the surface to `w × h`: the frame does
 render fewer pixels, but the UI with it, so the HUD softens as much as the scene. To
 render the 3D scene at fewer pixels and keep the HUD native, set
 [`Graphics.SetRenderScale`](Graphics.md) (Unity's *Render Scale*): `0.5` on a 2×
-surface renders the scene at the 1× pixel count, and the UI stays sharp.
+surface renders the scene at the 1× pixel count, and the UI stays sharp; a project
+default of `"match_display"` (`Graphics.SetDefaultRenderScale`) does it on every
+HiDPI display.
+
+**`GetDisplayScale`** (#1715; Unity reads the same through `Screen.dpi`) tells a
+Retina 2940×1388 from a 1× monitor of the same pixels. The window reports it each
+frame, so moving the window to another monitor changes it the next frame. Like
+`UI.GetScreenSize` it is a sim input: headless it is `1`, and a demo records it, so
+a replay reads the recording's scale, not the monitor it plays on.
 
 Settings persist through the `video` `Storage` namespace
 (loaded at startup, written back when the app quits; Stop does not store them), so

@@ -147,7 +147,7 @@ impl EditorFrontend {
             &mut self.editor_ui,
             &self.egui_ctx,
             &mut game.resources.application.borrow_mut(),
-            &mut game.script_manager().graphics_cell().borrow_mut().options,
+            &mut game.script_manager().graphics_cell().borrow_mut(),
             &mut game.resources.console.borrow_mut(),
         );
         if paint::take_edits(&mut self.editor_ui, game) {

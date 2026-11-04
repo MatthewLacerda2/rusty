@@ -43,7 +43,8 @@ pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
         .unwrap_or(defaults);
     let mut app = game.resources.application.borrow_mut();
     app.restore_quality(saved_quality(&storage));
-    let graphics = GraphicsSettings::load(&storage, app.graphics_defaults(), app.quality_presets());
+    let defaults = (app.graphics_defaults(), app.render_scale_default());
+    let graphics = GraphicsSettings::load(&storage, defaults, app.quality_presets());
     drop(app);
     let speaker_mode = SpeakerMode::load(&storage);
     drop(storage);
@@ -61,11 +62,24 @@ pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
     shell.applied_video = video;
 }
 
-/// Hand the shared graphics cell (preset values + player options) to the renderer: the one
-/// place either frontend does it, every frame, and [`load`] at boot (#1438).
+/// Hand the shared graphics cell (preset values + player options + render scale) to the
+/// renderer: the one place either frontend does it, every frame, and [`load`] at boot
+/// (#1438). The render scale resolves on the display scale the screen resource holds
+/// (#1715), which each frontend reports with the Game view's size ([`report_screen`]).
 pub fn apply_graphics(shell: &mut Shell, game: &GameWorld) {
+    let display_scale = game.resources.screen.borrow().display_scale();
     let graphics = *game.script_manager().graphics_cell().borrow();
-    shell.renderer.apply_graphics(graphics);
+    shell.renderer.apply_graphics(graphics, display_scale);
+}
+
+/// Report the Game view's pixel size (#417) and the window's display scale (#1715) to
+/// the screen resource: sim inputs, which `UI.GetScreenSize` and
+/// `Video.GetDisplayScale` read. Read every frame, so a move to another monitor
+/// reaches a `"match_display"` render scale the next frame.
+pub fn report_screen(shell: &Shell, game: &GameWorld, (width, height): (u32, u32)) {
+    let mut screen = game.resources.screen.borrow_mut();
+    screen.set_game_view(width, height);
+    screen.set_display_scale(shell.window.scale_factor() as f32);
 }
 
 /// Apply any video-settings change a script wrote into the shared cell this frame.

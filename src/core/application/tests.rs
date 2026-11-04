@@ -66,6 +66,25 @@ fn a_default_graphics_option_writes_through_the_bound_file() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// The render-scale default (#1715) writes the bound file, reaches the live
+/// setting, and reopening reads it back; a demo's settings carry it.
+#[test]
+fn the_render_scale_default_writes_through_the_bound_file() {
+    use crate::core::settings::render_scale::{RenderScaleDefault, RenderScaleSetting};
+    let path = temp_path("render_scale");
+    let mut app = Application::new();
+    app.open(&path).unwrap();
+    let mut live = RenderScaleSetting::default();
+    let matching = RenderScaleDefault::MatchDisplay;
+    app.set_default_render_scale(matching, &mut live).unwrap();
+    assert_eq!(live.default, matching);
+    let mut reopened = Application::new();
+    reopened.open(&path).unwrap();
+    assert_eq!(reopened.render_scale_default(), matching);
+    assert_eq!(reopened.settings().graphics.render_scale, matching);
+    let _ = std::fs::remove_file(&path);
+}
+
 #[test]
 fn saving_the_settings_keeps_the_recorded_engine() {
     let path = temp_path("engine");

@@ -24,7 +24,7 @@ fn fog_api_and_shared_op_converge_without_a_volume() -> Result<(), Box<dyn std::
         rusty::api::graphics::register(
             &lua,
             bind(&lua, &lua_scene),
-            bind(&lua, &quality),
+            (bind(&lua, &quality), rusty::api::ApiCell::default()),
             bind(&lua, &app),
         )
         .unwrap();

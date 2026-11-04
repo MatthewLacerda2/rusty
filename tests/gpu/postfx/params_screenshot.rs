@@ -59,7 +59,7 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
         rusty::api::graphics::register(
             &lua,
             bind(&lua, scene),
-            bind(&lua, &quality),
+            (bind(&lua, &quality), rusty::api::ApiCell::default()),
             bind(&lua, &app),
         )
         .unwrap();

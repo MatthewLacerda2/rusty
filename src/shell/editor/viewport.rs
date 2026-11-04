@@ -72,8 +72,9 @@ impl EditorFrontend {
             _ => panel,
         };
         if self.demo_size().is_none() {
-            // The UI lays out on the game view's pixel size (#417) — a sim input.
-            game.resources.screen.borrow_mut().set_game_view(px, py);
+            // The UI lays out on the game view's pixel size (#417) — a sim input,
+            // like the display scale (#1715).
+            crate::shell::settings::report_screen(shell, game, (px, py));
         }
         // Create-or-resize this tab's own view. A view's resize guard checks its own
         // size, so it never fights the other tab's or the preview's (#355). The Game
@@ -84,7 +85,7 @@ impl EditorFrontend {
             &renderer.device,
             renderer.config.format,
             (px, py),
-            renderer.graphics(scene_tab).render_scale,
+            renderer.render_scale(scene_tab),
         );
         // `wgpu::TextureView` is a refcounted handle, so this owned view doesn't
         // borrow `view` and `render` can take it as the output.

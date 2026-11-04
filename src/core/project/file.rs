@@ -5,7 +5,7 @@
 //!
 //! ```json
 //! { "engine_commit": "<git commit>", "engine_order": 1318, "build": { … },
-//!   "graphics_options": { "motion_blur": true, … },
+//!   "graphics_options": { "motion_blur": true, … }, "graphics": { "render_scale": 1 },
 //!   "quality": { "default": "Medium", "presets": [ { "name": "Low", … }, … ] },
 //!   "decals": { "max_per_owner": 256, "max_world": 1024, "max_total": 4096 },
 //!   "demos": { "keep": 20 } }
@@ -22,6 +22,9 @@
 //! * **`build`** — the [`BuildSettings`].
 //! * **`graphics_options`** — the player graphics options a fresh install starts
 //!   with ([`GraphicsOptions`], #1438); a player's saved choice wins over them.
+//! * **`graphics`** — the render scale that runs while the player has chosen none
+//!   ([`ProjectGraphics`], #1715): a factor, or `"match_display"` for `1 / display
+//!   scale`.
 //! * **`quality`** — the game's quality presets ([`QualityPresets`], #1522): named
 //!   bundles of per-effect quality values, seeded with `Low`, `Medium` and `High`
 //!   when the file is created, the game's to edit, rename, add to or delete.
@@ -41,6 +44,7 @@ use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::demos::DemoSettings;
 use crate::core::settings::graphics_options::GraphicsOptions;
 use crate::core::settings::quality::QualityPresets;
+use crate::core::settings::render_scale::ProjectGraphics;
 
 /// The project file, at the project root.
 pub const PROJECT_FILE: &str = "project.rusty";
@@ -61,6 +65,8 @@ pub struct ProjectFile {
     pub build: BuildSettings,
     /// The project's default player graphics options (all allowed by default).
     pub graphics_options: GraphicsOptions,
+    /// The project's render-scale default (#1715).
+    pub graphics: ProjectGraphics,
     /// The game's quality presets (a file that omits them gets the seeded three).
     pub quality: QualityPresets,
     /// The game's decal budgets.
@@ -76,6 +82,7 @@ impl Default for ProjectFile {
             engine_order: engine_order(),
             build: BuildSettings::default(),
             graphics_options: GraphicsOptions::default(),
+            graphics: ProjectGraphics::default(),
             quality: QualityPresets::default(),
             decals: DecalLimits::default(),
             demos: DemoSettings::default(),
@@ -93,6 +100,7 @@ impl Default for ProjectFile {
 pub struct ProjectSettings {
     pub build: BuildSettings,
     pub graphics_options: GraphicsOptions,
+    pub graphics: ProjectGraphics,
     pub quality: QualityPresets,
     pub decals: DecalLimits,
     pub demos: DemoSettings,
@@ -103,6 +111,7 @@ impl From<ProjectFile> for ProjectSettings {
         Self {
             build: file.build,
             graphics_options: file.graphics_options,
+            graphics: file.graphics,
             quality: file.quality,
             decals: file.decals,
             demos: file.demos,
