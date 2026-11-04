@@ -60,7 +60,7 @@ fn gpu_planes_with_different_subdivisions_upload_two_meshes() {
     let quad = create_entity(&mut scene, "Quad", Some(Primitive::Plane));
     let grid = create_entity(&mut scene, "Grid", Some(Primitive::Plane));
     set_subdivisions(&mut scene.world.mesh_mut(grid).unwrap(), 8).unwrap();
-    renderer.upload_scene_meshes(&scene);
+    renderer.extract_scene(&scene);
     for (id, indices) in [(quad, 6), (grid, 8 * 8 * 6)] {
         let key = MeshId::from_mesh(&scene.world.mesh(id).unwrap());
         assert_eq!(renderer.gpu_meshes[&key].num_indices, indices, "{key:?}");

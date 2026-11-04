@@ -89,7 +89,7 @@ impl Renderer {
         pass.set_bind_group(3, &self.shadow_bind_group, &[]);
         let mut bound = None;
         for draw in &draws.outline {
-            let Some(gpu_mesh) = self.gpu_meshes.get(&draw.mesh) else {
+            let Some(gpu_mesh) = self.gpu_mesh_of(draw.mesh) else {
                 continue;
             };
             if bound != Some(draw.facing) {

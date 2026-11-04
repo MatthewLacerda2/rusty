@@ -148,7 +148,7 @@ pub(super) fn plan_probes(
     let report = LightingBakeReport {
         auto_placed_light,
         auto_placed_reflection,
-        light_probes: planned.light.probes.len(),
+        light_probes: planned.light.probes().len(),
         reflection_probes: planned.reflections.len(),
         ..Default::default()
     };
@@ -236,7 +236,7 @@ fn auto_place_light(
     nav: Option<&NavigationGraph>,
     spacing: f32,
 ) -> bool {
-    let manual: Vec<Vec3> = (volume.probes.iter())
+    let manual: Vec<Vec3> = (volume.probes().iter())
         .filter(|p| p.manual)
         .map(|p| p.position)
         .collect();

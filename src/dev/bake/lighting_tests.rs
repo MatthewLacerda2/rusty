@@ -74,7 +74,7 @@ fn gpu_auto_places_both_sets_on_empty_scene() {
     if !report.ran_light_bake {
         return; // no adapter: nothing was applied
     }
-    assert_eq!(scene.probes.probes.len(), report.light_probes);
+    assert_eq!(scene.probes.probes().len(), report.light_probes);
     assert_eq!(scene.reflection_probes.len(), report.reflection_probes);
 }
 
@@ -133,12 +133,12 @@ fn with_manual_probes() -> (Scene, crate::scene::ReflectionProbe) {
 /// The manual probes are as they were, the placed one is gone, and no placed
 /// reflection probe stands in the manual one's box.
 fn assert_manual_kept(scene: &Scene, manual: &crate::scene::ReflectionProbe) {
-    assert_eq!(scene.probes.probes[0].position, Vec3::new(1.0, 4.0, 1.0));
-    assert!(scene.probes.probes[0].manual);
-    assert_eq!(scene.probes.probes.iter().filter(|p| p.manual).count(), 1);
+    assert_eq!(scene.probes.probes()[0].position, Vec3::new(1.0, 4.0, 1.0));
+    assert!(scene.probes.probes()[0].manual);
+    assert_eq!(scene.probes.probes().iter().filter(|p| p.manual).count(), 1);
     let old = Vec3::new(-9.0, 4.0, -9.0);
     assert!(
-        !scene.probes.probes.iter().any(|p| p.position == old),
+        !scene.probes.probes().iter().any(|p| p.position == old),
         "the old placed probe is replaced"
     );
     let kept = &scene.reflection_probes.probes[0];

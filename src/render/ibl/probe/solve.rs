@@ -57,7 +57,7 @@ impl BounceSolve {
     /// [`changed`](Self::changed) and [`commit`](Self::commit) compare against
     /// the scene's own set, so they are for a solve made by [`new`](Self::new).
     pub fn of(volume: ProbeVolume, resolution: u32) -> Self {
-        let positions: Vec<Vec3> = volume.probes.iter().map(|p| p.position).collect();
+        let positions: Vec<Vec3> = volume.probes().iter().map(|p| p.position).collect();
         let report = positions.is_empty().then_some(BounceReport {
             bounces: 0,
             converged: true,
@@ -117,7 +117,7 @@ impl BounceSolve {
     /// Whether `scene`'s light probes are no longer the ones this solve bakes: one
     /// added, removed or moved since it started (a `FillGrid` among them).
     pub fn changed(&self, scene: &Scene) -> bool {
-        let live = &scene.probes.probes;
+        let live = &scene.probes.probes();
         live.len() != self.positions.len()
             || live
                 .iter()
@@ -134,8 +134,8 @@ impl BounceSolve {
         if self.changed(scene) {
             return Err(PROBES_CHANGED.into());
         }
-        let field = self.volume.probes.iter().map(|p| p.sh);
-        for (probe, sh) in scene.probes.probes.iter_mut().zip(field) {
+        let field = self.volume.probes().iter().map(|p| p.sh);
+        for (probe, sh) in scene.probes.probes_mut().iter_mut().zip(field) {
             probe.sh = sh;
         }
         Ok(())

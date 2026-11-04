@@ -24,7 +24,10 @@
 //! Play snapshot restored, an Undo or Redo stepped ([`World::rewind_changes`]), or
 //! the log dropped what the cursor had not read yet). What an id holds *now* is the World's answer: a
 //! consumer re-reads it, and an id that is gone or lost the column was removed.
-//! Any number of cursors read one channel, each at its own pace.
+//! Any number of cursors read one channel, each at its own pace. Opening and
+//! reading take `&World` (the logs sit in a `RefCell`), so a reader that only
+//! borrows the World, the renderer's retained scene (`render::scene`, #1706), keeps
+//! its own cursors; every stamp still takes `&mut World`.
 //!
 //! **Cost.** A channel no cursor was ever opened on costs a write one test and,
 //! when another channel is being read, one lookup; nothing accumulates for it, and
@@ -160,29 +163,35 @@ impl World {
     /// step, `scene::undo`): every cursor reads [`Changes::Rebuild`] next. One per
     /// step, not per entity: each costs every recording log a reset.
     pub fn rewind_changes(&mut self) {
-        self.changes.new_epoch();
+        self.changes.get_mut().new_epoch();
     }
 
     /// How many times the change logs were reset ([`World::rewind_changes`], a clear).
     #[cfg(test)]
     pub(crate) fn change_rewinds(&self) -> u64 {
-        self.changes.rewinds
+        self.changes.borrow().rewinds
     }
 
-    /// Open a cursor on channel `T`: it has read everything up to now.
-    pub fn change_cursor<T: Channel>(&mut self) -> Cursor<T> {
-        let seen = self.changes.slot::<T>().open();
+    /// Open a cursor on channel `T`: it has read everything up to now. Takes `&self`
+    /// so a reader that only borrows the World (the renderer, #1706) can open one;
+    /// opening still starts `T`'s recording, as with `&mut`.
+    pub fn change_cursor<T: Channel>(&self) -> Cursor<T> {
+        let mut changes = self.changes.borrow_mut();
+        let seen = changes.slot::<T>().open();
         Cursor {
-            epoch: self.changes.epoch,
+            epoch: changes.epoch,
             seen,
             _channel: PhantomData,
         }
     }
 
     /// What changed on `T` since `cursor`'s last read; the cursor then has read it all.
-    pub fn changes<T: Channel>(&mut self, cursor: &mut Cursor<T>) -> Changes {
-        let epoch = self.changes.epoch;
-        let log = self.changes.slot::<T>();
+    /// Takes `&self` for the same reason as [`World::change_cursor`]: a read moves only
+    /// the log's own bookkeeping (what no cursor has read past), never the World.
+    pub fn changes<T: Channel>(&self, cursor: &mut Cursor<T>) -> Changes {
+        let mut changes = self.changes.borrow_mut();
+        let epoch = changes.epoch;
+        let log = changes.slot::<T>();
         let ids = (cursor.epoch == epoch)
             .then(|| log.since(cursor.seen))
             .flatten();
@@ -196,14 +205,15 @@ impl World {
 
     /// [`StaticSet`]'s revision, which moves on every stamp: `World::static_revision`.
     pub(in crate::ecs) fn static_set_revision(&self) -> u64 {
-        self.changes.logs[STATIC].revision
+        self.changes.borrow().logs[STATIC].revision
     }
 
     /// Each opened channel's counters, in opening order: how much churn a game makes,
     /// per channel (`Debug.Stats`'s `changes_<name>`). [`StaticSet`] is always listed.
     pub fn change_stats(&self) -> Vec<ChangeStat> {
-        let logs = self.changes.logs.iter();
-        let names = self.changes.names.iter().copied();
+        let changes = self.changes.borrow();
+        let logs = changes.logs.iter();
+        let names = changes.names.iter().copied();
         names
             .zip(logs)
             .map(|(name, log)| ChangeStat {

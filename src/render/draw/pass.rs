@@ -270,7 +270,7 @@ impl Renderer {
     ) {
         let mut bound = None;
         for batch in batches {
-            let Some(gpu_mesh) = self.gpu_meshes.get(&batch.key.mesh) else {
+            let Some(gpu_mesh) = self.gpu_mesh_of(batch.key.mesh) else {
                 continue;
             };
             let in_prepass = batch.key.in_prepass();

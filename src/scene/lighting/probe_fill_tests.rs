@@ -20,10 +20,10 @@ fn scene_with_ambient(color: Vec3, intensity: f32) -> Scene {
 /// The fill of one probe at the origin (where the height stand-in is 1), read back
 /// as the forward shader reads a probe: irradiance over π.
 fn read_back(scene: &mut Scene, n: Vec3) -> Vec3 {
-    scene.probes.probes.clear();
+    scene.probes.clear();
     scene.probes.add_probe(Vec3::ZERO);
     analytic_fill(scene);
-    scene.probes.probes[0].sh.eval(n) / std::f32::consts::PI
+    scene.probes.probes()[0].sh.eval(n) / std::f32::consts::PI
 }
 
 const NORMALS: [Vec3; 4] = [Vec3::Y, Vec3::NEG_Y, Vec3::X, Vec3::Z];
@@ -34,8 +34,8 @@ fn fill_is_position_dependent() {
     scene.probes.add_probe(Vec3::new(0.0, 0.0, 0.0));
     scene.probes.add_probe(Vec3::new(0.0, 4.0, 0.0));
     analytic_fill(&mut scene);
-    let low = scene.probes.probes[0].sh.eval(Vec3::Y);
-    let high = scene.probes.probes[1].sh.eval(Vec3::Y);
+    let low = scene.probes.probes()[0].sh.eval(Vec3::Y);
+    let high = scene.probes.probes()[1].sh.eval(Vec3::Y);
     assert!(
         high.x > low.x,
         "expected height to brighten: {high} vs {low}"

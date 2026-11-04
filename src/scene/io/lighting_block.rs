@@ -78,7 +78,7 @@ fn add_lighting_to_record(scene: &Scene, path: &str) {
 fn copy_lighting(scene: &Scene, data: &mut SceneData) {
     data.probes = scene.probes.clone();
     data.reflection_probes = scene.reflection_probes.clone();
-    data.lightmaps = scene.lightmaps.clone();
+    data.lightmaps = (*scene.lightmaps).clone();
     data.lighting_settings = scene.lighting_settings;
 }
 

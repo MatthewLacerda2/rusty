@@ -87,7 +87,8 @@ pub struct Scene {
     /// Entities reference a material by name via their `MaterialComponent`; many
     /// entities can share one entry. A `BTreeMap` (not `HashMap`) so serialization
     /// order is deterministic (the repo has a determinism guard).
-    pub materials: BTreeMap<String, MaterialAsset>,
+    /// Every write moves its revision (`scene::revision`), which the renderer reads.
+    pub materials: crate::scene::revision::Revisioned<BTreeMap<String, MaterialAsset>>,
     /// Runtime box-projector decals (bullet holes, scorch, blood splats). These are
     /// ephemeral *visual* state spawned from raycast hits, NOT serialized scene
     /// data — the decal renderer reads them each frame and projects them onto the
@@ -107,7 +108,9 @@ pub struct Scene {
     pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
     /// Baked lightmaps (#438): which lightmap page each static mesh wears. A mesh
     /// absent from it keeps probe / ambient lighting.
-    pub lightmaps: crate::scene::lighting::lightmap::LightmapSet,
+    /// Every write moves its revision (`scene::revision`), which the renderer reads.
+    pub lightmaps:
+        crate::scene::revision::Revisioned<crate::scene::lighting::lightmap::LightmapSet>,
     /// What Generate Lighting bakes with (#832), saved with the scene.
     pub lighting_settings: crate::scene::lighting::LightingSettings,
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
@@ -174,7 +177,7 @@ impl Default for Scene {
             sky: crate::scene::SkySettings::default(),
             layers: LayerRegistry::default(),
             collision_matrix: CollisionMatrix::default(),
-            materials: BTreeMap::new(),
+            materials: BTreeMap::new().into(),
             decals: Default::default(),
             probes: crate::scene::lighting::probe::ProbeVolume::new(),
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),

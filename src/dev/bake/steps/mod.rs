@@ -85,7 +85,7 @@ struct Baseline {
 
 impl Baseline {
     fn take(scene: &Scene) -> Self {
-        let light = scene.probes.probes.iter();
+        let light = scene.probes.probes().iter();
         Self {
             light: light.map(|p| (p.position, p.manual)).collect(),
             reflections: ReflectionSnapshot::take(scene),
@@ -93,7 +93,7 @@ impl Baseline {
     }
 
     fn changed(&self, scene: &Scene) -> bool {
-        let light = scene.probes.probes.iter().map(|p| (p.position, p.manual));
+        let light = scene.probes.probes().iter().map(|p| (p.position, p.manual));
         !light.eq(self.light.iter().copied()) || self.reflections.changed(scene)
     }
 }

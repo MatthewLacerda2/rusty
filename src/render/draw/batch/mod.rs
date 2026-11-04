@@ -23,10 +23,11 @@ use std::ops::Range;
 
 use crate::render::gpu::pipelines::Facing;
 use crate::render::gpu::uniforms::MATERIAL_DATA_WORDS;
-use crate::render::{InstanceData, MaterialData, MeshId};
+use crate::render::scene::MeshHandle;
+use crate::render::{InstanceData, MaterialData};
 
 /// What two solids must share to be drawn by one instanced call.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct BatchKey {
     /// The pipeline: the standard forward shader (0) or a material's authored surface
     /// shader (#396). First, so opaque draws sort into one run of state per shader.
@@ -35,8 +36,9 @@ pub(crate) struct BatchKey {
     /// (a mirrored instance's flips, #1134). Second, so each shader's runs group by
     /// cull state.
     pub facing: Facing,
-    /// The geometry (vertex + index buffers), by asset identity (#127).
-    pub mesh: MeshId,
+    /// The geometry (vertex + index buffers), by asset identity (#127), interned
+    /// (#1706): resolved to its `MeshId` once per batch, never compared as a string.
+    pub mesh: MeshHandle,
     /// The drawn index run (#1285), whole: each material run of one mesh is a draw of
     /// its own, and two entities whose runs of one mesh are joined differently never
     /// share a draw.
@@ -85,7 +87,7 @@ pub(crate) struct DrawItem {
 /// (its world matrix), so the outline re-derives nothing the forward pass decided.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct OutlineDraw {
-    pub mesh: MeshId,
+    pub mesh: MeshHandle,
     /// The triangles the forward draw keeps (#1615).
     pub facing: Facing,
     pub material: usize,
@@ -98,7 +100,7 @@ impl OutlineDraw {
     /// The outline of `instance`, packed into `batch`.
     fn of(batch: &DrawBatch, instance: u32) -> Self {
         Self {
-            mesh: batch.key.mesh.clone(),
+            mesh: batch.key.mesh,
             facing: batch.key.facing,
             material: batch.key.material,
             indices: batch.key.indices.range(),

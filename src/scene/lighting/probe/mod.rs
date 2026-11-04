@@ -19,12 +19,18 @@
 //! squared distance less the next one's, so a probe's weight reaches zero just as it
 //! leaves the blend and a moving object fades from one probe to the next. They are
 //! found through a spatial index (`index.rs`) built when the set is first sampled
-//! after a change, so a sample reads the probes near it, not the whole set; edit
-//! positions through [`ProbeVolume`]'s methods, which drop the stale index.
+//! after a change, so a sample reads the probes near it, not the whole set.
+//!
+//! The probes and the grid are written only through [`ProbeVolume`]'s methods
+//! ([`ProbeVolume::probes_mut`] for the baked SH and a probe's own fields), which
+//! drop the stale index and move the set's [`ProbeVolume::revision`]: how the
+//! renderer learns the field changed without hashing it every frame
+//! (`scene::revision`, #1706).
 //!
 //! This module is pure data + math — deterministic, sim-reachable, no RNG/clock.
 
 mod index;
+mod sample;
 
 use std::sync::OnceLock;
 
@@ -32,6 +38,7 @@ use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 use crate::scene::lighting::sh::Sh9;
+use crate::scene::revision::Revision;
 use index::ProbeIndex;
 
 /// How many probes a point outside any grid blends: the four nearest, a
@@ -100,12 +107,14 @@ impl ProbeGrid {
 /// Owned by `Scene`. Save/load splits the SH out into the sidecar.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ProbeVolume {
-    pub probes: Vec<Probe>,
+    probes: Vec<Probe>,
     #[serde(default)]
-    pub grid: Option<ProbeGrid>,
+    grid: Option<ProbeGrid>,
     /// The nearest-probe index, built on the first sample after a change.
     #[serde(skip)]
     index: OnceLock<Option<ProbeIndex>>,
+    #[serde(skip)]
+    revision: Revision,
 }
 
 impl ProbeVolume {
@@ -115,6 +124,30 @@ impl ProbeVolume {
 
     pub fn is_empty(&self) -> bool {
         self.probes.is_empty()
+    }
+
+    /// The probes, in index order.
+    pub fn probes(&self) -> &[Probe] {
+        &self.probes
+    }
+
+    /// The probes to write in place (the baked SH, a position, the manual flag): the
+    /// set counts as changed.
+    pub fn probes_mut(&mut self) -> &mut [Probe] {
+        self.reindex();
+        &mut self.probes
+    }
+
+    /// The grid layout, if the probes form one.
+    pub fn grid(&self) -> Option<ProbeGrid> {
+        self.grid
+    }
+
+    /// What the set was last written as: equal across two reads exactly when no
+    /// write came between them, or one set is a copy of the other. The renderer's
+    /// retained objects hold probe SH and read this to know when to re-sample.
+    pub fn revision(&self) -> Revision {
+        self.revision
     }
 
     /// Add a single free probe at `position`, returning its index.
@@ -146,6 +179,7 @@ impl ProbeVolume {
     pub fn set_manual(&mut self, index: usize, manual: bool) {
         if let Some(p) = self.probes.get_mut(index) {
             p.manual = manual;
+            self.revision = Revision::default();
         }
     }
 
@@ -172,9 +206,10 @@ impl ProbeVolume {
         self.reindex();
     }
 
-    /// Drop the nearest-probe index: the positions changed.
+    /// Drop the nearest-probe index and take a fresh revision: the set changed.
     fn reindex(&mut self) {
         self.index = OnceLock::new();
+        self.revision = Revision::default();
     }
 
     /// Replace the probe set with a regular grid spanning `[min, max]` at `spacing`
@@ -203,91 +238,6 @@ impl ProbeVolume {
         }
         self.grid = Some(grid);
         self.reindex();
-    }
-
-    /// Sample the interpolated SH irradiance at a world position. Trilinear over the
-    /// grid when one is present and the point falls inside it; otherwise (free probes,
-    /// or a point outside the grid) the [`BLEND_PROBES`] nearest blended. `None` when
-    /// there are no probes.
-    pub fn sample(&self, position: Vec3) -> Option<Sh9> {
-        if self.probes.is_empty() {
-            return None;
-        }
-        if let Some(grid) = &self.grid {
-            if let Some(sh) = self.sample_trilinear(grid, position) {
-                return Some(sh);
-            }
-        }
-        Some(self.sample_nearest(position))
-    }
-
-    /// Trilinear interpolation within the grid; `None` if the point lies outside the
-    /// lattice bounds (the caller then falls back to nearest).
-    fn sample_trilinear(&self, grid: &ProbeGrid, position: Vec3) -> Option<Sh9> {
-        let local = (position - grid.origin) / grid.spacing;
-        let max = Vec3::new(
-            (grid.counts[0].saturating_sub(1)) as f32,
-            (grid.counts[1].saturating_sub(1)) as f32,
-            (grid.counts[2].saturating_sub(1)) as f32,
-        );
-        if local.cmplt(Vec3::ZERO).any() || local.cmpgt(max).any() {
-            return None;
-        }
-        let base = local.floor();
-        let frac = local - base;
-        let (i0, j0, k0) = (base.x as u32, base.y as u32, base.z as u32);
-        let i1 = (i0 + 1).min(grid.counts[0].saturating_sub(1));
-        let j1 = (j0 + 1).min(grid.counts[1].saturating_sub(1));
-        let k1 = (k0 + 1).min(grid.counts[2].saturating_sub(1));
-
-        let at = |i, j, k| self.probes[grid.index(i, j, k)].sh;
-        // Interpolate along x, then y, then z.
-        let c00 = Sh9::lerp(&at(i0, j0, k0), &at(i1, j0, k0), frac.x);
-        let c10 = Sh9::lerp(&at(i0, j1, k0), &at(i1, j1, k0), frac.x);
-        let c01 = Sh9::lerp(&at(i0, j0, k1), &at(i1, j0, k1), frac.x);
-        let c11 = Sh9::lerp(&at(i0, j1, k1), &at(i1, j1, k1), frac.x);
-        let c0 = Sh9::lerp(&c00, &c10, frac.y);
-        let c1 = Sh9::lerp(&c01, &c11, frac.y);
-        Some(Sh9::lerp(&c0, &c1, frac.z))
-    }
-
-    /// The [`BLEND_PROBES`] nearest probes' SH, weighted by inverse squared
-    /// distance (used for free probes or out-of-grid points). A point on a probe
-    /// reads that probe; ties keep the lower index, so the answer is deterministic.
-    fn sample_nearest(&self, position: Vec3) -> Sh9 {
-        let index = self.index.get_or_init(|| ProbeIndex::build(&self.probes));
-        let near = match index {
-            Some(index) => index.nearest(&self.probes, position),
-            None => index::scan(&self.probes, position),
-        };
-        self.blend(&near)
-    }
-
-    /// The first [`BLEND_PROBES`] of `near` blended by `1/d² − 1/d²ₙ`, where `dₙ`
-    /// is the next probe's distance: a probe's weight falls to zero as the next one
-    /// draws level and replaces it, so a swap never pops.
-    fn blend(&self, near: &index::Nearest) -> Sh9 {
-        let (blended, next) = near.split_at(BLEND_PROBES);
-        let found = || blended.iter().filter(|n| n.1 != usize::MAX);
-        if let Some(&(_, i)) = found().find(|n| n.0 <= ON_PROBE) {
-            return self.probes[i].sh;
-        }
-        // `1/dₙ²` is 0 with no next probe (an infinite distance); the plain weights
-        // are the fallback when every blended probe is as far as the next.
-        for fade in [1.0 / next[0].0, 0.0] {
-            let (mut sum, mut total) = (Sh9::zero(), 0.0);
-            for &(d, i) in found() {
-                let w = 1.0 / d - fade;
-                if w > 0.0 {
-                    sum = Sh9::lerp(&sum, &self.probes[i].sh, w / (total + w));
-                    total += w;
-                }
-            }
-            if total > 0.0 {
-                return sum;
-            }
-        }
-        Sh9::zero()
     }
 }
 
