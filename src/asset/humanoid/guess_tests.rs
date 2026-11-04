@@ -54,9 +54,40 @@ fn a_sideless_limb_or_a_sided_spine_reads_as_nothing() {
 #[test]
 fn the_first_joint_a_bone_matches_takes_it() {
     let names = ["root", "Hips", "pelvis", "LeftFoot"].map(String::from);
-    let slots = guess(&names);
+    let slots = guess(&names, |_| false);
     let at = |c: &str| slots[CANONICAL.iter().position(|n| *n == c).unwrap()];
     assert_eq!(at("Hips"), Some(1));
     assert_eq!(at("LeftFoot"), Some(3));
     assert_eq!(at("Head"), None);
+}
+
+#[test]
+fn an_override_takes_its_joint_from_the_guess_holding_it() {
+    use super::rig_fixture::{rig, Shape};
+    use super::{BoneMap, HumanoidSettings};
+    let mut skin = rig(Shape::default());
+    skin.names[3] = "leg.L".into();
+    skin.names[4] = "shin.L".into();
+    let mut settings = HumanoidSettings::default();
+    let guessed = BoneMap::resolve(&skin, &settings);
+    assert_eq!(
+        guessed.slot("LeftLowerLeg"),
+        Some(3),
+        "'leg' reads as a shin"
+    );
+    settings.bones.insert("LeftUpperLeg".into(), "leg.L".into());
+    let map = BoneMap::resolve(&skin, &settings);
+    assert_eq!(map.slot("LeftUpperLeg"), Some(3));
+    assert_eq!(
+        map.slot("LeftLowerLeg"),
+        Some(4),
+        "guessed again without it"
+    );
+    let said = map.problems.join("; ");
+    assert!(said.contains("LeftLowerLeg: 'leg.L'"), "{said}");
+    settings
+        .bones
+        .insert("RightUpperLeg".into(), "leg.L".into());
+    let twice = BoneMap::resolve(&skin, &settings).problems.join("; ");
+    assert!(twice.contains("both name 'leg.L'"), "{twice}");
 }

@@ -90,3 +90,38 @@ fn the_cached_import_follows_its_sources_map() {
         "a source's unmapped hips drive nothing"
     );
 }
+
+#[test]
+fn a_source_sharing_no_bone_lends_no_clip() {
+    let dir = crate::test_temp::dir().join("rusty_humanoid_disjoint");
+    let a = model(&dir, "a.gltf", "Wave", &[]);
+    let mut settings = sidecar::load(&a).unwrap();
+    settings.humanoid.bones.clear();
+    sidecar::save(&a, &settings).unwrap();
+    let b = import_file(&model(&dir, "b.gltf", "Idle", &[&a])).unwrap();
+    assert_eq!(clips(&b), ["Idle"]);
+}
+
+#[test]
+fn travel_on_a_root_above_the_hips_is_said() {
+    use super::borrow::root_travel_lost;
+    use super::rig_fixture::{rig, walk, Shape, HIPS};
+    use super::BoneMap;
+    let mut skin = rig(Shape::default());
+    let mut clip = walk(&skin);
+    let none = HumanoidSettings::default();
+    assert_eq!(
+        root_travel_lost(&skin, &BoneMap::resolve(&skin, &none), &[clip.clone()]),
+        None
+    );
+    // The hips under a `root` (the spine, renamed), which carries the travel.
+    skin.names[1] = "root".into();
+    skin.parents[HIPS] = Some(1);
+    clip.tracks[1].translation = clip.tracks[HIPS].translation.clone();
+    let map = BoneMap::resolve(&skin, &none);
+    let said = root_travel_lost(&skin, &map, &[clip]).unwrap();
+    assert!(
+        said.contains("'root' above the hips moves in clip 'Walk'"),
+        "{said}"
+    );
+}

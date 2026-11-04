@@ -143,19 +143,50 @@ clips. Each model's `<file>.meta` sidecar may carry a `humanoid` entry:
 The retarget happens once per import and is cached with it, so a borrowed clip is an
 ordinary clip of the model: blend trees, layers, avatar masks, IK and root motion see it
 like any other, and a clip on its own rig is never touched. Rotations transfer in
-rest-relative space (Godot's rest-fixer composition): each bone's turn away from its rest,
-in model space, is given to the mapped bone, so differing bone axes and rest poses carry
-the motion. Translations are dropped (the target's bone lengths hold) except the hips',
-whose offset from rest is scaled by the target over source hip height, so a 20 % taller
-rig's feet stay on the ground and its root motion travels 20 % farther. Scale keys are
-dropped. Not handled: fingers, twist bones, a turn on a source bone the map leaves out,
-and A-pose vs T-pose correction beyond the rest-relative transfer.
+rest-relative space (Godot's rest-fixer composition): each bone's turn away from its rest
+is given to the mapped bone, so differing bone axes and rest poses carry the motion. Both
+rigs are read in their **body frame**: model space (an `Armature` node's rotation and
+scale undone, so a Blender export that is Z-up and in centimetres reads like a native
+glTF), turned so the body faces +Z (from where its left leg, arm or shoulder sits against
+the right one), as Unity's Humanoid normalises. So rigs exported differently, or facing
+opposite ways, take the same walk forward. Translations are dropped (the target's bone
+lengths hold) except the hips', whose offset from rest is scaled by the target over source
+hip height (each rig's hips above its model origin), so a 20 % taller rig's feet stay on
+the ground and its hips travel 20 % farther. Scale keys are dropped. A borrowed clip keeps
+its source's duration, so wrap, phase and events land where they do on the source; a
+source none of whose humanoid bones maps onto the target lends no clip, said once in the
+console.
+
+Not handled:
+- fingers, twist bones, and A-pose vs T-pose correction beyond the rest-relative transfer;
+- a turn on a source bone the map leaves out (an animated `Spine2` when only `Spine` and
+  `Chest` are mapped);
+- travel keyed on a joint **above** the source's hips (a UE-style `root -> pelvis`): only
+  the hips' offset is carried, so the clip plays in place on every rig that borrows it.
+  The import says so in the console; key the travel on the hips instead;
+- a chain of borrowing: a source's own borrowed clips do not pass on, so with B borrowing
+  from A and C from B, C gets B's own clips and not A's. Name A in C's `clipsFrom` too.
+
+**Cost.** The retarget runs once per import, and the clip it makes is sampled by the same
+code as an own clip, so playing it costs per tick what an own clip of that size costs.
+What it holds is not shared: like an own clip, every skinned mesh instanced from the
+model holds its own copy of the model's clips (each `Mesh` clones them), so 40 clips on
+100 enemies are 100 copies. And each borrowing model imports its source in full (the
+source's whole file, not only its clips) when it imports, as `Assets.Manifest` does on
+each call, with the warnings again each time.
 
 A mask or `Animator.SetRootBone` names the **target** rig's bones: the clip is keyed on
 them. A source rig's bone name there is simply not in the skeleton (a mask ignores it,
 `SetRootBone` warns). Root motion reads the target's root bone, so it follows the
 scaled hips when that bone is the mapped `Hips`; a root bone above the hips that the
-map doesn't cover is not driven by a borrowed clip.
+map doesn't cover is not driven by a borrowed clip. On a Z-up Blender export (an
+`Armature` node turned and scaled above the mesh) root motion itself, own clips
+included, loses the travel today (#1822); the retargeted pose is right.
+
+An explicit `bones` entry takes its joint from whichever bone a guess gave it to: that
+bone is guessed again over the joints left, and the problem list says so (`'leg.L'` named
+`LeftUpperLeg` frees the shin guess for `shin.L`). Two entries naming one joint are a
+problem too.
 
 `GetHumanoid` returns the map as resolved on the model's first skinned mesh (overrides
 and guesses together), the sources, and what resolving found wrong. `SetHumanoid`

@@ -72,16 +72,9 @@ pub fn reimport_written(scene: &mut Scene, stale: &Stale, skip: &BTreeSet<u32>) 
     let rebuilt = reimport_where(scene, Rig::Rebuild, skip, |file| {
         *named
             .entry(file.to_string())
-            .or_insert_with_key(|file| stale.matches(file) || borrows_from(file, stale))
+            .or_insert_with_key(|file| asset::humanoid::clips_follow(file, stale))
     });
     rebuilt.len()
-}
-
-/// Whether the model at `file` borrows clips (#1747) from a model `stale` names:
-/// its clips came from that file, so they are re-made with it.
-fn borrows_from(file: &str, stale: &Stale) -> bool {
-    asset::sidecar::load(Path::new(file))
-        .is_ok_and(|s| s.humanoid.clips_from.iter().any(|from| stale.matches(from)))
 }
 
 /// Re-import every mesh outside `skip` whose reference's file `names` accepts,

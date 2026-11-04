@@ -10,7 +10,7 @@
 //!
 //! The retarget runs **at import** (`borrow`): each borrowed clip is rewritten
 //! into the target's joint slots once (`retarget`), and the result is an ordinary
-//! clip of the target's import, cached and shared like its own clips. So blend
+//! clip of the target's import, cached with it like its own clips. So blend
 //! trees, layers, masks, IK and root motion see a plain clip, nothing samples per
 //! bone per tick, and a clip on its own rig is never touched.
 
@@ -26,6 +26,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::mesh_data::SkinData;
+use crate::core::fs::written::Stale;
 
 /// The canonical humanoid bones, Unity's `HumanBodyBones` names, parents first.
 /// The issue's set plus the optional shoulders and upper chest, so a rig that has
@@ -79,6 +80,20 @@ pub struct HumanoidSettings {
     pub clips_from: Vec<String>,
 }
 
+/// Whether the clips of the model at `file` change with the files `changed`
+/// names: it is one of them, or it borrows clips from one (each by any
+/// spelling of the same file). The one test `Assets.SetHumanoid` and the
+/// re-import of a re-written model share.
+pub fn clips_follow(file: &str, changed: &Stale) -> bool {
+    changed.matches(file)
+        || super::sidecar::load(std::path::Path::new(file)).is_ok_and(|s| {
+            s.humanoid
+                .clips_from
+                .iter()
+                .any(|from| changed.matches(from))
+        })
+}
+
 impl HumanoidSettings {
     pub fn is_empty(&self) -> bool {
         self.bones.is_empty() && self.clips_from.is_empty()
@@ -97,36 +112,65 @@ pub struct BoneMap {
 }
 
 impl BoneMap {
-    /// `skin`'s map: `settings.bones` first, the guesser for the rest.
+    /// `skin`'s map: `settings.bones` first, the guesser for the rest over the
+    /// joints the explicit entries leave free, so naming a joint for one bone
+    /// takes it from the bone a guess gave it to (said in `problems`).
     pub fn resolve(skin: &SkinData, settings: &HumanoidSettings) -> Self {
-        let mut map = Self {
-            slots: guess::guess(&skin.names),
-            problems: Vec::new(),
-        };
+        let mut problems = Vec::new();
+        // Canonical index → its explicit entry's slot (`Some(None)`: unmapped).
+        let mut explicit: Vec<Option<Option<usize>>> = vec![None; CANONICAL.len()];
         for (canonical, bone) in &settings.bones {
             let Some(i) = CANONICAL.iter().position(|c| c == canonical) else {
-                map.problems
-                    .push(format!("'{canonical}' is no humanoid bone"));
+                problems.push(format!("'{canonical}' is no humanoid bone"));
                 continue;
             };
-            map.slots[i] = None;
-            if bone.is_empty() {
-                continue;
+            let slot = (!bone.is_empty())
+                .then(|| skin.names.iter().position(|n| n == bone))
+                .flatten();
+            if !bone.is_empty() && slot.is_none() {
+                problems.push(format!("{canonical}: no bone '{bone}'"));
             }
-            match skin.names.iter().position(|n| n == bone) {
-                Some(slot) => map.slots[i] = Some(slot),
-                None => map.problems.push(format!("{canonical}: no bone '{bone}'")),
+            if let Some(j) = slot.and_then(|s| explicit.iter().position(|e| *e == Some(Some(s)))) {
+                problems.push(format!(
+                    "{} and {canonical} both name '{bone}'",
+                    CANONICAL[j]
+                ));
             }
+            explicit[i] = Some(slot);
         }
-        let missing: Vec<&str> = (CANONICAL.iter().zip(&map.slots))
+        let claimed = |slot: usize| explicit.contains(&Some(Some(slot)));
+        let plain = guess::guess(&skin.names, |_| false);
+        let guessed = guess::guess(&skin.names, claimed);
+        for (i, (e, g)) in explicit.iter().zip(&plain).enumerate() {
+            let Some(g) = g.filter(|g| e.is_none() && claimed(*g)) else {
+                continue;
+            };
+            let now = guessed[i].map_or("left unmapped".into(), |s| {
+                format!("guessed '{}' instead", skin.name(s))
+            });
+            problems.push(format!(
+                "{}: '{}' is named for another bone; {now}",
+                CANONICAL[i],
+                skin.name(g)
+            ));
+        }
+        let slots: Vec<Option<usize>> = (explicit.iter().zip(&guessed))
+            .map(|(e, g)| e.unwrap_or(*g))
+            .collect();
+        let missing: Vec<&str> = (CANONICAL.iter().zip(&slots))
             .filter(|(c, s)| s.is_none() && !OPTIONAL.contains(c))
             .map(|(c, _)| *c)
             .collect();
         if !missing.is_empty() {
-            map.problems
-                .push(format!("unmapped: {}", missing.join(", ")));
+            problems.push(format!("unmapped: {}", missing.join(", ")));
         }
-        map
+        Self { slots, problems }
+    }
+
+    /// Whether some canonical bone is mapped on both `self` and `other`: a clip
+    /// can move between their rigs at all.
+    pub fn shares_any(&self, other: &BoneMap) -> bool {
+        (self.slots.iter().zip(&other.slots)).any(|(a, b)| a.is_some() && b.is_some())
     }
 
     /// The slot mapped to canonical bone `name`.
@@ -143,6 +187,8 @@ impl BoneMap {
 
 #[cfg(test)]
 mod guess_tests;
+#[cfg(test)]
+mod retarget_pose_tests;
 #[cfg(test)]
 mod retarget_tests;
 #[cfg(test)]

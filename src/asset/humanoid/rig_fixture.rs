@@ -1,6 +1,6 @@
-//! Primitive humanoid rigs for the retarget tests (#1747): built from mesh-space
+//! Primitive humanoid rigs for the retarget tests (#1747): built from model-space
 //! rests, so two rigs can share a silhouette while their bone axes, rest poses,
-//! root offsets and heights differ.
+//! root offsets, heights, facing and the armature their mesh sits under differ.
 
 use glam::{Mat4, Quat, Vec3};
 
@@ -34,8 +34,24 @@ pub struct Shape {
     pub axes: Quat,
     /// The arm lowered by this many radians about +Z at the shoulder (an A-pose).
     pub arm_down: f32,
-    /// The skeleton root's parent space (an `Armature` node).
+    /// The skeleton root's parent space, relative to the mesh node.
     pub root_offset: Mat4,
+    /// The node the mesh and the skeleton sit under, in model space: what a
+    /// Blender export of a Mixamo FBX writes ([`blender_armature`]).
+    pub armature: Mat4,
+    /// The way the body faces, a turn about +Y from glTF's +Z.
+    pub facing: f32,
+}
+
+/// A Mixamo character through Blender's glTF export: the `Armature` object
+/// turned +90° about X and scaled 0.01, the mesh parented under it, so the
+/// mesh's own space is Z-up and in centimetres.
+pub fn blender_armature() -> Mat4 {
+    Mat4::from_scale_rotation_translation(
+        Vec3::splat(0.01),
+        Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
+        Vec3::ZERO,
+    )
 }
 
 impl Default for Shape {
@@ -45,6 +61,8 @@ impl Default for Shape {
             axes: Quat::IDENTITY,
             arm_down: 0.0,
             root_offset: Mat4::IDENTITY,
+            armature: Mat4::IDENTITY,
+            facing: 0.0,
         }
     }
 }
@@ -52,7 +70,10 @@ impl Default for Shape {
 /// The rig `shape` describes.
 pub fn rig(shape: Shape) -> SkinData {
     let down = Quat::from_rotation_z(-shape.arm_down);
+    let face = Quat::from_rotation_y(shape.facing);
     let shoulder = Vec3::from(BONES[LEFT_UPPER_ARM].2) * shape.height;
+    let inherited = shape.armature.to_scale_rotation_translation().0;
+    // Model-space joint globals; a bone inherits the armature's scale.
     let globals: Vec<Mat4> = (BONES.iter().enumerate())
         .map(|(slot, (_, _, at))| {
             let mut p = Vec3::from(*at) * shape.height;
@@ -61,12 +82,13 @@ pub fn rig(shape: Shape) -> SkinData {
                 p = shoulder + down * (p - shoulder);
                 r = down * r;
             }
-            Mat4::from_rotation_translation(r, p)
+            Mat4::from_scale_rotation_translation(inherited, face * r, face * p)
         })
         .collect();
+    let root_parent = shape.armature * shape.root_offset;
     let local_bind = (BONES.iter().enumerate())
         .map(|(slot, (_, parent, _))| {
-            let parent = parent.map_or(shape.root_offset, |p| globals[p]);
+            let parent = parent.map_or(root_parent, |p| globals[p]);
             let (scale, rotation, translation) =
                 (parent.inverse() * globals[slot]).to_scale_rotation_translation();
             JointTransform {
@@ -76,24 +98,33 @@ pub fn rig(shape: Shape) -> SkinData {
             }
         })
         .collect();
+    let mesh_inverse = shape.armature.inverse();
+    let bind_global: Vec<Mat4> = globals.iter().map(|g| mesh_inverse * *g).collect();
     SkinData {
-        inverse_bind: globals.iter().map(|g| g.inverse()).collect(),
-        bind_global: globals,
+        inverse_bind: bind_global.iter().map(|g| g.inverse()).collect(),
+        bind_global,
         local_bind,
         parents: BONES.iter().map(|b| b.1).collect(),
         joint_nodes: (0..BONES.len()).collect(),
-        mesh_inverse: Mat4::IDENTITY,
+        mesh_inverse,
         names: BONES.iter().map(|b| b.0.to_string()).collect(),
     }
 }
 
-/// Five keys of a walk on `skin`: the hips bob and travel 1 m along +Z, the legs
-/// and the arm swing, each key a turn on top of the bone's rest local.
+/// `skin`'s rest of joint `slot` in model space.
+pub fn model_rest(skin: &SkinData, slot: usize) -> Mat4 {
+    skin.mesh_to_model() * skin.bind_global[slot]
+}
+
+/// Five keys of a walk on `skin`: the hips bob and travel 1 m along model +Z
+/// (whatever space the root's parent is in), the legs and the arm swing, each
+/// key a turn on top of the bone's rest local.
 pub fn walk(skin: &SkinData) -> AnimationClip {
     let times = vec![0.0, 0.25, 0.5, 0.75, 1.0];
     let swing = [0.0, 0.5, 0.0, -0.5, 0.0];
     let mut tracks = vec![JointTrack::default(); BONES.len()];
     let rest = |slot: usize| skin.local_bind[slot];
+    let root_parent = (skin.mesh_to_model() * skin.root_offset(HIPS)).inverse();
     let turn = |slot: usize, axis: Vec3, k: f32| {
         let values = swing
             .iter()
@@ -109,7 +140,8 @@ pub fn walk(skin: &SkinData) -> AnimationClip {
         times: times.clone(),
         values: (0..5)
             .map(|k| {
-                rest(HIPS).translation + Vec3::new(0.0, -0.03 * swing[k].abs(), 0.25 * k as f32)
+                let step = Vec3::new(0.0, -0.03 * swing[k].abs(), 0.25 * k as f32);
+                rest(HIPS).translation + root_parent.transform_vector3(step)
             })
             .collect(),
         interpolation: Interpolation::Linear,
@@ -140,7 +172,7 @@ pub fn walk(skin: &SkinData) -> AnimationClip {
     clip
 }
 
-/// `skin`'s mesh-space joint globals at `clip`'s key `k` (every keyed track
+/// `skin`'s model-space joint globals at `clip`'s key `k` (every keyed track
 /// has a value there, or one held), rests where unkeyed.
 pub fn posed(skin: &SkinData, clip: &AnimationClip, k: usize) -> Vec<Mat4> {
     let mut globals: Vec<Mat4> = Vec::with_capacity(skin.parents.len());
@@ -161,5 +193,6 @@ pub fn posed(skin: &SkinData, clip: &AnimationClip, k: usize) -> Vec<Mat4> {
         let parent = skin.parents[slot].map_or(skin.root_offset(slot), |p| globals[p]);
         globals.push(parent * local.matrix());
     }
-    globals
+    let model = skin.mesh_to_model();
+    globals.into_iter().map(|g| model * g).collect()
 }

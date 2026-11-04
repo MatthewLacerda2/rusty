@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use crate::asset::{self, humanoid::HumanoidSettings, AssetRef};
+use crate::core::fs::written::Stale;
 use crate::scene::Scene;
 
 /// Write `settings` as the humanoid settings of the model at `path` and give
@@ -25,6 +26,7 @@ pub fn set_humanoid(
     }
     stored.humanoid = settings;
     asset::sidecar::save(source, &stored).map_err(|e| e.to_string())?;
+    let changed = Stale::new(vec![path.to_string()]);
     let mut shaped: BTreeMap<String, bool> = BTreeMap::new();
     let mut count = 0;
     for id in scene.world.ids_with_mesh() {
@@ -35,11 +37,8 @@ pub fn set_humanoid(
             continue;
         };
         let file = reference.path.clone();
-        let hit = *shaped.entry(file.clone()).or_insert_with(|| {
-            file == path
-                || asset::sidecar::load(Path::new(&file))
-                    .is_ok_and(|s| s.humanoid.clips_from.iter().any(|f| f == path))
-        });
+        let hit = *(shaped.entry(file.clone()))
+            .or_insert_with_key(|file| asset::humanoid::clips_follow(file, &changed));
         if !hit {
             continue;
         }

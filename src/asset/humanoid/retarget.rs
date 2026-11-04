@@ -20,6 +20,12 @@
 //! and carried through the parents' rests the same way: `t_t = Pt⁻¹(r · Ps(t_s −
 //! rest_s)) + rest_t`. Scale keys are dropped.
 //!
+//! **Both rigs' rests are read in their body frame** ([`body`]): model space
+//! (the skinned mesh node's own transform applied, so an `Armature` node's
+//! rotation and scale, Blender's Z-up and centimetres, are undone and up is +Y as
+//! glTF has it), turned about +Y so the body faces +Z, as Unity's Humanoid
+//! normalises. So a rig exported Z-up, or facing −Z, takes a walk forward and up.
+//!
 //! Each key is mapped on its own, at its own time: a fixed rotation on either
 //! side of a slerp is a slerp of the rotated ends, and the translation map is
 //! affine, so the retargeted clip samples between keys as the source would.
@@ -45,6 +51,7 @@ pub fn retarget(
     let (dst_skin, dst_map) = dst;
     let ratio = hip_ratio(src, dst);
     let hips = dst_map.slot("Hips");
+    let (src_body, dst_body) = (body(src_skin, src_map), body(dst_skin, dst_map));
     let mut tracks = vec![JointTrack::default(); dst_skin.local_bind.len()];
     for (t_slot, track) in tracks.iter_mut().enumerate() {
         let Some(c) = dst_map.canonical_of(t_slot) else {
@@ -56,8 +63,8 @@ pub fn retarget(
         let Some(source) = clip.tracks.get(s_slot) else {
             continue;
         };
-        let s = Rest::of(src_skin, s_slot);
-        let t = Rest::of(dst_skin, t_slot);
+        let s = Rest::of(src_skin, s_slot, src_body);
+        let t = Rest::of(dst_skin, t_slot, dst_body);
         let (pre, post) = (
             t.parent_rot.inverse() * s.parent_rot,
             s.rot.inverse() * t.rot,
@@ -71,16 +78,17 @@ pub fn retarget(
             });
         }
     }
-    let mut out = AnimationClip {
+    // The source's length, not the kept tracks': wrap, phase and events land
+    // where they do on the source rig.
+    AnimationClip {
         name: clip.name.clone(),
         tracks,
-        duration: 0.0,
-    };
-    out.recompute_duration();
-    out
+        duration: clip.duration,
+    }
 }
 
-/// A joint's rests: its own and its parent's global ones, and its local translation.
+/// A joint's rests: its own and its parent's, in its rig's body frame, and its
+/// local translation.
 struct Rest {
     rot: Quat,
     parent: Mat4,
@@ -89,12 +97,13 @@ struct Rest {
 }
 
 impl Rest {
-    fn of(skin: &SkinData, slot: usize) -> Self {
-        let global = skin.bind_global.get(slot).copied().unwrap_or_default();
-        let parent = match skin.parents.get(slot).copied().flatten() {
-            Some(p) => skin.bind_global.get(p).copied().unwrap_or_default(),
-            None => skin.root_offset(slot),
-        };
+    fn of(skin: &SkinData, slot: usize, body: Mat4) -> Self {
+        let global = body * skin.bind_global.get(slot).copied().unwrap_or_default();
+        let parent = body
+            * match skin.parents.get(slot).copied().flatten() {
+                Some(p) => skin.bind_global.get(p).copied().unwrap_or_default(),
+                None => skin.root_offset(slot),
+            };
         Self {
             rot: rotation(global),
             parent,
@@ -113,11 +122,11 @@ fn rotation(m: Mat4) -> Quat {
 }
 
 /// The target over source hip height (each rig's hips above its model origin
-/// at rest); 1 when either has no hips or no height.
+/// at rest, along model +Y); 1 when either has no hips or no height.
 pub(super) fn hip_ratio(src: (&SkinData, &BoneMap), dst: (&SkinData, &BoneMap)) -> f32 {
     let height = |(skin, map): (&SkinData, &BoneMap)| {
         let slot = map.slot("Hips")?;
-        Some(skin.bind_global.get(slot)?.w_axis.y)
+        Some((body(skin, map) * *skin.bind_global.get(slot)?).w_axis.y)
     };
     match (height(src), height(dst)) {
         (Some(s), Some(t)) if s.abs() > MIN_HEIGHT && t.abs() > MIN_HEIGHT => {
@@ -130,6 +139,34 @@ pub(super) fn hip_ratio(src: (&SkinData, &BoneMap), dst: (&SkinData, &BoneMap)) 
         }
         _ => 1.0,
     }
+}
+
+/// From `skin`'s mesh-local space into its body frame: model space (the mesh
+/// node's transform, [`SkinData::mesh_to_model`]), then turned about +Y so the
+/// body faces +Z. Its facing is the ground-plane direction its left side points
+/// (glTF: a model faces +Z, its left on +X), read from the first left/right pair
+/// the map has; a rig without one keeps model space's facing.
+pub(super) fn body(skin: &SkinData, map: &BoneMap) -> Mat4 {
+    let model = skin.mesh_to_model();
+    let at = |slot: usize| {
+        let rest = skin.bind_global.get(slot).copied().unwrap_or_default();
+        (model * rest).w_axis.truncate()
+    };
+    let pairs = [
+        ("LeftUpperLeg", "RightUpperLeg"),
+        ("LeftUpperArm", "RightUpperArm"),
+        ("LeftShoulder", "RightShoulder"),
+        ("LeftFoot", "RightFoot"),
+    ];
+    let left = pairs.iter().find_map(|(l, r)| {
+        let v = at(map.slot(l)?) - at(map.slot(r)?);
+        let v = Vec3::new(v.x, 0.0, v.z);
+        (v.is_finite() && v.length() > MIN_HEIGHT).then_some(v)
+    });
+    let Some(left) = left else { return model };
+    let forward = left.cross(Vec3::Y);
+    let facing = Quat::from_rotation_y(forward.x.atan2(forward.z));
+    Mat4::from_quat(facing.inverse()) * model
 }
 
 fn map_track<T: Copy>(track: &Track<T>, f: impl Fn(T) -> T) -> Track<T> {

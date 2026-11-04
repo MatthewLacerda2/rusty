@@ -25,6 +25,9 @@ impl Source {
         let skin = sub.skin?;
         let map = BoneMap::resolve(&skin, settings);
         warn_problems(path, &map);
+        if let Some(lost) = root_travel_lost(&skin, &map, &sub.clips) {
+            log::warn!("[Asset] {path}: {lost}");
+        }
         Some(Self {
             path: path.to_string(),
             skin,
@@ -74,6 +77,13 @@ pub fn borrow_clips(
             warned = true;
         }
         for source in &sources {
+            if !source.map.shares_any(&map) {
+                log::warn!(
+                    "[Asset] {shown}: no humanoid bone of '{}' maps onto this rig; its clips are left out",
+                    source.path
+                );
+                continue;
+            }
             for clip in &source.clips {
                 if sub.clips.iter().any(|c| c.name == clip.name) {
                     log::warn!(
@@ -88,6 +98,34 @@ pub fn borrow_clips(
             }
         }
     }
+}
+
+/// What a borrowed clip loses when a joint above `skin`'s hips (a UE-style
+/// `root`) carries travel in one of `clips`: the retarget moves only the
+/// hips, so the clip plays in place on every rig that borrows it.
+pub(crate) fn root_travel_lost(
+    skin: &SkinData,
+    map: &BoneMap,
+    clips: &[AnimationClip],
+) -> Option<String> {
+    let mut up = skin.parents.get(map.slot("Hips")?).copied().flatten();
+    // Bounded by the joint count, so a malformed parent loop ends.
+    for _ in 0..skin.parents.len() {
+        let joint = up?;
+        let moving = clips.iter().find(|c| {
+            (c.tracks.get(joint))
+                .is_some_and(|t| t.translation.values.windows(2).any(|w| w[0] != w[1]))
+        });
+        if let Some(clip) = moving {
+            return Some(format!(
+                "'{}' above the hips moves in clip '{}': a borrowed clip carries only the hips' travel, so it plays in place (key the travel on the hips)",
+                skin.name(joint),
+                clip.name
+            ));
+        }
+        up = skin.parents.get(joint).copied().flatten();
+    }
+    None
 }
 
 /// Say once what resolving `map` for the model at `path` found wrong.

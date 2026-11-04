@@ -163,6 +163,11 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
         CACHE.with_borrow_mut(|cache| cache.remove(&key));
     })?;
     let settings = super::settings_of(path);
+    // The models it borrows clips from too (#1747): a re-exported source's
+    // re-conversion is noted the same way, so the lookup drops this import.
+    for from in &settings.humanoid.clips_from {
+        let _ = super::read_target(Path::new(from));
+    }
     let geometry = Geometry::of(&settings);
     let held = CACHE.with_borrow_mut(|cache| {
         cache.enter(project::moves());
@@ -284,6 +289,8 @@ impl Cache {
     }
 }
 
+#[cfg(test)]
+mod borrow_tests;
 #[cfg(test)]
 mod budget_tests;
 #[cfg(test)]

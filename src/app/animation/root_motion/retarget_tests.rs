@@ -34,6 +34,7 @@ fn a_borrowed_walk_travels_by_the_hip_height_ratio() {
         axes: Quat::from_rotation_y(0.8) * Quat::from_rotation_x(0.3),
         arm_down: 0.5,
         root_offset: Mat4::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+        ..Shape::default()
     });
     let none = HumanoidSettings::default();
     let (ma, mb) = (BoneMap::resolve(&a, &none), BoneMap::resolve(&b, &none));

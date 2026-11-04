@@ -27,3 +27,18 @@ fn a_rewritten_source_reimports_the_models_borrowing_from_it() {
         .collect();
     assert_eq!(names, ["Idle", "Lunge"]);
 }
+
+#[test]
+fn set_humanoid_finds_a_borrower_by_another_spelling_of_its_source() {
+    let dir = crate::test_temp::dir().join("rusty_humanoid_spelling");
+    let a = model(&dir, "a.gltf", "Wave", &[]);
+    let b = model(&dir, "b.gltf", "Idle", &[&a]);
+    let mut scene = Scene::new();
+    let reference = format!("{}::Animated", b.to_string_lossy());
+    instantiate_asset(&mut scene, &reference, None, Vec3::ZERO).unwrap();
+    let spelled = dir.join(".").join("a.gltf").to_string_lossy().into_owned();
+    let mut settings = crate::asset::sidecar::load(&a).unwrap().humanoid;
+    settings.bones.insert("Hips".into(), String::new());
+    let set = crate::scene::asset_instance::set_humanoid(&mut scene, &spelled, settings);
+    assert_eq!(set, Ok(1));
+}

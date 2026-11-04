@@ -33,10 +33,14 @@ const CORES: &[(&[&str], &str)] = &[
     (&["toes", "toe", "toebase", "ball"], "Toes"),
 ];
 
-/// Canonical index → the first of `names` guessed as that bone.
-pub(super) fn guess(names: &[String]) -> Vec<Option<usize>> {
+/// Canonical index → the first of `names` guessed as that bone, the slots
+/// `taken` says an explicit map already holds left out.
+pub(super) fn guess(names: &[String], taken: impl Fn(usize) -> bool) -> Vec<Option<usize>> {
     let mut slots = vec![None; CANONICAL.len()];
     for (slot, name) in names.iter().enumerate() {
+        if taken(slot) {
+            continue;
+        }
         let Some(canonical) = canonical(name) else {
             continue;
         };

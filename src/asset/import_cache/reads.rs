@@ -25,16 +25,20 @@ pub(super) type Stamp = Option<(u64, Option<Duration>)>;
 /// The files an import read, the parsed one first, each with its [`Stamp`].
 pub(super) type Files = Vec<(String, Stamp)>;
 
-/// Then, for each model `borrowed` names (#1747), the files its parse reads
-/// and its sidecar, whose humanoid map shapes the borrowed clips.
+/// Then, for each model `borrowed` names (#1747), the files its parse reads,
+/// its own file when that is converted, and its sidecar, whose humanoid map
+/// shapes the borrowed clips.
 pub(super) fn files_of(read: &Path, borrowed: &[String]) -> Files {
     let own = std::iter::once(read.to_path_buf()).chain(reads(read));
     let sources = borrowed.iter().flat_map(|from| {
         let from = Path::new(from);
         let read = crate::asset::read_target(from).unwrap_or_else(|_| from.to_path_buf());
         let meta = crate::asset::sidecar::meta_path(from);
+        // The source itself too, when a conversion reads another file for it.
+        let own = (read != from).then(|| from.to_path_buf());
         std::iter::once(read.clone())
             .chain(reads(&read))
+            .chain(own)
             .chain([meta])
     });
     own.chain(sources)
