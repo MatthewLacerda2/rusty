@@ -142,8 +142,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             fx.say(f"watch: #{number}'s runs, which its hand-back outwaited, went green; back in line.")
         for number, why in ended:
             stalled.pop(number)  # an ordinary hand-back from here: a re-run or a push brings it back
-            fx.say(f"watch: #{number}'s runs, which its hand-back outwaited, ended without going green: {why}"
-                   " Passed over until its head moves or runs again.")
+            fx.say(ending.stall_ended(number, why))
         for number in handbacks.reworded(pulls, memory, claims):
             forget(number)
             fx.say(f"watch: #{number}'s description or labels changed since its hand-back; back in line.")

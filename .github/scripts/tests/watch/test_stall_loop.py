@@ -14,8 +14,10 @@ import tempfile
 import unittest
 
 from merging.queue import outcomes
-from merging.watch import handbacks, loop, stalls
+from merging.watch import ending, handbacks, loop, stalls
 from tests.watch import fakes
+from tests.verdict.fixtures import READY, built, gates_running
+from tests.verdict.fixtures import run as listed
 from tests.watch.fakes import pr
 
 GREEN, OUT = (stalls.GREEN, ""), (stalls.OUT, "")
@@ -61,6 +63,16 @@ class StallLoop(unittest.TestCase):
         taken, said, _, kept = run([OUT, OUT, GREEN], [outcomes.STALLED, outcomes.MERGED])
         self.assertEqual((taken, said.count(BACK), kept), ([1, 1], 1, {}))
 
+    def test_ci_dropping_out_of_one_listing_does_not_park_it(self):
+        # The review's reproduction, through the real reader: out, `ci` missing
+        # once, out, green. Read as an ending, the blink popped the stall.
+        out = ([listed("ci", status="in_progress", conclusion=None), listed("lint")], {1: gates_running(), 2: built("lint")})
+        blink, green = ([listed("lint")], {2: built("lint")}), ([listed("ci"), listed("lint")], {1: built("ci"), 2: built("lint")})
+        listings = [stalls.reading(READY, *got) for got in (out, blink, out, green)]
+        taken, said, _, _ = run(listings, [outcomes.STALLED, outcomes.MERGED])
+        self.assertEqual((taken, said.count(BACK)), ([1, 1], 1))
+        self.assertFalse([s for s in said if "ended without going green" in s])
+
     def test_its_hand_back_line_asks_for_no_re_run(self):
         _, said, _, kept = run([OUT], [outcomes.STALLED])
         line = next(s for s in said if s.startswith("HANDED BACK #1"))
@@ -73,6 +85,7 @@ class StallLoop(unittest.TestCase):
         ended = [s for s in said if "ended without going green" in s]
         self.assertEqual((taken, len(ended), asked, kept), ([1], 1, [1], {}))
         self.assertIn("concluded cancelled", ended[0])
+        self.assertTrue(ended[0].startswith(ending.HANDED_BACK_LINE + " #1"), ended[0])
 
     def test_a_stall_ending_red_and_later_green_stays_passed_over(self):
         red = (stalls.ENDED, "a `ci` run for pushed1 concluded failure.")

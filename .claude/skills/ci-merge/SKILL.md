@@ -82,12 +82,17 @@ this watch and later ones, until it moves — pushing a fix is the whole of
 re-queueing it. **A new run attempt on that head counts as moving** (#869): `gh
 run rerun --failed ID` re-queues it, no push, no relaunch. **A hand-back for
 outwaiting its runs** (the deadline passed with nothing red and nothing green,
-runners busy or GitHub down; #1831) **comes back by itself**: the watch asks
-about its runs each listing and takes it again once every one is green. Re-run
+runners busy or GitHub down; #1831) **comes back by itself while a watch
+runs**: the watch asks about its runs each listing and takes it again once
+every one is green (a run missing from one listing is still out, #592). Re-run
 nothing for it, which would spend a runner during the outage that stalled it.
-If those runs end cancelled or red instead, the watch says so once (`watch: #N's
-runs, which its hand-back outwaited, ended without going green: …`), and from
-there it waits like a red run: re-run the failed jobs or push. **A hand-back no push
+If those runs end cancelled or red instead, the watch says so once, as a
+hand-back (`HANDED BACK #N: the runs its hand-back outwaited ended without going
+green: …`, with the run's URL), and from there it waits like a red run: re-run
+the failed jobs or push. A hand-back remembered *before* #1831 that went green
+afterwards has no failed job and is no stall to the watch: re-run one cheap
+job, `gh run rerun --job <deny's id>`, to make the attempt. Never do that for a
+stall. **A hand-back no push
 fixes waits for what does** (#1279). One for what the description or labels
 claim (a missing `Closes #N`, a stray keyword, a wrong number, an issue-less code
 change) says "no push needed", and the watch takes it again once the pull

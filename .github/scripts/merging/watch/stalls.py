@@ -15,9 +15,16 @@ So a stall is its own kind of hand-back, remembered in
 don't yet agree is still out, #1095, #1182):
 
 - **every gating run concluded success**: back in line, once;
-- **a run still out**: still passed over, nothing said;
-- **anything else** (a cancelled run, a red one, a run gone from the
-  listing): still passed over, said once with its reason, and from then on an
+- **a run still out**: still passed over, nothing said. **A run gone from the
+  listing counts as out** (#1831's review): a stall exists only after its runs
+  were seen, so an absent one is the listing flickering (#592), as the CI wait
+  reads it, or a run deleted, which stays passed over until a re-run or a push.
+  Read as an ending, one blink popped the stall and the next whole listing,
+  green, left the head parked: #1820 again;
+- **anything else** (a cancelled run, a red one, one that built nothing):
+  still passed over, said once with its reason and the run's URL, beginning
+  [`ending.HANDED_BACK_LINE`] so the orchestrator's Monitor wakes on it, and
+  from then on an
   ordinary hand-back: an orchestrator's re-run moves its attempt and the
   #869 mark brings it back. No re-run is made here: a stall ending cancelled
   during an outage would otherwise hold the queue's one slot for a deadline
@@ -45,10 +52,12 @@ def reading(pull: dict, runs: list[dict], jobs: dict[int, list[dict]]) -> tuple[
     if all(state == decide.PASSED for state, _ in states):
         return GREEN, ""
     failed = [lines for state, lines in states if state == decide.FAILED]
-    if not failed and any(state == decide.RUNNING for state, _ in states):
+    if not failed and any(state in (decide.RUNNING, decide.ABSENT) for state, _ in states):
         return OUT, ""
     lines = failed[0] if failed else next(lines for state, lines in states if state != decide.PASSED)
-    return ENDED, " ".join(lines[:2])
+    # The first line and the run's URL: the reader is told to re-run it, and
+    # `assess` may put "Judged as listed…" between the two.
+    return ENDED, " ".join([lines[0], *(line for line in lines[1:] if line.startswith("See "))])
 
 
 def returned(pulls: list[dict], memory: dict[int, str], stalls: dict[int, str], ask) -> tuple[list[int], list[tuple[int, str]]]:

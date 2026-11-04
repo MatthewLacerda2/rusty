@@ -53,10 +53,17 @@ class Reading(unittest.TestCase):
         self.assertEqual(read(run("ci"), lagging)[0], stalls.OUT)
         self.assertEqual(read(run("ci"), built("ci"))[0], stalls.GREEN)
 
-    def test_a_run_gone_from_the_listing_is_ended(self):
-        state, why = stalls.reading(READY, [run("lint")], {2: built("lint")})
+    def test_a_run_gone_from_the_listing_is_still_out(self):
+        # Seen before the stall, so its absence is the listing flickering (#592).
+        self.assertEqual(stalls.reading(READY, [run("lint")], {2: built("lint")})[0], stalls.OUT)
+        self.assertEqual(stalls.reading(READY, [], {})[0], stalls.OUT)
+
+    def test_an_ending_keeps_the_runs_url_when_judged_as_listed(self):
+        unagreed = [job("build-test", "failure"), {"name": "ci-gate", "status": "in_progress", "conclusion": None}]
+        state, why = read(run("ci", conclusion="failure"), unagreed)
         self.assertEqual(state, stalls.ENDED)
-        self.assertIn("`ci`", why)
+        self.assertIn("https://example.invalid/run/1", why)
+        self.assertNotIn("Judged as listed", why)
 
 
 class Returned(unittest.TestCase):

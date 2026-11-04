@@ -9,6 +9,15 @@ from merging.queue import outcomes, polling, pulls
 from merging.verdict import github, runners
 
 
+# The deadline's last line when its last poll listed a run red whose jobs had
+# not yet shown it over (#1831's review): "Nothing is red" would be wrong, and
+# the watch says how it ended a listing later ([`watch.stalls`]).
+STALLED_RED = (
+    "Handed back with a run listed red whose jobs do not show it over yet, so whether the runners"
+    " or the code reddened it is not known; the watch says how it ends."
+)
+
+
 def wait_for(
     repo: str, number: int, sha: str, before: str, deadline: float, poll: float, tick=None
 ) -> tuple[str, list[str]]:
@@ -32,12 +41,14 @@ def wait_for(
         pull = pulls.look(number)
         waited = time.monotonic() - began
         state, lines = polling.head_state(pull.get("headRefOid", ""), sha, before, waited)
+        red = False  # a run listed red whose jobs don't show it over yet, this poll
         if state in (outcomes.STOP, outcomes.HEAD_MOVED):
             return state, lines
         if state == outcomes.GO:
             runs, jobs = github.evidence(repo, sha)
             seen |= polling.sighted(pull, runs)
             state, lines = polling.progress(pull, runs, jobs, github.paths(pull), waited, seen, rerun, red_since)
+            red = state == outcomes.WAIT and bool(runners.unread(pull, runs, jobs))
             if state == outcomes.RERUN:
                 refused = rerun_failed(runners.outage(pull, runs, jobs, polling.expiry(waited, red_since)), rerun)
                 if refused:
@@ -50,7 +61,7 @@ def wait_for(
             return outcomes.STALLED, [
                 f"still waiting on {sha[:7]} after {waited / 60:.0f} minutes.",
                 *lines,
-                "Handed back with the run still out. Nothing is red; nothing is green either.",
+                STALLED_RED if red else "Handed back with the run still out. Nothing is red; nothing is green either.",
             ]
         outcomes.say(f"#{number}: {lines[0]}")
         if tick is not None:

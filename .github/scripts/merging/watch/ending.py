@@ -127,12 +127,21 @@ def handed_back(number: int, why: str, waits: str | None = None) -> str:
                " Take the `queue` label off while must-fix findings are open: any `Independent review`"
                " comment puts it back in line, whatever the record says")
     elif waits == outcomes.STALLED:
-        fix = ("Nothing failed, so nothing to re-run: it comes back by itself when the runs it outwaited go green"
-               " (said here if they end otherwise)")
+        fix = ("Nothing failed, so nothing to re-run: while a watch runs, it comes back by itself when the runs it"
+               " outwaited go green (said here, as a hand-back, if they end otherwise)")
     else:
         fix = ("Push a fix, or re-run the failed jobs (`gh run rerun --failed`) when it was runners or a flake:"
                " passed over until its head moves or runs again")
     return f"{HANDED_BACK_LINE} #{number}: {why} {fix}; the watch carries on."
+
+
+def stall_ended(number: int, why: str) -> str:
+    """The line for a stall whose runs ended cancelled or red (#1831), beginning
+    [`HANDED_BACK_LINE`]: someone has to act now, and the Monitor `issue-batch`
+    runs and `ci-merge`'s grep wake only on that."""
+    return (f"{HANDED_BACK_LINE} #{number}: the runs its hand-back outwaited ended without going green: {why}"
+            " Re-run the failed jobs (`gh run rerun --failed`) or push a fix:"
+            " passed over until its head moves or runs again; the watch carries on.")
 
 
 def over_budget(for_minutes: float | None, deadline: float) -> str | None:
