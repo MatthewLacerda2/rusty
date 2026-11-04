@@ -74,7 +74,8 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
     let cell = r.f32()?;
     let dims = UVec3::new(r.u32()?, r.u32()?, r.u32()?);
     let cells_in = dims.x as u64 * dims.y as u64 * dims.z as u64;
-    if !origin.is_finite() || !(cell.is_finite() && cell > 0.0) || cells_in > MAX_CELLS as u64 {
+    let finite = origin.is_finite() && cell.is_finite() && cell > 0.0;
+    if !finite || cells_in > MAX_CELLS as u64 {
         return Err("grid out of range".into());
     }
     let words = r.u32()? as usize;
