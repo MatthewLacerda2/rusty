@@ -36,6 +36,7 @@ struct Session {
     last: InputFrame,
     last_dt: f32,
     size: Option<(u32, u32)>,
+    display_scale: Option<f32>,
     host: Vec<HostCall>,
     entry: Entry,
     index: Indexer,
@@ -177,6 +178,7 @@ impl Recorder {
                     last: InputFrame::default(),
                     last_dt: FIXED_DT,
                     size: header.size,
+                    display_scale: header.display_scale,
                     host: Vec::new(),
                     entry: Entry::default(),
                     index: Indexer::start(world),
@@ -191,7 +193,9 @@ impl Session {
     /// The tick's input and size, read right before it is published.
     fn read_input(&mut self, world: &GameWorld) {
         let frame = world.input().borrow().frame();
-        let size = world.resources.screen.borrow().game_view();
+        let screen = world.resources.screen.borrow();
+        let (size, scale) = (screen.game_view(), screen.reported_display_scale());
+        drop(screen);
         let host = std::mem::take(&mut self.host);
         self.entry = Entry {
             t: self.t,
@@ -199,10 +203,12 @@ impl Session {
             input: InputDelta::between(&self.last, &frame),
             host: host.iter().map(host_json).collect(),
             size: (size != self.size).then_some(size).flatten(),
+            display_scale: (scale != self.display_scale).then_some(scale).flatten(),
             digest: None,
         };
         self.last = frame;
         self.size = size;
+        self.display_scale = scale;
     }
 
     /// The tick's `dt`, written when it is not the last tick's (bit for bit).

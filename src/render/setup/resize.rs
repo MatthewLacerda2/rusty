@@ -4,6 +4,7 @@
 //! settings changing *after* the renderer exists.
 
 use crate::core::settings::quality::QualityValues;
+use crate::core::settings::render_scale::RenderScale;
 use crate::core::settings::GraphicsSettings;
 use crate::render::{PixelSize, Renderer};
 
@@ -16,23 +17,31 @@ impl Renderer {
     }
 
     /// Adopt the preset's values, the player's options (#1438) and the render scale (#1498) the
-    /// shared cell carries.
-    pub fn apply_graphics(&mut self, graphics: GraphicsSettings) {
+    /// shared cell carries, resolved on a display of `display_scale` (#1715).
+    pub fn apply_graphics(&mut self, graphics: GraphicsSettings, display_scale: f32) {
         self.set_quality(graphics.quality);
         self.graphics_options = graphics.options;
-        self.render_scale = graphics.render_scale;
+        self.render_scale = graphics.render_scale.resolve(display_scale);
     }
 
-    /// What shapes a view's post-FX: the preset's values, and the player's options and render
-    /// scale except in the editor's Scene view (`editor_mode`), which ignores them as
-    /// Unity's Scene view ignores PlayerPrefs and the URP asset's render scale. The
-    /// Game view and the player honour all of them.
+    /// The scene's render scale: native in the editor's Scene view (`editor_mode`),
+    /// which ignores it as Unity's ignores the URP asset's; else the applied one.
+    pub(crate) fn render_scale(&self, editor_mode: bool) -> RenderScale {
+        match editor_mode {
+            true => RenderScale::NATIVE,
+            false => self.render_scale,
+        }
+    }
+
+    /// What shapes a view's post-FX: the preset's values, and the player's options
+    /// except in the editor's Scene view (`editor_mode`), which ignores them as
+    /// Unity's Scene view ignores PlayerPrefs. The Game view and the player honour
+    /// them. The render scale is [`render_scale`](Self::render_scale)'s.
     pub(crate) fn graphics(&self, editor_mode: bool) -> GraphicsSettings {
         let player = match editor_mode {
             true => GraphicsSettings::default(),
             false => GraphicsSettings {
                 options: self.graphics_options,
-                render_scale: self.render_scale,
                 ..Default::default()
             },
         };

@@ -114,7 +114,7 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     rusty::api::graphics::register(
         &lua,
         bind(&lua, &lua_scene),
-        bind(&lua, &quality),
+        (bind(&lua, &quality), rusty::api::ApiCell::default()),
         bind(&lua, &app),
     )
     .unwrap();

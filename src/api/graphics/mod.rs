@@ -18,7 +18,9 @@
 //!   running one's values in the shared graphics cell, which the platform layer
 //!   hands to the renderer each frame. No preset gates an effect: each effect's
 //!   quality level reads its values from the running preset. The scene's render
-//!   scale (#1498) is a value in the same cell (`state`).
+//!   scale (#1498) is a value in the same cell (`render_scale`): the player's choice
+//!   over the project's default on `Application` (#1715), resolved on the display
+//!   scale the `ScreenSize` resource holds.
 //! * The player's graphics options (`options`, #1438) in the same cell, which gate
 //!   every camera's effects, and the project's defaults for them on `Application`.
 //!
@@ -31,6 +33,7 @@ pub(crate) mod effects;
 mod fog;
 mod options;
 mod quality;
+mod render_scale;
 mod shadows;
 mod ssao;
 mod state;
@@ -42,19 +45,20 @@ use crate::api::ApiCell;
 use crate::core::application::Application;
 use crate::core::settings::GraphicsSettings;
 use crate::scene::Scene;
+use crate::ui::ScreenSize;
 
 /// Register the `Graphics` namespace onto `lua`.
 pub fn register(
     lua: &Lua,
     scene: ApiCell<Scene>,
-    graphics: ApiCell<GraphicsSettings>,
+    (graphics, screen): (ApiCell<GraphicsSettings>, ApiCell<ScreenSize>),
     app: ApiCell<Application>,
 ) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
     effects::register(lua, &table, scene)?;
     quality::register_quality(lua, &table, graphics, app)?;
-    state::register_render_scale(lua, &table, graphics)?;
+    render_scale::register(lua, &table, (graphics, screen), app)?;
     options::register_options(lua, &table, graphics, app)?;
     shadows::register_shadows(lua, &table, scene)?;
     fog::register_fog(lua, &table, scene)?;

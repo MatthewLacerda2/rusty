@@ -47,6 +47,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetCustomEffects` / `SetCustomEffects` | `()` / `({names})` | array of baked postfx module names, in run order (**default empty**; empty with no active volume) |
 | `Graphics.GetDefaultOption` / `SetDefaultOption` | `(name)` / `(name, bool)` | `bool`: the project's default for an option |
 | `Graphics.GetDefaultQuality` / `SetDefaultQuality` | `()` / `(name \| nil)` | `string` or `nil`: the preset a player with no saved choice gets (`project.rusty`'s `"default"`; `nil` selects the middle one; an unknown name raises an error listing them; see *Quality presets*) |
+| `Graphics.GetDefaultRenderScale` / `SetDefaultRenderScale` | `()` / `(scale \| "match_display")` | `number`, or `"match_display"` (`1 / Video.GetDisplayScale()`): the render scale that runs while the player has chosen none (`project.rusty`'s `"graphics"`, **default `1`**; not a positive number nor `"match_display"` raises an error; see *Render scale*) |
 | `Graphics.GetDepthOfFieldAperture` / `SetDepthOfFieldAperture` | `()` / `(f_stop)` | `number`: Bokeh's f-stop, lower blurs more (clamped 1–32, **default `5.6`**) |
 | `Graphics.GetDepthOfFieldFocalLength` / `SetDepthOfFieldFocalLength` | `()` / `(mm)` | `number`: Bokeh's focal length, longer blurs more (clamped 1–300, **default `50`**) |
 | `Graphics.GetDepthOfFieldFocusDistance` / `SetDepthOfFieldFocusDistance` | `()` / `(metres)` | `number`: Bokeh's distance in focus, along the view axis (clamped to `0.1`–`10000`; `math.huge` is focus at infinity; **default `10`**) |
@@ -94,7 +95,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetOptionNames` | `()` | array of every option name, alphabetical (a menu's order) |
 | `Graphics.GetPostParam` / `SetPostParam` | `(name)` / `(name, value)` | a custom effect's runtime param: `number`, or an array for a vector param (the effect's baked default until set; the block's catalog default with no active volume, where a set raises an error) |
 | `Graphics.GetQuality` / `SetQuality` | `()` / `(name)` | `string`: the running quality preset's name (one of the project's, case-insensitive; an unknown one raises an error listing them; `nil` when the project has none; see *Quality presets*) |
-| `Graphics.GetRenderScale` / `SetRenderScale` | `()` / `(scale)` | `number`: the scene's resolution as a factor of the surface's (clamped 0.1–2, **default `1`**; see *Render scale*) |
+| `Graphics.GetRenderScale` / `SetRenderScale` | `()` / `(scale)` | `number`: the scene's resolution as a factor of the surface's, the one running (clamped 0.1–2; **default**: the project's, `1` unless `SetDefaultRenderScale` changed it; see *Render scale*) |
 | `Graphics.GetSaturation` / `SetSaturation` | `()` / `(value)` | `number` |
 | `Graphics.GetShadowCascades` / `SetShadowCascades` | `()` / `(n)` | `number` (clamped 1–4, **default `4`**) |
 | `Graphics.GetShadowDistance` / `SetShadowDistance` | `()` / `(units)` | `number` (world units, clamped ≥ 1, **default `100`**) |
@@ -119,6 +120,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.QualityPresets` | `()` | array of the project's presets, in order, each `{ name, ssao, ssr, ... }` with every value it holds (see *Quality presets*) |
 | `Graphics.RemoveQualityPreset` | `(name)` | nothing; removes the project's preset of that name (an unknown one raises an error listing them) |
 | `Graphics.ResetOptions` | `()` | nothing; every option back to the project's default |
+| `Graphics.ResetRenderScale` | `()` | nothing; forgets the player's render scale, so the project's default runs again (see *Render scale*) |
 | `Graphics.SetQualityPreset` | `(name, values)` | nothing; writes `values` (any part of a preset's, as `QualityPresets` lists them, `name` included when it is this one's) over the preset of that name, or adds it over the engine's values (a key a preset has not, or another `name`, raises an error) |
 
 ### Post effects
@@ -738,7 +740,25 @@ Range `0.1`–`2` (URP's), **default `1`**, which renders exactly as without it 
 upscale pass). Like the quality preset it is a player setting: it writes the same shared cell,
 applies the next frame in the standalone player and the editor's Game view, and is
 **persisted** through `Storage` (`graphics.render_scale`) at the Stop and quit
-boundaries. Screen sizes stay the surface's: `UI.GetScreenSize`, the UI's layout and
+boundaries. `GetRenderScale` returns the scale that runs, the player's or the
+default.
+
+**Project default** (#1715). While the player has chosen no scale (no
+`graphics.render_scale` in `Storage`), the project's runs: `SetDefaultRenderScale`,
+or **File → Build Settings → Default render scale**, which write `project.rusty`'s
+`"graphics": { "render_scale": … }` (in the player and the harness the setter
+changes it in memory only). It is a factor, or `"match_display"`: `1 /
+Video.GetDisplayScale()`, the scene at the 1× pixel count on a HiDPI display
+(`0.5` on a 2× Retina) and native on a 1× monitor, following the window to another
+monitor the next frame. A value in the file that is neither (a string, `null`,
+zero or below) keeps `1` and warns; out of range clamps. Changing the default
+applies at once unless the player chose a scale. `ResetRenderScale` is an options
+menu's "Default": it forgets the choice (deleting the `Storage` key at the next
+Stop or quit), so the default runs again, display-matched if it is. During a run it
+is the only way back: Stop and quit write the running choice back to `Storage`, so
+a script's `Storage.Delete("graphics", "render_scale")` does not bring the default
+back. A hand edit of `project.rusty`'s default runs from the next Play. Per-preset
+render scales are not part of the quality presets yet. Screen sizes stay the surface's: `UI.GetScreenSize`, the UI's layout and
 `Camera.ScreenToWorldRay` speak surface pixels whatever the scale. The editor's **Scene
 view** ignores it, as Unity's Scene view does; so do render textures, which keep
 their own size.

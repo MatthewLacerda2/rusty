@@ -84,7 +84,7 @@ impl EditorFrontend {
             &renderer.device,
             renderer.config.format,
             (px, py),
-            renderer.graphics(scene_tab).render_scale,
+            renderer.render_scale(scene_tab),
         );
         // `wgpu::TextureView` is a refcounted handle, so this owned view doesn't
         // borrow `view` and `render` can take it as the output.
@@ -116,7 +116,7 @@ impl EditorFrontend {
     }
 
     /// The size of the Game view an open demo replays on; `None` with none open.
-    fn demo_size(&self) -> Option<(u32, u32)> {
+    pub(super) fn demo_size(&self) -> Option<(u32, u32)> {
         #[cfg(feature = "dev")]
         return self.editor_ui.demo_size();
         #[cfg(not(feature = "dev"))]

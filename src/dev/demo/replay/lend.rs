@@ -1,7 +1,7 @@
 //! What a replay borrows from the host it plays in (#1598), as one list: [`Host`].
 //! [`prepare`](super::prepare) writes the demo's start over the world's save data,
-//! video and graphics settings, quality choice, play seed, clock and Game view
-//! size: harmless on a headless run's throwaway world, but the editor's world is
+//! video and graphics settings, quality choice, play seed, clock, Game view
+//! size and display scale: harmless on a headless run's throwaway world, but the editor's world is
 //! the operator's, and its store is bound to `saved/storage.json`, flushed at
 //! every Stop.
 //!
@@ -31,16 +31,20 @@ pub struct Host {
     pub(super) seed: u64,
     pub(super) time: Time,
     pub(super) game_view: Option<(u32, u32)>,
+    pub(super) display_scale: Option<f32>,
 }
 
 impl Host {
     /// Take `world`'s host state, leaving an empty pathless store and no Game view
-    /// size (a demo recorded headless lays out on its video resolution).
+    /// size or display scale (a demo recorded headless lays out on its video
+    /// resolution, at scale 1).
     pub(super) fn take(world: &mut GameWorld) -> Self {
         let storage = std::mem::take(&mut *world.resources.storage.borrow_mut());
         let mut screen = world.resources.screen.borrow_mut();
         let game_view = screen.game_view();
         screen.restore_game_view(None);
+        let display_scale = screen.reported_display_scale();
+        screen.restore_display_scale(None);
         drop(screen);
         let manager = world.script_manager();
         Self {
@@ -53,6 +57,7 @@ impl Host {
             seed: manager.play_seed(),
             time: world.time().borrow().clone(),
             game_view,
+            display_scale,
         }
     }
 
@@ -66,6 +71,7 @@ impl Host {
             seed,
             time,
             game_view,
+            display_scale,
         } = self;
         *world.resources.storage.borrow_mut() = storage;
         let manager = world.script_manager();
@@ -74,7 +80,9 @@ impl Host {
         (world.resources.application.borrow_mut()).restore_quality(quality);
         world.resources.script_manager.set_play_seed(seed);
         *world.time().borrow_mut() = time;
-        (world.resources.screen.borrow_mut()).restore_game_view(game_view);
+        let mut screen = world.resources.screen.borrow_mut();
+        screen.restore_game_view(game_view);
+        screen.restore_display_scale(display_scale);
     }
 }
 

@@ -18,7 +18,7 @@ fn run(scene: Scene, script: &str) -> Scene {
     rusty::api::graphics::register(
         &lua,
         bind(&lua, &scene),
-        bind(&lua, &graphics),
+        (bind(&lua, &graphics), rusty::api::ApiCell::default()),
         bind(&lua, &app),
     )
     .unwrap();
@@ -82,7 +82,7 @@ fn without_a_volume_the_getters_report_the_defaults() {
         rusty::api::graphics::register(
             &lua,
             bind(&lua, &scene),
-            bind(&lua, &graphics),
+            (bind(&lua, &graphics), rusty::api::ApiCell::default()),
             bind(&lua, &app),
         )
         .unwrap();
