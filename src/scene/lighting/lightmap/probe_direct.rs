@@ -20,7 +20,7 @@ use super::bake::triangles;
 use super::input::{BakeScene, LightShape};
 use super::lights::area;
 use super::rays::Rays;
-use super::trace::{arrival, T_MIN};
+use super::trace::{arrival, Tracer, T_MIN};
 use crate::scene::lighting::sh::Sh9;
 
 /// One SH per position in `positions`: the direct light of every `Baked` light in
@@ -68,19 +68,6 @@ pub fn mixed_occlusion(scene: &BakeScene, positions: &[Vec3]) -> Vec<Vec4> {
         return vec![Vec4::ONE; positions.len()];
     }
     let rays = Rays::build(triangles(scene));
-    let one = |&p: &Vec3| {
-        let mut mask = Vec4::ONE;
-        for light in &scene.lights {
-            let Some(c) = light.mask_channel else {
-                continue;
-            };
-            if let Some((to_light, distance, _)) = arrival(light, p, Vec2::ZERO) {
-                if rays.occluded(p, to_light, T_MIN, distance) {
-                    mask[c as usize] = 0.0;
-                }
-            }
-        }
-        mask
-    };
-    positions.iter().map(one).collect()
+    let tracer = Tracer { scene, rays: &rays };
+    positions.iter().map(|&p| tracer.mask(p)).collect()
 }

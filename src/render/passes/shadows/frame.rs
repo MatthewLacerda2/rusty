@@ -37,11 +37,13 @@ impl Renderer {
         self.queue
             .write_buffer(&self.shadow_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
         self.shadow_renderer.instancing = self.instancing;
-        self.shadow_renderer.sun_statics = !self.statics_masked(scene, live_sun_id(scene, false));
+        let masking = self.masking_statics(scene);
+        let sun = live_sun_id(scene, false);
+        self.shadow_renderer.sun_statics = !(masking && sun.is_some_and(|id| masked(scene, id)));
         self.shadow_renderer.update_cascades(&self.queue, fitted);
         self.shadow_renderer
             .set_time(&self.queue, scene.shader_time);
-        self.plan_shadow_atlas(scene, camera, aspect);
+        self.plan_shadow_atlas(scene, camera, aspect, masking);
 
         let mut encoder = self
             .device
@@ -88,7 +90,7 @@ impl Renderer {
     /// Only lights the camera's light budget keeps are planned (#873). Each light
     /// keeps its tiles from frame to frame (#1711); a bake capture plans on its own,
     /// so it never moves them.
-    fn plan_shadow_atlas(&mut self, scene: &Scene, camera: &Camera, aspect: f32) {
+    fn plan_shadow_atlas(&mut self, scene: &Scene, camera: &Camera, aspect: f32, masking: bool) {
         let view_proj = camera.build_view_projection(aspect);
         let grid = ClusterGrid::new(camera, aspect);
         let mut requests = clusters::shadow_requests(&grid, &self.clusters.staged());
@@ -113,7 +115,9 @@ impl Renderer {
         for &(light, first_tile) in &plan.shadows {
             self.clusters.set_shadow(light, first_tile);
         }
-        self.keep_masked_statics_out(scene, &requests, &mut plan);
+        if masking {
+            keep_masked_statics_out(scene, &requests, &mut plan);
+        }
         self.upload_local_lights();
         let c = &mut self.frame_counters;
         c.shadowed_lights = plan.shadows.len() as u32;
@@ -125,39 +129,62 @@ impl Renderer {
 }
 
 impl Renderer {
-    /// Whether light `id`'s realtime shadow leaves static casters out (#1695): the
-    /// frame (never a bake capture, which draws `Mixed` lights as `BakedIndirect`
-    /// does) under `Shadowmask`, not `DistanceShadowmask`, for a light the scene
-    /// masks by a channel. Its static shadow is then the baked mask's.
-    fn statics_masked(&self, scene: &Scene, id: Option<u32>) -> bool {
+    /// Whether this frame's realtime shadows leave a masked light's static casters
+    /// out (#1695): the frame (never a bake capture, which draws `Mixed` lights as
+    /// `BakedIndirect` does) of a scene on `Shadowmask` under the plain
+    /// `Shadowmask` quality mode (not `DistanceShadowmask`), while the mask pages
+    /// are bound and no camera's volume turns volumetric fog on. A light the scene
+    /// masks by a channel ([`masked`]) then takes its static shadow from the bake.
+    ///
+    /// Until the masks are bound (a page still decoding, a missing or refused PNG,
+    /// a bake that wrote channels and no page) the maps keep their statics and a
+    /// masked light draws as Distance Shadowmask does near the camera. The fog's
+    /// air reads only the maps, never a mask, so with fog on they keep their
+    /// statics too, and a sealed room's air stays dark.
+    fn masking_statics(&self, scene: &Scene) -> bool {
         use crate::core::settings::quality::ShadowmaskMode;
+        use crate::scene::lighting::MixedLightingMode;
+        let on = scene.lighting_settings.mixed_lighting_mode == MixedLightingMode::Shadowmask;
         let plain = self.quality.shadowmask_mode == ShadowmaskMode::Shadowmask;
-        let masked = id.and_then(|id| scene.mask_channel(id)).is_some();
-        !self.capture.static_only && plain && masked
+        !self.capture.static_only && on && plain && self.lightmaps.masked() && !fog_on(scene)
     }
+}
 
-    /// Mark the tiles of every light [`Self::statics_masked`] keeps statics out of,
-    /// so the atlas bakes them without (`Tile::statics`).
-    fn keep_masked_statics_out(
-        &self,
-        scene: &Scene,
-        requests: &[(clusters::LocalLight, bool)],
-        plan: &mut atlas::AtlasPlan,
-    ) {
-        let ids = local_light_ids(scene, self.capture.static_only);
-        for &(light, first) in &plan.shadows {
-            if !self.statics_masked(scene, ids.get(light).copied()) {
-                continue;
-            }
-            let faces = if requests[light].0.one_frustum() {
-                1
-            } else {
-                6
-            };
-            let first = first as usize;
-            for tile in plan.tiles.iter_mut().skip(first).take(faces) {
-                tile.statics = false;
-            }
+/// Whether light `id` is one the scene masks by a channel.
+fn masked(scene: &Scene, id: u32) -> bool {
+    scene.mask_channel(id).is_some()
+}
+
+/// Whether any active camera's volume turns volumetric fog on (#1703): its air
+/// samples the shadow maps, so they must keep their static casters.
+pub(super) fn fog_on(scene: &Scene) -> bool {
+    let world = &scene.world;
+    world.ids_with_camera().into_iter().any(|id| {
+        crate::scene::camera::camera_volume(scene, id).is_some_and(|v| v.volumetric_fog.active)
+    })
+}
+
+/// Mark the tiles of every light the scene masks ([`masked`]), so the atlas bakes
+/// them without statics (`Tile::statics`). Only called while
+/// `Renderer::masking_statics` holds.
+fn keep_masked_statics_out(
+    scene: &Scene,
+    requests: &[(clusters::LocalLight, bool)],
+    plan: &mut atlas::AtlasPlan,
+) {
+    let ids = local_light_ids(scene, false);
+    for &(light, first) in &plan.shadows {
+        if !ids.get(light).is_some_and(|&id| masked(scene, id)) {
+            continue;
+        }
+        let faces = if requests[light].0.one_frustum() {
+            1
+        } else {
+            6
+        };
+        let first = first as usize;
+        for tile in plan.tiles.iter_mut().skip(first).take(faces) {
+            tile.statics = false;
         }
     }
 }

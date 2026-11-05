@@ -246,7 +246,13 @@ shadow is the baked one met with the realtime one as the running quality preset'
   shadow distance (the sun's cascades; a point or spot light's own shadow fade
   distance); the static shadow is the mask's at every distance, and the darker of
   the two wins. Static casters stay out of its shadow maps, so they cost nothing
-  there.
+  there, with two exceptions where the maps keep them and the light draws as under
+  `"DistanceShadowmask"`: while **volumetric fog** is on (a camera's volume turns it
+  on), since the fog's air reads only the shadow maps and would otherwise glow
+  through walls, so a fogged scene pays for its static casters there; and until the
+  shadowmask pages are **bound** (still decoding, a missing or refused PNG, or a bake
+  that recorded channels and wrote no page), so a load failure leaves the scene
+  shadowed.
 - `"DistanceShadowmask"` — every caster draws its realtime shadow within the shadow
   distance, fading into the mask past it, as in Unity: no pop at the edge, only the
   realtime shadow's softness giving way to the mask's.
@@ -270,7 +276,19 @@ What to know:
   interpolated at the object's position, so a dynamic object's baked shadow is soft
   and whole-object. A static surface with no lightmap (no second UV map) reads the
   probes' too; a lightmapped one whose shadowmask pages have not loaded yet has the
-  realtime shadow alone until they do.
+  realtime shadow alone until they do, from maps that then hold the static casters
+  (above), faded out past the shadow distance.
+- **Two-sided and translucent panels.** A static panel lit from behind by a `Mixed`
+  lamp reads mask 0 on its back-lit side: the bake's shadow ray starts on the front
+  of the surface's normal and meets the panel itself. Light it with a `Baked` or
+  `Realtime` lamp, or face the panel toward the lamp.
+- **Outside every probe.** Under plain `"Shadowmask"` a dynamic object (or a static
+  one with no lightmap) outside every light probe reads occlusion 1 and the maps hold
+  no static casters, so it gets no static shadow from a masked light at all, as in
+  Unity. Cover the level with probes where actors walk.
+- **A mode change takes effect next frame.** A masked lamp set to `Realtime` or its
+  shadows turned off is masked by no channel; a fallen-back lamp set to `Realtime`
+  draws live again.
 - **A light moved or retuned after the bake** keeps its old mask, as in Unity: its
   static shadow stays where it was baked until the next bake.
 - **Switching back to `"BakedIndirect"`** draws as a `BakedIndirect` scene at once

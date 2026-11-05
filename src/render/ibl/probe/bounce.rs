@@ -106,14 +106,16 @@ pub(super) fn write_field(volume: &mut ProbeVolume, field: &[Sh9]) {
 /// Add the direct light of `scene`'s `Baked` lights to every probe of `volume` (#809),
 /// shadowed by the static meshes the lightmap bake sees, and write each probe's
 /// shadowmask occlusion (#1695, `mixed_occlusion`; unoccluded unless the scene's
-/// Mixed Lighting Mode is `Shadowmask`). The channels are the ones a lightmap bake
-/// of the same scene gives (`lightmap::assign_channels`, a pure function of it).
+/// Mixed Lighting Mode is `Shadowmask`). The channels and fallbacks are the ones
+/// the last lightmap bake recorded (`LightmapSet::channels`, `fell_back`), never
+/// assigned here, so the frame reads each light's occlusion on its own channel.
 pub(super) fn add_baked_direct(scene: &Scene, volume: &mut ProbeVolume) {
     let positions: Vec<Vec3> = volume.probes().iter().map(|p| p.position).collect();
     if positions.is_empty() {
         return;
     }
-    let statics = BakeScene::gather(scene, &|_| None);
+    let mut statics = BakeScene::gather(scene, &|_| None);
+    statics.use_recorded_channels(scene);
     let direct = baked_direct_sh(&statics, &positions);
     let occlusion = mixed_occlusion(&statics, &positions);
     for ((probe, direct), occlusion) in volume.probes_mut().iter_mut().zip(direct).zip(occlusion) {

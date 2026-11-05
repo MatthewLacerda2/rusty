@@ -40,6 +40,9 @@ fn register_probe(lua: &Lua, ctx: &ApiCtx) -> Reg {
             let mut scene = scene.borrow_mut();
             refuse_while_baking(&scene).map_err(mlua::Error::external)?;
             let console = &*console.get(lua)?;
+            if let Some(note) = scene.shadowmask_note(false) {
+                console.borrow_mut().warn(note.to_string());
+            }
             let mut log = BakeLog::to_console(console);
             probe_bake::bake_scene_probes(&mut scene, &mut log).map_err(mlua::Error::external)
         }),
@@ -168,6 +171,9 @@ fn register_lightmaps(lua: &Lua, ctx: &ApiCtx) -> Reg {
                 )
                 .map_err(mlua::Error::external)?;
                 log.finish();
+                if let Some(note) = scene.shadowmask_note(true) {
+                    console.borrow_mut().warn(note.to_string());
+                }
                 Ok(baked)
             },
         ),

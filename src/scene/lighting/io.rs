@@ -79,11 +79,13 @@ pub fn apply_lighting(scene: &mut Scene, data: &LightingData) {
 }
 
 /// Write the lighting sidecar next to `scene_path`, but only if at least one probe
-/// carries non-zero SH. When no probe is baked the sidecar is removed (if present) so
+/// carries non-zero SH or a shadowmask occlusion below one (#1695). When no probe
+/// is baked the sidecar is removed (if present) so
 /// stale data can't linger. Errors are returned as strings, matching scene I/O.
 pub fn save_lighting_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
     let path = sidecar_path(scene_path);
-    let has_baked = scene.probes.probes().iter().any(|p| p.sh != Sh9::zero());
+    let has_baked = (scene.probes.probes().iter())
+        .any(|p| p.sh != Sh9::zero() || p.occlusion != glam::Vec4::ONE);
     if !has_baked {
         if path.exists() {
             std::fs::remove_file(&path).map_err(|e| format!("Failed to remove sidecar: {}", e))?;
@@ -140,5 +142,21 @@ mod tests {
         other.probes.add_probe(Vec3::X);
         apply_lighting(&mut other, &data);
         assert_eq!(other.probes.probes()[1].sh.coeffs[0], [1.0, 2.0, 3.0]);
+    }
+
+    #[test]
+    fn a_probe_with_only_occlusion_is_saved() {
+        let dir = crate::test_temp::dir().join("rusty_probe_occlusion_sidecar");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("o.scene").to_string_lossy().into_owned();
+        let mut scene = Scene::default();
+        scene.probes.add_probe(Vec3::ZERO);
+        scene.probes.probes_mut()[0].occlusion = glam::Vec4::new(0.0, 1.0, 1.0, 1.0);
+        save_lighting_sidecar(&scene, &path).unwrap();
+        let mut back = Scene::default();
+        back.probes.add_probe(Vec3::ZERO);
+        load_lighting_sidecar(&mut back, &path).unwrap();
+        assert_eq!(back.probes.probes()[0].occlusion.x, 0.0);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

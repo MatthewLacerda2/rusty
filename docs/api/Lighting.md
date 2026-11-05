@@ -9,7 +9,14 @@ path. The call returns when the bake is done (Unity's `Lightmapping.Bake`); the 
 bakes the same probes a step a frame — one reflection probe or a few light probes —
 so the editor and the MCP keep answering (Unity's `BakeAsync`, #1602). Both say each
 bounce pass and reflection probe in the console (`Baking reflection probe 3 of 12`).
-The two individual verbs stay for a script that wants only one of them.
+The two individual verbs stay for a script that wants only one of them. On a
+`Shadowmask` scene (#1695) the lightmap bake records each masked light's channel and
+only a probe bake writes the probes' occlusion on it, reading those channels from the
+record and never assigning its own: so `Lighting.BakeLightmaps` warns once in the
+console that the probes' occlusion is stale until `Probe.Bake()` or Generate
+Lighting, and `Probe.Bake()` warns once when the record holds no channels (the
+probes then carry no light's occlusion). Generate Lighting runs both, lightmaps
+first.
 
 | Function | Signature | Returns |
 |---|---|---|

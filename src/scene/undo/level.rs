@@ -111,7 +111,7 @@ fn assign<T>(value: T, slot: &mut T) {
 }
 
 /// The probe set as placed: the grid, every position and whether it is manual
-/// (`Probe.SetManual` is an edit, #1737), not the baked SH.
+/// (`Probe.SetManual` is an edit, #1737), not the baked SH or occlusion.
 fn same_probes(a: &ProbeVolume, b: &ProbeVolume) -> bool {
     a.grid() == b.grid()
         && a.probes().len() == b.probes().len()
@@ -126,15 +126,17 @@ fn at(p: glam::Vec3) -> [u32; 3] {
     p.to_array().map(f32::to_bits)
 }
 
-/// Put the probes back, each keeping the baked SH of a live probe at its position.
+/// Put the probes back, each keeping the baked SH and shadowmask occlusion
+/// (#1695) of a live probe at its position.
 fn put_probes(mut value: ProbeVolume, slot: &mut ProbeVolume) {
     let mut live: BTreeMap<[u32; 3], _> = BTreeMap::new();
     for p in slot.probes().iter().rev() {
-        live.insert(at(p.position), p.sh);
+        live.insert(at(p.position), (p.sh, p.occlusion));
     }
     for p in value.probes_mut() {
-        if let Some(&sh) = live.get(&at(p.position)) {
+        if let Some(&(sh, occlusion)) = live.get(&at(p.position)) {
             p.sh = sh;
+            p.occlusion = occlusion;
         }
     }
     *slot = value;

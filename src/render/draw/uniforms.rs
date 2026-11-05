@@ -247,8 +247,12 @@ pub(crate) fn probe_sh_at(scene: &Scene, position: glam::Vec3) -> (u32, [[f32; 4
 /// The light probes' shadowmask occlusion at `position` (#1695), all ones when no
 /// probe covers it: what a `Mixed` light's static shadow is on a surface no
 /// shadowmask page covers (a dynamic object, a static one with no lightmap). A
-/// non-finite position reads all ones, never a NaN the shader would spread.
+/// non-finite position reads all ones, never a NaN the shader would spread. A
+/// scene whose bake gave no light a channel samples nothing.
 pub(crate) fn probe_occlusion_at(scene: &Scene, position: glam::Vec3) -> [f32; 4] {
+    if scene.lightmaps.channels.is_empty() {
+        return [1.0; 4];
+    }
     let o = scene
         .probes
         .sample_occlusion(position)

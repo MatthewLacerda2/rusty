@@ -82,18 +82,28 @@ impl ShadowRenderer {
         }
         // The bake outlives the frame, so it cannot follow the camera's LOD choice.
         let finest = LodSelection::finest(frame.scene);
-        let volumes: Vec<Mat4> = stale.iter().map(|&i| tiles[i].view_proj).collect();
-        let batches = self.prepare_casters(frame, &finest, Sweep::AtlasStatic, &volumes);
+        // A shadowmasked tile keeps its statics out (#1695): it is cleared only,
+        // and no static caster is culled for it.
+        let drawn: Vec<usize> = stale
+            .iter()
+            .copied()
+            .filter(|&i| tiles[i].statics)
+            .collect();
+        let volumes: Vec<Mat4> = drawn.iter().map(|&i| tiles[i].view_proj).collect();
+        let batches = match volumes.is_empty() {
+            true => Vec::new(),
+            false => self.prepare_casters(frame, &finest, Sweep::AtlasStatic, &volumes),
+        };
         {
             let view = &self.atlas.static_view;
             let mut pass = depth_pass(encoder, frame, "Shadow Atlas Static Pass", view, false);
-            for (&i, batches) in stale.iter().zip(&batches) {
+            for &i in &stale {
                 focus(&mut pass, &tiles[i]);
                 self.atlas.blit.clear(&mut pass);
-                // A shadowmasked tile keeps its statics out (#1695): cleared only.
-                if tiles[i].statics {
-                    self.draw_casters(&mut pass, frame, batches, Sweep::AtlasStatic, i);
-                }
+            }
+            for (&i, batches) in drawn.iter().zip(&batches) {
+                focus(&mut pass, &tiles[i]);
+                self.draw_casters(&mut pass, frame, batches, Sweep::AtlasStatic, i);
             }
         }
         let rebaked = stale.iter().map(|&i| tiles[i]);

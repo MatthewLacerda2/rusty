@@ -7,8 +7,8 @@ use crate::components::LightMode;
 use crate::scene::lighting::MixedLightingMode::{BakedIndirect, Shadowmask};
 
 /// A floor point the lamp lights, and one a pillar beside it shades.
-const LIT: Vec3 = Vec3::new(-1.0, 0.0, -5.0);
-const SHADED: Vec3 = Vec3::new(1.6, 0.0, -5.0);
+pub(super) const LIT: Vec3 = Vec3::new(-1.0, 0.0, -5.0);
+pub(super) const SHADED: Vec3 = Vec3::new(1.6, 0.0, -5.0);
 
 /// How far a shadowmasked lamp's diffuse on a lightmapped floor may be from the
 /// same lamp `Baked` (a 16-sample path trace against a live light with a little
@@ -19,7 +19,7 @@ const LIKE_BAKED: f32 = 0.2;
 /// lamp's mirror image lands.
 const GLINT: f32 = 1.5;
 
-fn pillar(scene: &mut crate::scene::Scene) {
+pub(super) fn pillar(scene: &mut crate::scene::Scene) {
     let at = (Vec3::new(0.8, 1.0, -5.0), Vec3::new(0.3, 2.0, 0.3));
     block(scene, "pillar", at, 1.0, true);
 }
@@ -91,33 +91,4 @@ fn gpu_baked_indirect_draws_what_a_baked_indirect_bake_draws_whatever_the_mask()
     assert!(plain.lightmaps.masks.is_empty());
     let (a, b) = (settled(&mut r, &was_masked), settled(&mut r, &plain));
     assert!(a == b, "off means off");
-}
-
-#[test]
-fn gpu_static_casters_leave_a_masked_lamps_map_under_shadowmask_only() {
-    use crate::core::settings::quality::ShadowmaskMode;
-    let Some(mut r) = renderer() else { return };
-    let (mut s, _) = scene(LightMode::Mixed, Shadowmask, 1.0);
-    pillar(&mut s);
-    bake(&mut s, "statics_out");
-    // Without its pages a lightmapped floor has the realtime shadow alone.
-    s.lightmaps.masks.clear();
-    let mut behind = |mode| {
-        r.quality.shadowmask_mode = mode;
-        let frame = settled(&mut r, &s);
-        (patch(&frame, SHADED), patch(&frame, LIT))
-    };
-    let (plain, lit) = behind(ShadowmaskMode::Shadowmask);
-    let (distance, _) = behind(ShadowmaskMode::DistanceShadowmask);
-    eprintln!(
-        "[shadowmask] unmasked pillar shadow: {plain} Shadowmask, {distance} Distance, {lit} lit"
-    );
-    assert!(
-        plain > lit * 0.5,
-        "the static pillar casts no realtime shadow: {plain}"
-    );
-    assert!(
-        distance < lit * 0.25,
-        "it casts one under Distance: {distance}"
-    );
 }

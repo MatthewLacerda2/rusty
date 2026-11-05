@@ -949,7 +949,8 @@ blur's, which has no volume (a power of two). `shadowmask_mode` (#1695) is Unity
 `QualitySettings.shadowmaskMode`, one value per preset as Unity keeps it per quality
 level, read only in a scene whose Mixed Lighting Mode is `"Shadowmask"`
 ([`Light`](Light.md), *Shadowmask*): `"Shadowmask"` (only dynamic casters draw a
-`Mixed` light's realtime shadow; the seeded `Low` and `Medium`) or
+`Mixed` light's realtime shadow, unless volumetric fog is on or the mask pages are
+not bound yet, when every caster does; the seeded `Low` and `Medium`) or
 `"DistanceShadowmask"` (every caster, within the shadow distance; the seeded `High`).
 `Graphics.SetQualityPreset("High", { shadowmask_mode = "Shadowmask" })` sets it. A project with no presets runs the
 seeded `Medium` preset's values.

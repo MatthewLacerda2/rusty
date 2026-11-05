@@ -24,7 +24,9 @@
 // The pixel's baked occlusion per channel: a lightmapped surface's shadowmask
 // texel (page `page` + 1, at `uv` and mip `lod`, taken before any branch), or all
 // ones while its pages are not bound (still loading, or failed: the realtime
-// shadow alone); anything else reads the probes' (`objects[object].occlusion`: a
+// shadow alone, whose maps then keep their static casters, as the renderer's
+// `masking_statics` holds, so the surface draws as Distance Shadowmask does near
+// the camera); anything else reads the probes' (`objects[object].occlusion`: a
 // dynamic object, a static one with no lightmap). All ones while the scene masks
 // nothing, for a uniform branch and no texture read.
 fn baked_occlusion(uv: vec2<f32>, page: u32, lod: f32, object: u32) -> vec4<f32> {

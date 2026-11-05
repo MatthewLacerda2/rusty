@@ -111,11 +111,12 @@ impl LightmapSet {
         self.channels.get(&entity).copied()
     }
 
-    /// The mode light `entity` was baked as: `mode`, but `Baked` for a light that
-    /// fell back for want of a shadowmask channel ([`Self::fell_back`]). What the
-    /// frame draws it as until the next bake.
+    /// The mode light `entity` was baked as: `mode`, but `Baked` for a `Mixed`
+    /// light that fell back for want of a shadowmask channel ([`Self::fell_back`]).
+    /// What the frame draws it as until the next bake; a fallen-back light set to
+    /// another mode since draws as that one.
     pub fn baked_mode(&self, entity: u32, mode: LightMode) -> LightMode {
-        match self.fell_back.contains(&entity) {
+        match mode == LightMode::Mixed && self.fell_back.contains(&entity) {
             true => LightMode::Baked,
             false => mode,
         }
