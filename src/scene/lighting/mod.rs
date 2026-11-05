@@ -12,4 +12,4 @@ pub mod reflection_probe;
 pub mod settings;
 pub mod sh;
 
-pub use settings::{DiffuseModel, LightingSettings};
+pub use settings::{DiffuseModel, LightingSettings, MixedLightingMode};

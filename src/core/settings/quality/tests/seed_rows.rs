@@ -25,6 +25,7 @@ fn rows(values: &QualityValues) -> [(&'static str, bool); 7] {
         volumetric_fog,
         // One value, not three levels: there is nothing to differ.
         ui_blur_divisor: _,
+        shadowmask_mode: _,
     } = values;
     [
         ("ssao", flat(ssao)),

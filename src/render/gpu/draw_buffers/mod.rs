@@ -2,22 +2,26 @@
 //! the resources every group-1 bind group is built from.
 //!
 //! This replaces the per-entity pool of #210 (one uniform buffer, bone buffer and two
-//! bind groups kept alive per entity). A camera's solids are five packed arrays —
-//! per-draw uniforms at a 256-byte stride, joint matrices, instances, the material
-//! records the uniforms index (#1616) and the Light Probe Proxy Volumes the instances
-//! index (#1672) — written with a `write_buffer` each, behind
-//! **one** bind group whose dynamic offset picks a batch's uniform. The material array
-//! is written only when its bytes differ from the last upload, so a camera whose
-//! visible materials hold still does not rewrite it; the buffers are the renderer's,
-//! so cameras that see different materials rewrite it in turn. Nothing is keyed by
-//! entity, so two scenes rendered in one frame (#355) cannot evict each other: each
-//! render simply rewrites the arrays before its own submit.
+//! bind groups kept alive per entity). A camera's solids are four packed arrays —
+//! per-draw uniforms at a 256-byte stride, joint matrices, instances and the Light
+//! Probe Proxy Volumes the instances index (#1672) — and the two kept tables below
+//! (objects, and the material records the uniforms index, #1616), behind **one** bind
+//! group whose dynamic offset picks a batch's
+//! uniform. The per-camera arrays are written with a `write_buffer` each. Nothing is
+//! keyed by entity, so two scenes rendered in one frame (#355) cannot evict each
+//! other: each render simply rewrites the arrays before its own submit.
 //!
-//! **The object array** (#1706) is the one that is not packed per camera: every kept
+//! **The object array** (#1706) is not packed per camera: every kept
 //! object's [`ObjectData`] (world matrix, probe SH, lightmap) at its slot of the
 //! renderer's `scene::ObjectTable`, written where it changed (`objects.rs`). A
 //! camera's instance is 16 bytes naming its object's slot, so the per-camera upload
 //! no longer grows with what the objects hold.
+//!
+//! **The material array** is held the same way (#1706): every kept material record
+//! (one per scene, library material and variant, `scene::MaterialRecords`) at its slot,
+//! written where it changed. A draw's uniform names the slot (its value class's
+//! least, so equal records batch), so a colour edit uploads that one record and no
+//! camera re-packs records.
 //!
 //! The joint matrices are one storage array (#455), not a fixed 64-matrix uniform: a
 //! skinned draw's palette is its run of the array, as long as its skin, and the draw's
@@ -35,7 +39,7 @@ pub(crate) use pack::{joint_array_bytes, push_palette, uniform_array_bytes, Join
 
 use super::grow_buffer::GrowBuffer;
 use super::uniforms::ObjectData;
-use crate::render::scene::ObjectTable;
+use crate::render::scene::{ObjectTable, SlotTable};
 use crate::render::{DrawUniform, InstanceData, MaterialData};
 
 /// Byte distance between per-draw uniforms: wgpu's default
@@ -50,16 +54,16 @@ const IDENTITY_JOINT: [f32; 16] = glam::Mat4::IDENTITY.to_cols_array();
 /// One camera's draw data: `uniforms` in slot order, the skinned draws' `joints`
 /// back to back (a draw whose `bone_base` is `n` starts at `joints[n - 1]`; element 0
 /// of the uploaded array is the identity), the packed `instances`, and the
-/// `materials` the uniforms index, the `proxies` the instances index
-/// (`draw::proxy_volume`), and the object table the instances name, whose changed
-/// slots and transient ones are written with them.
+/// `proxies` the instances index (`draw::proxy_volume`), and the slot tables the
+/// uniforms and instances name (materials and objects), whose changed slots and
+/// transient ones are written with them.
 pub(crate) struct FrameUpload<'a> {
     pub uniforms: &'a [DrawUniform],
     pub joints: &'a [JointMatrix],
     pub instances: &'a [InstanceData],
-    pub materials: &'a [MaterialData],
     pub proxies: &'a [[f32; 4]],
     pub objects: &'a mut ObjectTable,
+    pub materials: &'a mut SlotTable<MaterialData>,
 }
 
 pub(crate) struct DrawBuffers {
@@ -73,8 +77,6 @@ pub(crate) struct DrawBuffers {
     /// Bytes written since the last [`Self::take_written`] (`Debug.Stats`'
     /// `render_upload_bytes`).
     written: u64,
-    /// The material bytes last written, so an unchanged array is not rewritten.
-    last_materials: Vec<u8>,
     bind_group: wgpu::BindGroup,
     /// The identity joint alone, for overlays (they bind their own uniform).
     default_bones: wgpu::Buffer,
@@ -88,7 +90,7 @@ impl DrawBuffers {
         let uniforms = GrowBuffer::new(device, "Frame Draw Uniforms", U::UNIFORM);
         let bones = GrowBuffer::new(device, "Frame Joint Matrices", U::STORAGE);
         let instances = GrowBuffer::new(device, "Frame Instances", U::STORAGE);
-        let materials = GrowBuffer::new(device, "Frame Materials", U::STORAGE);
+        let materials = GrowBuffer::new(device, "Material Records", U::STORAGE | U::COPY_SRC);
         let proxies = GrowBuffer::new(device, "Frame Proxy Volumes", U::STORAGE);
         // Copyable, so a test can read back that it mirrors the table.
         let objects = GrowBuffer::new(device, "Object Records", U::STORAGE | U::COPY_SRC);
@@ -130,15 +132,14 @@ impl DrawBuffers {
             proxies,
             objects,
             written: 0,
-            last_materials: Vec::new(),
             bind_group,
             default_bones,
             identity_instance,
         }
     }
 
-    /// Write one camera's draw data, and the object slots that changed since the
-    /// last upload. Rebuilds the bind group only when a buffer had to grow.
+    /// Write one camera's draw data, and the object and material slots that changed
+    /// since the last upload. Rebuilds the bind group only when a buffer had to grow.
     pub(crate) fn upload(
         &mut self,
         device: &wgpu::Device,
@@ -150,21 +151,15 @@ impl DrawBuffers {
             uniforms,
             joints,
             instances,
-            materials,
             proxies,
             objects,
+            materials,
         } = frame;
         let uniform_bytes = uniform_array_bytes(uniforms);
         let bone_bytes = joint_array_bytes(joints);
-        let material_bytes: &[u8] = bytemuck::cast_slice(materials);
-        // Equal bytes are an equal length, so a skipped write never misses a growth.
-        let materials_changed = material_bytes != self.last_materials.as_slice();
-        let materials_grew = materials_changed && {
-            self.last_materials.clear();
-            self.last_materials.extend_from_slice(material_bytes);
-            self.written += material_bytes.len() as u64;
-            self.materials.upload(device, queue, material_bytes)
-        };
+        let gpu = (device, queue);
+        let materials_grew =
+            objects::sync_table(gpu, &mut self.materials, materials, &mut self.written);
 
         self.written += (uniform_bytes.len() + bone_bytes.len()) as u64;
         self.written += (std::mem::size_of_val(instances) + std::mem::size_of_val(proxies)) as u64;

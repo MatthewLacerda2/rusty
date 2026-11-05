@@ -13,7 +13,7 @@ use super::super::bake::progress::BakeLog;
 use crate::api::{global_table, put, ApiCell, ApiCtx, Reg};
 use crate::scene::lighting::lightmap::BakeSettings;
 use crate::scene::lighting::settings::ReflectionSettings;
-use crate::scene::lighting::DiffuseModel;
+use crate::scene::lighting::{DiffuseModel, MixedLightingMode};
 use crate::scene::Scene;
 
 /// The knobs a script may override, each optional; `None` keeps `base`'s.
@@ -104,6 +104,7 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
             out.set("directional", s.directional)?;
             out.set("maxLightmapSize", s.max_lightmap_size)?;
             out.set("diffuseModel", settings.diffuse_model.name())?;
+            out.set("mixedLightingMode", settings.mixed_lighting_mode.name())?;
             put_reflections(&out, &r)?;
             Ok(out)
         }),
@@ -125,10 +126,12 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
 fn set_settings(scene: &mut crate::scene::Scene, t: &Table) -> mlua::Result<()> {
     let overrides = Overrides::from_table(t)?;
     let model = diffuse_model(t)?;
+    let mixed = mixed_lighting_mode(t)?;
     let mut reflections = scene.lighting_settings.reflections;
     set_reflections(t, &mut reflections)?;
     let settings = &mut scene.lighting_settings;
     settings.diffuse_model = model.unwrap_or(settings.diffuse_model);
+    settings.mixed_lighting_mode = mixed.unwrap_or(settings.mixed_lighting_mode);
     settings.lightmaps = overrides.apply(settings.lightmaps);
     settings.reflections = reflections;
     Ok(())
@@ -142,6 +145,19 @@ fn diffuse_model(t: &Table) -> mlua::Result<Option<DiffuseModel>> {
     DiffuseModel::from_name(&name).map(Some).ok_or_else(|| {
         mlua::Error::runtime(format!(
             "unknown diffuseModel '{name}' (Lambert or HalfLambert)"
+        ))
+    })
+}
+
+/// The Mixed Lighting Mode `t` names (#1695), if any; an unknown name is an error.
+fn mixed_lighting_mode(t: &Table) -> mlua::Result<Option<MixedLightingMode>> {
+    let Some(name) = t.get::<Option<String>>("mixedLightingMode")? else {
+        return Ok(None);
+    };
+    MixedLightingMode::parse(&name).map(Some).ok_or_else(|| {
+        mlua::Error::runtime(format!(
+            "unknown mixedLightingMode '{name}' ({})",
+            MixedLightingMode::names()
         ))
     })
 }

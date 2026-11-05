@@ -16,6 +16,7 @@ fn page_fillers(n: usize) -> Vec<Lightmap> {
     let size = max_map_edge(32);
     (0..n as u32)
         .map(|entity| Lightmap {
+            masks: Vec::new(),
             entity,
             size,
             texels: vec![Vec3::ONE; (size * size) as usize],

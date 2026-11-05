@@ -24,11 +24,14 @@ use super::{ClusterGrid, LocalLight};
 use crate::components::{LightComponent, LightType};
 use crate::ecs::{Activity, Changes, Cursor, World, WorldPose};
 use crate::render::gpu::grow_buffer::GrowBuffer;
+use crate::scene::revision::Revision;
 use crate::scene::{Scene, SceneId};
 
 /// The change cursors the list is kept by, and the scene they read.
 struct Kept {
     scene: SceneId,
+    /// The bake's record (#1695): a rebake can turn a `Mixed` light `Baked`.
+    lightmaps: Revision,
     light: Cursor<LightComponent>,
     pose: Cursor<WorldPose>,
     activity: Cursor<Activity>,
@@ -97,9 +100,15 @@ impl BakedLamps {
     /// rebuild the log asks for, or a changed id that is or was a light.
     fn changed(&mut self, scene: &Scene) -> bool {
         let world = &scene.world;
-        let Some(kept) = self.kept.as_mut().filter(|k| k.scene == scene.id()) else {
+        let rebaked = |k: &Kept| k.lightmaps != scene.lightmaps.revision();
+        let Some(kept) = self
+            .kept
+            .as_mut()
+            .filter(|k| k.scene == scene.id() && !rebaked(k))
+        else {
             self.kept = Some(Kept {
                 scene: scene.id(),
+                lightmaps: scene.lightmaps.revision(),
                 light: world.change_cursor(),
                 pose: world.change_cursor(),
                 activity: world.change_cursor(),
@@ -112,7 +121,7 @@ impl BakedLamps {
             Changes::Rebuild => true,
             Changes::Ids(ids) => ids
                 .iter()
-                .any(|&id| listed.contains(&id) || is_baked_lamp(world, id)),
+                .any(|&id| listed.contains(&id) || is_baked_lamp(scene, id)),
         };
         let light = touches(world.changes(&mut kept.light), &self.listed);
         let pose = touches(world.changes(&mut kept.pose), &self.listed);
@@ -144,10 +153,12 @@ impl BakedLamps {
 /// false for it), active or not. Area lights are left out: always `Baked`, they
 /// would enter as an unshadowed far-field stand-in of `intensity × area`, and a
 /// panel's light in the air is not a lamp's halo; a panel gives no halo yet.
-fn is_baked_lamp(world: &World, id: u32) -> bool {
-    world.light(id).is_some_and(|l| {
+/// A `Mixed` light the last bake baked as `Baked` (#1695, `Scene::light_mode`)
+/// is one too.
+fn is_baked_lamp(scene: &Scene, id: u32) -> bool {
+    scene.world.light(id).is_some_and(|l| {
         matches!(l.light_type, LightType::Point | LightType::Spotlight)
-            && !l.effective_mode().renders_live(false)
+            && !scene.light_mode(id, &l).renders_live(false)
     })
 }
 
@@ -157,7 +168,7 @@ fn baked_ids(scene: &Scene) -> impl Iterator<Item = u32> + '_ {
     world
         .ids_with_light()
         .into_iter()
-        .filter(move |&id| world.is_active_in_hierarchy(id) && is_baked_lamp(world, id))
+        .filter(move |&id| world.is_active_in_hierarchy(id) && is_baked_lamp(scene, id))
 }
 
 /// [`baked_ids`]' records, unshadowed.

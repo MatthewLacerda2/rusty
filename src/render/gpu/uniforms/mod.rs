@@ -143,7 +143,10 @@ pub(crate) struct DirectionalLightUniform {
     /// 1.0 when the scene's lightmap bake took this light in (#1750,
     /// `LightmapSet::baked_light`): SSIL gathers none of its light.
     pub bounce_baked: f32,
-    pub _pad2: [f32; 2],
+    /// Its shadowmask channel (#1695, `LightmapSet::channels`), `0.0..=3.0`; `-1.0`
+    /// for none, and always under `BakedIndirect`.
+    pub mask_channel: f32,
+    pub _pad2: f32,
 }
 
 /// The most directional lights shaded at once (#434); slot 0 is the sun, the one
@@ -173,7 +176,13 @@ pub(crate) struct LightingUniform {
     // 0.0 in every bake capture (`CaptureMode::static_only`), so a view-dependent
     // highlight is never frozen into a probe. The pad keeps the probe array aligned.
     pub baked_specular: f32,
-    pub _pad_baked_specular: [f32; 3],
+    // `shadowmask` (#1695): 0.0 off (the scene on `BakedIndirect`, or no bake gave
+    // a light a channel), 1.0 `Shadowmask`, 2.0 `DistanceShadowmask` (the running
+    // quality preset's `shadowmask_mode`). `masks_bound` 1.0 when the shadowmask
+    // pages are bound beside the lightmaps.
+    pub shadowmask: f32,
+    pub masks_bound: f32,
+    pub _pad_baked_specular: f32,
     // The resident reflection probes (#1206): a draw's instance names the two it
     // blends (`InstanceData::reflection_probe`, #1584), and the shader box-projects
     // against each one's box and samples its cube's layer of the binding-4 cube array.

@@ -9,17 +9,21 @@
 //! material decides: tint, PBR scalars, map flags, emissive, cutout, the decal and
 //! lit flags, and the [`SurfaceUniform`] and [`MappingUniform`] terms.
 //!
-//! Records are keyed by their packed bytes ([`RecordTable`](super::RecordTable)):
-//! every frame each distinct record is stored once, sorted by its bytes
-//! (`render::draw::batch::FrameDraws::pack`), so draws with identical material values
-//! share one, a camera that moves and reorders the draws packs the same array while it
-//! sees the same materials, and the array is written to the GPU only when its bytes
-//! changed since the last upload (`DrawBuffers::upload`).
+//! A solid's record is kept (#1706): one per scene, library material and variant
+//! (`render::scene::MaterialRecords`), at a slot of the renderer's material table,
+//! written to the GPU only where it changed. The per-draw uniform names the slot (its
+//! value class's least, so equal records batch), so a colour edit rewrites one record
+//! and no camera packs records. The
+//! editor overlays still pack theirs per frame ([`RecordTable`](super::RecordTable)),
+//! one per distinct tint.
 //!
 //! **Adding a material field.** Add it to [`MaterialData`] (spend a `_pad` word, or
 //! append a 16-byte run at the end, keeping the size a multiple of 16), mirror it in
 //! `MaterialData` in `engine/shaders/forward/bindings.wgsl` at the same offset, set it
-//! in `render::draw::uniforms::material_data`, add its row to
+//! in `render::draw::uniforms::material_data` (a value the CPU decides a pass by also
+//! goes into `render::draw::batch::RecordTraits`; an asset field it reads alone goes
+//! into `render::scene::records::record_free`, so an edit of it rewrites the record
+//! in place instead of re-deriving the material's users), add its row to
 //! `uniform_layout_tests::draw`, and read it in WGSL as `material().<field>`. The
 //! per-draw uniform and its 256-byte stride are untouched; the record has no fixed cap
 //! (a storage array's element is as large as its struct).
@@ -93,8 +97,8 @@ const _: () = assert!(std::mem::size_of::<MaterialData>().is_multiple_of(16));
 pub(crate) const MATERIAL_DATA_WORDS: usize = std::mem::size_of::<MaterialData>() / 4;
 
 impl MaterialData {
-    /// The record as plain words: the batch key compares these bit-for-bit, so two
-    /// draws share a batch only when every material scalar and flag is identical.
+    /// The record as plain words, compared bit for bit: the overlays fold equal
+    /// tints into one record ([`super::RecordTable`]).
     pub(crate) fn words(&self) -> [u32; MATERIAL_DATA_WORDS] {
         let mut words = [0u32; MATERIAL_DATA_WORDS];
         words.copy_from_slice(bytemuck::cast_slice(bytemuck::bytes_of(self)));

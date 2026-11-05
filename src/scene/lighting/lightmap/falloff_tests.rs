@@ -72,6 +72,7 @@ fn bounce_under_a_ceiling_lamp() -> Vec<f32> {
         },
         radiance: Vec3::splat(3.5),
         bakes_direct: true,
+        mask_channel: None,
     };
     let scene = lit(vec![lamp], vec![floor(), ceiling]);
     let rays = Rays::build(triangles(&scene));

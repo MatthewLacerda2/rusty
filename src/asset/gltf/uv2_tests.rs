@@ -71,6 +71,7 @@ fn bake_input(mesh: &SubMesh) -> crate::scene::lighting::lightmap::BakeScene {
     let field =
         |f: fn(&crate::asset::MeshVertex) -> glam::Vec3| mesh.vertices.iter().map(f).collect();
     BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![BakeMesh {
             entity: 1,
             positions: field(|v| v.position.into()),

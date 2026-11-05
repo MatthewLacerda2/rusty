@@ -142,7 +142,7 @@ fn gpu_a_static_flag_flip_rebakes_with_no_one_invalidating() {
     let key = super::super::statics_key(&scene);
     let baked: Vec<_> = r.shadow_renderer.static_cache.iter().flatten().collect();
     assert!(
-        !baked.is_empty() && baked.iter().all(|(k, _)| *k == key),
+        !baked.is_empty() && baked.iter().all(|(k, _, _)| *k == key),
         "cascades too"
     );
     frame(&mut r, &mut view, &scene);

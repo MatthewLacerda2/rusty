@@ -32,9 +32,13 @@ crate::core::named_enum! {
     ///
     /// * `Realtime` — direct light and shadows every frame; neither the lightmap bake nor
     ///   the probe bake sees it, so it bounces nowhere.
-    /// * `Mixed` — Unity's *Baked Indirect*: realtime direct light and shadows, plus its
-    ///   bounce baked into lightmaps and light probes. The default, because it is what
-    ///   every light did before modes existed (rendered live, bounced into the probe bake).
+    /// * `Mixed` — realtime direct light and shadows, plus its bounce baked into
+    ///   lightmaps and light probes. The default, because it is what every light did
+    ///   before modes existed (rendered live, bounced into the probe bake). What else
+    ///   it bakes is the scene's `MixedLightingMode` (#1695): nothing under
+    ///   `BakedIndirect` (Unity's *Baked Indirect*), its static occlusion under
+    ///   `Shadowmask`, where a light that finds no free mask channel bakes as `Baked`
+    ///   (`Scene::light_mode`).
     /// * `Baked` — direct and bounce both baked, and never drawn live (#809): static
     ///   surfaces get it from their lightmap, dynamic objects from the light probes (whose
     ///   bake adds its direct light). It costs nothing at runtime and casts no realtime
@@ -83,7 +87,8 @@ pub struct LightComponent {
     /// Whether a point or spot light casts shadows, through the shadow atlas (#468).
     /// Off by default, as in Unity: each shadowed light costs atlas space and a depth
     /// pass per tile (six for a point light). The sun ignores it and always casts its
-    /// cascades.
+    /// cascades. Under a `Shadowmask` scene it is also what gives a `Mixed` point or
+    /// spot light a mask channel (#1695), as in Unity.
     #[serde(default)]
     pub cast_shadows: bool,
     /// Realtime / Mixed / Baked (#438); `Mixed` when the file names none.

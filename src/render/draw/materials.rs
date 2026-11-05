@@ -102,19 +102,6 @@ impl Renderer {
             .unwrap_or_else(|| Rc::clone(&self.default_texture))
     }
 
-    /// Entity `id`'s material record for `material`
-    /// ([`super::uniforms::solid_material_data`]), its map channels set by what
-    /// is resident ([`Self::with_map_channels`]).
-    pub(crate) fn solid_material(
-        &self,
-        scene: &Scene,
-        id: u32,
-        material: Option<&MaterialAsset>,
-    ) -> MaterialData {
-        let record = super::uniforms::solid_material_data(scene, id, material);
-        self.with_map_channels(record, material)
-    }
-
     /// `record` with its metallic and roughness flags set to 2 where the map is
     /// resident and of Texture Type `SingleChannel` (#1574), BC4 or not yet: the
     /// shader then reads its red channel instead of glTF's packed blue and green,

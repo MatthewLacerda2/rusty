@@ -32,17 +32,24 @@
 //! beside a bound colour array whose page count and size they match; otherwise the
 //! zeroed fallback stands in, never read: an instance reads its direction page only
 //! when one is bound (`ObjectData::lightmap_directional`, [`Lightmaps::directional`]).
+//!
+//! A `Shadowmask` bake (#1695) adds its shadowmask pages as a third array at
+//! binding 19 (RGBA8 PNGs, their mips made on load), bound under the same rule
+//! beside a matching colour array; the shader reads it only while the lighting
+//! uniform's `masks_bound` says so ([`Lightmaps::masked`]).
 
 mod load;
 mod upload;
+mod worker;
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::mpsc::{channel, Receiver, TryRecvError};
+use std::sync::mpsc::{Receiver, TryRecvError};
 
 use crate::core::fs::written::{written_since, Stale};
 use load::{Kind, Loaded};
-use upload::{create, fits, upload, LightmapArray};
+use upload::{create, LightmapArray};
+use worker::{finish, start};
 
 /// A page list's array: uploaded (or failed), or still being read.
 enum Entry {
@@ -52,10 +59,12 @@ enum Entry {
 
 /// What group 0 binds for lightmaps, and the arrays built so far.
 pub(crate) struct Lightmaps {
-    /// The colour and direction page lists bound now (empty: the fallback).
-    bound: (Vec<String>, Vec<String>),
+    /// The colour, direction and shadowmask page lists bound now (empty: the
+    /// fallback).
+    bound: [Vec<String>; 3],
     current: Option<Rc<LightmapArray>>,
     directions: Option<Rc<LightmapArray>>,
+    masks: Option<Rc<LightmapArray>>,
     /// Arrays by page list, colour and direction alike.
     cache: HashMap<Vec<String>, Entry>,
     /// A 1×1×1 black array, bound when the scene has no lightmaps.
@@ -72,9 +81,10 @@ impl Lightmaps {
     pub(crate) fn new(device: &wgpu::Device, in_line: bool) -> Self {
         let fallback = create(device, wgpu::TextureFormat::Rgba8Unorm, 1, 1, 1);
         Self {
-            bound: (Vec::new(), Vec::new()),
+            bound: Default::default(),
             current: None,
             directions: None,
+            masks: None,
             cache: HashMap::new(),
             fallback,
             seen: written_since(u64::MAX).0,
@@ -82,8 +92,9 @@ impl Lightmaps {
         }
     }
 
-    /// Bind the arrays of `pages` and their `directions` (#810; empty for a
-    /// non-directional bake), starting each one's load on first sight. Returns
+    /// Bind the arrays of `pages`, their `directions` (#810; empty for a
+    /// non-directional bake) and their shadowmask `masks` (#1695; empty unless a
+    /// `Shadowmask` bake), starting each one's load on first sight. Returns
     /// whether the binding changed, so the caller rebuilds group 0.
     pub(crate) fn bind(
         &mut self,
@@ -91,14 +102,16 @@ impl Lightmaps {
         queue: &wgpu::Queue,
         pages: &[String],
         directions: &[String],
+        masks: &[String],
     ) -> bool {
         let rewritten = self.drop_rewritten();
         let landed = self.land(device, queue);
-        let same = self.bound.0 == pages && self.bound.1 == directions;
+        let lists = [pages, directions, masks];
+        let same = self.bound.iter().zip(lists).all(|(b, l)| b == l);
         if same && !rewritten && !landed {
             return false;
         }
-        self.bound = (pages.to_vec(), directions.to_vec());
+        self.bound = lists.map(|l| l.to_vec());
         let bc = device
             .features()
             .contains(wgpu::Features::TEXTURE_COMPRESSION_BC);
@@ -107,9 +120,13 @@ impl Lightmaps {
         let directions = self
             .array(device, queue, directions, Kind::Direction, bc)
             .filter(|d| Some(d.shape) == shape);
-        let changed =
-            !same_array(&current, &self.current) || !same_array(&directions, &self.directions);
-        (self.current, self.directions) = (current, directions);
+        let masks = self
+            .array(device, queue, masks, Kind::Mask, bc)
+            .filter(|m| Some(m.shape) == shape);
+        let changed = !same_array(&current, &self.current)
+            || !same_array(&directions, &self.directions)
+            || !same_array(&masks, &self.masks);
+        (self.current, self.directions, self.masks) = (current, directions, masks);
         changed || !same
     }
 
@@ -144,7 +161,7 @@ impl Lightmaps {
         }
         let touches = |list: &[String]| list.iter().any(|p| stale.matches(p));
         self.cache.retain(|list, _| !touches(list));
-        touches(&self.bound.0) || touches(&self.bound.1)
+        self.bound.iter().any(|list| touches(list))
     }
 
     /// The (cached) array of `pages`; `None` for no pages, one that won't load, or
@@ -207,7 +224,8 @@ impl Lightmaps {
             _ => None,
         });
         let cached: Vec<&Rc<LightmapArray>> = cached.collect();
-        let bound = [&self.current, &self.directions].into_iter().flatten();
+        let bound = [&self.current, &self.directions, &self.masks];
+        let bound = bound.into_iter().flatten();
         let uncached = bound.filter(|b| !cached.iter().any(|c| Rc::ptr_eq(c, b)));
         cached
             .iter()
@@ -222,13 +240,33 @@ impl Lightmaps {
         self.directions.is_some()
     }
 
-    /// The bound colour and direction views and their sampler (the fallback's when
-    /// none is).
-    pub(crate) fn binding(&self) -> (&wgpu::TextureView, &wgpu::TextureView, &wgpu::Sampler) {
+    /// Whether shadowmask pages are bound beside it (#1695).
+    pub(crate) fn masked(&self) -> bool {
+        self.masks.is_some()
+    }
+
+    /// The bound colour, direction and shadowmask views and their sampler (the
+    /// fallback's when none is).
+    pub(crate) fn binding(&self) -> LightmapBinding<'_> {
         let array = self.current.as_deref().unwrap_or(&self.fallback);
         let directions = self.directions.as_deref().unwrap_or(&self.fallback);
-        (&array.view, &directions.view, &array.sampler)
+        let masks = self.masks.as_deref().unwrap_or(&self.fallback);
+        LightmapBinding {
+            pages: &array.view,
+            directions: &directions.view,
+            masks: &masks.view,
+            sampler: &array.sampler,
+        }
     }
+}
+
+/// What group 0 binds of the lightmaps: the colour (14), direction (16) and
+/// shadowmask (19) arrays, and the sampler all three read through (15).
+pub(crate) struct LightmapBinding<'a> {
+    pub pages: &'a wgpu::TextureView,
+    pub directions: &'a wgpu::TextureView,
+    pub masks: &'a wgpu::TextureView,
+    pub sampler: &'a wgpu::Sampler,
 }
 
 /// Whether two bindings are the same array (or both none).
@@ -237,40 +275,6 @@ fn same_array(a: &Option<Rc<LightmapArray>>, b: &Option<Rc<LightmapArray>>) -> b
         (Some(a), Some(b)) => Rc::ptr_eq(a, b),
         (None, None) => true,
         _ => false,
-    }
-}
-
-/// Read `list` on a worker; it wakes a frame when it is done.
-fn start(list: Vec<String>, kind: Kind, bc: bool) -> Receiver<Result<Loaded, String>> {
-    let (outbox, inbox) = channel();
-    let spawned = std::thread::Builder::new()
-        .name("lightmap-load".into())
-        .spawn(move || {
-            // A renderer gone meanwhile has dropped the inbox: nothing to tell.
-            let _ = outbox.send(load::load(&list, kind, bc));
-            crate::core::wake::frame();
-        });
-    if let Err(e) = spawned {
-        log::warn!("[Lightmap] cannot start the page loader: {e}");
-    }
-    inbox
-}
-
-/// Upload a finished load, or warn of why it failed: unreadable, or more or larger
-/// pages than the device's limits take (`fits`, #1704).
-fn finish(
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    list: &[String],
-    result: Result<Loaded, String>,
-) -> Option<Rc<LightmapArray>> {
-    let limits = device.limits();
-    match result.and_then(|l| fits(&limits, l.edge, l.layers.len()).map(|()| l)) {
-        Ok(loaded) => Some(Rc::new(upload(device, queue, &loaded))),
-        Err(e) => {
-            log::warn!("[Lightmap] cannot load the pages {list:?}: {e}");
-            None
-        }
     }
 }
 

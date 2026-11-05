@@ -107,6 +107,9 @@ struct DirectionalLight {
     baked: f32,
     // 1.0 when the lightmap bake took this light in: SSIL gathers none (#1750).
     bounce_baked: f32,
+    // Its shadowmask channel (#1695, `LightmapSet::channels`), 0 to 3; -1 for none,
+    // and always -1 unless the scene is on `Shadowmask` (`lighting.shadowmask`).
+    mask_channel: f32,
 };
 
 struct LightingUniforms {
@@ -130,8 +133,13 @@ struct LightingUniforms {
     // (`forward::lightmap::baked_specular`, #1695); 0.0 in every bake capture, so a
     // view-dependent highlight is never frozen into a probe.
     baked_specular: f32,
+    // The scene's shadowmask (#1695): 0 off (`BakedIndirect`, or no bake gave a
+    // channel), 1 `Shadowmask`, 2 `DistanceShadowmask` (the quality preset's mode).
+    shadowmask: f32,
+    // 1.0 when the shadowmask pages are bound beside the lightmaps.
+    masks_bound: f32,
     // Scalars, not a vec3, which would align to 16 and move `refl_probes`.
-    baked_specular_pad_a: f32, baked_specular_pad_b: f32, baked_specular_pad_c: f32,
+    baked_specular_pad_c: f32,
     // The resident reflection probes (#1206); a draw's instance names the two it
     // blends (`InstanceData.reflection_probe`, packed indices + 1 and weights, #1584). Length is the Rust
     // `MAX_REFLECTION_PROBES`. Mirrors the Rust `LightingUniform` byte-for-byte.
@@ -161,7 +169,8 @@ struct LocalLight {
     near: f32,
     // 1.0 when the lightmap bake took this light in: SSIL gathers none (#1750).
     bounce_baked: f32,
-    _pad: f32,
+    // Its shadowmask channel (#1695), as `DirectionalLight::mask_channel`.
+    mask_channel: f32,
 };
 
 // The light cluster `world` falls in: its screen tile (from `view_proj`) and its

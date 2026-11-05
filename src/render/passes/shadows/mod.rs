@@ -32,7 +32,7 @@ use clips::Clip;
 use glam::Mat4;
 
 pub(crate) use casters::{shadow_runs, ShadowRun};
-pub(crate) use clips::{moves, slot_clip, CasterClip};
+pub(crate) use clips::{moves, slot_clip, CasterClip, Cutout};
 pub(crate) use setup::{depth_pipeline, lazy_depth_pipeline};
 #[cfg(test)]
 pub(crate) use statics::statics_key;
@@ -73,7 +73,11 @@ pub struct ShadowRenderer {
     /// and the Inspector preview) from sampling each other's statics; naming the
     /// light volume re-bakes a cascade exactly when it moved (the camera crossed its
     /// snap grid, or the sun turned) and never otherwise.
-    static_cache: [Option<(StaticsKey, Mat4)>; MAX_CASCADES],
+    static_cache: [Option<(StaticsKey, Mat4, bool)>; MAX_CASCADES],
+    /// Whether the sun's static casters are baked into its cascades: false for a
+    /// shadowmasked sun under `Shadowmask` (#1695), whose static shadow is the
+    /// baked mask's. Set each frame by `Renderer::run_shadow_passes`.
+    pub(crate) sun_statics: bool,
 
     global_bind_group: wgpu::BindGroup,
     global_layout: wgpu::BindGroupLayout,
@@ -148,6 +152,7 @@ impl ShadowRenderer {
             light_space_buffer,
             cascades: Vec::new(),
             static_cache: [None; MAX_CASCADES],
+            sun_statics: true,
             global_bind_group,
             global_layout,
             entity_layout,
@@ -214,7 +219,7 @@ impl ShadowRenderer {
         let count = self.cascades.len().max(1);
         self.static_cache[..count]
             .iter()
-            .any(|baked| baked.map(|(k, _)| k) != Some(key))
+            .any(|baked| baked.map(|(k, _, _)| k) != Some(key))
     }
 
     /// Drop every static bake — the cascades' and the atlas tiles' (#694) — so the
@@ -249,6 +254,9 @@ impl ShadowRenderer {
 
 #[cfg(test)]
 mod cache_tests;
+
+#[cfg(all(test, feature = "dev"))]
+mod shadowmask;
 
 #[cfg(test)]
 mod casting_tests;

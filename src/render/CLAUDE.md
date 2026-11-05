@@ -44,8 +44,19 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   per-object value the shader reads goes into `ObjectData` (Rust and
   `forward/bindings.wgsl`), written in `pose_object`; a per-view one into
   `InstanceData`, and the fragment stage gets it through `VertexOutput::instance`,
-  since it is at its 8 storage buffers and never binds the instances. A library edit
-  re-derives only the objects naming that material (`RenderScene::by_material`).
+  since it is at its 8 storage buffers and never binds the instances.
+- **A material's record lives on the GPU in its slot too** (part 4 of #1706): one
+  `MaterialData` per (scene, library material, `Variant`) in the material table
+  (`scene/records.rs`), written where it changed; a batch key names the slot
+  (`BatchKey::record`) and carries what the CPU decides a pass by
+  (`BatchKey::traits`). Each frame names a slot by its value class's least slot
+  (`scene/classes.rs`, `MaterialRecords::rep`) before it batches, so equal records
+  under different names (each entity's own `Material.Set*` material) share a draw;
+  a record is written only through `MaterialRecords`, which keeps the classes. A library edit that moves only a record's values (a colour,
+  a scalar, the params: `records::rekeys` false) rewrites its records and param buffer
+  in place and re-derives no object; any other edit re-derives only the objects naming
+  that material (`RenderScene::by_material`). A record never reads the entity: a
+  per-object input is a `Variant`, the object record, or the instance.
 - **Occlusion culling reads the scene's baked PVS** (#1714, `scene/occlusion/`):
   bound per scene and re-checked against a baked object's fingerprint only after
   that static object changed (a whole bind when the PVS, the objects or the

@@ -16,7 +16,7 @@
 use glam::{Vec3, Vec4};
 
 use super::atlas::MIP_LEVELS;
-use super::encode::encode_direction;
+use super::encode::{encode_direction, encode_mask};
 use super::raster::Texel;
 use crate::asset::lightmap_page::{self, encode_bc6h, encode_bc7, Page};
 
@@ -68,6 +68,15 @@ pub fn direction_levels(page: &[Vec4], edge: u32) -> Vec<Vec<[u8; 4]>> {
     chain(page, edge)
         .iter()
         .map(|level| level.iter().map(|&d| encode_direction(d)).collect())
+        .collect()
+}
+
+/// A shadowmask page's levels as RGBA8 texels (#1695, `encode::encode_mask`): a
+/// mip averages occlusion as it averages light, so a far shadow edge softens.
+pub fn mask_levels(page: &[Vec4], edge: u32) -> Vec<Vec<[u8; 4]>> {
+    chain(page, edge)
+        .iter()
+        .map(|level| level.iter().map(|&m| encode_mask(m)).collect())
         .collect()
 }
 

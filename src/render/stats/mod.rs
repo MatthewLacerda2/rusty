@@ -163,8 +163,8 @@ pub struct RenderCounters {
     /// CPU microseconds the extract took (#1706), inside `renderer_ms`. Wall-clock.
     pub render_extract_us: u64,
     /// Bytes this frame wrote into the forward pass's group-1 arrays (#1706), every
-    /// camera summed: per-draw uniforms, joints, instances, the material records
-    /// when they changed, proxy volumes and the object records that changed.
+    /// camera summed: per-draw uniforms, joints, instances, proxy volumes, and the
+    /// object and material records that changed.
     pub render_upload_bytes: u64,
 }
 

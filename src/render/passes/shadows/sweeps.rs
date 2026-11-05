@@ -25,7 +25,8 @@ impl ShadowRenderer {
         }
         let scene = frame.scene;
         let statics = frame.statics;
-        let key = |c: &Cascade| Some((statics, c.light_space));
+        let with_statics = self.sun_statics;
+        let key = |c: &Cascade| Some((statics, c.light_space, with_statics));
         let stale: Vec<usize> = (0..self.cascades.len())
             .filter(|&i| self.static_cache[i] != key(&self.cascades[i]))
             .collect();
@@ -33,11 +34,18 @@ impl ShadowRenderer {
             // The bake outlives the frame, so it cannot follow the camera's LOD
             // choice: it bakes every group at LOD0 (#472).
             let finest = LodSelection::finest(scene);
-            let volumes: Vec<Mat4> = stale
-                .iter()
-                .map(|&i| self.cascades[i].light_space)
-                .collect();
-            let batches = self.prepare_casters(frame, &finest, Sweep::Static, &volumes);
+            // A shadowmasked sun keeps its statics out (#1695): its layers are
+            // cleared only, and no static caster is culled for them.
+            let batches = match with_statics {
+                true => {
+                    let volumes: Vec<Mat4> = stale
+                        .iter()
+                        .map(|&i| self.cascades[i].light_space)
+                        .collect();
+                    self.prepare_casters(frame, &finest, Sweep::Static, &volumes)
+                }
+                false => stale.iter().map(|_| Vec::new()).collect(),
+            };
             for (&i, batches) in stale.iter().zip(&batches) {
                 let view = &self.static_layers[i];
                 let mut pass = depth_pass(encoder, frame, "Shadow Static Pass", view, true);

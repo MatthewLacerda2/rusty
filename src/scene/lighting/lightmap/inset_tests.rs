@@ -86,6 +86,7 @@ fn floor_at_wall() -> BakeScene {
     );
     wall.lightmap_uvs = vec![Vec2::ZERO; 4];
     BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor, wall],
         lights: vec![BakeLight {
             shape: LightShape::Directional {
@@ -93,6 +94,7 @@ fn floor_at_wall() -> BakeScene {
             },
             radiance: Vec3::splat(3.0),
             bakes_direct: true,
+            mask_channel: None,
         }],
         sky: Vec3::splat(0.5).into(),
         diffuse: Default::default(),

@@ -17,6 +17,7 @@ fn texels(maps: &[Lightmap], entity: u32) -> (Vec<Vec4>, Vec4) {
 
 fn scene(meshes: Vec<BakeMesh>, lights: Vec<BakeLight>, sky: f32) -> BakeScene {
     BakeScene {
+        shadowmask: Default::default(),
         meshes,
         lights,
         sky: Vec3::splat(sky).into(),

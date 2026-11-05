@@ -11,8 +11,8 @@ use std::path::Path;
 
 use crate::asset::lightmap_page::{self, Page};
 use crate::scene::lighting::lightmap::{
-    check_page_count, colour_page, direction_page, encode_directions, encode_texels, pack,
-    BakeProgress, Lightmap, LightmapEntry, LightmapSet, MAX_PAGES,
+    check_page_count, colour_page, direction_page, encode_directions, encode_masks, encode_texels,
+    pack, BakeProgress, Lightmap, LightmapEntry, LightmapSet, MaskChannels, MAX_PAGES,
 };
 use crate::scene::Scene;
 
@@ -32,6 +32,12 @@ pub struct EncodedPages {
     /// The lights the bake took in (`LightmapSet::lights`, #1750), set by whoever
     /// gathered its input (`taken_lights`); empty from [`encode_pages`].
     pub lights: std::collections::BTreeSet<u32>,
+    /// Per shadowmask page (#1695): its RGBA8 PNG file's bytes. Empty unless the
+    /// bake gave a light a channel.
+    pub masks: Vec<Vec<u8>>,
+    /// The bake's shadowmask channels (`BakeScene::shadowmask`), set like
+    /// `lights`; empty from [`encode_pages`].
+    pub shadowmask: MaskChannels,
 }
 
 /// Pack `maps` into pages of at most `max_page` texels a side (the bake's
@@ -50,7 +56,8 @@ pub fn encode_pages(
     check_page_count(maps, max_page, MAX_PAGES)?;
     let atlas = pack(maps, max_page);
     let size = atlas.page_size;
-    progress.start_pages((atlas.pages.len() + atlas.directions.len()) as u64);
+    let total = atlas.pages.len() + atlas.directions.len() + atlas.masks.len();
+    progress.start_pages(total as u64);
     let stop = || progress.is_cancelled();
     let mut colour = Vec::with_capacity(atlas.pages.len());
     for texels in &atlas.pages {
@@ -66,6 +73,15 @@ pub fn encode_pages(
             return Ok(None);
         };
         directions.push((page, png(size, encode_directions(dirs))?));
+        progress.page_done();
+    }
+    // A mask page is its RGBA8 PNG alone: the loader makes its mips (#1695).
+    let mut masks = Vec::with_capacity(atlas.masks.len());
+    for mask in &atlas.masks {
+        if stop() {
+            return Ok(None);
+        }
+        masks.push(png(size, encode_masks(mask))?);
         progress.page_done();
     }
     let entries = atlas
@@ -84,7 +100,15 @@ pub fn encode_pages(
         directions,
         entries,
         lights: Default::default(),
+        masks,
+        shadowmask: MaskChannels::default(),
     }))
+}
+
+/// What one `size`² shadowmask page takes on the GPU: RGBA8 with its mips.
+fn mask_gpu_bytes(size: u32) -> usize {
+    let levels = crate::scene::lighting::lightmap::level_count(size);
+    (0..levels).map(|l| ((size >> l) as usize).pow(2) * 4).sum()
 }
 
 /// A `size`² RGBA8 page as a PNG file's bytes.
@@ -121,6 +145,12 @@ pub fn apply_encoded(
     clear_old_lightmaps(&dir)?;
     scene.lightmaps.clear();
     if encoded.maps == 0 {
+        // No lightmap, but the probes still mask by these channels (#1695).
+        let mut set = LightmapSet::default();
+        set.channels = encoded.shadowmask.channels.clone();
+        set.fell_back = encoded.shadowmask.fell_back.clone();
+        warn_fell_back(&set);
+        scene.lightmaps = set.into();
         return Ok(0);
     }
     std::fs::create_dir_all(&dir).map_err(|e| format!("lightmap folder: {e}"))?;
@@ -133,20 +163,29 @@ pub fn apply_encoded(
         set.directions
             .push(write_page(&dir, "lightmap_dir", k, page, png)?);
     }
+    for (k, png) in encoded.masks.iter().enumerate() {
+        set.masks.push(write_png(&dir, "lightmap_mask", k, png)?);
+    }
     set.extend(encoded.entries.iter().cloned());
     set.lights = encoded.lights.clone();
+    set.channels = encoded.shadowmask.channels.clone();
+    set.fell_back = encoded.shadowmask.fell_back.clone();
+    warn_fell_back(&set);
+    let mask_bytes = encoded.masks.len() * mask_gpu_bytes(size);
     let bytes: usize = (encoded.colour.iter())
         .chain(&encoded.directions)
         .map(|(p, _)| p.gpu_bytes())
-        .sum();
+        .sum::<usize>()
+        + mask_bytes;
     log::info!(
         "[LightmapBake] {} lightmaps in {} page(s) of {size}²{}, {:.1} MiB on the GPU, in {}",
         encoded.maps,
         set.pages.len(),
-        if set.directions.is_empty() {
-            ""
-        } else {
-            " (directional)"
+        match (set.directions.is_empty(), set.masks.is_empty()) {
+            (true, true) => "",
+            (false, true) => " (directional)",
+            (true, false) => " (shadowmask)",
+            (false, false) => " (directional, shadowmask)",
         },
         bytes as f64 / (1024.0 * 1024.0),
         dir.display()
@@ -174,6 +213,29 @@ fn write_page(
     }
     // The scene document stores `/` paths on every OS, like its other assets (#819).
     Ok(crate::core::paths::to_slash(&ktx2_path))
+}
+
+/// Write one shadowmask page as `<dir>/<prefix>_<k>_<tag>.png` and return its path.
+fn write_png(dir: &Path, prefix: &str, k: usize, png: &[u8]) -> Result<String, String> {
+    let path = dir.join(format!("{prefix}_{k}_{:08x}.png", content_tag(png)));
+    std::fs::write(&path, png).map_err(|e| format!("write {}: {e}", path.display()))?;
+    crate::core::fs::written::note_written(&path.to_string_lossy());
+    Ok(crate::core::paths::to_slash(&path))
+}
+
+/// Say, once per bake, which `Mixed` lights found no shadowmask channel and were
+/// baked as `Baked` (#1695): more than four overlapped there.
+fn warn_fell_back(set: &LightmapSet) {
+    if set.fell_back.is_empty() {
+        return;
+    }
+    log::warn!(
+        "[LightmapBake] {} Mixed light(s) overlap 4 others and were baked as Baked \
+         (no shadowmask channel left): entities {:?}. Turn some to Baked, or shrink \
+         their range.",
+        set.fell_back.len(),
+        set.fell_back
+    );
 }
 
 /// The page's content hash, folded to 32 bits: the file name's content tag.

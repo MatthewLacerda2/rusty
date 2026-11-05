@@ -1,6 +1,7 @@
-//! The material records one bind group's draws index (#1616), shared by the solids
-//! (`FrameDraws::pack`), the editor overlays (`OverlayDraws`) and the shadow casters
-//! (`CasterRecords`).
+//! The material records one bind group's draws index (#1616): the editor overlays'
+//! (`OverlayDraws`), one per distinct tint. The solids and the shadow casters read
+//! the renderer's kept material table instead (`render::scene::MaterialRecords`,
+//! #1706).
 
 use super::{MaterialData, MATERIAL_DATA_WORDS};
 
@@ -30,6 +31,7 @@ impl RecordTable {
     }
 
     /// How many records the array holds.
+    #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.0.len()
     }

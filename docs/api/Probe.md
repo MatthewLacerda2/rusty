@@ -10,7 +10,10 @@ its whole mesh; one carrying a [`LightProbeProxyVolume`](LightProbeProxyVolume.m
 samples a grid over its bounds instead and is lit per pixel from it, so a tall
 object goes from a lit top to a dark foot. Probe POSITIONS save into the `.scene` document;
 their baked SH saves into a `<scene>.lighting.json` sidecar (heavy, regenerable data
-kept out of the diffable scene file).
+kept out of the diffable scene file), with each probe's shadowmask occlusion beside it
+after a `Shadowmask` bake (#1695; [`Light`](Light.md), *Shadowmask*): one value per
+channel, how much of that `Mixed` light reaches the probe past static occluders,
+interpolated like the SH and read by the objects the probe lights.
 
 Probes are addressed by **index** (0-based, in placement order), not by entity id.
 `Move`/`Remove` on an out-of-range index are no-ops. `Remove` drops the grid layout

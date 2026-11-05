@@ -23,6 +23,7 @@ fn panel(mode: ShadowCasting, emissive: f32) -> BakeMesh {
 /// The floor under `panel`, unlit but for what `lights` add.
 fn under(panel: BakeMesh, lights: Vec<BakeLight>) -> BakeScene {
     BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor(), panel],
         lights,
         sky: Vec3::ZERO.into(),
@@ -38,6 +39,7 @@ fn noon() -> BakeLight {
         },
         radiance: Vec3::splat(3.0),
         bakes_direct: true,
+        mask_channel: None,
     }
 }
 

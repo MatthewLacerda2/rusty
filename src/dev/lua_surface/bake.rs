@@ -40,10 +40,23 @@ fn register_probe(lua: &Lua, ctx: &ApiCtx) -> Reg {
             let mut scene = scene.borrow_mut();
             refuse_while_baking(&scene).map_err(mlua::Error::external)?;
             let console = &*console.get(lua)?;
+            shadowmask_note(&scene, console, false);
             let mut log = BakeLog::to_console(console);
             probe_bake::bake_scene_probes(&mut scene, &mut log).map_err(mlua::Error::external)
         }),
     )
+}
+
+/// Warn once when a single bake verb left the other half of a `Shadowmask` bake
+/// missing (#1695, `Scene::shadowmask_note`): `lightmaps` for the lightmap verb.
+fn shadowmask_note(
+    scene: &crate::scene::Scene,
+    console: &std::cell::RefCell<crate::scripting::ConsoleLogs>,
+    lightmaps: bool,
+) {
+    if let Some(note) = scene.shadowmask_note(lightmaps) {
+        console.borrow_mut().warn(note.to_string());
+    }
 }
 
 /// `Reflection.Bake()` (#245): for each probe capture the static surroundings to a
@@ -168,6 +181,7 @@ fn register_lightmaps(lua: &Lua, ctx: &ApiCtx) -> Reg {
                 )
                 .map_err(mlua::Error::external)?;
                 log.finish();
+                shadowmask_note(&scene, console, true);
                 Ok(baked)
             },
         ),

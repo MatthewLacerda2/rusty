@@ -78,6 +78,9 @@ pub struct LightmapAtlas {
     /// The direction pages (#810), one per colour page, packed identically. Empty
     /// unless every lightmap carries directions.
     pub directions: Vec<Vec<Vec4>>,
+    /// The shadowmask pages (#1695), one per colour page, packed identically.
+    /// Empty unless every lightmap carries a mask.
+    pub masks: Vec<Vec<Vec4>>,
     /// Per input lightmap, in order: its entity, page, and the scale/offset that maps
     /// its lightmap UV into the page (`uv * st.xy + st.zw`).
     pub placements: Vec<(u32, u32, [f32; 4])>,
@@ -100,6 +103,12 @@ pub fn pack(maps: &[Lightmap], max_page: u32) -> LightmapAtlas {
         true => vec![vec![Vec4::ZERO; (page_size * page_size) as usize]; page_count],
         false => Vec::new(),
     };
+    let masked = !maps.is_empty() && maps.iter().all(|m| !m.masks.is_empty());
+    // A mask's background is lit: only a chart's own texels hold a shadow.
+    let mut masks = match masked {
+        true => vec![vec![Vec4::ONE; (page_size * page_size) as usize]; page_count],
+        false => Vec::new(),
+    };
     let mut placements = Vec::with_capacity(maps.len());
     for (i, map) in maps.iter().enumerate() {
         let (page, x, y) = corners[i];
@@ -113,6 +122,9 @@ pub fn pack(maps: &[Lightmap], max_page: u32) -> LightmapAtlas {
         if directional {
             at.blit(&mut directions[page as usize], &map.directions, map.size);
         }
+        if masked {
+            at.blit(&mut masks[page as usize], &map.masks, map.size);
+        }
         let (scale, edge) = (sizes[i] as f32 / page_size as f32, page_size as f32);
         let (u, v) = ((x + PAD) as f32 / edge, (y + PAD) as f32 / edge);
         placements.push((map.entity, page, [scale, scale, u, v]));
@@ -121,6 +133,7 @@ pub fn pack(maps: &[Lightmap], max_page: u32) -> LightmapAtlas {
         page_size,
         pages,
         directions,
+        masks,
         placements,
     }
 }

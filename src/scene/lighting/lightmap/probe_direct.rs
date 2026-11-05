@@ -1,4 +1,5 @@
-//! The direct light of `Baked` lights at light probes (#809).
+//! The direct light of `Baked` lights at light probes (#809), and a `Shadowmask`
+//! bake's per-probe occlusion of its `Mixed` lights ([`mixed_occlusion`], #1695).
 //!
 //! A `Baked` light never renders live, so dynamic objects get it only through the
 //! probes. The probe bake's cubemap capture sees lit *surfaces*, never a light itself,
@@ -13,13 +14,13 @@
 //! lightmap tracer (`trace::arrival`). An Area light (#1674) is integrated over a
 //! fixed grid of points on its rectangle, one shadow ray each (`area::grid`).
 
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
 
 use super::bake::triangles;
 use super::input::{BakeScene, LightShape};
 use super::lights::area;
 use super::rays::Rays;
-use super::trace::{arrival, T_MIN};
+use super::trace::{arrival, Tracer, T_MIN};
 use crate::scene::lighting::sh::Sh9;
 
 /// One SH per position in `positions`: the direct light of every `Baked` light in
@@ -55,4 +56,18 @@ pub fn baked_direct_sh(scene: &BakeScene, positions: &[Vec3]) -> Vec<Sh9> {
             sh.band_scaled(scene.diffuse.sh_band_scale())
         })
         .collect()
+}
+
+/// One shadowmask occlusion per position in `positions` (#1695, Unity's light-probe
+/// occlusion): per channel, 0 where one shadow ray to its `Mixed` light meets a
+/// static occluder, else 1, as the lightmap's mask texels are
+/// (`trace::Tracer::mask`). All ones when the scene masks no light. A NaN position
+/// reaches nothing, so it stays unoccluded.
+pub fn mixed_occlusion(scene: &BakeScene, positions: &[Vec3]) -> Vec<Vec4> {
+    if !scene.lights.iter().any(|l| l.mask_channel.is_some()) {
+        return vec![Vec4::ONE; positions.len()];
+    }
+    let rays = Rays::build(triangles(scene));
+    let tracer = Tracer { scene, rays: &rays };
+    positions.iter().map(|&p| tracer.mask(p)).collect()
 }

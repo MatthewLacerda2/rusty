@@ -19,8 +19,9 @@
 //!   and start reporting overlaps; the mass sync after it re-spreads the body's
 //!   mass, since a trigger carries none.
 //!
-//! All walk the sorted plan, or the bodies the change log named (`watch`), and
-//! touch a collider only when it differs.
+//! All walk the sorted plan, or the bodies the change log named (`watch`; a
+//! step's changes reach only the body-state pass, `sync`), and touch a collider
+//! only when it differs.
 
 use rapier3d::prelude::*;
 
