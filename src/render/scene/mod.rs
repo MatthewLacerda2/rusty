@@ -50,6 +50,9 @@
 //! re-derives only the objects whose slots name the material
 //! (`RenderScene::by_material`).
 
+mod classes;
+#[cfg(test)]
+mod classes_gpu_tests;
 mod draw;
 #[cfg(test)]
 mod equivalence_ops;

@@ -24,6 +24,7 @@ use crate::render::draw::batch::BatchKey;
 use crate::render::draw::uniforms::mapping_uniform;
 use crate::render::gpu::pipelines::surface::{SurfaceShaders, STANDARD};
 use crate::render::gpu::uniforms::MappingUniform;
+use crate::render::scene::MaterialRecords;
 
 /// A clipped caster's draw key: the surface pipeline whose cut it runs
 /// ([`STANDARD`] for a cutout alone), its material group, and, for a variant, its
@@ -39,6 +40,14 @@ pub(crate) struct Clip {
 }
 
 impl Clip {
+    /// This clip naming its record's value class (`scene/classes.rs`) rather than
+    /// its slot, so a variant's casters of equal records batch as their forward
+    /// draws do.
+    pub(crate) fn by_class(self, records: &MaterialRecords) -> Self {
+        let record = self.record.map(|r| records.rep(r));
+        Self { record, ..self }
+    }
+
     /// A clip of `pipeline` over material group `material`, reading no record.
     #[cfg(test)]
     pub(crate) fn of(pipeline: usize, material: usize) -> Self {

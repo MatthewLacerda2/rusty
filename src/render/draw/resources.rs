@@ -143,7 +143,8 @@ impl Renderer {
     ) -> FrameDraws {
         back_to_front(&mut transparent);
         let transparent = transparent.into_iter().map(|(item, _)| item).collect();
-        let draws = FrameDraws::build(opaque, transparent, self.instancing);
+        let records = &self.retained.records;
+        let draws = FrameDraws::build((opaque, transparent), records, self.instancing);
         let uniforms = draws.pack();
         self.draw_buffers.upload(
             &self.device,
@@ -155,7 +156,7 @@ impl Renderer {
                 instances: &draws.instances,
                 proxies,
                 objects: &mut self.retained.objects,
-                materials: &mut self.retained.records.table,
+                materials: self.retained.records.table_for_sync(),
             },
         );
         self.retained.objects.end_camera();

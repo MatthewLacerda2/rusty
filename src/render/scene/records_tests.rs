@@ -27,6 +27,7 @@ fn a_record_per_scene_name_and_variant_freed_with_its_name_or_scene() {
         "slot 0 is the flat record's"
     );
     let mut all = vec![lit, unlit, other, none];
+    all.sort_unstable();
     all.dedup();
     assert_eq!(
         all.len(),

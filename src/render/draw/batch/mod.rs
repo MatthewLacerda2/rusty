@@ -25,7 +25,7 @@ pub(crate) use traits::RecordTraits;
 use std::ops::Range;
 
 use crate::render::gpu::pipelines::Facing;
-use crate::render::scene::MeshHandle;
+use crate::render::scene::{MaterialRecords, MeshHandle};
 use crate::render::InstanceData;
 
 /// What two solids must share to be drawn by one instanced call.
@@ -50,8 +50,9 @@ pub(crate) struct BatchKey {
     /// The material record's slot in the renderer's material table (tint, PBR
     /// scalars, map and cutout flags, the surface and mapping terms, #1616): one per
     /// scene, library material and variant (`render::scene::MaterialRecords`, #1706).
-    /// Two materials holding equal values are two slots, so two draws share a batch
-    /// only when they name one material.
+    /// Two materials holding equal values are two slots; the frame's batching
+    /// ([`FrameDraws::build`]) names each by its value class's least slot, so they
+    /// still share a batch, as copies of one material do.
     pub record: u32,
     /// What the CPU reads of that record (#1706): kept beside the slot, so no pass
     /// reads the table to decide.
@@ -137,11 +138,19 @@ impl FrameDraws {
     /// Batch `opaque` (sorted by key, its runs nearest first) and `transparent` (order kept — the caller sorted
     /// it back-to-front). With `instancing` off every item is its own draw, in the
     /// order given: the pre-#470 path, kept for equivalence tests and measurement.
+    ///
+    /// Each item's record slot is first turned into its value class's representative
+    /// ([`MaterialRecords::rep`]), so two draws whose records hold equal bytes batch
+    /// though they name different library materials (`Material.Set*` gives each entity
+    /// its own), and the per-draw uniform names a slot holding those bytes.
     pub(crate) fn build(
-        mut opaque: Vec<DrawItem>,
-        transparent: Vec<DrawItem>,
+        (mut opaque, mut transparent): (Vec<DrawItem>, Vec<DrawItem>),
+        records: &MaterialRecords,
         instancing: bool,
     ) -> Self {
+        for item in opaque.iter_mut().chain(&mut transparent) {
+            item.key.record = records.rep(item.key.record);
+        }
         if instancing {
             opaque = sort::front_to_back(opaque);
         }

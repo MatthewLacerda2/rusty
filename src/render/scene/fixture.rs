@@ -66,7 +66,7 @@ pub(super) fn frame(r: &mut Renderer, scene: &Scene) -> (Vec<u8>, RenderCounters
 pub(super) type Held = (u32, RenderObject, ObjectData, Vec<MaterialData>);
 
 fn as_held(r: &Renderer, rs: &RenderScene) -> Vec<Held> {
-    let table = &r.retained.records.table;
+    let table = r.retained.records.table();
     let held = rs.objects().map(|(id, o)| {
         let records = o.slots.iter().map(|s| *table.get(s.key.record));
         let object = RenderObject {
@@ -115,14 +115,15 @@ pub(super) fn fresh(r: &mut Renderer, scene: &Scene) -> Vec<Held> {
 pub(super) fn table_holds(r: &mut Renderer) -> Result<(), String> {
     let live = (r.retained.objects.live(), r.retained.kept_objects() + 1);
     let kept = &r.retained.records;
-    let records = (kept.table.live(), kept.kept().len() + 1);
+    let records = (kept.table().live(), kept.kept().len() + 1);
     if live.0 != live.1 || records.0 != records.1 {
         return Err(format!(
             "live / kept: {live:?} objects, {records:?} records"
         ));
     }
+    r.retained.records.classes_hold()?;
     let gpu = r.objects_on_gpu() == r.retained.objects.records().0;
-    match gpu && r.records_on_gpu() == r.retained.records.table.records().0 {
+    match gpu && r.records_on_gpu() == r.retained.records.table().records().0 {
         true => Ok(()),
         false => Err("the GPU's records differ from a table's".into()),
     }

@@ -5,6 +5,7 @@
 use super::sort::depth_bucket;
 use super::tests::{item, name};
 use super::{DrawItem, FrameDraws};
+use crate::render::scene::MaterialRecords;
 
 /// `item` of mesh `mesh`, tagged `tag`, at view depth `depth`.
 fn at(mesh: &str, tag: f32, depth: f32) -> DrawItem {
@@ -26,7 +27,7 @@ fn layered_walls_draw_nearest_first_whatever_the_given_order() {
         at("Mid", 1.0, 20.0),
         at("Near", 2.0, 5.0),
     ];
-    let draws = FrameDraws::build(opaque, Vec::new(), true);
+    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), true);
     assert_eq!(meshes(&draws), ["Near", "Mid", "Far"]);
 }
 
@@ -39,7 +40,7 @@ fn a_run_draws_at_its_nearest_instance_and_stays_one_draw() {
         at("Crate", 2.0, 60.0),
         at("Crate", 3.0, 2.0),
     ];
-    let draws = FrameDraws::build(opaque, Vec::new(), true);
+    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), true);
     assert_eq!(meshes(&draws), ["Crate", "Wall"]);
     assert_eq!(draws.opaque[0].instances.len(), 3);
     // Inside the run, the copies are nearest first too.
@@ -55,7 +56,7 @@ fn near_equal_depths_keep_the_key_order() {
     // Within one bucket the material (key) order holds, so state changes stay few.
     assert_eq!(depth_bucket(10.0), depth_bucket(10.5));
     let opaque = vec![at("B", 0.0, 10.0), at("A", 1.0, 10.5)];
-    let draws = FrameDraws::build(opaque, Vec::new(), true);
+    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), true);
     assert_eq!(meshes(&draws), ["A", "B"]);
 }
 
@@ -73,6 +74,6 @@ fn buckets_grow_with_distance_and_clamp_at_the_camera() {
 #[test]
 fn without_instancing_the_given_order_is_kept() {
     let opaque = vec![at("Far", 0.0, 40.0), at("Near", 1.0, 5.0)];
-    let draws = FrameDraws::build(opaque, Vec::new(), false);
+    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), false);
     assert_eq!(meshes(&draws), ["Far", "Near"]);
 }

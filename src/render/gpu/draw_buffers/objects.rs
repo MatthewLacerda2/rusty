@@ -76,7 +76,7 @@ impl crate::render::Renderer {
     pub(crate) fn records_on_gpu(&mut self) -> Vec<crate::render::MaterialData> {
         let (device, queue) = (&self.device, &self.queue);
         let buffers = &mut self.draw_buffers;
-        let table = &mut self.retained.records.table;
+        let table = self.retained.records.table_for_sync();
         if sync_table((device, queue), &mut buffers.materials, table, &mut 0) {
             buffers.rebind(device, &self.entity_bones_layout);
         }

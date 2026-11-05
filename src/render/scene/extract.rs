@@ -87,24 +87,26 @@ impl Renderer {
             };
             for (variant, slot) in self.retained.records.variants_of(scene.id(), name) {
                 let record = self.variant_record(variant, Some(asset));
-                self.retained.records.table.write(slot, record);
+                self.retained.records.write(slot, record);
             }
             if !params {
                 continue;
             }
+            let overriding = rs.users_of_name(name);
+            rederive.extend(overriding.filter(|&id| scene.shader_overrides.of(id).is_some()));
+            // Only a buffer something draws is rewritten, so a params edit on a
+            // material nothing draws compiles no shader mid-extract.
+            let owner = ParamOwner::Material(scene.id(), name.clone());
+            if !self.materials.holds_params(&owner) {
+                continue;
+            }
             let shader = asset.shader.as_deref();
             let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
-            let Some(layout) = self.surface_shaders.params(pipeline) else {
-                continue;
-            };
-            let owner = ParamOwner::Material(scene.id(), name.clone());
-            if self.materials.holds_params(&owner) {
+            if let Some(layout) = self.surface_shaders.params(pipeline) {
                 let values = layout.pack(&asset.shader_params);
                 let (device, queue) = (&self.device, &self.queue);
                 self.materials.write_params(device, queue, &owner, values);
             }
-            let overriding = rs.users_of_name(name);
-            rederive.extend(overriding.filter(|&id| scene.shader_overrides.of(id).is_some()));
         }
         rederive
     }

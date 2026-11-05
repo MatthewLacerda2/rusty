@@ -23,6 +23,7 @@
 
 use std::collections::BTreeMap;
 
+use super::classes::Classes;
 use super::table::{SlotTable, Slotted};
 use crate::components::MaterialAsset;
 use crate::render::draw::batch::RecordTraits;
@@ -72,10 +73,13 @@ impl Variant {
 /// One name's (or no material's) slots, by [`Variant`].
 type Slots = [Option<u32>; 3];
 
-/// Every kept record's slot, by scene, name and variant, and the table they sit in.
+/// Every kept record's slot, by scene, name and variant, the table they sit in, and
+/// the slots' value classes (`classes.rs`): every write goes through here, so a class
+/// never lags its slot.
 #[derive(Default)]
 pub(crate) struct MaterialRecords {
-    pub table: SlotTable<MaterialData>,
+    table: SlotTable<MaterialData>,
+    classes: Classes,
     named: BTreeMap<SceneId, BTreeMap<String, Slots>>,
     /// The record a draw naming no library material reads, per scene.
     unnamed: BTreeMap<SceneId, Slots>,
@@ -101,8 +105,36 @@ impl MaterialRecords {
         };
         let table = &mut self.table;
         let slot = *slots[variant.at()].get_or_insert_with(|| table.alloc());
-        self.table.write(slot, data);
+        self.write(slot, data);
         slot
+    }
+
+    /// Make kept slot `slot` hold `data` (a record-only edit's rewrite).
+    pub(crate) fn write(&mut self, slot: u32, data: MaterialData) {
+        self.table.write(slot, data);
+        self.classes.set(slot, &data);
+    }
+
+    /// The slot a draw naming `slot` names, so equal records batch: the least slot
+    /// holding the same bytes (`classes.rs`).
+    pub(crate) fn rep(&self, slot: u32) -> u32 {
+        self.classes.rep(slot)
+    }
+
+    /// The table, as the GPU mirror and the shadow sweeps read it.
+    pub(crate) fn table(&self) -> &SlotTable<MaterialData> {
+        &self.table
+    }
+
+    /// The table, for the GPU mirror to take its dirty runs: no record is written
+    /// through this (that is [`Self::write`]'s, which keeps the classes).
+    pub(crate) fn table_for_sync(&mut self) -> &mut SlotTable<MaterialData> {
+        &mut self.table
+    }
+
+    fn free(&mut self, slot: u32) {
+        self.classes.clear(slot);
+        self.table.release(slot);
     }
 
     /// The variants of `name` scene `scene` keeps, with their slots.
@@ -117,7 +149,7 @@ impl MaterialRecords {
     pub(crate) fn release_name(&mut self, scene: SceneId, name: &str) {
         let slots = self.named.get_mut(&scene).and_then(|n| n.remove(name));
         for slot in slots.into_iter().flatten().flatten() {
-            self.table.release(slot);
+            self.free(slot);
         }
     }
 
@@ -134,7 +166,26 @@ impl MaterialRecords {
             .flatten()
             .collect();
         for slot in slots {
-            self.table.release(slot);
+            self.free(slot);
+        }
+    }
+
+    /// Every kept record names, as its class's representative, the least kept slot
+    /// holding its very bytes.
+    #[cfg(test)]
+    pub(crate) fn classes_hold(&self) -> Result<(), String> {
+        let slots = self.kept();
+        let bytes = |s: u32| bytemuck::bytes_of(self.table.get(s)).to_vec();
+        let least = |s| {
+            slots
+                .iter()
+                .copied()
+                .filter(|&o| bytes(o) == bytes(s))
+                .min()
+        };
+        match slots.iter().find(|&&s| Some(self.rep(s)) != least(s)) {
+            Some(&s) => Err(format!("slot {s} names {} not {:?}", self.rep(s), least(s))),
+            None => Ok(()),
         }
     }
 

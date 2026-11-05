@@ -1,6 +1,7 @@
 //! The instancing grouping rules (#470), pinned without a GPU.
 
 use super::{BatchKey, DrawItem, FrameDraws, RecordTraits};
+use crate::render::scene::MaterialRecords;
 use crate::render::scene::MeshHandle;
 use crate::render::InstanceData;
 
@@ -62,7 +63,7 @@ fn copies_of_one_mesh_and_material_become_one_draw() {
         item("Box", 0, 1.0, 2.0),
         item("Box", 0, 1.0, 3.0),
     ];
-    let draws = FrameDraws::build(opaque, Vec::new(), true);
+    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), true);
     let runs: Vec<_> = draws
         .opaque
         .iter()
@@ -81,7 +82,7 @@ fn a_different_uniform_or_skinned_palette_splits_the_batch() {
         item("Box", 1, 1.0, 2.0),
         item("Box", 2, 1.0, 3.0),
     ];
-    let draws = FrameDraws::build(opaque, Vec::new(), true);
+    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), true);
     assert_eq!(
         draws.opaque.len(),
         4,
@@ -108,7 +109,11 @@ fn transparent_order_is_kept_and_only_neighbours_merge() {
         item("B", 0, 1.0, 2.0),
         item("A", 0, 1.0, 3.0),
     ];
-    let draws = FrameDraws::build(vec![item("Box", 0, 1.0, 9.0)], transparent, true);
+    let draws = FrameDraws::build(
+        (vec![item("Box", 0, 1.0, 9.0)], transparent),
+        &MaterialRecords::default(),
+        true,
+    );
     let runs: Vec<_> = draws
         .transparent
         .iter()
@@ -127,7 +132,7 @@ fn instancing_off_is_one_draw_per_entity_in_scene_order() {
         item("Barrel", 0, 1.0, 1.0),
         item("Box", 0, 1.0, 2.0),
     ];
-    let draws = FrameDraws::build(opaque, Vec::new(), false);
+    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), false);
     assert_eq!(draws.opaque.len(), 3);
     assert_eq!(tags(&draws), [0.0, 1.0, 2.0]);
     assert!(draws.opaque.iter().all(|b| b.instances.len() == 1));

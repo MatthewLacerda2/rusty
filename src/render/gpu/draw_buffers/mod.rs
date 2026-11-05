@@ -11,7 +11,7 @@
 //! keyed by entity, so two scenes rendered in one frame (#355) cannot evict each
 //! other: each render simply rewrites the arrays before its own submit.
 //!
-//! **The object array** (#1706) is the one that is not packed per camera: every kept
+//! **The object array** (#1706) is not packed per camera: every kept
 //! object's [`ObjectData`] (world matrix, probe SH, lightmap) at its slot of the
 //! renderer's `scene::ObjectTable`, written where it changed (`objects.rs`). A
 //! camera's instance is 16 bytes naming its object's slot, so the per-camera upload
@@ -19,8 +19,9 @@
 //!
 //! **The material array** is held the same way (#1706): every kept material record
 //! (one per scene, library material and variant, `scene::MaterialRecords`) at its slot,
-//! written where it changed. A draw's uniform names the slot, so a colour edit
-//! uploads that one record and no camera re-packs or compares records.
+//! written where it changed. A draw's uniform names the slot (its value class's
+//! least, so equal records batch), so a colour edit uploads that one record and no
+//! camera re-packs records.
 //!
 //! The joint matrices are one storage array (#455), not a fixed 64-matrix uniform: a
 //! skinned draw's palette is its run of the array, as long as its skin, and the draw's
