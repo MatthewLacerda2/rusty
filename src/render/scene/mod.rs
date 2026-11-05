@@ -45,7 +45,9 @@
 //!
 //! **Material records** (part 4): each (scene, library material, variant) has its
 //! `MaterialData` at a slot of the renderer's [`MaterialRecords`] table (`records.rs`),
-//! mirrored on the GPU, and a batch key names the slot. A library edit that moves only
+//! mirrored on the GPU, and a batch key names the slot; a frame batches it by its
+//! class of equal records (`classes.rs`), so equal values under different names still
+//! share a draw. A library edit that moves only
 //! a record's values rewrites it in place, no object re-derived; any other edit
 //! re-derives only the objects whose slots name the material
 //! (`RenderScene::by_material`).

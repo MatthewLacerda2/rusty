@@ -11,8 +11,9 @@
 //!
 //! A solid's record is kept (#1706): one per scene, library material and variant
 //! (`render::scene::MaterialRecords`), at a slot of the renderer's material table,
-//! written to the GPU only where it changed. The per-draw uniform names the slot, so a
-//! colour edit rewrites one record and no camera packs or compares records. The
+//! written to the GPU only where it changed. The per-draw uniform names the slot (its
+//! value class's least, so equal records batch), so a colour edit rewrites one record
+//! and no camera packs records. The
 //! editor overlays still pack theirs per frame ([`RecordTable`](super::RecordTable)),
 //! one per distinct tint.
 //!

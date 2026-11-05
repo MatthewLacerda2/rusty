@@ -49,7 +49,10 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   `MaterialData` per (scene, library material, `Variant`) in the material table
   (`scene/records.rs`), written where it changed; a batch key names the slot
   (`BatchKey::record`) and carries what the CPU decides a pass by
-  (`BatchKey::traits`). A library edit that moves only a record's values (a colour,
+  (`BatchKey::traits`). Each frame names a slot by its value class's least slot
+  (`scene/classes.rs`, `MaterialRecords::rep`) before it batches, so equal records
+  under different names (each entity's own `Material.Set*` material) share a draw;
+  a record is written only through `MaterialRecords`, which keeps the classes. A library edit that moves only a record's values (a colour,
   a scalar, the params: `records::rekeys` false) rewrites its records and param buffer
   in place and re-derives no object; any other edit re-derives only the objects naming
   that material (`RenderScene::by_material`). A record never reads the entity: a

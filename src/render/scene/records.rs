@@ -20,6 +20,10 @@
 //! moves nothing a key, a clip or the static bakes read (a colour, a scalar) rewrites
 //! the name's records in place and re-derives no object; any other edit re-derives
 //! its users, as before.
+//!
+//! **Batching.** Equal records under different names (each entity's own
+//! `Material.Set*` material) are one value class (`classes.rs`): a frame names a
+//! slot by [`MaterialRecords::rep`] before it batches, so they share a draw.
 
 use std::collections::BTreeMap;
 
