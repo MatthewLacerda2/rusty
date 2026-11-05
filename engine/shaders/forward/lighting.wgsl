@@ -16,8 +16,12 @@
 // newer decal lands over the older ones. Derivatives are taken here, before the
 // cluster's own loop, so the walk may diverge per pixel.
 fn fold_decals(s: DecalSurface, cluster: u32, world: vec3<f32>, facing: vec3<f32>) -> DecalSurface {
-    let dx = dpdx(world);
-    let dy = dpdy(world);
+    // The footprint the decal maps are read over: one pixel's, shrunk by the
+    // material maps' mip bias while TAA upscales the view (#1702), so a decal keeps
+    // the mip of the wall it lies on. `exp2(0)` is exactly 1: no bias, no change.
+    let footprint = exp2(camera.lod.x);
+    let dx = dpdx(world) * footprint;
+    let dy = dpdy(world) * footprint;
     let dims = camera.clusters.dims;
     let range = cluster_ranges[dims.x * dims.y * dims.z + cluster];
     var out = s;

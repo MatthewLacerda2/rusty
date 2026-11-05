@@ -56,7 +56,10 @@ fn gpu_a_scaled_view_sizes_its_scene_targets_and_keeps_its_output() {
         return;
     };
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 64, 48);
-    assert!(view.scaled_output().is_none(), "native: no upscale target");
+    assert!(
+        view.scaled_output(&r.device, true).is_none(),
+        "native: no upscale target"
+    );
     view.set_render_scale(RenderScale::new(0.5));
     view.resize(&r.device, 64, 48);
     assert_eq!(view.size(), PixelSize::new(64, 48));
@@ -64,13 +67,20 @@ fn gpu_a_scaled_view_sizes_its_scene_targets_and_keeps_its_output() {
     assert_eq!(extent(&view.depth_texture), (32, 24));
     assert_eq!(view.post_fx.full_size, (32, 24));
     assert_eq!(extent(view.color_target().unwrap()), (64, 48));
-    assert!(view.scaled_output().is_some());
+    assert!(
+        !view.holds_upscale_source(),
+        "made on first use, not by the resize"
+    );
+    assert!(view.scaled_output(&r.device, true).is_some());
+    // A frame TAA upscales (TAAU) writes the output itself: no target is held.
+    assert!(view.scaled_output(&r.device, false).is_none());
+    assert!(!view.holds_upscale_source());
     // Back to native: one size again, and no upscale target.
     view.set_render_scale(RenderScale::NATIVE);
     view.resize(&r.device, 64, 48);
     assert_eq!(view.scene_size(), view.size());
     assert_eq!(extent(&view.depth_texture), (64, 48));
-    assert!(view.scaled_output().is_none());
+    assert!(view.scaled_output(&r.device, true).is_none());
 }
 
 const W: u32 = 96;

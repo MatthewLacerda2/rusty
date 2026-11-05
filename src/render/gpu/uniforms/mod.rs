@@ -53,6 +53,10 @@ pub(crate) struct CameraUniform {
     /// `x`: 1 in the opaque pass of a base camera running SSIL (#1750), which then
     /// adds its bounce and writes its realtime share; `yzw` unused.
     pub ssil: [f32; 4],
+    /// `x`: the material maps' mip bias (#1702), negative while TAA upscales the
+    /// view (`log2(scene/output)`), else 0, which samples exactly as without one.
+    /// `yzw`: unused.
+    pub lod: [f32; 4],
     /// Volumetric fog (#1703, `fog::volumetric`): `x` 1 where this camera reads the
     /// integrated volume, `y` its depth slices, `z` its far end and `w` the near end
     /// of its exponential slices; all zero where it reads none.

@@ -30,7 +30,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 fn blur(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let (post, graphics, stack) = (cx.effect.post, cx.effect.graphics, cx.stack);
     let blurs = motion::wanted(post, graphics, cx.effect.full, stack.editor_mode);
-    let blur = blur_params(post, graphics, view.scene_size().height)
+    let blur = blur_params(post, graphics, view.post_fx.chain_size.1)
         .filter(|_| blurs)
         .map(|b| b.per_frames(stack.motion_frames));
     let gpu = (&r.device, &r.queue);

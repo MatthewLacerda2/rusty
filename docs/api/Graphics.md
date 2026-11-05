@@ -152,7 +152,9 @@ chromatic aberration, screen-space reflections, bloom's add, the lens flare's ad
 exposure on the HDR colour, then the grading LUT (white balance, Lift / Gamma / Gain, the color
 adjustments, the tonemapper, the display gamma and the Color Lookup, baked into one
 table), then the vignette and film grain on the display colour; then the custom
-effects and FXAA (skipped on a frame TAA ran). An effect that is off costs nothing and leaves the image
+effects and FXAA (skipped on a frame TAA ran). On a camera that TAA upscales (a
+render scale below 1, *TAA*) depth of field runs at the scaled size and everything
+from TAA on at the output's. An effect that is off costs nothing and leaves the image
 byte-identical; one left on at a zero strength draws the same image, but may still
 run its passes (bloom at intensity `0` still runs its chain).
 
@@ -788,17 +790,39 @@ scene load, Play or Stop, a camera switch, a resize) is the current frame alone,
 nothing of the last shot ghosts in. The editor's Scene view never runs TAA (it keeps
 FXAA); the Game view, the player and a render-texture camera with `taa_active` and
 `post_fx` on do, each with its own history. The player's `taa` option can turn it
-off. It runs at the view's render-scale size: a render scale below 1 is resolved,
-then upscaled like the rest of the scene.
+off.
+
+**With a render scale below 1, TAA upscales** (TAAU, #1702; URP's STP and HDRP's
+FSR2 do the same, at the same place): the scene renders at the scaled size and
+TAA rebuilds the output-resolution image from the jittered samples of many frames,
+instead of the bilinear upscale, so `0.67` looks close to native and `0.5` keeps
+thin wires whole. Depth of field runs before it, at the scaled size; TAA then
+upscales, and everything after it (motion blur, the exposure meter, bloom, the
+composite with the grade, the authored effects) runs at the output's size on the
+resolved image and writes the screen, so bloom, film grain, a screen-space pattern
+and a HUD glass panel's backdrop blur see a stable image. FXAA is skipped. What the
+scale saves is the scene's own shading (and depth of field); the chain after TAA
+costs what it costs at the output's size. While it upscales, the jitter runs a
+sequence of `8 × (1/scale)²` offsets (18 at `0.67`, 32 at `0.5`) and every
+material map (albedo, normal, metallic, roughness, emissive, a surface block's mask
+and the decals) reads with a mip bias of `log2(scale)`, so its detail matches the
+output's pixels; the lightmaps and the ambient occlusion keep theirs. A
+render-scale change, a resize and a move to a monitor of another density under
+`"match_display"` start the history over: no ghost of the old size. At `1` (or
+above, supersampling) it resolves at the scene's size as before. There is no filter
+setting: with TAA on and a scale below `1` it upscales, and with TAA off the
+bilinear upscale runs as it always did.
 
 **Harness screenshots see one frame of it, not a player's settled image.** A
 headless capture (`Harness.Screenshot`, `Harness.Render`) draws one frame per shot
 through one kept view, and FXAA is skipped whenever the resolve ran. So with TAA on,
 the first shot, and the first after any cut (another scene, Play or Stop, a shot at
 another size), is the raw jittered frame: aliased, and shifted up to half a pixel.
-Each later shot blends 0.1 of its own frame into the history of the shots before
-it, however many sim steps apart they were, so two shots of an unchanged scene can
-differ. To compare shots pixel for pixel, or to judge a scene's edges, turn TAA off
+Upscaling (a render scale below 1), it is that frame's 3×3 reconstruction at the
+output's size: as soft as a bilinear upscale, and shifted too. Each later shot
+blends 0.1 of its own frame into the history of the shots before it (upscaling,
+0.1 times how near its nearest sample landed to the pixel), however many sim steps
+apart they were, so two shots of an unchanged scene can differ. To compare shots pixel for pixel, or to judge a scene's edges, turn TAA off
 for the capture (`Graphics.SetTaaActive(false)`: FXAA then runs, if it is on).
 
 ### Lighting settings
@@ -938,7 +962,11 @@ least 1 pixel). Every scene target is that size: colour, depth (which the SSAO p
 motion vectors and the post-FX targets, so the cost of the fill-bound passes follows
 the pixel count. The finished, post-processed image is then upscaled (bilinear, as
 URP's *Auto* filter outside FSR) to the surface **before the UI**, which stays at
-native resolution and sharp. Below `1` the scene looks softer; above `1` it
+native resolution and sharp. A camera running TAA upscales through TAA instead,
+inside the chain (see *TAA*): there the post targets from TAA on (motion blur,
+bloom, the exposure meter, the composite, the authored effects) are the surface's
+size, no scaled copy of the image is kept to upscale, and only the scene, its depth, motion vectors, SSAO, SSR and depth of field
+are the scaled size. Below `1` the scene looks softer; above `1` it
 supersamples. On a 2× Retina surface `0.5` renders at the 1× pixel count:
 `Video.SetResolution` sizes the window (or, fullscreen, the whole framebuffer, UI
 included), and cannot do that. Each side is capped at the device's largest texture
