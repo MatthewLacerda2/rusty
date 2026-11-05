@@ -10,7 +10,7 @@ use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::effects::ssil;
 use crate::render::postfx::effects::ssr::{ssr_enabled, surface, transparent};
-use crate::render::postfx::effects::{self, taa, EffectCx, PassCx};
+use crate::render::postfx::effects::{self, taa, volumetric_fog, EffectCx, PassCx};
 use crate::render::postfx::params::{frame_params, PostSource};
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -76,8 +76,8 @@ impl Renderer {
                 .motion
                 .begin(&self.device, size, key, velocity, &cameras);
         let prev_time = view.post_fx.motion.history.game_time(scene.shader_time);
-        // SSIL (#1750) keeps a history per view: a bake capture's faces and the
-        // shader preview keep none, so they never run it.
+        // SSIL (#1750) and volumetric fog (#1703) keep a history per view: a bake
+        // capture's faces and the shader preview keep none, so they never run them.
         let keeps = !own_pipeline && !self.capture.static_only;
         // TAA (#1702): the frame's sub-pixel jitter, every camera's alike; a cut
         // forgets its history.
@@ -93,6 +93,7 @@ impl Renderer {
             ssao: SsaoPlan::for_volume(pass.post.volume, self.graphics(pass.editor_mode)),
             ssr_march: transparent::camera_march(pass.post, graphics, ssr),
             ssil: ssil::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
+            volumetric: volumetric_fog::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
         };
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);

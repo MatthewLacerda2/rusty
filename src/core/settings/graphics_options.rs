@@ -58,6 +58,8 @@ crate::core::named_enum! {
         Taa = "taa",
         /// The volume's vignette (#1439).
         Vignette = "vignette",
+        /// The volume's volumetric fog (#1703).
+        VolumetricFog = "volumetric_fog",
     }
 }
 

@@ -5,7 +5,7 @@
 //! pipeline on the first muzzle flash or smoke cloud is a hitch mid-combat, so
 //! [`Renderer::new`] warms them all before the first frame.
 
-use crate::render::gpu::pipelines::LazyPipeline;
+use crate::render::gpu::pipelines::{LazyCompute, LazyPipeline};
 use crate::render::Renderer;
 
 impl Renderer {
@@ -18,6 +18,16 @@ impl Renderer {
         for pipeline in self.lazy_pipelines(editor_overlays) {
             pipeline.get();
         }
+        for pipeline in self.lazy_computes() {
+            pipeline.get();
+        }
+    }
+
+    /// Every compute pipeline built on first dispatch (#1703). A new
+    /// [`LazyCompute`] goes in this list, as a render one goes in
+    /// [`Self::lazy_pipelines`].
+    pub(crate) fn lazy_computes(&self) -> Vec<&LazyCompute> {
+        self.post_passes.lazy_computes()
     }
 
     /// Every pipeline built on first draw. A new [`LazyPipeline`] goes in this list,

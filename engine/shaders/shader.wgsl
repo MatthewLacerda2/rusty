@@ -1,4 +1,4 @@
-#import common::{DecalSurface, PI, VertexInput, apply_fog, blend_joints, fog_factor, cluster_index, local_light_radiance}
+#import common::{DecalSurface, PI, VertexInput, blend_joints, cluster_index, local_light_radiance}
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
 #import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, draw, instances, lighting, local_lights, material, normal_to_world, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
@@ -328,7 +328,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // Unlit rendering (e.g. path highlights, a light's own mesh). Still fogged: an
     // unlit sign down a smoky corridor fades like the wall it hangs on (#437).
     if (m.is_lit == 0u) {
-        return vec4<f32>(apply_fog(camera.fog, base_color.rgb, in.world_position, camera.camera_pos), base_color.a);
+        return vec4<f32>(transparent::fogged(base_color.rgb, in.world_position), base_color.a);
     }
 
     // Geometric normal, optionally perturbed by a tangent-space normal map (#207; z
@@ -494,8 +494,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // A transparent surface with `receive_ssr` traces SSR over it here (#1570).
     let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, N, roughness, instances[in.instance].reflection_probe, baked_diffuse(ambient_irradiance, lightmap_page > 0u || instances[in.instance].use_sh == 1u)) * reflection_weight, reflection_weight, in.world_position, N, R, roughness);
     lighting_color += reflection;
-    // One fog value for the SSR record and SSIL's realtime light (step 6).
-    let surface_fog = fog_factor(camera.fog, in.world_position, camera.camera_pos);
+    // One fog value for the SSR record and SSIL's realtime light (step 6): the
+    // distance fog's and the volumetric fog's together (#1703).
+    let surface_fog = transparent::surface_fog(in.world_position);
     ssr_texels = ssr_surface::encode(N, roughness, reflection, reflection_weight, surface_fog);
 
     // 6. Emissive (#222 factor, #207 map): self-illumination added on top of the lit

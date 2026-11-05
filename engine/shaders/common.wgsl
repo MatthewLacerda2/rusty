@@ -67,6 +67,10 @@ struct CameraUniforms {
     // `forward::lighting::with_ssil_share`), 0 everywhere else, the translucents
     // after it included. yzw: unused.
     ssil: vec4<f32>,
+    // Volumetric fog (#1703, `fog::volumetric`): x 1 where this camera reads the
+    // integrated volume, y its depth slices, z its far end, w the near end of its
+    // exponential slices; zero where it reads none.
+    volumetric: vec4<f32>,
 };
 
 // The forward lighting uniform (group 0, binding 1) and its light records. Shared
@@ -395,12 +399,6 @@ fn fog_factor(fog: Fog, world_pos: vec3<f32>, eye: vec3<f32>) -> f32 {
         f = 1.0 - exp(-x * x);
     }
     return clamp(f, 0.0, 1.0);
-}
-
-// Fade a lit colour into the fog colour — opaque, transparent and alpha-blended
-// surfaces (the caller keeps its alpha).
-fn apply_fog(fog: Fog, color: vec3<f32>, world_pos: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
-    return mix(color, fog.color, fog_factor(fog, world_pos, eye));
 }
 
 // The sky's fog along view direction `dir`: as fogged as a point at

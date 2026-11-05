@@ -2,6 +2,7 @@ pub(crate) mod budget;
 pub(crate) mod build;
 pub(crate) mod gpu_rule;
 pub(crate) mod headless;
+mod limits;
 pub(crate) mod resize;
 mod shadow_system;
 pub(crate) mod textures;
@@ -61,7 +62,7 @@ impl Renderer {
                 // BC compression where the GPU has it (#1574).
                 required_features: adapter.features()
                     & crate::render::gpu::textures::compressed::FEATURE,
-                required_limits: wgpu::Limits::default(),
+                required_limits: limits::device_limits(),
                 label: None,
                 ..Default::default()
             })
@@ -217,6 +218,7 @@ impl Renderer {
             spare_global_group: Default::default(),
             clusters: global.clusters,
             lightmaps: global.lightmaps,
+            fog_volume: global.fog_volume,
             draw_buffers,
             proxy_volumes: Default::default(),
             materials: crate::render::gpu::material_cache::MaterialCache::new(textures.zero_params),

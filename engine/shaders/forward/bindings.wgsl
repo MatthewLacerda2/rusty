@@ -6,6 +6,7 @@
 #define_import_path forward::bindings
 
 #import common::{CameraUniforms, Decal, LightingUniforms, LocalLight, ShadowTile, VertexInput, blend_joints}
+#import lighting::cascades::ShadowCascades
 
 // One draw's own data (#1616), mirroring `DrawUniform`
 // (src/render/gpu/uniforms/material.rs) byte-for-byte: its transform on top of each
@@ -173,6 +174,13 @@ var s_lightmaps: sampler;
 // `decode_lightmap_direction`); a 1x1 zero page, never read, when not baked.
 @group(0) @binding(16)
 var t_lightmap_dirs: texture_2d_array<f32>;
+// The integrated volumetric fog (#1703, `fog::volumetric`): rgb the light the air
+// scatters toward the eye, a what gets through, per froxel; a 1x1x1 stand-in
+// while no camera runs it, read only where `camera.volumetric.x` says so.
+@group(0) @binding(17)
+var t_fog_volume: texture_3d<f32>;
+@group(0) @binding(18)
+var s_fog_volume: sampler;
 
 @group(1) @binding(0)
 var<uniform> draw: DrawUniforms;
@@ -280,18 +288,7 @@ var s_normal: sampler;
 @group(2) @binding(21)
 var s_emissive: sampler;
 
-// The sun's cascaded shadow maps (#435): one light volume per slice of the view,
-// written by `render::passes::shadows::CascadeUniform`.
-struct ShadowCascades {
-    light_space: array<mat4x4<f32>, 4>,
-    splits: vec4<f32>,       // view depth where each cascade ends
-    texels: vec4<f32>,       // world size of one texel, per cascade
-    depth_ranges: vec4<f32>, // world depth each cascade's [0, 1] spans
-    view_pos: vec4<f32>,
-    view_dir: vec4<f32>,
-    params: vec4<f32>,       // x count, y shadow distance, z blend fraction
-};
-
+// The sun's cascaded shadow maps (#435): `lighting::cascades`.
 @group(3) @binding(0)
 var<uniform> shadow: ShadowCascades;
 @group(3) @binding(1)
@@ -313,8 +310,8 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 // the distance from the eye to that surface; a 1x1 stand-in in every pass but a
 // transparent one with a surface that refracts or absorbs. Linear, clamped sampler.
 // In the opaque pass of a base camera running SSIL (`camera.ssil.x`, #1750), which
-// reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel: the
-// stage's 16 sampled textures, wgpu's default limit, are all taken.
+// reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel, so
+// the stage binds no texture more than `render::setup::limits` allows (17).
 @group(3) @binding(6)
 var t_opaque: texture_2d<f32>;
 @group(3) @binding(7)

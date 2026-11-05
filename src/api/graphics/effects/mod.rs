@@ -5,6 +5,8 @@
 //! `scene::authoring` ops the Inspector calls; an effect's numeric knobs that are a
 //! pair on their own come from its knob table ([`knobs`]).
 
+// lint: allow(dir-size) a flat registry: one file per effect's `Graphics.*` functions, listed in `REGISTRARS`; families already have their folders (`grading`, `lens`)
+
 use super::super::Reg;
 use crate::api::ApiCell;
 use crate::scene::Scene;
@@ -25,6 +27,7 @@ mod motion_blur;
 mod ssil;
 mod ssr;
 mod taa;
+mod volumetric_fog;
 
 use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, white_balance};
 use lens::{chromatic_aberration, film_grain, vignette};
@@ -54,6 +57,7 @@ pub(crate) const REGISTRARS: &[(&str, Registrar)] = &[
     ("taa", taa::register),
     ("tonemapping", tonemapping::register),
     ("vignette", vignette::register),
+    ("volumetric_fog", volumetric_fog::register),
     ("white_balance", white_balance::register),
 ];
 

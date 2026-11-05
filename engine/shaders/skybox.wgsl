@@ -1,4 +1,5 @@
 #import common::{CameraUniforms, VertexInput, equirect_uv, sky_fog}
+#import sky::air::through_air
 #import sky::motion::{SkyTargets, sky_targets}
 
 @group(0) @binding(0)
@@ -7,6 +8,8 @@ var<uniform> camera: CameraUniforms;
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) view_dir: vec3<f32>,
+    // The clip-space position again, for the volumetric fog's screen lookup.
+    @location(1) clip: vec4<f32>,
 };
 
 @vertex
@@ -20,6 +23,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     
     // Set z to w so it resides exactly at the far plane depth (1.0)
     out.clip_position = out.clip_position.xyww;
+    out.clip = out.clip_position;
     return out;
 }
 
@@ -37,6 +41,8 @@ fn fs_main(in: VertexOutput) -> SkyTargets {
     let sky = textureSampleLevel(t_skybox, s_skybox, equirect_uv(dir), 0.0);
     // Blend toward the scene fog at the horizon (#437) so fogged geometry doesn't
     // silhouette against a clear sky.
-    let color = vec4<f32>(sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos), sky.a);
+    // Then the volumetric fog's whole depth (#1703).
+    let fogged = sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos);
+    let color = vec4<f32>(through_air(fogged, camera.volumetric, in.clip), sky.a);
     return sky_targets(camera, color, dir);
 }
