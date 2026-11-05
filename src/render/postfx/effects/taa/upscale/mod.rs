@@ -29,3 +29,5 @@ mod chain_gpu_tests;
 mod ghost_gpu_tests;
 #[cfg(test)]
 mod gpu_tests;
+#[cfg(test)]
+mod toksvig_gpu_tests;

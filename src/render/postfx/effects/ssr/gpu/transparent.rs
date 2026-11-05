@@ -57,3 +57,45 @@ fn gpu_receive_ssr_traces_nothing_where_ssr_is_off() {
     let plain = frame(&mut r, &pool(false, false, 0.0));
     assert!(off == plain, "SSR off: receive_ssr changes no pixel");
 }
+
+/// A 128² busy normal map, each texel a whole normal tilted up to ~35° (#1702).
+fn busy_normal_map() -> String {
+    let mut state = 0x2545_f491u32;
+    let mut next = || {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        64 + (state >> 24) as u8 / 2
+    };
+    let img = image::RgbaImage::from_fn(128, 128, |_, _| {
+        let (x, y) = (next(), next());
+        let (nx, ny) = (x as f32 / 127.5 - 1.0, y as f32 / 127.5 - 1.0);
+        let nz = (1.0 - nx * nx - ny * ny).max(0.0).sqrt();
+        image::Rgba([x, y, (nz * 127.5 + 127.5) as u8, 255])
+    });
+    let path = crate::test_temp::dir().join("rusty_1702_ssr_bumps.png");
+    img.save(&path).unwrap();
+    path.to_string_lossy().into_owned()
+}
+
+/// Toksvig widens a far busy floor's lobe to about roughness 0.45, under the sharp
+/// floor transparent SSR fades from; its fade reads the authored roughness, so the
+/// glass still reflects the cube (#1702's review, item 2).
+#[test]
+fn gpu_a_busy_normal_mapped_transparent_floor_keeps_its_ssr() {
+    let Some(mut r) = renderer() else { return };
+    let at = pixel(REFLECTING);
+    let busy = |receive: bool| {
+        let mut scene = pool(true, receive, 0.0);
+        let floor = scene.materials.get_mut("floor").unwrap();
+        (floor.normal_map, floor.tiling) = (Some(busy_normal_map().into()), [40.0, 60.0]);
+        scene
+    };
+    let (traced, _) = shot(&mut r, &busy(true), at);
+    let (plain, _) = shot(&mut r, &busy(false), at);
+    eprintln!("[ssr] busy transparent floor at {at:?}: receive {traced:?}, not {plain:?}");
+    assert!(
+        redness(traced) >= redness(plain) + 30,
+        "the busy floor still shows the red cube"
+    );
+}

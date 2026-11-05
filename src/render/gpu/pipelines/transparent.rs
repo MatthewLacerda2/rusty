@@ -8,7 +8,7 @@ use super::{FacedPipeline, Facing, LazyPipeline};
 use crate::render::gpu::uniforms::SurfaceUniform;
 
 /// The blend state a translucent batch draws with.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum TransparentBlend {
     /// `Alpha`: `src * a + dst * (1 - a)`.
     Straight,

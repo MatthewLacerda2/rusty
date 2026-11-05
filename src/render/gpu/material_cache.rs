@@ -165,6 +165,11 @@ impl MaterialCache {
         self.params.insert(owner.clone(), (buffer, values));
     }
 
+    /// Whether `owner` has a param buffer: a draw bound it.
+    pub(crate) fn holds_params(&self, owner: &ParamOwner) -> bool {
+        self.params.contains_key(owner)
+    }
+
     /// Drop every group (their param buffers stay), so the next lookup rebuilds each
     /// over the textures resident now — called when a texture file was re-written
     /// (#689), before any draw of the frame resolves an index.

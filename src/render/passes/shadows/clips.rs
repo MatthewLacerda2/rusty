@@ -23,22 +23,31 @@ use crate::components::{MaterialAsset, RenderMode};
 use crate::render::draw::batch::BatchKey;
 use crate::render::draw::uniforms::mapping_uniform;
 use crate::render::gpu::pipelines::surface::{SurfaceShaders, STANDARD};
-use crate::render::gpu::uniforms::{MappingUniform, RecordWords};
+use crate::render::gpu::uniforms::MappingUniform;
+use crate::render::scene::MaterialRecords;
 
 /// A clipped caster's draw key: the surface pipeline whose cut it runs
 /// ([`STANDARD`] for a cutout alone), its material group, and, for a variant, its
-/// material record's words (#1616), which its `vs_shadow` and cut read through
-/// `material()` as its forward draw does. A cutout alone reads its test per caster
+/// material record's slot in the material table (#1616, #1706), which its
+/// `vs_shadow` and cut read through `material()` as its forward draw does. A cutout alone reads its test per caster
 /// and never the record, so it carries none: Cutout materials that share a map but
 /// differ in tint stay one shadow draw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct Clip {
     pub pipeline: usize,
     pub material: usize,
-    pub record: Option<RecordWords>,
+    pub record: Option<u32>,
 }
 
 impl Clip {
+    /// This clip naming its record's value class (`scene/classes.rs`) rather than
+    /// its slot, so a variant's casters of equal records batch as their forward
+    /// draws do.
+    pub(crate) fn by_class(self, records: &MaterialRecords) -> Self {
+        let record = self.record.map(|r| records.rep(r));
+        Self { record, ..self }
+    }
+
     /// A clip of `pipeline` over material group `material`, reading no record.
     #[cfg(test)]
     pub(crate) fn of(pipeline: usize, material: usize) -> Self {

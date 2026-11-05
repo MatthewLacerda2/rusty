@@ -14,9 +14,7 @@ use crate::render::{RenderView, Renderer};
 
 /// The batches of `translucents` that write their depth after drawing.
 pub(crate) fn writers(translucents: &[DrawBatch]) -> impl Iterator<Item = &DrawBatch> {
-    translucents
-        .iter()
-        .filter(|b| b.key.record().surface.depth_postpass == 1)
+    translucents.iter().filter(|b| b.key.traits.depth_postpass)
 }
 
 impl Renderer {
