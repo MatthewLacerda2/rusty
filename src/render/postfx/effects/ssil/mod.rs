@@ -27,7 +27,7 @@
 //! lightmap bake didn't take in (`LightmapSet::lights`, Unity's
 //! `Light.bakingOutput`; uploaded as each light's `bounce_baked`) and the emission
 //! of meshes the bake didn't take in (`BakeScene::takes_mesh`, uploaded as each
-//! instance's `in_bake`). Not the indirect term (lightmap, probes, flat ambient, SSIL
+//! object's `in_bake`). Not the indirect term (lightmap, probes, flat ambient, SSIL
 //! itself), not the environment reflection. So a lightmapped scene whose lights were
 //! all baked gathers nothing; a light spawned after the bake bounces. Unlit
 //! surfaces and the sky feed nothing. A transparent surface reads none (its group 3

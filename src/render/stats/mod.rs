@@ -158,6 +158,10 @@ pub struct RenderCounters {
     pub render_posed: u32,
     /// CPU microseconds the extract took (#1706), inside `renderer_ms`. Wall-clock.
     pub render_extract_us: u64,
+    /// Bytes this frame wrote into the forward pass's group-1 arrays (#1706), every
+    /// camera summed: per-draw uniforms, joints, instances, the material records
+    /// when they changed, proxy volumes and the object records that changed.
+    pub render_upload_bytes: u64,
 }
 
 impl RenderCounters {
@@ -210,6 +214,7 @@ impl RenderCounters {
             ("render_extracted", self.render_extracted.into()),
             ("render_posed", self.render_posed.into()),
             ("render_extract_us", self.render_extract_us),
+            ("render_upload_bytes", self.render_upload_bytes),
         ]
     }
 

@@ -157,7 +157,7 @@ impl BakeScene {
     /// Whether [`Self::gather`] takes mesh `id` in: active, static, unskinned and no
     /// light gizmo. Such a mesh occludes, bounces and emits in the bake whether or
     /// not it receives a lightmap, so the renderer's SSIL gathers none of its
-    /// emission once the scene holds a bake (#1750, `InstanceData::in_bake`).
+    /// emission once the scene holds a bake (#1750, `ObjectData::in_bake`).
     pub fn takes_mesh(scene: &Scene, id: u32) -> bool {
         scene.world.is_active_in_hierarchy(id)
             && scene.world.is_static(id)

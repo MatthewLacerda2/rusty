@@ -13,7 +13,7 @@
 use glam::Mat4;
 use std::collections::HashMap;
 
-use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
+use crate::render::gpu::draw_buffers::JointMatrix;
 use crate::render::InstanceData;
 use crate::scene::{Scene, SceneId};
 
@@ -124,25 +124,30 @@ impl MotionHistory {
 }
 
 /// Give `instance` entity `id`'s last-frame pose from `history` and record this
-/// frame's (`model`, `palette`, already at `bone_base` in `joints`). Last frame's
-/// palette is appended to `joints` beside this frame's; one of another length (the
-/// mesh changed) is not, and the vertex keeps this frame's skin under last frame's
-/// world matrix.
+/// frame's (`model`, `palette`). Last frame's world matrix is appended to `joints`,
+/// where `instance.motion` names it, and a skinned instance's last-frame palette
+/// right after it (`forward/bindings.wgsl`'s `vertex_to_world_prev`); one of another
+/// length (the mesh changed) is replaced by this frame's, so the vertex keeps this
+/// frame's skin under last frame's world matrix. A view without motion vectors never
+/// calls this and pays for none of it.
 pub(crate) fn track(
     history: &mut MotionHistory,
     id: u32,
     (model, palette): (Mat4, &[Mat4]),
-    bone_base: u32,
     joints: &mut Vec<JointMatrix>,
     instance: &mut InstanceData,
 ) {
     if let Some(prev) = history.pose(id) {
-        instance.prev_model_matrix = prev.model.to_cols_array();
-        instance.prev_bone_base = match prev.palette.len() == palette.len() {
-            true => push_palette(joints, &prev.palette),
-            false => bone_base,
-        };
-        instance.motion = 1;
+        // Element 0 of the uploaded array is the identity, so this starts one later.
+        instance.motion = joints.len() as u32 + 1;
+        joints.push(prev.model.to_cols_array());
+        if !palette.is_empty() {
+            let skin = match prev.palette.len() == palette.len() {
+                true => &prev.palette[..],
+                false => palette,
+            };
+            joints.extend(skin.iter().map(Mat4::to_cols_array));
+        }
     }
     history.record(id, model, palette);
 }

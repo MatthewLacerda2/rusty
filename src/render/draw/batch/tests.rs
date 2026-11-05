@@ -21,13 +21,13 @@ pub(super) fn name(handle: MeshHandle) -> &'static str {
     MESHES[handle.0 as usize]
 }
 
-/// An item of mesh `mesh`, palette `bone_base`, tint `tint`, tagged by `tag` in its
-/// instance's translation so a test can read back the order instances were packed in.
+/// An item of mesh `mesh`, palette `bone_base`, tint `tint`, tagged by `tag` (its bits
+/// as the instance's object slot) so a test can read back the order instances were
+/// packed in.
 pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem {
     let mut record = [0u32; crate::render::gpu::uniforms::MATERIAL_DATA_WORDS];
     record[0] = tint.to_bits();
-    let mut instance = InstanceData::IDENTITY;
-    instance.model_matrix[12] = tag;
+    let instance = InstanceData::of(tag.to_bits());
     DrawItem {
         key: BatchKey {
             pipeline: 0,
@@ -44,8 +44,13 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
     }
 }
 
+/// The tag [`item`] gave `instance`.
+pub(super) fn tag_of(instance: &InstanceData) -> f32 {
+    f32::from_bits(instance.object)
+}
+
 fn tags(draws: &FrameDraws) -> Vec<f32> {
-    draws.instances.iter().map(|i| i.model_matrix[12]).collect()
+    draws.instances.iter().map(tag_of).collect()
 }
 
 #[test]

@@ -1,6 +1,7 @@
 //! src/render/scene/idle_tests.rs — what an extract costs (#1706): a frame that
 //! changed nothing walks no object and no mesh column, shadows included (probe
-//! field, library and lightmaps included), a
+//! field, library and lightmaps included), a library edit re-derives that
+//! material's users alone, a
 //! move re-places only what moved, and a load, an Undo or a Play restore rebuilds,
 //! then holds what a fresh build holds.
 
@@ -42,6 +43,10 @@ fn gpu_a_frame_with_nothing_changed_walks_no_object() {
     let red = scene.materials["red"].clone();
     scene.materials.insert("red".into(), red);
     assert_eq!(extracted(&frame(&mut r, &scene).1), (0, 0), "same value");
+    // An edit re-derives that material's users alone: one red prop of six.
+    scene.materials.get_mut("red").unwrap().base_color[1] = 0.5;
+    assert_eq!(extracted(&frame(&mut r, &scene).1), (1, 0), "one material");
+    assert_eq!(held(&r, &scene), fresh(&mut r, &scene));
     // A re-baked probe re-samples every object.
     scene.probes.probes_mut()[0].sh.coeffs[0] = [0.5; 3];
     assert_eq!(extracted(&frame(&mut r, &scene).1), (6, 0), "a probe bake");

@@ -33,8 +33,8 @@ pub(crate) fn entity_params(scene: &Scene, id: u32, slot: usize) -> Option<Entit
 }
 
 impl Renderer {
-    /// The material cache index for `material` — `(library key, asset)` — drawn with
-    /// pipeline `pipeline`: its five maps (albedo, metallic, roughness, normal,
+    /// The material cache index for `material` — `(library key, asset)` of scene
+    /// `scene`'s library — drawn with pipeline `pipeline`: its five maps (albedo, metallic, roughness, normal,
     /// emissive), building the bind group on first use. The key is the *resolved*
     /// signature, so a late-loaded texture gets a fresh group (#207). When the
     /// pipeline's shader has runtime params, the material's values are packed into
@@ -47,6 +47,7 @@ impl Renderer {
     /// frame, one buffer.
     pub(crate) fn material_index(
         &mut self,
+        scene: SceneId,
         material: Option<(&str, &MaterialAsset)>,
         pipeline: usize,
         overrides: Option<EntityParams>,
@@ -54,13 +55,16 @@ impl Renderer {
         let owner = material.and_then(|(key, asset)| {
             let layout = self.surface_shaders.params(pipeline)?;
             let (owner, values) = match overrides {
-                Some((scene, id, slot, own)) => {
+                Some((owner_scene, id, slot, own)) => {
                     let mut merged = asset.shader_params.clone();
                     merged.extend(own.iter().map(|(k, v)| (k.clone(), v.clone())));
-                    (ParamOwner::Entity(scene, id, slot), layout.pack(&merged))
+                    (
+                        ParamOwner::Entity(owner_scene, id, slot),
+                        layout.pack(&merged),
+                    )
                 }
                 None => (
-                    ParamOwner::Material(key.to_owned()),
+                    ParamOwner::Material(scene, key.to_owned()),
                     layout.pack(&asset.shader_params),
                 ),
             };

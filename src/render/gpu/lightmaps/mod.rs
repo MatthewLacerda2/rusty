@@ -31,7 +31,7 @@
 //! read through the same sampler with the same page index and UV. They are bound only
 //! beside a bound colour array whose page count and size they match; otherwise the
 //! zeroed fallback stands in, never read: an instance reads its direction page only
-//! when one is bound (`InstanceData::lightmap_directional`, [`Lightmaps::directional`]).
+//! when one is bound (`ObjectData::lightmap_directional`, [`Lightmaps::directional`]).
 
 mod load;
 mod upload;

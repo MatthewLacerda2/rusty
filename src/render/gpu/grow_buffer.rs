@@ -4,7 +4,9 @@
 //! The instanced draw lists pack a whole frame's per-draw uniforms, bone palettes and
 //! instances into a few of these, so a frame costs a handful of `write_buffer` calls
 //! instead of one per entity. Growth reallocates, which invalidates any bind group that
-//! names the old buffer — `upload` says so, and the owner rebuilds.
+//! names the old buffer — `upload` says so, and the owner rebuilds. The object table
+//! (#1706) is kept instead: [`GrowBuffer::reserve`] grows it, and
+//! [`GrowBuffer::write_at`] writes only the slots that changed.
 
 /// Smallest allocation, so a near-empty scene does not reallocate on its first props.
 const MIN_BYTES: u64 = 4096;
@@ -52,6 +54,26 @@ impl GrowBuffer {
             queue.write_buffer(&self.buffer, 0, bytes);
         }
         grown
+    }
+
+    /// Make room for `bytes` without writing them: `true` when the buffer was
+    /// replaced, empty, so the caller must rewrite all of it and rebuild its bind
+    /// groups.
+    pub(crate) fn reserve(&mut self, device: &wgpu::Device, bytes: u64) -> bool {
+        let grown = bytes > self.buffer.size();
+        if grown {
+            let size = bytes.next_power_of_two().max(MIN_BYTES);
+            self.buffer = allocate(device, self.label, self.usage, size);
+        }
+        grown
+    }
+
+    /// Write `bytes` at `offset`, which [`Self::reserve`] made room for.
+    pub(crate) fn write_at(&self, queue: &wgpu::Queue, offset: u64, bytes: &[u8]) {
+        debug_assert!(offset + bytes.len() as u64 <= self.buffer.size());
+        if !bytes.is_empty() {
+            queue.write_buffer(&self.buffer, offset, bytes);
+        }
     }
 }
 

@@ -6,6 +6,7 @@ use glam::Vec3;
 
 use super::{RenderObject, RenderScene};
 use crate::components::{MaterialAsset, MaterialComponent, RenderMode};
+use crate::render::gpu::uniforms::ObjectData;
 use crate::render::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{Camera, Scene};
@@ -59,16 +60,81 @@ pub(super) fn frame(r: &mut Renderer, scene: &Scene) -> (Vec<u8>, RenderCounters
     (px, r.frame_counters)
 }
 
-/// The objects `r` holds for `scene` now, in draw order.
-pub(super) fn held(r: &Renderer, scene: &Scene) -> Vec<(u32, RenderObject)> {
+/// One object as a test compares it: its id, the object with its slot number
+/// blanked (a kept and a fresh build allocate different slots), and what its slot of
+/// the object table holds.
+pub(super) type Held = (u32, RenderObject, ObjectData);
+
+fn as_held(r: &Renderer, rs: &RenderScene) -> Vec<Held> {
+    let held = rs.objects().map(|(id, o)| {
+        let data = *r.retained.objects.get(o.slot);
+        (
+            id,
+            RenderObject {
+                slot: 0,
+                ..o.clone()
+            },
+            data,
+        )
+    });
+    held.collect()
+}
+
+/// The objects `r` holds for `scene` now, in draw order, with their records. Every
+/// kept object has a slot of its own.
+pub(super) fn held(r: &Renderer, scene: &Scene) -> Vec<Held> {
     let kept = r.retained.scene(scene.id()).expect("extracted");
-    kept.objects().map(|(id, o)| (id, o.clone())).collect()
+    let mut slots: Vec<u32> = kept.objects().map(|(_, o)| o.slot).collect();
+    slots.sort_unstable();
+    slots.dedup();
+    assert_eq!(
+        slots.len(),
+        kept.objects().count(),
+        "two objects share a slot"
+    );
+    assert!(!slots.contains(&0), "slot 0 is the identity's");
+    as_held(r, kept)
 }
 
 /// The objects a build of `scene` from scratch gives, through `r`'s own handles
-/// and resident buffers.
-pub(super) fn fresh(r: &mut Renderer, scene: &Scene) -> Vec<(u32, RenderObject)> {
+/// and resident buffers, with their records; their slots are given back after.
+pub(super) fn fresh(r: &mut Renderer, scene: &Scene) -> Vec<Held> {
     let mut rs = RenderScene::default();
     r.rebuild_objects(scene, &mut rs);
-    rs.objects().map(|(id, o)| (id, o.clone())).collect()
+    let held = as_held(r, &rs);
+    rs.release(&mut r.retained.objects);
+    held
+}
+
+/// The object table is whole: every slot in use is a kept object's (or the
+/// identity's), and the GPU holds what the table holds, slot for slot.
+pub(super) fn table_holds(r: &mut Renderer) -> Result<(), String> {
+    let live = (r.retained.objects.live(), r.retained.kept_objects() + 1);
+    if live.0 != live.1 {
+        return Err(format!("{} slots live for {} objects", live.0, live.1));
+    }
+    let gpu = r.objects_on_gpu();
+    match gpu == r.retained.objects.records().0 {
+        true => Ok(()),
+        false => Err("the GPU's object records differ from the table's".into()),
+    }
+}
+
+/// Edit the library: `red`'s colour, `glass`'s alpha, or add or remove `blue`,
+/// which objects may name while it is missing.
+pub(super) fn library(scene: &mut Scene, c: u8) {
+    let m = &mut scene.materials;
+    match c {
+        0..=2 => m.get_mut("red").unwrap().base_color[0] = f32::from(c),
+        3 => m.get_mut("glass").unwrap().alpha = 0.2,
+        _ if m.remove("blue").is_some() => {}
+        _ => drop(m.insert("blue".into(), Default::default())),
+    }
+}
+
+/// Run `f` on entity `id` of `scene`, when there is one.
+pub(super) fn on(scene: &mut Scene, id: Option<u32>, f: impl FnOnce(&mut Scene, u32)) {
+    if let Some(id) = id {
+        f(scene, id);
+    }
 }

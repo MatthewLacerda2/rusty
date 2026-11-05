@@ -4,17 +4,17 @@
 
 use glam::{Mat4, Vec3};
 
-use crate::components::{MaterialAsset, RenderFace, ShadowCasting};
+use crate::components::{MaterialAsset, MaterialComponent, RenderFace, ShadowCasting};
 use crate::render::draw::batch::BatchKey;
 use crate::render::draw::materials::material_texture_paths;
-use crate::render::draw::uniforms::solid_instance;
+use crate::render::draw::uniforms::solid_object;
 use crate::render::frustum::transform_aabb;
 use crate::render::gpu::pipelines::Facing;
 use crate::render::passes::shadows::{
     moves, shadow_runs, slot_clip, CasterClip, ObjectCasting, ShadowRun,
 };
 use crate::render::render_texture::is_render_texture;
-use crate::render::{InstanceData, MeshId, Renderer, SmallLimits};
+use crate::render::{MeshId, Renderer, SmallLimits};
 use crate::scene::Scene;
 
 use super::handles::MeshHandle;
@@ -65,10 +65,15 @@ pub(crate) struct RenderObject {
     /// A material map names a render texture (#430): its group's key names that
     /// texture's allocation, which the frame's views re-register.
     pub reads_render_texture: bool,
-    /// Its instance, but for what a camera sets per frame: the reflection probe,
-    /// the proxy volume and the motion history.
-    pub instance: InstanceData,
+    /// Its slot in the renderer's object table (`table.rs`), which holds its
+    /// `ObjectData` (world matrix, probe SH, lightmap): kept across re-derives,
+    /// freed when the object goes. A camera's instance names it.
+    pub slot: u32,
     pub slots: Vec<SlotDraw>,
+    /// The library names its material slots reference, found or not, each once
+    /// (sorted): an edit to one of them re-derives it (`RenderScene::by_material`),
+    /// and no other does.
+    pub materials: Vec<String>,
     /// Its slots' depth draws, adjacent slots that cast alike joined
     /// (`passes::shadows::shadow_runs`): derived with the slots, so a shadow sweep
     /// allocates nothing per caster.
@@ -87,14 +92,31 @@ impl RenderObject {
     }
 }
 
+/// The names `materials` references, each once: two slots may name one material
+/// (`scene::authoring::material::set_slot` pads with its key), and `RenderScene::set` indexes
+/// each name once.
+fn library_names(materials: Option<&MaterialComponent>) -> Vec<String> {
+    let mut names = materials.map_or_else(Vec::new, |m| m.materials.clone());
+    names.sort_unstable();
+    names.dedup();
+    names
+}
+
 impl Renderer {
     /// Entity `id` as the renderer keeps it, `None` when it has no mesh. Reads every
     /// input a draw of it takes but the per-camera ones; its mesh must already be
-    /// uploaded and its maps loaded, so the keys it builds bind what is resident.
-    pub(crate) fn extract_object(&mut self, scene: &Scene, id: u32) -> Option<RenderObject> {
+    /// uploaded and its maps loaded, so the keys it builds bind what is resident. Its
+    /// record goes into object-table slot `slot` (a fresh one when `None`).
+    pub(crate) fn extract_object(
+        &mut self,
+        scene: &Scene,
+        id: u32,
+        slot: Option<u32>,
+    ) -> Option<RenderObject> {
         let world = &scene.world;
         let mesh = world.mesh(id)?;
         let seq = world.seq(id)?;
+        let slot = slot.unwrap_or_else(|| self.retained.objects.alloc());
         let mesh_id = MeshId::from_mesh(&mesh);
         let handle = self.retained.meshes.intern(&mesh_id);
         let model = world.local_to_world(id);
@@ -120,28 +142,42 @@ impl Renderer {
             layer: world.layer(id),
             small: SmallLimits::of(&mesh),
             reads_render_texture: false,
-            instance: InstanceData::IDENTITY,
+            slot,
             slots: Vec::with_capacity(runs.len()),
+            materials: library_names(world.material(id).as_deref()),
             shadow_runs: Vec::new(),
         };
         drop(mesh);
-        for (slot, indices) in runs {
-            let entry = scene.material_entry_at(id, slot);
-            let material = entry.map(|(_, asset)| asset);
-            let (key, transparent) = self.slot_key(scene, id, (slot, indices), (model, handle));
-            let maps = material_texture_paths(material).into_iter().flatten();
-            object.reads_render_texture |= maps.into_iter().any(|m| is_render_texture(m.as_str()));
-            let clip = material.and_then(|m| slot_clip(&self.surface_shaders, &key, m));
-            object.slots.push(SlotDraw {
-                key,
-                transparent,
-                face: material.map_or(RenderFace::Front, |m: &MaterialAsset| m.render_face),
-                clip,
-            });
+        for run in runs {
+            self.push_slot(scene, id, run, &mut object);
         }
         object.shadow_runs = shadow_runs(&object.slots);
         self.pose_object(scene, id, &mut object);
         Some(object)
+    }
+
+    /// Add material slot `slot` (drawing `indices`) of entity `id` to `object`: its
+    /// key, whether it is transparent, its face and its shadow clip.
+    fn push_slot(
+        &mut self,
+        scene: &Scene,
+        id: u32,
+        (slot, indices): (usize, std::ops::Range<u32>),
+        object: &mut RenderObject,
+    ) {
+        let entry = scene.material_entry_at(id, slot);
+        let material = entry.map(|(_, asset)| asset);
+        let at = (object.world, object.mesh);
+        let (key, transparent) = self.slot_key(scene, id, (slot, indices), at);
+        let maps = material_texture_paths(material).into_iter().flatten();
+        object.reads_render_texture |= maps.into_iter().any(|m| is_render_texture(m.as_str()));
+        let clip = material.and_then(|m| slot_clip(&self.surface_shaders, &key, m));
+        object.slots.push(SlotDraw {
+            key,
+            transparent,
+            face: material.map_or(RenderFace::Front, |m: &MaterialAsset| m.render_face),
+            clip,
+        });
     }
 
     /// Whether a surface variant whose cut moves cuts any of entity `id`'s material
@@ -159,15 +195,17 @@ impl Renderer {
     }
 
     /// Re-place `object` (entity `id`) under its world matrix now: its bounds, its
-    /// instance (the probe SH it samples where it stands, its lightmap) and each
-    /// slot's facing. All a move changes; what else it changes is a full extract's.
-    pub(crate) fn pose_object(&self, scene: &Scene, id: u32, object: &mut RenderObject) {
+    /// record in the object table (the probe SH it samples where it stands, its
+    /// lightmap) and each slot's facing. All a move changes; what else it changes is
+    /// a full extract's.
+    pub(crate) fn pose_object(&mut self, scene: &Scene, id: u32, object: &mut RenderObject) {
         let model = scene.world.local_to_world(id);
         object.world = model;
         let (min, max) = object.local_aabb;
         let posed = object.resident && !object.palette;
         object.bounds = posed.then(|| transform_aabb(min, max, model));
-        object.instance = solid_instance(scene, id, model, &self.capture, &self.lightmaps);
+        let data = solid_object(scene, id, model, &self.capture, &self.lightmaps);
+        self.retained.objects.write(object.slot, data);
         for slot in &mut object.slots {
             slot.key.facing = Facing::of(model, slot.face);
         }

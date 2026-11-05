@@ -31,7 +31,12 @@ impl Renderer {
             facing: Facing::of_material(world, material),
             mesh,
             indices: indices.into(),
-            material: self.material_index(entry, pipeline, entity_params(scene, id, slot)),
+            material: self.material_index(
+                scene.id(),
+                entry,
+                pipeline,
+                entity_params(scene, id, slot),
+            ),
             record: record.words(),
             bone_base: 0,
         };
