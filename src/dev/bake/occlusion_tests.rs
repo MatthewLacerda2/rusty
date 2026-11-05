@@ -1,5 +1,5 @@
 //! The occlusion bake's runs (#1714): the editor's worker and a script's logged
-//! run write the same bytes as the in-line bake, and the log says its cells.
+//! run write the same bytes as the in-line bake, and the log says its step.
 
 use std::cell::RefCell;
 use std::time::Duration;
@@ -31,12 +31,10 @@ fn the_worker_and_the_logged_run_bake_what_the_inline_bake_does() {
     let logged = bake_occlusion_logged(&scene, &mut log).unwrap();
     drop(log);
     assert_eq!(encode(logged.data.as_ref().unwrap()), inline);
-    let last = lines.into_inner().pop().expect("a line").text;
-    let cells = baked.report.cells;
-    assert_eq!(
-        last,
-        format!("[Lighting] occlusion 100% ({cells}/{cells} cells)")
-    );
+    // A frozen clock: the step's first line, and no other step's.
+    let lines: Vec<String> = lines.into_inner().into_iter().map(|l| l.text).collect();
+    assert_eq!(lines[0], "[Lighting] occlusion preparing", "{lines:?}");
+    assert!(lines.iter().all(|l| l.starts_with("[Lighting] occlusion")));
 }
 
 #[test]

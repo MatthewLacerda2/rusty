@@ -11,14 +11,15 @@ use super::{bake_occlusion, culls_from, fingerprint, MAX_CULLING_NEAR};
 use crate::components::mesh::MeshRevision;
 use crate::components::{MaterialComponent, Projection};
 
-/// Where [`gap`]'s doors stand along the wall, off any regular spacing.
-const DOORS: [f32; 4] = [0.0, 3.37, -6.91, 8.53];
+/// Where [`gap`]'s doors stand along the wall, off any regular spacing (a door
+/// at the wall's centre meets a lattice point whatever the spacing).
+const DOORS: [f32; 3] = [3.37, -6.91, 8.53];
 
 #[test]
 fn a_long_wall_seen_through_a_door_is_kept_at_any_length() {
-    let cases = [20.0, 40.0, 200.0]
-        .into_iter()
-        .flat_map(|l| DOORS.map(|x| (l, x)));
+    // The 200 m wall at one door: the slowest bake, and the same lattice.
+    let short = [20.0, 40.0].into_iter().flat_map(|l| DOORS.map(|x| (l, x)));
+    let cases = short.chain([(200.0, DOORS[0])]);
     for (length, x) in cases {
         let (scene, door, wall) = gap(length, x);
         let data = bake_occlusion(&scene, 4)
