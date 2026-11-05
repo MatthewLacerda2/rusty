@@ -51,7 +51,7 @@ fn register_probe(lua: &Lua, ctx: &ApiCtx) -> Reg {
 /// missing (#1695, `Scene::shadowmask_note`): `lightmaps` for the lightmap verb.
 fn shadowmask_note(
     scene: &crate::scene::Scene,
-    console: &std::cell::RefCell<crate::scripting::console::ConsoleLogs>,
+    console: &std::cell::RefCell<crate::scripting::ConsoleLogs>,
     lightmaps: bool,
 ) {
     if let Some(note) = scene.shadowmask_note(lightmaps) {
