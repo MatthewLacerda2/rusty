@@ -181,6 +181,12 @@ impl PhysicsWorld {
         }
         self.recovery.bootstrapped |= dt > 0.0;
         self.recovery.panics_in_a_row = 0;
+        // Every body the step may have changed: rapier neither moves a sleeping
+        // body nor wakes one without leaving it awake. The next sync visits them
+        // too, named or not (`Tracked::stepped`).
+        let mut stepped = awake_before;
+        stepped.extend(self.awake_owners());
+        self.tracked.stepped.clone_from(&stepped);
 
         let overlaps = self.overlap_pairs();
         let triggers = TriggerEvents::from_overlap_sets(&self.prev_triggers, overlaps);
@@ -189,7 +195,7 @@ impl PhysicsWorld {
         let collisions = CollisionEvents::from_contact_sets(&self.prev_collisions, contacts);
         self.prev_collisions = collisions.stayed_keys();
         let joint_breaks = self.break_joints(scene, &pre_solve, dt);
-        self.sync_from_rapier(scene, &synced, awake_before);
+        self.sync_from_rapier(scene, &synced, stepped);
         PhysicsEvents {
             triggers,
             collisions,

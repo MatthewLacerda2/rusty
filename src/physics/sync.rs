@@ -5,9 +5,14 @@
 //! Both paths run the same passes in the same order (plan, joints, enabled,
 //! materials, layers, sensors, characters, masses, then each body's state and
 //! compound offsets); the incremental one visits the named bodies only, in
-//! ascending owner order, the order the full pass visits them in. A body no
-//! change named is one the full pass would leave as it is: its inputs are what it
-//! last pushed, and no pass so much as borrows a body or collider that already
+//! ascending owner order, the order the full pass visits them in. It also visits
+//! every body the last step may have changed (rapier had it awake): the solver
+//! rewrites the pose of every body in its active set, a static one included (a
+//! body just turned static is still there, and its rotation comes back an ulp
+//! off what was pushed, #1842), so only a body neither named nor stepped is sure
+//! to hold what it was last given. Such a body is one the full pass would leave
+//! as it is: its inputs are what it last pushed, rapier has not touched it since,
+//! and no pass so much as borrows a body or collider that already
 //! holds what it would write (`writes::body_to_write`, `writes::collider_to_write`).
 //! The borrow matters, not only the write: rapier lists whatever is borrowed
 //! mutably as modified, and that list's order is the order the next step meets
@@ -28,6 +33,7 @@ impl PhysicsWorld {
     /// pose and velocities and each compound collider's offset.
     /// Returns the bodies it synced.
     pub(super) fn sync_to_rapier(&mut self, scene: &mut Scene) -> Owners {
+        let stepped = std::mem::take(&mut self.tracked.stepped);
         let owners = match self.read_changes(scene) {
             None => {
                 self.resync_topology(scene);
@@ -35,7 +41,7 @@ impl PhysicsWorld {
                 self.resync_joints_tracked(scene);
                 Owners::All
             }
-            Some(changed) => self.resync_changed(scene, &changed),
+            Some(changed) => self.resync_changed(scene, &changed, &stepped),
         };
         let matrix_moved = self.tracked.matrix.as_ref() != Some(&scene.collision_matrix);
         if matrix_moved {
@@ -81,15 +87,14 @@ impl PhysicsWorld {
     /// After a full sync, every owner, ascending. Otherwise only the ones whose
     /// write can differ from what they hold, in the same order: the bodies synced
     /// (an edit may have woken one, or reset a static body's velocity), the ones
-    /// awake before or after the step (rapier neither moves a sleeping body nor
-    /// wakes one without leaving it awake), and every owner below one whose write
+    /// the step may have changed (`stepped`: awake before or after it), and every owner below one whose write
     /// moved it, which the full pass reaches after it and re-reads under its new
     /// parent pose (a body disabled under a falling one holds its world pose).
     pub(super) fn sync_from_rapier(
         &self,
         scene: &mut Scene,
         synced: &Owners,
-        mut queue: BTreeSet<u32>,
+        stepped: BTreeSet<u32>,
     ) {
         let Owners::Only(synced) = synced else {
             for &owner in self.plan.keys() {
@@ -97,8 +102,8 @@ impl PhysicsWorld {
             }
             return;
         };
+        let mut queue = stepped;
         queue.extend(synced);
-        queue.extend(self.awake_owners());
         while let Some(owner) = queue.pop_first() {
             if !self.write_back(scene, owner) {
                 continue;
@@ -125,9 +130,14 @@ impl PhysicsWorld {
     }
 
     /// Rebuild what `changed` may have reshaped (the plan, the joints) and return
-    /// the bodies to sync: every owner a named id is or belongs to, and every body
-    /// just built.
-    fn resync_changed(&mut self, scene: &Scene, changed: &Changed) -> Owners {
+    /// the bodies to sync: every owner a named id is or belongs to, every body
+    /// just built, and every body the last step may have changed (`stepped`).
+    fn resync_changed(
+        &mut self,
+        scene: &Scene,
+        changed: &Changed,
+        stepped: &BTreeSet<u32>,
+    ) -> Owners {
         let mut owners = BTreeSet::new();
         let replan = self.plan_may_change(scene, changed);
         if replan {
@@ -144,6 +154,7 @@ impl PhysicsWorld {
             }
             owners.extend(self.tracked.member_owner.get(&id));
         }
+        owners.extend(stepped.iter().filter(|o| self.plan.contains_key(o)));
         Owners::Only(owners)
     }
 

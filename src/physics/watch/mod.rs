@@ -36,6 +36,14 @@
 //! re-derived from a moved owner can round differently, so a moving body would no
 //! longer step byte-identically to the full pass. A body at rest writes back the
 //! values it holds, and that stamps nothing (`write_back` compares first).
+//!
+//! **What a step changed without a write-back.** rapier's solver rewrites the pose
+//! of every body in its active set, not only a dynamic one: a body just turned
+//! static is still there, and its rotation comes back an ulp off the one pushed
+//! (#1842). No write-back stamps it (physics never moves a static body's
+//! Transform), so the log alone would leave it while the full pass re-pushes it.
+//! The incremental sync therefore also visits every body awake before or after
+//! the last step (`Tracked::stepped`), whatever a step does to it.
 
 use std::collections::BTreeSet;
 
@@ -57,6 +65,8 @@ pub(super) mod fixture_tests;
 mod ops_tests;
 #[cfg(test)]
 mod sleep_tests;
+#[cfg(test)]
+mod stepped_tests;
 #[cfg(test)]
 mod tests;
 
@@ -176,6 +186,11 @@ pub(in crate::physics) struct Tracked {
     /// Every `Joint` entity, the body each one names and that body's owner, at the
     /// last joint sync.
     pub joint_deps: BTreeSet<u32>,
+    /// The owners the last step may have changed (awake before or after it), which
+    /// the next incremental sync visits whether a change named them or not: rapier's
+    /// solver rewrites an awake body's pose, even a static one's (#1842). Empty after
+    /// a step that skipped rapier.
+    pub stepped: BTreeSet<u32>,
     /// The collision matrix the colliders' groups were last derived from.
     pub matrix: Option<CollisionMatrix>,
     /// Ignore the log and run the full pass every step: the reference the
