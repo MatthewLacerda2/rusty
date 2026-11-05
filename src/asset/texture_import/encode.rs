@@ -83,14 +83,18 @@ pub(super) fn encode(
     let threads = cores.threads();
     let mut levels = vec![compress(&base, variant, format, threads)];
     let mut working = to_working(&base, kind);
-    // A BC5 map's normals as the shader reads them, z rebuilt (#1702).
-    let mut unit = (format == BlockFormat::Bc5).then(|| variance::as_read(&working));
+    // A BC5 map's normals as the shader reads them, z rebuilt (#1702). `half`
+    // filters each channel alone and BC5 keeps only x and y, which `as_read` leaves
+    // as they were, so one pyramid gives both the blocks and the spread.
+    let bc5 = format == BlockFormat::Bc5;
+    if bc5 {
+        working = variance::as_read(&working);
+    }
     let mut spread = Vec::new();
     for _ in 1..count {
         working = half(&working);
-        if let Some(normals) = unit.as_mut() {
-            *normals = half(normals);
-            spread.push(variance::level_mean(normals));
+        if bc5 {
+            spread.push(variance::level_mean(&working));
         }
         let level = to_bytes(&working, kind);
         levels.push(compress(&level, variant, format, threads));

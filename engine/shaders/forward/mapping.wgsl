@@ -145,15 +145,19 @@ fn level_at(size: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
 }
 
 // The level of normal map `t` one pixel's footprint covers at `c` (`level_at`):
-// each projection's blended by its weight (UV0 and Planar: the one lookup's), plus
-// the mip bias [`lookup`] reads it with. Takes derivatives: call it before any
-// per-pixel branch.
+// UV0's and Planar's one lookup's, Triplanar's three projections' blended by their
+// weights, plus the mip bias [`lookup`] reads it with. Takes derivatives: call it in
+// uniform control flow (a branch on `material()` is).
 fn normal_level(t: texture_2d<f32>, c: MapCoords) -> f32 {
     let size = vec2<f32>(textureDimensions(t));
-    let x = level_at(size, dpdx(c.x), dpdy(c.x));
-    let y = level_at(size, dpdx(c.y), dpdy(c.y));
-    let z = level_at(size, dpdx(c.z), dpdy(c.z));
-    return dot(vec3<f32>(x, y, z), c.weights) + camera.lod.x;
+    var level = level_at(size, dpdx(c.uv), dpdy(c.uv));
+    if (material().uv_mapping == TRIPLANAR) {
+        let x = level_at(size, dpdx(c.x), dpdy(c.x));
+        let y = level_at(size, dpdx(c.y), dpdy(c.y));
+        let z = level_at(size, dpdx(c.z), dpdy(c.z));
+        level = dot(vec3<f32>(x, y, z), c.weights);
+    }
+    return level + camera.lod.x;
 }
 
 // A normal map's filtered read: the world-space shading normal, and how long the
@@ -165,11 +169,16 @@ struct NormalSample {
 };
 
 // The length of the normal a texel stores, z from its blue: under 1 where a mip
-// averaged normals that disagreed. A BC5 texel has no blue (its z reads −1), so its
-// length is meaningless and never read (`use_normal_map == 2`).
+// averaged normals that disagreed. A texel whose stored z is under `WHOLE_BELOW_Z`
+// counts as whole (length 1): a mip of upward normals never averages that low, so
+// such a blue is not the normal's z (an RG export's 128, AO or height packed in
+// blue, a BC5 texel's 0), and its length would be a false spread (#1702's review).
 fn stored_length(texel: vec4<f32>) -> f32 {
-    return length(texel.xyz * 2.0 - 1.0);
+    let n = texel.xyz * 2.0 - 1.0;
+    return select(length(n), 1.0, n.z < WHOLE_BELOW_Z);
 }
+
+const WHOLE_BELOW_Z: f32 = 0.25;
 
 // The world-space shading normal from tangent-space normal map `t` at `c`, over
 // geometric normal `n`, each sample's z rebuilt from x and y (`maps::unpack_normal`,

@@ -122,6 +122,26 @@ mod tests {
         assert_eq!(level_mean(&mixed), KERNEL_MAX);
     }
 
+    /// The encoder halves the z-rebuilt image in place of the stored one for BC5,
+    /// which keeps x and y only: `half` must leave those as halving the stored
+    /// image would, whatever its blue and alpha held.
+    #[test]
+    fn rebuilding_z_changes_no_x_or_y_of_any_mip() {
+        let stored = Rgba32FImage::from_fn(8, 8, |x, y| {
+            let v = |k: u32| ((x * 7 + y * 13 + k * 5) % 11) as f32 / 10.0;
+            image::Rgba([v(0), v(1), v(2), v(3)])
+        });
+        let (mut a, mut b) = (stored.clone(), as_read(&stored));
+        for _ in 0..3 {
+            (a, b) = (
+                super::super::shrink::half(&a),
+                super::super::shrink::half(&b),
+            );
+            let rg = |i: &Rgba32FImage| i.pixels().flat_map(|p| [p[0], p[1]]).collect::<Vec<_>>();
+            assert_eq!(rg(&a), rg(&b));
+        }
+    }
+
     #[test]
     fn a_bc5_cache_keeps_what_its_mips_lost_and_a_flat_or_colour_one_nothing() {
         let dir = crate::test_temp::dir();

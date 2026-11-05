@@ -319,8 +319,6 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     var specular_kernel = specular_aa::kernel(normalize(in.world_normal));
     // Where every map below is read (#1573): UV0 tiled, or projected from world space.
     let maps = mapping::coords(in.tex_coords, in.world_position, geometric);
-    // The level the normal map is read at (#1702, Toksvig): before any branch too.
-    let normal_level = mapping::normal_level(t_normal, maps);
     var base_color = m.color_tint;
     if (m.use_texture == 1u) {
         base_color *= mapping::sample(t_diffuse, s_diffuse, maps);
@@ -343,12 +341,15 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // Geometric normal, optionally perturbed by a tangent-space normal map (#207; z
     // rebuilt by `maps::unpack_normal`), rotated into world space by the mesh's tangent
     // frame or, under a world mapping, reoriented per projection (`mapping::sample_normal`).
-    // Its spread inside the texel read widens the lobe too (#1702, Toksvig).
+    // Its spread inside the texel read widens the lobe too (#1702, Toksvig), at the
+    // level its footprint covers: derivatives, but the branch is on the draw's record,
+    // so uniform, and a material without a normal map pays nothing for them.
     var N = geometric;
     if (m.use_normal_map != 0u) {
         let read = mapping::sample_normal(t_normal, s_normal, maps, N, facing_tangent(in.world_tangent, behind));
         N = read.normal;
-        specular_kernel += specular_aa::map_kernel(m.use_normal_map, m.normal_variance, read.length, normal_level);
+        let level = mapping::normal_level(t_normal, maps);
+        specular_kernel += specular_aa::map_kernel(m.use_normal_map, m.normal_variance, read.length, level);
     }
     let V = normalize(camera.camera_pos - in.world_position);
 
@@ -384,8 +385,12 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     }
     let metallic = surface.metallic;
     // Specular AA (#1702): every GGX read below (the lights, the lightmap's lobe, the
-    // environment reflection's mip, SSR's record) takes the widened roughness, so a
-    // highlight and its reflection agree.
+    // environment reflection's mip and its specular occlusion, SSR's record) takes the
+    // widened roughness, so a highlight and its reflection agree. The environment
+    // BRDF's weight, and so a transparent surface's opacity, and transparent SSR's
+    // smoothness fade read the authored `surface.roughness` (step 5): the widening
+    // spreads a highlight and blurs a reflection, never takes a far glossy surface's
+    // grazing reflection, its opacity or its SSR away.
     let roughness = specular_aa::widen(surface.roughness, specular_kernel);
 
     let F0 = mix(vec3<f32>(0.04), albedo, metallic);
@@ -497,14 +502,20 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // face turned toward it, which would otherwise take the grazing Fresnel.
     // The AO weighs it as specular occlusion (#1697, Frostbite's, as HDRP has it), and
     // each probe is normalised by this pixel's baked diffuse (`baked_diffuse`).
+    // The weight reads the authored roughness, not the widened one: a far floor's
+    // spread of normals (up to 0.08 of α², `specular_aa`) would take `grazing` from
+    // 0.96 to 0.51 and a pane's opacity with it (#1702's review). URP has no
+    // specular AA; HDRP filters its smoothness through a preintegrated FGD rusty
+    // has not got.
     let R = reflect(-V, N);
-    let grazing = saturate(1.0 - roughness + (0.04 + 0.96 * metallic)); // URP's reflectivity
-    let alpha = roughness * roughness;
+    let grazing = saturate(1.0 - surface.roughness + (0.04 + 0.96 * metallic)); // URP's reflectivity
+    let alpha = surface.roughness * surface.roughness;
     let fresnel = pow(1.0 - saturate(abs(dot(N, V))), 4.0);
     let env_brdf = mix(F0, vec3<f32>(grazing), fresnel) / (alpha * alpha + 1.0);
     let reflection_weight = env_brdf * specular_occlusion(saturate(abs(dot(N, V))), ao, roughness);
-    // A transparent surface with `receive_ssr` traces SSR over it here (#1570).
-    let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, N, roughness, in.instance.y, baked_diffuse(ambient_irradiance, lightmap_page > 0u || objects[in.instance.x].use_sh == 1u)) * reflection_weight, reflection_weight, in.world_position, N, R, roughness);
+    // A transparent surface with `receive_ssr` traces SSR over it here (#1570), faded
+    // by its authored smoothness.
+    let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, N, roughness, in.instance.y, baked_diffuse(ambient_irradiance, lightmap_page > 0u || objects[in.instance.x].use_sh == 1u)) * reflection_weight, reflection_weight, in.world_position, N, R, surface.roughness);
     lighting_color += reflection;
     // One fog value for the SSR record and SSIL's realtime light (step 6): the
     // distance fog's and the volumetric fog's together (#1703).

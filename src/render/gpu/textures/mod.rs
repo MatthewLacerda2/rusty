@@ -215,6 +215,8 @@ mod formats_tests;
 #[cfg(test)]
 mod freshness_tests;
 #[cfg(test)]
+mod normal_variance_gpu_tests;
+#[cfg(test)]
 mod panorama_tests;
 
 /// The image `map` names, decoded: a map that references a texture a conversion
