@@ -1,27 +1,22 @@
 //! One camera's batches as what the GPU reads (#1616): a per-draw uniform per batch,
-//! in `uniform_slot` order, and the distinct material records they index.
+//! in `uniform_slot` order, each naming its material record's slot of the renderer's
+//! material table (`render::scene::MaterialRecords`, #1706).
 
-use crate::render::gpu::uniforms::RecordTable;
-use crate::render::{DrawUniform, MaterialData};
+use crate::render::DrawUniform;
 
 use super::FrameDraws;
 
 impl FrameDraws {
-    /// Every batch's per-draw uniform, in `uniform_slot` order, and the material
-    /// records they name: each distinct record once, sorted by its words
-    /// ([`RecordTable`]), so the array does not follow the draw order a moving camera
-    /// changes.
-    pub(crate) fn pack(&self) -> (Vec<DrawUniform>, Vec<MaterialData>) {
-        let table = RecordTable::new(self.batches().map(|b| b.key.record));
-        let uniforms = self
-            .batches()
+    /// Every batch's per-draw uniform, in `uniform_slot` order. The records they name
+    /// are kept slots, so nothing about them is packed per camera.
+    pub(crate) fn pack(&self) -> Vec<DrawUniform> {
+        self.batches()
             .map(|b| DrawUniform {
                 model_matrix: glam::Mat4::IDENTITY.to_cols_array(),
                 bone_base: b.key.bone_base,
-                material: table.index(&b.key.record),
+                material: b.key.record,
                 _pad: [0; 2],
             })
-            .collect();
-        (uniforms, table.records())
+            .collect()
     }
 }

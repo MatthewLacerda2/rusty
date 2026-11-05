@@ -49,7 +49,7 @@ use crate::render::gpu::material_cache::MaterialCache;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
 use crate::render::gpu::pipelines::winding::Facing;
 use crate::render::lod::LodSelection;
-use crate::render::scene::{MeshHandle, MeshHandles, RenderScene};
+use crate::render::scene::{MaterialRecords, MeshHandle, MeshHandles, RenderScene};
 use crate::render::{GpuMesh, MeshId, SmallObjectCull};
 use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
@@ -113,6 +113,9 @@ pub(super) struct CasterFrame<'a> {
     pub meshes: &'a MeshHandles,
     /// The material groups and variant pipelines the clipped casters' draws bind.
     pub materials: &'a MaterialCache,
+    /// The material table (#1706): a clip's record, read as it is now (a record-only
+    /// edit's cut follows), named by its value class ([`Clip::by_class`]).
+    pub records: &'a MaterialRecords,
     pub surfaces: &'a SurfaceShaders,
     /// The scene's [`StaticsKey`](super::StaticsKey), kept by the retained scene and
     /// compared by both the cascades' and the atlas's static bakes (#1594).
@@ -156,8 +159,9 @@ impl ShadowRenderer {
             self.drawn.extend(batches.iter().map(CasterBatch::counts));
             per_volume.push(batches);
         }
-        // Indexed once every volume is batched: the records sort by their words.
-        let records = CasterRecords::new(per_volume.iter().flatten().map(|b| b.key.clip.as_ref()));
+        // Indexed once every volume is batched: each distinct slot its clips name.
+        let clips = per_volume.iter().flatten().map(|b| b.key.clip.as_ref());
+        let records = CasterRecords::new(clips, frame.records.table());
         for batch in per_volume.iter_mut().flatten() {
             batch.record = records.index(batch.key.clip.as_ref());
         }
@@ -228,7 +232,7 @@ impl ShadowRenderer {
                     id,
                     key: CasterKey {
                         facing: caster_facing(world, two_sided, face),
-                        clip: clip.map(|c| c.clip),
+                        clip: clip.map(|c| c.clip.by_class(frame.records)),
                         mesh: object.mesh,
                         indices: indices.into(),
                     },

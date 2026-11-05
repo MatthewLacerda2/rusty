@@ -1,6 +1,9 @@
-//! src/render/scene/table.rs — the renderer's object table (#1706): one slot per kept
-//! object, holding the [`ObjectData`] the forward pass reads through a camera's
-//! instances, mirrored on the GPU and written there only where it changed.
+//! src/render/scene/table.rs — the renderer's slot tables (#1706): one slot per kept
+//! record, mirrored on the GPU and written there only where it changed. The object
+//! table ([`ObjectTable`]) holds one [`ObjectData`] per kept object, which the forward
+//! pass reads through a camera's instances; the material table (`records.rs`) holds
+//! one `MaterialData` per kept (scene, library material, variant), which a draw's
+//! uniform names.
 //!
 //! Every kept scene allocates its objects' slots from the one table, so a preview tab
 //! and the main scene never share a slot and a switch between them uploads nothing.
@@ -24,24 +27,38 @@ use crate::render::gpu::uniforms::ObjectData;
 /// a split would. Each call also allocates in wgpu (about four allocations).
 pub(crate) const JOIN_GAP: u32 = 32;
 
-pub(crate) struct ObjectTable {
+/// A record a [`SlotTable`] holds: slot 0 holds [`Slotted::identity`] for good.
+pub(crate) trait Slotted: Copy + PartialEq + bytemuck::Pod {
+    fn identity() -> Self;
+}
+
+impl Slotted for ObjectData {
+    fn identity() -> Self {
+        ObjectData::IDENTITY
+    }
+}
+
+/// The object table: every kept object's record, by slot.
+pub(crate) type ObjectTable = SlotTable<ObjectData>;
+
+pub(crate) struct SlotTable<T> {
     /// Every slot's record, freed ones included (unread until reused).
-    records: Vec<ObjectData>,
+    records: Vec<T>,
     free: Vec<u32>,
     /// Slots written since the last [`Self::take_dirty`], in any order.
     dirty: Vec<u32>,
     /// One camera's mesh particles, at slots `records.len()..`.
-    transient: Vec<ObjectData>,
+    transient: Vec<T>,
     /// Which slots are free, by slot: what checks a double release in linear time
     /// (a scene's release frees every slot it held).
     #[cfg(debug_assertions)]
     freed: Vec<bool>,
 }
 
-impl Default for ObjectTable {
+impl<T: Slotted> Default for SlotTable<T> {
     fn default() -> Self {
         Self {
-            records: vec![ObjectData::IDENTITY],
+            records: vec![T::identity()],
             free: Vec::new(),
             // The identity reaches the GPU with the first upload.
             dirty: vec![0],
@@ -52,7 +69,7 @@ impl Default for ObjectTable {
     }
 }
 
-impl ObjectTable {
+impl<T: Slotted> SlotTable<T> {
     /// A slot for a new object, reusing a freed one first. A new slot is marked
     /// dirty: what the GPU holds there (zeros, or a past camera's transient record)
     /// is not what the table holds, even when its first write leaves it unchanged.
@@ -63,7 +80,7 @@ impl ObjectTable {
         );
         let slot = self.free.pop().unwrap_or_else(|| {
             let slot = self.records.len() as u32;
-            self.records.push(ObjectData::IDENTITY);
+            self.records.push(T::identity());
             self.dirty.push(slot);
             slot
         });
@@ -87,7 +104,7 @@ impl ObjectTable {
     }
 
     /// Make `slot` hold `data`; marked for upload only when it changed.
-    pub(crate) fn write(&mut self, slot: u32, data: ObjectData) {
+    pub(crate) fn write(&mut self, slot: u32, data: T) {
         let at = &mut self.records[slot as usize];
         if *at != data {
             *at = data;
@@ -96,13 +113,13 @@ impl ObjectTable {
     }
 
     /// What `slot` holds.
-    pub(crate) fn get(&self, slot: u32) -> &ObjectData {
+    pub(crate) fn get(&self, slot: u32) -> &T {
         &self.records[slot as usize]
     }
 
     /// A transient slot holding `data` for the current camera's draws (a mesh
     /// particle), dropped by [`Self::end_camera`].
-    pub(crate) fn push_transient(&mut self, data: ObjectData) -> u32 {
+    pub(crate) fn push_transient(&mut self, data: T) -> u32 {
         self.transient.push(data);
         (self.records.len() + self.transient.len() - 1) as u32
     }
@@ -114,7 +131,7 @@ impl ObjectTable {
 
     /// Every kept slot's record, freed ones included, then the transient ones: the
     /// whole array as the GPU holds it after a sync.
-    pub(crate) fn records(&self) -> (&[ObjectData], &[ObjectData]) {
+    pub(crate) fn records(&self) -> (&[T], &[T]) {
         (&self.records, &self.transient)
     }
 
