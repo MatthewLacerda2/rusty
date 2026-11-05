@@ -45,7 +45,8 @@ fn material_data_matches_wgsl_layout() {
     let mapping = members!(MappingUniform, mapping;
         uv_st, uv_mapping, world_scale, blend_sharpness,
     );
-    let pairs: Vec<_> = [&own[..], &surface, &mapping].concat();
+    let tail = members!(MaterialData, 0; normal_variance);
+    let pairs: Vec<_> = [&own[..], &surface, &mapping, &tail].concat();
     let found = wgsl_struct_in(PROBE, "MaterialData");
     assert_members(found, "MaterialData", &pairs, size_of::<MaterialData>());
 }

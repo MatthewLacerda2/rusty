@@ -81,6 +81,7 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
         two_sided: u32::from(material.is_some_and(|m| m.render_face != RenderFace::Front)),
         surface: surface_uniform(lit, material),
         mapping: material.map_or_else(MappingUniform::default, mapping_uniform),
+        normal_variance: [0; 4],
     }
 }
 

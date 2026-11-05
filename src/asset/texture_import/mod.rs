@@ -9,7 +9,7 @@
 //! | Texture Type | format | mips average |
 //! |---|---|---|
 //! | `Default` | BC7 (a byte a texel) | in linear light; raw with *sRGB* off |
-//! | `NormalMap` | BC5 (x and y, a byte a texel; the shader rebuilds z) | raw |
+//! | `NormalMap` | BC5 (x and y, a byte a texel; the shader rebuilds z) | raw, each level's lost length kept ([`variance`]) |
 //! | `SingleChannel` | BC4 (red, half a byte a texel) | raw |
 //!
 //! `HighQuality` searches BC7's modes harder than `Normal`; BC4 and BC5 encode
@@ -48,6 +48,7 @@ mod encode;
 mod orphans;
 mod refresh;
 mod shrink;
+pub mod variance;
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
@@ -65,7 +66,7 @@ use super::sidecar::{Compression, TextureSettings, TextureType};
 
 /// Bumped whenever `encode` would write different blocks for the same input,
 /// so every cached texture is re-made.
-pub const ENCODER_VERSION: u32 = 2;
+pub const ENCODER_VERSION: u32 = 3;
 
 /// What a slot reads a texture as: how an uncompressed upload's mips average,
 /// and which compressed formats it can sample ([`fits`]).

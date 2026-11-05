@@ -116,7 +116,8 @@ fn finite_hdr(c: vec4<f32>) -> vec4<f32> {
 // so it needs no prepass; a miss keeps the probe. Only a material with `receive_ssr`
 // on a camera that marches (`camera.ssr.x`, the base camera of a view running SSR)
 // traces: both are uniform, so every other surface returns at once. `N` is the
-// shading normal, `roughness` the perceptual roughness. The copy has no mip pyramid,
+// shading normal, `roughness` the authored perceptual roughness (not specular AA's
+// widened one, #1702: a far busy pane keeps its SSR). The copy has no mip pyramid,
 // so the hit is sharp: the camera's *Minimum Smoothness* here is never below the
 // sharp floor (`render::postfx::effects::ssr::transparent::SHARP_SMOOTHNESS`).
 fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<f32> {
