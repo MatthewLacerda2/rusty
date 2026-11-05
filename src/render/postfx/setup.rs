@@ -136,7 +136,7 @@ impl PostFx {
     }
 
     /// (Re)allocate the HDR target for a new framebuffer size; the LDR targets are
-    /// made at the chain's size by the next frame's [`Self::fit_chain`], and the
+    /// made at the chain's size by the next frame's `PostFx::fit_chain`, and the
     /// effects' own (bloom's chain among them) the next frame they run.
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
         let (w, h) = (width.max(1), height.max(1));

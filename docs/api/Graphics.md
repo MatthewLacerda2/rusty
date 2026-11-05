@@ -888,7 +888,7 @@ URP's *Auto* filter outside FSR) to the surface **before the UI**, which stays a
 native resolution and sharp. A camera running TAA upscales through TAA instead,
 inside the chain (see *TAA*): there the post targets from TAA on (motion blur,
 bloom, the exposure meter, the composite, the authored effects) are the surface's
-size, and only the scene, its depth, motion vectors, SSAO, SSR and depth of field
+size, no scaled copy of the image is kept to upscale, and only the scene, its depth, motion vectors, SSAO, SSR and depth of field
 are the scaled size. Below `1` the scene looks softer; above `1` it
 supersamples. On a 2× Retina surface `0.5` renders at the 1× pixel count:
 `Video.SetResolution` sizes the window (or, fullscreen, the whole framebuffer, UI
