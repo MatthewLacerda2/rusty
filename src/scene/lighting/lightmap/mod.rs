@@ -24,7 +24,8 @@
 //!   page (#1694), with the RGBM PNG beside it as the fallback;
 //! * `set` — the scene's pages and each entity's place in them ([`LightmapSet`]);
 //! * `probe_direct` — the direct light of `Baked` lights at light probes, which the
-//!   probe bake adds analytically ([`baked_direct_sh`], #809).
+//!   probe bake adds analytically ([`baked_direct_sh`], #809), and the probes'
+//!   shadowmask occlusion ([`mixed_occlusion`], #1695).
 //!
 //! The bake is a pure function of (scene, settings, seed): no clock, no unseeded RNG,
 //! and the result never depends on how many threads ran it.

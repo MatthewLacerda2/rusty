@@ -94,6 +94,13 @@ impl LightmapSet {
             && self.fell_back.is_empty()
     }
 
+    /// Whether a lightmap bake's light is held: a lightmap or a light it took in.
+    /// A `Shadowmask` bake with nothing to lightmap holds only its channels (#1695),
+    /// whose light is nowhere in a page.
+    pub fn holds_bake(&self) -> bool {
+        !self.entries.is_empty() || !self.lights.is_empty()
+    }
+
     /// Whether the bake took light `entity` in ([`Self::lights`]).
     pub fn baked_light(&self, entity: u32) -> bool {
         self.lights.contains(&entity)

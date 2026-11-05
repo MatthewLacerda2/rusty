@@ -1,4 +1,5 @@
-//! src/scene/lighting/io.rs — the `<scene>.lighting.json` SH sidecar.
+//! src/scene/lighting/io.rs — the `<scene>.lighting.json` SH sidecar (and, after a
+//! `Shadowmask` bake, each probe's shadowmask occlusion beside its SH, #1695).
 //!
 //! Mirrors the scene ↔ sidecar split: the scene document stores probe POSITIONS +
 //! grid layout (human-diffable references/values); the heavy baked SH lives here, in

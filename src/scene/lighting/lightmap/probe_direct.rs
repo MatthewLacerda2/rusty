@@ -1,4 +1,5 @@
-//! The direct light of `Baked` lights at light probes (#809).
+//! The direct light of `Baked` lights at light probes (#809), and a `Shadowmask`
+//! bake's per-probe occlusion of its `Mixed` lights ([`mixed_occlusion`], #1695).
 //!
 //! A `Baked` light never renders live, so dynamic objects get it only through the
 //! probes. The probe bake's cubemap capture sees lit *surfaces*, never a light itself,

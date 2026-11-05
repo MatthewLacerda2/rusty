@@ -9,9 +9,10 @@
 //! Storage split (mirrors the scene ↔ sidecar layout of `skybox_path`):
 //!   * Probe POSITIONS + the grid layout live in the scene document (references +
 //!     values, no GPU buffers).
-//!   * The baked SH coefficients live in a SIDECAR `<scene>.lighting.json`
-//!     (`LightingData`), keyed by probe index — heavy, regenerable data kept out
-//!     of the human-diffable scene file.
+//!   * The baked SH coefficients, and a `Shadowmask` bake's per-probe occlusion
+//!     (#1695), live in a SIDECAR `<scene>.lighting.json` (`LightingData`), keyed by
+//!     probe index — heavy, regenerable data kept out of the human-diffable scene
+//!     file. The occlusion blends with the SH's weights (`sample_occlusion`).
 //!
 //! Interpolation is TRILINEAR over the grid (no tetrahedral gold-plating). Outside
 //! a grid, or for a set with none (the automatic placement's, #1737, whose density

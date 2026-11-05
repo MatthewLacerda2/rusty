@@ -183,7 +183,7 @@ pub(crate) fn solid_object(
         lightmap_page: lightmap.map_or(0, |l| l.page + 1),
         lightmap_directional: u32::from(lightmap.is_some() && lightmaps.directional()),
         lightmap_st: lightmap.map_or([0.0; 4], |l| l.scale_offset),
-        in_bake: u32::from(!scene.lightmaps.is_empty() && BakeScene::takes_mesh(scene, id)),
+        in_bake: u32::from(scene.lightmaps.holds_bake() && BakeScene::takes_mesh(scene, id)),
         sh,
         occlusion: probe_occlusion_at(scene, model_matrix.w_axis.truncate()),
     }
