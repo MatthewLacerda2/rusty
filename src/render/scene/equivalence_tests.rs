@@ -5,11 +5,10 @@
 //! capture, a re-uploaded shared mesh) and the shadow ops (`shadow_ops`). The table
 //! leaks no slot and the GPU mirrors it (`table_holds`). One renderer for every case.
 
-use glam::Vec3;
 use proptest::prelude::*;
 use proptest::test_runner::{Config, TestRunner};
 
-use super::fixture::{fresh, held, library, on, table_holds, yard, RES};
+use super::fixture::{fresh, held, library, on, probe, table_holds, yard, RES};
 use super::shadow_ops::{self, s_op, S};
 use crate::components::mesh::MeshRevision;
 use crate::components::{LightComponent, MaterialComponent};
@@ -69,7 +68,7 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
             create_entity(scene, "prop", Some(kinds[k as usize]));
         }
         R::Library(c) => library(scene, c),
-        R::Probe(x) => drop(scene.probes.add_probe(Vec3::X * f32::from(x))),
+        R::Probe(x) => probe(scene, x),
         R::Capture(on) => r.capture.static_only = on,
         R::Rewind => scene.world.rewind_changes(),
         R::Shadow(ref op) => shadow_ops::edit(scene, op),

@@ -80,6 +80,8 @@ mod gather_tests;
 #[cfg(test)]
 mod inset_tests;
 #[cfg(test)]
+mod mask_tests;
+#[cfg(test)]
 mod pages_bc_tests;
 #[cfg(test)]
 mod pages_tests;

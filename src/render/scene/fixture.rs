@@ -120,6 +120,15 @@ pub(super) fn table_holds(r: &mut Renderer) -> Result<(), String> {
     }
 }
 
+/// Add a probe at `x` along +X, or for an odd `x` write the first probe's
+/// shadowmask occlusion (#1695, `ObjectData::occlusion`).
+pub(super) fn probe(scene: &mut Scene, x: u8) {
+    match (x % 2, scene.probes.probes_mut().first_mut()) {
+        (1, Some(p)) => p.occlusion = glam::Vec4::splat(0.25 * f32::from(x)),
+        _ => drop(scene.probes.add_probe(glam::Vec3::X * f32::from(x))),
+    }
+}
+
 /// Edit the library: `red`'s colour, `glass`'s alpha, or add or remove `blue`,
 /// which objects may name while it is missing.
 pub(super) fn library(scene: &mut Scene, c: u8) {

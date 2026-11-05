@@ -144,6 +144,8 @@ mod limits_tests;
 #[cfg(test)]
 mod logged_tests;
 #[cfg(test)]
+mod shadowmask_tests;
+#[cfg(test)]
 mod survivor_tests;
 #[cfg(test)]
 mod tests;
