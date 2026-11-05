@@ -35,8 +35,17 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   static bakes' key is `RenderScene::statics_key`, refolded only when a static object
   was re-derived. A new input a shadow reads is kept or read per frame the same way,
   and `passes::shadows::statics_key` (the from-scratch digest the tests compare)
-  folds it too. The material table and the per-camera instance array are still
-  rebuilt per frame: part 3.
+  folds it too.
+- **What an object holds lives on the GPU in its slot** (part 3 of #1706): its
+  `ObjectData` (world matrix, probe SH, lightmap) sits at its slot of the object table
+  (`scene/table.rs`), written where it changed (`gpu/draw_buffers/objects.rs`). A
+  camera's `InstanceData` is 16 bytes naming the slot plus what the camera decides
+  (reflection probes, proxy volume, motion history in the joint array). A new
+  per-object value the shader reads goes into `ObjectData` (Rust and
+  `forward/bindings.wgsl`), written in `pose_object`; a per-view one into
+  `InstanceData`, and the fragment stage gets it through `VertexOutput::instance`,
+  since it is at its 8 storage buffers and never binds the instances. A library edit
+  re-derives only the objects naming that material (`RenderScene::by_material`).
 
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no

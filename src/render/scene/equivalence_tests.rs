@@ -1,16 +1,15 @@
-//! src/render/scene/equivalence_tests.rs — the retained objects after any edit
-//! sequence equal a build from scratch (#1706), as `ecs/changes/derived_tests.rs`
-//! proves the change log's consumers: the ECS write paths of `ops_tests`, then the
-//! inputs the log does not cover (the material library, overrides, lightmaps and
-//! a bake's light record, which alone sets `in_bake` (#1750), probes, a capture, a
-//! re-uploaded shared mesh), and what the shadow sweeps read (`shadow_ops`): each
-//! frame the static bakes' key equals a from-scratch digest. One renderer for all.
+//! src/render/scene/equivalence_tests.rs — after any edit sequence the retained
+//! objects and their object-table records equal a build from scratch (#1706): the
+//! ECS write paths of `ops_tests`, the inputs the log does not cover (library,
+//! overrides, lightmaps and a bake's light record (`in_bake`, #1750), probes, a
+//! capture, a re-uploaded shared mesh) and the shadow ops (`shadow_ops`). The table
+//! leaks no slot and the GPU mirrors it (`table_holds`). One renderer for every case.
 
 use glam::Vec3;
 use proptest::prelude::*;
 use proptest::test_runner::{Config, TestRunner};
 
-use super::fixture::{fresh, held, yard, RES};
+use super::fixture::{fresh, held, library, on, table_holds, yard, RES};
 use super::shadow_ops::{self, s_op, S};
 use crate::components::mesh::MeshRevision;
 use crate::components::{LightComponent, MaterialComponent};
@@ -24,7 +23,8 @@ use crate::scene::Scene;
 enum R {
     World(Op),
     Prop(u8),
-    Material(usize, Option<bool>),
+    /// Entity, material, and whether two slots name it (`set_slot` pads a list).
+    Material(usize, Option<u8>, bool),
     Library(u8),
     Override(usize, bool),
     Light(usize, bool),
@@ -43,8 +43,9 @@ fn r_op() -> impl Strategy<Value = R> {
     prop_oneof![
         8 => op().prop_map(R::World),
         2 => (0u8..3).prop_map(R::Prop),
-        2 => (at(), proptest::option::of(any::<bool>())).prop_map(|(i, m)| R::Material(i, m)),
-        1 => (0u8..4).prop_map(R::Library),
+        3 => (at(), proptest::option::of(0u8..3), any::<bool>())
+            .prop_map(|(i, m, two)| R::Material(i, m, two)),
+        2 => (0u8..6).prop_map(R::Library),
         2 => (at(), any::<bool>()).prop_map(|(i, s)| R::Override(i, s)),
         1 => (at(), any::<bool>()).prop_map(|(i, l)| R::Light(i, l)),
         1 => (at(), 0u8..4).prop_map(|(i, l)| R::Lightmap(i, l)),
@@ -67,17 +68,17 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         R::Prop(k) => {
             create_entity(scene, "prop", Some(kinds[k as usize]));
         }
-        R::Library(c) => scene.materials.get_mut("red").unwrap().base_color[0] = f32::from(c),
-        R::Probe(x) => {
-            scene.probes.add_probe(Vec3::X * f32::from(x));
-        }
+        R::Library(c) => library(scene, c),
+        R::Probe(x) => drop(scene.probes.add_probe(Vec3::X * f32::from(x))),
         R::Capture(on) => r.capture.static_only = on,
         R::Rewind => scene.world.rewind_changes(),
         R::Shadow(ref op) => shadow_ops::edit(scene, op),
         R::Frame => {}
-        R::Material(i, m) => on(scene, pick(scene, i), |s, id| {
-            let name = m.map(|red| if red { "red" } else { "glass" }.to_string());
-            s.world.set_material(id, name.map(MaterialComponent::new));
+        R::Material(i, m, two) => on(scene, pick(scene, i), |s, id| {
+            let name = m.map(|m| ["red", "glass", "blue"][m as usize].to_string());
+            let slots = name.map(|n| vec![n; 1 + usize::from(two)]);
+            let slots = slots.map(|materials| MaterialComponent { materials });
+            s.world.set_material(id, slots);
         }),
         R::Override(i, set) => on(scene, pick(scene, i), |s, id| match set {
             true => s.shader_overrides.set(id, "tint".into(), vec![1.0]),
@@ -111,11 +112,6 @@ fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
     }
 }
 
-fn on(scene: &mut Scene, id: Option<u32>, f: impl FnOnce(&mut Scene, u32)) {
-    let Some(id) = id else { return };
-    f(scene, id);
-}
-
 /// After every frame of `ops`, the objects `r` holds equal a fresh build.
 fn holds(r: &mut Renderer, ops: &[R]) -> Result<(), TestCaseError> {
     let mut scene = yard(6);
@@ -127,6 +123,8 @@ fn holds(r: &mut Renderer, ops: &[R]) -> Result<(), TestCaseError> {
             r.extract_scene(&scene);
             let kept = held(r, &scene);
             prop_assert_eq!(kept, fresh(r, &scene), "after {:?}", ops);
+            let table = table_holds(r);
+            prop_assert!(table.is_ok(), "{:?} after {:?}", table, ops);
             let shadows = shadow_ops::kept_equals_fresh(r, &scene);
             prop_assert!(shadows.is_ok(), "{:?} after {:?}", shadows, ops);
         }

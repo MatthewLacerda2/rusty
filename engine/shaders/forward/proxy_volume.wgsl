@@ -17,7 +17,7 @@
 #define_import_path forward::proxy_volume
 
 #import common::PI
-#import forward::bindings::{instances, proxy_volumes}
+#import forward::bindings::proxy_volumes
 #import lighting::sh::sh_basis
 
 const HEADER: u32 = 5u;
@@ -32,12 +32,11 @@ fn add_point(acc: ptr<function, array<vec3<f32>, 4>>, base: u32, p: u32, w: f32)
     }
 }
 
-// The irradiance E at `world_pos` for normal `N` from instance `instance`'s proxy
-// volume, in rgb, with a = 1; a = 0 when it has none, and the caller keeps the
+// The irradiance E at `world_pos` for normal `N` from proxy volume `proxy` (an
+// instance's `proxy_volume`), in rgb, with a = 1; a = 0 when it has none, and the caller keeps the
 // single sample. The L1 terms are `eval_sh`'s first
 // four, so a one-point volume reads what `eval_sh` reads without its L2 bands.
-fn proxy_irradiance(world_pos: vec3<f32>, N: vec3<f32>, instance: u32) -> vec4<f32> {
-    let proxy = instances[instance].proxy_volume;
+fn proxy_irradiance(world_pos: vec3<f32>, N: vec3<f32>, proxy: u32) -> vec4<f32> {
     if (proxy == 0u) {
         return vec4<f32>(0.0);
     }

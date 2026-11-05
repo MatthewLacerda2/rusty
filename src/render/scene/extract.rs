@@ -19,7 +19,7 @@ impl Renderer {
         let start = std::time::Instant::now();
         let mut retained = self.retained.take(scene.id());
         let last = self.update_objects(scene, &mut retained);
-        self.retained.put(scene.id(), retained);
+        self.keep_scene(scene.id(), retained);
         self.frame_counters.render_extracted += last.extracted;
         self.frame_counters.render_posed += last.posed;
         self.frame_counters.render_extract_us += start.elapsed().as_micros() as u64;
@@ -47,7 +47,14 @@ impl Renderer {
         };
         let stats = match dirty {
             Dirty::Rebuild => self.rebuild_objects(scene, rs),
-            Dirty::Some { whole, posed } => self.update_some(scene, rs, whole, posed),
+            Dirty::Some {
+                mut whole,
+                posed,
+                materials,
+            } => {
+                whole.extend(rs.users_of(&materials));
+                self.update_some(scene, rs, whole, posed)
+            }
         };
         let inputs = rs.inputs.as_mut().expect("opened above");
         inputs.uploads_seen = self.retained.meshes.uploads();
@@ -60,13 +67,25 @@ impl Renderer {
     }
 
     /// Every mesh entity re-derived: the first frame, a load, an Undo, a renderer
-    /// input. The one walk of the World an extract takes.
+    /// input. The one walk of the World an extract takes. An object still there
+    /// keeps its slot, so a record whose value did not move uploads nothing; only
+    /// the slots of objects gone are freed.
     pub(super) fn rebuild_objects(&mut self, scene: &Scene, rs: &mut RenderScene) -> ExtractStats {
         let ids = scene.world.ids_with_mesh();
         self.upload_meshes_of(scene, &ids);
         self.load_maps_of(scene, &ids);
-        rs.objects.clear();
-        rs.order.clear();
+        let meshed: BTreeSet<u32> = ids.iter().copied().collect();
+        let gone: Vec<u32> = rs
+            .objects
+            .keys()
+            .filter(|id| !meshed.contains(id))
+            .copied()
+            .collect();
+        for id in gone {
+            let slot = rs.objects[&id].slot;
+            self.retained.objects.release(slot);
+            rs.set(id, None);
+        }
         rs.casting = None;
         ExtractStats {
             extracted: self.derive_objects(scene, rs, &ids),
@@ -120,13 +139,17 @@ impl Renderer {
         }
     }
 
-    /// Re-derive the objects of `ids` (an id without a mesh drops its object); how
-    /// many were derived.
+    /// Re-derive the objects of `ids`, each keeping its slot (an id without a mesh
+    /// drops its object and frees its slot); how many were derived.
     fn derive_objects(&mut self, scene: &Scene, rs: &mut RenderScene, ids: &[u32]) -> u32 {
         let mut derived = 0;
         for &id in ids {
-            let object = self.extract_object(scene, id);
-            derived += u32::from(object.is_some());
+            let slot = rs.objects.get(&id).map(|o| o.slot);
+            let object = self.extract_object(scene, id, slot);
+            match (&object, slot) {
+                (None, Some(slot)) => self.retained.objects.release(slot),
+                _ => derived += u32::from(object.is_some()),
+            }
             rs.set(id, object);
         }
         derived

@@ -15,8 +15,11 @@
 //! and each is only a bind group over shared textures.
 //!
 //! **Runtime params (#399).** A material whose surface shader exposes runtime params
-//! owns one uniform buffer, keyed by its library name, and its group binds that buffer
-//! — so its key also carries the name, and it batches only with itself. Every other
+//! owns one uniform buffer, keyed by its scene and library name, and its group binds
+//! that buffer — so its key also carries the name, and it batches only with itself.
+//! Two kept scenes (the main scene and a preview tab, #1706) each own theirs, so a
+//! same-named material never draws with the other scene's values; a scene the
+//! retained set evicts gives its buffers back ([`MaterialCache::release_scene`]). Every other
 //! material binds the shared all-zero buffer and batches by maps exactly as before. A
 //! param change is a `write_buffer` into the owned buffer: the group, the pipeline and
 //! the WGSL are untouched.
@@ -40,11 +43,11 @@ pub(crate) const MATERIAL_TEXTURES: usize = 5 + crate::shadergen::textures::SLOT
 /// texture slots (`mask`), in that order.
 pub(crate) type MapSignature = [String; MATERIAL_TEXTURES];
 
-/// Who owns a param buffer: a material (by library key), or one material slot of an
-/// entity overriding its material's values (#670, #1285).
+/// Who owns a param buffer: a material (by its scene and library key), or one
+/// material slot of an entity overriding its material's values (#670, #1285).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ParamOwner {
-    Material(String),
+    Material(SceneId, String),
     Entity(SceneId, u32, usize),
 }
 
@@ -102,11 +105,25 @@ impl MaterialCache {
     /// `overrides` (#670) — run before the frame resolves any index, so a freed slot
     /// is never one a batch of this frame points at.
     pub(crate) fn release_entities(&mut self, scene: SceneId, overrides: impl Fn(u32) -> bool) {
-        let stale = |o: &ParamOwner| matches!(o, ParamOwner::Entity(s, id, _) if *s == scene && !overrides(*id));
+        self.release(
+            |o| matches!(o, ParamOwner::Entity(s, id, _) if *s == scene && !overrides(*id)),
+        );
+    }
+
+    /// Release every buffer and group scene `scene` owns: the retained set dropped
+    /// it, and drawing it again rebuilds what it reads.
+    pub(crate) fn release_scene(&mut self, scene: SceneId) {
+        self.release(|o| match o {
+            ParamOwner::Material(s, _) | ParamOwner::Entity(s, ..) => *s == scene,
+        });
+    }
+
+    /// Release the buffers and groups of every owner `stale` names.
+    fn release(&mut self, stale: impl Fn(&ParamOwner) -> bool) {
         self.params.retain(|owner, _| !stale(owner));
         let (groups, free) = (&mut self.groups, &mut self.free);
         self.index.retain(|(_, owner), i| {
-            let keep = !owner.as_ref().is_some_and(stale);
+            let keep = !owner.as_ref().is_some_and(&stale);
             if !keep {
                 groups[*i] = None;
                 free.push(*i);

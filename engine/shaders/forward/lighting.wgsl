@@ -10,7 +10,7 @@
 #import lighting::sh::sh_basis
 #import forward::proxy_volume::proxy_irradiance
 #import forward::transparent
-#import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, instances, lighting, s_decal, s_shadow, shadow, t_ao, t_decal_color, t_decal_data, t_lightmaps, t_opaque, t_shadow}
+#import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, lighting, objects, s_decal, s_shadow, shadow, t_ao, t_decal_color, t_decal_data, t_lightmaps, t_opaque, t_shadow}
 
 // Fold the decals binned into `cluster` into `s`, oldest first (FIFO, #638): each
 // newer decal lands over the older ones. Derivatives are taken here, before the
@@ -291,7 +291,7 @@ fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
 // basis polynomials (`lighting::sh::sh_basis`) and the same cosine-lobe band factors
 // (pi, 2pi/3, pi/4), so the headless analytic path and the GPU agree. Result clamped
 // to non-negative.
-fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
+fn eval_sh(N: vec3<f32>, object: u32) -> vec3<f32> {
     let b = sh_basis(N);
     let a0 = PI;
     let a1 = 2.0 * PI / 3.0;
@@ -302,16 +302,17 @@ fn eval_sh(N: vec3<f32>, instance: u32) -> vec3<f32> {
     lobe[4] = a2; lobe[5] = a2; lobe[6] = a2; lobe[7] = a2; lobe[8] = a2;
     var out = vec3<f32>(0.0);
     for (var i = 0u; i < 9u; i = i + 1u) {
-        out += instances[instance].sh[i].xyz * b[i] * lobe[i];
+        out += objects[object].sh[i].xyz * b[i] * lobe[i];
     }
     return max(out, vec3<f32>(0.0));
 }
 
-// The probe irradiance E at `world_pos` for normal `N`: the instance's one SH sample
+// The probe irradiance E at `world_pos` for normal `N`: the object's one SH sample
 // (`eval_sh`), or, with a Light Probe Proxy Volume, the volume's grid (#1672).
-fn probe_irradiance(world_pos: vec3<f32>, N: vec3<f32>, instance: u32) -> vec3<f32> {
-    let proxy = proxy_irradiance(world_pos, N, instance);
-    return select(eval_sh(N, instance), proxy.rgb, proxy.w > 0.5);
+// `instance` is the fragment's `VertexOutput::instance`: x the object, z the volume.
+fn probe_irradiance(world_pos: vec3<f32>, N: vec3<f32>, instance: vec3<u32>) -> vec3<f32> {
+    let proxy = proxy_irradiance(world_pos, N, instance.z);
+    return select(eval_sh(N, instance.x), proxy.rgb, proxy.w > 0.5);
 }
 
 // The scene's ambient at normal `N`, as irradiance E / pi (`lighting::ambient::ambient_radiance`:

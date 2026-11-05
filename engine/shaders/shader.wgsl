@@ -1,7 +1,10 @@
 #import common::{DecalSurface, PI, VertexInput, blend_joints, cluster_index, local_light_radiance}
 // Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
-// `fs_main` names its result `shadow`), so a surface variant's blocks can read any.
-#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, draw, instances, lighting, local_lights, material, normal_to_world, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
+// `fs_main` names its result `shadow`), so a surface variant's blocks can read any,
+// with one exception by stage: `instances` is `VERTEX`-only (the fragment stage is at
+// its 8 storage buffers), so a fragment block reads its instance through
+// `in.instance` and its object record through `objects[in.instance.x]`.
+#import forward::bindings::{bones, camera, cluster_lights, cluster_ranges, decals, draw, instances, lighting, local_lights, material, normal_to_world, objects, s_decal, s_diffuse, s_emissive, s_lightmaps, s_metallic, s_normal, s_refl_cube, s_roughness, s_shadow, s_skybox, shadow_tiles, t_ao, t_decal_color, t_decal_data, t_diffuse, t_emissive, t_lightmap_dirs, t_lightmaps, t_metallic, t_normal, t_refl_cube, t_roughness, t_shadow, t_shadow_atlas, t_skybox, tangent_to_world, vertex_to_world, vertex_to_world_prev}
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
@@ -27,8 +30,11 @@ struct VertexOutput {
     // World-space tangent for normal mapping; `w` carries the handedness sign so the
     // fragment shader can reconstruct the bitangent as `w * cross(N, T)`.
     @location(3) world_tangent: vec4<f32>,
-    // Which `instances` entry this fragment belongs to (#470), for its probe SH.
-    @location(4) @interpolate(flat) instance: u32,
+    // What the fragment stage reads of its instance (#470, #1706): x its object's
+    // slot in `objects` (probe SH, lightmap), y its reflection probes, z its proxy
+    // volume. The vertex stage reads `instances`; the fragment stage never does. A
+    // shadow caster's x is its index in `casters`.
+    @location(4) @interpolate(flat) instance: vec3<u32>,
     // Where this fragment sits in its lightmap page (#438), already scaled/offset.
     @location(5) lightmap_uv: vec2<f32>,
 };
@@ -55,8 +61,9 @@ fn forward_vertex(model: VertexInput, instance: u32) -> VertexOutput {
     // `w` as transformed, so the identity `surface_vertex` leaves the clip position
     // bit-identical to `view_proj * world_pos`.
     out.clip_position = camera.view_proj * vec4<f32>(moved.position, world_pos.w);
-    out.instance = instance;
-    let st = instances[instance].lightmap_st;
+    let drawn = instances[instance];
+    out.instance = vec3<u32>(drawn.object, drawn.reflection_probe, drawn.proxy_volume);
+    let st = objects[drawn.object].lightmap_st;
     out.lightmap_uv = model.lightmap_uv * st.xy + st.zw;
     return out;
 }
@@ -163,7 +170,7 @@ fn vs_shadow(model: VertexInput, @builtin(instance_index) instance: u32) -> Vert
     out.world_position = moved.position;
     out.world_normal = moved.normal;
     out.tex_coords = model.tex_coords;
-    out.instance = instance;
+    out.instance = vec3<u32>(instance, 0u, 0u);
     return out;
 }
 
@@ -172,7 +179,7 @@ fn vs_shadow(model: VertexInput, @builtin(instance_index) instance: u32) -> Vert
 // unconditionally: `use_texture` and the mapping are per instance, so a branch on
 // either is not uniform (`mapping::sample_any`).
 fn shadow_clip(in: VertexOutput) {
-    let caster = casters[in.instance];
+    let caster = casters[in.instance.x];
     let texel = mapping::sample_any(t_diffuse, s_diffuse, caster.terms, in.tex_coords, in.world_position, normalize(in.world_normal)).a;
     if (select(1.0, texel, caster.use_texture == 1u) < caster.alpha_cutoff) {
         discard;
@@ -213,7 +220,7 @@ struct VelocityVertex {
     @location(1) world_normal: vec3<f32>,
     @location(2) tex_coords: vec2<f32>,
     @location(3) world_tangent: vec4<f32>,
-    @location(4) @interpolate(flat) instance: u32,
+    @location(4) @interpolate(flat) instance: vec3<u32>,
     @location(5) lightmap_uv: vec2<f32>,
     @location(6) clip_now: vec4<f32>,
     @location(7) clip_prev: vec4<f32>,
@@ -387,13 +394,13 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     var ambient_irradiance: vec3<f32>;
     // A directional lightmap's one specular lobe: the `Baked` lamps' highlight (#1695).
     var lightmap_specular = vec3<f32>(0.0);
-    let lightmap_page = instances[in.instance].lightmap_page;
+    let lightmap_page = objects[in.instance.x].lightmap_page;
     if (lightmap_page > 0u) {
         // Baked lightmap (#438, `forward::lightmap`), at the level taken above.
-        let baked = lightmap_light(in.lightmap_uv, lightmap_page - 1u, lightmap_lod, instances[in.instance].lightmap_directional == 1u, behind, N, geometric, V, F0, roughness);
+        let baked = lightmap_light(in.lightmap_uv, lightmap_page - 1u, lightmap_lod, objects[in.instance.x].lightmap_directional == 1u, behind, N, geometric, V, F0, roughness);
         ambient_irradiance = baked.irradiance;
         lightmap_specular = baked.specular;
-    } else if (instances[in.instance].use_sh == 1u) {
+    } else if (objects[in.instance.x].use_sh == 1u) {
         // `probe_irradiance` returns irradiance E (its one SH sample, or its Light Probe
         // Proxy Volume's grid inside one, #1672); a Lambert surface reflects albedo / pi
         // * E, the same response `calculate_pbr` gives a direct light and the E / pi the
@@ -492,7 +499,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let env_brdf = mix(F0, vec3<f32>(grazing), fresnel) / (alpha * alpha + 1.0);
     let reflection_weight = env_brdf * specular_occlusion(saturate(abs(dot(N, V))), ao, roughness);
     // A transparent surface with `receive_ssr` traces SSR over it here (#1570).
-    let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, N, roughness, instances[in.instance].reflection_probe, baked_diffuse(ambient_irradiance, lightmap_page > 0u || instances[in.instance].use_sh == 1u)) * reflection_weight, reflection_weight, in.world_position, N, R, roughness);
+    let reflection = transparent::reflect_ssr(environment_reflection(in.world_position, R, N, roughness, in.instance.y, baked_diffuse(ambient_irradiance, lightmap_page > 0u || objects[in.instance.x].use_sh == 1u)) * reflection_weight, reflection_weight, in.world_position, N, R, roughness);
     lighting_color += reflection;
     // One fog value for the SSR record and SSIL's realtime light (step 6): the
     // distance fog's and the volumetric fog's together (#1703).
@@ -510,7 +517,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     lighting_color += emissive;
     // A bake holds the emission of every static mesh it took in, lightmap UVs or
     // not (`in_bake`); the fog (step 7) dims the rest.
-    ssil_realtime += emissive * f32(lightmap_page == 0u && instances[in.instance].in_bake == 0u);
+    ssil_realtime += emissive * f32(lightmap_page == 0u && objects[in.instance.x].in_bake == 0u);
     ssil_realtime *= (1.0 - surface_fog);
 
     // 7. Scene fog (#437), last, in linear HDR before post-FX, and how a transparent

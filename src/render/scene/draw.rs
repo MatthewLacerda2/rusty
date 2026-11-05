@@ -11,7 +11,7 @@ use crate::render::draw::proxy_volume;
 use crate::render::draw::visibility::{CameraCulls, ViewCull};
 use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
 use crate::render::motion::{track, MotionHistory};
-use crate::render::Renderer;
+use crate::render::{InstanceData, Renderer};
 use crate::scene::Scene;
 
 /// A mesh's world bounds, `None` when they cannot be known (never culled).
@@ -54,7 +54,7 @@ impl Renderer {
             let outline = ringed.contains(&id);
             self.object_items(scene, at, (eye, outline), &mut history, &mut out);
         }
-        self.retained.put(scene.id(), retained);
+        self.keep_scene(scene.id(), retained);
         (culls, visible)
     }
 
@@ -108,8 +108,8 @@ impl Renderer {
             .world_bounds(&mesh, object.world)
     }
 
-    /// `object`'s draw items, one per material slot (#1285), into `out`: its instance
-    /// with the reflection probe picked at its bounds' centre (#1206) and its proxy
+    /// `object`'s draw items, one per material slot (#1285), into `out`: an instance
+    /// of its object-table slot with the reflection probe picked at its bounds' centre (#1206) and its proxy
     /// volume (#1672), its palette appended to the joints (a skinned one is a draw of
     /// its own), and with `history` its last-frame pose.
     fn object_items(
@@ -124,17 +124,18 @@ impl Renderer {
         let palette: &[Mat4] = mesh.as_ref().map_or(&[], |m| m.active_palette());
         let origin = object.origin();
         let centre = bounds.map_or(origin, |(min, max)| (min + max) * 0.5);
-        let mut instance = object.instance;
+        let mut instance = InstanceData::of(object.slot);
         instance.reflection_probe = self.reflection_probes.probe_for(centre);
         // A capture draws static geometry for a bake: its probes are in flux.
-        if instance.use_sh == 1 && !self.capture.static_only {
+        let use_sh = self.retained.objects.get(object.slot).use_sh == 1;
+        if use_sh && !self.capture.static_only {
             let at = (object.world, object.local_aabb);
             instance.proxy_volume = self.proxy_volumes.push(scene, id, at, out.proxies);
         }
         let bone_base = push_palette(out.joints, palette);
         if let Some(history) = history.as_deref_mut().filter(|_| object.has_opaque_run()) {
             let pose = (object.world, palette);
-            track(history, id, pose, bone_base, out.joints, &mut instance);
+            track(history, id, pose, out.joints, &mut instance);
         }
         let depth = view_depth(centre, eye.0, eye.1);
         for slot in &object.slots {
