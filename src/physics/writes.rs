@@ -12,14 +12,25 @@ use super::shape::build::EntityBodyState;
 /// so a disabled kinematic body that moved would differ forever and be borrowed
 /// by every full pass but no incremental one. Re-enabling it is safe, since
 /// `sync_enabled` runs before this in the same pass.
+///
+/// A static body is compared against `pushed`, the pose last pushed to it
+/// (`Tracked::static_poses`), when there is one, not against rapier's: the solver
+/// rewrites the pose of a body still in its active set, a body just turned static
+/// included, and rounds a rotation an ulp off (#1842). Compared with rapier's
+/// pose, the body would be re-pushed every step, and each push wakes whatever
+/// rests on it.
 pub(super) fn state_differs(
     b: &RigidBody,
     snap: &EntityBodyState,
     class: RigidBodyType,
     pose: Pose,
     scale: f32,
+    pushed: Option<&Pose>,
 ) -> bool {
-    let placed = (b.is_enabled() && *b.position() != pose) || *b.next_position() != pose;
+    let placed = match pushed.filter(|_| snap.is_static) {
+        Some(&pushed) => pushed != pose,
+        None => (b.is_enabled() && *b.position() != pose) || *b.next_position() != pose,
+    };
     let moved = if snap.kinematic || snap.is_static {
         placed
     } else {

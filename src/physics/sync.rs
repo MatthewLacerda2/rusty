@@ -4,11 +4,19 @@
 //!
 //! Both paths run the same passes in the same order (plan, joints, enabled,
 //! materials, layers, sensors, characters, masses, then each body's state and
-//! compound offsets); the incremental one visits the named bodies only, in
-//! ascending owner order, the order the full pass visits them in. A body no
-//! change named is one the full pass would leave as it is: its inputs are what it
-//! last pushed, and no pass so much as borrows a body or collider that already
-//! holds what it would write (`writes::body_to_write`, `writes::collider_to_write`).
+//! compound offsets), in ascending owner order, the order the full pass visits
+//! them in. The incremental one runs every pass over the named bodies, and the
+//! body-state pass also over every body the last step may have changed (rapier
+//! had it awake, `Tracked::stepped`): a step changes a body's pose, velocities
+//! and sleep, and nothing the other passes read. The solver rewrites the pose of
+//! every body in its active set, a static one included (a body just turned
+//! static is still there, and its rotation comes back an ulp off what was pushed,
+//! #1842), so only a body neither named nor stepped is sure to hold what it was
+//! last given; a static one is compared against what was last pushed to it
+//! (`Tracked::static_poses`), so neither path re-pushes it for that rounding. A
+//! body in neither set is one the full pass would leave as it is: its inputs are
+//! what it last pushed, rapier has not touched it since, and no pass so much as
+//! borrows a body or collider that already holds what it would write (`writes::body_to_write`, `writes::collider_to_write`).
 //! The borrow matters, not only the write: rapier lists whatever is borrowed
 //! mutably as modified, and that list's order is the order the next step meets
 //! new contact pairs and so solves them (#1798).
@@ -26,8 +34,9 @@ impl PhysicsWorld {
     /// any body whose collider set changed, then every enabled flag (before any
     /// character sweep, so no sweep sees a stale one), then each owner's world
     /// pose and velocities and each compound collider's offset.
-    /// Returns the bodies it synced.
+    /// Returns the bodies whose state it synced.
     pub(super) fn sync_to_rapier(&mut self, scene: &mut Scene) -> Owners {
+        let stepped = std::mem::take(&mut self.tracked.stepped);
         let owners = match self.read_changes(scene) {
             None => {
                 self.resync_topology(scene);
@@ -49,6 +58,14 @@ impl PhysicsWorld {
         // Before the masses: a resized capsule changes its body's volume.
         self.sync_characters(scene, &owners);
         self.sync_masses(scene, &owners);
+        // The one pass a step's changes reach: pose, velocities, sleep.
+        let owners = match owners {
+            Owners::All => Owners::All,
+            Owners::Only(mut named) => {
+                named.extend(stepped.iter().filter(|o| self.plan.contains_key(o)));
+                Owners::Only(named)
+            }
+        };
         let plan = std::mem::take(&mut self.plan);
         for (&owner, ids) in owners.pick(&plan) {
             let Some(&handle) = self.id_to_body.get(&owner) else {
@@ -80,11 +97,11 @@ impl PhysicsWorld {
     ///
     /// After a full sync, every owner, ascending. Otherwise only the ones whose
     /// write can differ from what they hold, in the same order: the bodies synced
-    /// (an edit may have woken one, or reset a static body's velocity), the ones
-    /// awake before or after the step (rapier neither moves a sleeping body nor
-    /// wakes one without leaving it awake), and every owner below one whose write
-    /// moved it, which the full pass reaches after it and re-reads under its new
-    /// parent pose (a body disabled under a falling one holds its world pose).
+    /// (an edit may have woken one, or reset a static body's velocity), `queue`
+    /// (the ones the step may have changed: awake before or after it), and every
+    /// owner below one whose write moved it, which the full pass reaches after it
+    /// and re-reads under its new parent pose (a body disabled under a falling one
+    /// holds its world pose).
     pub(super) fn sync_from_rapier(
         &self,
         scene: &mut Scene,
@@ -98,7 +115,6 @@ impl PhysicsWorld {
             return;
         };
         queue.extend(synced);
-        queue.extend(self.awake_owners());
         while let Some(owner) = queue.pop_first() {
             if !self.write_back(scene, owner) {
                 continue;

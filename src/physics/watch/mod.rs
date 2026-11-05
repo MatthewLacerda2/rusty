@@ -4,7 +4,8 @@
 //! The sync before each step used to re-derive everything it pushes into rapier
 //! from every entity, every tick, to find that nothing changed. It now asks the
 //! World which ids were stamped on the channels its inputs live on, and syncs only
-//! the bodies those ids belong to. Unity syncs only transforms with `hasChanged`
+//! the bodies those ids belong to (and, for pose and velocities, the bodies the
+//! last step may have changed, below). Unity syncs only transforms with `hasChanged`
 //! and never re-syncs statics; bevy_rapier and avian sync changed bodies only.
 //!
 //! **What each sync pass reads, and where its change shows up:**
@@ -36,8 +37,23 @@
 //! re-derived from a moved owner can round differently, so a moving body would no
 //! longer step byte-identically to the full pass. A body at rest writes back the
 //! values it holds, and that stamps nothing (`write_back` compares first).
+//!
+//! **What a step changed without a write-back.** rapier's solver rewrites the pose
+//! of every body in its active set, not only a dynamic one: a body just turned
+//! static is still there, and its rotation comes back an ulp off the one pushed
+//! (#1842). No write-back stamps it (physics never moves a static body's
+//! Transform), so the log alone would leave it while the full pass, comparing
+//! with rapier's pose, would re-push it. The incremental sync therefore also
+//! visits every body awake before or after
+//! the last step (`Tracked::stepped`) in the body-state pass, the one pass whose
+//! inputs a step changes (pose, velocity, sleep). A static body is then compared
+//! against the pose last pushed to it (`Tracked::static_poses`), not rapier's, so
+//! neither path re-pushes it for the solver's rounding and both keep the solver's
+//! value: a re-push every step would wake whatever rests on it, for good.
 
 use std::collections::BTreeSet;
+
+use rapier3d::prelude::{Pose, RigidBodyHandle};
 
 use super::compound::{body_owner, BodyPlan};
 use crate::components::{
@@ -57,6 +73,8 @@ pub(super) mod fixture_tests;
 mod ops_tests;
 #[cfg(test)]
 mod sleep_tests;
+#[cfg(test)]
+mod stepped_tests;
 #[cfg(test)]
 mod tests;
 
@@ -144,7 +162,9 @@ impl Watch {
     }
 }
 
-/// Which bodies a sync pass visits: every plan owner, or the ones a change named.
+/// Which bodies a sync pass visits: every plan owner, or some of them (the ones a
+/// change named, and for the body-state pass and the write-back also the ones
+/// the last step may have changed, `Tracked::stepped`).
 pub(super) enum Owners {
     All,
     /// Ascending, so a pass visits them in the plan's own order.
@@ -176,6 +196,17 @@ pub(in crate::physics) struct Tracked {
     /// Every `Joint` entity, the body each one names and that body's owner, at the
     /// last joint sync.
     pub joint_deps: BTreeSet<u32>,
+    /// The owners the last step may have changed (awake before or after it), which
+    /// the next incremental sync visits whether a change named them or not: rapier's
+    /// solver rewrites an awake body's pose, even a static one's (#1842). Empty after
+    /// a step that skipped rapier.
+    pub stepped: BTreeSet<u32>,
+    /// The pose last pushed to each static body, which its next push is compared
+    /// against instead of rapier's (`writes::state_differs`): the solver rounds a
+    /// static body still in its active set, and a re-push every step would keep
+    /// whatever rests on it awake (#1842). Both paths push through
+    /// `apply_body_state`, so both read and write the same record.
+    pub static_poses: Map<RigidBodyHandle, Pose>,
     /// The collision matrix the colliders' groups were last derived from.
     pub matrix: Option<CollisionMatrix>,
     /// Ignore the log and run the full pass every step: the reference the
