@@ -18,13 +18,10 @@ fn poll_once(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs
     poll(editor, &egui::Context::default(), scene, console, &nav);
 }
 
-#[test]
-fn gpu_a_bake_dropped_while_the_pvs_bakes_keeps_the_written_lighting() {
-    let dir = crate::test_temp::dir().join("bake_drop_occlusion");
-    std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("level.scene").to_string_lossy().into_owned();
+/// A saved scene with a wall the PVS bakes and one reflection probe the probe
+/// step bakes, and an editor in that probe step.
+fn probing(path: &str) -> (EditorUi, Scene) {
     let mut scene = Scene::new();
-    // A wall the PVS bakes, and one reflection probe the probe step bakes.
     block(
         &mut scene,
         "Wall",
@@ -36,26 +33,36 @@ fn gpu_a_bake_dropped_while_the_pvs_bakes_keeps_the_written_lighting() {
         .add(Vec3::new(0.0, 1.0, 2.0), Vec3::splat(2.0));
     scene.reflection_probes.edit(i, |p| p.manual = true);
     scene.lighting_settings.reflections.resolution = 16;
-    scene.save_to_file(&path).unwrap();
+    scene.save_to_file(path).unwrap();
     let mut editor = EditorUi::new(Default::default());
-    editor.set_current_scene_path(Some(path.clone()));
-    let job = start_probes(&mut scene, &path, None).unwrap();
+    editor.set_current_scene_path(Some(path.to_string()));
+    let job = start_probes(&mut scene, path, None).unwrap();
     let step = Step::Probes {
         job: Box::new(job),
         lightmaps: 0,
-        path: path.clone(),
+        path: path.to_string(),
     };
-    let (id, open) = (scene.id(), Some(path.clone()));
+    let (id, open) = (scene.id(), Some(path.to_string()));
     editor.dev.lightmap_bake = Some(ActiveBake {
         step,
         scene: id,
         path: open,
     });
+    (editor, scene)
+}
+
+fn occluding(editor: &EditorUi) -> bool {
+    let active = editor.dev.lightmap_bake.as_ref();
+    active.is_some_and(|b| matches!(b.step, Step::Occlusion { .. }))
+}
+
+#[test]
+fn gpu_a_bake_dropped_while_the_pvs_bakes_keeps_the_written_lighting() {
+    let dir = crate::test_temp::dir().join("bake_drop_occlusion");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("level.scene").to_string_lossy().into_owned();
+    let (mut editor, mut scene) = probing(&path);
     let mut console = ConsoleLogs::new();
-    let occluding = |e: &EditorUi| {
-        let active = e.dev.lightmap_bake.as_ref();
-        active.is_some_and(|b| matches!(b.step, Step::Occlusion { .. }))
-    };
     for _ in 0..50 {
         if occluding(&editor) {
             break;

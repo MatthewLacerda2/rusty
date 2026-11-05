@@ -20,7 +20,7 @@ use crate::scene::lighting::occlusion::{
 };
 use crate::scene::Scene;
 
-/// A finished occlusion bake: its PVS (`None` when nothing occludes), its report,
+/// A finished occlusion bake: its PVS (`None` when nothing occludes or the level is too large to cull), its report,
 /// and the wall-clock milliseconds it took.
 #[derive(Debug)]
 pub struct BakedOcclusion {

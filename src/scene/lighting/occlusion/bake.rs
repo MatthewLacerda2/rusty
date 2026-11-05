@@ -58,7 +58,8 @@ pub fn gather_occlusion(scene: &Scene) -> OcclusionInput {
 }
 
 /// Bake `scene`'s PVS on `threads` workers, in line. `None` when there is nothing
-/// to cull: no static mesh, or none that occludes.
+/// to cull (no static mesh, none that occludes, none small and finite enough to
+/// sample) or the level needs cells over `MAX_CELL`.
 pub fn bake_occlusion(
     scene: &Scene,
     threads: usize,
@@ -71,7 +72,8 @@ pub fn bake_occlusion(
 
 impl OcclusionInput {
     /// Bake the PVS on `threads` workers, counting into `progress`; `None` when it
-    /// was cancelled, else the data (`None` when nothing occludes) and the report.
+    /// was cancelled, else the data (`None` when nothing occludes, nothing can be
+    /// culled, or the level is too large: the report says which) and the report.
     pub fn bake(
         &self,
         threads: usize,

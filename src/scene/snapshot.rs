@@ -40,6 +40,8 @@ pub struct SceneSnapshot {
     /// The baked PVS (#1714): no document field (it is the `<scene>.occlusion`
     /// file), so it is put back as it was.
     occlusion: Option<std::sync::Arc<crate::scene::lighting::occlusion::OcclusionData>>,
+    /// Whether the PVS's file could not be read, so the next save keeps it.
+    occlusion_unread: bool,
 }
 
 impl SceneSnapshot {
@@ -53,6 +55,7 @@ impl SceneSnapshot {
             id: scene.id(),
             disk_text: scene.disk_text(),
             occlusion: (*scene.occlusion).clone(),
+            occlusion_unread: scene.occlusion_unread,
         }
     }
 
@@ -71,5 +74,6 @@ impl SceneSnapshot {
         if *scene.occlusion != self.occlusion {
             *scene.occlusion = self.occlusion;
         }
+        scene.occlusion_unread = self.occlusion_unread;
     }
 }

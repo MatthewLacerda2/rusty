@@ -61,7 +61,7 @@ impl Polygons {
         let (c, t) = ((from.0 + from.1) * 0.5, (to.0 + to.1) * 0.5);
         let delta = t - c;
         let reach = delta.length();
-        if !(reach > CLEAR) {
+        if reach.is_nan() || reach <= CLEAR {
             return false;
         }
         let dir = delta / reach;

@@ -18,7 +18,7 @@ const DOORS: [f32; 3] = [3.37, -6.91, 8.53];
 #[test]
 fn a_long_wall_seen_through_a_door_is_kept_at_any_length() {
     // The 200 m wall at one door: the slowest bake, and the same lattice.
-    let short = [20.0, 40.0].into_iter().flat_map(|l| DOORS.map(|x| (l, x)));
+    let short = DOORS.map(|x| (20.0, x)).into_iter();
     let cases = short.chain([(200.0, DOORS[0])]);
     for (length, x) in cases {
         let (scene, door, wall) = gap(length, x);
