@@ -1,7 +1,8 @@
 //! The PVS's cells (#1714): a uniform 3D grid of cubes over the static bounds, one
 //! cell of margin on every side, so a camera standing at a wall's outer face is
 //! still in a cell. A level too big for [`MAX_CELLS`] cells of [`CELL_SIZE`] is cut
-//! into fewer, larger ones.
+//! into fewer, larger ones, up to [`MAX_CELL`]; one that needs larger still is not
+//! culled at all.
 
 use glam::{UVec3, Vec3};
 
@@ -14,6 +15,11 @@ pub const CELL_SIZE: f32 = 2.0;
 /// objects) and the file.
 pub const MAX_CELLS: usize = 16_384;
 
+/// The largest cell edge the bake lays, metres: a Dust2-sized level takes 3.9 m
+/// cells. Each cell is sampled as [`CELL_SIZE`] cubes, so a larger cell costs the
+/// bake the cube of its ratio; past it the level is not occlusion-culled.
+pub const MAX_CELL: f32 = 4.0;
+
 /// The cells: cube `(x, y, z)` spans `origin + (x, y, z) * cell` to one `cell` more.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Grid {
@@ -24,21 +30,28 @@ pub struct Grid {
 
 impl Grid {
     /// The grid over `(min, max)`: cubes of [`CELL_SIZE`], or larger until at most
-    /// [`MAX_CELLS`] cover the bounds and their margin.
-    pub fn over(min: Vec3, max: Vec3) -> Self {
+    /// [`MAX_CELLS`] cover the bounds and their margin. `None` when that needs cells
+    /// over [`MAX_CELL`], or the bounds are not finite.
+    pub fn over(min: Vec3, max: Vec3) -> Option<Self> {
+        if !(min.is_finite() && max.is_finite()) {
+            return None;
+        }
         let mut cell = CELL_SIZE;
-        loop {
+        while cell <= MAX_CELL {
             let grid = Self::with_cell(min, max, cell);
             if grid.cell_count() <= MAX_CELLS {
-                return grid;
+                return Some(grid);
             }
             cell *= 1.25;
         }
+        None
     }
 
     fn with_cell(min: Vec3, max: Vec3, cell: f32) -> Self {
         let span = (max - min).max(Vec3::ZERO);
-        let inner = (span / cell).ceil().as_uvec3().max(UVec3::ONE);
+        // Clamped, so a span of any size counts past the cap and never overflows.
+        let inner = (span / cell).ceil().min(Vec3::splat(MAX_CELLS as f32));
+        let inner = inner.as_uvec3().max(UVec3::ONE);
         Self {
             origin: min - Vec3::splat(cell),
             cell,
@@ -47,7 +60,14 @@ impl Grid {
     }
 
     pub fn cell_count(&self) -> usize {
-        self.dims.x as usize * self.dims.y as usize * self.dims.z as usize
+        let d = self.dims.as_u64vec3();
+        d.x.saturating_mul(d.y).saturating_mul(d.z) as usize
+    }
+
+    /// How many [`CELL_SIZE`] cubes a cell is sampled as, along each axis.
+    pub fn subdivisions(&self) -> u32 {
+        // A cell a rounding over 2 m is still one cube.
+        ((self.cell / CELL_SIZE) - 1e-3).ceil().max(1.0) as u32
     }
 
     /// The cell index holding `point`, `None` outside the grid (or for a NaN).

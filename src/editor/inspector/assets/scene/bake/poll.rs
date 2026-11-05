@@ -1,14 +1,15 @@
 //! Generate Lighting's per-frame drive (#808, #1602): the lightmaps' worker polled
 //! and its lightmaps applied, then the probe step taken one step a frame and
-//! committed, then the occlusion culling's worker polled (#1714) and the lighting
-//! written. A bake dropped midway says what reached the scene: the lightmaps once
-//! they landed, the probes once committed, the PVS never. Any failure after the
-//! lightmaps leaves the applied lighting unwritten, so it marks the scene unsaved.
+//! committed and the lighting written, then the occlusion culling's worker polled
+//! (#1714) and its PVS written beside it. A bake dropped midway says what reached
+//! the scene: the lightmaps once they landed, the probes and the written lighting
+//! once committed, the PVS never. A failure before the lighting is written leaves
+//! it unwritten, so it marks the scene unsaved.
 
 use std::time::Duration;
 
 use super::Step;
-use crate::dev::bake::generate_lighting::{finish, start_probes};
+use crate::dev::bake::generate_lighting::{finish, start_probes, write_lighting};
 use crate::dev::bake::lightmap::BakeOutcome;
 use crate::dev::bake::occlusion::OcclusionBakeJob;
 use crate::dev::bake::steps::PROBES_CHANGED;
@@ -130,7 +131,8 @@ fn land_lightmaps(
     }
 }
 
-/// One probe step; at the end, commit the probes and start the occlusion bake.
+/// One probe step; at the end, commit the probes, write the lighting and start the
+/// occlusion bake.
 fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> Option<bool> {
     let Step::Probes {
         job,
@@ -147,18 +149,26 @@ fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> 
     });
     match stepped {
         Ok(false) => None,
-        Ok(true) => match OcclusionBakeJob::start(scene) {
-            Ok(occlusion) => {
-                *step = Step::Occlusion {
-                    job: occlusion,
-                    lightmaps: *lightmaps,
-                    probes: job.report(),
-                    path: std::mem::take(path),
-                };
-                None
+        Ok(true) => {
+            let saved = match write_lighting(scene, path) {
+                Ok(saved) => saved,
+                Err(e) => return fail(log, e, true),
+            };
+            let needs_save = saved == LightingSave::NeedsSceneSave;
+            match OcclusionBakeJob::start(scene) {
+                Ok(occlusion) => {
+                    *step = Step::Occlusion {
+                        job: occlusion,
+                        lightmaps: *lightmaps,
+                        probes: job.report(),
+                        saved,
+                        path: std::mem::take(path),
+                    };
+                    None
+                }
+                Err(e) => fail(log, e, needs_save),
             }
-            Err(e) => fail(log, e, true),
-        },
+        }
         Err(e) if e == PROBES_CHANGED => {
             log.warn(dropped(step, "the probes changed during the bake"));
             // The lightmaps were applied but never written.
@@ -168,32 +178,35 @@ fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> 
     }
 }
 
-/// Once the occlusion worker finished, apply its PVS and write the lighting.
+/// Once the occlusion worker finished, apply its PVS and write it beside the
+/// scene; the lighting was written when the probes committed.
 fn advance_occlusion(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> Option<bool> {
     let Step::Occlusion {
         job,
         lightmaps,
         probes,
+        saved,
         path,
     } = step
     else {
         return None;
     };
+    let needs_save = *saved == LightingSave::NeedsSceneSave;
     let baked = match job.poll()? {
         Ok(baked) => baked,
-        Err(e) => return fail(log, e, true), // the lighting applied, never written
+        Err(e) => return fail(log, e, needs_save),
     };
-    match scene.unrecorded(|scene| finish(scene, path, *lightmaps, *probes, baked)) {
+    let lighting = (*lightmaps, *probes, *saved);
+    match scene.unrecorded(|scene| finish(scene, path, lighting, baked)) {
         Ok(report) => {
             log.info(report.summary());
-            Some(report.saved == LightingSave::NeedsSceneSave)
+            Some(needs_save)
         }
-        Err(e) => fail(log, e, true),
+        Err(e) => fail(log, e, true), // the PVS applied, never written
     }
 }
 
-/// Say the bake failed; `needs_save` when the lightmaps were applied but never
-/// written.
+/// Say the bake failed; `needs_save` when what it applied was never written.
 fn fail(log: &mut ConsoleLogs, e: String, needs_save: bool) -> Option<bool> {
     log.error(format!("Generate Lighting failed: {e}"));
     Some(needs_save)
@@ -207,7 +220,7 @@ fn dropped(step: &Step, why: &str) -> String {
             "Generate Lighting dropped: {why}; the lightmaps were applied, the probes kept their old lighting"
         ),
         Step::Occlusion { .. } => format!(
-            "Generate Lighting dropped: {why}; the lightmaps and probes were applied, the occlusion culling kept its old bake"
+            "Generate Lighting dropped: {why}; the lightmaps and probes were applied and written, the occlusion culling kept its old bake"
         ),
     }
 }

@@ -112,6 +112,8 @@ authored_fields!(scene_state {
         // Keyed by entity, but checked against each entity's fingerprint on use, so
         // a despawn or a Play load leaves it as it is.
         occlusion: BakeOutput, No as ["lightmaps"];
+        // Set by the load that could not read `<scene>.occlusion`, so a save keeps it.
+        occlusion_unread: DiskRecord, No;
         pending_destroy: Runtime, Dropped;
         playing: Runtime, No;
         pending_load: Runtime, No;

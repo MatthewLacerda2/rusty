@@ -48,3 +48,38 @@ fn a_cancelled_bake_returns_nothing() {
         "what a dropped job's worker sees"
     );
 }
+
+#[test]
+fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
+    use crate::dev::bake::generate_lighting::GenerateReport;
+    use crate::scene::lighting::occlusion::OcclusionBakeReport;
+    let occlusion = OcclusionBakeReport {
+        objects: 9,
+        never_culled: 2,
+        cells: 40,
+        cell_size: 2.0,
+        bytes: 900,
+        ..Default::default()
+    };
+    let mut report = GenerateReport {
+        lightmaps: 0,
+        probes: Default::default(),
+        occlusion,
+        occlusion_ms: 5,
+        saved: crate::scene::LightingSave::Written,
+    };
+    let line = report.summary();
+    assert!(
+        line.contains("40 cell(s) of 2.0 m, 9 object(s), 2 never culled"),
+        "{line}"
+    );
+    report.occlusion = OcclusionBakeReport {
+        too_large: true,
+        ..Default::default()
+    };
+    let line = report.summary();
+    assert!(
+        line.contains("no occlusion culling: the level needs cells over 4 m"),
+        "{line}"
+    );
+}

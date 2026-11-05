@@ -80,6 +80,7 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
             out.set("occlusionCells", report.occlusion.cells)?;
             out.set("occlusionObjects", report.occlusion.objects)?;
             out.set("occlusionBytes", report.occlusion.bytes)?;
+            out.set("occlusionNeverCulled", report.occlusion.never_culled)?;
             out.set("saved", report.saved == crate::scene::LightingSave::Written)?;
             Ok(out)
         }),

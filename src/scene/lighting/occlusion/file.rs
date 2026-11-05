@@ -95,11 +95,12 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
         .ok_or_else(|| "rows disagree with the grid".into())
 }
 
-/// Write `scene`'s PVS beside `scene_path`, or remove a stale one when it has none.
+/// Write `scene`'s PVS beside `scene_path`, or remove a stale one when it has none
+/// (and kept none it could not read: that file stays, [`load_sidecar`]).
 pub fn save_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
     let path = occlusion_path(scene_path);
     let Some(data) = scene.occlusion.as_deref() else {
-        if path.exists() {
+        if path.exists() && !scene.occlusion_unread {
             std::fs::remove_file(&path)
                 .map_err(|e| format!("Failed to remove {}: {e}", path.display()))?;
         }
@@ -111,9 +112,12 @@ pub fn save_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
 }
 
 /// Load the PVS beside `scene_path` onto `scene`: none when there is no file, and
-/// none, with a warning, when the file is refused.
+/// none, with a warning, when the file is refused. A file that is there but cannot
+/// be read (a permission, a transient failure) also loads none, with a warning, and
+/// marks the scene so its next save keeps the file.
 pub fn load_sidecar(scene: &mut Scene, scene_path: &str) {
     let path = occlusion_path(scene_path);
+    scene.occlusion_unread = false;
     let data = match std::fs::read(&path) {
         Ok(bytes) => decode(&bytes)
             .map_err(|e| {
@@ -123,7 +127,16 @@ pub fn load_sidecar(scene: &mut Scene, scene_path: &str) {
                 )
             })
             .ok(),
-        Err(_) => None,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => {
+            log::warn!(
+                "[Occlusion] could not read {} ({e}): nothing is occlusion-culled, and \
+                 the file is kept",
+                path.display()
+            );
+            scene.occlusion_unread = true;
+            None
+        }
     };
     *scene.occlusion = data.map(Arc::new);
 }

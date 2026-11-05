@@ -48,8 +48,9 @@ pub(crate) struct OcclusionBinding {
     broken: BTreeSet<u32>,
     /// The layers the matching occluders sit on.
     layers: u32,
-    /// The revision a stale bake was last reported at, so it is said once.
-    reported: Option<Revision>,
+    /// The revision a stale bake was last reported at, and whether that report
+    /// said culling stopped: said once, and again when an occluder breaks after.
+    reported: Option<(Revision, bool)>,
     /// Fingerprints the last refresh computed: what a tween costs.
     pub(crate) rechecked: usize,
 }
@@ -138,13 +139,15 @@ impl OcclusionBinding {
         }
     }
 
-    /// Say once per PVS that it is older than the scene's statics.
+    /// Say once per PVS that it is older than the scene's statics, and again when
+    /// a baked occluder changes after a report that only meshes did, since culling
+    /// then stops.
     fn warn_changed(&mut self, revision: Revision) {
         let (moved, broken) = (self.changed.len(), self.broken.len());
-        if moved == 0 || self.reported == Some(revision) {
+        if !warning_due(self.reported, revision, (moved, broken)) {
             return;
         }
-        self.reported = Some(revision);
+        self.reported = Some((revision, broken > 0));
         log::warn!(
             "[Occlusion] the bake is older than the scene's statics: {moved} baked mesh(es) \
              changed since; {}. Generate Lighting re-bakes it.",
@@ -201,3 +204,23 @@ mod camera_gpu_tests;
 mod gpu_tests;
 #[cfg(test)]
 pub(super) mod ops;
+
+/// Whether a stale-bake warning is due, given the last one (`reported`: its
+/// revision and whether it said culling stopped), the PVS `revision` and how many
+/// baked meshes, and of them occluders, changed: once per revision, and again when
+/// occluders broke after a warning that said only meshes did.
+fn warning_due(
+    reported: Option<(Revision, bool)>,
+    revision: Revision,
+    (moved, broken): (usize, usize),
+) -> bool {
+    let said = match reported {
+        Some((r, said_broken)) if r == revision => broken == 0 || said_broken,
+        _ => false,
+    };
+    moved > 0 && !said
+}
+
+#[cfg(test)]
+#[path = "warn_tests.rs"]
+mod warn_tests;

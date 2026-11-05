@@ -13,7 +13,7 @@ The two individual verbs stay for a script that wants only one of them.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, saved }` (the occlusion fields `0` when nothing occludes) |
+| `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
 | `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, diffuseModel, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
 | `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, diffuseModel?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
@@ -346,39 +346,54 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   with a max draw distance or min screen size, and a light's gizmo are **occludees
   only** (what draws of them changes, or a view passes through them). Dynamic,
   skinned, shadows-only and inactive meshes take no part and are always drawn.
-- **Cells.** A uniform grid of 2 m cubes over the static bounds, one cell of margin
-  round them, coarser cubes past 16384 cells (a Dust2-sized level). A camera outside
-  every cell culls nothing. Each cell keeps what any point in it may see: rays from
-  seeded points in the cell to points on each mesh: its extremes and a lattice laid on
-  its triangles at most 1 m apart, so a long wall seen through a doorway is aimed at
-  wherever the doorway shows it, however long the wall is. A point on a one-sided
-  triangle that faces away from the whole cell is skipped. Every cell then also takes
-  its 26 neighbours' sets, and cells that see the same set share one row. The bake is
-  a pure function of the scene and a fixed seed: the same bytes at any thread count.
+- **Cells.** A uniform grid of 2 m cubes over the bounds of the static meshes it can
+  cull, one cell of margin round them, coarser cubes past 16384 cells, up to 4 m (a
+  Dust2-sized level, 200 × 200 m on two storeys, takes 3.9 m). A level that needs
+  larger cells is **not occlusion-culled**: Generate Lighting's console line says so,
+  and bakes no PVS. A camera outside every cell culls nothing. Each cell keeps what any
+  point in it may see: rays from seeded points to points on each mesh. A cell larger
+  than 2 m is sampled as 2 m cubes, six points each, so the eye's density is the same
+  at every cell size. The points on a mesh are its extremes and a lattice laid on its
+  triangles at most 1 m apart, kept at one per half-metre cube of space, so their
+  count follows the mesh's surface area, not its triangles (a 2000-triangle prop gets
+  about the points a box of its size does), and a long wall seen through a doorway is
+  aimed at wherever the doorway shows it. A point on a one-sided triangle that faces
+  away from a sampled cube is skipped, and one occluder face (a triangle, or a box's
+  side) that hides a whole mesh or point from a whole cube skips its rays. Every cell
+  then also takes its 26 neighbours' sets, and cells that see the same set share one
+  row. The bake is a pure function of the scene and a fixed seed: the same bytes at
+  any thread count.
 - **What it can miss, and what it never culls.** A gap that shows less than about a
-  metre of a mesh may hide it (points are sampled, not every ray). A mesh too large to
-  sample (over 4096 lattice points, some 2000 m² of surface) is never culled: it is
-  kept in sight of every cell.
+  metre of a mesh may hide it (points are sampled, not every ray), at every cell size
+  the grid allows. A mesh too large to sample (over 4096 points, about 4000 m² of
+  surface: both sides of a 600 m wall 3 m high) or with a vertex or a transform that is
+  not finite is never culled: it is kept in sight of every cell, lays no cell (a
+  ground slab never coarsens the grid), and Generate Lighting's console line and
+  `occlusionNeverCulled` count it.
 - **Cost** (release build, 4 threads, primitive levels of rooms with a doorway in
   every wall): a Kolvik-sized interior (8 × 8 rooms of 6 m, 418 static meshes, 2916
   cells) bakes in about 30 s into 124 KB; a Dust2-sized level (20 × 20 rooms of
   10 m on two storeys, 4163 meshes, 11664 cells) in about 19 minutes into 4.9 MB.
   At runtime a camera costs one cell lookup, and each static mesh
   a map lookup and a bit test; a static mesh moved or edited re-checks that mesh alone.
-- **Runs** as Generate Lighting's last step: in the editor on a worker thread, with
-  its cells on the card's bar, so the editor and the MCP keep answering;
+- **Runs** as Generate Lighting's last step, after the lightmaps and probes are
+  written into the scene, so a bake dropped or failed during it (the scene closed or
+  reloaded, another opened) loses none of the lighting: in the editor on a worker
+  thread, with its cells on the card's bar, so the editor and the MCP keep answering;
   `Lighting.Generate()` bakes it in line and logs `[Lighting] occlusion 62%
   (2260/3645 cells)` lines like the other steps.
 - **Stored** beside the scene as `<scene>.occlusion` (a small binary file, written
   with the lighting and on every save; removed when the scene has none). A file that
   is truncated or out of range is refused on load with a warning, and nothing is
-  occlusion-culled.
+  occlusion-culled. One that is there but cannot be read (a permission) also culls
+  nothing, with a warning, and the next save leaves it in place.
 - **A bake older than the scene** never hides what is there: a static mesh moved,
   re-materialled, re-imported with other vertices (the bake hashes each mesh's
   positions and indices), added to or taken out of a `LODGroup`, or made dynamic
   since is drawn, a mesh added since is drawn, and if an occluder changed so, or was
   removed or deactivated, nothing is occlusion-culled until the next Generate
-  Lighting. The console says so once. A runtime `Scene.Load` that moves the level's
+  Lighting. The console says so once, and again if an occluder changes after it
+  said only meshes did. A runtime `Scene.Load` that moves the level's
   ids out of a `DontDestroyOnLoad` entity's way moves the bake's with them.
 - **Per camera.** Each perspective camera reads its own position's cell: the base
   camera, a stacked or viewmodel camera, a render-texture camera. An orthographic

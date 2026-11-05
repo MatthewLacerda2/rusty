@@ -9,19 +9,22 @@
 //! through). A mesh in a `LODGroup`, or with a small-object cull, is only occluded
 //! too: what draws of it changes with the camera.
 //!
-//! **Cells.** A uniform 3D grid over the static bounds ([`Grid`]), not the room
+//! **Cells.** A uniform 3D grid over the bounds of the static meshes it can cull
+//! ([`Grid`]), up to [`MAX_CELL`] a side (past it nothing is culled), not the room
 //! finder's rooms: rooms are found on one floor's plan (`placement::rooms`), while a
 //! Dust2-sized level has storeys, stairs, drops and open yards a camera moves
 //! through. A uniform grid holds all of them. Cells that see the same set share one
 //! row (`rows`); after the dilation few do, so the data is about one bit per cell
 //! per object (4.9 MB for a Dust2-sized level of 4163 meshes, `docs/api/Lighting.md`).
 //!
-//! **What a cell holds** (`bake`): every baked object any point in it may see. From
-//! seeded points in the cell, rays go to points on each object's own triangles: its
-//! extremes and a lattice at most `TARGET_SPACING` apart, so a large wall gets as
-//! many as its area needs (`targets`); one ray that no occluder stops before it
-//! arrives makes the object visible. An object too large for `MAX_TARGETS` points is
-//! never culled. Then every cell takes its 26 neighbours' sets too (the dilation), so a
+//! **What a cell holds** (`bake`, `baking`): every baked object any point in it may
+//! see. From seeded points in each 2 m cube of the cell (the same density at every
+//! cell size), rays go to points on each object's own triangles: its extremes and a
+//! lattice at most `TARGET_SPACING` apart, one per `VOXEL` of space, so the count
+//! follows its area, not its triangles (`targets`); one ray that no occluder stops
+//! before it arrives makes the object visible. One occluder face that hides an
+//! object or a point from a whole cube spares its rays (`shaft`). An object too
+//! large for `MAX_TARGETS` points, or not finite, is never culled and lays no cell. Then every cell takes its 26 neighbours' sets too (the dilation), so a
 //! camera anywhere in a cell is covered by samples from the cells around it. The
 //! invariant is one way: a cell may keep what is hidden, and must never drop what is
 //! visible. The sampling is a pure function of the scene and the seed, and each cell
@@ -42,10 +45,12 @@
 //! carried entity's way renames the baked objects with them ([`OcclusionData::remap`]).
 
 mod bake;
+mod baking;
 mod file;
 mod gather;
 mod grid;
 mod progress;
+mod shaft;
 mod targets;
 
 pub use bake::{
@@ -53,14 +58,16 @@ pub use bake::{
 };
 pub use file::{decode, encode, load_sidecar, occlusion_path, save_sidecar};
 pub use gather::{fingerprint, Fingerprints};
-pub use grid::{Grid, CELL_SIZE, MAX_CELLS};
+pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
 pub use progress::OcclusionProgress;
-pub use targets::{MAX_TARGETS, TARGET_SPACING};
+pub use targets::{MAX_TARGETS, TARGET_SPACING, VOXEL};
 
 #[cfg(test)]
 mod bake_tests;
 #[cfg(test)]
 mod carry_tests;
+#[cfg(test)]
+mod dense_tests;
 #[cfg(test)]
 mod file_tests;
 #[cfg(test)]
@@ -71,6 +78,10 @@ mod sampling_tests;
 pub(crate) mod test_gap;
 #[cfg(test)]
 pub(crate) mod test_level;
+#[cfg(test)]
+mod unread_tests;
+#[cfg(test)]
+mod window_tests;
 
 /// A scene's baked PVS (`Scene::occlusion`): `None` until Generate Lighting bakes
 /// one, and then nothing is occlusion-culled. Every write moves its revision,

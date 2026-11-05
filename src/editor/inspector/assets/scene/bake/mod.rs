@@ -14,7 +14,7 @@
 //! Last, the occlusion culling's PVS bakes on a worker (#1714), its cells on the bar.
 //! The card shows the stage (the light probes' bounce, or the reflection probes) on
 //! a line above the bar and `i / n` in it; the console says each pass and probe. Then [`poll`]
-//! commits the probes and writes the lighting. A bake cancelled during the lightmaps
+//! commits the probes and writes the lighting, before the PVS bakes. A bake cancelled during the lightmaps
 //! writes nothing. The probe step bakes from a snapshot of the probes and applies them
 //! only at its end, so the scene stays editable while it runs; a probe added, removed
 //! or moved meanwhile drops it with nothing of the probes applied. It has no Cancel
@@ -62,11 +62,13 @@ enum Step {
         lightmaps: usize,
         path: String,
     },
-    /// The occlusion culling's PVS, on its worker, once the probes committed.
+    /// The occlusion culling's PVS, on its worker, once the probes committed and
+    /// the lighting was written (`saved` says whether the file took it).
     Occlusion {
         job: OcclusionBakeJob,
         lightmaps: usize,
         probes: LightingBakeReport,
+        saved: crate::scene::LightingSave,
         path: String,
     },
 }
@@ -292,5 +294,7 @@ fn draw_occlusion_progress(ui: &mut egui::Ui, (done, total): (usize, usize)) {
 
 #[cfg(test)]
 mod drop_tests;
+#[cfg(test)]
+mod occlusion_drop_tests;
 #[cfg(test)]
 mod tests;

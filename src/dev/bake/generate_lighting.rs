@@ -5,8 +5,10 @@
 //! reflection probes (`lighting_bake`, #246), both with the scene's own
 //! [`LightingSettings`](crate::scene::lighting::LightingSettings), then the
 //! occlusion culling's PVS (`scene::lighting::occlusion`, #1714, which Unity bakes
-//! from its Occlusion window), and finally the lighting written into the scene
-//! file ([`save_lighting`]) so nobody has to remember to save. The individual bakes
+//! from its Occlusion window). The lighting is written into the scene file
+//! ([`write_lighting`], [`save_lighting`]) as soon as the probes commit, so nobody
+//! has to remember to save and a PVS step dropped or failed loses none of it; the
+//! PVS is written beside it when it ends ([`finish`]). The individual bakes
 //! stay for scripts that want one of them.
 //!
 //! The editor runs the lightmap step on a worker (#808), then steps the probe bake
@@ -53,21 +55,33 @@ impl GenerateReport {
             "Generated lighting: {} lightmap(s), {} light probe(s), {} reflection probe(s)",
             self.lightmaps, p.light_probes, p.reflection_probes
         );
-        let o = &self.occlusion;
-        if o.cells > 0 {
-            line.push_str(&format!(
-                ", occlusion over {} cell(s) of {} object(s) ({} KiB, {} ms)",
-                o.cells,
-                o.objects,
-                o.bytes.div_ceil(1024),
-                self.occlusion_ms
-            ));
-        }
+        line.push_str(&occlusion_summary(&self.occlusion, self.occlusion_ms));
         line.push_str(match self.saved {
             LightingSave::Written => "; saved",
             LightingSave::NeedsSceneSave => "; save the scene to keep it",
         });
         line
+    }
+}
+
+/// The occlusion bake's part of the summary line: empty when nothing occludes.
+fn occlusion_summary(o: &OcclusionBakeReport, ms: u64) -> String {
+    let never = match o.never_culled {
+        0 => String::new(),
+        n => format!(", {n} never culled (too large to sample)"),
+    };
+    if o.too_large {
+        let max = crate::scene::lighting::occlusion::MAX_CELL;
+        return format!(", no occlusion culling: the level needs cells over {max} m");
+    }
+    match o.cells {
+        0 => String::new(),
+        cells => format!(
+            ", occlusion over {cells} cell(s) of {:.1} m, {} object(s){never} ({} KiB, {ms} ms)",
+            o.cell_size,
+            o.objects,
+            o.bytes.div_ceil(1024),
+        ),
     }
 }
 
@@ -93,8 +107,10 @@ pub fn generate_lighting(
         let mut probes = start_probes(scene, path, nav)?;
         run_to_end(&mut probes, scene, say, log)?;
         probes.commit(scene)?;
+        let saved = write_lighting(scene, path)?;
         let occlusion = bake_occlusion_logged(scene, log)?;
-        let report = finish(scene, path, lightmaps, probes.report(), occlusion)?;
+        let lighting = (lightmaps, probes.report(), saved);
+        let report = finish(scene, path, lighting, occlusion)?;
         log.finish();
         Ok(report)
     })
@@ -113,20 +129,31 @@ pub fn start_probes(
     start_lighting(scene, Some(path), nav, LightingBakeParams::default())
 }
 
-/// The last step, once lightmaps (`lightmaps` of them, already applied to `scene`)
-/// and probes are baked and committed ([`LightingBake::commit`]) and the occlusion
-/// culling's PVS is baked (#1714): apply the PVS, then write the lighting into the
-/// file at `path` and the PVS beside it.
+/// Write the applied lightmaps and the committed probes ([`LightingBake::commit`])
+/// into the file at `path`, before the PVS bakes: what Generate Lighting baked is
+/// on disk however its last step ends.
+pub fn write_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> {
+    refuse_in_play(scene)?;
+    save_lighting(scene, path)
+}
+
+/// The last step, once the lighting is written ([`write_lighting`]: `lightmaps` of
+/// them, the probes' report, and whether it reached the file) and the occlusion
+/// culling's PVS is baked (#1714): apply the PVS and write it beside the scene. A
+/// scene file that could not take the lighting alone waits for a full save, which
+/// writes the PVS too.
 pub fn finish(
     scene: &mut Scene,
     path: &str,
-    lightmaps: usize,
-    probes: LightingBakeReport,
+    (lightmaps, probes, saved): (usize, LightingBakeReport, LightingSave),
     occlusion: BakedOcclusion,
 ) -> Result<GenerateReport, String> {
     refuse_in_play(scene)?;
     *scene.occlusion = occlusion.data.map(std::sync::Arc::new);
-    let saved = save_lighting(scene, path)?;
+    scene.occlusion_unread = false;
+    if saved == LightingSave::Written {
+        crate::scene::lighting::occlusion::save_sidecar(scene, path)?;
+    }
     Ok(GenerateReport {
         lightmaps,
         probes,

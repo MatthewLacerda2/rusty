@@ -105,6 +105,9 @@ pub struct Scene {
         crate::scene::revision::Revisioned<crate::scene::lighting::lightmap::LightmapSet>,
     /// The baked occlusion culling (#1714), from `<scene>.occlusion`: see its type.
     pub occlusion: crate::scene::lighting::occlusion::SceneOcclusion,
+    /// The `<scene>.occlusion` file was there but could not be read (not a missing
+    /// file, not a refused one): a save keeps it rather than removing it as absent.
+    pub occlusion_unread: bool,
     /// What Generate Lighting bakes with (#832), saved with the scene.
     pub lighting_settings: crate::scene::lighting::LightingSettings,
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
@@ -177,6 +180,7 @@ impl Default for Scene {
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
             lightmaps: Default::default(),
             occlusion: Default::default(),
+            occlusion_unread: false,
             lighting_settings: Default::default(),
             pending_destroy: Vec::new(),
             playing: false,

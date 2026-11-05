@@ -1,17 +1,22 @@
 //! Where the occlusion bake aims its rays at an object (#1714): its extremes along
 //! the eight box diagonals (a corner peeking past a door frame), and a lattice laid
-//! on each of its triangles at most [`TARGET_SPACING`] apart, so the count grows
-//! with the object's area. A gap that shows a patch of an object about that wide
-//! is seen through, however large the object is.
+//! on each of its triangles at most [`TARGET_SPACING`] apart, kept at one point per
+//! [`VOXEL`] cube of space, so the count follows the object's surface area, not its
+//! triangle count: a dense 1.5 m prop gets about the points a box of its size does.
+//! A gap that shows a patch of an object about [`TARGET_SPACING`] wide is seen
+//! through, however large the object is.
 //!
 //! Each point keeps the plane of its triangle's drawn side, so a cell wholly
 //! behind it skips it, and a ray from a cell point behind it is never cast: no
-//! camera there sees that side (a two-sided triangle is never skipped).
+//! camera there sees that side. A two-sided triangle, or a voxel whose points lie on
+//! planes that disagree (a thin prop's two faces, a curved surface), is never skipped.
 //!
-//! An object whose lattice would pass [`MAX_TARGETS`] points (some 2000 m² of
-//! surface, a 600 m wall 3 m high) has no targets: the bake keeps it visible from
-//! every cell. Conservative beats clever: a size the lattice could miss is never
-//! culled.
+//! An object whose points would pass [`MAX_TARGETS`] (some 4000 m² of surface, a
+//! 600 m wall 3 m high), or that has a vertex that is not finite, has no targets:
+//! the bake keeps it visible from every cell. Conservative beats clever: a size the
+//! lattice could miss is never culled.
+
+use std::collections::btree_map::{BTreeMap, Entry};
 
 use glam::Vec3;
 
@@ -23,6 +28,11 @@ pub const TARGET_SPACING: f32 = 1.0;
 
 /// The most target points one object gets; past it, it is never culled.
 pub const MAX_TARGETS: usize = 4096;
+
+/// The edge of the cubes of space that keep one target point each, metres: half
+/// the spacing, so a lattice on a wall keeps every point, and a fine mesh's corners
+/// fold into about one point per quarter square metre.
+pub const VOXEL: f32 = TARGET_SPACING / 2.0;
 
 /// How far a point is pulled toward its triangle's centre, so it lies inside it
 /// and a ray to it is not stopped by a neighbour sharing its edge.
@@ -45,6 +55,22 @@ impl Target {
         }
     }
 
+    /// Fold `other`, a point in the same voxel, into this one: it keeps its plane
+    /// only when `other` lies on it and faces the same way, else it is seen from
+    /// both sides.
+    fn absorb(&mut self, other: &Target) {
+        let Some((n, d)) = self.front else {
+            return;
+        };
+        let same = other.front.is_some_and(|(m, _)| {
+            n.normalize_or_zero().dot(m.normalize_or_zero()) > 0.999
+                && (n.dot(other.at) - d).abs() <= 0.02 * n.length()
+        });
+        if !same {
+            self.front = None;
+        }
+    }
+
     /// Whether `point` is on its drawn side: a ray from behind reaches only its
     /// undrawn back.
     pub(super) fn drawn_toward(&self, point: Vec3) -> bool {
@@ -63,9 +89,13 @@ impl Target {
     }
 }
 
-/// `tris`' target points, `None` when it has more than [`MAX_TARGETS`].
+/// `tris`' target points, `None` when it has more than [`MAX_TARGETS`] or a corner
+/// that is not finite.
 pub(super) fn target_points(tris: &[([Vec3; 3], Face)]) -> Option<Vec<Target>> {
-    let mut points = Vec::with_capacity(8);
+    if !tris.iter().all(|t| t.0.iter().all(|p| p.is_finite())) {
+        return None;
+    }
+    let mut points = Vec::with_capacity(64);
     for k in 0..8 {
         let axis = |bit: i32| if k & bit == 0 { -1.0 } else { 1.0 };
         let diagonal = Vec3::new(axis(1), axis(2), axis(4));
@@ -75,13 +105,22 @@ pub(super) fn target_points(tris: &[([Vec3; 3], Face)]) -> Option<Vec<Target>> {
             points.push(Target::on(p, t));
         }
     }
-    let lattices: Vec<Lattice> = tris.iter().map(|t| Lattice::of(&t.0)).collect();
-    let count = lattices.iter().map(Lattice::count);
-    if points.len() + count.sum::<usize>() > MAX_TARGETS {
-        return None;
-    }
-    for (t, lattice) in tris.iter().zip(&lattices) {
-        lattice.points(|p| points.push(Target::on(p, t)));
+    let mut voxels: BTreeMap<[i32; 3], usize> = BTreeMap::new();
+    for t in tris {
+        let fits = Lattice::of(&t.0).points(|p| {
+            let target = Target::on(p, t);
+            match voxels.entry((target.at / VOXEL).floor().as_ivec3().to_array()) {
+                Entry::Vacant(slot) => {
+                    slot.insert(points.len());
+                    points.push(target);
+                }
+                Entry::Occupied(kept) => points[*kept.get()].absorb(&target),
+            }
+            points.len() <= MAX_TARGETS
+        });
+        if !fits {
+            return None;
+        }
     }
     Some(points)
 }
@@ -105,8 +144,9 @@ impl Lattice {
         let legs = (b - a, c - a);
         let steps = |leg: Vec3| {
             let n = (leg.length() / TARGET_SPACING).ceil();
-            // A NaN or huge leg is clamped: its count then passes the cap anyway.
-            n.clamp(1.0, MAX_TARGETS as f32) as u32
+            // A huge leg is clamped (its points then pass the cap anyway); `max`
+            // takes 1 over a NaN, so a step count is never 0.
+            n.max(1.0).min(MAX_TARGETS as f32) as u32
         };
         Self {
             apex: a,
@@ -122,21 +162,17 @@ impl Lattice {
         u64::from(i) * u64::from(n2) + u64::from(j) * u64::from(n1) <= u64::from(n1) * u64::from(n2)
     }
 
-    fn count(&self) -> usize {
-        let (n1, n2) = self.steps;
-        let (n1, n2) = (u64::from(n1), u64::from(n2));
-        // Row i holds j = 0..=floor(n2 (n1 - i) / n1).
-        let row = |i: u64| (n2 * (n1 - i) / n1 + 1) as usize;
-        (0..=n1).map(row).sum()
-    }
-
-    fn points(&self, mut out: impl FnMut(Vec3)) {
+    /// Hand each point to `out` while it returns true; whether it always did.
+    fn points(&self, mut out: impl FnMut(Vec3) -> bool) -> bool {
         let (n1, n2) = self.steps;
         for i in 0..=n1 {
             for j in (0..=n2).take_while(|&j| self.inside(i, j)) {
                 let (u, v) = (i as f32 / n1 as f32, j as f32 / n2 as f32);
-                out(self.apex + self.legs.0 * u + self.legs.1 * v);
+                if !out(self.apex + self.legs.0 * u + self.legs.1 * v) {
+                    return false;
+                }
             }
         }
+        true
     }
 }
