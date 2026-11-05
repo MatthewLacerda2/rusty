@@ -371,9 +371,14 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   ground slab never coarsens the grid), and Generate Lighting's console line and
   `occlusionNeverCulled` count it.
 - **Cost** (release build, 4 threads, primitive levels of rooms with a doorway in
-  every wall): a Kolvik-sized interior (8 × 8 rooms of 6 m, 418 static meshes, 2916
-  cells) bakes in about 30 s into 124 KB; a Dust2-sized level (20 × 20 rooms of
-  10 m on two storeys, 4163 meshes, 11664 cells) in about 19 minutes into 4.9 MB.
+  every wall and three 1.5 m props per room): a Kolvik-sized interior (8 × 8 rooms of
+  6 m, 450 static meshes, 2916 cells of 2 m) bakes in about 21 s into 135 KB, 24 s
+  with one prop per room a 2000-triangle sphere. A Dust2-sized level (20 × 20 rooms of
+  10 m on two storeys, 5604 meshes with the same dense props, 11664 cells of 3.9 m,
+  each sampled as eight 2 m cubes) takes about 3.9 s a cell on one thread: some 3 hours
+  on 4 threads, less on more cores (estimated from 400 cells spread over the grid, not
+  a whole run). The eye's density is what costs: a cell sampled as eight cubes does
+  eight times the work.
   At runtime a camera costs one cell lookup, and each static mesh
   a map lookup and a bit test; a static mesh moved or edited re-checks that mesh alone.
 - **Runs** as Generate Lighting's last step, after the lightmaps and probes are
