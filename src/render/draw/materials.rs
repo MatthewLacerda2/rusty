@@ -12,8 +12,10 @@ use std::rc::Rc;
 
 use crate::asset::MapRef;
 use crate::components::MaterialAsset;
+use crate::render::draw::batch::RecordTraits;
 use crate::render::gpu::material_cache::{ParamOwner, MATERIAL_TEXTURES};
 use crate::render::gpu::textures::TextureKind;
+use crate::render::scene::Variant;
 use crate::render::{GpuTexture, MaterialData, Renderer};
 use crate::scene::shader_overrides::ParamValues;
 use crate::scene::{Scene, SceneId};
@@ -102,17 +104,31 @@ impl Renderer {
             .unwrap_or_else(|| Rc::clone(&self.default_texture))
     }
 
-    /// Entity `id`'s material record for `material`
-    /// ([`super::uniforms::solid_material_data`]), its map channels set by what
-    /// is resident ([`Self::with_map_channels`]).
-    pub(crate) fn solid_material(
+    /// The slot of scene `scene`'s record of `material` — `(library key, asset)`,
+    /// `None` for no material — under `variant`, kept in the material table
+    /// (`render::scene::MaterialRecords`, #1706) and made to hold what it holds now
+    /// ([`Self::variant_record`]); and what the CPU reads of it.
+    pub(crate) fn material_record(
+        &mut self,
+        scene: SceneId,
+        material: Option<(&str, &MaterialAsset)>,
+        variant: Variant,
+    ) -> (u32, RecordTraits) {
+        let asset = material.map(|(_, asset)| asset);
+        let record = self.variant_record(variant, asset);
+        let name = material.map(|(key, _)| key);
+        let slot = self.retained.records.slot((scene, name, variant), record);
+        (slot, RecordTraits::of(&record))
+    }
+
+    /// `material`'s record under `variant`, its map channels set by what is
+    /// resident ([`Self::with_map_channels`]).
+    pub(crate) fn variant_record(
         &self,
-        scene: &Scene,
-        id: u32,
+        variant: Variant,
         material: Option<&MaterialAsset>,
     ) -> MaterialData {
-        let record = super::uniforms::solid_material_data(scene, id, material);
-        self.with_map_channels(record, material)
+        self.with_map_channels(variant.record(material), material)
     }
 
     /// `record` with its metallic and roughness flags set to 2 where the map is

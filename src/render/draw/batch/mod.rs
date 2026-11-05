@@ -18,13 +18,15 @@
 
 mod records;
 pub(crate) mod sort;
+mod traits;
+
+pub(crate) use traits::RecordTraits;
 
 use std::ops::Range;
 
 use crate::render::gpu::pipelines::Facing;
-use crate::render::gpu::uniforms::MATERIAL_DATA_WORDS;
 use crate::render::scene::MeshHandle;
-use crate::render::{InstanceData, MaterialData};
+use crate::render::InstanceData;
 
 /// What two solids must share to be drawn by one instanced call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -45,20 +47,21 @@ pub(crate) struct BatchKey {
     pub indices: IndexRun,
     /// The group-2 material bind group (the resolved texture maps), by cache index.
     pub material: usize,
-    /// The material record's words (tint, PBR scalars, map and cutout flags, the
-    /// surface and mapping terms, #1616), compared bit-for-bit.
-    pub record: [u32; MATERIAL_DATA_WORDS],
+    /// The material record's slot in the renderer's material table (tint, PBR
+    /// scalars, map and cutout flags, the surface and mapping terms, #1616): one per
+    /// scene, library material and variant (`render::scene::MaterialRecords`, #1706).
+    /// Two materials holding equal values are two slots, so two draws share a batch
+    /// only when they name one material.
+    pub record: u32,
+    /// What the CPU reads of that record (#1706): kept beside the slot, so no pass
+    /// reads the table to decide.
+    pub traits: RecordTraits,
     /// Where the draw's joint palette starts (#455): each skinned entity, with a
     /// palette of its own, is a draw of its own.
     pub bone_base: u32,
 }
 
 impl BatchKey {
-    /// The material record this key carries.
-    pub(crate) fn record(&self) -> MaterialData {
-        MaterialData::from_words(&self.record)
-    }
-
     /// Whether the SSAO depth prepass draws this batch, so its depth is in the prepass
     /// (#436): the one rule the prepass and depth priming (#1499) both read. Unlit
     /// solids (gizmos, a light's own mesh) cast no occlusion, so they are left out,
@@ -66,7 +69,7 @@ impl BatchKey {
     /// keeps is its shader's: `fs_prepass` / `fs_prepass_cut` clip Cutout texels, cut
     /// and move the UVs as `fs_main` does (`shadergen::assemble::depth`).
     pub(crate) fn in_prepass(&self) -> bool {
-        self.record().is_lit != 0
+        self.traits.lit
     }
 }
 

@@ -17,23 +17,10 @@ use crate::scene::authoring::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, 
 use crate::scene::lighting::lightmap::BakeScene;
 use crate::scene::Scene;
 
-/// Compute the material record (tint, lit flag, PBR params, cutout) for a solid
-/// mesh. It carries no transform — that is per instance — so every entity sharing a
-/// material produces the same record and can share a draw call (#470). Tint is driven by components only — never by entity name. A game colours its
-/// entities via its referenced material's `base_color`; the engine carries no
-/// per-name colour assumptions. `material` is the entity's resolved library material
-/// (`None` when it references none).
-pub(crate) fn solid_material_data(
-    scene: &Scene,
-    id: u32,
-    material: Option<&MaterialAsset>,
-) -> MaterialData {
-    // A light's own gizmo mesh is drawn unlit.
-    material_data(!scene.world.has_light(id), material)
-}
-
-/// The material record for `material`, lit or not — shared by entity solids and
-/// mesh particles (#440), which have no entity of their own.
+/// The material record (tint, lit flag, PBR params, cutout, surface and mapping
+/// terms) for `material`, lit or not. It carries no transform and reads no entity,
+/// so every draw of a material under one `render::scene::Variant` reads one record
+/// (#470, #1706). Tint is driven by components only — never by entity name.
 pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> MaterialData {
     let is_lit = u32::from(lit);
     let color_tint = material_color_tint(material);

@@ -49,8 +49,8 @@ use crate::render::gpu::material_cache::MaterialCache;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
 use crate::render::gpu::pipelines::winding::Facing;
 use crate::render::lod::LodSelection;
-use crate::render::scene::{MeshHandle, MeshHandles, RenderScene};
-use crate::render::{GpuMesh, MeshId, SmallObjectCull};
+use crate::render::scene::{MeshHandle, MeshHandles, RenderScene, SlotTable};
+use crate::render::{GpuMesh, MaterialData, MeshId, SmallObjectCull};
 use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
 use buffer::{CasterData, CasterRecords, CasterUpload};
@@ -113,6 +113,9 @@ pub(super) struct CasterFrame<'a> {
     pub meshes: &'a MeshHandles,
     /// The material groups and variant pipelines the clipped casters' draws bind.
     pub materials: &'a MaterialCache,
+    /// The material table (#1706): a clipped draw's record is read from its slot
+    /// as it is now, so a variant's cut follows a record-only edit.
+    pub records: &'a SlotTable<MaterialData>,
     pub surfaces: &'a SurfaceShaders,
     /// The scene's [`StaticsKey`](super::StaticsKey), kept by the retained scene and
     /// compared by both the cascades' and the atlas's static bakes (#1594).
@@ -157,7 +160,8 @@ impl ShadowRenderer {
             per_volume.push(batches);
         }
         // Indexed once every volume is batched: the records sort by their words.
-        let records = CasterRecords::new(per_volume.iter().flatten().map(|b| b.key.clip.as_ref()));
+        let clips = per_volume.iter().flatten().map(|b| b.key.clip.as_ref());
+        let records = CasterRecords::new(clips, frame.records);
         for batch in per_volume.iter_mut().flatten() {
             batch.record = records.index(batch.key.clip.as_ref());
         }

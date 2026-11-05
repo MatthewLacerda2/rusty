@@ -1,6 +1,6 @@
 //! The instancing grouping rules (#470), pinned without a GPU.
 
-use super::{BatchKey, DrawItem, FrameDraws};
+use super::{BatchKey, DrawItem, FrameDraws, RecordTraits};
 use crate::render::scene::MeshHandle;
 use crate::render::InstanceData;
 
@@ -21,12 +21,12 @@ pub(super) fn name(handle: MeshHandle) -> &'static str {
     MESHES[handle.0 as usize]
 }
 
-/// An item of mesh `mesh`, palette `bone_base`, tint `tint`, tagged by `tag` (its bits
-/// as the instance's object slot) so a test can read back the order instances were
-/// packed in.
+/// An item of mesh `mesh`, palette `bone_base`, tint `tint` (its material record's
+/// slot is ten times it), tagged by `tag` (its bits as the instance's object slot)
+/// so a test can read back the order instances were packed in.
 pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem {
-    let mut record = [0u32; crate::render::gpu::uniforms::MATERIAL_DATA_WORDS];
-    record[0] = tint.to_bits();
+    let record = (tint * 10.0) as u32;
+    let traits = RecordTraits::of(&crate::render::MaterialData::flat([tint; 4]));
     let instance = InstanceData::of(tag.to_bits());
     DrawItem {
         key: BatchKey {
@@ -36,6 +36,7 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
             indices: (0..36).into(),
             material: 0,
             record,
+            traits,
             bone_base,
         },
         instance,
@@ -88,12 +89,14 @@ fn a_different_uniform_or_skinned_palette_splits_the_batch() {
     );
     let slots: Vec<u32> = draws.opaque.iter().map(|b| b.uniform_slot).collect();
     assert_eq!(slots, [0, 1, 2, 3]);
-    let (uniforms, records) = draws.pack();
+    let uniforms = draws.pack();
     assert_eq!(uniforms.len(), 4);
-    assert_eq!(records.len(), 2, "the three tint-1 draws share one record");
     let named: Vec<_> = uniforms.iter().map(|u| (u.material, u.bone_base)).collect();
-    assert_eq!(named, [(0, 0), (1, 0), (1, 1), (1, 2)]);
-    assert_eq!(records[0].color_tint[0], 0.5);
+    assert_eq!(
+        named,
+        [(5, 0), (10, 0), (10, 1), (10, 2)],
+        "each uniform names its key's record slot"
+    );
 }
 
 #[test]

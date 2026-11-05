@@ -63,6 +63,7 @@ impl Renderer {
             gpu_meshes: &self.gpu_meshes,
             meshes: &self.retained.meshes,
             materials: &self.materials,
+            records: &self.retained.records.table,
             surfaces: &self.surface_shaders,
             timer: &self.gpu_timer,
             statics: objects.statics_key(scene),

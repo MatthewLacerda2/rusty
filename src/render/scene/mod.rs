@@ -58,6 +58,7 @@ mod handles;
 mod idle_tests;
 mod inputs;
 mod object;
+pub(crate) mod records;
 #[cfg(test)]
 mod shadow_ops;
 #[cfg(test)]
@@ -69,7 +70,8 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
 pub(crate) use object::{RenderObject, SlotDraw};
-pub(crate) use table::ObjectTable;
+pub(crate) use records::{MaterialRecords, Variant};
+pub(crate) use table::{ObjectTable, SlotTable, Slotted};
 
 use crate::render::passes::shadows::{casting_key, StaticsKey, UnbakedCasters};
 use crate::render::{GpuMesh, Renderer};
@@ -86,6 +88,9 @@ pub(crate) struct Retained {
     pub meshes: MeshHandles,
     /// Every kept scene's objects' records, by slot (`table.rs`), mirrored on the GPU.
     pub objects: ObjectTable,
+    /// Every kept scene's material records, by slot (`records.rs`), mirrored on the
+    /// GPU.
+    pub records: MaterialRecords,
     /// Bumped by [`Self::touch`] whenever a renderer-side input every object's keys
     /// read changes (a material group dropped, a surface shader re-built): each scene
     /// re-derives all its objects on its next frame. Render textures have their own
@@ -115,7 +120,8 @@ impl Retained {
     }
 
     /// Keep `scene` as `id`'s, the most recently drawn; a scene evicted past
-    /// [`MAX_SCENES`] gives its slots back, and its id is returned.
+    /// [`MAX_SCENES`] gives its object and material slots back, and its id is
+    /// returned.
     fn put(&mut self, id: SceneId, scene: RenderScene) -> Option<SceneId> {
         self.scenes.push((id, scene));
         if self.scenes.len() <= MAX_SCENES {
@@ -123,6 +129,7 @@ impl Retained {
         }
         let (gone, mut evicted) = self.scenes.remove(0);
         evicted.release(&mut self.objects);
+        self.records.release_scene(gone);
         Some(gone)
     }
 
@@ -196,6 +203,11 @@ impl RenderScene {
             .filter_map(|name| self.by_material.get(name))
             .flatten()
             .copied()
+    }
+
+    /// The objects drawing library material `name`.
+    fn users_of_name<'a>(&'a self, name: &str) -> impl Iterator<Item = u32> + 'a {
+        self.by_material.get(name).into_iter().flatten().copied()
     }
 
     /// Drop every object, giving its slot back to `table`.

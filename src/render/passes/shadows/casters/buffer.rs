@@ -10,11 +10,12 @@ use crate::render::gpu::draw_buffers::{
     joint_array_bytes, uniform_array_bytes, JointMatrix, UNIFORM_STRIDE,
 };
 use crate::render::gpu::grow_buffer::GrowBuffer;
-use crate::render::gpu::uniforms::{MappingUniform, RecordTable, RecordWords};
+use crate::render::gpu::uniforms::MappingUniform;
 use crate::render::passes::shadows::clips::{Clip, Cutout};
 use crate::render::passes::shadows::setup::{
     CASTERS_BINDING, DRAW_BINDING, JOINTS_BINDING, MATERIALS_BINDING,
 };
+use crate::render::scene::SlotTable;
 use crate::render::{DrawUniform, MaterialData};
 
 /// One caster as `shader.wgsl`'s `Caster` reads it: world matrix, where its palette
@@ -59,24 +60,36 @@ impl CasterData {
     }
 }
 
-/// A sweep's distinct material records ([`RecordTable`]): every variant clip's
-/// record, and a flat one that plain draws and a cutout's standard clip (which reads
-/// its test per caster) bind and never read.
-pub(in crate::render::passes::shadows) struct CasterRecords(RecordTable);
+/// A sweep's distinct material records: every variant clip's record, by its slot of
+/// the material table (#1706), and slot 0, the flat one that plain draws and a
+/// cutout's standard clip (which reads its test per caster) bind and never read.
+/// Each is read from the table as it is now, so a record-only edit's cut follows
+/// with no caster re-derived.
+pub(in crate::render::passes::shadows) struct CasterRecords {
+    /// The slots read, sorted, each once.
+    slots: Vec<u32>,
+    records: Vec<MaterialData>,
+}
 
 impl CasterRecords {
-    /// The records `clips` read, beside the flat one.
+    /// The records `clips` read, beside the flat one, as `table` holds them.
     pub(in crate::render::passes::shadows) fn new<'a>(
         clips: impl IntoIterator<Item = Option<&'a Clip>>,
+        table: &SlotTable<MaterialData>,
     ) -> Self {
         let read = clips.into_iter().flatten().filter_map(|c| c.record);
-        Self(RecordTable::new(read.chain([flat()])))
+        let mut slots: Vec<u32> = read.chain([FLAT]).collect();
+        slots.sort_unstable();
+        slots.dedup();
+        let records = slots.iter().map(|&s| *table.get(s)).collect();
+        Self { slots, records }
     }
 
     /// The index of the record `clip` reads (the flat one when it reads none).
     pub(in crate::render::passes::shadows) fn index(&self, clip: Option<&Clip>) -> u32 {
-        self.0
-            .index(&clip.and_then(|c| c.record).unwrap_or_else(flat))
+        let slot = clip.and_then(|c| c.record).unwrap_or(FLAT);
+        let found = self.slots.binary_search(&slot);
+        found.expect("built from every clip its draws name") as u32
     }
 
     /// One per-draw uniform per record, naming it.
@@ -87,14 +100,12 @@ impl CasterRecords {
             material,
             _pad: [0; 2],
         };
-        (0..self.0.len() as u32).map(draw).collect()
+        (0..self.slots.len() as u32).map(draw).collect()
     }
 }
 
-/// The record a draw that reads none binds.
-fn flat() -> RecordWords {
-    MaterialData::flat([1.0; 4]).words()
-}
+/// The material table's slot 0: the flat record a draw that reads none binds.
+const FLAT: u32 = 0;
 
 /// The caster, joint and record arrays and the bind group that exposes them to the
 /// shadow stage.
@@ -141,7 +152,7 @@ impl CasterBuffer {
         layout: &wgpu::BindGroupLayout,
         sweep: CasterUpload,
     ) {
-        let records = sweep.records.0.records();
+        let records = &sweep.records.records;
         let grew = [
             self.casters
                 .upload(device, queue, bytemuck::cast_slice(sweep.casters)),
@@ -150,7 +161,7 @@ impl CasterBuffer {
             self.draws
                 .upload(device, queue, &uniform_array_bytes(&sweep.records.draws())),
             self.materials
-                .upload(device, queue, bytemuck::cast_slice(&records)),
+                .upload(device, queue, bytemuck::cast_slice(records)),
         ];
         if grew.contains(&true) {
             let buffers = [&self.casters, &self.joints, &self.draws, &self.materials];

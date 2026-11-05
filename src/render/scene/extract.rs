@@ -5,9 +5,10 @@
 
 use std::collections::BTreeSet;
 
-use super::inputs::{Dirty, Inputs, RendererInputs};
+use super::inputs::{Dirty, Inputs, LibraryEdits, RendererInputs};
 use super::{ExtractStats, RenderScene};
 use crate::render::draw::materials::material_maps;
+use crate::render::gpu::material_cache::ParamOwner;
 use crate::render::passes::shadows::UnbakedCasters;
 use crate::render::Renderer;
 use crate::scene::Scene;
@@ -38,21 +39,18 @@ impl Renderer {
 
     fn update_objects(&mut self, scene: &Scene, rs: &mut RenderScene) -> ExtractStats {
         let now = self.renderer_inputs();
-        let dirty = match &mut rs.inputs {
+        let (dirty, library) = match &mut rs.inputs {
             Some(inputs) => inputs.read(scene, now),
             None => {
                 rs.inputs = Some(Inputs::open(scene, now));
-                Dirty::Rebuild
+                (Dirty::Rebuild, LibraryEdits::default())
             }
         };
+        let rekeyed = self.apply_library(scene, rs, &library);
         let stats = match dirty {
             Dirty::Rebuild => self.rebuild_objects(scene, rs),
-            Dirty::Some {
-                mut whole,
-                posed,
-                materials,
-            } => {
-                whole.extend(rs.users_of(&materials));
+            Dirty::Some { mut whole, posed } => {
+                whole.extend(rekeyed);
                 self.update_some(scene, rs, whole, posed)
             }
         };
@@ -64,6 +62,51 @@ impl Renderer {
         }
         rs.refold_casting();
         stats
+    }
+
+    /// Act on the library's edits (#1706): a removed name's records are freed, and a
+    /// record-only edit rewrites the name's records in the material table and its
+    /// param buffer in place. Returns the objects to re-derive: the users of a name
+    /// added, removed or re-keyed, and those of a name whose params moved that
+    /// override them (their buffers merge the material's params).
+    fn apply_library(
+        &mut self,
+        scene: &Scene,
+        rs: &RenderScene,
+        edits: &LibraryEdits,
+    ) -> BTreeSet<u32> {
+        let mut rederive: BTreeSet<u32> = rs.users_of(&edits.rekeyed).collect();
+        for name in &edits.rekeyed {
+            if !scene.materials.contains_key(name) {
+                self.retained.records.release_name(scene.id(), name);
+            }
+        }
+        for (name, &params) in &edits.rewritten {
+            let Some(asset) = scene.materials.get(name) else {
+                continue;
+            };
+            for (variant, slot) in self.retained.records.variants_of(scene.id(), name) {
+                let record = self.variant_record(variant, Some(asset));
+                self.retained.records.table.write(slot, record);
+            }
+            if !params {
+                continue;
+            }
+            let shader = asset.shader.as_deref();
+            let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
+            let Some(layout) = self.surface_shaders.params(pipeline) else {
+                continue;
+            };
+            let owner = ParamOwner::Material(scene.id(), name.clone());
+            if self.materials.holds_params(&owner) {
+                let values = layout.pack(&asset.shader_params);
+                let (device, queue) = (&self.device, &self.queue);
+                self.materials.write_params(device, queue, &owner, values);
+            }
+            let overriding = rs.users_of_name(name);
+            rederive.extend(overriding.filter(|&id| scene.shader_overrides.of(id).is_some()));
+        }
+        rederive
     }
 
     /// Every mesh entity re-derived: the first frame, a load, an Undo, a renderer

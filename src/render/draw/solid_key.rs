@@ -1,12 +1,12 @@
 //! The batch key of one material slot of a solid (#470, #1615): what two draws must
 //! share to be one instanced call — its shader, cull state, mesh run, material group
-//! and record, and palette.
+//! and record slot, and palette.
 
 use super::batch::BatchKey;
 use super::materials::entity_params;
 use crate::components::MaterialAsset;
 use crate::render::gpu::pipelines::Facing;
-use crate::render::scene::MeshHandle;
+use crate::render::scene::{MeshHandle, Variant};
 use crate::render::Renderer;
 use crate::scene::Scene;
 
@@ -23,7 +23,12 @@ impl Renderer {
     ) -> (BatchKey, bool) {
         let entry = scene.material_entry_at(id, slot);
         let material = entry.map(|(_, asset)| asset);
-        let record = self.solid_material(scene, id, material);
+        // A light's own gizmo mesh draws its material unlit.
+        let variant = match scene.world.has_light(id) {
+            true => Variant::Unlit,
+            false => Variant::Lit,
+        };
+        let (record, traits) = self.material_record(scene.id(), entry, variant);
         let shader = material.and_then(|m| m.shader.as_deref());
         let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
         let key = BatchKey {
@@ -37,7 +42,8 @@ impl Renderer {
                 pipeline,
                 entity_params(scene, id, slot),
             ),
-            record: record.words(),
+            record,
+            traits,
             bone_base: 0,
         };
         (key, material.is_some_and(MaterialAsset::is_transparent))
