@@ -5,7 +5,7 @@
 //! camera's). Every row moves between its levels (#1716): a test fails on one whose
 //! three levels are equal, unless it names the row with a reason.
 
-use super::{levels, QualityValues, SsaoQuality, SsilQuality, SsrQuality};
+use super::{levels, QualityValues, SsaoQuality, SsilQuality, SsrQuality, VolumetricFogQuality};
 
 const fn ssao(samples: u32, resolution_divisor: u32) -> SsaoQuality {
     SsaoQuality {
@@ -31,6 +31,12 @@ const fn march(steps: u32, step_length: f32) -> SsrQuality {
     SsrQuality { steps, step_length }
 }
 
+/// Volumetric fog's froxel grid (#1703): UE's default is 160×90×64, the `Medium`
+/// preset's `High`; each level below roughly halves the froxels.
+const fn froxels(resolution: u32, slices: u32) -> VolumetricFogQuality {
+    VolumetricFogQuality { resolution, slices }
+}
+
 /// The seeded `Low` preset: an iGPU floor.
 pub(super) fn low() -> QualityValues {
     QualityValues {
@@ -40,6 +46,7 @@ pub(super) fn low() -> QualityValues {
         bloom_resolution_divisor: levels(4, 4, 2),
         depth_of_field_resolution_divisor: levels(4, 2, 2),
         motion_blur_samples: levels(4, 8, 16),
+        volumetric_fog: levels(froxels(64, 32), froxels(80, 48), froxels(120, 64)),
         ui_blur_divisor: 4,
     }
 }
@@ -54,6 +61,7 @@ pub(super) fn medium() -> QualityValues {
         depth_of_field_resolution_divisor: levels(2, 2, 1),
         // 32 at `Medium`: what the default camera ran before presets (#1522).
         motion_blur_samples: levels(16, 32, 32),
+        volumetric_fog: levels(froxels(80, 48), froxels(120, 64), froxels(160, 64)),
         ui_blur_divisor: 2,
     }
 }
@@ -67,6 +75,7 @@ pub(super) fn high() -> QualityValues {
         bloom_resolution_divisor: levels(4, 3, 2),
         depth_of_field_resolution_divisor: levels(2, 1, 1),
         motion_blur_samples: levels(16, 32, 32),
+        volumetric_fog: levels(froxels(120, 64), froxels(160, 64), froxels(160, 128)),
         ui_blur_divisor: 2,
     }
 }

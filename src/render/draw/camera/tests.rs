@@ -18,6 +18,7 @@ fn stages_run_in_the_frames_order() {
         [
             "camera_uniform",
             "clusters",
+            "volumetric_fog",
             "solids",
             "scene",
             "ssil_source",
@@ -41,6 +42,10 @@ fn every_stage_reads_only_what_an_earlier_stage_wrote() {
     assert_eq!(position("camera_uniform"), 0);
     // Every lit pass reads this camera's light and decal clusters (#434, #638).
     assert!(position("clusters") < position("scene"));
+    // The froxels light with the binned clusters, and every fogging pass reads them
+    // (#1703).
+    assert!(position("clusters") < position("volumetric_fog"));
+    assert!(position("volumetric_fog") < position("scene"));
     // The scene and transparent passes draw the solids batch.
     assert!(position("solids") < position("scene"));
     assert!(position("solids") < position("transparent"));

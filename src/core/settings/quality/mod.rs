@@ -90,6 +90,14 @@ pub struct SsrQuality {
     pub step_length: f32,
 }
 
+/// Volumetric fog's froxel grid (#1703): froxels across the view (up is `9/16` of
+/// it) and depth slices out to its distance. Its cost scales with their product.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VolumetricFogQuality {
+    pub resolution: u32,
+    pub slices: u32,
+}
+
 /// Every per-effect quality value one preset holds. A value a preset leaves out,
 /// whole or in part, is the seeded `Medium` preset's (`partial`).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -110,6 +118,8 @@ pub struct QualityValues {
     /// Motion blur's taps per pixel (#1436).
     #[serde(deserialize_with = "partial::motion_blur")]
     pub motion_blur_samples: Levels<u32>,
+    #[serde(deserialize_with = "partial::volumetric_fog")]
+    pub volumetric_fog: Levels<VolumetricFogQuality>,
     /// The UI backdrop blur's working-resolution divisor (#426), a power of two. The
     /// UI has no volume, so it takes one value, not three levels.
     pub ui_blur_divisor: u32,

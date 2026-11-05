@@ -14,7 +14,7 @@ fn flat<T: PartialEq>(l: &Levels<T>) -> bool {
 
 /// Each row of `values` and whether it is flat. The destructuring names every
 /// field, so a row added to [`QualityValues`] fails to compile until it is here.
-fn rows(values: &QualityValues) -> [(&'static str, bool); 6] {
+fn rows(values: &QualityValues) -> [(&'static str, bool); 7] {
     let QualityValues {
         ssao,
         ssil,
@@ -22,6 +22,7 @@ fn rows(values: &QualityValues) -> [(&'static str, bool); 6] {
         bloom_resolution_divisor,
         depth_of_field_resolution_divisor,
         motion_blur_samples,
+        volumetric_fog,
         // One value, not three levels: there is nothing to differ.
         ui_blur_divisor: _,
     } = values;
@@ -35,6 +36,7 @@ fn rows(values: &QualityValues) -> [(&'static str, bool); 6] {
             flat(depth_of_field_resolution_divisor),
         ),
         ("motion_blur_samples", flat(motion_blur_samples)),
+        ("volumetric_fog", flat(volumetric_fog)),
     ]
 }
 

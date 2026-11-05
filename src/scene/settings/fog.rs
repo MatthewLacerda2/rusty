@@ -2,7 +2,9 @@
 //!
 //! Unity's Lighting-window fog: one per scene, saved with it, applied by the
 //! renderer to every world-space pass (opaque, transparent, particles, decals, and
-//! the sky's horizon) through one shared WGSL function (`common.wgsl::apply_fog`).
+//! the sky's horizon) through one shared WGSL formula (`common.wgsl::fog_factor`).
+//! Volumetric fog (#1703, light in the air) is the post-processing volume's
+//! `volumetric_fog`, drawn over this one.
 //! It sits beside the skybox and ambient scalars rather than on the
 //! post-processing volume: fog is the scene's atmosphere, it must hold with no
 //! volume in the scene, and the sky it blends into is scene-level too.

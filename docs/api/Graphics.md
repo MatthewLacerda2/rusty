@@ -123,6 +123,17 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetVignetteColor` / `SetVignetteColor` | `()` / `(r, g, b)` | `r, g, b` (linear, each clamped 0–1, **default black**) |
 | `Graphics.GetVignetteIntensity` / `SetVignetteIntensity` | `()` / `(value)` | `number` (clamped 0–1, **default `0.3`**) |
 | `Graphics.GetVignetteSmoothness` / `SetVignetteSmoothness` | `()` / `(value)` | `number` (falloff softness, clamped 0.01–1, **default `0.2`**) |
+| `Graphics.GetVolumetricFogActive` / `SetVolumetricFogActive` | `()` / `(bool)` | `bool`: volumetric fog (**default `false`**; see *Volumetric fog*) |
+| `Graphics.GetVolumetricFogAlbedo` / `SetVolumetricFogAlbedo` | `()` / `(r, g, b)` | `r, g, b`: the colour the fog scatters with (linear, each clamped 0–1, **default white**) |
+| `Graphics.GetVolumetricFogAnisotropy` / `SetVolumetricFogAnisotropy` | `()` / `(g)` | `number`: where light scatters, `0` evenly, toward `1` onward (clamped −0.95–0.95, **default `0`**) |
+| `Graphics.GetVolumetricFogBaseHeight` / `SetVolumetricFogBaseHeight` | `()` / `(y)` | `number`: world height below which the fog is at full density (clamped ±100000, **default `0`**) |
+| `Graphics.GetVolumetricFogDepthExtent` / `SetVolumetricFogDepthExtent` | `()` / `(units)` | `number`: how far from the camera the froxels reach, HDRP's *Volumetric Fog Distance* (world units, clamped 4–1000, **default `64`**) |
+| `Graphics.GetVolumetricFogGlobalLightProbeDimmer` / `SetVolumetricFogGlobalLightProbeDimmer` | `()` / `(value)` | `number`: how much of the scene's ambient the fog scatters (clamped 0–1, **default `1`**) |
+| `Graphics.GetVolumetricFogMaximumHeight` / `SetVolumetricFogMaximumHeight` | `()` / `(y)` | `number`: world height at which the density has fallen to `1/e` (clamped ±100000, **default `50`**) |
+| `Graphics.GetVolumetricFogMeanFreePath` / `SetVolumetricFogMeanFreePath` | `()` / `(units)` | `number`: HDRP's *Fog Attenuation Distance*, how far light goes before all but `1/e` is gone; shorter is thicker (world units, clamped 1–10000, **default `400`**) |
+| `Graphics.GetVolumetricFogQuality` / `SetVolumetricFogQuality` | `()` / `(name)` | which froxel grid it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
+| `Graphics.GetVolumetricFogResolution` / `SetVolumetricFogResolution` | `()` / `(n)` | `number`: the `Custom` froxels across the view, `9/16` of it up (clamped 16–256, **default `160`**) |
+| `Graphics.GetVolumetricFogSlices` / `SetVolumetricFogSlices` | `()` / `(n)` | `number`: the `Custom` depth slices (clamped 16–128, **default `64`**) |
 | `Graphics.GetWhiteBalance` / `SetWhiteBalance` | `()` / `(temperature, tint)` | `temperature, tint` (each clamped −100–100, **neutral `0, 0`**; see *Colour grading*) |
 | `Graphics.QualityPresets` | `()` | array of the project's presets, in order, each `{ name, ssao, ssr, ... }` with every value it holds (see *Quality presets*) |
 | `Graphics.RemoveQualityPreset` | `(name)` | nothing; removes the project's preset of that name (an unknown one raises an error listing them) |
@@ -373,6 +384,65 @@ the seeded `Medium` preset gathers 6, 8 or 12 samples at half resolution at its
 and 12 at half, 16 at full), and `Custom` gathers `samples` at `resolution_divisor`.
 The player's `ssil` option gates it.
 Tween paths: `Graphics.ssil.intensity`, `Graphics.ssil.radius`.
+
+<!-- effect: volumetric_fog -->
+#### Volumetric fog
+
+**Volumetric fog** (#1703) puts light in the air: lamps get halos, a shadowed spot
+casts a shaft with a dark side, a hall fills with haze. It is HDRP's *Fog* with
+volumetrics (Frostbite's froxel scattering, as UE's *Volumetric Fog* and Godot 4 run
+it), **off by default**; a volume turns it on. Its settings take HDRP's names and
+defaults: `mean_free_path` (*Fog Attenuation Distance*, 400 m: shorter is thicker),
+`albedo` (white), `anisotropy` (0, isotropic; toward 1 a lamp glows brighter looking
+into it), `base_height` and `maximum_height` (full density below 0, falling to `1/e`
+at 50 m), `depth_extent` (*Volumetric Fog Distance*, 64 m) and
+`global_light_probe_dimmer` (how much of the ambient it scatters, 1). The distance and
+height fog (`Graphics.SetFogMode` and its siblings) still draws under it.
+
+Each frame, before the base camera draws, a compute pass lights a **froxel grid**
+over the view (the quality's froxels across, `9/16` of that up, its slices deep,
+exponential from half a metre to `depth_extent`): at a jittered point in each froxel
+the fog's density, lit by the ambient (the light probes' where the scene has them,
+read from a coarse 16×8×16 grid around the camera refilled only when the probes
+change or the camera crosses into another cell, so a sealed room's air is as dark
+as its probes; else the scene ambient), the live suns (the first through its shadow
+cascades), the clustered point and spot lights through their shadows, and the
+**`Baked` lamps unshadowed** (they reach surfaces only through the lightmaps, so a
+lightmapped level gets its halos from here; each camera keeps the 64 that matter most,
+32 per cluster, as for its live lights), each through Henyey-Greenstein's phase.
+An Area light gives no halo yet. A `Baked` lamp's light is in the probes too, so
+near probes it lights it also reaches the air as a soft, probe-wide glow under its
+halo.
+Each froxel keeps 85% of last frame's at the same world point, reprojected, so a
+light that moves leaves under 5% of its old glow after 19 frames; a cut (a scene
+load, Play or Stop, a camera switch), a resize or a change of grid starts over. A
+second pass integrates the grid front to back, and every pass that fogs reads it:
+opaque and transparent surfaces (decals with them), the sky (the whole volume) and
+particles (per vertex). A surface's colour becomes `colour × transmittance +
+in-scattered light`; an Additive surface is only dimmed and a Multiply one's tint
+fades toward white, since what is behind them already carries that air. SSR's reflections and SSIL's bounce are dimmed by the same
+fog the surface got, so neither adds light the fog took. World-space canvases and
+trails take only the distance fog.
+
+**Which cameras.** The base camera of a view. An overlay camera (a viewmodel) reads
+none: at arm's length there is no air in front of a gun to speak of. A render
+texture's camera runs its own when its `post_fx` is on; bake captures and the shader
+preview never do. Off, nothing runs and no texture is read: the frame is the same
+bytes as without the feature.
+
+**Cost.** Its **quality** sets the grid (see *Quality presets*): the seeded `Medium`
+preset runs 80, 120 or 160 froxels across with 48, 64 or 64 slices at its `Low`,
+`Medium` and `High` levels (the `Low` preset 64×32, 80×48 and 120×64; the `High`
+preset 120×64, 160×64 and 160×128), and `Custom` runs `resolution` × `slices`. Each
+froxel grid is 8 bytes a froxel: 160×90×64 is 7.4 MB, and a view running it holds two
+(this frame and its history) beside the renderer's one integrated grid. That grid
+is sized for the camera that runs last, so a render-texture camera whose `Custom`
+grid differs from the screen's makes it reallocate twice a frame: give both the
+same grid. An M4 is
+expected to take 0.5–1 ms at 160×90×64, **not yet measured**
+(`Debug.Stats().gpu_passes.volumetric_fog` times it; `volumetric_froxels` counts the
+froxels lit). The player's `volumetric_fog` option gates it.
+Tween paths: `Graphics.volumetric_fog.mean_free_path`, `Graphics.volumetric_fog.anisotropy`, `Graphics.volumetric_fog.base_height`, `Graphics.volumetric_fog.maximum_height`, `Graphics.volumetric_fog.depth_extent`, `Graphics.volumetric_fog.global_light_probe_dimmer`.
 
 <!-- effect: ssr -->
 #### Screen-space reflections
@@ -807,7 +877,7 @@ HDRP's model: `"Low"`, `"Medium"` or `"High"` take that effect's values from the
 **running quality preset**, its row for that level, and `"Custom"` takes the values
 authored beside it (SSAO's and SSIL's `samples` and `resolution_divisor`, SSR's `steps` and
 `step_length`, bloom's and depth of field's `resolution_divisor`, motion blur's
-`samples`). A new volume and camera start at `"Medium"`. A preset never turns an
+`samples`, volumetric fog's `resolution` and `slices`). A new volume and camera start at `"Medium"`. A preset never turns an
 effect off: an effect a camera has on (and the player allows) runs, at the quality
 its settings say. The Inspector shows each effect's quality, and its `Custom` fields
 while it is `Custom`.
@@ -823,6 +893,7 @@ without one, the middle preset):
   { "name": "Low", "ssao": { "low": { "samples": 4, "resolution_divisor": 2 }, … },
     "ssil": { … }, "ssr": { … }, "bloom_resolution_divisor": { "low": 4, "medium": 4, "high": 2 },
     "depth_of_field_resolution_divisor": { … }, "motion_blur_samples": { … },
+    "volumetric_fog": { "low": { "resolution": 64, "slices": 32 }, … },
     "ui_blur_divisor": 4 }, … ] }
 ```
 
@@ -918,6 +989,7 @@ An option can only turn an effect off; it never turns on what a camera left off.
 | `ssr` | the volume's screen-space reflections |
 | `taa` | the camera's TAA (when it is off, FXAA runs if the camera's `fxaa_active` and the `fxaa` option allow it) |
 | `vignette` | the volume's vignette |
+| `volumetric_fog` | the volume's volumetric fog |
 
 Names are snake_case; an unknown name raises an error listing the valid ones.
 `SetOption` takes effect next frame and is **persisted** through `Storage`

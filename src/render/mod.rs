@@ -264,6 +264,10 @@ pub struct Renderer {
     /// the forward pass's material inputs.
     decals: decals::DecalBuffers,
 
+    /// The integrated volumetric fog (#1703), bound in group 0: written by each base
+    /// camera running it, before it draws.
+    fog_volume: postfx::effects::volumetric_fog::SharedVolume,
+
     /// The scene-depth layout the soft particles sample the depth target through.
     scene_depth_layout: wgpu::BindGroupLayout,
 

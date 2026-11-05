@@ -31,6 +31,7 @@ mod path_field;
 mod ssil;
 mod ssr;
 mod volume;
+mod volumetric_fog;
 
 #[cfg(test)]
 mod slider_tests;
@@ -82,6 +83,7 @@ pub(crate) const SECTIONS: &[Section] = &[
     vignette::SECTION,
     volume::SHADOWS,
     volume::SSAO,
+    volumetric_fog::SECTION,
     white_balance::SECTION,
 ];
 

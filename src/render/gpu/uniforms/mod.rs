@@ -53,6 +53,10 @@ pub(crate) struct CameraUniform {
     /// `x`: 1 in the opaque pass of a base camera running SSIL (#1750), which then
     /// adds its bounce and writes its realtime share; `yzw` unused.
     pub ssil: [f32; 4],
+    /// Volumetric fog (#1703, `fog::volumetric`): `x` 1 where this camera reads the
+    /// integrated volume, `y` its depth slices, `z` its far end and `w` the near end
+    /// of its exponential slices; all zero where it reads none.
+    pub volumetric: [f32; 4],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in

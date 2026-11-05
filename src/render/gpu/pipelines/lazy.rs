@@ -1,4 +1,5 @@
-//! A render pipeline built on its first draw, not with the renderer (#985).
+//! A pipeline built on its first use, not with the renderer (#985): a render pipeline
+//! on its first draw, a compute one ([`LazyCompute`], #1703) on its first dispatch.
 //!
 //! Creating a pipeline compiles its shaders for the adapter, and on a software
 //! rasterizer (lavapipe) that is an LLVM compile of the whole forward shader: about
@@ -10,20 +11,25 @@
 use std::sync::OnceLock;
 
 /// Builds the pipeline, the first time it is asked for.
-type Build = Box<dyn Fn(&wgpu::Device) -> wgpu::RenderPipeline + Send + Sync>;
+type Build<P> = Box<dyn Fn(&wgpu::Device) -> P + Send + Sync>;
 
-/// A pipeline that is created the first time [`LazyPipeline::get`] runs, then kept.
-pub(crate) struct LazyPipeline {
-    cell: OnceLock<wgpu::RenderPipeline>,
+/// A pipeline that is created the first time [`LazyPipeline::get`] runs, then kept:
+/// a render pipeline, or a compute one ([`LazyCompute`], #1703).
+pub(crate) struct LazyPipeline<P = wgpu::RenderPipeline> {
+    cell: OnceLock<P>,
     device: wgpu::Device,
-    build: Build,
+    build: Build<P>,
 }
 
-impl LazyPipeline {
+/// A compute pipeline built on its first dispatch; warmed through
+/// `Renderer::lazy_computes`.
+pub(crate) type LazyCompute = LazyPipeline<wgpu::ComputePipeline>;
+
+impl<P> LazyPipeline<P> {
     /// A pipeline `build` creates on `device` at first use; nothing is compiled yet.
     pub(crate) fn new(
         device: &wgpu::Device,
-        build: impl Fn(&wgpu::Device) -> wgpu::RenderPipeline + Send + Sync + 'static,
+        build: impl Fn(&wgpu::Device) -> P + Send + Sync + 'static,
     ) -> Self {
         Self {
             cell: OnceLock::new(),
@@ -33,7 +39,7 @@ impl LazyPipeline {
     }
 
     /// The pipeline, built if this is the first call.
-    pub(crate) fn get(&self) -> &wgpu::RenderPipeline {
+    pub(crate) fn get(&self) -> &P {
         self.cell.get_or_init(|| (self.build)(&self.device))
     }
 
