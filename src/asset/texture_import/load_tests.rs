@@ -49,7 +49,7 @@ fn a_cache_is_current_exactly_when_a_read_takes_it() {
     let mut longer = good.clone();
     longer.push(0);
     let cases = [
-        at(25, 15),
+        at(41, 15),
         at(21, 9),
         at(13, 6),
         at(21, 0),

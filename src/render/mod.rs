@@ -42,6 +42,7 @@ pub use camera::{build_camera_stack, texture_cameras, ScreenStack, TextureCamera
 pub use frustum::{Frustum, SkinBounds};
 pub(crate) use frustum::{SmallLimits, SmallObjectCull};
 pub use gpu::mesh::MeshId;
+pub use gpu::textures::GpuTexture;
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe::bake::{project_cubemap, project_light_probe, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe::bounce::{BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
@@ -90,26 +91,6 @@ impl GpuMesh {
         let runs = crate::components::mesh::clip_runs(mesh.index_ranges(), self.num_indices);
         crate::components::mesh::material_runs(runs, material.map(|m| m.materials.len()))
     }
-}
-
-// Stores GPU handlers for textures
-pub struct GpuTexture {
-    pub texture: wgpu::Texture,
-    /// The colour view: an sRGB-stored image decodes to linear on sample. What
-    /// albedo, emissive, UI, decals and particles bind.
-    pub view: wgpu::TextureView,
-    /// The same texels read as stored, with no sRGB decode (#647): what a material's
-    /// data maps (metallic, roughness, normal, the shader texture slots) bind.
-    pub data_view: wgpu::TextureView,
-    pub sampler: wgpu::Sampler,
-    /// The filter `sampler` reads with: a UI image samples with it too, but always
-    /// clamped (`render::ui`, #1397).
-    pub filter: crate::asset::sidecar::FilterMode,
-    pub bind_group: wgpu::BindGroup,
-    /// The source image's size before *Max Size*: UI geometry measures in it (#1574).
-    pub source_size: (u32, u32),
-    /// Texture Type `SingleChannel`: a metallic/roughness slot reads red (#1574).
-    pub single_channel: bool,
 }
 
 pub struct Renderer {

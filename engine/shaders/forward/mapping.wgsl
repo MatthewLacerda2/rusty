@@ -113,31 +113,75 @@ fn mask(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords, packed: u32) -> f
     return map_factor(sample(t, s, c), on, packed);
 }
 
+// The level an implicit-LOD lookup of a `size`-texel texture reads with screen
+// derivatives `dx` and `dy` of its coordinates, as a 16× anisotropic trilinear
+// sampler (the default, `render::gpu::textures::sampler`) picks it: Vulkan's λ, the
+// major axis's footprint over the taps anisotropy spreads along it.
+fn level_at(size: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
+    let px = length(dx * size);
+    let py = length(dy * size);
+    let major = max(px, py);
+    let taps = min(ceil(major / max(min(px, py), 1e-8)), 16.0);
+    return log2(max(major / taps, 1e-8));
+}
+
+// The level normal map `t` is read at, at `c`: each projection's blended by its
+// weight (UV0 and Planar: the one lookup's). Takes derivatives: call it before any
+// per-pixel branch.
+fn normal_level(t: texture_2d<f32>, c: MapCoords) -> f32 {
+    let size = vec2<f32>(textureDimensions(t));
+    let x = level_at(size, dpdx(c.x), dpdy(c.x));
+    let y = level_at(size, dpdx(c.y), dpdy(c.y));
+    let z = level_at(size, dpdx(c.z), dpdy(c.z));
+    return dot(vec3<f32>(x, y, z), c.weights);
+}
+
+// A normal map's filtered read: the world-space shading normal, and how long the
+// stored normal the texels averaged to is (`stored_length`), blended as the samples
+// are. The length means something only for a map that keeps z (`texture_kernel`).
+struct NormalSample {
+    normal: vec3<f32>,
+    length: f32,
+};
+
+// The length of the normal a texel stores, z from its blue: under 1 where a mip
+// averaged normals that disagreed. A BC5 texel has no blue (its z reads −1), so its
+// length is meaningless and never read (`use_normal_map == 2`).
+fn stored_length(texel: vec4<f32>) -> f32 {
+    return length(texel.xyz * 2.0 - 1.0);
+}
+
 // The world-space shading normal from tangent-space normal map `t` at `c`, over
 // geometric normal `n`, each sample's z rebuilt from x and y (`maps::unpack_normal`,
 // so a BC5 map, which keeps only those, reads right, #1574). UV0 rotates the map by the mesh's tangent frame (`tangent`,
 // `w` its handedness); Planar and Triplanar have no mesh tangents to lean on, so
 // each projection's sample is reoriented onto its world axis with the whiteout
 // blend (Golus), and Planar is Triplanar with all the weight on the Y projection.
-fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tangent: vec4<f32>) -> vec3<f32> {
+fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tangent: vec4<f32>) -> NormalSample {
     let mapping = material().uv_mapping;
+    let texel_y = textureSample(t, s, c.uv);
     if (mapping == UV0) {
         let T = normalize(tangent.xyz);
         let B = cross(n, T) * tangent.w;
-        let sampled = unpack_normal(textureSample(t, s, c.uv));
-        return normalize(mat3x3<f32>(T, B, n) * sampled);
+        let sampled = unpack_normal(texel_y);
+        return NormalSample(normalize(mat3x3<f32>(T, B, n) * sampled), stored_length(texel_y));
     }
-    let ty = unpack_normal(textureSample(t, s, c.uv));
+    let ty = unpack_normal(texel_y);
     var tx = vec3<f32>(0.0, 0.0, 1.0);
     var tz = vec3<f32>(0.0, 0.0, 1.0);
     var w = vec3<f32>(0.0, 1.0, 0.0);
+    var lengths = vec3<f32>(1.0, stored_length(texel_y), 1.0);
     if (mapping == TRIPLANAR) {
-        tx = unpack_normal(textureSample(t, s, c.x));
-        tz = unpack_normal(textureSample(t, s, c.z));
+        let texel_x = textureSample(t, s, c.x);
+        let texel_z = textureSample(t, s, c.z);
+        tx = unpack_normal(texel_x);
+        tz = unpack_normal(texel_z);
+        lengths = vec3<f32>(stored_length(texel_x), lengths.y, stored_length(texel_z));
         w = c.weights;
     }
     let nx = vec3<f32>(tx.xy + n.zy, abs(tx.z) * n.x);
     let ny = vec3<f32>(ty.xy + n.xz, abs(ty.z) * n.y);
     let nz = vec3<f32>(tz.xy + n.xy, abs(tz.z) * n.z);
-    return normalize(nx.zyx * w.x + ny.xzy * w.y + nz.xyz * w.z);
+    let normal = normalize(nx.zyx * w.x + ny.xzy * w.y + nz.xyz * w.z);
+    return NormalSample(normal, dot(lengths, w));
 }

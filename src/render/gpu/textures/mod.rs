@@ -7,8 +7,9 @@ mod panorama;
 mod sampler;
 
 use crate::asset::sidecar::{FilterMode, TextureSettings};
+use crate::asset::texture_import::variance::VarianceTable;
 use crate::asset::MapRef;
-use crate::render::{GpuTexture, Renderer};
+use crate::render::Renderer;
 use mips::full_chain_len;
 pub(crate) use mips::{MipGenerator, MipSettings, TextureKind};
 pub(crate) use sampler::{sampler, ui_sampler};
@@ -19,6 +20,30 @@ const IMAGE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 /// The format an uploaded image's data view reinterprets it as: the same bytes, no
 /// decode — a data map stores its values raw (glTF 2.0, `Texture.Bake`) (#647).
 const DATA_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+
+/// A texture on the GPU: its views, sampler and bind group, and what its import
+/// settings tell a material about it.
+pub struct GpuTexture {
+    pub texture: wgpu::Texture,
+    /// The colour view: an sRGB-stored image decodes to linear on sample. What
+    /// albedo, emissive, UI, decals and particles bind.
+    pub view: wgpu::TextureView,
+    /// The same texels read as stored, with no sRGB decode (#647): what a material's
+    /// data maps (metallic, roughness, normal, the shader texture slots) bind.
+    pub data_view: wgpu::TextureView,
+    pub sampler: wgpu::Sampler,
+    /// The filter `sampler` reads with: a UI image samples with it too, but always
+    /// clamped (`render::ui`, #1397).
+    pub filter: crate::asset::sidecar::FilterMode,
+    pub bind_group: wgpu::BindGroup,
+    /// The source image's size before *Max Size*: UI geometry measures in it (#1574).
+    pub source_size: (u32, u32),
+    /// Texture Type `SingleChannel`: a metallic/roughness slot reads red (#1574).
+    pub single_channel: bool,
+    /// A BC5 normal map's lost spread per mip level, from the import cache (#1702):
+    /// the shader reads it in place of the length BC5 cannot keep.
+    pub normal_variance: Option<VarianceTable>,
+}
 
 impl Renderer {
     /// Generates a standard checkerboard texture for meshes that don't have texture
@@ -98,6 +123,7 @@ impl Renderer {
             bind_group,
             source_size: (size.width, size.height),
             single_channel: false,
+            normal_variance: None,
         }
     }
 }

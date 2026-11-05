@@ -316,9 +316,11 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // What this pixel's spread of normals adds to the GGX lobe (#1702), before any
     // branch too; `roughness` below is widened by it. Taken before the two-sided flip:
     // a flip inside a pixel quad (a pane seen edge-on) is not a curved surface.
-    let specular_kernel = specular_aa::kernel(normalize(in.world_normal));
+    var specular_kernel = specular_aa::kernel(normalize(in.world_normal));
     // Where every map below is read (#1573): UV0 tiled, or projected from world space.
     let maps = mapping::coords(in.tex_coords, in.world_position, geometric);
+    // The level the normal map is read at (#1702, Toksvig): before any branch too.
+    let normal_level = mapping::normal_level(t_normal, maps);
     var base_color = m.color_tint;
     if (m.use_texture == 1u) {
         base_color *= mapping::sample(t_diffuse, s_diffuse, maps);
@@ -341,9 +343,12 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // Geometric normal, optionally perturbed by a tangent-space normal map (#207; z
     // rebuilt by `maps::unpack_normal`), rotated into world space by the mesh's tangent
     // frame or, under a world mapping, reoriented per projection (`mapping::sample_normal`).
+    // Its spread inside the texel read widens the lobe too (#1702, Toksvig).
     var N = geometric;
-    if (m.use_normal_map == 1u) {
-        N = mapping::sample_normal(t_normal, s_normal, maps, N, facing_tangent(in.world_tangent, behind));
+    if (m.use_normal_map != 0u) {
+        let read = mapping::sample_normal(t_normal, s_normal, maps, N, facing_tangent(in.world_tangent, behind));
+        N = read.normal;
+        specular_kernel += specular_aa::map_kernel(m.use_normal_map, m.normal_variance, read.length, normal_level);
     }
     let V = normalize(camera.camera_pos - in.world_position);
 
@@ -378,9 +383,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         N = faceForward(N, -V, N);
     }
     let metallic = surface.metallic;
-    // Geometric specular AA (#1702): every GGX read below (the lights, the lightmap's
-    // lobe, the environment reflection's mip, SSR's record) takes the widened
-    // roughness, so a highlight and its reflection agree.
+    // Specular AA (#1702): every GGX read below (the lights, the lightmap's lobe, the
+    // environment reflection's mip, SSR's record) takes the widened roughness, so a
+    // highlight and its reflection agree.
     let roughness = specular_aa::widen(surface.roughness, specular_kernel);
 
     let F0 = mix(vec3<f32>(0.04), albedo, metallic);

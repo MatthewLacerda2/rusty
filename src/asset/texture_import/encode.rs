@@ -10,6 +10,7 @@ use block_compression::{encode::compress_rgba8, BC7Settings, CompressionVariant}
 use image::{DynamicImage, RgbaImage};
 
 use super::shrink::{half, to_bytes, to_working};
+use super::variance::{self, VarianceTable};
 use super::{Compression, TextureKind, TextureSettings};
 
 /// A block-compressed GPU format: 4×4 texels a block.
@@ -41,14 +42,17 @@ impl BlockFormat {
     }
 }
 
-/// A texture ready to upload: its format, the base level's size and every mip
-/// level's blocks, largest first.
+/// A texture ready to upload: its format, the base level's size, every mip
+/// level's blocks, largest first, and for BC5 what its mips' normals lost
+/// (`variance`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Compressed {
     pub format: BlockFormat,
     pub width: u32,
     pub height: u32,
     pub levels: Vec<Vec<u8>>,
+    /// Each level's mean spread of normals (#1702): all zero unless BC5.
+    pub variance: VarianceTable,
 }
 
 /// How many levels a full chain of a `width`×`height` image has, down to 1×1.
@@ -79,8 +83,15 @@ pub(super) fn encode(
     let threads = cores.threads();
     let mut levels = vec![compress(&base, variant, format, threads)];
     let mut working = to_working(&base, kind);
+    // A BC5 map's normals as the shader reads them, z rebuilt (#1702).
+    let mut unit = (format == BlockFormat::Bc5).then(|| variance::as_read(&working));
+    let mut spread = Vec::new();
     for _ in 1..count {
         working = half(&working);
+        if let Some(normals) = unit.as_mut() {
+            *normals = half(normals);
+            spread.push(variance::level_mean(normals));
+        }
         let level = to_bytes(&working, kind);
         levels.push(compress(&level, variant, format, threads));
     }
@@ -89,6 +100,7 @@ pub(super) fn encode(
         width,
         height,
         levels,
+        variance: variance::table(&spread),
     })
 }
 
