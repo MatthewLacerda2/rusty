@@ -10,7 +10,7 @@
 //! layer, small-object limits), its object-table slot (world matrix, probe SH,
 //! lightmap) and one
 //! [`SlotDraw`] per material slot holding the slot's whole batch key (shader, facing,
-//! index run, material group, record). They are held per scene ([`SceneId`]) in
+//! index run, material group, record slot). They are held per scene ([`SceneId`]) in
 //! `ids_with_mesh` order, so draws come out in the order the per-entity walk gave.
 //!
 //! **Extract** (`extract.rs`), once per frame in `prepare_frame`: the change log
@@ -41,9 +41,14 @@
 //! **On the GPU** (part 3): each object's `ObjectData` (world matrix, probe SH,
 //! lightmap) sits at its slot of the renderer's [`ObjectTable`] (`table.rs`),
 //! mirrored on the GPU and written only where it changed; a camera's instance names
-//! the slot. A library edit re-derives only the objects whose slots name the
-//! material (`RenderScene::by_material`), and a material's param buffer is its
-//! scene's own (`MaterialCache`).
+//! the slot. A material's param buffer is its scene's own (`MaterialCache`).
+//!
+//! **Material records** (part 4): each (scene, library material, variant) has its
+//! `MaterialData` at a slot of the renderer's [`MaterialRecords`] table (`records.rs`),
+//! mirrored on the GPU, and a batch key names the slot. A library edit that moves only
+//! a record's values rewrites it in place, no object re-derived; any other edit
+//! re-derives only the objects whose slots name the material
+//! (`RenderScene::by_material`).
 
 mod draw;
 #[cfg(test)]

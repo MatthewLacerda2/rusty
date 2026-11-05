@@ -2,10 +2,11 @@
 //! the resources every group-1 bind group is built from.
 //!
 //! This replaces the per-entity pool of #210 (one uniform buffer, bone buffer and two
-//! bind groups kept alive per entity). A camera's solids are five packed arrays —
-//! per-draw uniforms at a 256-byte stride, joint matrices, instances, the material
-//! records the uniforms index (#1616) and the Light Probe Proxy Volumes the instances
-//! index (#1672) — behind **one** bind group whose dynamic offset picks a batch's
+//! bind groups kept alive per entity). A camera's solids are four packed arrays —
+//! per-draw uniforms at a 256-byte stride, joint matrices, instances and the Light
+//! Probe Proxy Volumes the instances index (#1672) — and the two kept tables below
+//! (objects, and the material records the uniforms index, #1616), behind **one** bind
+//! group whose dynamic offset picks a batch's
 //! uniform. The per-camera arrays are written with a `write_buffer` each. Nothing is
 //! keyed by entity, so two scenes rendered in one frame (#355) cannot evict each
 //! other: each render simply rewrites the arrays before its own submit.

@@ -161,8 +161,8 @@ pub struct Renderer {
     clusters: clusters::ClusterBuffers,
     /// The baked lightmap pages group 0 binds (#438), rebound when the scene's change.
     pub(crate) lightmaps: gpu::lightmaps::Lightmaps,
-    /// The packed per-frame draw data every solid draw binds as group 1 (#470): per-draw
-    /// uniforms, bone palettes, instances and material records, rewritten per camera.
+    /// What every solid draw binds as group 1 (#470): per-draw uniforms, palettes and
+    /// instances per camera, and the object and material tables (#1706).
     draw_buffers: gpu::draw_buffers::DrawBuffers,
     /// Each Light Probe Proxy Volume's last grid samples (#1672).
     proxy_volumes: draw::proxy_volume::ProxyVolumes,
