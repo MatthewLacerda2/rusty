@@ -18,8 +18,8 @@
 // highlight at a distance instead of sparkling. A map that keeps z (RGBA8, BC7) gives
 // that length in its sample (`texture_kernel`); a BC5 map rebuilds z, so the importer
 // measured each level's mean spread and the record carries it (`table_kernel`,
-// `asset::texture_import::variance`). At the base level neither widens: a glossy floor
-// stays glossy up close.
+// `asset::texture_import::variance`). At the map's base level it adds nothing: a glossy
+// floor stays glossy up close.
 
 #define_import_path forward::specular_aa
 
@@ -29,6 +29,7 @@ const SCREEN_SPACE_VARIANCE: f32 = 0.1;
 // HDRP Lit's `_SpecularAAThreshold` default. HDRP squares it, so a pixel's footprint
 // adds at most 0.04 to α² (squared GGX roughness): a mirror's α rises to at most 0.2
 // (perceptual roughness 0.45) at a silhouette, where the normal swings across a pixel.
+// The normal map's spread is capped by it too, so the two add at most 0.08.
 const THRESHOLD: f32 = 0.2;
 
 // What one pixel's footprint adds to α²: the variance of the interpolated vertex normal

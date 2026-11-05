@@ -94,6 +94,18 @@ mod tests {
     }
 
     #[test]
+    fn the_shader_sums_with_the_same_constants() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/engine/shaders/forward/specular_aa.wgsl"
+        );
+        let wgsl = std::fs::read_to_string(path).unwrap();
+        assert!(wgsl.contains("const THRESHOLD: f32 = 0.2;"));
+        assert!(wgsl.contains("const QUANTUM: f32 = 2.0 / 255.0;"));
+        assert!((KERNEL_MAX - 0.2f32 * 0.2).abs() < 1e-7);
+    }
+
+    #[test]
     fn the_table_quantizes_each_level_and_repeats_the_last() {
         let t = table(&[0.0, KERNEL_MAX / 2.0, KERNEL_MAX]);
         assert_eq!(&t[..4], &[0, 128, 255, 255]);
