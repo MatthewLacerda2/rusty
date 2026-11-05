@@ -17,9 +17,12 @@
 //!
 //! A view has two sizes (#1498): its **output** ([`RenderView::size`]: the colour
 //! target, the UI, the projection's aspect) and its **scene** size
-//! ([`RenderView::scene_size`]: depth, the SSAO prepass, motion vectors, every post-FX
-//! target), the output at the view's [`RenderScale`]. They differ only on a scaled
-//! screen view, whose post-processed scene is upscaled to the output before the UI.
+//! ([`RenderView::scene_size`]: depth, the SSAO prepass, motion vectors, the post
+//! passes up to TAA), the output at the view's [`RenderScale`]. They differ only on a
+//! scaled screen view, whose post-processed scene is upscaled bilinearly to the
+//! output before the UI, or, while TAA runs, upscaled by TAA inside the chain (TAAU,
+//! #1702): everything after TAA then runs at the output's size
+//! (`PostFx::chain_size`), and the view holds no scaled target.
 
 use crate::core::settings::render_scale::RenderScale;
 use crate::render::gpu::shaders::ShaderRegistry;
@@ -41,8 +44,10 @@ pub struct RenderView {
     scene_size: PixelSize,
     /// What `scene_size` is of `size`; native until a screen view's consumer sets it.
     render_scale: RenderScale,
-    /// The post-processed scene at `scene_size`, upscaled to the output before the UI;
-    /// `None` while the two sizes are equal, so a native view draws as it always did.
+    /// The post-processed scene at `scene_size`, upscaled bilinearly to the output
+    /// before the UI ([`Self::scaled_output`], made on first use); `None` while the
+    /// two sizes are equal, so a native view draws as it always did, and while TAA
+    /// upscales the view (TAAU, #1702), whose chain writes the output itself.
     upscale_source: Option<wgpu::Texture>,
     /// Colour format this view composites into (the swapchain format for the editor
     /// viewport/preview, the offscreen format for screenshots) — its post-FX composite
@@ -202,7 +207,8 @@ impl RenderView {
         self.ssao = None;
         let (w, h) = (scene.width, scene.height);
         self.post_fx.resize(device, w, h);
-        self.upscale_source = scale::upscale_source(device, self.format, size, scene);
+        // Made again at the new size the first frame that upscales bilinearly.
+        self.upscale_source = None;
         if output_changed && self.color_target.is_some() {
             let (w, h) = (size.width, size.height);
             let (target, ui_format) = create_color_target(device, self.format, w, h);
@@ -226,8 +232,11 @@ impl RenderView {
         self.size
     }
 
-    /// The size of this view's scene targets (depth, SSAO, motion vectors, post-FX):
-    /// [`Self::size`] at its render scale (#1498). What a scene pass sizes by.
+    /// The size of this view's scene targets (depth, SSAO, motion vectors, depth of
+    /// field, SSR, SSIL, TAA's input): [`Self::size`] at its render scale (#1498).
+    /// What a pass that draws or reads the scene sizes by. **Not** what a post pass
+    /// after TAA sizes by: that is `PostFx::chain_size`, the output's size while TAA
+    /// upscales the view (TAAU, #1702).
     pub fn scene_size(&self) -> PixelSize {
         self.scene_size
     }

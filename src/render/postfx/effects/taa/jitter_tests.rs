@@ -1,6 +1,6 @@
 use glam::{Mat4, Vec2, Vec3, Vec4};
 
-use super::{halton, jittered, ndc, pixels, SEQUENCE};
+use super::{halton, jittered, mip_bias, ndc, phases, pixels, upscales, SEQUENCE};
 use crate::components::Projection;
 use crate::render::PixelSize;
 use crate::scene::Camera;
@@ -18,12 +18,48 @@ fn halton_starts_as_urp_does() {
 
 #[test]
 fn offsets_stay_in_the_pixel_average_to_its_centre_and_repeat() {
-    let all: Vec<Vec2> = (0..SEQUENCE).map(pixels).collect();
+    let all: Vec<Vec2> = (0..SEQUENCE).map(|f| pixels(f, SEQUENCE)).collect();
     assert!(all.iter().all(|p| p.abs().max_element() <= 0.5));
     let mean = all.iter().copied().sum::<Vec2>() / SEQUENCE as f32;
     assert!(mean.abs().max_element() < 0.01, "centred: {mean}");
-    assert_eq!(pixels(3), pixels(3 + SEQUENCE));
-    assert_ne!(pixels(0), pixels(1));
+    assert_eq!(pixels(3, SEQUENCE), pixels(3 + SEQUENCE, SEQUENCE));
+    assert_ne!(pixels(0, SEQUENCE), pixels(1, SEQUENCE));
+    // Plain TAA's sequence is URP's `frame & 1023`, bit for bit.
+    let urp = |f: u32| {
+        let i = (f & (SEQUENCE - 1)) + 1;
+        Vec2::new(halton(i, 2) - 0.5, halton(i, 3) - 0.5)
+    };
+    assert!((0..3000).all(|f| pixels(f, SEQUENCE) == urp(f)));
+}
+
+fn px(width: u32, height: u32) -> PixelSize {
+    PixelSize { width, height }
+}
+
+#[test]
+fn upscaling_runs_fsr2s_phase_count_and_a_negative_mip_bias() {
+    let native = px(1920, 1080);
+    assert!(!upscales(native, native));
+    assert_eq!(
+        (phases(native, native), mip_bias(native, native)),
+        (SEQUENCE, 0.0)
+    );
+    // A supersampled scene (render scale 2) does not upscale either.
+    assert!(!upscales(px(3840, 2160), native));
+    assert_eq!(mip_bias(px(3840, 2160), native), 0.0);
+    // 0.67: 8 × 1.49² ≈ 17.8 → 18; 0.5: 32 phases and a bias of −1.
+    assert_eq!(phases(px(1286, 724), native), 18);
+    assert_eq!(phases(px(960, 540), native), 32);
+    assert_eq!(mip_bias(px(960, 540), native), -1.0);
+    assert!((mip_bias(px(1286, 724), native) - (0.67f32).log2()).abs() < 0.01);
+    // One side shorter by a pixel is enough to upscale; a tiny scale stays bounded.
+    assert!(upscales(px(1920, 1079), native));
+    assert_eq!(phases(px(1, 1), native), SEQUENCE);
+    let wraps: Vec<Vec2> = (0..36).map(|f| pixels(f, 18)).collect();
+    assert_eq!(
+        wraps[0], wraps[18],
+        "the sequence repeats every phase count"
+    );
 }
 
 #[test]

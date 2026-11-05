@@ -94,9 +94,10 @@ pub(crate) struct BloomTargets {
     pub(super) groups: Vec<wgpu::BindGroup>,
     /// The first mip's size, the chain's result's.
     pub(crate) size: (u32, u32),
-    /// The divisor `size` was made at; the bloom pass rebuilds the chain when the
-    /// volume's quality asks for another.
-    pub(crate) divisor: u32,
+    /// The image size and divisor `size` was made at; the bloom pass rebuilds the
+    /// chain when either changes (the volume's quality, or the chain's size when
+    /// TAA starts or stops upscaling the view, #1702).
+    pub(crate) made_for: ((u32, u32), u32),
     pub(super) params: wgpu::Buffer,
 }
 
@@ -139,7 +140,7 @@ impl BloomTargets {
             up,
             groups,
             size,
-            divisor,
+            made_for: (scene, divisor),
             params,
         }
     }

@@ -154,7 +154,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `ribbons` | trails and lines |
 | `particles` | particle systems |
 | `depth_of_field` | depth of field (#1445): its circle-of-confusion, prefilter, blur and composite passes |
-| `taa` | temporal anti-aliasing's resolve (#1702): one fullscreen pass over the scene, its history and the velocity target |
+| `taa` | temporal anti-aliasing's resolve (#1702): one fullscreen pass over the scene, its history and the velocity target; on a view upscaling through it (a render scale below 1), the same pass reconstructing the output-size image from the scaled scene |
 | `motion_blur` | per-object motion blur (#1436): its TileMax and NeighborMax tile passes and the gather |
 | `lens_flare` | the screen-space lens flare (#1443): its flare pass (the composite adds it, under `post_fx`) |
 | `post_fx` | bloom, the composite, authored effects, FXAA |
