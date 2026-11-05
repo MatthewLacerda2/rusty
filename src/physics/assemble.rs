@@ -73,6 +73,7 @@ impl PhysicsWorld {
             return;
         };
         self.body_to_id.remove(&handle);
+        self.tracked.static_poses.remove(&handle);
         if let Some(body) = self.bodies.get(handle) {
             for collider in body.colliders() {
                 if let Some(id) = self.collider_to_id.remove(collider) {

@@ -5,7 +5,8 @@
 //! from the scene on entering Play and stepped once per fixed physics tick:
 //!
 //!   1. `sync_to_rapier`  — push the (externally mutated) component transforms and
-//!      velocities into rapier, for the bodies the World's change log names
+//!      velocities into rapier, for the bodies the World's change log names and,
+//!      for their pose and velocities, the bodies the last step may have changed
 //!      (`sync`, `watch`; every body on the first step, a load or an Undo). Kinematic bodies are pure movers: their next pose
 //!      is their Transform (a CharacterController has already collided-and-slid
 //!      it there in `Move`, see `character`); dynamic bodies get their pose,
@@ -125,7 +126,12 @@ impl PhysicsWorld {
         let class = body_type(snap);
         let pose = to_pose(snap.pos, snap.rot);
         let scale = gravity_scale(snap.use_gravity);
-        let differs = |b: &RigidBody| state_differs(b, snap, class, pose, scale);
+        let poses = &mut self.tracked.static_poses;
+        if !snap.is_static {
+            poses.remove(&handle);
+        }
+        let pushed = poses.get(&handle).copied();
+        let differs = |b: &RigidBody| state_differs(b, snap, class, pose, scale, pushed.as_ref());
         let Some(body) = body_to_write(&mut self.bodies, handle, differs) else {
             return;
         };
@@ -145,6 +151,7 @@ impl PhysicsWorld {
             body.set_next_kinematic_position(pose);
         } else if snap.is_static {
             body.set_position(pose, true);
+            poses.insert(handle, pose);
         } else {
             // Dynamic: trust rapier for pose, but let scripts inject linear and
             // angular velocity (SetVelocity / SetAngularVelocity / AddForce mutate
@@ -181,6 +188,12 @@ impl PhysicsWorld {
         }
         self.recovery.bootstrapped |= dt > 0.0;
         self.recovery.panics_in_a_row = 0;
+        // Every body the step may have changed: rapier neither moves a sleeping
+        // body nor wakes one without leaving it awake. The next sync visits them
+        // too, named or not (`Tracked::stepped`).
+        let mut stepped = awake_before;
+        stepped.extend(self.awake_owners());
+        self.tracked.stepped.clone_from(&stepped);
 
         let overlaps = self.overlap_pairs();
         let triggers = TriggerEvents::from_overlap_sets(&self.prev_triggers, overlaps);
@@ -189,7 +202,7 @@ impl PhysicsWorld {
         let collisions = CollisionEvents::from_contact_sets(&self.prev_collisions, contacts);
         self.prev_collisions = collisions.stayed_keys();
         let joint_breaks = self.break_joints(scene, &pre_solve, dt);
-        self.sync_from_rapier(scene, &synced, awake_before);
+        self.sync_from_rapier(scene, &synced, stepped);
         PhysicsEvents {
             triggers,
             collisions,
