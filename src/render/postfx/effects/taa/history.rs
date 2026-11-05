@@ -83,13 +83,17 @@ impl TaaHistory {
 /// The size the chain runs at after TAA this frame ([`PostFx::fit_chain`]): the
 /// output's when `on` and the view upscales through TAA, else the scene's.
 pub(crate) fn chain_size(view: &RenderView, on: bool) -> (u32, u32) {
-    let (scene, output) = (view.scene_size(), view.size());
-    let size = if on && jitter::upscales(scene, output) {
-        output
-    } else {
-        scene
+    let size = match upscales(view, on) {
+        true => view.size(),
+        false => view.scene_size(),
     };
     (size.width, size.height)
+}
+
+/// Whether `view`, running TAA when `on` ([`super::runs`]), upscales through it this
+/// frame (TAAU): its scene is smaller than its output.
+pub(crate) fn upscales(view: &RenderView, on: bool) -> bool {
+    on && jitter::upscales(view.scene_size(), view.size())
 }
 
 /// Start a stack's frame, after the motion history's `begin`: with `on`, fit the

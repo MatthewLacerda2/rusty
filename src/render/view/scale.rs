@@ -30,11 +30,32 @@ impl RenderView {
         self.render_scale
     }
 
-    /// Where a render of this view composites its scene: the upscale source while the
-    /// scene is scaled, else `None` (straight into the caller's output).
-    pub(crate) fn scaled_output(&self) -> Option<wgpu::TextureView> {
+    /// Where a render of this view composites its scene when it upscales bilinearly
+    /// (`bilinear`): the upscale source, made the first frame it is needed, while the
+    /// scene is scaled. `None` (straight into the caller's output) on a native view,
+    /// and on a frame TAA upscales (TAAU, #1702), whose chain writes the output
+    /// itself: the source is then dropped, so a view under TAAU holds none.
+    pub(crate) fn scaled_output(
+        &mut self,
+        device: &wgpu::Device,
+        bilinear: bool,
+    ) -> Option<wgpu::TextureView> {
+        if !bilinear {
+            self.upscale_source = None;
+            return None;
+        }
+        if self.upscale_source.is_none() {
+            let (format, size, scene) = (self.format, self.size, self.scene_size);
+            self.upscale_source = upscale_source(device, format, size, scene);
+        }
         let source = self.upscale_source.as_ref()?;
         Some(source.create_view(&wgpu::TextureViewDescriptor::default()))
+    }
+
+    /// Whether this view holds its bilinear upscale source, for a test.
+    #[cfg(test)]
+    pub(crate) fn holds_upscale_source(&self) -> bool {
+        self.upscale_source.is_some()
     }
 }
 

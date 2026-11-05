@@ -105,7 +105,6 @@ impl Renderer {
                 base_id: Some(cam.id),
                 post: guards.source(),
                 output: &target,
-                upscaled: None,
                 editor_mode: false,
                 full_post_fx: cam.target.post_fx,
                 motion_frames,

@@ -30,12 +30,10 @@ pub(crate) struct StackPass<'a> {
     /// stack's base camera's (#1434, Unity URP's rule), borrowed once per view.
     pub post: PostSource<'a>,
     /// Where post-FX writes the finished image, and the editor's overlays draw: a
-    /// scaled view's scene-size target ([`RenderView::scaled_output`]), else the
-    /// output.
+    /// scaled view's scene-size target ([`RenderView::scaled_output`]) on the
+    /// bilinear path, else the output itself (a native view, or one TAA upscales,
+    /// TAAU #1702, whose chain runs at the output's size).
     pub output: &'a wgpu::TextureView,
-    /// A scaled view's real output, which the chain writes instead of `output`
-    /// when TAA upscales the view (TAAU, #1702); `None` on a native view.
-    pub upscaled: Option<&'a wgpu::TextureView>,
     pub editor_mode: bool,
     /// Run `post`'s grading, bloom, SSR, TAA, motion blur and FXAA. Off, the image is
     /// only brought from HDR to display (a render texture's `post_fx = false`).
@@ -64,8 +62,13 @@ impl Renderer {
                 && !own_pipeline;
         let velocity = velocity_target(moving, ssr);
         // TAA (#1702): whether it runs, so the chain's size, before any effect fits.
-        let taa_on =
-            taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode) && !own_pipeline;
+        let taa_on = taa::runs(
+            view,
+            pass.post,
+            graphics,
+            pass.full_post_fx,
+            pass.editor_mode,
+        );
         view.post_fx
             .fit_chain(&self.device, taa::chain_size(view, taa_on));
         let key = HistoryKey::new(scene, pass.base_id);
@@ -106,9 +109,9 @@ impl Renderer {
     /// effect's scene pass in order (depth of field, TAA, motion blur, the exposure
     /// meter, bloom, the lens flare), the grading LUT's bake when its inputs changed,
     /// then the composite and the LDR passes, writing the corrected image to
-    /// `StackPass::output`. When TAA upscaled the view (TAAU, #1702), everything
-    /// after it runs at the output's size and writes `StackPass::upscaled`, the real
-    /// output, so the caller skips the bilinear upscale.
+    /// `StackPass::output`. When TAA upscales the view (TAAU, #1702), everything
+    /// after it runs at the output's size and `output` is the real output, so the
+    /// caller has no scaled target to upscale.
     pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &CameraCtx) {
         use crate::render::postfx::PostFxContext;
 
@@ -142,10 +145,7 @@ impl Renderer {
         let chain = PostFxContext {
             depth_view: &view.depth_view,
             skybox: (&sky.view, &sky.sampler),
-            output: match stack.upscaled {
-                Some(output) if view.post_fx.taa_upscaled() => output,
-                _ => stack.output,
-            },
+            output: stack.output,
             timer: &self.gpu_timer,
         };
         view.post_fx

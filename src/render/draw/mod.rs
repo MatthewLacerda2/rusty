@@ -26,6 +26,7 @@ use self::stack::StackPass;
 use crate::asset::MapRef;
 use crate::render::gpu::textures::TextureKind;
 use crate::render::lod::LodSelection;
+use crate::render::postfx::effects::taa;
 use crate::render::postfx::params::borrow_post_source;
 use crate::render::{build_camera_stack, texture_cameras, GpuTexture, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -127,21 +128,22 @@ impl Renderer {
         // A scaled view composites into its own scene-sized target and upscales it to
         // `output` after post-FX, before the UI (#1498), bilinearly. A view running
         // TAA upscales inside the chain instead (TAAU, #1702), at TAA's place, and
-        // the chain writes `output` itself.
-        let scaled = view.scaled_output();
+        // the chain writes `output` itself: it holds no scaled target then.
+        let graphics = self.graphics(editor_mode);
+        let taa_on = taa::runs(view, post, graphics, true, editor_mode);
+        let scaled = view.scaled_output(&self.device, !taa::upscales(view, taa_on));
         let pass = StackPass {
             stack: &stack,
             entities: &screen.entities,
             base_id: screen.base_id,
             post,
             output: scaled.as_ref().unwrap_or(output),
-            upscaled: scaled.is_some().then_some(output),
             editor_mode,
             full_post_fx: true,
             motion_frames: 1,
         };
         self.draw_stack(view, scene, pass);
-        if let Some(scaled) = scaled.as_ref().filter(|_| !view.post_fx.taa_upscaled()) {
+        if let Some(scaled) = scaled.as_ref() {
             self.upscale_scene(view, scaled, output);
         }
 
@@ -183,7 +185,6 @@ impl Renderer {
             base_id: None,
             post: Default::default(),
             output,
-            upscaled: None,
             editor_mode: false,
             full_post_fx: false,
             motion_frames: 1,

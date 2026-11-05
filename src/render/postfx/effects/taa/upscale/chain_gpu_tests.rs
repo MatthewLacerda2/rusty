@@ -24,6 +24,10 @@ fn gpu_an_upscaling_frame_runs_the_chain_at_the_output_size_and_skips_fxaa() {
     let mut b = scaled(&r, 0.5);
     let without = settle(&mut r, &mut b, &plain, &cam, 6);
     assert!(upscales(&a) && a.post_fx.taa_upscaled() && a.post_fx.taa_ran());
+    assert!(
+        !a.holds_upscale_source(),
+        "TAAU writes the output: no scaled target"
+    );
     assert_eq!(
         a.post_fx.chain_size,
         (W, H),
@@ -34,11 +38,18 @@ fn gpu_an_upscaling_frame_runs_the_chain_at_the_output_size_and_skips_fxaa() {
         "FXAA on or off, an upscaling frame is TAA's alone"
     );
 
-    // TAA off: the bilinear path, the chain back at the scene's size.
+    // TAA off: the bilinear path, the chain back at the scene's size. A scene-size
+    // target (SSIL's history, say) survives the change of the chain's size.
+    struct SceneSized;
+    a.post_fx.targets.get_or(|| SceneSized);
     let (mut off, _) = taa_scene(false, true);
     tilted_cube(&mut off, at);
     drop(frame(&mut r, &mut a, &off, &cam));
-    assert!(!a.post_fx.taa_upscaled());
+    assert!(
+        a.post_fx.targets.get::<SceneSized>().is_some(),
+        "dropped on the toggle"
+    );
+    assert!(!a.post_fx.taa_upscaled() && a.holds_upscale_source());
     let scene = a.scene_size();
     assert_eq!(a.post_fx.chain_size, (scene.width, scene.height));
 }

@@ -35,8 +35,8 @@ pub(crate) mod history;
 pub(crate) mod jitter;
 mod upscale;
 
-pub(crate) use effect::{wanted, EFFECT};
-pub(crate) use history::{begin, chain_size, TaaFrame, TaaHistory};
+pub(crate) use effect::{runs, wanted, EFFECT};
+pub(crate) use history::{begin, chain_size, upscales, TaaFrame, TaaHistory};
 
 use glam::Vec2;
 
@@ -216,7 +216,9 @@ impl PostFx {
     }
 
     /// Whether TAA upscaled this frame to the output (TAAU): the chain then wrote
-    /// the output itself, and no bilinear upscale follows.
+    /// the output itself, and no bilinear upscale followed (`Renderer::render`
+    /// decides that up front, through `taa::runs` and `taa::upscales`), for a test.
+    #[cfg(test)]
     pub(crate) fn taa_upscaled(&self) -> bool {
         let history = self.targets.get::<TaaHistory>();
         history.is_some_and(|h| h.ran && h.upscale)

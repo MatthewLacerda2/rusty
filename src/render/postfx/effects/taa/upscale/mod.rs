@@ -9,7 +9,7 @@
 //! (`PostFx::chain_size`), as URP's STP and HDRP's FSR2 and DLSS place it. So
 //! bloom, film grain, a screen-space pattern and a HUD glass panel see a stable
 //! image, and the chain writes the output: nothing upscales twice
-//! (`PostFx::taa_upscaled`). What the scale saves is the scene's shading; the
+//! (`Renderer::render` asks `taa::upscales` and holds no scaled target). What the scale saves is the scene's shading; the
 //! chain after TAA costs what it costs at the output's size.
 //!
 //! **The reconstruction** (`fs_upscale` in `postfx/taa.wgsl`): each output pixel
@@ -21,6 +21,8 @@
 
 #[cfg(test)]
 mod bias_gpu_tests;
+#[cfg(test)]
+mod blur_gpu_tests;
 #[cfg(test)]
 mod chain_gpu_tests;
 #[cfg(test)]
