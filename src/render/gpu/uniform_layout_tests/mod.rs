@@ -93,12 +93,15 @@ fn camera_uniform_matches_wgsl_layout() {
         ("inv_view_proj", offset_of!(CameraUniform, inv_view_proj)),
         ("ssr", offset_of!(CameraUniform, ssr)),
         ("ssil", offset_of!(CameraUniform, ssil)),
+        ("lod", offset_of!(CameraUniform, lod)),
+        ("volumetric", offset_of!(CameraUniform, volumetric)),
     ];
     assert_layout("CameraUniforms", &pairs, size_of::<CameraUniform>());
     // `time` rides in the vec3 pad (#398); the cluster block adds 48 bytes (#434),
     // last frame's matrix 64 (#1435), the stack index 16 (#1436), the inverse 64 (#1523),
-    // the transparent SSR trace 16 (#1736), SSIL's switch 16 (#1750).
-    assert_eq!(size_of::<CameraUniform>(), 352);
+    // the transparent SSR trace 16 (#1736), SSIL's switch 16 (#1750), the material
+    // maps' mip bias 16 (#1702), the volumetric fog's slices 16 (#1703).
+    assert_eq!(size_of::<CameraUniform>(), 384);
 }
 
 #[test]

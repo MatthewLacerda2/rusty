@@ -61,6 +61,7 @@ impl PostFx {
             bloom_dirt: None,
             ldr,
             full_size,
+            chain_size: full_size,
             output_format,
             motion: Default::default(),
             targets: Default::default(),
@@ -134,21 +135,40 @@ impl PostFx {
         (params_buffer, fx_buffer, sampler)
     }
 
-    /// (Re)allocate the HDR + LDR targets for a new framebuffer size; the effects'
-    /// own (bloom's chain among them) are made again the next frame they run.
+    /// (Re)allocate the HDR target for a new framebuffer size; the LDR targets are
+    /// made at the chain's size by the next frame's `PostFx::fit_chain`, and the
+    /// effects' own (bloom's chain among them) the next frame they run.
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
-        let (full_size, scene_hdr, ldr) =
-            Self::create_targets(device, width, height, self.output_format);
-        self.full_size = full_size;
-        self.scene_hdr = scene_hdr;
-        self.ldr = ldr;
-        self.custom.resize(device, full_size.0, full_size.1);
+        let (w, h) = (width.max(1), height.max(1));
+        self.full_size = (w, h);
+        self.scene_hdr = Self::target(device, w, h, "PostFX Scene HDR", HDR_FORMAT);
+        // Unfitted: no chain is 0 wide, so the next `fit_chain` remakes the LDR
+        // targets once, at their real size (the output's under TAAU).
+        self.chain_size = (0, 0);
         // A resize is a cut (#1435): no smear from last frame's framing, and the
         // exposure snaps (#1444).
         self.motion.reset();
         self.exposure.cut();
         // Every effect's own targets refit at the new size the next frame it runs.
         self.targets.clear();
+    }
+
+    /// Run the chain after TAA at `size` from this frame on (#1702): the scene's
+    /// size, or the output's while TAA upscales the view; every frame calls it
+    /// (`draw_stack`) before any effect runs. Another size than the last frame's
+    /// (or the first frame after a resize) remakes the LDR targets and the custom
+    /// chain's history; the same size is a no-op. Each effect sized by the chain
+    /// refits its own targets when it sees the new size (bloom's `made_for`,
+    /// motion blur's `BlurTargets::fit`), so the scene-size ones (SSIL's history,
+    /// depth of field, SSR) survive TAA starting or stopping.
+    pub(crate) fn fit_chain(&mut self, device: &wgpu::Device, size: (u32, u32)) {
+        let size = (size.0.max(1), size.1.max(1));
+        if size == self.chain_size {
+            return;
+        }
+        self.chain_size = size;
+        self.ldr = Self::target(device, size.0, size.1, "PostFX LDR", self.output_format);
+        self.custom.resize(device, size.0, size.1);
     }
 
     fn create_targets(

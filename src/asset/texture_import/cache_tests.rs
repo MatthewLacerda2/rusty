@@ -65,14 +65,15 @@ fn a_cache_whose_levels_do_not_match_its_header_is_a_miss() {
     refresh(&png, "").unwrap();
     let out = cache_file(&png).unwrap();
     let good = std::fs::read(&out).unwrap();
-    // The header: magic, stamp, format, width, height, count, then level 0's length.
+    // The header: magic, stamp, format, width, height, count, the variance table,
+    // then level 0's length (at 41).
     let at = |offset: usize, value: u32| {
         let mut bad = good.clone();
         bad[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
         bad
     };
     for (what, bad) in [
-        ("a level too short", at(25, 15)),
+        ("a level too short", at(41, 15)),
         ("too many levels", at(21, 9)),
         ("a side not in whole blocks", at(13, 6)),
         ("no levels", at(21, 0)),

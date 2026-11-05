@@ -20,6 +20,12 @@ pub(super) fn bin_clusters(r: &mut Renderer, _: &mut RenderView, ctx: &mut Camer
     r.bin_clusters(&ctx.clusters, !ctx.overlay);
 }
 
+/// Volumetric fog (#1703): the base camera's froxels into the renderer's volume,
+/// after its lights are binned and before anything draws (`volumetric_fog::run`).
+pub(super) fn volumetric_fog(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    r.run_volumetric_fog(view, ctx);
+}
+
 /// This camera's solids (the culling mask differs per camera) as instanced draws
 /// (#470), split opaque/cutout vs transparent (#242).
 /// A view writing motion vectors gives each solid its last-frame pose (#1435).

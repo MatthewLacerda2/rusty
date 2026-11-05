@@ -6,7 +6,7 @@
 use glam::Mat4;
 
 use super::Lightmaps;
-use crate::render::draw::uniforms::solid_instance;
+use crate::render::draw::uniforms::solid_object;
 use crate::render::test_gpu::headless_or_skip;
 use crate::scene::lighting::lightmap::LightmapEntry;
 use crate::scene::Scene;
@@ -46,7 +46,7 @@ fn gpu_lightmaps_rebind_on_colour_pages_and_match_direction_shapes() {
         page: 0,
         scale_offset: [1.0, 1.0, 0.0, 0.0],
     });
-    let instance = |id| solid_instance(&scene, id, Mat4::IDENTITY, &Default::default(), &maps);
+    let instance = |id| solid_object(&scene, id, Mat4::IDENTITY, &Default::default(), &maps);
     assert_eq!(instance(1).lightmap_directional, 1, "lightmapped");
     assert_eq!(
         instance(2).lightmap_directional,

@@ -18,6 +18,7 @@
 
 #import lighting::ambient::ambient_average
 #import common::{CameraUniforms, Fog, LightingUniforms, LocalLight, cluster_index, fog_factor, local_light_radiance}
+#import fog::volumetric::{through_volume, volumetric_fog}
 
 struct ParticleGlobals {
     view_proj: mat4x4<f32>,
@@ -41,6 +42,9 @@ struct ParticleGlobals {
 @group(3) @binding(7) var<storage, read> local_lights: array<LocalLight>;
 @group(3) @binding(8) var<storage, read> cluster_ranges: array<vec2<u32>>;
 @group(3) @binding(9) var<storage, read> cluster_lights: array<u32>;
+// The integrated volumetric fog (#1703), read per vertex like the scene fog.
+@group(3) @binding(17) var t_fog_volume: texture_3d<f32>;
+@group(3) @binding(18) var s_fog_volume: sampler;
 
 struct InstanceInput {
     @location(0) center: vec3<f32>,
@@ -64,6 +68,9 @@ struct VsOut {
     @location(2) fog: f32,
     @location(3) world: vec3<f32>,
     @location(4) soft: f32,
+    // The volumetric fog at this corner (#1703): rgb the air's light, a what gets
+    // through; (0, 0, 0, 1) where the camera reads no volume.
+    @location(5) air: vec4<f32>,
 };
 
 // Corner of a unit quad (two triangles via the index buffer 0,1,2,0,2,3) derived
@@ -165,6 +172,7 @@ fn vs_main(@builtin(vertex_index) vid: u32, inst: InstanceInput) -> VsOut {
     out.fog = fog_factor(globals.fog, world, globals.cam_pos.xyz);
     out.world = world;
     out.soft = inst.sheet.w;
+    out.air = volumetric_fog(t_fog_volume, s_fog_volume, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
     return out;
 }
 
@@ -189,11 +197,12 @@ fn soft_fade(in: VsOut) -> f32 {
     return clamp(gap / in.soft, 0.0, 1.0);
 }
 
-// Alpha-blended smoke fades into the fog colour, like the surface behind it.
+// Alpha-blended smoke fades into the fog colour, like the surface behind it, and
+// sits behind the volumetric fog's air in front of it (#1703).
 @fragment
 fn fs_alpha(in: VsOut) -> @location(0) vec4<f32> {
     let c = textureSample(sprite_tex, sprite_sampler, in.uv) * in.color;
-    return vec4<f32>(mix(c.rgb, globals.fog.color, in.fog), c.a * soft_fade(in));
+    return vec4<f32>(through_volume(mix(c.rgb, globals.fog.color, in.fog), in.air), c.a * soft_fade(in));
 }
 
 // Additive sparks fade OUT instead: adding the fog colour would brighten the fog
@@ -201,5 +210,5 @@ fn fs_alpha(in: VsOut) -> @location(0) vec4<f32> {
 @fragment
 fn fs_additive(in: VsOut) -> @location(0) vec4<f32> {
     let c = textureSample(sprite_tex, sprite_sampler, in.uv) * in.color;
-    return vec4<f32>(c.rgb * (1.0 - in.fog), c.a * soft_fade(in));
+    return vec4<f32>(c.rgb * (1.0 - in.fog) * in.air.a, c.a * soft_fade(in));
 }

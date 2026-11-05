@@ -1,6 +1,6 @@
 //! Per-entity forward-pass data builders: the tint/PBR/cutout `MaterialData` record a
-//! solid mesh's draw reads (#1616), and the `InstanceData` (world matrix + light-probe
-//! SH) it adds to that draw's instance array (#470).
+//! solid mesh's draw reads (#1616), and the `ObjectData` (world matrix, light-probe
+//! SH, lightmap) its kept object holds in the object table (#470, #1706).
 //! Split out of `draw_resources` to keep that file under the size cap; behaviour
 //! unchanged. Free functions (no GPU state), called from `sync_solid_resource`.
 
@@ -10,9 +10,9 @@ use glam::Mat4;
 
 use crate::components::{MaterialAsset, RefractionModel, RenderFace, RenderMode};
 use crate::render::gpu::lightmaps::Lightmaps;
-use crate::render::gpu::uniforms::{MappingUniform, SurfaceUniform};
+use crate::render::gpu::uniforms::{MappingUniform, ObjectData, SurfaceUniform};
 use crate::render::postfx::effects::ssr;
-use crate::render::{InstanceData, MaterialData};
+use crate::render::MaterialData;
 use crate::scene::authoring::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 use crate::scene::lighting::lightmap::BakeScene;
 use crate::scene::Scene;
@@ -81,6 +81,7 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
         two_sided: u32::from(material.is_some_and(|m| m.render_face != RenderFace::Front)),
         surface: surface_uniform(lit, material),
         mapping: material.map_or_else(MappingUniform::default, mapping_uniform),
+        normal_variance: [0; 4],
     }
 }
 
@@ -161,34 +162,30 @@ pub(crate) fn preserves_specular(m: &MaterialAsset) -> bool {
     m.preserve_specular && m.blend_mode.preserves_specular()
 }
 
-/// One solid's instance: its world matrix, the SH its ambient term reads when a light
+/// One solid's object record (#1706): its world matrix, the SH its ambient term reads when a light
 /// probe covers it (see [`entity_probe_sh`]), and its baked lightmap when it has one
 /// and `lightmaps` has its pages bound (#438), directional when their direction
 /// pages are bound too (#810). `capture` is the renderer's [`CaptureMode`]: a bake
 /// capture's static surfaces read probes only on a probe bounce.
 ///
 /// [`CaptureMode`]: crate::render::ibl::cubemap_capture::CaptureMode
-pub(crate) fn solid_instance(
+pub(crate) fn solid_object(
     scene: &Scene,
     id: u32,
     model_matrix: Mat4,
     capture: &crate::render::ibl::cubemap_capture::CaptureMode,
     lightmaps: &Lightmaps,
-) -> InstanceData {
+) -> ObjectData {
     let (use_sh, sh) = entity_probe_sh(scene, id, model_matrix, capture);
     let lightmap = scene.lightmaps.get(id).filter(|_| lightmaps.resident());
-    InstanceData {
+    ObjectData {
         model_matrix: model_matrix.to_cols_array(),
         use_sh,
         lightmap_page: lightmap.map_or(0, |l| l.page + 1),
         lightmap_directional: u32::from(lightmap.is_some() && lightmaps.directional()),
-        // The draw sets its probe from its world bounds (`solid_draw_item`, #1206).
-        reflection_probe: 0,
         lightmap_st: lightmap.map_or([0.0; 4], |l| l.scale_offset),
         in_bake: u32::from(!scene.lightmaps.is_empty() && BakeScene::takes_mesh(scene, id)),
         sh,
-        // No history until `motion::track` gives it one (#1435).
-        ..InstanceData::IDENTITY
     }
 }
 

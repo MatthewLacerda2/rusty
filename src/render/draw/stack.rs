@@ -10,7 +10,7 @@ use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::effects::ssil;
 use crate::render::postfx::effects::ssr::{ssr_enabled, surface, transparent};
-use crate::render::postfx::effects::{self, taa, EffectCx, PassCx};
+use crate::render::postfx::effects::{self, taa, volumetric_fog, EffectCx, PassCx};
 use crate::render::postfx::params::{frame_params, PostSource};
 use crate::render::{RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -29,7 +29,10 @@ pub(crate) struct StackPass<'a> {
     /// The camera and volume settings that drive this view's post-FX and SSAO: the
     /// stack's base camera's (#1434, Unity URP's rule), borrowed once per view.
     pub post: PostSource<'a>,
-    /// Where post-FX writes the finished image.
+    /// Where post-FX writes the finished image, and the editor's overlays draw: a
+    /// scaled view's scene-size target ([`RenderView::scaled_output`]) on the
+    /// bilinear path, else the output itself (a native view, or one TAA upscales,
+    /// TAAU #1702, whose chain runs at the output's size).
     pub output: &'a wgpu::TextureView,
     pub editor_mode: bool,
     /// Run `post`'s grading, bloom, SSR, TAA, motion blur and FXAA. Off, the image is
@@ -46,17 +49,7 @@ impl Renderer {
     /// camera runs the [`CAMERA_PASSES`] table in order.
     pub(crate) fn draw_stack(&mut self, view: &mut RenderView, scene: &Scene, pass: StackPass) {
         let aspect = view.aspect();
-        let view_projs: Vec<_> = pass
-            .stack
-            .iter()
-            .map(|c| c.build_view_projection(aspect))
-            .collect();
-        let cameras: Vec<_> = pass
-            .entities
-            .iter()
-            .copied()
-            .zip(view_projs.iter().copied())
-            .collect();
+        let (view_projs, cameras) = matrices(&pass, aspect);
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
         // this view runs motion blur, TAA (#1702), depth of field (#1445) or SSR, which reads its
         // depths beside its own surface targets (#1526). A view shading
@@ -68,6 +61,16 @@ impl Renderer {
             motion::target_wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode)
                 && !own_pipeline;
         let velocity = velocity_target(moving, ssr);
+        // TAA (#1702): whether it runs, so the chain's size, before any effect fits.
+        let taa_on = taa::runs(
+            view,
+            pass.post,
+            graphics,
+            pass.full_post_fx,
+            pass.editor_mode,
+        );
+        view.post_fx
+            .fit_chain(&self.device, taa::chain_size(view, taa_on));
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.scene_size();
         surface::begin(&mut view.post_fx.targets, &self.device, size, ssr);
@@ -76,23 +79,23 @@ impl Renderer {
                 .motion
                 .begin(&self.device, size, key, velocity, &cameras);
         let prev_time = view.post_fx.motion.history.game_time(scene.shader_time);
-        // SSIL (#1750) keeps a history per view: a bake capture's faces and the
-        // shader preview keep none, so they never run it.
+        // SSIL (#1750) and volumetric fog (#1703) keep a history per view: a bake
+        // capture's faces and the shader preview keep none, so they never run them.
         let keeps = !own_pipeline && !self.capture.static_only;
-        // TAA (#1702): the frame's sub-pixel jitter, every camera's alike; a cut
-        // forgets its history.
-        let taa_on = taa::wanted(pass.post, graphics, pass.full_post_fx, pass.editor_mode);
-        let jitter = taa::begin(view, &self.device, taa_on && !own_pipeline);
+        // TAA (#1702): the frame's sub-pixel jitter, every camera's alike, and the
+        // material maps' mip bias while it upscales; a cut forgets its history.
+        let taa = taa::begin(view, &self.device, taa_on);
         let shared = StackShared {
             aspect,
             view_projs,
             prev_view_projs,
             prev_time,
-            jitter,
+            taa,
             fog: FogUniform::from_settings(&scene.fog),
             ssao: SsaoPlan::for_volume(pass.post.volume, self.graphics(pass.editor_mode)),
             ssr_march: transparent::camera_march(pass.post, graphics, ssr),
             ssil: ssil::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
+            volumetric: volumetric_fog::begin(&mut view.post_fx, (&pass, graphics, key), keeps),
         };
         for idx in 0..pass.stack.len() {
             let mut ctx = CameraCtx::new(scene, &pass, &shared, idx);
@@ -105,8 +108,11 @@ impl Renderer {
 
     /// Run the post-process chain over the view's composited HDR target: every
     /// effect's scene pass in order (depth of field, TAA, motion blur, the exposure
-    /// meter, bloom, the lens flare), the grading LUT's bake when its inputs changed, then the composite and
-    /// the LDR passes, writing the corrected image to `output`.
+    /// meter, bloom, the lens flare), the grading LUT's bake when its inputs changed,
+    /// then the composite and the LDR passes, writing the corrected image to
+    /// `StackPass::output`. When TAA upscales the view (TAAU, #1702), everything
+    /// after it runs at the output's size and `output` is the real output, so the
+    /// caller has no scaled target to upscale.
     pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &CameraCtx) {
         use crate::render::postfx::PostFxContext;
 
@@ -146,6 +152,17 @@ impl Renderer {
         view.post_fx
             .run((&self.device, &self.queue), chain, &effect, params);
     }
+}
+
+/// Each camera's view-projection at `aspect`, and beside it each one's entity, which
+/// keeps its motion history (#1435).
+fn matrices(pass: &StackPass, aspect: f32) -> (Vec<glam::Mat4>, Vec<(Option<u32>, glam::Mat4)>) {
+    let view_projs: Vec<_> = (pass.stack.iter())
+        .map(|c| c.build_view_projection(aspect))
+        .collect();
+    let cameras = pass.entities.iter().copied();
+    let cameras = cameras.zip(view_projs.iter().copied()).collect();
+    (view_projs, cameras)
 }
 
 /// The velocity target a view writes: motion vectors when an effect reads motion,

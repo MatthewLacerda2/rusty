@@ -9,9 +9,13 @@
 //   - the blend: history clamped into the box, then lerped toward the current pixel
 //     by the frame influence in URP's perceptual space (each colour over 1 + luma), so
 //     a bright highlight cannot dominate the average.
-// Its output is both what the rest of the chain reads and next frame's history. The
-// current pixel is the jittered frame's own, not re-filtered (URP's `High`; its
-// `VeryHigh` adds the filter), so a still frame converges to the jitter's average:
+// Its output is both what the rest of the chain reads and next frame's history.
+// `fs_upscale` is the same resolve upscaling (TAAU, #1702 part 3,
+// `render/postfx/effects/taa/upscale/`): a scaled view's scene-size frame into an
+// output-size history, at the same place in the chain, so what follows it runs at
+// the output's size. The current pixel is the jittered frame's own, not re-filtered
+// (URP's `High`; its `VeryHigh` adds the filter), so a still frame converges to the
+// jitter's average:
 // a supersampled pixel.
 //
 // Units. The velocity target holds `ndc_now - ndc_prev` in `.xy`, both unjittered,
@@ -22,11 +26,16 @@
 #import numeric
 
 struct TaaParams {
-    // xy: the view's size in pixels; zw: one over it
+    // xy: the history's size in pixels (the scene's, or the output's when
+    // upscaling); zw: one over it
     size: vec4<f32>,
     // x: the frame influence (the current frame's weight), y: the variance clamp's
     // scale, z: 1 when the history holds a frame of this view, w: unused
     knobs: vec4<f32>,
+    // xy: the scene's size in pixels (the current frame's); zw: one over it
+    scene: vec4<f32>,
+    // xy: this frame's jitter in scene pixels (`jitter::pixels`, NDC's y up); zw: unused
+    jitter: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> taa: TaaParams;
@@ -149,22 +158,92 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     lo = max(lo, mean - spread);
     hi = min(hi, mean + spread);
 
-    // Last frame's resolve where this pixel's surface was. NDC y points up, uv down.
     let uv = pos.xy * taa.size.zw;
-    let prev_uv = uv - nearest_motion(p) * vec2<f32>(0.5, -0.5);
+    let frame = Frame(here, lo, hi, taa.knobs.x);
+    return blend(frame, uv, nearest_motion(p));
+}
+
+// One pixel's current frame for [`blend`]: its colour, the box its history is
+// clamped into (YCoCg) and the weight it takes in the blend.
+struct Frame {
+    here: vec4<f32>,
+    lo: vec3<f32>,
+    hi: vec3<f32>,
+    weight: f32,
+};
+
+// The pixel at history `uv`, whose surface moved by `motion` (NDC): last frame's
+// resolve where that surface was, clamped into the frame's box and lerped toward
+// the frame by its weight in URP's perceptual space; the frame alone, exactly, with
+// no history to blend.
+fn blend(frame: Frame, uv: vec2<f32>, motion: vec2<f32>) -> vec4<f32> {
+    // NDC y points up, uv down.
+    let prev_uv = uv - motion * vec2<f32>(0.5, -0.5);
     let sampled = history_bicubic(prev_uv);
     let inside = all(abs(prev_uv - 0.5) <= vec2<f32>(0.5));
     if (taa.knobs.z < 0.5 || !inside || !numeric::finite3(sampled)) {
-        // No history to blend: the current frame alone, exactly.
-        return here;
+        return frame.here;
     }
-    let history = clamp(rgb_to_ycocg(max(sampled, vec3<f32>(0.0))), lo, hi);
+    let center = rgb_to_ycocg(frame.here.rgb);
+    let history = clamp(rgb_to_ycocg(max(sampled, vec3<f32>(0.0))), frame.lo, frame.hi);
 
     // Lerp in perceptual space: each colour over 1 + its luma, and back.
     let a = history / (1.0 + history.x);
     let b = center / (1.0 + center.x);
-    let mixed = mix(a, b, taa.knobs.x);
+    let mixed = mix(a, b, frame.weight);
     let rgb = ycocg_to_rgb(mixed / max(1.0 - mixed.x, 1.0 / MAX_HDR));
     let out = clamp(rgb, vec3<f32>(0.0), vec3<f32>(MAX_HDR));
-    return vec4<f32>(select(here.rgb, out, numeric::finite3(rgb)), here.a);
+    return vec4<f32>(select(frame.here.rgb, out, numeric::finite3(rgb)), frame.here.a);
+}
+
+// The weight of a sample `d` scene pixels from where it should land: URP's
+// `CalculateFilterWeights` (`TemporalAA.hlsl`), a Gaussian fit of a Blackman-Harris
+// window of radius 1, positive everywhere, so the reconstruction never rings.
+fn sample_weight(d: vec2<f32>) -> f32 {
+    return exp(-2.29 * dot(d, d));
+}
+
+// TAAU: output pixel `pos` of a scaled view, from the scene-size `t_current` (the
+// scene, or depth of field's result) and the output-size history. The 3x3 scene pixels around the output
+// pixel's centre each sampled the unjittered image `jitter` away from their own
+// centre (the projection moved the image by `jitter`, y flipped into pixel rows);
+// each is weighted by where its sample landed, the history is clamped into their
+// box as `fs_resolve` does, and the frame weighs the frame influence times its
+// nearest sample's weight, so a sample far from this pixel only nudges it.
+@fragment
+fn fs_upscale(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+    let uv = pos.xy * taa.size.zw;
+    let at = uv * taa.scene.xy;
+    let base = vec2<i32>(floor(at));
+    let shift = vec2<f32>(taa.jitter.x, -taa.jitter.y);
+
+    var lo = vec3<f32>(1e9);
+    var hi = vec3<f32>(-1e9);
+    var m1 = vec3<f32>(0.0);
+    var m2 = vec3<f32>(0.0);
+    var sum = vec3<f32>(0.0);
+    var weights = 0.0;
+    var nearest = 0.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let k = base + vec2<i32>(x, y);
+            let c = current(k).rgb;
+            let w = sample_weight(vec2<f32>(k) + 0.5 - shift - at);
+            sum += c * w;
+            weights += w;
+            nearest = max(nearest, w);
+            let ycocg = rgb_to_ycocg(c);
+            lo = min(lo, ycocg);
+            hi = max(hi, ycocg);
+            m1 += ycocg;
+            m2 += ycocg * ycocg;
+        }
+    }
+    let here = vec4<f32>(sum / max(weights, 1e-6), current(base).a);
+    let mean = m1 / 9.0;
+    let spread = taa.knobs.y * sqrt(abs(m2 / 9.0 - mean * mean));
+    lo = max(lo, mean - spread);
+    hi = min(hi, mean + spread);
+    let frame = Frame(here, lo, hi, taa.knobs.x * nearest);
+    return blend(frame, uv, nearest_motion(base));
 }

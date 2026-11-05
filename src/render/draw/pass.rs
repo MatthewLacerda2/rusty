@@ -223,11 +223,9 @@ impl Renderer {
         on && prepass && !view.has_forward_override()
     }
 
-    /// Rebuild the group-0 bind group, but only when something it names changed — the
-    /// skybox, the probe cube, or a light-cluster buffer that grew (#434). Its buffers
-    /// are otherwise persistent (skips ~one bind-group creation per camera, #210).
-    /// When only the procedural sky slot changed, the group kept for that slot is
-    /// swapped in instead (`SpareGroup`, #1620).
+    /// Rebuild the group-0 bind group only when something it names changed (the list:
+    /// `GlobalGroup`'s module doc); its buffers otherwise persist (#210). When only the
+    /// procedural sky slot changed, that slot's kept group is swapped in (#1620).
     fn update_global_bind_group(&mut self) {
         let switched = self.spare_global_group.switched;
         if !self.global_bind_group_dirty && !switched {
@@ -248,6 +246,7 @@ impl Renderer {
                 clusters: &self.clusters,
                 decals: &self.decals,
                 lightmaps: self.lightmaps.binding(),
+                fog_volume: (self.fog_volume.view(), &self.fog_volume.sampler),
             }
             .create(&self.device, &self.camera_lighting_layout)
         };

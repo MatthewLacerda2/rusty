@@ -9,7 +9,8 @@
 //!   reprojected through last frame's view-projection, then a depth-aware blur, a
 //!   temporal accumulate and an upsample to full resolution. The forward pass reads
 //!   the result at its group 3, in the opaque copy's slot (`t_opaque`, which that
-//!   pass never reads: the stage's 16 sampled textures are all taken) while the
+//!   pass never reads, so the stage binds no texture more than
+//!   `render::setup::limits` allows) while the
 //!   camera uniform's `ssil.x` says it runs; adds it to the ambient irradiance
 //!   (`forward::lighting::indirect_bounce`) through the same `albedo × 0.96 ×
 //!   (1 − metallic)` response and the same `ao` (SSAO's contact occlusion is
@@ -26,7 +27,7 @@
 //! lightmap bake didn't take in (`LightmapSet::lights`, Unity's
 //! `Light.bakingOutput`; uploaded as each light's `bounce_baked`) and the emission
 //! of meshes the bake didn't take in (`BakeScene::takes_mesh`, uploaded as each
-//! instance's `in_bake`). Not the indirect term (lightmap, probes, flat ambient, SSIL
+//! object's `in_bake`). Not the indirect term (lightmap, probes, flat ambient, SSIL
 //! itself), not the environment reflection. So a lightmapped scene whose lights were
 //! all baked gathers nothing; a light spawned after the bake bounces. Unlit
 //! surfaces and the sky feed nothing. A transparent surface reads none (its group 3

@@ -5,12 +5,14 @@
 //! wrong length.
 //!
 //! Layout, little-endian: `RBCT`, the stamp (u64), the format (u8, its index in
-//! [`BlockFormat::ALL`]), width, height and level count (u32 each), then each
-//! level's byte length (u32) and its blocks.
+//! [`BlockFormat::ALL`]), width, height and level count (u32 each), the
+//! [`VarianceTable`] (16 bytes, #1702), then each level's byte length (u32) and
+//! its blocks.
 
 use std::path::Path;
 
 use super::encode::{full_chain_len, BlockFormat, Compressed};
+use super::variance::{VarianceTable, VARIANCE_LEVELS};
 use super::{TextureSettings, ENCODER_VERSION};
 use crate::core::hash::content;
 
@@ -31,8 +33,8 @@ pub(super) fn stamp(source: u64, settings: &TextureSettings) -> u64 {
     content(made_by.as_bytes())
 }
 
-/// What a cache's head holds: its format, base size and level count.
-type Head = (BlockFormat, u32, u32, u32);
+/// What a cache's head holds: its format, base size, level count and variance.
+type Head = (BlockFormat, u32, u32, u32, VarianceTable);
 
 /// The head of a cache made with `stamp`, when it is well formed.
 fn head(r: &mut Reader<'_>, stamp: u64) -> Option<Head> {
@@ -43,11 +45,13 @@ fn head(r: &mut Reader<'_>, stamp: u64) -> Option<Head> {
     let (width, height, count) = (r.u32()?, r.u32()?, r.u32()?);
     let whole = width > 0 && height > 0 && width % 4 == 0 && height % 4 == 0;
     let fits = count > 0 && count <= full_chain_len(width, height);
-    (whole && fits).then_some((format, width, height, count))
+    let variance = r.take(VARIANCE_LEVELS)?.try_into().ok()?;
+    (whole && fits).then_some((format, width, height, count, variance))
 }
 
-/// The bytes of a cache's head: magic, stamp, format, width, height, count.
-const HEAD_LEN: usize = 4 + 8 + 1 + 4 * 3;
+/// The bytes of a cache's head: magic, stamp, format, width, height, count,
+/// variance.
+const HEAD_LEN: usize = 4 + 8 + 1 + 4 * 3 + VARIANCE_LEVELS;
 
 /// Whether the cache at `path` was made with `stamp` and [`read`] would take it,
 /// found from its head, each level's length and the file's size, never its blocks:
@@ -58,7 +62,7 @@ pub(super) fn is_current(path: &Path, stamp: u64) -> bool {
         let mut file = std::fs::File::open(path).ok()?;
         let mut bytes = [0; HEAD_LEN];
         file.read_exact(&mut bytes).ok()?;
-        let (format, width, height, count) = head(&mut Reader(&bytes), stamp)?;
+        let (format, width, height, count, _) = head(&mut Reader(&bytes), stamp)?;
         let mut at = HEAD_LEN as u64;
         for mip in 0..count {
             let mut len = [0; 4];
@@ -80,7 +84,7 @@ pub(super) fn is_current(path: &Path, stamp: u64) -> bool {
 pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
     let bytes = std::fs::read(path).ok()?;
     let mut r = Reader(&bytes);
-    let (format, width, height, count) = head(&mut r, stamp)?;
+    let (format, width, height, count, variance) = head(&mut r, stamp)?;
     let mut levels = Vec::with_capacity(count as usize);
     for mip in 0..count {
         let len = r.u32()? as usize;
@@ -95,6 +99,7 @@ pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
         width,
         height,
         levels,
+        variance,
     })
 }
 
@@ -109,6 +114,7 @@ pub(super) fn write(path: &Path, stamp: u64, texture: &Compressed) -> std::io::R
     for n in [texture.width, texture.height, count] {
         out.extend(n.to_le_bytes());
     }
+    out.extend(texture.variance);
     for level in &texture.levels {
         out.extend((level.len() as u32).to_le_bytes());
         out.extend(level);

@@ -190,7 +190,7 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
         pfx.targets.remove::<FlareTargets>();
         return;
     };
-    let aspect = pfx.full_size.0 as f32 / pfx.full_size.1.max(1) as f32;
+    let aspect = pfx.chain_size.0 as f32 / pfx.chain_size.1.max(1) as f32;
     let Some(params) = flare_params(&cx.effect, aspect) else {
         pfx.targets.remove::<FlareTargets>();
         return;

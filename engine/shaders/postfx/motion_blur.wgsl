@@ -23,6 +23,10 @@
 // order holds under a `DepthOnly` overlay that cleared the depth buffer. A *streak* is that motion in pixels, scaled by the shutter (`intensity`)
 // and clamped to the longest streak the camera allows; a tap reaches half a streak
 // either side of its pixel.
+//
+// Sizes. Every pass works in the image's pixels (`t_color`'s). The velocity target
+// is at the scene's size, which is the image's except when TAA upscaled the view
+// (#1702): a pixel then reads the velocity texel under its centre (`velocity_at`).
 
 #import fullscreen
 #import numeric
@@ -47,11 +51,23 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> @builtin(position) vec4<f32
     return fullscreen::triangle(vid);
 }
 
+// The image's size in pixels: what every pass counts pixels in.
+fn image_size() -> vec2<f32> {
+    return vec2<f32>(textureDimensions(t_color));
+}
+
+// The velocity texel under image pixel `p`'s centre: `p` itself when the two are
+// the same size (the ratio is then exactly 1).
+fn velocity_at(p: vec2<i32>) -> vec4<f32> {
+    let ratio = vec2<f32>(textureDimensions(t_velocity)) / image_size();
+    return textureLoad(t_velocity, vec2<i32>((vec2<f32>(p) + 0.5) * ratio), 0);
+}
+
 // Pixel `p`'s streak: its motion in pixels over the open shutter, clamped. A
 // non-finite motion is none, so no `inf` or NaN reaches the blur or bloom.
 fn streak(p: vec2<i32>) -> vec2<f32> {
-    let dims = vec2<f32>(textureDimensions(t_velocity));
-    let ndc = textureLoad(t_velocity, p, 0).xy;
+    let dims = image_size();
+    let ndc = velocity_at(p).xy;
     if (!numeric::finite2(ndc)) {
         return vec2<f32>(0.0);
     }
@@ -75,7 +91,7 @@ fn fs_tile_max_x(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let tile = i32(blur.shape.w);
     let y = i32(pos.y);
     let start = i32(pos.x) * tile;
-    let end = min(start + tile, i32(textureDimensions(t_velocity).x));
+    let end = min(start + tile, i32(image_size().x));
     var best = vec2<f32>(0.0);
     for (var x = start; x < end; x = x + 1) {
         best = longer(best, streak(vec2<i32>(x, y)));
@@ -114,7 +130,7 @@ fn fs_neighbor_max(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> 
 // Where the surface at pixel `p` lies: its camera's index in the stack (x) and its
 // depth along that camera's view axis (y).
 fn depth_key(p: vec2<i32>) -> vec2<f32> {
-    let texel = textureLoad(t_velocity, p, 0);
+    let texel = velocity_at(p);
     return vec2<f32>(texel.w, texel.z);
 }
 

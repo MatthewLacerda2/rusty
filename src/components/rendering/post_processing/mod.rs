@@ -22,6 +22,7 @@ mod lens_flare;
 mod lighting;
 mod ssil;
 mod ssr;
+mod volumetric_fog;
 
 // sorted: each module's settings, re-exported by name
 pub use bloom::{Bloom, DEFAULT_DIRT_TEXTURE};
@@ -37,6 +38,7 @@ pub use lens_flare::LensFlare;
 pub use lighting::{ShadowSettings, SsaoSettings};
 pub use ssil::Ssil;
 pub use ssr::Ssr;
+pub use volumetric_fog::VolumetricFog;
 
 /// A post-processing volume. Every field defaults when a file leaves it out, so a
 /// scene names only what it sets, each effect to its own default (the Add Component
@@ -64,6 +66,7 @@ pub struct PostProcessingComponent {
     pub ssr: Ssr,
     pub tonemapping: Tonemapping,
     pub vignette: Vignette,
+    pub volumetric_fog: VolumetricFog,
     pub white_balance: WhiteBalance,
 
     /// Directional-shadow cascades and reach (#435).
@@ -96,6 +99,7 @@ impl Default for PostProcessingComponent {
             ssr: Default::default(),
             tonemapping: Default::default(),
             vignette: Default::default(),
+            volumetric_fog: Default::default(),
             white_balance: Default::default(),
         }
     }

@@ -7,7 +7,8 @@
 //!
 //! **Objects.** One [`RenderObject`] per mesh entity: its interned mesh
 //! ([`MeshHandle`]), resident bounds, world matrix and bounds, flags (shown, static,
-//! layer, small-object limits), its instance (world matrix, probe SH, lightmap) and one
+//! layer, small-object limits), its object-table slot (world matrix, probe SH,
+//! lightmap) and one
 //! [`SlotDraw`] per material slot holding the slot's whole batch key (shader, facing,
 //! index run, material group, record). They are held per scene ([`SceneId`]) in
 //! `ids_with_mesh` order, so draws come out in the order the per-entity walk gave.
@@ -41,8 +42,14 @@
 //! **Shadows** (part 2): the cascades' and the atlas's sweeps gather their casters
 //! from the objects (`passes::shadows::casters`), each slot carrying its shadow
 //! clip, and the static bakes' key is the scene's [`RenderScene::statics_key`],
-//! folded from the objects. Part 3 moves the material table and the instances onto
-//! persistent GPU buffers.
+//! folded from the objects.
+//!
+//! **On the GPU** (part 3): each object's `ObjectData` (world matrix, probe SH,
+//! lightmap) sits at its slot of the renderer's [`ObjectTable`] (`table.rs`),
+//! mirrored on the GPU and written only where it changed; a camera's instance names
+//! the slot. A library edit re-derives only the objects whose slots name the
+//! material (`RenderScene::by_material`), and a material's param buffer is its
+//! scene's own (`MaterialCache`).
 
 mod draw;
 #[cfg(test)]
@@ -60,13 +67,17 @@ mod object;
 mod occlusion;
 #[cfg(test)]
 mod shadow_ops;
+#[cfg(test)]
+mod stack_gpu_tests;
+mod table;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
 pub(crate) use object::{RenderObject, SlotDraw};
 pub(crate) use occlusion::OcclusionBinding;
+pub(crate) use table::ObjectTable;
 
 use crate::render::passes::shadows::{casting_key, StaticsKey, UnbakedCasters};
 use crate::render::{GpuMesh, Renderer};
@@ -81,6 +92,8 @@ const MAX_SCENES: usize = 4;
 #[derive(Default)]
 pub(crate) struct Retained {
     pub meshes: MeshHandles,
+    /// Every kept scene's objects' records, by slot (`table.rs`), mirrored on the GPU.
+    pub objects: ObjectTable,
     /// Bumped by [`Self::touch`] whenever a renderer-side input every object's keys
     /// read changes (a material group dropped, a surface shader re-built): each scene
     /// re-derives all its objects on its next frame. Render textures have their own
@@ -109,12 +122,23 @@ impl Retained {
         }
     }
 
-    /// Keep `scene` as `id`'s, the most recently drawn.
-    fn put(&mut self, id: SceneId, scene: RenderScene) {
+    /// Keep `scene` as `id`'s, the most recently drawn; a scene evicted past
+    /// [`MAX_SCENES`] gives its slots back, and its id is returned.
+    fn put(&mut self, id: SceneId, scene: RenderScene) -> Option<SceneId> {
         self.scenes.push((id, scene));
-        if self.scenes.len() > MAX_SCENES {
-            self.scenes.remove(0);
+        if self.scenes.len() <= MAX_SCENES {
+            return None;
         }
+        let (gone, mut evicted) = self.scenes.remove(0);
+        evicted.release(&mut self.objects);
+        Some(gone)
+    }
+
+    /// Objects kept across every scene: with the identity, the object table's live
+    /// slots.
+    #[cfg(test)]
+    pub(crate) fn kept_objects(&self) -> usize {
+        self.scenes.iter().map(|(_, s)| s.objects.len()).sum()
     }
 
     /// Scene `id`'s objects, if kept.
@@ -132,6 +156,9 @@ pub(crate) struct RenderScene {
     objects: BTreeMap<u32, RenderObject>,
     /// Ids by insertion sequence: `ids_with_mesh`'s order.
     order: BTreeMap<u64, u32>,
+    /// Ids by the library names their objects reference
+    /// (`RenderObject::materials`): who a library edit re-derives.
+    by_material: BTreeMap<String, BTreeSet<u32>>,
     /// The renderers its `LODGroup`s keep out of the static bakes (#1714), re-read
     /// only when a group or a mesh changed.
     pub(crate) unbaked: UnbakedCasters,
@@ -155,12 +182,43 @@ impl RenderScene {
         if let Some(old) = self.objects.remove(&id) {
             self.order.remove(&old.seq);
             self.forget_casting(id, old.is_static);
+            for name in &old.materials {
+                let users = self.by_material.get_mut(name).expect("indexed with it");
+                users.remove(&id);
+                if users.is_empty() {
+                    self.by_material.remove(name);
+                }
+            }
         }
         if let Some(object) = object {
             self.forget_casting(id, object.is_static);
             self.order.insert(object.seq, id);
+            for name in &object.materials {
+                self.by_material.entry(name.clone()).or_default().insert(id);
+            }
             self.objects.insert(id, object);
         }
+    }
+
+    /// The objects drawing any library material in `names`.
+    fn users_of<'a>(&'a self, names: &'a BTreeSet<String>) -> impl Iterator<Item = u32> + 'a {
+        names
+            .iter()
+            .filter_map(|name| self.by_material.get(name))
+            .flatten()
+            .copied()
+    }
+
+    /// Drop every object, giving its slot back to `table`.
+    pub(super) fn release(&mut self, table: &mut ObjectTable) {
+        for object in self.objects.values() {
+            table.release(object.slot);
+        }
+        self.objects.clear();
+        self.order.clear();
+        self.by_material.clear();
+        self.casting = None;
+        self.occlusion.forget();
     }
 
     /// Static object `id` came or went: the digest is refolded, and the PVS
@@ -211,6 +269,14 @@ pub(crate) struct ExtractStats {
 }
 
 impl Renderer {
+    /// Keep `rs` as scene `id`'s objects. A scene that evicts gives back its slots
+    /// and its material param buffers (`MaterialCache::release_scene`).
+    fn keep_scene(&mut self, id: SceneId, rs: RenderScene) {
+        if let Some(gone) = self.retained.put(id, rs) {
+            self.materials.release_scene(gone);
+        }
+    }
+
     /// The resident buffers of the mesh `handle` names.
     pub(crate) fn gpu_mesh_of(&self, handle: MeshHandle) -> Option<&GpuMesh> {
         self.gpu_meshes.get(self.retained.meshes.id(handle))

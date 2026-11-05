@@ -110,6 +110,9 @@ pub struct RenderCounters {
     /// on the base camera of each view running it; `0` with SSIL off. The prepass it
     /// draws on a camera without SSAO is counted in `draw_calls` and `triangles`.
     pub ssil_samples: u64,
+    /// Froxels the volumetric fog lit (#1703): its grid, on the base camera of each
+    /// view running it; `0` with it off.
+    pub volumetric_froxels: u64,
     /// Particles drawn: sprite instances plus mesh particles, summed over the stack
     /// (#440). Their draw calls are in `draw_calls` — one per merged sprite batch, and
     /// one per instanced run of mesh particles.
@@ -159,6 +162,10 @@ pub struct RenderCounters {
     pub render_posed: u32,
     /// CPU microseconds the extract took (#1706), inside `renderer_ms`. Wall-clock.
     pub render_extract_us: u64,
+    /// Bytes this frame wrote into the forward pass's group-1 arrays (#1706), every
+    /// camera summed: per-draw uniforms, joints, instances, the material records
+    /// when they changed, proxy volumes and the object records that changed.
+    pub render_upload_bytes: u64,
 }
 
 impl RenderCounters {
@@ -198,6 +205,7 @@ impl RenderCounters {
             ("ui_blur_passes", self.ui_blur_passes.into()),
             ("ssao_samples", self.ssao_samples),
             ("ssil_samples", self.ssil_samples),
+            ("volumetric_froxels", self.volumetric_froxels),
             ("particles_drawn", self.particles_drawn.into()),
             ("render_texture_draws", self.render_texture_draws.into()),
             ("velocity_passes", self.velocity_passes.into()),
@@ -211,6 +219,7 @@ impl RenderCounters {
             ("render_extracted", self.render_extracted.into()),
             ("render_posed", self.render_posed.into()),
             ("render_extract_us", self.render_extract_us),
+            ("render_upload_bytes", self.render_upload_bytes),
         ]
     }
 

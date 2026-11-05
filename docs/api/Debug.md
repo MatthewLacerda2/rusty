@@ -116,6 +116,7 @@ end
 | `shadow_atlas_cached` / `shadow_atlas_rebaked` | atlas tiles whose static casters came from the cache / were re-drawn this frame (#694). A tile re-bakes when its light moves or turns, when it gets another place or size in the atlas (a size change past the hysteresis, or a repack, #1711), or when the editor changes static geometry; a still scene, or a light blinking off and on, reads all cached |
 | `ssao_samples` | depth taps the SSAO pass traced (occlusion texels × the samples its quality picks, #436, #1522); `0` when AO is off |
 | `ssil_samples` | samples the SSIL gather took (its texels × the samples its quality picks, #1750); `0` when SSIL is off |
+| `volumetric_froxels` | froxels the volumetric fog lit (its grid, on the base camera of each view running it, #1703); `0` when it is off |
 | `particles_drawn` | particles the renderer drew — sprite instances plus mesh particles, summed over the camera stack (#440). Their draws are in `draw_calls`: one per merged sprite batch, one per instanced run of mesh particles |
 | `render_texture_draws` | cameras drawn into render textures this frame (#430) — their geometry is already in `draw_calls` / `triangles`; a camera skipped (unreferenced, or between its `update_every` frames) is not counted |
 | `velocity_passes` | opaque scene passes that wrote a velocity buffer (#1435): one per stacked camera of each view whose base camera runs motion blur, depth of field or SSR (SSR's holds only depths, #1526); `0` when none does |
@@ -128,7 +129,8 @@ end
 | `grade_lut_bakes` | views whose colour-grading LUT was rebaked this frame (#1440): a grading knob or the tonemap changed, or the view is new; `0` on every frame the grade holds |
 | `ui_mask_passes` / `ui_blur_passes` | UI `Mask` coverage textures rendered (#428) / fullscreen passes of the UI backdrop blur, its composite included — `0` with no backdrop visible (#426) |
 | `renderer_ms` | CPU ms `Renderer::render` took to record the frame |
-| `render_extracted` / `render_posed` / `render_extract_us` | the retained render scene's update this frame (#1706): objects re-derived whole (every mesh entity on a first frame, a load, an Undo, a Play restore, a material library, lightmap or light probe change, or a renderer-side one such as a re-written texture; otherwise only the meshes whose mesh, material, activity, layer, static flag, light or shader overrides changed, and those sharing a re-uploaded geometry) / objects only re-placed because they moved / CPU µs the update took, inside `renderer_ms` (wall-clock). `0` / `0` on a frame that changed nothing |
+| `render_extracted` / `render_posed` / `render_extract_us` | the retained render scene's update this frame (#1706): objects re-derived whole (every mesh entity on a first frame, a load, an Undo, a Play restore, a lightmap or light probe change, or a renderer-side one such as a re-written texture; otherwise only the meshes whose mesh, material, activity, layer, static flag, light or shader overrides changed, those naming a library material that was edited, added or removed, and those sharing a re-uploaded geometry) / objects only re-placed because they moved / CPU µs the update took, inside `renderer_ms` (wall-clock). `0` / `0` on a frame that changed nothing |
+| `render_upload_bytes` | bytes the frame wrote into the forward pass's per-draw arrays (#1706), every camera summed: per-draw uniforms, joint palettes (and a motion-blurred view's last-frame poses), 16 bytes per drawn instance, the material records when they changed, proxy volumes, and the 240-byte record of each object that moved or changed, with the unchanged records between two changed ones fewer than 32 slots apart, rewritten so the two go in one write (a static, unchanged object costs only its instance). A shadow sweep's casters are not counted |
 | `gpu_ms` | GPU ms the frame's render passes kept the GPU busy (#835): the sum of `gpu_passes` below. **Only where the adapter has timestamp queries** (Metal, most Vulkan GPUs; not lavapipe) — elsewhere the key is absent, never `0` |
 | `gpu_passes.<pass>` | GPU ms per kind of render pass, in the same `{ last, min, avg, max, samples }` shape, under stable names (below). Absent as a whole without timestamps |
 
@@ -146,13 +148,14 @@ each kind's passes summed, under names that never change so two reports diff:
 | `ssao` | the SSAO occlusion pass, at its quality's resolution |
 | `ssao_blur` | the SSAO blur at the occlusion's resolution, and the depth-aware upsample to full resolution when that is lower |
 | `ssil` | screen-space indirect lighting (#1750): its gather, blur, accumulate and upsample before the base camera's opaque pass, and the source it keeps after it; the depth prepass it draws on a camera without SSAO is under `ssao_prepass` |
+| `volumetric_fog` | volumetric fog (#1703): its froxels' scatter and integrate, before the base camera draws |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
 | `ssr` | screen-space reflections (#1526): the march over the base camera's opaque image; the copy of that image it reads and its mip pyramid (#1736) are recorded before the timed pass, untimed, so they aren't counted |
 | `transparent` | translucent solids |
 | `ribbons` | trails and lines |
 | `particles` | particle systems |
 | `depth_of_field` | depth of field (#1445): its circle-of-confusion, prefilter, blur and composite passes |
-| `taa` | temporal anti-aliasing's resolve (#1702): one fullscreen pass over the scene, its history and the velocity target |
+| `taa` | temporal anti-aliasing's resolve (#1702): one fullscreen pass over the scene, its history and the velocity target; on a view upscaling through it (a render scale below 1), the same pass reconstructing the output-size image from the scaled scene |
 | `motion_blur` | per-object motion blur (#1436): its TileMax and NeighborMax tile passes and the gather |
 | `lens_flare` | the screen-space lens flare (#1443): its flare pass (the composite adds it, under `post_fx`) |
 | `post_fx` | bloom, the composite, authored effects, FXAA |

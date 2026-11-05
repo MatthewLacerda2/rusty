@@ -35,8 +35,17 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   static bakes' key is `RenderScene::statics_key`, refolded only when a static object
   was re-derived. A new input a shadow reads is kept or read per frame the same way,
   and `passes::shadows::statics_key` (the from-scratch digest the tests compare)
-  folds it too. The material table and the per-camera instance array are still
-  rebuilt per frame: part 3.
+  folds it too.
+- **What an object holds lives on the GPU in its slot** (part 3 of #1706): its
+  `ObjectData` (world matrix, probe SH, lightmap) sits at its slot of the object table
+  (`scene/table.rs`), written where it changed (`gpu/draw_buffers/objects.rs`). A
+  camera's `InstanceData` is 16 bytes naming the slot plus what the camera decides
+  (reflection probes, proxy volume, motion history in the joint array). A new
+  per-object value the shader reads goes into `ObjectData` (Rust and
+  `forward/bindings.wgsl`), written in `pose_object`; a per-view one into
+  `InstanceData`, and the fragment stage gets it through `VertexOutput::instance`,
+  since it is at its 8 storage buffers and never binds the instances. A library edit
+  re-derives only the objects naming that material (`RenderScene::by_material`).
 - **Occlusion culling reads the scene's baked PVS** (#1714, `scene/occlusion/`):
   bound per scene and re-checked against a baked object's fingerprint only after
   that static object changed (a whole bind when the PVS, the objects or the
@@ -112,6 +121,17 @@ every file and row.
   ones to its `lazy_pipelines`). Its per-view targets are its own type in
   `PostFx::targets` (`effects::Targets`: `get_or` while it runs, `remove` when it
   doesn't; a resize drops every slot), never a `PostFx` field.
+- **Size** — a pass after TAA's (a `Pass::Scene` ordered after 15, and every
+  `Pass::Ldr`) sizes its targets by `PostFx::chain_size`, **never** `full_size` or
+  `RenderView::scene_size()`, and refits when it changes. The two differ only while
+  TAA upscales the view (TAAU, #1702: a render scale below 1 with TAA on), when the
+  chain after TAA runs at the output's size, so a pass sized by the scene passes
+  every other test and goes wrong only there. A pass that reads the velocity
+  target or depth (scene-size) from a chain-size image maps its pixel by the size
+  ratio, as `motion_blur.wgsl`'s `velocity_at` does. A pass before TAA (depth of
+  field, SSR) sizes by `full_size`. `effects::chain_size_tests` scans each later
+  pass's files and fails on a scene size; a line that must read one says so inline
+  (`chain-size: scene <why>`).
 - **Composite textures** — a composite function that reads a texture of its effect's
   own (a target its pass drew, a texture it picked) declares it in its `textures`
   ([`CompositeTexture`](postfx/effects/textures.rs): a name and a `view` fn of the

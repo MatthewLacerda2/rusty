@@ -48,6 +48,7 @@ fn pass_names_are_stable_and_unique() {
             "ssao",
             "ssao_blur",
             "ssil",
+            "volumetric_fog",
             "forward",
             "ssr",
             "transparent",

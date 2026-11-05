@@ -10,10 +10,10 @@
 //! - **On the `Scene`, outside the log**, by revision (`scene::revision`): one
 //!   compare on a frame nothing wrote them. The probe field (`entity_probe_sh`) by
 //!   [`crate::scene::ProbeVolume::revision`]; the material library
-//!   (`material_entry_at`, `entity_params`) and the lightmap set (`solid_instance`)
+//!   (`material_entry_at`, `entity_params`) and the lightmap set (`solid_object`)
 //!   by their `Revisioned` revisions, kept with a copy compared only when a revision
 //!   moved, so a write of the same value (a script setting a colour each frame)
-//!   re-derives nothing. The instance's `in_bake` (#1750: SSIL gathers no emission a
+//!   re-derives nothing. The object's `in_bake` (#1750: SSIL gathers no emission a
 //!   bake took in) reads the static flag, activity, the light and mesh cursors and
 //!   the lightmap set, its baked-light record included: a re-bake that records
 //!   other lights changes the set's content, so it is seen. The shader overrides are compared whole (a handful of
@@ -64,19 +64,22 @@
 //! frame, so its record is rebuilt per frame and uploaded only when the records
 //! differ from what the buffer holds.
 //!
-//! **Known gaps, for part 3** (the persistent material table):
-//! - A material's shared param buffer (`ParamOwner::Material`) is keyed by library
-//!   name across scenes, and `write_params` runs only when an object is re-derived,
-//!   so scene A can draw with scene B's values for a same-named material whose
-//!   surface shader has runtime params. No shipping path reaches it today. Part 2
-//!   widened it: the per-frame shadow clip walk (`shadow_clips`) called
-//!   `write_params` for every clipped slot, which hid the gap for cutting
-//!   materials. With a preview tab beside the main scene, a same-named cutting
-//!   material with other runtime params now has the main scene's shadow cut and
-//!   camera draw read the preview's values until the main scene's object is
-//!   re-derived.
+//! **The material library** (part 3): an edit re-derives the objects whose material
+//! slots name an edited, added or removed material (`RenderScene::by_material`),
+//! no others. Finding the edited names compares the library entry by entry once its
+//! revision moved, so a script animating one colour each frame pays that compare
+//! and its material's users, not a rebuild. A runtime param buffer is keyed by scene
+//! and name (`ParamOwner::Material`), so two kept scenes holding a same-named
+//! material each draw their own values.
+//!
+//! **Known gaps:**
 //! - Any change to the lightmap set rebuilds every object, and a despawn removes the
 //!   entity's lightmap entry: destroying one lightmapped prop re-derives the World.
+//!   Each object keeps its slot through a rebuild, so only records whose value
+//!   moved are uploaded.
+//! - A library edit re-derives every user of the material: 4000 props sharing one
+//!   animated colour re-derive all 4000 a frame. What removes it is a persistent
+//!   material record updated in place, no object re-derived (#1706 stays open).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -104,10 +107,12 @@ pub(super) struct RendererInputs {
 pub(super) enum Dirty {
     /// Re-derive every object.
     Rebuild,
-    /// Re-derive `whole`; re-place `posed` (a move alone).
+    /// Re-derive `whole` and every object drawing a library material named in
+    /// `materials` (one added, removed or edited); re-place `posed` (a move alone).
     Some {
         whole: BTreeSet<u32>,
         posed: BTreeSet<u32>,
+        materials: BTreeSet<String>,
     },
 }
 
@@ -121,7 +126,7 @@ pub(super) struct Inputs {
     layer: Cursor<Layer>,
     statics: Cursor<StaticSet>,
     lod_groups: Cursor<LodGroupComponent>,
-    library: Kept<BTreeMap<String, MaterialAsset>>,
+    library: Kept<Library>,
     overrides: ShaderOverrides,
     lightmaps: Kept<LightmapSet>,
     probes: Revision,
@@ -183,7 +188,7 @@ impl Inputs {
         let mut posed = BTreeSet::new();
         take(w.changes(&mut self.pose), &mut posed);
         rebuild |= std::mem::replace(&mut self.renderer, renderer) != renderer;
-        rebuild |= self.library.refresh(&scene.materials);
+        let materials = self.library.edited(&scene.materials);
         rebuild |= self.lightmaps.refresh(&scene.lightmaps);
         let probes = scene.probes.revision();
         rebuild |= std::mem::replace(&mut self.probes, probes) != probes;
@@ -196,7 +201,11 @@ impl Inputs {
             return Dirty::Rebuild;
         }
         posed.retain(|id| !whole.contains(id));
-        Dirty::Some { whole, posed }
+        Dirty::Some {
+            whole,
+            posed,
+            materials,
+        }
     }
 }
 
@@ -225,6 +234,58 @@ impl<T: Clone + PartialEq> Kept<T> {
         }
         self.copy.clone_from(now);
         true
+    }
+}
+
+/// The material library, as the scene holds it.
+type Library = BTreeMap<String, MaterialAsset>;
+
+impl Kept<Library> {
+    /// Bring the copy up to `now`; the names whose material was added, removed or
+    /// edited. One compare of the revisions when nothing wrote the library; when
+    /// something did, one walk of both (sorted) maps together, one compare per name,
+    /// and only the edited ones copied.
+    fn edited(&mut self, now: &Revisioned<Library>) -> BTreeSet<String> {
+        if std::mem::replace(&mut self.seen, now.revision()) == now.revision() {
+            return BTreeSet::new();
+        }
+        let edited = library_diff(&self.copy, now);
+        for name in &edited {
+            match now.get(name) {
+                Some(asset) => self.copy.insert(name.clone(), asset.clone()),
+                None => self.copy.remove(name),
+            };
+        }
+        edited
+    }
+}
+
+/// The names added, removed or edited between `old` and `new`: one merge walk of
+/// the two sorted maps, each name visited once.
+fn library_diff(old: &Library, new: &Library) -> BTreeSet<String> {
+    use std::cmp::Ordering::{Equal, Greater, Less};
+    let (mut a, mut b) = (old.iter().peekable(), new.iter().peekable());
+    let mut edited = BTreeSet::new();
+    loop {
+        let name = match (a.peek(), b.peek()) {
+            (None, None) => return edited,
+            (Some(_), None) => a.next().map(|(n, _)| n),
+            (None, Some(_)) => b.next().map(|(n, _)| n),
+            (Some((x, ma)), Some((y, mb))) => match x.cmp(y) {
+                Less => a.next().map(|(n, _)| n),
+                Greater => b.next().map(|(n, _)| n),
+                Equal if ma == mb => {
+                    a.next();
+                    b.next();
+                    None
+                }
+                Equal => {
+                    b.next();
+                    a.next().map(|(n, _)| n)
+                }
+            },
+        };
+        edited.extend(name.cloned());
     }
 }
 

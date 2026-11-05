@@ -33,8 +33,8 @@ pub(crate) fn entity_params(scene: &Scene, id: u32, slot: usize) -> Option<Entit
 }
 
 impl Renderer {
-    /// The material cache index for `material` — `(library key, asset)` — drawn with
-    /// pipeline `pipeline`: its five maps (albedo, metallic, roughness, normal,
+    /// The material cache index for `material` — `(library key, asset)` of scene
+    /// `scene`'s library — drawn with pipeline `pipeline`: its five maps (albedo, metallic, roughness, normal,
     /// emissive), building the bind group on first use. The key is the *resolved*
     /// signature, so a late-loaded texture gets a fresh group (#207). When the
     /// pipeline's shader has runtime params, the material's values are packed into
@@ -47,6 +47,7 @@ impl Renderer {
     /// frame, one buffer.
     pub(crate) fn material_index(
         &mut self,
+        scene: SceneId,
         material: Option<(&str, &MaterialAsset)>,
         pipeline: usize,
         overrides: Option<EntityParams>,
@@ -54,13 +55,16 @@ impl Renderer {
         let owner = material.and_then(|(key, asset)| {
             let layout = self.surface_shaders.params(pipeline)?;
             let (owner, values) = match overrides {
-                Some((scene, id, slot, own)) => {
+                Some((owner_scene, id, slot, own)) => {
                     let mut merged = asset.shader_params.clone();
                     merged.extend(own.iter().map(|(k, v)| (k.clone(), v.clone())));
-                    (ParamOwner::Entity(scene, id, slot), layout.pack(&merged))
+                    (
+                        ParamOwner::Entity(owner_scene, id, slot),
+                        layout.pack(&merged),
+                    )
                 }
                 None => (
-                    ParamOwner::Material(key.to_owned()),
+                    ParamOwner::Material(scene, key.to_owned()),
                     layout.pack(&asset.shader_params),
                 ),
             };
@@ -114,7 +118,8 @@ impl Renderer {
     /// `record` with its metallic and roughness flags set to 2 where the map is
     /// resident and of Texture Type `SingleChannel` (#1574), BC4 or not yet: the
     /// shader then reads its red channel instead of glTF's packed blue and green,
-    /// so the look does not change when the compressed copy lands.
+    /// so the look does not change when the compressed copy lands. Its normal flag
+    /// is 2 where the bound normal map is BC5, its table in the record (#1702).
     pub(crate) fn with_map_channels(
         &self,
         mut record: MaterialData,
@@ -132,6 +137,12 @@ impl Renderer {
         }
         if single(&m.roughness_map) {
             record.use_roughness_map = 2;
+        }
+        let normal = m.normal_map.as_ref();
+        let bound = normal.and_then(|p| self.texture_for(p, TextureKind::Normal));
+        if let Some(table) = bound.and_then(|t| t.normal_variance) {
+            record.use_normal_map = 2;
+            record.normal_variance = pack_variance(table);
         }
         record
     }
@@ -274,4 +285,10 @@ pub(crate) fn material_texture_paths(
         .map(|s| m.shader_textures.get(s.name));
     let mut paths = maps.into_iter().map(Option::as_ref).chain(slots);
     std::array::from_fn(|_| paths.next().flatten().cloned())
+}
+
+/// A [`VarianceTable`](crate::asset::texture_import::variance::VarianceTable) as
+/// the record's four words, low byte first (`specular_aa::table_entry`).
+fn pack_variance(table: crate::asset::texture_import::variance::VarianceTable) -> [u32; 4] {
+    std::array::from_fn(|w| u32::from_le_bytes(std::array::from_fn(|b| table[w * 4 + b])))
 }

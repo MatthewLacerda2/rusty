@@ -15,6 +15,7 @@ use crate::render::ibl::reflection_probes::ProbeArray;
 use crate::render::ibl::sky_cube::SkyReflection;
 use crate::render::passes::outline::OutlinePasses;
 use crate::render::passes::transparent::OpaqueCopyPass;
+use crate::render::postfx::effects::volumetric_fog::SharedVolume;
 use crate::render::postfx::{effects::Passes, grade::GradeBake, HDR_FORMAT};
 use crate::render::setup::shadow_system::{create_shadow_system, ShadowSystem};
 use crate::render::setup::textures::{create_textures, Textures};
@@ -36,6 +37,8 @@ pub(crate) struct GlobalBindings {
     pub reflection_probes: ProbeArray,
     /// The sky's reflection cubes group 0 binds (#1553).
     pub sky_reflection: SkyReflection,
+    /// The integrated volumetric fog group 0 binds (#1703).
+    pub fog_volume: SharedVolume,
 }
 
 /// The forward-lit, line, outline and skybox passes — everything that draws into
@@ -199,6 +202,7 @@ fn create_global_bindings(
     let decals = DecalBuffers::new(device);
     let lightmaps = Lightmaps::new(device, false);
     let sky_reflection = SkyReflection::new(device, registry);
+    let fog_volume = SharedVolume::new(device);
     let global_bind_group = GlobalGroup {
         camera: &camera_buffer,
         lighting: &lighting_buffer,
@@ -207,6 +211,7 @@ fn create_global_bindings(
         clusters: &clusters,
         decals: &decals,
         lightmaps: lightmaps.binding(),
+        fog_volume: (fog_volume.view(), &fog_volume.sampler),
     }
     .create(device, camera_lighting_layout);
 
@@ -219,6 +224,7 @@ fn create_global_bindings(
         lightmaps,
         reflection_probes,
         sky_reflection,
+        fog_volume,
     }
 }
 
