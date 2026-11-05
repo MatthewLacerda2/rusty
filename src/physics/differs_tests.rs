@@ -42,7 +42,7 @@ fn holding(s: &EntityBodyState) -> RigidBody {
 
 fn differs(b: &RigidBody, s: &EntityBodyState) -> bool {
     let pose = to_pose(s.pos, s.rot);
-    state_differs(b, s, body_type(s), pose, gravity_scale(s.use_gravity))
+    state_differs(b, s, body_type(s), pose, gravity_scale(s.use_gravity), None)
 }
 
 #[test]
