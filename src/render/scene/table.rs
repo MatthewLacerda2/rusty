@@ -4,8 +4,9 @@
 //!
 //! Every kept scene allocates its objects' slots from the one table, so a preview tab
 //! and the main scene never share a slot and a switch between them uploads nothing.
-//! A slot is freed when its object goes (a despawn, a mesh removed, a rebuild, the
-//! scene evicted) and reused by the next object. Slot 0 is [`ObjectData::IDENTITY`]
+//! A slot is freed when its object goes (a despawn, a mesh removed, the scene
+//! evicted) and reused by the next object; a rebuild keeps every surviving
+//! object's slot, so it uploads only the records whose value moved. Slot 0 is [`ObjectData::IDENTITY`]
 //! for good: overlays name it. Mesh particles, which are no kept object, get
 //! *transient* slots past the kept ones for one camera's draws
 //! ([`ObjectTable::push_transient`]), written with that camera's upload.
