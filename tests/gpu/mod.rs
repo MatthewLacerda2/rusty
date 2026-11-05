@@ -81,6 +81,7 @@ mod skinning_joint_cap;
 mod sky_reflection_screenshot;
 mod specular_aa_screenshot;
 mod ssao_screenshot;
+mod toksvig;
 mod transparent_sorting_screenshot;
 mod transparent_surfaces;
 mod ui;

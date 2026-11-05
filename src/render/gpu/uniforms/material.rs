@@ -57,7 +57,8 @@ pub(crate) struct MaterialData {
     // Map flags (#202, #207). When set, the shader samples the matching group(2)
     // texture: metallic/roughness multiply their scalar by the sampled channel
     // (glTF's blue/green at 1, red at 2: a one-channel BC4 upload, #1574);
-    // `use_normal_map` perturbs the shading normal in tangent space; `use_emissive_map`
+    // `use_normal_map` perturbs the shading normal in tangent space (2: a BC5 map,
+    // whose spread comes from `normal_variance`, #1702); `use_emissive_map`
     // modulates the emissive factor.
     pub use_metallic_map: u32,
     pub use_roughness_map: u32,
@@ -82,6 +83,9 @@ pub(crate) struct MaterialData {
     pub surface: SurfaceUniform,
     // Where the material's maps are read (#1573).
     pub mapping: MappingUniform,
+    // What a BC5 normal map's mips lost (#1702, Toksvig): its `VarianceTable`, four
+    // levels a word, low byte first; read when `use_normal_map == 2`.
+    pub normal_variance: [u32; 4],
 }
 
 // The stride is a dynamic-offset alignment, not a cap the record has to fit; a storage

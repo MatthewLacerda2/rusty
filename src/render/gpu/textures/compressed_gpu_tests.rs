@@ -20,10 +20,17 @@ use wgpu::TextureFormat as F;
 /// A 16² PNG of `texel` everywhere at a fresh path named `name`, of
 /// `texture_type`, its compressed copy imported.
 fn flat(name: &str, texel: [u8; 4], texture_type: TextureType) -> String {
+    typed(
+        name,
+        RgbaImage::from_pixel(16, 16, Rgba(texel)),
+        texture_type,
+    )
+}
+
+/// `image` at a fresh path named `name`, of `texture_type`, imported.
+pub(super) fn typed(name: &str, image: RgbaImage, texture_type: TextureType) -> String {
     let path = temp_png(name);
-    RgbaImage::from_pixel(16, 16, Rgba(texel))
-        .save(&path)
-        .unwrap();
+    image.save(&path).unwrap();
     let settings = TextureSettings {
         texture_type,
         ..Default::default()
