@@ -7,7 +7,7 @@ use glam::Vec3;
 use super::{RenderObject, RenderScene};
 use crate::components::{MaterialAsset, MaterialComponent, RenderMode};
 use crate::render::gpu::uniforms::ObjectData;
-use crate::render::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
+use crate::render::{MaterialData, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::{Camera, Scene};
 
@@ -61,20 +61,23 @@ pub(super) fn frame(r: &mut Renderer, scene: &Scene) -> (Vec<u8>, RenderCounters
 }
 
 /// One object as a test compares it: its id, the object with its slot number
-/// blanked (a kept and a fresh build allocate different slots), and what its slot of
-/// the object table holds.
-pub(super) type Held = (u32, RenderObject, ObjectData);
+/// blanked (a kept and a fresh build allocate different slots), what its slot of
+/// the object table holds, and what each material slot's record holds.
+pub(super) type Held = (u32, RenderObject, ObjectData, Vec<MaterialData>);
 
 fn as_held(r: &Renderer, rs: &RenderScene) -> Vec<Held> {
+    let table = &r.retained.records.table;
     let held = rs.objects().map(|(id, o)| {
-        let data = *r.retained.objects.get(o.slot);
+        let records = o.slots.iter().map(|s| *table.get(s.key.record));
+        let object = RenderObject {
+            slot: 0,
+            ..o.clone()
+        };
         (
             id,
-            RenderObject {
-                slot: 0,
-                ..o.clone()
-            },
-            data,
+            object,
+            *r.retained.objects.get(o.slot),
+            records.collect(),
         )
     });
     held.collect()
@@ -106,29 +109,22 @@ pub(super) fn fresh(r: &mut Renderer, scene: &Scene) -> Vec<Held> {
     held
 }
 
-/// The object table is whole: every slot in use is a kept object's (or the
-/// identity's), and the GPU holds what the table holds, slot for slot.
+/// The tables are whole: every object slot in use is a kept object's (or the
+/// identity's), every material slot in use a kept record's (or the flat one's), and
+/// the GPU holds what each table holds, slot for slot.
 pub(super) fn table_holds(r: &mut Renderer) -> Result<(), String> {
     let live = (r.retained.objects.live(), r.retained.kept_objects() + 1);
-    if live.0 != live.1 {
-        return Err(format!("{} slots live for {} objects", live.0, live.1));
+    let kept = &r.retained.records;
+    let records = (kept.table.live(), kept.kept().len() + 1);
+    if live.0 != live.1 || records.0 != records.1 {
+        return Err(format!(
+            "live / kept: {live:?} objects, {records:?} records"
+        ));
     }
-    let gpu = r.objects_on_gpu();
-    match gpu == r.retained.objects.records().0 {
+    let gpu = r.objects_on_gpu() == r.retained.objects.records().0;
+    match gpu && r.records_on_gpu() == r.retained.records.table.records().0 {
         true => Ok(()),
-        false => Err("the GPU's object records differ from the table's".into()),
-    }
-}
-
-/// Edit the library: `red`'s colour, `glass`'s alpha, or add or remove `blue`,
-/// which objects may name while it is missing.
-pub(super) fn library(scene: &mut Scene, c: u8) {
-    let m = &mut scene.materials;
-    match c {
-        0..=2 => m.get_mut("red").unwrap().base_color[0] = f32::from(c),
-        3 => m.get_mut("glass").unwrap().alpha = 0.2,
-        _ if m.remove("blue").is_some() => {}
-        _ => drop(m.insert("blue".into(), Default::default())),
+        false => Err("the GPU's records differ from a table's".into()),
     }
 }
 

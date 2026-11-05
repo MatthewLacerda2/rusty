@@ -68,19 +68,44 @@ impl crate::render::Renderer {
             buffers.rebind(device, &self.entity_bones_layout);
         }
         let size = self.retained.objects.records().0.len() as u64 * STRIDE;
-        let staging = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Object Records Readback"),
-            size,
-            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let mut encoder = device.create_command_encoder(&Default::default());
-        encoder.copy_buffer_to_buffer(buffers.objects.buffer(), 0, &staging, 0, size);
-        queue.submit([encoder.finish()]);
-        let slice = staging.slice(..);
-        slice.map_async(wgpu::MapMode::Read, |_| {});
-        let _ = device.poll(wgpu::PollType::wait_indefinitely());
-        let mapped = slice.get_mapped_range().expect("mapped");
-        bytemuck::cast_slice(&mapped).to_vec()
+        read_back(device, queue, buffers.objects.buffer(), size)
     }
+
+    /// Write the material table's dirty slots now, as a camera's upload would, and
+    /// read the GPU's kept slots back.
+    pub(crate) fn records_on_gpu(&mut self) -> Vec<crate::render::MaterialData> {
+        let (device, queue) = (&self.device, &self.queue);
+        let buffers = &mut self.draw_buffers;
+        let table = &mut self.retained.records.table;
+        if sync_table((device, queue), &mut buffers.materials, table, &mut 0) {
+            buffers.rebind(device, &self.entity_bones_layout);
+        }
+        let stride = std::mem::size_of::<crate::render::MaterialData>() as u64;
+        let size = table.records().0.len() as u64 * stride;
+        read_back(device, queue, buffers.materials.buffer(), size)
+    }
+}
+
+/// The first `size` bytes of `buffer`, read back as records.
+#[cfg(test)]
+fn read_back<T: bytemuck::Pod>(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    buffer: &wgpu::Buffer,
+    size: u64,
+) -> Vec<T> {
+    let staging = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Slot Table Readback"),
+        size,
+        usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let mut encoder = device.create_command_encoder(&Default::default());
+    encoder.copy_buffer_to_buffer(buffer, 0, &staging, 0, size);
+    queue.submit([encoder.finish()]);
+    let slice = staging.slice(..);
+    slice.map_async(wgpu::MapMode::Read, |_| {});
+    let _ = device.poll(wgpu::PollType::wait_indefinitely());
+    let mapped = slice.get_mapped_range().expect("mapped");
+    bytemuck::cast_slice(&mapped).to_vec()
 }

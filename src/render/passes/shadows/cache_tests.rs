@@ -124,3 +124,25 @@ fn a_cutouts_slot_index_counts_unresolved_slots() {
     let first = key_as(vec![key.clone(), "missing".into()]);
     assert_ne!(key_as(vec!["missing".into(), key.clone()]), first);
 }
+
+#[test]
+fn gpu_a_cutouts_colour_edit_keeps_its_bake_and_a_cutoff_edit_re_bakes() {
+    let Some(mut r) = crate::render::test_gpu::headless_or_skip(48, 32) else {
+        return;
+    };
+    let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 48, 32);
+    let mut scene = static_yard();
+    let id = scene.world.ids_with_mesh()[0];
+    let key = crate::scene::authoring::material::ensure_material_key(&mut scene, id).unwrap();
+    scene.materials.get_mut(&key).unwrap().render_mode = crate::components::RenderMode::Cutout;
+    let home = Vec3::new(0.0, 2.0, 6.0);
+    let mut draws = |s: &Scene| shadow_draws(&mut r, &mut view, s, home);
+    assert!(
+        draws(&scene) > 0 && draws(&scene) == 0,
+        "baked, then cached"
+    );
+    scene.materials.get_mut(&key).unwrap().base_color = [0.2, 0.9, 0.2];
+    assert_eq!(draws(&scene), 0, "a colour edit (#1706): no re-bake");
+    scene.materials.get_mut(&key).unwrap().alpha_cutoff = 0.9;
+    assert!(draws(&scene) > 0, "a cutoff edit re-bakes");
+}

@@ -47,6 +47,8 @@
 
 mod draw;
 #[cfg(test)]
+mod equivalence_ops;
+#[cfg(test)]
 mod equivalence_tests;
 mod extract;
 #[cfg(test)]
@@ -59,6 +61,8 @@ mod idle_tests;
 mod inputs;
 mod object;
 pub(crate) mod records;
+#[cfg(test)]
+mod records_gpu_tests;
 #[cfg(test)]
 mod shadow_ops;
 #[cfg(test)]
