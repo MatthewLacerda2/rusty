@@ -32,7 +32,8 @@ struct MaterialData {
     roughness: f32,
     // Map flags (#202, #207). metallic/roughness scale their scalar by the sampled
     // channel (glTF's blue/green at 1, red at 2: a one-channel BC4 upload, #1574);
-    // normal perturbs the shading normal; emissive modulates the emissive factor.
+    // normal perturbs the shading normal (2: BC5, its spread in `normal_variance`);
+    // emissive modulates the emissive factor.
     use_metallic_map: u32,
     use_roughness_map: u32,
     use_normal_map: u32,
@@ -80,6 +81,9 @@ struct MaterialData {
     world_scale: f32,
     blend_sharpness: f32,
     mapping_pad: u32,
+    // A BC5 normal map's lost spread per mip level (#1702), byte L-1 level L, read
+    // when `use_normal_map == 2` (`specular_aa::table_kernel`).
+    normal_variance: vec4<u32>,
 };
 
 // One object a kept scene draws (#1706), at its slot of `objects`: what the object

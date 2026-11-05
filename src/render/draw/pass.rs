@@ -5,7 +5,7 @@ use crate::render::draw::batch::DrawBatch;
 use crate::render::gpu::draw_buffers::DrawBuffers;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
-use crate::render::gpu::pipelines::{PrimedPipelines, TransparentBlend};
+use crate::render::gpu::pipelines::PrimedPipelines;
 use crate::render::ibl::skybox::SkyTargets;
 use crate::render::motion;
 use crate::render::passes::ssao::SsaoFrame;
@@ -277,7 +277,7 @@ impl Renderer {
                 continue;
             }
             let primed = solid_pass.primed() && in_prepass;
-            let blend = TransparentBlend::of(&batch.key.record().surface);
+            let blend = batch.key.traits.blend;
             let facing = batch.key.facing;
             let pipeline = (batch.key.pipeline, primed, blend, facing);
             if bound != Some(pipeline) {

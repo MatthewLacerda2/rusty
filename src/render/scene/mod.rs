@@ -10,7 +10,7 @@
 //! layer, small-object limits), its object-table slot (world matrix, probe SH,
 //! lightmap) and one
 //! [`SlotDraw`] per material slot holding the slot's whole batch key (shader, facing,
-//! index run, material group, record). They are held per scene ([`SceneId`]) in
+//! index run, material group, record slot). They are held per scene ([`SceneId`]) in
 //! `ids_with_mesh` order, so draws come out in the order the per-entity walk gave.
 //!
 //! **Extract** (`extract.rs`), once per frame in `prepare_frame`: the change log
@@ -41,11 +41,23 @@
 //! **On the GPU** (part 3): each object's `ObjectData` (world matrix, probe SH,
 //! lightmap) sits at its slot of the renderer's [`ObjectTable`] (`table.rs`),
 //! mirrored on the GPU and written only where it changed; a camera's instance names
-//! the slot. A library edit re-derives only the objects whose slots name the
-//! material (`RenderScene::by_material`), and a material's param buffer is its
-//! scene's own (`MaterialCache`).
+//! the slot. A material's param buffer is its scene's own (`MaterialCache`).
+//!
+//! **Material records** (part 4): each (scene, library material, variant) has its
+//! `MaterialData` at a slot of the renderer's [`MaterialRecords`] table (`records.rs`),
+//! mirrored on the GPU, and a batch key names the slot; a frame batches it by its
+//! class of equal records (`classes.rs`), so equal values under different names still
+//! share a draw. A library edit that moves only
+//! a record's values rewrites it in place, no object re-derived; any other edit
+//! re-derives only the objects whose slots name the material
+//! (`RenderScene::by_material`).
 
+mod classes;
+#[cfg(test)]
+mod classes_gpu_tests;
 mod draw;
+#[cfg(test)]
+mod equivalence_ops;
 #[cfg(test)]
 mod equivalence_tests;
 mod extract;
@@ -58,6 +70,9 @@ mod handles;
 mod idle_tests;
 mod inputs;
 mod object;
+pub(crate) mod records;
+#[cfg(test)]
+mod records_gpu_tests;
 #[cfg(test)]
 mod shadow_ops;
 #[cfg(test)]
@@ -69,7 +84,8 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
 pub(crate) use object::{RenderObject, SlotDraw};
-pub(crate) use table::ObjectTable;
+pub(crate) use records::{MaterialRecords, Variant};
+pub(crate) use table::{ObjectTable, SlotTable, Slotted};
 
 use crate::render::passes::shadows::{casting_key, StaticsKey, UnbakedCasters};
 use crate::render::{GpuMesh, Renderer};
@@ -86,6 +102,9 @@ pub(crate) struct Retained {
     pub meshes: MeshHandles,
     /// Every kept scene's objects' records, by slot (`table.rs`), mirrored on the GPU.
     pub objects: ObjectTable,
+    /// Every kept scene's material records, by slot (`records.rs`), mirrored on the
+    /// GPU.
+    pub records: MaterialRecords,
     /// Bumped by [`Self::touch`] whenever a renderer-side input every object's keys
     /// read changes (a material group dropped, a surface shader re-built): each scene
     /// re-derives all its objects on its next frame. Render textures have their own
@@ -115,7 +134,8 @@ impl Retained {
     }
 
     /// Keep `scene` as `id`'s, the most recently drawn; a scene evicted past
-    /// [`MAX_SCENES`] gives its slots back, and its id is returned.
+    /// [`MAX_SCENES`] gives its object and material slots back, and its id is
+    /// returned.
     fn put(&mut self, id: SceneId, scene: RenderScene) -> Option<SceneId> {
         self.scenes.push((id, scene));
         if self.scenes.len() <= MAX_SCENES {
@@ -123,6 +143,7 @@ impl Retained {
         }
         let (gone, mut evicted) = self.scenes.remove(0);
         evicted.release(&mut self.objects);
+        self.records.release_scene(gone);
         Some(gone)
     }
 
@@ -196,6 +217,11 @@ impl RenderScene {
             .filter_map(|name| self.by_material.get(name))
             .flatten()
             .copied()
+    }
+
+    /// The objects drawing library material `name`.
+    fn users_of_name<'a>(&'a self, name: &str) -> impl Iterator<Item = u32> + 'a {
+        self.by_material.get(name).into_iter().flatten().copied()
     }
 
     /// Drop every object, giving its slot back to `table`.

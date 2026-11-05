@@ -59,25 +59,23 @@
 //! frame, so its record is rebuilt per frame and uploaded only when the records
 //! differ from what the buffer holds.
 //!
-//! **The material library** (part 3): an edit re-derives the objects whose material
-//! slots name an edited, added or removed material (`RenderScene::by_material`),
-//! no others. Finding the edited names compares the library entry by entry once its
-//! revision moved, so a script animating one colour each frame pays that compare
-//! and its material's users, not a rebuild. A runtime param buffer is keyed by scene
-//! and name (`ParamOwner::Material`), so two kept scenes holding a same-named
-//! material each draw their own values.
+//! **The material library**: finding the edited names compares the library entry by
+//! entry once its revision moved. An edit that moves only a material's record and
+//! params (a colour, a scalar: `records::rekeys` false) rewrites its records in the
+//! material table and its param buffer, and re-derives only its users with
+//! overrides (whose buffers merge its params); any other edit, an add or a removal
+//! re-derives the objects naming it (`RenderScene::by_material`), no others. Records
+//! and param buffers are keyed by scene and name, so two kept scenes holding a
+//! same-named material each draw their own values.
 //!
-//! **Known gaps:**
-//! - Any change to the lightmap set rebuilds every object, and a despawn removes the
-//!   entity's lightmap entry: destroying one lightmapped prop re-derives the World.
-//!   Each object keeps its slot through a rebuild, so only records whose value
-//!   moved are uploaded.
-//! - A library edit re-derives every user of the material: 4000 props sharing one
-//!   animated colour re-derive all 4000 a frame. What removes it is a persistent
-//!   material record updated in place, no object re-derived (#1706 stays open).
+//! **Known gap:** any change to the lightmap set rebuilds every object, and a despawn
+//! removes the entity's lightmap entry: destroying one lightmapped prop re-derives
+//! the World. Each object keeps its slot through a rebuild, so only records whose
+//! value moved are uploaded.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::records::{params_moved, rekeys};
 use crate::components::{
     LightComponent, LodGroupComponent, MaterialAsset, MaterialComponent, MeshComponent,
 };
@@ -102,13 +100,21 @@ pub(super) struct RendererInputs {
 pub(super) enum Dirty {
     /// Re-derive every object.
     Rebuild,
-    /// Re-derive `whole` and every object drawing a library material named in
-    /// `materials` (one added, removed or edited); re-place `posed` (a move alone).
+    /// Re-derive `whole`, and re-place `posed` (a move alone).
     Some {
         whole: BTreeSet<u32>,
         posed: BTreeSet<u32>,
-        materials: BTreeSet<String>,
     },
+}
+
+/// The library names an extract acts on, whether it rebuilds or not.
+#[derive(Default)]
+pub(super) struct LibraryEdits {
+    /// Added, removed, or edited in what a key reads: their users are re-derived.
+    pub rekeyed: BTreeSet<String>,
+    /// Edited in their record's values alone: their records are rewritten, and,
+    /// with `params` true, their param buffers.
+    pub rewritten: BTreeMap<String, bool>,
 }
 
 /// One scene's cursors and copies.
@@ -161,7 +167,7 @@ impl Inputs {
 
     /// What changed in `scene` since the last read, every cursor and copy brought up
     /// to date.
-    pub fn read(&mut self, scene: &Scene, renderer: RendererInputs) -> Dirty {
+    pub fn read(&mut self, scene: &Scene, renderer: RendererInputs) -> (Dirty, LibraryEdits) {
         let w = &scene.world;
         let mut whole = BTreeSet::new();
         let mut rebuild = false;
@@ -183,7 +189,7 @@ impl Inputs {
         let mut posed = BTreeSet::new();
         take(w.changes(&mut self.pose), &mut posed);
         rebuild |= std::mem::replace(&mut self.renderer, renderer) != renderer;
-        let materials = self.library.edited(&scene.materials);
+        let library = self.library.edited(&scene.materials);
         rebuild |= self.lightmaps.refresh(&scene.lightmaps);
         let probes = scene.probes.revision();
         rebuild |= std::mem::replace(&mut self.probes, probes) != probes;
@@ -193,14 +199,10 @@ impl Inputs {
         }
         if rebuild {
             self.regroup = true;
-            return Dirty::Rebuild;
+            return (Dirty::Rebuild, library);
         }
         posed.retain(|id| !whole.contains(id));
-        Dirty::Some {
-            whole,
-            posed,
-            materials,
-        }
+        (Dirty::Some { whole, posed }, library)
     }
 }
 
@@ -237,21 +239,27 @@ type Library = BTreeMap<String, MaterialAsset>;
 
 impl Kept<Library> {
     /// Bring the copy up to `now`; the names whose material was added, removed or
-    /// edited. One compare of the revisions when nothing wrote the library; when
-    /// something did, one walk of both (sorted) maps together, one compare per name,
-    /// and only the edited ones copied.
-    fn edited(&mut self, now: &Revisioned<Library>) -> BTreeSet<String> {
+    /// edited, sorted by [`rekeys`]. One compare of the revisions when nothing wrote
+    /// the library; when something did, one walk of both (sorted) maps together, one
+    /// compare per name, and only the edited ones copied.
+    fn edited(&mut self, now: &Revisioned<Library>) -> LibraryEdits {
+        let mut edits = LibraryEdits::default();
         if std::mem::replace(&mut self.seen, now.revision()) == now.revision() {
-            return BTreeSet::new();
+            return edits;
         }
-        let edited = library_diff(&self.copy, now);
-        for name in &edited {
-            match now.get(name) {
-                Some(asset) => self.copy.insert(name.clone(), asset.clone()),
-                None => self.copy.remove(name),
+        for name in library_diff(&self.copy, now) {
+            match (self.copy.get(&name), now.get(&name)) {
+                (Some(old), Some(new)) if !rekeys(old, new) => {
+                    edits.rewritten.insert(name.clone(), params_moved(old, new));
+                }
+                _ => drop(edits.rekeyed.insert(name.clone())),
+            }
+            match now.get(&name) {
+                Some(asset) => self.copy.insert(name, asset.clone()),
+                None => self.copy.remove(&name),
             };
         }
-        edited
+        edits
     }
 }
 

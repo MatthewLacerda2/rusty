@@ -11,7 +11,7 @@ use std::collections::HashSet;
 
 use crate::asset::MapRef;
 use crate::components::{MeshComponent, RenderFace, ShadowCasting};
-use crate::render::passes::shadows::clips::Cutout;
+use crate::render::passes::shadows::Cutout;
 use crate::scene::{Scene, SceneId};
 
 /// Which scene's static casters a bake holds, at which of its

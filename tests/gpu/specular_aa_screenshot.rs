@@ -103,7 +103,7 @@ fn frames() -> Option<Vec<Vec<f64>>> {
 /// Each pixel's variance over `frames`, summed, over the sum of each pixel's mean
 /// squared: the frame-to-frame flicker relative to the signal, so a highlight that
 /// grows broader and brighter is not scored as more shimmer. Also the summed mean.
-fn relative_temporal_variance(frames: &[Vec<f64>]) -> (f64, f64) {
+pub(crate) fn relative_temporal_variance(frames: &[Vec<f64>]) -> (f64, f64) {
     let n = frames.len() as f64;
     let (mut variance, mut signal, mut total) = (0.0, 0.0, 0.0);
     for px in 0..frames[0].len() {

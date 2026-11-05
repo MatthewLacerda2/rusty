@@ -107,6 +107,10 @@ impl Renderer {
         };
         texture.source_size = loaded.source_size;
         texture.single_channel = import.texture_type == TextureType::SingleChannel;
+        texture.normal_variance = match &loaded.texels {
+            Texels::Blocks(b) if b.format == texture_import::BlockFormat::Bc5 => Some(b.variance),
+            _ => None,
+        };
         Some(Rc::new(texture))
     }
 
