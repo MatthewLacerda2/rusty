@@ -12,7 +12,7 @@ use crate::scene::lighting::occlusion::bake_occlusion;
 use crate::scene::Scene;
 
 /// [`yard`] with every mesh static and its PVS baked.
-pub(super) fn baked_yard(n: u32) -> Scene {
+pub(in crate::render::scene) fn baked_yard(n: u32) -> Scene {
     let mut scene = yard(n);
     for id in scene.world.ids_with_mesh() {
         scene.world.set_static(id, true);
@@ -23,7 +23,10 @@ pub(super) fn baked_yard(n: u32) -> Scene {
 }
 
 /// Whether the binding `r` keeps for `scene` equals one bound from scratch.
-pub(super) fn kept_equals_fresh(r: &Renderer, scene: &Scene) -> Result<(), String> {
+pub(in crate::render::scene) fn kept_equals_fresh(
+    r: &Renderer,
+    scene: &Scene,
+) -> Result<(), String> {
     let kept = r.retained.scene(scene.id()).expect("extracted");
     let mut fresh = OcclusionBinding::default();
     fresh.refresh(scene);
