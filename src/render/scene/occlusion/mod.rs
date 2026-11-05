@@ -1,4 +1,4 @@
-//! src/render/scene/occlusion.rs — the baked PVS as a camera reads it (#1714):
+//! src/render/scene/occlusion/ — the baked PVS as a camera reads it (#1714):
 //! which retained objects are still what was baked, and whether the bake may be
 //! used at all.
 //!
@@ -194,3 +194,10 @@ impl OcclusionBinding {
         (usable, if usable { self.layers } else { 0 }, unchanged)
     }
 }
+
+#[cfg(test)]
+mod camera_gpu_tests;
+#[cfg(test)]
+mod gpu_tests;
+#[cfg(test)]
+pub(super) mod ops;

@@ -14,7 +14,7 @@
 //! Dust2-sized level has storeys, stairs, drops and open yards a camera moves
 //! through. A uniform grid holds all of them. Cells that see the same set share one
 //! row (`rows`); after the dilation few do, so the data is about one bit per cell
-//! per object (7.8 MB for a Dust2-sized level of 4163 meshes, `docs/api/Lighting.md`).
+//! per object (4.9 MB for a Dust2-sized level of 4163 meshes, `docs/api/Lighting.md`).
 //!
 //! **What a cell holds** (`bake`): every baked object any point in it may see. From
 //! seeded points in the cell, rays go to points on each object's own triangles: its

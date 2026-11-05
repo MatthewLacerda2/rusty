@@ -3,13 +3,13 @@
 //! proves the change log's consumers: the ECS write paths of `ops_tests`, the inputs
 //! the log does not cover (the library, overrides, lightmaps and a bake's light
 //! record (#1750), probes, a capture, a re-uploaded shared mesh), the shadow sweeps'
-//! key (`shadow_ops`) and the baked PVS's binding (`occlusion_ops`). One renderer.
+//! key (`shadow_ops`) and the baked PVS's binding (`occlusion::ops`). One renderer.
 
 use glam::Vec3;
 use proptest::{prelude::*, test_runner::Config, test_runner::TestRunner};
 
 use super::fixture::{fresh, held, RES};
-use super::occlusion_ops::{self, baked_yard};
+use super::occlusion::ops::{self as occlusion_ops, baked_yard};
 use super::shadow_ops::{self, s_op, S};
 use crate::components::mesh::MeshRevision;
 use crate::components::{LightComponent, MaterialComponent};

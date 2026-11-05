@@ -359,7 +359,11 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   metre of a mesh may hide it (points are sampled, not every ray). A mesh too large to
   sample (over 4096 lattice points, some 2000 m² of surface) is never culled: it is
   kept in sight of every cell.
-- **Cost** (__COST__). At runtime a camera costs one cell lookup, and each static mesh
+- **Cost** (release build, 4 threads, primitive levels of rooms with a doorway in
+  every wall): a Kolvik-sized interior (8 × 8 rooms of 6 m, 418 static meshes, 2916
+  cells) bakes in about 30 s into 124 KB; a Dust2-sized level (20 × 20 rooms of
+  10 m on two storeys, 4163 meshes, 11664 cells) in about 19 minutes into 4.9 MB.
+  At runtime a camera costs one cell lookup, and each static mesh
   a map lookup and a bit test; a static mesh moved or edited re-checks that mesh alone.
 - **Runs** as Generate Lighting's last step: in the editor on a worker thread, with
   its cells on the card's bar, so the editor and the MCP keep answering;

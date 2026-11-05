@@ -52,7 +52,7 @@
 //! - **Per frame, on purpose:** the base camera's LOD level and small-object
 //!   verdict, and a palette object's palette and posed bounds (unstamped).
 //!
-//! **The baked PVS** (#1714, `occlusion.rs`, outside the objects): bound whole per
+//! **The baked PVS** (#1714, `occlusion/`, outside the objects): bound whole per
 //! scene when `Scene::occlusion`'s revision moved, on a rebuild, or when the
 //! `LODGroup`s' renderers moved (read when `regroup` is set); a static object
 //! re-derived or moved re-checks that object alone. A camera reads its cell's row

@@ -59,12 +59,6 @@ mod inputs;
 mod object;
 mod occlusion;
 #[cfg(test)]
-mod occlusion_camera_gpu_tests;
-#[cfg(test)]
-mod occlusion_gpu_tests;
-#[cfg(test)]
-mod occlusion_ops;
-#[cfg(test)]
 mod shadow_ops;
 
 use std::collections::BTreeMap;

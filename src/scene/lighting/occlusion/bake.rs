@@ -1,5 +1,5 @@
 //! The occlusion bake (#1714): which baked objects each cell may see, by rays from
-//! seeded points in the cell to seeded points on each object's triangles, through
+//! seeded points in the cell to points on each object's triangles (`targets`), through
 //! the lightmap bake's BVH (`lightmap::Rays`), then dilated over each cell's
 //! neighbours and folded into shared rows. Gathered on the caller's thread
 //! ([`gather_occlusion`]) and baked on any ([`OcclusionInput::bake`]), so the editor

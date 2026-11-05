@@ -1,12 +1,12 @@
-//! src/render/scene/occlusion_ops.rs — what the equivalence tests add for the baked
+//! src/render/scene/occlusion/ops.rs — what the equivalence tests add for the baked
 //! PVS's binding (#1714): the yard made static and baked, and a check that the
 //! binding an extract keeps decides what one bound from scratch does, after any
 //! edit (a `LODGroup` change among them, through `shadow_ops`).
 
 use std::sync::Arc;
 
-use super::fixture::yard;
 use super::OcclusionBinding;
+use crate::render::scene::fixture::yard;
 use crate::render::Renderer;
 use crate::scene::lighting::occlusion::bake_occlusion;
 use crate::scene::Scene;

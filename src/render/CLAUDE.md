@@ -37,7 +37,7 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   and `passes::shadows::statics_key` (the from-scratch digest the tests compare)
   folds it too. The material table and the per-camera instance array are still
   rebuilt per frame: part 3.
-- **Occlusion culling reads the scene's baked PVS** (#1714, `scene/occlusion.rs`):
+- **Occlusion culling reads the scene's baked PVS** (#1714, `scene/occlusion/`):
   bound per scene and re-checked against a baked object's fingerprint only after
   that static object changed (a whole bind when the PVS, the objects or the
   `LODGroup`s' renderers changed); it may keep what is hidden and never culls what
