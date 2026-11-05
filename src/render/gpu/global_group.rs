@@ -1,11 +1,13 @@
 //! The forward renderer's group 0 (camera, lighting, skybox, reflection cube, the
 //! light clusters, the decals and the lightmap pages), built in one place: at setup
 //! and whenever a resource it names is swapped (a new skybox or probe cube array, a grown
-//! cluster or decal buffer, a grown decal atlas, a rebaked lightmap set, a
+//! cluster or decal buffer, a grown decal atlas, a rebaked lightmap set (its
+//! shadowmask pages too, #1695), a
 //! volumetric fog volume of another grid).
 
 use crate::render::clusters::ClusterBuffers;
 use crate::render::decals::DecalBuffers;
+use crate::render::gpu::lightmaps::LightmapBinding;
 
 /// What group 0 binds; see `bind_layouts::create_camera_lighting_layout`.
 pub(crate) struct GlobalGroup<'a> {
@@ -16,13 +18,9 @@ pub(crate) struct GlobalGroup<'a> {
     pub cube: (&'a wgpu::TextureView, &'a wgpu::Sampler),
     pub clusters: &'a ClusterBuffers,
     pub decals: &'a DecalBuffers,
-    /// The baked lightmap pages (#438), their direction pages (#810) and the
-    /// sampler both read through.
-    pub lightmaps: (
-        &'a wgpu::TextureView,
-        &'a wgpu::TextureView,
-        &'a wgpu::Sampler,
-    ),
+    /// The baked lightmap pages (#438), their direction (#810) and shadowmask
+    /// (#1695) pages and the sampler they read through.
+    pub lightmaps: LightmapBinding<'a>,
     /// The integrated volumetric fog and its sampler (#1703).
     pub fog_volume: (&'a wgpu::TextureView, &'a wgpu::Sampler),
 }
@@ -49,11 +47,12 @@ impl GlobalGroup<'_> {
             (11, TextureView(&self.decals.atlas.color_view)),
             (12, TextureView(&self.decals.atlas.data_view)),
             (13, Sampler(&self.decals.atlas.sampler)),
-            (14, TextureView(self.lightmaps.0)),
-            (15, Sampler(self.lightmaps.2)),
-            (16, TextureView(self.lightmaps.1)),
+            (14, TextureView(self.lightmaps.pages)),
+            (15, Sampler(self.lightmaps.sampler)),
+            (16, TextureView(self.lightmaps.directions)),
             (17, TextureView(self.fog_volume.0)),
             (18, Sampler(self.fog_volume.1)),
+            (19, TextureView(self.lightmaps.masks)),
         ];
         let entries: Vec<_> = resources
             .into_iter()

@@ -6,8 +6,9 @@
 //! lighting. The pieces:
 //!
 //! * `input` — the static scene flattened for the bake ([`BakeScene::gather`]);
-//! * `lights` — the lights it bakes, each one's [`LightShape`], and in `lights::area`
-//!   how an Area light's rectangle is sampled and falls off (#1674);
+//! * `lights` — the lights it bakes, each one's [`LightShape`], in `lights::area`
+//!   how an Area light's rectangle is sampled and falls off (#1674), and in
+//!   `lights::channels` which shadowmask channel each `Mixed` light gets (#1695);
 //! * `rays` / `raster` / `trace` — ray queries (parry's `TriMesh`), texel → surface
 //!   point, and the per-texel estimate (the units it stores are explained in `trace`);
 //! * `filter` — the edge-aware Gaussian that smooths the baked bounce;
@@ -16,13 +17,15 @@
 //!   mesh's texels share, in fixed-size batches (#1656);
 //! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
 //!   a cell its BC blocks and first [`MIP_LEVELS`] mips never leave (#1694);
-//! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, and the RGBA8 direction
-//!   page a directional bake adds (#810);
+//! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, the RGBA8 direction
+//!   page a directional bake adds (#810) and the RGBA8 shadowmask page a
+//!   `Shadowmask` bake adds (#1695);
 //! * `pages` — a packed page's mip chain, as BC6H irradiance and a BC7 direction
 //!   page (#1694), with the RGBM PNG beside it as the fallback;
 //! * `set` — the scene's pages and each entity's place in them ([`LightmapSet`]);
 //! * `probe_direct` — the direct light of `Baked` lights at light probes, which the
-//!   probe bake adds analytically ([`baked_direct_sh`], #809).
+//!   probe bake adds analytically ([`baked_direct_sh`], #809), and the probes'
+//!   shadowmask occlusion ([`mixed_occlusion`], #1695).
 //!
 //! The bake is a pure function of (scene, settings, seed): no clock, no unseeded RNG,
 //! and the result never depends on how many threads ran it.
@@ -47,12 +50,14 @@ pub use atlas::{
     MAX_PAGES, MIN_PAGE, MIP_LEVELS, PAD,
 };
 pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
-pub use encode::{decode_direction, decode_rgbm, encode_directions, encode_texels};
+pub use encode::{
+    decode_direction, decode_mask, decode_rgbm, encode_directions, encode_masks, encode_texels,
+};
 pub use input::{BakeLight, BakeMesh, BakeRun, BakeScene, LightShape};
 pub use lights::area::AreaShape;
-pub use lights::taken_lights;
-pub use pages::{colour_page, direction_levels, direction_page, level_count, levels};
-pub use probe_direct::baked_direct_sh;
+pub use lights::{assign_channels, taken_lights, MaskChannels, MASK_CHANNELS};
+pub use pages::{colour_page, direction_levels, direction_page, level_count, levels, mask_levels};
+pub use probe_direct::{baked_direct_sh, mixed_occlusion};
 pub use progress::BakeProgress;
 pub use raster::{lightmap_size, MIN_RESOLUTION};
 pub use set::{LightmapEntry, LightmapSet};
@@ -75,6 +80,8 @@ mod falloff_tests;
 mod gather_tests;
 #[cfg(test)]
 mod inset_tests;
+#[cfg(test)]
+mod mask_tests;
 #[cfg(test)]
 mod pages_bc_tests;
 #[cfg(test)]

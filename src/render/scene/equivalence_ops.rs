@@ -2,10 +2,9 @@
 //! sequences from (#1706): the ECS write paths of `ops_tests`, the inputs the log
 //! does not cover, and the shadow ops.
 
-use glam::Vec3;
 use proptest::prelude::*;
 
-use super::fixture::on;
+use super::fixture::{on, probe};
 use super::shadow_ops::{self, s_op, S};
 use crate::components::mesh::MeshRevision;
 use crate::components::{LightComponent, MaterialComponent, RenderMode};
@@ -68,7 +67,7 @@ pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
             create_entity(scene, "prop", Some(kinds[k as usize]));
         }
         R::Library(c) => library(scene, c),
-        R::Probe(x) => drop(scene.probes.add_probe(Vec3::X * f32::from(x))),
+        R::Probe(x) => probe(scene, x),
         R::Capture(on) => r.capture.static_only = on,
         R::Rewind => scene.world.rewind_changes(),
         R::Shadow(ref op) => shadow_ops::edit(scene, op),

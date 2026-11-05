@@ -257,6 +257,7 @@ impl ShadowSlots {
                     origin,
                     size,
                     texel,
+                    statics: true,
                 });
             }
         }

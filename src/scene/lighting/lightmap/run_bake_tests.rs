@@ -88,6 +88,7 @@ fn glass_is_lit_and_lets_light_through_to_the_floor() {
         },
         radiance: Vec3::splat(3.0),
         bakes_direct: true,
+        mask_channel: None,
     });
     let maps = bake(&baked, &settings());
     let map = |entity| maps.iter().find(|m| m.entity == entity).expect("baked");

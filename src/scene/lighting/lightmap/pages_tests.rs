@@ -11,6 +11,7 @@ use super::raster::fill_rest;
 
 fn map(entity: u32, size: u32, value: f32) -> Lightmap {
     Lightmap {
+        masks: Vec::new(),
         entity,
         size,
         texels: vec![Vec3::splat(value); (size * size) as usize],

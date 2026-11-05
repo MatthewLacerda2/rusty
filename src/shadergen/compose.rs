@@ -51,6 +51,7 @@ pub const MODULES: &[&str] = &[
     "forward/lightmap.wgsl",
     "forward/reflection.wgsl",
     "forward/local_shadow.wgsl",
+    "forward/shadowmask.wgsl",
     "postfx/params.wgsl",
     "postfx/frame.wgsl",
     "postfx/grade.wgsl",

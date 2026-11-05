@@ -8,7 +8,8 @@
 //!   (`Layer`) and the static flag (`StaticSet`). The skinned palette is the one ECS
 //!   input not stamped (`World::set_pose_palette`): read per camera.
 //! - **On the `Scene`, outside the log**, by revision (`scene::revision`): one
-//!   compare on a frame nothing wrote them. The probe field (`entity_probe_sh`) by
+//!   compare on a frame nothing wrote them. The probe field (`entity_probe_sh`, and
+//!   the shadowmask occlusion `probe_occlusion_at`, #1695) by
 //!   [`crate::scene::ProbeVolume::revision`]; the material library
 //!   (`material_entry_at`, `entity_params`) and the lightmap set (`solid_object`)
 //!   by their `Revisioned` revisions, kept with a copy compared only when a revision

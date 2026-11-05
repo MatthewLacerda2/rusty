@@ -91,6 +91,9 @@ pub const MARKS: &[Mark] = marks! {
         s.probes.probes().first().is_some_and(|p| p.position.x == 1.5);
     "probes.sh" as BakeOutput => |s, _| s.probes.probes_mut()[0].sh.coeffs[0] = [0.5; 3],
         s.probes.probes().first().is_some_and(|p| p.sh.coeffs[0] == [0.5; 3]);
+    "probes.occlusion" as BakeOutput
+        => |s, _| s.probes.probes_mut()[0].occlusion = glam::Vec4::new(0.0, 1.0, 1.0, 1.0),
+        s.probes.probes().first().is_some_and(|p| p.occlusion.x == 0.0);
     "reflection_probes" => |s, _| s.reflection_probes.probes[0].importance = 3,
         s.reflection_probes.probes.first().is_some_and(|p| p.importance == 3);
     "reflection_probes.cubemap" as BakeOutput

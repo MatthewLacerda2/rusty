@@ -22,7 +22,7 @@
 
 use std::f32::consts::{PI, TAU};
 
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
 
 use super::input::{BakeLight, BakeRun, BakeScene, LightShape};
 use super::lights::area::{strata, stratified};
@@ -55,6 +55,9 @@ pub(super) struct TexelLight {
     /// from, in the same units: `|indirect_dir| <= luminance(indirect)` (#810).
     pub indirect_dir: Vec3,
     pub direct_dir: Vec3,
+    /// Per shadowmask channel (#1695), how much of its `Mixed` light reaches the
+    /// texel past static occluders: 1 lit (or out of its reach), 0 shadowed.
+    pub mask: Vec4,
     /// False when most of the texel's rays start out hitting back faces: it sits
     /// inside other geometry (a floor texel under a crate), so its light is
     /// meaningless and the bake fills it from its neighbours instead (Unity's
@@ -95,6 +98,7 @@ impl Tracer<'_> {
             direct: direct / PI,
             indirect_dir: dir_sum / n,
             direct_dir: direct_dir / PI,
+            mask: self.mask(origin),
             valid: (inside as f32) < samples as f32 * BACKFACE_TOLERANCE,
         }
     }
@@ -192,6 +196,27 @@ impl Tracer<'_> {
             }
         }
         (e, dir)
+    }
+
+    /// The shadowmask at `point` (#1695): per channel, 0 where one shadow ray to
+    /// its light meets a static occluder that blocks light, else 1. A texel out of
+    /// the light's reach keeps 1, so a channel two far-apart lights share
+    /// (`lights::channels`) holds each one's shadow where it shines. Unity bakes
+    /// occlusion the same way: visibility, not light, so it multiplies a live
+    /// light's attenuation.
+    pub(super) fn mask(&self, point: Vec3) -> Vec4 {
+        let mut mask = Vec4::ONE;
+        for light in &self.scene.lights {
+            let Some(c) = light.mask_channel else {
+                continue;
+            };
+            if let Some((to_light, distance, _)) = arrival(light, point, Vec2::ZERO) {
+                if self.rays.occluded(point, to_light, T_MIN, distance) {
+                    mask[c as usize] = 0.0;
+                }
+            }
+        }
+        mask
     }
 
     /// What a ray escaping along `dir` sees: the ambient's radiance from there,

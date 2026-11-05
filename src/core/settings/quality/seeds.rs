@@ -5,7 +5,10 @@
 //! camera's). Every row moves between its levels (#1716): a test fails on one whose
 //! three levels are equal, unless it names the row with a reason.
 
-use super::{levels, QualityValues, SsaoQuality, SsilQuality, SsrQuality, VolumetricFogQuality};
+use super::{
+    levels, QualityValues, ShadowmaskMode, SsaoQuality, SsilQuality, SsrQuality,
+    VolumetricFogQuality,
+};
 
 const fn ssao(samples: u32, resolution_divisor: u32) -> SsaoQuality {
     SsaoQuality {
@@ -48,6 +51,7 @@ pub(super) fn low() -> QualityValues {
         motion_blur_samples: levels(4, 8, 16),
         volumetric_fog: levels(froxels(64, 32), froxels(80, 48), froxels(120, 64)),
         ui_blur_divisor: 4,
+        shadowmask_mode: ShadowmaskMode::Shadowmask,
     }
 }
 
@@ -63,6 +67,7 @@ pub(super) fn medium() -> QualityValues {
         motion_blur_samples: levels(16, 32, 32),
         volumetric_fog: levels(froxels(80, 48), froxels(120, 64), froxels(160, 64)),
         ui_blur_divisor: 2,
+        shadowmask_mode: ShadowmaskMode::Shadowmask,
     }
 }
 
@@ -77,5 +82,6 @@ pub(super) fn high() -> QualityValues {
         motion_blur_samples: levels(16, 32, 32),
         volumetric_fog: levels(froxels(120, 64), froxels(160, 64), froxels(160, 128)),
         ui_blur_divisor: 2,
+        shadowmask_mode: ShadowmaskMode::DistanceShadowmask,
     }
 }

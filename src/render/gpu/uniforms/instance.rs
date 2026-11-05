@@ -2,7 +2,7 @@
 //! draws (#470), split by who writes it (#1706).
 //!
 //! An [`ObjectData`] is what the object holds: its world matrix, its light-probe SH
-//! (#240) and where its baked lightmap sits (#438). A kept scene writes it into the
+//! (#240) and shadowmask occlusion (#1695), and where its baked lightmap sits (#438). A kept scene writes it into the
 //! object's slot of the renderer's persistent object array when it changes
 //! (`render::scene::ObjectTable`), never per camera. An [`InstanceData`] is what one
 //! camera decides for one object this frame: which object, the reflection probes it
@@ -40,6 +40,10 @@ pub(crate) struct ObjectData {
     pub in_bake: u32,
     pub lightmap_st: [f32; 4],
     pub sh: [[f32; 4]; 9],
+    // Per shadowmask channel (#1695), the light probes' static occlusion at the
+    // object (`ProbeVolume::sample_occlusion`): how a `Mixed` light's baked shadow
+    // reaches a surface no shadowmask page covers. All ones with no probe.
+    pub occlusion: [f32; 4],
 }
 
 impl ObjectData {
@@ -52,6 +56,7 @@ impl ObjectData {
         in_bake: 0,
         lightmap_st: [0.0; 4],
         sh: [[0.0; 4]; 9],
+        occlusion: [1.0; 4],
     };
 }
 
@@ -99,8 +104,12 @@ mod tests {
 
     #[test]
     fn records_keep_the_shader_layouts_size() {
-        // `ObjectData`: a mat4, four u32, a vec4, nine vec4. `InstanceData`: four u32.
-        assert_eq!(std::mem::size_of::<ObjectData>(), 64 + 16 + 16 + 9 * 16);
+        // `ObjectData`: a mat4, four u32, a vec4, nine vec4, a vec4. `InstanceData`:
+        // four u32.
+        assert_eq!(
+            std::mem::size_of::<ObjectData>(),
+            64 + 16 + 16 + 9 * 16 + 16
+        );
         assert_eq!(std::mem::size_of::<InstanceData>(), 16);
     }
 }

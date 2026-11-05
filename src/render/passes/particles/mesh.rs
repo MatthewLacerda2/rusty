@@ -16,7 +16,7 @@ use crate::components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderM
 use crate::render::draw::batch::sort::view_depth;
 use crate::render::draw::batch::{BatchKey, DrawItem};
 use crate::render::draw::materials::material_maps;
-use crate::render::draw::uniforms::probe_sh_at;
+use crate::render::draw::uniforms::{probe_occlusion_at, probe_sh_at};
 use crate::render::gpu::pipelines::Facing;
 use crate::render::gpu::uniforms::ObjectData;
 use crate::render::scene::Variant;
@@ -76,6 +76,7 @@ impl Renderer {
                     model_matrix: model.to_cols_array(),
                     use_sh,
                     sh,
+                    occlusion: probe_occlusion_at(scene, p.position),
                     ..ObjectData::IDENTITY
                 });
                 let item = DrawItem {

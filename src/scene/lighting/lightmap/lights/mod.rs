@@ -4,11 +4,18 @@
 use glam::Vec3;
 
 pub(in crate::scene::lighting::lightmap) mod area;
+mod channels;
+#[cfg(test)]
+mod channels_tests;
+#[cfg(test)]
+mod recorded_tests;
 #[cfg(test)]
 mod tests;
 
+pub use channels::{assign_channels, MaskChannels, MASK_CHANNELS};
+
 use super::input::BakeScene;
-use crate::components::LightType;
+use crate::components::{LightMode, LightType};
 use crate::scene::Scene;
 use area::AreaShape;
 
@@ -41,8 +48,12 @@ pub struct BakeLight {
     pub shape: LightShape,
     /// Colour times intensity (per unit area for an Area light).
     pub radiance: Vec3,
-    /// Whether the receiving texel's own direct light is baked (`Baked`).
+    /// Whether the receiving texel's own direct light is baked (`Baked`, or a
+    /// `Mixed` light that fell back for want of a shadowmask channel, #1695).
     pub bakes_direct: bool,
+    /// The shadowmask channel its static occlusion is baked into (#1695), for a
+    /// `Mixed` light of a `Shadowmask` bake (`channels`).
+    pub mask_channel: Option<u8>,
 }
 
 /// The lights a bake of `scene` takes in, by entity (`LightmapSet::lights`,
@@ -71,6 +82,33 @@ impl BakeScene {
     /// The active lights that take part in the bake (an `Ambient` light is in the
     /// sky already, through `Scene::drawn_ambient`).
     pub(super) fn gather_lights(&mut self, scene: &Scene) {
+        self.gather_lights_with(scene, assign_channels(scene));
+    }
+
+    /// Re-gather the lights with the shadowmask channels and fallbacks the scene's
+    /// last lightmap bake recorded (#1695), never assigned afresh: what the probe
+    /// bake uses, so a probe's occlusion channel is the one the frame masks the
+    /// light by (`Scene::mask_channel`), and a fallen-back light bakes direct where
+    /// the frame draws it as `Baked` (`Scene::light_mode`). A light the record
+    /// gave no channel has no occlusion in the probes.
+    pub fn use_recorded_channels(&mut self, scene: &Scene) {
+        let recorded = MaskChannels {
+            channels: (scene.lightmaps.channels.keys())
+                .filter_map(|&id| scene.mask_channel(id).map(|c| (id, c)))
+                .collect(),
+            fell_back: (scene.lightmaps.fell_back.iter().copied())
+                .filter(|&id| {
+                    let light = scene.world.light(id);
+                    light.is_some_and(|l| scene.light_mode(id, &l) == LightMode::Baked)
+                })
+                .collect(),
+        };
+        self.lights.clear();
+        self.gather_lights_with(scene, recorded);
+    }
+
+    fn gather_lights_with(&mut self, scene: &Scene, shadowmask: MaskChannels) {
+        self.shadowmask = shadowmask;
         for id in scene.world.ids_with_light() {
             if !scene.world.is_active_in_hierarchy(id) {
                 continue;
@@ -105,7 +143,8 @@ impl BakeScene {
                 self.lights.push(BakeLight {
                     shape,
                     radiance: light.color * light.intensity,
-                    bakes_direct: mode.bakes_direct(),
+                    bakes_direct: mode.bakes_direct() || self.shadowmask.fell_back.contains(&id),
+                    mask_channel: self.shadowmask.channels.get(&id).copied(),
                 });
             }
         }

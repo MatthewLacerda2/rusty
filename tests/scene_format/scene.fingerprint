@@ -806,9 +806,13 @@ scene.lighting_settings.lightmaps.max_lightmap_size: u32
 scene.lighting_settings.lightmaps.samples: u32
 scene.lighting_settings.lightmaps.seed: u64
 scene.lighting_settings.lightmaps.texels_per_unit: f32
+scene.lighting_settings.mixed_lighting_mode: enum BakedIndirect|Shadowmask
 scene.lighting_settings.reflections.budget_mb: u32
 scene.lighting_settings.reflections.max_probes: u32
 scene.lighting_settings.reflections.resolution: u32
+scene.lightmaps.channels: map
+scene.lightmaps.channels{key}: u32
+scene.lightmaps.channels{}: u8
 scene.lightmaps.directions: seq
 scene.lightmaps.directions[]: string
 scene.lightmaps.entries: seq
@@ -816,8 +820,12 @@ scene.lightmaps.entries[].entity: u32
 scene.lightmaps.entries[].page: u32
 scene.lightmaps.entries[].scale_offset: tuple(4)
 scene.lightmaps.entries[].scale_offset[]: f32
+scene.lightmaps.fell_back: seq
+scene.lightmaps.fell_back[]: u32
 scene.lightmaps.lights: seq
 scene.lightmaps.lights[]: u32
+scene.lightmaps.masks: seq
+scene.lightmaps.masks[]: string
 scene.lightmaps.pages: seq
 scene.lightmaps.pages[]: string
 scene.materials: map

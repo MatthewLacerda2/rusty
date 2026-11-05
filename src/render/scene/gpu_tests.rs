@@ -122,9 +122,10 @@ fn gpu_a_move_uploads_the_moved_record_alone_and_a_rebuild_none() {
     let mover = scene.world.ids_with_mesh()[0];
     scene.world.transform_mut(mover).unwrap().position.y += 0.01;
     let moved = frame(&mut r, &scene).1.render_upload_bytes;
+    let record = std::mem::size_of::<crate::render::gpu::uniforms::ObjectData>();
     assert_eq!(
         moved - idle,
-        240,
+        record as u64,
         "one object record, none per static object"
     );
     // A rebuild re-derives every object; each keeps its slot, so none uploads.

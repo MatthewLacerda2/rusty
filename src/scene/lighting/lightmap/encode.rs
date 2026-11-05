@@ -65,6 +65,23 @@ pub fn encode_directions(texels: &[Vec4]) -> Vec<u8> {
     texels.iter().flat_map(|&d| encode_direction(d)).collect()
 }
 
+/// One shadowmask texel (#1695) as RGBA8: each channel's occlusion, 0..=1, to a
+/// byte. Unity's shadowmask is 8 bits a channel too.
+pub fn encode_mask(mask: Vec4) -> [u8; 4] {
+    mask.to_array()
+        .map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8)
+}
+
+/// Decode one shadowmask texel back to its four occlusions.
+pub fn decode_mask(px: [u8; 4]) -> Vec4 {
+    Vec4::from_array(px.map(|b| b as f32 / 255.0))
+}
+
+/// A whole shadowmask page as RGBA8 bytes, row-major.
+pub fn encode_masks(texels: &[Vec4]) -> Vec<u8> {
+    texels.iter().flat_map(|&m| encode_mask(m)).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

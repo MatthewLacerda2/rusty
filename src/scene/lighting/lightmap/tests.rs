@@ -51,6 +51,7 @@ pub(super) fn sun(mode_baked: bool) -> BakeLight {
         shape: LightShape::Directional { direction: Vec3::X },
         radiance: Vec3::splat(3.0),
         bakes_direct: mode_baked,
+        mask_channel: None,
     }
 }
 
@@ -75,6 +76,7 @@ pub(super) fn mean(maps: &[Lightmap], entity: u32) -> f32 {
 #[test]
 fn same_seed_gives_identical_texels() {
     let scene = BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor(), wall()],
         lights: vec![sun(false)],
         sky: Vec3::new(0.3, 0.4, 0.5).into(),
@@ -94,6 +96,7 @@ fn a_mixed_light_reaches_the_floor_only_by_bounce() {
     // The sun travels along the floor (cos 0): it cannot light it directly, only off
     // the wall it hits head-on. No sky, so anything on the floor is bounce.
     let alone = BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor()],
         lights: vec![sun(false)],
         sky: Vec3::ZERO.into(),
@@ -125,6 +128,7 @@ fn a_mixed_light_reaches_the_floor_only_by_bounce() {
 #[test]
 fn a_baked_light_bakes_its_direct_light_too() {
     let scene = |baked| BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor(), wall()],
         lights: vec![sun(baked)],
         sky: Vec3::ZERO.into(),

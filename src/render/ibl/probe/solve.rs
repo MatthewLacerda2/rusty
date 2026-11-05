@@ -134,9 +134,10 @@ impl BounceSolve {
         if self.changed(scene) {
             return Err(PROBES_CHANGED.into());
         }
-        let field = self.volume.probes().iter().map(|p| p.sh);
-        for (probe, sh) in scene.probes.probes_mut().iter_mut().zip(field) {
+        let field = self.volume.probes().iter().map(|p| (p.sh, p.occlusion));
+        for (probe, (sh, occlusion)) in scene.probes.probes_mut().iter_mut().zip(field) {
             probe.sh = sh;
+            probe.occlusion = occlusion;
         }
         Ok(())
     }

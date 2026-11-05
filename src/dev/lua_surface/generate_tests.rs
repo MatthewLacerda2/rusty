@@ -42,28 +42,30 @@ fn reflection_settings_read_back_and_clamp() {
 }
 
 #[test]
-fn the_diffuse_model_reads_back_sets_and_refuses_an_unknown_name() {
-    use crate::scene::lighting::DiffuseModel;
+fn the_diffuse_and_mixed_modes_read_back_set_and_refuse_an_unknown_name() {
+    use crate::scene::lighting::{DiffuseModel as D, MixedLightingMode as M};
     let s = session();
-    assert_eq!(
-        s.eval("return Lighting.GetSettings().diffuseModel")
-            .unwrap(),
-        "Lambert"
-    );
-    s.eval("Lighting.SetSettings{ diffuseModel = 'HalfLambert' }")
-        .unwrap();
-    let model = || s.world().scene().borrow().lighting_settings.diffuse_model;
-    assert_eq!(model(), DiffuseModel::HalfLambert);
-    let err = s
-        .eval("Lighting.SetSettings{ diffuseModel = 'Wrap', samples = 3 }")
-        .unwrap_err();
-    assert!(err.contains("unknown diffuseModel"), "{err}");
+    let get = "local g = Lighting.GetSettings() return g.diffuseModel .. g.mixedLightingMode";
+    assert_eq!(s.eval(get).unwrap(), "LambertBakedIndirect");
+    s.eval(
+        "Lighting.SetSettings{ diffuseModel = 'HalfLambert', mixedLightingMode = 'shadowmask' }",
+    )
+    .unwrap();
+    let modes = || {
+        let l = s.world().scene().borrow().lighting_settings;
+        (l.diffuse_model, l.mixed_lighting_mode)
+    };
+    assert_eq!(modes(), (D::HalfLambert, M::Shadowmask));
+    let err = s.eval("Lighting.SetSettings{ mixedLightingMode = 'Subtractive' }");
+    assert!(err.unwrap_err().contains("BakedIndirect, Shadowmask"));
+    let err = s.eval("Lighting.SetSettings{ diffuseModel = 'Wrap', samples = 3 }");
+    assert!(err.unwrap_err().contains("unknown diffuseModel"));
     // A bad reflection field raises after the model is read: still nothing changes.
     s.eval("Lighting.SetSettings{ diffuseModel = 'lambert', reflectionBudgetMB = 'x' }")
         .unwrap_err();
     assert_eq!(
-        model(),
-        DiffuseModel::HalfLambert,
+        modes(),
+        (D::HalfLambert, M::Shadowmask),
         "refused calls change nothing"
     );
 }

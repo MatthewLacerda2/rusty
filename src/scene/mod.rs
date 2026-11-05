@@ -44,6 +44,7 @@ pub mod decal;
 pub mod default_scene;
 pub mod identity;
 pub mod io;
+mod light_mode;
 pub mod lighting;
 pub mod lod_instance;
 mod material_lookup;

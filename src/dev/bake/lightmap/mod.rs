@@ -15,7 +15,9 @@
 //! pages first so a rebake never leaves stale ones behind. `<tag>` hashes the page,
 //! so a rebake that changes a page changes its path and the renderer, which caches
 //! pages by path, loads the new one. A directional bake (#810) writes each page's
-//! direction page beside it as `lightmap_dir_<page>_<tag>` (BC7, and RGBA8 PNG).
+//! direction page beside it as `lightmap_dir_<page>_<tag>` (BC7, and RGBA8 PNG), and
+//! a `Shadowmask` bake (#1695) its shadowmask page as `lightmap_mask_<page>_<tag>.png`
+//! (RGBA8, one channel per masked light; the loader makes its mips).
 //!
 //! The bake splits in three so the editor can run the middle on a worker thread
 //! ([`job`], #808): [`gather_bake_input`] borrows the scene, `bake` needs only
@@ -76,6 +78,7 @@ pub fn bake_scene_lightmaps_logged(
     let input = gather_bake_input(scene);
     let mut encoded = logged::bake_logged(&input, settings, log)?;
     encoded.lights = crate::scene::lighting::lightmap::taken_lights(scene);
+    encoded.shadowmask = input.shadowmask.clone();
     warn_missing_uvs(lightmap_receivers(&input), encoded.maps);
     apply_encoded(scene, scene_path, &encoded)
 }
@@ -140,6 +143,8 @@ mod job_tests;
 mod limits_tests;
 #[cfg(test)]
 mod logged_tests;
+#[cfg(test)]
+mod shadowmask_tests;
 #[cfg(test)]
 mod survivor_tests;
 #[cfg(test)]

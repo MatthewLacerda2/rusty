@@ -135,3 +135,12 @@ pub(super) fn on(scene: &mut Scene, id: Option<u32>, f: impl FnOnce(&mut Scene, 
         f(scene, id);
     }
 }
+
+/// Add a probe at `x` along +X, or for an odd `x` write the first probe's
+/// shadowmask occlusion (#1695, `ObjectData::occlusion`).
+pub(super) fn probe(scene: &mut Scene, x: u8) {
+    match (x % 2, scene.probes.probes_mut().first_mut()) {
+        (1, Some(p)) => p.occlusion = glam::Vec4::splat(0.25 * f32::from(x)),
+        _ => drop(scene.probes.add_probe(Vec3::X * f32::from(x))),
+    }
+}

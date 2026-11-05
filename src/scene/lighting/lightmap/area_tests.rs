@@ -26,6 +26,7 @@ pub(super) fn panel(w: f32, h: f32, y: f32, range: f32) -> BakeLight {
         }),
         radiance: Vec3::splat(RADIANCE),
         bakes_direct: true,
+        mask_channel: None,
     }
 }
 
@@ -39,6 +40,7 @@ pub(super) fn direct_at(scene: &BakeScene, p: Vec3, normal: Vec3) -> f32 {
 
 pub(super) fn lit(lights: Vec<BakeLight>, meshes: Vec<BakeMesh>) -> BakeScene {
     BakeScene {
+        shadowmask: Default::default(),
         meshes,
         lights,
         sky: Vec3::ZERO.into(),
@@ -104,6 +106,7 @@ fn the_penumbra_widens_with_the_panel() {
         },
         radiance: Vec3::splat(RADIANCE),
         bakes_direct: true,
+        mask_channel: None,
     };
     let (hard, small, wide) = (
         penumbra(point),

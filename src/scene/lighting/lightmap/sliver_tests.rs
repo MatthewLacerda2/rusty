@@ -78,6 +78,7 @@ fn floor_halves(grating: bool) -> (f32, f32) {
         meshes.push(slivers);
     }
     let scene = BakeScene {
+        shadowmask: Default::default(),
         meshes,
         lights: Vec::new(),
         sky: Vec3::ONE.into(),

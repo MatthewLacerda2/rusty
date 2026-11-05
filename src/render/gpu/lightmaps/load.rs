@@ -13,7 +13,9 @@
 use std::path::Path;
 
 use crate::asset::lightmap_page::{self, PageFormat};
-use crate::scene::lighting::lightmap::{decode_direction, decode_rgbm, direction_levels, levels};
+use crate::scene::lighting::lightmap::{
+    decode_direction, decode_mask, decode_rgbm, direction_levels, levels, mask_levels,
+};
 
 /// Which pages a list holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -22,6 +24,9 @@ pub(crate) enum Kind {
     Colour,
     /// Directions (#810, `LightmapSet::directions`).
     Direction,
+    /// Shadowmasks (#1695, `LightmapSet::masks`): an RGBA8 PNG alone, whose mips
+    /// are made here.
+    Mask,
 }
 
 /// A page list ready to upload: its format, edge, and per page every level's
@@ -66,6 +71,9 @@ fn page(
     kind: Kind,
     bc: bool,
 ) -> Result<(wgpu::TextureFormat, u32, Vec<Vec<u8>>), String> {
+    if kind == Kind::Mask {
+        return mask_page(path);
+    }
     let is_ktx2 = Path::new(path)
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("ktx2"));
@@ -103,6 +111,7 @@ fn page(
             let bytes = chain.iter().map(|l| lightmap_page::to_rgba16f(l)).collect();
             (wgpu::TextureFormat::Rgba16Float, edge, bytes)
         }
+        Kind::Mask => unreachable!("a mask page is read by `mask_page`"),
         Kind::Direction => {
             let bytes = match mips {
                 true => {
@@ -115,4 +124,18 @@ fn page(
             (wgpu::TextureFormat::Rgba8Unorm, edge, bytes)
         }
     })
+}
+
+/// One shadowmask page (#1695): its PNG's occlusions with the mips the colour
+/// pages carry (`lightmap::mask_levels`, the same box filter), as RGBA8.
+fn mask_page(path: &str) -> Result<(wgpu::TextureFormat, u32, Vec<Vec<u8>>), String> {
+    let image = image::open(path).map_err(|e| e.to_string())?.to_rgba8();
+    let edge = image.width();
+    if image.height() != edge || edge == 0 {
+        return Err("not a square page".into());
+    }
+    let masks: Vec<_> = image.pixels().map(|p| decode_mask(p.0)).collect();
+    let chain = mask_levels(&masks, edge);
+    let bytes = chain.into_iter().map(|l| l.concat()).collect();
+    Ok((wgpu::TextureFormat::Rgba8Unorm, edge, bytes))
 }
