@@ -10,6 +10,19 @@ use crate::core::color::f16_to_f32;
 use crate::render::postfx::effects::volumetric_fog::VOLUME_NEAR;
 use crate::render::readback::read_mip_bytes;
 
+/// Slice `z` of the integrated volume's centre texel, after checking every
+/// texel of the slice is finite.
+fn centre_texel(r: &crate::render::Renderer, z: u32) -> [f32; 4] {
+    let [w, h, _] = r.fog_volume.grid().expect("the volume is in use");
+    let level = (r.fog_volume.texture(), 0, z);
+    let bytes = read_mip_bytes(&r.device, &r.queue, level, (w, h), 8);
+    let half = |at: usize| f16_to_f32(u16::from_le_bytes([bytes[at], bytes[at + 1]]));
+    let finite = (0..bytes.len()).step_by(2).all(|at| half(at).is_finite());
+    assert!(finite, "slice {z} holds a non-finite texel");
+    let at = (h as usize / 2 * w as usize + w as usize / 2) * 8;
+    std::array::from_fn(|c| half(at + 2 * c))
+}
+
 #[test]
 fn gpu_a_bright_lamp_in_thick_fog_stays_finite_and_lit() {
     let Some(mut r) = renderer() else { return };
@@ -24,32 +37,8 @@ fn gpu_a_bright_lamp_in_thick_fog_stays_finite_and_lit() {
     for _ in 0..3 {
         draw(&mut r, &mut v, &scene);
     }
-    let [w, h, d] = r.fog_volume.grid().expect("the volume is in use");
-    let (x, y) = ((w / 2) as usize, (h / 2) as usize);
-    let column: Vec<[f32; 4]> = (0..d)
-        .map(|z| {
-            let bytes = read_mip_bytes(
-                &r.device,
-                &r.queue,
-                (r.fog_volume.texture(), 0, z),
-                (w, h),
-                8,
-            );
-            assert!(
-                bytes
-                    .chunks(2)
-                    .all(|b| f16_to_f32(u16::from_le_bytes([b[0], b[1]])).is_finite()),
-                "slice {z} holds a non-finite texel"
-            );
-            let at = (y * w as usize + x) * 8;
-            std::array::from_fn(|c| {
-                f16_to_f32(u16::from_le_bytes([
-                    bytes[at + 2 * c],
-                    bytes[at + 2 * c + 1],
-                ]))
-            })
-        })
-        .collect();
+    let [_, _, d] = r.fog_volume.grid().expect("the volume is in use");
+    let column: Vec<[f32; 4]> = (0..d).map(|z| centre_texel(&r, z)).collect();
     // `fog::volumetric::froxel_depth` past the first slice: texel z ends at z + 1.
     let far_end = |z: u32| {
         let ratio = (thick.depth_extent / VOLUME_NEAR).ln();
