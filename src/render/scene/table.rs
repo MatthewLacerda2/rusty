@@ -19,9 +19,9 @@ use crate::render::gpu::uniforms::ObjectData;
 
 /// How many clean slots a dirty run may span to join the next one. Measured on
 /// lavapipe in release (#1706): one `write_buffer` call costs about 1.2 µs over its
-/// bytes, about what 8 KB of copy costs, so a gap of 16 records (3.75 KB) is cheaper
-/// rewritten than split, with room to spare for a GPU whose copies cost more.
-pub(crate) const JOIN_GAP: u32 = 16;
+/// bytes, about what 8 KB of copy costs, so a gap of 32 records (7.5 KB) costs about what
+/// a split would. Each call also allocates in wgpu (about four allocations).
+pub(crate) const JOIN_GAP: u32 = 32;
 
 pub(crate) struct ObjectTable {
     /// Every slot's record, freed ones included (unread until reused).
@@ -189,7 +189,7 @@ mod tests {
         let mut t = ObjectTable::default();
         (0..3 * JOIN_GAP).for_each(|_| _ = t.alloc());
         t.take_dirty();
-        // 15 clean slots between 2 and 18 join; 16 between 18 and 35 do not.
+        // JOIN_GAP - 1 clean slots between 2 and `near` join; JOIN_GAP after it do not.
         let (near, far) = (2 + JOIN_GAP, 3 + 2 * JOIN_GAP);
         for slot in [1, 2, near, far] {
             t.write(slot, at(slot as f32));
