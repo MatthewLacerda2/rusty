@@ -20,6 +20,11 @@
 // measured each level's mean spread and the record carries it (`table_kernel`,
 // `asset::texture_import::variance`). At the map's base level it adds nothing: a glossy
 // floor stays glossy up close.
+//
+// The widened value is for the lobe only (the lights, the environment's mip, SSR's
+// blur): the environment BRDF's weight, a pane's opacity and transparent SSR's fade
+// read the authored roughness (`shader.wgsl`, step 5), so a far glossy surface
+// keeps its grazing reflection.
 
 #define_import_path forward::specular_aa
 
