@@ -1,11 +1,12 @@
-//! Pre-creation of editor overlay resources: the floor grid and per-collider AABB
-//! wireframes (the selection outline is its own pass, `passes::outline`), and the
+//! Pre-creation of editor overlay resources: the floor grid, per-collider AABB
+//! wireframes, the selected camera's occlusion view (`occlusion`, #1714) (the selection outline is its own pass, `passes::outline`), and the
 //! pass that draws them over the finished image ([`handles`], #1224).
 
 mod axis;
 mod batch;
 mod handles;
 mod lights;
+mod occlusion;
 mod probes;
 
 use glam::{Mat4, Vec3};

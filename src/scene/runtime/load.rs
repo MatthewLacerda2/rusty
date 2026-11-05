@@ -11,7 +11,8 @@
 //! event system hold those ids. An incoming entity whose id a survivor already holds
 //! is moved to a fresh id instead (`make_room`), its references rewritten with it
 //! through the one id-field walk; a survivor's references to the entities left
-//! behind are cleared through the same walk.
+//! behind are cleared through the same walk, and the level's baked PVS renames its
+//! objects with the moves (#1714).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -78,7 +79,7 @@ impl Scene {
             .collect();
 
         let decals = self.take_persistent_decals(survivors);
-        make_room(&mut data, survivors);
+        let moved = make_room(&mut data, survivors);
         apply_scene_data(self, data);
         for mut entity in carried {
             if entity.parent_id.is_some_and(|p| !survivors.contains(&p)) {
@@ -96,14 +97,35 @@ impl Scene {
         self.pending_destroy.retain(|id| survivors.contains(id));
         self.land_persistent_decals(decals);
         self.renew_id();
-        crate::scene::lighting::io::load_lighting_sidecar(self, path)
+        let loaded = crate::scene::lighting::io::load_lighting_sidecar(self, path);
+        self.remap_occlusion(&moved);
+        loaded
+    }
+
+    /// The baked PVS was baked against the file's ids: rename the objects
+    /// `make_room` moved, so a carried entity never turns the level's culling off.
+    fn remap_occlusion(&mut self, moved: &BTreeMap<u32, u32>) {
+        if moved.is_empty() {
+            return;
+        }
+        let Some(data) = self.occlusion.as_deref() else {
+            return;
+        };
+        let remapped = data.remap(moved);
+        if remapped.is_none() {
+            log::warn!(
+                "[Occlusion] the bake's ids collide after the load: nothing is occlusion-culled"
+            );
+        }
+        *self.occlusion = remapped.map(std::sync::Arc::new);
     }
 }
 
 /// Move every incoming entity whose id is in `taken` to a fresh id past both the
 /// document's ids and `taken`, in document order (so the result is a pure function of
-/// the inputs), rewriting parent, child and component references to match.
-pub(super) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) {
+/// the inputs), rewriting parent, child and component references to match. Returns
+/// the moves, old id → new.
+pub(super) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) -> BTreeMap<u32, u32> {
     let mut next = data
         .entities
         .iter()
@@ -119,7 +141,7 @@ pub(super) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) {
     }
     data.next_entity_id = next;
     if moved.is_empty() {
-        return;
+        return moved;
     }
     let remap = |id: u32| moved.get(&id).copied().unwrap_or(id);
     for entity in &mut data.entities {
@@ -131,4 +153,5 @@ pub(super) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) {
         entity.remap_refs(&|r| Some(remap(r)));
     }
     data.selected_entity_id = data.selected_entity_id.map(remap);
+    moved
 }

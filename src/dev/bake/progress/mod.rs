@@ -12,6 +12,7 @@
 //! [Lighting] lightmap pages 50% (6/12 pages encoded), ~30 s left
 //! [Lighting] light probes, bounce 2 of at most 5: 40% (48/120 probes), ~1 min left in this bounce
 //! [Lighting] reflection probes 19% (3/16 probes), ~4 min left
+//! [Lighting] occlusion 62% (2260/3645 cells), ~4 s left
 //! [Lighting] done in 1 h 4 min
 //! ```
 //!
@@ -53,6 +54,8 @@ pub enum Step {
         max: u32,
     },
     ReflectionProbes,
+    /// The occlusion culling's PVS (#1714): cells baked of the grid's.
+    Occlusion,
 }
 
 /// Where a bake is: its step, the work done of the step's total (texels or probes),

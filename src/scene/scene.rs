@@ -45,13 +45,6 @@ pub const DEFAULT_AMBIENT_COLOR: Vec3 = Vec3::new(0.45, 0.55, 0.70);
 /// The default hemisphere-ambient intensity (scales [`DEFAULT_AMBIENT_COLOR`]).
 pub const DEFAULT_AMBIENT_INTENSITY: f32 = 0.55;
 
-fn default_ambient_color() -> Vec3 {
-    DEFAULT_AMBIENT_COLOR
-}
-fn default_ambient_intensity() -> f32 {
-    DEFAULT_AMBIENT_INTENSITY
-}
-
 pub struct Scene {
     /// This live scene's runtime identity (#355). Not scene *data* — it names the
     /// instance, so the renderer can key per-entity GPU caches by (scene, entity)
@@ -103,14 +96,18 @@ pub struct Scene {
     /// Scene-level reflection-probe dataset (#244): each probe is a capture position, a
     /// box volume for parallax correction, and a PATH to its baked cubemap (a KTX2
     /// sidecar — never inlined, like `skybox_path`). Lit objects reflect the nearest
-    /// applicable probe with box-projected parallax correction instead of the global
-    /// skybox. The cubemaps themselves are baked by a later issue (#245).
+    /// applicable probe with box-projected parallax correction, not the skybox.
     pub reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet,
     /// Baked lightmaps (#438): which lightmap page each static mesh wears. A mesh
     /// absent from it keeps probe / ambient lighting.
     /// Every write moves its revision (`scene::revision`), which the renderer reads.
     pub lightmaps:
         crate::scene::revision::Revisioned<crate::scene::lighting::lightmap::LightmapSet>,
+    /// The baked occlusion culling (#1714), from `<scene>.occlusion`: see its type.
+    pub occlusion: crate::scene::lighting::occlusion::SceneOcclusion,
+    /// The `<scene>.occlusion` file was there but could not be read (not a missing
+    /// file, not a refused one): a save keeps it rather than removing it as absent.
+    pub occlusion_unread: bool,
     /// What Generate Lighting bakes with (#832), saved with the scene.
     pub lighting_settings: crate::scene::lighting::LightingSettings,
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
@@ -169,8 +166,8 @@ impl Default for Scene {
             world: World::new(),
             selected_entity_id: None,
             skybox_path: default_skybox_path(),
-            ambient_color: default_ambient_color(),
-            ambient_intensity: default_ambient_intensity(),
+            ambient_color: DEFAULT_AMBIENT_COLOR,
+            ambient_intensity: DEFAULT_AMBIENT_INTENSITY,
             ambient: Default::default(),
             nav_settings: NavMeshSettings::default(),
             fog: crate::scene::FogSettings::default(),
@@ -182,6 +179,8 @@ impl Default for Scene {
             probes: crate::scene::lighting::probe::ProbeVolume::new(),
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
             lightmaps: Default::default(),
+            occlusion: Default::default(),
+            occlusion_unread: false,
             lighting_settings: Default::default(),
             pending_destroy: Vec::new(),
             playing: false,

@@ -11,9 +11,10 @@
 //! step then runs one step a frame (#1602, Unity's `BakeAsync`): the probes capture
 //! through the GPU, so they stay on the UI thread, but no frame waits on more than a
 //! reflection probe or a few light probes, and the editor and the MCP keep answering.
+//! Last, the occlusion culling's PVS bakes on a worker (#1714), its cells on the bar.
 //! The card shows the stage (the light probes' bounce, or the reflection probes) on
 //! a line above the bar and `i / n` in it; the console says each pass and probe. Then [`poll`]
-//! commits the probes and writes the lighting. A bake cancelled during the lightmaps
+//! commits the probes and writes the lighting, before the PVS bakes. A bake cancelled during the lightmaps
 //! writes nothing. The probe step bakes from a snapshot of the probes and applies them
 //! only at its end, so the scene stays editable while it runs; a probe added, removed
 //! or moved meanwhile drops it with nothing of the probes applied. It has no Cancel
@@ -21,21 +22,22 @@
 //! settings under the button (#810's directional mode among them) are the scene's,
 //! as `Lighting.SetSettings{…}` edits them.
 
-use crate::editor::widgets::DragRange;
 use std::path::Path;
 
 use egui_phosphor::regular as icon;
 
+use crate::dev::bake::lighting::LightingBakeReport;
 use crate::dev::bake::lightmap::LightmapBakeJob;
+use crate::dev::bake::occlusion::OcclusionBakeJob;
 use crate::dev::bake::steps::{LightingBake, Stage};
 use crate::editor::EditorUi;
-use crate::scene::lighting::lightmap::BakeSettings;
-use crate::scene::lighting::{DiffuseModel, MixedLightingMode};
 use crate::scene::{Scene, SceneId};
 use crate::scripting::ConsoleLogs;
 
 mod poll;
+mod settings;
 pub use poll::poll;
+use settings::{draw_diffuse_model, draw_mixed_mode, draw_settings};
 
 /// A background Generate Lighting and the scene it belongs to: the scene's runtime
 /// identity and the editor's open scene file when it started. A result for a scene
@@ -49,7 +51,7 @@ pub struct ActiveBake {
     path: Option<String>,
 }
 
-/// Which half of Generate Lighting is running.
+/// Which part of Generate Lighting is running.
 enum Step {
     /// The lightmaps, on their worker.
     Lightmaps(LightmapBakeJob),
@@ -59,6 +61,15 @@ enum Step {
         lightmaps: usize,
         path: String,
     },
+    /// The occlusion culling's PVS, on its worker, once the probes committed and
+    /// the lighting was written (`saved` says whether the file took it).
+    Occlusion {
+        job: OcclusionBakeJob,
+        lightmaps: usize,
+        probes: LightingBakeReport,
+        saved: crate::scene::LightingSave,
+        path: String,
+    },
 }
 
 impl ActiveBake {
@@ -66,7 +77,7 @@ impl ActiveBake {
     pub fn scene_path(&self) -> &str {
         match &self.step {
             Step::Lightmaps(job) => job.scene_path(),
-            Step::Probes { path, .. } => path,
+            Step::Probes { path, .. } | Step::Occlusion { path, .. } => path,
         }
     }
 }
@@ -109,96 +120,6 @@ pub fn draw(
         start(editor, scene, console);
     }
     draw_progress(ui, editor);
-}
-
-/// The scene's lightmap knobs; returns whether any changed.
-fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
-    let mut changed = false;
-    let mut row = |ui: &mut egui::Ui, drag: egui::DragValue, label: &str, hover: &str| {
-        ui.horizontal(|ui| {
-            changed |= ui.add(drag).on_hover_text(hover).changed();
-            ui.label(label);
-        });
-    };
-    let texels = egui::DragValue::new(&mut s.texels_per_unit).ranged(BakeSettings::TEXELS_PER_UNIT);
-    row(
-        ui,
-        texels.speed(0.1),
-        "Texels per unit",
-        "Lightmap resolution",
-    );
-    let samples = egui::DragValue::new(&mut s.samples).ranged(BakeSettings::SAMPLES);
-    row(
-        ui,
-        samples,
-        "Samples",
-        "Paths traced per texel; more is smoother and slower",
-    );
-    let bounces = egui::DragValue::new(&mut s.bounces).ranged(BakeSettings::BOUNCES);
-    row(
-        ui,
-        bounces,
-        "Bounces",
-        "Surfaces a path bounces off before it stops",
-    );
-    changed |= draw_max_lightmap_size(ui, &mut s.max_lightmap_size);
-    changed |= ui
-        .checkbox(&mut s.directional, "Directional lightmaps")
-        .on_hover_text("Bake light directions too, so normal maps show under baked light (#810)")
-        .changed();
-    changed
-}
-
-/// Unity's *Max Lightmap Size* (#1704): the atlas page edge, a power of two from
-/// [`BakeSettings::MAX_LIGHTMAP_SIZE`]; returns whether it changed.
-fn draw_max_lightmap_size(ui: &mut egui::Ui, size: &mut u32) -> bool {
-    let before = *size;
-    let (low, high) = BakeSettings::MAX_LIGHTMAP_SIZE.into_inner();
-    let edges = std::iter::successors(Some(low), |e| Some(e * 2)).take_while(|&e| e <= high);
-    egui::ComboBox::from_label("Max Lightmap Size")
-        .selected_text(size.to_string())
-        .show_ui(ui, |ui| {
-            for edge in edges {
-                ui.selectable_value(size, edge, edge.to_string());
-            }
-        })
-        .response
-        .on_hover_text("Atlas page edge in texels; the largest lightmap a mesh can get");
-    *size != before
-}
-
-/// The scene's diffuse model (#1698); returns whether it changed. Live lights follow
-/// it at once, baked light from the next Generate Lighting.
-fn draw_diffuse_model(ui: &mut egui::Ui, model: &mut DiffuseModel) -> bool {
-    let before = *model;
-    egui::ComboBox::from_label("Diffuse model")
-        .selected_text(model.name())
-        .show_ui(ui, |ui| {
-            for m in DiffuseModel::ALL {
-                ui.selectable_value(model, m, m.name());
-            }
-        })
-        .response
-        .on_hover_text(
-            "Lambert, or the retro half-Lambert wrap; Realtime and baked lamps both use it",
-        );
-    *model != before
-}
-
-/// The scene's Mixed Lighting Mode (#1695); returns whether it changed. It takes
-/// effect at the next Generate Lighting.
-fn draw_mixed_mode(ui: &mut egui::Ui, mode: &mut MixedLightingMode) -> bool {
-    let before = *mode;
-    egui::ComboBox::from_label("Mixed lighting")
-        .selected_text(mode.name())
-        .show_ui(ui, |ui| {
-            for m in MixedLightingMode::ALL {
-                ui.selectable_value(mode, m, m.name());
-            }
-        })
-        .response
-        .on_hover_text("Shadowmask also bakes Mixed lights' static shadows (next bake)");
-    *mode != before
 }
 
 /// Whether the card's scene file is the editor's open scene. Unity bakes the open
@@ -248,6 +169,7 @@ fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
     let job = match &active.step {
         Step::Lightmaps(job) => job,
         Step::Probes { job, .. } => return draw_probe_progress(ui, job.stage()),
+        Step::Occlusion { job, .. } => return draw_occlusion_progress(ui, job.cells()),
     };
     let (done, total) = job.progress();
     let text = match (job.is_cancelled(), job.pages(), total) {
@@ -285,7 +207,20 @@ fn draw_probe_progress(ui: &mut egui::Ui, stage: Stage) {
     ui.add_sized([180.0, 20.0], bar);
 }
 
+/// The occlusion step's bar: cells baked of the grid's.
+fn draw_occlusion_progress(ui: &mut egui::Ui, (done, total): (usize, usize)) {
+    ui.label("Occlusion culling");
+    let text = match total {
+        0 => "Preparing…".to_string(),
+        _ => format!("{done} / {total} cells"),
+    };
+    let bar = egui::ProgressBar::new(done as f32 / total.max(1) as f32).text(text);
+    ui.add_sized([180.0, 20.0], bar);
+}
+
 #[cfg(test)]
 mod drop_tests;
+#[cfg(test)]
+mod occlusion_drop_tests;
 #[cfg(test)]
 mod tests;

@@ -33,16 +33,18 @@ pub(super) fn bake_logged(
     if !log.is_on() {
         return run(&progress);
     }
-    watch(&progress, log, run)
+    watch(&progress, read, log, run)
 }
 
-/// Run `work` on a scoped worker while this thread logs `progress`. The step's
+/// Run `work` on a scoped worker while this thread logs `progress`, as `read`
+/// reads it (the lightmaps' counters, or the occlusion bake's, #1714). The step's
 /// first line is logged before the worker exists (#1808): a trace short enough to
 /// reach its pages before the first poll would otherwise never say it started.
-pub(super) fn watch<T: Send>(
-    progress: &BakeProgress,
+pub(in crate::dev::bake) fn watch<P: Sync, T: Send>(
+    progress: &P,
+    read: fn(&P) -> Progress,
     log: &mut BakeLog,
-    work: impl FnOnce(&BakeProgress) -> Result<T, String> + Send,
+    work: impl FnOnce(&P) -> Result<T, String> + Send,
 ) -> Result<T, String> {
     log.observe(read(progress));
     let (sent, result) = mpsc::channel();
@@ -67,7 +69,7 @@ pub(super) fn watch<T: Send>(
 }
 
 /// The bake's counters as the log reads them: the trace's, then the encode's.
-fn read(progress: &BakeProgress) -> Progress {
+pub(super) fn read(progress: &BakeProgress) -> Progress {
     if let Some((done, total)) = progress.pages() {
         return Progress {
             step: Step::LightmapPages,

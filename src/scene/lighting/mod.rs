@@ -1,9 +1,10 @@
 //! Baked lighting for a scene: the lighting sidecar I/O, editor placement of
 //! probe volumes, the irradiance probe grid and its analytic fill, reflection
-//! probes, the scene's bake settings, and the spherical-harmonics basis they all share.
+//! probes, the baked occlusion culling (`occlusion`, #1714), the scene's bake settings, and the spherical-harmonics basis they all share.
 
 pub mod io;
 pub mod lightmap;
+pub mod occlusion;
 pub mod placement;
 pub mod probe;
 pub mod probe_fill;

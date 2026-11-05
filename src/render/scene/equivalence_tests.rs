@@ -2,9 +2,9 @@
 //! objects and their object-table records equal a build from scratch (#1706): the
 //! ECS write paths of `ops_tests`, the inputs the log does not cover (library,
 //! overrides, lightmaps and a bake's light record (`in_bake`, #1750), probes, a
-//! capture, a re-uploaded shared mesh) and the shadow ops (`shadow_ops`), with a
-//! second kept scene holding the first's material names. Each slot's material
-//! record equals a fresh build's too. The tables leak no slot and the GPU mirrors
+//! capture, a re-uploaded shared mesh), the shadow ops (`shadow_ops`) and the baked
+//! PVS's binding (`occlusion::ops`, #1714), with a second kept scene holding the
+//! first's material names. Each slot's material record equals a fresh build's too. The tables leak no slot and the GPU mirrors
 //! them (`table_holds`). One renderer for every case.
 
 use proptest::prelude::*;
@@ -12,6 +12,7 @@ use proptest::test_runner::{Config, TestRunner};
 
 use super::equivalence_ops::{edit, library, r_op, R};
 use super::fixture::{fresh, held, table_holds, yard, RES};
+use super::occlusion::ops::{self as occlusion_ops, baked_yard};
 use super::shadow_ops;
 use crate::render::Renderer;
 
@@ -19,7 +20,7 @@ use crate::render::Renderer;
 /// material records, equal a fresh build. The second scene's library holds the
 /// first's names (#1706: a record is its scene's).
 fn holds(r: &mut Renderer, ops: &[R]) -> Result<(), TestCaseError> {
-    let (mut scene, mut other) = (yard(6), yard(3));
+    let (mut scene, mut other) = (baked_yard(6), yard(3));
     library(&mut other, 1);
     r.capture.static_only = false;
     r.extract_scene(&scene);
@@ -37,7 +38,8 @@ fn holds(r: &mut Renderer, ops: &[R]) -> Result<(), TestCaseError> {
             }
             let table = table_holds(r);
             prop_assert!(table.is_ok(), "{:?} after {:?}", table, ops);
-            let shadows = shadow_ops::kept_equals_fresh(r, &scene);
+            let shadows = shadow_ops::kept_equals_fresh(r, &scene)
+                .and_then(|()| occlusion_ops::kept_equals_fresh(r, &scene));
             prop_assert!(shadows.is_ok(), "{:?} after {:?}", shadows, ops);
         }
     }

@@ -38,7 +38,7 @@ use crate::scene::lighting::lightmap::{BakeScene, BakeSettings};
 use crate::scene::Scene;
 
 pub mod job;
-mod logged;
+pub(in crate::dev::bake) mod logged;
 mod pages;
 pub use job::{BakeOutcome, LightmapBakeJob};
 #[cfg(test)]

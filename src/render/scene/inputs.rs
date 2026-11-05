@@ -53,6 +53,12 @@
 //! - **Per frame, on purpose:** the base camera's LOD level and small-object
 //!   verdict, and a palette object's palette and posed bounds (unstamped).
 //!
+//! **The baked PVS** (#1714, `occlusion/`, outside the objects): bound whole per
+//! scene when `Scene::occlusion`'s revision moved, on a rebuild, or when the
+//! `LODGroup`s' renderers moved (read when `regroup` is set); a static object
+//! re-derived or moved re-checks that object alone. A camera reads its cell's row
+//! per frame, on purpose.
+//!
 //! **Decals** (`decals::kept`, outside the objects): each decal's maps are kept by
 //! decal id, re-read when it names another material or texture or the scene or
 //! library revision moved; its owner's pose and its age's fade are read every
@@ -75,7 +81,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::records::{params_moved, rekeys};
+use super::records::{library_diff, params_moved, rekeys};
 use crate::components::{
     LightComponent, LodGroupComponent, MaterialAsset, MaterialComponent, MeshComponent,
 };
@@ -235,7 +241,7 @@ impl<T: Clone + PartialEq> Kept<T> {
 }
 
 /// The material library, as the scene holds it.
-type Library = BTreeMap<String, MaterialAsset>;
+pub(super) type Library = BTreeMap<String, MaterialAsset>;
 
 impl Kept<Library> {
     /// Bring the copy up to `now`; the names whose material was added, removed or
@@ -260,35 +266,6 @@ impl Kept<Library> {
             };
         }
         edits
-    }
-}
-
-/// The names added, removed or edited between `old` and `new`: one merge walk of
-/// the two sorted maps, each name visited once.
-fn library_diff(old: &Library, new: &Library) -> BTreeSet<String> {
-    use std::cmp::Ordering::{Equal, Greater, Less};
-    let (mut a, mut b) = (old.iter().peekable(), new.iter().peekable());
-    let mut edited = BTreeSet::new();
-    loop {
-        let name = match (a.peek(), b.peek()) {
-            (None, None) => return edited,
-            (Some(_), None) => a.next().map(|(n, _)| n),
-            (None, Some(_)) => b.next().map(|(n, _)| n),
-            (Some((x, ma)), Some((y, mb))) => match x.cmp(y) {
-                Less => a.next().map(|(n, _)| n),
-                Greater => b.next().map(|(n, _)| n),
-                Equal if ma == mb => {
-                    a.next();
-                    b.next();
-                    None
-                }
-                Equal => {
-                    b.next();
-                    a.next().map(|(n, _)| n)
-                }
-            },
-        };
-        edited.extend(name.cloned());
     }
 }
 

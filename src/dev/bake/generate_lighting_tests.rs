@@ -89,6 +89,8 @@ fn the_summary_says_whether_the_scene_needs_saving() {
     let mut report = GenerateReport {
         lightmaps: 2,
         probes: Default::default(),
+        occlusion: Default::default(),
+        occlusion_ms: 0,
         saved: LightingSave::Written,
     };
     assert_eq!(

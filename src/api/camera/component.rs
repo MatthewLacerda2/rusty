@@ -1,6 +1,7 @@
 //! src/api/camera/component.rs — the `Camera` functions that take an entity id and
-//! tune its `CameraComponent` (#430): projection, culling mask (#827) and
-//! render-texture target, plus the lens and stacking fields (`lens`, #1341). Every
+//! tune its `CameraComponent` (#430): projection, culling mask (#827), occlusion
+//! culling (#1714) and render-texture target, plus the lens and stacking fields
+//! (`lens`, #1341). Every
 //! setter routes through `scene::authoring::rendering::camera`, the ops the inspector's Camera
 //! card uses. Getters return `nil` without a camera; setters are then no-ops.
 
@@ -49,6 +50,7 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
         ),
     )?;
     register_culling_mask(lua, table, scene)?;
+    register_occlusion_culling(lua, table, scene)?;
     super::lens::register(lua, table, scene)?;
     register_target(lua, table, scene)
 }
@@ -71,6 +73,31 @@ fn register_culling_mask(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Sc
             let id = id.live("Camera", "SetCullingMask")?;
             write(&*scene.get(lua)?, id, |c| {
                 camera_ops::set_culling_mask(c, mask as u32)
+            });
+            Ok(())
+        }),
+    )
+}
+
+/// `Get/SetUseOcclusionCulling` (#1714): Unity's `Camera.useOcclusionCulling`,
+/// whether the camera skips what the scene's baked PVS hides from its cell.
+fn register_occlusion_culling(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
+    put(
+        table,
+        "GetUseOcclusionCulling",
+        lua.create_function(move |lua, id: EntityArg| {
+            Ok(read(&*scene.get(lua)?, id.read(), |c| {
+                c.use_occlusion_culling
+            }))
+        }),
+    )?;
+    put(
+        table,
+        "SetUseOcclusionCulling",
+        lua.create_function(move |lua, (id, on): (EntityArg, bool)| {
+            let id = id.live("Camera", "SetUseOcclusionCulling")?;
+            write(&*scene.get(lua)?, id, |c| {
+                camera_ops::set_use_occlusion_culling(c, on)
             });
             Ok(())
         }),

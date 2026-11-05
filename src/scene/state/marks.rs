@@ -105,6 +105,9 @@ pub const MARKS: &[Mark] = marks! {
             scale_offset: [1.0, 1.0, 0.0, 0.0],
         }),
         s.lightmaps.get(b).is_some();
+    "occlusion" => |s, _| *s.occlusion = Some(std::sync::Arc::new(marked_occlusion())),
+        s.occlusion.as_ref().is_some_and(|d| d.grid.cell == 7.0);
+    "occlusion_unread" => |s, _| s.occlusion_unread = true, s.occlusion_unread;
     "lighting_settings" => |s, _| s.lighting_settings.reflections.budget_mb = 77,
         s.lighting_settings.reflections.budget_mb == 77;
     "pending_destroy" => |s, b| s.pending_destroy.push(b), s.pending_destroy.contains(&b);
@@ -143,4 +146,15 @@ pub fn all() -> Vec<&'static Mark> {
     #[cfg(feature = "dev")]
     let marks = marks.chain(DEV_MARKS);
     marks.collect()
+}
+
+/// A one-cell PVS of no object, its cell 7 m: the `occlusion` mark.
+fn marked_occlusion() -> crate::scene::lighting::occlusion::OcclusionData {
+    let grid = crate::scene::lighting::occlusion::Grid {
+        origin: Vec3::ZERO,
+        cell: 7.0,
+        dims: glam::UVec3::ONE,
+    };
+    crate::scene::lighting::occlusion::OcclusionData::new(grid, Vec::new(), Vec::new(), vec![0])
+        .expect("one cell, no object")
 }

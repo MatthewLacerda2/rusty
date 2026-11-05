@@ -8,6 +8,7 @@ use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
 mod motion_blur;
+mod occlusion;
 pub(crate) mod post_processing;
 mod taa;
 mod target;
@@ -35,6 +36,7 @@ pub fn draw_camera(
         target::draw_projection_mode(ui, world, id, &cam, is_dirty);
         draw_projection(ui, world, id, &cam, is_dirty);
         draw_culling_mask(ui, world, id, cam.culling_mask, named_layers, is_dirty);
+        occlusion::draw_occlusion_culling(ui, world, id, &cam, is_dirty);
         draw_stacking(ui, world, id, cam.render_order, cam.clear_flags, is_dirty);
         for section in camera_effects() {
             ui.push_id(section.effect, |ui| {

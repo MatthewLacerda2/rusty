@@ -6,12 +6,12 @@
 use std::collections::BTreeSet;
 
 use super::inputs::{Dirty, Inputs, LibraryEdits, RendererInputs};
-use super::{ExtractStats, RenderScene};
+use super::RenderScene;
 use crate::render::draw::materials::material_maps;
 use crate::render::gpu::material_cache::ParamOwner;
 use crate::render::passes::shadows::UnbakedCasters;
 use crate::render::Renderer;
-use crate::scene::Scene;
+use crate::scene::{Scene, SceneId};
 
 impl Renderer {
     /// Bring `scene`'s retained objects up to date. Once per frame, after everything
@@ -58,9 +58,10 @@ impl Renderer {
         inputs.uploads_seen = self.retained.meshes.uploads();
         inputs.render_textures_seen = self.retained.render_textures;
         if inputs.regroup {
-            rs.regroup(UnbakedCasters::of(scene));
+            rs.regroup(scene, UnbakedCasters::of(scene));
         }
         rs.refold_casting();
+        rs.occlusion.refresh(scene);
         stats
     }
 
@@ -132,6 +133,7 @@ impl Renderer {
             rs.set(id, None);
         }
         rs.casting = None;
+        rs.occlusion.forget();
         ExtractStats {
             extracted: self.derive_objects(scene, rs, &ids),
             posed: 0,
@@ -176,6 +178,9 @@ impl Renderer {
             if let Some(object) = rs.objects.get_mut(&id) {
                 self.pose_object(scene, id, object);
                 moved += 1;
+                if object.is_static {
+                    rs.occlusion.touch(id);
+                }
             }
         }
         ExtractStats {
@@ -212,6 +217,27 @@ impl Renderer {
             for (path, kind) in maps {
                 self.load_texture_as(&path, kind);
             }
+        }
+    }
+}
+
+/// What one extract did. `extract_scene` adds it to the frame's
+/// `RenderCounters`, which `Debug.Stats` reports as `render_extracted` and
+/// `render_posed` (`render::stats`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ExtractStats {
+    /// Objects re-derived whole: ids the extract re-read that still have a mesh.
+    pub extracted: u32,
+    /// Objects only re-placed (a move).
+    pub posed: u32,
+}
+
+impl Renderer {
+    /// Keep `rs` as scene `id`'s objects. A scene that evicts gives back its slots
+    /// and its material param buffers (`MaterialCache::release_scene`).
+    pub(super) fn keep_scene(&mut self, id: SceneId, rs: RenderScene) {
+        if let Some(gone) = self.retained.put(id, rs) {
+            self.materials.release_scene(gone);
         }
     }
 }

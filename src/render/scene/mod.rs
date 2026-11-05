@@ -33,6 +33,12 @@
 //! The equivalence tests (`equivalence_tests.rs`) hold that an incrementally updated
 //! scene equals one built from scratch; a new input gets a case there.
 //!
+//! **Occlusion** (#1714): the scene's baked PVS is bound to the objects
+//! ([`OcclusionBinding`]): bound whole when the PVS was replaced, the objects rebuilt
+//! or the `LODGroup`s' renderers moved, and otherwise re-checked only for the static
+//! objects re-derived or moved; a camera then culls an unchanged static object its
+//! cell cannot see.
+//!
 //! **Shadows** (part 2): the cascades' and the atlas's sweeps gather their casters
 //! from the objects (`passes::shadows::casters`), each slot carrying its shadow
 //! clip, and the static bakes' key is the scene's [`RenderScene::statics_key`],
@@ -70,6 +76,7 @@ mod handles;
 mod idle_tests;
 mod inputs;
 mod object;
+mod occlusion;
 pub(crate) mod records;
 #[cfg(test)]
 mod records_gpu_tests;
@@ -84,6 +91,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
 pub(crate) use object::{RenderObject, SlotDraw};
+pub(crate) use occlusion::OcclusionBinding;
 pub(crate) use records::{MaterialRecords, Variant};
 pub(crate) use table::{ObjectTable, SlotTable, Slotted};
 
@@ -179,6 +187,9 @@ pub(crate) struct RenderScene {
     /// the objects only after a static one was re-derived or `unbaked` changed;
     /// `None` until then.
     casting: Option<u64>,
+    /// The scene's baked PVS bound to these objects (#1714), re-bound after a static
+    /// one changed or the PVS was replaced.
+    pub(crate) occlusion: OcclusionBinding,
 }
 
 impl RenderScene {
@@ -191,7 +202,7 @@ impl RenderScene {
     fn set(&mut self, id: u32, object: Option<RenderObject>) {
         if let Some(old) = self.objects.remove(&id) {
             self.order.remove(&old.seq);
-            self.forget_casting(old.is_static);
+            self.forget_casting(id, old.is_static);
             for name in &old.materials {
                 let users = self.by_material.get_mut(name).expect("indexed with it");
                 users.remove(&id);
@@ -201,7 +212,7 @@ impl RenderScene {
             }
         }
         if let Some(object) = object {
-            self.forget_casting(object.is_static);
+            self.forget_casting(id, object.is_static);
             self.order.insert(object.seq, id);
             for name in &object.materials {
                 self.by_material.entry(name.clone()).or_default().insert(id);
@@ -233,17 +244,22 @@ impl RenderScene {
         self.order.clear();
         self.by_material.clear();
         self.casting = None;
+        self.occlusion.forget();
     }
 
-    /// A static object came or went: the digest is refolded.
-    fn forget_casting(&mut self, is_static: bool) {
+    /// Static object `id` came or went: the digest is refolded, and the PVS
+    /// re-checks it.
+    fn forget_casting(&mut self, id: u32, is_static: bool) {
         if is_static {
             self.casting = None;
+            self.occlusion.touch(id);
         }
     }
 
-    /// `unbaked` re-read: the digest is refolded when it moved.
-    fn regroup(&mut self, unbaked: UnbakedCasters) {
+    /// A `LODGroup` or a mesh changed: `unbaked` re-read, and the digest refolded
+    /// when it moved; the PVS re-bound if the groups' renderers moved.
+    fn regroup(&mut self, scene: &Scene, unbaked: UnbakedCasters) {
+        self.occlusion.regroup(scene);
         if unbaked != self.unbaked {
             self.unbaked = unbaked;
             self.casting = None;
@@ -267,26 +283,7 @@ impl RenderScene {
     }
 }
 
-/// What one extract did. `extract_scene` adds it to the frame's
-/// `RenderCounters`, which `Debug.Stats` reports as `render_extracted` and
-/// `render_posed` (`render::stats`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct ExtractStats {
-    /// Objects re-derived whole: ids the extract re-read that still have a mesh.
-    pub extracted: u32,
-    /// Objects only re-placed (a move).
-    pub posed: u32,
-}
-
 impl Renderer {
-    /// Keep `rs` as scene `id`'s objects. A scene that evicts gives back its slots
-    /// and its material param buffers (`MaterialCache::release_scene`).
-    fn keep_scene(&mut self, id: SceneId, rs: RenderScene) {
-        if let Some(gone) = self.retained.put(id, rs) {
-            self.materials.release_scene(gone);
-        }
-    }
-
     /// The resident buffers of the mesh `handle` names.
     pub(crate) fn gpu_mesh_of(&self, handle: MeshHandle) -> Option<&GpuMesh> {
         self.gpu_meshes.get(self.retained.meshes.id(handle))

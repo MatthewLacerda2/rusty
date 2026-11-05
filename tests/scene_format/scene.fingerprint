@@ -121,6 +121,7 @@ scene.entities[].camera.target_texture.post_fx: bool
 scene.entities[].camera.target_texture.update_every: u32
 scene.entities[].camera.target_texture.width: u32
 scene.entities[].camera.target_texture: option
+scene.entities[].camera.use_occlusion_culling: bool
 scene.entities[].camera: option
 scene.entities[].canvas.match_width_or_height: f32
 scene.entities[].canvas.pixels_per_unit: f32

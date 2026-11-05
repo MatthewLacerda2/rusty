@@ -25,9 +25,10 @@
 //! `Material.Set*` material) are one value class (`classes.rs`): a frame names a
 //! slot by [`MaterialRecords::rep`] before it batches, so they share a draw.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::classes::Classes;
+use super::inputs::Library;
 use super::table::{SlotTable, Slotted};
 use crate::components::MaterialAsset;
 use crate::render::draw::batch::RecordTraits;
@@ -257,3 +258,32 @@ fn record_free(m: &MaterialAsset) -> MaterialAsset {
 #[cfg(test)]
 #[path = "records_tests.rs"]
 mod tests;
+
+/// The names added, removed or edited between `old` and `new`: one merge walk of
+/// the two sorted maps, each name visited once.
+pub(super) fn library_diff(old: &Library, new: &Library) -> BTreeSet<String> {
+    use std::cmp::Ordering::{Equal, Greater, Less};
+    let (mut a, mut b) = (old.iter().peekable(), new.iter().peekable());
+    let mut edited = BTreeSet::new();
+    loop {
+        let name = match (a.peek(), b.peek()) {
+            (None, None) => return edited,
+            (Some(_), None) => a.next().map(|(n, _)| n),
+            (None, Some(_)) => b.next().map(|(n, _)| n),
+            (Some((x, ma)), Some((y, mb))) => match x.cmp(y) {
+                Less => a.next().map(|(n, _)| n),
+                Greater => b.next().map(|(n, _)| n),
+                Equal if ma == mb => {
+                    a.next();
+                    b.next();
+                    None
+                }
+                Equal => {
+                    b.next();
+                    a.next().map(|(n, _)| n)
+                }
+            },
+        };
+        edited.extend(name.cloned());
+    }
+}

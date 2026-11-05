@@ -14,6 +14,7 @@ pub(super) fn progress(p: &Progress, left: Option<Duration>) -> String {
             format!("light probes, bounce {bounce} of at most {max}:")
         }
         Step::ReflectionProbes => "reflection probes".to_string(),
+        Step::Occlusion => "occlusion".to_string(),
     };
     if p.total == 0 {
         return format!("[Lighting] {} preparing", what.trim_end_matches(':'));
@@ -27,6 +28,7 @@ pub(super) fn progress(p: &Progress, left: Option<Duration>) -> String {
         ),
         (Step::Lightmaps, None) => format!("{}/{} texels", count(p.done), count(p.total)),
         (Step::LightmapPages, _) => format!("{}/{} pages encoded", p.done, p.total),
+        (Step::Occlusion, _) => format!("{}/{} cells", p.done, p.total),
         _ => format!("{}/{} probes", p.done, p.total),
     };
     let mut line = format!("[Lighting] {what} {percent}% ({counts})");

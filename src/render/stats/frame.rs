@@ -33,6 +33,7 @@ impl Renderer {
         c.culled_entities += solids.culls.culled;
         c.size_culled_entities += solids.culls.size_culled;
         c.lod_hidden_entities += solids.culls.lod_hidden;
+        c.occlusion_culled += solids.culls.occluded;
         c.draw_calls += particles.draw_calls;
         c.particles_drawn += particles.instances + solids.mesh_particles;
     }

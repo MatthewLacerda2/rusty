@@ -77,6 +77,7 @@ inspect! {
         op!("fxaa_active", camera::set_fxaa_active),
         op!("taa_active", camera::set_taa_active),
         op!("projection", camera::set_projection),
+        op!("use_occlusion_culling", camera::set_use_occlusion_culling),
         with!("target_texture", |c, v: Option<RenderTarget>| set_target(c, v)),
     ];
     PostProcessingComponent => post_processing, post_processing_mut, &vc::FIELDS;

@@ -57,6 +57,13 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   in place and re-derives no object; any other edit re-derives only the objects naming
   that material (`RenderScene::by_material`). A record never reads the entity: a
   per-object input is a `Variant`, the object record, or the instance.
+- **Occlusion culling reads the scene's baked PVS** (#1714, `scene/occlusion/`):
+  bound per scene and re-checked against a baked object's fingerprint only after
+  that static object changed (a whole bind when the PVS, the objects or the
+  `LODGroup`s' renderers changed); it may keep what is hidden and never culls what
+  a camera sees. A new path that decides what a camera draws reads it through
+  `Renderer::occlusion_eye`, so a capture, an orthographic camera and a far near
+  plane cull nothing.
 
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no

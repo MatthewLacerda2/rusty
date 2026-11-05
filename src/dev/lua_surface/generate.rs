@@ -1,5 +1,6 @@
 //! `Lighting.Generate()` and the scene's lighting settings (#832): the one verb
-//! behind the editor's Generate Lighting button, and `Lighting.GetSettings()` /
+//! behind the editor's Generate Lighting button (lightmaps, probes and, #1714, the
+//! occlusion culling's PVS), and `Lighting.GetSettings()` /
 //! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, its
 //! Max Lightmap Size included, #1704, and the
 //! reflection probes' default resolution, memory budget and probe ceiling, #1584,
@@ -76,6 +77,10 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
             out.set("lightmaps", report.lightmaps)?;
             out.set("lightProbes", report.probes.light_probes)?;
             out.set("reflectionProbes", report.probes.reflection_probes)?;
+            out.set("occlusionCells", report.occlusion.cells)?;
+            out.set("occlusionObjects", report.occlusion.objects)?;
+            out.set("occlusionBytes", report.occlusion.bytes)?;
+            out.set("occlusionNeverCulled", report.occlusion.never_culled)?;
             out.set("saved", report.saved == crate::scene::LightingSave::Written)?;
             Ok(out)
         }),

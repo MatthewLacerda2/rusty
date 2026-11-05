@@ -182,6 +182,7 @@ pub fn default_camera() -> CameraComponent {
         fxaa_active: true,
         taa_active: false,
         projection: Default::default(),
+        use_occlusion_culling: true,
         target_texture: None,
     }
 }
