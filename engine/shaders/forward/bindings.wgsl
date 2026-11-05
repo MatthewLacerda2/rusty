@@ -102,6 +102,9 @@ struct ObjectData {
     in_bake: u32,
     lightmap_st: vec4<f32>,
     sh: array<vec4<f32>, 9>,
+    // Per shadowmask channel (#1695), the light probes' static occlusion at the
+    // object: a `Mixed` light's baked shadow where no shadowmask page covers it.
+    occlusion: vec4<f32>,
 };
 
 // One instance of an instanced draw (#470), indexed by `instance_index`: what one
@@ -187,6 +190,11 @@ var t_lightmap_dirs: texture_2d_array<f32>;
 var t_fog_volume: texture_3d<f32>;
 @group(0) @binding(18)
 var s_fog_volume: sampler;
+// The shadowmask pages of a `Shadowmask` bake (#1695), same layers and UVs: per
+// channel the static occlusion of the `Mixed` light on it (1 lit); a 1x1 page,
+// never read, unless `lighting.masks_bound`.
+@group(0) @binding(19)
+var t_lightmap_masks: texture_2d_array<f32>;
 
 @group(1) @binding(0)
 var<uniform> draw: DrawUniforms;

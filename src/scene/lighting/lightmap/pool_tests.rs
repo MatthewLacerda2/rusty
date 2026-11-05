@@ -74,6 +74,7 @@ fn a_bake_is_byte_identical_on_one_worker_or_many() {
         meshes.push(quad(10 + k, c, Vec3::splat(0.7)));
     }
     let scene = BakeScene {
+        shadowmask: Default::default(),
         meshes,
         lights: vec![sun(true)],
         sky: Vec3::new(0.3, 0.4, 0.5).into(),

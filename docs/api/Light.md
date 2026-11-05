@@ -168,14 +168,22 @@ whether it is drawn live:
 | Mode | Static, lightmapped surfaces | Dynamic objects (probe-lit) | Realtime shadows |
 |---|---|---|---|
 | `Realtime` | live direct light only, no bounce | live direct light only, no bounce | yes, if it casts shadows |
-| `Mixed` *(default)* | live direct light + baked bounce | live direct light + bounce from the probes | yes, if it casts shadows |
+| `Mixed` *(default)* | live direct light + baked bounce (+ its baked static shadow under `Shadowmask`) | live direct light + bounce from the probes (+ the probes' baked occlusion under `Shadowmask`) | yes, if it casts shadows |
 | `Baked` | direct light and bounce from the lightmap, and one specular highlight from a directional lightmap | direct light and bounce from the probes only, no highlight | no |
 
 - `Realtime` — direct light and shadows every frame; neither bake sees it, so it
   bounces nowhere (a muzzle flash, a flickering lamp).
-- `Mixed` — Unity's *Baked Indirect*: realtime direct light and shadows, plus its
-  bounce baked into the lightmaps and the light probes. No shadowmask. The light
-  that should cast sharp shadows on actors.
+- `Mixed` — realtime direct light (diffuse and specular) and shadows, plus its
+  bounce baked into the lightmaps and the light probes. What else it bakes is the
+  scene's **Mixed Lighting Mode** (`Lighting.SetSettings{ mixedLightingMode = … }`,
+  Unity's *Lighting Mode*): under `"BakedIndirect"` (the default, Unity's *Baked
+  Indirect*) nothing, so its shadow ends at the shadow distance. Under
+  `"Shadowmask"` (#1695) a shadow-casting `Mixed` light (the sun always) also bakes
+  its **static occlusion**: a shadowmask page beside each lightmap page for static
+  surfaces, and one value per light probe for dynamic objects. Its static shadows
+  then hold at any distance, it still glints on glossy surfaces, and a dynamic
+  enemy under it still casts a realtime shadow. The light that should cast sharp
+  shadows on actors. Details below.
 - `Baked` — costs nothing at runtime: it is never drawn live, anywhere. Static
   surfaces get it from their lightmap; dynamic objects get its direct light and its
   bounce from the light probes, whose bake adds the light's own direct light per
@@ -185,7 +193,7 @@ whether it is drawn live:
   Scale In Lightmap `0` ([`Lighting`](Lighting.md#generate-lighting)) takes it from the
   probes, as a dynamic object does.
 
-  **Its highlight** (#1695). A lightmap holds a `Baked` light's diffuse light only, so
+  **Its highlight** (#1695 step 1). A lightmap holds a `Baked` light's diffuse light only, so
   on its own a metal rail or a polished floor beside a `Baked` lamp shows no glint.
   A **directional** bake (`Lighting.BakeLightmaps`'s `directional`, on by default)
   also records where each texel's light comes from and how much of it is `Baked`
@@ -223,3 +231,52 @@ whether it is drawn live:
   - **A level needs a directional bake** to have it; a non-directional lightmap, a
     surface with no lightmap and a probe-lit dynamic object get none. No probe or
     reflection bake sees it, since it depends on the viewer.
+
+**Shadowmask** (#1695, Unity's *Shadowmask* and *Distance Shadowmask*). With the
+scene's Mixed Lighting Mode at `"Shadowmask"`
+([`Lighting`](Lighting.md#generate-lighting)), the next bake gives each `Mixed` light
+that casts shadows (and every `Mixed` directional light, which always does) one of
+four **channels** (Unity's `Light.bakingOutput.occlusionMaskChannel`) and stores, per
+lightmap texel and per light probe, how much of that light reaches it past static
+occluders. In the frame its direct light, diffuse and specular, stays live; its
+shadow is the baked one met with the realtime one as the running quality preset's
+`shadowmask_mode` says ([`Graphics`](Graphics.md#quality-presets)):
+
+- `"Shadowmask"` — only dynamic casters draw the light's realtime shadow, out to its
+  shadow distance (the sun's cascades; a point or spot light's own shadow fade
+  distance); the static shadow is the mask's at every distance, and the darker of
+  the two wins. Static casters stay out of its shadow maps, so they cost nothing
+  there.
+- `"DistanceShadowmask"` — every caster draws its realtime shadow within the shadow
+  distance, fading into the mask past it, as in Unity: no pop at the edge, only the
+  realtime shadow's softness giving way to the mask's.
+
+What to know:
+
+- **Four to a texel.** Channels are an overlap colouring of the lights' reach (a
+  point or spot light's range sphere; a directional light meets every light), so at
+  most four masked lights overlap anywhere. A light that finds all four taken **falls
+  back to `Baked`** in the bake's record (`GetMode` still reads `"Mixed"`): its direct
+  light goes into the lightmaps and probes, the frame stops drawing it live, and the
+  bake names it once in the console. So a level switches to `Mixed` only the lamps
+  that matter (the ones over glossy surfaces and in the actors' paths) and leaves the
+  rest `Baked`: each `Mixed` lamp takes a place in the frame's light loop, and the
+  clustered budget drops what is over it per cluster, as it always did.
+- **Past the shadow atlas's budget** a masked light still has its baked static
+  shadow; only its dynamic casters' shadow is missing that frame.
+- **What the mask holds.** A texel's channel is one shadow ray to the light, 0 or 1,
+  filtered by the page's mips and bilinear sampling, so the baked shadow's edge is as
+  sharp as the lightmap's texels. A probe's is the same ray from the probe,
+  interpolated at the object's position, so a dynamic object's baked shadow is soft
+  and whole-object. A static surface with no lightmap (no second UV map) reads the
+  probes' too; a lightmapped one whose shadowmask pages have not loaded yet has the
+  realtime shadow alone until they do.
+- **A light moved or retuned after the bake** keeps its old mask, as in Unity: its
+  static shadow stays where it was baked until the next bake.
+- **Switching back to `"BakedIndirect"`** draws as a `BakedIndirect` scene at once
+  (the mask is ignored); a light that fell back stays `Baked` until the next bake.
+- **Bake captures** (the light and reflection probes) draw a `Mixed` light as
+  `BakedIndirect` does: shadowed by realtime maps that hold every static caster.
+- **Costs.** One RGBA8 shadowmask page with mips per lightmap page (5.25 MiB on the
+  GPU for a 1024² page, with its three levels), one `vec4` per probe in the lighting sidecar, and in the
+  bake one more shadow ray per masked light per texel and per probe.

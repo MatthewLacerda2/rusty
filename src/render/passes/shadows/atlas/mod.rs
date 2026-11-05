@@ -26,7 +26,7 @@ mod hysteresis;
 mod plan;
 mod slots;
 mod sweep;
-pub(crate) use plan::{plan, Tile, ATLAS_SIZE, MAX_TILES};
+pub(crate) use plan::{plan, AtlasPlan, Tile, ATLAS_SIZE, MAX_TILES};
 pub(crate) use slots::{Frame, ShadowSlots};
 
 use super::casters::CasterBuffer;

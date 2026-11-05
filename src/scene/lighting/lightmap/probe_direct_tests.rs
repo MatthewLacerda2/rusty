@@ -19,11 +19,13 @@ fn lamp(baked: bool) -> BakeLight {
         },
         radiance: Vec3::splat(5.0),
         bakes_direct: baked,
+        mask_channel: None,
     }
 }
 
 fn scene(meshes: Vec<BakeMesh>, light: BakeLight) -> BakeScene {
     BakeScene {
+        shadowmask: Default::default(),
         meshes,
         lights: vec![light],
         sky: Vec3::ZERO.into(),

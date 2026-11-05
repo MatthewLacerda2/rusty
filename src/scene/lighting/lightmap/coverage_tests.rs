@@ -66,6 +66,7 @@ fn every_sub_texel_strip_owns_its_row_traced_on_its_own_surface() {
 #[test]
 fn sub_texel_strips_bake_lit_not_black() {
     let scene = BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![strips()],
         lights: Vec::new(),
         sky: Vec3::ONE.into(),

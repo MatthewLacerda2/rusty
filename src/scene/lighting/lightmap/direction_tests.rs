@@ -18,6 +18,7 @@ fn mean_dir(maps: &[Lightmap], entity: u32) -> Vec3 {
 fn a_baked_sun_points_the_wall_at_the_sun() {
     // The sun travels +X into the wall's front: its light arrives from -X.
     let scene = BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor(), wall()],
         lights: vec![sun(true)],
         sky: Vec3::ZERO.into(),
@@ -33,6 +34,7 @@ fn an_open_floor_under_the_sky_points_up_but_not_fully() {
     // An even sky over a floor arrives from the whole hemisphere: the dominant
     // direction is up and its directionality the cosine-weighted mean, about 2/3.
     let scene = BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor()],
         lights: Vec::new(),
         sky: Vec3::splat(0.5).into(),
@@ -50,6 +52,7 @@ fn an_open_floor_under_the_sky_points_up_but_not_fully() {
 #[test]
 fn the_filter_smooths_directions_and_keeps_them_unit_bounded() {
     let scene = BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor(), wall()],
         lights: vec![sun(false)],
         sky: Vec3::new(0.2, 0.3, 0.4).into(),
@@ -81,6 +84,7 @@ fn the_filter_smooths_directions_and_keeps_them_unit_bounded() {
 #[test]
 fn turning_it_off_drops_directions_and_keeps_the_colour() {
     let scene = BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor(), wall()],
         lights: vec![sun(true)],
         sky: Vec3::new(0.2, 0.3, 0.4).into(),
@@ -106,6 +110,7 @@ fn turning_it_off_drops_directions_and_keeps_the_colour() {
 #[test]
 fn direction_pages_share_the_colour_pages_layout() {
     let map = |entity, size: u32, value: f32| Lightmap {
+        masks: Vec::new(),
         entity,
         size,
         texels: vec![Vec3::splat(value); (size * size) as usize],

@@ -41,7 +41,7 @@ fn gpu_a_ktx2_page_binds_compressed_with_its_mips_or_from_its_png() {
         .contains(wgpu::Features::TEXTURE_COMPRESSION_BC);
     let pages = vec![page("a", 64), page("b", 64)];
     let mut maps = Lightmaps::new(device, true);
-    assert!(maps.bind(device, queue, &pages, &[]));
+    assert!(maps.bind(device, queue, &pages, &[], &[]));
     let format = match bc {
         true => wgpu::TextureFormat::Bc6hRgbUfloat,
         false => wgpu::TextureFormat::Rgba16Float,
@@ -62,7 +62,7 @@ fn gpu_a_ktx2_page_binds_compressed_with_its_mips_or_from_its_png() {
         .with_extension("png")
         .to_string_lossy()
         .into_owned()];
-    assert!(maps.bind(device, queue, &png, &[]));
+    assert!(maps.bind(device, queue, &png, &[], &[]));
     assert_eq!(
         maps.bound_format(),
         Some((wgpu::TextureFormat::Rgba16Float, 1)),
@@ -84,16 +84,19 @@ fn gpu_a_windowed_renderer_binds_once_the_read_lands() {
     let (device, queue) = (&renderer.device, &renderer.queue);
     let pages = vec![page("late", 32)];
     let mut maps = Lightmaps::new(device, false);
-    maps.bind(device, queue, &pages, &[]);
+    maps.bind(device, queue, &pages, &[], &[]);
     for _ in 0..2000 {
         if maps.resident() {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
-        maps.bind(device, queue, &pages, &[]);
+        maps.bind(device, queue, &pages, &[], &[]);
     }
     assert!(maps.resident(), "the worker's read landed and bound");
-    assert!(!maps.bind(device, queue, &pages, &[]), "and then holds");
+    assert!(
+        !maps.bind(device, queue, &pages, &[], &[]),
+        "and then holds"
+    );
 }
 
 #[test]
@@ -108,7 +111,7 @@ fn gpu_a_loader_that_died_is_a_failed_load_not_pending_forever() {
     drop(outbox); // the worker panicked before it answered
     maps.cache
         .insert(list.clone(), super::Entry::Pending(inbox));
-    maps.bind(device, queue, &list, &[]);
+    maps.bind(device, queue, &list, &[], &[]);
     assert!(matches!(maps.cache[&list], super::Entry::Ready(None)));
     assert!(!maps.resident());
 }

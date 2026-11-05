@@ -13,6 +13,7 @@ use crate::asset::lightmap_page::decode_bc6h;
 
 fn map(entity: u32, size: u32, light: Vec3) -> Lightmap {
     Lightmap {
+        masks: Vec::new(),
         entity,
         size,
         texels: vec![light; (size * size) as usize],

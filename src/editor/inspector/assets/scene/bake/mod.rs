@@ -30,7 +30,7 @@ use crate::dev::bake::lightmap::LightmapBakeJob;
 use crate::dev::bake::steps::{LightingBake, Stage};
 use crate::editor::EditorUi;
 use crate::scene::lighting::lightmap::BakeSettings;
-use crate::scene::lighting::DiffuseModel;
+use crate::scene::lighting::{DiffuseModel, MixedLightingMode};
 use crate::scene::{Scene, SceneId};
 use crate::scripting::ConsoleLogs;
 
@@ -101,6 +101,7 @@ pub fn draw(
         .add_enabled_ui(idle, |ui| {
             draw_settings(ui, &mut settings.lightmaps)
                 | draw_diffuse_model(ui, &mut settings.diffuse_model)
+                | draw_mixed_mode(ui, &mut settings.mixed_lighting_mode)
         })
         .inner;
     editor.is_dirty |= changed;
@@ -182,6 +183,22 @@ fn draw_diffuse_model(ui: &mut egui::Ui, model: &mut DiffuseModel) -> bool {
             "Lambert, or the retro half-Lambert wrap; Realtime and baked lamps both use it",
         );
     *model != before
+}
+
+/// The scene's Mixed Lighting Mode (#1695); returns whether it changed. It takes
+/// effect at the next Generate Lighting.
+fn draw_mixed_mode(ui: &mut egui::Ui, mode: &mut MixedLightingMode) -> bool {
+    let before = *mode;
+    egui::ComboBox::from_label("Mixed lighting")
+        .selected_text(mode.name())
+        .show_ui(ui, |ui| {
+            for m in MixedLightingMode::ALL {
+                ui.selectable_value(mode, m, m.name());
+            }
+        })
+        .response
+        .on_hover_text("Shadowmask also bakes Mixed lights' static shadows (next bake)");
+    *mode != before
 }
 
 /// Whether the card's scene file is the editor's open scene. Unity bakes the open

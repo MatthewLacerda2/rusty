@@ -260,15 +260,18 @@ fn sample_cascade(c: i32, world_pos: vec3<f32>, N: vec3<f32>, NdotL: f32) -> f32
     return lit / taps;
 }
 
-// The sun's visibility at `world_pos`: the cascade whose slice holds the fragment's
-// view depth, cross-faded into the next over the last `blend` of its range, and
-// faded out over the last tenth of the shadow distance so the edge never pops.
-fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
+// The sun's visibility at `world_pos`, in two parts: the cascade whose slice holds
+// the fragment's view depth, cross-faded into the next over the last `blend` of its
+// range (x), and how far it has faded out over the last tenth of the shadow
+// distance (y: 0 inside, 1 past it or with no cascade), so the edge never pops.
+// `forward::shadowmask::sun_shadow` fades x to lit by y, and under a shadowmask
+// into the baked shadow (#1695).
+fn sun_shadow_parts(world_pos: vec3<f32>, N: vec3<f32>) -> vec2<f32> {
     let count = i32(shadow.params.x);
     let distance = shadow.params.y;
     let depth = dot(world_pos - shadow.view_pos.xyz, shadow.view_dir.xyz);
     if (count == 0 || depth >= distance) {
-        return 1.0;
+        return vec2<f32>(1.0, 1.0);
     }
     var c = 0;
     while (c < count - 1 && depth > shadow.splits[c]) {
@@ -283,7 +286,7 @@ fn calculate_shadow(world_pos: vec3<f32>, N: vec3<f32>) -> f32 {
         lit = mix(lit, sample_cascade(c + 1, world_pos, N, NdotL), t);
     }
     let fade = clamp((depth - distance * 0.9) / (distance * 0.1), 0.0, 1.0);
-    return mix(lit, 1.0, fade);
+    return vec2<f32>(lit, fade);
 }
 
 // Reconstruct diffuse irradiance from the entity's L2 SH probe for a surface normal

@@ -34,7 +34,7 @@ mod sample;
 
 use std::sync::OnceLock;
 
-use glam::Vec3;
+use glam::{Vec3, Vec4};
 use serde::{Deserialize, Serialize};
 
 use crate::scene::lighting::sh::Sh9;
@@ -61,6 +61,16 @@ pub struct Probe {
     pub manual: bool,
     #[serde(skip)]
     pub sh: Sh9,
+    /// Per shadowmask channel (#1695), how much of its `Mixed` light reaches the
+    /// probe past static occluders: 1 lit, 0 shadowed (Unity's light-probe
+    /// occlusion). All ones until a `Shadowmask` bake writes it; in the sidecar
+    /// beside the SH.
+    #[serde(skip, default = "unoccluded")]
+    pub occlusion: Vec4,
+}
+
+fn unoccluded() -> Vec4 {
+    Vec4::ONE
 }
 
 impl Probe {
@@ -69,6 +79,7 @@ impl Probe {
             position,
             manual: false,
             sh: Sh9::zero(),
+            occlusion: Vec4::ONE,
         }
     }
 }

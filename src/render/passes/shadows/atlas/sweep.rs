@@ -90,7 +90,10 @@ impl ShadowRenderer {
             for (&i, batches) in stale.iter().zip(&batches) {
                 focus(&mut pass, &tiles[i]);
                 self.atlas.blit.clear(&mut pass);
-                self.draw_casters(&mut pass, frame, batches, Sweep::AtlasStatic, i);
+                // A shadowmasked tile keeps its statics out (#1695): cleared only.
+                if tiles[i].statics {
+                    self.draw_casters(&mut pass, frame, batches, Sweep::AtlasStatic, i);
+                }
             }
         }
         let rebaked = stale.iter().map(|&i| tiles[i]);

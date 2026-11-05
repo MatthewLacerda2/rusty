@@ -14,6 +14,7 @@ fn tile(origin: [u32; 2], size: u32, eye: Vec3) -> Tile {
         origin,
         size,
         texel: 0.01,
+        statics: true,
     }
 }
 

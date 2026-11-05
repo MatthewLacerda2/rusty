@@ -123,6 +123,27 @@ pub struct QualityValues {
     /// The UI backdrop blur's working-resolution divisor (#426), a power of two. The
     /// UI has no volume, so it takes one value, not three levels.
     pub ui_blur_divisor: u32,
+    /// Which casters draw a shadowmasked light's realtime shadow (#1695), Unity's
+    /// `QualitySettings.shadowmaskMode`: one value per preset, as Unity keeps it
+    /// per quality level.
+    pub shadowmask_mode: ShadowmaskMode,
+}
+
+crate::core::named_enum! {
+    /// Unity's *Shadowmask Mode* (#1695), read only where the scene's Mixed
+    /// Lighting Mode is `Shadowmask`.
+    ///
+    /// * `Shadowmask` — only dynamic casters draw a `Mixed` light's realtime shadow;
+    ///   static casters' shadows come from the baked mask at every distance, and
+    ///   the darker of the two wins. Cheaper: static casters stay out of its maps.
+    /// * `DistanceShadowmask` — every caster draws it within the shadow distance,
+    ///   fading to the baked mask past it.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum ShadowmaskMode {
+        #[default]
+        Shadowmask = "Shadowmask",
+        DistanceShadowmask = "DistanceShadowmask",
+    }
 }
 
 impl QualityValues {

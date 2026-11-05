@@ -10,7 +10,8 @@ use super::lightmap::BakeSettings;
 use super::reflection_probe::clamp_resolution;
 
 /// Unity's Lighting Settings, the part rusty has: the lightmap bake's knobs, the
-/// reflection probes' defaults and the diffuse model every lit path shades with.
+/// reflection probes' defaults, the diffuse model every lit path shades with and
+/// what a `Mixed` light means (its Mixed Lighting Mode, #1695).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LightingSettings {
@@ -24,6 +25,41 @@ pub struct LightingSettings {
     /// Lambert, so a scene saved before it existed round-trips unchanged.
     #[serde(skip_serializing_if = "DiffuseModel::is_lambert")]
     pub diffuse_model: DiffuseModel,
+    /// What the bake and the frame make of a `Mixed` light (#1695), Unity's
+    /// *Lighting Mode*: `BakedIndirect` (the default, left out of the file) or
+    /// `Shadowmask`. A change takes effect at the next bake: the frame follows
+    /// what the last bake recorded (`LightmapSet::channels`).
+    #[serde(skip_serializing_if = "MixedLightingMode::is_baked_indirect")]
+    pub mixed_lighting_mode: MixedLightingMode,
+}
+
+crate::core::named_enum! {
+    /// Unity's scene-level *Mixed Lighting Mode* (#1695): what a `Mixed` light
+    /// bakes and how it shades.
+    ///
+    /// * `BakedIndirect` — its bounce is baked, its direct light and shadows are
+    ///   realtime: no shadow past the shadow distance. The default.
+    /// * `Shadowmask` — also bakes each `Mixed` light's static occlusion, per
+    ///   texel into a shadowmask page beside each lightmap page and per light
+    ///   probe for dynamic objects, so its direct light (diffuse and specular) is
+    ///   realtime but its static shadows hold at any distance. At most four
+    ///   overlapping `Mixed` lights share a texel (one channel each); a light that
+    ///   gets no channel bakes as `Baked`. Which casters draw its realtime shadow is
+    ///   the quality preset's `shadowmask_mode` (Unity's `QualitySettings.shadowmaskMode`).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum MixedLightingMode {
+        #[default]
+        BakedIndirect = "BakedIndirect",
+        Shadowmask = "Shadowmask",
+    }
+}
+
+impl MixedLightingMode {
+    /// True for the default, [`MixedLightingMode::BakedIndirect`]: the scene file
+    /// then leaves it out, so a scene saved before it existed round-trips unchanged.
+    pub fn is_baked_indirect(&self) -> bool {
+        *self == Self::BakedIndirect
+    }
 }
 
 /// The diffuse response to a lamp's direct light, scene-wide (#1698). It applies

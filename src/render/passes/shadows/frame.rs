@@ -37,6 +37,7 @@ impl Renderer {
         self.queue
             .write_buffer(&self.shadow_uniform_buffer, 0, bytemuck::bytes_of(&uniform));
         self.shadow_renderer.instancing = self.instancing;
+        self.shadow_renderer.sun_statics = !self.statics_masked(scene, live_sun_id(scene, false));
         self.shadow_renderer.update_cascades(&self.queue, fitted);
         self.shadow_renderer
             .set_time(&self.queue, scene.shader_time);
@@ -108,9 +109,11 @@ impl Renderer {
             let slots = &mut self.shadow_renderer.atlas.slots;
             slots.plan(Some(scene.id()), &frame, |id| scene.world.contains(id))
         };
+        let mut plan = plan;
         for &(light, first_tile) in &plan.shadows {
             self.clusters.set_shadow(light, first_tile);
         }
+        self.keep_masked_statics_out(scene, &requests, &mut plan);
         self.upload_local_lights();
         let c = &mut self.frame_counters;
         c.shadowed_lights = plan.shadows.len() as u32;
@@ -118,6 +121,44 @@ impl Renderer {
         c.shadow_atlas_tiles = plan.tiles.len() as u32;
         c.shadow_atlas_texels = plan.texels();
         self.shadow_renderer.atlas.update(&self.queue, plan.tiles);
+    }
+}
+
+impl Renderer {
+    /// Whether light `id`'s realtime shadow leaves static casters out (#1695): the
+    /// frame (never a bake capture, which draws `Mixed` lights as `BakedIndirect`
+    /// does) under `Shadowmask`, not `DistanceShadowmask`, for a light the scene
+    /// masks by a channel. Its static shadow is then the baked mask's.
+    fn statics_masked(&self, scene: &Scene, id: Option<u32>) -> bool {
+        use crate::core::settings::quality::ShadowmaskMode;
+        let plain = self.quality.shadowmask_mode == ShadowmaskMode::Shadowmask;
+        let masked = id.and_then(|id| scene.mask_channel(id)).is_some();
+        !self.capture.static_only && plain && masked
+    }
+
+    /// Mark the tiles of every light [`Self::statics_masked`] keeps statics out of,
+    /// so the atlas bakes them without (`Tile::statics`).
+    fn keep_masked_statics_out(
+        &self,
+        scene: &Scene,
+        requests: &[(clusters::LocalLight, bool)],
+        plan: &mut atlas::AtlasPlan,
+    ) {
+        let ids = local_light_ids(scene, self.capture.static_only);
+        for &(light, first) in &plan.shadows {
+            if !self.statics_masked(scene, ids.get(light).copied()) {
+                continue;
+            }
+            let faces = if requests[light].0.one_frustum() {
+                1
+            } else {
+                6
+            };
+            let first = first as usize;
+            for tile in plan.tiles.iter_mut().skip(first).take(faces) {
+                tile.statics = false;
+            }
+        }
     }
 }
 
@@ -130,7 +171,7 @@ pub(super) fn local_light_ids(scene: &Scene, capture: bool) -> Vec<u32> {
         .filter(|&id| world.is_active_in_hierarchy(id))
         .filter(|&id| {
             world.light(id).is_some_and(|light| {
-                light.effective_mode().renders_live(capture)
+                scene.light_mode(id, &light).renders_live(capture)
                     && matches!(
                         light.light_type,
                         LightType::Point | LightType::Spotlight | LightType::Area
@@ -160,17 +201,24 @@ fn frame_cascades(
 /// (#809), so the cascades follow the light in the uniform's slot 0. The sun always
 /// casts: its `cast_shadows` is not read.
 fn live_sun(scene: &Scene, capture: bool) -> Option<Vec3> {
-    let mut dir = None;
+    let id = live_sun_id(scene, capture)?;
+    Some(scene.world.transform_direction(id, Vec3::NEG_Z).normalize())
+}
+
+/// The entity of [`live_sun`]'s light.
+fn live_sun_id(scene: &Scene, capture: bool) -> Option<u32> {
+    let mut sun = None;
     for id in scene.world.ids_with_light() {
         if !scene.world.is_active_in_hierarchy(id) {
             continue;
         }
         let light = scene.world.light(id).expect("id came from ids_with_light");
-        if light.light_type == LightType::Directional && light.mode.renders_live(capture) {
-            dir = Some(scene.world.transform_direction(id, Vec3::NEG_Z).normalize());
+        let live = scene.light_mode(id, &light).renders_live(capture);
+        if light.light_type == LightType::Directional && live {
+            sun = Some(id);
         }
     }
-    dir
+    sun
 }
 
 #[cfg(test)]

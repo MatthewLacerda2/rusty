@@ -894,7 +894,7 @@ without one, the middle preset):
     "ssil": { … }, "ssr": { … }, "bloom_resolution_divisor": { "low": 4, "medium": 4, "high": 2 },
     "depth_of_field_resolution_divisor": { … }, "motion_blur_samples": { … },
     "volumetric_fog": { "low": { "resolution": 64, "slices": 32 }, … },
-    "ui_blur_divisor": 4 }, … ] }
+    "ui_blur_divisor": 4, "shadowmask_mode": "Shadowmask" }, … ] }
 ```
 
 A new project is seeded with `Low`, `Medium` and `High` (`Medium` first); the game may
@@ -921,7 +921,13 @@ made from the editor (a build setting, another preset) keeps it.
 `SetQuality(name)` selects one (the editor's **Config** menu lists them too); the
 running preset's values reach the renderer next frame, and bloom reallocates its
 buffers when its divisor actually changes. `ui_blur_divisor` is the UI backdrop
-blur's, which has no volume (a power of two). A project with no presets runs the
+blur's, which has no volume (a power of two). `shadowmask_mode` (#1695) is Unity's
+`QualitySettings.shadowmaskMode`, one value per preset as Unity keeps it per quality
+level, read only in a scene whose Mixed Lighting Mode is `"Shadowmask"`
+([`Light`](Light.md), *Shadowmask*): `"Shadowmask"` (only dynamic casters draw a
+`Mixed` light's realtime shadow; the seeded `Low` and `Medium`) or
+`"DistanceShadowmask"` (every caster, within the shadow distance; the seeded `High`).
+`Graphics.SetQualityPreset("High", { shadowmask_mode = "Shadowmask" })` sets it. A project with no presets runs the
 seeded `Medium` preset's values.
 
 ### Render scale

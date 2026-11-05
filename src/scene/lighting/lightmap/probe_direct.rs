@@ -13,7 +13,7 @@
 //! lightmap tracer (`trace::arrival`). An Area light (#1674) is integrated over a
 //! fixed grid of points on its rectangle, one shadow ray each (`area::grid`).
 
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
 
 use super::bake::triangles;
 use super::input::{BakeScene, LightShape};
@@ -55,4 +55,31 @@ pub fn baked_direct_sh(scene: &BakeScene, positions: &[Vec3]) -> Vec<Sh9> {
             sh.band_scaled(scene.diffuse.sh_band_scale())
         })
         .collect()
+}
+
+/// One shadowmask occlusion per position in `positions` (#1695, Unity's light-probe
+/// occlusion): per channel, 0 where one shadow ray to its `Mixed` light meets a
+/// static occluder, else 1, as the lightmap's mask texels are
+/// (`trace::Tracer::mask`). All ones when the scene masks no light. A NaN position
+/// reaches nothing, so it stays unoccluded.
+pub fn mixed_occlusion(scene: &BakeScene, positions: &[Vec3]) -> Vec<Vec4> {
+    if !scene.lights.iter().any(|l| l.mask_channel.is_some()) {
+        return vec![Vec4::ONE; positions.len()];
+    }
+    let rays = Rays::build(triangles(scene));
+    let one = |&p: &Vec3| {
+        let mut mask = Vec4::ONE;
+        for light in &scene.lights {
+            let Some(c) = light.mask_channel else {
+                continue;
+            };
+            if let Some((to_light, distance, _)) = arrival(light, p, Vec2::ZERO) {
+                if rays.occluded(p, to_light, T_MIN, distance) {
+                    mask[c as usize] = 0.0;
+                }
+            }
+        }
+        mask
+    };
+    positions.iter().map(one).collect()
 }

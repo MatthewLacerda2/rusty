@@ -8,6 +8,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use crate::components::LightMode;
+
 /// One lightmapped entity: which page, and where in it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LightmapEntry {
@@ -44,6 +46,24 @@ pub struct LightmapSet {
     /// Undo that takes a light's creation back gives its id back.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub lights: BTreeSet<u32>,
+    /// The shadowmask pages of a `Shadowmask` bake (#1695), one per colour page and
+    /// packed the same: RGBA8 PNGs whose channel `c` holds, per texel, how much of
+    /// the `Mixed` light on channel `c` reaches it past static occluders (1 lit,
+    /// 0 shadowed). Empty for a `BakedIndirect` bake.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub masks: Vec<String>,
+    /// Each shadowmasked light's channel, by entity (#1695, Unity's
+    /// `Light.bakingOutput.occlusionMaskChannel`): the mask pages' and the light
+    /// probes' channel holding its static occlusion. A light the bake gave none
+    /// to is not here.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub channels: BTreeMap<u32, u8>,
+    /// The `Mixed` lights a `Shadowmask` bake found no free channel for (#1695):
+    /// more than four overlapped. As in Unity, each baked as `Baked` (its direct
+    /// light is in the lightmaps and the probes), and the frame draws it no more
+    /// until a bake gives it a channel.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub fell_back: BTreeSet<u32>,
 }
 
 impl LightmapSet {
@@ -68,12 +88,30 @@ impl LightmapSet {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty() && self.lights.is_empty()
+        self.entries.is_empty()
+            && self.lights.is_empty()
+            && self.channels.is_empty()
+            && self.fell_back.is_empty()
     }
 
     /// Whether the bake took light `entity` in ([`Self::lights`]).
     pub fn baked_light(&self, entity: u32) -> bool {
         self.lights.contains(&entity)
+    }
+
+    /// The shadowmask channel the bake gave light `entity` ([`Self::channels`]).
+    pub fn mask_channel(&self, entity: u32) -> Option<u8> {
+        self.channels.get(&entity).copied()
+    }
+
+    /// The mode light `entity` was baked as: `mode`, but `Baked` for a light that
+    /// fell back for want of a shadowmask channel ([`Self::fell_back`]). What the
+    /// frame draws it as until the next bake.
+    pub fn baked_mode(&self, entity: u32, mode: LightMode) -> LightMode {
+        match self.fell_back.contains(&entity) {
+            true => LightMode::Baked,
+            false => mode,
+        }
     }
 
     /// Forget every lightmap: every mesh falls back to probe / ambient lighting.
@@ -82,6 +120,9 @@ impl LightmapSet {
         self.directions.clear();
         self.entries.clear();
         self.lights.clear();
+        self.masks.clear();
+        self.channels.clear();
+        self.fell_back.clear();
     }
 }
 

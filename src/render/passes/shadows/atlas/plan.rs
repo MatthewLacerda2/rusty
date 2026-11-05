@@ -51,6 +51,11 @@ pub(crate) struct Tile {
     pub size: u32,
     /// World size of one texel at one metre from the light (normal-offset bias).
     pub texel: f32,
+    /// Whether its static casters are baked into it: false for a shadowmasked
+    /// light's tile under `Shadowmask` (#1695), whose static shadow is the baked
+    /// mask's, so only dynamic casters draw into it. Part of what the static cache
+    /// keys on, so a mode change re-bakes the tile.
+    pub statics: bool,
 }
 
 /// The frame's atlas: every tile, and which light owns which.

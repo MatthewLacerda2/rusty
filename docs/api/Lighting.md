@@ -14,8 +14,8 @@ The two individual verbs stay for a script that wants only one of them.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, saved }` |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, diffuseModel, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, diffuseModel?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
@@ -61,6 +61,18 @@ The two individual verbs stay for a script that wants only one of them.
     light: a probe stores the lamp unshadowed at its own position. This step is a known
     limit of the opt-in retro mode; under `Lambert` there is nothing past the
     terminator to lose, and every path agrees.
+- **The Mixed Lighting Mode** (`mixedLightingMode`, #1695) is Unity's scene-level
+  *Lighting Mode*: what a `Mixed` light bakes. `"BakedIndirect"` (the default, left
+  out of the file) bakes its bounce only; `"Shadowmask"` also bakes its static
+  occlusion, into a shadowmask page beside each lightmap page
+  (`<scene>.lightmaps/lightmap_mask_<page>_<tag>.png`, RGBA8, one channel per masked
+  light) and into the light probes, so its static shadows hold past the shadow
+  distance (see [`Light`](Light.md), *Shadowmask*). The scene file's `lightmaps` block
+  records each masked light's channel (`channels`) and the lights that fell back to
+  `Baked` (`fell_back`). The name is read in any case and an unknown one is an
+  error; the editor's card edits it beside the diffuse model. A change takes effect
+  at the next bake. Whether static casters also draw a masked light's realtime shadow
+  is the quality preset's `shadowmask_mode` ([`Graphics`](Graphics.md#quality-presets)).
 - **The result is written at once**, as Unity writes its lighting data asset: the
   lightmap pages, the probes' baked SH (`<scene>.lighting.json`), and the scene file's
   lighting fields (probe layout, reflection probes, lightmap set, settings). Only those

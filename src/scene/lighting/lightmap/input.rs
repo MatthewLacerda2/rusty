@@ -100,6 +100,9 @@ pub struct BakeScene {
     /// baked lamp's direct light falls off across a texel or a bounce surface, and how
     /// it lands in a probe, as the forward shader shades a live one.
     pub diffuse: crate::scene::lighting::DiffuseModel,
+    /// The shadowmask channels of a `Shadowmask` bake (#1695; empty otherwise),
+    /// which `lights` carry and the bake records in `LightmapSet::channels`.
+    pub shadowmask: super::lights::MaskChannels,
 }
 
 impl BakeScene {

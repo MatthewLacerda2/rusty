@@ -53,10 +53,13 @@ impl Renderer {
         // The scene's baked lightmap pages (#438) and their direction pages (#810):
         // rebinding group 0 only on a change.
         let set = &scene.lightmaps;
-        if self
-            .lightmaps
-            .bind(&self.device, &self.queue, &set.pages, &set.directions)
-        {
+        if self.lightmaps.bind(
+            &self.device,
+            &self.queue,
+            &set.pages,
+            &set.directions,
+            &set.masks,
+        ) {
             self.global_bind_group_dirty = true;
         }
 

@@ -11,21 +11,18 @@ use std::thread;
 use glam::{Vec3, Vec4};
 
 use super::atlas::{max_map_edge, page_edge, MAX_PAGE, MIN_PAGE};
-use super::filter::smooth;
 use super::input::BakeScene;
 use super::progress::BakeProgress;
-use super::raster::{dilate, fill_rest, lightmap_size, rasterize, world_per_uv, TexelPoint};
+use super::raster::{lightmap_size, rasterize, world_per_uv, TexelPoint};
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
 
+mod assemble;
 pub(super) mod direction;
 pub(super) mod pool;
 
-use direction::direction_texel;
-
-/// Rings of empty texels dilation fills around each chart.
-const DILATE_PASSES: u32 = 3;
+use assemble::assemble;
 
 /// The bake's knobs, Unity's Lightmapping settings in miniature. The scene stores
 /// them in its lighting settings (#832); a field a scene file omits takes its default.
@@ -121,6 +118,10 @@ pub struct Lightmap {
     /// `Baked` lamps' direct light from one way, `direction::direction_texel`). Empty
     /// when the bake was not [`BakeSettings::directional`].
     pub directions: Vec<Vec4>,
+    /// Per texel (#1695), its shadowmask: per channel the static occlusion of the
+    /// `Mixed` light on it (`trace::Tracer::mask`). Empty unless the bake gave a
+    /// light a channel (`BakeScene::shadowmask`).
+    pub masks: Vec<Vec4>,
 }
 
 /// Bake every mesh in `scene` that has a usable lightmap UV and receives a lightmap
@@ -212,56 +213,15 @@ fn lightmap(
         .filter(|(_, l)| l.valid)
         .unzip();
     let texel_world = world_per_uv(mesh).unwrap_or(1.0) / size as f32;
-    let (texels, directions) = assemble(&points, &light, size, texel_world, settings);
+    let masked = scene.shadowmask.any();
+    let maps = assemble(&points, &light, size, texel_world, settings, masked);
     Lightmap {
         entity: mesh.entity,
         size,
-        texels,
-        directions,
+        texels: maps.texels,
+        directions: maps.directions,
+        masks: maps.masks,
     }
-}
-
-/// One chart's traced texels as its `size`² lightmap and, for a directional bake,
-/// its direction map: the bounce (and its directions) smoothed, the direct light
-/// added, then both dilated past the chart's edge and the rest of the map filled
-/// from its nearest chart (`raster::fill_rest`, for the mips, #1694).
-fn assemble(
-    points: &[TexelPoint],
-    light: &[TexelLight],
-    size: u32,
-    texel_world: f32,
-    settings: &BakeSettings,
-) -> (Vec<Vec3>, Vec<Vec4>) {
-    let indirect: Vec<Vec3> = light.iter().map(|l| l.indirect).collect();
-    let radius = settings.filter_radius;
-    let indirect = smooth(points, &indirect, size, radius, texel_world);
-    // The bounce's directions are smoothed by the same kernel as its colour, so
-    // the direction page is no noisier than the lightmap it reshapes.
-    let indirect_dir: Vec<Vec3> = match settings.directional {
-        true => {
-            let dirs: Vec<Vec3> = light.iter().map(|l| l.indirect_dir).collect();
-            smooth(points, &dirs, size, radius, texel_world)
-        }
-        false => vec![Vec3::ZERO; points.len()],
-    };
-    let mut texels = vec![Vec3::ZERO; (size * size) as usize];
-    let mut directions = vec![Vec4::ZERO; texels.len()];
-    let mut filled = vec![false; texels.len()];
-    for (k, (point, light)) in points.iter().zip(light).enumerate() {
-        texels[point.index] = indirect[k] + light.direct;
-        directions[point.index] = direction_texel(indirect[k], indirect_dir[k], light);
-        filled[point.index] = true;
-    }
-    if settings.directional {
-        let mut ring = filled.clone();
-        dilate(&mut directions, &mut ring, size, DILATE_PASSES);
-        fill_rest(&mut directions, &ring, size);
-    } else {
-        directions.clear();
-    }
-    dilate(&mut texels, &mut filled, size, DILATE_PASSES);
-    fill_rest(&mut texels, &filled, size);
-    (texels, directions)
 }
 
 /// Every mesh's occluding triangles, for the BVH: a Transparent run lets light

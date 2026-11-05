@@ -28,6 +28,11 @@ pub struct LightingData {
     /// One `Sh9` per probe, in probe order. Length should match the scene's probe
     /// count; a mismatch tolerates by merging up to the shorter length.
     pub probe_sh: Vec<Sh9>,
+    /// One shadowmask occlusion per probe (#1695, `Probe::occlusion`), in probe
+    /// order; left out when every probe is unoccluded (no `Shadowmask` bake), and
+    /// read as unoccluded when missing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub probe_occlusion: Vec<[f32; 4]>,
 }
 
 /// The sidecar path for a scene path: `foo.scene` → `foo.scene.lighting.json`.
@@ -39,8 +44,14 @@ pub fn sidecar_path(scene_path: &str) -> PathBuf {
 
 /// Pull the baked SH out of a scene's probes into a serializable sidecar.
 pub fn extract_lighting(scene: &Scene) -> LightingData {
+    let probes = scene.probes.probes();
+    let masked = probes.iter().any(|p| p.occlusion != glam::Vec4::ONE);
     LightingData {
-        probe_sh: scene.probes.probes().iter().map(|p| p.sh).collect(),
+        probe_sh: probes.iter().map(|p| p.sh).collect(),
+        probe_occlusion: match masked {
+            true => probes.iter().map(|p| p.occlusion.to_array()).collect(),
+            false => Vec::new(),
+        },
     }
 }
 
@@ -55,6 +66,14 @@ pub fn apply_lighting(scene: &mut Scene, data: &LightingData) {
         .zip(data.probe_sh.iter())
     {
         probe.sh = *sh;
+    }
+    let occlusion = data
+        .probe_occlusion
+        .iter()
+        .map(|o| glam::Vec4::from_array(*o));
+    let mut occlusion = occlusion.chain(std::iter::repeat(glam::Vec4::ONE));
+    for probe in scene.probes.probes_mut() {
+        probe.occlusion = occlusion.next().unwrap_or(glam::Vec4::ONE);
     }
 }
 

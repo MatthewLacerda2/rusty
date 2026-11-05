@@ -25,7 +25,8 @@ impl ShadowRenderer {
         }
         let scene = frame.scene;
         let statics = frame.statics;
-        let key = |c: &Cascade| Some((statics, c.light_space));
+        let with_statics = self.sun_statics;
+        let key = |c: &Cascade| Some((statics, c.light_space, with_statics));
         let stale: Vec<usize> = (0..self.cascades.len())
             .filter(|&i| self.static_cache[i] != key(&self.cascades[i]))
             .collect();
@@ -41,7 +42,10 @@ impl ShadowRenderer {
             for (&i, batches) in stale.iter().zip(&batches) {
                 let view = &self.static_layers[i];
                 let mut pass = depth_pass(encoder, frame, "Shadow Static Pass", view, true);
-                self.draw_casters(&mut pass, frame, batches, Sweep::Static, i);
+                // A shadowmasked sun keeps its statics out (#1695): cleared only.
+                if with_statics {
+                    self.draw_casters(&mut pass, frame, batches, Sweep::Static, i);
+                }
             }
             for i in stale {
                 self.static_cache[i] = key(&self.cascades[i]);

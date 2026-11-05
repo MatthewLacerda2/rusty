@@ -52,7 +52,9 @@ pub(crate) struct LocalLight {
     /// `LightmapSet::baked_light`): SSIL gathers none of its light. Set by
     /// [`local_lights`], which knows the scene.
     pub bounce_baked: f32,
-    pub _pad: f32,
+    /// Its shadowmask channel (#1695, `Scene::mask_channel`); `-1.0` for none.
+    /// Set by [`local_lights`], which knows the scene.
+    pub mask_channel: f32,
 }
 
 impl LocalLight {
@@ -96,7 +98,7 @@ impl LocalLight {
                 .unwrap_or(0.0),
             near: if near.is_finite() { near } else { 0.0 },
             bounce_baked: 0.0,
-            _pad: 0.0,
+            mask_channel: -1.0,
         })
     }
 
@@ -158,7 +160,8 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
         .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .filter_map(|id| {
             let light = scene.world.light(id)?;
-            if !light.effective_mode().renders_live(capture) {
+            let mode = scene.light_mode(id, &light);
+            if !mode.renders_live(capture) {
                 return None;
             }
             // World space: a light on a child (a flashlight in a hand) lights
@@ -168,10 +171,12 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
                 scene.world.transform_direction(id, Vec3::NEG_Z),
             );
             let mut local = LocalLight::new(at, forward, &light)?;
+            local.baked = f32::from(u8::from(mode.bakes_direct()));
             if capture {
                 local.shadow_fade = 0.0;
             }
             local.bounce_baked = f32::from(u8::from(scene.lightmaps.baked_light(id)));
+            local.mask_channel = scene.mask_channel(id).map_or(-1.0, f32::from);
             Some((local, light.cast_shadows))
         })
         .collect()

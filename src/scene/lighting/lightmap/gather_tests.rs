@@ -13,9 +13,8 @@ use crate::scene::Scene;
 fn an_open_floor_bakes_to_the_sky_gradient() {
     let scene = BakeScene {
         meshes: vec![floor()],
-        lights: vec![],
         sky: Vec3::ONE.into(),
-        diffuse: Default::default(),
+        ..Default::default()
     };
     let s = BakeSettings {
         samples: 256,
@@ -36,6 +35,7 @@ fn a_mesh_without_lightmap_uvs_gets_no_lightmap_but_still_occludes() {
     roof.normals = vec![Vec3::NEG_Y; 4];
     assert_eq!(lightmap_size(&roof, 4.0, 64), None);
     let scene = BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor(), roof],
         lights: vec![],
         sky: Vec3::ONE.into(),

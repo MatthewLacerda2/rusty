@@ -4,11 +4,12 @@
 
 use glam::Vec3;
 
+use crate::core::settings::quality::ShadowmaskMode;
 use crate::render::gpu::uniforms::{ProceduralSkyUniform, MAX_DIRECTIONAL_LIGHTS};
 use crate::render::ibl::cubemap_capture::CaptureMode;
 use crate::render::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use crate::render::{AmbientLightUniform, DirectionalLightUniform, LightingUniform};
-use crate::scene::lighting::DiffuseModel;
+use crate::scene::lighting::{DiffuseModel, MixedLightingMode};
 use crate::scene::{LightType, Scene};
 
 /// The base lighting uniform, with the scene's ambient, before its directional lights
@@ -26,7 +27,9 @@ pub(crate) fn default_lighting_uniform(scene: &Scene) -> LightingUniform {
             DiffuseModel::HalfLambert => 1.0,
         },
         baked_specular: 1.0,
-        _pad_baked_specular: [0.0; 3],
+        shadowmask: 0.0,
+        masks_bound: 0.0,
+        _pad_baked_specular: 0.0,
         refl_probes: [Default::default(); MAX_REFLECTION_PROBES],
     }
 }
@@ -80,7 +83,7 @@ pub(crate) fn apply_scene_lights(
         }
         let light = scene.world.light(id).expect("id came from ids_with_light");
         match light.light_type {
-            LightType::Directional if light.mode.renders_live(capture) => {
+            LightType::Directional if scene.light_mode(id, &light).renders_live(capture) => {
                 dirs.push(DirectionalLightUniform {
                     direction: scene.world.transform_direction(id, Vec3::NEG_Z).to_array(),
                     _pad1: 0.0,
@@ -88,9 +91,10 @@ pub(crate) fn apply_scene_lights(
                     intensity: light.intensity,
                     // `Baked` (#438), only ever uploaded in a bake capture: a
                     // lightmapped surface skips it, its lightmap holds it.
-                    baked: f32::from(u8::from(light.mode.bakes_direct())),
+                    baked: f32::from(u8::from(scene.light_mode(id, &light).bakes_direct())),
                     bounce_baked: f32::from(u8::from(scene.lightmaps.baked_light(id))),
-                    _pad2: [0.0; 2],
+                    mask_channel: scene.mask_channel(id).map_or(-1.0, f32::from),
+                    _pad2: 0.0,
                 })
             }
             LightType::Ambient
@@ -106,6 +110,18 @@ pub(crate) fn apply_scene_lights(
     dirs.truncate(MAX_DIRECTIONAL_LIGHTS);
     lighting_uniform.dir_lights[..dirs.len()].copy_from_slice(&dirs);
     lighting_uniform.num_dir_lights = dirs.len() as u32;
+}
+
+/// The lighting uniform's `shadowmask` (#1695): 0 off, 1 `Shadowmask`, 2
+/// `DistanceShadowmask`. Off unless the scene is on `Shadowmask` and its bake gave
+/// a light a channel: a `BakedIndirect` scene draws as it always did.
+pub(crate) fn shadowmask_mode(scene: &Scene, quality: ShadowmaskMode) -> f32 {
+    let on = scene.lighting_settings.mixed_lighting_mode == MixedLightingMode::Shadowmask;
+    match (on && !scene.lightmaps.channels.is_empty(), quality) {
+        (false, _) => 0.0,
+        (true, ShadowmaskMode::Shadowmask) => 1.0,
+        (true, ShadowmaskMode::DistanceShadowmask) => 2.0,
+    }
 }
 
 impl crate::render::Renderer {
@@ -139,6 +155,12 @@ impl crate::render::Renderer {
     fn build_lighting_uniform(&self, scene: &Scene) -> LightingUniform {
         let mut lighting_uniform = default_lighting_uniform(scene);
         apply_scene_lights(&mut lighting_uniform, scene, self.capture.static_only);
+        // A bake capture draws a `Mixed` light as `BakedIndirect` does (#1695): its
+        // realtime maps hold every static caster, so the capture needs no mask.
+        if !self.capture.static_only {
+            lighting_uniform.shadowmask = shadowmask_mode(scene, self.quality.shadowmask_mode);
+            lighting_uniform.masks_bound = f32::from(u8::from(self.lightmaps.masked()));
+        }
         lighting_uniform.refl_probes = *self.reflection_probes.uniforms();
         apply_capture(&mut lighting_uniform, self.capture);
         if self.skybox_texture.is_some() {

@@ -30,7 +30,7 @@ use glam::Vec3;
 
 use super::solve::BounceSolve;
 use crate::render::Renderer;
-use crate::scene::lighting::lightmap::{baked_direct_sh, BakeScene};
+use crate::scene::lighting::lightmap::{baked_direct_sh, mixed_occlusion, BakeScene};
 use crate::scene::lighting::probe::ProbeVolume;
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::Scene;
@@ -104,19 +104,21 @@ pub(super) fn write_field(volume: &mut ProbeVolume, field: &[Sh9]) {
 }
 
 /// Add the direct light of `scene`'s `Baked` lights to every probe of `volume` (#809),
-/// shadowed by the static meshes the lightmap bake sees.
+/// shadowed by the static meshes the lightmap bake sees, and write each probe's
+/// shadowmask occlusion (#1695, `mixed_occlusion`; unoccluded unless the scene's
+/// Mixed Lighting Mode is `Shadowmask`). The channels are the ones a lightmap bake
+/// of the same scene gives (`lightmap::assign_channels`, a pure function of it).
 pub(super) fn add_baked_direct(scene: &Scene, volume: &mut ProbeVolume) {
     let positions: Vec<Vec3> = volume.probes().iter().map(|p| p.position).collect();
     if positions.is_empty() {
         return;
     }
     let statics = BakeScene::gather(scene, &|_| None);
-    for (probe, direct) in volume
-        .probes_mut()
-        .iter_mut()
-        .zip(baked_direct_sh(&statics, &positions))
-    {
+    let direct = baked_direct_sh(&statics, &positions);
+    let occlusion = mixed_occlusion(&statics, &positions);
+    for ((probe, direct), occlusion) in volume.probes_mut().iter_mut().zip(direct).zip(occlusion) {
         probe.sh.accumulate(&direct);
+        probe.occlusion = occlusion;
     }
 }
 

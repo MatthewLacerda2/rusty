@@ -17,6 +17,7 @@ fn noon() -> BakeLight {
         },
         radiance: Vec3::splat(3.0),
         bakes_direct: true,
+        mask_channel: None,
     }
 }
 
@@ -28,6 +29,7 @@ fn floor_under_panel(scale: f32) -> BakeScene {
     panel.normals = vec![Vec3::NEG_Y; 4];
     panel.scale_in_lightmap = scale;
     BakeScene {
+        shadowmask: Default::default(),
         meshes: vec![floor(), panel],
         lights: vec![noon()],
         sky: Vec3::ZERO.into(),

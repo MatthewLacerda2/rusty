@@ -54,6 +54,8 @@ pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::Bind
                 visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                 ..sampler_entry(18)
             },
+            // The shadowmask pages (#1695), beside the lightmaps.
+            texture_entry(19, D2Array),
         ],
     })
 }

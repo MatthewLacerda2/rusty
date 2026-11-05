@@ -1,5 +1,5 @@
 #import common::{DecalSurface, PI, VertexInput, blend_joints, cluster_index, local_light_radiance}
-// Every forward binding but `shadow` (the cascades, read only by `calculate_shadow`;
+// Every forward binding but `shadow` (the cascades, read only by `sun_shadow_parts`;
 // `fs_main` names its result `shadow`), so a surface variant's blocks can read any,
 // with one exception by stage: `instances` is `VERTEX`-only (the fragment stage is at
 // its 8 storage buffers), so a fragment block reads its instance through
@@ -9,8 +9,8 @@
 #import forward::transparent
 #import forward::mapping
 #import forward::reflection::{baked_diffuse, environment_reflection, specular_occlusion}
-#import forward::lighting::{ambient_occlusion, calculate_shadow, flat_ambient, fold_decals, indirect_bounce, lamp, lightmap_level, probe_irradiance, ssil_realtime, with_ssil_share}
-#import forward::local_shadow::local_shadow
+#import forward::lighting::{ambient_occlusion, sun_shadow_parts, flat_ambient, fold_decals, indirect_bounce, lamp, lightmap_level, probe_irradiance, ssil_realtime, with_ssil_share}
+#import forward::shadowmask::{baked_occlusion, directional_shadows, local_shadows}
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
 #import forward::specular_aa
 #import forward::lightmap::lightmap_light
@@ -430,12 +430,17 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // cascades and the atlas.
     // Light through a translucent surface reaches its back face, so its shadow is
     // looked up off that face (`-N`), where the surface casts none on itself.
-    var shadow = 1.0;
-    var back_shadow = 1.0;
+    // Each shadow is its realtime part and its fade (`sun_shadow_parts`); a
+    // `Mixed` light under a shadowmask meets its baked shadow too (#1695,
+    // `forward::shadowmask`), which a surface that receives no realtime shadow
+    // still gets, as it gets a `Baked` light's from its lightmap.
+    let baked_shadow = baked_occlusion(in.lightmap_uv, lightmap_page, lightmap_lod, in.instance.x);
+    var shadow = vec2<f32>(1.0, 1.0);
+    var back_shadow = vec2<f32>(1.0, 1.0);
     if (m.receive_shadows == 1u) {
-        shadow = calculate_shadow(in.world_position, N);
+        shadow = sun_shadow_parts(in.world_position, N);
         if (translucent) {
-            back_shadow = calculate_shadow(in.world_position, -N);
+            back_shadow = sun_shadow_parts(in.world_position, -N);
         }
     }
     for (var i = 0u; i < lighting.num_dir_lights; i = i + 1u) {
@@ -445,7 +450,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         }
         let L = normalize(-sun.direction);
         let radiance = sun.color * sun.intensity;
-        let shadowed = select(vec2<f32>(1.0), vec2<f32>(shadow, back_shadow), i == 0u);
+        let shadowed = directional_shadows(i, shadow, back_shadow, sun.mask_channel, baked_shadow);
         lighting_color += lamp(N, V, L, radiance * shadowed.x, radiance * shadowed.y, F0, metallic, roughness, diffuse_albedo, m.transmission, sun.bounce_baked);
     }
 
@@ -463,16 +468,9 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         }
         // Its shadow (#468, faded by distance #1712), off the back face too for a
         // translucent surface.
-        var lit = 1.0;
-        var back_lit = 1.0;
-        if (m.receive_shadows == 1u) {
-            lit = local_shadow(light, in.world_position, N);
-            if (translucent) {
-                back_lit = local_shadow(light, in.world_position, -N);
-            }
-        }
+        let lit = local_shadows(light, in.world_position, N, m.receive_shadows == 1u, translucent, baked_shadow);
         let L = normalize(light.position - in.world_position);
-        lighting_color += lamp(N, V, L, radiance * lit, radiance * back_lit, F0, metallic, roughness, diffuse_albedo, m.transmission, light.bounce_baked);
+        lighting_color += lamp(N, V, L, radiance * lit.x, radiance * lit.y, F0, metallic, roughness, diffuse_albedo, m.transmission, light.bounce_baked);
     }
 
     // 5. Environment reflections (#244), always on (#718) but in a light-probe capture
