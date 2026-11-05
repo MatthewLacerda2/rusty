@@ -6,11 +6,20 @@
 // `sample_normal`, so all maps of a material agree on where they are read.
 //
 // Every branch here is on `material()` (the draw's record, indexed by a per-draw
-// uniform), so the implicit-LOD samples sit in uniform control flow.
+// uniform) or on the camera's mip bias, so the implicit-LOD samples sit in uniform
+// control flow.
+//
+// The mip bias (#1702) is TAA's while it upscales the view (`camera.lod.x`,
+// `log2(scene/output)`): every material map takes it through [`lookup`] (the
+// maps read here and the surface blocks' `t_mask`), and the decals through their
+// sampling footprint (`forward::lighting::fold_decals`); the lightmap, the AO
+// target and the geometric specular AA's derivatives never do; the normal map's
+// Toksvig level adds it (`normal_level`), as its lookup does. At 0 the lookup is the plain
+// `textureSample`, so a view that doesn't upscale samples as it always did.
 
 #define_import_path forward::mapping
 
-#import forward::bindings::material
+#import forward::bindings::{camera, material}
 #import forward::maps::{map_factor, unpack_normal}
 
 const UV0: u32 = 0u;
@@ -93,14 +102,24 @@ fn sample_any(t: texture_2d<f32>, s: sampler, m: Mapping, uv: vec2<f32>, positio
         + textureSampleGrad(t, s, c.z, dx[2], dy[2]) * c.weights.z;
 }
 
+// One material-map lookup at `uv`, with the camera's mip bias when it has one.
+// The branch is on a uniform, so both samples are in uniform control flow.
+fn lookup(t: texture_2d<f32>, s: sampler, uv: vec2<f32>) -> vec4<f32> {
+    let bias = camera.lod.x;
+    if (bias == 0.0) {
+        return textureSample(t, s, uv);
+    }
+    return textureSampleBias(t, s, uv, bias);
+}
+
 // Map `t` at `c`.
 fn sample(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
     if (material().uv_mapping != TRIPLANAR) {
-        return textureSample(t, s, c.uv);
+        return lookup(t, s, c.uv);
     }
-    return textureSample(t, s, c.x) * c.weights.x
-        + textureSample(t, s, c.y) * c.weights.y
-        + textureSample(t, s, c.z) * c.weights.z;
+    return lookup(t, s, c.x) * c.weights.x
+        + lookup(t, s, c.y) * c.weights.y
+        + lookup(t, s, c.z) * c.weights.z;
 }
 
 // The factor metallic or roughness map `t` at `c` multiplies its scalar by, under
@@ -126,14 +145,14 @@ fn level_at(size: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
 }
 
 // The level normal map `t` is read at, at `c`: each projection's blended by its
-// weight (UV0 and Planar: the one lookup's). Takes derivatives: call it before any
-// per-pixel branch.
+// weight (UV0 and Planar: the one lookup's), plus the mip bias [`lookup`] reads it
+// with. Takes derivatives: call it before any per-pixel branch.
 fn normal_level(t: texture_2d<f32>, c: MapCoords) -> f32 {
     let size = vec2<f32>(textureDimensions(t));
     let x = level_at(size, dpdx(c.x), dpdy(c.x));
     let y = level_at(size, dpdx(c.y), dpdy(c.y));
     let z = level_at(size, dpdx(c.z), dpdy(c.z));
-    return dot(vec3<f32>(x, y, z), c.weights);
+    return dot(vec3<f32>(x, y, z), c.weights) + camera.lod.x;
 }
 
 // A normal map's filtered read: the world-space shading normal, and how long the
@@ -159,7 +178,7 @@ fn stored_length(texel: vec4<f32>) -> f32 {
 // blend (Golus), and Planar is Triplanar with all the weight on the Y projection.
 fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tangent: vec4<f32>) -> NormalSample {
     let mapping = material().uv_mapping;
-    let texel_y = textureSample(t, s, c.uv);
+    let texel_y = lookup(t, s, c.uv);
     if (mapping == UV0) {
         let T = normalize(tangent.xyz);
         let B = cross(n, T) * tangent.w;
@@ -172,8 +191,8 @@ fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tan
     var w = vec3<f32>(0.0, 1.0, 0.0);
     var lengths = vec3<f32>(1.0, stored_length(texel_y), 1.0);
     if (mapping == TRIPLANAR) {
-        let texel_x = textureSample(t, s, c.x);
-        let texel_z = textureSample(t, s, c.z);
+        let texel_x = lookup(t, s, c.x);
+        let texel_z = lookup(t, s, c.z);
         tx = unpack_normal(texel_x);
         tz = unpack_normal(texel_z);
         lengths = vec3<f32>(stored_length(texel_x), lengths.y, stored_length(texel_z));

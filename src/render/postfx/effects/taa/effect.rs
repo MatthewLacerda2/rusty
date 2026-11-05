@@ -47,3 +47,17 @@ pub(crate) fn wanted(
 ) -> bool {
     full && !scene_view && taa_enabled(post, graphics)
 }
+
+/// Whether `view` runs TAA this frame: [`wanted`], and the view shades with the
+/// engine's own forward pipeline (the Inspector's shader preview does not). The one
+/// predicate `draw_stack` and `Renderer::render` (which picks where a scaled view
+/// composites before the stack draws) both ask.
+pub(crate) fn runs(
+    view: &RenderView,
+    post: PostSource,
+    graphics: GraphicsSettings,
+    full: bool,
+    scene_view: bool,
+) -> bool {
+    wanted(post, graphics, full, scene_view) && !view.has_forward_override()
+}
