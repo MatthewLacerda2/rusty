@@ -132,21 +132,22 @@ fn mask(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords, packed: u32) -> f
     return map_factor(sample(t, s, c), on, packed);
 }
 
-// The level an implicit-LOD lookup of a `size`-texel texture reads with screen
-// derivatives `dx` and `dy` of its coordinates, as a 16× anisotropic trilinear
-// sampler (the default, `render::gpu::textures::sampler`) picks it: Vulkan's λ, the
-// major axis's footprint over the taps anisotropy spreads along it.
+// The mip level whose texel covers as many texels of a `size`-texel texture as one
+// pixel does, from the screen derivatives `dx` and `dy` of its coordinates: half the
+// log2 of the footprint's area. A grazing footprint is long and thin; an anisotropic
+// sampler reads a sharp level along it and averages its taps, so the spread of
+// normals a pixel covers is the whole footprint's, which this treats as a square of
+// the same area (the sampler's own level, the minor axis's, would see almost none).
 fn level_at(size: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
-    let px = length(dx * size);
-    let py = length(dy * size);
-    let major = max(px, py);
-    let taps = min(ceil(major / max(min(px, py), 1e-8)), 16.0);
-    return log2(max(major / taps, 1e-8));
+    let a = dx * size;
+    let b = dy * size;
+    return 0.5 * log2(max(abs(a.x * b.y - a.y * b.x), 1e-12));
 }
 
-// The level normal map `t` is read at, at `c`: each projection's blended by its
-// weight (UV0 and Planar: the one lookup's), plus the mip bias [`lookup`] reads it
-// with. Takes derivatives: call it before any per-pixel branch.
+// The level of normal map `t` one pixel's footprint covers at `c` (`level_at`):
+// each projection's blended by its weight (UV0 and Planar: the one lookup's), plus
+// the mip bias [`lookup`] reads it with. Takes derivatives: call it before any
+// per-pixel branch.
 fn normal_level(t: texture_2d<f32>, c: MapCoords) -> f32 {
     let size = vec2<f32>(textureDimensions(t));
     let x = level_at(size, dpdx(c.x), dpdy(c.x));

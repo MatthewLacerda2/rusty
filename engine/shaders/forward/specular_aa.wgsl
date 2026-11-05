@@ -53,7 +53,7 @@ fn widen(perceptual: f32, kernel: f32) -> f32 {
 const QUANTUM: f32 = 2.0 / 255.0;
 
 // What a normal-map texel whose filtered normal is `length` long adds to α², at
-// `level` (the level it was read at, `mapping::normal_level`): HDRP's
+// `level` (the level its footprint covers, `mapping::normal_level`): HDRP's
 // `TextureNormalVariance` (κ = (3r − r³)/(1 − r²), variance 1/(4κ)), doubled and
 // capped as its `TextureNormalFiltering` does, faded in over the first level, where
 // trilinear filtering blends the base level (whole normals, only rounding and

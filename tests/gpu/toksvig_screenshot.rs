@@ -101,8 +101,8 @@ const NEAR: (Vec3, f32) = (Vec3::new(0.0, 0.25, -2.5), -60.0);
 
 // Measured on lavapipe; `main`'s numbers are this test's with both texture kernels
 // forced to 0. Glossy (roughness 0.08), far: relative temporal variance 0.605 (RGBA8)
-// and 0.663 (BC5) on `main`, 0.071 and 0.079 here (8.5x and 8.4x less). Its mean
-// luma rises (3.2 to 15.3, 3.1 to 14.1): `main`'s sparkles clip at 255, so its mean
+// and 0.663 (BC5) on `main`, 0.074 and 0.078 here (8.2x and 8.5x less). Its mean
+// luma rises (3.2 to 23.3, 3.1 to 21.7): `main`'s sparkles clip at 255, so its mean
 // understates the light; the floor only checks none is lost.
 const GLOSSY_BOUND: f64 = 0.2;
 const GLOSSY_MEAN_FLOOR: f64 = 3.0;
@@ -110,7 +110,7 @@ const GLOSSY_MEAN_FLOOR: f64 = 3.0;
 /// Each run: the map's name, whether it is BC5, and two means `main` shows. Near,
 /// at the base level, the frames are byte-identical to `main`'s; at roughness 0.3
 /// under a dim lamp, where `main`'s highlights do not clip (peak 175), widening a
-/// normalized lobe moves light without making or losing much (3.43 and 3.16 here).
+/// normalized lobe moves light without making or losing much (3.35 and 3.07 here).
 const RUNS: [(&str, bool, f64, f64); 2] = [
     ("rusty_1702_rgba.png", false, 27.14, 3.20),
     ("rusty_1702_bc5.png", true, 28.81, 3.00),
