@@ -36,8 +36,9 @@
 //! Its helper is `fn uv_barrel(uv, amount, corner_radius) -> vec2<f32>`, sending a
 //! point outside the rounded screen to an off-frame sentinel. `phosphor_mask` is a
 //! colour block in **screen pixels**: its call passes the fragment position
-//! `in.pos.xy` instead of `uv`, so the RGB stripes are whole pixels of the scene target (output × render scale; the chain
-//! runs before the upscale, so at a render scale other than 1 they beat or wash out), and it multiplies by a gain that keeps each channel's mean (a stripe
+//! `in.pos.xy` instead of `uv`, so the RGB stripes are whole pixels of the image the chain runs at: the scene target
+//! (output × render scale) on the bilinear path, where they beat or wash out at a scale other than 1, or the output on a
+//! camera TAA upscales (#1702), and it multiplies by a gain that keeps each channel's mean (a stripe
 //! lit at 3×, the others at 0, mixed in by `strength`). Its `kind` is a choice param
 //! (`Param::choice`), baked as an index.
 //!

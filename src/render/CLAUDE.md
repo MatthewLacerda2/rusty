@@ -122,6 +122,17 @@ every file and row.
   ones to its `lazy_pipelines`). Its per-view targets are its own type in
   `PostFx::targets` (`effects::Targets`: `get_or` while it runs, `remove` when it
   doesn't; a resize drops every slot), never a `PostFx` field.
+- **Size** — a pass after TAA's (a `Pass::Scene` ordered after 15, and every
+  `Pass::Ldr`) sizes its targets by `PostFx::chain_size`, **never** `full_size` or
+  `RenderView::scene_size()`, and refits when it changes. The two differ only while
+  TAA upscales the view (TAAU, #1702: a render scale below 1 with TAA on), when the
+  chain after TAA runs at the output's size, so a pass sized by the scene passes
+  every other test and goes wrong only there. A pass that reads the velocity
+  target or depth (scene-size) from a chain-size image maps its pixel by the size
+  ratio, as `motion_blur.wgsl`'s `velocity_at` does. A pass before TAA (depth of
+  field, SSR) sizes by `full_size`. `effects::chain_size_tests` scans each later
+  pass's files and fails on a scene size; a line that must read one says so inline
+  (`chain-size: scene <why>`).
 - **Composite textures** — a composite function that reads a texture of its effect's
   own (a target its pass drew, a texture it picked) declares it in its `textures`
   ([`CompositeTexture`](postfx/effects/textures.rs): a name and a `view` fn of the

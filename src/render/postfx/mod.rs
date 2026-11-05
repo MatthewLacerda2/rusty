@@ -94,7 +94,13 @@ pub struct PostFx {
     /// straight to the output and this texture is simply never read — the off path
     /// stays a byte-exact pass-through.
     pub ldr: PfxTarget,
+    /// The scene targets' size: what the stack draws, depth of field and SSR at.
     pub full_size: (u32, u32),
+    /// The size the chain runs at after TAA (#1702): motion blur, the exposure
+    /// meter, bloom, the composite, the LDR passes and [`PostFx::ldr`].
+    /// `full_size`, unless TAA upscales the view (TAAU), when it is the output's
+    /// ([`PostFx::fit_chain`]).
+    pub(crate) chain_size: (u32, u32),
     /// The output format `ldr` and the composite/FXAA pipelines are built against,
     /// kept so `resize` can reallocate `ldr` to match.
     output_format: wgpu::TextureFormat,

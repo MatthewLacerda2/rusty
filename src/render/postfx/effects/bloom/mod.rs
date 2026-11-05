@@ -88,10 +88,10 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let divisor = vc.bloom.quality.pick(levels, vc.bloom.resolution_divisor);
     let divisor = divisor.clamp(1, MAX_RESOLUTION_DIVISOR);
     let (device, passes) = (&r.device, &r.post_passes.bloom);
-    let (scene, sampler) = (pfx.full_size, &pfx.sampler);
+    let (scene, sampler) = (pfx.chain_size, &pfx.sampler);
     let make = || BloomTargets::new(device, passes, sampler, scene, divisor);
     let t = pfx.targets.get_or(make);
-    if t.divisor != divisor {
+    if t.made_for != (scene, divisor) {
         *t = make();
     }
     pfx.bloom_dirt = r.lens_dirt(vc);

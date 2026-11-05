@@ -265,7 +265,7 @@ into the lit color; postfx blocks grade the sampled scene color.
   in the recipe. What falls past the curved screen, and past its rounded corners
   (`corner_radius` in uv), draws **black**, after every colour block);
   `phosphor_mask {kind = "aperture", scale = 1, strength* = 0.3}` (the RGB
-  phosphor pattern in **screen pixels** of the scene target (output size × render scale), so it is pixel-fine at render scale 1 only: the chain runs before the upscale, so at any other scale the stripes beat against the output pixels or wash out:
+  phosphor pattern in **screen pixels** of the image the chain runs at: the scene target (output size × render scale) on the bilinear path, where the chain runs before the upscale, so at any scale but 1 the stripes beat against the output pixels or wash out; on a camera upscaling through TAA the chain after TAA runs at the output's size, so the stripes are whole output pixels at any scale:
   `kind` names it — `"aperture"` vertical R/G/B stripes, `"shadow"` the stripes
   staggered a pixel per row, `"slot"` stripes broken into staggered slots; `scale`
   is pixels per stripe; the lit stripe is brightened so each channel's mean

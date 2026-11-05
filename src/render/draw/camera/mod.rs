@@ -105,8 +105,9 @@ pub(crate) struct StackShared {
     pub prev_view_projs: Vec<glam::Mat4>,
     /// The game time the view drew at last frame (#1524), the shader time without one.
     pub prev_time: f32,
-    /// TAA's jitter this frame, in NDC (#1702): zero without TAA.
-    pub jitter: glam::Vec2,
+    /// TAA's jitter this frame, in NDC, and the material maps' mip bias while it
+    /// upscales (#1702): zero for both without TAA.
+    pub taa: crate::render::postfx::effects::taa::TaaFrame,
     pub fog: FogUniform,
     pub ssao: Option<SsaoPlan>,
     /// The view's SSIL (#1750) and what its history is valid for, when it runs.
@@ -128,7 +129,7 @@ impl<'a> CameraCtx<'a> {
         let cam = &stack.stack[idx];
         // Drawn jittered (TAA, #1702); culled through the unjittered matrix.
         let unjittered = shared.view_projs[idx];
-        let view_proj = jittered(unjittered, shared.jitter);
+        let view_proj = jittered(unjittered, shared.taa.jitter);
         let clusters = ClusterGrid::new(cam, shared.aspect);
         let overlay = is_overlay(idx == 0, cam.clear_flags);
         let (march, traces) = ssr_march(idx == 0, shared.ssr_march);
@@ -161,12 +162,13 @@ impl<'a> CameraCtx<'a> {
                 stack: [
                     idx as f32,
                     shared.prev_time,
-                    shared.jitter.x,
-                    shared.jitter.y,
+                    shared.taa.jitter.x,
+                    shared.taa.jitter.y,
                 ],
                 inv_view_proj: view_proj.inverse().to_cols_array(),
                 ssr: march,
                 ssil: [ssil.as_ref().map_or(0.0, |_| 1.0), 0.0, 0.0, 0.0],
+                lod: [shared.taa.mip_bias, 0.0, 0.0, 0.0],
                 volumetric: VolumetricPlan::camera_slot(plan),
             },
             clusters,

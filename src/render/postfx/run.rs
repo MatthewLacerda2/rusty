@@ -134,7 +134,8 @@ impl PostFx {
         scene_of(None, None, self.targets.get(), &self.scene_hdr)
     }
 
-    /// TAA's output this frame, when its resolve ran.
+    /// TAA's output this frame, when its resolve ran: at the output's size when it
+    /// upscaled the view (TAAU), which is then the size of all that reads it.
     fn taa(&self) -> Option<&PfxTarget> {
         let history = self.targets.get::<effects::taa::TaaHistory>();
         history.and_then(|h| h.output())
@@ -148,10 +149,11 @@ impl PostFx {
         &mut effects::exposure::ExposureMeter,
         (&wgpu::TextureView, [u32; 2]),
     ) {
-        let size = self.scene_hdr.texture.size();
+        // The chain's size: the output's when TAA upscaled the view (#1702).
+        let size = [self.chain_size.0, self.chain_size.1];
         let taa = (self.targets.get::<effects::taa::TaaHistory>()).and_then(|h| h.output());
         let scene = scene_of(self.targets.get(), taa, self.targets.get(), &self.scene_hdr);
-        (&mut self.exposure, (scene, [size.width, size.height]))
+        (&mut self.exposure, (scene, size))
     }
 
     /// The format the chain writes its output in (what [`PostFx::composite_into`]
