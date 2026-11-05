@@ -1,7 +1,8 @@
 //! The forward renderer's group 0 (camera, lighting, skybox, reflection cube, the
 //! light clusters, the decals and the lightmap pages), built in one place: at setup
 //! and whenever a resource it names is swapped (a new skybox or probe cube array, a grown
-//! cluster or decal buffer, a grown decal atlas, a rebaked lightmap set).
+//! cluster or decal buffer, a grown decal atlas, a rebaked lightmap set, a
+//! volumetric fog volume of another grid).
 
 use crate::render::clusters::ClusterBuffers;
 use crate::render::decals::DecalBuffers;
@@ -22,6 +23,8 @@ pub(crate) struct GlobalGroup<'a> {
         &'a wgpu::TextureView,
         &'a wgpu::Sampler,
     ),
+    /// The integrated volumetric fog and its sampler (#1703).
+    pub fog_volume: (&'a wgpu::TextureView, &'a wgpu::Sampler),
 }
 
 impl GlobalGroup<'_> {
@@ -49,6 +52,8 @@ impl GlobalGroup<'_> {
             (14, TextureView(self.lightmaps.0)),
             (15, Sampler(self.lightmaps.2)),
             (16, TextureView(self.lightmaps.1)),
+            (17, TextureView(self.fog_volume.0)),
+            (18, Sampler(self.fog_volume.1)),
         ];
         let entries: Vec<_> = resources
             .into_iter()

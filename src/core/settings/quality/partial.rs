@@ -7,7 +7,7 @@ use serde::de::{DeserializeOwned, Error};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use super::{seeds, Levels, SsaoQuality, SsilQuality, SsrQuality};
+use super::{seeds, Levels, SsaoQuality, SsilQuality, SsrQuality, VolumetricFogQuality};
 
 /// Write `patch` over `base` key by key, `path` naming where for a refusal. A key
 /// `base` doesn't have is refused, so a misspelled value never loads silently.
@@ -63,4 +63,10 @@ pub(super) fn depth_of_field<'de, D: Deserializer<'de>>(d: D) -> Result<Levels<u
 pub(super) fn motion_blur<'de, D: Deserializer<'de>>(d: D) -> Result<Levels<u32>, D::Error> {
     let base = seeds::medium().motion_blur_samples;
     over(d, base, "motion_blur_samples.")
+}
+
+pub(super) fn volumetric_fog<'de, D: Deserializer<'de>>(
+    d: D,
+) -> Result<Levels<VolumetricFogQuality>, D::Error> {
+    over(d, seeds::medium().volumetric_fog, "volumetric_fog.")
 }

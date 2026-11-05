@@ -33,6 +33,7 @@ pub mod lens_flare;
 pub mod ssil;
 pub mod ssr;
 pub mod volume;
+pub mod volumetric_fog;
 
 pub use knob::{Effect, Knob};
 
@@ -59,6 +60,7 @@ pub const EFFECTS: &[Effect] = &[
     ssr::EFFECT,
     tonemapping::EFFECT,
     vignette::EFFECT,
+    volumetric_fog::EFFECT,
     white_balance::EFFECT,
 ];
 

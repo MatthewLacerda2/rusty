@@ -55,6 +55,10 @@ pub(crate) struct CameraUniform {
     /// view (`log2(scene/output)`), else 0, which samples exactly as without one.
     /// `yzw`: unused.
     pub lod: [f32; 4],
+    /// Volumetric fog (#1703, `fog::volumetric`): `x` 1 where this camera reads the
+    /// integrated volume, `y` its depth slices, `z` its far end and `w` the near end
+    /// of its exponential slices; all zero where it reads none.
+    pub volumetric: [f32; 4],
 }
 
 /// How a world point finds its light cluster (#434), mirroring `Clusters` in

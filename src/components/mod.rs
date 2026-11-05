@@ -75,7 +75,7 @@ pub use rendering::post_processing::{
     AutoExposure, Bloom, ChromaticAberration, ColorAdjustments, ColorLookup, ColorWheel,
     CustomEffects, DepthOfField, DofMode, Exposure, ExposureMode, FilmGrain, LiftGammaGain,
     PostProcessingComponent, ShadowSettings, SsaoSettings, Ssil, Ssr, Tonemap, Tonemapping,
-    Vignette, Wheel, WhiteBalance,
+    Vignette, VolumetricFog, Wheel, WhiteBalance,
 };
 pub use ribbon::{LineComponent, RibbonStyle, TextureMode, TrailComponent};
 pub use script::{ScriptComponent, ScriptFieldValue};

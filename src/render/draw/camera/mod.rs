@@ -10,8 +10,8 @@
 //! [`CameraCtx`]; a new camera-uniform field is set once, in [`CameraCtx::new`].
 //! No trait objects and no registration at runtime: a static, ordered table.
 //!
-//! Five stages are not every camera's: `ssil_source` (#1750) and `ssr` run only on
-//! the base camera, over its opaque image (#1526); `post_fx` runs only on the last
+//! Six stages are not every camera's: `volumetric_fog` (#1703), `ssil_source`
+//! (#1750) and `ssr` run only on the base camera, over its opaque image (#1526); `post_fx` runs only on the last
 //! camera (it composites the whole stack) and returns early on the others, and the
 //! editor's `outline` and `handles` follow it there, onto the finished image, in
 //! Unity's order: scene, post-FX, outline, handles, then the UI (#1224). An
@@ -30,6 +30,7 @@ use crate::render::passes::particles::ParticleDraws;
 use crate::render::passes::ssao::SsaoPlan;
 use crate::render::postfx::effects::ssil::{SsilFrame, SsilView};
 use crate::render::postfx::effects::taa::jitter::jittered;
+use crate::render::postfx::effects::volumetric_fog::{self, VolumetricPlan, VolumetricView};
 use crate::render::{CameraUniform, Frustum, RenderView, Renderer};
 use crate::scene::{Camera, ClearFlags, Scene};
 use stages::*;
@@ -42,6 +43,7 @@ pub(crate) type CameraPass = fn(&mut Renderer, &mut RenderView, &mut CameraCtx);
 pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("camera_uniform", upload_camera),
     ("clusters", bin_clusters),
+    ("volumetric_fog", volumetric_fog),
     ("solids", batch_solids),
     ("scene", scene_pass),
     ("ssil_source", ssil_source),
@@ -80,6 +82,8 @@ pub(crate) struct CameraCtx<'a> {
     pub ssao: Option<SsaoPlan>,
     /// The view's SSIL (#1750) on its base camera; `None` on every other camera.
     pub ssil: Option<SsilFrame>,
+    /// The view's volumetric fog (#1703) on its base camera; `None` on every other.
+    pub volumetric: Option<VolumetricView>,
     /// Whether this camera's `receive_ssr` translucents trace SSR (#1570): the base
     /// camera of a view running it ([`ssr_march`]).
     pub traces: bool,
@@ -108,6 +112,8 @@ pub(crate) struct StackShared {
     pub ssao: Option<SsaoPlan>,
     /// The view's SSIL (#1750) and what its history is valid for, when it runs.
     pub ssil: Option<SsilView>,
+    /// The view's volumetric fog (#1703) and what its history is valid for.
+    pub volumetric: Option<VolumetricView>,
     /// The base camera's transparent SSR march (#1570), `[steps, step, min
     /// smoothness, fade width]`; zero when the view runs no SSR.
     pub ssr_march: [f32; 4],
@@ -128,6 +134,8 @@ impl<'a> CameraCtx<'a> {
         let overlay = is_overlay(idx == 0, cam.clear_flags);
         let (march, traces) = ssr_march(idx == 0, shared.ssr_march);
         let ssil = SsilFrame::for_camera(shared.ssil.filter(|_| idx == 0), view_proj, cam);
+        let volumetric = volumetric_fog::for_camera(shared.volumetric, idx == 0);
+        let plan = volumetric.as_ref().map(|(plan, _)| plan);
         Self {
             scene,
             cam,
@@ -142,6 +150,7 @@ impl<'a> CameraCtx<'a> {
             ssao: shared.ssao.filter(|_| !overlay),
             traces,
             ssil,
+            volumetric,
             lod: LodSelection::for_camera(scene, cam),
             uniform: CameraUniform {
                 view_proj: view_proj.to_cols_array(),
@@ -160,6 +169,7 @@ impl<'a> CameraCtx<'a> {
                 ssr: march,
                 ssil: [ssil.as_ref().map_or(0.0, |_| 1.0), 0.0, 0.0, 0.0],
                 lod: [shared.taa.mip_bias, 0.0, 0.0, 0.0],
+                volumetric: VolumetricPlan::camera_slot(plan),
             },
             clusters,
             solids: SolidResources::default(),

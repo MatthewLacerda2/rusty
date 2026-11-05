@@ -15,6 +15,7 @@
 // the surfaces only: the sky never follows them (#1647, as Unity's skybox).
 
 #import common::{AmbientLight, CameraUniforms, ProceduralSky, VertexInput, procedural_sky, sky_fog}
+#import sky::air::through_air
 #import sky::motion::{SkyTargets, sky_targets}
 
 @group(0) @binding(0)
@@ -34,6 +35,8 @@ var<uniform> lighting: SkyLighting;
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) view_dir: vec3<f32>,
+    // The clip-space position again, for the volumetric fog's screen lookup.
+    @location(1) clip: vec4<f32>,
 };
 
 @vertex
@@ -45,6 +48,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     // far plane (depth 1.0) and only fills pixels no geometry has drawn over.
     let world_pos = model.position + camera.camera_pos;
     out.clip_position = (camera.view_proj * vec4<f32>(world_pos, 1.0)).xyww;
+    out.clip = out.clip_position;
     return out;
 }
 
@@ -57,6 +61,8 @@ fn fs_main(in: VertexOutput) -> SkyTargets {
     let color = procedural_sky(lighting.sky, lighting.ambient.color, dir);
 
     // Blend toward the scene fog at the horizon (#437), as the panorama sky does.
-    let fogged = vec4<f32>(sky_fog(camera.fog, color, dir, camera.camera_pos), 1.0);
+    // Then the volumetric fog's whole depth (#1703).
+    let hazed = sky_fog(camera.fog, color, dir, camera.camera_pos);
+    let fogged = vec4<f32>(through_air(hazed, camera.volumetric, in.clip), 1.0);
     return sky_targets(camera, fogged, dir);
 }

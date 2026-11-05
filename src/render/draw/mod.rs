@@ -61,6 +61,9 @@ impl Renderer {
             self.global_bind_group_dirty = true;
         }
 
+        // The volumetric fog's volume (#1703) goes back to its stand-in once no
+        // camera has run it for a few renders.
+        self.global_bind_group_dirty |= self.fog_volume.tick(&self.device);
         // Build + write the camera-independent lighting uniform once (it starts the
         // frame's counters).
         self.upload_lighting(scene);

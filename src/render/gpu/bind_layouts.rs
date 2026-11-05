@@ -14,13 +14,14 @@ use super::layout_entries::{
 /// frame's point/spot lights (7), each cluster's light and decal ranges (8) and the
 /// index list (9), and the decals (#638): their records (10), the decal atlas's
 /// sRGB (11) and raw (12) views and its sampler (13), and the baked lightmap pages (14)
-/// with their sampler (15, #438) and direction pages (16, #810). Binding 6 is the shadow module's (see `shader.wgsl`).
+/// with their sampler (15, #438) and direction pages (16, #810), and the
+/// integrated volumetric fog (17) with its sampler (18, #1703). Binding 6 is the shadow module's (see `shader.wgsl`).
 /// The cube array holds the resident probes' baked, prefiltered cubemaps, one per layer
 /// (#245, #1206); a draw's instance names the two probes it blends (#1584), and the
 /// shader samples their layers (parallax-corrected, roughness->mip) and the sky's
 /// cube for the weight they leave.
 pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    use wgpu::TextureViewDimension::{Cube, CubeArray, D2Array};
+    use wgpu::TextureViewDimension::{Cube, CubeArray, D2Array, D3};
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Camera, Lighting, Skybox & Reflection Layout"),
         entries: &[
@@ -43,6 +44,16 @@ pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::Bind
             texture_entry(14, D2Array),
             sampler_entry(15),
             texture_entry(16, D2Array),
+            // The integrated volumetric fog (#1703); vertex-visible too: particles
+            // fog per vertex.
+            wgpu::BindGroupLayoutEntry {
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                ..texture_entry(17, D3)
+            },
+            wgpu::BindGroupLayoutEntry {
+                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                ..sampler_entry(18)
+            },
         ],
     })
 }
