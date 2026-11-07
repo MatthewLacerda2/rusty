@@ -336,8 +336,8 @@ mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCO
 
 # The `dev` suite under plain `cargo test`, every test of a binary in one process
 # (#1338): nextest's process per test hides a test that leaks process-wide state (the
-# working directory, a `static` left set), and cargo-mutants runs `cargo test`, so such
-# a leak broke the mutation baseline of every branch after it (#1042, #1069, #1337).
+# working directory, a `static` left set); while cargo-mutants ran `cargo test`, such a
+# leak broke the mutation baseline of every branch after it (#1042, #1069, #1337, #1844).
 # A signal, never a gate: it runs nightly on `main` in cargo-test.yml, and this verb
 # runs it on demand. `NEXTEST=1` keeps the guarantee that a test never holds a provider
 # key (`dev::providers::credentials`, #974), and it runs on the gates' proptest seed
