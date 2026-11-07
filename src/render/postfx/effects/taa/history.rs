@@ -51,8 +51,9 @@ pub(crate) struct TaaHistory {
     pub(super) pixels: Vec2,
     pub(super) frames: [PfxTarget; 2],
     /// Beside each of `frames`, each pixel's surface as that resolve saw it
-    /// ([`SURFACE_FORMAT`]): next frame drops the history where its own surface
-    /// lies farther than all of last frame's around it, a reveal (#1846). Made, dropped and reset with `frames`, so
+    /// ([`SURFACE_FORMAT`]): next frame drops the history where this frame's nearest
+    /// surface in the 3×3 (`Front::near`, not the pixel's own) lies farther than all
+    /// of last frame's around the reprojected place, a reveal (#1846). Made, dropped and reset with `frames`, so
     /// it follows every cut, resize and render-scale change they do.
     pub(super) surfaces: [PfxTarget; 2],
     pub(super) params: wgpu::Buffer,
