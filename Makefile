@@ -16,6 +16,15 @@ LINT := cargo run --quiet --manifest-path tools/lint/Cargo.toml
 # The test runner (#484): cargo-nextest, configured in .config/nextest.toml.
 # nextest does not run doctests, so the `test` gate runs `cargo test --doc` beside it.
 TEST := cargo nextest run --locked
+# The gates' fixed proptest seed (#1852): ci.yml's, read from there so there is one
+# number, and a local gate run goes red only for the branch under test, never for a
+# seed that drew an old bug. Exported to every recipe, so `make test` and `make
+# test-one-process` both run on it; only `make test-explore` draws fresh seeds. An
+# exported PROPTEST_RNG_SEED wins, so a seed from a report still reproduces.
+# test_workflow_hygiene.py runs both verbs' recipes on a probe and fails when either
+# sees another number than ci.yml's, or none.
+PROPTEST_SEED := $(shell sed -n "s/^  PROPTEST_RNG_SEED: .* '\([0-9][0-9]*\)' .*/\1/p" .github/workflows/ci.yml)
+export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)
 
 # The gates, in the order `make gates` runs them. The quick ones take seconds; the
 # heavy ones compile, so a cold run passes a cloud tool call's ten-minute limit and
@@ -31,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -170,13 +179,25 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
 
-test: ## [gate] Engine tests (nextest) and doctests, both feature sets
+test: ## [gate] Engine tests (nextest) and doctests, both feature sets, on the gates' proptest seed
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
 	$(TEST)
 	$(TEST) --features dev
 	cargo test --doc --locked
 	cargo test --doc --locked --features dev
+
+# Fresh proptest seeds, as the nightly draws (#1852): a signal, never a gate. A case
+# it finds is written to proptest-regressions/ and committed with its fix
+# (docs/testing.md). PROPTEST_CASES=<n> runs more cases per property.
+# Both feature sets run even when the first fails, and the exit says if either did.
+test-explore: ## Signal: the nextest suite, both feature sets, on random proptest seeds
+	@command -v cargo-nextest >/dev/null 2>&1 || { \
+		echo "test-explore: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
+	@rc=0; \
+	env -u PROPTEST_RNG_SEED $(TEST) || rc=1; \
+	env -u PROPTEST_RNG_SEED $(TEST) --features dev || rc=1; \
+	exit $$rc
 
 # The converters' fingerprints (#1286): re-blessed after a bump of a converter's
 # `version`, never in place of one (the test refuses). Blender's rows only where
@@ -319,7 +340,8 @@ mutants-remote: ## Mutation on GitHub's runners, scoped. make mutants-remote SCO
 # a leak broke the mutation baseline of every branch after it (#1042, #1069, #1337).
 # A signal, never a gate: it runs nightly on `main` in cargo-test.yml, and this verb
 # runs it on demand. `NEXTEST=1` keeps the guarantee that a test never holds a provider
-# key (`dev::providers::credentials`, #974). `--quiet`, since its ~1,800 pass lines are
+# key (`dev::providers::credentials`, #974), and it runs on the gates' proptest seed
+# (PROPTEST_RNG_SEED, above; the nightly explores). `--quiet`, since its ~1,800 pass lines are
 # output every agent pays for; `--no-fail-fast` runs every binary, and the failing tests
 # are named again at the end (the log stays in target/one-process.log).
 test-one-process: ## Signal: the dev suite under plain cargo test, one process per binary

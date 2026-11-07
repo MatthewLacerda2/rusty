@@ -221,7 +221,7 @@ into the lit color; postfx blocks grade the sampled scene color.
   stepped flicker, in `color` over a faint copy of the surface — set `color`, e.g.
   `{0.3, 0.8, 1}`; pair it with a Transparent material for see-through);
   `uv_scroll {speed = 0.25}` (a **uv-stage** block: offsets the UVs by `speed`
-  — a 2-vector, uv per game second — *before* any map is sampled, so the base,
+  — a 2-vector, uv per game second, in the mesh's UV space where v runs down the image, so +y scrolls the texture up the surface — *before* any map is sampled, so the base,
   normal, metallic/roughness and mask maps all move together: conveyors, flowing
   energy, water. Its place in the recipe doesn't matter; every color block sees the
   moved UVs).
