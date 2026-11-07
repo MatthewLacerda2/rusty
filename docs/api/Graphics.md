@@ -781,6 +781,21 @@ deviations, no texture mip bias). Thin edges stop crawling and sub-pixel
 highlights stop sparkling under a moving camera; a still frame settles toward a
 supersampled one.
 
+Two rules go beyond URP's (#1846). **A moving pixel trusts its history less**:
+its current frame weighs from 0.1 still up to 0.25 at 2 pixels of motion a frame
+(Unity's Post-processing Stack v2 blends the same way), so a turning view stays
+nearly as sharp as a still one. **A revealed surface drops its history** (FSR2's
+depth test): the history keeps each pixel's distance from its camera, and where
+a pixel now lies more than 10 % farther than everything last frame held around it
+(a wall coming out from behind a pillar, a grunt stepping clear of a crate) the
+history fades, gone at 25 %. So a reveal shows no smear of what covered it, even
+when both are the same grey, which the colour clamp alone cannot tell apart. The
+distance, not the depth along the view axis, so a fast flick of the camera is no
+reveal. Across a camera stack the order decides: where a viewmodel's gun moves off
+a wall the wall is a reveal, and where it arrives over one nothing is. A still
+pixel blends exactly as URP's. These are fixed constants for now. The distances
+cost each TAA camera half again its history memory: 50 MB in all at 1920×1080.
+
 Unity's camera has **one anti-aliasing mode**, so with both on, TAA runs and the
 FXAA pass is skipped; `fxaa_active` keeps its value for when TAA is turned off. TAA
 needs the velocity target, so a view running it pays for the motion-vector pass

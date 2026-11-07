@@ -4,9 +4,9 @@
 
 use glam::Vec3;
 
-use super::gpu_fixture::{big_view, downsample, errors, frame, holds, renderer, settle};
-use super::gpu_fixture::{taa_scene, tilted_cube, view};
-use super::jitter_of;
+use super::super::jitter_of;
+use super::fixture::{big_view, downsample, errors, frame, holds, renderer, settle};
+use super::fixture::{taa_scene, tilted_cube, view};
 use crate::render::motion::gpu_fixture::{eye, render, H, W};
 use crate::render::readback;
 
@@ -137,7 +137,7 @@ fn gpu_a_nan_in_the_history_does_not_stay() {
     let halves = bytes.chunks(2).map(|b| u16::from_le_bytes([b[0], b[1]]));
     let bad = halves.filter(|h| h & 0x7c00 == 0x7c00).count();
     assert_eq!(bad, 0, "{bad} history channels not finite a frame later");
-    let off = (0..W * H).map(|i| super::gpu_fixture::diff(&after, &settled, (i % W, i / W)));
+    let off = (0..W * H).map(|i| super::fixture::diff(&after, &settled, (i % W, i / W)));
     let worst = off.max().unwrap();
     eprintln!("[taa] a frame after a NaN history, the image is {worst} off the settled one");
     assert!(
