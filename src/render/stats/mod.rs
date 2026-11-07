@@ -35,6 +35,10 @@ pub struct RenderCounters {
     /// Shadow casters inside a light volume but too far or too small from the base
     /// camera (#1714), summed over the shadow views.
     pub shadow_size_culled: u32,
+    /// Static shadow casters inside a point or spot light's volume and kept by the
+    /// size cull, but out of sight of the light's cell by the scene's baked PVS
+    /// (#1714), summed over the shadow views.
+    pub shadow_occlusion_culled: u32,
     /// Static mesh entities inside a camera's frustum and big enough, but out of
     /// sight of its cell by the scene's baked PVS (#1714), summed over the camera
     /// views. `0` with no bake, or for a camera with `use_occlusion_culling` off.
@@ -181,6 +185,10 @@ impl RenderCounters {
             ("shadow_cull_tested", self.shadow_cull_tested.into()),
             ("shadow_frustum_culled", self.shadow_frustum_culled.into()),
             ("shadow_size_culled", self.shadow_size_culled.into()),
+            (
+                "shadow_occlusion_culled",
+                self.shadow_occlusion_culled.into(),
+            ),
             ("occlusion_culled", self.occlusion_culled.into()),
             ("lod_hidden_entities", self.lod_hidden_entities.into()),
             ("lights", self.lights.into()),

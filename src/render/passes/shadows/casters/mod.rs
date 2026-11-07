@@ -25,8 +25,11 @@
 //! walks them, never the ECS, and reads per frame only what the frame decides (the
 //! LOD level, the small-object verdict) and a skinned caster's pose.
 //!
-//! Casters are gathered once per sweep and culled per light volume — a cascade (#435)
-//! or an atlas tile (#468) — so a prop inside two volumes is drawn into both. The
+//! Casters are gathered once per sweep (`gather`) and culled per light volume — a
+//! cascade (#435) or an atlas tile (#468) — so a prop inside two volumes is drawn
+//! into both. A point or spot light's tile also drops the baked casters its light's
+//! PVS cell cannot see (#1714, [`LightVolume`]): the wall that hides them is in the
+//! same map, so the map is the same without them. The
 //! cascades' and the atlas's static bakes and dynamic passes each own a [`CasterBuffer`]
 //! holding every volume's casters: all four are recorded into the same encoder
 //! before one submit, so sharing one buffer would let a later upload overwrite an
@@ -34,6 +37,7 @@
 
 mod buffer;
 mod cull;
+mod gather;
 mod runs;
 mod sweep;
 
@@ -42,9 +46,8 @@ use std::ops::Range;
 
 use super::clips::Clip;
 use super::ShadowRenderer;
-use crate::components::{RenderFace, ShadowCasting};
+use crate::components::RenderFace;
 use crate::render::draw::batch::IndexRun;
-use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
 use crate::render::gpu::material_cache::MaterialCache;
 use crate::render::gpu::pipelines::surface::SurfaceShaders;
 use crate::render::gpu::pipelines::winding::Facing;
@@ -54,7 +57,7 @@ use crate::render::{GpuMesh, MeshId, SmallObjectCull};
 use crate::scene::Scene;
 pub(super) use buffer::CasterBuffer;
 use buffer::{CasterData, CasterRecords, CasterUpload};
-use cull::Candidate;
+pub(super) use cull::LightVolume;
 pub(crate) use cull::ShadowCulls;
 use glam::Mat4;
 use runs::batch_casters;
@@ -135,7 +138,8 @@ impl CasterFrame<'_> {
 
 impl ShadowRenderer {
     /// Gather every active caster `sweep` takes whose LOD level `lod` shows, cull it
-    /// against each of `volumes` (light view-projections), and upload every volume's
+    /// against each of `volumes` (light view-projections, and the PVS rows of
+    /// their lights' cells), and upload every volume's
     /// batches into that sweep's one caster buffer. Returns the batches per volume,
     /// in the order given.
     pub(super) fn prepare_casters(
@@ -143,13 +147,19 @@ impl ShadowRenderer {
         frame: &CasterFrame,
         lod: &LodSelection,
         sweep: Sweep,
-        volumes: &[Mat4],
+        volumes: &[LightVolume],
     ) -> Vec<Vec<CasterBatch>> {
-        let (candidates, joints) = self.collect_casters(frame, lod, sweep);
+        let (candidates, joints, walls) = self.collect_casters(frame, lod, sweep);
+        let pvs = &frame.objects.occlusion;
         let mut matrices = Vec::new();
         let mut per_volume = Vec::with_capacity(volumes.len());
         for &volume in volumes {
-            let casters = cull::cull(&candidates, volume, &mut self.culls);
+            // A baked occluder with no buffers draws nothing: its light sees past it.
+            let volume = match walls {
+                true => volume,
+                false => LightVolume::open(volume.view_proj),
+            };
+            let casters = cull::cull(&candidates, volume, pvs, &mut self.culls);
             let (packed, mut batches) = batch_casters(casters, self.instancing);
             let base = matrices.len() as u32;
             for batch in &mut batches {
@@ -179,70 +189,6 @@ impl ShadowRenderer {
         };
         buffer.upload(frame.device, frame.queue, layout, sweep);
         per_volume
-    }
-
-    /// Every active caster `sweep` takes — a caster a surface variant cuts counts as
-    /// dynamic (see `clips`) — that has a GPU mesh, from the retained scene's
-    /// objects (#1706), and the joint matrices its skinned casters' `bone_base`s
-    /// index — one palette per caster per sweep, however many cascades draw it. Only
-    /// what the frame decides is read here: the LOD level, the small-object verdict,
-    /// and a palette object's pose and posed bounds, which animation writes unstamped.
-    fn collect_casters(
-        &self,
-        frame: &CasterFrame,
-        lod: &LodSelection,
-        sweep: Sweep,
-    ) -> (Vec<Candidate>, Vec<JointMatrix>) {
-        let (mut casters, mut joints) = (Vec::new(), Vec::new());
-        for (id, object) in frame.objects.objects() {
-            // An inactive caster, one set to cast nothing (#1571), or a level of detail
-            // this sweep does not draw (#472).
-            let off = !object.cast.casts() || !object.active;
-            if !object.resident || off || lod.hides(id) {
-                continue;
-            }
-            // One a camera may cull as small casts per frame, never from a bake (#1714).
-            let unbaked = frame
-                .objects
-                .unbaked
-                .holds(id, object.casting.culls_small());
-            if !sweep.takes(object.is_static && !object.moving && !unbaked) {
-                continue;
-            }
-            let world = object.world;
-            // A skinned caster is bounded by its posed skeleton (#833); one whose pose
-            // cannot be bounded is never culled — a wrongly-culled caster drops its shadow.
-            let mesh = object.palette.then(|| frame.scene.world.mesh(id)).flatten();
-            let bounds = match (&mesh, frame.gpu_mesh(object.mesh)) {
-                (Some(mesh), Some(gpu)) => gpu.world_bounds(mesh, world),
-                _ => object.bounds,
-            };
-            let small = frame.culls_small(object, bounds);
-            // A culled caster never draws: no palette to upload for it.
-            let palette = mesh.as_ref().map_or(&[][..], |m| m.active_palette());
-            let bone_base = (!small).then(|| push_palette(&mut joints, palette));
-            let bone_base = bone_base.unwrap_or(0);
-            let two_sided = object.cast == ShadowCasting::TwoSided;
-            for (indices, (clip, face)) in object.shadow_runs.iter().cloned() {
-                let mut caster = CasterData::new(world, bone_base);
-                if let Some(cut) = clip.and_then(|c| c.cutout) {
-                    caster = caster.cutout(cut);
-                }
-                casters.push(Candidate {
-                    id,
-                    key: CasterKey {
-                        facing: caster_facing(world, two_sided, face),
-                        clip: clip.map(|c| c.clip.by_class(frame.records)),
-                        mesh: object.mesh,
-                        indices: indices.into(),
-                    },
-                    caster,
-                    bounds,
-                    small,
-                });
-            }
-        }
-        (casters, joints)
     }
 
     /// Record one sweep's instanced depth draws for its `volume`th light volume from
@@ -292,6 +238,8 @@ impl ShadowRenderer {
     }
 }
 
+#[cfg(test)]
+mod cull_tests;
 #[cfg(test)]
 mod layout_tests;
 #[cfg(test)]

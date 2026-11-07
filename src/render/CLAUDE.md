@@ -63,7 +63,9 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   `LODGroup`s' renderers changed); it may keep what is hidden and never culls what
   a camera sees. A new path that decides what a camera draws reads it through
   `Renderer::occlusion_eye`, so a capture, an orthographic camera and a far near
-  plane cull nothing.
+  plane cull nothing. A light's shadow views read it through
+  `OcclusionBinding::shadow_row` (the light's cell, culling nothing while a matching
+  occluder casts no shadow) and only for a tile whose statics are drawn into it.
 
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no

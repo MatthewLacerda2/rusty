@@ -51,6 +51,8 @@ pub(crate) struct Tile {
     pub size: u32,
     /// World size of one texel at one metre from the light (normal-offset bias).
     pub texel: f32,
+    /// The light's position: the PVS cell its casters are culled by (#1714).
+    pub light: Vec3,
     /// Whether its static casters are baked into it: false for a shadowmasked
     /// light's tile under `Shadowmask` (#1695), whose static shadow is the baked
     /// mask's, so only dynamic casters draw into it. Part of what the static cache
