@@ -11,6 +11,8 @@
 //!   The rest of the chain then runs at the output's size ([`chain_size`]) and
 //!   writes the output itself, so no bilinear upscale follows. The jitter runs
 //!   FSR2's longer sequence and the material maps read with a negative mip bias.
+//!
+//! On either path the camera's *Mip Bias* (#1847) adds to the material maps' bias.
 
 use glam::Vec2;
 
@@ -23,8 +25,9 @@ use crate::render::RenderView;
 pub(crate) struct TaaFrame {
     /// The projection's sub-pixel jitter, in NDC.
     pub jitter: Vec2,
-    /// The material maps' mip bias ([`jitter::mip_bias`]): negative only while the
-    /// view upscales.
+    /// The material maps' mip bias: TAAU's ([`jitter::mip_bias`], negative only
+    /// while the view upscales) plus the camera's *Mip Bias* (#1847), which applies
+    /// on every frame TAA runs.
     pub mip_bias: f32,
 }
 
@@ -126,7 +129,7 @@ impl TaaHistory {
 pub(crate) fn chain_size(view: &RenderView, on: bool) -> (u32, u32) {
     let size = match upscales(view, on) {
         true => view.size(),
-        false => view.scene_size(),
+        false => view.scene_size(), // chain-size: scene the resolve's own input
     };
     (size.width, size.height)
 }
@@ -134,7 +137,7 @@ pub(crate) fn chain_size(view: &RenderView, on: bool) -> (u32, u32) {
 /// Whether `view`, running TAA when `on` ([`super::runs`]), upscales through it this
 /// frame (TAAU): its scene is smaller than its output.
 pub(crate) fn upscales(view: &RenderView, on: bool) -> bool {
-    on && jitter::upscales(view.scene_size(), view.size())
+    on && jitter::upscales(view.scene_size(), view.size()) // chain-size: scene compared to the output
 }
 
 /// Start a stack's frame, after the motion history's `begin`: with `on`, fit the
@@ -144,8 +147,18 @@ pub(crate) fn upscales(view: &RenderView, on: bool) -> bool {
 /// history starts over) the history is forgotten and the sequence restarts, so the
 /// frame is exactly a new view's first. A resize or a render-scale change drops the
 /// history with every post target (`PostFx::resize`): a cut too.
-pub(crate) fn begin(view: &mut RenderView, device: &wgpu::Device, on: bool) -> TaaFrame {
-    let (scene, output) = (view.scene_size(), view.size());
+///
+/// `knobs` is the base camera's `(jitter_scale, mip_bias)` (URP's *Jitter Scale* and
+/// *Mip Bias*, #1847): the first scales the sub-pixel offset (`1` its default, so a
+/// camera at its defaults jitters as before), the second adds the camera's negative
+/// mip bias to the bias TAAU already applies.
+pub(crate) fn begin(
+    view: &mut RenderView,
+    device: &wgpu::Device,
+    on: bool,
+    (jitter_scale, mip_bias): (f32, f32),
+) -> TaaFrame {
+    let (scene, output) = (view.scene_size(), view.size()); // chain-size: scene the jitter's
     let cut = view.post_fx.motion.history.cut();
     let targets = &mut view.post_fx.targets;
     if !on {
@@ -167,9 +180,9 @@ pub(crate) fn begin(view: &mut RenderView, device: &wgpu::Device, on: bool) -> T
     }
     h.frame = h.frame.wrapping_add(1);
     h.ran = false;
-    h.pixels = jitter::pixels(h.frame, h.phases);
+    h.pixels = jitter::pixels(h.frame, h.phases) * jitter_scale;
     TaaFrame {
         jitter: jitter::ndc(h.pixels, scene),
-        mip_bias: jitter::mip_bias(scene, output),
+        mip_bias: jitter::mip_bias(scene, output) + mip_bias,
     }
 }

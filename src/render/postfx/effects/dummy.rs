@@ -28,7 +28,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         pack: |_, _| {},
     }],
     grade: &[],
-    pass: Some(Pass::Scene { order: 90, run }),
+    passes: &[Pass::Scene { order: 90, run }],
 };
 
 /// The dummy's per-view state: what a real effect's targets would be.

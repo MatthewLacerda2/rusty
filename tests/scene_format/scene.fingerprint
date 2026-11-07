@@ -115,6 +115,12 @@ scene.entities[].camera.projection: enum Perspective|Orthographic
 scene.entities[].camera.projection<Orthographic>.size: f32
 scene.entities[].camera.render_order: i32
 scene.entities[].camera.taa_active: bool
+scene.entities[].camera.taa_base_blend_factor: f32
+scene.entities[].camera.taa_contrast_adaptive_sharpening: f32
+scene.entities[].camera.taa_jitter_scale: f32
+scene.entities[].camera.taa_mip_bias: f32
+scene.entities[].camera.taa_quality: enum VeryLow|Low|Medium|High|VeryHigh
+scene.entities[].camera.taa_variance_clamp_scale: f32
 scene.entities[].camera.target_texture.height: u32
 scene.entities[].camera.target_texture.name: string
 scene.entities[].camera.target_texture.post_fx: bool

@@ -19,7 +19,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         pack,
     }],
     grade: &[],
-    pass: None,
+    passes: &[],
 };
 
 /// Slot 0: intensity (`0` when it doesn't run), smoothness, centre; slot 1: the

@@ -19,7 +19,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         pack,
     }],
     grade: &[],
-    pass: None,
+    passes: &[],
 };
 
 /// x: the intensity (`0` when it doesn't run), y: the response, both clamped.

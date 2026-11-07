@@ -12,10 +12,11 @@
 //!   the registry binds ([`textures`], #1473);
 //! - **grade functions** ([`Grade`]): functions the grading bake runs on each texel of
 //!   the view's LUT, in order;
-//! - a **pass** ([`Pass`]): its own GPU work, on the HDR scene before the composite
-//!   ([`Pass::Scene`]: depth of field, TAA, motion blur, the exposure meter, bloom's
-//!   mip chain, the lens flare) or on the LDR image after it ([`Pass::Ldr`]: the authored effects,
-//!   FXAA).
+//! - **passes** ([`Pass`]): its own GPU work, on the HDR scene before the composite
+//!   ([`Pass::Scene`]: depth of field, TAA's resolve, motion blur, the exposure meter,
+//!   bloom's mip chain, the lens flare) or on the LDR image after it ([`Pass::Ldr`]:
+//!   the authored effects, TAA's sharpen, FXAA). An effect may have one of each, as
+//!   TAA does (URP resolves before the uber pass and sharpens in its final pass).
 //!
 //! **Params without a shared struct.** Each function packs its own vec4 slots; the
 //! composite's slots and the bake's are each one array, laid out from this registry
@@ -110,7 +111,8 @@ pub(crate) struct PostEffect {
     pub module: Option<&'static str>,
     pub composite: &'static [Composite],
     pub grade: &'static [Grade],
-    pub pass: Option<Pass>,
+    /// Its own GPU work, each pass placed by its own stage and order.
+    pub passes: &'static [Pass],
 }
 
 /// Where an effect's settings live.
@@ -180,6 +182,20 @@ pub(crate) enum LdrRun {
     /// Reads [`super::PostFx::ldr`] and leaves its result there.
     InPlace(
         fn(&mut super::PostFx, Gpu, &mut wgpu::CommandEncoder, &super::PostFxContext, &EffectCx),
+    ),
+    /// Reads `ldr` as [`Self::InPlace`] does, told whether it is the chain's last
+    /// pass (nothing in place after it, no finishing pass). Last, it may write the
+    /// chain's output itself and return true, and the chain skips its copy (TAA's
+    /// sharpen, #1847); false leaves its result in `ldr`.
+    MayEnd(
+        fn(
+            &mut super::PostFx,
+            Gpu,
+            &mut wgpu::CommandEncoder,
+            &super::PostFxContext,
+            &EffectCx,
+            bool,
+        ) -> bool,
     ),
     /// The finishing pass: this pipeline, `ldr` in, the chain's output out. At most
     /// one runs, last; without one the chain copies `ldr` out.

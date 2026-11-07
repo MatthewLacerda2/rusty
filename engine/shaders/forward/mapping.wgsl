@@ -9,13 +9,14 @@
 // uniform) or on the camera's mip bias, so the implicit-LOD samples sit in uniform
 // control flow.
 //
-// The mip bias (#1702) is TAA's while it upscales the view (`camera.lod.x`,
-// `log2(scene/output)`): every material map takes it through [`lookup`] (the
+// The mip bias (`camera.lod.x`) is TAA's: `log2(scene/output)` while it upscales
+// the view (#1702), plus the camera's TAA *Mip Bias* on every frame TAA runs
+// (#1847); 0 without TAA. Every material map takes it through [`lookup`] (the
 // maps read here and the surface blocks' `t_mask`), and the decals through their
 // sampling footprint (`forward::lighting::fold_decals`); the lightmap, the AO
 // target and the geometric specular AA's derivatives never do; the normal map's
 // Toksvig level adds it (`normal_level`), as its lookup does. At 0 the lookup is the plain
-// `textureSample`, so a view that doesn't upscale samples as it always did.
+// `textureSample`, so a view at no bias samples as it always did.
 
 #define_import_path forward::mapping
 

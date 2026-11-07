@@ -53,22 +53,21 @@ fn sources(name: &str) -> Vec<std::path::PathBuf> {
     files.into_iter().filter(own).collect()
 }
 
-/// Whether an effect's pass runs after TAA's resolve, at the chain's size.
-fn after_taa(pass: &Option<Pass>, taa: u16) -> bool {
-    match pass {
-        Some(Pass::Scene { order, .. }) => *order > taa,
-        Some(Pass::Ldr { .. }) => true,
-        None => false,
-    }
+/// Whether one of an effect's passes runs after TAA's resolve, at the chain's size.
+fn after_taa(passes: &[Pass], taa: u16) -> bool {
+    passes.iter().any(|pass| match pass {
+        Pass::Scene { order, .. } => *order > taa,
+        Pass::Ldr { .. } => true,
+    })
 }
 
 #[test]
 fn every_pass_after_taa_sizes_by_the_chain() {
-    let Some(Pass::Scene { order: taa, .. }) = super::taa::EFFECT.pass else {
-        panic!("TAA is a scene pass");
+    let Some(&Pass::Scene { order: taa, .. }) = super::taa::EFFECT.passes.first() else {
+        panic!("TAA's first pass is its scene pass");
     };
     let mut found = Vec::new();
-    for effect in POST_EFFECTS.iter().filter(|e| after_taa(&e.pass, taa)) {
+    for effect in POST_EFFECTS.iter().filter(|e| after_taa(e.passes, taa)) {
         let files = sources(effect.name);
         assert!(!files.is_empty(), "no source found for `{}`", effect.name);
         for file in files {

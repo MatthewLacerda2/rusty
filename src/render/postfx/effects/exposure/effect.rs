@@ -24,10 +24,10 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         pack,
     }],
     grade: &[],
-    pass: Some(Pass::Scene {
+    passes: &[Pass::Scene {
         order: 30,
         run: meter,
-    }),
+    }],
 };
 
 /// x: the fixed EV, y: `1` in Automatic (the composite reads the adapted EV).

@@ -15,6 +15,7 @@ use super::{assemble, Owner, POST_EFFECTS};
 use crate::components::PostProcessingComponent;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::scene::authoring::fields;
+use crate::scene::authoring::rendering::camera;
 use crate::scene::authoring::rendering::post_processing as authoring;
 
 /// What one layer of the engine lists, by effect name.
@@ -28,6 +29,9 @@ pub(super) struct Layers {
     pub camera: Vec<String>,
     /// The authoring registry's effects, each with its knob paths.
     pub ops: Vec<(String, Vec<String>)>,
+    /// The camera effects' knob tables (`camera::TAA_KNOBS`), each with its knob
+    /// paths: their tween paths need their doc line as a volume knob's do.
+    pub camera_knobs: Vec<(String, Vec<String>)>,
     /// The `Graphics.*` registrars.
     pub api: Vec<String>,
     /// The Inspector's sections (both cards).
@@ -97,6 +101,7 @@ pub(super) fn engine() -> Layers {
                 )
             })
             .collect(),
+        camera_knobs: camera_knobs(),
         api: crate::api::graphics::effects::REGISTRARS
             .iter()
             .map(|(n, _)| n.to_string())
@@ -110,6 +115,12 @@ pub(super) fn engine() -> Layers {
         textures: texture_uses(),
         composite: assemble::composite_source(),
     }
+}
+
+/// The camera effects' knob tables, each with its knob paths.
+fn camera_knobs() -> Vec<(String, Vec<String>)> {
+    let taa = camera::TAA_KNOBS.iter().map(|k| k.field.into());
+    vec![("taa".into(), taa.collect())]
 }
 
 /// Every declared composite texture, as the composite should use it.
@@ -158,7 +169,7 @@ pub(super) fn check(l: &Layers) -> Vec<String> {
                 .map(lacks),
         );
     }
-    for (name, knobs) in &l.ops {
+    for (name, knobs) in l.ops.iter().chain(&l.camera_knobs) {
         for knob in knobs {
             let path = format!("`Graphics.{name}.{knob}`");
             if !l.docs.contains(&path) {

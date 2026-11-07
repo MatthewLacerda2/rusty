@@ -17,7 +17,8 @@
 use glam::Vec4;
 
 use crate::scene::authoring::{
-    material, rendering::post_processing as vc_ops, ui::shader as ui_shader,
+    material, rendering::camera as camera_ops, rendering::post_processing as vc_ops,
+    ui::shader as ui_shader,
 };
 use crate::scene::Scene;
 use crate::shadergen::params::ParamLayout;
@@ -48,6 +49,9 @@ enum Source {
     /// A built-in knob of the volume, `<effect>.<knob>` (#1445, #1467): one number,
     /// through the knob's op, as the Inspector and `Graphics.*` write it.
     Knob(&'static vc_ops::Knob),
+    /// A camera effect's knob, `taa.<knob>` (#1847): one number on the entity's
+    /// `CameraComponent`, through the camera op.
+    CameraKnob(&'static camera_ops::CameraKnob),
 }
 
 impl ShaderParam {
@@ -66,7 +70,7 @@ impl ShaderParam {
             let arity = match &source {
                 Source::Material(layout) | Source::Ui { layout, .. } => layout.resolve(name)?.arity,
                 Source::Post(chain) => chain.resolve(name)?.1.arity,
-                Source::Knob(_) => 1,
+                Source::Knob(_) | Source::CameraKnob(_) => 1,
             };
             Ok(Self {
                 path: path.to_owned(),
@@ -105,6 +109,7 @@ impl ShaderParam {
                 vc_ops::custom_effects::param_with(&*w.post_processing(id)?, chain, &self.name)
             }
             Source::Knob(knob) => Ok(vec![(knob.get)(&*w.post_processing(id)?)]),
+            Source::CameraKnob(knob) => Ok(vec![(knob.get)(&*w.camera(id)?)]),
         };
         value.ok().map(|v| lanes(&v))
     }
@@ -136,6 +141,11 @@ impl ShaderParam {
                 .post_processing_mut(id)
                 .map(|mut vc| (knob.set)(&mut vc, v.x))
                 .is_some(),
+            Source::CameraKnob(knob) => scene
+                .world
+                .camera_mut(id)
+                .map(|mut c| (knob.set)(&mut c, v.x))
+                .is_some(),
         }
     }
 }
@@ -157,8 +167,17 @@ fn ui_source(scene: &Scene, id: u32) -> Result<Source, String> {
     Ok(Source::Ui { shader, layout })
 }
 
-/// The volume's built-in knob `name` names, else its authored effects' chain.
+/// A camera effect's knob (`taa.<knob>`, #1847) on the entity's camera, else the
+/// volume's built-in knob `name` names, else its authored effects' chain. The
+/// camera knob needs no volume — a scene can run TAA without one.
 fn post_source(scene: &Scene, id: u32, name: &str) -> Result<Source, String> {
+    if let Some(knob) = camera_ops::camera_knob(name) {
+        return scene
+            .world
+            .camera(id)
+            .map(|_| Source::CameraKnob(knob))
+            .ok_or_else(|| format!("entity {id} has no Camera"));
+    }
     let vc = scene
         .world
         .post_processing(id)

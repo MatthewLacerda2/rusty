@@ -76,6 +76,15 @@ inspect! {
         op!("motion_blur_max_length", camera::set_motion_blur_max_length),
         op!("fxaa_active", camera::set_fxaa_active),
         op!("taa_active", camera::set_taa_active),
+        op!("taa_quality", camera::set_taa_quality),
+        op!("taa_base_blend_factor", camera::set_taa_base_blend_factor),
+        op!("taa_variance_clamp_scale", camera::set_taa_variance_clamp_scale),
+        op!("taa_jitter_scale", camera::set_taa_jitter_scale),
+        op!("taa_mip_bias", camera::set_taa_mip_bias),
+        op!(
+            "taa_contrast_adaptive_sharpening",
+            camera::set_taa_contrast_adaptive_sharpening
+        ),
         op!("projection", camera::set_projection),
         op!("use_occlusion_culling", camera::set_use_occlusion_culling),
         with!("target_texture", |c, v: Option<RenderTarget>| set_target(c, v)),

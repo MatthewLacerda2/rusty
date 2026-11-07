@@ -111,3 +111,30 @@ fn every_effect_knob_tweens_by_its_path() {
     assert_eq!(vc.vignette.intensity, 0.9);
     assert_eq!(vc.exposure.automatic.compensation, 2.0);
 }
+
+#[test]
+fn a_taa_camera_knob_tweens_by_its_path() {
+    // A camera effect's knob (#1847) tweens on the camera, with no volume.
+    let (mut m, id) = rig("tween_taa", &counted(""));
+    m.cells
+        .scene
+        .borrow_mut()
+        .world
+        .set_camera(id, Some(Default::default()));
+    tick(&mut m, 1);
+    m.eval(&format!(
+        "Tween.To({id}, 'Graphics.taa.base_blend_factor', 0.6, 2 / 60, {{ from = 0.9 }})"
+    ))
+    .unwrap();
+    tick(&mut m, 3);
+    assert_eq!(
+        m.cells
+            .scene
+            .borrow()
+            .world
+            .camera(id)
+            .unwrap()
+            .taa_base_blend_factor,
+        0.6
+    );
+}
