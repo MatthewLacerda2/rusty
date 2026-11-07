@@ -4,6 +4,7 @@
 
 pub mod io;
 pub mod lightmap;
+pub mod mesh_maps;
 pub mod occlusion;
 pub mod placement;
 pub mod probe;

@@ -27,7 +27,7 @@ pub(super) fn smooth(
     }
     let mut slot = vec![usize::MAX; (size * size) as usize];
     for (k, p) in points.iter().enumerate() {
-        slot[p.index] = k;
+        slot[p.at()] = k;
     }
     let r = radius as i32;
     let sigma = radius as f32 * 0.5 + 0.5;
@@ -36,10 +36,7 @@ pub(super) fn smooth(
     points
         .iter()
         .map(|p| {
-            let (x, y) = (
-                (p.index as u32 % size) as i32,
-                (p.index as u32 / size) as i32,
-            );
+            let (x, y) = ((p.index % size) as i32, (p.index / size) as i32);
             let (mut sum, mut weight) = (Vec3::ZERO, 0.0);
             for dy in -r..=r {
                 for dx in -r..=r {
