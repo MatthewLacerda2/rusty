@@ -1,8 +1,9 @@
 //! The transparent-surface field table: every row reads back what it wrote, and
 //! each kind refuses or clamps what it cannot hold.
 
-use super::*;
-use crate::components::BlendMode;
+use super::super::field::*;
+use super::super::MaterialLibrary;
+use crate::components::{BlendMode, MaterialAsset};
 
 fn one() -> MaterialLibrary {
     MaterialLibrary::from([("k".to_string(), MaterialAsset::default())])
@@ -96,4 +97,28 @@ fn a_pair_is_clamped_per_component() {
         SurfaceValue::Number(1.0),
     );
     assert!(err.unwrap_err().contains("{x, y}"));
+}
+
+#[test]
+fn tiling_and_offset_hints_follow_the_mapping() {
+    use crate::components::UvMapping;
+    let hint = |name, mapping| {
+        let m = MaterialAsset {
+            uv_mapping: mapping,
+            ..MaterialAsset::default()
+        };
+        (field(name).hint)(&m)
+    };
+    for name in ["tiling", "offset"] {
+        let uv0 = hint(name, UvMapping::Uv0).expect("a UV0 hint");
+        assert!(uv0.starts_with("Unity's"), "{name}: {uv0}");
+        for world in [UvMapping::Planar, UvMapping::Triplanar] {
+            let w = hint(name, world).expect("a world-mapping hint");
+            assert!(w.contains("World Size"), "{name}: {w}");
+        }
+    }
+    assert!(hint("offset", UvMapping::Uv0)
+        .unwrap()
+        .contains("down the surface"));
+    assert_eq!(hint("blend_mode", UvMapping::Uv0), None);
 }

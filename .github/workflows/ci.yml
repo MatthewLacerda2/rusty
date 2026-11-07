@@ -44,7 +44,9 @@ concurrency:
 # caused by what is under test, not by a seed finding something old on an unrelated
 # branch (#1777, #1798). The nightly explores instead: empty is proptest's random
 # seed, and a finding there goes through `main-health` to the board, whose run link
-# holds its `cc` line. `docs/testing.md` says how to reproduce one.
+# holds its `cc` line. `docs/testing.md` says how to reproduce one. `make test`
+# reads the number from this line (the Makefile's PROPTEST_SEED, #1852), so it is
+# the one place the seed is written.
 env:
   PROPTEST_RNG_SEED: ${{ github.event_name != 'schedule' && '1784' || '' }}
 
