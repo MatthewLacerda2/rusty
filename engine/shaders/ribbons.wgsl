@@ -8,10 +8,11 @@
 // colour, additive ones fade out.
 
 #import common::{Fog, fog_factor}
+#import reactive
 
 struct RibbonGlobals {
     view_proj: mat4x4<f32>,
-    cam_pos: vec4<f32>, // xyz used
+    cam_pos: vec4<f32>, // xyz the camera's position, w its index in its stack (#1845)
     fog: Fog,
 };
 
@@ -60,12 +61,42 @@ fn vs_main(in: VertexInput) -> VsOut {
 
 @fragment
 fn fs_alpha(in: VsOut) -> @location(0) vec4<f32> {
+    return alpha_color(in);
+}
+
+fn alpha_color(in: VsOut) -> vec4<f32> {
     let c = textureSample(ribbon_tex, ribbon_sampler, in.uv) * in.color;
     return vec4<f32>(mix(c.rgb, globals.fog.color, in.fog), c.a);
 }
 
 @fragment
 fn fs_additive(in: VsOut) -> @location(0) vec4<f32> {
+    return additive_color(in);
+}
+
+fn additive_color(in: VsOut) -> vec4<f32> {
     let c = textureSample(ribbon_tex, ribbon_sampler, in.uv) * in.color;
     return vec4<f32>(c.rgb * (1.0 - in.fog), c.a);
+}
+
+// ---- TAA's reactive mask (#1845, `reactive.wgsl`) ----
+// A view that runs TAA draws its ribbons through these twins: the same colour at
+// location 0, and at location 1 how much of the pixel the strip laid down (its
+// alpha, or what it added), always automatic; `globals.cam_pos.w` is the drawing
+// camera's index in its stack.
+struct ReactiveOut {
+    @location(0) color: vec4<f32>,
+    @location(1) reactive: vec4<f32>,
+};
+
+@fragment
+fn fs_alpha_reactive(in: VsOut) -> ReactiveOut {
+    let c = alpha_color(in);
+    return ReactiveOut(c, reactive::texel(reactive::over(c.a), -1.0, globals.cam_pos.w));
+}
+
+@fragment
+fn fs_additive_reactive(in: VsOut) -> ReactiveOut {
+    let c = additive_color(in);
+    return ReactiveOut(c, reactive::texel(reactive::added(c.rgb * c.a), -1.0, globals.cam_pos.w));
 }

@@ -78,7 +78,9 @@ pub(crate) fn create_pipelines(
     ForwardPipelines {
         forward: FacedPipeline::eager(|f| set.lazy(forward_spec().facing(f))),
         velocity: VelocityPipelines::new(|surface| set.faced(velocity_spec(surface))),
-        transparent: TransparentPipelines::new(|blend| set.faced(transparent_spec(blend))),
+        transparent: TransparentPipelines::new(|blend, reactive| {
+            set.faced(transparent_spec(blend, reactive))
+        }),
         depth_postpass: DepthPostpassPipelines::new(device, shader, &render_layout),
         line: lazy_pipeline(device, shader, output_format, &line_layout, line_spec()),
         prepass: prepass_set(device, shader, &render_layout, "fs_prepass"),
@@ -108,7 +110,9 @@ pub(crate) fn surface_pipelines(
         forward: FacedPipeline::eager(|f| set.lazy(forward_spec().facing(f))),
         velocity: VelocityPipelines::new(|surface| set.faced(velocity_spec(surface))),
         primed: PrimedPipelines::new(&set),
-        transparent: TransparentPipelines::new(|blend| set.faced(transparent_spec(blend))),
+        transparent: TransparentPipelines::new(|blend, reactive| {
+            set.faced(transparent_spec(blend, reactive))
+        }),
         depth_postpass: DepthPostpassPipelines::new(device, shader, layout),
         cut: cut.then(|| surface::CutPipelines {
             prepass: prepass_set(device, shader, layout, CUT_PREPASS),

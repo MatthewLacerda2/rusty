@@ -124,7 +124,8 @@ impl MaterialData {
 }
 
 /// A draw's transparent-surface terms (#1523): blending, shadows, refraction,
-/// absorption, depth postpass and thin translucency, packed from its material.
+/// absorption, depth postpass, thin translucency and TAA's reactivity and motion
+/// (#1845), packed from its material.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct SurfaceUniform {
@@ -157,7 +158,12 @@ pub(crate) struct SurfaceUniform {
     /// reflect (`postfx::effects::ssr::transparent::traces`); it traces only where
     /// the camera's `ssr.x` gives a march.
     pub receive_ssr: u32,
-    pub _pad: [u32; 3],
+    /// TAA's reactivity (#1845): below zero `Auto`, else the fixed value
+    /// (`TaaReactive::gpu`); 0 on an opaque surface, which writes none.
+    pub reactive: f32,
+    /// 1 when a `Transparent` surface writes its own motion vectors (#1845).
+    pub writes_motion: u32,
+    pub _pad: u32,
 }
 
 /// Where a draw's material maps are read (#1573), packed from its

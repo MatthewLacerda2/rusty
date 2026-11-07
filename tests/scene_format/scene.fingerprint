@@ -463,6 +463,7 @@ scene.entities[].particles.render.material: string
 scene.entities[].particles.render.mesh: option
 scene.entities[].particles.render.mesh: string
 scene.entities[].particles.render.mode: enum billboard|stretched|horizontal|vertical|mesh
+scene.entities[].particles.render.reactive: enum Auto|Off|Full
 scene.entities[].particles.render.soft_distance: f32
 scene.entities[].particles.render.speed_scale: f32
 scene.entities[].particles.rotation: any
@@ -873,6 +874,7 @@ scene.materials{}.normal_map: string
 scene.materials{}.offset: tuple(2)
 scene.materials{}.offset[]: f32
 scene.materials{}.preserve_specular: bool
+scene.materials{}.reactive: enum Auto|Off|Full
 scene.materials{}.receive_decals: bool
 scene.materials{}.receive_shadows: bool
 scene.materials{}.receive_ssr: bool
@@ -901,6 +903,7 @@ scene.materials{}.transmittance_color: tuple(3)
 scene.materials{}.transmittance_color[]: f32
 scene.materials{}.uv_mapping: enum UV0|Planar|Triplanar
 scene.materials{}.world_size: f32
+scene.materials{}.writes_motion: bool
 scene.nav_settings.agent_height: f32
 scene.nav_settings.agent_radius: f32
 scene.nav_settings.areas: seq

@@ -247,6 +247,7 @@ fn record_free(m: &MaterialAsset) -> MaterialAsset {
         absorption_distance: d.absorption_distance,
         depth_postpass: d.depth_postpass,
         receive_ssr: d.receive_ssr,
+        reactive: d.reactive,
         transmission_color: d.transmission_color,
         transmission: d.transmission,
         receive_decals: d.receive_decals,

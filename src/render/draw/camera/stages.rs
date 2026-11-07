@@ -105,7 +105,8 @@ pub(super) fn world_ui(r: &mut Renderer, view: &mut RenderView, ctx: &mut Camera
 /// Ribbons (#441) then sprite particles, each back to front; mesh particles drew
 /// with the solids.
 pub(super) fn effects(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    ctx.effects = r.draw_effects(view, ctx.scene, ctx.cam, ctx.view_proj);
+    let camera = (ctx.cam, ctx.uniform.stack[0]);
+    ctx.effects = r.draw_effects(view, ctx.scene, camera, ctx.view_proj);
 }
 
 pub(super) fn count(r: &mut Renderer, _: &mut RenderView, ctx: &mut CameraCtx) {

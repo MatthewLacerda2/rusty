@@ -41,6 +41,7 @@ fn material_data_matches_wgsl_layout() {
     let surface = members!(SurfaceUniform, surface;
         blend_mode, premultiply_diffuse, receive_shadows, refraction_model, ior,
         thickness, uses_opaque, depth_postpass, absorption, transmission, receive_ssr,
+        reactive, writes_motion,
     );
     let mapping = members!(MappingUniform, mapping;
         uv_st, uv_mapping, world_scale, blend_sharpness,

@@ -81,9 +81,15 @@ pub(crate) struct RenderObject {
 }
 
 impl RenderObject {
-    /// Whether any slot draws in the opaque pass: only those write velocity (#1435).
-    pub(crate) fn has_opaque_run(&self) -> bool {
-        self.slots.iter().any(|s| !s.transparent)
+    /// Whether any slot writes velocity: an opaque one (#1435), or a translucent
+    /// one writing its motion or its depth postpass (#1845, #1523). Only those need
+    /// a last-frame pose; without one a translucent's texel moved with the camera
+    /// alone.
+    pub(crate) fn writes_velocity(&self) -> bool {
+        self.slots.iter().any(|s| {
+            let t = s.key.traits;
+            !s.transparent || t.writes_motion || t.depth_postpass
+        })
     }
 
     /// Its origin: where the transparent sort anchors it.

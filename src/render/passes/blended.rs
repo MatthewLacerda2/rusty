@@ -1,11 +1,14 @@
 //! src/render/passes/blended.rs — the shape the particle and ribbon passes share
 //! (#939): a globals uniform at group 0, and an alpha and an additive pipeline into
-//! the HDR target that test the scene depth without writing it.
+//! the HDR target that test the scene depth without writing it (and into TAA's
+//! reactive mask beside it in a view running TAA, #1845; the pass opens with
+//! `taa::reactive::hdr_attachments`).
 
 use crate::components::ParticleBlend;
 use crate::render::gpu::layout_entries::uniform_entry;
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::DEPTH_FORMAT;
+use crate::render::postfx::effects::taa;
 use crate::render::postfx::HDR_FORMAT;
 
 /// A pass's group-0 globals: one `size`-byte uniform, its layout and bind group,
@@ -44,15 +47,19 @@ impl Globals {
     }
 }
 
-/// The alpha and additive pipelines of one blended pass, each built the first time a
+/// The alpha and additive pipelines of one blended pass, and their twins writing
+/// TAA's reactive mask for a view running TAA (#1845), each built the first time a
 /// frame draws with it (#985).
 pub(crate) struct BlendPipelines {
     alpha: LazyPipeline,
     additive: LazyPipeline,
+    alpha_reactive: LazyPipeline,
+    additive_reactive: LazyPipeline,
 }
 
 impl BlendPipelines {
-    /// Prepare both from `shader`'s `vs_main` and its `fs_alpha` / `fs_additive`,
+    /// Prepare both from `shader`'s `vs_main` and its `fs_alpha` / `fs_additive`
+    /// (and the reactive twins from its `fs_alpha_reactive` / `fs_additive_reactive`),
     /// drawing `vertex` buffers into the HDR target. Both faces are drawn, and the
     /// scene depth is tested but never written: overlapping translucent sprites and
     /// strips must all blend, not z-fight, and the same depth can also be bound as a
@@ -63,7 +70,7 @@ impl BlendPipelines {
         (shader, layout): (&wgpu::ShaderModule, &wgpu::PipelineLayout),
         vertex: wgpu::VertexBufferLayout<'static>,
     ) -> Self {
-        let lazy = |blend, fragment_entry: &'static str| {
+        let lazy = |blend, fragment_entry: &'static str, reactive: bool| {
             let (shader, layout, vertex) = (shader.clone(), layout.clone(), vertex.clone());
             LazyPipeline::new(device, move |device| {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -79,11 +86,14 @@ impl BlendPipelines {
                         module: &shader,
                         entry_point: Some(fragment_entry),
                         compilation_options: Default::default(),
-                        targets: &[Some(wgpu::ColorTargetState {
-                            format: HDR_FORMAT,
-                            blend: Some(blend),
-                            write_mask: wgpu::ColorWrites::ALL,
-                        })],
+                        targets: &[
+                            Some(wgpu::ColorTargetState {
+                                format: HDR_FORMAT,
+                                blend: Some(blend),
+                                write_mask: wgpu::ColorWrites::ALL,
+                            }),
+                            Some(taa::reactive::target_state()),
+                        ][..1 + usize::from(reactive)],
                     }),
                     primitive: wgpu::PrimitiveState {
                         topology: wgpu::PrimitiveTopology::TriangleList,
@@ -103,22 +113,37 @@ impl BlendPipelines {
                 })
             })
         };
+        let alpha = wgpu::BlendState::ALPHA_BLENDING;
         Self {
-            alpha: lazy(wgpu::BlendState::ALPHA_BLENDING, "fs_alpha"),
-            additive: lazy(additive_blend(), "fs_additive"),
+            alpha: lazy(alpha, "fs_alpha", false),
+            additive: lazy(additive_blend(), "fs_additive", false),
+            alpha_reactive: lazy(alpha, "fs_alpha_reactive", true),
+            additive_reactive: lazy(additive_blend(), "fs_additive_reactive", true),
         }
     }
 
-    pub(crate) fn pipeline_for(&self, blend: ParticleBlend) -> &wgpu::RenderPipeline {
-        match blend {
-            ParticleBlend::Alpha => self.alpha.get(),
-            ParticleBlend::Additive => self.additive.get(),
+    /// The pipeline for `blend`, writing TAA's reactive mask too when `reactive`.
+    pub(crate) fn pipeline_for(
+        &self,
+        blend: ParticleBlend,
+        reactive: bool,
+    ) -> &wgpu::RenderPipeline {
+        match (blend, reactive) {
+            (ParticleBlend::Alpha, false) => self.alpha.get(),
+            (ParticleBlend::Additive, false) => self.additive.get(),
+            (ParticleBlend::Alpha, true) => self.alpha_reactive.get(),
+            (ParticleBlend::Additive, true) => self.additive_reactive.get(),
         }
     }
 
-    /// Both pipelines, built or not (#985).
-    pub(crate) fn lazy(&self) -> [&LazyPipeline; 2] {
-        [&self.alpha, &self.additive]
+    /// Every pipeline, built or not (#985).
+    pub(crate) fn lazy(&self) -> [&LazyPipeline; 4] {
+        [
+            &self.alpha,
+            &self.additive,
+            &self.alpha_reactive,
+            &self.additive_reactive,
+        ]
     }
 }
 

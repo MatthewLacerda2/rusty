@@ -8,8 +8,10 @@
 //! engine-provided per-entity type), while the data it points at is the shared asset.
 
 mod decal;
+mod defaults;
 mod mapping;
 mod surface;
+mod temporal;
 
 use std::collections::BTreeMap;
 
@@ -22,6 +24,7 @@ pub use mapping::UvMapping;
 use mapping::{default_blend_sharpness, default_tiling};
 use surface::{default_ior, default_one, white};
 pub use surface::{BlendMode, RefractionModel, RenderFace, RenderMode};
+pub use temporal::{TaaReactive, MAX_REACTIVE};
 
 fn default_base_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
@@ -152,6 +155,16 @@ pub struct MaterialAsset {
     /// see it rather than what is behind it. Off by default.
     #[serde(default)]
     pub depth_postpass: bool,
+    /// HDRP's *Transparent Writes Motion Vectors* (#1845): a `Transparent` surface
+    /// writes its own motion (and view depth) into the velocity target, without
+    /// writing depth, so TAA, motion blur and depth of field move it as a solid
+    /// rather than as what is behind it. For solid-looking translucents (a plasma
+    /// ball); off by default.
+    #[serde(default)]
+    pub writes_motion: bool,
+    /// How reactive the surface is under TAA (#1845): `Auto` by default.
+    #[serde(default)]
+    pub reactive: TaaReactive,
     /// HDRP's *Receive SSR Transparent* (#1570): a `Transparent` surface traces
     /// screen-space reflections of the opaque scene where the view runs SSR, over its
     /// probe reflection. Off by default; an opaque surface always takes SSR.
@@ -199,49 +212,6 @@ pub struct MaterialAsset {
     /// absent from the scene file while it holds the defaults.
     #[serde(default, skip_serializing_if = "DecalBlend::is_default")]
     pub decal: DecalBlend,
-}
-
-impl Default for MaterialAsset {
-    fn default() -> Self {
-        Self {
-            base_color: default_base_color(),
-            base_color_map: None,
-            metallic: 0.0,
-            metallic_map: None,
-            roughness: default_roughness(),
-            roughness_map: None,
-            normal_map: None,
-            emissive: [0.0, 0.0, 0.0],
-            emissive_map: None,
-            tiling: default_tiling(),
-            offset: [0.0; 2],
-            uv_mapping: UvMapping::Uv0,
-            world_size: default_one(),
-            blend_sharpness: default_blend_sharpness(),
-            render_mode: RenderMode::Opaque,
-            render_face: RenderFace::Front,
-            alpha: default_alpha(),
-            alpha_cutoff: default_alpha_cutoff(),
-            blend_mode: BlendMode::Alpha,
-            preserve_specular: true,
-            receive_shadows: true,
-            refraction_model: RefractionModel::None,
-            ior: default_ior(),
-            thickness: default_one(),
-            transmittance_color: white(),
-            absorption_distance: default_one(),
-            depth_postpass: false,
-            receive_ssr: false,
-            transmission_color: white(),
-            transmission: 0.0,
-            shader: None,
-            shader_params: BTreeMap::new(),
-            shader_textures: BTreeMap::new(),
-            maps_recipe: None,
-            receive_decals: true,
-            decal: DecalBlend::default(),
-        }
-    }
 }
 
 impl MaterialAsset {

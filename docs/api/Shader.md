@@ -142,7 +142,9 @@ assembles byte-identical WGSL.
   lacks `fs_depth_postpass` (a translucent's depth postpass) and returns through the
   old fog line rather than `transparent::composite`: a variant inherits the
   transparent-surface knobs (`Material.SetBlendMode`, refraction, absorption,
-  translucency, …) from the standard shader only once re-baked.
+  translucency, …) from the standard shader only once re-baked. One baked before
+  #1845 lacks `fs_transparent` (a translucent's draw in a view running TAA, which
+  writes TAA's reactive mask) and is refused the same way until re-baked.
   Each surface block also says how it changes the environment reflection that SSR
   replaces (#1526): a block adding light (a rim, a glow) keeps it, one scaling the
   colour (a tint, a `mix` toward a colour such as `hit_flash`) scales it alike, and one

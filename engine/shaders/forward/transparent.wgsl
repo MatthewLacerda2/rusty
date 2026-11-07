@@ -14,6 +14,7 @@
 #import fog::volumetric::volumetric_fog
 #import lighting::ssr_march
 #import lighting::ssr_surface
+#import reactive
 
 // The volumetric fog between the eye and `world` (#1703): rgb the light it adds,
 // a what gets through. No fetch where the camera reads no volume.
@@ -188,4 +189,33 @@ fn behind(world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
         depth = m.absorption.w;
     }
     return scene.rgb * exp(-m.absorption.rgb * depth);
+}
+
+// TAA's reactive texel for a transparent surface that drew `color` (#1845,
+// `reactive.wgsl`): over the pixel by its alpha (Alpha, Premultiply, and a surface
+// over the opaque copy, which writes alpha 1), adding its light (Additive: times
+// alpha unless premultiplied), or multiplying it (Multiply); a material's `Off` or
+// `Full` replaces it. Written by `fs_transparent` where the view runs TAA.
+fn reactive_texel(color: vec4<f32>) -> vec4<f32> {
+    let m = material();
+    var r = reactive::over(color.a);
+    if (m.blend_mode == 2u) {
+        // Never over the opaque copy: `MaterialAsset::reads_opaque` requires Alpha
+        // or Premultiply.
+        let premultiplied = m.premultiply_diffuse == 1u;
+        r = reactive::added(select(color.rgb * color.a, color.rgb, premultiplied));
+    } else if (m.blend_mode == 3u) {
+        r = reactive::multiplied(color.rgb);
+    }
+    return reactive::texel(r, m.reactive, camera.stack.x);
+}
+
+// What `fs_transparent` writes: the colour, and its reactive texel.
+struct ReactiveTargets {
+    @location(0) color: vec4<f32>,
+    @location(1) reactive: vec4<f32>,
+};
+
+fn reactive_targets(color: vec4<f32>) -> ReactiveTargets {
+    return ReactiveTargets(color, reactive_texel(color));
 }

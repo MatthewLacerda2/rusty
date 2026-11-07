@@ -7,8 +7,8 @@ use crate::render::MaterialData;
 
 /// The record terms a pass reads on the CPU: whether the draw is lit (the depth
 /// prepass and priming, #436, #1499), the blend state its surface asks for, whether
-/// it reads the opaque copy or traces SSR (#1523, #1570), and whether it writes its
-/// depth after drawing. A library edit that moves one of these re-derives the
+/// it reads the opaque copy or traces SSR (#1523, #1570), whether it writes its
+/// depth after drawing, and its motion (#1845). A library edit that moves one of these re-derives the
 /// material's users (`render::scene::records::rekeys`); one that moves only other
 /// record terms rewrites the record alone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -18,6 +18,8 @@ pub(crate) struct RecordTraits {
     pub uses_opaque: bool,
     pub receive_ssr: bool,
     pub depth_postpass: bool,
+    /// Whether it writes its own motion vectors (#1845), in the depth postpass.
+    pub writes_motion: bool,
 }
 
 impl RecordTraits {
@@ -30,6 +32,7 @@ impl RecordTraits {
             uses_opaque: s.uses_opaque == 1,
             receive_ssr: s.receive_ssr == 1,
             depth_postpass: s.depth_postpass == 1,
+            writes_motion: s.writes_motion == 1,
         }
     }
 }

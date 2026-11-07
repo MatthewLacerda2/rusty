@@ -101,12 +101,17 @@ impl ParticleRenderer {
         }
     }
 
-    pub(crate) fn pipeline_for(&self, blend: ParticleBlend) -> &wgpu::RenderPipeline {
-        self.pipelines.pipeline_for(blend)
+    /// The pipeline for `blend`, into TAA's reactive mask too when `reactive` (#1845).
+    pub(crate) fn pipeline_for(
+        &self,
+        blend: ParticleBlend,
+        reactive: bool,
+    ) -> &wgpu::RenderPipeline {
+        self.pipelines.pipeline_for(blend, reactive)
     }
 
-    /// Both blend pipelines, built or not (#985).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+    /// Every blend pipeline, built or not (#985).
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
         self.pipelines.lazy()
     }
 }

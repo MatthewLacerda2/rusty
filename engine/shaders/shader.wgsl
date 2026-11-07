@@ -206,6 +206,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 // SSIL's share (#1750): `forward::lighting::with_ssil_share`.
 
+// ---- TAA's reactive mask (#1845) ----
+// A view that runs TAA draws its translucents through this instead of `fs_main`:
+// the same colour at location 0, and at location 1 (the `R16Float` reactive
+// target, blended by max) how much of the pixel this surface laid down this frame
+// (`forward::transparent::reactive_targets`).
+@fragment
+fn fs_transparent(in: VertexOutput) -> transparent::ReactiveTargets {
+    return transparent::reactive_targets(with_ssil_share(transparent::finite_hdr(surface_color(in))));
+}
+
 // ---- Motion vectors (#1435) ----
 // A view that runs motion blur draws its opaque solids through these instead: the
 // same surface colour at location 0, and at location 1 (the `Rgba16Float` velocity
@@ -304,7 +314,7 @@ fn fs_velocity_ssr(in: VelocityVertex) -> VelocitySsrTargets {
 
 // The lit surface colour `fs_main` writes: an authored surface variant splices its
 // blocks in here (`shadergen::assemble`), so every colour entry point carries them
-// (`fs_main`, `fs_velocity`, `fs_velocity_ssr`).
+// (`fs_main`, `fs_velocity`, `fs_velocity_ssr`, `fs_transparent`).
 fn surface_color(in: VertexOutput) -> vec4<f32> {
     let m = material();
     // The geometric normal, turned toward the viewer on a face seen from behind when
