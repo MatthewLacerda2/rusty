@@ -25,13 +25,18 @@ ROUTINES = {"data": [{"name": "rusty #8 earlier", "created_at": "2026-10-28T00:0
 class Fake:
     """GitHub and the routines API, answering from tables and noting the calls."""
 
-    def __init__(self, issue: dict | None = None, comments: list | None = None, create=(200, None)):
+    def __init__(self, issue: dict | None = None, comments: list | None = None, create=(200, None),
+                 routines: dict | None = None, pulls: list | None = None):
+        self.pulls = [] if pulls is None else pulls
+        self.routines = ROUTINES if routines is None else routines
         self.issue = {"number": 9, "title": "Do it", "state": "open", "labels": []} if issue is None else issue
         self.comments = [BRIEF] if comments is None else comments
         self.create = create
         self.calls: list[dict] = []
 
     def gh(self, path: str):
+        if "/pulls" in path:
+            return self.pulls if "page=1" in path else []
         if "/comments" in path:
             return self.comments if "page=1" in path else []
         return self.issue
@@ -39,7 +44,7 @@ class Fake:
     def call(self, arguments: dict):
         self.calls.append(arguments)
         if arguments["action"] == "list":
-            return 200, ROUTINES
+            return 200, self.routines
         status, answer = self.create
         return status, answer if answer is not None else {"trigger": {"id": "trig_new"}}
 
@@ -75,7 +80,7 @@ class Launch(unittest.TestCase):
     def test_rusty_cloud_env_skips_the_lookup(self):
         fake = Fake()
         self.assertEqual(fake.run("9", env={"RUSTY_CLOUD_ENV": "env_set"})[0], 0)
-        self.assertEqual([c["action"] for c in fake.calls], ["create"])
+        self.assertEqual([c["action"] for c in fake.calls], ["list", "create"])
         self.assertEqual(fake.created()[0]["job_config"]["ccr"]["environment_id"], "env_set")
 
     def test_a_dry_run_prints_the_body_and_creates_nothing(self):
@@ -84,6 +89,54 @@ class Launch(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(fake.created(), [])
         self.assertEqual(json.loads(out)["name"], "rusty #9 Do it")
+
+
+def busy(*issues: int) -> dict:
+    """A routine list with a fired coder on each of `issues`; its run reads finished (#1866)."""
+    run = {"status": "ROUTINE_RUN_STATUS_SUCCEEDED", "fired_at": "2026-10-29T13:00:00Z",
+           "finished_at": "2026-10-29T13:30:00Z"}
+    return {"data": ROUTINES["data"] + [{"name": f"rusty #{n} x", "enabled": False, "ended_reason": "run_once_fired",
+                                         "last_run": run} for n in issues]}
+
+
+def drafts(*issues: int) -> list[dict]:
+    return [{"draft": True, "head": {"ref": f"{n}-x"}} for n in issues]
+
+
+class Limit(unittest.TestCase):
+    def test_a_sixth_coder_is_refused_and_names_the_five(self):
+        fake = Fake(routines=busy(1, 2, 3, 4, 5), pulls=drafts(1, 2, 3, 4, 5))
+        code, _, err = fake.run("9")
+        self.assertEqual(code, 1)
+        self.assertIn("limit is 5", err)
+        self.assertIn("rusty #5 x", err)
+        self.assertEqual(fake.created(), [])
+
+    def test_four_running_leaves_room_for_a_fifth(self):
+        self.assertEqual(Fake(routines=busy(1, 2, 3, 4), pulls=drafts(1, 2, 3, 4)).run("9")[0], 0)
+
+    def test_a_ready_pull_request_frees_its_coder(self):
+        pulls = drafts(1, 2, 3, 4) + [{"draft": False, "head": {"ref": "5-x"}}]
+        self.assertEqual(Fake(routines=busy(1, 2, 3, 4, 5), pulls=pulls).run("9")[0], 0)
+
+    def test_a_fire_with_no_pull_request_past_two_hours_is_said_and_not_counted(self):
+        listed = busy(1, 2, 3, 4)
+        listed["data"].append({**listed["data"][-1], "name": "rusty #5 x",
+                               "last_run": {"fired_at": "2026-10-29T11:00:00Z"}})
+        code, _, err = Fake(routines=listed, pulls=drafts(1, 2, 3, 4)).run("9")
+        self.assertEqual(code, 0)
+        self.assertIn("rusty #5 x: no PR in 2 h: ended or stalled; not counted", err)
+
+    def test_a_rebrief_of_a_counted_issue_launches(self):
+        fake = Fake(routines=busy(1, 2, 3, 4, 9), pulls=drafts(1, 2, 3, 4, 9))
+        self.assertEqual(fake.run("9")[0], 0)
+        self.assertEqual(len(fake.created()), 1)
+
+    def test_over_limit_launches_anyway_and_says_so(self):
+        fake = Fake(routines=busy(1, 2, 3, 4, 5), pulls=drafts(1, 2, 3, 4, 5))
+        code, _, err = fake.run("9", "--over-limit")
+        self.assertEqual(code, 0)
+        self.assertIn("--over-limit", err)
 
 
 class Refuse(unittest.TestCase):
@@ -108,6 +161,13 @@ class Refuse(unittest.TestCase):
         fake = Fake()
         fake.gh = lambda path: None
         self.assertEqual(fake.run("9")[0], 2)
+
+    def test_unlisted_pull_requests_exit_2(self):
+        fake = Fake()
+        fake.gh = lambda path: None if "/pulls" in path else Fake().gh(path)
+        code, _, err = fake.run("9")
+        self.assertEqual((code, fake.created()), (2, []))
+        self.assertIn("open pull requests", err)
 
     def test_a_bad_argument_is_usage(self):
         self.assertEqual(Fake().run("nine")[0], 1)

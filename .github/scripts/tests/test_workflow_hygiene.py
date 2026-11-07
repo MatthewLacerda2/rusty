@@ -11,7 +11,10 @@ because tests parse it (`docs/api/`, #525, #587).
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -24,7 +27,12 @@ GATING = ("ci.yml", "lint.yml")
 
 
 #: A gate proves its commit on a fixed proptest seed; the nightly explores (#1800).
-SEED_POLICY = r"(?m)^  PROPTEST_RNG_SEED: \$\{\{ github\.event_name != 'schedule' && '\d+' \|\| '' \}\}$"
+SEED_POLICY = r"(?m)^  PROPTEST_RNG_SEED: \$\{\{ github\.event_name != 'schedule' && '(?P<seed>\d+)' \|\| '' \}\}$"
+#: The verbs that run proptests and must run them on that seed (#1852).
+PINNED = ("test", "test-one-process")
+#: Made a prerequisite of the verb, so it runs with that verb's variables and exports,
+#: prints the seed its recipe would see, and stops make before the recipe runs.
+PROBE = "{verb}: seed-probe\nseed-probe:\n\t@echo \"seed=$$PROPTEST_RNG_SEED\"; exit 3\n"
 
 
 def jobs(workflow: str) -> dict[str, str]:
@@ -43,6 +51,42 @@ class ProptestSeed(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertNotRegex(line, SEED_POLICY)
 
+    def test_the_make_verbs_run_on_the_same_seed(self):
+        # One number (#1852): the Makefile reads ci.yml's, it never copies it.
+        for verb in PINNED:
+            with self.subTest(verb=verb):
+                self.assertEqual(seen(verb, ROOT / "Makefile"), ci_seed())
+
+    def test_a_verb_without_the_seed_or_with_a_copy_is_flagged(self):
+        line = "export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)\n"
+        text = (ROOT / "Makefile").read_text()
+        self.assertEqual(text.count(line), 1, "the export line moved: update this test")
+        for broken in ("", line.replace("$(PROPTEST_SEED)", str(int(ci_seed()) + 1))):
+            with self.subTest(line=broken), tempfile.TemporaryDirectory() as tmp:
+                (Path(tmp) / "Makefile").write_text(text.replace(line, broken))
+                self.assertNotEqual(seen("test", Path(tmp) / "Makefile"), ci_seed())
+
+
+ROOT = SCRIPTS.parents[1]
+
+
+def ci_seed() -> str:
+    return re.search(SEED_POLICY, (WORKFLOW_DIR / "ci.yml").read_text())["seed"]
+
+
+def seen(verb: str, makefile: Path) -> str:
+    """The PROPTEST_RNG_SEED `make <verb>`'s recipe runs with, from the Makefile alone:
+    none is inherited (CI's jobs export one), nor the caller's make flags (#1852)."""
+    drop = {"PROPTEST_RNG_SEED", "MAKEFLAGS", "MFLAGS", "MAKELEVEL"}
+    env = {k: v for k, v in os.environ.items() if k not in drop}
+    with tempfile.TemporaryDirectory() as tmp:
+        probe = Path(tmp) / "probe.mk"
+        probe.write_text(PROBE.format(verb=verb))
+        out = subprocess.run(
+            ["make", "-s", "--no-print-directory", "-f", str(makefile), "-f", str(probe), verb],
+            cwd=ROOT, env=env, capture_output=True, text=True,
+        ).stdout
+    return "".join(l.removeprefix("seed=") for l in out.splitlines() if l.startswith("seed="))
 
 class Runners(unittest.TestCase):
     def test_every_gating_job_has_a_timeout(self):
