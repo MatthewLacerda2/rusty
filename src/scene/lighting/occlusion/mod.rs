@@ -17,15 +17,20 @@
 //! row (`rows`); after the dilation few do, so the data is about one bit per cell
 //! per object (4.9 MB for a Dust2-sized level of 4163 meshes, `docs/api/Lighting.md`).
 //!
-//! **What a cell holds** (`bake`, `baking`): every baked object any point in it may
+//! **What a cell holds** (`bake`, `sample`): every baked object any point in it may
 //! see. From seeded points in each 2 m cube of the cell (the same density at every
 //! cell size), rays go to points on each object's own triangles: its extremes and a
 //! lattice at most `TARGET_SPACING` apart, one per `VOXEL` of space, so the count
 //! follows its area, not its triangles (`targets`); one ray that no occluder stops
-//! before it arrives makes the object visible. One occluder face that hides an
-//! object or a point from a whole cube spares its rays (`shaft`). An object too
-//! large for `MAX_TARGETS` points, or not finite, is never culled and lays no cell. Then every cell takes its 26 neighbours' sets too (the dilation), so a
-//! camera anywhere in a cell is covered by samples from the cells around it. The
+//! before it arrives makes the object visible. Most rays never need casting
+//! (part 3): an occluder face, alone or fused with the other faces on its plane (a
+//! floor of tiles, a wall of pieces), that hides a cluster of objects, an object, or
+//! a chunk of its points from a cube or from one of its points proves their rays
+//! stopped, and each cube tries first the faces that last stopped one (`sight`).
+//! Every such proof is exact, so they change the bake's speed, not what it sees.
+//! An object too large for `MAX_TARGETS` points, or not finite, is never culled and
+//! lays no cell. Then every cell takes its 26 neighbours' sets too (the dilation),
+//! so a camera anywhere in a cell is covered by samples from the cells around it. The
 //! invariant is one way: a cell may keep what is hidden, and must never drop what is
 //! visible. The sampling is a pure function of the scene and the seed, and each cell
 //! is baked alone, so the bytes are the same at any worker count.
@@ -46,11 +51,15 @@
 
 mod bake;
 mod baking;
+mod clusters;
+mod eye;
 mod file;
 mod gather;
 mod grid;
 mod progress;
 mod shaft;
+mod sheets;
+mod sight;
 mod targets;
 
 pub use bake::{
@@ -78,6 +87,8 @@ mod file_tests;
 mod grid_tests;
 #[cfg(test)]
 mod sampling_tests;
+#[cfg(test)]
+mod sheets_tests;
 #[cfg(test)]
 pub(crate) mod test_gap;
 #[cfg(test)]

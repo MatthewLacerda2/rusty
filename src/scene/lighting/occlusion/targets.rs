@@ -176,3 +176,32 @@ impl Lattice {
         true
     }
 }
+
+/// The edge of the cubes of space an object's targets are grouped by, metres:
+/// one polygon that hides a chunk's box spares every ray to its targets.
+const CHUNK: f32 = 2.0;
+
+/// Some of an object's targets, near one another, and the box round them.
+pub(super) struct Chunk {
+    pub bounds: (Vec3, Vec3),
+    pub targets: Vec<Target>,
+}
+
+/// `points` grouped by the [`CHUNK`] cube each lies in, in the cubes' order.
+pub(super) fn chunks(points: Vec<Target>) -> Vec<Chunk> {
+    let mut cubes: BTreeMap<[i32; 3], Vec<Target>> = BTreeMap::new();
+    for t in points {
+        let key = (t.at / CHUNK).floor().as_ivec3().to_array();
+        cubes.entry(key).or_default().push(t);
+    }
+    let chunk = |targets: Vec<Target>| {
+        let at = targets.iter().map(|t| t.at);
+        let lo = at.clone().reduce(Vec3::min).unwrap_or_default();
+        let hi = at.reduce(Vec3::max).unwrap_or_default();
+        Chunk {
+            bounds: (lo, hi),
+            targets,
+        }
+    };
+    cubes.into_values().map(chunk).collect()
+}

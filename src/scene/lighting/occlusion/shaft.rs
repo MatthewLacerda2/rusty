@@ -12,6 +12,7 @@
 use glam::Vec3;
 
 use super::gather::Face;
+use super::sheets::{sheets, Member, Sheet};
 use crate::scene::lighting::lightmap::{Rays, Tri};
 
 /// How far, metres, both boxes must clear a face's plane, and a crossing its edges.
@@ -22,14 +23,20 @@ pub(super) struct Polygons {
     /// Per triangle (the BVH's order), its polygon.
     of: Vec<u32>,
     polygons: Vec<Polygon>,
+    /// The planes several polygons share, fused, and per polygon its sheet
+    /// (`u32::MAX` when it has none).
+    sheets: Vec<Sheet>,
+    sheet_of: Vec<u32>,
 }
 
 /// A convex polygon, its corners wound about `normal` (unit), on the plane
-/// `normal · p = offset`.
+/// `normal · p = offset`; the object it belongs to and the side it draws.
 struct Polygon {
     corners: Vec<Vec3>,
     normal: Vec3,
     offset: f32,
+    mesh: u32,
+    face: Face,
 }
 
 impl Polygons {
@@ -40,55 +47,83 @@ impl Polygons {
             let joins = i > 0 && tris[i - 1].mesh == t.mesh && faces[i - 1] == faces[i];
             let last = polygons.last_mut().filter(|_| joins);
             if !last.is_some_and(|p| p.merge(corners)) {
-                polygons.push(Polygon::new(corners));
+                polygons.push(Polygon::new(corners, t.mesh, faces[i]));
             }
             of.push(polygons.len() as u32 - 1);
         }
-        Self { of, polygons }
+        let members: Vec<Member> = (polygons.iter())
+            .map(|p| Member {
+                corners: &p.corners,
+                normal: p.normal,
+                mesh: p.mesh,
+                face: p.face,
+            })
+            .collect();
+        let (sheets, sheet_of) = sheets(&members);
+        Self {
+            of,
+            polygons,
+            sheets,
+            sheet_of,
+        }
     }
 
-    /// Whether the occluder face nearest along the line between the boxes' centres
-    /// hides all of box `to` from all of box `from`. The face must be another
-    /// object's than `object`'s and turned toward `from`; a point is a box whose
-    /// corners meet.
-    pub fn hides(
+    /// The occluder polygon nearest along the line between the boxes' centres,
+    /// when it hides all of box `to` from all of box `from` ([`Self::hides`]).
+    pub fn hider(
         &self,
-        (rays, faces): (&Rays, &[Face]),
+        rays: &Rays,
         from: (Vec3, Vec3),
         to: (Vec3, Vec3),
         object: u32,
-    ) -> bool {
+    ) -> Option<u32> {
         let (c, t) = ((from.0 + from.1) * 0.5, (to.0 + to.1) * 0.5);
         let delta = t - c;
         let reach = delta.length();
         if reach.is_nan() || reach <= CLEAR {
-            return false;
+            return None;
         }
-        let dir = delta / reach;
-        let Some(hit) = rays.closest(c, dir, 0.0, reach) else {
-            return false;
-        };
-        let tri = &rays.tris[hit.tri];
-        if tri.mesh == object || !faces[hit.tri].stops(tri.normal(), dir) {
-            return false;
+        let hit = rays.closest(c, delta / reach, 0.0, reach)?;
+        let polygon = self.of[hit.tri];
+        self.hides(polygon, from, to, object).then_some(polygon)
+    }
+
+    /// Whether polygon `polygon` hides all of box `to` from all of box `from`:
+    /// another object's than `object`'s, its drawn side turned toward `from`, and
+    /// every segment between the boxes crossing it. A point is a box whose
+    /// corners meet.
+    pub fn hides(&self, polygon: u32, from: (Vec3, Vec3), to: (Vec3, Vec3), object: u32) -> bool {
+        let sheet = self.sheets.get(self.sheet_of[polygon as usize] as usize);
+        if sheet.is_some_and(|s| !s.holds(object) && s.hides(from, to)) {
+            return true;
         }
-        self.polygons[self.of[hit.tri] as usize].separates(from, to)
+        let p = &self.polygons[polygon as usize];
+        // Boxes on opposite sides of its plane see it from one side, so the
+        // centres' direction says which.
+        let dir = (to.0 + to.1) * 0.5 - (from.0 + from.1) * 0.5;
+        p.mesh != object && p.face.stops(p.normal, dir) && p.separates(from, to)
+    }
+
+    /// The polygon triangle `tri` (the BVH's order) belongs to.
+    pub fn polygon_of(&self, tri: usize) -> u32 {
+        self.of[tri]
     }
 }
 
 /// A box's corners, one when they meet.
-fn corners((min, max): (Vec3, Vec3)) -> Vec<Vec3> {
-    if min == max {
-        return vec![min];
-    }
+fn corners((min, max): (Vec3, Vec3)) -> ([Vec3; 8], usize) {
     let pick = |k: usize, bit: usize, axis: usize| if k & bit == 0 { min[axis] } else { max[axis] };
-    (0..8)
-        .map(|k| Vec3::new(pick(k, 1, 0), pick(k, 2, 1), pick(k, 4, 2)))
-        .collect()
+    let all = std::array::from_fn(|k| Vec3::new(pick(k, 1, 0), pick(k, 2, 1), pick(k, 4, 2)));
+    (all, if min == max { 1 } else { 8 })
+}
+
+/// How far box `(min, max)` reaches either way along `normal` from its centre.
+fn reach_along(normal: Vec3, (min, max): (Vec3, Vec3)) -> f32 {
+    normal.abs().dot((max - min) * 0.5)
 }
 
 impl Polygon {
-    fn new(corners: [Vec3; 3]) -> Self {
+    fn new(corners: [Vec3; 3], mesh: u32, face: Face) -> Self {
         let normal = (corners[1] - corners[0])
             .cross(corners[2] - corners[0])
             .normalize_or_zero();
@@ -96,6 +131,8 @@ impl Polygon {
             corners: corners.to_vec(),
             normal,
             offset: normal.dot(corners[0]),
+            mesh,
+            face,
         }
     }
 
@@ -138,10 +175,14 @@ impl Polygon {
             return false;
         }
         let side = |p: Vec3| self.normal.dot(p) - self.offset;
-        let (near, far) = (corners(from), corners(to));
-        let sign = side((from.0 + from.1) * 0.5).signum();
-        let clear = near.iter().all(|&p| side(p) * sign > CLEAR)
-            && far.iter().all(|&p| side(p) * sign < -CLEAR);
+        let centre = |b: (Vec3, Vec3)| side((b.0 + b.1) * 0.5);
+        let sign = centre(from).signum();
+        // Both boxes clear the plane, on opposite sides: their nearest corners are
+        // their centres less their reach along the normal.
+        let clear = centre(from) * sign - reach_along(self.normal, from) > CLEAR
+            && -centre(to) * sign - reach_along(self.normal, to) > CLEAR;
+        let ((near, n), (far, f)) = (corners(from), corners(to));
+        let (near, far) = (&near[..n], &far[..f]);
         clear
             && near.iter().all(|&a| {
                 far.iter().all(|&b| {

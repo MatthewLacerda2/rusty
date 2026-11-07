@@ -1,7 +1,8 @@
 //! The occlusion bake's sampling (#1714): the static scene ready to trace, and what
 //! one cell sees. Rays go from seeded points in the cell to each object's targets
-//! (`targets`) through the lightmap bake's BVH (`lightmap::Rays`), after a shaft
-//! test (`shaft`) that proves an object or a target hidden from a whole box at once.
+//! (`targets`) through the lightmap bake's BVH (`lightmap::Rays`), once no
+//! occluder face, alone (`shaft`) or fused with the others on its plane
+//! (`sheets`), proves them hidden (`sight`).
 //!
 //! The eye keeps one density at every cell size: a cell is sampled as
 //! [`Grid::subdivisions`] cubes of at most `CELL_SIZE` a side, each with its
@@ -13,10 +14,12 @@ use std::sync::Mutex;
 
 use glam::Vec3;
 
+use super::clusters::{clusters, Cluster};
+use super::eye::Eye;
 use super::gather::{Face, Object};
 use super::progress::OcclusionProgress;
 use super::shaft::Polygons;
-use super::targets::{target_points, Target};
+use super::targets::{chunks, target_points, Chunk};
 use super::{Grid, OCCLUSION_SEED};
 use crate::scene::lighting::lightmap::{Rays, Rng, Tri};
 
@@ -29,7 +32,7 @@ pub(super) const REACH_SLACK: f32 = 1e-3;
 
 /// An object's world bounds and its targets (`None`: too large or not finite to
 /// sample, so it stays in sight of every cell).
-pub(super) type Targets = (Vec3, Vec3, Option<Vec<Target>>);
+pub(super) type Targets = (Vec3, Vec3, Option<Vec<Chunk>>);
 
 /// The scene ready to sample: the occluders' BVH, each triangle's drawn side and
 /// the planar polygons they make, and per object its bounds and target points.
@@ -38,6 +41,7 @@ pub(super) struct Baking {
     pub faces: Vec<Face>,
     pub polygons: Polygons,
     pub targets: Vec<Targets>,
+    pub clusters: Vec<Cluster>,
     /// The bounds of every object that can be culled, `None` when none can: a
     /// never-culled one (a ground slab) needs no cell, so it never coarsens them.
     pub bounds: Option<(Vec3, Vec3)>,
@@ -63,7 +67,7 @@ impl Baking {
                 .clone()
                 .fold(Vec3::splat(f32::MAX), |m, &p| m.min(p));
             let max = corners.fold(Vec3::splat(f32::MIN), |m, &p| m.max(p));
-            let points = target_points(&object.drawn);
+            let points = target_points(&object.drawn).map(chunks);
             if points.is_some() {
                 bounds = Some(bounds.map_or((min, max), |(lo, hi)| (lo.min(min), hi.max(max))));
             }
@@ -71,6 +75,7 @@ impl Baking {
         }
         let polygons = Polygons::of(&tris, &faces);
         Self {
+            clusters: clusters(&targets),
             rays: Rays::build(tris),
             faces,
             polygons,
@@ -107,9 +112,9 @@ impl Baking {
         (!progress.is_cancelled()).then_some(out)
     }
 
-    /// Cell `index`'s sampling cubes, each with its points: the centre, then seeded
+    /// Cell `index`'s sampling cubes, each as its points: the centre, then seeded
     /// ones from the cell's own stream.
-    fn samples(&self, grid: &Grid, index: usize) -> Vec<((Vec3, Vec3), Vec<Vec3>)> {
+    fn samples(&self, grid: &Grid, index: usize) -> Vec<Vec<Vec3>> {
         let (min, _) = grid.bounds(index);
         let n = grid.subdivisions();
         let edge = grid.cell / n as f32;
@@ -121,20 +126,18 @@ impl Baking {
                 0 => lo + Vec3::splat(edge * 0.5),
                 _ => lo + Vec3::new(rng.next_f32(), rng.next_f32(), rng.next_f32()) * edge,
             });
-            cubes.push(((lo, lo + Vec3::splat(edge)), points.collect::<Vec<_>>()));
+            cubes.push(points.collect::<Vec<_>>());
         }
         // A point inside a wall or a floor sees out through the back faces round it,
         // which no camera does: it is dropped, unless every point is inside.
         let open = |p: &Vec3| !self.inside(*p);
         let kept: Vec<Vec<Vec3>> = cubes
             .iter()
-            .map(|(_, p)| p.iter().copied().filter(open).collect())
+            .map(|p| p.iter().copied().filter(open).collect())
             .collect();
         if kept.iter().any(|p| !p.is_empty()) {
-            for (cube, kept) in cubes.iter_mut().zip(kept) {
-                cube.1 = kept;
-            }
-            cubes.retain(|c| !c.1.is_empty());
+            cubes = kept;
+            cubes.retain(|c| !c.is_empty());
         }
         cubes
     }
@@ -143,29 +146,48 @@ impl Baking {
     /// its neighbours outright, any other when a sampled ray reaches it.
     pub fn cell(&self, grid: &Grid, index: usize) -> Vec<u64> {
         let (min, max) = grid.bounds(index);
-        let cubes = self.samples(grid, index);
+        let samples = self.samples(grid, index).into_iter();
+        let mut eyes: Vec<Eye> = samples.map(Eye::new).collect();
         let near = (min - Vec3::splat(grid.cell), max + Vec3::splat(grid.cell));
         let mut bits = vec![0u64; self.targets.len().div_ceil(64)];
+        let set = |bits: &[u64], i: u32| bits[i as usize / 64] & (1 << (i % 64)) != 0;
         for (i, (omin, omax, targets)) in self.targets.iter().enumerate() {
             let overlaps = omin.cmple(near.1).all() && omax.cmpge(near.0).all();
-            let reached = |t: &Vec<Target>| {
-                cubes.iter().any(|(cube, points)| {
-                    !self
-                        .polygons
-                        .hides(self.parts(), *cube, (*omin, *omax), i as u32)
-                        && self.reaches(*cube, points, t, i as u32)
-                })
-            };
-            if overlaps || targets.as_ref().is_none_or(reached) {
+            if overlaps || targets.is_none() {
                 bits[i / 64] |= 1 << (i % 64);
+            }
+        }
+        // Eye by eye, cluster by cluster: nearby objects one after another, so
+        // the polygons an eye remembers keep hiding them (`eye`).
+        for eye in &mut eyes {
+            for cluster in &self.clusters {
+                if cluster.objects.iter().all(|&i| set(&bits, i))
+                    || self.hidden(eye, cluster.bounds)
+                {
+                    continue;
+                }
+                for &i in &cluster.objects {
+                    let (lo, hi, targets) = &self.targets[i as usize];
+                    let chunks = targets.as_deref().unwrap_or_default();
+                    if !set(&bits, i) && self.sees(eye, (i, (*lo, *hi)), chunks) {
+                        bits[i as usize / 64] |= 1 << (i % 64);
+                    }
+                }
             }
         }
         bits
     }
 
-    /// The BVH and the drawn sides, as the shaft test reads them.
-    fn parts(&self) -> (&Rays, &[Face]) {
-        (&self.rays, &self.faces)
+    /// Whether one polygon hides the box `to`, which holds whole objects, from
+    /// all of `eye`. Any polygon will do: one of those objects' own lies inside
+    /// the box, so it never separates it.
+    fn hidden(&self, eye: &mut Eye, to: (Vec3, Vec3)) -> bool {
+        let polygons = &self.polygons;
+        if eye.cached(polygons, eye.bounds, to, u32::MAX) {
+            return true;
+        }
+        let hider = polygons.hider(&self.rays, eye.bounds, to, u32::MAX);
+        hider.inspect(|&p| eye.remember(p)).is_some()
     }
 
     /// Whether `point` sits inside an occluder: most of the six axis rays from it
@@ -188,37 +210,5 @@ impl Baking {
                 })
         });
         backs.count() > axes.len() / 2
-    }
-
-    /// Whether a ray from any of `from` (in the box `cube`) reaches any of
-    /// `targets` (on object `object`) with no other object's occluder turned toward
-    /// it in between. A target whose drawn side faces away from the whole cube, or
-    /// that one occluder's polygon hides from all of it, is skipped.
-    fn reaches(&self, cube: (Vec3, Vec3), from: &[Vec3], targets: &[Target], object: u32) -> bool {
-        let facing = targets.iter().filter(|t| t.faces(cube));
-        let mut open = facing.filter(|t| {
-            !self
-                .polygons
-                .hides(self.parts(), cube, (t.at, t.at), object)
-        });
-        open.any(|target| {
-            let to = target.at;
-            let from = from.iter().filter(|&&o| target.drawn_toward(o));
-            from.copied().any(|origin| {
-                let delta = to - origin;
-                let reach = delta.length();
-                if reach <= REACH_SLACK {
-                    return true;
-                }
-                let dir = delta / reach;
-                let blocks = |t: usize| {
-                    let tri = &self.rays.tris[t];
-                    tri.mesh != object && self.faces[t].stops(tri.normal(), dir)
-                };
-                !self
-                    .rays
-                    .occluded_by(origin, dir, (0.0, reach - REACH_SLACK), blocks)
-            })
-        })
     }
 }
