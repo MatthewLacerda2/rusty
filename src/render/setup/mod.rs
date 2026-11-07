@@ -239,6 +239,7 @@ impl Renderer {
             quality,
             graphics_options: Default::default(),
             render_scale: Default::default(),
+            upscaler: Default::default(),
             gpu_meshes: HashMap::new(),
             gpu_textures: HashMap::new(),
             texture_fallbacks: HashMap::new(),

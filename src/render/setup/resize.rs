@@ -5,6 +5,7 @@
 
 use crate::core::settings::quality::QualityValues;
 use crate::core::settings::render_scale::RenderScale;
+use crate::core::settings::upscaler::Upscaler;
 use crate::core::settings::GraphicsSettings;
 use crate::render::{PixelSize, Renderer};
 
@@ -16,12 +17,23 @@ impl Renderer {
         self.quality = values;
     }
 
-    /// Adopt the preset's values, the player's options (#1438) and the render scale (#1498) the
-    /// shared cell carries, resolved on a display of `display_scale` (#1715).
+    /// Adopt the preset's values, the player's options (#1438), the render scale
+    /// (#1498) and the upscaler (#1848) the shared cell carries, the scale resolved
+    /// on a display of `display_scale` (#1715).
     pub fn apply_graphics(&mut self, graphics: GraphicsSettings, display_scale: f32) {
         self.set_quality(graphics.quality);
         self.graphics_options = graphics.options;
         self.render_scale = graphics.render_scale.resolve(display_scale);
+        self.upscaler = graphics.upscaler.resolve();
+    }
+
+    /// The upscaler a TAA camera runs: TAA's in the editor's Scene view
+    /// (`editor_mode`), which runs no TAA anyway; else the applied one (#1848).
+    pub(crate) fn upscaler(&self, editor_mode: bool) -> Upscaler {
+        match editor_mode {
+            true => Upscaler::Taa,
+            false => self.upscaler,
+        }
     }
 
     /// The scene's render scale: native in the editor's Scene view (`editor_mode`),

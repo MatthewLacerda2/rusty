@@ -48,6 +48,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetDefaultOption` / `SetDefaultOption` | `(name)` / `(name, bool)` | `bool`: the project's default for an option |
 | `Graphics.GetDefaultQuality` / `SetDefaultQuality` | `()` / `(name \| nil)` | `string` or `nil`: the preset a player with no saved choice gets (`project.rusty`'s `"default"`; `nil` selects the middle one; an unknown name raises an error listing them; see *Quality presets*) |
 | `Graphics.GetDefaultRenderScale` / `SetDefaultRenderScale` | `()` / `(scale \| "match_display")` | `number`, or `"match_display"` (`1 / Video.GetDisplayScale()`): the render scale that runs while the player has chosen none (`project.rusty`'s `"graphics"`, **default `1`**; not a positive number nor `"match_display"` raises an error; see *Render scale*) |
+| `Graphics.GetDefaultUpscaler` / `SetDefaultUpscaler` | `()` / `(name)` | `"taa"` or `"fsr2"`: the upscaler that runs while the player has chosen none (`project.rusty`'s `"graphics"`, **default `"taa"`**; another name raises an error; see *Upscaler*) |
 | `Graphics.GetDepthOfFieldAperture` / `SetDepthOfFieldAperture` | `()` / `(f_stop)` | `number`: Bokeh's f-stop, lower blurs more (clamped 1–32, **default `5.6`**) |
 | `Graphics.GetDepthOfFieldFocalLength` / `SetDepthOfFieldFocalLength` | `()` / `(mm)` | `number`: Bokeh's focal length, longer blurs more (clamped 1–300, **default `50`**) |
 | `Graphics.GetDepthOfFieldFocusDistance` / `SetDepthOfFieldFocusDistance` | `()` / `(metres)` | `number`: Bokeh's distance in focus, along the view axis (clamped to `0.1`–`10000`; `math.huge` is focus at infinity; **default `10`**) |
@@ -124,6 +125,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetTaaQuality` / `SetTaaQuality` | `()` / `(name)` | `"VeryLow"` / `"Low"` / `"Medium"` / `"High"` / `"VeryHigh"` (**default `"High"`**, URP's; names are case-insensitive, an unknown one raises an error listing them; see *TAA*) |
 | `Graphics.GetTaaVarianceClampScale` / `SetTaaVarianceClampScale` | `()` / `(value)` | `number`: URP's *Variance Clamp Scale*, the history box's half-width in deviations (clamped 0.6–1.2, **default `0.9`**; see *TAA*) |
 | `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"Neutral"` / `"AgX"` / `"ACES"` / `"Reinhard"` / `"None"` (**default `"Neutral"`**; Unity's names; names are case-insensitive) |
+| `Graphics.GetUpscaler` / `SetUpscaler` | `()` / `(name)` | `"taa"` or `"fsr2"`: what resolves a screen camera's TAA frames, TAA's resolve (and TAAU) or AMD's FSR2 in its place, the one running (**default**: the project's, `"taa"` unless `SetDefaultUpscaler` changed it; another name raises an error; see *Upscaler*) |
 | `Graphics.GetVignetteActive` / `SetVignetteActive` | `()` / `(bool)` | `bool` (**default `false`**; see *Lens effects*) |
 | `Graphics.GetVignetteCenter` / `SetVignetteCenter` | `()` / `(x, y)` | `x, y` (screen uv, `0, 0` top-left, each clamped 0–1, **default `0.5, 0.5`**) |
 | `Graphics.GetVignetteColor` / `SetVignetteColor` | `()` / `(r, g, b)` | `r, g, b` (linear, each clamped 0–1, **default black**) |
@@ -145,6 +147,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.RemoveQualityPreset` | `(name)` | nothing; removes the project's preset of that name (an unknown one raises an error listing them) |
 | `Graphics.ResetOptions` | `()` | nothing; every option back to the project's default |
 | `Graphics.ResetRenderScale` | `()` | nothing; forgets the player's render scale, so the project's default runs again (see *Render scale*) |
+| `Graphics.ResetUpscaler` | `()` | nothing; forgets the player's upscaler, so the project's default runs again (see *Upscaler*) |
 | `Graphics.SetQualityPreset` | `(name, values)` | nothing; writes `values` (any part of a preset's, as `QualityPresets` lists them, `name` included when it is this one's) over the preset of that name, or adds it over the engine's values (a key a preset has not, or another `name`, raises an error) |
 
 ### Post effects
@@ -860,9 +863,10 @@ and the decals) reads with a mip bias of `log2(scale)`, so its detail matches th
 output's pixels; the lightmaps and the ambient occlusion keep theirs. A
 render-scale change, a resize and a move to a monitor of another density under
 `"match_display"` start the history over: no ghost of the old size. At `1` (or
-above, supersampling) it resolves at the scene's size as before. There is no filter
-setting: with TAA on and a scale below `1` it upscales, and with TAA off the
-bilinear upscale runs as it always did.
+above, supersampling) it resolves at the scene's size as before. With TAA on and
+a scale below `1` it upscales, and with TAA off the bilinear upscale runs as it
+always did. The upscaler setting (`SetUpscaler("fsr2")`, see *Upscaler*) runs AMD's
+FSR2 in the resolve's place instead, at any scale.
 
 **Harness screenshots see one frame of it, not a player's settled image.** A
 headless capture (`Harness.Screenshot`, `Harness.Render`) draws one frame per shot
@@ -1092,6 +1096,54 @@ render scales are not part of the quality presets yet. Screen sizes stay the sur
 `Camera.ScreenToWorldRay` speak surface pixels whatever the scale. The editor's **Scene
 view** ignores it, as Unity's Scene view does; so do render textures, which keep
 their own size.
+
+### Upscaler
+
+`SetUpscaler(name)` (#1848) is URP's *Upscaling Filter*, beside the render scale:
+what resolves the jittered frames of a screen camera running TAA. **`"taa"`** (the
+default) is TAA's own resolve, and TAAU below a render scale of 1 (see *TAA*).
+**`"fsr2"`** is AMD FidelityFX Super Resolution 2.2.1, ported to WGSL (MIT), run at
+TAA's place in its stead: after depth of field, before motion blur, the rest of the
+chain at the output's size after it, as under TAAU, and at any render scale, `1`
+included (FSR's native anti-aliasing). With TAA off the camera upscales
+bilinearly under either: that is the bilinear fallback. A view that never scales
+keeps TAA's resolve whatever the setting: the editor's Scene view (which runs no
+TAA), the Inspector's previews and render textures. So does a render scale above
+`1`: FSR2 only upscales.
+
+FSR's quality modes are render scales (Unity's custom scaling; FSR2 has no fixed
+range per mode), so a graphics menu offers them through `SetRenderScale`, and
+`"match_display"` keeps working:
+
+| FSR2 mode | Render scale |
+|---|---|
+| Native AA | `1` |
+| Quality | `0.67` |
+| Balanced | `0.59` |
+| Performance | `0.5` |
+| Ultra Performance | `0.33` |
+
+Under FSR2 the jitter runs FSR2's Halton sequence over `8 × (1/scale)²` phases (8
+at `1`, 32 at `0.5`) and the material maps read with FSR2's mip bias,
+`log2(scale) - 1`, each plus the camera's TAA *Jitter Scale* and *Mip Bias*. Its
+inputs are the engine's: the motion vectors and view depths of the velocity
+target, the translucents' reactive mask (see *TAA*), and the exposure (the
+volume's fixed EV, or the adapted one in Automatic, a frame late). The camera's
+TAA *Base Blend Factor*, *Variance Clamp Scale* and *Quality* are TAA's resolve's
+and do nothing under FSR2; its *Contrast Adaptive Sharpening* runs after the
+composite on a frame FSR2 ran, as after TAA (FSR2's own sharpening pass is not
+ported; Unity's FSR2 also defaults it off). FXAA is skipped. A cut, a resize and
+a render-scale change start its history over. `Debug.Stats().gpu_passes.fsr2`
+times it; it costs each FSR2 camera 52 bytes a pixel at the output's size and 40 at
+the scene's (129 MB at 1920×1080 from `0.5`), against TAA's 24 at the history's.
+
+Like the render scale it is a player setting: the same shared cell, applied the
+next frame in the player and the Game view, **persisted** through `Storage`
+(`graphics.upscaler`) at the Stop and quit boundaries. While the player has chosen
+none the project's runs: `SetDefaultUpscaler`, which writes `project.rusty`'s
+`"graphics": { "upscaler": … }` (in the player and the harness, in memory only); a
+value there that names no upscaler keeps `"taa"` and warns. `ResetUpscaler` forgets
+the choice, as `ResetRenderScale` does.
 
 ### Player options
 

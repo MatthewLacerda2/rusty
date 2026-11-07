@@ -3,7 +3,9 @@
 //! (20), URP's order. Like FXAA it needs no volume.
 
 use super::super::{Owner, Pass, PassCx, PostEffect};
+use crate::components::ExposureMode;
 use crate::core::settings::graphics_options::GraphicsOption;
+use crate::core::settings::upscaler::Upscaler;
 use crate::core::settings::GraphicsSettings;
 use crate::render::postfx::params::Gate;
 use crate::render::postfx::params::{effect_runs, PostSource};
@@ -25,11 +27,20 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     ],
 };
 
-/// The resolve; [`super::begin`] already chose whether this view runs it, and held
-/// the history only then.
+/// The resolve, TAA's or FSR2's in its place (#1848); [`super::begin`] already
+/// chose whether and how this view runs it, and held the history only then.
 fn resolve(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let gpu = (&r.device, &r.queue);
     let lenses = super::params::lenses(cx.stack.stack, view.aspect());
+    let history = view.post_fx.targets.get::<super::TaaHistory>();
+    if history.is_some_and(|h| h.resolver == Upscaler::Fsr2) {
+        let inputs = super::fsr2::Fsr2Inputs {
+            exposure: exposure(cx),
+            lens: [lenses[0][0], lenses[0][1]],
+        };
+        let passes = &r.post_passes.taa.fsr2;
+        return view.post_fx.run_fsr2(gpu, passes, &r.gpu_timer, inputs);
+    }
     // The base camera's TAA knobs (#1847); a view with no camera keeps URP's
     // defaults, so its resolve is unchanged.
     let tune = cx
@@ -40,6 +51,15 @@ fn resolve(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
         .unwrap_or_default();
     view.post_fx
         .run_taa(gpu, &r.post_passes.taa, &r.gpu_timer, tune, lenses);
+}
+
+/// The exposure FSR2 reads (#1848): the volume's fixed EV, and whether its mode is
+/// Automatic (the meter's adapted EV then runs); EV 0 without a volume.
+fn exposure(cx: &PassCx) -> (f32, bool) {
+    cx.effect.volume().map_or((0.0, false), |vc| {
+        let auto = vc.exposure.mode == ExposureMode::Automatic;
+        (vc.exposure.fixed_ev, auto)
+    })
 }
 
 /// Whether `post`'s camera runs TAA, through [`effect_runs`]: its component has it

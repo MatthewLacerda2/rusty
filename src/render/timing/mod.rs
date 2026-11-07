@@ -81,6 +81,8 @@ crate::core::named_enum! {
         DepthOfField = "depth_of_field",
         /// Temporal anti-aliasing's resolve (#1702).
         Taa = "taa",
+        /// FSR2 in TAA's place (#1848): its five compute dispatches.
+        Fsr2 = "fsr2",
         /// Per-object motion blur (#1436): its three tile passes and the gather.
         MotionBlur = "motion_blur",
         /// The screen-space lens flare (#1443): its flare pass (the composite adds

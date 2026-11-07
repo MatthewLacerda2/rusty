@@ -227,6 +227,8 @@ pub struct Renderer {
     pub graphics_options: crate::core::settings::graphics_options::GraphicsOptions,
     /// The screen's render scale (#1498); see [`RenderView::set_render_scale`].
     pub render_scale: crate::core::settings::render_scale::RenderScale,
+    /// The upscaler a screen camera with TAA on runs (#1848): TAA's or FSR2.
+    pub upscaler: crate::core::settings::upscaler::Upscaler,
     /// Present modes the surface advertises, captured at construction. Used to
     /// decide whether vsync can be turned off (`Immediate`) without a wgpu panic;
     /// the headless path has no real swapchain so it only ever lists `Fifo`.

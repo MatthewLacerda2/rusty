@@ -35,6 +35,7 @@
 //! composite ([`sharpen`]).
 
 mod effect;
+pub(crate) mod fsr2;
 pub(crate) mod history;
 pub(crate) mod jitter;
 pub(crate) mod params;
@@ -44,7 +45,7 @@ pub(crate) mod sharpen;
 mod upscale;
 
 pub(crate) use effect::{runs, wanted, EFFECT};
-pub(crate) use history::{begin, chain_size, upscales, TaaFrame, TaaHistory};
+pub(crate) use history::{begin, chain_size, mode, upscales, TaaFrame, TaaHistory};
 pub(crate) use sharpen::Sharpen;
 
 use params::TaaParams;
@@ -52,7 +53,7 @@ use params::TaaParams;
 use crate::render::gpu::bind_entry as entry;
 use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
-use crate::render::gpu::pipelines::LazyPipeline;
+use crate::render::gpu::pipelines::{LazyCompute, LazyPipeline};
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::postfx::PostFx;
 use crate::render::timing::{GpuPass, GpuTimer};
@@ -65,8 +66,10 @@ pub(crate) struct TaaPasses {
     resolve: LazyPipeline,
     upscale: LazyPipeline,
     /// The contrast-adaptive sharpen after the composite (#1847), into each output
-    /// format a view writes; #1848's upscaler reuses it.
+    /// format a view writes; it runs after FSR2 too (#1848).
     pub(crate) sharpen: Sharpen,
+    /// FSR2's passes, TAA's alternative (#1848).
+    pub(crate) fsr2: fsr2::Fsr2Passes,
 }
 
 impl TaaPasses {
@@ -121,6 +124,7 @@ impl TaaPasses {
             resolve,
             upscale,
             sharpen: Sharpen::new(device, registry, output_formats),
+            fsr2: fsr2::Fsr2Passes::new(device, registry),
         }
     }
 
@@ -130,7 +134,7 @@ impl TaaPasses {
     fn group(
         &self,
         device: &wgpu::Device,
-        h: &TaaHistory,
+        (h, frames): (&TaaHistory, &history::TaaFrames),
         read: usize,
         current: &wgpu::TextureView,
         velocity: &wgpu::TextureView,
@@ -141,12 +145,15 @@ impl TaaPasses {
             entries: &[
                 entry(0, h.params.as_entire_binding()),
                 entry(1, wgpu::BindingResource::TextureView(current)),
-                entry(2, wgpu::BindingResource::TextureView(&h.frames[read].view)),
+                entry(
+                    2,
+                    wgpu::BindingResource::TextureView(&frames.colour[read].view),
+                ),
                 entry(3, wgpu::BindingResource::TextureView(velocity)),
                 entry(4, wgpu::BindingResource::Sampler(&self.sampler)),
                 entry(
                     5,
-                    wgpu::BindingResource::TextureView(&h.surfaces[read].view),
+                    wgpu::BindingResource::TextureView(&frames.surfaces[read].view),
                 ),
                 entry(6, wgpu::BindingResource::TextureView(&h.reactive.view)),
             ],
@@ -159,6 +166,18 @@ impl TaaPasses {
             .into_iter()
             .chain(self.sharpen.lazy_pipelines())
     }
+
+    /// The compute pipelines, for warming (`Renderer::lazy_computes`): FSR2's.
+    pub(crate) fn lazy_computes(&self) -> [&LazyCompute; 5] {
+        self.fsr2.lazy_computes()
+    }
+}
+
+/// This frame's resolved image in `targets`, when TAA's resolve or FSR2 ran: what
+/// the rest of the chain reads.
+pub(crate) fn output(targets: &super::Targets) -> Option<&crate::render::postfx::PfxTarget> {
+    let fsr2 = targets.get::<fsr2::Fsr2Targets>().and_then(|f| f.output());
+    fsr2.or_else(|| targets.get::<TaaHistory>().and_then(|h| h.output()))
 }
 
 impl PostFx {
@@ -173,9 +192,14 @@ impl PostFx {
         tune: params::TaaTune,
         lenses: [[f32; 4]; params::MAX_CAMERAS],
     ) {
-        let (Some(h), Some(velocity)) =
-            (self.targets.get::<TaaHistory>(), self.motion.target_view())
+        let Some((h, velocity)) = self
+            .targets
+            .get::<TaaHistory>()
+            .zip(self.motion.target_view())
         else {
+            return;
+        };
+        let Some(frames) = h.frames.as_ref() else {
             return;
         };
         let (read, write) = (h.latest, 1 - h.latest);
@@ -187,7 +211,7 @@ impl PostFx {
         let params = params.without(h.rules);
         queue.write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
         let current = self.focused_color();
-        let group = passes.group(device, h, read, current, velocity);
+        let group = passes.group(device, (h, frames), read, current, velocity);
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("TAA Encoder"),
         });
@@ -197,7 +221,7 @@ impl PostFx {
             &passes.resolve
         };
         let timed = (pipeline.get(), timer.writes(GpuPass::Taa));
-        let into = [&h.frames[write].view, &h.surfaces[write].view];
+        let into = [&frames.colour[write].view, &frames.surfaces[write].view];
         PostFx::fullscreen_into(&mut encoder, timed, &[&group], into);
         if drawn {
             reactive::clear(&mut encoder, &h.reactive);
@@ -241,6 +265,6 @@ impl PostFx {
     /// The history's latest frame, for a test to poison.
     pub(crate) fn taa_latest(&self) -> Option<&wgpu::Texture> {
         let h = self.targets.get::<TaaHistory>()?;
-        Some(&h.frames[h.latest].texture)
+        Some(&h.frames.as_ref()?.colour[h.latest].texture)
     }
 }

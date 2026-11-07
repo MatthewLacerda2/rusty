@@ -5,6 +5,7 @@
 //! draw through here, so a picture-in-picture is the same frame as the screen's.
 
 use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
+use crate::core::settings::upscaler::Upscaler;
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::motion::{self, HistoryKey, Velocity};
 use crate::render::passes::ssao::SsaoPlan;
@@ -35,6 +36,10 @@ pub(crate) struct StackPass<'a> {
     /// TAAU #1702, whose chain runs at the output's size).
     pub output: &'a wgpu::TextureView,
     pub editor_mode: bool,
+    /// The upscaler this view may run in TAA's place (#1848): the settings' on the
+    /// screen ([`Renderer::upscaler`]), TAA's on a view that never scales (a render
+    /// texture, a preview).
+    pub upscaler: Upscaler,
     /// Run `post`'s grading, bloom, SSR, TAA, motion blur and FXAA. Off, the image is
     /// only brought from HDR to display (a render texture's `post_fx = false`).
     pub full_post_fx: bool,
@@ -69,8 +74,9 @@ impl Renderer {
             pass.full_post_fx,
             pass.editor_mode,
         );
+        let taa_mode = taa::mode(view, taa_on, pass.upscaler);
         view.post_fx
-            .fit_chain(&self.device, taa::chain_size(view, taa_on));
+            .fit_chain(&self.device, taa::chain_size(view, taa_mode));
         let key = HistoryKey::new(scene, pass.base_id);
         let size = view.scene_size();
         surface::begin(&mut view.post_fx.targets, &self.device, size, ssr);
@@ -84,7 +90,7 @@ impl Renderer {
         let keeps = !own_pipeline && !self.capture.static_only;
         // TAA (#1702): the frame's jitter and the maps' mip bias, tuned by the base
         // camera's knobs (#1847); a cut forgets its history.
-        let taa = taa::begin(view, &self.device, taa_on, taa_knobs(pass.post.camera));
+        let taa = taa::begin(view, &self.device, taa_mode, taa_knobs(pass.post.camera));
         let shared = StackShared {
             aspect,
             view_projs,

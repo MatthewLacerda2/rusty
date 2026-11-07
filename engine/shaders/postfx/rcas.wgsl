@@ -1,6 +1,7 @@
 // engine/shaders/postfx/rcas.wgsl — contrast-adaptive sharpening (#1847): AMD's
-// FidelityFX RCAS (Robust Contrast-Adaptive Sharpening, MIT), the sharpen URP's TAA
-// *Contrast Adaptive Sharpening* and FSR run in its final post pass, after
+// FidelityFX RCAS (Robust Contrast-Adaptive Sharpening; Copyright (c) 2022-2023
+// Advanced Micro Devices, Inc., MIT: the notice in `postfx/fsr2/LICENSE.txt`), the
+// sharpen URP's TAA *Contrast Adaptive Sharpening* and FSR run in its final post pass, after
 // tonemapping. One pass over the chain's LDR image at the chain's size
 // (`PostFx::chain_size`), so bloom and the exposure meter read the unsharpened scene.
 //

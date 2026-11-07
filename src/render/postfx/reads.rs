@@ -37,11 +37,11 @@ impl PostFx {
         scene_of(None, None, self.targets.get(), &self.scene_hdr)
     }
 
-    /// TAA's output this frame, when its resolve ran: at the output's size when it
-    /// upscaled the view (TAAU), which is then the size of all that reads it.
+    /// TAA's output this frame, when its resolve ran (or FSR2 in its place, #1848):
+    /// at the output's size when it upscaled the view (TAAU, FSR2), which is then
+    /// the size of all that reads it.
     fn taa(&self) -> Option<&PfxTarget> {
-        let history = self.targets.get::<effects::taa::TaaHistory>();
-        history.and_then(|h| h.output())
+        effects::taa::output(&self.targets)
     }
 
     /// The exposure meter and [`PostFx::scene_color`] (with its size) at once, so the
@@ -55,7 +55,7 @@ impl PostFx {
     ) {
         // The chain's size: the output's when TAA upscaled the view (#1702).
         let size = [self.chain_size.0, self.chain_size.1];
-        let taa = (self.targets.get::<effects::taa::TaaHistory>()).and_then(|h| h.output());
+        let taa = effects::taa::output(&self.targets);
         let scene = scene_of(self.targets.get(), taa, self.targets.get(), &self.scene_hdr);
         (&mut self.exposure, (scene, size))
     }

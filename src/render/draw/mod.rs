@@ -137,7 +137,9 @@ impl Renderer {
         // the chain writes `output` itself: it holds no scaled target then.
         let graphics = self.graphics(editor_mode);
         let taa_on = taa::runs(view, post, graphics, true, editor_mode);
-        let scaled = view.scaled_output(&self.device, !taa::upscales(view, taa_on));
+        let upscaler = self.upscaler(editor_mode);
+        let taa_mode = taa::mode(view, taa_on, upscaler);
+        let scaled = view.scaled_output(&self.device, !taa::upscales(view, taa_mode));
         let pass = StackPass {
             stack: &stack,
             entities: &screen.entities,
@@ -145,6 +147,7 @@ impl Renderer {
             post,
             output: scaled.as_ref().unwrap_or(output),
             editor_mode,
+            upscaler,
             full_post_fx: true,
             motion_frames: 1,
         };
@@ -192,6 +195,7 @@ impl Renderer {
             post: Default::default(),
             output,
             editor_mode: false,
+            upscaler: Default::default(),
             full_post_fx: false,
             motion_frames: 1,
         };

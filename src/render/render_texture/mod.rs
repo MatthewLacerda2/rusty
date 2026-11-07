@@ -106,6 +106,8 @@ impl Renderer {
                 post: guards.source(),
                 output: &target,
                 editor_mode: false,
+                // A render texture never scales: it keeps TAA (#1848).
+                upscaler: Default::default(),
                 full_post_fx: cam.target.post_fx,
                 motion_frames,
             };
