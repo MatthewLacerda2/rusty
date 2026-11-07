@@ -19,7 +19,8 @@ TEST := cargo nextest run --locked
 # The gates' fixed proptest seed (#1852): ci.yml's, read from there so there is one
 # number, and a local gate run goes red only for the branch under test, never for a
 # seed that drew an old bug. `make test-explore` draws fresh seeds instead. An
-# exported PROPTEST_RNG_SEED wins, so a seed from a report still reproduces.
+# exported PROPTEST_RNG_SEED wins, so a seed from a report still reproduces;
+# test_workflow_hygiene.py fails when this read finds no number.
 PROPTEST_SEED := $(shell sed -n "s/^  PROPTEST_RNG_SEED: .* '\([0-9][0-9]*\)' .*/\1/p" .github/workflows/ci.yml)
 
 # The gates, in the order `make gates` runs them. The quick ones take seconds; the
@@ -179,7 +180,6 @@ test: export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)
 test: ## [gate] Engine tests (nextest) and doctests, both feature sets, on the gates' proptest seed
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
-	@test -n "$(PROPTEST_SEED)" || { echo "test: no PROPTEST_RNG_SEED number in ci.yml's env (#1852)" >&2; exit 1; }
 	$(TEST)
 	$(TEST) --features dev
 	cargo test --doc --locked
