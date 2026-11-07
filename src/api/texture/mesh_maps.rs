@@ -10,7 +10,10 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use super::folder;
+use mlua::{Lua, Table};
+
+use super::{folder, put};
+use crate::api::Reg;
 use crate::asset::{self, SubMesh};
 use crate::procgen::bake::bake_to_png;
 use crate::procgen::Slot;
@@ -18,6 +21,23 @@ use crate::scene::lighting::mesh_maps::{bake, MeshMap, MeshSource};
 
 /// The resolution a call that names none bakes at.
 pub(super) const DEFAULT_RESOLUTION: u32 = 1024;
+
+/// Put `BakeMeshMaps` on the `Texture` table.
+pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
+    put(
+        table,
+        "BakeMeshMaps",
+        lua.create_function(
+            |lua, (model, maps, prefix, size): (String, Vec<String>, String, Option<u32>)| {
+                let size = size.unwrap_or(DEFAULT_RESOLUTION);
+                let root = crate::core::project::root();
+                let written = bake_mesh_maps(&model, &maps, &prefix, size, &root)
+                    .map_err(mlua::Error::RuntimeError)?;
+                lua.create_table_from(written)
+            },
+        ),
+    )
+}
 
 /// Bake `maps` of `model` at `resolution`² and write each to `<prefix><map>.png`,
 /// the folders above `prefix` made first when inside `root`. Returns map → path. An

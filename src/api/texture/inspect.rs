@@ -1,12 +1,36 @@
 //! src/api/texture/inspect.rs — `Texture.Stats` and `Texture.Preview` (#1486): let
 //! the agent see what every node of a recipe makes, by numbers or by eye.
 
-use mlua::{Lua, Table};
+use mlua::{Lua, Table, Value};
+
+use super::from_lua::parse_recipe;
+use super::put;
+use crate::api::Reg;
 
 use crate::procgen::image_buf::Rgba;
 use crate::procgen::runner::preview::write_preview;
 use crate::procgen::runner::stats::{stats, NodeStats};
 use crate::procgen::TextureRecipe;
+
+/// Put `Stats` and `Preview` on the `Texture` table.
+pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
+    put(
+        table,
+        "Stats",
+        lua.create_function(|lua, (recipe, resolution): (Value, Option<u32>)| {
+            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
+            stats_table(lua, recipe, resolution)
+        }),
+    )?;
+    put(
+        table,
+        "Preview",
+        lua.create_function(|lua, (recipe, path, size): (Value, String, Option<u32>)| {
+            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
+            preview_table(lua, &recipe, &path, size)
+        }),
+    )
+}
 
 /// The tile's longer side `Texture.Preview` uses when none is given, or the
 /// recipe's longer side when that is smaller.

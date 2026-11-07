@@ -83,19 +83,7 @@ pub fn register(lua: &Lua) -> Reg {
         }),
     )?;
 
-    put(
-        &table,
-        "BakeMeshMaps",
-        lua.create_function(
-            |lua, (model, maps, prefix, size): (String, Vec<String>, String, Option<u32>)| {
-                let size = size.unwrap_or(mesh_maps::DEFAULT_RESOLUTION);
-                let root = crate::core::project::root();
-                let written = mesh_maps::bake_mesh_maps(&model, &maps, &prefix, size, &root)
-                    .map_err(mlua::Error::RuntimeError)?;
-                lua.create_table_from(written)
-            },
-        ),
-    )?;
+    mesh_maps::register(lua, &table)?;
 
     put(
         &table,
@@ -106,23 +94,7 @@ pub fn register(lua: &Lua) -> Reg {
         }),
     )?;
 
-    put(
-        &table,
-        "Stats",
-        lua.create_function(|lua, (recipe, resolution): (Value, Option<u32>)| {
-            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            inspect::stats_table(lua, recipe, resolution)
-        }),
-    )?;
-
-    put(
-        &table,
-        "Preview",
-        lua.create_function(|lua, (recipe, path, size): (Value, String, Option<u32>)| {
-            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            inspect::preview_table(lua, &recipe, &path, size)
-        }),
-    )?;
+    inspect::register(lua, &table)?;
 
     put(
         &table,
