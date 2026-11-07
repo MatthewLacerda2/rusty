@@ -233,7 +233,8 @@ jobs:
       - name: Mutation test (one shard of the full deterministic sim, report-only)
         # Build/test with the dev feature so the headless-harness sim tests run
         # too, under nextest, the gate's runner (#1844: a process per test and
-        # the `gpu` group, so the baseline sees what the gates see; plain
+        # the `gpu` group, as the gates run the unit and integration tests;
+        # nextest runs no doctests, so those are left out here; plain
         # `cargo test` broke it four times, #1042, #1069, #1337, #1844), with
         # `--fail-fast` so a caught mutant stops at its first failing test.
         # Scoped by --file to the sim modules; the timeout multiplier guards
@@ -253,6 +254,14 @@ jobs:
         # signal" 4 min into a mutant whose test limit was 172 s, and the shard
         # was lost with no report. Capped, the test binary dies on its own
         # allocation and cargo-mutants counts the mutant caught.
+        # The cap is per process, so it holds the runner only as long as the
+        # processes under it can't sum past its memory: nextest runs a process
+        # per test, `test-threads` of them at once (the CPU count, 4, by
+        # default), and four mutated tests allocating together would take the
+        # runner down at about 4 GiB each. `--test-threads 2` keeps cap times
+        # threads at the runner's 16 GB; the `gpu` group already allows only
+        # 2 renderers at once, so it costs only CPU-bound tests' overlap.
+        # `test_gpu_config.py` (`make scripts`) holds the product.
         run: |
           budget=$(( BUDGET_SECONDS - ($(date +%s) - JOB_STARTED) ))
           ulimit -v 8388608
@@ -264,7 +273,7 @@ jobs:
             cargo mutants --test-tool nextest --no-shuffle --timeout-multiplier 3 \
               --shard '${{ matrix.shard }}/${{ strategy.job-total }}' --sharding round-robin \
               "${files[@]}" \
-              -- --features dev --fail-fast || rc=$?
+              -- --features dev --fail-fast --test-threads 2 || rc=$?
           mkdir -p mutants.out
           echo "$rc" > mutants.out/exit-code
           # Setup included, as the budget counts it: what `mutants-report`

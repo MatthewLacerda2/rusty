@@ -64,7 +64,8 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
             flag(
                 i + 1,
                 GPU_ENTRY,
-                "ask for a GPU through `crate::render::test_gpu::headless_or_skip`",
+                "ask for a GPU through `crate::render::test_gpu::headless_or_skip` \
+                 (or `headless_pair_or_skip`, for two renderers alive at once)",
             );
         }
     }

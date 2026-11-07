@@ -882,13 +882,17 @@ second (#1844): a runner unlike the gate's finds the next such difference in eve
 branch's mutation run. Plain `cargo test` stays the nightly `cargo-test.yml` signal,
 where a runner difference is the finding. The mutation jobs render: they install
 lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and the nextest `gpu` group bounds them.
+Doctests are left out: nextest doesn't run them (`make test` does), so a mutant only a
+doctest would catch survives. The runs pass `--test-threads 2`: the jobs' `ulimit -v`
+cap (#674) is per process, so it times the test processes running at once stays within
+the runner's memory (`test_gpu_config.py` holds the product).
 
 Prefer `make mutants-remote` (every mutant rebuilds the crate, which is hours of
 contention on a machine building sibling worktrees). Locally, the same question:
 ```
 git diff origin/main > branch.diff
-cargo mutants --test-tool nextest --in-diff branch.diff -- --features dev --fail-fast   # what the branch changed
-cargo mutants --test-tool nextest --no-shuffle --timeout-multiplier 3 -- --features dev --fail-fast   # full sweep
+cargo mutants --test-tool nextest --in-diff branch.diff -- --features dev --fail-fast --test-threads 2   # what the branch changed
+cargo mutants --test-tool nextest --no-shuffle --timeout-multiplier 3 -- --features dev --fail-fast --test-threads 2   # full sweep
 ```
 
 ## Fuzzing (local-first)

@@ -149,11 +149,12 @@ jobs:
           in_scope=$(python3 -c 'import json,sys; t=open(sys.argv[1]).read().strip(); print(len(json.loads(t)) if t else 0)' planned.json)
           echo "in_scope=$in_scope" >> "$GITHUB_OUTPUT"
 
-      # Same dev-feature build, timeout multiplier and memory cap as the sweep
-      # (`mutants-sweep.yml` says why each).
+      # Same dev-feature build, timeout multiplier, memory cap and test-thread
+      # bound as the sweep (`mutants-sweep.yml` says why each).
       # The tests run under nextest (`--test-tool nextest`, #1844), the gate's
       # runner: a process per test and the `gpu` test group, so the baseline
-      # sees what the gates see. Under plain `cargo test` it broke four times
+      # runs the unit and integration tests as the gates do (not the doctests:
+      # nextest doesn't run them, `make test` does). Under plain `cargo test` it broke four times
       # on a test that passed the gate (#1042, #1069, #1337, #1844); runner
       # independence is `cargo-test.yml`'s nightly signal, not this one's.
       # `--fail-fast` overrides the profile's `fail-fast = false` (right for the
@@ -170,7 +171,7 @@ jobs:
           rc=0
           timeout --signal=INT --kill-after=60s "${budget}s" \
             cargo mutants --test-tool nextest --no-shuffle --timeout-multiplier 3 \
-              --in-diff scope.diff -- --features dev --fail-fast || rc=$?
+              --in-diff scope.diff -- --features dev --fail-fast --test-threads 2 || rc=$?
           echo "status=$rc" >> "$GITHUB_OUTPUT"
 
       # Red when cargo-mutants broke (any status but finished or stopped at

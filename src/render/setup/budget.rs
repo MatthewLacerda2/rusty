@@ -160,7 +160,9 @@ impl Budget {
                  first. Under plain `cargo test` (the nightly cargo-test run) tests share the budget, so two such tests each hold one \
                  slot and wait forever for a second (#1844). A test that needs two \
                  renderers alive at once takes both slots together: \
-                 render::test_gpu::headless_pair_or_skip."
+                 render::test_gpu::headless_pair_or_skip. An integration test \
+                 (tests/gpu/), where that helper is out of reach, drops the first \
+                 renderer before building the second."
             );
         }
         while held.live + slots > self.cap {
