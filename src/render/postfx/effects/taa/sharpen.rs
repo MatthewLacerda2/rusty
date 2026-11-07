@@ -231,8 +231,11 @@ impl Sharpen {
 /// frame the sharpen is not the last pass (`None` while it writes the output).
 pub(crate) struct SharpenTargets {
     params: wgpu::Buffer,
-    sharpened: Option<(((u32, u32), wgpu::TextureFormat), PfxTarget)>,
+    sharpened: Option<(MadeFor, PfxTarget)>,
 }
+
+/// What a sharpen target was made for: the chain's size and the output format.
+type MadeFor = ((u32, u32), wgpu::TextureFormat);
 
 impl SharpenTargets {
     fn new(device: &wgpu::Device) -> Self {
