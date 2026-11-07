@@ -48,3 +48,23 @@ fn the_uniform_packs_each_input_in_its_slot() {
     assert_eq!(p.frame, [0.0, 32.0, 1.0, 0.0]);
     assert_eq!(p.exposure, [1.5, 1.0, 0.7, 0.4]);
 }
+
+#[test]
+fn fsr2_runs_where_chosen_unless_off_or_supersampled() {
+    use crate::core::settings::upscaler::Upscaler::{Fsr2, Taa};
+    use crate::render::postfx::effects::taa::history::resolver;
+    let (out, half, big) = (px(1920, 1080), px(960, 540), px(2880, 1620));
+    assert_eq!(resolver(true, Fsr2, (half, out)), Some(Fsr2));
+    assert_eq!(resolver(true, Fsr2, (out, out)), Some(Fsr2), "native AA");
+    assert_eq!(
+        resolver(true, Fsr2, (big, out)),
+        Some(Taa),
+        "FSR2 only upscales"
+    );
+    assert_eq!(resolver(true, Taa, (half, out)), Some(Taa));
+    assert_eq!(
+        resolver(false, Fsr2, (half, out)),
+        None,
+        "TAA off: bilinear"
+    );
+}

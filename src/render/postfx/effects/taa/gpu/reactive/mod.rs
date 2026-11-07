@@ -7,6 +7,7 @@
 //! keeps them. What the scene is: `scene`.
 
 mod coverage;
+mod fsr2;
 mod scene;
 mod viewmodel;
 
@@ -17,7 +18,7 @@ use crate::components::TaaReactive;
 /// How far under FXAA's the ball's p95 and brightest luma may sit under TAA: ours,
 /// a few steps of a byte. Lavapipe measures the ball 13 and 24 below without the
 /// mask (the issue measured 9 and 13 in its game), 5 and 11 above with it.
-const P95_TOLERANCE: f32 = 4.0;
+pub(super) const P95_TOLERANCE: f32 = 4.0;
 const MAX_TOLERANCE: f32 = 8.0;
 
 /// Whether `taa` keeps `fxaa`'s detail, within the tolerances.

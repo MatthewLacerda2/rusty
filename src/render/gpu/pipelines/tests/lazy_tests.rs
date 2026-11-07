@@ -122,6 +122,10 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + (1 + F + 2)
     );
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
+    // Compute: volumetric fog's scatter and integrate (#1703), FSR2's five (#1848).
+    let computes = renderer.lazy_computes();
+    assert_eq!(computes.len(), 2 + 5);
+    assert!(computes.iter().all(|p| !p.is_built()));
 
     renderer.warm_pipelines(false);
     assert!(renderer.lazy_pipelines(false).iter().all(|p| p.is_built()));
@@ -133,4 +137,5 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
 
     renderer.warm_pipelines(true);
     assert!(renderer.lazy_pipelines(true).iter().all(|p| p.is_built()));
+    assert!(renderer.lazy_computes().iter().all(|p| p.is_built()));
 }

@@ -7,6 +7,7 @@ use crate::components::{
     MaterialAsset, MaterialComponent, RefractionModel, RenderMode, TaaReactive,
 };
 use crate::core::settings::render_scale::RenderScale;
+use crate::core::settings::upscaler::Upscaler;
 use crate::render::motion::gpu_fixture::{H, W};
 use crate::render::{RenderView, Renderer};
 use crate::scene::authoring::{create_entity, Primitive};
@@ -28,6 +29,8 @@ pub(super) struct Ball {
     /// The view's render scale: below 1 TAA upscales (TAAU), FXAA's frame is
     /// upscaled bilinearly.
     pub scale: f32,
+    /// What resolves TAA's frames: TAA's own, or FSR2 in its place (#1848).
+    pub upscaler: Upscaler,
 }
 
 impl Default for Ball {
@@ -37,6 +40,7 @@ impl Default for Ball {
             reactive: TaaReactive::Auto,
             writes_motion: false,
             scale: 1.0,
+            upscaler: Upscaler::Taa,
         }
     }
 }
@@ -122,6 +126,7 @@ fn luma(px: &[u8]) -> f32 {
 /// those the frame changed against the same frame without it.
 pub(super) fn ball_frame(ball: Ball) -> Option<Stats> {
     let mut r = renderer()?;
+    r.upscaler = ball.upscaler;
     let cam = Camera::new(Vec3::ZERO, -90.0, 0.0);
     let (mut scene, id) = build(ball);
     let mut v = ball_view(&r, ball);

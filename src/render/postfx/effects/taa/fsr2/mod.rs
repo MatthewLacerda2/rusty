@@ -106,3 +106,5 @@ impl Fsr2Passes {
 
 #[cfg(test)]
 mod gpu_tests;
+#[cfg(test)]
+mod reset_gpu_tests;

@@ -16,3 +16,4 @@ mod options;
 mod quality;
 mod quality_project;
 mod render_scale;
+mod upscaler;
