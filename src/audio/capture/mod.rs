@@ -233,3 +233,11 @@ mod doppler_tests;
 #[cfg(test)]
 #[path = "loud_tests.rs"]
 mod loud_tests;
+
+#[cfg(test)]
+#[path = "loud_hall_tests.rs"]
+mod loud_hall_tests;
+
+#[cfg(test)]
+#[path = "master_hall_tests.rs"]
+mod master_hall_tests;

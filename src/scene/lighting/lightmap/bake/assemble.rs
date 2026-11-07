@@ -49,10 +49,10 @@ pub(super) fn assemble(
     let mut masks = vec![Vec4::ONE; texels.len()];
     let mut filled = vec![false; texels.len()];
     for (k, (point, light)) in points.iter().zip(light).enumerate() {
-        texels[point.index] = indirect[k] + light.direct;
-        directions[point.index] = direction_texel(indirect[k], indirect_dir[k], light);
-        masks[point.index] = light.mask;
-        filled[point.index] = true;
+        texels[point.at()] = indirect[k] + light.direct;
+        directions[point.at()] = direction_texel(indirect[k], indirect_dir[k], light);
+        masks[point.at()] = light.mask;
+        filled[point.at()] = true;
     }
     for (keep, map) in [
         (settings.directional, &mut directions),

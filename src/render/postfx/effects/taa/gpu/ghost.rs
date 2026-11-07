@@ -1,10 +1,10 @@
 //! TAA's ghosts on lavapipe (#1702): a moving cube and a moving sprite particle
-//! (which writes no motion) leave no trail. A cut: `cut_gpu_tests`; a viewmodel:
-//! `viewmodel_gpu_tests`.
+//! (which writes no motion) leave no trail. A cut: `cut`; a viewmodel:
+//! `viewmodel`.
 
 use glam::Vec3;
 
-use super::gpu_fixture::{
+use super::fixture::{
     cube, diff, eye, frame, fresh_frame, pixel, project, renderer, settle, taa_scene, view,
 };
 use crate::components::particle::{Particle, ParticleEmitterComponent};

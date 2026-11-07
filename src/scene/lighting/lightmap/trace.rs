@@ -280,7 +280,7 @@ fn toward(position: Vec3, point: Vec3, range: f32) -> Option<(Vec3, f32)> {
 }
 
 /// A cosine-weighted direction on the hemisphere around `normal`.
-fn cosine_sample(normal: Vec3, rng: &mut Rng) -> Vec3 {
+pub(in crate::scene::lighting) fn cosine_sample(normal: Vec3, rng: &mut Rng) -> Vec3 {
     let (u1, u2) = (rng.next_f32(), rng.next_f32());
     let r = u1.sqrt();
     let phi = TAU * u2;

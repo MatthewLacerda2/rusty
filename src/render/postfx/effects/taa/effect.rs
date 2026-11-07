@@ -24,9 +24,11 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 
 /// The resolve; [`super::begin`] already chose whether this view runs it, and held
 /// the history only then.
-fn resolve(r: &Renderer, view: &mut RenderView, _: &PassCx) {
+fn resolve(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let gpu = (&r.device, &r.queue);
-    view.post_fx.run_taa(gpu, &r.post_passes.taa, &r.gpu_timer);
+    let lenses = super::params::lenses(cx.stack.stack, view.aspect());
+    view.post_fx
+        .run_taa(gpu, &r.post_passes.taa, &r.gpu_timer, lenses);
 }
 
 /// Whether `post`'s camera runs TAA, through [`effect_runs`]: its component has it

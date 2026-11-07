@@ -45,10 +45,7 @@ fn strips() -> BakeMesh {
 fn every_sub_texel_strip_owns_its_row_traced_on_its_own_surface() {
     let points = rasterize(&strips(), S);
     for k in 0..STRIPS {
-        let row: Vec<_> = points
-            .iter()
-            .filter(|p| p.index / S as usize == 2 * k as usize)
-            .collect();
+        let row: Vec<_> = points.iter().filter(|p| p.index / S == 2 * k).collect();
         assert_eq!(row.len(), S as usize, "strip {k} owns its whole row");
         for p in row {
             let (x, z) = (p.position.x, p.position.z - k as f32);
@@ -74,7 +71,7 @@ fn sub_texel_strips_bake_lit_not_black() {
     };
     // A density that sizes the strips' map at exactly S, under the page's cap.
     let settings = BakeSettings {
-        texels_per_unit: (S as f32 - 0.5) / world_per_uv(&strips()).unwrap(),
+        texels_per_unit: (S as f32 - 0.5) / world_per_uv(&strips().surface()).unwrap(),
         ..settings()
     };
     let map = &bake(&scene, &settings)[0];
@@ -108,7 +105,7 @@ fn centre_texels_keep_their_centre_and_the_edge_ring_is_traced_inset_from_every_
     let points = rasterize(&corner(0.0, edge / S as f32), S);
     assert_eq!(points.len(), (S * (S + 1) / 2) as usize, "x + y < S");
     for p in &points {
-        let (x, y) = ((p.index % S as usize) as f32, (p.index / S as usize) as f32);
+        let (x, y) = ((p.index % S) as f32, (p.index / S) as f32);
         let (u, v) = (p.position.x, p.position.z);
         let ok = match x + y + 1.0 < S as f32 {
             true => Vec2::new(u - x - 0.5, v - y - 0.5).length() < 1e-4,

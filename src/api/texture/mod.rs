@@ -14,6 +14,9 @@
 //! - `Texture.BakeSet(recipe, prefix)` — bake every entry of the recipe's
 //!   `outputs` (slot → node id) from one evaluation to `<prefix>_<slot>.png`
 //!   (#403). Returns a table canonical slot → path.
+//! - `Texture.BakeMeshMaps(model, maps, prefix, [resolution])` — bake a model's
+//!   mesh maps (curvature, AO, world normal, position, thickness, ID) in its UV0 to
+//!   `<prefix><map>.png` (`mesh_maps`, #1849). Returns a table map → path.
 //! - `Texture.ToJson(recipe)` — serialize a recipe to its canonical JSON for
 //!   saving / diffing.
 //! - `Texture.Stats(recipe, [resolution])` — every node's min / max / mean / std /
@@ -28,6 +31,9 @@
 //! evaluates it (`scene::authoring::material::load_sources`, #1491): procgen itself
 //! reads no files.
 //!
+//! `Bake` and `BakeSet` make the missing folders above their target inside the
+//! project (`folder`, #1850), and a failed write names the verb and the path.
+//!
 //! A `recipe` is a Lua table **or** its JSON string (the on-disk form, #410), so a
 //! saved recipe re-bakes through the same verb without a round-trip through Lua.
 //!
@@ -38,9 +44,14 @@
 //! `Texture` borrows no engine state — it reads a recipe and writes a file — so it
 //! registers as a plain static namespace, like `Assets`.
 
+mod folder;
 mod from_lua;
 mod inspect;
+mod mesh_maps;
 mod ops;
+
+use std::collections::BTreeMap;
+use std::path::Path;
 
 use mlua::{Lua, Value};
 
@@ -58,7 +69,7 @@ pub fn register(lua: &Lua) -> Reg {
         "Bake",
         lua.create_function(|_, (recipe, path, slot): (Value, String, String)| {
             let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            bake(&recipe, &path, &slot)
+            bake(&recipe, &path, &slot, &crate::core::project::root())
         }),
     )?;
 
@@ -67,10 +78,12 @@ pub fn register(lua: &Lua) -> Reg {
         "BakeSet",
         lua.create_function(|lua, (recipe, prefix): (Value, String)| {
             let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            let paths = bake_set(&recipe, &set_sources(&recipe)?, &prefix);
-            lua.create_table_from(paths.map_err(mlua::Error::RuntimeError)?)
+            let root = crate::core::project::root();
+            lua.create_table_from(bake_whole_set(&recipe, &prefix, &root)?)
         }),
     )?;
+
+    mesh_maps::register(lua, &table)?;
 
     put(
         &table,
@@ -81,23 +94,7 @@ pub fn register(lua: &Lua) -> Reg {
         }),
     )?;
 
-    put(
-        &table,
-        "Stats",
-        lua.create_function(|lua, (recipe, resolution): (Value, Option<u32>)| {
-            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            inspect::stats_table(lua, recipe, resolution)
-        }),
-    )?;
-
-    put(
-        &table,
-        "Preview",
-        lua.create_function(|lua, (recipe, path, size): (Value, String, Option<u32>)| {
-            let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            inspect::preview_table(lua, &recipe, &path, size)
-        }),
-    )?;
+    inspect::register(lua, &table)?;
 
     put(
         &table,
@@ -111,9 +108,26 @@ pub fn register(lua: &Lua) -> Reg {
 }
 
 /// Evaluate + bake a parsed recipe for the named slot, surfacing any error to Lua.
-fn bake(recipe: &TextureRecipe, path: &str, slot: &str) -> mlua::Result<String> {
+/// The missing folders above `path` are made first when they lie inside `root`.
+fn bake(recipe: &TextureRecipe, path: &str, slot: &str, root: &Path) -> mlua::Result<String> {
     let slot = Slot::parse(slot).map_err(mlua::Error::RuntimeError)?;
-    bake_recipe(recipe, &sources(recipe)?, slot, path).map_err(mlua::Error::RuntimeError)
+    let sources = sources(recipe)?;
+    folder::make_parents(path, root)
+        .and_then(|()| bake_recipe(recipe, &sources, slot, path))
+        .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Bake: {e}")))
+}
+
+/// `Texture.BakeSet`'s body: every output of `recipe` to `<prefix>_<slot>.png`,
+/// the folder above `prefix` made first when it lies inside `root`.
+fn bake_whole_set(
+    recipe: &TextureRecipe,
+    prefix: &str,
+    root: &Path,
+) -> mlua::Result<BTreeMap<String, String>> {
+    let sources = set_sources(recipe)?;
+    folder::make_parents(prefix, root)
+        .and_then(|()| bake_set(recipe, &sources, prefix))
+        .map_err(|e| mlua::Error::RuntimeError(format!("Texture.BakeSet: {e}")))
 }
 
 /// [`sources`] for a set bake: its `outputs` are checked first, so a recipe with

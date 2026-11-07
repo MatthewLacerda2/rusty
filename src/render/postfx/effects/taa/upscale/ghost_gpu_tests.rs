@@ -9,7 +9,7 @@ use glam::Vec3;
 use super::gpu_tests::{fresh_at, scaled, upscales};
 use crate::core::settings::render_scale::RenderScale;
 use crate::render::motion::gpu_fixture::{H, W};
-use crate::render::postfx::effects::taa::gpu_fixture::{
+use crate::render::postfx::effects::taa::gpu::fixture::{
     cube, diff, eye, frame, pixel, project, renderer, settle, taa_scene,
 };
 

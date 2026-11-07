@@ -5,7 +5,7 @@
 
 use glam::{Quat, Vec3};
 
-use super::gpu_fixture::{eye, frame, renderer, taa_scene, view};
+use super::fixture::{eye, frame, renderer, taa_scene, view};
 use crate::components::{LightComponent, MaterialAsset, MaterialComponent};
 use crate::scene::authoring::{create_entity, default_light, Primitive};
 use crate::scene::Scene;

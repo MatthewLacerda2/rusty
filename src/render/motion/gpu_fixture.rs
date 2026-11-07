@@ -16,6 +16,12 @@ pub(crate) fn renderer() -> Option<Renderer> {
     crate::render::test_gpu::headless_or_skip(W, H)
 }
 
+/// A headless renderer and the slot for a second, taken together (#1844), or
+/// `None` without an adapter.
+pub(crate) fn renderer_pair() -> Option<(Renderer, crate::render::test_gpu::HeadlessPair)> {
+    crate::render::test_gpu::headless_pair_or_skip(W, H)
+}
+
 /// A view kept across frames: its history is what the tests exercise.
 pub(crate) fn view(r: &Renderer) -> RenderView {
     RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H)

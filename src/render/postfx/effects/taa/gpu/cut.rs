@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use super::gpu_fixture::{cube, eye, frame, fresh_frame, renderer, settle, taa_scene, view};
+use super::fixture::{cube, eye, frame, fresh_frame, renderer, settle, taa_scene, view};
 use crate::render::motion::gpu_fixture::{H, W};
 
 #[test]

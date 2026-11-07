@@ -38,6 +38,9 @@ pub(crate) fn headless_or_skip(width: u32, height: u32) -> Option<Renderer> {
     pollster::block_on(Renderer::new_headless(width, height))
 }
 
+pub(crate) mod pair;
+pub(crate) use pair::{headless_pair_or_skip, HeadlessPair};
+
 /// Give `scene` a black skybox panorama, so nothing but its own lights and emissives
 /// lights it. `ambient_intensity = 0` removes the ambient term only: the procedural
 /// sky still lights every surface through its environment reflection (#1543), as

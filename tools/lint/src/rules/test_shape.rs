@@ -8,8 +8,9 @@
 //!   (#782): `Harness::in_user_workspace` and `scenario::run(` are the CLI's; a test
 //!   runs a scenario with `scenario::run_isolated`.
 //! - **`test-gpu-entry`** — test code asks for a GPU only through
-//!   `crate::render::test_gpu::headless_or_skip`, the one place that decides what
-//!   "no GPU here" means; a direct `Renderer::new_headless` drifts from it.
+//!   `crate::render::test_gpu` (`headless_or_skip`, or `headless_pair_or_skip` for
+//!   two renderers at once), the one place that decides what "no GPU here" means; a
+//!   direct `Renderer::new_headless` / `new_headless_with` drifts from it.
 //!
 //! Test code is what `test_code.rs` says it is. Comment lines never count, so a doc
 //! may name the calls.
@@ -22,8 +23,9 @@ pub const INNER_CFG: &str = "test-inner-cfg";
 pub const USER_WORKSPACE: &str = "test-user-workspace";
 pub const GPU_ENTRY: &str = "test-gpu-entry";
 
-/// The one file that may call `new_headless` from test code.
-const GPU_HELPER: &str = "src/render/test_gpu.rs";
+/// The one module that may call `new_headless` from test code: `test_gpu.rs` and
+/// the files under `test_gpu/` (its pair helper, #1844).
+const GPU_HELPER: &str = "src/render/test_gpu";
 
 /// Every break of the three locks in the test code of `path` (`test`, per line).
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
@@ -57,15 +59,23 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
                 "a test never reads the developer's project; use `scenario::run_isolated`",
             );
         }
-        if path != GPU_HELPER && code.contains("new_headless(") {
+        let builds = code.contains("new_headless(") || code.contains("new_headless_with(");
+        if !is_helper(path) && builds {
             flag(
                 i + 1,
                 GPU_ENTRY,
-                "ask for a GPU through `crate::render::test_gpu::headless_or_skip`",
+                "ask for a GPU through `crate::render::test_gpu::headless_or_skip` \
+                 (or `headless_pair_or_skip`, for two renderers alive at once)",
             );
         }
     }
     found
+}
+
+/// Whether `path` is the GPU helper module: `test_gpu.rs` or a file under `test_gpu/`.
+fn is_helper(path: &str) -> bool {
+    path.strip_prefix(GPU_HELPER)
+        .is_some_and(|rest| rest == ".rs" || rest.starts_with('/'))
 }
 
 /// The rule over every scanned file.

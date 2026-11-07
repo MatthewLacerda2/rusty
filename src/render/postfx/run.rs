@@ -225,22 +225,36 @@ impl PostFx {
     /// the pass's timestamp writes (#835).
     pub(crate) fn fullscreen(
         encoder: &mut wgpu::CommandEncoder,
-        (pipeline, timestamp_writes): Timed<'_>,
+        timed: Timed<'_>,
         groups: &[&wgpu::BindGroup],
         target: &wgpu::TextureView,
     ) {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            multiview_mask: None,
-            label: Some("PostFX Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+        Self::fullscreen_into(encoder, timed, groups, [target]);
+    }
+
+    /// [`Self::fullscreen`] into several colour `targets` at once, in their
+    /// locations' order (TAA's colour and surface, #1846).
+    pub(crate) fn fullscreen_into<const N: usize>(
+        encoder: &mut wgpu::CommandEncoder,
+        (pipeline, timestamp_writes): Timed<'_>,
+        groups: &[&wgpu::BindGroup],
+        targets: [&wgpu::TextureView; N],
+    ) {
+        let attachments = targets.map(|view| {
+            Some(wgpu::RenderPassColorAttachment {
                 depth_slice: None,
-                view: target,
+                view,
                 resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                     store: wgpu::StoreOp::Store,
                 },
-            })],
+            })
+        });
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            multiview_mask: None,
+            label: Some("PostFX Pass"),
+            color_attachments: &attachments,
             depth_stencil_attachment: None,
             timestamp_writes,
             occlusion_query_set: None,

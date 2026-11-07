@@ -125,10 +125,11 @@ fn the_filter_smooths_grain_but_not_across_a_crease() {
     use super::filter::smooth;
     use super::raster::TexelPoint;
     // A 4×1 strip: three texels facing up, the last facing sideways (a crease).
-    let point = |i: usize, normal| TexelPoint {
+    let point = |i: u32, normal| TexelPoint {
         index: i,
         position: Vec3::new(i as f32, 0.0, 0.0),
         normal,
+        first: 0,
     };
     let points = [
         point(0, Vec3::Y),

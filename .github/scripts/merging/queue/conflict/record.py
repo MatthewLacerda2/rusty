@@ -14,6 +14,22 @@ The file is JSON lines, under the checkout's common git directory beside the
 hand-back memory, so every worktree and every watch shares it. The watch prints
 the totals for its own life in its closing summary; `make conflicts SINCE=12h`
 prints them on demand.
+
+## What the record answered (#1727)
+
+The first batch it covered (2026-11-04 to 05) held 14 hand-backs, and the
+sorted-list rule resolved none. Each was reproduced from its pull request's
+merge commits and classed against #1727's rule (a check proves the result:
+every line each side changed survives, nothing else moves). Three qualified,
+all of them two sides editing adjacent but different lines (a doc line on one
+side, a signature on the other), and a plain line-level merge reproduced the
+coder's resolution exactly, so a model added nothing there. The other eleven
+needed a choice or new prose: both sides rewording one doc sentence, a `mod`
+line's visibility changed both ways, a refactor on one side meeting an edit on
+the other. One "keep both" merge the check would have accepted (#1829's
+`shader.wgsl`, where the coder moved `lighting_color += lightmap_specular`
+elsewhere) was not what the code needed. So no model is called on a conflict;
+read this record again before reopening the question.
 """
 
 from __future__ import annotations
