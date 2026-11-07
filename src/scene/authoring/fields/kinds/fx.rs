@@ -126,6 +126,7 @@ fn set_render(p: &mut ParticleEmitterComponent, r: ParticleRender) {
     fx::set_flipbook(p, r.flipbook);
     fx::set_soft_distance(p, r.soft_distance);
     fx::set_lit(p, r.lit);
+    fx::set_reactive(p, r.reactive);
 }
 
 /// A trail's or line's ribbon look, whole.

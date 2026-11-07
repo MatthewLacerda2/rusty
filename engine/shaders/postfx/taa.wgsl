@@ -12,7 +12,10 @@
 // Beyond URP (#1846, `taa/params.rs`): the frame weighs more as the pixel moves, and
 // the history fades where this pixel's surface lies farther from its camera than
 // last frame's there, or a camera higher in the stack drew there and no longer does
-// (a reveal). Its output is what the rest of the chain reads and next frame's history
+// (a reveal). Where a translucent drew this frame (#1845, its reactive mask, FSR2's)
+// the frame weighs more again, so a moving translucent, which writes no motion and
+// is reprojected with what is behind it, keeps its detail.
+// Its output is what the rest of the chain reads and next frame's history
 // (colour, and its own surface: distance and camera, `ResolveOut`).
 // `fs_upscale` is the same resolve upscaling (TAAU, #1702 part 3,
 // `render/postfx/effects/taa/upscale/`): a scaled view's scene-size frame into an
@@ -39,7 +42,8 @@ struct TaaParams {
     knobs: vec4<f32>,
     // xy: the scene's size in pixels (the current frame's); zw: one over it
     scene: vec4<f32>,
-    // xy: this frame's jitter in scene pixels (`jitter::pixels`, NDC's y up); zw: unused
+    // xy: this frame's jitter in scene pixels (`jitter::pixels`, NDC's y up); z: 1
+    // when a translucent wrote the reactive mask this frame (#1845); w: unused
     jitter: vec4<f32>,
     // x: a moving pixel's frame influence, y: the history pixels a frame it applies
     // at; z, w: the relative depth gap the history starts to fade at, and is gone
@@ -61,6 +65,10 @@ const MAX_CAMERAS: u32 = 8u;
 // Last resolve's surface per history pixel, each pixel's own (`ResolveOut::surface`):
 // its distance from its camera in `.x`, that camera's index in `.y`.
 @group(0) @binding(5) var t_surface_history: texture_2d<f32>;
+// This frame's reactive mask at the scene's size (#1845, `reactive.wgsl`): the
+// topmost camera that drew a translucent there, plus how much of the pixel that
+// camera's translucents laid down (below 1); 0 where none drew.
+@group(0) @binding(6) var t_reactive: texture_2d<f32>;
 
 struct ResolveOut { // what the resolve writes: next frame's history, colour and surface
     @location(0) color: vec4<f32>,
@@ -239,24 +247,51 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> ResolveOut {
     hi = min(hi, mean + spread);
 
     let uv = pos.xy * taa.size.zw;
-    let frame = Frame(here, lo, hi, 1.0);
-    return blend(frame, uv, frontmost(p));
+    let front = frontmost(p);
+    let frame = Frame(here, lo, hi, 1.0, reactivity(p, front.own.y));
+    return blend(frame, uv, front);
+}
+
+// The reactivity around scene pixel `p` (#1845): the most reactive texel of its
+// 3×3, as the motion is its 3×3's frontmost (ours: a translucent's edge the jitter
+// moves by a pixel stays reactive), counting only translucents drawn by `camera`
+// (the pixel's own surface's) or a camera above it, so a world window behind a
+// viewmodel's gun leaves the gun alone. Zero where no translucent drew.
+fn reactivity(p: vec2<i32>, camera: f32) -> f32 {
+    // An opaque-only frame: the mask is all zero, nothing to read.
+    if (taa.jitter.z < 0.5) {
+        return 0.0;
+    }
+    let last = vec2<i32>(textureDimensions(t_reactive)) - 1;
+    var r = 0.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let v = textureLoad(t_reactive, clamp(p + vec2<i32>(x, y), vec2<i32>(0), last), 0).r;
+            let drawn_by = floor(v);
+            if (v > 0.0 && drawn_by >= camera) {
+                r = max(r, v - drawn_by);
+            }
+        }
+    }
+    return r;
 }
 
 // One pixel's current frame for [`blend`]: its colour, the box its history is
-// clamped into (YCoCg) and how much its weight is trusted (1, or TAAU's nearest
-// sample's weight).
+// clamped into (YCoCg), how much its weight is trusted (1, or TAAU's nearest
+// sample's weight) and its reactivity ([`reactivity`], #1845).
 struct Frame {
     here: vec4<f32>,
     lo: vec3<f32>,
     hi: vec3<f32>,
     trust: f32,
+    reactive: f32,
 };
 
 // The frame's weight: the frame influence, raised toward a moving pixel's as its
 // motion goes from `knobs.w` to `rejection.y` history pixels, times the frame's trust,
-// then toward 1 as surface `now` is a reveal ([`depth_mismatch`]). A still,
-// unrevealed pixel weighs exactly `knobs.x` × trust.
+// then toward 1 as surface `now` is a reveal ([`depth_mismatch`]), then toward 1
+// by the frame's reactivity (FSR2 scales the history's share by `1 - reactive`). A
+// still, unrevealed pixel no translucent drew weighs exactly `knobs.x` × trust.
 fn frame_weight(frame: Frame, motion: vec2<f32>, prev_uv: vec2<f32>, now: vec2<f32>) -> f32 {
     let pixels = length(motion * 0.5 * taa.size.xy);
     let moving = clamp((pixels - taa.knobs.w) / (taa.rejection.y - taa.knobs.w), 0.0, 1.0);
@@ -264,7 +299,9 @@ fn frame_weight(frame: Frame, motion: vec2<f32>, prev_uv: vec2<f32>, now: vec2<f
     let mismatch = depth_mismatch(prev_uv * taa.size.xy, now);
     let span = taa.rejection.w - taa.rejection.z;
     let revealed = clamp((mismatch - taa.rejection.z) / span, 0.0, 1.0);
-    return mix(influence, 1.0, revealed);
+    let weight = mix(influence, 1.0, revealed);
+    // Exactly the weight where no translucent drew.
+    return select(weight, mix(weight, 1.0, frame.reactive), frame.reactive > 0.0);
 }
 
 // The pixel at history `uv` (`front`: its frontmost surface's NDC motion and that
@@ -342,6 +379,7 @@ fn fs_upscale(@builtin(position) pos: vec4<f32>) -> ResolveOut {
     let spread = taa.knobs.y * sqrt(abs(m2 / 9.0 - mean * mean));
     lo = max(lo, mean - spread);
     hi = min(hi, mean + spread);
-    let frame = Frame(here, lo, hi, nearest);
-    return blend(frame, uv, frontmost(base));
+    let front = frontmost(base);
+    let frame = Frame(here, lo, hi, nearest, reactivity(base, front.own.y));
+    return blend(frame, uv, front);
 }

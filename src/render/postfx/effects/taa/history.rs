@@ -39,7 +39,8 @@ pub(crate) const SURFACE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16
 /// **Memory, per TAA camera** at the history's size (the output's when
 /// upscaling): two HDR colour frames (8 bytes a pixel each) and two surface
 /// frames (4 bytes each, #1846), 24 bytes a pixel: 50 MB at 1920×1080, 199 MB at
-/// 3840×2160. The level's size (a Dust2-sized map or a room) changes none of it.
+/// 3840×2160; and at the scene's size the reactive mask (2 bytes a pixel, #1845):
+/// 4 MB at 1920×1080. The level's size (a Dust2-sized map or a room) changes none of it.
 pub(crate) struct TaaHistory {
     /// The history's size: the scene's when resolving, the output's when upscaling.
     pub(super) size: (u32, u32),
@@ -56,6 +57,15 @@ pub(crate) struct TaaHistory {
     /// of last frame's around the reprojected place, a reveal (#1846). Made, dropped and reset with `frames`, so
     /// it follows every cut, resize and render-scale change they do.
     pub(super) surfaces: [PfxTarget; 2],
+    /// The reactive mask the translucents write this frame, at the scene's size
+    /// ([`super::reactive`], #1845); cleared after each resolve.
+    pub(super) reactive: PfxTarget,
+    /// The scene's size, which [`Self::reactive`] has.
+    pub(super) scene: (u32, u32),
+    /// Whether a translucent pass bound [`Self::reactive`] since the last resolve
+    /// (`reactive::hdr_attachments` sets it): when not, the mask is all zero, and
+    /// the resolve skips reading it and clearing it.
+    pub(super) reactive_drawn: std::sync::atomic::AtomicBool,
     pub(super) params: wgpu::Buffer,
     /// Which of `frames` holds the latest resolve.
     pub(super) latest: usize,
@@ -72,7 +82,12 @@ pub(crate) struct TaaHistory {
 }
 
 impl TaaHistory {
-    fn new(device: &wgpu::Device, (w, h): (u32, u32), upscale: bool, phases: u32) -> Self {
+    fn new(
+        device: &wgpu::Device,
+        [(w, h), scene]: [(u32, u32); 2],
+        upscale: bool,
+        phases: u32,
+    ) -> Self {
         let frame = |label| PostFx::target(device, w, h, label, HDR_FORMAT);
         let surface = |label| PostFx::target(device, w, h, label, SURFACE_FORMAT);
         Self {
@@ -82,6 +97,9 @@ impl TaaHistory {
             pixels: Vec2::ZERO,
             frames: [frame("TAA History A"), frame("TAA History B")],
             surfaces: [surface("TAA Surfaces A"), surface("TAA Surfaces B")],
+            reactive: super::reactive::create(device, scene),
+            scene,
+            reactive_drawn: Default::default(),
             params: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("TAA Params"),
                 size: std::mem::size_of::<super::TaaParams>() as u64,
@@ -138,9 +156,11 @@ pub(crate) fn begin(view: &mut RenderView, device: &wgpu::Device, on: bool) -> T
     let fit = if upscale { output } else { scene };
     let size_px = (fit.width.max(1), fit.height.max(1));
     let phases = jitter::phases(scene, output);
-    let h = targets.get_or(|| TaaHistory::new(device, size_px, upscale, phases));
-    if (h.size, h.upscale, h.phases) != (size_px, upscale, phases) {
-        *h = TaaHistory::new(device, size_px, upscale, phases);
+    let scene_px = (scene.width.max(1), scene.height.max(1));
+    let sizes = [size_px, scene_px];
+    let h = targets.get_or(|| TaaHistory::new(device, sizes, upscale, phases));
+    if (h.size, h.scene, h.upscale, h.phases) != (size_px, scene_px, upscale, phases) {
+        *h = TaaHistory::new(device, sizes, upscale, phases);
     }
     if cut {
         (h.frame, h.valid) = (0, false);

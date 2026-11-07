@@ -21,7 +21,11 @@ fn camera() -> Camera {
 
 fn params() -> TaaParams {
     let lenses = lenses(&[camera()], 1.0);
-    TaaParams::new(((64, 48), (32, 24)), true, Vec2::new(0.25, -0.5), lenses)
+    TaaParams::new(
+        ((64, 48), (32, 24)),
+        (true, Vec2::new(0.25, -0.5), false),
+        lenses,
+    )
 }
 
 #[test]

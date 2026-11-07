@@ -24,6 +24,7 @@ pub const MODULES: &[&str] = &[
     "fullscreen.wgsl",
     "lighting/screen_space.wgsl",
     "numeric.wgsl",
+    "reactive.wgsl",
     "lighting/sh.wgsl",
     "color/srgb.wgsl",
     "sky/noise.wgsl",

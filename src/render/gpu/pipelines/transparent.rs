@@ -84,31 +84,53 @@ impl TransparentBlend {
 }
 
 /// One shader's translucent pipelines, one per [`TransparentBlend`] and [`Facing`]
-/// (#1615), each built on its first draw.
-pub(crate) struct TransparentPipelines([FacedPipeline; 5]);
+/// (#1615), and again writing TAA's reactive mask for a view running TAA (#1845),
+/// each built on its first draw.
+pub(crate) struct TransparentPipelines {
+    plain: [FacedPipeline; 5],
+    reactive: [FacedPipeline; 5],
+}
 
 impl TransparentPipelines {
-    /// The set `make(blend)` builds.
-    pub(super) fn new(make: impl Fn(TransparentBlend) -> FacedPipeline) -> Self {
-        Self(TransparentBlend::ALL.map(make))
+    /// The set `make(blend, reactive)` builds.
+    pub(super) fn new(make: impl Fn(TransparentBlend, bool) -> FacedPipeline) -> Self {
+        Self {
+            plain: TransparentBlend::ALL.map(|b| make(b, false)),
+            reactive: TransparentBlend::ALL.map(|b| make(b, true)),
+        }
     }
 
-    /// The pipeline for `blend`, keeping `facing`'s triangles.
-    pub(crate) fn get(&self, blend: TransparentBlend, facing: Facing) -> &wgpu::RenderPipeline {
-        self.0[blend as usize].get(facing)
+    /// The pipeline for `blend`, keeping `facing`'s triangles, writing the reactive
+    /// mask too when `reactive`.
+    pub(crate) fn get(
+        &self,
+        blend: TransparentBlend,
+        facing: Facing,
+        reactive: bool,
+    ) -> &wgpu::RenderPipeline {
+        let set = if reactive {
+            &self.reactive
+        } else {
+            &self.plain
+        };
+        set[blend as usize].get(facing)
     }
 
     /// Whether any of `blend`'s pipelines has been built.
     #[cfg(test)]
     pub(crate) fn is_built(&self, blend: TransparentBlend) -> bool {
-        Facing::ALL
-            .into_iter()
-            .any(|f| self.0[blend as usize].is_built(f))
+        let built = |set: &[FacedPipeline; 5]| {
+            Facing::ALL
+                .into_iter()
+                .any(|f| set[blend as usize].is_built(f))
+        };
+        built(&self.plain) || built(&self.reactive)
     }
 
     /// Every one, for warming.
     pub(crate) fn lazies(&self) -> impl Iterator<Item = &LazyPipeline> {
-        self.0.iter().flat_map(FacedPipeline::lazies)
+        let all = self.plain.iter().chain(&self.reactive);
+        all.flat_map(FacedPipeline::lazies)
     }
 }
 

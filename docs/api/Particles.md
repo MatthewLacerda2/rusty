@@ -29,6 +29,8 @@ actually spawned (the `max_particles` cap may swallow some).
 | `Particles.SetFlipbook` | `(id, columns, rows, opts?)` | — |
 | `Particles.SetSoft` | `(id, distance)` | — (world units, clamped ≥ 0; 0 = off) |
 | `Particles.SetLit` | `(id, lit)` | — |
+| `Particles.SetReactive` | `(id, name)` | — (`"Auto"`, `"Off"` or `"Full"`, any case; an unknown name is an error): the sprites' reactivity under TAA (`Graphics.md` → *TAA*, #1845); `Auto`, the default, from their alpha (Alpha) or what they add (Additive). Mesh particles take their material's |
+| `Particles.GetReactive` | `(id)` | reactivity name, or `nil` without an emitter |
 | `Particles.SetSimulationSpace` | `(id, space)` | — (`"World"` or `"Local"`, any case; an unknown name is an error) |
 | `Particles.GetSimulationSpace` | `(id)` | space name, or `nil` without an emitter |
 

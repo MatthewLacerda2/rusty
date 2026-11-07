@@ -26,10 +26,14 @@ pub(crate) enum SolidPass<'a> {
     /// when the last field holds (#1526).
     Velocity(&'a VelocityPipelines, Option<&'a PrimedPipelines>, bool),
     /// Blended solids; each standard pipeline is built only if a batch uses it.
-    Transparent(&'a TransparentPipelines),
+    /// Into TAA's reactive mask too when the last field holds (#1845).
+    Transparent(&'a TransparentPipelines, bool),
     /// The translucents' depth postpass (#1523), into the view's velocity target
     /// too when the last field holds.
     DepthPostpass(&'a DepthPostpassPipelines, bool),
+    /// The translucents that write their motion alone (#1845), into the velocity
+    /// target, depth tested but not written.
+    MotionPostpass(&'a DepthPostpassPipelines),
 }
 
 impl SolidPass<'_> {
@@ -78,12 +82,15 @@ impl SurfaceShaders {
             SolidPass::Velocity(standard, _, ssr) => {
                 variant.map_or(standard, |v| &v.velocity).get(ssr, facing)
             }
-            SolidPass::Transparent(standard) => variant
+            SolidPass::Transparent(standard, reactive) => variant
                 .map_or(standard, |v| &v.transparent)
-                .get(blend, facing),
+                .get(blend, facing, reactive),
             SolidPass::DepthPostpass(standard, velocity) => variant
                 .map_or(standard, |v| &v.depth_postpass)
                 .get(velocity, facing),
+            SolidPass::MotionPostpass(standard) => variant
+                .map_or(standard, |v| &v.depth_postpass)
+                .motion(facing),
         }
     }
 }

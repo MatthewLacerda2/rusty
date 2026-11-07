@@ -91,6 +91,9 @@ pub struct ParticleRender {
     /// Lit particles: shaded by the ambient / light probes and the scene lights
     /// (dark in a dark room, lit by a muzzle flash). Off = the sprite's own colour.
     pub lit: bool,
+    /// How reactive the sprites are under TAA (#1845): `Auto` by default, from
+    /// their alpha (`Alpha`) or brightness (`Additive`).
+    pub reactive: crate::components::TaaReactive,
 }
 
 impl Default for ParticleRender {
@@ -104,6 +107,7 @@ impl Default for ParticleRender {
             flipbook: Flipbook::default(),
             soft_distance: 0.0,
             lit: false,
+            reactive: crate::components::TaaReactive::Auto,
         }
     }
 }

@@ -30,6 +30,7 @@ use strip::RibbonVertex;
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct RibbonGlobals {
     pub(crate) view_proj: [f32; 16],
+    /// xyz the camera's position, w its index in its stack (#1845).
     pub(crate) cam_pos: [f32; 4],
     pub(crate) fog: FogUniform,
 }
@@ -76,12 +77,17 @@ impl RibbonRenderer {
         }
     }
 
-    pub(crate) fn pipeline_for(&self, blend: ParticleBlend) -> &wgpu::RenderPipeline {
-        self.pipelines.pipeline_for(blend)
+    /// The pipeline for `blend`, into TAA's reactive mask too when `reactive` (#1845).
+    pub(crate) fn pipeline_for(
+        &self,
+        blend: ParticleBlend,
+        reactive: bool,
+    ) -> &wgpu::RenderPipeline {
+        self.pipelines.pipeline_for(blend, reactive)
     }
 
-    /// Both blend pipelines, built or not (#985).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+    /// Every blend pipeline, built or not (#985).
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
         self.pipelines.lazy()
     }
 }

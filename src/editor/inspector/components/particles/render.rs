@@ -1,11 +1,11 @@
 //! src/editor/inspector/components/particles/render.rs — the card's Rendering
 //! section: blend, texture, and the #440 render settings (mode, stretch, mesh,
-//! flipbook, soft, lit). Every write goes through a shared particle op.
+//! flipbook, soft, lit, TAA reactive). Every write goes through a shared particle op.
 
 use super::widgets::{clamped, combo, drag_u32};
 use super::{apply, Cx};
 use crate::asset::MapRef;
-use crate::components::{Flipbook, ParticleRenderMode};
+use crate::components::{Flipbook, ParticleRenderMode, TaaReactive};
 use crate::scene::authoring::particles as particle_ops;
 use crate::scene::{ParticleBlend, ParticleEmitterComponent};
 
@@ -67,7 +67,7 @@ fn draw_mesh(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -
     changed
 }
 
-/// Flipbook grid, soft-fade distance and the lit toggle.
+/// Flipbook grid, soft-fade distance, the lit toggle and TAA's reactivity.
 fn draw_look(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut book: Flipbook = p.render.flipbook;
     let mut changed = drag_u32(ui, "Flipbook Columns:", &mut book.columns, 1..=64)
@@ -89,6 +89,12 @@ fn draw_look(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -
     let mut lit = p.render.lit;
     if ui.checkbox(&mut lit, "Lit").changed() {
         apply(cx, |c| particle_ops::set_lit(c, lit));
+        changed = true;
+    }
+    let mut reactive = p.render.reactive;
+    let choices = TaaReactive::ALL.map(|r| (r, r.name()));
+    if combo(ui, "TAA Reactive", &mut reactive, &choices) {
+        apply(cx, |c| particle_ops::set_reactive(c, reactive));
         changed = true;
     }
     changed

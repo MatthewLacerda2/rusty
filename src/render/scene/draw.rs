@@ -142,7 +142,7 @@ impl Renderer {
             instance.proxy_volume = self.proxy_volumes.push(scene, id, at, out.proxies);
         }
         let bone_base = push_palette(out.joints, palette);
-        if let Some(history) = history.as_deref_mut().filter(|_| object.has_opaque_run()) {
+        if let Some(history) = history.as_deref_mut().filter(|_| object.writes_velocity()) {
             let pose = (object.world, palette);
             track(history, id, pose, out.joints, &mut instance);
         }

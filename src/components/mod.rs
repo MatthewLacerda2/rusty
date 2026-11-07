@@ -39,7 +39,7 @@ pub use entity::{
 };
 pub use material::{
     BlendMode, DecalBlend, MaterialAsset, MaterialComponent, RefractionModel, RenderFace,
-    RenderMode, UvMapping,
+    RenderMode, TaaReactive, UvMapping, MAX_REACTIVE,
 };
 pub use mesh::{MeshComponent, MeshRevision, ShadowCasting};
 pub use nav::agent::{NavMeshAgentComponent, NavPathStatus, MAX_AVOIDANCE_PRIORITY};

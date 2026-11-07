@@ -19,6 +19,7 @@
 #import lighting::ambient::ambient_average
 #import common::{CameraUniforms, Fog, LightingUniforms, LocalLight, cluster_index, fog_factor, local_light_radiance}
 #import fog::volumetric::{through_volume, volumetric_fog}
+#import reactive
 
 struct ParticleGlobals {
     view_proj: mat4x4<f32>,
@@ -58,6 +59,8 @@ struct InstanceInput {
     // Flipbook columns, rows and frame; soft-fade distance (0 = off).
     @location(6) sheet: vec4<f32>,
     @location(7) mode: u32,
+    // TAA's reactivity (#1845): below 0 automatic, else the emitter's fixed value.
+    @location(8) reactive: f32,
 };
 
 struct VsOut {
@@ -71,6 +74,7 @@ struct VsOut {
     // The volumetric fog at this corner (#1703): rgb the air's light, a what gets
     // through; (0, 0, 0, 1) where the camera reads no volume.
     @location(5) air: vec4<f32>,
+    @location(6) @interpolate(flat) reactive: f32,
 };
 
 // Corner of a unit quad (two triangles via the index buffer 0,1,2,0,2,3) derived
@@ -172,6 +176,7 @@ fn vs_main(@builtin(vertex_index) vid: u32, inst: InstanceInput) -> VsOut {
     out.fog = fog_factor(globals.fog, world, globals.cam_pos.xyz);
     out.world = world;
     out.soft = inst.sheet.w;
+    out.reactive = inst.reactive;
     out.air = volumetric_fog(t_fog_volume, s_fog_volume, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
     return out;
 }
@@ -201,6 +206,10 @@ fn soft_fade(in: VsOut) -> f32 {
 // sits behind the volumetric fog's air in front of it (#1703).
 @fragment
 fn fs_alpha(in: VsOut) -> @location(0) vec4<f32> {
+    return alpha_color(in);
+}
+
+fn alpha_color(in: VsOut) -> vec4<f32> {
     let c = textureSample(sprite_tex, sprite_sampler, in.uv) * in.color;
     return vec4<f32>(through_volume(mix(c.rgb, globals.fog.color, in.fog), in.air), c.a * soft_fade(in));
 }
@@ -209,6 +218,32 @@ fn fs_alpha(in: VsOut) -> @location(0) vec4<f32> {
 // itself, so fogged light simply contributes less.
 @fragment
 fn fs_additive(in: VsOut) -> @location(0) vec4<f32> {
+    return additive_color(in);
+}
+
+fn additive_color(in: VsOut) -> vec4<f32> {
     let c = textureSample(sprite_tex, sprite_sampler, in.uv) * in.color;
     return vec4<f32>(c.rgb * (1.0 - in.fog) * in.air.a, c.a * soft_fade(in));
+}
+
+// ---- TAA's reactive mask (#1845, `reactive.wgsl`) ----
+// A view that runs TAA draws its sprites through these twins: the same colour at
+// location 0, and at location 1 how much of the pixel the sprite laid down, its
+// alpha (alpha-blended) or what it added (additive, blended by its alpha), or the
+// emitter's fixed value.
+struct ReactiveOut {
+    @location(0) color: vec4<f32>,
+    @location(1) reactive: vec4<f32>,
+};
+
+@fragment
+fn fs_alpha_reactive(in: VsOut) -> ReactiveOut {
+    let c = alpha_color(in);
+    return ReactiveOut(c, reactive::texel(reactive::over(c.a), in.reactive, camera.stack.x));
+}
+
+@fragment
+fn fs_additive_reactive(in: VsOut) -> ReactiveOut {
+    let c = additive_color(in);
+    return ReactiveOut(c, reactive::texel(reactive::added(c.rgb * c.a), in.reactive, camera.stack.x));
 }

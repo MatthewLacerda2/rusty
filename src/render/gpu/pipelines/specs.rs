@@ -7,6 +7,7 @@ use super::winding::Facing;
 use crate::render::gpu::mesh::vertex_layout;
 use crate::render::gpu::DEPTH_FORMAT;
 use crate::render::postfx::effects::ssr::surface::target_state as surface_target_state;
+use crate::render::postfx::effects::taa::reactive;
 
 /// Fixed-function knobs that distinguish the forward-pass pipelines. The default is
 /// the opaque forward pass: counter-clockwise triangles kept (each pass builds one
@@ -33,6 +34,9 @@ pub(super) struct PipelineSpec {
     /// Whether it draws into a view's two SSR surface targets too (#1526), as its
     /// third and fourth colour targets, after the velocity one.
     pub surface: bool,
+    /// Whether it draws into TAA's reactive mask too (#1845), as its second colour
+    /// target (a translucent's `fs_transparent`; no velocity target beside it).
+    pub reactive: bool,
 }
 
 impl PipelineSpec {
@@ -50,6 +54,7 @@ impl PipelineSpec {
             fragment: "fs_main",
             velocity: None,
             surface: false,
+            reactive: false,
         }
     }
 
@@ -118,11 +123,18 @@ fn primed(spec: PipelineSpec) -> PipelineSpec {
 /// Transparent pass (#242): same shader/layout as the forward pass but blended by
 /// `blend` (#1523) and depth-WRITE-off (still depth-TESTED against opaque) so
 /// overlapping translucent surfaces all blend rather than z-cull each other. Drawn
-/// back-to-front after opaque.
-pub(super) fn transparent_spec(blend: TransparentBlend) -> PipelineSpec {
+/// back-to-front after opaque. With `reactive`, a view running TAA, it writes TAA's
+/// reactive mask too through `fs_transparent` (#1845).
+pub(super) fn transparent_spec(blend: TransparentBlend, reactive: bool) -> PipelineSpec {
     PipelineSpec {
         blend: blend.state(),
         depth_write_enabled: false,
+        fragment: if reactive {
+            "fs_transparent"
+        } else {
+            "fs_main"
+        },
+        reactive,
         ..PipelineSpec::opaque(blend.label())
     }
 }
@@ -152,6 +164,31 @@ pub(crate) fn velocity_target(write_mask: wgpu::ColorWrites) -> wgpu::ColorTarge
     }
 }
 
+/// `spec`'s colour targets: colour into `format`, then the velocity target, the
+/// two SSR surface targets or the reactive mask, as it draws into them.
+fn targets(
+    format: wgpu::TextureFormat,
+    spec: &PipelineSpec,
+) -> Vec<Option<wgpu::ColorTargetState>> {
+    let colour = wgpu::ColorTargetState {
+        format,
+        blend: Some(spec.blend),
+        write_mask: wgpu::ColorWrites::ALL,
+    };
+    let surface = Some(surface_target_state(wgpu::ColorWrites::ALL));
+    let surfaces = if spec.surface {
+        vec![surface.clone(), surface]
+    } else {
+        Vec::new()
+    };
+    let reactive = spec.reactive.then(reactive::target_state);
+    std::iter::once(Some(colour))
+        .chain(spec.velocity.map(|m| Some(velocity_target(m))))
+        .chain(surfaces)
+        .chain(reactive.map(Some))
+        .collect()
+}
+
 /// Create one forward-pass render pipeline from a [`PipelineSpec`]. The pipelines
 /// share the same vertex layout and depth format; only the spec's fixed-function
 /// knobs, entry points and velocity and surface targets differ.
@@ -175,16 +212,7 @@ pub(super) fn make_pipeline(
             module: shader,
             entry_point: Some(spec.fragment),
             compilation_options: Default::default(),
-            targets: &[
-                Some(wgpu::ColorTargetState {
-                    format,
-                    blend: Some(spec.blend),
-                    write_mask: wgpu::ColorWrites::ALL,
-                }),
-                spec.velocity.map(velocity_target),
-                Some(surface_target_state(wgpu::ColorWrites::ALL)),
-                Some(surface_target_state(wgpu::ColorWrites::ALL)),
-            ][..1 + usize::from(spec.velocity.is_some()) + 2 * usize::from(spec.surface)],
+            targets: &targets(format, spec),
         }),
         primitive: spec.facing.primitive(wgpu::PrimitiveState {
             topology: spec.topology,

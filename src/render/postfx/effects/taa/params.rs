@@ -109,12 +109,13 @@ pub(super) fn lenses(stack: &[Camera], aspect: f32) -> [[f32; 4]; MAX_CAMERAS] {
 }
 
 impl TaaParams {
-    /// The history's size `size`, the scene's `scene` (the same when not upscaling)
-    /// the frame's jitter in scene pixels and the stack's [`lenses`].
+    /// The history's size `size`, the scene's `scene` (the same when not upscaling),
+    /// whether the history holds a frame, the frame's jitter in scene pixels,
+    /// whether a translucent wrote the reactive mask (#1845) and the stack's
+    /// [`lenses`].
     pub(super) fn new(
         (size, scene): ((u32, u32), (u32, u32)),
-        history: bool,
-        jitter: Vec2,
+        (history, jitter, reactive): (bool, Vec2, bool),
         lenses: [[f32; 4]; MAX_CAMERAS],
     ) -> Self {
         let dims = |(w, h): (u32, u32)| {
@@ -130,7 +131,7 @@ impl TaaParams {
                 STILL_PIXELS,
             ],
             scene: dims(scene),
-            jitter: [jitter.x, jitter.y, 0.0, 0.0],
+            jitter: [jitter.x, jitter.y, f32::from(u8::from(reactive)), 0.0],
             rejection: [
                 MOVING_FRAME_INFLUENCE,
                 MOVING_PIXELS,

@@ -16,7 +16,7 @@
 //!
 //! **Lazy, fail-safe.** A slot is built the first frame a material names it. A module
 //! that is missing, fails to compose, lacks `vs_main`/`fs_main` (a postfx module) or
-//! the motion, SSR or depth-postpass entries (#1435, #1526, #1523), or fails
+//! the motion, SSR, depth-postpass or reactive entries (#1435, #1526, #1523, #1845), or fails
 //! validation is logged **once** and draws with the standard pipeline. A module baked
 //! from a recipe is first brought up to date when stale (`shadergen::baked`, #1638).
 //!
@@ -239,6 +239,7 @@ impl SurfaceShaders {
             ("fs_velocity", fragment),       // #1435
             ("fs_velocity_ssr", fragment),   // #1526
             ("fs_depth_postpass", fragment), // #1523
+            ("fs_transparent", fragment),    // #1845
         ];
         for (entry, stage) in colour.into_iter().chain(motion) {
             if !has(entry, stage) {

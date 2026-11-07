@@ -17,6 +17,7 @@ use crate::components::{ParticleBlend, RibbonStyle};
 use crate::render::draw::batch::sort::{back_to_front, view_depth};
 use crate::render::gpu::uniforms::FogUniform;
 use crate::render::passes::particles::ParticleDraws;
+use crate::render::postfx::effects::taa;
 use crate::render::timing::GpuPass;
 use crate::render::{GpuTexture, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -47,22 +48,23 @@ impl Renderer {
         &mut self,
         view: &mut RenderView,
         scene: &Scene,
-        camera: &Camera,
+        (camera, stack_index): (&Camera, f32),
         view_proj: Mat4,
     ) -> ParticleDraws {
-        let ribbons = self.draw_ribbons(view, scene, camera, view_proj);
+        let ribbons = self.draw_ribbons(view, scene, (camera, stack_index), view_proj);
         let mut draws = self.draw_particles(view, scene, camera, view_proj);
         draws.draw_calls += ribbons;
         draws
     }
 
-    /// Draw every visible trail and line into `view`'s HDR target for `camera`.
+    /// Draw every visible trail and line into `view`'s HDR target for `camera`,
+    /// `stack_index` in its stack (what its reactive texels name, #1845).
     /// Returns the draw calls issued (one per ribbon) for the frame counters.
     pub(crate) fn draw_ribbons(
         &mut self,
         view: &RenderView,
         scene: &Scene,
-        camera: &Camera,
+        (camera, stack_index): (&Camera, f32),
         view_proj: Mat4,
     ) -> u32 {
         // Ribbons are dynamic effects: never baked into a static probe capture.
@@ -75,7 +77,7 @@ impl Renderer {
         }
         let globals = RibbonGlobals {
             view_proj: view_proj.to_cols_array(),
-            cam_pos: camera.position.extend(0.0).to_array(),
+            cam_pos: camera.position.extend(stack_index).to_array(),
             fog: FogUniform::from_settings(&scene.fog),
         };
         let rr = &self.ribbon_renderer;
@@ -122,13 +124,14 @@ impl Renderer {
                 label: Some("Ribbon Encoder"),
             });
         {
+            let reactive = view.post_fx.taa_reactive().is_some();
             let mut pass = effect_pass(&mut encoder, view, self.gpu_timer.writes(GpuPass::Ribbons));
             pass.set_bind_group(0, &rr.globals_bind_group, &[]);
             pass.set_vertex_buffer(0, vertices.slice(..));
             pass.set_index_buffer(indices.slice(..), wgpu::IndexFormat::Uint32);
             for (draw, texture) in ribbons.draws.iter().zip(textures) {
                 let tex = texture.as_deref().unwrap_or(&rr.white);
-                pass.set_pipeline(rr.pipeline_for(draw.blend));
+                pass.set_pipeline(rr.pipeline_for(draw.blend, reactive));
                 pass.set_bind_group(1, &tex.bind_group, &[]);
                 pass.draw_indexed(draw.first..draw.first + draw.count, 0, 0..1);
             }
@@ -138,7 +141,8 @@ impl Renderer {
 }
 
 /// A pass over `view`'s HDR colour and depth that keeps both (loads, never
-/// clears), as every effect pass drawn over the lit scene does.
+/// clears), as every effect pass drawn over the lit scene does, and its reactive
+/// mask where it runs TAA (#1845).
 fn effect_pass<'e>(
     encoder: &'e mut wgpu::CommandEncoder,
     view: &'e RenderView,
@@ -147,15 +151,7 @@ fn effect_pass<'e>(
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         multiview_mask: None,
         label: Some("Ribbon Pass"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-            depth_slice: None,
-            view: &view.post_fx.scene_hdr.view,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Load,
-                store: wgpu::StoreOp::Store,
-            },
-        })],
+        color_attachments: &taa::reactive::hdr_attachments(view),
         depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
             view: &view.depth_view,
             depth_ops: Some(wgpu::Operations {

@@ -136,7 +136,9 @@ pub(crate) fn surface_uniform(lit: bool, material: Option<&MaterialAsset>) -> Su
         transmission: transmission(m.transmission_color, m.transmission),
         absorption: absorption(m.transmittance_color, m.absorption_distance, m.thickness),
         receive_ssr: u32::from(lit && glass && ssr::transparent::traces(m)),
-        _pad: [0; 3],
+        reactive: if glass { m.reactive.gpu() } else { 0.0 },
+        writes_motion: u32::from(glass && m.writes_motion),
+        _pad: 0,
     }
 }
 
@@ -277,3 +279,7 @@ mod probe_sh_tests;
 #[cfg(test)]
 #[path = "mapping_tests.rs"]
 mod mapping_tests;
+
+#[cfg(test)]
+#[path = "temporal_tests.rs"]
+mod temporal_tests;
