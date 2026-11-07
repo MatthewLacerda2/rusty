@@ -1,7 +1,7 @@
 //! The Dust2-sized level the occlusion bake is measured on (#1714, part 3):
 //! `n × n` rooms of 10 m on two storeys, a doorway in every wall between
 //! neighbours, a hole in some ceilings, and in each room two crates and a dense
-//! sphere. At `n = 20` it is 200 × 200 m and some 5600 meshes; `n = 5` is about
+//! sphere. At `n = 20` it is 200 × 200 m and 6344 meshes; `n = 5` is about
 //! Kolvik's size.
 
 use glam::Vec3;

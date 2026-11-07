@@ -97,15 +97,7 @@ impl Sheet {
         if area * 4.0 < (max - min).x * (max - min).y {
             return None;
         }
-        let mut texel = TEXEL;
-        let (origin, dims) = loop {
-            let origin = (min / texel).floor() * texel;
-            let dims = ((max - origin) / texel).ceil().max(Vec2::ONE).as_uvec2();
-            if (dims.x as usize).saturating_mul(dims.y as usize) <= MAX_TEXELS {
-                break (origin, dims);
-            }
-            texel *= 2.0;
-        };
+        let (origin, texel, dims) = grid(min, max);
         let mut set = vec![false; (dims.x * dims.y) as usize];
         for poly in &polys {
             fill(&mut set, poly, (origin, texel, dims), tol);
@@ -183,6 +175,20 @@ impl Sheet {
         let at = |p: UVec2| self.sums[p.y as usize * w + p.x as usize] as i64;
         let count = at(hi) - at(UVec2::new(lo.x, hi.y)) - at(UVec2::new(hi.x, lo.y)) + at(lo);
         count == i64::from((hi.x - lo.x) * (hi.y - lo.y))
+    }
+}
+
+/// The texel grid round the rectangle `(min, max)`: its origin, texel and size,
+/// [`TEXEL`]s unless that makes more than [`MAX_TEXELS`].
+fn grid(min: Vec2, max: Vec2) -> (Vec2, f32, UVec2) {
+    let mut texel = TEXEL;
+    loop {
+        let origin = (min / texel).floor() * texel;
+        let dims = ((max - origin) / texel).ceil().max(Vec2::ONE).as_uvec2();
+        if (dims.x as usize).saturating_mul(dims.y as usize) <= MAX_TEXELS {
+            return (origin, texel, dims);
+        }
+        texel *= 2.0;
     }
 }
 

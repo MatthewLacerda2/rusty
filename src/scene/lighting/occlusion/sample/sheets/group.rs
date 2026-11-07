@@ -9,6 +9,9 @@ use super::{Member, Sheet, CLEAR};
 /// `f32` steps there.
 const NOISE: f32 = 8.0 * f32::EPSILON;
 
+/// A face's index under its plane's key: normal, offset and side.
+type Keyed = (([i64; 3], i64, u8), u32);
+
 /// The sheets `faces` make, and per face its sheet (`u32::MAX` for a face alone
 /// on its plane, which its own polygon tests as well, on a sparse sheet, or with
 /// no plane).
@@ -55,7 +58,7 @@ pub(super) fn tolerance<'a>(points: impl Iterator<Item = &'a Vec3>) -> f32 {
 /// A run of faces that share a plane to the grouping's rounding, split into runs
 /// of two or more whose faces lie within [`tolerance`] of one depth; a face that
 /// is not itself flat to it is left out.
-fn depths(faces: &[Member], run: &[(([i64; 3], i64, u8), u32)]) -> Vec<Vec<u32>> {
+fn depths(faces: &[Member], run: &[Keyed]) -> Vec<Vec<u32>> {
     let normal = faces[run[0].1 as usize].normal;
     let all = run.iter().flat_map(|&(_, i)| faces[i as usize].corners);
     let tol = tolerance(all);

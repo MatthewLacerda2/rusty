@@ -383,7 +383,11 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   plane that draw the same side count as one (Unity's occluder fusion, for coplanar
   faces): a floor of tiles, a wall built of pieces with its doorways left open. A
   seam fuses where it falls on the quarter-metre grid of world units, as a modular
-  level's do. Each cube tries first the faces that last stopped one of its rays.
+  level's do; a slit between two faces is seen through however thin, down to float
+  noise, and faces fuse only at one depth (to float noise), never a millimetre
+  apart. Fusion takes faces merged into convex quads (a mesh's consecutive
+  triangles are paired), so a wall triangulated as a fan or an n-gon fuses little:
+  it bakes slower, never wrong, and the times below are on primitive boxes. Each cube tries first the faces that last stopped one of its rays.
   These proofs are exact, so they change how fast a cell bakes, not what it keeps.
   Every cell
   then also takes its 26 neighbours' sets, and cells that see the same set share one
@@ -399,7 +403,7 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
 - **Cost** (release build, 4 threads, primitive levels of 10 m rooms on two
   storeys, a doorway in every wall, two crates and a 1150-triangle sphere in each):
   a Kolvik-sized interior (5 × 5 rooms, 397 static meshes, 4704 cells of 2 m) bakes
-  in about 5 s into 277 KB; a Dust2-sized level (20 × 20 rooms, 6344 meshes, 14580
+  in about 4–5 s into 277 KB; a Dust2-sized level (20 × 20 rooms, 6344 meshes, 14580
   cells of 3.9 m, each sampled as eight 2 m cubes) in about 12 minutes into 11.8 MB,
   with the process peaking under 0.6 GB, about what the occluders' BVH alone takes
   (part 2 took some 8 hours on that level). Fewer cores take longer in proportion.
