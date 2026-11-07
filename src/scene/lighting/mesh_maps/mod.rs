@@ -23,6 +23,12 @@
 //! lightmap walk gives it; a triangle outside UV 0..1 bakes only its part inside.
 //! The bake is a pure function of (mesh, maps, resolution): each texel's rays draw
 //! from their own seeded stream, so threads never show in the bytes.
+//!
+//! Memory: the covered texels' points (40 bytes each) live through the whole bake,
+//! and one map at a time beside them: its `Image` (16 bytes a texel), a flag per
+//! texel, and the PNG encoder's copy. Measured with all six maps on a quad that
+//! covers every texel (the worst case) through `Texture.BakeMeshMaps`: 1.2 GiB peak
+//! at 4096², 4.6 GiB at 8192² (2026-11-07). A UV layout with gutters covers less.
 
 mod curvature;
 mod margin;

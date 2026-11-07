@@ -134,7 +134,9 @@ Texture.Bake({ resolution = 1024, nodes = {
 - `maps` lists any of the names below (case-insensitive; a map named twice bakes
   once). Each is written to `<prefix><map>.png` as soon as it is baked, the folders
   above it made first as `Bake` makes them (a `prefix` ending in `/` names a folder
-  of its own). `resolution` is the square map's edge, 1 to 8192.
+  of its own). `resolution` is the square map's edge, 1 to 8192. Memory grows with
+  its square: about 1.2 GiB at 4096 and 4.6 GiB at 8192 at worst (every texel
+  covered), whatever the number of maps, since one map is held at a time.
 - Every map but `id` is a 16-bit `data` PNG; `id` is 8-bit.
 
 | Map | What a texel holds | Off the islands |

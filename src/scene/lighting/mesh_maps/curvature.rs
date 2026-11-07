@@ -45,6 +45,9 @@ struct Crease {
     surface: u32,
 }
 
+/// One face along an edge: its normal, its corner off the edge, its surface.
+type Side = (Vec3, Vec3, u32);
+
 /// The creases of one mesh, bucketed for the per-texel read.
 pub(super) struct Curvature {
     creases: Vec<Crease>,
@@ -94,8 +97,7 @@ impl Curvature {
 /// three faces share is skipped.
 fn creases(source: &MeshSource, weld: &Weld, surfaces: &[u32]) -> Vec<Crease> {
     let (ids, welded) = (&weld.ids, &weld.corners);
-    // (welded end, welded end) → (face normal, the face's third corner, surface).
-    let mut edges: BTreeMap<(u32, u32), Vec<(Vec3, Vec3, u32)>> = BTreeMap::new();
+    let mut edges: BTreeMap<(u32, u32), Vec<Side>> = BTreeMap::new();
     for (k, t) in source.indices.chunks_exact(3).enumerate() {
         let [a, b, c] = [t[0], t[1], t[2]].map(|i| i as usize);
         let p = [a, b, c].map(|i| source.positions[i]);
