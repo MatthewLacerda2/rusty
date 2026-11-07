@@ -6,7 +6,9 @@
 use glam::Vec3;
 
 use super::fixture::{eye, renderer, settle, taa_scene, tilted_cube, view};
+use crate::core::settings::render_scale::RenderScale;
 use crate::render::motion::gpu_fixture::{H, W};
+use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::Scene;
 
 /// A scene whose camera runs TAA with contrast-adaptive sharpening at `strength`,
@@ -80,5 +82,44 @@ fn gpu_sharpen_raises_edge_contrast_without_ringing() {
             let d = off[i + c].abs_diff(on[i + c]);
             assert!(d <= 2, "flat corner ({x},{y}) channel {c} rang by {d}");
         }
+    }
+}
+
+/// A fixture-size view whose scene renders at `scale` (TAAU below 1).
+fn scaled(r: &Renderer, scale: f32) -> RenderView {
+    let mut v = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
+    v.set_render_scale(RenderScale::new(scale));
+    v.resize(&r.device, W, H);
+    v
+}
+
+#[test]
+fn gpu_sharpen_runs_at_the_output_size_under_taau() {
+    let Some(mut r) = renderer() else { return };
+    // With a render scale below 1 TAA upscales, and the sharpen must run at the
+    // output's size (PostFx::chain_size), not the scaled scene's. If it were sized
+    // by the scene it would sample a smaller image and produce a degenerate frame.
+    for scale in [0.5, 0.33] {
+        let (off_scene, _) = sharpen_scene(0.0);
+        let (on_scene, _) = sharpen_scene(0.9);
+        let (mut a, mut b) = (scaled(&r, scale), scaled(&r, scale));
+        let off = settle(&mut r, &mut a, &off_scene, &eye(0.0), 24);
+        let on = settle(&mut r, &mut b, &on_scene, &eye(0.0), 24);
+        assert!(
+            a.post_fx.taa_upscaled(),
+            "scale {scale} should upscale through TAA"
+        );
+        // The sharpen ran at the output's size: the frame changed, and stayed sane
+        // (no black holes a size mismatch would leave).
+        let changed = off.iter().zip(&on).filter(|(a, b)| a != b).count();
+        assert!(changed > 0, "sharpen did nothing at render scale {scale}");
+        let dark = on
+            .chunks(4)
+            .filter(|px| px[0] as u32 + px[1] as u32 + px[2] as u32 == 0)
+            .count();
+        assert_eq!(
+            dark, 0,
+            "a size mismatch left black pixels at render scale {scale}"
+        );
     }
 }
