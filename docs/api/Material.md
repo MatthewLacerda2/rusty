@@ -61,8 +61,8 @@ in brackets, and shown in the Inspector's Material card under the maps.
 
 | Function | Signature |
 |---|---|
-| `Material.SetTiling` / `GetTiling` | `(id, {x, y})` [`tiling`] — Unity's *Tiling*, `mainTextureScale`: how many times the maps repeat across UV0, or across `world_size` metres under a world mapping. Default `{1, 1}`; each lane clamped to `[-1000, 1000]`. Takes `{4, 2}` or `{x = 4, y = 2}`, returns `{x, y}` by position |
-| `Material.SetOffset` / `GetOffset` | `(id, {x, y})` [`offset`] — Unity's *Offset*, `mainTextureOffset`, in texture repeats, added after the tiling, with Unity's sign: under `UV0`, +y slides the texture **down** the surface (toward the image's bottom edge) and +x toward the UVs' u = 0 side (left, on an upright unwrap), so a Unity material's numbers carry over unchanged. Under `Planar` and `Triplanar` a positive lane moves the texture toward the world's -X and -Z (and down, -Y, on a wall's projection), as HDRP's does. `GetOffset` returns what was set. Default `{0, 0}` |
+| `Material.SetTiling` / `GetTiling` | `(id, {x, y})` [`tiling`] — Unity's *Tiling*, `mainTextureScale`: how many times the maps repeat across UV0, scaled from the image's bottom edge as Unity's is, or across `world_size` metres under a world mapping. Default `{1, 1}`; each lane clamped to `[-1000, 1000]`. Takes `{4, 2}` or `{x = 4, y = 2}`, returns `{x, y}` by position |
+| `Material.SetOffset` / `GetOffset` | `(id, {x, y})` [`offset`] — Unity's *Offset*, `mainTextureOffset`, in texture repeats, added after the tiling, with Unity's sign: under `UV0`, +y slides the texture **down** the surface and +x toward the UVs' u = 0 side (left, on an upright unwrap), so a Unity material's numbers carry over unchanged. Under `Planar` and `Triplanar` a positive lane moves the texture toward the world's -X and -Z (and down, -Y, on a wall's projection), as HDRP's does. `GetOffset` returns what was set. Default `{0, 0}` |
 | `Material.SetUvMapping` / `GetUvMapping` | `(id, mode)` [`uv_mapping`] — HDRP's *Base UV Mapping*: `"UV0"` (default: the mesh's UVs), `"Planar"` (projected straight down world Y: floors and terrain tile over world X and Z, walls stretch) or `"Triplanar"` (projected along each world axis and blended by the surface normal: every face of any mesh shows the texture at the same size in metres, however the entity is scaled) |
 | `Material.SetWorldSize` / `GetWorldSize` | `(id, metres)` [`world_size`] — how many metres one repeat of the texture covers under `Planar` and `Triplanar`, in `[0.01, 100]` (default 1; HDRP's *World Scale* is its inverse). Ignored under `UV0` |
 | `Material.SetBlendSharpness` / `GetBlendSharpness` | `(id, power)` [`blend_sharpness`] — how sharply `Triplanar` turns from one projection to the next across a rounded face, in `[1, 64]` (default 4): the normal's components are raised to this power before they weight the three projections, so 1 blends widely and 64 is a hard seam |
@@ -73,7 +73,9 @@ brick wall's bumps face out of every side of a box. The projections are in world
 space, so the texture stays put as an entity moves through it: use world mapping
 for static level geometry (a greybox of scaled primitives sharing one material), and
 UV0 for anything that moves. A surface shader's UV blocks (`uv_scroll`, see *Surface
-shaders* below) move UV0, so they apply under `UV0` only. A `Cutout` material's
+shaders* below) move UV0, so they apply under `UV0` only. Their speeds are in the
+mesh's own UV space, where v runs down the image as in glTF, so `uv_scroll`'s +y
+scrolls the texture **up** the surface, the opposite of Offset's +y. A `Cutout` material's
 shadow is clipped where its surface is, through the same Tiling, Offset and mapping.
 
 Tiling and Offset follow Unity's `TRANSFORM_TEX` (`uv * Tiling + Offset`, with v
@@ -85,6 +87,11 @@ of `{0, 0.25}` lowers it by a quarter of one repeat:
 -- A wall texture whose bottom row sat 0.25 repeats too high: slide it down.
 Material.SetOffset(id, {0, 0.25})
 ```
+
+The pivot shows where a texture does not repeat. With a texture whose `wrapMode`
+is `"Clamp"` (`Assets.md`), Tiling `{1, 2}` fills the bottom half of the surface and
+stretches the image's top row over the top half; with `"Mirror"` an even y tiling
+starts the surface's top with a flipped copy. Both are what Unity draws.
 
 ```lua with=id
 -- Two boxes of different scale, one material: the same 0.5 m tiles on every face.

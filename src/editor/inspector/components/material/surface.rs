@@ -24,7 +24,7 @@ pub(super) fn draw_fields(
         if !(field.shown)(&materials[key]) {
             continue;
         }
-        if let Some(value) = draw_field(ui, field, (field.get)(&materials[key])) {
+        if let Some(value) = draw_field(ui, field, &materials[key]) {
             // A widget only offers values of the row's own kind, so it is never refused.
             if mat_ops::set_surface(materials, key, field, value).is_ok() {
                 *is_dirty = true;
@@ -37,11 +37,12 @@ pub(super) fn draw_fields(
 fn draw_field(
     ui: &mut egui::Ui,
     field: &SurfaceField,
-    value: SurfaceValue,
+    material: &MaterialAsset,
 ) -> Option<SurfaceValue> {
+    let value = (field.get)(material);
     ui.horizontal(|ui| {
         let label = ui.label(format!("{}:", field.label));
-        if let Some(hint) = mat_ops::coordinate_hint(field.key) {
+        if let Some(hint) = (field.hint)(material) {
             label.on_hover_text(hint);
         }
         match (&field.kind, value) {
