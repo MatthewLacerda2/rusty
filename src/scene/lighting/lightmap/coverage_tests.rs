@@ -47,7 +47,7 @@ fn every_sub_texel_strip_owns_its_row_traced_on_its_own_surface() {
     for k in 0..STRIPS {
         let row: Vec<_> = points
             .iter()
-            .filter(|p| p.index / S as usize == 2 * k as usize)
+            .filter(|p| p.index / S == 2 * k as u32)
             .collect();
         assert_eq!(row.len(), S as usize, "strip {k} owns its whole row");
         for p in row {
@@ -108,7 +108,7 @@ fn centre_texels_keep_their_centre_and_the_edge_ring_is_traced_inset_from_every_
     let points = rasterize(&corner(0.0, edge / S as f32), S);
     assert_eq!(points.len(), (S * (S + 1) / 2) as usize, "x + y < S");
     for p in &points {
-        let (x, y) = ((p.index % S as usize) as f32, (p.index / S as usize) as f32);
+        let (x, y) = ((p.index % S) as f32, (p.index / S) as f32);
         let (u, v) = (p.position.x, p.position.z);
         let ok = match x + y + 1.0 < S as f32 {
             true => Vec2::new(u - x - 0.5, v - y - 0.5).length() < 1e-4,

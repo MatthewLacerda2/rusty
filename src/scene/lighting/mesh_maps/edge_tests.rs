@@ -81,3 +81,25 @@ fn a_map_asked_twice_bakes_once_and_unknown_names_are_listed() {
     );
     assert_eq!(MeshMap::parse("AO"), Ok(MeshMap::Ao));
 }
+
+#[test]
+fn a_face_wound_against_its_normal_still_casts_its_rays() {
+    // An .obj floor wound clockwise seen from its `vn 0 1 0`: the face normal says
+    // down, the shading normal up. Nothing occludes it, so AO and thickness read open.
+    let v = |x: f32, z: f32| Vec3::new(x, 0.0, z);
+    let mut m = MeshSource::default();
+    quad(
+        &mut m,
+        [v(0., 0.), v(1., 0.), v(1., 1.), v(0., 1.)],
+        cell(0),
+        0,
+    );
+    m.normals.iter_mut().for_each(|n| *n = Vec3::Y);
+    let maps = bake_all(&m, &[MeshMap::Ao, MeshMap::Thickness], 32).unwrap();
+    let (lo, hi) = cell(0);
+    let p = ((lo + hi) * 0.5 * 32.0).floor();
+    for (map, img) in maps {
+        let texel = img.pixels()[p.y as usize * 32 + p.x as usize];
+        assert!((texel[0] - 1.0).abs() < 1e-3, "{map:?} reads {texel:?}");
+    }
+}

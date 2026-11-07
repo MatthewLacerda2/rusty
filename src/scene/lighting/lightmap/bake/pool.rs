@@ -55,7 +55,7 @@ impl<P, L, T> Slot<P, L, T> {
 /// workers, then `finish(chart, items, results)` once per chart with its own items
 /// back and its results in item order. `None` when `progress` was cancelled before
 /// every chart finished.
-pub(in super::super) fn run<P, L, T>(
+pub(in crate::scene::lighting) fn run<P, L, T>(
     charts: Vec<Vec<P>>,
     threads: usize,
     progress: &BakeProgress,

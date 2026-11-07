@@ -135,7 +135,7 @@ Texture.Bake({ resolution = 1024, nodes = {
   once). Each is written to `<prefix><map>.png` as soon as it is baked, the folders
   above it made first as `Bake` makes them (a `prefix` ending in `/` names a folder
   of its own). `resolution` is the square map's edge, 1 to 8192. Memory grows with
-  its square: about 1.2 GiB at 4096 and 4.6 GiB at 8192 at worst (every texel
+  its square: at most about 1.2 GiB at 4096 and 4.6 GiB at 8192 (every texel
   covered), whatever the number of maps, since one map is held at a time.
 - Every map but `id` is a 16-bit `data` PNG; `id` is 8-bit.
 
@@ -154,14 +154,25 @@ whole bounds diagonal, and a **16-texel margin** around every UV island (a
 continuous map's margin averages its border, the ID map's copies it, so no margin
 holds a colour between two materials). Rays are drawn around the interpolated
 normal, and one that would leave under the triangle's own face is dropped, so on a
-smooth low-poly mesh no ray starts under the face it leaves. A `curvature` crease lights a band 2%
+smooth low-poly mesh no ray starts under the face it leaves; a face wound
+against its normals (an `.obj` face listed clockwise from its `vn`) draws them
+around its face normal instead. A `curvature` crease lights a band 2%
 of the bounds diagonal wide, never narrower than 3 texels: each edge two faces
 share is a crease of strength `angle / 90°` (capped at 1), corners welded by
-position first so a UV or normal seam never breaks one. A boundary edge is no
+position first so a UV or normal seam never breaks one. A texel sums the convex
+creases within the band (each fading to nothing at its edge), and apart the
+concave ones, each sum held to 1: so a right angle reads alike as one sharp edge,
+a chamfer or a rounded bevel of many small creases, while the bevel is narrow
+beside the band (a bevel wider than the band reads as the gentle curve it is).
+A boundary edge is no
 crease, nor is the outline of a double-sided face (two faces with opposite
 normals), and a texel reads only the creases of **its own connected surface**: a
 floor beside a separate crate, or a hull under a floating panel, gets no band
-from the other's edges.
+from the other's edges. The band is a straight-line distance in 3D, not along
+the surface: inside one connected mesh a crease still reaches faces across a
+gap narrower than the band (between two fins, inside a slot, across a corridor
+of a level-sized mesh), so model such parts as separate surfaces or keep the gap
+wider than the band.
 
 Only the part of UV0 inside the 0..1 square is baked. Where UVs overlap, a texel
 takes the first triangle in index order. A model without UV0 (its texture UVs

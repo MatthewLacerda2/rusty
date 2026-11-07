@@ -46,13 +46,28 @@ pub(super) use clip::INSET;
 pub const MIN_RESOLUTION: u32 = 4;
 
 /// A covered texel: its index in the row-major image, where it sits on the mesh,
-/// and the offset of the first index of the triangle it was taken from.
+/// and the offset of the first index of the triangle it was taken from. Both
+/// offsets are `u32` (no image or mesh comes near 2³² texels or indices), so a
+/// point stays 32 bytes, as before the mesh-map baker added `first` (#1849): a
+/// fully covered 4096² map holds 512 MiB of points, not 640.
 #[derive(Clone, Copy, Debug)]
 pub(in crate::scene::lighting) struct TexelPoint {
-    pub index: usize,
+    pub index: u32,
     pub position: Vec3,
     pub normal: Vec3,
-    pub first: usize,
+    pub first: u32,
+}
+
+impl TexelPoint {
+    /// [`index`](Self::index) as a slice index.
+    pub fn at(&self) -> usize {
+        self.index as usize
+    }
+
+    /// [`first`](Self::first) as a slice index.
+    pub fn tri(&self) -> usize {
+        self.first as usize
+    }
 }
 
 /// What [`rasterize_surface`] walks: per-vertex positions, unit normals and the UV
@@ -141,7 +156,7 @@ pub(in crate::scene::lighting) fn rasterize_surface(mesh: &Surface, size: u32) -
                 };
                 let Some(w) = w else { continue };
                 taken[index] = true;
-                out.push(point(mesh, t, index, w));
+                out.push(point(mesh, t, index as u32, w));
             }
         }
     }
@@ -179,7 +194,7 @@ fn texels_under(t: &UvTri, size: u32) -> impl Iterator<Item = (u32, u32)> {
 }
 
 /// The surface point of triangle `t` at barycentric weights `w`, for texel `index`.
-fn point(mesh: &Surface, t: &UvTri, index: usize, w: Vec3) -> TexelPoint {
+fn point(mesh: &Surface, t: &UvTri, index: u32, w: Vec3) -> TexelPoint {
     let [a, b, c] = t.idx;
     let position = w.x * mesh.positions[a] + w.y * mesh.positions[b] + w.z * mesh.positions[c];
     let normal = (w.x * mesh.normals[a] + w.y * mesh.normals[b] + w.z * mesh.normals[c])
@@ -189,7 +204,7 @@ fn point(mesh: &Surface, t: &UvTri, index: usize, w: Vec3) -> TexelPoint {
         index,
         position,
         normal,
-        first: t.first,
+        first: t.first as u32,
     }
 }
 

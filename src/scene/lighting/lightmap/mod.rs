@@ -16,7 +16,8 @@
 //! * `filter` — the edge-aware Gaussian that smooths the baked bounce;
 //! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
 //!   `progress` ([`BakeProgress`], #808); its `pool` is the one work pool every
-//!   mesh's texels share, in fixed-size batches (#1656);
+//!   mesh's texels share, in fixed-size batches (#1656), and the mesh-map baker
+//!   runs its texels on too (`run_pool`, #1849);
 //! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
 //!   a cell its BC blocks and first [`MIP_LEVELS`] mips never leave (#1694);
 //! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, the RGBA8 direction
@@ -51,6 +52,7 @@ pub use atlas::{
     check_page_count, max_map_edge, pack, page_count, page_edge, LightmapAtlas, MAX_PAGE,
     MAX_PAGES, MIN_PAGE, MIP_LEVELS, PAD,
 };
+pub(in crate::scene::lighting) use bake::pool::run as run_pool;
 pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
 pub use encode::{
     decode_direction, decode_mask, decode_rgbm, encode_directions, encode_masks, encode_texels,

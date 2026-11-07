@@ -1,11 +1,14 @@
 //! The curvature map (#1849): how sharply the surface turns near each texel, from
 //! the mesh's own edges. Every edge two triangles share is a crease with a signed
 //! strength: its dihedral angle over 90° (capped at 1), positive where the surface
-//! folds away (convex), negative where it folds in (concave). A texel reads the
-//! strongest convex and the strongest concave crease within [`RADIUS`] of its
-//! point, each fading linearly to nothing at the radius, and stores
+//! folds away (convex), negative where it folds in (concave). A texel sums the
+//! convex creases within [`RADIUS`] of its point, and apart the concave ones, each
+//! fading linearly to nothing at the radius and each sum held to 1, and stores
 //! `0.5 + 0.5 × (convex + concave)`: 0.5 flat, 1 on a right-angled convex edge,
-//! 0 in a right-angled concave one. Seams in UV or normals don't break a crease:
+//! 0 in a right-angled concave one. Summing makes the read follow the shape, not
+//! the tessellation: a right angle reads the same whether it is one sharp edge, a
+//! 45° + 45° chamfer or a rounded bevel of many small creases, as long as the
+//! bevel is narrow beside the band. Seams in UV or normals don't break a crease:
 //! corners are welded by position first. A texel reads only the creases of its own
 //! connected surface, so a floor beside a separate crate gets no band from the
 //! crate's edges; and two faces whose normals are opposite (a double-sided face's
@@ -75,8 +78,10 @@ impl Curvature {
 
     /// The curvature of the texel at `p`.
     pub(super) fn texel(&self, p: &TexelPoint) -> Vec4 {
-        let surface = self.surfaces[p.first / 3];
-        let (mut convex, mut concave) = (0.0f32, 0.0f32);
+        let surface = self.surfaces[p.tri() / 3];
+        // A crease can be entered in several of the cubes read: each counts once,
+        // summed in crease order so the bytes never depend on the grid's.
+        let mut near: Vec<(u32, f32)> = Vec::new();
         for &k in self.grid.near(p.position) {
             let c = &self.creases[k as usize];
             if c.surface != surface {
@@ -84,11 +89,20 @@ impl Curvature {
             }
             let d = segment_distance(p.position, c.a, c.b);
             if d < self.radius {
-                let w = c.strength * (1.0 - d / self.radius);
-                (convex, concave) = (convex.max(w), concave.min(w));
+                near.push((k, c.strength * (1.0 - d / self.radius)));
             }
         }
-        Vec3::splat(0.5 + 0.5 * (convex + concave).clamp(-1.0, 1.0)).extend(1.0)
+        near.sort_unstable_by_key(|&(k, _)| k);
+        near.dedup_by_key(|&mut (k, _)| k);
+        let (mut convex, mut concave) = (0.0f32, 0.0f32);
+        for (_, w) in near {
+            if w > 0.0 {
+                convex += w;
+            } else {
+                concave += w;
+            }
+        }
+        Vec3::splat(0.5 + 0.5 * (convex.min(1.0) + concave.max(-1.0))).extend(1.0)
     }
 }
 
@@ -165,7 +179,7 @@ impl Grid {
     }
 
     /// The creases entered within two cubes of `p` (a crease may come up more than
-    /// once; the texel's strongest-wins read doesn't mind).
+    /// once: the texel's read removes the duplicates).
     fn near(&self, p: Vec3) -> impl Iterator<Item = &u32> {
         let [x, y, z] = Self::key(p, self.cell);
         (-2..=2)

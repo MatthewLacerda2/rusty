@@ -9,7 +9,7 @@ use glam::Vec4;
 
 use super::{Baked, MeshMap, MARGIN};
 use crate::procgen::image_buf::{Image, Rgba};
-use crate::scene::lighting::lightmap::TexelPoint;
+use crate::scene::lighting::lightmap::{run_pool, BakeProgress, TexelPoint};
 
 /// Points evaluated per block: the values buffer a map holds before they are
 /// written into its image (16 bytes each).
@@ -41,39 +41,34 @@ pub(super) fn image(
     for (b, block) in baked.points.chunks(BLOCK).enumerate() {
         let values = per_texel(block, |k, p| f(b * BLOCK + k, p));
         for (p, v) in block.iter().zip(values) {
-            px[p.index] = v.to_array();
-            filled[p.index] = true;
+            px[p.at()] = v.to_array();
+            filled[p.at()] = true;
         }
     }
     grow(px, &mut filled, size, MARGIN, map != MeshMap::Id);
     out
 }
 
-/// `f(k, point)` for every point, split across the machine's threads in contiguous
-/// chunks and joined back in order: which thread ran a texel never shows.
+/// `f(k, point)` for every point, on the lightmapper's work pool (#1656): small
+/// batches pulled off one counter, so a ray-heavy corner never holds up a thread's
+/// whole share, and joined back in order: which worker ran a texel never shows.
+/// The pool's items are unit placeholders (no memory); a batch's `first` and
+/// length say which points it covers.
 fn per_texel(points: &[TexelPoint], f: impl Fn(usize, &TexelPoint) -> Vec4 + Sync) -> Vec<Vec4> {
     let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
-    let chunk = points.len().div_ceil(threads).max(1);
-    let f = &f;
-    std::thread::scope(|s| {
-        let handles: Vec<_> = points
-            .chunks(chunk)
-            .enumerate()
-            .map(|(c, part)| {
-                s.spawn(move || {
-                    let base = c * chunk;
-                    part.iter()
-                        .enumerate()
-                        .map(|(k, p)| f(base + k, p))
-                        .collect::<Vec<_>>()
-                })
-            })
-            .collect();
-        handles
-            .into_iter()
-            .flat_map(|h| h.join().expect("a mesh-map worker panicked"))
-            .collect()
-    })
+    let trace = |_, first: usize, batch: &[()]| {
+        let at = first..first + batch.len();
+        at.map(|k| f(k, &points[k])).collect()
+    };
+    run_pool(
+        vec![vec![(); points.len()]],
+        threads,
+        &BakeProgress::default(),
+        trace,
+        |_, _, values| values,
+    )
+    .and_then(|mut charts| charts.pop())
+    .expect("a pool nobody cancels finishes its one chart")
 }
 
 /// The eight neighbours a margin texel reads, in the lightmap dilation's order.

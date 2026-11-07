@@ -88,15 +88,23 @@ impl MeshRays {
 /// The origin and the [`SAMPLES`] cosine directions a texel casts, `side` 1 out of
 /// the surface, -1 into it. They are drawn around the interpolated normal, and a
 /// direction on the wrong side of the triangle's own face is dropped, so on a
-/// smooth low-poly mesh no ray starts under the face it leaves.
+/// smooth low-poly mesh no ray starts under the face it leaves. A shading normal
+/// that points against the winding (a face wound the other way from its `vn`)
+/// would lose every ray that way, so there the rays are drawn around the face
+/// normal instead.
 fn rays_off<'r>(
     baked: &Baked,
     p: &TexelPoint,
     side: f32,
     rng: &'r mut Rng,
 ) -> (Vec3, impl Iterator<Item = Vec3> + 'r) {
-    let face = baked.source.face_normal(p.first).unwrap_or(p.normal) * side;
-    let around = p.normal * side;
+    let face = baked.source.face_normal(p.tri()).unwrap_or(p.normal);
+    let around = if p.normal.dot(face) > 0.0 {
+        p.normal
+    } else {
+        face
+    } * side;
+    let face = face * side;
     let origin = p.position + face * OFFSET * baked.diagonal;
     let dirs = (0..SAMPLES)
         .map(move |_| cosine_sample(around, rng))

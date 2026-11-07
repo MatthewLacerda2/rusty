@@ -20,7 +20,7 @@ use super::trace::{TexelLight, Tracer};
 
 mod assemble;
 pub(super) mod direction;
-pub(super) mod pool;
+pub(in crate::scene::lighting) mod pool;
 
 use assemble::assemble;
 
