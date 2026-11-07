@@ -7,6 +7,8 @@
 
 use std::path::{Component, Path};
 
+use crate::core::paths::to_slash;
+
 /// Make the missing folders above `file`, when they lie inside `root`. A relative
 /// `file` is read against `root` (the working directory, as the write itself does).
 /// A path whose missing part climbs out (`..`) is left to the write to refuse.
@@ -22,7 +24,7 @@ pub(super) fn make_parents(file: &str, root: &Path) -> Result<(), String> {
         return Ok(());
     }
     std::fs::create_dir_all(&parent)
-        .map_err(|e| format!("cannot make the folder {}: {e}", parent.display()))
+        .map_err(|e| format!("cannot make the folder {}: {e}", to_slash(&parent)))
 }
 
 /// True when `dir` (which may not exist yet) lies inside `root`: its nearest
