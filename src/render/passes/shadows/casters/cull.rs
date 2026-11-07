@@ -45,13 +45,15 @@ impl CasterFrame<'_> {
 /// What the shadow views' culling did this frame, summed over every volume each
 /// sweep drew: entities tested, culled by the light's frustum, kept by it but
 /// culled as too far or too small from the base camera, and kept by both but
-/// hidden from the light's PVS cell.
+/// hidden from the light's PVS cell; and the CPU µs the sweeps took to gather,
+/// cull and batch their casters (wall-clock).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ShadowCulls {
     pub tested: u32,
     pub frustum: u32,
     pub size: u32,
     pub occlusion: u32,
+    pub gather_us: u64,
 }
 
 /// One light volume a sweep draws: its view-projection, and the PVS row of the

@@ -149,6 +149,7 @@ impl ShadowRenderer {
         sweep: Sweep,
         volumes: &[LightVolume],
     ) -> Vec<Vec<CasterBatch>> {
+        let start = std::time::Instant::now();
         let (candidates, joints, walls) = self.collect_casters(frame, lod, sweep);
         let pvs = &frame.objects.occlusion;
         let mut matrices = Vec::new();
@@ -175,6 +176,7 @@ impl ShadowRenderer {
         for batch in per_volume.iter_mut().flatten() {
             batch.record = records.index(batch.key.clip.as_ref());
         }
+        self.culls.gather_us += start.elapsed().as_micros() as u64;
         let buffer = match sweep {
             Sweep::Static => &mut self.static_casters,
             Sweep::Dynamic => &mut self.dynamic_casters,

@@ -39,6 +39,9 @@ pub struct RenderCounters {
     /// size cull, but out of sight of the light's cell by the scene's baked PVS
     /// (#1714), summed over the shadow views.
     pub shadow_occlusion_culled: u32,
+    /// CPU microseconds the shadow sweeps took to gather, cull and batch their
+    /// casters (#1714), summed over the sweeps, inside `renderer_ms`. Wall-clock.
+    pub shadow_gather_us: u64,
     /// Static mesh entities inside a camera's frustum and big enough, but out of
     /// sight of its cell by the scene's baked PVS (#1714), summed over the camera
     /// views. `0` with no bake, or for a camera with `use_occlusion_culling` off.
@@ -189,6 +192,7 @@ impl RenderCounters {
                 "shadow_occlusion_culled",
                 self.shadow_occlusion_culled.into(),
             ),
+            ("shadow_gather_us", self.shadow_gather_us),
             ("occlusion_culled", self.occlusion_culled.into()),
             ("lod_hidden_entities", self.lod_hidden_entities.into()),
             ("lights", self.lights.into()),

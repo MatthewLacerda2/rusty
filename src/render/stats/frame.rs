@@ -48,6 +48,7 @@ impl Renderer {
         c.shadow_frustum_culled = culls.frustum;
         c.shadow_size_culled = culls.size;
         c.shadow_occlusion_culled = culls.occlusion;
+        c.shadow_gather_us = culls.gather_us;
         c.add_draws(self.shadow_renderer.drawn.iter().copied());
         c.ui_draws = view.ui.last_batches() as u32;
         c.ui_mask_passes = view.ui.last_mask_passes();
