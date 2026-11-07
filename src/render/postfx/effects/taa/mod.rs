@@ -163,7 +163,9 @@ impl PostFx {
             return;
         };
         let (read, write) = (h.latest, 1 - h.latest);
-        let params = TaaParams::new((h.size, self.full_size), h.valid, h.pixels, lenses);
+        let drawn = self.take_reactive_drawn();
+        let frame = (h.valid, h.pixels, drawn);
+        let params = TaaParams::new((h.size, self.full_size), frame, lenses);
         #[cfg(test)]
         let params = params.without(h.rules);
         queue.write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
@@ -180,7 +182,9 @@ impl PostFx {
         let timed = (pipeline.get(), timer.writes(GpuPass::Taa));
         let into = [&h.frames[write].view, &h.surfaces[write].view];
         PostFx::fullscreen_into(&mut encoder, timed, &[&group], into);
-        reactive::clear(&mut encoder, &h.reactive);
+        if drawn {
+            reactive::clear(&mut encoder, &h.reactive);
+        }
         queue.submit(std::iter::once(encoder.finish()));
         let h = self.targets.get_mut::<TaaHistory>().expect("held above");
         (h.latest, h.valid, h.ran) = (write, true, true);

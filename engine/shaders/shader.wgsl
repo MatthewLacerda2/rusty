@@ -208,7 +208,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 // ---- TAA's reactive mask (#1845) ----
 // A view that runs TAA draws its translucents through this instead of `fs_main`:
-// the same colour at location 0, and at location 1 (the `Rg8Unorm` reactive
+// the same colour at location 0, and at location 1 (the `R16Float` reactive
 // target, blended by max) how much of the pixel this surface laid down this frame
 // (`forward::transparent::reactive_targets`).
 @fragment

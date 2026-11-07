@@ -200,7 +200,9 @@ fn reactive_texel(color: vec4<f32>) -> vec4<f32> {
     let m = material();
     var r = reactive::over(color.a);
     if (m.blend_mode == 2u) {
-        let premultiplied = m.premultiply_diffuse == 1u || m.uses_opaque == 1u;
+        // Never over the opaque copy: `MaterialAsset::reads_opaque` requires Alpha
+        // or Premultiply.
+        let premultiplied = m.premultiply_diffuse == 1u;
         r = reactive::added(select(color.rgb * color.a, color.rgb, premultiplied));
     } else if (m.blend_mode == 3u) {
         r = reactive::multiplied(color.rgb);

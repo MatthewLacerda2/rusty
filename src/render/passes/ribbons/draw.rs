@@ -16,8 +16,8 @@ use crate::asset::MapRef;
 use crate::components::{ParticleBlend, RibbonStyle};
 use crate::render::draw::batch::sort::{back_to_front, view_depth};
 use crate::render::gpu::uniforms::FogUniform;
-use crate::render::passes::blended::BlendPipelines;
 use crate::render::passes::particles::ParticleDraws;
+use crate::render::postfx::effects::taa;
 use crate::render::timing::GpuPass;
 use crate::render::{GpuTexture, RenderView, Renderer};
 use crate::scene::{Camera, Scene};
@@ -151,7 +151,7 @@ fn effect_pass<'e>(
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         multiview_mask: None,
         label: Some("Ribbon Pass"),
-        color_attachments: &BlendPipelines::attachments(view),
+        color_attachments: &taa::reactive::hdr_attachments(view),
         depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
             view: &view.depth_view,
             depth_ops: Some(wgpu::Operations {

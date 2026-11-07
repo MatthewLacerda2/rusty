@@ -38,22 +38,12 @@ impl Renderer {
             });
         // TAA's reactive mask (#1845), where the view runs TAA.
         let reactive = view.post_fx.taa_reactive();
-        let colour = wgpu::RenderPassColorAttachment {
-            depth_slice: None,
-            view: &view.post_fx.scene_hdr.view,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Load,
-                store: wgpu::StoreOp::Store,
-            },
-        };
-        let targets = [Some(colour), reactive.map(taa::reactive::attachment)];
-        let targets = &targets[..1 + usize::from(reactive.is_some())];
+        let targets = taa::reactive::hdr_attachments(view);
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 multiview_mask: None,
                 label: Some("Transparent Pass"),
-                color_attachments: targets,
+                color_attachments: &targets,
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &view.depth_view,
                     // Load the opaque depth so glass is occluded by solids in front,

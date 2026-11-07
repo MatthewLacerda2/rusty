@@ -6,6 +6,7 @@
 //! loses its rim and swirl; with it (or with the ball writing its own motion) it
 //! keeps them. What the scene is: `scene`.
 
+mod coverage;
 mod scene;
 mod viewmodel;
 

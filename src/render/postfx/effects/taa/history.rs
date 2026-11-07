@@ -62,6 +62,10 @@ pub(crate) struct TaaHistory {
     pub(super) reactive: PfxTarget,
     /// The scene's size, which [`Self::reactive`] has.
     pub(super) scene: (u32, u32),
+    /// Whether a translucent pass bound [`Self::reactive`] since the last resolve
+    /// (`reactive::hdr_attachments` sets it): when not, the mask is all zero, and
+    /// the resolve skips reading it and clearing it.
+    pub(super) reactive_drawn: std::sync::atomic::AtomicBool,
     pub(super) params: wgpu::Buffer,
     /// Which of `frames` holds the latest resolve.
     pub(super) latest: usize,
@@ -95,6 +99,7 @@ impl TaaHistory {
             surfaces: [surface("TAA Surfaces A"), surface("TAA Surfaces B")],
             reactive: super::reactive::create(device, scene),
             scene,
+            reactive_drawn: Default::default(),
             params: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("TAA Params"),
                 size: std::mem::size_of::<super::TaaParams>() as u64,

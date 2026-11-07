@@ -42,7 +42,8 @@ struct TaaParams {
     knobs: vec4<f32>,
     // xy: the scene's size in pixels (the current frame's); zw: one over it
     scene: vec4<f32>,
-    // xy: this frame's jitter in scene pixels (`jitter::pixels`, NDC's y up); zw: unused
+    // xy: this frame's jitter in scene pixels (`jitter::pixels`, NDC's y up); z: 1
+    // when a translucent wrote the reactive mask this frame (#1845); w: unused
     jitter: vec4<f32>,
     // x: a moving pixel's frame influence, y: the history pixels a frame it applies
     // at; z, w: the relative depth gap the history starts to fade at, and is gone
@@ -64,9 +65,9 @@ const MAX_CAMERAS: u32 = 8u;
 // Last resolve's surface per history pixel, each pixel's own (`ResolveOut::surface`):
 // its distance from its camera in `.x`, that camera's index in `.y`.
 @group(0) @binding(5) var t_surface_history: texture_2d<f32>;
-// This frame's reactive mask at the scene's size (#1845, `reactive.wgsl`): r how
-// much of the pixel a translucent laid down, g `(camera + 1) / 255` of the camera
-// that drew it.
+// This frame's reactive mask at the scene's size (#1845, `reactive.wgsl`): the
+// topmost camera that drew a translucent there, plus how much of the pixel that
+// camera's translucents laid down (below 1); 0 where none drew.
 @group(0) @binding(6) var t_reactive: texture_2d<f32>;
 
 struct ResolveOut { // what the resolve writes: next frame's history, colour and surface
@@ -257,13 +258,18 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> ResolveOut {
 // (the pixel's own surface's) or a camera above it, so a world window behind a
 // viewmodel's gun leaves the gun alone. Zero where no translucent drew.
 fn reactivity(p: vec2<i32>, camera: f32) -> f32 {
+    // An opaque-only frame: the mask is all zero, nothing to read.
+    if (taa.jitter.z < 0.5) {
+        return 0.0;
+    }
     let last = vec2<i32>(textureDimensions(t_reactive)) - 1;
     var r = 0.0;
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
-            let t = textureLoad(t_reactive, clamp(p + vec2<i32>(x, y), vec2<i32>(0), last), 0);
-            if (round(t.g * 255.0) - 1.0 >= camera) {
-                r = max(r, t.r);
+            let v = textureLoad(t_reactive, clamp(p + vec2<i32>(x, y), vec2<i32>(0), last), 0).r;
+            let drawn_by = floor(v);
+            if (v > 0.0 && drawn_by >= camera) {
+                r = max(r, v - drawn_by);
             }
         }
     }

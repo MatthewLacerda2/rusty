@@ -18,20 +18,28 @@
 //!
 //! A view without TAA (no history: a bake capture, a view with TAA off) holds no
 //! target and draws its translucents through the pipelines it always did, byte for
-//! byte. The target is cleared after each resolve, so a frame with no translucent
-//! reads zero everywhere and resolves exactly as before.
+//! byte. The target is cleared after each resolve that read it, so a frame with no
+//! translucent reads zero everywhere and resolves exactly as before; such a frame
+//! (no pass bound the mask, `TaaHistory::reactive_drawn`) skips the read and the
+//! clear altogether.
+
+use std::sync::atomic::Ordering;
 
 use crate::render::postfx::{PfxTarget, PostFx};
 
 use super::TaaHistory;
 
-/// What the target holds: r the reactivity, g which camera of the stack wrote it,
-/// `(index + 1) / 255` (the resolve ignores a lower camera's translucent under a
-/// higher camera's surface: a world window behind a viewmodel's gun).
-pub(crate) const REACTIVE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg8Unorm;
+/// What the target holds: one packed value, the index in its stack of the topmost
+/// camera that drew a translucent there plus that camera's reactivity (below 1),
+/// 0 where none drew (`engine/shaders/reactive.wgsl`). Blended by max, a higher
+/// camera's write replaces a lower one's, so the resolve ignores a lower camera's
+/// translucent under a higher camera's surface (a world window behind a
+/// viewmodel's gun). Half-float keeps a reactivity step under 1/256 up to the
+/// eighth camera.
+pub(crate) const REACTIVE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R16Float;
 
-/// The colour target a reactive pipeline writes at location 1: blended by max in
-/// each channel, so overlapping translucents keep the most reactive.
+/// The colour target a reactive pipeline writes at location 1: blended by max, so
+/// overlapping translucents keep the topmost camera's most reactive.
 pub(crate) fn target_state() -> wgpu::ColorTargetState {
     let max = wgpu::BlendComponent {
         src_factor: wgpu::BlendFactor::One,
@@ -44,7 +52,7 @@ pub(crate) fn target_state() -> wgpu::ColorTargetState {
             color: max,
             alpha: max,
         }),
-        write_mask: wgpu::ColorWrites::RED | wgpu::ColorWrites::GREEN,
+        write_mask: wgpu::ColorWrites::RED,
     }
 }
 
@@ -64,6 +72,23 @@ pub(crate) fn attachment(view: &wgpu::TextureView) -> wgpu::RenderPassColorAttac
             store: wgpu::StoreOp::Store,
         },
     }
+}
+
+/// The colour attachments of a translucent pass into `view`: its HDR target, then
+/// this mask where the view runs TAA. Every translucent pass (the transparent
+/// surfaces, `passes::blended`'s particles and ribbons) begins with these, so its
+/// target count matches its pipelines' (`target_state` at location 1).
+pub(crate) fn hdr_attachments(
+    view: &crate::render::RenderView,
+) -> Vec<Option<wgpu::RenderPassColorAttachment<'_>>> {
+    let colour = attachment(&view.post_fx.scene_hdr.view);
+    let reactive = view.post_fx.taa_reactive().map(attachment);
+    if let Some(h) = view.post_fx.targets.get::<TaaHistory>() {
+        h.reactive_drawn.store(true, Ordering::Relaxed);
+    }
+    std::iter::once(Some(colour))
+        .chain(reactive.map(Some))
+        .collect()
 }
 
 /// Clear the target after the resolve read it, so next frame starts from zero.
@@ -92,5 +117,12 @@ impl PostFx {
     pub(crate) fn taa_reactive(&self) -> Option<&wgpu::TextureView> {
         let h = self.targets.get::<TaaHistory>()?;
         Some(&h.reactive.view)
+    }
+
+    /// Whether a translucent pass bound the mask since the last resolve, and reset
+    /// it: the resolve reads and clears the mask only then.
+    pub(super) fn take_reactive_drawn(&self) -> bool {
+        let h = self.targets.get::<TaaHistory>();
+        h.is_some_and(|h| h.reactive_drawn.swap(false, Ordering::Relaxed))
     }
 }

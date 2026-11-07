@@ -810,13 +810,18 @@ laid down this frame, and there the frame weighs more again (the history's share
 times `1 - reactive`, as FSR2): a surface blending over what is behind writes its
 alpha (FSR2's recommendation; a refracting or absorbing one, which composites what
 is behind it itself, writes 1), an additive one how much it brightened the pixel
-(the largest channel of what it added, tonemapped by `x / (1 + x)`, as FSR2's
-`GenerateReactiveMask` measures it), a multiplying one how much it can darken it;
-all capped at FSR2's 0.9. `Material.SetReactive` and `Particles.SetReactive` (`Auto`,
-the default; `Off`; `Full`, 0.9) override it: `Off` for a large still window, whose
-jittered edges would otherwise shimmer, `Full` for a fast effect. Ribbons are always
-`Auto`. A translucent drawn by a lower camera of the stack never makes a higher
-camera's surface reactive (a window behind a viewmodel's gun). A solid-looking
+(the largest channel of what it added, tonemapped by `x / (1 + x)`: an
+approximation of FSR2's `GenerateReactiveMask`, which tonemaps the colour before
+and after compositing, where the pass can't read what is under it), a multiplying
+one how much it can darken it; all capped at FSR2's 0.9. `Material.SetReactive` and
+`Particles.SetReactive` (`Auto`, the default; `Off`; `Full`, 0.9) override it,
+where the draw shows (a `Full` sprite's transparent corners stay as `Off`): `Off`
+for a large still window, whose jittered edges would otherwise shimmer, `Full` for
+a fast effect. Ribbons are always `Auto`. A translucent drawn by a lower camera of
+the stack never makes a higher camera's surface reactive (a window behind a
+viewmodel's gun), even under the higher camera's own translucents (a muzzle flash
+over the gun): a pixel keeps the topmost camera's reactivity, so a lower camera's
+translucent under a higher camera's translucent gives up its own there. A solid-looking
 translucent can instead write its own motion, `Material.SetWritesMotion` (HDRP's
 *Transparent Writes Motion Vectors*): TAA, motion blur and depth of field then move
 it as a solid, and its reveals drop the history as an opaque surface's do. Decals

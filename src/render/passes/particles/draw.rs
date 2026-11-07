@@ -17,7 +17,7 @@ use crate::components::particle::ParticleBlend;
 use crate::components::ParticleRenderMode;
 use crate::render::draw::batch::sort::back_to_front;
 use crate::render::gpu::uniforms::FogUniform;
-use crate::render::passes::blended::BlendPipelines;
+use crate::render::postfx::effects::taa;
 use crate::render::timing::GpuPass;
 use crate::render::{GpuTexture, RenderView, Renderer};
 use crate::scene::Camera;
@@ -178,7 +178,7 @@ impl Renderer {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 multiview_mask: None,
                 label: Some("Particle Pass"),
-                color_attachments: &BlendPipelines::attachments(view),
+                color_attachments: &taa::reactive::hdr_attachments(view),
                 // `depth_ops: None` makes the attachment read-only, which is what lets
                 // the same texture be sampled (group 2) in this pass.
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {

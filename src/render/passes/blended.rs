@@ -1,7 +1,8 @@
 //! src/render/passes/blended.rs — the shape the particle and ribbon passes share
 //! (#939): a globals uniform at group 0, and an alpha and an additive pipeline into
 //! the HDR target that test the scene depth without writing it (and into TAA's
-//! reactive mask beside it in a view running TAA, #1845).
+//! reactive mask beside it in a view running TAA, #1845; the pass opens with
+//! `taa::reactive::hdr_attachments`).
 
 use crate::components::ParticleBlend;
 use crate::render::gpu::layout_entries::uniform_entry;
@@ -143,26 +144,6 @@ impl BlendPipelines {
             &self.alpha_reactive,
             &self.additive_reactive,
         ]
-    }
-
-    /// The colour attachments of a blended pass into `view`: its HDR target, then
-    /// TAA's reactive mask where the view runs TAA (#1845).
-    pub(crate) fn attachments(
-        view: &crate::render::RenderView,
-    ) -> Vec<Option<wgpu::RenderPassColorAttachment<'_>>> {
-        let colour = wgpu::RenderPassColorAttachment {
-            depth_slice: None,
-            view: &view.post_fx.scene_hdr.view,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Load,
-                store: wgpu::StoreOp::Store,
-            },
-        };
-        let reactive = view.post_fx.taa_reactive().map(taa::reactive::attachment);
-        std::iter::once(Some(colour))
-            .chain(reactive.map(Some))
-            .collect()
     }
 }
 

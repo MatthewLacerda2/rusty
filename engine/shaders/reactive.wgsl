@@ -4,16 +4,22 @@
 // history. A translucent writes no motion of its own, so without it the history
 // reprojects it with the surface behind and averages its detail away.
 //
-// The formulas are FSR2's. A surface blending over what is behind it writes its
+// The formulas follow FSR2's. A surface blending over what is behind it writes its
 // alpha (the FSR2 README: "a good proxy for reactiveness is the alpha value used
-// when compositing"); one adding to it writes how much it changed the pixel, as
-// FSR2's `GenerateReactiveMask` measures it (the largest channel of the change,
-// tonemapped by `x / (1 + x)`); one multiplying it writes the most it can darken
-// it. All clamp to FSR2's recommended maximum, 0.9.
+// when compositing"); one adding to it writes how much it changed the pixel, an
+// approximation of FSR2's `GenerateReactiveMask` (the largest channel of the change,
+// tonemapped by `x / (1 + x)`: FSR2 tonemaps the colour before and after
+// compositing and takes the difference, but a pass here can't read what is under
+// it, so only the added light is tonemapped); one multiplying it writes the most it
+// can darken it. All clamp to FSR2's recommended maximum, 0.9.
 //
-// The target is `Rg8Unorm`, blended by max: r the reactivity, g which camera of the
-// stack wrote it, `(index + 1) / 255`, so the resolve ignores a world camera's
-// translucent under a viewmodel's opaque gun.
+// The target is `R16Float`, blended by max, holding one packed value: the drawing
+// camera's index in its stack plus its reactivity (below 1), so a higher camera's
+// write replaces a lower one's whatever their reactivities, and the resolve
+// ignores a world camera's translucent under a viewmodel's opaque gun. A draw that
+// lays down nothing (a sprite's transparent corner) writes 0, which the max
+// leaves alone. The price: where a higher camera's translucent lies over a lower
+// camera's surface, only the higher camera's reactivity is kept there.
 
 #define_import_path reactive
 
@@ -21,12 +27,15 @@
 const MAX_REACTIVE: f32 = 0.9;
 
 // The texel camera `camera` (its index in the stack) writes for reactivity `r`;
-// `fixed` at or above 0 replaces it (a material's or an emitter's `Off` / `Full`).
+// `fixed` at or above 0 replaces it (a material's or an emitter's `Off` / `Full`),
+// only where the draw laid down something (`r` at least a byte's step), so a
+// `Full` sprite's transparent corners leave the pixel alone.
 fn texel(r: f32, fixed: f32, camera: f32) -> vec4<f32> {
-    let value = select(r, fixed, fixed >= 0.0);
     // A NaN (a broken colour upstream) reads 0, never a garbage weight.
-    let safe = select(0.0, min(value, MAX_REACTIVE), value >= 0.0);
-    return vec4<f32>(safe, (camera + 1.0) / 255.0, 0.0, 0.0);
+    let automatic = select(0.0, r, r >= 0.0);
+    let value = select(automatic, fixed * step(1.0 / 255.0, automatic), fixed >= 0.0);
+    let safe = min(value, MAX_REACTIVE);
+    return vec4<f32>(select(0.0, camera + safe, safe > 0.0), 0.0, 0.0, 0.0);
 }
 
 // A surface blended over the pixel by `alpha`.
