@@ -80,7 +80,7 @@ fn gpu_a_move_re_places_the_moved_subtree_alone() {
 
 #[test]
 fn gpu_an_undo_a_load_and_a_play_restore_rebuild_what_a_fresh_build_holds() {
-    let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+    let Some((mut r, pair)) = crate::render::test_gpu::headless_pair_or_skip(RES, RES) else {
         return;
     };
     let mut scene = yard(6);
@@ -105,7 +105,7 @@ fn gpu_an_undo_a_load_and_a_play_restore_rebuild_what_a_fresh_build_holds() {
     let mut loaded = yard(6);
     loaded.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 2.0, -3.0);
     let (after_load, _) = frame(&mut r, &loaded);
-    let mut other = crate::render::test_gpu::headless_or_skip(RES, RES).expect("one ran");
+    let mut other = pair.renderer(RES, RES);
     assert_eq!(
         after_load,
         frame(&mut other, &loaded).0,
@@ -120,7 +120,7 @@ fn gpu_an_undo_a_load_and_a_play_restore_rebuild_what_a_fresh_build_holds() {
 
 #[test]
 fn gpu_a_preview_tab_beside_a_moving_scene_keeps_both() {
-    let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+    let Some((mut r, pair)) = crate::render::test_gpu::headless_pair_or_skip(RES, RES) else {
         return;
     };
     let (mut main, preview) = (yard(6), yard(2));
@@ -137,6 +137,6 @@ fn gpu_a_preview_tab_beside_a_moving_scene_keeps_both() {
         }
     }
     assert_eq!(held(&r, &main), fresh(&mut r, &main));
-    let mut other = crate::render::test_gpu::headless_or_skip(RES, RES).expect("one ran");
+    let mut other = pair.renderer(RES, RES);
     assert_eq!(frame(&mut r, &main).0, frame(&mut other, &main).0);
 }

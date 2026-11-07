@@ -225,13 +225,18 @@ jobs:
       # failed baseline instead of that silence.
       - name: Software Vulkan driver (lavapipe)
         run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
-      - name: Install cargo-mutants
+      # nextest too: mutants run under it (`--test-tool nextest`, below).
+      - name: Install cargo-mutants and cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-mutants
+          tool: cargo-mutants,cargo-nextest
       - name: Mutation test (one shard of the full deterministic sim, report-only)
         # Build/test with the dev feature so the headless-harness sim tests run
-        # too. Scoped by --file to the sim modules; the timeout multiplier guards
+        # too, under nextest, the gate's runner (#1844: a process per test and
+        # the `gpu` group, so the baseline sees what the gates see; plain
+        # `cargo test` broke it four times, #1042, #1069, #1337, #1844), with
+        # `--fail-fast` so a caught mutant stops at its first failing test.
+        # Scoped by --file to the sim modules; the timeout multiplier guards
         # against mutants that induce infinite loops. The exit code is recorded
         # so `mutants-report` can tell a finished shard (0 clean, 2 survivors,
         # 3 timeouts) from one stopped at its budget (124/137: what it measured
@@ -256,10 +261,10 @@ jobs:
           for glob in $SWEEP_FILES; do files+=(--file "$glob"); done
           rc=0
           timeout --signal=INT --kill-after=60s "${budget}s" \
-            cargo mutants --no-shuffle --timeout-multiplier 3 \
+            cargo mutants --test-tool nextest --no-shuffle --timeout-multiplier 3 \
               --shard '${{ matrix.shard }}/${{ strategy.job-total }}' --sharding round-robin \
               "${files[@]}" \
-              -- --features dev || rc=$?
+              -- --features dev --fail-fast || rc=$?
           mkdir -p mutants.out
           echo "$rc" > mutants.out/exit-code
           # Setup included, as the budget counts it: what `mutants-report`

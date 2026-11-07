@@ -8,6 +8,7 @@ use glam::Vec3;
 
 use super::fixture::{frame, fresh, held, table_holds, RES};
 use crate::components::{MaterialAsset, MaterialComponent};
+use crate::render::test_gpu::HeadlessPair;
 use crate::render::{RenderCounters, Renderer};
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::Scene;
@@ -42,51 +43,51 @@ fn colour(scene: &mut Scene, name: &str, c: [f32; 3]) {
     scene.materials.get_mut(name).expect("a box's").base_color = c;
 }
 
-fn fresh_pixels(scene: &Scene) -> Vec<u8> {
-    let mut other = crate::render::test_gpu::headless_or_skip(RES, RES).expect("one ran");
+fn fresh_pixels(pair: &HeadlessPair, scene: &Scene) -> Vec<u8> {
+    let mut other = pair.renderer(RES, RES);
     frame(&mut other, scene).0
 }
 
-/// Render `scene` in `r`, check it against a fresh renderer and the tables, and give
-/// its counters.
-fn checked(r: &mut Renderer, scene: &Scene, what: &str) -> RenderCounters {
+/// Render `scene` in `r`, check it against a fresh renderer on `pair` and the
+/// tables, and give its counters.
+fn checked(r: &mut Renderer, pair: &HeadlessPair, scene: &Scene, what: &str) -> RenderCounters {
     let (pixels, c) = frame(r, scene);
-    assert_eq!(pixels, fresh_pixels(scene), "{what}: the pixels");
+    assert_eq!(pixels, fresh_pixels(pair, scene), "{what}: the pixels");
     table_holds(r).unwrap_or_else(|e| panic!("{what}: {e}"));
     c
 }
 
 #[test]
 fn gpu_equal_records_under_their_own_names_draw_as_one_material() {
-    let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+    let Some((mut r, pair)) = crate::render::test_gpu::headless_pair_or_skip(RES, RES) else {
         return;
     };
     let shared = frame(&mut r, &boxes(false)).1;
     let mut scene = boxes(true);
-    let base = checked(&mut r, &scene, "own names");
+    let base = checked(&mut r, &pair, &scene, "own names");
     let calls = |c: &RenderCounters| (c.draw_calls, c.shadow_draws);
     assert_eq!(calls(&base), calls(&shared), "as one shared material");
     // One box's colour edit: one more batch, no object derived.
     colour(&mut scene, "p5", [0.9, 0.1, 0.1]);
-    let c = checked(&mut r, &scene, "p5 red");
+    let c = checked(&mut r, &pair, &scene, "p5 red");
     assert_eq!(c.render_extracted, 0, "a colour edit derives nothing");
     assert_eq!(c.draw_calls, base.draw_calls + 1, "p5 draws apart");
     // Set back, it joins the batch again.
     colour(&mut scene, "p5", GREY);
-    let c = checked(&mut r, &scene, "p5 grey again");
+    let c = checked(&mut r, &pair, &scene, "p5 grey again");
     assert_eq!((c.render_extracted, c.draw_calls), (0, base.draw_calls));
     // The class's representative (the least slot, p0's) edited while the rest draw.
     colour(&mut scene, "p0", [0.1, 0.1, 0.9]);
-    let c = checked(&mut r, &scene, "p0 blue");
+    let c = checked(&mut r, &pair, &scene, "p0 blue");
     assert_eq!(c.draw_calls, base.draw_calls + 1);
     colour(&mut scene, "p0", GREY);
     assert_eq!(
-        checked(&mut r, &scene, "p0 back").draw_calls,
+        checked(&mut r, &pair, &scene, "p0 back").draw_calls,
         base.draw_calls
     );
     // Freed while the rest draw: its box falls back to the default material.
     scene.materials.remove("p0");
-    let c = checked(&mut r, &scene, "p0 removed");
+    let c = checked(&mut r, &pair, &scene, "p0 removed");
     assert_eq!(c.render_extracted, 1, "p0's user");
     assert_eq!(held(&r, &scene), fresh(&mut r, &scene));
 }

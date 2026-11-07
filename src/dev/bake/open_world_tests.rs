@@ -68,6 +68,8 @@ fn floor_under_a_baked_sun() -> (Scene, String, String) {
 
 #[test]
 fn gpu_a_bake_after_a_lightmap_uv_reimport_lights_the_open_world() {
+    // The editor's renderer stays alive while the bake builds its own (#1844).
+    let _two = crate::render::test_gpu::pair::headless_pair();
     let (mut scene, model, path) = floor_under_a_baked_sun();
     let mut editor = CaptureHost::new();
     // The editor has drawn the floor as imported: no lightmap UV, no lightmap.

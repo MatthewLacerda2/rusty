@@ -32,12 +32,19 @@ fn a_direct_headless_renderer_is_flagged_outside_the_helper() {
     assert_eq!(rules("src/render/a_tests.rs", call), [(1, GPU_ENTRY)]);
     assert_eq!(rules("tests/gpu/b.rs", call), [(1, GPU_ENTRY)]);
     assert!(rules("src/render/test_gpu.rs", call).is_empty());
+    assert!(rules("src/render/test_gpu/pair.rs", call).is_empty());
+    assert_eq!(
+        rules("src/render/test_gpu_tests.rs", call),
+        [(1, GPU_ENTRY)]
+    );
     assert!(
         rules("src/dev/probe_bake.rs", call).is_empty(),
         "production"
     );
     let ok = "let Some(r) = headless_or_skip(64, 64) else { return };\n";
     assert!(rules("src/render/a_tests.rs", ok).is_empty());
+    let on_a_slot = "Renderer::new_headless_with(permit, 64, 64);\n";
+    assert_eq!(rules("src/render/a_tests.rs", on_a_slot), [(1, GPU_ENTRY)]);
 }
 
 #[test]

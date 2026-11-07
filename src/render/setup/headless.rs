@@ -44,18 +44,27 @@ impl Renderer {
     /// clear log) when no GPU/software adapter or device is available, so neither
     /// `cargo build` nor CI ever depends on a GPU at runtime.
     pub async fn new_headless(width: u32, height: u32) -> Option<Self> {
-        let width = width.max(1);
-        let height = height.max(1);
-
         // Claim a slot in the headless budget *before* allocating anything, and hold it
         // for this renderer's whole life (#366). Every headless consumer — the tests,
         // the screenshot path, the probe/reflection bakes, `Debug.Preview` — funnels
         // through here, so this is the one place the bound can be enforced for all of
-        // them. Claimed before the adapter/device requests below rather than after, so
+        // them. Claimed before the adapter/device requests (`new_headless_with`), so
         // the count bounds live allocations; if one of those `?`s bails out, the permit
         // drops with this frame and the slot is never leaked.
         let permit = super::budget::acquire_headless();
+        Self::new_headless_with(permit, width, height).await
+    }
 
+    /// [`new_headless`](Self::new_headless) on a slot the caller already holds: one
+    /// share of a [`Pair`](super::budget::Pair), for a test that keeps two renderers
+    /// alive at once (`render::test_gpu::headless_pair_or_skip`, #1844).
+    pub(crate) async fn new_headless_with(
+        permit: super::budget::Permit,
+        width: u32,
+        height: u32,
+    ) -> Option<Self> {
+        let width = width.max(1);
+        let height = height.max(1);
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: HEADLESS_BACKENDS,
             ..wgpu::InstanceDescriptor::new_without_display_handle()

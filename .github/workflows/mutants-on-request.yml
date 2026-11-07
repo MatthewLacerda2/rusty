@@ -119,10 +119,11 @@ jobs:
       # failed baseline instead of that silence.
       - name: Software Vulkan driver (lavapipe)
         run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
-      - name: Install cargo-mutants
+      # nextest too: mutants run under it (`--test-tool nextest`, below).
+      - name: Install cargo-mutants and cargo-nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-mutants
+          tool: cargo-mutants,cargo-nextest
 
       - name: What was asked for
         env:
@@ -150,12 +151,15 @@ jobs:
 
       # Same dev-feature build, timeout multiplier and memory cap as the sweep
       # (`mutants-sweep.yml` says why each).
-      # cargo-mutants runs `cargo test`, not nextest, so the nextest `gpu`
-      # group does not apply; the in-process headless budget
-      # (`render/setup/budget.rs`, two renderers at once) is what bounds GPU
-      # tests here, as it does under any `cargo test` (#785). The per-mutant
-      # timeout is the baseline's test time times 3, so the slower GPU tests
-      # raise it on their own. SIGINT at the budget is
+      # The tests run under nextest (`--test-tool nextest`, #1844), the gate's
+      # runner: a process per test and the `gpu` test group, so the baseline
+      # sees what the gates see. Under plain `cargo test` it broke four times
+      # on a test that passed the gate (#1042, #1069, #1337, #1844); runner
+      # independence is `cargo-test.yml`'s nightly signal, not this one's.
+      # `--fail-fast` overrides the profile's `fail-fast = false` (right for the
+      # gate's summary) so a caught mutant stops at its first failing test. The
+      # per-mutant timeout is the baseline's test time times 3, so the slower
+      # GPU tests raise it on their own. SIGINT at the budget is
       # cargo-mutants' Ctrl-C: it stops cleanly and keeps what it measured.
       - name: Mutate
         id: mutate
@@ -165,8 +169,8 @@ jobs:
           ulimit -v 8388608
           rc=0
           timeout --signal=INT --kill-after=60s "${budget}s" \
-            cargo mutants --no-shuffle --timeout-multiplier 3 --in-diff scope.diff \
-              -- --features dev || rc=$?
+            cargo mutants --test-tool nextest --no-shuffle --timeout-multiplier 3 \
+              --in-diff scope.diff -- --features dev --fail-fast || rc=$?
           echo "status=$rc" >> "$GITHUB_OUTPUT"
 
       # Red when cargo-mutants broke (any status but finished or stopped at
