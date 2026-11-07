@@ -10,7 +10,9 @@
 //!   how an Area light's rectangle is sampled and falls off (#1674), and in
 //!   `lights::channels` which shadowmask channel each `Mixed` light gets (#1695);
 //! * `rays` / `raster` / `trace` — ray queries (parry's `TriMesh`), texel → surface
-//!   point, and the per-texel estimate (the units it stores are explained in `trace`);
+//!   point, and the per-texel estimate (the units it stores are explained in `trace`).
+//!   `rays` and `raster` are shared with the mesh-map baker (`lighting::mesh_maps`,
+//!   #1849), which walks a model's UV0 the same way;
 //! * `filter` — the edge-aware Gaussian that smooths the baked bounce;
 //! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
 //!   `progress` ([`BakeProgress`], #808); its `pool` is the one work pool every
@@ -59,10 +61,14 @@ pub use lights::{assign_channels, taken_lights, MaskChannels, MASK_CHANNELS};
 pub use pages::{colour_page, direction_levels, direction_page, level_count, levels, mask_levels};
 pub use probe_direct::{baked_direct_sh, mixed_occlusion};
 pub use progress::BakeProgress;
+pub(in crate::scene::lighting) use raster::{
+    dilate, rasterize_surface, world_per_uv, Surface, TexelPoint,
+};
 pub use raster::{lightmap_size, MIN_RESOLUTION};
 pub(in crate::scene::lighting) use rays::{Rays, Tri};
 pub(in crate::scene::lighting) use rng::Rng;
 pub use set::{LightmapEntry, LightmapSet};
+pub(in crate::scene::lighting) use trace::cosine_sample;
 
 #[cfg(test)]
 mod ambient_tests;

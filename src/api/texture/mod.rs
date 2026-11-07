@@ -14,6 +14,9 @@
 //! - `Texture.BakeSet(recipe, prefix)` — bake every entry of the recipe's
 //!   `outputs` (slot → node id) from one evaluation to `<prefix>_<slot>.png`
 //!   (#403). Returns a table canonical slot → path.
+//! - `Texture.BakeMeshMaps(model, maps, prefix, [resolution])` — bake a model's
+//!   mesh maps (curvature, AO, world normal, position, thickness, ID) in its UV0 to
+//!   `<prefix><map>.png` (`mesh_maps`, #1849). Returns a table map → path.
 //! - `Texture.ToJson(recipe)` — serialize a recipe to its canonical JSON for
 //!   saving / diffing.
 //! - `Texture.Stats(recipe, [resolution])` — every node's min / max / mean / std /
@@ -44,6 +47,7 @@
 mod folder;
 mod from_lua;
 mod inspect;
+mod mesh_maps;
 mod ops;
 
 use std::collections::BTreeMap;
@@ -77,6 +81,20 @@ pub fn register(lua: &Lua) -> Reg {
             let root = crate::core::project::root();
             lua.create_table_from(bake_whole_set(&recipe, &prefix, &root)?)
         }),
+    )?;
+
+    put(
+        &table,
+        "BakeMeshMaps",
+        lua.create_function(
+            |lua, (model, maps, prefix, size): (String, Vec<String>, String, Option<u32>)| {
+                let size = size.unwrap_or(mesh_maps::DEFAULT_RESOLUTION);
+                let root = crate::core::project::root();
+                let written = mesh_maps::bake_mesh_maps(&model, &maps, &prefix, size, &root)
+                    .map_err(mlua::Error::RuntimeError)?;
+                lua.create_table_from(written)
+            },
+        ),
     )?;
 
     put(

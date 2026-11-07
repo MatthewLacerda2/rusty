@@ -22,6 +22,7 @@ wall-clock or unseeded RNG).
 |---|---|---|
 | `Texture.Bake` | `(recipe, path, slot)` | the written `path` |
 | `Texture.BakeSet` | `(recipe, prefix)` | `{ [slot] = path, … }` — one PNG per entry of the recipe's `outputs` |
+| `Texture.BakeMeshMaps` | `(model, maps, prefix, [resolution = 1024])` | `{ [map] = path, … }` — one PNG per mesh map, baked from a model's UV0 |
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
 | `Texture.Stats` | `(recipe, [resolution])` | `{ [node_id] = { min, max, mean, std, p1, p99 }, … }` for **every** node, each field an `{r, g, b, a}` array |
 | `Texture.Preview` | `(recipe, path, [size = 128])` | `{ path, columns, order = { node ids } }` — a PNG contact sheet of every node |
@@ -107,6 +108,57 @@ Everything is checked before a file is written: a recipe with no `outputs`, an
 unknown slot, two keys naming one slot (`albedo` and `base_color`), or an unknown
 node id is an error and nothing is baked. `outputs` is optional and ignored by
 `Texture.Bake`, which still bakes the single `output`.
+
+### Maps baked from a model — `Texture.BakeMeshMaps`
+
+The ops' `curvature`, `cavity` and `ambient_occlusion` read a height field in texture
+space, so they know nothing of a model's real edges. `Texture.BakeMeshMaps` is
+Substance's *Bake Mesh Maps*: it bakes data about one model's surface into its
+**UV0**, and a recipe reads each map with the `image` op (`encoding = "linear"`), so
+edge wear follows the model's chamfers and grime its real recesses (#1849).
+
+```lua no-run
+local maps = Texture.BakeMeshMaps("assets/models/kolvik/generator.blend::Generator",
+  { "curvature", "ao", "world_normal" }, "assets/textures/kolvik/generator_", 1024)
+-- maps.curvature == "assets/textures/kolvik/generator_curvature.png"
+Texture.Bake({ resolution = 1024, nodes = {
+  { id = "edges", op = "image", path = maps.curvature, encoding = "linear" },
+  { id = "wear", op = "levels", in_low = 0.55, in_high = 0.8, inputs = { "edges" } },
+} }, "assets/textures/kolvik/generator_wear.png", "data")
+```
+
+- `model` is an asset reference as `Scene.Instantiate` takes it: `path::SubObject`,
+  or a bare model path when the file holds one mesh (one holding several is an
+  error that lists them). The mesh is baked **in its own space**, as imported:
+  "world" means the model's frame before any scene transform.
+- `maps` lists any of the names below (case-insensitive; a map named twice bakes
+  once). Each is written to `<prefix><map>.png`, the folders above `prefix` made as
+  `Bake` makes them. `resolution` is the square map's edge, 1 to 8192.
+- Every map but `id` is a 16-bit `data` PNG; `id` is 8-bit.
+
+| Map | What a texel holds | Off the islands |
+|---|---|---|
+| `curvature` | 0.5 flat; brighter towards a convex edge (1 on a right-angled one), darker towards a concave one (0) | 0.5 |
+| `ao` | the share of 64 cosine-weighted rays that meet no part of the model within its bounds' diagonal: 1 open, 0 enclosed | 1 |
+| `world_normal` | the surface normal, `n * 0.5 + 0.5` per axis (Y up) | 0.5 |
+| `position` | the surface point, normalised per axis to the model's bounds (a flat axis reads 0.5) | 0 |
+| `thickness` | how far 64 rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
+| `id` | one fully saturated colour per material slot, hues a golden-ratio step apart (slot 0 red) | black |
+
+The defaults are Substance's and can be changed by editing the recipe that reads
+the maps, not the bake: 64 rays, an occluder distance of the whole bounds
+diagonal, and a **16-texel margin** around every UV island (a continuous map's
+margin averages its border, the ID map's copies it, so no margin holds a colour
+between two slots). A `curvature` crease lights a band 2% of the bounds diagonal
+wide, never narrower than 3 texels: each edge two faces share is a crease of
+strength `angle / 90°` (capped at 1), corners welded by position first so a UV or
+normal seam never breaks one; a boundary edge is no crease.
+
+Only the part of UV0 inside the 0..1 square is baked. Where UVs overlap, a texel
+takes the first triangle in index order. A model without UV0 (its texture UVs
+enclose no area), without triangles, or with a non-finite position is an error
+naming the verb and the model, never a black map. The bake is deterministic: the
+same model and arguments write the same bytes, however many threads ran it.
 
 ### The recipe shape
 
@@ -240,7 +292,7 @@ A few notes hold for a whole family. The colour ops are pixel to pixel. Noise us
 only part of the range (a 4-octave fBM spans about 0.35–0.64), so a ramp fed straight
 from it shows only its middle; `auto_levels` before the `color_ramp` uses the whole
 ramp, whatever the input's spread. The filters wrap, so a tiling input gives a tiling
-result (but for `flood_gradient` on a band that loops the tile, below); `ambient_occlusion`, `cavity` and `curvature` read the input's red as height,
+result (but for `flood_gradient` on a band that loops the tile, below); `ambient_occlusion`, `cavity` and `curvature` read the input's red as height (for a model's real edges and cavities, bake its mesh maps: `Texture.BakeMeshMaps`),
 and `flood_fill` reads it as a mask, its readers the islands it found.
 
 <!-- sorted: one bullet per op, so two branches adding ops land on different lines -->

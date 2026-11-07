@@ -74,7 +74,7 @@ fn sub_texel_strips_bake_lit_not_black() {
     };
     // A density that sizes the strips' map at exactly S, under the page's cap.
     let settings = BakeSettings {
-        texels_per_unit: (S as f32 - 0.5) / world_per_uv(&strips()).unwrap(),
+        texels_per_unit: (S as f32 - 0.5) / world_per_uv(&strips().surface()).unwrap(),
         ..settings()
     };
     let map = &bake(&scene, &settings)[0];

@@ -11,6 +11,11 @@
 //! filtering never reads black at a seam, and [`fill_rest`] the rest of the map
 //! from its nearest chart, so no mip level averages the empty background in
 //! (#1694).
+//!
+//! The walk reads a [`Surface`]: positions, normals, one UV set and the triangles.
+//! The lightmap bake hands it a mesh's lightmap UV; the mesh-map baker
+//! (`lighting::mesh_maps`, #1849) a model's UV0, so both rasterize, inset and dilate
+//! the same way.
 
 use std::ops::{Add, Div, Mul};
 
@@ -21,7 +26,7 @@ use super::input::BakeMesh;
 /// A value a lightmap map holds texel by texel: a colour (`Vec3`), or a direction
 /// texel (`Vec4`, the vector and its lamp share, #1695). Dilation, the fill, the
 /// atlas and the mips only ever copy, add and scale one.
-pub(super) trait Texel:
+pub(in crate::scene::lighting) trait Texel:
     Copy + Default + Add<Output = Self> + Mul<f32, Output = Self> + Div<f32, Output = Self>
 {
 }
@@ -40,12 +45,36 @@ pub(super) use clip::INSET;
 /// Smallest lightmap edge, in texels.
 pub const MIN_RESOLUTION: u32 = 4;
 
-/// A covered texel: its index in the row-major image, and where it sits on the mesh.
+/// A covered texel: its index in the row-major image, where it sits on the mesh,
+/// and the offset of the first index of the triangle it was taken from.
 #[derive(Clone, Copy, Debug)]
-pub(super) struct TexelPoint {
+pub(in crate::scene::lighting) struct TexelPoint {
     pub index: usize,
     pub position: Vec3,
     pub normal: Vec3,
+    pub first: usize,
+}
+
+/// What [`rasterize_surface`] walks: per-vertex positions, unit normals and the UV
+/// set to rasterize in, and the triangle list indexing them.
+#[derive(Clone, Copy)]
+pub(in crate::scene::lighting) struct Surface<'a> {
+    pub positions: &'a [Vec3],
+    pub normals: &'a [Vec3],
+    pub uvs: &'a [Vec2],
+    pub indices: &'a [u32],
+}
+
+impl BakeMesh {
+    /// The mesh as the lightmap bake rasterizes it: in its lightmap UV.
+    pub(super) fn surface(&self) -> Surface<'_> {
+        Surface {
+            positions: &self.positions,
+            normals: &self.normals,
+            uvs: &self.lightmap_uvs,
+            indices: &self.indices,
+        }
+    }
 }
 
 /// The square lightmap edge for `mesh`: `texels_per_unit` texels per world unit,
@@ -53,31 +82,28 @@ pub(super) struct TexelPoint {
 /// `[MIN_RESOLUTION, max]`. `None` when the lightmap UVs enclose no area (no second
 /// UV map): that mesh keeps probe / ambient lighting.
 pub fn lightmap_size(mesh: &BakeMesh, texels_per_unit: f32, max: u32) -> Option<u32> {
-    let edge = world_per_uv(mesh)? * texels_per_unit;
+    let edge = world_per_uv(&mesh.surface())? * texels_per_unit;
     Some((edge.ceil() as u32).clamp(MIN_RESOLUTION, max.max(MIN_RESOLUTION)))
 }
 
-/// World units spanned by one unit of `mesh`'s lightmap UV (the square root of world
-/// area over UV area); `None` when the lightmap UVs enclose no area.
-pub(super) fn world_per_uv(mesh: &BakeMesh) -> Option<f32> {
+/// World units spanned by one unit of `mesh`'s UV (the square root of world area
+/// over UV area); `None` when its UVs enclose no area.
+pub(in crate::scene::lighting) fn world_per_uv(mesh: &Surface) -> Option<f32> {
     let (mut world, mut uv) = (0.0f32, 0.0f32);
     for t in mesh.indices.chunks_exact(3) {
         let [a, b, c] = [t[0], t[1], t[2]].map(|i| i as usize);
         let (pa, pb, pc) = (mesh.positions[a], mesh.positions[b], mesh.positions[c]);
         world += (pb - pa).cross(pc - pa).length() * 0.5;
-        let (ua, ub, uc) = (
-            mesh.lightmap_uvs[a],
-            mesh.lightmap_uvs[b],
-            mesh.lightmap_uvs[c],
-        );
+        let (ua, ub, uc) = (mesh.uvs[a], mesh.uvs[b], mesh.uvs[c]);
         uv += (ub - ua).perp_dot(uc - ua).abs() * 0.5;
     }
     (uv >= 1e-8 && world > 0.0).then(|| (world / uv).sqrt())
 }
 
-/// One triangle of a mesh in lightmap texel space: its vertex indices, its UVs
-/// scaled to texels, and their signed doubled area.
+/// One triangle of a mesh in texel space: its first index's offset, its vertex
+/// indices, its UVs scaled to texels, and their signed doubled area.
 struct UvTri {
+    first: usize,
     idx: [usize; 3],
     uv: [Vec2; 3],
     area: f32,
@@ -93,6 +119,11 @@ struct UvTri {
 /// share goes to the first in index order, and the first pass never yields to the
 /// second, so a centre-covered texel bakes exactly as it would without the second.
 pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
+    rasterize_surface(&mesh.surface(), size)
+}
+
+/// [`rasterize`] over any [`Surface`]: its own UV set, scaled to a `size`² image.
+pub(in crate::scene::lighting) fn rasterize_surface(mesh: &Surface, size: u32) -> Vec<TexelPoint> {
     let tris = uv_triangles(mesh, size as f32);
     let mut taken = vec![false; (size * size) as usize];
     let mut out = Vec::new();
@@ -119,14 +150,21 @@ pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
 
 /// `mesh`'s triangles in texel space, those without UV area (or with a non-finite
 /// UV) left out.
-fn uv_triangles(mesh: &BakeMesh, scale: f32) -> Vec<UvTri> {
+fn uv_triangles(mesh: &Surface, scale: f32) -> Vec<UvTri> {
     mesh.indices
         .chunks_exact(3)
-        .filter_map(|t| {
+        .enumerate()
+        .filter_map(|(k, t)| {
             let idx = [t[0], t[1], t[2]].map(|i| i as usize);
-            let uv = idx.map(|i| mesh.lightmap_uvs[i] * scale);
+            let uv = idx.map(|i| mesh.uvs[i] * scale);
             let area = (uv[1] - uv[0]).perp_dot(uv[2] - uv[0]);
-            (area.is_finite() && area.abs() >= 1e-12).then_some(UvTri { idx, uv, area })
+            let first = 3 * k;
+            (area.is_finite() && area.abs() >= 1e-12).then_some(UvTri {
+                first,
+                idx,
+                uv,
+                area,
+            })
         })
         .collect()
 }
@@ -141,7 +179,7 @@ fn texels_under(t: &UvTri, size: u32) -> impl Iterator<Item = (u32, u32)> {
 }
 
 /// The surface point of triangle `t` at barycentric weights `w`, for texel `index`.
-fn point(mesh: &BakeMesh, t: &UvTri, index: usize, w: Vec3) -> TexelPoint {
+fn point(mesh: &Surface, t: &UvTri, index: usize, w: Vec3) -> TexelPoint {
     let [a, b, c] = t.idx;
     let position = w.x * mesh.positions[a] + w.y * mesh.positions[b] + w.z * mesh.positions[c];
     let normal = (w.x * mesh.normals[a] + w.y * mesh.normals[b] + w.z * mesh.normals[c])
@@ -151,6 +189,7 @@ fn point(mesh: &BakeMesh, t: &UvTri, index: usize, w: Vec3) -> TexelPoint {
         index,
         position,
         normal,
+        first: t.first,
     }
 }
 
@@ -166,7 +205,12 @@ fn barycentric(uv: [Vec2; 3], area: f32, p: Vec2) -> Option<Vec3> {
 
 /// Fill each empty texel bordering filled ones with their average, `passes` rings
 /// deep, so bilinear filtering at a chart's edge reads lit texels, not black.
-pub(super) fn dilate<T: Texel>(texels: &mut [T], filled: &mut [bool], size: u32, passes: u32) {
+pub(in crate::scene::lighting) fn dilate<T: Texel>(
+    texels: &mut [T],
+    filled: &mut [bool],
+    size: u32,
+    passes: u32,
+) {
     let size = size as i32;
     for _ in 0..passes {
         let snapshot = filled.to_vec();

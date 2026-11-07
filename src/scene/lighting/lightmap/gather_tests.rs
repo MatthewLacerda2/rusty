@@ -129,6 +129,7 @@ fn the_filter_smooths_grain_but_not_across_a_crease() {
         index: i,
         position: Vec3::new(i as f32, 0.0, 0.0),
         normal,
+        first: 0,
     };
     let points = [
         point(0, Vec3::Y),

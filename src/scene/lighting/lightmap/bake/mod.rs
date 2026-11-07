@@ -212,7 +212,7 @@ fn lightmap(
         .zip(light)
         .filter(|(_, l)| l.valid)
         .unzip();
-    let texel_world = world_per_uv(mesh).unwrap_or(1.0) / size as f32;
+    let texel_world = world_per_uv(&mesh.surface()).unwrap_or(1.0) / size as f32;
     let masked = scene.shadowmask.any();
     let maps = assemble(&points, &light, size, texel_world, settings, masked);
     Lightmap {

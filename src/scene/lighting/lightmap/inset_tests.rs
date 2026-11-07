@@ -106,7 +106,7 @@ fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
     let scene = floor_at_wall();
     // A density that sizes the floor's map at exactly S.
     let settings = BakeSettings {
-        texels_per_unit: (S as f32 - 0.5) / world_per_uv(&scene.meshes[0]).unwrap(),
+        texels_per_unit: (S as f32 - 0.5) / world_per_uv(&scene.meshes[0].surface()).unwrap(),
         samples: 64,
         ..super::tests::settings()
     };
