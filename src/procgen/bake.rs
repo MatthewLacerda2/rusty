@@ -168,7 +168,7 @@ pub fn bake_to_png(img: &Image, slot: Slot, path: &str) -> Result<String, String
         Slot::Data => encode_data(img).save(path),
         _ => encode(img, slot).save(path),
     }
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| format!("cannot write {path}: {e}"))?;
     crate::core::fs::written::note_written(path);
     Ok(path.to_string())
 }
