@@ -13,8 +13,8 @@ newest `Brief` at that moment.
 It refuses, and starts nothing, when the issue is closed, is labelled
 `planning` or `human`, has no brief, or has a brief from someone who cannot push
 (`dispatch/brief.py`), and when [`running.LIMIT`] coders on other issues are
-already waiting to fire or running (#1856, `dispatch/running.py` says what the
-routines API can tell): a re-brief of an issue is never counted against
+already waiting to fire or running (#1856; a fired one is placed from its pull
+request and briefs on GitHub, #1866, `dispatch/running.py` says why): a re-brief of an issue is never counted against
 itself, and `--over-limit` launches anyway.
 
 The operator asked on 2026-10-29 for a script that starts the coder for an
@@ -75,11 +75,24 @@ def environment_id(env: dict, listed: list[dict]) -> str:
     return found
 
 
-def check_limit(listed: list[dict], number: int, over: bool) -> None:
+def github(gh, repository: str, now: datetime) -> running.GitHub:
+    """What placing a fired coder reads from GitHub, over REST (#1866): one listing of open
+    pull requests, and per issue its comments and, when it has no open pull request, itself."""
+    pulls = ghrest.pages(gh, f"repos/{repository}/pulls?state=open")
+    if pulls is None:
+        raise remote.RemoteError("could not list the open pull requests from GitHub")
+    return running.GitHub(pulls=pulls,
+                          comments=lambda n: ghrest.pages(gh, f"repos/{repository}/issues/{n}/comments"),
+                          issue=lambda n: gh(f"repos/{repository}/issues/{n}"), now=now)
+
+
+def check_limit(listed: list[dict], number: int, over: bool, reader: running.GitHub) -> None:
     """Refuse a launch past [`running.LIMIT`] coders, unless `over`; name what was counted."""
-    counted, unknown = running.coders(listed, number)
-    for found in unknown:
-        say(f"cannot tell whether {found.get('name', '?')} is still running (fired, no run listed); not counted")
+    counted, noted = running.coders(listed, number, reader)
+    for found, placed, why in noted:
+        name = found.get("name", "?")
+        say(f"cannot tell whether {name} is still running ({why}); not counted" if placed == "unknown"
+            else f"{name}: {why}; not counted")
     if len(counted) < running.LIMIT:
         return
     names = "; ".join(running.describe(found) for found in counted)
@@ -103,6 +116,7 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
         say(USAGE)
         return 1
     number, dry = int(args[0].lstrip("#")), "--dry-run" in argv
+    now = now or datetime.now(timezone.utc)
     repository = ghrest.slug()
     issue = gh(f"repos/{repository}/issues/{number}")
     comments = ghrest.pages(gh, f"repos/{repository}/issues/{number}/comments")
@@ -112,10 +126,10 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
     try:
         found = brief.read(issue, comments)
         listed = routines(call)
-        check_limit(listed, number, "--over-limit" in argv)
+        check_limit(listed, number, "--over-limit" in argv, github(gh, repository, now))
         env_id = environment_id(os.environ if env is None else env, listed)
         made = routine.body(number, issue.get("title", ""), found.get("html_url", ""), env_id, repository,
-                            now or datetime.now(timezone.utc))
+                            now)
         if dry:
             print(json.dumps(made, indent=2))
             say(f"dry run: nothing created (brief {found.get('html_url', '')})")
