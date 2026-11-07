@@ -101,10 +101,7 @@ pub(super) fn engine() -> Layers {
                 )
             })
             .collect(),
-        camera_knobs: vec![(
-            "taa".into(),
-            (camera::TAA_KNOBS.iter()).map(|k| k.field.into()).collect(),
-        )],
+        camera_knobs: camera_knobs(),
         api: crate::api::graphics::effects::REGISTRARS
             .iter()
             .map(|(n, _)| n.to_string())
@@ -118,6 +115,12 @@ pub(super) fn engine() -> Layers {
         textures: texture_uses(),
         composite: assemble::composite_source(),
     }
+}
+
+/// The camera effects' knob tables, each with its knob paths.
+fn camera_knobs() -> Vec<(String, Vec<String>)> {
+    let taa = camera::TAA_KNOBS.iter().map(|k| k.field.into());
+    vec![("taa".into(), taa.collect())]
 }
 
 /// Every declared composite texture, as the composite should use it.

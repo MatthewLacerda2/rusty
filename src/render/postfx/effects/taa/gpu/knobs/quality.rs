@@ -22,7 +22,7 @@ fn tuned(tune: impl FnOnce(&mut CameraComponent)) -> Scene {
     let (mut scene, cam) = taa_scene(true, true);
     noisy_wall(&mut scene, -7.0);
     tilted_cube(&mut scene, Vec3::new(0.0, 0.0, -4.0));
-    tune(&mut *scene.world.camera_mut(cam).unwrap());
+    tune(&mut scene.world.camera_mut(cam).unwrap());
     scene
 }
 
