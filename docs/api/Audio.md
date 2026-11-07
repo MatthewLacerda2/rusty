@@ -238,10 +238,11 @@ an `AudioSource` through its `output_group`, a `PlayAt` one-shot through its
 **`Master`** and five buses under it — **`Music`**, **`SFX`**, **`Voice`**,
 **`World`**, **`UI`** — and `Audio.CreateGroup` adds more (`"Guns"` under `"SFX"`).
 A child sums into its parent, so a voice's dry signal is scaled by its group's volume and every
-ancestor's. Its reverb send is taken after its group's filters, effects and volume, and the
-wet signal comes back on the output, under Master's volume and filters but past every group
-between the two (a post-fader send that skips the ancestors, where Unity lets the send's
-place be chosen). Group names are exact (case-sensitive).
+ancestor's. Its reverb send is taken after its group's filters, effects and volume (a voice
+played straight into `Master` sends before Master's, which run on the output), and the
+wet signal comes back on the output, under Master's filters, volume and effects but past
+every group between the two (a post-fader send that skips the ancestors, where Unity lets
+the send's place be chosen). Group names are exact (case-sensitive).
 
 Each group has a **volume** and **mute**, a **low-pass** and a **high-pass** filter
 (cutoff in Hz plus resonance; a 22 kHz low-pass and a 10 Hz high-pass are open and
