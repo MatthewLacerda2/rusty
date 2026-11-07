@@ -49,9 +49,8 @@ use crate::render::gpu::fullscreen::Fullscreen;
 use crate::render::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
 use crate::render::gpu::pipelines::LazyPipeline;
 use crate::render::gpu::shaders::ShaderRegistry;
-use crate::render::postfx::{PostFx, HDR_FORMAT};
+use crate::render::postfx::PostFx;
 use crate::render::timing::{GpuPass, GpuTimer};
-use history::DEPTH_FORMAT;
 
 /// The resolve's pipelines, shared by every view: the scene-size resolve and the
 /// upscaling one (TAAU), both into an HDR history target.
@@ -84,11 +83,6 @@ impl TaaPasses {
         let pipeline = |fs: &'static str, label: &'static str| {
             let (shader, layout) = (shader.clone(), pipeline_layout.clone());
             LazyPipeline::new(device, move |device| {
-                let target = |format| wgpu::ColorTargetState {
-                    format,
-                    blend: None,
-                    write_mask: wgpu::ColorWrites::ALL,
-                };
                 Fullscreen {
                     label,
                     shader: &shader,
@@ -96,10 +90,7 @@ impl TaaPasses {
                     vs: "vs_fullscreen",
                     fs,
                 }
-                .colour(
-                    device,
-                    &[Some(target(HDR_FORMAT)), Some(target(DEPTH_FORMAT))],
-                )
+                .colour(device, &pass::targets())
             })
         };
         let resolve = pipeline("fs_resolve", "TAA Resolve");

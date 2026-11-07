@@ -2,7 +2,19 @@
 //! and depth frames at once (`ResolveOut` in `postfx/taa.wgsl`), so next frame
 //! reads both from the same resolve (#1846).
 
+use super::history::DEPTH_FORMAT;
 use crate::render::postfx::run::Timed;
+use crate::render::postfx::HDR_FORMAT;
+
+/// What the resolve's pipelines write: the colour frame, then its depths.
+pub(super) fn targets() -> [Option<wgpu::ColorTargetState>; 2] {
+    let target = |format| wgpu::ColorTargetState {
+        format,
+        blend: None,
+        write_mask: wgpu::ColorWrites::ALL,
+    };
+    [Some(target(HDR_FORMAT)), Some(target(DEPTH_FORMAT))]
+}
 
 /// Draw the resolve, `group` bound at 0, into `[colour, depth]`.
 pub(super) fn resolve(
