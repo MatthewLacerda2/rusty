@@ -26,10 +26,12 @@ pub(crate) struct ParticleInstance {
     pub(crate) sheet: [f32; 4],
     /// The sprite render mode (0 billboard, 1 stretched, 2 horizontal, 3 vertical).
     pub(crate) mode: u32,
+    /// TAA's reactivity (#1845): the emitter's `TaaReactive::gpu`, below 0 `Auto`.
+    pub(crate) reactive: f32,
 }
 
 impl ParticleInstance {
-    const ATTRIBS: [wgpu::VertexAttribute; 8] = wgpu::vertex_attr_array![
+    const ATTRIBS: [wgpu::VertexAttribute; 9] = wgpu::vertex_attr_array![
         0 => Float32x3, // center
         1 => Float32,   // size
         2 => Float32,   // rotation
@@ -38,6 +40,7 @@ impl ParticleInstance {
         5 => Float32x4, // light
         6 => Float32x4, // sheet
         7 => Uint32,    // mode
+        8 => Float32,   // reactive
     ];
 
     pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -139,6 +142,7 @@ pub(crate) fn emitter_instances(
                     render.soft_distance,
                 ],
                 mode,
+                reactive: render.reactive.gpu(),
             };
             (instance, view_depth(p.position, eye.pos, eye.fwd))
         })

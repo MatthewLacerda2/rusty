@@ -2,7 +2,7 @@
 //! (#440): what the Particle System card's Render section and the `Particles.Set*`
 //! render bindings both call, so the two can never clamp differently.
 
-use crate::components::{Flipbook, ParticleEmitterComponent, ParticleRenderMode};
+use crate::components::{Flipbook, ParticleEmitterComponent, ParticleRenderMode, TaaReactive};
 use crate::scene::authoring::sanitize::non_negative;
 
 /// Set how the particles are drawn (billboard / stretched / flat / mesh).
@@ -42,6 +42,11 @@ pub fn set_flipbook(p: &mut ParticleEmitterComponent, flipbook: Flipbook) {
 /// Set the soft-particle fade distance (world units, `≥ 0`; `0` = hard edges).
 pub fn set_soft_distance(p: &mut ParticleEmitterComponent, distance: f32) {
     p.render.soft_distance = non_negative(distance);
+}
+
+/// Set how reactive the sprites are under TAA (#1845).
+pub fn set_reactive(p: &mut ParticleEmitterComponent, reactive: TaaReactive) {
+    p.render.reactive = reactive;
 }
 
 /// Set whether the particles are lit by the scene.

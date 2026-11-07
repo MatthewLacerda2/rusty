@@ -1,11 +1,11 @@
 //! The transparent-surface fields of a material (#1523): URP Lit's blending and
-//! shadow toggles and HDRP Lit's refraction, absorption, depth postpass, transparent
-//! SSR and thin translucency, as rows of the material field table (`field.rs`).
+//! shadow toggles and HDRP Lit's refraction, absorption, depth postpass, motion vectors,
+//! transparent SSR and thin translucency, and TAA's reactivity (#1845), as rows of the material field table (`field.rs`).
 //!
 //! Pure.
 
 use super::field::{no_hint, SurfaceField, SurfaceKind, SurfaceValue};
-use crate::components::{BlendMode, MaterialAsset, RefractionModel};
+use crate::components::{BlendMode, MaterialAsset, RefractionModel, TaaReactive};
 
 fn transparent(m: &MaterialAsset) -> bool {
     m.is_transparent()
@@ -145,6 +145,26 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         get: |m| SurfaceValue::Bool(m.depth_postpass),
         hint: no_hint,
         put: |m, v| m.depth_postpass = boolean(v),
+    },
+    SurfaceField {
+        key: "writes_motion",
+        api: "WritesMotion",
+        label: "Writes Motion Vectors",
+        kind: SurfaceKind::Toggle,
+        shown: transparent,
+        get: |m| SurfaceValue::Bool(m.writes_motion),
+        hint: no_hint,
+        put: |m, v| m.writes_motion = boolean(v),
+    },
+    SurfaceField {
+        key: "reactive",
+        api: "Reactive",
+        label: "TAA Reactive",
+        kind: SurfaceKind::Choice(|| TaaReactive::ALL.map(TaaReactive::name).to_vec()),
+        shown: transparent,
+        get: |m| SurfaceValue::Text(m.reactive.name().to_owned()),
+        hint: no_hint,
+        put: |m, v| m.reactive = choice(v, TaaReactive::parse),
     },
     SurfaceField {
         key: "receive_ssr",

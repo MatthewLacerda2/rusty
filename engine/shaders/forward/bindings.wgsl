@@ -70,8 +70,12 @@ struct MaterialData {
     // 1 when the surface traces screen-space reflections (#1570) where the camera
     // marches (`camera.ssr.x`).
     receive_ssr: u32,
-    surface_pad_a: u32,
-    surface_pad_b: u32,
+    // TAA's reactivity (#1845): below 0 `Auto` (from the surface's alpha or
+    // brightness, `forward::transparent::reactive`), else the fixed value.
+    reactive: f32,
+    // 1 when the surface writes its own motion (#1845, HDRP's *Transparent Writes
+    // Motion Vectors*); read on the CPU.
+    writes_motion: u32,
     surface_pad_c: u32,
     // Where the maps are read (#1573): xy the tiling, zw the offset, packed for
     // v down the image (`mapping_uniform`, #1851).

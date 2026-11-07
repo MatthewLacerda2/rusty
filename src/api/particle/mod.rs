@@ -10,6 +10,7 @@
 //! through the component's own seeded spawn path (`emit_at`), so a scripted burst
 //! stays bit-for-bit reproducible alongside the sim's own emission.
 
+mod reactive;
 mod render;
 mod space;
 
@@ -36,6 +37,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     register_state(lua, &table, scene)?;
     render::register(lua, &table, scene)?;
     space::register(lua, &table, scene)?;
+    reactive::register(lua, &table, scene)?;
 
     lua.globals()
         .set("Particles", table)

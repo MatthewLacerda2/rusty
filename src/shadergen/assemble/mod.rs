@@ -11,7 +11,8 @@
 //!   colour blocks are folded into the final color just before `surface_color`
 //!   returns (scaling the SSR record of the reflection as they scale the colour,
 //!   `blocks::Reflection`, #1526), which every colour entry point calls (`fs_main`,
-//!   the motion-vector `fs_velocity`, #1435, and `fs_velocity_ssr`, #1526). So a
+//!   the motion-vector `fs_velocity`, #1435, `fs_velocity_ssr`, #1526, and the
+//!   reactive `fs_transparent`, #1845). So a
 //!   surface variant binds against the
 //!   forward pipeline unchanged (same `VertexInput`, bind groups, and entry points),
 //!   varying only the fragment look — exactly the contract. A vertex-stage block

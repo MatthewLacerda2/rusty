@@ -19,6 +19,7 @@ pub(crate) use opaque_copy::{OpaqueCopyPass, OpaqueViews};
 
 use crate::render::draw::batch::DrawBatch;
 use crate::render::gpu::pipelines::surface::SolidPass;
+use crate::render::postfx::effects::taa;
 use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
 
@@ -35,19 +36,24 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Transparent Encoder"),
             });
+        // TAA's reactive mask (#1845), where the view runs TAA.
+        let reactive = view.post_fx.taa_reactive();
+        let colour = wgpu::RenderPassColorAttachment {
+            depth_slice: None,
+            view: &view.post_fx.scene_hdr.view,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Load,
+                store: wgpu::StoreOp::Store,
+            },
+        };
+        let targets = [Some(colour), reactive.map(taa::reactive::attachment)];
+        let targets = &targets[..1 + usize::from(reactive.is_some())];
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 multiview_mask: None,
                 label: Some("Transparent Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    depth_slice: None,
-                    view: &view.post_fx.scene_hdr.view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
+                color_attachments: targets,
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &view.depth_view,
                     // Load the opaque depth so glass is occluded by solids in front,
@@ -62,7 +68,8 @@ impl Renderer {
                 timestamp_writes: self.gpu_timer.writes(GpuPass::Transparent),
                 occlusion_query_set: None,
             });
-            self.record_transparent(&mut pass, self.transparent_group3(view), items);
+            let group3 = self.transparent_group3(view);
+            self.record_transparent(&mut pass, group3, items, reactive.is_some());
         }
         self.queue.submit(std::iter::once(encoder.finish()));
     }
@@ -70,19 +77,21 @@ impl Renderer {
     /// Record the back-to-front transparent draws into `pass`: the global bind group
     /// and `group3` (the shadows, and the opaque copy when this camera made one,
     /// #1523), then the same batch recording the opaque pass uses — each batch
-    /// binding the transparent pipeline of its material's shader (#396) and blend.
+    /// binding the transparent pipeline of its material's shader (#396) and blend,
+    /// the one writing TAA's reactive mask too when `reactive` (#1845).
     fn record_transparent<'a>(
         &'a self,
         pass: &mut wgpu::RenderPass<'a>,
         group3: &'a wgpu::BindGroup,
         items: &'a [DrawBatch],
+        reactive: bool,
     ) {
         pass.set_bind_group(0, &self.global_bind_group, &[]);
         pass.set_bind_group(3, group3, &[]);
         self.draw_batches(
             pass,
             items,
-            SolidPass::Transparent(&self.transparent_pipelines),
+            SolidPass::Transparent(&self.transparent_pipelines, reactive),
         );
     }
 }

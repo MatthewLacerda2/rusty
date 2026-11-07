@@ -17,6 +17,7 @@ use crate::components::particle::ParticleBlend;
 use crate::components::ParticleRenderMode;
 use crate::render::draw::batch::sort::back_to_front;
 use crate::render::gpu::uniforms::FogUniform;
+use crate::render::passes::blended::BlendPipelines;
 use crate::render::timing::GpuPass;
 use crate::render::{GpuTexture, RenderView, Renderer};
 use crate::scene::Camera;
@@ -172,19 +173,12 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Particle Encoder"),
             });
+        let reactive = view.post_fx.taa_reactive().is_some();
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 multiview_mask: None,
                 label: Some("Particle Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    depth_slice: None,
-                    view: &view.post_fx.scene_hdr.view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
+                color_attachments: &BlendPipelines::attachments(view),
                 // `depth_ops: None` makes the attachment read-only, which is what lets
                 // the same texture be sampled (group 2) in this pass.
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
@@ -202,7 +196,7 @@ impl Renderer {
             pass.set_index_buffer(pr.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             pass.set_vertex_buffer(0, instance_buffer.slice(..));
             for batch in batches {
-                pass.set_pipeline(pr.pipeline_for(batch.blend));
+                pass.set_pipeline(pr.pipeline_for(batch.blend, reactive));
                 pass.set_bind_group(1, &batch.texture.bind_group, &[]);
                 pass.draw_indexed(0..6, 0, batch.instances.clone());
             }

@@ -37,6 +37,7 @@ pub(crate) mod history;
 pub(crate) mod jitter;
 pub(crate) mod params;
 mod pass;
+pub(crate) mod reactive;
 mod upscale;
 
 pub(crate) use effect::{runs, wanted, EFFECT};
@@ -73,6 +74,7 @@ impl TaaPasses {
                 texture_entry(3, wgpu::TextureViewDimension::D2),
                 sampler_entry(4),
                 texture_entry(5, wgpu::TextureViewDimension::D2),
+                texture_entry(6, wgpu::TextureViewDimension::D2),
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -110,7 +112,8 @@ impl TaaPasses {
     }
 
     /// The resolve's bind group: `h`'s params, this frame's `current` image, the
-    /// history frame `read` (its colour and its surfaces) and the `velocity` target.
+    /// history frame `read` (its colour and its surfaces), the `velocity` target
+    /// and the reactive mask (#1845).
     fn group(
         &self,
         device: &wgpu::Device,
@@ -132,6 +135,7 @@ impl TaaPasses {
                     5,
                     wgpu::BindingResource::TextureView(&h.surfaces[read].view),
                 ),
+                entry(6, wgpu::BindingResource::TextureView(&h.reactive.view)),
             ],
         })
     }
@@ -176,6 +180,7 @@ impl PostFx {
         let timed = (pipeline.get(), timer.writes(GpuPass::Taa));
         let into = [&h.frames[write].view, &h.surfaces[write].view];
         PostFx::fullscreen_into(&mut encoder, timed, &[&group], into);
+        reactive::clear(&mut encoder, &h.reactive);
         queue.submit(std::iter::once(encoder.finish()));
         let h = self.targets.get_mut::<TaaHistory>().expect("held above");
         (h.latest, h.valid, h.ran) = (write, true, true);
