@@ -9,9 +9,9 @@
 //! The graph: each voice is a [`ClipSound`] playing into its mixer group's track
 //! (`groups.rs`), whose rack runs the group's effects (`mixer/effects/rack.rs`,
 //! #1748); group tracks nest as the group tree does and send to one reverb
-//! bus; everything sums into kira's main track, which runs Master's rack
-//! ([`MasterRack`], #1855: after the reverb bus has summed in) and then the
-//! [`OutputStage`] that shapes the total for the speaker mode (#546). The maestro hands over a [`VoiceMix`] per
+//! bus; everything sums into kira's main track, which runs Master's filters,
+//! volume and rack ([`MasterStrip`], #1855: after the reverb bus has summed in)
+//! and then the [`OutputStage`] that shapes the total for the speaker mode (#546). The maestro hands over a [`VoiceMix`] per
 //! voice each frame (#412) through the voice's shared [`VoiceControl`], and a
 //! [`GroupMix`] per group whenever the mixer moves. Decoding is path-cached
 //! ([`ClipCache`]), so the hundredth footstep costs no disk or decode until the
@@ -30,7 +30,7 @@ use kira::{AudioManager, AudioManagerSettings, Capacities};
 
 use super::capture::Clocked;
 use super::decode::ClipCache;
-use super::groups::{GroupTracks, MasterRack, VOICES_PER_GROUP};
+use super::groups::{GroupTracks, MasterStrip, VOICES_PER_GROUP};
 use super::output::OutputStage;
 use super::tap::{Tap, TapEffect};
 use super::voice::{ClipSound, ClipSoundData, VoiceControl};
@@ -63,7 +63,7 @@ impl<B: Backend> KiraBackend<B> {
     /// A mixer over kira backend `B` built with `settings`; `None` if it won't start.
     pub fn with_backend(settings: B::Settings) -> Option<Self> {
         let mut main = MainTrackBuilder::new().sound_capacity(VOICES_PER_GROUP);
-        let master = MasterRack::build(&mut main);
+        let master = MasterStrip::build(&mut main);
         let output = OutputStage::build(&mut main, SpeakerMode::default());
         let tap = Arc::new(Tap::default());
         main.add_effect(TapEffect(Arc::clone(&tap)));

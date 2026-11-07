@@ -237,8 +237,11 @@ an `AudioSource` through its `output_group`, a `PlayAt` one-shot through its
 `group` argument, both Master when unset. Groups form a tree; the mixer starts with
 **`Master`** and five buses under it — **`Music`**, **`SFX`**, **`Voice`**,
 **`World`**, **`UI`** — and `Audio.CreateGroup` adds more (`"Guns"` under `"SFX"`).
-A child sums into its parent, so a voice is scaled by its group's volume and every
-ancestor's. Group names are exact (case-sensitive).
+A child sums into its parent, so a voice's dry signal is scaled by its group's volume and every
+ancestor's. Its reverb send is taken after its group's filters, effects and volume, and the
+wet signal comes back on the output, under Master's volume and filters but past every group
+between the two (a post-fader send that skips the ancestors, where Unity lets the send's
+place be chosen). Group names are exact (case-sensitive).
 
 Each group has a **volume** and **mute**, a **low-pass** and a **high-pass** filter
 (cutoff in Hz plus resonance; a 22 kHz low-pass and a 10 Hz high-pass are open and
@@ -303,12 +306,13 @@ starts a fresh effect there (a delay's echoes, a compressor's envelope start ove
 **Master starts with a limiter at −0.3 dBFS**, so a pile-up of loud sounds never
 takes the mix past it, the reverb included. It is an effect like any other: retune
 it, or remove it with `Audio.SetGroupEffects("Master", {})`, and then nothing limits.
-**Master's effects run on the whole mix**, as Unity's Master holds everything under
-it: after Master's filters and volume and after the reverb bus (the wet signal of
-every group's reverb send) has summed in, then the [speaker mode](#speaker-mode)
-shapes what they let through. So a sidechain keyed on `Master` hears the reverb
-too. The order on the output, last to first: the speaker mode's stage ← Master's
-effects ← Master's volume + the reverb bus ← Master's filters ← the groups under it.
+**Master runs on the whole mix**, as Unity's Master holds everything under it:
+Master's filters, volume, mute and effects all run after the reverb bus (the wet
+signal of every group's reverb send) has summed in, so a fade, a mute or a low-pass
+on Master reaches every reverb tail too. Then the [speaker mode](#speaker-mode)
+shapes what they let through. The order on the output: the groups under Master and
+the reverb bus sum → Master's low-pass → its high-pass → its volume and mute → its
+effects → the speaker mode's stage.
 
 | Kind | Parameters (default) |
 |---|---|

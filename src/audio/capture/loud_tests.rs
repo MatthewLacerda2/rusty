@@ -65,7 +65,12 @@ pub(super) fn capture(
     }
     maestro.stop_capture().unwrap();
     let heard = decode_file(&out.to_string_lossy()).unwrap();
-    assert!(heard.samples().len() > 2 * RATE as usize, "1.2 s of stereo");
+    let stereo = 2 * RATE as usize * 6 / 5;
+    assert_eq!(
+        heard.samples().len(),
+        stereo,
+        "1.2 s of stereo, interleaved"
+    );
     heard.samples().to_vec()
 }
 

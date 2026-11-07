@@ -13,7 +13,7 @@ use crate::audio::SpeakerMode;
 use crate::components::ReverbParams;
 
 /// SFX sending everything into a long zone at full wet, `master`'s effects on Master.
-fn hall(maestro: &mut AudioMaestro, master: EffectChain) {
+pub(super) fn hall(maestro: &mut AudioMaestro, master: EffectChain) {
     let send = GroupPatch {
         reverb_send: Some(1.0),
         ..Default::default()
