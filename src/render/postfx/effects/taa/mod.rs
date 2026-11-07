@@ -64,10 +64,18 @@ pub(crate) struct TaaPasses {
     sampler: wgpu::Sampler,
     resolve: LazyPipeline,
     upscale: LazyPipeline,
+    /// The contrast-adaptive sharpen after the composite (#1847), into each output
+    /// format a view writes; #1848's upscaler reuses it.
+    pub(crate) sharpen: Sharpen,
 }
 
 impl TaaPasses {
-    pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
+    /// The resolves, and the sharpen into each of `output_formats`.
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        registry: &mut ShaderRegistry,
+        output_formats: &[wgpu::TextureFormat],
+    ) -> Self {
         let shader = registry.load(device, "postfx/taa.wgsl", "TAA Shader");
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("TAA Layout"),
@@ -112,6 +120,7 @@ impl TaaPasses {
             sampler,
             resolve,
             upscale,
+            sharpen: Sharpen::new(device, registry, output_formats),
         }
     }
 
@@ -145,8 +154,10 @@ impl TaaPasses {
     }
 
     /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+    pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
         [&self.resolve, &self.upscale]
+            .into_iter()
+            .chain(self.sharpen.lazy_pipelines())
     }
 }
 

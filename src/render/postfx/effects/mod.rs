@@ -183,6 +183,20 @@ pub(crate) enum LdrRun {
     InPlace(
         fn(&mut super::PostFx, Gpu, &mut wgpu::CommandEncoder, &super::PostFxContext, &EffectCx),
     ),
+    /// Reads `ldr` as [`Self::InPlace`] does, told whether it is the chain's last
+    /// pass (nothing in place after it, no finishing pass). Last, it may write the
+    /// chain's output itself and return true, and the chain skips its copy (TAA's
+    /// sharpen, #1847); false leaves its result in `ldr`.
+    MayEnd(
+        fn(
+            &mut super::PostFx,
+            Gpu,
+            &mut wgpu::CommandEncoder,
+            &super::PostFxContext,
+            &EffectCx,
+            bool,
+        ) -> bool,
+    ),
     /// The finishing pass: this pipeline, `ldr` in, the chain's output out. At most
     /// one runs, last; without one the chain copies `ldr` out.
     Finish(fn(&super::PostFx) -> &wgpu::RenderPipeline),

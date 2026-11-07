@@ -13,7 +13,7 @@ use crate::scene::Scene;
 
 /// A scene whose camera runs TAA with contrast-adaptive sharpening at `strength`,
 /// a tilted cube giving angled edges over the flat background.
-fn sharpen_scene(strength: f32) -> (Scene, u32) {
+pub(super) fn sharpen_scene(strength: f32) -> (Scene, u32) {
     let (mut scene, cam) = taa_scene(true, true);
     tilted_cube(&mut scene, Vec3::new(0.0, 0.0, -4.0));
     let mut c = scene.world.camera_mut(cam).unwrap();

@@ -71,9 +71,6 @@ pub struct PostFx {
     /// Authored post-FX effects (#397): their module cache, second LDR target and
     /// previous-frame history.
     pub custom: effects::custom_effects::CustomChain,
-    /// TAA's contrast-adaptive sharpen (#1847), an LDR pass in the output format;
-    /// #1848's upscaler reuses it.
-    pub(crate) sharpen: effects::taa::Sharpen,
     pub io_layout: wgpu::BindGroupLayout,
     /// The composite's group 1, the effects' own textures (#1473).
     pub(crate) effect_textures: effects::textures::CompositeTextures,

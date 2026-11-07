@@ -1,7 +1,8 @@
 //! Per-frame execution of the post-process chain after the effects' scene passes:
 //! the composite (assembled from the effects' functions around the grading LUT
-//! `grade` baked), the LDR passes (the authored effects, #397, then FXAA — or a
-//! plain copy) that write the finished image to the target.
+//! `grade` baked), the LDR passes (the authored effects, #397, TAA's sharpen, then
+//! FXAA — or a plain copy, unless the last pass wrote the output itself) that write
+//! the finished image to the target.
 
 use super::effects::{self, EffectCx, Gpu, LdrRun, Pass};
 use super::{PostFx, PostFxContext, PostParams};
@@ -46,18 +47,25 @@ impl PostFx {
         Self::fullscreen(&mut encoder, composite, &[&io, &textures], composite_target);
 
         let mut finish = None;
-        for run in ldr {
+        let mut ended = false;
+        let count = ldr.len();
+        for (i, run) in ldr.into_iter().enumerate() {
             match run {
                 LdrRun::InPlace(run) => run(self, gpu, &mut encoder, &ctx, cx),
+                LdrRun::MayEnd(run) => {
+                    // Only a finishing pass comes after the in-place ones, so the
+                    // last one in the list is the chain's last.
+                    ended = run(self, gpu, &mut encoder, &ctx, cx, i + 1 == count);
+                }
                 LdrRun::Finish(pipeline) => finish = Some(*pipeline),
             }
         }
-        // The finishing pass, or the copy that lands the in-place passes' result.
-        // The aux/depth/skybox bindings are unused by either but must satisfy the
-        // shared IO layout.
+        // The finishing pass, or the copy that lands the in-place passes' result,
+        // unless the last one wrote the output itself. The aux/depth/skybox bindings
+        // are unused by either but must satisfy the shared IO layout.
         let last = match finish {
             Some(pipeline) => Some(pipeline(self)),
-            None => followed.then_some(&self.copy_pipeline),
+            None => (followed && !ended).then_some(&self.copy_pipeline),
         };
         if let Some(pipeline) = last {
             let bg = self.io_bind_group(

@@ -207,6 +207,7 @@ impl Renderer {
             skybox: (&sky.view, &sky.sampler),
             output: &targets.downs[0].view,
             timer: &self.gpu_timer,
+            passes: &self.post_passes,
         };
         view.post_fx.composite_into(&self.device, &mut encoder, ctx);
         let passes = self.encode_chain(&mut encoder, targets, deepest, &levels);

@@ -10,7 +10,6 @@ use crate::render::gpu::shaders::ShaderRegistry;
 
 use super::effects::custom_effects::CustomChain;
 use super::effects::exposure::ExposureMeter;
-use super::effects::taa::Sharpen;
 use super::effects::textures::CompositeTextures;
 use super::effects::{assemble, composite_slots_len};
 use super::grade::GradeLut;
@@ -45,7 +44,6 @@ impl PostFx {
         let custom = CustomChain::new(device, &io_layout, output_format, full_size);
         let grade = GradeLut::new(device);
         let exposure = ExposureMeter::new(device);
-        let sharpen = Sharpen::new(device, registry, output_format);
 
         Self {
             composite_pipeline: pipelines.composite,
@@ -54,7 +52,6 @@ impl PostFx {
             grade,
             exposure,
             custom,
-            sharpen,
             io_layout,
             effect_textures,
             params_buffer,

@@ -148,6 +148,7 @@ impl Renderer {
             skybox: (&sky.view, &sky.sampler),
             output: stack.output,
             timer: &self.gpu_timer,
+            passes: &self.post_passes,
         };
         view.post_fx
             .run((&self.device, &self.queue), chain, &effect, params);

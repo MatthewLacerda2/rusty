@@ -11,6 +11,8 @@
 //!   The rest of the chain then runs at the output's size ([`chain_size`]) and
 //!   writes the output itself, so no bilinear upscale follows. The jitter runs
 //!   FSR2's longer sequence and the material maps read with a negative mip bias.
+//!
+//! On either path the camera's *Mip Bias* (#1847) adds to the material maps' bias.
 
 use glam::Vec2;
 
@@ -23,8 +25,9 @@ use crate::render::RenderView;
 pub(crate) struct TaaFrame {
     /// The projection's sub-pixel jitter, in NDC.
     pub jitter: Vec2,
-    /// The material maps' mip bias ([`jitter::mip_bias`]): negative only while the
-    /// view upscales.
+    /// The material maps' mip bias: TAAU's ([`jitter::mip_bias`], negative only
+    /// while the view upscales) plus the camera's *Mip Bias* (#1847), which applies
+    /// on every frame TAA runs.
     pub mip_bias: f32,
 }
 

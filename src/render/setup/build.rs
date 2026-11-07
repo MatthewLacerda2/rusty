@@ -20,7 +20,7 @@ use crate::render::postfx::{effects::Passes, grade::GradeBake, HDR_FORMAT};
 use crate::render::setup::shadow_system::{create_shadow_system, ShadowSystem};
 use crate::render::setup::textures::{create_textures, Textures};
 use crate::render::{ibl::skybox, passes::ssao};
-use crate::render::{CameraUniform, LightingUniform};
+use crate::render::{CameraUniform, LightingUniform, OFFSCREEN_FORMAT};
 
 /// Camera + lighting uniform buffers and the group(0) bind group.
 pub(crate) struct GlobalBindings {
@@ -143,7 +143,9 @@ impl GpuResources {
             ui,
             ssao,
             grade_bake: GradeBake::new(device, &mut registry),
-            post_passes: Passes::new(device, &mut registry),
+            // The window's format and the offscreen views' (render textures, the
+            // editor's panels, captures): the two an LDR pass writes.
+            post_passes: Passes::new(device, &mut registry, &[output_format, OFFSCREEN_FORMAT]),
             quality: QualityValues::default(),
         }
     }
