@@ -91,8 +91,13 @@ re-brief launch: a new routine whose prompt names the new `Brief`.
   `isolation: "remote"`, which fell back to a local worktree here (#504). The API
   cannot list environments, so the script takes the one the newest `rusty #…`
   routine ran in; `RUSTY_CLOUD_ENV` names it on an account with none yet.
-- **What it refuses:** a closed issue, a `planning` or `human` one, and a brief
-  by someone who cannot push.
+- **What it refuses:** a closed issue, a `planning` or `human` one, a brief
+  by someone who cannot push, and a sixth coder (CLAUDE.md's limit, #1856): it
+  counts the `rusty #…` routines not yet fired or whose run is still going, and
+  names them. A re-brief is never counted against its own issue; `ARGS=--over-limit`
+  launches anyway (a run the API never marked finished). It cannot see a fired
+  routine listed without a run, nor one pushed off the API's 20 newest, and says
+  which it could not place (`dispatch/running.py`).
 - `run_once_at` computed, `allowed_tools` with `ToolSearch` (the GitHub MCP tools
   load through it without being listed), and the prompt below.
 - **The prompt names the brief's URL**, the exact comment the script checked,
