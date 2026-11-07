@@ -141,28 +141,40 @@ impl Rays {
         &self,
         origin: Vec3,
         dir: Vec3,
-        (t_min, t_max): (f32, f32),
+        range: (f32, f32),
         blocks: impl Fn(usize) -> bool,
     ) -> bool {
-        let Some(mesh) = &self.mesh else {
-            return false;
-        };
+        self.blocker(origin, dir, range, blocks).is_some()
+    }
+
+    /// The first triangle met in the BVH's walk (not the nearest) that `blocks`
+    /// accepts and that lies on `origin + t * dir` for `t` in `[t_min, t_max)`:
+    /// [`Self::occluded_by`] naming its blocker, so the occlusion bake can try it
+    /// first on the next ray (#1714).
+    pub(in crate::scene::lighting) fn blocker(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        (t_min, t_max): (f32, f32),
+        blocks: impl Fn(usize) -> bool,
+    ) -> Option<usize> {
+        let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);
         let reach = t_max - t_min;
-        let mut blocked = false;
+        let mut blocker = None;
         mesh.bvh().traverse(|node| {
             if node.cast_ray(&ray, reach) == f32::MAX {
                 return TraversalAction::Prune;
             }
             if let Some(i) = node.leaf_data() {
                 if blocks(i as usize) && hit(mesh, i, &ray, reach).is_some() {
-                    blocked = true;
+                    blocker = Some(i as usize);
                     return TraversalAction::EarlyExit;
                 }
             }
             TraversalAction::Continue
         });
-        blocked
+        blocker
     }
 }
 

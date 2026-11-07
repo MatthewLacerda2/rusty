@@ -6,7 +6,7 @@
 use glam::Vec3;
 
 use super::gather::Fingerprints;
-use super::targets::target_points;
+use super::sample::target_points;
 use super::test_level::{block, corridors};
 use super::{bake_occlusion, OcclusionData};
 use crate::components::mesh::{primitives, MeshRevision};

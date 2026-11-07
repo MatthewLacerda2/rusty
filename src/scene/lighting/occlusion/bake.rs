@@ -8,9 +8,9 @@
 
 use std::collections::BTreeMap;
 
-use super::baking::Baking;
 use super::gather::{Fingerprints, Object};
 use super::progress::OcclusionProgress;
+use super::sample::Baking;
 use super::{BakedObject, Grid, OcclusionData};
 use crate::scene::Scene;
 
@@ -71,6 +71,23 @@ pub fn bake_occlusion(
 }
 
 impl OcclusionInput {
+    /// Bake `count` cells spread over the grid on this thread, for a measurement
+    /// of a level too large to bake whole in a test: the grid's cell count and
+    /// edge, and the sheets the occluders fused into (count, bytes). `None` when
+    /// no grid is laid.
+    #[cfg(all(test, feature = "dev"))]
+    pub(crate) fn bake_sample(&self, count: usize) -> Option<(usize, f32, (usize, usize))> {
+        let scene = Baking::of(&self.objects);
+        let (min, max) = scene.bounds?;
+        let grid = Grid::over(min, max)?;
+        let cells = grid.cell_count() as u64;
+        for k in 0..count as u64 {
+            let cell = k.wrapping_mul(0x9E37_79B9_7F4A_7C15) % cells;
+            std::hint::black_box(scene.cell(&grid, cell as usize));
+        }
+        Some((grid.cell_count(), grid.cell, scene.sheets()))
+    }
+
     /// Bake the PVS on `threads` workers, counting into `progress`; `None` when it
     /// was cancelled, else the data (`None` when nothing occludes, nothing can be
     /// culled, or the level is too large: the report says which) and the report.
@@ -88,7 +105,7 @@ impl OcclusionInput {
         let mut report = OcclusionBakeReport {
             objects: objects.len(),
             occluders,
-            never_culled: scene.targets.iter().filter(|t| t.2.is_none()).count(),
+            never_culled: scene.never_culled(),
             ..Default::default()
         };
         // Nothing to cull, or a level too large to cull: no PVS, said in the report.
