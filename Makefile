@@ -280,7 +280,8 @@ reclaim: ## Remove merged worktrees (and their target/) and finished local branc
 # `Brief` comment on the issue and creates the one-off routine that starts the
 # cloud coder (through `claude mcp serve`, so the
 # claude.ai token stays inside claude); running it again is the re-brief launch.
-# It refuses a closed, `planning` or `human` issue.
+# It refuses a closed, `planning` or `human` issue, and a sixth running coder
+# (#1856; a re-brief never counts against itself, ARGS=--over-limit overrides).
 # ARGS=--dry-run prints the routine and creates nothing. `review-level` prints
 # `high` or `medium` for an independent review, and the paths that decided it.
 coder: ## Start the cloud coder on an issue's newest Brief. make coder ISSUE=1569, ARGS=--dry-run creates nothing

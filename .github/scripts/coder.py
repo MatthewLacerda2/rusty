@@ -12,14 +12,18 @@ newest `Brief` at that moment.
 
 It refuses, and starts nothing, when the issue is closed, is labelled
 `planning` or `human`, has no brief, or has a brief from someone who cannot push
-(`dispatch/brief.py`).
+(`dispatch/brief.py`), and when [`running.LIMIT`] coders on other issues are
+already waiting to fire or running (#1856, `dispatch/running.py` says what the
+routines API can tell): a re-brief of an issue is never counted against
+itself, and `--over-limit` launches anyway.
 
 The operator asked on 2026-10-29 for a script that starts the coder for an
 issue, so spawning one is no work: before it, the orchestrator assembled the
 `RemoteTrigger` body by hand from `issue-batch` each time, and the operator
 could not launch one without a Claude session.
 
-`--dry-run` prints the routine it would create and creates nothing. Needs the
+`--dry-run` prints the routine it would create and creates nothing; it still
+refuses at the limit, since that is what a launch would do. Needs the
 `claude` CLI signed in to claude.ai (the routines API is reached through
 `claude mcp serve`, `dispatch/remote.py`) and `gh`. `RUSTY_CLOUD_ENV` names the
 `anthropic_cloud` environment's id when no coder routine exists yet to read it
@@ -35,9 +39,10 @@ import sys
 from datetime import datetime, timezone
 
 import ghrest
-from dispatch import brief, remote, routine
+from dispatch import brief, remote, routine, running
 
-USAGE = "usage: coder.py ISSUE [--dry-run]"
+USAGE = "usage: coder.py ISSUE [--dry-run] [--over-limit]"
+FLAGS = ("--dry-run", "--over-limit")
 
 
 def say(message: str) -> None:
@@ -51,18 +56,38 @@ def gh_json(path: str) -> object:
     return json.loads(done.stdout)
 
 
-def environment_id(env: dict, call) -> str:
-    """`RUSTY_CLOUD_ENV`, or the environment the newest coder routine ran in."""
-    if env.get("RUSTY_CLOUD_ENV"):
-        return env["RUSTY_CLOUD_ENV"]
+def routines(call) -> list[dict]:
+    """The account's routines, as the routines API lists them."""
     status, answer = call({"action": "list"})
     if status != 200 or not isinstance(answer, dict):
         raise remote.RemoteError(f"listing routines answered HTTP {status}: {str(answer)[:300]}")
-    found = routine.environment(answer.get("data") or [])
+    return answer.get("data") or []
+
+
+def environment_id(env: dict, listed: list[dict]) -> str:
+    """`RUSTY_CLOUD_ENV`, or the environment the newest coder routine ran in."""
+    if env.get("RUSTY_CLOUD_ENV"):
+        return env["RUSTY_CLOUD_ENV"]
+    found = routine.environment(listed)
     if found is None:
         raise brief.Refused("no coder routine exists to take the environment from: set RUSTY_CLOUD_ENV "
                             "to the id of the anthropic_cloud environment (claude.ai/code, Environments)")
     return found
+
+
+def check_limit(listed: list[dict], number: int, over: bool) -> None:
+    """Refuse a launch past [`running.LIMIT`] coders, unless `over`; name what was counted."""
+    counted, unknown = running.coders(listed, number)
+    for found in unknown:
+        say(f"cannot tell whether {found.get('name', '?')} is still running (fired, no run listed); not counted")
+    if len(counted) < running.LIMIT:
+        return
+    names = "; ".join(running.describe(found) for found in counted)
+    if over:
+        say(f"--over-limit: launching past {len(counted)} running coders ({names})")
+        return
+    raise brief.Refused(f"{len(counted)} cloud coders already waiting or running, the limit is {running.LIMIT} "
+                        f"(CLAUDE.md): {names}. Launch when one is ready, or pass --over-limit")
 
 
 def trigger_id(answer: object) -> str | None:
@@ -73,7 +98,7 @@ def trigger_id(answer: object) -> str | None:
 
 def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = None,
          env: dict | None = None) -> int:
-    args = [a for a in argv if a != "--dry-run"]
+    args = [a for a in argv if a not in FLAGS]
     if len(args) != 1 or not args[0].lstrip("#").isdigit():
         say(USAGE)
         return 1
@@ -86,7 +111,9 @@ def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = N
         return 2
     try:
         found = brief.read(issue, comments)
-        env_id = environment_id(os.environ if env is None else env, call)
+        listed = routines(call)
+        check_limit(listed, number, "--over-limit" in argv)
+        env_id = environment_id(os.environ if env is None else env, listed)
         made = routine.body(number, issue.get("title", ""), found.get("html_url", ""), env_id, repository,
                             now or datetime.now(timezone.utc))
         if dry:

@@ -7,6 +7,7 @@ mechanical, so they live here, one responsibility per module:
 
 - [`brief`]: the newest `Brief` comment on an issue;
 - [`routine`]: the one-off routine that starts a cloud coder on that brief;
+- [`running`]: how many coders are running, against the limit of five (#1856);
 - [`remote`]: the claude.ai routines API, reached through `claude mcp serve`;
 - [`review_level`]: `high` or `medium` for a pull request, from its paths;
 - [`rebriefs`]: how many briefs issues take, and why each re-brief happened (#1724).
