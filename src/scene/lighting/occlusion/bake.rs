@@ -71,9 +71,21 @@ pub fn bake_occlusion(
 }
 
 impl OcclusionInput {
-    #[cfg(test)]
-    pub(super) fn objects(&self) -> &[Object] {
-        &self.objects
+    /// Bake `count` cells spread over the grid on this thread, for a measurement
+    /// of a level too large to bake whole in a test: the grid's cell count and
+    /// edge, and the sheets the occluders fused into (count, bytes). `None` when
+    /// no grid is laid.
+    #[cfg(all(test, feature = "dev"))]
+    pub(crate) fn bake_sample(&self, count: usize) -> Option<(usize, f32, (usize, usize))> {
+        let scene = Baking::of(&self.objects);
+        let (min, max) = scene.bounds?;
+        let grid = Grid::over(min, max)?;
+        let cells = grid.cell_count() as u64;
+        for k in 0..count as u64 {
+            let cell = k.wrapping_mul(0x9E37_79B9_7F4A_7C15) % cells;
+            std::hint::black_box(scene.cell(&grid, cell as usize));
+        }
+        Some((grid.cell_count(), grid.cell, scene.sheets()))
     }
 
     /// Bake the PVS on `threads` workers, counting into `progress`; `None` when it

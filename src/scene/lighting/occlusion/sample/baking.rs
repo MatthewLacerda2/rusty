@@ -55,7 +55,7 @@ impl Baking {
     }
 
     /// How many sheets the occluders fused into, and the bytes they take.
-    #[cfg(test)]
+    #[cfg(all(test, feature = "dev"))]
     pub fn sheets(&self) -> (usize, usize) {
         self.polygons.sheet_bytes()
     }

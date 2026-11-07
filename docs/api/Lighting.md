@@ -400,7 +400,7 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   storeys, a doorway in every wall, two crates and a 1150-triangle sphere in each):
   a Kolvik-sized interior (5 × 5 rooms, 397 static meshes, 4704 cells of 2 m) bakes
   in about 5 s into 277 KB; a Dust2-sized level (20 × 20 rooms, 6344 meshes, 14580
-  cells of 3.9 m, each sampled as eight 2 m cubes) in about 14 minutes into 11.8 MB,
+  cells of 3.9 m, each sampled as eight 2 m cubes) in about 12 minutes into 11.8 MB,
   with the process peaking under 0.6 GB, about what the occluders' BVH alone takes
   (part 2 took some 8 hours on that level). Fewer cores take longer in proportion.
   What costs is the cells under the ground floor and across a storey's slab, where

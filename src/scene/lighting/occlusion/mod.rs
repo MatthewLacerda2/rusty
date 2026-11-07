@@ -67,10 +67,8 @@ pub use sample::{MAX_TARGETS, TARGET_SPACING, VOXEL};
 
 #[cfg(test)]
 mod bake_tests;
-#[cfg(test)]
-mod bench_level;
-#[cfg(test)]
-mod bench_tests;
+#[cfg(all(test, feature = "dev"))]
+pub(crate) mod bench_level;
 #[cfg(test)]
 mod carry_tests;
 #[cfg(test)]
