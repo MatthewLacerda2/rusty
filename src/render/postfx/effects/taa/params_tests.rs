@@ -41,38 +41,21 @@ fn the_lanes_are_where_the_shader_reads_them() {
         DISOCCLUSION_FULL,
     ];
     assert_eq!(p.rejection, rejection);
-    // The default tune (URP's defaults) reduces to the constants (#1847).
-    assert_eq!(p.knobs[0], FRAME_INFLUENCE);
-    assert_eq!(p.knobs[1], VARIANCE_CLAMP_SCALE);
-    // The quality rides `jitter.w`: `High` (the default) is level 3.
-    assert_eq!(p.jitter[3], 3.0);
+    // The quality's steps ride `levels`: `High` (the default) is URP's (2, 2, 2, 0).
+    assert_eq!(p.levels, [2.0, 2.0, 2.0, 0.0]);
     let wgsl = shader();
     for read in [
         "(pixels - taa.knobs.w) / (taa.rejection.y - taa.knobs.w)",
         "mix(taa.knobs.x, taa.rejection.x, moving)",
         "taa.rejection.w - taa.rejection.z",
         "(mismatch - taa.rejection.z) / span",
-        "return taa.jitter.w;",
+        "taa.levels.x",
+        "taa.levels.y",
+        "taa.levels.z",
+        "taa.levels.w",
     ] {
         assert!(wgsl.contains(read), "the shader no longer reads `{read}`");
     }
-}
-
-#[test]
-fn the_tune_carries_the_camera_knobs() {
-    use crate::components::{CameraComponent, TaaQuality};
-    let cam = CameraComponent {
-        taa_base_blend_factor: 0.8,
-        taa_variance_clamp_scale: 1.1,
-        taa_quality: TaaQuality::VeryHigh,
-        ..CameraComponent::default()
-    };
-    let tune = TaaTune::from_camera(&cam);
-    // Frame influence is URP's `1 - base_blend`.
-    assert!((tune.frame_influence - 0.2).abs() < 1e-6);
-    assert_eq!(tune.variance_clamp_scale, 1.1);
-    assert_eq!(tune.quality, 4.0);
-    assert_eq!(quality_level(TaaQuality::VeryLow), 0.0);
 }
 
 #[test]
@@ -86,10 +69,18 @@ fn the_struct_and_the_camera_count_match_the_shader() {
         .filter(|l| !l.starts_with("//") && l.contains(':'))
         .map(|l| l.split(':').next().unwrap())
         .collect();
-    let rust = ["size", "knobs", "scene", "jitter", "rejection", "lenses"];
+    let rust = [
+        "size",
+        "knobs",
+        "scene",
+        "jitter",
+        "levels",
+        "rejection",
+        "lenses",
+    ];
     assert_eq!(fields, rust);
     assert!(wgsl.contains(&format!("const MAX_CAMERAS: u32 = {MAX_CAMERAS}u;")));
-    assert_eq!(std::mem::size_of::<TaaParams>(), (5 + MAX_CAMERAS) * 16);
+    assert_eq!(std::mem::size_of::<TaaParams>(), (6 + MAX_CAMERAS) * 16);
 }
 
 #[test]

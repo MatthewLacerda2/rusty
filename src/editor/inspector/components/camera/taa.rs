@@ -30,7 +30,8 @@ pub(super) fn draw_taa(
     draw_quality(ui, (world, id), cam, is_dirty);
     for knob in camera_ops::TAA_KNOBS {
         let mut value = (knob.get)(cam);
-        if slider(ui, knob.field, &mut value, knob_range(knob.field)) {
+        let (lo, hi) = knob.range;
+        if slider(ui, knob.label, &mut value, lo..=hi) {
             if let Some(mut c) = world.camera_mut(id) {
                 (knob.set)(&mut c, value);
             }
@@ -53,21 +54,6 @@ fn draw_quality(
             camera_ops::set_taa_quality(&mut c, quality);
         }
         *is_dirty = true;
-    }
-}
-
-/// The slider range for a knob, by its field (the op clamps to the same bounds).
-fn knob_range(field: &str) -> std::ops::RangeInclusive<f32> {
-    match field {
-        "base_blend_factor" => {
-            CameraComponent::MIN_TAA_BASE_BLEND_FACTOR..=CameraComponent::MAX_TAA_BASE_BLEND_FACTOR
-        }
-        "variance_clamp_scale" => {
-            CameraComponent::MIN_TAA_VARIANCE_CLAMP_SCALE
-                ..=CameraComponent::MAX_TAA_VARIANCE_CLAMP_SCALE
-        }
-        "mip_bias" => CameraComponent::MIN_TAA_MIP_BIAS..=0.0,
-        _ => 0.0..=1.0, // jitter_scale, contrast_adaptive_sharpening
     }
 }
 

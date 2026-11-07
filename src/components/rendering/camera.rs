@@ -45,11 +45,11 @@ fn default_fxaa_active() -> bool {
 }
 
 crate::core::named_enum! {
-    /// TAA's quality (#1847, URP's `TemporalAAQuality`): the richer the level, the
-    /// more of the resolve runs. `VeryLow` drops motion dilation; `Low` adds it;
-    /// `Medium` adds variance clamping; `High` (URP's default) adds bicubic history;
-    /// `VeryHigh` re-filters the current pixel. rusty's reveal (#1846) and reactive
-    /// (#1845) rules run at every level.
+    /// TAA's quality (#1847, URP's `TemporalAAQuality`): each level runs URP's
+    /// `DoTemporalAA` steps for it (`render::postfx::effects::taa::params::levels`),
+    /// from `VeryLow`'s cross box and undilated motion to `VeryHigh`'s variance
+    /// clipping and re-filtered pixel; `High` is URP's default. rusty's reveal
+    /// (#1846) and reactive (#1845) rules run at every level.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum TaaQuality {
         VeryLow = "VeryLow",
@@ -135,7 +135,7 @@ pub struct CameraComponent {
     /// bias TAAU already applies while upscaling.
     #[serde(default)]
     pub taa_mip_bias: f32,
-    /// URP's TAA *Contrast Adaptive Sharpening* (#1847): AMD's RCAS over the resolve,
+    /// URP's TAA *Contrast Adaptive Sharpening* (#1847): AMD's RCAS on the tonemapped image,
     /// `0`..`1`; `0` (default) runs no sharpen, leaving the frame untouched.
     #[serde(default)]
     pub taa_contrast_adaptive_sharpening: f32,

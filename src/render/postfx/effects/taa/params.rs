@@ -72,7 +72,9 @@ pub(crate) const DISOCCLUSION_START: f32 = 0.1;
 pub(crate) const DISOCCLUSION_FULL: f32 = 0.25;
 
 // The shader divides by both ramps' spans, and a moving pixel weighs more than a
-// still one: a constant edited out of order fails the build.
+// still one at URP's default: a constant edited out of order fails the build. A
+// camera's own Base Blend Factor can lift the still weight past the moving one;
+// `TaaParams::new` then raises the moving weight to match.
 const _: () = assert!(STILL_PIXELS < MOVING_PIXELS);
 const _: () = assert!(DISOCCLUSION_START < DISOCCLUSION_FULL);
 const _: () = assert!(FRAME_INFLUENCE < MOVING_FRAME_INFLUENCE && MOVING_FRAME_INFLUENCE <= 1.0);
@@ -85,6 +87,7 @@ pub(super) struct TaaParams {
     knobs: [f32; 4],
     scene: [f32; 4],
     jitter: [f32; 4],
+    levels: [f32; 4],
     rejection: [f32; 4],
     lenses: [[f32; 4]; MAX_CAMERAS],
 }
@@ -109,15 +112,15 @@ pub(super) fn lenses(stack: &[Camera], aspect: f32) -> [[f32; 4]; MAX_CAMERAS] {
 }
 
 /// The camera's TAA knobs the resolve reads (#1847): the still pixel's frame
-/// influence (`1 - base_blend`), the variance clamp scale and the quality level
-/// (0 `VeryLow` … 4 `VeryHigh`, [`quality_level`]). URP's defaults reduce to the
-/// constants [`FRAME_INFLUENCE`], [`VARIANCE_CLAMP_SCALE`] and `High`, so a camera
-/// left at its defaults resolves bit for bit as before (#1847).
+/// influence (`1 - base_blend`), the variance clamp scale and the quality level's
+/// steps ([`levels`]). URP's defaults reduce to the constants [`FRAME_INFLUENCE`],
+/// [`VARIANCE_CLAMP_SCALE`] and `High`, so a camera left at its defaults resolves
+/// bit for bit as before (#1847).
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TaaTune {
     pub frame_influence: f32,
     pub variance_clamp_scale: f32,
-    pub quality: f32,
+    pub levels: [f32; 4],
 }
 
 impl TaaTune {
@@ -126,7 +129,7 @@ impl TaaTune {
         Self {
             frame_influence: (1.0 - cam.taa_base_blend_factor).clamp(0.0, 1.0),
             variance_clamp_scale: cam.taa_variance_clamp_scale,
-            quality: quality_level(cam.taa_quality),
+            levels: levels(cam.taa_quality),
         }
     }
 }
@@ -137,18 +140,31 @@ impl Default for TaaTune {
         Self {
             frame_influence: FRAME_INFLUENCE,
             variance_clamp_scale: VARIANCE_CLAMP_SCALE,
-            quality: quality_level(crate::components::TaaQuality::default()),
+            levels: levels(crate::components::TaaQuality::default()),
         }
     }
 }
 
-/// A quality level as the shader reads it (`taa.jitter.w`): its index in
-/// `TaaQuality::ALL`, 0 `VeryLow` … 4 `VeryHigh`.
-pub(crate) fn quality_level(quality: crate::components::TaaQuality) -> f32 {
-    crate::components::TaaQuality::ALL
-        .iter()
-        .position(|q| *q == quality)
-        .unwrap_or(3) as f32
+/// A quality level's steps as the shader reads them (`taa.levels`): URP's
+/// `DoTemporalAA(clamp, motion, history, central)` arguments per level
+/// (`TemporalAA.shader`'s passes):
+/// - **clamp** 0 the 5-tap cross's min/max box, 2 the 3×3's narrowed by the variance,
+///   3 that box with the history clipped toward its centre (`ClipToAABBCenter`)
+///   rather than clamped;
+/// - **motion** 0 the pixel's own velocity, 1 the frontmost of its 5-tap cross,
+///   2 of its 3×3;
+/// - **history** 0 and 1 one bilinear read (rusty drops an off-image history at
+///   every level, where URP's 0 keeps it), 2 the 5-tap bicubic;
+/// - **central** 1 re-filters the current pixel toward its jittered average.
+pub(crate) fn levels(quality: crate::components::TaaQuality) -> [f32; 4] {
+    use crate::components::TaaQuality::*;
+    match quality {
+        VeryLow => [0.0, 0.0, 0.0, 0.0],
+        Low => [0.0, 1.0, 1.0, 0.0],
+        Medium => [2.0, 2.0, 1.0, 0.0],
+        High => [2.0, 2.0, 2.0, 0.0],
+        VeryHigh => [3.0, 2.0, 2.0, 1.0],
+    }
 }
 
 impl TaaParams {
@@ -175,14 +191,12 @@ impl TaaParams {
                 STILL_PIXELS,
             ],
             scene: dims(scene),
-            jitter: [
-                jitter.x,
-                jitter.y,
-                f32::from(u8::from(reactive)),
-                tune.quality,
-            ],
+            jitter: [jitter.x, jitter.y, f32::from(u8::from(reactive)), 0.0],
+            levels: tune.levels,
             rejection: [
-                MOVING_FRAME_INFLUENCE,
+                // A moving pixel never trusts its history more than a still one,
+                // whatever the camera's Base Blend Factor (#1847).
+                MOVING_FRAME_INFLUENCE.max(tune.frame_influence),
                 MOVING_PIXELS,
                 DISOCCLUSION_START,
                 DISOCCLUSION_FULL,
@@ -196,7 +210,7 @@ impl TaaParams {
     #[cfg(test)]
     pub(super) fn without(mut self, rules: Rules) -> Self {
         if !rules.moving {
-            self.rejection[0] = FRAME_INFLUENCE;
+            self.rejection[0] = self.knobs[0];
         }
         if !rules.reveal {
             // Out of reach of any gap, yet a finite span to divide by.
@@ -225,6 +239,9 @@ impl Default for Rules {
     }
 }
 
+#[cfg(test)]
+#[path = "levels_tests.rs"]
+mod levels_tests;
 #[cfg(test)]
 #[path = "params_tests.rs"]
 mod tests;

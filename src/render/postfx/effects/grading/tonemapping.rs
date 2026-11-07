@@ -25,7 +25,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
             pack: pack_gamma,
         },
     ],
-    pass: None,
+    passes: &[],
 };
 
 /// x: the operator's index; none (clamp only) without a volume.

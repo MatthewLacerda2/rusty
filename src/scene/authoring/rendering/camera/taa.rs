@@ -63,11 +63,15 @@ pub fn set_taa_contrast_adaptive_sharpening(c: &mut CameraComponent, value: f32)
 
 /// One numeric TAA knob (#1847): the counterpart of a volume effect's `Knob`, but
 /// over the camera component. `field` is the tween path's last part
-/// (`Graphics.taa.<field>`), `api` the `Graphics.Get/Set<api>` pair's name.
+/// (`Graphics.taa.<field>`), `api` the `Graphics.Get/Set<api>` pair's name, `label`
+/// URP's display name and `range` the Inspector slider's bounds, the same ones its
+/// `set` clamps to.
 #[derive(Debug)]
 pub struct CameraKnob {
     pub field: &'static str,
     pub api: &'static str,
+    pub label: &'static str,
+    pub range: (f32, f32),
     pub get: fn(&CameraComponent) -> f32,
     pub set: fn(&mut CameraComponent, f32),
 }
@@ -79,30 +83,46 @@ pub const TAA_KNOBS: &[CameraKnob] = &[
     CameraKnob {
         field: "base_blend_factor",
         api: "TaaBaseBlendFactor",
+        label: "Base Blend Factor",
+        range: (
+            CameraComponent::MIN_TAA_BASE_BLEND_FACTOR,
+            CameraComponent::MAX_TAA_BASE_BLEND_FACTOR,
+        ),
         get: |c| c.taa_base_blend_factor,
         set: set_taa_base_blend_factor,
     },
     CameraKnob {
         field: "variance_clamp_scale",
         api: "TaaVarianceClampScale",
+        label: "Variance Clamp Scale",
+        range: (
+            CameraComponent::MIN_TAA_VARIANCE_CLAMP_SCALE,
+            CameraComponent::MAX_TAA_VARIANCE_CLAMP_SCALE,
+        ),
         get: |c| c.taa_variance_clamp_scale,
         set: set_taa_variance_clamp_scale,
     },
     CameraKnob {
         field: "jitter_scale",
         api: "TaaJitterScale",
+        label: "Jitter Scale",
+        range: (0.0, 1.0),
         get: |c| c.taa_jitter_scale,
         set: set_taa_jitter_scale,
     },
     CameraKnob {
         field: "mip_bias",
         api: "TaaMipBias",
+        label: "Mip Bias",
+        range: (CameraComponent::MIN_TAA_MIP_BIAS, 0.0),
         get: |c| c.taa_mip_bias,
         set: set_taa_mip_bias,
     },
     CameraKnob {
         field: "contrast_adaptive_sharpening",
         api: "TaaContrastAdaptiveSharpening",
+        label: "Contrast Adaptive Sharpening",
+        range: (0.0, 1.0),
         get: |c| c.taa_contrast_adaptive_sharpening,
         set: set_taa_contrast_adaptive_sharpening,
     },
@@ -151,6 +171,18 @@ mod tests {
         assert_eq!(c.taa_mip_bias, CameraComponent::MIN_TAA_MIP_BIAS);
         set_taa_contrast_adaptive_sharpening(&mut c, 9.0);
         assert_eq!(c.taa_contrast_adaptive_sharpening, 1.0);
+    }
+
+    #[test]
+    fn each_knob_clamps_to_its_own_range() {
+        // The slider's range and the op's clamp are one pair of bounds.
+        for knob in TAA_KNOBS {
+            let mut c = CameraComponent::default();
+            (knob.set)(&mut c, -1e6);
+            assert_eq!((knob.get)(&c), knob.range.0, "{} low", knob.field);
+            (knob.set)(&mut c, 1e6);
+            assert_eq!((knob.get)(&c), knob.range.1, "{} high", knob.field);
+        }
     }
 
     #[test]

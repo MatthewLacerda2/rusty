@@ -1,11 +1,10 @@
-//! Contrast-adaptive sharpening (#1847) on lavapipe: RCAS over the TAA resolve. At
-//! strength 0 the sharpen pass never runs, so the frame is byte-identical to no
-//! sharpen; above 0 an edge's contrast rises while a flat area stays put (RCAS's
+//! Contrast-adaptive sharpening (#1847) on lavapipe: RCAS on the tonemapped image
+//! of a frame TAA resolved. At strength 0 the sharpen pass is never recorded; above 0 an edge's contrast rises while a flat area stays put (RCAS's
 //! symmetric lobe cancels on a flat neighbourhood, so there is no ringing).
 
 use glam::Vec3;
 
-use super::fixture::{eye, renderer, settle, taa_scene, tilted_cube, view};
+use super::super::fixture::{eye, renderer, settle, taa_scene, tilted_cube, view};
 use crate::core::settings::render_scale::RenderScale;
 use crate::render::motion::gpu_fixture::{H, W};
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -38,24 +37,28 @@ fn total_variation(frame: &[u8]) -> u64 {
     tv
 }
 
+/// Whether `view` holds the sharpen's target: it ran this frame.
+fn sharpens(view: &RenderView) -> bool {
+    let targets = &view.post_fx.targets;
+    targets
+        .get::<super::super::super::sharpen::SharpenTargets>()
+        .is_some()
+}
+
 #[test]
-fn gpu_sharpen_at_zero_is_byte_identical_to_no_sharpen() {
+fn gpu_sharpen_at_zero_records_no_pass() {
     let Some(mut r) = renderer() else { return };
-    // A default camera runs no sharpen; an explicit strength of 0 must match it
-    // byte for byte, because the pass is never dispatched.
-    // An explicit strength of 0 matches the untouched (default-0) camera byte for
-    // byte: the sharpen pass is never dispatched.
+    // At strength 0 the pass is never recorded: the view holds no sharpen target,
+    // and the frame matches a default camera's (also 0) byte for byte. Above 0
+    // the target is held, so the check is not vacuous.
     let (zero_scene, _) = sharpen_scene(0.0);
-    let (mut none_scene, _) = taa_scene(true, true);
-    tilted_cube(&mut none_scene, Vec3::new(0.0, 0.0, -4.0));
+    let (on_scene, _) = sharpen_scene(0.9);
     let (mut a, mut b) = (view(&r), view(&r));
-    let zero = settle(&mut r, &mut a, &zero_scene, &eye(0.0), 24);
-    let off = settle(&mut r, &mut b, &none_scene, &eye(0.0), 24);
-    let diffs = zero.iter().zip(&off).filter(|(a, b)| a != b).count();
-    assert_eq!(
-        diffs, 0,
-        "{diffs} bytes differ with the sharpen at strength 0"
-    );
+    let zero = settle(&mut r, &mut a, &zero_scene, &eye(0.0), 4);
+    assert!(!sharpens(&a), "strength 0 recorded the sharpen");
+    let on = settle(&mut r, &mut b, &on_scene, &eye(0.0), 4);
+    assert!(sharpens(&b), "strength 0.9 did not sharpen");
+    assert_ne!(zero, on, "the sharpen changed nothing");
 }
 
 #[test]

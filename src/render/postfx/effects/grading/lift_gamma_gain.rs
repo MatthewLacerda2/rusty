@@ -21,7 +21,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         slots: 3,
         pack,
     }],
-    pass: None,
+    passes: &[],
 };
 
 /// Slot 0: lift (xyz); slot 1: `1 / gamma`; slot 2: gain. The neutral wheels without

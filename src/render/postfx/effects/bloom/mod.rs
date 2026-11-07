@@ -49,7 +49,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         pack,
     }],
     grade: &[],
-    pass: Some(Pass::Scene { order: 40, run }),
+    passes: &[Pass::Scene { order: 40, run }],
 };
 
 /// Whether `cx`'s volume blooms this frame.

@@ -22,7 +22,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         slots: 2,
         pack,
     }],
-    pass: None,
+    passes: &[],
 };
 
 /// Slot 0: the LUT's input range start (xyz) and its contribution held to `0..=1`

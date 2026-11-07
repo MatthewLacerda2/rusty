@@ -154,14 +154,14 @@ impl Renderer {
     }
 }
 
-/// Each camera's view-projection at `aspect`, and beside it each one's entity, which
-/// keeps its motion history (#1435).
 /// The base camera's TAA jitter-scale and mip-bias knobs (#1847); a view with no
 /// camera keeps URP's defaults, so it jitters and samples as before.
 fn taa_knobs(camera: Option<&crate::components::CameraComponent>) -> (f32, f32) {
     camera.map_or((1.0, 0.0), |c| (c.taa_jitter_scale, c.taa_mip_bias))
 }
 
+/// Each camera's view-projection at `aspect`, and beside it each one's entity, which
+/// keeps its motion history (#1435).
 fn matrices(pass: &StackPass, aspect: f32) -> (Vec<glam::Mat4>, Vec<(Option<u32>, glam::Mat4)>) {
     let view_projs: Vec<_> = (pass.stack.iter())
         .map(|c| c.build_view_projection(aspect))

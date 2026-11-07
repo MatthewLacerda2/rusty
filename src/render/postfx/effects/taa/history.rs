@@ -126,7 +126,7 @@ impl TaaHistory {
 pub(crate) fn chain_size(view: &RenderView, on: bool) -> (u32, u32) {
     let size = match upscales(view, on) {
         true => view.size(),
-        false => view.scene_size(),
+        false => view.scene_size(), // chain-size: scene the resolve's own input
     };
     (size.width, size.height)
 }
@@ -134,7 +134,7 @@ pub(crate) fn chain_size(view: &RenderView, on: bool) -> (u32, u32) {
 /// Whether `view`, running TAA when `on` ([`super::runs`]), upscales through it this
 /// frame (TAAU): its scene is smaller than its output.
 pub(crate) fn upscales(view: &RenderView, on: bool) -> bool {
-    on && jitter::upscales(view.scene_size(), view.size())
+    on && jitter::upscales(view.scene_size(), view.size()) // chain-size: scene compared to the output
 }
 
 /// Start a stack's frame, after the motion history's `begin`: with `on`, fit the
@@ -155,7 +155,7 @@ pub(crate) fn begin(
     on: bool,
     (jitter_scale, mip_bias): (f32, f32),
 ) -> TaaFrame {
-    let (scene, output) = (view.scene_size(), view.size());
+    let (scene, output) = (view.scene_size(), view.size()); // chain-size: scene the jitter's
     let cut = view.post_fx.motion.history.cut();
     let targets = &mut view.post_fx.targets;
     if !on {

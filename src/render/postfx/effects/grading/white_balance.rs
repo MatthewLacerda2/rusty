@@ -19,7 +19,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         slots: 1,
         pack,
     }],
-    pass: None,
+    passes: &[],
 };
 
 /// xyz: the LMS coefficients, w: `1` when white balance runs (neutral skips it).

@@ -16,6 +16,7 @@ fn a_missing_part_is_flagged_by_name() {
     l.sections.retain(|n| n != "vignette");
     l.docs = l.docs.replace("<!-- effect: fxaa -->", "");
     l.docs = l.docs.replace("`Graphics.bloom.threshold`", "");
+    l.docs = l.docs.replace("`Graphics.taa.mip_bias`", "");
     l.settings.push("lens_dirt".into());
     let problems = check(&l).join("\n");
     for needle in [
@@ -23,6 +24,7 @@ fn a_missing_part_is_flagged_by_name() {
         "`vignette` has no Inspector section",
         "`fxaa` has no section in the Graphics doc",
         "`Graphics.bloom.threshold` is not in docs",
+        "`Graphics.taa.mip_bias` is not in docs",
         "PostProcessingComponent lists `lens_dirt`",
     ] {
         assert!(

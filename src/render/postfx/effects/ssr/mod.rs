@@ -37,7 +37,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     module: None,
     composite: &[],
     grade: &[],
-    pass: None,
+    passes: &[],
 };
 
 /// The march `ssr` runs under `graphics`: its quality level's row of the running

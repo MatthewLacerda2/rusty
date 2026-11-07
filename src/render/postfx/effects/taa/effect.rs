@@ -16,10 +16,13 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     module: None,
     composite: &[],
     grade: &[],
-    pass: Some(Pass::Scene {
-        order: 15,
-        run: resolve,
-    }),
+    passes: &[
+        Pass::Scene {
+            order: 15,
+            run: resolve,
+        },
+        super::sharpen::PASS,
+    ],
 };
 
 /// The resolve; [`super::begin`] already chose whether this view runs it, and held
@@ -37,14 +40,6 @@ fn resolve(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
         .unwrap_or_default();
     view.post_fx
         .run_taa(gpu, &r.post_passes.taa, &r.gpu_timer, tune, lenses);
-    // Contrast-adaptive sharpen over the resolve (#1847): only when the camera asks.
-    let sharpen = cx
-        .effect
-        .post
-        .camera
-        .map_or(0.0, |c| c.taa_contrast_adaptive_sharpening);
-    view.post_fx
-        .run_sharpen(gpu, &r.post_passes.taa.sharpen, &r.gpu_timer, sharpen);
 }
 
 /// Whether `post`'s camera runs TAA, through [`effect_runs`]: its component has it

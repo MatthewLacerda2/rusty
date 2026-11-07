@@ -30,7 +30,9 @@
 //! **Defaults (URP's `TemporalAA.Settings`).** Frame influence 0.1 for a still pixel
 //! (*Base Blend Factor* 0.9; [`params`] for a moving or revealed one), variance clamp scale 0.9, jitter scale 1, mip bias 0 when not
 //! upscaling (`log2(scene/output)` when it is, on the material maps only), no
-//! sharpening.
+//! sharpening. The camera tunes each (#1847, [`params::TaaTune`]), and its
+//! contrast-adaptive sharpen is TAA's second pass, an LDR one after the
+//! composite ([`sharpen`]).
 
 mod effect;
 pub(crate) mod history;
@@ -43,7 +45,7 @@ mod upscale;
 
 pub(crate) use effect::{runs, wanted, EFFECT};
 pub(crate) use history::{begin, chain_size, upscales, TaaFrame, TaaHistory};
-pub(crate) use sharpen::{Sharpen, SharpenTargets};
+pub(crate) use sharpen::Sharpen;
 
 use params::TaaParams;
 
@@ -62,9 +64,6 @@ pub(crate) struct TaaPasses {
     sampler: wgpu::Sampler,
     resolve: LazyPipeline,
     upscale: LazyPipeline,
-    /// The contrast-adaptive sharpen that runs after the resolve (#1847); reusable
-    /// by #1848's upscaler.
-    pub(crate) sharpen: Sharpen,
 }
 
 impl TaaPasses {
@@ -113,7 +112,6 @@ impl TaaPasses {
             sampler,
             resolve,
             upscale,
-            sharpen: Sharpen::new(device, registry),
         }
     }
 
@@ -147,12 +145,8 @@ impl TaaPasses {
     }
 
     /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
-        [
-            &self.resolve,
-            &self.upscale,
-            self.sharpen.lazy_pipelines()[0],
-        ]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
+        [&self.resolve, &self.upscale]
     }
 }
 
@@ -176,7 +170,8 @@ impl PostFx {
         let (read, write) = (h.latest, 1 - h.latest);
         let drawn = self.take_reactive_drawn();
         let frame = (h.valid, h.pixels, drawn);
-        let params = TaaParams::new((h.size, self.full_size), frame, tune, lenses);
+        let sizes = (h.size, self.full_size); // chain-size: scene the frame TAA reads
+        let params = TaaParams::new(sizes, frame, tune, lenses);
         #[cfg(test)]
         let params = params.without(h.rules);
         queue.write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
@@ -226,7 +221,7 @@ mod gpu;
 pub(crate) fn jitter_of(view: &crate::render::RenderView) -> glam::Vec2 {
     let history = view.post_fx.targets.get::<TaaHistory>();
     history.map_or(glam::Vec2::ZERO, |h| {
-        jitter::ndc(h.pixels, view.scene_size())
+        jitter::ndc(h.pixels, view.scene_size()) // chain-size: scene the jitter's
     })
 }
 

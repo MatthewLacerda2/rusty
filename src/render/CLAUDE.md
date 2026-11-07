@@ -121,8 +121,9 @@ every file and row.
   (`CAMERA_SECTIONS` for a camera effect).
 - **Render** — `render/postfx/effects/<effect>.rs` (or a folder) and its row in
   `POST_EFFECTS`: composite functions (`Phase::Hdr` before the grade, `Phase::Display`
-  after it), grade functions (the LUT bake) and/or a pass (`Pass::Scene` before the
-  composite, `Pass::Ldr` after it), **each placed by the order it declares**. Its WGSL
+  after it), grade functions (the LUT bake) and/or passes (`Pass::Scene` before the
+  composite, `Pass::Ldr` after it; TAA has one of each), **each placed by the order
+  it declares**. Its WGSL
   is a module at `engine/shaders/postfx/effects/<effect>.wgsl` with
   `#define_import_path postfx::effects::<effect>`: a function takes the colour, the
   `Frag` (composite only), one `texture_2d<f32>` per composite texture and one `vec4`

@@ -118,7 +118,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
 | `Graphics.GetTaaActive` / `SetTaaActive` | `()` / `(bool)` | `bool` (**default `false`**; `false` with no screen camera; see *TAA*) |
 | `Graphics.GetTaaBaseBlendFactor` / `SetTaaBaseBlendFactor` | `()` / `(value)` | `number`: URP's *Base Blend Factor*, the history's share for a still pixel (frame influence is `1 - base`; clamped 0.6–0.98, **default `0.9`**; see *TAA*) |
-| `Graphics.GetTaaContrastAdaptiveSharpening` / `SetTaaContrastAdaptiveSharpening` | `()` / `(value)` | `number`: RCAS strength over the resolve (clamped 0–1, **default `0`**: no sharpen; see *TAA*) |
+| `Graphics.GetTaaContrastAdaptiveSharpening` / `SetTaaContrastAdaptiveSharpening` | `()` / `(value)` | `number`: RCAS strength, on the tonemapped image after the resolve (clamped 0–1, **default `0`**: no sharpen; see *TAA*) |
 | `Graphics.GetTaaJitterScale` / `SetTaaJitterScale` | `()` / `(value)` | `number`: URP's *Jitter Scale* on the sub-pixel jitter (clamped 0–1, **default `1`**; see *TAA*) |
 | `Graphics.GetTaaMipBias` / `SetTaaMipBias` | `()` / `(value)` | `number`: URP's *Mip Bias* on material-map sampling, added to the bias TAAU applies (clamped −1–0, **default `0`**; see *TAA*) |
 | `Graphics.GetTaaQuality` / `SetTaaQuality` | `()` / `(name)` | `"VeryLow"` / `"Low"` / `"Medium"` / `"High"` / `"VeryHigh"` (**default `"High"`**, URP's; names are case-insensitive, an unknown one raises an error listing them; see *TAA*) |
@@ -879,22 +879,41 @@ for the capture (`Graphics.SetTaaActive(false)`: FXAA then runs, if it is on).
 **Camera TAA settings** (#1847, URP's `taaSettings`). The resolve's strength is on
 the camera, by URP's names and defaults; the Inspector's Camera card edits the same
 fields, saved with the scene. **Base Blend Factor** is the history's share for a
-still pixel (frame influence `1 - base`; `0.9` is URP's 0.1 influence). **Variance
-Clamp Scale** is the colour box's half-width in deviations (`0.9`). **Jitter Scale**
-scales the sub-pixel offset (`1`). **Mip Bias** biases material-map sampling toward
-sharper mips (`0`, added to the negative bias TAAU applies). The `1847` moving and
-reveal rules stay fixed constants. **Quality** (URP's `VeryLow`…`VeryHigh`, default
-`High`) sets how much of the resolve runs: `VeryLow` drops the 3×3 motion dilation,
-`Low` adds it, `Medium` adds the variance clamp, `High` (URP's default, what the
-resolve always did) adds the bicubic history, and `VeryHigh` re-filters the current
-pixel toward its jittered average. rusty's reveal and reactive rules run at every
-level.
+still pixel (frame influence `1 - base`; `0.9` is URP's 0.1 influence). A moving
+pixel's weight (0.25, #1846) never drops below the still one's, so a low Base Blend
+Factor never makes motion ghost more than stillness. **Variance Clamp Scale** is the
+colour box's half-width in deviations (`0.9`). **Jitter Scale** scales the sub-pixel
+offset (`1`). **Mip Bias** biases material-map sampling toward sharper mips (`0`,
+added to the negative bias TAAU applies). The float ranges (Base Blend Factor
+`0.6`..`0.98`, Variance Clamp Scale `0.6`..`1.2`, Jitter Scale `0`..`1`, Mip Bias
+`-1`..`0`, sharpening `0`..`1`) are URP's Camera Inspector bounds, which every
+setter here clamps to; URP's own script setters accept wider values. #1846's moving
+and reveal rules stay fixed constants.
+
+**Quality** (URP's `VeryLow`…`VeryHigh`, default `High`) picks URP's
+`DoTemporalAA(clamp, motion, history, central)` for each level:
+
+| Quality | Colour box | Motion | History | Current pixel |
+|---|---|---|---|---|
+| `VeryLow` | 5-tap cross, min/max | the pixel's own | bilinear | point |
+| `Low` | 5-tap cross, min/max | frontmost of the 5-tap cross | bilinear | point |
+| `Medium` | 3×3, variance clamp | frontmost of the 3×3 | bilinear | point |
+| `High` | 3×3, variance clamp | frontmost of the 3×3 | 5-tap bicubic | point |
+| `VeryHigh` | 3×3, variance, clipped toward the centre | frontmost of the 3×3 | 5-tap bicubic | re-filtered |
+
+`High` is what the resolve always did. Where rusty differs from URP: a history that
+reprojects off the image is dropped at every level (URP's `VeryLow` keeps it);
+while TAA upscales, the box is always the 3×3 the reconstruction reads, narrowed
+by the variance from `Medium` up; and rusty's reveal and reactive rules run at
+every level.
 
 **Contrast Adaptive Sharpening** (#1847, URP's TAA *Contrast Adaptive Sharpening*)
-runs AMD's RCAS over the resolve, at the output's size, to counter TAA's softness
-(and TAAU's at low scales). Its strength is `0`..`1`; `0` (the default) runs no pass
-and leaves the frame byte-identical, so a game turns it on only where it wants it.
-The sharpened image is what motion blur, bloom and the composite then read.
+runs AMD's RCAS where URP does, in the final post pass: on the tonemapped image
+after the composite and the authored effects, at the output's size, to counter
+TAA's softness (and TAAU's at low scales). Bloom, the exposure meter and motion
+blur read the unsharpened scene. Its strength is `0`..`1`; `0` (the default) runs
+no pass and leaves the frame byte-identical, so a game turns it on only where it
+wants it. It runs only on a frame TAA resolved.
 
 Tween paths (the float knobs, through the camera entity): `Graphics.taa.base_blend_factor`, `Graphics.taa.variance_clamp_scale`, `Graphics.taa.jitter_scale`, `Graphics.taa.mip_bias`, `Graphics.taa.contrast_adaptive_sharpening` (the quality, a mode, does not tween).
 

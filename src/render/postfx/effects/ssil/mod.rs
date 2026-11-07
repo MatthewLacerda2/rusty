@@ -85,7 +85,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     module: None,
     composite: &[],
     grade: &[],
-    pass: None,
+    passes: &[],
 };
 
 /// What a view's SSIL does this frame, when it runs: the volume's look within its

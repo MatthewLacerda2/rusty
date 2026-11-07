@@ -80,9 +80,10 @@ fn scene_passes_have_their_own_order_and_a_finishing_pass_runs_last() {
     for ldr in [false, true] {
         let mut orders: Vec<u16> = POST_EFFECTS
             .iter()
-            .filter_map(|e| match e.pass {
-                Some(Pass::Scene { order, .. }) if !ldr => Some(order),
-                Some(Pass::Ldr { order, .. }) if ldr => Some(order),
+            .flat_map(|e| e.passes)
+            .filter_map(|pass| match *pass {
+                Pass::Scene { order, .. } if !ldr => Some(order),
+                Pass::Ldr { order, .. } if ldr => Some(order),
                 _ => None,
             })
             .collect();

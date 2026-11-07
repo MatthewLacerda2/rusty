@@ -17,11 +17,11 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     module: None,
     composite: &[],
     grade: &[],
-    pass: Some(Pass::Ldr {
+    passes: &[Pass::Ldr {
         order: 10,
         prepare,
         run: LdrRun::InPlace(run),
-    }),
+    }],
 };
 
 /// No authored params: a view without a volume.
