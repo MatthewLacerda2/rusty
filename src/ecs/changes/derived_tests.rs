@@ -138,6 +138,11 @@ fn a_reparent_under_an_adopted_child_is_refused() {
         &[Op::On(1, Overwrite(false, false)), Op::Spawn, Op::Read],
     ]
     .concat();
+    let mut w = World::new();
+    ops[..8].iter().for_each(|op| apply(&mut w, op));
+    let (e, before) = (w.ids()[5], w.parent_id(w.ids()[5]));
+    apply(&mut w, &ops[8]);
+    assert_eq!(w.parent_id(e), before, "a cycle is refused");
     let poses = |w: &World, id| Some(bits(w.local_to_world(id)));
     kept_equals_rebuilt::<WorldPose, _>(&ops, poses).expect("kept equals rebuilt");
 }

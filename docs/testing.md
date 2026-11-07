@@ -293,7 +293,8 @@ cargo-nextest` (CI uses `taiki-e/install-action`). What it buys over `cargo test
   after 5 min.
 - **A fixed proptest seed in the gates, a random one in exploring** (#1800, #1852).
   `ci.yml` runs its gates on one `PROPTEST_RNG_SEED`, and `make test` (so `make
-  gates`) reads that same number from `ci.yml`, so a red proptest comes from the
+  gates`) and `make test-one-process` read that same number from `ci.yml` (the
+  Makefile exports it to every recipe), so a red proptest comes from the
   branch under test, never from a seed that happened to draw an old bug. An exported
   `PROPTEST_RNG_SEED` wins, to reproduce a reported seed. Exploring reports and never
   blocks: the nightly `ci.yml` run and `make test-explore` draw fresh seeds
