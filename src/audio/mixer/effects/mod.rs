@@ -2,7 +2,8 @@
 //!
 //! Unity's mixer effects and Godot's bus effects, cut to a small fixed set: every
 //! group carries an ordered [`EffectChain`] of up to [`MAX_EFFECTS`] effects, run
-//! after its filters and before its volume. The kinds are rows of [`KINDS`]
+//! after its filters and before its volume (Master's after its volume and the
+//! reverb bus, on the device's main track, #1855). The kinds are rows of [`KINDS`]
 //! (`kinds/`): a compressor (with an optional sidechain from another group), a
 //! limiter, an EQ, a distortion and a delay. Each row names its parameters
 //! ([`Param`]) and builds the DSP that runs it on the audio thread ([`Dsp`]), so a
@@ -124,7 +125,8 @@ impl EffectChain {
     }
 
     /// Master's default: one limiter at its −0.3 dBFS ceiling, so a loud moment
-    /// never takes Master past it (the reverb bus adds after it, beside Master).
+    /// never takes the mix past it. Master's chain runs after the reverb bus sums
+    /// in (`device/groups.rs`, #1855), so the limiter holds the reverb too.
     pub fn master() -> EffectChain {
         let limiter = KindId::named("limiter").map(EffectParams::defaults);
         EffectChain::of(&limiter.into_iter().collect::<Vec<_>>()).unwrap_or_default()

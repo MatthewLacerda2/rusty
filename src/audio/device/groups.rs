@@ -6,7 +6,14 @@
 //! filter is switched fully dry, so it is bit-transparent) and routes a send into
 //! the one reverb bus (`reverb.rs`, tuned by reverb zones, #469). After the
 //! filters, the group's effect chain runs in its rack (`mixer/effects/rack.rs`,
-//! #1748), which also publishes the group's level for sidechains. Volume,
+//! #1748), which also publishes the group's level for sidechains.
+//!
+//! **Master's rack is the exception** (#1855): kira sums a send track only into
+//! its main track, never into a sub-track, so the reverb bus adds up beside
+//! Master's track, not through it. Master's chain therefore runs on the main
+//! track ([`MasterRack`]), after Master's track (its filters, volume and send) and
+//! the reverb bus have summed, and before the speaker-mode stage (`output.rs`):
+//! its default limiter holds the whole mix, reverb included. Volume,
 //! cutoffs and the send move with kira's 10 ms tween, so a snapshot stepped once a
 //! frame never clicks.
 
@@ -16,7 +23,7 @@ use crate::core::collections::Map;
 
 use kira::backend::Backend;
 use kira::effect::filter::{FilterBuilder, FilterHandle, FilterMode};
-use kira::track::{TrackBuilder, TrackHandle};
+use kira::track::{MainTrackBuilder, TrackBuilder, TrackHandle};
 use kira::{AudioManager, Decibels, Mix, Tween};
 
 use super::gate::{Gated, Wake};
@@ -45,8 +52,26 @@ struct GroupTrack {
     pub track: TrackHandle,
     low_pass: FilterHandle,
     high_pass: FilterHandle,
+    /// The group's effect rack; `None` for Master, whose rack is the [`MasterRack`].
+    rack: Option<RackHandle>,
+    wake: Wake,
+}
+
+/// Master's effect rack, on kira's main track (module docs). It runs after
+/// Master's volume, so the level it publishes needs no output gain.
+pub struct MasterRack {
     rack: RackHandle,
     wake: Wake,
+}
+
+impl MasterRack {
+    /// Add the rack to `main`; call it before the speaker-mode stage is added.
+    pub fn build(main: &mut MainTrackBuilder) -> Self {
+        let wake = Wake::default();
+        let (effects, rack) = rack();
+        main.add_effect(Gated(effects, wake.clone(), Some(rack.tail())));
+        Self { rack, wake }
+    }
 }
 
 /// Every group's track plus the reverb bus they send to.
@@ -55,15 +80,18 @@ pub struct GroupTracks {
     /// Every group's output level, for the sidechains that key from it.
     levels: Map<GroupId, Arc<KeyLevel>>,
     reverb: ReverbBus,
+    master: MasterRack,
 }
 
 impl GroupTracks {
-    /// The reverb bus (dry: no zone yet), ready for groups to be added.
-    pub fn new<B: Backend>(manager: &mut AudioManager<B>) -> Option<Self> {
+    /// The reverb bus (dry: no zone yet), ready for groups to be added; `master`
+    /// runs Master's effects.
+    pub fn new<B: Backend>(manager: &mut AudioManager<B>, master: MasterRack) -> Option<Self> {
         Some(Self {
             tracks: Map::default(),
             levels: Map::default(),
             reverb: ReverbBus::new(manager, &ReverbParams::DRY)?,
+            master,
         })
     }
 
@@ -89,8 +117,11 @@ impl GroupTracks {
         let gated = |mode, f| Gated(filter(mode, f), wake.clone(), None);
         let low_pass = builder.add_effect(gated(FilterMode::LowPass, Filter::LOW_PASS_OPEN));
         let high_pass = builder.add_effect(gated(FilterMode::HighPass, Filter::HIGH_PASS_OPEN));
-        let (effects, rack) = rack();
-        builder.add_effect(Gated(effects, wake.clone(), Some(rack.tail())));
+        let rack = (id != GroupId::MASTER).then(|| {
+            let (effects, rack) = rack();
+            builder.add_effect(Gated(effects, wake.clone(), Some(rack.tail())));
+            rack
+        });
         let track = match parent {
             None => manager.add_sub_track(builder).ok(),
             Some(p) => self
@@ -102,7 +133,8 @@ impl GroupTracks {
             log::warn!("[Audio] mixer group {id:?} got no track; its voices play silent");
             return;
         };
-        self.levels.insert(id, rack.level());
+        let level = rack.as_ref().unwrap_or(&self.master.rack).level();
+        self.levels.insert(id, level);
         let group = GroupTrack {
             track,
             low_pass,
@@ -136,8 +168,17 @@ impl GroupTracks {
             mix.high_pass.cutoff <= HIGH_PASS_OFF,
         );
         let levels = &self.levels;
-        group.rack.set(&mix.effects, &|g| levels.get(&g).cloned());
-        group.rack.set_output_gain(mix.volume);
+        let key = |g| levels.get(&g).cloned();
+        match group.rack.as_mut() {
+            Some(rack) => {
+                rack.set(&mix.effects, &key);
+                rack.set_output_gain(mix.volume);
+            }
+            None => {
+                self.master.rack.set(&mix.effects, &key);
+                self.master.wake.ring();
+            }
+        }
         group.wake.ring();
     }
 
@@ -145,9 +186,11 @@ impl GroupTracks {
     /// rebuild after a sample-rate change.
     pub fn maintain(&mut self) {
         let levels = &self.levels;
-        for group in self.tracks.values_mut() {
-            group.rack.maintain(&|g| levels.get(&g).cloned());
+        let key = |g| levels.get(&g).cloned();
+        for rack in self.tracks.values_mut().filter_map(|g| g.rack.as_mut()) {
+            rack.maintain(&key);
         }
+        self.master.rack.maintain(&key);
     }
 
     /// Group `id`'s track, if it was built.
