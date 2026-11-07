@@ -65,7 +65,7 @@ pub(crate) struct TaaPasses {
     resolve: LazyPipeline,
     upscale: LazyPipeline,
     /// The contrast-adaptive sharpen after the composite (#1847), into each output
-    /// format a view writes; #1848's upscaler reuses it.
+    /// format a view writes.
     pub(crate) sharpen: Sharpen,
 }
 

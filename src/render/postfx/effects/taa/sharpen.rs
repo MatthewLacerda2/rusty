@@ -17,7 +17,7 @@
 //! views'), which `Renderer::lazy_pipelines` lists, so a windowed renderer builds
 //! them at startup and a settings menu turning the sharpen on compiles nothing
 //! mid-frame. No view builds RCAS. [`Sharpen::run`] is the bare pass (LDR input,
-//! output and its format, strength), so #1848's FSR2 sharpens its own upscaled
+//! output and its format, strength), so another upscaler could sharpen its own
 //! output with it, in the same place in the chain.
 //!
 //! **Linear in, as URP.** `PostFx::ldr` is sRGB, so the pass reads linear values and
@@ -187,8 +187,8 @@ impl Sharpen {
     }
 
     /// Record RCAS at `strength` (`0..1`) from `input` into `output`, an LDR image
-    /// in `format` the input's size. The bare, reusable pass (#1848 calls it after
-    /// its upscale); the caller owns the targets, decides whether to run it, and
+    /// in `format` the input's size. The bare, reusable pass; the caller owns the
+    /// targets, decides whether to run it, and
     /// asks [`Self::pipeline`] first: a format with none panics here.
     pub(crate) fn run(
         &self,
