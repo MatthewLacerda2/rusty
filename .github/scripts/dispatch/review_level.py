@@ -49,6 +49,10 @@ TABLE: dict[str, tuple[str, ...]] = {
         # record and replay: a replay that diverges is a desynced harness (#1636's
         # seek/restore read `medium`)
         "src/dev/demo/",
+        # which `Debug.Stats` keys are wall-clock and stay out of the harness's
+        # `results.json`: a timing key let through makes two runs of one seed differ
+        # (#1872 found `render_extract_us` leaking, and read `medium`)
+        "src/core/frame_stats.rs",
     ),
     "scripting sandbox": (
         "src/scripting/sandbox/",  # the gameplay VM's stdlib: no os/io, require's reach
