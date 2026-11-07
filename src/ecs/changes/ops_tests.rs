@@ -23,8 +23,9 @@ pub enum Edit {
     SetLayer(u8),
     /// A Transform write; the small range lands the value already held too.
     Move(u8),
-    /// Re-parent under an older entity (a younger one unparents, so no cycle),
-    /// children lists kept in step as `Scene::set_parent` keeps them.
+    /// Re-parent under an older entity (a younger one unparents), children lists
+    /// kept in step as `Scene::set_parent` keeps them. An adopted entity's parent is
+    /// younger than it, so a pick can still close a cycle: refused, as there (#1853).
     Reparent(Option<usize>),
     Despawn,
     /// Overwrite in place with these `is_static` and `active` flags (prefab propagation).
@@ -110,7 +111,9 @@ pub fn apply(w: &mut World, op: &Op) {
         Edit::Move(x) => w.transform_mut(e).expect("live").position.x = f32::from(x),
         Edit::Reparent(p) => {
             let parent = p.and_then(|p| pick(w, p)).filter(|&p| p < e);
-            reparent(w, e, parent);
+            if !parent.is_some_and(|p| w.ancestors(p).any(|a| a == e)) {
+                reparent(w, e, parent);
+            }
         }
         Edit::Despawn => w.despawn(e),
         Edit::Overwrite(s, a) => {
