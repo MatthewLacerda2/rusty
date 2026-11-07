@@ -4,16 +4,16 @@
 
 use glam::{Vec3, Vec4};
 
-use super::TaaHistory;
+use super::super::TaaHistory;
 use crate::render::motion::gpu_fixture::{scene, H, W};
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::{Camera, Scene};
 
-pub(super) use crate::render::motion::gpu_fixture::{cube, eye, pixel, project, renderer, view};
+pub(crate) use crate::render::motion::gpu_fixture::{cube, eye, pixel, project, renderer, view};
 
 /// The fixture's scene, its camera running TAA when `taa` (FXAA on, its default)
 /// or neither anti-aliasing when `fxaa` is false too.
-pub(super) fn taa_scene(taa: bool, fxaa: bool) -> (Scene, u32) {
+pub(crate) fn taa_scene(taa: bool, fxaa: bool) -> (Scene, u32) {
     let (mut scene, cam) = scene(false);
     let mut c = scene.world.camera_mut(cam).unwrap();
     (c.taa_active, c.fxaa_active) = (taa, fxaa);
@@ -22,7 +22,7 @@ pub(super) fn taa_scene(taa: bool, fxaa: bool) -> (Scene, u32) {
 }
 
 /// Render `scene` through `cam` into `view` and read the finished frame (RGBA8).
-pub(super) fn frame(
+pub(crate) fn frame(
     r: &mut Renderer,
     view: &mut RenderView,
     scene: &Scene,
@@ -36,13 +36,13 @@ pub(super) fn frame(
 }
 
 /// One frame of `scene` in a fresh view (no history).
-pub(super) fn fresh_frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
+pub(crate) fn fresh_frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
     let mut v = view(r);
     frame(r, &mut v, scene, cam)
 }
 
 /// `n` frames of a still `scene`; the last one.
-pub(super) fn settle(
+pub(crate) fn settle(
     r: &mut Renderer,
     view: &mut RenderView,
     scene: &Scene,
@@ -54,23 +54,23 @@ pub(super) fn settle(
 }
 
 /// A view `scale` times the fixture's size on each side.
-pub(super) fn big_view(r: &Renderer, scale: u32) -> RenderView {
+pub(crate) fn big_view(r: &Renderer, scale: u32) -> RenderView {
     RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W * scale, H * scale)
 }
 
 /// Whether `view` holds TAA's history (it ran this frame).
-pub(super) fn holds(view: &RenderView) -> bool {
+pub(crate) fn holds(view: &RenderView) -> bool {
     view.post_fx.targets.get::<TaaHistory>().is_some()
 }
 
 /// The largest per-channel difference between two fixture-size frames at `(x, y)`.
-pub(super) fn diff(a: &[u8], b: &[u8], (x, y): (u32, u32)) -> u8 {
+pub(crate) fn diff(a: &[u8], b: &[u8], (x, y): (u32, u32)) -> u8 {
     let i = ((y * W + x) * 4) as usize;
     (0..3).map(|c| a[i + c].abs_diff(b[i + c])).max().unwrap()
 }
 
 /// A unit cube at `at`, turned so its edges cross the pixel grid at an angle.
-pub(super) fn tilted_cube(scene: &mut Scene, at: Vec3) -> u32 {
+pub(crate) fn tilted_cube(scene: &mut Scene, at: Vec3) -> u32 {
     let id = cube(scene, at);
     let turn = glam::Quat::from_rotation_z(0.5) * glam::Quat::from_rotation_y(0.4);
     scene.world.transform_mut(id).unwrap().rotation = turn;
@@ -78,7 +78,7 @@ pub(super) fn tilted_cube(scene: &mut Scene, at: Vec3) -> u32 {
 }
 
 /// An sRGB byte's linear value, and back: averages of colour are taken in linear.
-pub(super) fn to_linear(b: u8) -> f32 {
+pub(crate) fn to_linear(b: u8) -> f32 {
     let c = b as f32 / 255.0;
     if c <= 0.04045 {
         c / 12.92
@@ -87,7 +87,7 @@ pub(super) fn to_linear(b: u8) -> f32 {
     }
 }
 
-pub(super) fn to_srgb(l: f32) -> f32 {
+pub(crate) fn to_srgb(l: f32) -> f32 {
     let c = if l <= 0.0031308 {
         l * 12.92
     } else {
@@ -98,7 +98,7 @@ pub(super) fn to_srgb(l: f32) -> f32 {
 
 /// A frame `scale` times the fixture's size, box-filtered (in linear) to the
 /// fixture's: the supersampled reference, as sRGB values.
-pub(super) fn downsample(big: &[u8], scale: u32) -> Vec<Vec4> {
+pub(crate) fn downsample(big: &[u8], scale: u32) -> Vec<Vec4> {
     let (w, n) = (W * scale, (scale * scale) as f32);
     let mut out = Vec::with_capacity((W * H) as usize);
     for y in 0..H {
@@ -127,7 +127,7 @@ pub(super) fn downsample(big: &[u8], scale: u32) -> Vec<Vec4> {
 }
 
 /// Each pixel's largest channel distance from `reference`.
-pub(super) fn errors(frame: &[u8], reference: &[Vec4]) -> Vec<f32> {
+pub(crate) fn errors(frame: &[u8], reference: &[Vec4]) -> Vec<f32> {
     let px = |i: usize| {
         Vec4::new(
             frame[i * 4] as f32,

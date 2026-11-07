@@ -474,9 +474,12 @@ unbounded parallel renderers exhausted memory and failed *unrelated* tests with 
   how many renderers are alive in the one process, enforced by an RAII permit the
   renderer holds for its whole life. It applies to the normal library build, not just
   `cfg(test)`, because the screenshot integration tests reach the renderer indirectly
-  through `screenshot::capture`. If a test hangs waiting on a permit, the guard panics
-  with an explanation: something built a second headless renderer while still holding
-  the first.
+  through `screenshot::capture`. A test thread that holds a permit and asks for a
+  second panics at once (#1844): under `cargo test` two such tests each hold one slot
+  and wait forever for the other's. A test that keeps two renderers alive takes both
+  slots together, `render::test_gpu::headless_pair_or_skip` (or `test_gpu::pair::headless_pair`, when
+  the engine builds both, as a capture host beside a bake does). Any other thread
+  waiting past 180 s panics with an explanation.
 
 Keep the two numbers equal; `make scripts` fails when they differ, and holds the
 nextest settings above (no retries, `fail-fast = false`, the timeouts) in place
@@ -869,22 +872,27 @@ answer (a path with nothing to mutate, a baseline that does not build); survivor
 are a result. A run stopped at its budget says how many planned mutants it never
 reached.
 
-**The mutation jobs stay on `cargo test`, not nextest** (#484). A mutant's cost is
-the crate rebuild, not the test run, so nextest's scheduling buys little there — while
-process-per-test adds a process spawn per test per mutant, and `fail-fast = false`
-(right for the gate's summary) would make every *caught* mutant run the whole suite
-instead of stopping at its first failing binary. The mutation jobs do render: they
-install lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and under `cargo test` the
-in-process `MAX_CONCURRENT_HEADLESS` budget, not the nextest `gpu` group, bounds them. Revisit with
-`cargo mutants --test-tool nextest` plus a dedicated fail-fast profile if mutant
-test time ever dominates.
+**The mutation jobs run under nextest** (`cargo mutants --test-tool nextest`, #1844),
+the gate's runner, with `--fail-fast` so a caught mutant stops at its first failing
+test instead of running the whole suite (the profile's `fail-fast = false` is for the
+gate's summary). They once stayed on `cargo test` (#484), and the baseline broke four
+times on a test the gate passed, each a test leaning on a process of its own (#1042,
+#1069, #1337) or, the last, two GPU tests each holding a renderer and waiting for a
+second (#1844): a runner unlike the gate's finds the next such difference in every
+branch's mutation run. Plain `cargo test` stays the nightly `cargo-test.yml` signal,
+where a runner difference is the finding. The mutation jobs render: they install
+lavapipe and set `RUSTY_REQUIRE_GPU=1` (#785), and the nextest `gpu` group bounds them.
+Doctests are left out: nextest doesn't run them (`make test` does), so a mutant only a
+doctest would catch survives. The runs pass `--test-threads 2`: the jobs' `ulimit -v`
+cap (#674) is per process, so it times the test processes running at once stays within
+the runner's memory (`test_gpu_config.py` holds the product).
 
 Prefer `make mutants-remote` (every mutant rebuilds the crate, which is hours of
 contention on a machine building sibling worktrees). Locally, the same question:
 ```
 git diff origin/main > branch.diff
-cargo mutants --in-diff branch.diff -- --features dev                        # what the branch changed
-cargo mutants --no-shuffle --timeout-multiplier 3 -- --features dev          # full sweep
+cargo mutants --test-tool nextest --in-diff branch.diff -- --features dev --fail-fast --test-threads 2   # what the branch changed
+cargo mutants --test-tool nextest --no-shuffle --timeout-multiplier 3 -- --features dev --fail-fast --test-threads 2   # full sweep
 ```
 
 ## Fuzzing (local-first)

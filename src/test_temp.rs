@@ -1,8 +1,8 @@
 //! A scratch directory owned by one in-crate test (#629, #709, #999).
 //!
 //! Under nextest every test is its own process and several run at once, and parallel
-//! worktrees share one system temp dir. Under `cargo test` (and cargo-mutants, which
-//! runs it) every test of the binary shares one process and runs on its own thread.
+//! worktrees share one system temp dir. Under `cargo test` (the nightly `cargo-test.yml`
+//! run) every test of the binary shares one process and runs on its own thread.
 //! A fixed path under `std::env::temp_dir()` — or one keyed only on the process id —
 //! is therefore written by one test while another reads it. In-crate tests write
 //! under [`dir`] instead, keyed on both the process and the test. The integration

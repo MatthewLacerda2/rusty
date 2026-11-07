@@ -28,8 +28,18 @@ pub(crate) struct TaaFrame {
     pub mip_bias: f32,
 }
 
+/// What [`TaaHistory::surfaces`] holds: two half floats a pixel, its own surface's
+/// distance from its camera (the sky's 65504 fits) and that camera's index in the
+/// stack (#1846).
+pub(crate) const SURFACE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
+
 /// One view's TAA state while it runs: the two history targets, where the jitter
 /// sequence is and whether the history holds a resolved frame.
+///
+/// **Memory, per TAA camera** at the history's size (the output's when
+/// upscaling): two HDR colour frames (8 bytes a pixel each) and two surface
+/// frames (4 bytes each, #1846), 24 bytes a pixel: 50 MB at 1920×1080, 199 MB at
+/// 3840×2160. The level's size (a Dust2-sized map or a room) changes none of it.
 pub(crate) struct TaaHistory {
     /// The history's size: the scene's when resolving, the output's when upscaling.
     pub(super) size: (u32, u32),
@@ -40,6 +50,12 @@ pub(crate) struct TaaHistory {
     /// This frame's jitter in scene pixels.
     pub(super) pixels: Vec2,
     pub(super) frames: [PfxTarget; 2],
+    /// Beside each of `frames`, each pixel's surface as that resolve saw it
+    /// ([`SURFACE_FORMAT`]): next frame drops the history where this frame's nearest
+    /// surface in the 3×3 (`Front::near`, not the pixel's own) lies farther than all
+    /// of last frame's around the reprojected place, a reveal (#1846). Made, dropped and reset with `frames`, so
+    /// it follows every cut, resize and render-scale change they do.
+    pub(super) surfaces: [PfxTarget; 2],
     pub(super) params: wgpu::Buffer,
     /// Which of `frames` holds the latest resolve.
     pub(super) latest: usize,
@@ -50,17 +66,22 @@ pub(crate) struct TaaHistory {
     /// Whether the resolve ran this frame: its output is then the image the rest of
     /// the chain reads, at the output's size when `upscale`.
     pub(super) ran: bool,
+    /// Which of #1846's rules the resolve keeps: both, unless a test turned one off.
+    #[cfg(test)]
+    pub(crate) rules: super::params::Rules,
 }
 
 impl TaaHistory {
     fn new(device: &wgpu::Device, (w, h): (u32, u32), upscale: bool, phases: u32) -> Self {
         let frame = |label| PostFx::target(device, w, h, label, HDR_FORMAT);
+        let surface = |label| PostFx::target(device, w, h, label, SURFACE_FORMAT);
         Self {
             size: (w, h),
             upscale,
             phases,
             pixels: Vec2::ZERO,
             frames: [frame("TAA History A"), frame("TAA History B")],
+            surfaces: [surface("TAA Surfaces A"), surface("TAA Surfaces B")],
             params: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("TAA Params"),
                 size: std::mem::size_of::<super::TaaParams>() as u64,
@@ -71,6 +92,8 @@ impl TaaHistory {
             valid: false,
             frame: 0,
             ran: false,
+            #[cfg(test)]
+            rules: Default::default(),
         }
     }
 

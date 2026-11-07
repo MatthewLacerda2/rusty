@@ -50,7 +50,7 @@ agent can read exactly what failed.
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `src/editor` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
 | Rust API reference | rustdoc | **hard gate**: `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps` (both feature sets) — no broken intra-doc links, no public docs linking private items; name a private item as plain `code`, not a link |
 | Self-naming headers | `tools/lint -- --rules` (`self-path`) | **hard gate**: a source file's first `//!` line (a shader's first `//` line) that opens with a path under `src/`, `tests/`, `tools/`, `fuzz/`, `engine/` or `.github/` names the file itself; a `mod.rs` may name its directory (`src/scene/prefab/`). No header, or one opening with prose, is fine (#1654) |
-| Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, as cargo-mutants runs it, so a test leaking process-wide state (a moved working directory, a `static` left set) is named before it breaks the mutation baseline. Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
+| Shared process | `make test-one-process` (`cargo test --features dev --tests`) | **signal**, never a gate: the `dev` suite with every test of a binary in one process, so a test leaking process-wide state (a moved working directory, a `static` left set), which nextest's process per test hides, is named (it broke the mutation baseline four times while cargo-mutants ran `cargo test`, #1844). Nightly on `main` in `cargo-test.yml` (both feature sets), filed by `main-health` when red; `gh workflow run cargo-test.yml --ref <branch>` runs it on a branch (#1338) |
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | Sim panic-freedom | clippy `unwrap_used` + `tools/lint -- --rules` (`unwrap-deny`) | **hard gate**: every sim row of the layer table carries `#![deny(clippy::unwrap_used)]` at its `mod.rs`, and no sim file lifts it; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`, which `--determinism` keeps set); no `allow`/`expect` of `unwrap_used` anywhere (`ESCAPE`, #961) (#195, #962) |
 | Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
@@ -523,10 +523,11 @@ new flag, gate, CI step or baseline.
   `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
   its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`
   (use `scenario::run_isolated`); and test code reaches a GPU only through
-  `render::test_gpu::headless_or_skip`, never `new_headless` directly
+  `render::test_gpu::headless_or_skip` (or its `headless_pair_or_skip`), never
+  `new_headless` or `new_headless_with` directly
   (`rules/test_shape.rs`).
 - **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
-  process, every worktree and (under `cargo test` and cargo-mutants) every test
+  process, every worktree and (under `cargo test`) every test
   thread, so a fixed or process-keyed name races. Test code (the *Test code* bullet)
   calls `crate::test_temp::dir()` (in-crate) or `crate::temp::dir()`
   (integration) instead: both key on the process *and* the running test (#709,
