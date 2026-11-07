@@ -17,5 +17,30 @@ pub(super) use baking::Baking;
 pub(super) use targets::target_points;
 pub use targets::{MAX_TARGETS, TARGET_SPACING, VOXEL};
 
+use glam::Vec3;
+
+/// How far, metres, both boxes must clear an occluder's plane, and a crossing its
+/// edges, for a proof to hold: one figure for the polygon's proof (`shaft`) and
+/// the sheet's (`sheets`), so the two never disagree on what clears a plane.
+const CLEAR: f32 = 1e-3;
+
+/// A box's corners, one when they meet.
+fn corners((min, max): (Vec3, Vec3)) -> ([Vec3; 8], usize) {
+    let pick = |k: usize, bit: usize, axis: usize| if k & bit == 0 { min[axis] } else { max[axis] };
+    let all = std::array::from_fn(|k| Vec3::new(pick(k, 1, 0), pick(k, 2, 1), pick(k, 4, 2)));
+    (all, if min == max { 1 } else { 8 })
+}
+
+/// Whether boxes `from` and `to` clear the slab `lo <= normal · p <= hi` (a plane
+/// when `lo == hi`) by [`CLEAR`], on opposite sides.
+fn opposite(normal: Vec3, (lo, hi): (f32, f32), from: (Vec3, Vec3), to: (Vec3, Vec3)) -> bool {
+    let centre = |b: (Vec3, Vec3)| normal.dot((b.0 + b.1) * 0.5);
+    let reach = |b: (Vec3, Vec3)| normal.abs().dot((b.1 - b.0) * 0.5);
+    let (cf, ct) = (centre(from), centre(to));
+    let below = cf + reach(from) < lo - CLEAR && ct - reach(to) > hi + CLEAR;
+    let above = cf - reach(from) > hi + CLEAR && ct + reach(to) < lo - CLEAR;
+    below || above
+}
+
 #[cfg(test)]
 mod sheets_tests;

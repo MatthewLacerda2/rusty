@@ -16,6 +16,9 @@ use super::shaft::Polygons;
 /// How many polygons a cube remembers.
 const CACHED: usize = 8;
 
+/// Some of an eye's points, bit `i` for point `i`: an eye has at most eight.
+pub(super) type Points = u8;
+
 /// A sampling cube: its points and the box round them, which every shaft test
 /// uses (rays only ever leave from the points, so a tighter box proves more).
 pub(super) struct Eye {
@@ -27,20 +30,36 @@ pub(super) struct Eye {
 
 impl Eye {
     /// The eye of `points`, which are never empty (`baking` keeps a cube only
-    /// with a point left).
+    /// with a point left) and at most eight.
     pub fn new(points: Vec<Vec3>) -> Self {
-        Self {
-            bounds: Self::box_of(&points).unwrap_or_default(),
+        assert!(
+            points.len() <= Points::BITS as usize,
+            "an eye has at most 8 points"
+        );
+        let mut eye = Self {
+            bounds: (Vec3::ZERO, Vec3::ZERO),
             points,
             cache: Vec::with_capacity(CACHED),
-        }
+        };
+        eye.bounds = eye.box_of(eye.all()).unwrap_or_default();
+        eye
+    }
+
+    /// All its points.
+    pub fn all(&self) -> Points {
+        ((1u16 << self.points.len()) - 1) as Points
+    }
+
+    /// The indices of `points`, ascending.
+    pub fn each(points: Points) -> impl Iterator<Item = usize> {
+        (0..Points::BITS as usize).filter(move |&i| points & (1 << i) != 0)
     }
 
     /// The box round `points`, `None` when there are none.
-    pub fn box_of(points: &[Vec3]) -> Option<(Vec3, Vec3)> {
-        let lo = points.iter().copied().reduce(Vec3::min)?;
-        let hi = points.iter().copied().reduce(Vec3::max)?;
-        Some((lo, hi))
+    pub fn box_of(&self, points: Points) -> Option<(Vec3, Vec3)> {
+        let mut at = Self::each(points).map(|i| self.points[i]);
+        let first = at.next()?;
+        Some(at.fold((first, first), |(lo, hi), p| (lo.min(p), hi.max(p))))
     }
 
     /// A remembered polygon that hides box `to` (on object `object`) from the
@@ -66,16 +85,18 @@ impl Eye {
     pub fn open(
         &mut self,
         polygons: &Polygons,
-        points: &[Vec3],
+        points: Points,
         to: (Vec3, Vec3),
         object: u32,
-    ) -> Vec<Vec3> {
-        let hidden = |eye: &mut Self, p: Vec3| eye.cached(polygons, (p, p), to, object);
-        points
-            .iter()
-            .copied()
-            .filter(|&p| !hidden(self, p))
-            .collect()
+    ) -> Points {
+        let mut open = points;
+        for i in Self::each(points) {
+            let p = self.points[i];
+            if self.cached(polygons, (p, p), to, object) {
+                open &= !(1 << i);
+            }
+        }
+        open
     }
 
     /// Remember `polygon` as the latest that hid something.

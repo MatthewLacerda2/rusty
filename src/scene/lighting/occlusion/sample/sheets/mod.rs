@@ -13,23 +13,35 @@
 //! sits on multiples of [`TEXEL`] in world units, where modular levels put their
 //! seams.
 //!
-//! The members' faces may differ from the plane by a rounding: the sheet is a slab
-//! from the nearest to the farthest member corner, and the rectangle holds the
-//! crossings of both its planes. An object's own faces never hide it, so a sheet
-//! it is a member of is not used for it (`shaft` falls back to its own polygon).
+//! The members' faces may differ from the plane by float noise ([`tolerance`]):
+//! the sheet is a slab from the nearest to the farthest member corner, and the
+//! rectangle holds the crossings of both its planes. Noise is all a slab may hold:
+//! members a millimetre apart would leave a step a segment slips through while
+//! every texel under its rectangle is set, so faces that share a plane only to
+//! the grouping's rounding are split into sheets of one depth each. An object's
+//! own faces never hide it, so a sheet it is a member of is not used for it
+//! (`shaft` falls back to its own polygon).
+//!
+//! A texel is held by a face whose edge misses its corner by noise and no more,
+//! so a slit between two faces is seen through however thin, down to float noise.
+//! Fusion needs faces merged into convex quads (`shaft`'s `Polygon::merge` pairs
+//! a mesh's consecutive triangles): a wall triangulated as a fan or an n-gon
+//! leaves triangles no texel lies wholly inside, so it fuses little, which is
+//! slower and never wrong.
 
 use glam::{UVec2, Vec2, Vec3};
 
+use super::{corners, opposite, CLEAR};
+pub(super) use group::sheets;
+use group::tolerance;
+
+mod group;
 use crate::scene::lighting::occlusion::gather::Face;
 
 /// A texel's edge, metres.
 const TEXEL: f32 = 0.25;
 /// The most texels one sheet holds; a larger plane takes coarser texels.
 const MAX_TEXELS: usize = 1 << 22;
-/// How far, metres, both boxes must clear the slab, and a member face's edge may
-/// miss a texel's corner and still hold it.
-const CLEAR: f32 = 1e-3;
-const EDGE: f32 = 1e-4;
 
 /// One plane's fused occluder faces.
 pub(super) struct Sheet {
@@ -58,48 +70,6 @@ pub(super) struct Member<'a> {
     pub face: Face,
 }
 
-/// The sheets `faces` make, and per face its sheet (`u32::MAX` for a face alone
-/// on its plane, which its own polygon tests as well, on a sparse sheet, or with
-/// no plane).
-pub(super) fn sheets(faces: &[Member]) -> (Vec<Sheet>, Vec<u32>) {
-    // Each face keyed by its plane and side, sorted: a plane's faces then run
-    // together, in face order.
-    let key = |f: &Member| {
-        let n = (f.normal * 1e6).round().as_i64vec3().to_array();
-        (
-            n,
-            (f.normal.dot(f.corners[0]) / CLEAR).round() as i64,
-            f.face as u8,
-        )
-    };
-    let planar = faces
-        .iter()
-        .enumerate()
-        .filter(|(_, f)| f.normal != Vec3::ZERO);
-    let mut keyed: Vec<_> = planar.map(|(i, f)| (key(f), i as u32)).collect();
-    keyed.sort_unstable();
-    let mut of = vec![u32::MAX; faces.len()];
-    let mut sheets = Vec::new();
-    for run in keyed.chunk_by(|a, b| a.0 == b.0).filter(|r| r.len() > 1) {
-        let sheet = Sheet::of(run.iter().map(|&(_, i)| &faces[i as usize]));
-        let Some(sheet) = sheet.filter(|s| !s.sparse()) else {
-            continue;
-        };
-        for &(_, i) in run {
-            of[i as usize] = sheets.len() as u32;
-        }
-        sheets.push(sheet);
-    }
-    (sheets, of)
-}
-
-/// A box's corners, one when they meet.
-fn corners((min, max): (Vec3, Vec3)) -> ([Vec3; 8], usize) {
-    let pick = |k: usize, bit: usize, axis: usize| if k & bit == 0 { min[axis] } else { max[axis] };
-    let all = std::array::from_fn(|k| Vec3::new(pick(k, 1, 0), pick(k, 2, 1), pick(k, 4, 2)));
-    (all, if min == max { 1 } else { 8 })
-}
-
 impl Sheet {
     /// The sheet of `members`, `None` when their faces cover under a quarter of
     /// the rectangle round them (it would be [`Self::sparse`]: no texel is made).
@@ -114,6 +84,11 @@ impl Sheet {
         for p in all {
             (lo, hi) = (lo.min(normal.dot(p)), hi.max(normal.dot(p)));
             (min, max) = (min.min(flat(p)), max.max(flat(p)));
+        }
+        let all = members.clone().flat_map(|m| m.corners.iter());
+        let tol = tolerance(all);
+        if hi - lo > tol {
+            return None;
         }
         let polys: Vec<Vec<Vec2>> = (members.clone())
             .map(|m| m.corners.iter().map(|&p| flat(p)).collect())
@@ -133,7 +108,7 @@ impl Sheet {
         };
         let mut set = vec![false; (dims.x * dims.y) as usize];
         for poly in &polys {
-            fill(&mut set, poly, (origin, texel, dims));
+            fill(&mut set, poly, (origin, texel, dims), tol);
         }
         let mut members: Vec<u32> = members.map(|m| m.mesh).collect();
         members.sort_unstable();
@@ -176,15 +151,8 @@ impl Sheet {
     /// drawn side.
     pub fn hides(&self, from: (Vec3, Vec3), to: (Vec3, Vec3)) -> bool {
         let n = self.normal;
-        let centre = |b: (Vec3, Vec3)| n.dot((b.0 + b.1) * 0.5);
-        let reach = |b: (Vec3, Vec3)| n.abs().dot((b.1 - b.0) * 0.5);
-        let (cf, ct) = (centre(from), centre(to));
-        if !self.face.stops(n, n * (ct - cf)) {
-            return false;
-        }
-        let below = cf + reach(from) < self.lo - CLEAR && ct - reach(to) > self.hi + CLEAR;
-        let above = cf - reach(from) > self.hi + CLEAR && ct + reach(to) < self.lo - CLEAR;
-        if !(below || above) {
+        let dir = (to.0 + to.1) * 0.5 - (from.0 + from.1) * 0.5;
+        if !self.face.stops(n, dir) || !opposite(n, (self.lo, self.hi), from, to) {
             return false;
         }
         let ((near, k), (far, j)) = (corners(from), corners(to));
@@ -231,8 +199,8 @@ fn axes(normal: Vec3) -> (Vec3, Vec3) {
 }
 
 /// Set every texel of the grid `(origin, texel, dims)` wholly inside the convex
-/// polygon `poly`.
-fn fill(set: &mut [bool], poly: &[Vec2], (origin, texel, dims): (Vec2, f32, UVec2)) {
+/// polygon `poly`, whose edges may miss a texel's corner by `tol`.
+fn fill(set: &mut [bool], poly: &[Vec2], (origin, texel, dims): (Vec2, f32, UVec2), tol: f32) {
     let k = poly.len();
     if k < 3 {
         return;
@@ -241,7 +209,7 @@ fn fill(set: &mut [bool], poly: &[Vec2], (origin, texel, dims): (Vec2, f32, UVec
     let inside = |p: Vec2| {
         (0..k).all(|i| {
             let (a, b) = (poly[i], poly[(i + 1) % k]);
-            turn * (b - a).perp_dot(p - a) >= -EDGE * (b - a).length()
+            turn * (b - a).perp_dot(p - a) >= -tol * (b - a).length()
         })
     };
     let (min, max) = poly.iter().fold((Vec2::MAX, Vec2::MIN), |(lo, hi), &p| {

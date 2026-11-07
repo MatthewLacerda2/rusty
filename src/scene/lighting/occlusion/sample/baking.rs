@@ -194,12 +194,7 @@ impl Baking {
     /// all of `eye`. Any polygon will do: one of those objects' own lies inside
     /// the box, so it never separates it.
     fn hidden(&self, eye: &mut Eye, to: (Vec3, Vec3)) -> bool {
-        let polygons = &self.polygons;
-        if eye.cached(polygons, eye.bounds, to, u32::MAX) {
-            return true;
-        }
-        let hider = polygons.hider(&self.rays, eye.bounds, to, u32::MAX);
-        hider.inspect(|&p| eye.remember(p)).is_some()
+        self.proved(eye, eye.bounds, to, u32::MAX)
     }
 
     /// Whether `point` sits inside an occluder: most of the six axis rays from it

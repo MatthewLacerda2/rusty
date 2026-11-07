@@ -26,29 +26,44 @@ impl Baking {
         (object, bounds): (u32, (Vec3, Vec3)),
         chunks: &[Chunk],
     ) -> bool {
+        if self.proved(eye, eye.bounds, bounds, object) {
+            return false;
+        }
         let polygons = &self.polygons;
-        if eye.cached(polygons, eye.bounds, bounds, object) {
-            return false;
-        }
-        if let Some(p) = polygons.hider(&self.rays, eye.bounds, bounds, object) {
-            eye.remember(p);
-            return false;
-        }
-        let points = eye.points.clone();
-        let open = eye.open(polygons, &points, bounds, object);
+        let open = eye.open(polygons, eye.all(), bounds, object);
         for chunk in chunks {
-            let open = eye.open(polygons, &open, chunk.bounds, object);
-            let Some(from) = Eye::box_of(&open) else {
+            let open = eye.open(polygons, open, chunk.bounds, object);
+            let Some(from) = eye.box_of(open) else {
                 continue;
             };
             for target in chunk.targets.iter().filter(|t| t.faces(from)) {
-                let mut from = open.iter().filter(|&&o| target.drawn_toward(o));
-                if from.any(|&origin| self.ray(eye, origin, target.at, object)) {
-                    return true;
+                for i in Eye::each(open) {
+                    let origin = eye.points[i];
+                    if target.drawn_toward(origin) && self.ray(eye, origin, target.at, object) {
+                        return true;
+                    }
                 }
             }
         }
         false
+    }
+
+    /// Whether one polygon hides box `to` (on object `object`, `u32::MAX` for
+    /// none) from box `from` of `eye`: a remembered one, else the one the BVH
+    /// meets between their centres, which is then remembered.
+    pub(super) fn proved(
+        &self,
+        eye: &mut Eye,
+        from: (Vec3, Vec3),
+        to: (Vec3, Vec3),
+        object: u32,
+    ) -> bool {
+        let polygons = &self.polygons;
+        if eye.cached(polygons, from, to, object) {
+            return true;
+        }
+        let hider = polygons.hider(&self.rays, from, to, object);
+        hider.inspect(|&p| eye.remember(p)).is_some()
     }
 
     /// Whether the ray from `origin` reaches `to`, a target on `object`: no

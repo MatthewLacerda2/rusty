@@ -12,11 +12,9 @@
 use glam::Vec3;
 
 use super::sheets::{sheets, Member, Sheet};
+use super::{corners, opposite, CLEAR};
 use crate::scene::lighting::lightmap::{Rays, Tri};
 use crate::scene::lighting::occlusion::gather::Face;
-
-/// How far, metres, both boxes must clear a face's plane, and a crossing its edges.
-const CLEAR: f32 = 1e-3;
 
 /// Every occluder triangle's convex face.
 pub(super) struct Polygons {
@@ -119,18 +117,6 @@ impl Polygons {
     }
 }
 
-/// A box's corners, one when they meet.
-fn corners((min, max): (Vec3, Vec3)) -> ([Vec3; 8], usize) {
-    let pick = |k: usize, bit: usize, axis: usize| if k & bit == 0 { min[axis] } else { max[axis] };
-    let all = std::array::from_fn(|k| Vec3::new(pick(k, 1, 0), pick(k, 2, 1), pick(k, 4, 2)));
-    (all, if min == max { 1 } else { 8 })
-}
-
-/// How far box `(min, max)` reaches either way along `normal` from its centre.
-fn reach_along(normal: Vec3, (min, max): (Vec3, Vec3)) -> f32 {
-    normal.abs().dot((max - min) * 0.5)
-}
-
 impl Polygon {
     fn new(corners: [Vec3; 3], mesh: u32, face: Face) -> Self {
         let normal = (corners[1] - corners[0])
@@ -184,12 +170,7 @@ impl Polygon {
             return false;
         }
         let side = |p: Vec3| self.normal.dot(p) - self.offset;
-        let centre = |b: (Vec3, Vec3)| side((b.0 + b.1) * 0.5);
-        let sign = centre(from).signum();
-        // Both boxes clear the plane, on opposite sides: their nearest corners are
-        // their centres less their reach along the normal.
-        let clear = centre(from) * sign - reach_along(self.normal, from) > CLEAR
-            && -centre(to) * sign - reach_along(self.normal, to) > CLEAR;
+        let clear = opposite(self.normal, (self.offset, self.offset), from, to);
         let ((near, n), (far, f)) = (corners(from), corners(to));
         let (near, far) = (&near[..n], &far[..f]);
         clear

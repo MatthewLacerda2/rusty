@@ -9,11 +9,16 @@ use crate::scene::lighting::occlusion::gather::Face;
 /// A floor tile over `[x0, x1] × [z0, z1]` at y = 0, its drawn side up, wound
 /// counter-clockwise seen from above.
 fn tile(x0: f32, x1: f32, z0: f32, z1: f32) -> [Vec3; 4] {
+    tile_at(0.0, (x0, x1), (z0, z1))
+}
+
+/// The same tile at height `y`.
+fn tile_at(y: f32, (x0, x1): (f32, f32), (z0, z1): (f32, f32)) -> [Vec3; 4] {
     [
-        Vec3::new(x0, 0.0, z0),
-        Vec3::new(x0, 0.0, z1),
-        Vec3::new(x1, 0.0, z1),
-        Vec3::new(x1, 0.0, z0),
+        Vec3::new(x0, y, z0),
+        Vec3::new(x0, y, z1),
+        Vec3::new(x1, y, z1),
+        Vec3::new(x1, y, z0),
     ]
 }
 
@@ -83,4 +88,25 @@ fn a_plane_far_out_or_huge_bakes_without_a_panic() {
         Vec3::new(3.0 * far, -2.0, 1.0),
     );
     assert!(!fused[0].hides(EYE, past));
+}
+
+#[test]
+fn a_slit_a_fifth_of_a_millimetre_wide_is_seen_through() {
+    let tiles = [tile(-2.0, 1.9999, -2.0, 6.0), tile(2.0001, 6.0, -2.0, 6.0)];
+    assert!(!sheets(&floor(&tiles)).0[0].hides(EYE, UNDER));
+}
+
+#[test]
+fn faces_a_millimetre_apart_make_no_one_sheet() {
+    // Both round to one plane, but a segment slips through the step between
+    // them: it crosses y = 0.0014 at x ≈ 51.8, past the first tile, and
+    // y = 0.0006 at x ≈ 48.2, short of the second.
+    let tiles = [
+        tile_at(0.0014, (0.0, 50.0), (-1.0, 1.0)),
+        tile_at(0.0006, (50.0, 100.0), (-1.0, 1.0)),
+    ];
+    let (from, to) = (Vec3::new(100.0, 0.012, 0.0), Vec3::new(0.0, -0.01, 0.0));
+    let (fused, of) = sheets(&floor(&tiles));
+    assert!(fused.iter().all(|s| !s.hides((from, from), (to, to))));
+    assert_eq!(of, vec![u32::MAX; 2], "each is left to its polygon");
 }
