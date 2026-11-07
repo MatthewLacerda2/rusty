@@ -20,7 +20,7 @@ use std::collections::btree_map::{BTreeMap, Entry};
 
 use glam::Vec3;
 
-use super::gather::Face;
+use crate::scene::lighting::occlusion::gather::Face;
 
 /// The lattice's spacing on a triangle, metres: under a doorway's width, so a
 /// doorway-sized patch always holds a point.
@@ -41,7 +41,7 @@ const INWARD: f32 = 0.01;
 /// One point a ray is aimed at, and the plane of its triangle's drawn side
 /// (normal and offset; `None` when both sides draw).
 #[derive(Clone, Copy, Debug)]
-pub(super) struct Target {
+pub(in crate::scene::lighting::occlusion) struct Target {
     pub at: Vec3,
     front: Option<(Vec3, f32)>,
 }
@@ -91,7 +91,9 @@ impl Target {
 
 /// `tris`' target points, `None` when it has more than [`MAX_TARGETS`] or a corner
 /// that is not finite.
-pub(super) fn target_points(tris: &[([Vec3; 3], Face)]) -> Option<Vec<Target>> {
+pub(in crate::scene::lighting::occlusion) fn target_points(
+    tris: &[([Vec3; 3], Face)],
+) -> Option<Vec<Target>> {
     if !tris.iter().all(|t| t.0.iter().all(|p| p.is_finite())) {
         return None;
     }
@@ -175,4 +177,33 @@ impl Lattice {
         }
         true
     }
+}
+
+/// The edge of the cubes of space an object's targets are grouped by, metres:
+/// one polygon that hides a chunk's box spares every ray to its targets.
+const CHUNK: f32 = 2.0;
+
+/// Some of an object's targets, near one another, and the box round them.
+pub(super) struct Chunk {
+    pub bounds: (Vec3, Vec3),
+    pub targets: Vec<Target>,
+}
+
+/// `points` grouped by the [`CHUNK`] cube each lies in, in the cubes' order.
+pub(super) fn chunks(points: Vec<Target>) -> Vec<Chunk> {
+    let mut cubes: BTreeMap<[i32; 3], Vec<Target>> = BTreeMap::new();
+    for t in points {
+        let key = (t.at / CHUNK).floor().as_ivec3().to_array();
+        cubes.entry(key).or_default().push(t);
+    }
+    let chunk = |targets: Vec<Target>| {
+        let at = targets.iter().map(|t| t.at);
+        let lo = at.clone().reduce(Vec3::min).unwrap_or_default();
+        let hi = at.reduce(Vec3::max).unwrap_or_default();
+        Chunk {
+            bounds: (lo, hi),
+            targets,
+        }
+    };
+    cubes.into_values().map(chunk).collect()
 }

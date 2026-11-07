@@ -15,17 +15,22 @@
 //! Dust2-sized level has storeys, stairs, drops and open yards a camera moves
 //! through. A uniform grid holds all of them. Cells that see the same set share one
 //! row (`rows`); after the dilation few do, so the data is about one bit per cell
-//! per object (4.9 MB for a Dust2-sized level of 4163 meshes, `docs/api/Lighting.md`).
+//! per object (11.8 MB for a Dust2-sized level of 6344 meshes, `docs/api/Lighting.md`).
 //!
-//! **What a cell holds** (`bake`, `baking`): every baked object any point in it may
+//! **What a cell holds** (`bake`, `sample`): every baked object any point in it may
 //! see. From seeded points in each 2 m cube of the cell (the same density at every
 //! cell size), rays go to points on each object's own triangles: its extremes and a
 //! lattice at most `TARGET_SPACING` apart, one per `VOXEL` of space, so the count
 //! follows its area, not its triangles (`targets`); one ray that no occluder stops
-//! before it arrives makes the object visible. One occluder face that hides an
-//! object or a point from a whole cube spares its rays (`shaft`). An object too
-//! large for `MAX_TARGETS` points, or not finite, is never culled and lays no cell. Then every cell takes its 26 neighbours' sets too (the dilation), so a
-//! camera anywhere in a cell is covered by samples from the cells around it. The
+//! before it arrives makes the object visible. Most rays never need casting
+//! (part 3): an occluder face, alone or fused with the other faces on its plane (a
+//! floor of tiles, a wall of pieces), that hides a cluster of objects, an object, or
+//! a chunk of its points from a cube or from one of its points proves their rays
+//! stopped, and each cube tries first the faces that last stopped one (`sight`).
+//! Every such proof is exact, so they change the bake's speed, not what it sees.
+//! An object too large for `MAX_TARGETS` points, or not finite, is never culled and
+//! lays no cell. Then every cell takes its 26 neighbours' sets too (the dilation),
+//! so a camera anywhere in a cell is covered by samples from the cells around it. The
 //! invariant is one way: a cell may keep what is hidden, and must never drop what is
 //! visible. The sampling is a pure function of the scene and the seed, and each cell
 //! is baked alone, so the bytes are the same at any worker count.
@@ -45,13 +50,11 @@
 //! carried entity's way renames the baked objects with them ([`OcclusionData::remap`]).
 
 mod bake;
-mod baking;
 mod file;
 mod gather;
 mod grid;
 mod progress;
-mod shaft;
-mod targets;
+mod sample;
 
 pub use bake::{
     bake_occlusion, gather_occlusion, OcclusionBakeReport, OcclusionInput, OCCLUSION_SEED,
@@ -60,10 +63,12 @@ pub use file::{decode, encode, load_sidecar, occlusion_path, save_sidecar};
 pub use gather::{fingerprint, Fingerprints};
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
 pub use progress::OcclusionProgress;
-pub use targets::{MAX_TARGETS, TARGET_SPACING, VOXEL};
+pub use sample::{MAX_TARGETS, TARGET_SPACING, VOXEL};
 
 #[cfg(test)]
 mod bake_tests;
+#[cfg(all(test, feature = "dev"))]
+pub(crate) mod bench_level;
 #[cfg(test)]
 mod carry_tests;
 #[cfg(test)]

@@ -14,6 +14,8 @@ pub mod reflection;
 pub mod steps;
 
 #[cfg(test)]
+mod occlusion_cost_tests;
+#[cfg(test)]
 mod occlusion_tests;
 #[cfg(test)]
 mod open_world_tests;
