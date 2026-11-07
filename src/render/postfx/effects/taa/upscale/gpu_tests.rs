@@ -7,10 +7,10 @@ use glam::Vec3;
 
 use crate::core::settings::render_scale::RenderScale;
 use crate::render::motion::gpu_fixture::{H, W};
-use crate::render::postfx::effects::taa::gpu_fixture::{
+use crate::render::postfx::effects::taa::gpu::fixture::{
     big_view, downsample, errors, frame, holds, renderer, settle,
 };
-use crate::render::postfx::effects::taa::gpu_fixture::{cube, eye, taa_scene, tilted_cube};
+use crate::render::postfx::effects::taa::gpu::fixture::{cube, eye, taa_scene, tilted_cube};
 use crate::render::postfx::effects::taa::TaaHistory;
 use crate::render::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::{Camera, Scene};

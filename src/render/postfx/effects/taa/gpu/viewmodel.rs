@@ -4,7 +4,7 @@
 
 use glam::{Quat, Vec3};
 
-use super::gpu_fixture::{cube, diff, eye, frame, fresh_frame, renderer, settle, taa_scene, view};
+use super::fixture::{cube, diff, eye, frame, fresh_frame, renderer, settle, taa_scene, view};
 use crate::components::CameraComponent;
 use crate::render::motion::gpu_fixture::{H, W};
 use crate::render::postfx::effects::motion_blur::stack_order_gpu_tests::against_a_wall;
