@@ -14,8 +14,8 @@
 //!   bloom and the composite read ([`super::super::PostFx::scene_color`]) and next
 //!   frame's history;
 //! - **the history** ([`TaaHistory`], [`history`]), the view's, in [`super::Targets`]:
-//!   two HDR targets read and written in turn, each with the depths its resolve
-//!   saw (what tells a reveal, #1846). It is dropped on a resize, a
+//!   two HDR targets read and written in turn, each with the surfaces its
+//!   resolve saw, distance and camera (what tells a reveal, #1846). It is dropped on a resize, a
 //!   render-scale change and when TAA stops; it holds no frame after a cut the
 //!   motion history names (a scene load, Play or Stop, a camera switch,
 //!   `MotionVectors::reset`), so the first frame after one is the current frame
@@ -110,7 +110,7 @@ impl TaaPasses {
     }
 
     /// The resolve's bind group: `h`'s params, this frame's `current` image, the
-    /// history frame `read` (its colour and its depths) and the `velocity` target.
+    /// history frame `read` (its colour and its surfaces) and the `velocity` target.
     fn group(
         &self,
         device: &wgpu::Device,
@@ -128,7 +128,10 @@ impl TaaPasses {
                 entry(2, wgpu::BindingResource::TextureView(&h.frames[read].view)),
                 entry(3, wgpu::BindingResource::TextureView(velocity)),
                 entry(4, wgpu::BindingResource::Sampler(&self.sampler)),
-                entry(5, wgpu::BindingResource::TextureView(&h.depths[read].view)),
+                entry(
+                    5,
+                    wgpu::BindingResource::TextureView(&h.surfaces[read].view),
+                ),
             ],
         })
     }
@@ -171,7 +174,7 @@ impl PostFx {
             &passes.resolve
         };
         let timed = (pipeline.get(), timer.writes(GpuPass::Taa));
-        let into = [&h.frames[write].view, &h.depths[write].view];
+        let into = [&h.frames[write].view, &h.surfaces[write].view];
         PostFx::fullscreen_into(&mut encoder, timed, &[&group], into);
         queue.submit(std::iter::once(encoder.finish()));
         let h = self.targets.get_mut::<TaaHistory>().expect("held above");

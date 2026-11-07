@@ -60,7 +60,7 @@ const MAX_CAMERAS: u32 = 8u;
 @group(0) @binding(4) var s_linear: sampler;
 // Last resolve's surface per history pixel, each pixel's own (`ResolveOut::surface`):
 // its distance from its camera in `.x`, that camera's index in `.y`.
-@group(0) @binding(5) var t_depth_history: texture_2d<f32>;
+@group(0) @binding(5) var t_surface_history: texture_2d<f32>;
 
 struct ResolveOut { // what the resolve writes: next frame's history, colour and surface
     @location(0) color: vec4<f32>,
@@ -163,14 +163,14 @@ fn reveal_gap(then: vec2<f32>, now: vec2<f32>) -> f32 {
 // The 3×3 steps a scene pixel at a time: under TAAU that is several history pixels,
 // so the wire is found at any render scale.
 fn depth_mismatch(at: vec2<f32>, now: vec2<f32>) -> f32 {
-    let last = vec2<i32>(textureDimensions(t_depth_history)) - 1;
+    let last = vec2<i32>(textureDimensions(t_surface_history)) - 1;
     let c = vec2<i32>(floor(at));
     let step = max(taa.size.xy * taa.scene.zw, vec2<f32>(1.0));
     var best = MAX_HDR;
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
             let k = clamp(c + vec2<i32>(round(vec2<f32>(f32(x), f32(y)) * step)), vec2<i32>(0), last);
-            best = min(best, reveal_gap(textureLoad(t_depth_history, k, 0).xy, now));
+            best = min(best, reveal_gap(textureLoad(t_surface_history, k, 0).xy, now));
         }
     }
     return best;

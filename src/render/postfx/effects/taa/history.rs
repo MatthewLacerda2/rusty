@@ -28,10 +28,10 @@ pub(crate) struct TaaFrame {
     pub mip_bias: f32,
 }
 
-/// What [`TaaHistory::depths`] holds: two half floats a pixel, its own surface's
+/// What [`TaaHistory::surfaces`] holds: two half floats a pixel, its own surface's
 /// distance from its camera (the sky's 65504 fits) and that camera's index in the
 /// stack (#1846).
-pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
+pub(crate) const SURFACE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
 
 /// One view's TAA state while it runs: the two history targets, where the jitter
 /// sequence is and whether the history holds a resolved frame.
@@ -51,10 +51,10 @@ pub(crate) struct TaaHistory {
     pub(super) pixels: Vec2,
     pub(super) frames: [PfxTarget; 2],
     /// Beside each of `frames`, each pixel's surface as that resolve saw it
-    /// ([`DEPTH_FORMAT`]): next frame drops the history where its own surface
+    /// ([`SURFACE_FORMAT`]): next frame drops the history where its own surface
     /// lies farther than all of last frame's around it, a reveal (#1846). Made, dropped and reset with `frames`, so
     /// it follows every cut, resize and render-scale change they do.
-    pub(super) depths: [PfxTarget; 2],
+    pub(super) surfaces: [PfxTarget; 2],
     pub(super) params: wgpu::Buffer,
     /// Which of `frames` holds the latest resolve.
     pub(super) latest: usize,
@@ -73,14 +73,14 @@ pub(crate) struct TaaHistory {
 impl TaaHistory {
     fn new(device: &wgpu::Device, (w, h): (u32, u32), upscale: bool, phases: u32) -> Self {
         let frame = |label| PostFx::target(device, w, h, label, HDR_FORMAT);
-        let depth = |label| PostFx::target(device, w, h, label, DEPTH_FORMAT);
+        let surface = |label| PostFx::target(device, w, h, label, SURFACE_FORMAT);
         Self {
             size: (w, h),
             upscale,
             phases,
             pixels: Vec2::ZERO,
             frames: [frame("TAA History A"), frame("TAA History B")],
-            depths: [depth("TAA Depths A"), depth("TAA Depths B")],
+            surfaces: [surface("TAA Surfaces A"), surface("TAA Surfaces B")],
             params: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("TAA Params"),
                 size: std::mem::size_of::<super::TaaParams>() as u64,
