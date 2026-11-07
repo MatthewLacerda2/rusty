@@ -45,10 +45,7 @@ fn strips() -> BakeMesh {
 fn every_sub_texel_strip_owns_its_row_traced_on_its_own_surface() {
     let points = rasterize(&strips(), S);
     for k in 0..STRIPS {
-        let row: Vec<_> = points
-            .iter()
-            .filter(|p| p.index / S == 2 * k as u32)
-            .collect();
+        let row: Vec<_> = points.iter().filter(|p| p.index / S == 2 * k).collect();
         assert_eq!(row.len(), S as usize, "strip {k} owns its whole row");
         for p in row {
             let (x, z) = (p.position.x, p.position.z - k as f32);
