@@ -7,6 +7,7 @@ use super::super::sweeps::depth_pass;
 use super::super::ShadowRenderer;
 use super::Tile;
 use crate::render::lod::LodSelection;
+use crate::render::scene::OcclusionBinding;
 
 /// How the frame's tiles got their static casters: from the cache, or re-baked.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -31,7 +32,8 @@ impl ShadowRenderer {
         let tiles = std::mem::take(&mut self.atlas.frame_tiles);
         let bake = self.bake_static_tiles(encoder, frame, &tiles);
         if !tiles.is_empty() {
-            let volumes: Vec<LightVolume> = tiles.iter().map(|t| volume(frame, t)).collect();
+            let pvs = &frame.objects.occlusion;
+            let volumes: Vec<LightVolume> = tiles.iter().map(|t| volume(pvs, t)).collect();
             let batches = self.prepare_casters(frame, lod, Sweep::AtlasDynamic, &volumes);
             let scene = frame.statics;
             let clean = &self.atlas.clean_tiles;
@@ -87,7 +89,8 @@ impl ShadowRenderer {
             .copied()
             .filter(|&i| tiles[i].statics)
             .collect();
-        let volumes: Vec<LightVolume> = drawn.iter().map(|&i| volume(frame, &tiles[i])).collect();
+        let pvs = &frame.objects.occlusion;
+        let volumes: Vec<LightVolume> = drawn.iter().map(|&i| volume(pvs, &tiles[i])).collect();
         let batches = match volumes.is_empty() {
             true => Vec::new(),
             false => self.prepare_casters(frame, &finest, Sweep::AtlasStatic, &volumes),
@@ -117,8 +120,7 @@ impl ShadowRenderer {
 /// `tile`'s light volume: culled by its light's PVS row (#1714) only while its
 /// static casters are in it. A shadowmasked tile's walls are the mask's, not
 /// drawn, so its light sees past them and it culls nothing by occlusion.
-fn volume(frame: &CasterFrame, tile: &Tile) -> LightVolume {
-    let pvs = &frame.objects.occlusion;
+pub(super) fn volume(pvs: &OcclusionBinding, tile: &Tile) -> LightVolume {
     LightVolume {
         view_proj: tile.view_proj,
         row: tile.statics.then(|| pvs.shadow_row(tile.light)).flatten(),

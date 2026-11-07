@@ -440,8 +440,12 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
 - **Per light** (#1714, part 4): a shadowed point or spot light reads the cell its
   own position stands in, and leaves out of its shadow maps the static casters that
   cell cannot see. The camera's view plays no part (a caster the camera cannot see
-  may still cast into view), and it changes no shadow: a caster hidden from the light
-  is behind a wall the same map draws. So a light culls nothing by occlusion while a
+  may still cast into view). A caster hidden from the light is behind a wall the
+  same map draws, so its shadow is the same without it, with the camera's caveat
+  (*What it can miss*): a caster the light sees only through a gap showing less
+  than about a metre of it may be left out, and lose its shadow through that gap.
+  Unlike a camera's miss, which comes back as the camera moves, a still light's
+  cached tile keeps it until the light moves or a static caster changes. So a light culls nothing by occlusion while a
   baked occluder casts no shadow (`Mesh` cast mode `Off`) or has no GPU buffers, when
   it is shadowmasked under `Shadowmask` (its walls are in the mask, not the map), or
   stands outside every cell; the sun's cascades never do. It pays where a light's

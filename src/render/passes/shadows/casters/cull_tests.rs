@@ -1,6 +1,7 @@
 //! The light volume's PVS verdict (#1714, part 4), adapter-free: a baked caster its
 //! light's row hides is dropped and counted once per entity, a two-sided one and a
-//! volume with no row keep it, and the frustum and size verdicts come first.
+//! volume with no row keep it, the frustum and size verdicts come first, and a
+//! non-resident occluder opens the volume.
 
 use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
@@ -71,4 +72,28 @@ fn a_hidden_caster_is_dropped_once_per_entity_unless_two_sided_or_unrowed() {
     // Already culled as small: counted there, not twice.
     let (kept, culls) = take(&runs(far, far_at, true, false), lit);
     assert_eq!((kept, culls.size, culls.occlusion), (0, 1, 0));
+}
+
+#[test]
+fn a_non_resident_occluder_opens_every_volume() {
+    let scene = baked();
+    let pvs = OcclusionBinding::bound(&scene);
+    let far_at = Vec3::new(12.0, 0.5, 3.5);
+    let far = nearest(&scene, "Prop0", far_at);
+    let everything = directx::orthographic(-100.0, 100.0, -100.0, 100.0, -100.0, 100.0);
+    let lit = LightVolume {
+        view_proj: everything,
+        row: pvs.shadow_row(ROOM_1),
+    };
+    assert!(lit.row.is_some());
+    assert_eq!(lit.resident(true), lit, "every wall drawn: the row stands");
+    let open = lit.resident(false);
+    assert_eq!(
+        open,
+        LightVolume::open(everything),
+        "a wall missing from the map"
+    );
+    let mut culls = ShadowCulls::default();
+    let kept = cull(&runs(far, far_at, false, false), open, &pvs, &mut culls);
+    assert_eq!((kept.len(), culls.occlusion), (2, 0), "the far prop casts");
 }

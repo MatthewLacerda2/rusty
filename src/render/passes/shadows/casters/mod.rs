@@ -29,7 +29,9 @@
 //! cascade (#435) or an atlas tile (#468) — so a prop inside two volumes is drawn
 //! into both. A point or spot light's tile also drops the baked casters its light's
 //! PVS cell cannot see (#1714, [`LightVolume`]): the wall that hides them is in the
-//! same map, so the map is the same without them. The
+//! same map, so the map is the same without them, but for the bake's own miss (a
+//! caster seen only through a gap of under about a metre may be dropped, and a still
+//! light's cached tile keeps that until it re-bakes). The
 //! cascades' and the atlas's static bakes and dynamic passes each own a [`CasterBuffer`]
 //! holding every volume's casters: all four are recorded into the same encoder
 //! before one submit, so sharing one buffer would let a later upload overwrite an
@@ -155,11 +157,7 @@ impl ShadowRenderer {
         let mut matrices = Vec::new();
         let mut per_volume = Vec::with_capacity(volumes.len());
         for &volume in volumes {
-            // A baked occluder with no buffers draws nothing: its light sees past it.
-            let volume = match walls {
-                true => volume,
-                false => LightVolume::open(volume.view_proj),
-            };
+            let volume = volume.resident(walls);
             let casters = cull::cull(&candidates, volume, pvs, &mut self.culls);
             let (packed, mut batches) = batch_casters(casters, self.instancing);
             let base = matrices.len() as u32;

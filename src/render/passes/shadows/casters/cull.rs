@@ -73,6 +73,16 @@ impl LightVolume {
             row: None,
         }
     }
+
+    /// This volume as the sweep culls it: open when `walls` is false (a matching
+    /// baked occluder has no GPU buffers, so it draws into no map and its light
+    /// sees past it), else as it is.
+    pub(in crate::render::passes::shadows) fn resident(self, walls: bool) -> Self {
+        match walls {
+            true => self,
+            false => Self::open(self.view_proj),
+        }
+    }
 }
 
 /// The casters `volume` draws of `candidates`, its verdicts added to `culls`.
@@ -80,7 +90,8 @@ impl LightVolume {
 /// inside a cascade keeps its shadow — culling casters by the player camera's
 /// frustum is the classic pop-a-shadow bug. Only the size verdict is the camera's,
 /// so a shadow goes with its prop. A volume with a PVS row drops the baked casters
-/// `pvs` says its light's cell cannot see: the wall between is in the same map.
+/// `pvs` says its light's cell cannot see: the wall between is in the same map
+/// (to the bake's sampling: a caster seen only through a small gap may go).
 pub(super) fn cull(
     candidates: &[Candidate],
     volume: LightVolume,

@@ -191,6 +191,9 @@ impl OcclusionBinding {
     /// `None` when it culls nothing: no usable bake, a matching occluder that casts
     /// no shadow (the wall that hides a caster must be in the light's map), or a
     /// light outside every cell. A light has no culling mask, so every layer counts.
+    /// The row carries the camera's caveat: a caster the light sees only through a
+    /// gap the bake's sampled points miss (under about a metre of it) is hidden,
+    /// and a still light's cached tile keeps that lost shadow until it re-bakes.
     pub(crate) fn shadow_row(&self, light: Vec3) -> Option<u32> {
         let data = self.data.as_deref().filter(|_| self.usable())?;
         self.silent.is_empty().then(|| data.row_at(light)).flatten()
@@ -249,11 +252,13 @@ impl OcclusionBinding {
 #[cfg(test)]
 mod camera_gpu_tests;
 #[cfg(test)]
+pub(crate) mod fixture;
+#[cfg(test)]
 mod gpu_tests;
 #[cfg(test)]
 pub(super) mod ops;
 #[cfg(test)]
-pub(crate) mod shadow_tests;
+mod shadow_tests;
 
 /// Whether entity `id`'s mesh casts a shadow (any cast mode but Off).
 fn casts(scene: &Scene, id: u32) -> bool {

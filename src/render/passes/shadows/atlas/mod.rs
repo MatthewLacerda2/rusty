@@ -233,3 +233,5 @@ mod pvs_gpu_tests;
 #[cfg(test)]
 #[path = "settle_tests.rs"]
 mod settle_tests;
+#[cfg(test)]
+mod sweep_tests;

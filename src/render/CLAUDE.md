@@ -60,12 +60,15 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
 - **Occlusion culling reads the scene's baked PVS** (#1714, `scene/occlusion/`):
   bound per scene and re-checked against a baked object's fingerprint only after
   that static object changed (a whole bind when the PVS, the objects or the
-  `LODGroup`s' renderers changed); it may keep what is hidden and never culls what
-  a camera sees. A new path that decides what a camera draws reads it through
+  `LODGroup`s' renderers changed); it may keep what is hidden, and culls what a
+  camera sees only through a gap the bake's sampled points miss (about a metre,
+  `docs/api/Lighting.md`, *What it can miss*). A new path that decides what a camera draws reads it through
   `Renderer::occlusion_eye`, so a capture, an orthographic camera and a far near
   plane cull nothing. A light's shadow views read it through
   `OcclusionBinding::shadow_row` (the light's cell, culling nothing while a matching
   occluder casts no shadow) and only for a tile whose statics are drawn into it.
+  A light inherits the camera's gap caveat, and a still light's cached tile keeps
+  a shadow so lost until it re-bakes.
 
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no
