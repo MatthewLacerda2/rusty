@@ -25,7 +25,13 @@ pub(crate) struct Passes {
 }
 
 impl Passes {
-    pub(crate) fn new(device: &wgpu::Device, registry: &mut ShaderRegistry) -> Self {
+    /// Every effect's pipelines; an LDR pass's into each of `output_formats` (the
+    /// window's and the offscreen views').
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        registry: &mut ShaderRegistry,
+        output_formats: &[wgpu::TextureFormat],
+    ) -> Self {
         Self {
             bloom: bloom::BloomPasses::new(device, registry),
             depth_of_field: depth_of_field::DofPasses::new(device, registry),
@@ -34,7 +40,7 @@ impl Passes {
             motion_blur: motion_blur::MotionBlurPasses::new(device, registry),
             ssil: ssil::SsilPasses::new(device, registry),
             ssr: ssr::SsrPasses::new(device, registry),
-            taa: taa::TaaPasses::new(device, registry),
+            taa: taa::TaaPasses::new(device, registry, output_formats),
             volumetric_fog: volumetric_fog::VolumetricFogPasses::new(device, registry),
         }
     }

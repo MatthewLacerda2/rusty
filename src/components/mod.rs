@@ -61,7 +61,8 @@ pub use physics::collider::{
 pub use physics::joint::{JointComponent, JointKind};
 pub use physics::rigidbody::{CollisionDetection, RigidBodyComponent};
 pub use rendering::camera::{
-    is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, RENDER_TEXTURE_PREFIX,
+    is_render_texture, CameraComponent, ClearFlags, Projection, RenderTarget, TaaQuality,
+    RENDER_TEXTURE_PREFIX,
 };
 pub use rendering::light::{
     falloff, falloff_near, falloff_window, falloff_window_sq, spot_cone, LightComponent, LightMode,

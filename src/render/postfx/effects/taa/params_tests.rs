@@ -24,6 +24,7 @@ fn params() -> TaaParams {
     TaaParams::new(
         ((64, 48), (32, 24)),
         (true, Vec2::new(0.25, -0.5), false),
+        TaaTune::default(),
         lenses,
     )
 }
@@ -40,12 +41,18 @@ fn the_lanes_are_where_the_shader_reads_them() {
         DISOCCLUSION_FULL,
     ];
     assert_eq!(p.rejection, rejection);
+    // The quality's steps ride `levels`: `High` (the default) is URP's (2, 2, 2, 0).
+    assert_eq!(p.levels, [2.0, 2.0, 2.0, 0.0]);
     let wgsl = shader();
     for read in [
         "(pixels - taa.knobs.w) / (taa.rejection.y - taa.knobs.w)",
         "mix(taa.knobs.x, taa.rejection.x, moving)",
         "taa.rejection.w - taa.rejection.z",
         "(mismatch - taa.rejection.z) / span",
+        "taa.levels.x",
+        "taa.levels.y",
+        "taa.levels.z",
+        "taa.levels.w",
     ] {
         assert!(wgsl.contains(read), "the shader no longer reads `{read}`");
     }
@@ -62,10 +69,18 @@ fn the_struct_and_the_camera_count_match_the_shader() {
         .filter(|l| !l.starts_with("//") && l.contains(':'))
         .map(|l| l.split(':').next().unwrap())
         .collect();
-    let rust = ["size", "knobs", "scene", "jitter", "rejection", "lenses"];
+    let rust = [
+        "size",
+        "knobs",
+        "scene",
+        "jitter",
+        "levels",
+        "rejection",
+        "lenses",
+    ];
     assert_eq!(fields, rust);
     assert!(wgsl.contains(&format!("const MAX_CAMERAS: u32 = {MAX_CAMERAS}u;")));
-    assert_eq!(std::mem::size_of::<TaaParams>(), (5 + MAX_CAMERAS) * 16);
+    assert_eq!(std::mem::size_of::<TaaParams>(), (6 + MAX_CAMERAS) * 16);
 }
 
 #[test]

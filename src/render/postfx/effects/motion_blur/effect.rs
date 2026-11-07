@@ -19,10 +19,10 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     module: None,
     composite: &[],
     grade: &[],
-    pass: Some(Pass::Scene {
+    passes: &[Pass::Scene {
         order: 20,
         run: blur,
-    }),
+    }],
 };
 
 /// Gated by [`motion::wanted`], so the editor's Scene view never blurs and a view

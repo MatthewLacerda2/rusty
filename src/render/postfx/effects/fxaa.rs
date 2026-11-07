@@ -15,11 +15,11 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     module: None,
     composite: &[],
     grade: &[],
-    pass: Some(Pass::Ldr {
+    passes: &[Pass::Ldr {
         order: 20,
         prepare,
         run: LdrRun::Finish(|pfx| &pfx.fxaa_pipeline),
-    }),
+    }],
 };
 
 /// Skipped on a frame TAA resolved (#1702): Unity's camera has one anti-aliasing

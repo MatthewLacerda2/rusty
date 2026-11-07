@@ -42,7 +42,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         pack,
     }],
     grade: &[],
-    pass: Some(Pass::Scene { order: 50, run }),
+    passes: &[Pass::Scene { order: 50, run }],
 };
 
 /// w: `1` while the view flares, so the composite skips the fetch otherwise (the

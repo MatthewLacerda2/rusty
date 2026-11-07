@@ -102,9 +102,10 @@ pub(crate) fn scene_passes() -> &'static [ScenePass] {
     static PASSES: LazyLock<Vec<ScenePass>> = LazyLock::new(|| {
         let mut all: Vec<(u16, ScenePass)> = POST_EFFECTS
             .iter()
-            .filter_map(|e| match e.pass {
-                Some(Pass::Scene { order, run }) => Some((order, run)),
-                _ => None,
+            .flat_map(|e| e.passes)
+            .filter_map(|pass| match pass {
+                Pass::Scene { order, run } => Some((*order, *run)),
+                Pass::Ldr { .. } => None,
             })
             .collect();
         all.sort_by_key(|(order, _)| *order);
@@ -118,9 +119,10 @@ pub(crate) fn ldr_passes() -> &'static [&'static Pass] {
     static PASSES: LazyLock<Vec<&'static Pass>> = LazyLock::new(|| {
         let mut all: Vec<(u16, &Pass)> = POST_EFFECTS
             .iter()
-            .filter_map(|e| match &e.pass {
-                Some(pass @ Pass::Ldr { order, .. }) => Some((*order, pass)),
-                _ => None,
+            .flat_map(|e| e.passes)
+            .filter_map(|pass| match pass {
+                Pass::Ldr { order, .. } => Some((*order, pass)),
+                Pass::Scene { .. } => None,
             })
             .collect();
         all.sort_by_key(|(order, _)| *order);

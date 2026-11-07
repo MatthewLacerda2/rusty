@@ -1,5 +1,5 @@
 // engine/shaders/postfx/taa.wgsl — temporal anti-aliasing's resolve (#1702), URP's
-// `TemporalAA.hlsl` at its default quality (*High*: `DoTemporalAA(2, 2, 2, 0)`):
+// `TemporalAA.hlsl`; at its default quality (*High*: `DoTemporalAA(2, 2, 2, 0)`):
 //   - the neighbourhood: the current pixel's 3×3 in YCoCg, its min/max box tightened
 //     to mean ± `clamp scale` × the standard deviation (variance clamping);
 //   - the motion: the velocity of the 3×3's frontmost surface (so an edge
@@ -9,6 +9,9 @@
 //   - the blend: history clamped into the box, then lerped toward the current pixel
 //     by the frame influence in URP's perceptual space (each colour over 1 + luma), so
 //     a bright highlight cannot dominate the average.
+// The other levels (#1847) run URP's other `DoTemporalAA` arguments, `taa.levels`
+// (`params::levels`): a cross box, less or no motion dilation, a bilinear history,
+// clipping toward the box's centre and a re-filtered current pixel.
 // Beyond URP (#1846, `taa/params.rs`): the frame weighs more as the pixel moves, and
 // the history fades where this pixel's surface lies farther from its camera than
 // last frame's there, or a camera higher in the stack drew there and no longer does
@@ -45,6 +48,10 @@ struct TaaParams {
     // xy: this frame's jitter in scene pixels (`jitter::pixels`, NDC's y up); z: 1
     // when a translucent wrote the reactive mask this frame (#1845); w: unused
     jitter: vec4<f32>,
+    // The quality level's steps (#1847, `params::levels`), URP's `DoTemporalAA`
+    // arguments: x clamp (0 cross, 2 variance, 3 clipping), y motion (0 own, 1 cross,
+    // 2 3×3), z history (below 2 bilinear, 2 bicubic), w central filtering (1 on)
+    levels: vec4<f32>,
     // x: a moving pixel's frame influence, y: the history pixels a frame it applies
     // at; z, w: the relative depth gap the history starts to fade at, and is gone
     rejection: vec4<f32>,
@@ -134,11 +141,19 @@ fn frontmost(p: vec2<i32>) -> Front {
     let last = vec2<i32>(textureDimensions(t_velocity)) - 1;
     let here = textureLoad(t_velocity, clamp(p, vec2<i32>(0), last), 0);
     var front = here;
-    for (var y = -1; y <= 1; y++) {
-        for (var x = -1; x <= 1; x++) {
-            let t = textureLoad(t_velocity, clamp(p + vec2<i32>(x, y), vec2<i32>(0), last), 0);
-            if (in_front(t, front)) {
-                front = t;
+    // The motion dilation: URP's motion quality 2 the 3×3, 1 its 5-tap cross, 0 none
+    // (each pixel reprojects by its own motion).
+    let dilation = taa.levels.y;
+    if (dilation >= 1.0) {
+        for (var y = -1; y <= 1; y++) {
+            for (var x = -1; x <= 1; x++) {
+                if (dilation < 2.0 && x != 0 && y != 0) {
+                    continue;
+                }
+                let t = textureLoad(t_velocity, clamp(p + vec2<i32>(x, y), vec2<i32>(0), last), 0);
+                if (in_front(t, front)) {
+                    front = t;
+                }
             }
         }
     }
@@ -218,20 +233,47 @@ fn history_bicubic(uv: vec2<f32>) -> vec3<f32> {
     return (a * wa + b * wb + c * wc + d * wd + e * we) / (wa + wb + wc + wd + we);
 }
 
+// A re-filter of the current pixel (URP's central filtering, `VeryHigh`, #1847): the
+// 3×3's samples weighted by where each landed under the jitter ([`sample_weight`]),
+// so the output pixel converges on the jittered average sooner. Lower levels take
+// the point sample.
+fn filtered_center(p: vec2<i32>) -> vec4<f32> {
+    let shift = vec2<f32>(taa.jitter.x, -taa.jitter.y);
+    var sum = vec3<f32>(0.0);
+    var weights = 0.0;
+    for (var y = -1; y <= 1; y++) {
+        for (var x = -1; x <= 1; x++) {
+            let w = sample_weight(vec2<f32>(f32(x), f32(y)) - shift);
+            sum += current(p + vec2<i32>(x, y)).rgb * w;
+            weights += w;
+        }
+    }
+    return vec4<f32>(sum / max(weights, 1e-6), current(p).a);
+}
+
 @fragment
 fn fs_resolve(@builtin(position) pos: vec4<f32>) -> ResolveOut {
     let p = vec2<i32>(pos.xy);
-    let here = current(p);
+    // Central filtering re-filters the current pixel; without it, a point sample.
+    // A branch on the uniform, not a `select`, which would pay for both.
+    var here: vec4<f32>;
+    if (taa.levels.w >= 1.0) {
+        here = filtered_center(p);
+    } else {
+        here = current(p);
+    }
     let center = rgb_to_ycocg(here.rgb);
 
-    // The neighbourhood box and its moments.
+    // The neighbourhood box and its moments: the 3×3, or URP's 5-tap cross at
+    // clamp quality 0.
+    let cross = taa.levels.x < 1.0;
     var lo = center;
     var hi = center;
     var m1 = center;
     var m2 = center * center;
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
-            if (x != 0 || y != 0) {
+            if ((x != 0 || y != 0) && !(cross && x != 0 && y != 0)) {
                 let c = rgb_to_ycocg(current(p + vec2<i32>(x, y)).rgb);
                 lo = min(lo, c);
                 hi = max(hi, c);
@@ -240,11 +282,14 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> ResolveOut {
             }
         }
     }
-    let mean = m1 / 9.0;
-    let deviation = sqrt(abs(m2 / 9.0 - mean * mean));
-    let spread = taa.knobs.y * deviation;
-    lo = max(lo, mean - spread);
-    hi = min(hi, mean + spread);
+    // Variance clamping (URP's clamp quality 2 and up); below, the plain min/max box.
+    if (taa.levels.x >= 2.0) {
+        let mean = m1 / 9.0;
+        let deviation = sqrt(abs(m2 / 9.0 - mean * mean));
+        let spread = taa.knobs.y * deviation;
+        lo = max(lo, mean - spread);
+        hi = min(hi, mean + spread);
+    }
 
     let uv = pos.xy * taa.size.zw;
     let front = frontmost(p);
@@ -312,14 +357,21 @@ fn blend(frame: Frame, uv: vec2<f32>, front: Front) -> ResolveOut {
     let alone = ResolveOut(frame.here, front.own);
     // NDC y points up, uv down.
     let prev_uv = uv - front.motion * vec2<f32>(0.5, -0.5);
-    let sampled = history_bicubic(prev_uv);
+    // Bicubic history (URP's history quality 2); one bilinear read below it. A
+    // branch on the uniform, so each level pays for its own read only.
+    var sampled: vec3<f32>;
+    if (taa.levels.z >= 2.0) {
+        sampled = history_bicubic(prev_uv);
+    } else {
+        sampled = textureSampleLevel(t_history, s_linear, prev_uv, 0.0).rgb;
+    }
     let inside = all(abs(prev_uv - 0.5) <= vec2<f32>(0.5));
     if (taa.knobs.z < 0.5 || !inside || !numeric::finite3(sampled)) {
         return alone;
     }
     let weight = frame_weight(frame, front.motion, prev_uv, front.near);
     let center = rgb_to_ycocg(frame.here.rgb);
-    let history = clamp(rgb_to_ycocg(max(sampled, vec3<f32>(0.0))), frame.lo, frame.hi);
+    let history = into_box(rgb_to_ycocg(max(sampled, vec3<f32>(0.0))), frame.lo, frame.hi);
 
     // Lerp in perceptual space: each colour over 1 + its luma, and back.
     let a = history / (1.0 + history.x);
@@ -329,6 +381,21 @@ fn blend(frame: Frame, uv: vec2<f32>, front: Front) -> ResolveOut {
     let out = clamp(rgb, vec3<f32>(0.0), vec3<f32>(MAX_HDR));
     let color = vec4<f32>(select(frame.here.rgb, out, numeric::finite3(rgb)), frame.here.a);
     return ResolveOut(color, front.own);
+}
+
+// The history `h` brought into the box `lo`..`hi` (YCoCg): clamped per channel, or
+// at clamp quality 3 clipped toward the box's centre (URP's `ClipToAABBCenter`,
+// Playdead's), which keeps its hue where a clamp would shift it.
+fn into_box(h: vec3<f32>, lo: vec3<f32>, hi: vec3<f32>) -> vec3<f32> {
+    if (taa.levels.x < 3.0) {
+        return clamp(h, lo, hi);
+    }
+    let center = 0.5 * (hi + lo);
+    let extents = max(0.5 * (hi - lo), vec3<f32>(6.1e-5));
+    let offset = h - center;
+    let unit = abs(offset / extents);
+    let most = max(unit.x, max(unit.y, unit.z));
+    return select(h, center + offset / most, most > 1.0);
 }
 
 // The weight of a sample `d` scene pixels from where it should land: URP's
@@ -375,10 +442,14 @@ fn fs_upscale(@builtin(position) pos: vec4<f32>) -> ResolveOut {
         }
     }
     let here = vec4<f32>(sum / max(weights, 1e-6), current(base).a);
-    let mean = m1 / 9.0;
-    let spread = taa.knobs.y * sqrt(abs(m2 / 9.0 - mean * mean));
-    lo = max(lo, mean - spread);
-    hi = min(hi, mean + spread);
+    // Variance clamping (URP's clamp quality 2 and up); lower levels keep the
+    // min/max box, of the 3×3 the reconstruction reads at every level.
+    if (taa.levels.x >= 2.0) {
+        let mean = m1 / 9.0;
+        let spread = taa.knobs.y * sqrt(abs(m2 / 9.0 - mean * mean));
+        lo = max(lo, mean - spread);
+        hi = min(hi, mean + spread);
+    }
     let front = frontmost(base);
     let frame = Frame(here, lo, hi, nearest, reactivity(base, front.own.y));
     return blend(frame, uv, front);

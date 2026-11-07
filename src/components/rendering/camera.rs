@@ -44,6 +44,33 @@ fn default_fxaa_active() -> bool {
     true
 }
 
+crate::core::named_enum! {
+    /// TAA's quality (#1847, URP's `TemporalAAQuality`): each level runs URP's
+    /// `DoTemporalAA` steps for it (`render::postfx::effects::taa::params::levels`),
+    /// from `VeryLow`'s cross box and undilated motion to `VeryHigh`'s variance
+    /// clipping and re-filtered pixel; `High` is URP's default. rusty's reveal
+    /// (#1846) and reactive (#1845) rules run at every level.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum TaaQuality {
+        VeryLow = "VeryLow",
+        Low = "Low",
+        Medium = "Medium",
+        #[default]
+        High = "High",
+        VeryHigh = "VeryHigh",
+    }
+}
+
+fn default_taa_base_blend_factor() -> f32 {
+    CameraComponent::DEFAULT_TAA_BASE_BLEND_FACTOR
+}
+fn default_taa_variance_clamp_scale() -> f32 {
+    CameraComponent::DEFAULT_TAA_VARIANCE_CLAMP_SCALE
+}
+fn default_taa_jitter_scale() -> f32 {
+    1.0
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CameraComponent {
     pub active: bool,
@@ -90,6 +117,28 @@ pub struct CameraComponent {
     /// (Unity's camera has one anti-aliasing mode).
     #[serde(default)]
     pub taa_active: bool,
+    /// TAA's quality (#1847, URP's): how much of the resolve runs. Default `High`.
+    #[serde(default)]
+    pub taa_quality: TaaQuality,
+    /// URP's *Base Blend Factor* (#1847): the history's share for a still pixel; the
+    /// resolve's frame influence is `1 - base`, so `0.9` is URP's 0.1 influence.
+    #[serde(default = "default_taa_base_blend_factor")]
+    pub taa_base_blend_factor: f32,
+    /// URP's *Variance Clamp Scale* (#1847): the history box is the mean ± this many
+    /// deviations. Lower reduces ghosting, higher reduces flicker.
+    #[serde(default = "default_taa_variance_clamp_scale")]
+    pub taa_variance_clamp_scale: f32,
+    /// URP's *Jitter Scale* (#1847): scales the sub-pixel jitter; `1` is URP's.
+    #[serde(default = "default_taa_jitter_scale")]
+    pub taa_jitter_scale: f32,
+    /// URP's *Mip Bias* (#1847): a `-1`..`0` texture mip bias, added to the negative
+    /// bias TAAU already applies while upscaling.
+    #[serde(default)]
+    pub taa_mip_bias: f32,
+    /// URP's TAA *Contrast Adaptive Sharpening* (#1847): AMD's RCAS on the tonemapped image,
+    /// `0`..`1`; `0` (default) runs no sharpen, leaving the frame untouched.
+    #[serde(default)]
+    pub taa_contrast_adaptive_sharpening: f32,
     /// Perspective (the default) or orthographic — a top-down minimap (#430).
     #[serde(default)]
     pub projection: Projection,
@@ -119,6 +168,18 @@ impl CameraComponent {
     pub const DEFAULT_MOTION_BLUR_MAX_LENGTH: f32 = 0.05;
     /// The highest motion-blur clamp (Unity's upper bound, 0.2).
     pub const MAX_MOTION_BLUR_MAX_LENGTH: f32 = 0.2;
+
+    /// TAA's *Base Blend Factor* (URP's camera editor): default a 0.1 frame
+    /// influence, within the slider's bounds.
+    pub const DEFAULT_TAA_BASE_BLEND_FACTOR: f32 = 0.9;
+    pub const MIN_TAA_BASE_BLEND_FACTOR: f32 = 0.6;
+    pub const MAX_TAA_BASE_BLEND_FACTOR: f32 = 0.98;
+    /// TAA's *Variance Clamp Scale* (URP's camera editor): default and bounds.
+    pub const DEFAULT_TAA_VARIANCE_CLAMP_SCALE: f32 = 0.9;
+    pub const MIN_TAA_VARIANCE_CLAMP_SCALE: f32 = 0.6;
+    pub const MAX_TAA_VARIANCE_CLAMP_SCALE: f32 = 1.2;
+    /// The most negative TAA *Mip Bias* (URP's lower bound; 0 its default).
+    pub const MIN_TAA_MIP_BIAS: f32 = -1.0;
 }
 
 fn default_use_occlusion_culling() -> bool {
@@ -159,6 +220,12 @@ impl Default for CameraComponent {
             motion_blur_max_length: default_motion_blur_max_length(),
             fxaa_active: default_fxaa_active(),
             taa_active: false,
+            taa_quality: TaaQuality::default(),
+            taa_base_blend_factor: default_taa_base_blend_factor(),
+            taa_variance_clamp_scale: default_taa_variance_clamp_scale(),
+            taa_jitter_scale: default_taa_jitter_scale(),
+            taa_mip_bias: 0.0,
+            taa_contrast_adaptive_sharpening: 0.0,
             projection: Projection::Perspective,
             use_occlusion_culling: default_use_occlusion_culling(),
             target_texture: None,

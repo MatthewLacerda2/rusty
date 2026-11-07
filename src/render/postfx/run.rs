@@ -1,10 +1,11 @@
 //! Per-frame execution of the post-process chain after the effects' scene passes:
 //! the composite (assembled from the effects' functions around the grading LUT
-//! `grade` baked), the LDR passes (the authored effects, #397, then FXAA — or a
-//! plain copy) that write the finished image to the target.
+//! `grade` baked), the LDR passes (the authored effects, #397, TAA's sharpen, then
+//! FXAA — or a plain copy, unless the last pass wrote the output itself) that write
+//! the finished image to the target.
 
 use super::effects::{self, EffectCx, Gpu, LdrRun, Pass};
-use super::{PfxTarget, PostFx, PostFxContext, PostParams};
+use super::{PostFx, PostFxContext, PostParams};
 use crate::render::timing::GpuPass;
 
 impl PostFx {
@@ -46,18 +47,25 @@ impl PostFx {
         Self::fullscreen(&mut encoder, composite, &[&io, &textures], composite_target);
 
         let mut finish = None;
-        for run in ldr {
+        let mut ended = false;
+        let count = ldr.len();
+        for (i, run) in ldr.into_iter().enumerate() {
             match run {
                 LdrRun::InPlace(run) => run(self, gpu, &mut encoder, &ctx, cx),
+                LdrRun::MayEnd(run) => {
+                    // Only a finishing pass comes after the in-place ones, so the
+                    // last one in the list is the chain's last.
+                    ended = run(self, gpu, &mut encoder, &ctx, cx, i + 1 == count);
+                }
                 LdrRun::Finish(pipeline) => finish = Some(*pipeline),
             }
         }
-        // The finishing pass, or the copy that lands the in-place passes' result.
-        // The aux/depth/skybox bindings are unused by either but must satisfy the
-        // shared IO layout.
+        // The finishing pass, or the copy that lands the in-place passes' result,
+        // unless the last one wrote the output itself. The aux/depth/skybox bindings
+        // are unused by either but must satisfy the shared IO layout.
         let last = match finish {
             Some(pipeline) => Some(pipeline(self)),
-            None => followed.then_some(&self.copy_pipeline),
+            None => (followed && !ended).then_some(&self.copy_pipeline),
         };
         if let Some(pipeline) = last {
             let bg = self.io_bind_group(
@@ -101,59 +109,6 @@ impl PostFx {
             ctx.skybox,
         );
         [io, self.effect_textures.bind_group(device, self)]
-    }
-
-    /// Bloom's result (io binding 3): the top of its chain while the view blooms,
-    /// else the composite textures' black texel, so a view that never blooms holds
-    /// no chain (#1700).
-    pub(crate) fn bloom_view(&self) -> &wgpu::TextureView {
-        let chain = self.targets.get::<effects::bloom::BloomTargets>();
-        chain.map_or(self.effect_textures.black(), |t| t.view())
-    }
-
-    /// The scene the composite and bloom read: motion-blurred (#1436), else
-    /// [`PostFx::resolved_color`].
-    pub(crate) fn scene_color(&self) -> &wgpu::TextureView {
-        scene_of(
-            self.targets.get(),
-            self.taa(),
-            self.targets.get(),
-            &self.scene_hdr,
-        )
-    }
-
-    /// The scene motion blur reads: this frame's TAA resolve when it ran (#1702),
-    /// else [`PostFx::focused_color`]. URP's order: depth of field, TAA, motion blur.
-    pub(crate) fn resolved_color(&self) -> &wgpu::TextureView {
-        scene_of(None, self.taa(), self.targets.get(), &self.scene_hdr)
-    }
-
-    /// The scene TAA reads: this frame's depth of field when it ran (#1445), else
-    /// the HDR scene itself. Depth of field runs first, Unity's order.
-    pub(crate) fn focused_color(&self) -> &wgpu::TextureView {
-        scene_of(None, None, self.targets.get(), &self.scene_hdr)
-    }
-
-    /// TAA's output this frame, when its resolve ran: at the output's size when it
-    /// upscaled the view (TAAU), which is then the size of all that reads it.
-    fn taa(&self) -> Option<&PfxTarget> {
-        let history = self.targets.get::<effects::taa::TaaHistory>();
-        history.and_then(|h| h.output())
-    }
-
-    /// The exposure meter and [`PostFx::scene_color`] (with its size) at once, so the meter reads
-    /// the image after depth of field, TAA and motion blur (#1444) without a borrow clash.
-    pub(crate) fn exposure_and_scene(
-        &mut self,
-    ) -> (
-        &mut effects::exposure::ExposureMeter,
-        (&wgpu::TextureView, [u32; 2]),
-    ) {
-        // The chain's size: the output's when TAA upscaled the view (#1702).
-        let size = [self.chain_size.0, self.chain_size.1];
-        let taa = (self.targets.get::<effects::taa::TaaHistory>()).and_then(|h| h.output());
-        let scene = scene_of(self.targets.get(), taa, self.targets.get(), &self.scene_hdr);
-        (&mut self.exposure, (scene, size))
     }
 
     /// The format the chain writes its output in (what [`PostFx::composite_into`]
@@ -272,16 +227,3 @@ pub(crate) type Timed<'a> = (
     &'a wgpu::RenderPipeline,
     Option<wgpu::RenderPassTimestampWrites<'a>>,
 );
-
-/// The motion-blurred image when `blur` ran, else TAA's resolve when `taa` ran,
-/// else the focused one when `dof` did.
-fn scene_of<'a>(
-    blur: Option<&'a effects::motion_blur::BlurTargets>,
-    taa: Option<&'a PfxTarget>,
-    dof: Option<&'a effects::depth_of_field::DofTargets>,
-    scene_hdr: &'a PfxTarget,
-) -> &'a wgpu::TextureView {
-    let focused = dof.map_or(&scene_hdr.view, |d| &d.focused.view);
-    let resolved = taa.map_or(focused, |t| &t.view);
-    blur.map_or(resolved, |b| &b.blurred.view)
-}

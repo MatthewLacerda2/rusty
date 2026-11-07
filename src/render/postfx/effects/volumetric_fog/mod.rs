@@ -88,7 +88,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     module: None,
     composite: &[],
     grade: &[],
-    pass: None,
+    passes: &[],
 };
 
 /// Where the exponential slices start, in metres of view depth: the first slice

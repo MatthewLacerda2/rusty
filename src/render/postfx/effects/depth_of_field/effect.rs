@@ -19,10 +19,10 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     module: None,
     composite: &[],
     grade: &[],
-    pass: Some(Pass::Scene {
+    passes: &[Pass::Scene {
         order: 10,
         run: focus,
-    }),
+    }],
 };
 
 fn focus(r: &Renderer, view: &mut RenderView, cx: &PassCx) {

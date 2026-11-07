@@ -110,6 +110,7 @@ impl Renderer {
             skybox: (&sky.view, &sky.sampler),
             output,
             timer: &self.gpu_timer,
+            passes: &self.post_passes,
         };
         // The aux, depth and skybox bindings are unused by the copy but must satisfy
         // the chain's shared IO layout.

@@ -19,7 +19,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
         pack,
     }],
     grade: &[],
-    pass: None,
+    passes: &[],
 };
 
 /// x: the intensity, clamped (a loaded file bypasses the op's clamp); `0` when it

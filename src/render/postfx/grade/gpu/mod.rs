@@ -104,6 +104,7 @@ impl Chain {
             skybox: (&sky, &sampler),
             output: &out,
             timer: &timer,
+            passes: &self.r.post_passes,
         };
         let camera = CameraComponent {
             fxaa_active: false,

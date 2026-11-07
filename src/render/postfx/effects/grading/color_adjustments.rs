@@ -33,7 +33,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
             pack: pack_saturation,
         },
     ],
-    pass: None,
+    passes: &[],
 };
 
 /// The volume's adjustments, neutral without one.
