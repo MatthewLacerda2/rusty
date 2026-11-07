@@ -54,6 +54,16 @@ fn every_map_is_written_beside_the_prefix_in_a_new_folder() {
 }
 
 #[test]
+fn a_prefix_ending_in_a_slash_gets_its_folder_made() {
+    let (dir, model) = project("mesh_maps_slash");
+    let prefix = format!("{}/maps/kolvik/", dir.to_str().unwrap());
+    let written = bake_mesh_maps(&model, &["id".to_string()], &prefix, 8, &dir).unwrap();
+    assert!(Path::new(&written["id"]).is_file(), "{written:?}");
+    assert!(written["id"].ends_with("/maps/kolvik/id.png"));
+    std::fs::remove_dir_all(dir).ok();
+}
+
+#[test]
 fn a_bad_call_names_the_verb_and_the_model() {
     let (dir, model) = project("mesh_maps_bad");
     let prefix = format!("{}/l_", dir.to_str().unwrap());

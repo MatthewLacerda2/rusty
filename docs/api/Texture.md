@@ -132,8 +132,9 @@ Texture.Bake({ resolution = 1024, nodes = {
   error that lists them). The mesh is baked **in its own space**, as imported:
   "world" means the model's frame before any scene transform.
 - `maps` lists any of the names below (case-insensitive; a map named twice bakes
-  once). Each is written to `<prefix><map>.png`, the folders above `prefix` made as
-  `Bake` makes them. `resolution` is the square map's edge, 1 to 8192.
+  once). Each is written to `<prefix><map>.png` as soon as it is baked, the folders
+  above it made first as `Bake` makes them (a `prefix` ending in `/` names a folder
+  of its own). `resolution` is the square map's edge, 1 to 8192.
 - Every map but `id` is a 16-bit `data` PNG; `id` is 8-bit.
 
 | Map | What a texel holds | Off the islands |
@@ -143,16 +144,22 @@ Texture.Bake({ resolution = 1024, nodes = {
 | `world_normal` | the surface normal, `n * 0.5 + 0.5` per axis (Y up) | 0.5 |
 | `position` | the surface point, normalised per axis to the model's bounds (a flat axis reads 0.5) | 0 |
 | `thickness` | how far 64 rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
-| `id` | one fully saturated colour per material slot, hues a golden-ratio step apart (slot 0 red) | black |
+| `id` | one fully saturated colour per material, hues a golden-ratio step apart (a triangle with no material red, then the model's materials in order); two runs drawn with one material share its colour | black |
 
-The defaults are Substance's and can be changed by editing the recipe that reads
-the maps, not the bake: 64 rays, an occluder distance of the whole bounds
-diagonal, and a **16-texel margin** around every UV island (a continuous map's
-margin averages its border, the ID map's copies it, so no margin holds a colour
-between two slots). A `curvature` crease lights a band 2% of the bounds diagonal
-wide, never narrower than 3 texels: each edge two faces share is a crease of
-strength `angle / 90°` (capped at 1), corners welded by position first so a UV or
-normal seam never breaks one; a boundary edge is no crease.
+The bake's settings are Substance's defaults and are **fixed today**: no argument
+or recipe changes them. They are 64 rays per texel, an occluder distance of the
+whole bounds diagonal, and a **16-texel margin** around every UV island (a
+continuous map's margin averages its border, the ID map's copies it, so no margin
+holds a colour between two materials). Rays are drawn around the interpolated
+normal, and one that would leave under the triangle's own face is dropped, so on a
+smooth low-poly mesh no ray starts under the face it leaves. A `curvature` crease lights a band 2%
+of the bounds diagonal wide, never narrower than 3 texels: each edge two faces
+share is a crease of strength `angle / 90°` (capped at 1), corners welded by
+position first so a UV or normal seam never breaks one. A boundary edge is no
+crease, nor is the outline of a double-sided face (two faces with opposite
+normals), and a texel reads only the creases of **its own connected surface**: a
+floor beside a separate crate, or a hull under a floating panel, gets no band
+from the other's edges.
 
 Only the part of UV0 inside the 0..1 square is baked. Where UVs overlap, a texel
 takes the first triangle in index order. A model without UV0 (its texture UVs

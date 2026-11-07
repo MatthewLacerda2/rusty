@@ -2,15 +2,15 @@
 
 use glam::{Vec2, Vec3};
 
-use super::fixtures::{cell, cube, l_shape};
-use super::{bake, MeshMap, MeshSource};
+use super::fixtures::{bake_all, cell, cube, l_shape};
+use super::{MeshMap, MeshSource};
 use crate::procgen::image_buf::Image;
 
 const S: u32 = 96;
 
 /// The one map `map` of `mesh` at `S`².
 fn one(mesh: &MeshSource, map: MeshMap) -> Image {
-    bake(mesh, &[map], S).unwrap().remove(0).1
+    bake_all(mesh, &[map], S).unwrap().remove(0).1
 }
 
 /// The texel at UV `uv`.
@@ -58,7 +58,7 @@ fn a_cubes_curvature_is_bright_along_its_uv_mapped_edges_and_flat_inside() {
 #[test]
 fn an_ls_inner_edge_is_dark_in_curvature_and_in_ao() {
     let mesh = l_shape();
-    let maps = bake(&mesh, &[MeshMap::Curvature, MeshMap::Ao], S).unwrap();
+    let maps = bake_all(&mesh, &[MeshMap::Curvature, MeshMap::Ao], S).unwrap();
     let (curv, ao) = (&maps[0].1, &maps[1].1);
     let (lo, hi) = cell(0);
     // The floor's v runs along x: lo.y at the wall, hi.y away from it.
@@ -79,8 +79,8 @@ fn an_ls_inner_edge_is_dark_in_curvature_and_in_ao() {
 #[test]
 fn rebaking_gives_the_same_bytes() {
     let all = MeshMap::ALL;
-    let a = bake(&l_shape(), &all, 32).unwrap();
-    let b = bake(&l_shape(), &all, 32).unwrap();
+    let a = bake_all(&l_shape(), &all, 32).unwrap();
+    let b = bake_all(&l_shape(), &all, 32).unwrap();
     assert_eq!(a, b);
 }
 
@@ -106,7 +106,7 @@ fn normal_and_position_read_the_face_they_sit_on() {
 }
 
 #[test]
-fn each_material_slot_gets_its_own_id_colour_and_the_margin_copies_one() {
+fn each_material_gets_its_own_id_colour_and_the_margin_copies_one() {
     let img = one(&l_shape(), MeshMap::Id);
     let (floor, wall) = (at(&img, mid(0)), at(&img, mid(1)));
     assert_ne!(floor, wall);

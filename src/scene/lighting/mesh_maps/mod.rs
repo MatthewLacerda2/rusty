@@ -27,12 +27,14 @@
 mod curvature;
 mod margin;
 mod rays;
+mod source;
 
-use glam::{Vec2, Vec3, Vec4};
+use glam::{Vec3, Vec4};
 
-use super::lightmap::{rasterize_surface, world_per_uv, Surface, TexelPoint};
-use crate::asset::SubMesh;
+use super::lightmap::{rasterize_surface, world_per_uv, TexelPoint};
 use crate::procgen::image_buf::Image;
+use rays::MeshRays;
+pub use source::MeshSource;
 
 /// The largest map edge, in texels: Substance's 8K.
 pub const MAX_RESOLUTION: u32 = 8192;
@@ -89,70 +91,6 @@ impl MeshMap {
     }
 }
 
-/// The mesh a bake reads: unit normals, UV0, the triangles, and where each
-/// material slot's run of `indices` ends.
-#[derive(Clone, Debug, Default)]
-pub struct MeshSource {
-    pub positions: Vec<Vec3>,
-    pub normals: Vec<Vec3>,
-    pub uvs: Vec<Vec2>,
-    pub indices: Vec<u32>,
-    pub run_ends: Vec<u32>,
-}
-
-impl MeshSource {
-    /// An imported sub-mesh, in its own space.
-    pub fn from_sub_mesh(mesh: &SubMesh) -> Self {
-        let v = &mesh.vertices;
-        Self {
-            positions: v.iter().map(|v| Vec3::from(v.position)).collect(),
-            normals: v
-                .iter()
-                .map(|v| Vec3::from(v.normal).try_normalize().unwrap_or(Vec3::Y))
-                .collect(),
-            uvs: v.iter().map(|v| Vec2::from(v.tex_coords)).collect(),
-            indices: mesh.indices.clone(),
-            run_ends: mesh.ranges.iter().map(|r| r.indices.end).collect(),
-        }
-    }
-
-    fn surface(&self) -> Surface<'_> {
-        Surface {
-            positions: &self.positions,
-            normals: &self.normals,
-            uvs: &self.uvs,
-            indices: &self.indices,
-        }
-    }
-
-    /// The material slot the triangle starting at index `first` belongs to.
-    fn slot_at(&self, first: usize) -> usize {
-        self.run_ends.partition_point(|&end| end as usize <= first)
-    }
-
-    /// Why this mesh cannot be baked, if it can't: no triangles, an index past its
-    /// vertices, a non-finite position or UV, or UVs that enclose no area.
-    fn check(&self) -> Result<(), String> {
-        let n = self.positions.len();
-        if self.indices.len() < 3 {
-            return Err("has no triangles".into());
-        }
-        if self.normals.len() != n || self.uvs.len() != n {
-            return Err("has a vertex without a normal or a UV".into());
-        }
-        if self.indices.iter().any(|&i| i as usize >= n) {
-            return Err("has an index past its vertices".into());
-        }
-        if !self.positions.iter().all(|p| p.is_finite()) || !self.uvs.iter().all(|u| u.is_finite())
-        {
-            return Err("has a non-finite position or UV".into());
-        }
-        world_per_uv(&self.surface())
-            .map(|_| ())
-            .ok_or_else(|| "has no UV0 (its texture UVs enclose no area)".into())
-    }
-}
-
 /// What every map of one bake shares: the covered texels and the mesh's bounds.
 struct Baked<'a> {
     source: &'a MeshSource,
@@ -164,14 +102,17 @@ struct Baked<'a> {
     diagonal: f32,
 }
 
-/// Bake `maps` of `source` at `size`² texels, each map once, in the order asked.
-/// An error says what is wrong with the mesh or the arguments; the caller names the
-/// model.
+/// Bake `maps` of `source` at `size`² texels, each map once, in the order asked,
+/// handing each to `sink` as it is done: one map's image is alive at a time (its
+/// peak memory is in the module docs). An error says what is wrong with the mesh
+/// or the arguments, or is the first one `sink` returned (no later map is baked);
+/// the caller names the model.
 pub fn bake(
     source: &MeshSource,
     maps: &[MeshMap],
     size: u32,
-) -> Result<Vec<(MeshMap, Image)>, String> {
+    mut sink: impl FnMut(MeshMap, Image) -> Result<(), String>,
+) -> Result<(), String> {
     if !(1..=MAX_RESOLUTION).contains(&size) {
         return Err(format!("resolution {size} is outside 1..={MAX_RESOLUTION}"));
     }
@@ -192,37 +133,36 @@ pub fn bake(
         extent: max - min,
         diagonal: (max - min).length(),
     };
-    let tracer = maps
-        .iter()
-        .any(|m| matches!(m, MeshMap::Ao | MeshMap::Thickness))
-        .then(|| rays::MeshRays::new(source));
-    let mut out: Vec<(MeshMap, Image)> = Vec::new();
+    let mut tracer = None;
+    let mut done = Vec::new();
     for &map in maps {
-        if out.iter().any(|(m, _)| *m == map) {
+        if done.contains(&map) {
             continue;
         }
-        let values = match map {
-            MeshMap::Curvature => curvature::bake(&baked),
-            MeshMap::Ao => tracer.as_ref().map(|t| t.ao(&baked)).unwrap_or_default(),
-            MeshMap::Thickness => tracer
-                .as_ref()
-                .map(|t| t.thickness(&baked))
-                .unwrap_or_default(),
-            MeshMap::WorldNormal => baked.each(|p| (p.normal * 0.5 + 0.5).extend(1.0)),
-            MeshMap::Position => baked.each(|p| baked.normalised(p.position).extend(1.0)),
-            MeshMap::Id => baked.each(|p| margin::id_colour(source.slot_at(p.first))),
+        done.push(map);
+        let image = |f: &(dyn Fn(usize, &TexelPoint) -> Vec4 + Sync)| margin::image(map, &baked, f);
+        let image = match map {
+            MeshMap::Curvature => {
+                let c = curvature::Curvature::new(&baked);
+                image(&|_, p| c.texel(p))
+            }
+            MeshMap::Ao | MeshMap::Thickness => {
+                let t: &MeshRays = tracer.get_or_insert_with(|| MeshRays::new(source));
+                match map {
+                    MeshMap::Ao => image(&|i, p| t.ao(&baked, i, p)),
+                    _ => image(&|i, p| t.thickness(&baked, i, p)),
+                }
+            }
+            MeshMap::WorldNormal => image(&|_, p| (p.normal * 0.5 + 0.5).extend(1.0)),
+            MeshMap::Position => image(&|_, p| baked.normalised(p.position).extend(1.0)),
+            MeshMap::Id => image(&|_, p| margin::id_colour(source.material_key(p.first))),
         };
-        out.push((map, margin::image(map, &baked, &values)));
+        sink(map, image)?;
     }
-    Ok(out)
+    Ok(())
 }
 
 impl Baked<'_> {
-    /// `f` of every covered texel, in point order.
-    fn each(&self, f: impl Fn(&TexelPoint) -> Vec4 + Sync) -> Vec<Vec4> {
-        per_texel(&self.points, |_, p| f(p))
-    }
-
     /// `p` in the bounds, 0..1 per axis; a flat axis reads 0.5.
     fn normalised(&self, p: Vec3) -> Vec3 {
         let span = |d: f32, e: f32| if e > 0.0 { d / e } else { 0.5 };
@@ -240,36 +180,11 @@ impl Baked<'_> {
     }
 }
 
-/// `f(i, point)` for every point, split across the machine's threads in contiguous
-/// chunks and joined back in order: which thread ran a texel never shows.
-fn per_texel(points: &[TexelPoint], f: impl Fn(usize, &TexelPoint) -> Vec4 + Sync) -> Vec<Vec4> {
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get());
-    let chunk = points.len().div_ceil(threads).max(1);
-    let f = &f;
-    std::thread::scope(|s| {
-        let handles: Vec<_> = points
-            .chunks(chunk)
-            .enumerate()
-            .map(|(c, part)| {
-                s.spawn(move || {
-                    let base = c * chunk;
-                    part.iter()
-                        .enumerate()
-                        .map(|(k, p)| f(base + k, p))
-                        .collect::<Vec<_>>()
-                })
-            })
-            .collect();
-        handles
-            .into_iter()
-            .flat_map(|h| h.join().expect("a mesh-map worker panicked"))
-            .collect()
-    })
-}
-
 #[cfg(test)]
 mod edge_tests;
 #[cfg(test)]
 mod fixtures;
+#[cfg(test)]
+mod surface_tests;
 #[cfg(test)]
 mod tests;

@@ -3,11 +3,27 @@
 
 use glam::{Vec2, Vec3};
 
-use super::MeshSource;
+use super::{bake, MeshMap, MeshSource};
+use crate::procgen::image_buf::Image;
+
+/// Every map `maps` of `mesh` at `size`², in the order baked.
+pub(super) fn bake_all(
+    mesh: &MeshSource,
+    maps: &[MeshMap],
+    size: u32,
+) -> Result<Vec<(MeshMap, Image)>, String> {
+    let mut out = Vec::new();
+    bake(mesh, maps, size, |map, img| {
+        out.push((map, img));
+        Ok(())
+    })?;
+    Ok(out)
+}
 
 /// Append the quad `c` (counter-clockwise seen from where `normal` points) mapped to
-/// the UV rectangle `lo..hi`, as its own material run when `new_run`.
-pub(super) fn quad(m: &mut MeshSource, c: [Vec3; 4], uv: (Vec2, Vec2), new_run: bool) {
+/// the UV rectangle `lo..hi`, drawn with `material`: the last run grows when it has
+/// the same material, else a new run starts.
+pub(super) fn quad(m: &mut MeshSource, c: [Vec3; 4], uv: (Vec2, Vec2), material: usize) {
     let normal = (c[1] - c[0]).cross(c[2] - c[0]).normalize();
     let (lo, hi) = uv;
     let base = m.positions.len() as u32;
@@ -19,9 +35,9 @@ pub(super) fn quad(m: &mut MeshSource, c: [Vec3; 4], uv: (Vec2, Vec2), new_run: 
     }
     m.indices.extend([0, 1, 2, 0, 2, 3].map(|i| base + i));
     let end = m.indices.len() as u32;
-    match (new_run, m.run_ends.last_mut()) {
-        (false, Some(last)) => *last = end,
-        _ => m.run_ends.push(end),
+    match m.runs.last_mut() {
+        Some(last) if last.1 == Some(material) => last.0 = end,
+        _ => m.runs.push((end, Some(material))),
     }
 }
 
@@ -45,20 +61,20 @@ pub(super) fn cube() -> MeshSource {
     ];
     let mut m = MeshSource::default();
     for (k, f) in faces.into_iter().enumerate() {
-        quad(&mut m, f, cell(k), false);
+        quad(&mut m, f, cell(k), 0);
     }
     m
 }
 
 /// An open L: a floor `x, z ∈ [0, 1]` facing up in UV cell 0, and a wall at `x = 0`
-/// facing +X in cell 1, meeting in a concave edge along z. The wall is its own
-/// material slot.
+/// facing +X in cell 1, meeting in a concave edge along z. The wall has its own
+/// material.
 pub(super) fn l_shape() -> MeshSource {
     let v = |x: f32, y: f32, z: f32| Vec3::new(x, y, z);
     let mut m = MeshSource::default();
     let floor = [v(0., 0., 0.), v(0., 0., 1.), v(1., 0., 1.), v(1., 0., 0.)];
     let wall = [v(0., 0., 0.), v(0., 1., 0.), v(0., 1., 1.), v(0., 0., 1.)];
-    quad(&mut m, floor, cell(0), false);
-    quad(&mut m, wall, cell(1), true);
+    quad(&mut m, floor, cell(0), 0);
+    quad(&mut m, wall, cell(1), 1);
     m
 }

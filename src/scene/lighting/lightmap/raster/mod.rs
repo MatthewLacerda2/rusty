@@ -14,7 +14,7 @@
 //!
 //! The walk reads a [`Surface`]: positions, normals, one UV set and the triangles.
 //! The lightmap bake hands it a mesh's lightmap UV; the mesh-map baker
-//! (`lighting::mesh_maps`, #1849) a model's UV0, so both rasterize, inset and dilate
+//! (`lighting::mesh_maps`, #1849) a model's UV0, so both rasterize and inset
 //! the same way.
 
 use std::ops::{Add, Div, Mul};
@@ -26,7 +26,7 @@ use super::input::BakeMesh;
 /// A value a lightmap map holds texel by texel: a colour (`Vec3`), or a direction
 /// texel (`Vec4`, the vector and its lamp share, #1695). Dilation, the fill, the
 /// atlas and the mips only ever copy, add and scale one.
-pub(in crate::scene::lighting) trait Texel:
+pub(super) trait Texel:
     Copy + Default + Add<Output = Self> + Mul<f32, Output = Self> + Div<f32, Output = Self>
 {
 }
@@ -205,12 +205,7 @@ fn barycentric(uv: [Vec2; 3], area: f32, p: Vec2) -> Option<Vec3> {
 
 /// Fill each empty texel bordering filled ones with their average, `passes` rings
 /// deep, so bilinear filtering at a chart's edge reads lit texels, not black.
-pub(in crate::scene::lighting) fn dilate<T: Texel>(
-    texels: &mut [T],
-    filled: &mut [bool],
-    size: u32,
-    passes: u32,
-) {
+pub(super) fn dilate<T: Texel>(texels: &mut [T], filled: &mut [bool], size: u32, passes: u32) {
     let size = size as i32;
     for _ in 0..passes {
         let snapshot = filled.to_vec();

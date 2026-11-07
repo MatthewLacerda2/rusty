@@ -39,9 +39,10 @@ pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
     )
 }
 
-/// Bake `maps` of `model` at `resolution`² and write each to `<prefix><map>.png`,
-/// the folders above `prefix` made first when inside `root`. Returns map → path. An
-/// error names the verb and the model.
+/// Bake `maps` of `model` at `resolution`² and write each to `<prefix><map>.png`
+/// as it is baked, the folders above the first made before the bake when inside
+/// `root`. Returns map → path. An error names the verb and the model; a map that
+/// failed to write stops the bake, the maps before it stay written.
 pub(super) fn bake_mesh_maps(
     model: &str,
     maps: &[String],
@@ -59,18 +60,20 @@ pub(super) fn bake_mesh_maps(
         .collect::<Result<Vec<_>, _>>()
         .map_err(fail)?;
     let source = load(model).map_err(fail)?;
-    let baked = bake(&source, &maps, resolution).map_err(fail)?;
-    folder::make_parents(prefix, root).map_err(fail)?;
+    // `<prefix>` may end in a folder of its own (`maps/`): make it before the bake.
+    folder::make_parents(&format!("{prefix}{}.png", maps[0].name()), root).map_err(fail)?;
     let mut out = BTreeMap::new();
-    for (map, image) in baked {
+    bake(&source, &maps, resolution, |map, image| {
         let path = format!("{prefix}{}.png", map.name());
         let slot = match map {
             MeshMap::Id => Slot::Normal,
             _ => Slot::Data,
         };
-        bake_to_png(&image, slot, &path).map_err(fail)?;
+        bake_to_png(&image, slot, &path)?;
         out.insert(map.name().to_string(), path);
-    }
+        Ok(())
+    })
+    .map_err(fail)?;
     Ok(out)
 }
 

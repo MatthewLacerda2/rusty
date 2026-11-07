@@ -6,15 +6,20 @@
 //! point, each fading linearly to nothing at the radius, and stores
 //! `0.5 + 0.5 × (convex + concave)`: 0.5 flat, 1 on a right-angled convex edge,
 //! 0 in a right-angled concave one. Seams in UV or normals don't break a crease:
-//! corners are welded by position first.
+//! corners are welded by position first. A texel reads only the creases of its own
+//! connected surface, so a floor beside a separate crate gets no band from the
+//! crate's edges; and two faces whose normals are opposite (a double-sided face's
+//! outline) are no crease.
 
 use std::collections::BTreeMap;
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{Vec3, Vec4};
 
-use super::{per_texel, Baked, MeshSource};
+use super::source::Weld;
+use super::{Baked, MeshSource};
 use crate::core::collections::Map;
+use crate::scene::lighting::lightmap::TexelPoint;
 
 /// The band a crease lights, as a share of the mesh's bounds diagonal (at least
 /// [`MIN_TEXELS`] texels wide, so a low resolution still shows it).
@@ -27,78 +32,96 @@ const MIN_TEXELS: f32 = 3.0;
 /// noise on a flat face.
 const MIN_ANGLE: f32 = 1e-3;
 
-/// One crease: its two ends and its signed strength in `-1..=1`.
+/// Two face normals whose dot product is below `-1 + OPPOSITE` face away from each
+/// other: a face and its reversed copy, no crease.
+const OPPOSITE: f32 = 1e-4;
+
+/// One crease: its two ends, its signed strength in `-1..=1`, and the connected
+/// surface it lies on.
 struct Crease {
     a: Vec3,
     b: Vec3,
     strength: f32,
+    surface: u32,
 }
 
-/// The curvature of every covered texel, in point order.
-pub(super) fn bake(baked: &Baked) -> Vec<Vec4> {
-    let creases = creases(baked.source);
-    let radius = (RADIUS * baked.diagonal).max(MIN_TEXELS * baked.texel_world());
-    let grid = Grid::new(&creases, radius);
-    per_texel(&baked.points, |_, p| {
+/// The creases of one mesh, bucketed for the per-texel read.
+pub(super) struct Curvature {
+    creases: Vec<Crease>,
+    grid: Grid,
+    radius: f32,
+    /// Per triangle, its connected surface.
+    surfaces: Vec<u32>,
+}
+
+impl Curvature {
+    pub(super) fn new(baked: &Baked) -> Self {
+        let source = baked.source;
+        let weld = source.weld();
+        let surfaces = source.components(&weld);
+        let creases = creases(source, &weld, &surfaces);
+        let radius = (RADIUS * baked.diagonal).max(MIN_TEXELS * baked.texel_world());
+        let grid = Grid::new(&creases, radius);
+        Self {
+            creases,
+            grid,
+            radius,
+            surfaces,
+        }
+    }
+
+    /// The curvature of the texel at `p`.
+    pub(super) fn texel(&self, p: &TexelPoint) -> Vec4 {
+        let surface = self.surfaces[p.first / 3];
         let (mut convex, mut concave) = (0.0f32, 0.0f32);
-        for &k in grid.near(p.position) {
-            let c = &creases[k as usize];
+        for &k in self.grid.near(p.position) {
+            let c = &self.creases[k as usize];
+            if c.surface != surface {
+                continue;
+            }
             let d = segment_distance(p.position, c.a, c.b);
-            if d < radius {
-                let w = c.strength * (1.0 - d / radius);
+            if d < self.radius {
+                let w = c.strength * (1.0 - d / self.radius);
                 (convex, concave) = (convex.max(w), concave.min(w));
             }
         }
         Vec3::splat(0.5 + 0.5 * (convex + concave).clamp(-1.0, 1.0)).extend(1.0)
-    })
+    }
 }
 
 /// Every edge exactly two triangles share whose faces turn by more than
-/// [`MIN_ANGLE`], in a fixed order. A boundary edge or one three faces share is
-/// skipped.
-fn creases(source: &MeshSource) -> Vec<Crease> {
-    let mut weld: Map<[u32; 3], u32> = Map::default();
-    let ids: Vec<u32> = source
-        .positions
-        .iter()
-        .map(|p| {
-            let next = weld.len() as u32;
-            *weld.entry(p.to_array().map(f32::to_bits)).or_insert(next)
-        })
-        .collect();
-    // (welded end, welded end) → (face normal, the face's third corner).
-    let mut edges: BTreeMap<(u32, u32), Vec<(Vec3, Vec3)>> = BTreeMap::new();
-    for t in source.indices.chunks_exact(3) {
+/// [`MIN_ANGLE`] and are not [`OPPOSITE`], in a fixed order. A boundary edge or one
+/// three faces share is skipped.
+fn creases(source: &MeshSource, weld: &Weld, surfaces: &[u32]) -> Vec<Crease> {
+    let (ids, welded) = (&weld.ids, &weld.corners);
+    // (welded end, welded end) → (face normal, the face's third corner, surface).
+    let mut edges: BTreeMap<(u32, u32), Vec<(Vec3, Vec3, u32)>> = BTreeMap::new();
+    for (k, t) in source.indices.chunks_exact(3).enumerate() {
         let [a, b, c] = [t[0], t[1], t[2]].map(|i| i as usize);
         let p = [a, b, c].map(|i| source.positions[i]);
-        let Some(n) = (p[1] - p[0]).cross(p[2] - p[0]).try_normalize() else {
+        let Some(n) = source.face_normal(3 * k) else {
             continue;
         };
         for (i, j, far) in [(a, b, p[2]), (b, c, p[0]), (c, a, p[1])] {
             let key = (ids[i].min(ids[j]), ids[i].max(ids[j]));
-            edges.entry(key).or_default().push((n, far));
+            edges.entry(key).or_default().push((n, far, surfaces[k]));
         }
     }
-    let welded: Vec<Vec3> = {
-        let mut out = vec![Vec3::ZERO; weld.len()];
-        for (p, &id) in source.positions.iter().zip(&ids) {
-            out[id as usize] = *p;
-        }
-        out
-    };
     edges
         .into_iter()
         .filter_map(|((i, j), faces)| {
-            let [(n1, _), (n2, far2)] = faces[..] else {
+            let [(n1, _, surface), (n2, far2, _)] = faces[..] else {
                 return None;
             };
-            let angle = n1.dot(n2).clamp(-1.0, 1.0).acos();
+            let cos = n1.dot(n2);
+            let angle = cos.clamp(-1.0, 1.0).acos();
             let a = welded[i as usize];
             let sign = if (far2 - a).dot(n1) < 0.0 { 1.0 } else { -1.0 };
-            (angle > MIN_ANGLE).then(|| Crease {
+            (angle > MIN_ANGLE && cos > -1.0 + OPPOSITE).then(|| Crease {
                 a,
                 b: welded[j as usize],
                 strength: sign * (angle / FRAC_PI_2).min(1.0),
+                surface,
             })
         })
         .collect()

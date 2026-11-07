@@ -2,16 +2,16 @@
 
 use glam::{Vec2, Vec3};
 
-use super::fixtures::{cell, l_shape, quad};
-use super::{bake, MeshMap, MeshSource, MAX_RESOLUTION};
+use super::fixtures::{bake_all, cell, l_shape, quad};
+use super::{MeshMap, MeshSource, MAX_RESOLUTION};
 
 fn err(mesh: &MeshSource, size: u32) -> String {
-    bake(mesh, &[MeshMap::Ao], size).unwrap_err()
+    bake_all(mesh, &[MeshMap::Ao], size).unwrap_err()
 }
 
 #[test]
 fn a_one_texel_map_bakes_every_map() {
-    let maps = bake(&l_shape(), &MeshMap::ALL, 1).unwrap();
+    let maps = bake_all(&l_shape(), &MeshMap::ALL, 1).unwrap();
     assert_eq!(maps.len(), MeshMap::ALL.len());
     assert!(maps
         .iter()
@@ -52,15 +52,18 @@ fn overlapping_uvs_give_a_texel_to_the_first_triangle() {
         &mut m,
         [v(0., 0., 0.), v(0., 0., 1.), v(1., 0., 1.), v(1., 0., 0.)],
         cell(0),
-        false,
+        0,
     );
     quad(
         &mut m,
         [v(0., 0., 0.), v(0., 1., 0.), v(0., 1., 1.), v(0., 0., 1.)],
         cell(0),
-        false,
+        0,
     );
-    let n = bake(&m, &[MeshMap::WorldNormal], 32).unwrap().remove(0).1;
+    let n = bake_all(&m, &[MeshMap::WorldNormal], 32)
+        .unwrap()
+        .remove(0)
+        .1;
     let (lo, hi) = cell(0);
     let p = ((lo + hi) * 0.5 * 32.0).floor();
     let texel = n.pixels()[p.y as usize * 32 + p.x as usize];
@@ -69,7 +72,7 @@ fn overlapping_uvs_give_a_texel_to_the_first_triangle() {
 
 #[test]
 fn a_map_asked_twice_bakes_once_and_unknown_names_are_listed() {
-    let maps = bake(&l_shape(), &[MeshMap::Id, MeshMap::Id], 4).unwrap();
+    let maps = bake_all(&l_shape(), &[MeshMap::Id, MeshMap::Id], 4).unwrap();
     assert_eq!(maps.len(), 1);
     let e = MeshMap::parse("cavity").unwrap_err();
     assert!(
