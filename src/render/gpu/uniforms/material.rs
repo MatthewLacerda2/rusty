@@ -165,7 +165,8 @@ pub(crate) struct SurfaceUniform {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct MappingUniform {
-    /// `xy` the tiling, `zw` the offset (Unity's `_MainTex_ST`).
+    /// `xy` the tiling, `zw` the offset (Unity's `_MainTex_ST`), as
+    /// `draw::uniforms::mapping_uniform` converts them for v running down the image.
     pub uv_st: [f32; 4],
     /// 0 UV0, 1 planar (world XZ), 2 triplanar.
     pub uv_mapping: u32,

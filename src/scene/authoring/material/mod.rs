@@ -19,6 +19,7 @@
 
 mod coordinates;
 mod face;
+mod field;
 mod library;
 mod maps;
 mod shader_params;
@@ -35,6 +36,9 @@ pub use coordinates::{
     BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
 };
 pub use face::FACE_FIELDS;
+pub use field::{
+    material_fields, set_surface, surface_field, SurfaceField, SurfaceKind, SurfaceValue,
+};
 pub use library::{
     delete_asset, describe, describe_all, drop_unused, entity_keys, restore_asset, users,
     DeletedMaterial, MaterialUser,
@@ -47,10 +51,7 @@ pub use shader_params::{
 };
 pub use slots::{keys, set_slot, slot_count};
 pub use sources::load_sources;
-pub use surface::{
-    material_fields, set_surface, surface_field, SurfaceField, SurfaceKind, SurfaceValue,
-    SURFACE_FIELDS,
-};
+pub use surface::SURFACE_FIELDS;
 
 use super::sanitize::{finite_array_or, non_negative, unit};
 use crate::asset::MapRef;
