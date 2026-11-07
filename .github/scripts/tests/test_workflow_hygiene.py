@@ -12,6 +12,7 @@ because tests parse it (`docs/api/`, #525, #587).
 from __future__ import annotations
 
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -42,6 +43,15 @@ class ProptestSeed(unittest.TestCase):
         for line in ("  PROPTEST_RNG_SEED: 1784", "  PROPTEST_RNG_SEED: ${{ github.event_name != 'schedule' && '' || '' }}"):
             with self.subTest(line=line):
                 self.assertNotRegex(line, SEED_POLICY)
+
+    def test_make_test_runs_on_the_same_seed(self):
+        # One number (#1852): the Makefile reads ci.yml's, it never copies it.
+        ci = re.search(SEED_POLICY.replace(r"'\d+'", r"'(\d+)'"), (WORKFLOW_DIR / "ci.yml").read_text())
+        made = subprocess.run(
+            ["make", "-s", "--no-print-directory", "proptest-seed"],
+            cwd=SCRIPTS.parents[1], capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        self.assertEqual(made, ci.group(1))
 
 
 class Runners(unittest.TestCase):

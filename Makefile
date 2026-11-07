@@ -16,6 +16,11 @@ LINT := cargo run --quiet --manifest-path tools/lint/Cargo.toml
 # The test runner (#484): cargo-nextest, configured in .config/nextest.toml.
 # nextest does not run doctests, so the `test` gate runs `cargo test --doc` beside it.
 TEST := cargo nextest run --locked
+# The gates' fixed proptest seed (#1852): ci.yml's, read from there so there is one
+# number, and a local gate run goes red only for the branch under test, never for a
+# seed that drew an old bug. `make test-explore` draws fresh seeds instead. An
+# exported PROPTEST_RNG_SEED wins, so a seed from a report still reproduces.
+PROPTEST_SEED := $(shell sed -n "s/^  PROPTEST_RNG_SEED: .* '\([0-9][0-9]*\)' .*/\1/p" .github/workflows/ci.yml)
 
 # The gates, in the order `make gates` runs them. The quick ones take seconds; the
 # heavy ones compile, so a cold run passes a cloud tool call's ten-minute limit and
@@ -31,7 +36,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-one-process dead-pub editor-capture export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore proptest-seed test-one-process dead-pub editor-capture export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -170,13 +175,26 @@ doc: ## [gate] Rustdoc with warnings denied, both feature sets
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
 	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked --features dev
 
-test: ## [gate] Engine tests (nextest) and doctests, both feature sets
+test: export PROPTEST_RNG_SEED ?= $(PROPTEST_SEED)
+test: ## [gate] Engine tests (nextest) and doctests, both feature sets, on the gates' proptest seed
 	@command -v cargo-nextest >/dev/null 2>&1 || { \
 		echo "test: cargo-nextest is not installed — cargo install --locked cargo-nextest"; exit 1; }
+	@test -n "$(PROPTEST_SEED)" || { echo "test: no PROPTEST_RNG_SEED number in ci.yml's env (#1852)" >&2; exit 1; }
 	$(TEST)
 	$(TEST) --features dev
 	cargo test --doc --locked
 	cargo test --doc --locked --features dev
+
+# Fresh proptest seeds, as the nightly draws (#1852): a signal, never a gate. A case
+# it finds is written to proptest-regressions/ and committed with its fix
+# (docs/testing.md). PROPTEST_CASES=<n> runs more cases per property.
+test-explore: ## Signal: the nextest suite, both feature sets, on random proptest seeds
+	env -u PROPTEST_RNG_SEED $(TEST)
+	env -u PROPTEST_RNG_SEED $(TEST) --features dev
+
+# The number `make test` pins, for test_workflow_hygiene.py to hold equal to ci.yml's.
+proptest-seed:
+	@echo $(PROPTEST_SEED)
 
 # The converters' fingerprints (#1286): re-blessed after a bump of a converter's
 # `version`, never in place of one (the test refuses). Blender's rows only where

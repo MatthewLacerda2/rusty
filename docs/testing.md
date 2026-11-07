@@ -291,11 +291,14 @@ cargo-nextest` (CI uses `taiki-e/install-action`). What it buys over `cargo test
   at the first failing binary — the list an agent reads to decide what to fix.
 - **A hang is named, not waited out**: a test is flagged SLOW after 60 s and killed
   after 5 min.
-- **A fixed proptest seed in CI, a random one elsewhere** (#1800). `ci.yml` runs its
-  gates on one `PROPTEST_RNG_SEED`, so a red proptest there comes from the commit under
-  test: reproduce it with that seed, since a local `make test` draws random ones. The
-  nightly and local runs explore. Whichever finds a case, commit its `cc` line with the
-  fix, to the file proptest names when it fails: `proptest-regressions/<module
+- **A fixed proptest seed in the gates, a random one in exploring** (#1800, #1852).
+  `ci.yml` runs its gates on one `PROPTEST_RNG_SEED`, and `make test` (so `make
+  gates`) reads that same number from `ci.yml`, so a red proptest comes from the
+  branch under test, never from a seed that happened to draw an old bug. An exported
+  `PROPTEST_RNG_SEED` wins, to reproduce a reported seed. Exploring reports and never
+  blocks: the nightly `ci.yml` run and `make test-explore` draw fresh seeds
+  (`PROPTEST_CASES=<n>` for more cases). Whichever finds a case, commit its `cc` line
+  with the fix, to the file proptest names when it fails: `proptest-regressions/<module
   path>.txt` at the crate root (e.g. `proptest-regressions/physics/watch/tests.txt`,
   #1798), which every later run replays first. A suite that pins its own seed in
   its config (`tests/proptest/world_space.rs`) doesn't explore.
