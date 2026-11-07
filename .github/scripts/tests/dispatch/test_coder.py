@@ -119,6 +119,14 @@ class Limit(unittest.TestCase):
         pulls = drafts(1, 2, 3, 4) + [{"draft": False, "head": {"ref": "5-x"}}]
         self.assertEqual(Fake(routines=busy(1, 2, 3, 4, 5), pulls=pulls).run("9")[0], 0)
 
+    def test_a_fire_with_no_pull_request_past_two_hours_is_said_and_not_counted(self):
+        listed = busy(1, 2, 3, 4)
+        listed["data"].append({**listed["data"][-1], "name": "rusty #5 x",
+                               "last_run": {"fired_at": "2026-10-29T11:00:00Z"}})
+        code, _, err = Fake(routines=listed, pulls=drafts(1, 2, 3, 4)).run("9")
+        self.assertEqual(code, 0)
+        self.assertIn("rusty #5 x: no PR in 2 h: ended or stalled; not counted", err)
+
     def test_a_rebrief_of_a_counted_issue_launches(self):
         fake = Fake(routines=busy(1, 2, 3, 4, 9), pulls=drafts(1, 2, 3, 4, 9))
         self.assertEqual(fake.run("9")[0], 0)

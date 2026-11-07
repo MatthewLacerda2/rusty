@@ -7,6 +7,7 @@ The routine shapes are the ones the API showed for the batch's routines on
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from dispatch import running
 
@@ -19,6 +20,8 @@ WAITS = {**FIRED, "last_run": {"status": "ROUTINE_RUN_STATUS_SUCCEEDED", "fired_
                                "finished_at": "2026-11-07T04:22:04Z"}}
 NO_TIME = {"name": "rusty #5 e", "enabled": False, "ended_reason": "run_once_fired"}
 DISABLED = {"name": "rusty #6 f", "enabled": False, "ended_reason": ""}
+#: Ten minutes after FIRE: a coder still inside its first push.
+SOON = datetime(2026, 11, 7, 4, 1, 42, tzinfo=timezone.utc)
 
 
 def pr(number: int, draft: bool) -> dict:
@@ -29,9 +32,9 @@ def note(body: str, at: str, who: str = "OWNER") -> dict:
     return {"body": body, "created_at": at, "author_association": who}
 
 
-def hub(pulls=(), comments=None, closed=()) -> running.GitHub:
+def hub(pulls=(), comments=None, closed=(), now=SOON) -> running.GitHub:
     return running.GitHub(pulls=list(pulls), comments=lambda n: (comments or {}).get(n, []),
-                          issue=lambda n: {"state": "closed" if n in closed else "open"})
+                          issue=lambda n: {"state": "closed" if n in closed else "open"}, now=now)
 
 
 def placed(found: dict, github: running.GitHub) -> str:
@@ -57,6 +60,17 @@ class State(unittest.TestCase):
     def test_a_coder_with_no_pull_request_yet_counts(self):
         self.assertEqual(running.state(FIRED, hub()), ("running", "no pull request yet"))
 
+    def test_no_pull_request_past_the_first_push_has_ended(self):
+        # #1714 on 2026-11-07: part 2 merged (`Refs`), the issue open, part 3 not launched.
+        late = SOON + timedelta(hours=3)
+        self.assertEqual(running.state(WAITS, hub(now=late)), ("ended", running.STALE))
+        edge = running.when(FIRE) + running.FIRST_PUSH
+        self.assertEqual(placed(FIRED, hub(now=edge - timedelta(seconds=1))), "running")
+        self.assertEqual(placed(FIRED, hub(now=edge)), "ended")
+
+    def test_a_draft_counts_past_the_first_push(self):
+        self.assertEqual(placed(FIRED, hub([pr(2, True)], now=SOON + timedelta(days=1))), "running")
+
     def test_a_newer_brief_is_a_hand_back_waiting_for_relaunch(self):
         later = {2: [note("Brief\n\nBranch: x", "2026-11-07T05:00:00Z")]}
         self.assertEqual(placed(FIRED, hub([pr(2, True)], later)), "ended")
@@ -75,19 +89,21 @@ class State(unittest.TestCase):
 
     def test_what_cannot_be_read_is_unknown(self):
         self.assertEqual(placed(NO_TIME, hub()), "unknown")
-        blind = running.GitHub(pulls=[], comments=lambda n: None, issue=lambda n: {"state": "open"})
+        blind = running.GitHub(pulls=[], comments=lambda n: None, issue=lambda n: {"state": "open"}, now=SOON)
         self.assertEqual(placed(FIRED, blind), "unknown")
-        gone = running.GitHub(pulls=[], comments=lambda n: [], issue=lambda n: None)
+        gone = running.GitHub(pulls=[], comments=lambda n: [], issue=lambda n: None, now=SOON)
         self.assertEqual(placed(FIRED, gone), "unknown")
 
 
 class Coders(unittest.TestCase):
     def test_running_count_ended_does_not_and_unknown_is_set_apart(self):
         ready = {**FIRED, "name": "rusty #3 c"}
-        counted, unknown = running.coders([WAITING, FIRED, ready, NO_TIME, {"name": "scorsese #2 b"}], 99,
-                                          hub([pr(2, True), pr(3, False)]))
+        stale = {**FIRED, "name": "rusty #4 d", "last_run": {"fired_at": "2026-11-07T01:00:00Z"}}
+        counted, noted = running.coders([WAITING, FIRED, ready, stale, NO_TIME, {"name": "scorsese #2 b"}], 99,
+                                        hub([pr(2, True), pr(3, False)]))
         self.assertEqual([c["name"] for c in counted], ["rusty #1 a", "rusty #2 b"])
-        self.assertEqual([found for found, _ in unknown], [NO_TIME])
+        self.assertEqual([(found["name"], placed) for found, placed, _ in noted],
+                         [("rusty #4 d", "ended"), ("rusty #5 e", "unknown")])
 
     def test_only_the_newest_routine_of_an_issue_is_placed(self):
         old = {**WAITS, "created_at": "2026-11-06T00:00:00Z"}

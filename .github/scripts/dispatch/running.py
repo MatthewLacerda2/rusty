@@ -23,12 +23,16 @@ its pull request is ready (`cloud-brief.md`). For each issue's newest
 - fired, and its fire time cannot be read → *unknown*: named, not counted;
 - fired, and an open pull request for N (its branch `N-…`, CLAUDE.md *Branch
   naming*) is ready → ended;
-- fired, and N's pull request is a draft, **or** N has no open pull request and
-  the issue is still open (a coder that has not opened its PR yet, in its first
-  minutes, or one that stood down without a branch) → running, unless a `Brief`
-  on N from someone who can push (`ghrest.can_push`) is newer than the fire. The
-  orchestrator posts a re-brief, then launches, so a newer brief is a hand-back
-  waiting for its relaunch, with no coder on it;
+- fired, and N's pull request is a draft, **or** N has no open pull request,
+  the issue is still open and the fire is under [`FIRST_PUSH`] old (a coder
+  that has not opened its PR yet) → running, unless a `Brief` on N from someone
+  who can push (`ghrest.can_push`) is newer than the fire. The orchestrator
+  posts a re-brief, then launches, so a newer brief is a hand-back waiting for
+  its relaunch, with no coder on it;
+- fired, no open pull request, the issue open and the fire [`FIRST_PUSH`] old
+  or more → ended, and said (`STALE`): a finished part of a multi-part issue
+  (#1714 between part 2 merging and part 3's launch), an issue kept open after
+  its PR merged, or a coder that stood down or stalled before its first push;
 - fired, no open pull request, and the issue closed (merged) → ended.
 
 A stalled coder (draft, no newer brief) counts until the orchestrator deals
@@ -45,7 +49,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable
 
 import ghrest
@@ -54,17 +58,26 @@ from dispatch import brief, routine
 #: The most cloud coders at once (the operator, 2026-11-05).
 LIMIT = 5
 
+#: How long a fired coder may go without an open pull request and still count: a
+#: coder opens its draft on its first commit (`cloud-brief.md`, *Protocol*), well
+#: inside this. Past it, a fired coder with no PR on an open issue has ended or
+#: stalled, and counting it would hold a slot forever (#1866's review).
+FIRST_PUSH = timedelta(hours=2)
+STALE = "no PR in 2 h: ended or stalled"
+
 ISSUE = re.compile(re.escape(routine.NAME_PREFIX) + r"(\d+)\b")
 BRANCH = re.compile(r"^(\d+)-")
 
 
 @dataclass
 class GitHub:
-    """What placing a fired coder reads: the open pull requests, and per issue its comments and itself."""
+    """What placing a fired coder reads: the open pull requests, per issue its comments and
+    itself, and the time now (to age a fire against [`FIRST_PUSH`])."""
 
     pulls: list[dict]
     comments: Callable[[int], list | None]
     issue: Callable[[int], dict | None]
+    now: datetime
 
 
 def issue(found: dict) -> int | None:
@@ -121,6 +134,8 @@ def state(found: dict, github: GitHub) -> tuple[str, str]:
             return "unknown", f"could not read #{number}"
         if got.get("state") != "open":
             return "ended", f"#{number} is closed"
+        if github.now - since >= FIRST_PUSH:
+            return "ended", STALE
     comments = github.comments(number)
     if comments is None:
         return "unknown", f"could not read #{number}'s comments"
@@ -141,16 +156,18 @@ def newest(routines: list[dict], launching: int) -> list[dict]:
     return list(latest.values())
 
 
-def coders(routines: list[dict], launching: int, github: GitHub) -> tuple[list[dict], list[tuple[dict, str]]]:
-    """The coder routines that count, and the ones that cannot be placed with why."""
-    counted, unknown = [], []
+def coders(routines: list[dict], launching: int,
+           github: GitHub) -> tuple[list[dict], list[tuple[dict, str, str]]]:
+    """The coder routines that count, and the uncounted ones worth saying, as (routine,
+    placement, why): those that cannot be placed, and those [`STALE`] past [`FIRST_PUSH`]."""
+    counted, noted = [], []
     for found in newest(routines, launching):
         placed, why = state(found, github)
         if placed == "running":
             counted.append(found)
-        elif placed == "unknown":
-            unknown.append((found, why))
-    return counted, unknown
+        elif placed == "unknown" or why == STALE:
+            noted.append((found, placed, why))
+    return counted, noted
 
 
 def describe(found: dict) -> str:
