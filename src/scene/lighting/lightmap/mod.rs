@@ -10,11 +10,14 @@
 //!   how an Area light's rectangle is sampled and falls off (#1674), and in
 //!   `lights::channels` which shadowmask channel each `Mixed` light gets (#1695);
 //! * `rays` / `raster` / `trace` — ray queries (parry's `TriMesh`), texel → surface
-//!   point, and the per-texel estimate (the units it stores are explained in `trace`);
+//!   point, and the per-texel estimate (the units it stores are explained in `trace`).
+//!   `rays` and `raster` are shared with the mesh-map baker (`lighting::mesh_maps`,
+//!   #1849), which walks a model's UV0 the same way;
 //! * `filter` — the edge-aware Gaussian that smooths the baked bounce;
 //! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
 //!   `progress` ([`BakeProgress`], #808); its `pool` is the one work pool every
-//!   mesh's texels share, in fixed-size batches (#1656);
+//!   mesh's texels share, in fixed-size batches (#1656), and the mesh-map baker
+//!   runs its texels on too (`run_pool`, #1849);
 //! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
 //!   a cell its BC blocks and first [`MIP_LEVELS`] mips never leave (#1694);
 //! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, the RGBA8 direction
@@ -49,6 +52,7 @@ pub use atlas::{
     check_page_count, max_map_edge, pack, page_count, page_edge, LightmapAtlas, MAX_PAGE,
     MAX_PAGES, MIN_PAGE, MIP_LEVELS, PAD,
 };
+pub(in crate::scene::lighting) use bake::pool::run as run_pool;
 pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
 pub use encode::{
     decode_direction, decode_mask, decode_rgbm, encode_directions, encode_masks, encode_texels,
@@ -60,9 +64,11 @@ pub use pages::{colour_page, direction_levels, direction_page, level_count, leve
 pub use probe_direct::{baked_direct_sh, mixed_occlusion};
 pub use progress::BakeProgress;
 pub use raster::{lightmap_size, MIN_RESOLUTION};
+pub(in crate::scene::lighting) use raster::{rasterize_surface, world_per_uv, Surface, TexelPoint};
 pub(in crate::scene::lighting) use rays::{Rays, Tri};
 pub(in crate::scene::lighting) use rng::Rng;
 pub use set::{LightmapEntry, LightmapSet};
+pub(in crate::scene::lighting) use trace::cosine_sample;
 
 #[cfg(test)]
 mod ambient_tests;

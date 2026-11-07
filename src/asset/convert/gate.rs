@@ -66,7 +66,7 @@ const ON: Gate = Gate {
 // Per thread, in every build (#1337): a world plays on the thread that ticks it, and
 // that thread is the one that loads its assets, as Unity's asset database answers on
 // its main thread only. So a hold taken by one world refuses that world's thread
-// alone, and `cargo test` (cargo-mutants' runner), which runs every test of a
+// alone, and `cargo test` (the nightly `cargo-test.yml` run), which runs every test of a
 // binary in one process, cannot have one test's Play refuse another's import. A
 // `cfg(test)`-only split missed the integration binary, which links the library
 // without `cfg(test)`. Converting off the world's thread would need the hold handed

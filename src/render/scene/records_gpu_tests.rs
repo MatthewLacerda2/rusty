@@ -5,11 +5,13 @@
 
 use super::fixture::{frame, fresh, held, yard, RES};
 use crate::components::RenderMode;
+use crate::render::test_gpu::HeadlessPair;
 use crate::render::{MaterialData, Renderer};
 use crate::scene::Scene;
 
-fn fresh_pixels(scene: &Scene) -> Vec<u8> {
-    let mut other = crate::render::test_gpu::headless_or_skip(RES, RES).expect("one ran");
+/// `scene` drawn by a fresh renderer on `pair`'s second slot.
+fn fresh_pixels(pair: &HeadlessPair, scene: &Scene) -> Vec<u8> {
+    let mut other = pair.renderer(RES, RES);
     frame(&mut other, scene).0
 }
 
@@ -19,7 +21,7 @@ fn red(scene: &mut Scene) -> &mut crate::components::MaterialAsset {
 
 #[test]
 fn gpu_a_colour_edit_rewrites_one_record_and_derives_no_object() {
-    let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+    let Some((mut r, pair)) = crate::render::test_gpu::headless_pair_or_skip(RES, RES) else {
         return;
     };
     let mut scene = yard(12);
@@ -37,7 +39,7 @@ fn gpu_a_colour_edit_rewrites_one_record_and_derives_no_object() {
         );
         assert_eq!(
             pixels,
-            fresh_pixels(&scene),
+            fresh_pixels(&pair, &scene),
             "step {step}: the colour drawn"
         );
     }
@@ -47,13 +49,13 @@ fn gpu_a_colour_edit_rewrites_one_record_and_derives_no_object() {
     scene.materials.get_mut("glass").unwrap().alpha = 0.8;
     let (pixels, c) = frame(&mut r, &scene);
     assert_eq!(c.render_extracted, 0, "an alpha edit");
-    assert_eq!(pixels, fresh_pixels(&scene));
+    assert_eq!(pixels, fresh_pixels(&pair, &scene));
     // Turning it Cutout changes its key: its users (props 1, 7 and 10; prop 4
     // is glass) are re-derived.
     red(&mut scene).render_mode = RenderMode::Cutout;
     let (pixels, c) = frame(&mut r, &scene);
     assert_eq!(c.render_extracted, 3, "red's users");
-    assert_eq!(pixels, fresh_pixels(&scene));
+    assert_eq!(pixels, fresh_pixels(&pair, &scene));
     // A cutoff edit is a static bake's term: it re-keys too.
     red(&mut scene).alpha_cutoff = 0.9;
     assert_eq!(frame(&mut r, &scene).1.render_extracted, 3);
@@ -69,7 +71,7 @@ fn reddest(px: &[u8]) -> u8 {
 
 #[test]
 fn gpu_two_kept_scenes_draw_their_own_record_of_one_name() {
-    let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+    let Some((mut r, pair)) = crate::render::test_gpu::headless_pair_or_skip(RES, RES) else {
         return;
     };
     let (mut main, mut preview) = (yard(6), yard(6));
@@ -89,7 +91,7 @@ fn gpu_two_kept_scenes_draw_their_own_record_of_one_name() {
     // A colour edit in one rewrites that scene's record alone.
     red(&mut main).base_color = [0.9, 0.1, 0.9];
     let edited = draw(&mut r, &main);
-    assert_eq!(edited, fresh_pixels(&main));
+    assert_eq!(edited, fresh_pixels(&pair, &main));
     assert_eq!(draw(&mut r, &preview), p, "the preview keeps its own");
     let names = |s: &Scene| r.retained.records.variants_of(s.id(), "red");
     assert_ne!(names(&main), names(&preview), "a record per scene");
@@ -101,6 +103,6 @@ fn gpu_two_kept_scenes_draw_their_own_record_of_one_name() {
         .records
         .variants_of(preview.id(), "red")
         .is_empty());
-    assert_eq!(draw(&mut r, &preview), fresh_pixels(&preview));
+    assert_eq!(draw(&mut r, &preview), fresh_pixels(&pair, &preview));
     assert_eq!(draw(&mut r, &main), edited);
 }

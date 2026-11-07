@@ -61,7 +61,7 @@ fn gpu_two_kept_scenes_draw_a_same_named_material_with_their_own_values() {
 #[test]
 fn gpu_a_param_edit_rewrites_its_buffer_and_re_derives_only_the_overriding() {
     let flash = Flash::bake_as("_edit");
-    let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+    let Some((mut r, pair)) = crate::render::test_gpu::headless_pair_or_skip(RES, RES) else {
         return;
     };
     let mut scene = Scene::new();
@@ -92,7 +92,7 @@ fn gpu_a_param_edit_rewrites_its_buffer_and_re_derives_only_the_overriding() {
             rt.1 > r0.1,
             "the right flashes its own blue: {r0:?} → {rt:?}"
         );
-        let mut fresh = crate::render::test_gpu::headless_or_skip(RES, RES).expect("one ran");
+        let mut fresh = pair.renderer(RES, RES);
         assert_eq!(halves(&mut fresh, &scene), [l, rt], "amount {amount}");
     }
 }

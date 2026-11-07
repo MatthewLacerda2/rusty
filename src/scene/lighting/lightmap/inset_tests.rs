@@ -28,11 +28,7 @@ fn a_lone_needle_owns_every_texel_it_crosses_traced_inside_it_and_its_texel() {
     let mut points = rasterize(&mesh, S);
     points.sort_by_key(|p| p.index);
     let owned: Vec<_> = points.iter().map(|p| p.index).collect();
-    assert_eq!(
-        owned,
-        (0..S as usize).collect::<Vec<_>>(),
-        "row 0, all of it"
-    );
+    assert_eq!(owned, (0..S).collect::<Vec<_>>(), "row 0, all of it");
     for p in points {
         let (x, u, v) = (p.index as f32, p.position.x, p.position.z);
         assert!((x..=x + 1.0).contains(&u), "texel {x} traced at u = {u}");
@@ -106,7 +102,7 @@ fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
     let scene = floor_at_wall();
     // A density that sizes the floor's map at exactly S.
     let settings = BakeSettings {
-        texels_per_unit: (S as f32 - 0.5) / world_per_uv(&scene.meshes[0]).unwrap(),
+        texels_per_unit: (S as f32 - 0.5) / world_per_uv(&scene.meshes[0].surface()).unwrap(),
         samples: 64,
         ..super::tests::settings()
     };
@@ -132,4 +128,10 @@ fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
         border >= shade * 0.4,
         "the border goes dark: {border} vs {shade}"
     );
+}
+
+#[test]
+fn a_texel_point_stays_32_bytes() {
+    // Every covered texel of a bake holds one (#1849): 512 MiB at a full 4096² page.
+    assert_eq!(std::mem::size_of::<super::raster::TexelPoint>(), 32);
 }
