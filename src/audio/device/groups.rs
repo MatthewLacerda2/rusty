@@ -3,7 +3,7 @@
 //! Every mixer group is one kira sub-track, nested as the group tree is (a child
 //! track sums into its parent's, Master's into kira's main track), and routes a
 //! send into the one reverb bus (`reverb.rs`, tuned by reverb zones, #469). What a
-//! group runs on its signal is its [`Strip`]: a low-pass then a high-pass filter
+//! group runs on its signal is its `Strip`: a low-pass then a high-pass filter
 //! (kira's state-variable filter; an "open" filter is switched fully dry, so it is
 //! bit-transparent), then its effect chain in its rack (`mixer/effects/rack.rs`,
 //! #1748), which also publishes the group's level for sidechains. The track's
@@ -116,7 +116,7 @@ impl Strip {
     }
 }
 
-/// Master's [`Strip`], on kira's main track (module docs).
+/// Master's strip (`Strip`), on kira's main track (module docs).
 pub struct MasterStrip(Strip);
 
 impl MasterStrip {
