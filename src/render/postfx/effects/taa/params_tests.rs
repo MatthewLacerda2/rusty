@@ -66,9 +66,7 @@ fn the_struct_and_the_camera_count_match_the_shader() {
 
 #[test]
 fn the_ramps_the_shader_divides_by_are_positive() {
-    assert!(STILL_PIXELS < MOVING_PIXELS);
-    assert!(DISOCCLUSION_START < DISOCCLUSION_FULL);
-    assert!(FRAME_INFLUENCE < MOVING_FRAME_INFLUENCE && MOVING_FRAME_INFLUENCE <= 1.0);
+    // The constants' own order is held at compile time, beside them (`params.rs`).
     let off = params().without(Rules {
         moving: false,
         reveal: false,

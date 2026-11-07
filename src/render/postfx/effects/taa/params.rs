@@ -20,10 +20,14 @@
 //!   cos θ_now (a 720°/s flick at 90° FOV, 18 % at the edge), never its distance.
 //!   Across cameras the stack order decides, as it does what is in front: a
 //!   higher camera's surface gone (a viewmodel bobbing off a wall) is a reveal,
-//!   one arriving is not. The 3×3, stepped a scene pixel at a time (several
-//!   history pixels under TAAU), and the pixel's own (undilated) surface keep a
-//!   silhouette or a sub-pixel wire the jitter moves by a pixel from reading as
-//!   a reveal. HDRP's *Speed Rejection* (last frame's motion against
+//!   one arriving is not. Three choices keep a still frame's jitter from
+//!   reading as a reveal: last frame's 3×3, stepped a scene pixel at a time
+//!   (several history pixels under TAAU), so a silhouette the jitter moved by a
+//!   pixel finds its surface; this frame's side is the nearest surface in its own
+//!   3×3 (FSR2's dilated depth), so a sub-pixel gap the jitter sees the sky
+//!   through this frame is no reveal; and the history keeps each pixel's own
+//!   surface, undilated, so a sub-pixel wire the jitter misses this frame leaves
+//!   sky beside it there. HDRP's *Speed Rejection* (last frame's motion against
 //!   this frame's) catches the same reveal but rejects every pixel on the frame a
 //!   turn starts or stops, the input a keyboard-turned game sends all the time, so
 //!   the depth test stands in for it.
@@ -66,6 +70,12 @@ pub(crate) const DISOCCLUSION_START: f32 = 0.1;
 /// The relative distance gap at which the history is dropped: a crate 1 m in
 /// front of a wall 5 m away (25 %) reveals the wall with no trace of itself.
 pub(crate) const DISOCCLUSION_FULL: f32 = 0.25;
+
+// The shader divides by both ramps' spans, and a moving pixel weighs more than a
+// still one: a constant edited out of order fails the build.
+const _: () = assert!(STILL_PIXELS < MOVING_PIXELS);
+const _: () = assert!(DISOCCLUSION_START < DISOCCLUSION_FULL);
+const _: () = assert!(FRAME_INFLUENCE < MOVING_FRAME_INFLUENCE && MOVING_FRAME_INFLUENCE <= 1.0);
 
 /// The resolve's uniform, `TaaParams` in `postfx/taa.wgsl`.
 #[repr(C)]

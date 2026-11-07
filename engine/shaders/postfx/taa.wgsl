@@ -67,10 +67,11 @@ struct ResolveOut { // what the resolve writes: next frame's history, colour and
     @location(1) surface: vec2<f32>,
 };
 
-// What the resolve reads of a pixel's velocity: its frontmost surface's NDC motion,
-// and its own surface ([`surface_of`]).
+// What the resolve reads of a pixel's velocity ([`surface_of`] for a surface): its
+// 3×3's frontmost surface's NDC motion and that surface, and the pixel's own.
 struct Front {
     motion: vec2<f32>,
+    near: vec2<f32>,
     own: vec2<f32>,
 };
 
@@ -116,7 +117,11 @@ fn in_front(a: vec4<f32>, b: vec4<f32>) -> bool {
 }
 
 // The frontmost surface in `p`'s 3×3 (URP's motion quality 2, by [`in_front`]): its
-// NDC motion (none when it isn't finite), and `p`'s own surface.
+// NDC motion (none when it isn't finite) and its surface, as `p`'s ray sees it, and
+// `p`'s own surface. The reveal test reads the frontmost, as FSR2's depth clip reads
+// the dilated depth, so a sub-pixel gap the jitter sees the sky through in this
+// frame and not the last is no reveal; the history keeps the pixel's own, so a
+// sub-pixel wire the jitter misses in this frame leaves sky beside it there.
 fn frontmost(p: vec2<i32>) -> Front {
     let last = vec2<i32>(textureDimensions(t_velocity)) - 1;
     let here = textureLoad(t_velocity, clamp(p, vec2<i32>(0), last), 0);
@@ -130,7 +135,7 @@ fn frontmost(p: vec2<i32>) -> Front {
         }
     }
     let motion = select(vec2<f32>(0.0), front.xy, numeric::finite2(front.xy));
-    return Front(motion, surface_of(p, here));
+    return Front(motion, surface_of(p, front), surface_of(p, here));
 }
 
 // Velocity texel `t` of pixel `p` as the history keeps it: the camera-to-point
@@ -262,8 +267,8 @@ fn frame_weight(frame: Frame, motion: vec2<f32>, prev_uv: vec2<f32>, now: vec2<f
     return mix(influence, 1.0, revealed);
 }
 
-// The pixel at history `uv` (`front`: its frontmost surface's NDC motion, its own
-// surface), whose surface moved by `front.motion`: last frame's resolve where that surface was,
+// The pixel at history `uv` (`front`: its frontmost surface's NDC motion and that
+// surface, and its own), whose surface moved by `front.motion`: last frame's resolve where that surface was,
 // clamped into the frame's box and lerped toward the frame by [`frame_weight`] in
 // URP's perceptual space; the frame alone, exactly, with no history to blend.
 fn blend(frame: Frame, uv: vec2<f32>, front: Front) -> ResolveOut {
@@ -275,7 +280,7 @@ fn blend(frame: Frame, uv: vec2<f32>, front: Front) -> ResolveOut {
     if (taa.knobs.z < 0.5 || !inside || !numeric::finite3(sampled)) {
         return alone;
     }
-    let weight = frame_weight(frame, front.motion, prev_uv, front.own);
+    let weight = frame_weight(frame, front.motion, prev_uv, front.near);
     let center = rgb_to_ycocg(frame.here.rgb);
     let history = clamp(rgb_to_ycocg(max(sampled, vec3<f32>(0.0))), frame.lo, frame.hi);
 

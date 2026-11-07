@@ -1,12 +1,14 @@
 //! #1846 on lavapipe: a still frame converges exactly as URP's resolve does, its
-//! two rules on or off, at the scene's size and upscaling; and what the other
-//! tests compare a frame with one rule off by ([`run`]).
+//! two rules on or off, at the scene's size and upscaling: a noise wall behind a
+//! cube, and a fence whose gaps, a third of a pixel, show the sky in some frames'
+//! jitter and not in others' (no reveal: the test reads the 3×3's nearest surface).
+//! And what the other tests compare a frame with one rule off by ([`run`]).
 
 use glam::Vec3;
 
 use super::super::params::Rules;
 use super::super::TaaHistory;
-use super::fixture::{eye, frame, renderer, taa_scene, tilted_cube, view};
+use super::fixture::{cube, eye, frame, renderer, taa_scene, tilted_cube, view};
 use super::wall::noisy_wall;
 use crate::core::settings::render_scale::RenderScale;
 use crate::render::motion::gpu_fixture::{H, W};
@@ -59,21 +61,35 @@ fn scaled(r: &Renderer, scale: f32) -> RenderView {
     v
 }
 
+/// A fence 5 m out of slats 0.46 m wide, 4 cm apart: a third of a pixel.
+fn fence(scene: &mut Scene) {
+    for i in -6..6 {
+        let id = cube(scene, Vec3::new(i as f32 * 0.5 + 0.25, 0.0, -5.0));
+        let mut t = scene.world.transform_mut(id).unwrap();
+        (t.scale, t.rotation) = (Vec3::new(0.46, 3.0, 0.1), glam::Quat::from_rotation_z(0.05));
+    }
+}
+
 #[test]
 fn gpu_a_still_frame_converges_exactly_as_urps_resolve() {
     let Some(mut r) = renderer() else { return };
-    let (mut scene, _) = taa_scene(true, true);
-    noisy_wall(&mut scene, -7.0);
-    tilted_cube(&mut scene, Vec3::new(0.0, 0.0, -4.0));
+    let (mut walled, _) = taa_scene(true, true);
+    noisy_wall(&mut walled, -7.0);
+    tilted_cube(&mut walled, Vec3::new(0.0, 0.0, -4.0));
+    let (mut fenced, _) = taa_scene(true, true);
+    fence(&mut fenced);
     let still = |_: u32| eye(0.0);
-    for scale in [1.0, 0.5] {
+    for (scale, scene) in [1.0, 0.5]
+        .into_iter()
+        .flat_map(|s| [(s, &walled), (s, &fenced)])
+    {
         let make = |r: &Renderer| match scale {
             1.0 => view(r),
             s => scaled(r, s),
         };
         let (mut a, mut b) = (make(&r), make(&r));
-        let on = run(&mut r, &mut a, (&scene, &still), 24, Rules::default());
-        let off = run(&mut r, &mut b, (&scene, &still), 24, OFF);
+        let on = run(&mut r, &mut a, (scene, &still), 24, Rules::default());
+        let off = run(&mut r, &mut b, (scene, &still), 24, OFF);
         let n = differing(&on, &off);
         assert_eq!(n, 0, "at render scale {scale}, {n} bytes differ from URP's");
     }
