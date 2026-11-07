@@ -53,6 +53,8 @@ fn material_mapping() -> Mapping {
     return Mapping(m.uv_st, m.uv_mapping, m.world_scale, m.blend_sharpness, 0u);
 }
 
+// Tiling and Offset applied. The CPU packs `uv_st` so this plain sum reads what
+// Unity's `TRANSFORM_TEX` does (`render::draw::uniforms::mapping_uniform`, #1851).
 fn tile_with(m: Mapping, uv: vec2<f32>) -> vec2<f32> {
     return uv * m.uv_st.xy + m.uv_st.zw;
 }

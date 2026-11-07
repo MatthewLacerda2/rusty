@@ -40,7 +40,10 @@ fn draw_field(
     value: SurfaceValue,
 ) -> Option<SurfaceValue> {
     ui.horizontal(|ui| {
-        ui.label(format!("{}:", field.label));
+        let label = ui.label(format!("{}:", field.label));
+        if let Some(hint) = mat_ops::coordinate_hint(field.key) {
+            label.on_hover_text(hint);
+        }
         match (&field.kind, value) {
             (SurfaceKind::Choice(names), SurfaceValue::Text(mut current)) => {
                 let mut changed = false;

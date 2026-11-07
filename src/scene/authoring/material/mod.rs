@@ -32,7 +32,7 @@ use std::ops::RangeInclusive;
 pub use crate::components::material::entity_material_key;
 
 pub use coordinates::{
-    BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
+    coordinate_hint, BLEND_SHARPNESS_RANGE, COORDINATE_FIELDS, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
 };
 pub use face::FACE_FIELDS;
 pub use library::{

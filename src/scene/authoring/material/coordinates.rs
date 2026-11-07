@@ -26,6 +26,21 @@ fn pair(value: SurfaceValue) -> [f32; 2] {
     }
 }
 
+/// The Inspector's hover text for a map-coordinate row, by its `key`: the sign
+/// convention a number ported from Unity relies on (#1851).
+pub fn coordinate_hint(key: &str) -> Option<&'static str> {
+    match key {
+        "tiling" => {
+            Some("Unity's Tiling: repeats across the surface, from the image's bottom edge.")
+        }
+        "offset" => Some(
+            "Unity's Offset, in repeats: +y moves the texture down the surface, +x toward u = 0. \
+             Unity numbers carry over unchanged.",
+        ),
+        _ => None,
+    }
+}
+
 fn world_mapped(m: &MaterialAsset) -> bool {
     m.uv_mapping != UvMapping::Uv0
 }
