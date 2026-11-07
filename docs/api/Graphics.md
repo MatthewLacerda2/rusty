@@ -117,6 +117,12 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
 | `Graphics.GetTaaActive` / `SetTaaActive` | `()` / `(bool)` | `bool` (**default `false`**; `false` with no screen camera; see *TAA*) |
+| `Graphics.GetTaaBaseBlendFactor` / `SetTaaBaseBlendFactor` | `()` / `(value)` | `number`: URP's *Base Blend Factor*, the history's share for a still pixel (frame influence is `1 - base`; clamped 0.6–0.98, **default `0.9`**; see *TAA*) |
+| `Graphics.GetTaaContrastAdaptiveSharpening` / `SetTaaContrastAdaptiveSharpening` | `()` / `(value)` | `number`: RCAS strength over the resolve (clamped 0–1, **default `0`**: no sharpen; see *TAA*) |
+| `Graphics.GetTaaJitterScale` / `SetTaaJitterScale` | `()` / `(value)` | `number`: URP's *Jitter Scale* on the sub-pixel jitter (clamped 0–1, **default `1`**; see *TAA*) |
+| `Graphics.GetTaaMipBias` / `SetTaaMipBias` | `()` / `(value)` | `number`: URP's *Mip Bias* on material-map sampling, added to the bias TAAU applies (clamped −1–0, **default `0`**; see *TAA*) |
+| `Graphics.GetTaaQuality` / `SetTaaQuality` | `()` / `(name)` | `"VeryLow"` / `"Low"` / `"Medium"` / `"High"` / `"VeryHigh"` (**default `"High"`**, URP's; names are case-insensitive, an unknown one raises an error listing them; see *TAA*) |
+| `Graphics.GetTaaVarianceClampScale` / `SetTaaVarianceClampScale` | `()` / `(value)` | `number`: URP's *Variance Clamp Scale*, the history box's half-width in deviations (clamped 0.6–1.2, **default `0.9`**; see *TAA*) |
 | `Graphics.GetTonemap` / `SetTonemap` | `()` / `(name)` | `"Neutral"` / `"AgX"` / `"ACES"` / `"Reinhard"` / `"None"` (**default `"Neutral"`**; Unity's names; names are case-insensitive) |
 | `Graphics.GetVignetteActive` / `SetVignetteActive` | `()` / `(bool)` | `bool` (**default `false`**; see *Lens effects*) |
 | `Graphics.GetVignetteCenter` / `SetVignetteCenter` | `()` / `(x, y)` | `x, y` (screen uv, `0, 0` top-left, each clamped 0–1, **default `0.5, 0.5`**) |
@@ -869,6 +875,28 @@ blends 0.1 of its own frame into the history of the shots before it (upscaling,
 0.1 times how near its nearest sample landed to the pixel), however many sim steps
 apart they were, so two shots of an unchanged scene can differ. To compare shots pixel for pixel, or to judge a scene's edges, turn TAA off
 for the capture (`Graphics.SetTaaActive(false)`: FXAA then runs, if it is on).
+
+**Camera TAA settings** (#1847, URP's `taaSettings`). The resolve's strength is on
+the camera, by URP's names and defaults; the Inspector's Camera card edits the same
+fields, saved with the scene. **Base Blend Factor** is the history's share for a
+still pixel (frame influence `1 - base`; `0.9` is URP's 0.1 influence). **Variance
+Clamp Scale** is the colour box's half-width in deviations (`0.9`). **Jitter Scale**
+scales the sub-pixel offset (`1`). **Mip Bias** biases material-map sampling toward
+sharper mips (`0`, added to the negative bias TAAU applies). The `1847` moving and
+reveal rules stay fixed constants. **Quality** (URP's `VeryLow`…`VeryHigh`, default
+`High`) sets how much of the resolve runs: `VeryLow` drops the 3×3 motion dilation,
+`Low` adds it, `Medium` adds the variance clamp, `High` (URP's default, what the
+resolve always did) adds the bicubic history, and `VeryHigh` re-filters the current
+pixel toward its jittered average. rusty's reveal and reactive rules run at every
+level.
+
+**Contrast Adaptive Sharpening** (#1847, URP's TAA *Contrast Adaptive Sharpening*)
+runs AMD's RCAS over the resolve, at the output's size, to counter TAA's softness
+(and TAAU's at low scales). Its strength is `0`..`1`; `0` (the default) runs no pass
+and leaves the frame byte-identical, so a game turns it on only where it wants it.
+The sharpened image is what motion blur, bloom and the composite then read.
+
+Tween paths (the float knobs, through the camera entity): `Graphics.taa.base_blend_factor`, `Graphics.taa.variance_clamp_scale`, `Graphics.taa.jitter_scale`, `Graphics.taa.mip_bias`, `Graphics.taa.contrast_adaptive_sharpening` (the quality, a mode, does not tween).
 
 ### Lighting settings
 

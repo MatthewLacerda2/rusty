@@ -1,4 +1,5 @@
-//! src/scene/authoring/rendering/camera.rs — Shared camera-authoring ops.
+//! src/scene/authoring/rendering/camera/mod.rs — Shared camera-authoring ops (the
+//! TAA ops and knob table in `taa`).
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `CameraComponent` field by field: the projection (`fov` / `near` / `far`), the
@@ -25,6 +26,13 @@
 use crate::components::{CameraComponent, ClearFlags, Projection, RenderTarget};
 use crate::core::settings::quality::EffectQuality;
 use crate::scene::authoring::sanitize::{at_least, saturated};
+
+mod taa;
+pub use taa::{
+    camera_knob, set_taa_active, set_taa_base_blend_factor, set_taa_contrast_adaptive_sharpening,
+    set_taa_jitter_scale, set_taa_mip_bias, set_taa_quality, set_taa_variance_clamp_scale,
+    CameraKnob, TAA_KNOBS,
+};
 
 /// The field-of-view range, in degrees: Unity's Camera inspector bounds, applied
 /// to every write (the view camera's `Camera.SetFov` too).
@@ -119,12 +127,6 @@ pub fn set_motion_blur_max_length(c: &mut CameraComponent, max_length: f32) {
 /// chain (#360). Shared by the editor's Camera card and `Graphics.SetFxaaActive`.
 pub fn set_fxaa_active(c: &mut CameraComponent, active: bool) {
     c.fxaa_active = active;
-}
-
-/// Set the camera's TAA flag — temporal anti-aliasing (#1702), which replaces FXAA
-/// while it runs. Shared by the editor's Camera card and `Graphics.SetTaaActive`.
-pub fn set_taa_active(c: &mut CameraComponent, active: bool) {
-    c.taa_active = active;
 }
 
 /// Set the camera's Occlusion Culling flag (#1714, Unity's

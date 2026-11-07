@@ -10,6 +10,7 @@ mod ghost;
 mod reactive;
 mod resolve;
 mod reveal;
+mod sharpen;
 mod shimmer;
 pub(super) mod still;
 mod turn;

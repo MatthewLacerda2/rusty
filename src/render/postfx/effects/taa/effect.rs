@@ -27,8 +27,24 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 fn resolve(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let gpu = (&r.device, &r.queue);
     let lenses = super::params::lenses(cx.stack.stack, view.aspect());
+    // The base camera's TAA knobs (#1847); a view with no camera keeps URP's
+    // defaults, so its resolve is unchanged.
+    let tune = cx
+        .effect
+        .post
+        .camera
+        .map(super::params::TaaTune::from_camera)
+        .unwrap_or_default();
     view.post_fx
-        .run_taa(gpu, &r.post_passes.taa, &r.gpu_timer, lenses);
+        .run_taa(gpu, &r.post_passes.taa, &r.gpu_timer, tune, lenses);
+    // Contrast-adaptive sharpen over the resolve (#1847): only when the camera asks.
+    let sharpen = cx
+        .effect
+        .post
+        .camera
+        .map_or(0.0, |c| c.taa_contrast_adaptive_sharpening);
+    view.post_fx
+        .run_sharpen(gpu, &r.post_passes.taa.sharpen, &r.gpu_timer, sharpen);
 }
 
 /// Whether `post`'s camera runs TAA, through [`effect_runs`]: its component has it

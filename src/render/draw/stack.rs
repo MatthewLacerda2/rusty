@@ -82,9 +82,9 @@ impl Renderer {
         // SSIL (#1750) and volumetric fog (#1703) keep a history per view: a bake
         // capture's faces and the shader preview keep none, so they never run them.
         let keeps = !own_pipeline && !self.capture.static_only;
-        // TAA (#1702): the frame's sub-pixel jitter, every camera's alike, and the
-        // material maps' mip bias while it upscales; a cut forgets its history.
-        let taa = taa::begin(view, &self.device, taa_on);
+        // TAA (#1702): the frame's jitter and the maps' mip bias, tuned by the base
+        // camera's knobs (#1847); a cut forgets its history.
+        let taa = taa::begin(view, &self.device, taa_on, taa_knobs(pass.post.camera));
         let shared = StackShared {
             aspect,
             view_projs,
@@ -156,6 +156,12 @@ impl Renderer {
 
 /// Each camera's view-projection at `aspect`, and beside it each one's entity, which
 /// keeps its motion history (#1435).
+/// The base camera's TAA jitter-scale and mip-bias knobs (#1847); a view with no
+/// camera keeps URP's defaults, so it jitters and samples as before.
+fn taa_knobs(camera: Option<&crate::components::CameraComponent>) -> (f32, f32) {
+    camera.map_or((1.0, 0.0), |c| (c.taa_jitter_scale, c.taa_mip_bias))
+}
+
 fn matrices(pass: &StackPass, aspect: f32) -> (Vec<glam::Mat4>, Vec<(Option<u32>, glam::Mat4)>) {
     let view_projs: Vec<_> = (pass.stack.iter())
         .map(|c| c.build_view_projection(aspect))

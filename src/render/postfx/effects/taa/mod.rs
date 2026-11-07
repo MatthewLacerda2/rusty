@@ -38,10 +38,12 @@ pub(crate) mod jitter;
 pub(crate) mod params;
 mod pass;
 pub(crate) mod reactive;
+pub(crate) mod sharpen;
 mod upscale;
 
 pub(crate) use effect::{runs, wanted, EFFECT};
 pub(crate) use history::{begin, chain_size, upscales, TaaFrame, TaaHistory};
+pub(crate) use sharpen::{Sharpen, SharpenTargets};
 
 use params::TaaParams;
 
@@ -60,6 +62,9 @@ pub(crate) struct TaaPasses {
     sampler: wgpu::Sampler,
     resolve: LazyPipeline,
     upscale: LazyPipeline,
+    /// The contrast-adaptive sharpen that runs after the resolve (#1847); reusable
+    /// by #1848's upscaler.
+    pub(crate) sharpen: Sharpen,
 }
 
 impl TaaPasses {
@@ -108,6 +113,7 @@ impl TaaPasses {
             sampler,
             resolve,
             upscale,
+            sharpen: Sharpen::new(device, registry),
         }
     }
 
@@ -141,8 +147,12 @@ impl TaaPasses {
     }
 
     /// The pipelines, for warming (`Renderer::lazy_pipelines`).
-    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
-        [&self.resolve, &self.upscale]
+    pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
+        [
+            &self.resolve,
+            &self.upscale,
+            self.sharpen.lazy_pipelines()[0],
+        ]
     }
 }
 
@@ -155,6 +165,7 @@ impl PostFx {
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         passes: &TaaPasses,
         timer: &GpuTimer,
+        tune: params::TaaTune,
         lenses: [[f32; 4]; params::MAX_CAMERAS],
     ) {
         let (Some(h), Some(velocity)) =
@@ -165,7 +176,7 @@ impl PostFx {
         let (read, write) = (h.latest, 1 - h.latest);
         let drawn = self.take_reactive_drawn();
         let frame = (h.valid, h.pixels, drawn);
-        let params = TaaParams::new((h.size, self.full_size), frame, lenses);
+        let params = TaaParams::new((h.size, self.full_size), frame, tune, lenses);
         #[cfg(test)]
         let params = params.without(h.rules);
         queue.write_buffer(&h.params, 0, bytemuck::bytes_of(&params));

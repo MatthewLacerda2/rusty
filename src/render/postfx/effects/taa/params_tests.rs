@@ -24,6 +24,7 @@ fn params() -> TaaParams {
     TaaParams::new(
         ((64, 48), (32, 24)),
         (true, Vec2::new(0.25, -0.5), false),
+        TaaTune::default(),
         lenses,
     )
 }
@@ -40,15 +41,38 @@ fn the_lanes_are_where_the_shader_reads_them() {
         DISOCCLUSION_FULL,
     ];
     assert_eq!(p.rejection, rejection);
+    // The default tune (URP's defaults) reduces to the constants (#1847).
+    assert_eq!(p.knobs[0], FRAME_INFLUENCE);
+    assert_eq!(p.knobs[1], VARIANCE_CLAMP_SCALE);
+    // The quality rides `jitter.w`: `High` (the default) is level 3.
+    assert_eq!(p.jitter[3], 3.0);
     let wgsl = shader();
     for read in [
         "(pixels - taa.knobs.w) / (taa.rejection.y - taa.knobs.w)",
         "mix(taa.knobs.x, taa.rejection.x, moving)",
         "taa.rejection.w - taa.rejection.z",
         "(mismatch - taa.rejection.z) / span",
+        "return taa.jitter.w;",
     ] {
         assert!(wgsl.contains(read), "the shader no longer reads `{read}`");
     }
+}
+
+#[test]
+fn the_tune_carries_the_camera_knobs() {
+    use crate::components::{CameraComponent, TaaQuality};
+    let cam = CameraComponent {
+        taa_base_blend_factor: 0.8,
+        taa_variance_clamp_scale: 1.1,
+        taa_quality: TaaQuality::VeryHigh,
+        ..CameraComponent::default()
+    };
+    let tune = TaaTune::from_camera(&cam);
+    // Frame influence is URP's `1 - base_blend`.
+    assert!((tune.frame_influence - 0.2).abs() < 1e-6);
+    assert_eq!(tune.variance_clamp_scale, 1.1);
+    assert_eq!(tune.quality, 4.0);
+    assert_eq!(quality_level(TaaQuality::VeryLow), 0.0);
 }
 
 #[test]

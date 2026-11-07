@@ -1,0 +1,84 @@
+//! Contrast-adaptive sharpening (#1847) on lavapipe: RCAS over the TAA resolve. At
+//! strength 0 the sharpen pass never runs, so the frame is byte-identical to no
+//! sharpen; above 0 an edge's contrast rises while a flat area stays put (RCAS's
+//! symmetric lobe cancels on a flat neighbourhood, so there is no ringing).
+
+use glam::Vec3;
+
+use super::fixture::{eye, renderer, settle, taa_scene, tilted_cube, view};
+use crate::render::motion::gpu_fixture::{H, W};
+use crate::scene::Scene;
+
+/// A scene whose camera runs TAA with contrast-adaptive sharpening at `strength`,
+/// a tilted cube giving angled edges over the flat background.
+fn sharpen_scene(strength: f32) -> (Scene, u32) {
+    let (mut scene, cam) = taa_scene(true, true);
+    tilted_cube(&mut scene, Vec3::new(0.0, 0.0, -4.0));
+    let mut c = scene.world.camera_mut(cam).unwrap();
+    c.taa_contrast_adaptive_sharpening = strength;
+    drop(c);
+    (scene, cam)
+}
+
+/// The frame's horizontal total variation (sum of |left − right| over the luma of
+/// adjacent pixels): a measure of how much high-frequency contrast it holds.
+fn total_variation(frame: &[u8]) -> u64 {
+    let luma = |x: u32, y: u32| {
+        let i = ((y * W + x) * 4) as usize;
+        frame[i] as i32 + frame[i + 1] as i32 * 2 + frame[i + 2] as i32
+    };
+    let mut tv = 0u64;
+    for y in 0..H {
+        for x in 1..W {
+            tv += luma(x, y).abs_diff(luma(x - 1, y)) as u64;
+        }
+    }
+    tv
+}
+
+#[test]
+fn gpu_sharpen_at_zero_is_byte_identical_to_no_sharpen() {
+    let Some(mut r) = renderer() else { return };
+    // A default camera runs no sharpen; an explicit strength of 0 must match it
+    // byte for byte, because the pass is never dispatched.
+    // An explicit strength of 0 matches the untouched (default-0) camera byte for
+    // byte: the sharpen pass is never dispatched.
+    let (zero_scene, _) = sharpen_scene(0.0);
+    let (mut none_scene, _) = taa_scene(true, true);
+    tilted_cube(&mut none_scene, Vec3::new(0.0, 0.0, -4.0));
+    let (mut a, mut b) = (view(&r), view(&r));
+    let zero = settle(&mut r, &mut a, &zero_scene, &eye(0.0), 24);
+    let off = settle(&mut r, &mut b, &none_scene, &eye(0.0), 24);
+    let diffs = zero.iter().zip(&off).filter(|(a, b)| a != b).count();
+    assert_eq!(
+        diffs, 0,
+        "{diffs} bytes differ with the sharpen at strength 0"
+    );
+}
+
+#[test]
+fn gpu_sharpen_raises_edge_contrast_without_ringing() {
+    let Some(mut r) = renderer() else { return };
+    let (off_scene, _) = sharpen_scene(0.0);
+    let (on_scene, _) = sharpen_scene(0.9);
+    let (mut a, mut b) = (view(&r), view(&r));
+    let off = settle(&mut r, &mut a, &off_scene, &eye(0.0), 24);
+    let on = settle(&mut r, &mut b, &on_scene, &eye(0.0), 24);
+
+    // The edges sharpen: the frame's high-frequency contrast rises.
+    let (tv_off, tv_on) = (total_variation(&off), total_variation(&on));
+    assert!(
+        tv_on > tv_off,
+        "sharpening should raise edge contrast: {tv_on} vs {tv_off}"
+    );
+
+    // A flat background corner does not ring: RCAS's lobe cancels on a flat
+    // neighbourhood, so the pixel barely moves (float precision only).
+    for (x, y) in [(0, 0), (W - 1, 0), (0, H - 1), (W - 1, H - 1)] {
+        let i = ((y * W + x) * 4) as usize;
+        for c in 0..3 {
+            let d = off[i + c].abs_diff(on[i + c]);
+            assert!(d <= 2, "flat corner ({x},{y}) channel {c} rang by {d}");
+        }
+    }
+}

@@ -108,14 +108,58 @@ pub(super) fn lenses(stack: &[Camera], aspect: f32) -> [[f32; 4]; MAX_CAMERAS] {
     out
 }
 
+/// The camera's TAA knobs the resolve reads (#1847): the still pixel's frame
+/// influence (`1 - base_blend`), the variance clamp scale and the quality level
+/// (0 `VeryLow` … 4 `VeryHigh`, [`quality_level`]). URP's defaults reduce to the
+/// constants [`FRAME_INFLUENCE`], [`VARIANCE_CLAMP_SCALE`] and `High`, so a camera
+/// left at its defaults resolves bit for bit as before (#1847).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TaaTune {
+    pub frame_influence: f32,
+    pub variance_clamp_scale: f32,
+    pub quality: f32,
+}
+
+impl TaaTune {
+    /// From a camera's TAA fields: frame influence is URP's `1 - base_blend`.
+    pub(crate) fn from_camera(cam: &crate::components::CameraComponent) -> Self {
+        Self {
+            frame_influence: (1.0 - cam.taa_base_blend_factor).clamp(0.0, 1.0),
+            variance_clamp_scale: cam.taa_variance_clamp_scale,
+            quality: quality_level(cam.taa_quality),
+        }
+    }
+}
+
+impl Default for TaaTune {
+    /// A default camera's tune: URP's defaults, so the resolve matches the constants.
+    fn default() -> Self {
+        Self {
+            frame_influence: FRAME_INFLUENCE,
+            variance_clamp_scale: VARIANCE_CLAMP_SCALE,
+            quality: quality_level(crate::components::TaaQuality::default()),
+        }
+    }
+}
+
+/// A quality level as the shader reads it (`taa.jitter.w`): its index in
+/// `TaaQuality::ALL`, 0 `VeryLow` … 4 `VeryHigh`.
+pub(crate) fn quality_level(quality: crate::components::TaaQuality) -> f32 {
+    crate::components::TaaQuality::ALL
+        .iter()
+        .position(|q| *q == quality)
+        .unwrap_or(3) as f32
+}
+
 impl TaaParams {
     /// The history's size `size`, the scene's `scene` (the same when not upscaling),
     /// whether the history holds a frame, the frame's jitter in scene pixels,
-    /// whether a translucent wrote the reactive mask (#1845) and the stack's
-    /// [`lenses`].
+    /// whether a translucent wrote the reactive mask (#1845), the camera's [`TaaTune`]
+    /// (#1847) and the stack's [`lenses`].
     pub(super) fn new(
         (size, scene): ((u32, u32), (u32, u32)),
         (history, jitter, reactive): (bool, Vec2, bool),
+        tune: TaaTune,
         lenses: [[f32; 4]; MAX_CAMERAS],
     ) -> Self {
         let dims = |(w, h): (u32, u32)| {
@@ -125,13 +169,18 @@ impl TaaParams {
         Self {
             size: dims(size),
             knobs: [
-                FRAME_INFLUENCE,
-                VARIANCE_CLAMP_SCALE,
+                tune.frame_influence,
+                tune.variance_clamp_scale,
                 f32::from(u8::from(history)),
                 STILL_PIXELS,
             ],
             scene: dims(scene),
-            jitter: [jitter.x, jitter.y, f32::from(u8::from(reactive)), 0.0],
+            jitter: [
+                jitter.x,
+                jitter.y,
+                f32::from(u8::from(reactive)),
+                tune.quality,
+            ],
             rejection: [
                 MOVING_FRAME_INFLUENCE,
                 MOVING_PIXELS,
