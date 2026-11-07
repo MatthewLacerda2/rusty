@@ -4,10 +4,10 @@ name: cargo-test
 # suite is runner-independent: nextest gives each test its own process, but
 # `cargo test` runs a whole binary in one, so a test that leans on having its
 # process to itself (`set_var`, `set_current_dir`, a `static` left set) passes
-# the gate and races here. cargo-mutants runs `cargo test` too, so such a leak
-# broke the mutation baseline of every branch after it (#1042, #1069, #1337);
-# nightly puts it on the board the morning after it merges, days before the weekly
-# sweep. The `dev` step runs exactly what `make test-one-process` runs on demand.
+# the gate and races here. Such a leak broke the mutation baseline of every branch
+# after it four times while cargo-mutants ran `cargo test` (#1042, #1069, #1337,
+# #1844); mutation runs use nextest now, so this nightly run is the one place a
+# runner difference shows, on the board the morning after it merges. The `dev` step runs exactly what `make test-one-process` runs on demand.
 #
 # A red run files itself on the board through `main-health.yml`: a failure here
 # is the finding. Never on pull requests (the batch brief for #981); dispatch it

@@ -172,7 +172,10 @@ every file and row.
   live under `tests/gpu/`. nextest's `gpu` group selects them by name, and a test that
   builds a renderer without such a name panics in debug (`render::setup::gpu_rule`).
 - A test reaches a GPU only through `render::test_gpu::headless_or_skip`
-  (`make rules`, `test-gpu-entry`); with no adapter it skips.
+  (`make rules`, `test-gpu-entry`); with no adapter it skips. A test that keeps two
+  renderers alive at once takes both budget slots together with
+  `headless_pair_or_skip` (#1844): a second single one on a thread that holds the
+  first panics, since under plain `cargo test` two such tests deadlock.
 - **They run on lavapipe** in Linux CI and in cloud sessions (the SessionStart hook
   installs it, #826). `RUSTY_REQUIRE_GPU=1` turns "no adapter" into a failure: set it
   to know they rendered. Metal on macOS is the one real GPU, so pair anything

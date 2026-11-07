@@ -10,6 +10,9 @@ Two rules written in several files and held equal by hand until now:
 - **An adapter is required wherever the suite runs on CI.** A job that runs the
   tests without `RUSTY_REQUIRE_GPU=1` skips every GPU test when its driver goes
   missing, and reads green.
+- **A mutation run can't outgrow its runner.** `ulimit -v` caps each process
+  (#674), and nextest runs `--test-threads` test processes at once, so the cap
+  times the threads stays within the runner's memory (#1844).
 """
 
 from __future__ import annotations
@@ -58,6 +61,25 @@ def unguarded(text: str) -> list[str]:
         return []
     return [name for name, body in jobs(text).items()
             if runs_suite(body) and 'RUSTY_REQUIRE_GPU: "1"' not in body]
+
+
+#: `ubuntu-latest`'s memory in KiB, what `ulimit -v` takes: 16 GB.
+RUNNER_KIB = 16 * 1024 * 1024
+MUTATE = re.compile(r"cargo mutants (?!--list\b)")
+
+
+def overcommitted(text: str) -> list[str]:
+    """The jobs running mutants whose memory cap times test threads exceeds the
+    runner's, or that leave either unset (nextest's default is the CPU count)."""
+    bad = []
+    for name, body in jobs(text).items():
+        if not MUTATE.search(body):
+            continue
+        cap = re.search(r"ulimit -v (\d+)", body)
+        threads = re.search(r"--test-threads[ =](\d+)", body)
+        if not (cap and threads) or int(cap[1]) * int(threads[1]) > RUNNER_KIB:
+            bad.append(name)
+    return bad
 
 
 NEEDS_TOML = unittest.skipUnless(tomllib, "tomllib needs Python 3.11+")
@@ -113,6 +135,26 @@ class RequireGpu(unittest.TestCase):
         self.assertEqual(unguarded(docs), [])
         workflow_env = 'env:\n  RUSTY_REQUIRE_GPU: "1"\n' + guarded.replace("RUSTY_REQUIRE_GPU", "OTHER")
         self.assertEqual(unguarded(workflow_env), [])
+
+
+class MutationMemory(unittest.TestCase):
+    def test_every_mutation_job_fits_its_runner(self):
+        for path in sorted(WORKFLOWS.glob("mutants-*.yml")):
+            with self.subTest(workflow=path.name):
+                self.assertEqual(overcommitted(path.read_text()), [])
+
+    def test_flags_unbounded_threads_or_too_big_a_product(self):
+        job = ("on: push\njobs:\n  m:\n    steps:\n      - run: |\n          ulimit -v 8388608\n"
+               "          cargo mutants --test-tool nextest -- --features dev{}\n")
+        self.assertEqual(overcommitted(job.format("")), ["m"])
+        self.assertEqual(overcommitted(job.format(" --test-threads 4")), ["m"])
+        self.assertEqual(overcommitted(job.format(" --test-threads 2").replace("ulimit -v 8388608\n", "")), ["m"])
+
+    def test_passes_a_bounded_job_and_a_mutant_count(self):
+        job = ("on: push\njobs:\n  m:\n    steps:\n      - run: |\n          ulimit -v 8388608\n"
+               "          cargo mutants --test-tool nextest -- --test-threads 2\n"
+               "  plan:\n    steps:\n      - run: cargo mutants --list --json > p.json\n")
+        self.assertEqual(overcommitted(job), [])
 
 
 if __name__ == "__main__":

@@ -630,7 +630,12 @@ not. Re-ask with a narrower scope (`make mutants-remote SCOPE=src/physics/query/
 or reproduce a survivor locally with the same shape the job uses:
 
     git diff origin/main > branch.diff
-    cargo mutants --in-diff branch.diff -- --features dev
+    cargo mutants --test-tool nextest --in-diff branch.diff \
+      -- --features dev --fail-fast --test-threads 2
+
+That is CI's runner (#1844): nextest, a caught mutant stopping at its first
+failing test, and two test processes at a time, the bound that keeps the jobs'
+per-process `ulimit -v` within the runner's memory.
 
 `cargo mutants --list` names the functions and builds nothing — reach for it before
 believing a structural explanation of a bad report.

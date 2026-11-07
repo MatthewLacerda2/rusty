@@ -15,9 +15,15 @@ use super::Budget;
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
+/// No thread takes part in the nested-acquire check (that has its own tests,
+/// `holder_tests`).
+fn unchecked() -> Option<std::thread::ThreadId> {
+    None
+}
+
 #[test]
 fn a_permit_frees_its_slot_when_dropped() {
-    static B: Budget = Budget::new(2, TIMEOUT);
+    static B: Budget = Budget::new(2, TIMEOUT, unchecked);
     assert_eq!(B.live(), 0);
     let first = B.acquire();
     assert_eq!(B.live(), 1);
@@ -34,7 +40,7 @@ fn a_permit_frees_its_slot_when_dropped() {
 /// is the state #365 tripped over on Windows.
 #[test]
 fn concurrency_never_exceeds_the_cap() {
-    static B: Budget = Budget::new(2, TIMEOUT);
+    static B: Budget = Budget::new(2, TIMEOUT, unchecked);
     let live = AtomicUsize::new(0);
     let peak = AtomicUsize::new(0);
     let start = Barrier::new(8);
@@ -67,7 +73,7 @@ fn concurrency_never_exceeds_the_cap() {
 /// returning an already-saturated permit.
 #[test]
 fn a_full_budget_blocks_until_a_slot_frees() {
-    static B: Budget = Budget::new(1, TIMEOUT);
+    static B: Budget = Budget::new(1, TIMEOUT, unchecked);
     let held = B.acquire();
     let entered = Barrier::new(2);
     let acquired = AtomicUsize::new(0);

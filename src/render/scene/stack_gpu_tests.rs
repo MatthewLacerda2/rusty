@@ -7,7 +7,7 @@
 use glam::Vec3;
 
 use crate::components::CameraComponent;
-use crate::render::motion::gpu_fixture::{cube, eye, renderer, scene, view, H, W};
+use crate::render::motion::gpu_fixture::{cube, eye, renderer_pair, scene, view, H, W};
 use crate::render::postfx::effects::motion_blur::overlay_gpu_tests::{paint, VIEWMODEL};
 use crate::render::{readback, Renderer};
 use crate::scene::{ClearFlags, Scene};
@@ -69,10 +69,10 @@ fn count(frame: &[u8], xs: std::ops::Range<u32>, channel: usize) -> usize {
 
 #[test]
 fn gpu_a_stacked_viewmodel_leaves_the_world_cameras_draws_as_they_were() {
-    let Some(mut stacked) = renderer() else {
+    let Some((mut stacked, pair)) = renderer_pair() else {
         return;
     };
-    let mut alone = renderer().expect("one ran");
+    let mut alone = pair.renderer(W, H);
     let (with_gun, without) = (run(&mut stacked, true), run(&mut alone, false));
     let left = 0..W / 2 - 4;
     assert!(

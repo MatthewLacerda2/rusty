@@ -75,7 +75,7 @@ fn step(scene: &mut Scene, ids: &[u32], soldier: u32, step: u32) {
 
 #[test]
 fn gpu_a_kept_scene_draws_what_a_fresh_renderer_draws_after_every_edit() {
-    let Some(mut kept) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+    let Some((mut kept, pair)) = crate::render::test_gpu::headless_pair_or_skip(RES, RES) else {
         return;
     };
     let mut scene = yard(6);
@@ -89,7 +89,7 @@ fn gpu_a_kept_scene_draws_what_a_fresh_renderer_draws_after_every_edit() {
         // differ by nothing (whether a bake goes stale is `equivalence_tests`').
         kept.shadow_renderer.invalidate_static_cache();
         let (pixels, counters) = frame(&mut kept, &scene);
-        let mut fresh = crate::render::test_gpu::headless_or_skip(RES, RES).expect("one ran");
+        let mut fresh = pair.renderer(RES, RES);
         let (expected, fresh_counters) = frame(&mut fresh, &scene);
         assert_eq!(
             counters.visible_entities, fresh_counters.visible_entities,
