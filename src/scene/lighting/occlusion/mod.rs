@@ -65,6 +65,10 @@ pub use targets::{MAX_TARGETS, TARGET_SPACING, VOXEL};
 #[cfg(test)]
 mod bake_tests;
 #[cfg(test)]
+mod bench_level;
+#[cfg(test)]
+mod bench_tests;
+#[cfg(test)]
 mod carry_tests;
 #[cfg(test)]
 mod dense_tests;

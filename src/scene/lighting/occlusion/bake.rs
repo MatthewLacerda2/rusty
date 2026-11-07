@@ -71,6 +71,11 @@ pub fn bake_occlusion(
 }
 
 impl OcclusionInput {
+    #[cfg(test)]
+    pub(super) fn objects(&self) -> &[Object] {
+        &self.objects
+    }
+
     /// Bake the PVS on `threads` workers, counting into `progress`; `None` when it
     /// was cancelled, else the data (`None` when nothing occludes, nothing can be
     /// culled, or the level is too large: the report says which) and the report.
