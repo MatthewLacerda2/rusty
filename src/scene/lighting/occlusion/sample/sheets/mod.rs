@@ -18,11 +18,9 @@
 //! crossings of both its planes. An object's own faces never hide it, so a sheet
 //! it is a member of is not used for it (`shaft` falls back to its own polygon).
 
-use std::collections::BTreeMap;
-
 use glam::{UVec2, Vec2, Vec3};
 
-use super::gather::Face;
+use crate::scene::lighting::occlusion::gather::Face;
 
 /// A texel's edge, metres.
 const TEXEL: f32 = 0.25;
@@ -61,24 +59,36 @@ pub(super) struct Member<'a> {
 }
 
 /// The sheets `faces` make, and per face its sheet (`u32::MAX` for a face alone
-/// on its plane, which its own polygon tests as well, or with no plane).
+/// on its plane, which its own polygon tests as well, on a sparse sheet, or with
+/// no plane).
 pub(super) fn sheets(faces: &[Member]) -> (Vec<Sheet>, Vec<u32>) {
-    let mut planes: BTreeMap<([i64; 3], i64, u8), Vec<usize>> = BTreeMap::new();
-    let mut of = vec![u32::MAX; faces.len()];
-    for (i, f) in faces.iter().enumerate() {
-        if f.normal == Vec3::ZERO {
-            continue;
-        }
+    // Each face keyed by its plane and side, sorted: a plane's faces then run
+    // together, in face order.
+    let key = |f: &Member| {
         let n = (f.normal * 1e6).round().as_i64vec3().to_array();
-        let offset = (f.normal.dot(f.corners[0]) / CLEAR).round() as i64;
-        planes.entry((n, offset, f.face as u8)).or_default().push(i);
-    }
-    let mut sheets = Vec::with_capacity(planes.len());
-    for members in planes.into_values().filter(|m| m.len() > 1) {
-        for &i in &members {
-            of[i] = sheets.len() as u32;
+        (
+            n,
+            (f.normal.dot(f.corners[0]) / CLEAR).round() as i64,
+            f.face as u8,
+        )
+    };
+    let planar = faces
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| f.normal != Vec3::ZERO);
+    let mut keyed: Vec<_> = planar.map(|(i, f)| (key(f), i as u32)).collect();
+    keyed.sort_unstable();
+    let mut of = vec![u32::MAX; faces.len()];
+    let mut sheets = Vec::new();
+    for run in keyed.chunk_by(|a, b| a.0 == b.0).filter(|r| r.len() > 1) {
+        let sheet = Sheet::of(run.iter().map(|&(_, i)| &faces[i as usize]));
+        let Some(sheet) = sheet.filter(|s| !s.sparse()) else {
+            continue;
+        };
+        for &(_, i) in run {
+            of[i as usize] = sheets.len() as u32;
         }
-        sheets.push(Sheet::of(members.iter().map(|&i| &faces[i])));
+        sheets.push(sheet);
     }
     (sheets, of)
 }
@@ -91,7 +101,9 @@ fn corners((min, max): (Vec3, Vec3)) -> ([Vec3; 8], usize) {
 }
 
 impl Sheet {
-    fn of<'a>(members: impl Iterator<Item = &'a Member<'a>> + Clone) -> Self {
+    /// The sheet of `members`, `None` when their faces cover under a quarter of
+    /// the rectangle round them (it would be [`Self::sparse`]: no texel is made).
+    fn of<'a>(members: impl Iterator<Item = &'a Member<'a>> + Clone) -> Option<Self> {
         let first = members.clone().next().expect("a sheet has a member");
         let normal = first.normal;
         let axes = axes(normal);
@@ -103,6 +115,13 @@ impl Sheet {
             (lo, hi) = (lo.min(normal.dot(p)), hi.max(normal.dot(p)));
             (min, max) = (min.min(flat(p)), max.max(flat(p)));
         }
+        let polys: Vec<Vec<Vec2>> = (members.clone())
+            .map(|m| m.corners.iter().map(|&p| flat(p)).collect())
+            .collect();
+        let area: f32 = polys.iter().map(|p| area(p).abs()).sum();
+        if area * 4.0 < (max - min).x * (max - min).y {
+            return None;
+        }
         let mut texel = TEXEL;
         let (origin, dims) = loop {
             let origin = (min / texel).floor() * texel;
@@ -113,14 +132,13 @@ impl Sheet {
             texel *= 2.0;
         };
         let mut set = vec![false; (dims.x * dims.y) as usize];
-        for m in members.clone() {
-            let poly: Vec<Vec2> = m.corners.iter().map(|&p| flat(p)).collect();
-            fill(&mut set, &poly, (origin, texel, dims));
+        for poly in &polys {
+            fill(&mut set, poly, (origin, texel, dims));
         }
         let mut members: Vec<u32> = members.map(|m| m.mesh).collect();
         members.sort_unstable();
         members.dedup();
-        Self {
+        Some(Self {
             normal,
             lo,
             hi,
@@ -131,7 +149,22 @@ impl Sheet {
             dims,
             sums: sums(&set, dims),
             members,
-        }
+        })
+    }
+
+    /// Whether under a quarter of its texels are set: faces scattered over a plane
+    /// (the same facet of props in a row) fuse little, and would cost their
+    /// texels' memory for it.
+    fn sparse(&self) -> bool {
+        let total = self.dims.x as usize * self.dims.y as usize;
+        let set = *self.sums.last().unwrap_or(&0) as usize;
+        set * 4 < total
+    }
+
+    /// The bytes its texels' sums take.
+    #[cfg(test)]
+    pub fn bytes(&self) -> usize {
+        self.sums.len() * 4
     }
 
     /// Whether `object` has a face on it.
@@ -204,8 +237,7 @@ fn fill(set: &mut [bool], poly: &[Vec2], (origin, texel, dims): (Vec2, f32, UVec
     if k < 3 {
         return;
     }
-    let area: f32 = (0..k).map(|i| poly[i].perp_dot(poly[(i + 1) % k])).sum();
-    let turn = area.signum();
+    let turn = area(poly).signum();
     let inside = |p: Vec2| {
         (0..k).all(|i| {
             let (a, b) = (poly[i], poly[(i + 1) % k]);
@@ -231,6 +263,15 @@ fn fill(set: &mut [bool], poly: &[Vec2], (origin, texel, dims): (Vec2, f32, UVec
             }
         }
     }
+}
+
+/// The signed area of `poly`, positive when it winds counter-clockwise.
+fn area(poly: &[Vec2]) -> f32 {
+    let k = poly.len();
+    (0..k)
+        .map(|i| poly[i].perp_dot(poly[(i + 1) % k]))
+        .sum::<f32>()
+        * 0.5
 }
 
 /// The prefix sums of `set` over a `dims` grid, `(dims + 1)` a side.

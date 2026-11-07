@@ -6,8 +6,8 @@
 
 use std::time::Instant;
 
-use super::baking::Baking;
 use super::bench_level::rooms;
+use super::sample::Baking;
 use super::test_level::block;
 use super::{bake_occlusion, gather_occlusion, Grid};
 use crate::scene::Scene;
@@ -43,6 +43,7 @@ fn occlusion_bake_cost() {
     let input = gather_occlusion(&scene);
     let baking = Baking::of(input.objects());
     let prep = t.elapsed().as_secs_f64();
+    println!("Dust2-sized sheets (count, bytes): {:?}", baking.sheets());
     let (min, max) = baking.bounds.expect("cullable");
     let grid = Grid::over(min, max).expect("fits");
     let count = grid.cell_count();

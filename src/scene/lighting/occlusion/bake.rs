@@ -8,9 +8,9 @@
 
 use std::collections::BTreeMap;
 
-use super::baking::Baking;
 use super::gather::{Fingerprints, Object};
 use super::progress::OcclusionProgress;
+use super::sample::Baking;
 use super::{BakedObject, Grid, OcclusionData};
 use crate::scene::Scene;
 
@@ -93,7 +93,7 @@ impl OcclusionInput {
         let mut report = OcclusionBakeReport {
             objects: objects.len(),
             occluders,
-            never_culled: scene.targets.iter().filter(|t| t.2.is_none()).count(),
+            never_culled: scene.never_culled(),
             ..Default::default()
         };
         // Nothing to cull, or a level too large to cull: no PVS, said in the report.

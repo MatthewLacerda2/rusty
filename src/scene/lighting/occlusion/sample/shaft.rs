@@ -11,9 +11,9 @@
 
 use glam::Vec3;
 
-use super::gather::Face;
 use super::sheets::{sheets, Member, Sheet};
 use crate::scene::lighting::lightmap::{Rays, Tri};
+use crate::scene::lighting::occlusion::gather::Face;
 
 /// How far, metres, both boxes must clear a face's plane, and a crossing its edges.
 const CLEAR: f32 = 1e-3;
@@ -102,6 +102,15 @@ impl Polygons {
         // centres' direction says which.
         let dir = (to.0 + to.1) * 0.5 - (from.0 + from.1) * 0.5;
         p.mesh != object && p.face.stops(p.normal, dir) && p.separates(from, to)
+    }
+
+    /// How many sheets the polygons fused into, and the bytes they take.
+    #[cfg(test)]
+    pub fn sheet_bytes(&self) -> (usize, usize) {
+        (
+            self.sheets.len(),
+            self.sheets.iter().map(Sheet::bytes).sum(),
+        )
     }
 
     /// The polygon triangle `tri` (the BVH's order) belongs to.

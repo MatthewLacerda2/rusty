@@ -16,12 +16,12 @@ use glam::Vec3;
 
 use super::clusters::{clusters, Cluster};
 use super::eye::Eye;
-use super::gather::{Face, Object};
-use super::progress::OcclusionProgress;
 use super::shaft::Polygons;
 use super::targets::{chunks, target_points, Chunk};
-use super::{Grid, OCCLUSION_SEED};
 use crate::scene::lighting::lightmap::{Rays, Rng, Tri};
+use crate::scene::lighting::occlusion::gather::{Face, Object};
+use crate::scene::lighting::occlusion::progress::OcclusionProgress;
+use crate::scene::lighting::occlusion::{Grid, OCCLUSION_SEED};
 
 /// Points sampled in each sampling cube of a cell (its centre first, the rest
 /// seeded in the cube).
@@ -36,18 +36,30 @@ pub(super) type Targets = (Vec3, Vec3, Option<Vec<Chunk>>);
 
 /// The scene ready to sample: the occluders' BVH, each triangle's drawn side and
 /// the planar polygons they make, and per object its bounds and target points.
-pub(super) struct Baking {
-    pub rays: Rays,
-    pub faces: Vec<Face>,
-    pub polygons: Polygons,
-    pub targets: Vec<Targets>,
-    pub clusters: Vec<Cluster>,
+pub(in crate::scene::lighting::occlusion) struct Baking {
+    pub(super) rays: Rays,
+    pub(super) faces: Vec<Face>,
+    pub(super) polygons: Polygons,
+    pub(super) targets: Vec<Targets>,
+    pub(super) clusters: Vec<Cluster>,
     /// The bounds of every object that can be culled, `None` when none can: a
     /// never-culled one (a ground slab) needs no cell, so it never coarsens them.
     pub bounds: Option<(Vec3, Vec3)>,
 }
 
 impl Baking {
+    /// How many objects are too large or not finite to sample, and so are kept
+    /// in sight of every cell.
+    pub fn never_culled(&self) -> usize {
+        self.targets.iter().filter(|t| t.2.is_none()).count()
+    }
+
+    /// How many sheets the occluders fused into, and the bytes they take.
+    #[cfg(test)]
+    pub fn sheets(&self) -> (usize, usize) {
+        self.polygons.sheet_bytes()
+    }
+
     pub fn of(objects: &[Object]) -> Self {
         let (mut tris, mut faces) = (Vec::new(), Vec::new());
         let mut bounds: Option<(Vec3, Vec3)> = None;

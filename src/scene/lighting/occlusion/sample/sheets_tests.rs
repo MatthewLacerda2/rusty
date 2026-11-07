@@ -3,8 +3,8 @@
 
 use glam::Vec3;
 
-use super::gather::Face;
 use super::sheets::{sheets, Member};
+use crate::scene::lighting::occlusion::gather::Face;
 
 /// A floor tile over `[x0, x1] × [z0, z1]` at y = 0, its drawn side up, wound
 /// counter-clockwise seen from above.
@@ -42,8 +42,9 @@ fn two_tiles_hide_what_straddles_their_seam_and_a_gap_does_not() {
     assert!(fused[0].hides(EYE, UNDER));
     // From below, the tiles' undrawn side lets the view through.
     assert!(!fused[0].hides(UNDER, EYE));
-    // A 5 cm gap off the texel grid is seen through.
-    let tiles = [tile(-2.0, 1.95, -2.0, 6.0), tile(2.0, 6.0, -2.0, 6.0)];
+    // A 1.5 mm gap off the texel grid: the texels it crosses are not set, so it
+    // is seen through.
+    let tiles = [tile(-2.0, 1.9985, -2.0, 6.0), tile(2.0, 6.0, -2.0, 6.0)];
     assert!(!sheets(&floor(&tiles)).0[0].hides(EYE, UNDER));
 }
 
@@ -64,6 +65,11 @@ fn a_member_and_a_lone_face_are_left_to_their_polygons() {
     assert!(fused[0].holds(1) && !fused[0].holds(2));
     let (alone, of) = sheets(&floor(&tiles[..1]));
     assert!(alone.is_empty() && of == vec![u32::MAX]);
+    // Two small tiles on one plane far apart fuse nothing: the sheet would be
+    // mostly empty, so each is its own polygon.
+    let apart = [tile(-2.0, -1.0, -2.0, -1.0), tile(20.0, 21.0, 20.0, 21.0)];
+    let (none, of) = sheets(&floor(&apart));
+    assert!(none.is_empty() && of == vec![u32::MAX; 2]);
 }
 
 #[test]

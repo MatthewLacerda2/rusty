@@ -377,8 +377,15 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   count follows the mesh's surface area, not its triangles (a 2000-triangle prop gets
   about the points a box of its size does), and a long wall seen through a doorway is
   aimed at wherever the doorway shows it. A point on a one-sided triangle that faces
-  away from a sampled cube is skipped, and one occluder face (a triangle, or a box's
-  side) that hides a whole mesh or point from a whole cube skips its rays. Every cell
+  away from a sampled cube is skipped. Most rays are never cast (#1714, part 3): an
+  occluder face that hides a group of meshes, a mesh, or some of its points from a
+  cube or from one of its points proves their rays stopped, and the faces on one
+  plane that draw the same side count as one (Unity's occluder fusion, for coplanar
+  faces): a floor of tiles, a wall built of pieces with its doorways left open. A
+  seam fuses where it falls on the quarter-metre grid of world units, as a modular
+  level's do. Each cube tries first the faces that last stopped one of its rays.
+  These proofs are exact, so they change how fast a cell bakes, not what it keeps.
+  Every cell
   then also takes its 26 neighbours' sets, and cells that see the same set share one
   row. The bake is a pure function of the scene and a fixed seed: the same bytes at
   any thread count.
@@ -389,15 +396,15 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   not finite is never culled: it is kept in sight of every cell, lays no cell (a
   ground slab never coarsens the grid), and Generate Lighting's console line and
   `occlusionNeverCulled` count it.
-- **Cost** (release build, 4 threads, primitive levels of rooms with a doorway in
-  every wall and three 1.5 m props per room): a Kolvik-sized interior (8 × 8 rooms of
-  6 m, 450 static meshes, 2916 cells of 2 m) bakes in about 21 s into 135 KB, 24 s
-  with one prop per room a 2000-triangle sphere. A Dust2-sized level (20 × 20 rooms of
-  10 m on two storeys, 5604 meshes with the same dense props, 11664 cells of 3.9 m,
-  each sampled as eight 2 m cubes) takes about 3.9 s a cell on one thread: some 3 hours
-  on 4 threads, less on more cores (estimated from 400 cells spread over the grid, not
-  a whole run). The eye's density is what costs: a cell sampled as eight cubes does
-  eight times the work.
+- **Cost** (release build, 4 threads, primitive levels of 10 m rooms on two
+  storeys, a doorway in every wall, two crates and a 1150-triangle sphere in each):
+  a Kolvik-sized interior (5 × 5 rooms, 397 static meshes, 4704 cells of 2 m) bakes
+  in about 5 s into 277 KB; a Dust2-sized level (20 × 20 rooms, 6344 meshes, 14580
+  cells of 3.9 m, each sampled as eight 2 m cubes) in about 14 minutes into 11.8 MB,
+  with the process peaking under 0.6 GB, about what the occluders' BVH alone takes
+  (part 2 took some 8 hours on that level). Fewer cores take longer in proportion.
+  What costs is the cells under the ground floor and across a storey's slab, where
+  only many faces together hide what is past them.
   At runtime a camera costs one cell lookup, and each static mesh
   a map lookup and a bit test; a static mesh moved or edited re-checks that mesh alone.
 - **Runs** as Generate Lighting's last step, after the lightmaps and probes are

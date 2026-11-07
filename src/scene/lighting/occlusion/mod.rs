@@ -50,17 +50,11 @@
 //! carried entity's way renames the baked objects with them ([`OcclusionData::remap`]).
 
 mod bake;
-mod baking;
-mod clusters;
-mod eye;
 mod file;
 mod gather;
 mod grid;
 mod progress;
-mod shaft;
-mod sheets;
-mod sight;
-mod targets;
+mod sample;
 
 pub use bake::{
     bake_occlusion, gather_occlusion, OcclusionBakeReport, OcclusionInput, OCCLUSION_SEED,
@@ -69,7 +63,7 @@ pub use file::{decode, encode, load_sidecar, occlusion_path, save_sidecar};
 pub use gather::{fingerprint, Fingerprints};
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
 pub use progress::OcclusionProgress;
-pub use targets::{MAX_TARGETS, TARGET_SPACING, VOXEL};
+pub use sample::{MAX_TARGETS, TARGET_SPACING, VOXEL};
 
 #[cfg(test)]
 mod bake_tests;
@@ -87,8 +81,6 @@ mod file_tests;
 mod grid_tests;
 #[cfg(test)]
 mod sampling_tests;
-#[cfg(test)]
-mod sheets_tests;
 #[cfg(test)]
 pub(crate) mod test_gap;
 #[cfg(test)]
