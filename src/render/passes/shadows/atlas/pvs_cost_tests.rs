@@ -17,8 +17,9 @@ use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::lighting::occlusion::{bake_occlusion, bench_level::rooms};
 use crate::scene::{Camera, Scene};
 
-/// The bench level, `n × n` rooms, with three shadowed lamps in each ground room.
-fn lit(n: usize) -> (Scene, Vec<(u32, Vec3)>) {
+/// The bench level, `n × n` rooms, with three shadowed lamps of `range` in each
+/// ground room.
+fn lit(n: usize, range: f32) -> (Scene, Vec<(u32, Vec3)>) {
     let mut scene = rooms(n);
     let mut lamps = Vec::new();
     for (i, j) in (0..n).flat_map(|i| (0..n).map(move |j| (i, j))) {
@@ -31,7 +32,7 @@ fn lit(n: usize) -> (Scene, Vec<(u32, Vec3)>) {
             let id = create_entity(&mut scene, "Lamp", Some(Primitive::PointLight));
             scene.world.transform_mut(id).unwrap().position = at;
             let mut light = scene.world.light(id).unwrap().clone();
-            (light.cast_shadows, light.range, light.intensity) = (true, 9.0, 20.0);
+            (light.cast_shadows, light.range, light.intensity) = (true, range, 20.0);
             scene.world.set_light(id, Some(light));
             lamps.push((id, at));
         }
@@ -74,32 +75,41 @@ fn gpu_shadow_pvs_cost() {
         return;
     };
     for n in [5, 20] {
-        let (mut culled, lamps) = lit(n);
         let t = std::time::Instant::now();
-        let data = bake_occlusion(&culled, 4).0.expect("the level occludes");
-        let bake = t.elapsed().as_secs_f64();
-        *culled.occlusion = Some(Arc::new(data));
-        let (mut open, _) = lit(n);
-        for (name, swing) in [("moving", 0.05), ("still", 0.0)] {
-            for (pvs, scene) in [("PVS", &mut culled), ("none", &mut open)] {
-                let c = run(&mut r, scene, &lamps, swing);
-                let (tiles, rebaked) = (c.shadow_atlas_tiles.max(1), c.shadow_atlas_rebaked.max(1));
-                let drawn = c.shadow_cull_tested
-                    - c.shadow_frustum_culled
-                    - c.shadow_size_culled
-                    - c.shadow_occlusion_culled;
-                println!(
-                    "n={n} ({bake:.0} s bake) {name} lamps, {pvs}: {:.1} tiles/frame, \
-                     {:.1} re-baked; per re-baked tile {:.1} tested, {:.1} drawn, \
-                     {:.1} PVS-culled; gather {:.0} µs/frame",
-                    tiles as f32 / 10.0,
-                    c.shadow_atlas_rebaked as f32 / 10.0,
-                    c.shadow_cull_tested as f32 / rebaked as f32,
-                    drawn as f32 / rebaked as f32,
-                    c.shadow_occlusion_culled as f32 / rebaked as f32,
-                    c.shadow_gather_us as f32 / 10.0,
-                );
+        let data = bake_occlusion(&lit(n, 9.0).0, 4)
+            .0
+            .expect("the level occludes");
+        let (bake, data) = (t.elapsed().as_secs_f64(), Arc::new(data));
+        // A lamp's range is no part of what the bake reads: one bake serves both.
+        for range in [9.0, 18.0] {
+            let ((mut culled, lamps), (mut open, _)) = (lit(n, range), lit(n, range));
+            *culled.occlusion = Some(Arc::clone(&data));
+            for (name, swing) in [("moving", 0.05), ("still", 0.0)] {
+                for (pvs, scene) in [("PVS", &mut culled), ("none", &mut open)] {
+                    let c = run(&mut r, scene, &lamps, swing);
+                    report(
+                        &format!("n={n} ({bake:.0} s bake) {range} m {name} lamps, {pvs}"),
+                        &c,
+                    );
+                }
             }
         }
     }
+}
+
+/// One run's line: tiles a frame, and per re-baked tile the casters tested, drawn
+/// and PVS-culled, and the gather's CPU time a frame (ten frames summed in `c`).
+fn report(head: &str, c: &RenderCounters) {
+    let rebaked = c.shadow_atlas_rebaked.max(1) as f32;
+    let culled = c.shadow_frustum_culled + c.shadow_size_culled + c.shadow_occlusion_culled;
+    println!(
+        "{head}: {:.1} tiles/frame, {:.1} re-baked; per re-baked tile {:.1} tested, \
+         {:.1} drawn, {:.1} PVS-culled; gather {:.0} µs/frame",
+        c.shadow_atlas_tiles as f32 / 10.0,
+        c.shadow_atlas_rebaked as f32 / 10.0,
+        c.shadow_cull_tested as f32 / rebaked,
+        (c.shadow_cull_tested - culled) as f32 / rebaked,
+        c.shadow_occlusion_culled as f32 / rebaked,
+        c.shadow_gather_us as f32 / 10.0,
+    );
 }
