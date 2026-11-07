@@ -83,20 +83,21 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     let every = renderer.lazy_pipelines(true);
     // Every forward-target pass has one pipeline per facing (#1615): `F` of each.
     const F: usize = 3;
-    // one transparent per blend state and the 2 depth postpass (#1523) + the
+    // one transparent per blend state, again into TAA's reactive mask (#1845), and
+    // the 2 depth postpass (#1523) and its motion-only one (#1845) + the
     // motion-vector forward and 2 sky (#1435) + the same into the SSR surface target
     // too (#1526) + the 2 primed forward ones (#1499) and the primed SSR one + the
     // opaque pass's and the prepass's mirrored and two-sided ones (#1615) + SSR's own
     // pass and its pyramid's (#1736) + SSAO's occlusion, blur and upsample (#1578) + SSIL's 5 (#1750) + the motion blur's 3 tile
     // passes and gather (#1436) + TAA's resolve and its upscale (#1702) + the depth of field's 9 (#1445) + bloom's prefilter,
     // resample, downsample and upsample (#1700) + the lens flare's (#1443; the composite adds it, #1473)
-    // + 2 particle + 2 ribbon + one world canvas per blend mode + 2 mirrored and 2
+    // + 2 particle + 2 ribbon, each again reactive (#1845) + one world canvas per blend mode + 2 mirrored and 2
     // two-sided shadow (#1571) + the data-mip one + the opaque copy (#1523) + the
     // editor's line, the outline's mask (one per facing), dilation and edge.
     assert_eq!(
         every.len(),
-        super::TransparentBlend::ALL.len() * F
-            + 2 * F
+        2 * super::TransparentBlend::ALL.len() * F
+            + 3 * F
             + (F + 2)
             + (F + 2)
             + 2 * F
@@ -110,8 +111,8 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + 9
             + 4
             + 1
-            + 2
-            + 2
+            + 4
+            + 4
             + UiBlend::ALL.len()
             + 2
             + 2

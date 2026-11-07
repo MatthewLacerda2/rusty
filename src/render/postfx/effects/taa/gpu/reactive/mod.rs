@@ -7,6 +7,7 @@
 //! keeps them. What the scene is: `scene`.
 
 mod scene;
+mod viewmodel;
 
 use scene::{ball_frame, Ball, Stats};
 

@@ -799,8 +799,33 @@ cost each TAA camera half again its history memory: 50 MB in all at 1920×1080.
 Unity's camera has **one anti-aliasing mode**, so with both on, TAA runs and the
 FXAA pass is skipped; `fxaa_active` keeps its value for when TAA is turned off. TAA
 needs the velocity target, so a view running it pays for the motion-vector pass
-too. Transparent surfaces, sprite particles, ribbons and decals write no motion:
-the colour clamp is what keeps them from trailing. The first frame after a cut (a
+too.
+
+**Translucents are reactive** (#1845, FSR2's *reactive mask*). Transparent
+surfaces, sprite particles and ribbons write no motion of their own, so the history
+reprojects them with the surface behind them and averages a moving one with that
+surface's past (a plasma ball loses its rim and swirl, and over a plain wall
+trails). So where the view runs TAA they also write how much of each pixel they
+laid down this frame, and there the frame weighs more again (the history's share
+times `1 - reactive`, as FSR2): a surface blending over what is behind writes its
+alpha (FSR2's recommendation; a refracting or absorbing one, which composites what
+is behind it itself, writes 1), an additive one how much it brightened the pixel
+(the largest channel of what it added, tonemapped by `x / (1 + x)`, as FSR2's
+`GenerateReactiveMask` measures it), a multiplying one how much it can darken it;
+all capped at FSR2's 0.9. `Material.SetReactive` and `Particles.SetReactive` (`Auto`,
+the default; `Off`; `Full`, 0.9) override it: `Off` for a large still window, whose
+jittered edges would otherwise shimmer, `Full` for a fast effect. Ribbons are always
+`Auto`. A translucent drawn by a lower camera of the stack never makes a higher
+camera's surface reactive (a window behind a viewmodel's gun). A solid-looking
+translucent can instead write its own motion, `Material.SetWritesMotion` (HDRP's
+*Transparent Writes Motion Vectors*): TAA, motion blur and depth of field then move
+it as a solid, and its reveals drop the history as an opaque surface's do. Decals
+move with the surface they are folded into and need neither. With no translucent
+on screen nothing changes: the mask reads zero and every pixel resolves as before.
+The mask costs 2 bytes a pixel at the scene's size (4 MB at 1920×1080), the
+translucent passes one more blended target.
+
+The first frame after a cut (a
 scene load, Play or Stop, a camera switch, a resize) is the current frame alone, so
 nothing of the last shot ghosts in. The editor's Scene view never runs TAA (it keeps
 FXAA); the Game view, the player and a render-texture camera with `taa_active` and

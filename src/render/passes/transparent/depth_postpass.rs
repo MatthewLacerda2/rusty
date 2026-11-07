@@ -31,6 +31,28 @@ pub(crate) fn movers(translucents: &[DrawBatch]) -> impl Iterator<Item = &DrawBa
         .filter(move |b| t(b).writes_motion && !t(b).depth_postpass)
 }
 
+/// The pass's colour attachments: none at location 0, and the `velocity` target,
+/// loaded, at location 1 when the view has one.
+fn targets(
+    velocity: Option<&wgpu::TextureView>,
+) -> Vec<Option<wgpu::RenderPassColorAttachment<'_>>> {
+    let load = |view| {
+        Some(wgpu::RenderPassColorAttachment {
+            depth_slice: None,
+            view,
+            resolve_target: None,
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Load,
+                store: wgpu::StoreOp::Store,
+            },
+        })
+    };
+    match velocity {
+        Some(v) => vec![None, load(v)],
+        None => Vec::new(),
+    }
+}
+
 impl Renderer {
     /// Draw the depth postpass of `translucents` into `view`, then the motion
     /// writers'; nothing when none asks.
@@ -50,21 +72,7 @@ impl Renderer {
                 label: Some("Depth Postpass Encoder"),
             });
         {
-            let load = |view| {
-                Some(wgpu::RenderPassColorAttachment {
-                    depth_slice: None,
-                    view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Store,
-                    },
-                })
-            };
-            let targets = match velocity {
-                Some(v) => vec![None, load(v)],
-                None => Vec::new(),
-            };
+            let targets = targets(velocity);
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 multiview_mask: None,
                 label: Some("Depth Postpass"),
