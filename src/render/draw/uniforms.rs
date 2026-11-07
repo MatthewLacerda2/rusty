@@ -8,7 +8,7 @@ use std::ops::RangeInclusive;
 
 use glam::Mat4;
 
-use crate::components::{MaterialAsset, RefractionModel, RenderFace, RenderMode};
+use crate::components::{MaterialAsset, RefractionModel, RenderFace, RenderMode, UvMapping};
 use crate::render::gpu::lightmaps::Lightmaps;
 use crate::render::gpu::uniforms::{MappingUniform, ObjectData, SurfaceUniform};
 use crate::render::postfx::effects::ssr;
@@ -76,10 +76,25 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
 /// scale/offset, its mapping by index, and its world size as repeats per metre.
 /// Each value is clamped to its authoring row's range, since a hand-written scene
 /// skips the row's own clamp and a sharpness past it overflows the shader's blend.
+///
+/// Tiling and Offset mean Unity's (#1851): Unity's `TRANSFORM_TEX` is
+/// `uv * _ST.xy + _ST.zw` with v = 0 at the image's bottom, and UV0 here has v = 0 at
+/// its top (glTF), so UV0's v lane is packed as `tiling.y * v + (1 - tiling.y -
+/// offset.y)`, UnityGLTF's conversion of `KHR_texture_transform`: +y moves the
+/// texture down the surface and Tiling scales from the image's bottom edge, as in
+/// Unity. Planar and Triplanar project world coordinates, which HDRP transforms with
+/// the plain `uv * _ST.xy + _ST.zw` (`ComputeLayerTexCoord`), so they are packed
+/// as set: an offset moves the texture along the same world axis as in HDRP.
+/// The material keeps the value set; only this packing converts it, and every
+/// reader of `uv_st` (the forward maps, the cutout shadow casters) reads it here.
 pub(crate) fn mapping_uniform(c: &MaterialAsset) -> MappingUniform {
     let within = |v: f32, r: &RangeInclusive<f32>| v.clamp(*r.start(), *r.end());
     let [sx, sy] = c.tiling.map(|v| within(v, &MAP_COORD_RANGE));
     let [ox, oy] = c.offset.map(|v| within(v, &MAP_COORD_RANGE));
+    let oy = match c.uv_mapping {
+        UvMapping::Uv0 => 1.0 - sy - oy,
+        UvMapping::Planar | UvMapping::Triplanar => oy,
+    };
     MappingUniform {
         uv_st: [sx, sy, ox, oy],
         uv_mapping: c.uv_mapping as u32,
@@ -258,3 +273,7 @@ mod tests;
 #[cfg(test)]
 #[path = "probe_sh_tests.rs"]
 mod probe_sh_tests;
+
+#[cfg(test)]
+#[path = "mapping_tests.rs"]
+mod mapping_tests;

@@ -219,7 +219,12 @@ mode** menu and `Audio.SetSpeakerMode` change the same value.
 
 The compression runs on the device's **output stage** (kira's main track) — the one
 stage every voice sums into — because only the total can tell a footstep from a footstep under an
-explosion. It is **output shaping only**: the simulation never reads the mode, so
+explosion. It runs **after Master's effects** ([Group effects](#group-effects)), so
+Master's default limiter sees the mix first: `home_theater` passes what it lets
+through bit for bit, so the −0.3 dBFS ceiling holds; `headphones`' crossfeed only
+blends the two channels, so it holds there too; `tv`'s +9 dB makeup lifts the
+limited mix again and its own soft limiter keeps it under full scale (0 dBFS), not
+under Master's ceiling. It is **output shaping only**: the simulation never reads the mode, so
 it cannot change a replay, and `Audio.GetSpatial` still reports the unshaped
 `(gain, pan)`. On the headless harness the mode is kept and read back but there is
 no device to shape. The mode persists in `Storage` as `audio.speaker_mode`, loaded
@@ -232,8 +237,12 @@ an `AudioSource` through its `output_group`, a `PlayAt` one-shot through its
 `group` argument, both Master when unset. Groups form a tree; the mixer starts with
 **`Master`** and five buses under it — **`Music`**, **`SFX`**, **`Voice`**,
 **`World`**, **`UI`** — and `Audio.CreateGroup` adds more (`"Guns"` under `"SFX"`).
-A child sums into its parent, so a voice is scaled by its group's volume and every
-ancestor's. Group names are exact (case-sensitive).
+A child sums into its parent, so a voice's dry signal is scaled by its group's volume and every
+ancestor's. Its reverb send is taken after its group's filters, effects and volume (a voice
+played straight into `Master` sends before Master's, which run on the output), and the
+wet signal comes back on the output, under Master's filters, volume and effects but past
+every group between the two (a post-fader send that skips the ancestors, where Unity lets
+the send's place be chosen). Group names are exact (case-sensitive).
 
 Each group has a **volume** and **mute**, a **low-pass** and a **high-pass** filter
 (cutoff in Hz plus resonance; a 22 kHz low-pass and a 10 Hz high-pass are open and
@@ -284,7 +293,8 @@ sets its effects from a script at start. The device applies group changes with a
 ### Group effects
 
 Unity's mixer effects and Godot's bus effects, a small fixed set: every group runs an
-ordered list of up to 8 effects after its filters and before its volume.
+ordered list of up to 8 effects after its filters and before its volume, except
+Master's (below).
 A list is a Lua array: `Audio.SetGroupEffects("Master", { kind = "limiter" })`
 (the outer braces forgotten), a list with a hole, or a table nested deeper than an
 EQ's `bands` is an error naming the field, never a shorter list.
@@ -294,12 +304,16 @@ and names at once, as it blends the volume. On the device every parameter glides
 with the voices' 10 ms smoothing, so a retune never clicks; changing a slot's kind
 starts a fresh effect there (a delay's echoes, a compressor's envelope start over).
 
-**Master starts with a limiter at −0.3 dBFS**, so a pile-up of loud sounds through
-the groups never takes Master's own output past it. It is an effect like any other:
-retune it, or remove it with `Audio.SetGroupEffects("Master", {})`. The reverb bus
-sums into the output beside Master, not through it: the wet signal of every group's
-reverb send adds after the limiter, so a loud moment in a big reverb zone can still
-pass the ceiling there.
+**Master starts with a limiter at −0.3 dBFS**, so a pile-up of loud sounds never
+takes the mix past it, the reverb included. It is an effect like any other: retune
+it, or remove it with `Audio.SetGroupEffects("Master", {})`, and then nothing limits.
+**Master runs on the whole mix**, as Unity's Master holds everything under it:
+Master's filters, volume, mute and effects all run after the reverb bus (the wet
+signal of every group's reverb send) has summed in, so a fade, a mute or a low-pass
+on Master reaches every reverb tail too. Then the [speaker mode](#speaker-mode)
+shapes what they let through. The order on the output: the groups under Master and
+the reverb bus sum → Master's low-pass → its high-pass → its volume and mute → its
+effects → the speaker mode's stage.
 
 | Kind | Parameters (default) |
 |---|---|

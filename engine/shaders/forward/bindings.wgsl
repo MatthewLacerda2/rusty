@@ -73,7 +73,8 @@ struct MaterialData {
     surface_pad_a: u32,
     surface_pad_b: u32,
     surface_pad_c: u32,
-    // Where the maps are read (#1573): xy the tiling, zw the offset.
+    // Where the maps are read (#1573): xy the tiling, zw the offset, packed for
+    // v down the image (`mapping_uniform`, #1851).
     uv_st: vec4<f32>,
     // 0 UV0, 1 planar (world XZ), 2 triplanar (`forward/mapping.wgsl`).
     uv_mapping: u32,
