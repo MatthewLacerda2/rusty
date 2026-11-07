@@ -1,6 +1,7 @@
 //! Contrast-adaptive sharpening (#1847) on lavapipe: RCAS on the tonemapped image
-//! of a frame TAA resolved. At strength 0 the sharpen pass is never recorded; above 0 an edge's contrast rises while a flat area stays put (RCAS's
-//! symmetric lobe cancels on a flat neighbourhood, so there is no ringing).
+//! of a frame TAA resolved. At strength 0 the sharpen pass is never recorded; above
+//! 0 an edge's contrast rises while a flat area moves by no more than RCAS's lobe
+//! allows a one-level step (no ringing).
 
 use glam::Vec3;
 
@@ -77,15 +78,34 @@ fn gpu_sharpen_raises_edge_contrast_without_ringing() {
         "sharpening should raise edge contrast: {tv_on} vs {tv_off}"
     );
 
-    // A flat background corner does not ring: RCAS's lobe cancels on a flat
-    // neighbourhood, so the pixel barely moves (float precision only).
-    for (x, y) in [(0, 0), (W - 1, 0), (0, H - 1), (W - 1, H - 1)] {
-        let i = ((y * W + x) * 4) as usize;
-        for c in 0..3 {
-            let d = off[i + c].abs_diff(on[i + c]);
-            assert!(d <= 2, "flat corner ({x},{y}) channel {c} rang by {d}");
+    // A flat area does not ring. The sharpen reads the 8-bit image, so a smooth
+    // gradient (the sky) is 1-level steps RCAS sees as edges: at its strongest lobe
+    // (-0.1875, over 1 + 4 x lobe) a pixel whose cross spans at most one level
+    // moves by at most 3 (measured on Metal, the corner of the sky). More would be
+    // a halo.
+    let mut flat = 0;
+    for y in 1..H - 1 {
+        for x in 1..W - 1 {
+            for c in 0..3 {
+                let at = |x: u32, y: u32| off[((y * W + x) * 4) as usize + c];
+                let cross = [
+                    at(x, y),
+                    at(x - 1, y),
+                    at(x + 1, y),
+                    at(x, y - 1),
+                    at(x, y + 1),
+                ];
+                let (lo, hi) = (cross.iter().min().unwrap(), cross.iter().max().unwrap());
+                if hi - lo > 1 {
+                    continue;
+                }
+                let d = on[((y * W + x) * 4) as usize + c].abs_diff(at(x, y));
+                assert!(d <= 3, "flat ({x},{y}) channel {c} rang by {d}");
+                flat += 1;
+            }
         }
     }
+    assert!(flat > 100, "too few flat pixels to judge: {flat}");
 }
 
 /// A fixture-size view whose scene renders at `scale` (TAAU below 1).
