@@ -5,23 +5,37 @@ once** (CLAUDE.md, *Coding parallelises; merging does not*). Review, not coder
 count, was a batch's bottleneck, so a sixth coder only queues more diffs for
 one orchestrator to read.
 
-**What the routines API tells about a one-off routine**, read on 2026-11-07
-from the batch's own routines:
+**The routines API cannot tell a working coder from a finished one** (#1866).
+A one-off routine not fired yet shows `enabled` true, no `ended_reason` and no
+`last_run`. Once fired, its `last_run.status` reads `SUCCEEDED` with a
+`finished_at` whenever the session ends a turn, and a coder waiting on a
+background command (a dispatched mutation run) ends its turn and wakes later:
+on 2026-11-07, within the hour #1856's gate merged, #1844's and #1714's coders
+read `ended` while working, so with five coders running the gate saw two. The
+session listing doesn't help: a finished coder and a waiting one both show
+`status: active`, `worker_status: idle`.
 
-- not fired yet: `enabled` true, `ended_reason` empty, no `last_run`;
-- fired, its session still working: `last_run.status` is
-  `ROUTINE_RUN_STATUS_PENDING`, with a `fired_at` and no `finished_at`;
-- fired, its session ended: `last_run.status` is `ROUTINE_RUN_STATUS_SUCCEEDED`
-  (or a failure), with a `finished_at`. A coder ends when its pull request is
-  ready, by the standing rules (`cloud-brief.md`), so this one no longer counts.
+**So a fired coder is placed from GitHub**, since a coder's session ends when
+its pull request is ready (`cloud-brief.md`). For each issue's newest
+`rusty #N` routine:
 
-A fired routine the list shows **without** a `last_run` cannot be placed; it
-is named as unknown and not counted, rather than guessed. The list holds only
-the account's 20 newest routines (`routine.ENVIRONMENT_FROM`), so a running
-coder pushed off it by 20 newer ones is not seen either. A run never marked
-finished would count forever: the refusal names every counted routine and
-when it fired, so a stale one is plain to see, and `--over-limit` launches
-anyway.
+- not fired yet → running;
+- fired, and its fire time cannot be read → *unknown*: named, not counted;
+- fired, and an open pull request for N (its branch `N-…`, CLAUDE.md *Branch
+  naming*) is ready → ended;
+- fired, and N's pull request is a draft, **or** N has no open pull request and
+  the issue is still open (a coder that has not opened its PR yet, in its first
+  minutes, or one that stood down without a branch) → running, unless a `Brief`
+  on N from someone who can push (`ghrest.can_push`) is newer than the fire. The
+  orchestrator posts a re-brief, then launches, so a newer brief is a hand-back
+  waiting for its relaunch, with no coder on it;
+- fired, no open pull request, and the issue closed (merged) → ended.
+
+A stalled coder (draft, no newer brief) counts until the orchestrator deals
+with it, which is the right pressure; the refusal names every counted routine
+and when it fired, and `--over-limit` launches anyway. The routines list holds
+only the account's 20 newest routines (`routine.ENVIRONMENT_FROM`), so a coder
+pushed off it by 20 newer ones is not seen.
 
 A re-brief is not one more coder: the issue being launched is left out of
 the count, so its own earlier routine never blocks it.
@@ -30,15 +44,27 @@ the count, so its own earlier routine never blocks it.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Callable
 
-from dispatch import routine
+import ghrest
+from dispatch import brief, routine
 
 #: The most cloud coders at once (the operator, 2026-11-05).
 LIMIT = 5
 
-RUNNING = {"ROUTINE_RUN_STATUS_PENDING", "ROUTINE_RUN_STATUS_RUNNING"}
-
 ISSUE = re.compile(re.escape(routine.NAME_PREFIX) + r"(\d+)\b")
+BRANCH = re.compile(r"^(\d+)-")
+
+
+@dataclass
+class GitHub:
+    """What placing a fired coder reads: the open pull requests, and per issue its comments and itself."""
+
+    pulls: list[dict]
+    comments: Callable[[int], list | None]
+    issue: Callable[[int], dict | None]
 
 
 def issue(found: dict) -> int | None:
@@ -47,35 +73,87 @@ def issue(found: dict) -> int | None:
     return int(match.group(1)) if match else None
 
 
-def state(found: dict) -> str:
-    """`waiting` (not fired), `running`, `ended`, or `unknown` (fired, no run shown)."""
-    run = found.get("last_run")
-    if isinstance(run, dict) and run:
-        return "running" if run.get("status") in RUNNING and not run.get("finished_at") else "ended"
-    if found.get("last_fired_at") or found.get("ended_reason"):
-        return "unknown"
-    return "waiting" if found.get("enabled") else "ended"
+def fired(found: dict) -> bool:
+    return bool(found.get("last_run") or found.get("last_fired_at") or found.get("ended_reason"))
 
 
-def coders(routines: list[dict], launching: int) -> tuple[list[dict], list[dict]]:
-    """The coder routines that count (waiting or running), and the ones that cannot be placed.
+def fired_at(found: dict) -> datetime | None:
+    """When the routine fired, or `None` when the listing doesn't say."""
+    run = found.get("last_run") if isinstance(found.get("last_run"), dict) else {}
+    return when(run.get("fired_at") or found.get("last_fired_at"))
 
-    Routines for `launching` are left out: launching it again is a re-brief.
-    """
-    counted, unknown = [], []
+
+def when(stamp: object) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(stamp).replace("Z", "+00:00")) if stamp else None
+    except ValueError:
+        return None
+
+
+def pulls_for(number: int, pulls: list[dict]) -> list[dict]:
+    """The open pull requests whose branch is `number-…`."""
+    return [p for p in pulls if (m := BRANCH.match(str((p.get("head") or {}).get("ref", ""))))
+            and int(m.group(1)) == number]
+
+
+def rebriefed(comments: list[dict], since: datetime) -> bool:
+    """Whether a `Brief` from someone who can push was posted after `since`."""
+    trusted = [c for c in comments if ghrest.can_push(c)]
+    newest = brief.newest(trusted)
+    posted = when(newest.get("created_at")) if newest else None
+    return posted is not None and posted > since
+
+
+def state(found: dict, github: GitHub) -> tuple[str, str]:
+    """`running`, `ended` or `unknown`, and why, for one issue's newest coder routine."""
+    if not fired(found):
+        return ("running", "not fired") if found.get("enabled") else ("ended", "disabled")
+    since = fired_at(found)
+    if since is None:
+        return "unknown", "fired, no fire time listed"
+    number = issue(found)
+    mine = pulls_for(number, github.pulls)
+    if mine and not any(p.get("draft") for p in mine):
+        return "ended", "its pull request is ready"
+    if not mine:
+        got = github.issue(number)
+        if got is None:
+            return "unknown", f"could not read #{number}"
+        if got.get("state") != "open":
+            return "ended", f"#{number} is closed"
+    comments = github.comments(number)
+    if comments is None:
+        return "unknown", f"could not read #{number}'s comments"
+    if rebriefed(comments, since):
+        return "ended", "a newer brief waits for its relaunch"
+    return "running", "draft pull request" if mine else "no pull request yet"
+
+
+def newest(routines: list[dict], launching: int) -> list[dict]:
+    """Each issue's newest coder routine, leaving out `launching` (a re-brief)."""
+    latest: dict[int, dict] = {}
     for found in routines:
         number = issue(found)
         if number is None or number == launching:
             continue
-        placed = state(found)
-        if placed in ("waiting", "running"):
+        if number not in latest or found.get("created_at", "") > latest[number].get("created_at", ""):
+            latest[number] = found
+    return list(latest.values())
+
+
+def coders(routines: list[dict], launching: int, github: GitHub) -> tuple[list[dict], list[tuple[dict, str]]]:
+    """The coder routines that count, and the ones that cannot be placed with why."""
+    counted, unknown = [], []
+    for found in newest(routines, launching):
+        placed, why = state(found, github)
+        if placed == "running":
             counted.append(found)
         elif placed == "unknown":
-            unknown.append(found)
+            unknown.append((found, why))
     return counted, unknown
 
 
 def describe(found: dict) -> str:
-    run = found.get("last_run") or {}
-    when = f"fired {run['fired_at'][:16]}Z" if run.get("fired_at") else f"fires {found.get('run_once_at', '?')}"
-    return f"{found.get('name', '?')} ({when})"
+    since = fired_at(found)
+    told = f"fired {since:%Y-%m-%dT%H:%M}Z" if since and fired(found) else f"fires {found.get('run_once_at', '?')}"
+    return f"{found.get('name', '?')} ({told})"

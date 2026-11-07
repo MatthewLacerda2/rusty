@@ -93,11 +93,14 @@ re-brief launch: a new routine whose prompt names the new `Brief`.
   routine ran in; `RUSTY_CLOUD_ENV` names it on an account with none yet.
 - **What it refuses:** a closed issue, a `planning` or `human` one, a brief
   by someone who cannot push, and a sixth coder (CLAUDE.md's limit, #1856): it
-  counts the `rusty #…` routines not yet fired or whose run is still going, and
-  names them. A re-brief is never counted against its own issue; `ARGS=--over-limit`
-  launches anyway (a run the API never marked finished). It cannot see a fired
-  routine listed without a run, nor one pushed off the API's 20 newest, and says
-  which it could not place (`dispatch/running.py`).
+  counts each issue's newest `rusty #…` routine not yet fired, or fired with its
+  PR still a draft (or no PR yet, the issue open) and no newer `Brief`, and names
+  them. The API cannot tell a working coder from a finished one (a coder waiting
+  on a background command reads `SUCCEEDED`, #1866), so a fired one is placed from
+  GitHub. A re-brief is never counted against its own issue; `ARGS=--over-limit`
+  launches anyway (a stalled draft counts until dealt with). It cannot place a
+  fired routine with no fire time listed, nor see one pushed off the API's 20
+  newest, and says which it could not place (`dispatch/running.py`).
 - `run_once_at` computed, `allowed_tools` with `ToolSearch` (the GitHub MCP tools
   load through it without being listed), and the prompt below.
 - **The prompt names the brief's URL**, the exact comment the script checked,
