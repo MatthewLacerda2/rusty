@@ -38,14 +38,19 @@ fn slab(scene: &mut Scene, name: &str, at: Vec3, scale: Vec3) -> u32 {
     id
 }
 
+/// The noise, tinted `tint` and tiled `tiling` times across a face.
+pub(super) fn noise(tint: [f32; 3], tiling: [f32; 2]) -> MaterialAsset {
+    MaterialAsset {
+        base_color: tint,
+        base_color_map: Some(noise_map().into()),
+        tiling,
+        ..MaterialAsset::default()
+    }
+}
+
 /// A 30 m wide, 12 m tall wall of noise facing the camera, `z` along -Z.
 pub(super) fn noisy_wall(scene: &mut Scene, z: f32) -> u32 {
-    let asset = MaterialAsset {
-        base_color: [1.0; 3],
-        base_color_map: Some(noise_map().into()),
-        tiling: [8.0, 4.0],
-        ..MaterialAsset::default()
-    };
+    let asset = noise([1.0; 3], [8.0, 4.0]);
     scene.materials.insert("wall".to_string(), asset);
     slab(
         scene,

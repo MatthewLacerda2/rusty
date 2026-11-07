@@ -28,16 +28,17 @@ pub(crate) struct TaaFrame {
     pub mip_bias: f32,
 }
 
-/// What [`TaaHistory::depths`] holds: one half float a pixel, its own view depth
-/// (the sky's 65504 fits).
-pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R16Float;
+/// What [`TaaHistory::depths`] holds: two half floats a pixel, its own surface's
+/// distance from its camera (the sky's 65504 fits) and that camera's index in the
+/// stack (#1846).
+pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
 
 /// One view's TAA state while it runs: the two history targets, where the jitter
 /// sequence is and whether the history holds a resolved frame.
 ///
 /// **Memory, per TAA camera** at the history's size (the output's when
-/// upscaling): two HDR colour frames (8 bytes a pixel each) and two depth frames
-/// (2 bytes each, #1846), 20 bytes a pixel: 41 MB at 1920×1080, 166 MB at
+/// upscaling): two HDR colour frames (8 bytes a pixel each) and two surface
+/// frames (4 bytes each, #1846), 24 bytes a pixel: 50 MB at 1920×1080, 199 MB at
 /// 3840×2160. The level's size (a Dust2-sized map or a room) changes none of it.
 pub(crate) struct TaaHistory {
     /// The history's size: the scene's when resolving, the output's when upscaling.
@@ -49,9 +50,9 @@ pub(crate) struct TaaHistory {
     /// This frame's jitter in scene pixels.
     pub(super) pixels: Vec2,
     pub(super) frames: [PfxTarget; 2],
-    /// Beside each of `frames`, each pixel's view depth as that resolve saw it
-    /// ([`DEPTH_FORMAT`]): next frame drops the history where its own depth lies
-    /// behind all of last frame's around it, a reveal (#1846). Made, dropped and reset with `frames`, so
+    /// Beside each of `frames`, each pixel's surface as that resolve saw it
+    /// ([`DEPTH_FORMAT`]): next frame drops the history where its own surface
+    /// lies farther than all of last frame's around it, a reveal (#1846). Made, dropped and reset with `frames`, so
     /// it follows every cut, resize and render-scale change they do.
     pub(super) depths: [PfxTarget; 2],
     pub(super) params: wgpu::Buffer,
@@ -64,6 +65,9 @@ pub(crate) struct TaaHistory {
     /// Whether the resolve ran this frame: its output is then the image the rest of
     /// the chain reads, at the output's size when `upscale`.
     pub(super) ran: bool,
+    /// Which of #1846's rules the resolve keeps: both, unless a test turned one off.
+    #[cfg(test)]
+    pub(crate) rules: super::params::Rules,
 }
 
 impl TaaHistory {
@@ -87,6 +91,8 @@ impl TaaHistory {
             valid: false,
             frame: 0,
             ran: false,
+            #[cfg(test)]
+            rules: Default::default(),
         }
     }
 

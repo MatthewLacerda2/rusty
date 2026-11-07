@@ -148,6 +148,7 @@ impl PostFx {
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         passes: &TaaPasses,
         timer: &GpuTimer,
+        lenses: [[f32; 4]; params::MAX_CAMERAS],
     ) {
         let (Some(h), Some(velocity)) =
             (self.targets.get::<TaaHistory>(), self.motion.target_view())
@@ -155,7 +156,9 @@ impl PostFx {
             return;
         };
         let (read, write) = (h.latest, 1 - h.latest);
-        let params = TaaParams::new(h.size, self.full_size, h.valid, h.pixels);
+        let params = TaaParams::new((h.size, self.full_size), h.valid, h.pixels, lenses);
+        #[cfg(test)]
+        let params = params.without(h.rules);
         queue.write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
         let current = self.focused_color();
         let group = passes.group(device, h, read, current, velocity);
@@ -169,7 +172,7 @@ impl PostFx {
         };
         let timed = (pipeline.get(), timer.writes(GpuPass::Taa));
         let into = [&h.frames[write].view, &h.depths[write].view];
-        pass::resolve(&mut encoder, timed, &group, into);
+        PostFx::fullscreen_into(&mut encoder, timed, &[&group], into);
         queue.submit(std::iter::once(encoder.finish()));
         let h = self.targets.get_mut::<TaaHistory>().expect("held above");
         (h.latest, h.valid, h.ran) = (write, true, true);

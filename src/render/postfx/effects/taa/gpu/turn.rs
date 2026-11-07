@@ -2,12 +2,21 @@
 //! wall of noise keeps its detail. URP's fixed frame influence resamples 90 % of
 //! every pixel from the reprojected history each frame, and the image softens
 //! while turning; a moving pixel's higher weight keeps it near the still frame.
+//!
+//! And a flick is not a reveal. At 90° FOV a static wall pixel's view depth
+//! changes by cos θ_prev / cos θ_now under a turn, +10 % a frame at 360°/s and
+//! +19 % at 720°/s (60 fps) near the edge; its distance from the camera does not.
+//! So a static scene flicked across reads no pixel as revealed: each frame equals
+//! the one with the reveal test off.
 
-use super::fixture::{eye, frame, renderer, settle, taa_scene, view};
+use glam::Vec3;
+
+use super::fixture::{eye, frame, renderer, settle, taa_scene, tilted_cube, view};
+use super::still::{differing, run, NO_REVEAL};
 use super::wall::{luma, noisy_wall};
 use crate::render::motion::gpu_fixture::{H, W};
 use crate::render::{RenderView, Renderer};
-use crate::scene::Scene;
+use crate::scene::{Camera, Scene};
 
 /// Degrees a frame: 90°/s at 60 fps.
 const STEP: f32 = 1.5;
@@ -64,4 +73,28 @@ fn gpu_a_turning_camera_keeps_the_still_frames_sharpness() {
         "turning keeps {:.2} of the still frame's sharpness",
         t / s
     );
+}
+
+#[test]
+fn gpu_a_flick_across_a_static_scene_reveals_nothing() {
+    let Some(mut r) = renderer() else { return };
+    let (mut scene, lens) = taa_scene(true, true);
+    scene.world.camera_mut(lens).unwrap().fov = 90.0;
+    // The wall fills the view: a cube's silhouette is the one edge.
+    let wall = noisy_wall(&mut scene, -7.0);
+    scene.world.transform_mut(wall).unwrap().scale = Vec3::new(60.0, 40.0, 0.2);
+    tilted_cube(&mut scene, Vec3::new(1.0, 0.0, -3.0));
+    // 360°/s and 720°/s at 60 fps.
+    for step in [6.0, 12.0] {
+        let cam = move |f: u32| -> Camera {
+            let mut c = eye(step * (f % 2) as f32 - step / 2.0);
+            c.fov = 90.0;
+            c
+        };
+        let (mut a, mut b) = (view(&r), view(&r));
+        let on = run(&mut r, &mut a, (&scene, &cam), 8, Default::default());
+        let off = run(&mut r, &mut b, (&scene, &cam), 8, NO_REVEAL);
+        let n = differing(&on, &off);
+        assert_eq!(n, 0, "{step}° a frame: {n} bytes read as a reveal");
+    }
 }

@@ -10,11 +10,18 @@
 //!   to *Motion Blending*; HDRP's TAA keeps the same idea), so a turning view keeps
 //!   its detail instead of resampling 90 % of every pixel each frame;
 //! - **A revealed surface drops its history** (FSR2's *DepthClip*): the resolve
-//!   keeps each pixel's own depth beside its colour, and where this pixel lies
-//!   behind every depth of last frame's 3×3 at the reprojected place by more than
-//!   [`DISOCCLUSION_START`] (relative), the history fades out, gone at
-//!   [`DISOCCLUSION_FULL`]. Only behind: a surface last frame held in front of
-//!   this one is what left. The 3×3 and the pixel's own (undilated) depth keep a
+//!   keeps each pixel's own surface beside its colour, its distance from its
+//!   camera and that camera's index in the stack, and where this pixel lies
+//!   farther than every surface of last frame's 3×3 at the reprojected place by
+//!   more than [`DISOCCLUSION_START`] (relative), the history fades out, gone at
+//!   [`DISOCCLUSION_FULL`]. Only farther: a surface last frame held in front of
+//!   this one is what left. The distance, not the view depth the velocity target
+//!   holds: a camera turn changes a static point's view depth by cos θ_prev /
+//!   cos θ_now (a 720°/s flick at 90° FOV, 18 % at the edge), never its distance.
+//!   Across cameras the stack order decides, as it does what is in front: a
+//!   higher camera's surface gone (a viewmodel bobbing off a wall) is a reveal,
+//!   one arriving is not. The 3×3, stepped a scene pixel at a time (several
+//!   history pixels under TAAU), and the pixel's own (undilated) surface keep a
 //!   silhouette or a sub-pixel wire the jitter moves by a pixel from reading as
 //!   a reveal. HDRP's *Speed Rejection* (last frame's motion against
 //!   this frame's) catches the same reveal but rejects every pixel on the frame a
@@ -26,6 +33,9 @@
 
 use glam::Vec2;
 
+use crate::components::Projection;
+use crate::scene::Camera;
+
 /// URP's frame influence: the current frame's weight in the blend, for a still
 /// pixel.
 pub(crate) const FRAME_INFLUENCE: f32 = 0.1;
@@ -35,6 +45,10 @@ pub(crate) const VARIANCE_CLAMP_SCALE: f32 = 0.9;
 /// TAA range, Post-processing Stack v2's 0.05 → 0.15 ratio (×3) scaled to URP's
 /// base weight, rounded down.
 pub(crate) const MOVING_FRAME_INFLUENCE: f32 = 0.25;
+/// How many cameras of a stack the resolve holds a lens for (`MAX_CAMERAS` in
+/// `postfx/taa.wgsl`): a camera past the last reads the last one's lens, which
+/// misjudges its distances only where the two lenses differ.
+pub(crate) const MAX_CAMERAS: usize = 8;
 /// History pixels a frame below which a pixel is still and weighs URP's
 /// [`FRAME_INFLUENCE`] exactly: ours, above the rounding a still camera's motion
 /// vectors carry (lavapipe moved three pixels of a still frame by one level
@@ -44,13 +58,12 @@ pub(crate) const STILL_PIXELS: f32 = 0.05;
 /// from [`STILL_PIXELS`] to this the weight rises linearly. Ours: "a few pixels", so a
 /// sub-pixel drift (a slow pan, an idle sway) still settles nearly as a still one.
 pub(crate) const MOVING_PIXELS: f32 = 2.0;
-/// The relative depth gap (`(now - then) / then`, this pixel behind) below which the
-/// history is the same surface. Ours, above what a camera's own motion changes
-/// a static surface's view depth by in one frame (a 90°/s turn changes it 3 % at
-/// 50° off the view axis at 60 fps, 9 % at 20; walking at 5 m/s at 60 fps, 10 %
-/// only nearer than 0.8 m).
+/// The relative distance gap (`(now - then) / then`, this pixel farther) below
+/// which the history is the same surface. Ours, above what a camera's own motion
+/// changes a static surface's distance by in one frame (a turn: none; walking at
+/// 5 m/s at 60 fps, 10 % only nearer than 0.8 m).
 pub(crate) const DISOCCLUSION_START: f32 = 0.1;
-/// The relative depth gap at which the history is dropped: a crate 1 m in
+/// The relative distance gap at which the history is dropped: a crate 1 m in
 /// front of a wall 5 m away (25 %) reveals the wall with no trace of itself.
 pub(crate) const DISOCCLUSION_FULL: f32 = 0.25;
 
@@ -63,12 +76,37 @@ pub(super) struct TaaParams {
     scene: [f32; 4],
     jitter: [f32; 4],
     rejection: [f32; 4],
+    lenses: [[f32; 4]; MAX_CAMERAS],
+}
+
+/// Each of `stack`'s cameras' lens at `aspect`, as the resolve turns a view depth
+/// into a distance (`surface_of` in `postfx/taa.wgsl`): the view-space offset per
+/// NDC unit at one unit of view depth (perspective, z 1) or at any (orthographic,
+/// z 0). A slot past the stack reads as a 90° square lens; nothing indexes it.
+pub(super) fn lenses(stack: &[Camera], aspect: f32) -> [[f32; 4]; MAX_CAMERAS] {
+    let mut out = [[1.0, 1.0, 1.0, 0.0]; MAX_CAMERAS];
+    for (slot, cam) in out.iter_mut().zip(stack) {
+        let p = cam.projection_matrix(aspect);
+        let perspective = matches!(cam.projection, Projection::Perspective);
+        *slot = [
+            1.0 / p.x_axis.x,
+            1.0 / p.y_axis.y,
+            f32::from(u8::from(perspective)),
+            0.0,
+        ];
+    }
+    out
 }
 
 impl TaaParams {
     /// The history's size `size`, the scene's `scene` (the same when not upscaling)
-    /// and the frame's jitter in scene pixels.
-    pub(super) fn new(size: (u32, u32), scene: (u32, u32), history: bool, jitter: Vec2) -> Self {
+    /// the frame's jitter in scene pixels and the stack's [`lenses`].
+    pub(super) fn new(
+        (size, scene): ((u32, u32), (u32, u32)),
+        history: bool,
+        jitter: Vec2,
+        lenses: [[f32; 4]; MAX_CAMERAS],
+    ) -> Self {
         let dims = |(w, h): (u32, u32)| {
             let (w, h) = (w.max(1) as f32, h.max(1) as f32);
             [w, h, 1.0 / w, 1.0 / h]
@@ -89,6 +127,44 @@ impl TaaParams {
                 DISOCCLUSION_START,
                 DISOCCLUSION_FULL,
             ],
+            lenses,
+        }
+    }
+
+    /// The same frame with #1846's two rules off, for a test: a moving pixel weighs
+    /// a still one's, `moving` false, and no gap reads as a reveal, `reveal` false.
+    #[cfg(test)]
+    pub(super) fn without(mut self, rules: Rules) -> Self {
+        if !rules.moving {
+            self.rejection[0] = FRAME_INFLUENCE;
+        }
+        if !rules.reveal {
+            // Out of reach of any gap, yet a finite span to divide by.
+            self.rejection[2..4].copy_from_slice(&[1e30, 2e30]);
+        }
+        self
+    }
+}
+
+/// Which of #1846's rules a view's resolve keeps, for a test that compares a frame
+/// with one ([`TaaParams::without`]).
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Rules {
+    pub moving: bool,
+    pub reveal: bool,
+}
+
+#[cfg(test)]
+impl Default for Rules {
+    fn default() -> Self {
+        Self {
+            moving: true,
+            reveal: true,
         }
     }
 }
+
+#[cfg(test)]
+#[path = "params_tests.rs"]
+mod tests;
