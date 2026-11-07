@@ -24,7 +24,9 @@ const MAX_REACTIVE: f32 = 0.9;
 // `fixed` at or above 0 replaces it (a material's or an emitter's `Off` / `Full`).
 fn texel(r: f32, fixed: f32, camera: f32) -> vec4<f32> {
     let value = select(r, fixed, fixed >= 0.0);
-    return vec4<f32>(clamp(value, 0.0, MAX_REACTIVE), (camera + 1.0) / 255.0, 0.0, 0.0);
+    // A NaN (a broken colour upstream) reads 0, never a garbage weight.
+    let safe = select(0.0, min(value, MAX_REACTIVE), value >= 0.0);
+    return vec4<f32>(safe, (camera + 1.0) / 255.0, 0.0, 0.0);
 }
 
 // A surface blended over the pixel by `alpha`.
