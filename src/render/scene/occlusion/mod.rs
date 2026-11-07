@@ -19,6 +19,12 @@
 //!   it is re-baked (said once in the log);
 //! - a camera whose culling mask leaves out an occluder's layer sees past it, so it
 //!   culls nothing by occlusion.
+//!
+//! A point or spot light's shadow views read it too ([`OcclusionBinding::shadow_row`],
+//! part 4): a baked caster its cell's row does not see is not drawn into its maps.
+//! A wall hides what is behind it from a light only if the wall itself is drawn
+//! into that light's maps, so a light also culls nothing while any matching
+//! occluder casts no shadow (cast mode Off).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -46,6 +52,8 @@ pub(crate) struct OcclusionBinding {
     /// Baked objects that no longer match, and of them the occluders.
     changed: BTreeSet<u32>,
     broken: BTreeSet<u32>,
+    /// Matching occluders that cast no shadow: while any does, no light culls.
+    silent: BTreeSet<u32>,
     /// The layers the matching occluders sit on.
     layers: u32,
     /// The revision a stale bake was last reported at, and whether that report
@@ -57,7 +65,7 @@ pub(crate) struct OcclusionBinding {
 
 #[cfg(test)]
 /// What a binding decides, for comparing an incrementally kept one with a fresh one.
-pub(crate) type BindingState = (bool, u32, Vec<(u32, u32)>);
+pub(crate) type BindingState = (bool, u32, Vec<(u32, u32)>, Vec<u32>);
 
 impl OcclusionBinding {
     /// Bind whole on the next refresh: the objects were rebuilt.
@@ -101,6 +109,7 @@ impl OcclusionBinding {
         self.unchanged.clear();
         self.changed.clear();
         self.broken.clear();
+        self.silent.clear();
         self.layers = 0;
         let Some(data) = self.data.clone() else {
             return;
@@ -129,10 +138,15 @@ impl OcclusionBinding {
             self.broken.remove(&id);
             if baked.occluder {
                 self.layers |= 1u32 << scene.world.layer(id).min(31);
+                match casts(scene, id) {
+                    true => self.silent.remove(&id),
+                    false => self.silent.insert(id),
+                };
             }
         } else {
             self.unchanged.remove(&id);
             self.changed.insert(id);
+            self.silent.remove(&id);
             if baked.occluder {
                 self.broken.insert(id);
             }
@@ -173,6 +187,28 @@ impl OcclusionBinding {
             .flatten()
     }
 
+    /// The PVS row a point or spot light at `light` culls its shadow casters by,
+    /// `None` when it culls nothing: no usable bake, a matching occluder that casts
+    /// no shadow (the wall that hides a caster must be in the light's map), or a
+    /// light outside every cell. A light has no culling mask, so every layer counts.
+    /// The row carries the camera's caveat: a caster the light sees only through a
+    /// gap the bake's sampled points miss (under about a metre of it) is hidden,
+    /// and a still light's cached tile keeps that lost shadow until it re-bakes.
+    pub(crate) fn shadow_row(&self, light: Vec3) -> Option<u32> {
+        let data = self.data.as_deref().filter(|_| self.usable())?;
+        self.silent.is_empty().then(|| data.row_at(light)).flatten()
+    }
+
+    /// Whether entity `id` is a baked occluder unchanged since the bake: one a
+    /// light's mask needs drawn.
+    pub(crate) fn occludes(&self, id: u32) -> bool {
+        let Some(data) = self.data.as_deref() else {
+            return false;
+        };
+        let at = self.unchanged.get(&id);
+        at.is_some_and(|&i| data.objects[i as usize].occluder)
+    }
+
     /// The box of the cell holding `eye`, when the bake is usable there: what the
     /// editor's occlusion view outlines.
     pub(crate) fn cell_at(&self, eye: Vec3) -> Option<(Vec3, Vec3)> {
@@ -188,22 +224,47 @@ impl OcclusionBinding {
         self.unchanged.get(&id).is_some_and(|&i| !data.sees(row, i))
     }
 
-    /// Whether the bake is usable, the occluders' layers and the unchanged objects.
+    /// A binding of `scene` from scratch, for a test outside `render::scene`.
+    #[cfg(test)]
+    pub(crate) fn bound(scene: &Scene) -> Self {
+        let mut binding = Self::default();
+        binding.refresh(scene);
+        binding
+    }
+
+    /// Whether the bake is usable, the occluders' layers, the unchanged objects and
+    /// the silent occluders.
     #[cfg(test)]
     pub(crate) fn state(&self) -> BindingState {
         let unchanged = self.unchanged.iter().map(|(&e, &i)| (e, i)).collect();
         let usable = self.data.is_some() && self.usable();
         // A broken bake's layers are never read.
-        (usable, if usable { self.layers } else { 0 }, unchanged)
+        let silent = self.silent.iter().copied().collect();
+        (
+            usable,
+            if usable { self.layers } else { 0 },
+            unchanged,
+            silent,
+        )
     }
 }
 
 #[cfg(test)]
 mod camera_gpu_tests;
 #[cfg(test)]
+pub(crate) mod fixture;
+#[cfg(test)]
 mod gpu_tests;
 #[cfg(test)]
 pub(super) mod ops;
+#[cfg(test)]
+mod shadow_tests;
+
+/// Whether entity `id`'s mesh casts a shadow (any cast mode but Off).
+fn casts(scene: &Scene, id: u32) -> bool {
+    let mesh = scene.world.mesh(id);
+    mesh.is_some_and(|m| m.cast_shadows.casts())
+}
 
 /// Whether a stale-bake warning is due, given the last one (`reported`: its
 /// revision and whether it said culling stopped), the PVS `revision` and how many

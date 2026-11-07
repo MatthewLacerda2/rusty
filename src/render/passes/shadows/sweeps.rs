@@ -2,10 +2,8 @@
 //! volume moved, copy the static layers into the active array, then draw the dynamic
 //! casters over each cascade.
 
-use glam::Mat4;
-
 use super::cascades::Cascade;
-use super::casters::{CasterFrame, Sweep};
+use super::casters::{CasterFrame, LightVolume, Sweep};
 use super::ShadowRenderer;
 use crate::render::lod::LodSelection;
 use crate::render::timing::GpuPass;
@@ -38,9 +36,10 @@ impl ShadowRenderer {
             // cleared only, and no static caster is culled for them.
             let batches = match with_statics {
                 true => {
-                    let volumes: Vec<Mat4> = stale
+                    // A sun is in no cell: its cascades cull nothing by the PVS.
+                    let volumes: Vec<LightVolume> = stale
                         .iter()
-                        .map(|&i| self.cascades[i].light_space)
+                        .map(|&i| LightVolume::open(self.cascades[i].light_space))
                         .collect();
                     self.prepare_casters(frame, &finest, Sweep::Static, &volumes)
                 }
@@ -58,7 +57,8 @@ impl ShadowRenderer {
 
         self.copy_static_layers(encoder);
 
-        let all: Vec<Mat4> = self.cascades.iter().map(|c| c.light_space).collect();
+        let all = self.cascades.iter();
+        let all: Vec<LightVolume> = all.map(|c| LightVolume::open(c.light_space)).collect();
         let batches = self.prepare_casters(frame, lod, Sweep::Dynamic, &all);
         for (i, batches) in batches.iter().enumerate() {
             if batches.is_empty() {

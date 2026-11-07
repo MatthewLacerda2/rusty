@@ -39,10 +39,15 @@ fn json_without_timings_drops_ms_metrics_and_systems() {
     let mut stats = FrameStats::default();
     stats.record("entities", 3.0);
     stats.record("update_ms", 0.5);
+    stats.record("render_extract_us", 40.0);
     stats.record_system("tick_nav", 0.1);
     let counts = stats.to_json(false);
     assert!(counts["metrics"].get("entities").is_some());
     assert!(counts["metrics"].get("update_ms").is_none());
+    assert!(
+        counts["metrics"].get("render_extract_us").is_none(),
+        "µs are clocks too"
+    );
     assert!(counts.get("systems").is_none());
     let full = stats.to_json(true);
     assert!(full["metrics"].get("update_ms").is_some());

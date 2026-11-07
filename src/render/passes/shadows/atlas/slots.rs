@@ -243,10 +243,8 @@ impl ShadowSlots {
             dropped,
             ..AtlasPlan::default()
         };
-        for &Kept {
-            light, id, size, ..
-        } in kept
-        {
+        for k in kept {
+            let (light, id, size) = (k.light, k.id, k.size);
             let slot = &self.slots[&id];
             let l = &frame.lights[light].0;
             out.shadows.push((light, out.tiles.len() as u32));
@@ -257,6 +255,7 @@ impl ShadowSlots {
                     origin,
                     size,
                     texel,
+                    light: Vec3::from(l.position),
                     statics: true,
                 });
             }

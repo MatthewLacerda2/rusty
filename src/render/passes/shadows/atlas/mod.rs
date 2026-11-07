@@ -226,6 +226,12 @@ mod contact_tests;
 #[cfg(test)]
 #[path = "persist_tests.rs"]
 mod persist_tests;
+#[cfg(all(test, feature = "dev"))]
+mod pvs_cost_tests;
+#[cfg(test)]
+mod pvs_gpu_tests;
 #[cfg(test)]
 #[path = "settle_tests.rs"]
 mod settle_tests;
+#[cfg(test)]
+mod sweep_tests;

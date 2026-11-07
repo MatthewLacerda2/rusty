@@ -437,14 +437,26 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   Probe and reflection bakes cull nothing. A camera whose culling mask leaves out an occluder's layer sees past
   it, so it culls nothing by occlusion. A selected mesh the editor's outline rings is
   always drawn.
-- **Not culled by it:** shadows. A caster the camera cannot see may still cast into
-  view, and the shadow maps gather their casters by each light's volume as before.
+- **Per light** (#1714, part 4): a shadowed point or spot light reads the cell its
+  own position stands in, and leaves out of its shadow maps the static casters that
+  cell cannot see. The camera's view plays no part (a caster the camera cannot see
+  may still cast into view). A caster hidden from the light is behind a wall the
+  same map draws, so its shadow is the same without it, with the camera's caveat
+  (*What it can miss*): a caster the light sees only through a gap showing less
+  than about a metre of it may be left out, and lose its shadow through that gap.
+  Unlike a camera's miss, which comes back as the camera moves, a still light's
+  cached tile keeps it until the light moves or a static caster changes. So a light culls nothing by occlusion while a
+  baked occluder casts no shadow (`Mesh` cast mode `Off`) or has no GPU buffers, when
+  it is shadowmasked under `Shadowmask` (its walls are in the mask, not the map), or
+  stands outside every cell; the sun's cascades never do. It pays where a light's
+  map is drawn: a moving shadowed light (a carried flashlight, a swinging lamp) every
+  frame, a still one when its static bake re-bakes.
 - **See it** in the editor (Unity's *Visualization*): select a camera that culls by
   occlusion, and the Scene
   view outlines the cell it stands in (yellow) and every static mesh the bake hides
   from it (red). `make editor-capture ARGS="--select <camera>"` renders the same.
 - **Measure** with `Debug.Stats().occlusion_culled` (per frame, summed over the
-  camera views).
+  camera views) and `shadow_occlusion_culled` (over the shadow views).
 
 ### Environment
 

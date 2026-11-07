@@ -91,6 +91,8 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
 pub(crate) use object::{RenderObject, SlotDraw};
+#[cfg(test)]
+pub(crate) use occlusion::fixture as occlusion_fixture;
 pub(crate) use occlusion::OcclusionBinding;
 pub(crate) use records::{MaterialRecords, Variant};
 pub(crate) use table::{ObjectTable, SlotTable, Slotted};

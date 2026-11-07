@@ -100,8 +100,9 @@ end
 | `triangles` | triangles submitted by the solid, transparent, shadow and SSAO-prepass draws, every instance counted |
 | `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera views (the stack and render-texture cameras) |
 | `cull_tested` / `size_culled_entities` | mesh entities tested against a camera's frustum (every one the camera draws at all whose LOD level it shows) / kept by the frustum but past their max draw distance or under their min screen size (#1714, [`Mesh`](Mesh.md)), summed over the camera views |
-| `occlusion_culled` | static mesh entities inside a camera's frustum and over its small-object limits, but out of sight of its cell by the scene's baked occlusion (#1714; `Lighting.md`, *Occlusion culling*), summed over the camera views. `0` with no bake, for a camera with `use_occlusion_culling` off, an orthographic one or one whose near plane is past 1 m, and while the bake is older than a static occluder. Shadows are not occlusion-culled |
-| `shadow_cull_tested` / `shadow_frustum_culled` / `shadow_size_culled` | shadow casters tested against a light volume (a cascade or an atlas tile), one per entity per volume / outside it / inside it but too far or too small from the main camera (#1714), summed over every shadow view the frame drew: the per-frame passes, and the cached static bakes on a frame they re-bake |
+| `occlusion_culled` | static mesh entities inside a camera's frustum and over its small-object limits, but out of sight of its cell by the scene's baked occlusion (#1714; `Lighting.md`, *Occlusion culling*), summed over the camera views. `0` with no bake, for a camera with `use_occlusion_culling` off, an orthographic one or one whose near plane is past 1 m, and while the bake is older than a static occluder. A light's shadow casters are counted apart, in `shadow_occlusion_culled` |
+| `shadow_cull_tested` / `shadow_frustum_culled` / `shadow_size_culled` / `shadow_occlusion_culled` | shadow casters tested against a light volume (a cascade or an atlas tile), one per entity per volume / outside it / inside it but too far or too small from the main camera (#1714) / kept by both but out of sight of the point or spot light's cell by the scene's baked occlusion (#1714; never for a sun, a shadowmasked light, a light outside every cell, or while a baked occluder is older than the bake or casts no shadow), summed over every shadow view the frame drew: the per-frame passes, and the cached static bakes on a frame they re-bake |
+| `shadow_gather_us` | CPU **microseconds** the shadow sweeps took to gather, cull and batch their casters (#1714), summed over the sweeps the frame ran (a cached static bake costs nothing on a frame it does not re-bake), inside `renderer_ms` — wall-clock |
 | `lod_hidden_entities` | mesh entities skipped because their `LODGroup` showed another level (#472), summed over the camera stack |
 | `lights` / `lights_dropped` | active lights, and those left unlit: realtime directional lights past 4, every ambient but the last, and per camera the point/spot lights in view past the clustered budget of 64 (the least contributing go first, #434, #834) |
 | `cluster_lights_dropped` | (cluster, light) entries cut because more than 32 point/spot lights reached one cluster, the least contributing there first (#834); non-zero means some corner of the view is over the per-pixel budget |
@@ -170,7 +171,7 @@ The kinds therefore add up to `gpu_ms`, and a heavy pass shows as heavy instead 
 smearing into the light ones behind it. Like every `_ms` key, these are wall-clock
 and differ run to run, and they are this GPU's: compare them on one machine.
 
-Keys ending in `_ms`, and `light_bin_us`, are **wall-clock** and differ run to run; everything else is a
+Keys ending in `_ms` or `_us` are **wall-clock** and differ run to run; everything else is a
 count and is deterministic for a deterministic run. The timings are measured *around*
 the sim by the dev layer and never fed back into it, so reading them cannot change a
 replay. Render counters (and GPU times) appear only on frames something rendered through the

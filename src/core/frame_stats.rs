@@ -58,9 +58,10 @@ pub struct FrameStats {
     pub gpu_passes: BTreeMap<String, Series>,
 }
 
-/// Whether `key` names a wall-clock timing (non-deterministic) rather than a count.
+/// Whether `key` names a wall-clock timing (non-deterministic) rather than a count:
+/// milliseconds or microseconds (`render_extract_us`, `shadow_gather_us`).
 fn is_timing(key: &str) -> bool {
-    key.ends_with("_ms")
+    key.ends_with("_ms") || key.ends_with("_us")
 }
 
 impl FrameStats {
@@ -105,7 +106,7 @@ impl FrameStats {
 
     /// The stats as JSON: `{ frames, metrics: {key: series}, systems: {…},
     /// gpu_passes: {…} }`. With `timings` false only the deterministic counts are
-    /// kept (no `_ms` metric, no per-system or per-pass times), which is what a
+    /// kept (no `_ms` or `_us` metric, no per-system or per-pass times), which is what a
     /// replay-stable `results.json` can carry. `gpu_passes` is absent when empty.
     pub fn to_json(&self, timings: bool) -> Value {
         let metrics: BTreeMap<&String, &Series> = self

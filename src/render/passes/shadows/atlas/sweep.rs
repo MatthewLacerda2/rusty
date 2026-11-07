@@ -2,13 +2,12 @@
 //! into the static atlas, then bring the active atlas up to date — each tile that
 //! needs it copied from the static one, the dynamic casters drawn over it.
 
-use glam::Mat4;
-
-use super::super::casters::{CasterFrame, Sweep};
+use super::super::casters::{CasterFrame, LightVolume, Sweep};
 use super::super::sweeps::depth_pass;
 use super::super::ShadowRenderer;
 use super::Tile;
 use crate::render::lod::LodSelection;
+use crate::render::scene::OcclusionBinding;
 
 /// How the frame's tiles got their static casters: from the cache, or re-baked.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -33,7 +32,8 @@ impl ShadowRenderer {
         let tiles = std::mem::take(&mut self.atlas.frame_tiles);
         let bake = self.bake_static_tiles(encoder, frame, &tiles);
         if !tiles.is_empty() {
-            let volumes: Vec<Mat4> = tiles.iter().map(|t| t.view_proj).collect();
+            let pvs = &frame.objects.occlusion;
+            let volumes: Vec<LightVolume> = tiles.iter().map(|t| volume(pvs, t)).collect();
             let batches = self.prepare_casters(frame, lod, Sweep::AtlasDynamic, &volumes);
             let scene = frame.statics;
             let clean = &self.atlas.clean_tiles;
@@ -89,7 +89,8 @@ impl ShadowRenderer {
             .copied()
             .filter(|&i| tiles[i].statics)
             .collect();
-        let volumes: Vec<Mat4> = drawn.iter().map(|&i| tiles[i].view_proj).collect();
+        let pvs = &frame.objects.occlusion;
+        let volumes: Vec<LightVolume> = drawn.iter().map(|&i| volume(pvs, &tiles[i])).collect();
         let batches = match volumes.is_empty() {
             true => Vec::new(),
             false => self.prepare_casters(frame, &finest, Sweep::AtlasStatic, &volumes),
@@ -113,6 +114,16 @@ impl ShadowRenderer {
             .iter()
             .for_each(|&i| self.atlas.clean_tiles.forget(&tiles[i]));
         bake
+    }
+}
+
+/// `tile`'s light volume: culled by its light's PVS row (#1714) only while its
+/// static casters are in it. A shadowmasked tile's walls are the mask's, not
+/// drawn, so its light sees past them and it culls nothing by occlusion.
+pub(super) fn volume(pvs: &OcclusionBinding, tile: &Tile) -> LightVolume {
+    LightVolume {
+        view_proj: tile.view_proj,
+        row: tile.statics.then(|| pvs.shadow_row(tile.light)).flatten(),
     }
 }
 
