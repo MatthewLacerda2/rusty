@@ -31,3 +31,5 @@ mod ghost_gpu_tests;
 mod gpu_tests;
 #[cfg(test)]
 mod toksvig_gpu_tests;
+#[cfg(test)]
+mod wire_gpu_tests;

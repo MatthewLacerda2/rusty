@@ -9,7 +9,7 @@ use glam::Vec3;
 
 use super::gpu_tests::{scaled, upscales};
 use crate::components::{LightComponent, MaterialAsset, MaterialComponent};
-use crate::render::postfx::effects::taa::gpu_fixture::{eye, frame, renderer, taa_scene};
+use crate::render::postfx::effects::taa::gpu::fixture::{eye, frame, renderer, taa_scene};
 use crate::scene::authoring::{create_entity, default_light, Primitive};
 use crate::scene::Scene;
 
