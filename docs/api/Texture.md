@@ -54,6 +54,12 @@ made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the ex
 occlusion-roughness-metallic map: rusty's material has no occlusion map, so nothing
 is written to R.
 
+**The target folder.** `Bake` and `BakeSet` make the missing folders above `path`
+(or above `prefix`) when they lie inside the project, so a new set can bake to
+`assets/textures/<new set>/brick` at once (#1850). A target outside the project is
+written only into a folder that already exists. A write that still fails names the
+verb and the path: `Texture.BakeSet: cannot write <path>: <os error>`.
+
 The returned `path` drops straight into a material slot, e.g.
 `Material.SetTexture(id, Texture.Bake(recipe, "out/albedo.png", "base_color"))`.
 Baking again to a path already on screen shows the new texels on the next frame —
