@@ -176,9 +176,11 @@ is wrong.
   scales with **how separate their files are**: two branches appending to the same enum
   or registry cost more than five in separate modules, because a branch that conflicts
   with one merged ahead of it must be updated and taken alone, and only a colliding
-  update is expensive (a clean one rides a merge train without being touched, #1785). **Three kinds of agent, three limits:** **cloud coders ≈10**,
-  paced by token spend and by how many diffs one orchestrator can read, not by
-  hardware; **local coders ≤2**, because the queue lands one tested tree per CI run and a third
+  update is expensive (a clean one rides a merge train without being touched, #1785). **Three kinds of agent, three limits:** **cloud coders ≤5**
+  (the operator, 2026-11-05): paced by how many diffs one orchestrator can read,
+  not by hardware. A batch at 5 ran about 15 minutes per merged PR, and review,
+  not coder count, was the bottleneck (61 of 73 re-briefs came from it), so a
+  sixth only queues more diffs; `make coder` refuses one (#1856); **local coders ≤2**, because the queue lands one tested tree per CI run and a third
   local coder finishes nothing sooner; **read-only agents** (research, review,
   planning) without limit, since they build nothing. Merging stays **one at a time**,
   whatever the count. **One worktree per branch** under
