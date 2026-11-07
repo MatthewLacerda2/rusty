@@ -156,7 +156,7 @@ fn install(world: &mut GameWorld, demo: Demo, lua: Lua) {
     let app = world.resources.application.borrow();
     host.graphics = GraphicsSettings::load(
         &host.storage,
-        (app.graphics_defaults(), app.render_scale_default()),
+        (app.graphics_defaults(), app.project_graphics()),
         app.quality_presets(),
     );
     drop(app);

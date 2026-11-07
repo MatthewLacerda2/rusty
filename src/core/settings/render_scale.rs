@@ -11,17 +11,15 @@
 //! The scale that runs is a [`RenderScaleSetting`]: the player's choice, persisted
 //! beside the quality tier (`Storage` `graphics.render_scale`), over the project's
 //! default ([`RenderScaleDefault`], `project.rusty`'s `"graphics"` block,
-//! [`ProjectGraphics`]). The default is a factor or `"match_display"`: `1 / display
+//! [`ProjectGraphics`](super::project_graphics::ProjectGraphics)). The default is a factor or `"match_display"`: `1 / display
 //! scale`, the 1× pixel density on a HiDPI display, following a monitor change. With
 //! no choice stored the default runs, so forgetting the choice
 //! (`Graphics.ResetRenderScale`) brings the default back.
 
-use serde::de::Deserializer;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 use serde_json::Value;
 
 use super::GRAPHICS_NAMESPACE;
-use crate::core::project::PROJECT_FILE;
 use crate::core::storage::Storage;
 
 /// The render scale's `Storage` key, in the graphics namespace.
@@ -167,47 +165,6 @@ impl RenderScaleSetting {
                 storage.delete(GRAPHICS_NAMESPACE, RENDER_SCALE_KEY);
             }
         }
-    }
-}
-
-/// `project.rusty`'s `"graphics"` block (#1715): the project's render-scale default.
-/// A missing or bad value keeps native, with a warning ([`ProjectGraphics::read_json`]),
-/// so the project still opens.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
-pub struct ProjectGraphics {
-    pub render_scale: RenderScaleDefault,
-}
-
-impl ProjectGraphics {
-    /// The block `blob` spells, over the defaults, and a line for each part of it
-    /// that was skipped (an unknown key, a value that is not a default).
-    pub fn read_json(blob: &Value) -> (Self, Vec<String>) {
-        let mut settings = Self::default();
-        let Some(map) = blob.as_object() else {
-            return (settings, vec![format!("expected an object, found {blob}")]);
-        };
-        let mut ignored = Vec::new();
-        for (key, value) in map {
-            if key != RENDER_SCALE_KEY {
-                ignored.push(format!("unknown key '{key}' (one of {RENDER_SCALE_KEY})"));
-                continue;
-            }
-            match RenderScaleDefault::read_json(value) {
-                Ok(default) => settings.render_scale = default,
-                Err(why) => ignored.push(format!("{RENDER_SCALE_KEY}: {why}; using 1")),
-            }
-        }
-        (settings, ignored)
-    }
-}
-
-impl<'de> Deserialize<'de> for ProjectGraphics {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let (settings, ignored) = Self::read_json(&Value::deserialize(deserializer)?);
-        for line in ignored {
-            log::warn!("[Project] {PROJECT_FILE} graphics: {line}");
-        }
-        Ok(settings)
     }
 }
 

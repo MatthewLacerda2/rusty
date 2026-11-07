@@ -22,9 +22,9 @@
 //! * **`build`** — the [`BuildSettings`].
 //! * **`graphics_options`** — the player graphics options a fresh install starts
 //!   with ([`GraphicsOptions`], #1438); a player's saved choice wins over them.
-//! * **`graphics`** — the render scale that runs while the player has chosen none
-//!   ([`ProjectGraphics`], #1715): a factor, or `"match_display"` for `1 / display
-//!   scale`.
+//! * **`graphics`** — the render scale and the upscaler that run while the player
+//!   has chosen none ([`ProjectGraphics`]): a factor, or `"match_display"` for
+//!   `1 / display scale` (#1715); `"taa"` or `"fsr2"` (#1848).
 //! * **`quality`** — the game's quality presets ([`QualityPresets`], #1522): named
 //!   bundles of per-effect quality values, seeded with `Low`, `Medium` and `High`
 //!   when the file is created, the game's to edit, rename, add to or delete.
@@ -46,8 +46,8 @@ use crate::core::settings::audio::AudioSettings;
 use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::demos::DemoSettings;
 use crate::core::settings::graphics_options::GraphicsOptions;
+use crate::core::settings::project_graphics::ProjectGraphics;
 use crate::core::settings::quality::QualityPresets;
-use crate::core::settings::render_scale::ProjectGraphics;
 
 /// The project file, at the project root.
 pub const PROJECT_FILE: &str = "project.rusty";

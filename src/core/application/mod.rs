@@ -57,8 +57,8 @@ use crate::core::settings::audio::AudioSettings;
 use crate::core::settings::decals::DecalLimits;
 use crate::core::settings::demos::DemoSettings;
 use crate::core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
+use crate::core::settings::project_graphics::ProjectGraphics;
 use crate::core::settings::quality::QualityPresets;
-use crate::core::settings::render_scale::ProjectGraphics;
 
 mod demo;
 mod host;

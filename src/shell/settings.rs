@@ -43,7 +43,7 @@ pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
         .unwrap_or(defaults);
     let mut app = game.resources.application.borrow_mut();
     app.restore_quality(saved_quality(&storage));
-    let defaults = (app.graphics_defaults(), app.render_scale_default());
+    let defaults = (app.graphics_defaults(), app.project_graphics());
     let graphics = GraphicsSettings::load(&storage, defaults, app.quality_presets());
     drop(app);
     let speaker_mode = SpeakerMode::load(&storage);

@@ -20,7 +20,8 @@
 //!   quality level reads its values from the running preset. The scene's render
 //!   scale (#1498) is a value in the same cell (`render_scale`): the player's choice
 //!   over the project's default on `Application` (#1715), resolved on the display
-//!   scale the `ScreenSize` resource holds.
+//!   scale the `ScreenSize` resource holds. So is the upscaler a TAA camera runs
+//!   (`upscaler`, #1848), the same way.
 //! * The player's graphics options (`options`, #1438) in the same cell, which gate
 //!   every camera's effects, and the project's defaults for them on `Application`.
 //!
@@ -37,6 +38,7 @@ mod render_scale;
 mod shadows;
 mod ssao;
 mod state;
+mod upscaler;
 
 use mlua::Lua;
 
@@ -59,6 +61,7 @@ pub fn register(
     effects::register(lua, &table, scene)?;
     quality::register_quality(lua, &table, graphics, app)?;
     render_scale::register(lua, &table, (graphics, screen), app)?;
+    upscaler::register(lua, &table, graphics, app)?;
     options::register_options(lua, &table, graphics, app)?;
     shadows::register_shadows(lua, &table, scene)?;
     fog::register_fog(lua, &table, scene)?;

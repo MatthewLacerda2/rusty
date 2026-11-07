@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::settings::project_graphics::ProjectGraphics;
 
 #[test]
 fn new_clamps_to_urps_range_and_maps_nan_to_native() {
