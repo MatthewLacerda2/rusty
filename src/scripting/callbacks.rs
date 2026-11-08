@@ -62,6 +62,14 @@ pub const ON_JOINT_BREAK: &str = "OnJointBreak";
 /// Dispatched after the animation step and ragdoll posing, before `LateUpdate`,
 /// in the order the playheads crossed them.
 pub const ON_ANIMATION_EVENT: &str = "OnAnimationEvent";
+/// Called once per perception update the owning entity's `AIPerception` raised
+/// this tick (#1900) — `(id, target, info)`, Unreal's `OnTargetPerceptionUpdated`:
+/// a target gained (first sensed, or sensed again after not being), lost from
+/// sight (`info.sensed == false`, still known at its last-known position) or
+/// forgotten (`info.forgotten == true`), and every reported noise or hit.
+/// Dispatched after the perception step, before `LateUpdate`, perceivers in id
+/// order. `target` is `nil` for a noise or hit with no instigator.
+pub const ON_PERCEPTION_UPDATED: &str = "OnPerceptionUpdated";
 /// Called synchronously inside a `Damage.Apply` / `ApplyPoint` / `ApplyRadial`
 /// call (#1893) — `(id, amount, event)` — on the nearest active ancestor-or-self
 /// of the struck entity whose script defines it (it bubbles, like the UI pointer
@@ -137,6 +145,7 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_CONTROLLER_COLLIDER_HIT,
     ON_JOINT_BREAK,
     ON_ANIMATION_EVENT,
+    ON_PERCEPTION_UPDATED,
     ON_TAKE_DAMAGE,
     ON_POINTER_ENTER,
     ON_POINTER_EXIT,

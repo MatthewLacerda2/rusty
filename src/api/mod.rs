@@ -16,6 +16,7 @@
 
 // lint: allow(dir-size) a flat registry: one file per Lua namespace, so the list is the surface's index
 // sorted: namespace modules and their helpers; no module reads another's declaration order
+pub mod ai_perception;
 pub mod animator;
 pub mod application;
 pub mod assets;
@@ -134,6 +135,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // sorted: each registrar makes its own global table; the ones extending a table
     // (`register_hitscan`, `register_reimport`, `register_events`)
     // sort after the one that made it
+    ai_perception::register(lua, ctx.scene)?;
     animator::register(lua, ctx.scene, ctx.console)?;
     application::register(lua, ctx.application)?;
     // `Assets` mostly reads no engine cell (it walks the project asset root on each

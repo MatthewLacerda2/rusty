@@ -116,6 +116,8 @@ pub struct Resources {
     /// What each CharacterController moved by root motion touched this tick
     /// (#1879), in move order, drained with `animation_events`.
     pub(super) controller_hits: Vec<(u32, Vec<crate::physics::ControllerHit>)>,
+    /// The sight-ray budget and its round-robin (#1900), stepped by `perceive`.
+    pub(super) sight_rays: crate::ai::perception::SightRays,
     /// The schedule's observer (#433) — the dev layer's frame-stats timer. `None`
     /// unless installed via `GameWorld::set_probe`; it only watches the frame.
     pub(super) probe: Option<Box<dyn super::SystemProbe>>,
@@ -190,6 +192,7 @@ impl Resources {
             animation_graphs: GraphCache::default(),
             animation_events: Vec::new(),
             controller_hits: Vec::new(),
+            sight_rays: Default::default(),
             probe: None,
             tap: None,
             model_writes: Default::default(),

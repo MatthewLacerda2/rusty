@@ -233,11 +233,13 @@ pub(super) fn function(
             };
             let owner = g.nearest.owner;
             let active = scene.borrow().world.is_active_in_hierarchy(owner);
+            let damage = blast.min + (blast.amount - blast.min) * scale;
+            let hit = (damage, common.kind.as_str());
+            deliver::sense(scene, owner, common.instigator, origin, hit);
             if g.nearest.receives && active {
                 let event = common.event(lua, "radial")?;
                 event.set("origin", vec_table(lua, origin)?)?;
                 event.set("distance", g.nearest.distance)?;
-                let damage = blast.min + (blast.amount - blast.min) * scale;
                 let taken = deliver::call(lua, g.nearest.owner, damage, &event)?;
                 let row = lua.create_table()?;
                 row.set("id", g.nearest.owner)?;

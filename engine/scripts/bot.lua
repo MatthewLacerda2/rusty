@@ -11,11 +11,11 @@ function BotAI.Start(entity_id)
     print("[Lua] Bot initialized")
 end
 
--- Where to stand (#1892): an environment query around the player, reachable,
--- with a line of sight to the player and away from the other bots' spots, so a
--- group spreads round the player instead of funnelling into one file. The
--- `separation` test reads the other agents' NavMeshAgent targets, so each bot's
--- target is its claim. Built once: the player is a context, not part of the spec.
+-- Where to stand (#1892): an environment query around where the bot last knew
+-- the player to be, reachable, with a line of sight to that spot and away from
+-- the other bots' spots, so a group spreads round it instead of funnelling into
+-- one file. The `separation` test reads the other agents' NavMeshAgent targets,
+-- so each bot's target is its claim. Built once: the spot is a context.
 local SPOT = {
     generator = { donut = { context = "target", inner = 3, outer = 8, rings = 2, per_ring = 16 } },
     tests = {
@@ -25,21 +25,22 @@ local SPOT = {
         { separation = { radius = 3 }, score = { weight = 1 } },
     },
 }
--- Re-query about once a second, or sooner when the player moved this far (m).
+-- Re-query about once a second, or sooner when the last-known position moved
+-- this far (m).
 local REQUERY_SECONDS = 1.0
 local REQUERY_MOVE = 2.0
 
--- Per bot: when it last queried and where the player stood then.
+-- Per bot: when it last queried and the last-known position it queried around.
 local plans = {}
 
--- Pick a spot around the player, or chase the player itself when none is found
--- (no navmesh yet, or the player boxed in).
-local function choose_spot(entity_id, player_id, px, py, pz)
-    local found, x, y, z = EnvironmentQuery.Run(entity_id, SPOT, { target = player_id })
+-- Pick a spot around the last-known position `(kx, ky, kz)`, or head for that
+-- position itself when none is found (no navmesh yet, or the spot boxed in).
+local function choose_spot(entity_id, kx, ky, kz)
+    local found, x, y, z = EnvironmentQuery.Run(entity_id, SPOT, { target = { kx, ky, kz } })
     if found then
         return x, y, z
     end
-    return px, py, pz
+    return kx, ky, kz
 end
 
 function BotAI.Update(entity_id, delta_time)
@@ -54,13 +55,20 @@ function BotAI.Update(entity_id, delta_time)
         return
     end
 
-    local px, py, pz = Transform.GetPosition(player_id)
-    local plan = plans[entity_id]
-    local moved = plan and ((px - plan.px) ^ 2 + (pz - plan.pz) ^ 2) > REQUERY_MOVE ^ 2
-    if plan == nil or moved or Time.time() - plan.at >= REQUERY_SECONDS then
-        local x, y, z = choose_spot(entity_id, player_id, px, py, pz)
-        NavMeshAgent.SetTarget(entity_id, x, y, z)
-        plans[entity_id] = { at = Time.time(), px = px, pz = pz }
+    -- Chase what the bot KNOWS (#1900): where its AIPerception last saw, heard
+    -- or was shot by the player, never the player's live transform. A bot that
+    -- knows nothing keeps the course it has: its authored NavMeshAgent target (a
+    -- patrol point; Enemy_1's is the pool's middle), or, once it has forgotten
+    -- the player, the last spot it chose, where it searches.
+    local known = AIPerception.Get(entity_id, player_id)
+    if known ~= nil then
+        local plan = plans[entity_id]
+        local moved = plan and ((known.x - plan.kx) ^ 2 + (known.z - plan.kz) ^ 2) > REQUERY_MOVE ^ 2
+        if plan == nil or moved or Time.time() - plan.at >= REQUERY_SECONDS then
+            local x, y, z = choose_spot(entity_id, known.x, known.y, known.z)
+            NavMeshAgent.SetTarget(entity_id, x, y, z)
+            plans[entity_id] = { at = Time.time(), kx = known.x, kz = known.z }
+        end
     end
 
     -- The agent turns itself to face where it steers, at its authored angular speed

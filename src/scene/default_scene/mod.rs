@@ -148,8 +148,9 @@ fn add_player(scene: &mut Scene) {
 }
 
 /// Enemy_1 (id 5): a 2 m × 1.3 m box chasing the Player on the navmesh, from the +z
-/// spawn behind its cover crate; unscripted, it heads for the pool's middle (its
-/// authored target, the origin), down the north ramp. Its body is
+/// spawn behind its cover crate; until it perceives the Player (its `AIPerception`)
+/// or unscripted, it heads for the pool's middle (its authored target, the origin),
+/// down the north ramp. Its body is
 /// centred on its origin, so the agent stands it 1 m above its feet (#666). The agent
 /// is authored here, active, and `bot.lua` never overrides it (#743): its stopping
 /// distance is measured centre to centre, so it clears both bodies — the box's
@@ -178,6 +179,9 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
         nav_agent::set_base_offset(&mut a, 1.0);
         nav_agent::set_target(&mut a, Vec3::ZERO);
     }
+    // What it knows (#1900): `bot.lua` chases where it last saw, heard or was hit
+    // by the Player, so it walks its authored course until it does.
+    add_component(scene, id, ComponentKind::AIPerception);
     wear(scene, id, looks::ENEMY);
     if !bot_script.is_empty() {
         attach_script(scene, id, bot_script);

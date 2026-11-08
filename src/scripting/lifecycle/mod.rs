@@ -24,11 +24,12 @@
 //! submodule, the UI callbacks (#420) in `ui`, the trigger and collision callbacks
 //! (#310, #448) in `physics`, `OnAnimationEvent` (#459) in `animation`,
 //! `OnControllerColliderHit` (#1879, raised inside `CharacterController.Move`) in
-//! `controller`; this file holds the shared dispatch core and the
+//! `controller`, `OnPerceptionUpdated` (#1900) in `perception`; this file holds the shared dispatch core and the
 //! per-frame hooks.
 
 mod animation;
 mod controller;
+mod perception;
 mod physics;
 mod transitions;
 mod ui;

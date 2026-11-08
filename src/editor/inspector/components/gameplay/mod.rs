@@ -4,13 +4,15 @@
 //! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`, the NavMesh
 //! Obstacle card in `nav_obstacle`, the Off-Mesh Link card in `offmesh_link`, the
 //! NavMesh Modifier Volume card in `nav_modifier`, the Joint card in `joint`, the
-//! CharacterController card in `character_controller`.
+//! CharacterController card in `character_controller`, the AI Perception card in
+//! `ai_perception`.
 
 use crate::editor::inspector::components::card::remove_component;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
 use std::path::Path;
 
+mod ai_perception;
 mod character_controller;
 mod collider;
 mod joint;
@@ -18,6 +20,7 @@ mod nav;
 mod offmesh_link;
 mod physics;
 
+pub use ai_perception::draw_ai_perception;
 pub use character_controller::draw_character_controller;
 pub use collider::{commit_abandoned as commit_abandoned_collider, draw_collider};
 pub use joint::draw_joint;
@@ -37,7 +40,7 @@ pub fn draw_bodies(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is
 }
 
 /// The navigation cards, in inspector order: NavMesh Agent, NavMesh Obstacle,
-/// Off-Mesh Link, NavMesh Modifier Volume.
+/// Off-Mesh Link, NavMesh Modifier Volume, then the AI card: AI Perception.
 pub fn draw_navigation(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -48,6 +51,7 @@ pub fn draw_navigation(
     draw_nav_obstacle(ui, world, id, is_dirty);
     draw_offmesh_link(ui, world, id, is_dirty);
     draw_nav_modifier(ui, world, id, is_dirty);
+    draw_ai_perception(ui, world, id, is_dirty);
 }
 
 /// 3D. Script bindings — one card per attached script (#83). An entity can carry

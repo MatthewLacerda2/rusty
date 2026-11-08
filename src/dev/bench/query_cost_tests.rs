@@ -3,10 +3,13 @@
 //! Kolvik-sized `n = 5` and the Dust2-sized `n = 20`, on 1 m and 0.25 m navmesh
 //! cells, then the `path` worst case (`query_far`: a bot 40 m off and one
 //! survivor upstairs that no stair reaches). Here because the sim may not read
-//! a clock.
+//! a clock. Beside it, what perception's step costs (#1900): 30 perceivers and
+//! one target on the Dust2-sized level (`ai::perception::perception_cost_tests`).
 
 use std::time::Instant;
 
+use crate::ai::perception::perception_cost_tests::{level_with_perceivers, run};
+use crate::ai::perception::SightRays;
 use crate::ai::query::query_cost_tests::{level, query, query_far};
 
 #[test]
@@ -31,4 +34,21 @@ fn query_cost() {
         let per = t.elapsed().as_secs_f64() * 1e3 / f64::from(runs);
         println!("  bot 40 m off, one survivor upstairs: {per:.3} ms per query, {found} of 9 kept");
     }
+}
+
+#[test]
+// lint: allow(skip) a timing measurement in a release build, run by hand, never a gate
+#[ignore = "a release-build measurement, run by hand"]
+fn perception_cost() {
+    let (mut scene, physics, bots) = level_with_perceivers(20);
+    let mut rays = SightRays::default();
+    run(&mut scene, &physics, &mut rays, 10);
+    let ticks = 600;
+    let t = Instant::now();
+    run(&mut scene, &physics, &mut rays, ticks);
+    let per = t.elapsed().as_secs_f64() * 1e3 / ticks as f64;
+    println!(
+        "{} perceivers, one target: {per:.4} ms per tick",
+        bots.len()
+    );
 }

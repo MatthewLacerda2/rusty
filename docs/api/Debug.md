@@ -289,6 +289,10 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "render_order": 0, "projection": "Perspective",
                  "target_texture": null },                      // or "rt:<name>" (#430)
   "nav_agent": { "active": true, "radius": .., "target": [x,y,z], "speed": .., .. },
+  "ai_perception": { "sight_range": 20.0, "lose_sight_range": 25.0, "sight_angle": 60.0,
+                     "eye_height": 1.6, "sight_mask": .., "blocking_mask": 1,
+                     "hearing_range": 30.0, "sight_max_age": .., "hearing_max_age": ..,
+                     "damage_max_age": .., "known": [2], "in_sight": [2] },  // #1900, runtime
   "particles": { "active": true, "texture": null, "rate": .., "lifetime": .., .. },
   "animator":  { "clip": "Idle", "time": .., "speed": .., "playing": true,
                  "loop": false, "paused": false,
