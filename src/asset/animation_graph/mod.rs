@@ -214,6 +214,8 @@ impl AnimationGraph {
 #[cfg(test)]
 mod event_tests;
 #[cfg(test)]
+mod montage_tests;
+#[cfg(test)]
 mod nested_tests;
 #[cfg(test)]
 mod tests;

@@ -72,6 +72,12 @@ path + active state are saved with the entity.
 | `Animator.GetRootBone` | `(id)` | The root bone's name as set (`""`: the first root joint), or `nil` without an animator. |
 | `Animator.GetRootMotion` | `(id)` | The last fixed step's root motion: `dx, dy, dz, yaw` — the world-space displacement in metres and the turn about the model's up axis in degrees (counter-clockwise seen from above), Unity's `deltaPosition` / `deltaRotation`. Measured whether or not it is applied, so a script can move the entity itself; `0, 0, 0, 0` while stopped, paused or inactive, and `nil` without an animator. |
 
+| `Animator.PlayMontage` | `(id, montage [, opts])` | Play a **montage** (#1894) into its slot over the state machine; `true` when it started. `montage` is a montage of the graph or, failing that, a **clip** name played as a one-section montage in `DefaultSlot` with 0.25 s blends, so a quick flinch needs no authoring. `opts`: `rate` (default 1; ≤ 0 is a Lua error), `start_section` (default the first) and `slot` (overrides the montage's). Whatever the slot was playing is interrupted. An unknown montage, clip, slot or section warns once in the console and returns `false`. Starts a stopped or paused animator, as `Play` does. See *Montages*. |
+| `Animator.StopMontage` | `(id [, slot [, blend_out]])` | Blend out the montage playing in `slot` (every slot's when omitted) over `blend_out` seconds (default: the montage's own); `true` when one was playing. |
+| `Animator.IsMontagePlaying` | `(id [, slot])` | Whether a montage plays in `slot` (any slot when omitted). One already blending out no longer counts. |
+| `Animator.GetMontage` | `(id, slot)` | The montage playing in `slot` and its current section's name, as two values, or `nil`. |
+| `Animator.JumpToSection` | `(id, section [, slot])` | Jump the montage in `slot` (or the first playing one with such a section) to the start of `section`; `true` when it had one. |
+| `Animator.SetNextSection` | `(id, from, to [, slot])` | Make section `from` go on to `to` when it ends (`""`: end the montage there) in the montage of `slot` (or the first playing one with a section `from`), Unreal's `Montage_SetNextSection`; `true` when both sections exist. Lasts for this play only. |
 ### Blend trees (#457)
 
 A graph node can play a **blend tree** instead of one clip: several clips at
@@ -147,7 +153,8 @@ own `nodes`, `edges` and `entry`, evaluated each fixed step against the same
 shared parameters:
 
 - **`weight`** (0..1, default 1): how much the layer shows. Change it at runtime
-  with `Animator.SetLayerWeight`; fade a reload layer in and out by tweening it.
+  with `Animator.SetLayerWeight`. A one-off action over whatever the character
+  is doing (a reload, a flinch, a throw) is a *montage* instead (below).
 - **`blending`**: `Override` (default) blends toward the layer's pose by the
   weight; `Additive` adds the layer's motion **measured against that motion's
   first frame** (Unity's default reference pose) — translation offset, rotation
@@ -256,6 +263,94 @@ what the handler did. Events crossed in the same step fire in the order the
 playheads crossed them, then by layer (base first), then in authored order; the
 whole dispatch is deterministic. Events are authored data only: there is no API
 to add them at runtime.
+
+### Montages (#1894)
+
+A **montage** is Unreal's answer to one-off actions over whatever the character
+is doing: a reload, a melee swing, a grenade throw, a flinch. Instead of adding
+a state, a trigger and two edges to a layer and fading its weight from a script,
+the script says `Animator.PlayMontage(id, "Reload")` and hears
+`OnAnimationEvent(id, "MontageEnd")` when it is over.
+
+**Slots.** A montage plays into a **slot**: a named mask over the body, with a
+layer's `mask` and `blending` rules. Slots sit **above every layer**, in the
+order the graph's `slots` declares them, and show only while a montage plays in
+them, at its blend weight. Every animator also has the implicit full-body
+**`DefaultSlot`** (above the declared ones unless the graph declares it), so an
+animator with no graph can play a clip as a montage.
+
+**Montages** are declared on the graph, next to the events and masks:
+
+```json
+"slots": [ { "name": "UpperBody", "mask": ["spine_01"], "blending": "Override" } ],
+"montages": [
+  { "name": "Reload", "clip": "RifleReload", "slot": "UpperBody",
+    "blend_in": 0.15, "blend_out": 0.2,
+    "events": [ { "time": 0.9, "name": "MagOut" }, { "time": 1.6, "name": "MagIn" } ] },
+  { "name": "Throw", "clip": "GrenadeThrow", "slot": "DefaultSlot",
+    "sections": [ { "name": "Wind", "time": 0, "next": "Hold" },
+                  { "name": "Hold", "time": 0.4, "next": "Hold" },
+                  { "name": "Release", "time": 0.7 } ] }
+]
+```
+
+`slot` defaults to `DefaultSlot`, `blend_in` and `blend_out` to 0.25 s. A graph
+that fails its checks names the path of each problem
+(`montages[1].sections[0].next: no section 'Hodl'`).
+
+**Sections** split the clip by time, in ascending order. Each plays up to the
+next section's start (the last one to the clip's end), then goes on to its
+`next`: itself loops it, none ends the montage. A montage with no sections is
+one section, `"Default"`, spanning the clip. `JumpToSection` and
+`SetNextSection` steer it, e.g. hold the throw's wind-up until the button is
+released, then jump to `Release`:
+
+```lua no-run
+function M.Update(id)
+  if Input.GetKeyDown("G") then Animator.PlayMontage(id, "Throw") end
+  if Input.GetKeyUp("G") then Animator.JumpToSection(id, "Release") end
+end
+```
+
+**Playing.** A montage blends in over `blend_in` and out over `blend_out`, on
+unscaled time like a crossfade, while its playhead runs at its `rate` times the
+animator's speed (a reversed or stopped animator holds it; `Pause` freezes it).
+It starts blending out when it is in a section with no `next` and that
+section's end is no further than `blend_out` away, so it is gone as the clip
+ends (Unreal's default). Playing a montage into a slot that already plays one
+**interrupts** it: the old one blends out over the new one's `blend_in`, from
+the weight it had (a montage cut off mid-blend-in does not jump to full first).
+
+**Events.** A montage's `events` fire through `OnAnimationEvent` with exactly
+the crossing rules above (a looping section fires its markers once per loop).
+Two engine events tell a script where it stands, once each per montage, also
+when it is stopped or interrupted:
+
+- **`"MontageBlendOut"`** when it starts blending out (Unreal's
+  `OnMontageBlendingOut`);
+- **`"MontageEnd"`** when it is fully gone (`OnMontageEnded`).
+
+```lua no-run
+function M.OnAnimationEvent(id, name)
+  if name == "MagIn" then ammo = MAG_SIZE end
+  if name == "MontageEnd" then reloading = false end
+end
+```
+
+A montage fires no `"End"`: that event belongs to the state machine's clips.
+
+**Root motion.** A montage whose slot's mask covers the root bone contributes
+root motion the way a layer does (*Root motion*, below): a melee lunge or a
+stagger moves the character.
+
+**Runtime only.** What plays in each slot is something a script just did, like
+an IK target: it is not saved, and a scene load, a Play/Stop restore and
+`Animator.SetGraph` empty every slot without firing anything. A montage keeps
+the copy of its montage, slot and clip length it started with, so editing the
+`.animgraph` while it plays changes nothing already playing; `PlayMontage`
+reads the graph file afresh on each call (as `PlayNode` does), so the next one
+plays the edit. `Debug.Snapshot` lists the
+playing montages under the animator's `montages` key.
 
 ### Root motion (#1745)
 

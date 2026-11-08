@@ -271,6 +271,12 @@ mod end_tests;
 #[cfg(test)]
 mod layer_tests;
 #[cfg(test)]
+mod montage_play_tests;
+#[cfg(test)]
+mod montage_root_tests;
+#[cfg(test)]
+mod montage_tests;
+#[cfg(test)]
 mod nested_pose_tests;
 #[cfg(test)]
 mod playhead_tests;
