@@ -14,6 +14,11 @@ delivery, the hit information and the radial query.
 | `Damage.ApplyPoint` | `(hit, amount, dx, dy, dz [, opts])` — a shot: `hit` is a [`Physics.RaycastAll` / `RaycastThrough`](Physics.md) entry, `dx, dy, dz` the shot's direction (`event.kind = "point"`). A `RaycastThrough` crossing's `enter.point`, `enter.normal` and `enter.distance` stand in for the missing top-level ones. An error when `hit` has no `id`. | the damage taken; `0` when nothing received it |
 | `Damage.ApplyRadial` | `(x, y, z, amount, opts)` — a blast centred at `x, y, z` (`event.kind = "radial"`); see *Radial damage* below. `opts.outer` is required. | an array of `{ id, amount, distance }`, one per receiver, nearest first |
 
+Every hit is also the **damage sense** of [`AIPerception`](AIPerception.md) (#1900): the
+nearest entity from the one struck upward that has an `AIPerception` senses it, at the
+instigator's position, whether or not a script receives the damage. So pass
+`instigator`: it is how a shot bot learns where the shooter is.
+
 A harness scenario's `Damage.*` runs in the gameplay VM, so it reaches the game
 scripts' handlers too (`docs/testing.md`, *What a scenario can call*).
 
