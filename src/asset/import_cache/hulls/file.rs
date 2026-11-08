@@ -4,20 +4,23 @@
 //! the hulls a decomposition made:
 //!
 //! ```text
-//! "RHUL"  u32 entries
+//! "RHUL"  u32 n  n × u8 decomposer  u32 entries
 //! entry:  u64 hash  u64 positions  u64 indices  u32 hulls
 //! hull:   u32 points  points × (f32 x, y, z)  u32 triangles  triangles × (u32 a, b, c)
 //! ```
 //!
+//! `decomposer` is `core::hulls::DECOMPOSER` as UTF-8: a file another decomposer
+//! made (a parry release, V-HACD parameters, the piece filter) is refused, so a
+//! machine with the sidecar never simulates other hulls than one without it.
 //! An entry with no hulls records a mesh V-HACD found no piece with volume in.
 //! A file that is cut short, has a count past its length, a point that is not
 //! finite or an index past its hull's points is refused whole: the meshes are then
-//! decomposed again, and a dev build writes the file anew.
+//! decomposed again, and an authoring build writes the file anew.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::core::hulls::{Hull, Key, Pieces};
+use crate::core::hulls::{Hull, Key, Pieces, DECOMPOSER};
 
 const MAGIC: &[u8; 4] = b"RHUL";
 
@@ -25,6 +28,8 @@ const MAGIC: &[u8; 4] = b"RHUL";
 pub fn encode(entries: &BTreeMap<Key, Pieces>) -> Vec<u8> {
     let mut out = MAGIC.to_vec();
     let u32_of = |n: usize| u32::try_from(n).unwrap_or(u32::MAX).to_le_bytes();
+    out.extend(u32_of(DECOMPOSER.len()));
+    out.extend(DECOMPOSER.as_bytes());
     out.extend(u32_of(entries.len()));
     for (&(hash, positions, indices), pieces) in entries {
         out.extend(hash.to_le_bytes());
@@ -52,6 +57,10 @@ pub fn parse(bytes: &[u8]) -> Result<BTreeMap<Key, Pieces>, String> {
     let mut r = Reader { bytes, at: 0 };
     if r.take(4)? != MAGIC {
         return Err("not a hull sidecar".to_string());
+    }
+    let made_by = r.count(1)?;
+    if r.take(made_by)? != DECOMPOSER.as_bytes() {
+        return Err(format!("made by another decomposer than {DECOMPOSER:?}"));
     }
     let mut entries = BTreeMap::new();
     for _ in 0..r.u32()? {

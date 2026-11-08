@@ -54,7 +54,7 @@ impl GameWorld {
         self.resources.play_hold = Some(PlayHold::take());
     }
 
-    /// Build the rapier world from the scene as it stands, and (dev builds) write
+    /// Build the rapier world from the scene as it stands, and (authoring builds) write
     /// the convex decompositions it ran into their models' hull sidecars, so the
     /// next launch runs none (#1940).
     pub(super) fn build_physics(&mut self) {
@@ -255,9 +255,10 @@ mod play_navmesh_tests;
 #[path = "import_tests/mod.rs"]
 mod import_tests;
 
-/// Write the decompositions made since the last call into their hull sidecars: a
-/// dev build only, since a shipped player reads sidecars and never writes one.
+/// Write the decompositions made since the last call into their hull sidecars: an
+/// authoring build only (the editor or `dev`, `core::hulls::WRITES`), since a
+/// shipped player reads sidecars and never writes one.
 fn save_hulls() {
-    #[cfg(feature = "dev")]
+    #[cfg(any(feature = "editor", feature = "dev"))]
     crate::asset::import_cache::hulls::save_pending();
 }

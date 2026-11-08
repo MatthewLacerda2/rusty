@@ -1,12 +1,12 @@
 //! src/physics/shape/decompose/sidecar_tests.rs — a dynamic Suzanne decomposes
-//! once: a dev build writes the pieces into her hull sidecar, and the next launch
+//! once: an authoring build writes the pieces into her hull sidecar, and the next launch
 //! builds her from it with no V-HACD run, to the same bits (#1940).
 
 use glam::Vec3;
 
 use super::tests::hull_bits;
 use super::{forget_built, RUNS};
-use crate::asset::import_cache::hulls::{save_pending, sidecar_of};
+use crate::asset::import_cache::hulls::{file, save_pending, sidecar_of};
 use crate::core::hulls;
 use crate::physics::shape::fixture::prop;
 use crate::physics::PhysicsWorld;
@@ -41,10 +41,7 @@ fn play(mesh: &Mesh) -> (rapier3d::prelude::SharedShape, usize) {
 
 #[test]
 fn a_second_launch_builds_suzanne_from_her_sidecar_with_no_vhacd() {
-    let dir = crate::test_temp::dir().join("rusty_1940_suzanne");
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("suzanne.obj");
+    let path = crate::test_temp::dir().join("suzanne.obj");
     std::fs::copy("engine/models/suzanne.obj", &path).unwrap();
     let sidecar = sidecar_of(&path).unwrap();
     let _ = std::fs::remove_file(&sidecar);
@@ -52,10 +49,16 @@ fn a_second_launch_builds_suzanne_from_her_sidecar_with_no_vhacd() {
     let mesh = import(&path);
     let (first, runs) = play(&mesh);
     assert_eq!(runs, 1, "no sidecar yet: one decomposition");
-    assert!(save_pending().contains(&sidecar), "a dev build writes it");
+    save_pending();
+    // Whichever call took her pieces wrote them before this one returned.
+    let key = hulls::key(mesh.0.iter().copied(), &mesh.1);
+    let written = file::parse(&std::fs::read(&sidecar).expect("written")).unwrap();
+    assert!(
+        written.contains_key(&key),
+        "an authoring build writes her sidecar"
+    );
 
     // A fresh launch: nothing kept in memory, only the file on disk.
-    let key = hulls::key(&mesh.0, &mesh.1);
     hulls::forget(key);
     forget_built(key);
     let again = import(&path);

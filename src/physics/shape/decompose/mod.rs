@@ -15,14 +15,17 @@
 //!
 //! **Where the pieces come from.** `core::hulls` keeps every decomposition this
 //! process knows, keyed by the unscaled mesh: read from the model's hull sidecar
-//! when it was imported (`asset::hull_sidecar`), or made here by a V-HACD run and
-//! marked fresh, for a dev build to write into that sidecar. So V-HACD runs once
+//! when it was imported (`asset::import_cache::hulls`), or made here by a V-HACD run
+//! and marked fresh, for an authoring build to write into that sidecar. So V-HACD runs once
 //! per mesh, not once per session.
 //!
 //! **Determinism.** parry's V-HACD is single-threaded and has no randomness: it
 //! voxelises the mesh, cuts the voxels along planes picked by a fixed search, and
 //! hulls each part. The same points and triangles give the same hulls, bit for bit
-//! (`tests`), so pieces read from a sidecar are the ones a run would make.
+//! (`tests`), so pieces read from a sidecar are the ones a run would make, as
+//! long as the decomposer is the same: the parameters and the piece filter are
+//! pinned in `core::hulls::DECOMPOSER`, which a sidecar carries
+//! (`fingerprint_tests`).
 //!
 //! **Cost.** The built shape is kept too, per mesh and scale: entering Play again,
 //! or the twentieth copy of a prop, reuses it. A mesh with no usable
@@ -46,12 +49,14 @@ use crate::core::hulls::{self, Hull, Key, Pieces};
 #[cfg(test)]
 mod body_tests;
 #[cfg(test)]
+mod fingerprint_tests;
+#[cfg(test)]
 mod panic_tests;
 #[cfg(test)]
 mod refit_tests;
 #[cfg(test)]
 mod scale_tests;
-#[cfg(test)]
+#[cfg(all(test, any(feature = "editor", feature = "dev")))]
 mod sidecar_tests;
 #[cfg(test)]
 mod tests;
@@ -75,7 +80,7 @@ pub(in crate::physics) fn decomposition(
     indices: &[u32],
     scale: Vec3,
 ) -> Option<SharedShape> {
-    let mesh = hulls::key(positions, indices);
+    let mesh = hulls::key(positions.iter().copied(), indices);
     let built = (mesh, scale.to_array().map(f32::to_bits));
     let mut kept = KEPT_SHAPES.lock().unwrap_or_else(|e| e.into_inner());
     if let Some((_, shape)) = kept.iter().find(|(k, _)| *k == built) {
@@ -167,7 +172,7 @@ fn piece(hull: &Hull, scale: Vec3) -> Option<SharedShape> {
 }
 
 /// Forget every shape built from the mesh `mesh`, as a fresh launch has (tests).
-#[cfg(test)]
+#[cfg(all(test, any(feature = "editor", feature = "dev")))]
 pub(in crate::physics) fn forget_built(mesh: Key) {
     let mut kept = KEPT_SHAPES.lock().unwrap_or_else(|e| e.into_inner());
     kept.retain(|((k, _), _)| *k != mesh);

@@ -1,4 +1,4 @@
-//! src/core/hulls.rs — the convex decompositions of concave meshes this process
+//! src/core/hulls/mod.rs — the convex decompositions of concave meshes this process
 //! knows, at unit scale, keyed by the mesh's content (#1940).
 //!
 //! A concave mesh collider on a dynamic body is split into convex pieces with
@@ -7,22 +7,40 @@
 //! (a sim module, which never reads a file) finds them without running V-HACD:
 //!
 //! - **Loaded**: the asset layer reads a model's hull sidecar when it imports
-//!   the model (`asset::hull_sidecar`) and [`keep`]s each entry whose mesh the model
-//!   still has, so the first Play of a fresh launch decomposes nothing.
-//! - **Fresh**: a decomposition the physics ran is kept with [`keep_fresh`], and a
-//!   dev build writes the fresh ones into their models' sidecars ([`take_fresh`]).
+//!   the model (`asset::import_cache::hulls`) and [`keep`]s each entry whose mesh
+//!   the model still has, so the first Play of a fresh launch decomposes nothing.
+//! - **Fresh**: a decomposition the physics ran is kept with [`keep_fresh`]. An
+//!   authoring build ([`WRITES`]: the editor or `dev`) also marks it, and writes
+//!   the marked ones into their models' sidecars (`take_fresh`); the player keeps
+//!   no marks, so nothing piles up where nothing writes.
 //!
 //! **Key.** A mesh's [`Key`] is the content hash of its positions and indices, as
 //! the Mesh component holds them, and their counts: unscaled, since one
 //! decomposition serves every scale (the body's scale is applied to the hulls).
 //!
 //! **Determinism.** V-HACD is single-threaded and seed-free, so a kept entry is the
-//! same bits a fresh decomposition of the same mesh gives: whether a piece set came
-//! from here or from a run never changes what the sim sees. Bounded at [`KEPT`]
-//! entries; past it the oldest is dropped, and a later build decomposes it again.
+//! same bits a fresh decomposition of the same mesh gives, as long as the
+//! decomposer is the same one: a sidecar carries [`DECOMPOSER`], and one made by
+//! another is refused. Bounded at [`KEPT`] entries; past it the oldest is dropped,
+//! and a later build decomposes it again.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+
+/// Whether this build writes hull sidecars: an authoring build (the editor or
+/// `dev`), never the shipped player (`--no-default-features`).
+pub const WRITES: bool = cfg!(any(feature = "editor", feature = "dev"));
+
+/// The parry release whose V-HACD made the pieces. A test holds it to
+/// `Cargo.lock` (`physics::shape::decompose::fingerprint_tests`).
+pub const PARRY: &str = "0.31.1";
+
+/// What made a decomposition, written in every sidecar's header: bumped (the
+/// leading number) whenever `physics::shape::decompose` changes its V-HACD
+/// parameters or the filter that keeps a piece, and following [`PARRY`]. A sidecar
+/// with another fingerprint is refused, so every machine simulates the hulls this
+/// build would make. A test pins the parameters and the filter's slack.
+pub const DECOMPOSER: &str = "1 vhacd-default has-volume-1e-5 parry3d-0.31.1";
 
 /// One convex piece, at unit scale: its points and the triangles V-HACD hulled them
 /// with.
@@ -50,6 +68,7 @@ struct Store {
     order: Vec<Key>,
     pieces: BTreeMap<Key, Pieces>,
     /// Decompositions run this session and not yet written to a sidecar.
+    #[cfg(any(feature = "editor", feature = "dev"))]
     fresh: BTreeMap<Key, Pieces>,
 }
 
@@ -60,9 +79,10 @@ fn with<T>(f: impl FnOnce(&mut Store) -> T) -> T {
     f(guard.get_or_insert_with(Store::default))
 }
 
-/// The key of the mesh `positions` and `indices` (unscaled).
-pub fn key(positions: &[[f32; 3]], indices: &[u32]) -> Key {
-    let mut bytes = Vec::with_capacity(positions.len() * 12 + indices.len() * 4);
+/// The key of the mesh with unscaled `positions` and `indices`.
+pub fn key(positions: impl ExactSizeIterator<Item = [f32; 3]>, indices: &[u32]) -> Key {
+    let count = positions.len();
+    let mut bytes = Vec::with_capacity(count * 12 + indices.len() * 4);
     for p in positions {
         bytes.extend(p.iter().flat_map(|c| c.to_bits().to_le_bytes()));
     }
@@ -70,7 +90,7 @@ pub fn key(positions: &[[f32; 3]], indices: &[u32]) -> Key {
         bytes.extend(i.to_le_bytes());
     }
     let hash = crate::core::hash::content(&bytes);
-    (hash, positions.len(), indices.len())
+    (hash, count, indices.len())
 }
 
 /// The kept pieces of the mesh `key`, if any.
@@ -84,17 +104,17 @@ pub fn keep(key: Key, pieces: Pieces) {
     with(|s| s.insert(key, pieces));
 }
 
-/// Keep `pieces` a decomposition just made for `key`, and mark them for writing.
+/// Keep `pieces` a decomposition just made for `key`, and, in an authoring build,
+/// mark them for writing.
 pub fn keep_fresh(key: Key, pieces: Pieces) {
-    with(|s| {
-        s.fresh.insert(key, pieces.clone());
-        s.insert(key, pieces);
-    });
+    with(|s| s.keep_fresh(key, pieces));
 }
 
-/// The decompositions made since the last call, by key, for a dev build to write.
+/// The decompositions made since the last call, by key, for an authoring build to
+/// write.
+#[cfg(any(feature = "editor", feature = "dev"))]
 pub fn take_fresh() -> Vec<(Key, Pieces)> {
-    with(|s| std::mem::take(&mut s.fresh).into_iter().collect())
+    with(Store::take_fresh)
 }
 
 /// Forget `key`, as a fresh launch has (tests).
@@ -102,6 +122,7 @@ pub fn take_fresh() -> Vec<(Key, Pieces)> {
 pub fn forget(key: Key) {
     with(|s| {
         s.pieces.remove(&key);
+        #[cfg(any(feature = "editor", feature = "dev"))]
         s.fresh.remove(&key);
         s.order.retain(|k| *k != key);
     });
@@ -117,54 +138,18 @@ impl Store {
             self.pieces.remove(&oldest);
         }
     }
+
+    fn keep_fresh(&mut self, key: Key, pieces: Pieces) {
+        #[cfg(any(feature = "editor", feature = "dev"))]
+        self.fresh.insert(key, pieces.clone());
+        self.insert(key, pieces);
+    }
+
+    #[cfg(any(feature = "editor", feature = "dev"))]
+    fn take_fresh(&mut self) -> Vec<(Key, Pieces)> {
+        std::mem::take(&mut self.fresh).into_iter().collect()
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn one(x: f32) -> Pieces {
-        let points = vec![[x, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0; 3]];
-        Arc::new(vec![Hull {
-            points,
-            triangles: vec![[0, 1, 2]],
-        }])
-    }
-
-    #[test]
-    fn a_key_follows_every_coordinate_and_index() {
-        let p = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
-        let base = key(&p, &[0, 1, 2]);
-        assert_eq!(base, key(&p, &[0, 1, 2]));
-        assert_ne!(base, key(&p, &[0, 2, 1]));
-        let mut q = p;
-        q[2][1] = 1.0 + f32::EPSILON;
-        assert_ne!(base, key(&q, &[0, 1, 2]));
-        assert_eq!((base.1, base.2), (3, 3));
-    }
-
-    #[test]
-    fn fresh_pieces_are_kept_and_handed_out_once() {
-        let k = (0x1940_0001, 4, 3);
-        keep_fresh(k, one(1.0));
-        assert_eq!(get(k), Some(one(1.0)));
-        let fresh = take_fresh();
-        assert!(fresh.iter().any(|(f, _)| *f == k));
-        assert!(!take_fresh().iter().any(|(f, _)| *f == k));
-        assert_eq!(get(k), Some(one(1.0)), "still kept after the write");
-        let loaded = (0x1940_0002, 4, 3);
-        keep(loaded, one(2.0));
-        assert!(!take_fresh().iter().any(|(f, _)| *f == loaded));
-    }
-
-    #[test]
-    fn past_the_bound_the_oldest_goes() {
-        let mut store = Store::default();
-        for n in 0..=KEPT as u64 {
-            store.insert((n, 0, 0), one(1.0));
-        }
-        assert!(!store.pieces.contains_key(&(0, 0, 0)));
-        assert!(store.pieces.contains_key(&(KEPT as u64, 0, 0)));
-        assert_eq!(store.pieces.len(), KEPT);
-    }
-}
+mod tests;
