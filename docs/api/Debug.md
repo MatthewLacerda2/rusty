@@ -160,7 +160,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `motion_blur` | per-object motion blur (#1436): its TileMax and NeighborMax tile passes and the gather |
 | `lens_flare` | the screen-space lens flare (#1443): its flare pass (the composite adds it, under `post_fx`) |
 | `post_fx` | bloom, the composite, authored effects, FXAA |
-| `outline` | the editor's selection outline (its mask, dilation and ring) and the gizmos drawn over it after post-FX: grid, collider boxes, axis arrows, probes (editor only) |
+| `outline` | the editor's selection outline (its mask, dilation and ring) and the gizmos drawn over it after post-FX: grid, the occlusion view's boxes, axis arrows, probes (editor only) |
 | `ui` | world and screen UI, Mask textures and the backdrop blur |
 
 A kind appears once a frame ran it (`samples` counts those frames). GPUs overlap
