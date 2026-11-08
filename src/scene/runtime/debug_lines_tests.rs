@@ -56,8 +56,8 @@ fn bad_lines_drop_and_the_store_is_bounded() {
     );
 }
 
-/// Opening another scene (any document applied) drops the lines drawn over the old
-/// one, in edit mode too, where no tick ages them.
+/// Opening another scene in edit mode, where no tick ages them, drops the lines
+/// drawn over the old one.
 #[test]
 fn applying_a_document_drops_the_lines() {
     let mut scene = crate::scene::Scene::new();

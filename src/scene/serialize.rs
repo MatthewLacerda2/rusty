@@ -195,8 +195,12 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     // destroys everything of the old scene (#1649). A Play load took the
     // persistent ones out first (`swap_in`), and Stop's snapshot puts its own back.
     scene.clear_decals(false);
-    // And a `Debug.Draw*` line drawn over it (#1882), as Stop drops them.
-    scene.debug_lines = Default::default();
+    // An edit-mode load drops the `Debug.Draw*` lines drawn over the old World
+    // (#1882), as Stop does; a Play load leaves them to age out, as it leaves
+    // Play's other runtime state (`scene::state`).
+    if !scene.is_playing() {
+        scene.debug_lines = Default::default();
+    }
     for entity in data.entities {
         scene.world.insert_entity(entity);
     }
