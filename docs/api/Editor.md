@@ -38,13 +38,18 @@ flag, `docs/testing.md`).
 | `"UI"` | **UI** | the screen-space canvases over the scene, and the rect tool on them ([`ui.md`](../ui.md)) | on |
 | `"LightProbes"` | **Light Probes** | a cross at each light probe, tinted by the light it baked | on |
 | `"ReflectionProbes"` | **Reflection Probes** | each reflection probe's capture point and parallax box | on |
+| `"Colliders"` | **Colliders** | every collider's real shape (box, sphere, capsule, cylinder, hull and mesh edges) in Unity's green, triggers paler; the **selected** object's colliders draw with it off too, as Unity's do (#1882) | off |
 | `"NavMesh"` | *(hidden)* | nothing yet: the navmesh gizmo is #1910; the flag is set and read already | off |
 
 - Names are exact (case-sensitive). The set lasts the editor session, as Unity's
   does per user; a new editor starts from the defaults above.
 - A set takes effect at the next frame, as the toggle's click does, and
   `Editor.GetGizmo` reads it back at once.
-- Area lights are not probes: their gizmo always draws. Colliders draw no box.
+- Area lights are not probes: their gizmo always draws, and so do the
+  `Debug.DrawLine` / `Debug.DrawRay` lines ([`Debug.md`](Debug.md)).
+- The Game view has a **Gizmos** toggle of its own, as Unity's has: it draws the
+  colliders and the `Debug.Draw*` lines over the game frame, as
+  `Harness.Screenshot(path, { gizmos = true })` does.
 
 ```lua
 Editor.SetGizmo("NavMesh", true)

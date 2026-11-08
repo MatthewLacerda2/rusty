@@ -1,12 +1,15 @@
 use super::*;
 
-/// Unity's defaults: UI and the probes on, the navmesh off; its toggle hidden for now.
+/// Unity's defaults: UI and the probes on, every collider and the navmesh off; the
+/// navmesh's toggle hidden for now.
 #[test]
 fn defaults_follow_unity() {
     let set = SceneGizmos::default();
     assert!(set.on(Gizmo::Ui));
     assert!(set.on(Gizmo::LightProbes));
     assert!(set.on(Gizmo::ReflectionProbes));
+    assert!(!set.on(Gizmo::Colliders));
+    assert!(Gizmo::Colliders.row().shown);
     assert!(!set.on(Gizmo::NavMesh));
     assert!(!Gizmo::NavMesh.row().shown);
 }
@@ -18,7 +21,7 @@ fn names_round_trip() {
         assert_eq!(Gizmo::named(gizmo.row().name), Some(gizmo));
     }
     assert_eq!(Gizmo::named("navmesh"), None, "names are case-sensitive");
-    assert_eq!(Gizmo::named("Colliders"), None);
+    assert_eq!(Gizmo::named("colliders"), None);
 }
 
 /// A script's request reads back at once, reaches the editor's set at its frame, and

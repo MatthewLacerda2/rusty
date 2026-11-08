@@ -103,6 +103,9 @@ pub struct EditorUi {
     /// `Editor.SetGizmo` through the shell. `Gizmo::Ui` is the UI overlay: screen
     /// canvases drawn, the rect tool live (#423).
     pub gizmos: crate::core::application::SceneGizmos,
+    /// The Game tab's **Gizmos** toggle (#1882), Unity's: colliders and the
+    /// `Debug.Draw*` lines over the game frame. Off, as Unity's starts.
+    pub game_gizmos: bool,
     /// Live rect-tool drag on a UI element's handle (#423).
     pub rect_drag: Option<viewport::rect_tool::RectDrag>,
     /// The Scene tab's own camera and what the pointer is doing with it (#745).
@@ -165,6 +168,7 @@ impl EditorUi {
             ui_textures: Default::default(),
             gizmo_drag: None,
             gizmos: Default::default(),
+            game_gizmos: false,
             rect_drag: None,
             scene_view: Default::default(),
 

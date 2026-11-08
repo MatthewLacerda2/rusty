@@ -1,9 +1,9 @@
 //! Pre-creation of editor overlay resources: the floor grid, the selected camera's
 //! occlusion view (`occlusion`, #1714), the selection's axis arrows and the probe
 //! gizmos the Scene view's set leaves on (#1909) (the selection outline is its own
-//! pass, `passes::outline`), and the pass that draws them over the finished image
-//! ([`handles`], #1224). No collider box is drawn: the always-on AABB of every
-//! collider was noise, and the real collider shapes are #1882's.
+//! pass, `passes::outline`), the colliders' real shapes and the `Debug.Draw*` lines
+//! ([`wires`], #1882, also over a game frame with its gizmos on), and the pass that
+//! draws them over the finished image ([`handles`], #1224).
 
 mod axis;
 mod batch;
@@ -11,6 +11,7 @@ mod handles;
 mod lights;
 mod occlusion;
 mod probes;
+mod wires;
 
 use glam::{Mat4, Vec3};
 
@@ -18,6 +19,7 @@ use crate::components::mesh::Vertex;
 use crate::render::draw::resources::{GridResource, Overlays};
 use crate::render::Renderer;
 pub(crate) use batch::{OverlayBindings, OverlayDraws};
+pub(crate) use wires::ColliderScope;
 
 impl Renderer {
     pub(crate) fn precreate_grid(&self, draws: &mut OverlayDraws) -> Option<GridResource> {
@@ -66,6 +68,8 @@ impl Renderer {
         }
         // D. Light- & reflection-probe gizmos (#284) and Area lights (#1674).
         self.draw_probe_overlays(render_pass, bindings, &overlays.probes);
+        // E. Collider shapes and `Debug.Draw*` lines (#1882), through the same draws.
+        self.draw_probe_overlays(render_pass, bindings, &overlays.wires);
     }
 }
 

@@ -75,6 +75,15 @@ gizmos! {
         on: true,
         shown: true,
     },
+    // Every collider's shape (#1882); off, as Unity draws only the selection's
+    // colliders until asked. The selected object's colliders draw either way.
+    Colliders => GizmoRow {
+        name: "Colliders",
+        label: "Colliders",
+        hover: "Draw every collider's shape (the selected object's always draw)",
+        on: false,
+        shown: true,
+    },
     // Hidden until the navmesh gizmo draws something (#1910); off, as Unity's is:
     // it paints the whole floor.
     NavMesh => GizmoRow {

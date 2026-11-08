@@ -45,6 +45,7 @@ mod recover_tests;
 mod shape;
 mod sync;
 mod watch;
+mod wire;
 mod world;
 mod writes;
 
@@ -58,6 +59,7 @@ pub use query::sweep::Sweep;
 pub use query::through::RayCrossing;
 pub use query::RayHit;
 pub use shape::triangles::{collider_world_triangles, ColliderTriangles};
+pub use wire::{collider_wire, ColliderWire};
 pub use world::PhysicsWorld;
 
 use crate::scene::Scene;

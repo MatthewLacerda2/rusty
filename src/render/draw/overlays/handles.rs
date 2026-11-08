@@ -1,6 +1,7 @@
 //! The editor's handles and gizmos (#1224): the floor grid, the occlusion view's
 //! boxes, the selection's axis arrows and the probe gizmos (as the Scene view's set
-//! has them, #1909), drawn the way Unity draws them —
+//! has them, #1909) and the colliders and debug lines (#1882, the only ones a game
+//! frame with its gizmos on draws), drawn the way Unity draws them —
 //! after post-FX and the selection outline, before the UI. On the finished image no
 //! grade, bloom, SSR, motion blur or FXAA treats them as scene colour, and the
 //! outline's ring never paints over an arrow shaft. They are still depth-tested
@@ -14,13 +15,19 @@ impl Renderer {
     /// Draw `scene`'s editor gizmos onto `output`, the view's finished post-FX image,
     /// tested against the view's depth from the camera that just drew (the stack's
     /// last, the editor's one camera). Group 0 still holds that camera's uniform.
+    /// `eye` is that camera's position; with `editor` false this is a game frame's
+    /// gizmos (#1882): only the colliders and the debug lines.
     pub(crate) fn draw_handles(
         &self,
         view: &RenderView,
         scene: &Scene,
         output: &wgpu::TextureView,
+        (eye, editor): (glam::Vec3, bool),
     ) {
-        let overlays = self.precreate_overlays(scene, &view.gizmos);
+        let overlays = match editor {
+            true => self.precreate_overlays(scene, &view.gizmos, eye),
+            false => self.precreate_game_overlays(scene, eye),
+        };
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {

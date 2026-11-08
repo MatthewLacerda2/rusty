@@ -128,10 +128,13 @@ pub(super) fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraC
     }
 }
 
-/// The editor's handles and gizmos (grid, axis arrows, probes, the occlusion view) over
-/// the outline, depth-tested against this camera's scene (#1224).
+/// The editor's handles and gizmos (grid, axis arrows, probes, the occlusion view,
+/// colliders) over the outline, depth-tested against this camera's scene (#1224);
+/// over a game frame with its gizmos on, the colliders and debug lines (#1882).
 pub(super) fn handles(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    if ctx.is_last && ctx.stack.editor_mode {
-        r.draw_handles(view, ctx.scene, ctx.stack.output);
+    let editor = ctx.stack.editor_mode;
+    if ctx.is_last && (editor || view.game_gizmos) {
+        let eye = (ctx.cam.position, editor);
+        r.draw_handles(view, ctx.scene, ctx.stack.output, eye);
     }
 }

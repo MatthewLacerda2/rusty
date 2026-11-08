@@ -9,7 +9,8 @@
 //! owns no GPU state; the shell's editor frontend registers the texture and feeds the [`egui::TextureId`]
 //! in, and reads the returned [`ViewportInteraction`] back to drive picking/gizmo.
 //! The Scene tab's **UI** toggle draws the screen-space canvases over the scene and
-//! enables the rect tool on them (`rect_tool`, #423).
+//! enables the rect tool on them (`rect_tool`, #423). The Game tab's **Gizmos**
+//! toggle draws the colliders and the `Debug.Draw*` lines over the game (#1882).
 
 pub mod gizmo;
 pub mod pick;
@@ -70,11 +71,12 @@ pub fn draw(
     let t = editor.theme;
     let mut tab = editor.viewport_tab;
     let mut gizmos = editor.gizmos;
+    let mut game_gizmos = editor.game_gizmos;
 
     let response = egui::CentralPanel::default()
         .frame(egui::Frame::NONE.fill(t.bg_tier0))
         .show(ui, |ui| {
-            draw_tab_strip(ui, &mut tab, &mut gizmos, t);
+            draw_tab_strip(ui, &mut tab, (&mut gizmos, &mut game_gizmos), t);
             #[cfg_attr(not(feature = "dev"), expect(unused_mut, reason = "a demo fits it"))]
             let mut fit = None;
             #[cfg(feature = "dev")]
@@ -105,6 +107,7 @@ pub fn draw(
 
     editor.viewport_tab = tab;
     editor.gizmos = gizmos;
+    editor.game_gizmos = game_gizmos;
     let interaction = build_interaction(tab, &response, editor.scene_view.navigating);
     // Record the image rect's pixel size so the front-end resizes the offscreen
     // target to match (points scaled by the egui pixels-per-point).
@@ -114,11 +117,11 @@ pub fn draw(
 
 /// The tab strip: Scene / Game selectors (Unity's viewport tabs), and on the Scene
 /// tab the gizmo toggles (#1909, one per shown row of `Gizmo`'s table) and the
-/// navigation help.
+/// navigation help; on the Game tab its one **Gizmos** toggle (#1882).
 fn draw_tab_strip(
     ui: &mut egui::Ui,
     tab: &mut ViewportTab,
-    gizmos: &mut SceneGizmos,
+    (gizmos, game_gizmos): (&mut SceneGizmos, &mut bool),
     t: crate::editor::theme::Theme,
 ) {
     egui::Frame::NONE
@@ -145,6 +148,10 @@ fn draw_tab_strip(
                     }
                     ui.label(egui::RichText::new(icon::QUESTION).color(t.text_secondary))
                         .on_hover_ui(navigation_help);
+                } else {
+                    ui.separator();
+                    ui.toggle_value(game_gizmos, "Gizmos")
+                        .on_hover_text("Draw the colliders and the Debug.Draw lines over the game");
                 }
             });
         });

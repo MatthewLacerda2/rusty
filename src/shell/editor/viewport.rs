@@ -95,6 +95,7 @@ impl EditorFrontend {
 
         let scene = game.scene().borrow();
         view.gizmos = self.editor_ui.gizmos;
+        view.game_gizmos = !scene_tab && self.editor_ui.game_gizmos;
         view.ui.screen_in_editor = scene_tab && view.gizmos.on(Gizmo::Ui);
         view.set_pixel_scale(pixels_per_point);
         let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
