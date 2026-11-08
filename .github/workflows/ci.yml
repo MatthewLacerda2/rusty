@@ -184,11 +184,20 @@ jobs:
         run: dpkg-query -W mesa-vulkan-drivers libvulkan1
       # Open Image Denoise (#1884): no apt package, so the pinned, checksummed
       # release, unpacked where RUSTY_OIDN points. rusty opens it at run time, so
-      # only the tests need it; a build never links it.
-      - name: Install Open Image Denoise
+      # only the tests need it; a build never links it. Cached by version, as the
+      # Blender job caches Blender, and the download retries: one GitHub-releases
+      # 504 failed the whole job on its first run.
+      - name: Cache Open Image Denoise
         if: needs.changes.outputs.code != 'false'
+        id: oidn-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.RUSTY_OIDN }}
+          key: oidn-${{ env.OIDN_VERSION }}-x86_64-linux
+      - name: Install Open Image Denoise
+        if: needs.changes.outputs.code != 'false' && steps.oidn-cache.outputs.cache-hit != 'true'
         run: |
-          curl -sSfL -o "$RUNNER_TEMP/oidn.tgz" \
+          curl -sSfL --retry 5 --retry-all-errors --retry-delay 10 -o "$RUNNER_TEMP/oidn.tgz" \
             "https://github.com/RenderKit/oidn/releases/download/v${OIDN_VERSION}/oidn-${OIDN_VERSION}.x86_64.linux.tar.gz"
           echo "${OIDN_SHA256}  $RUNNER_TEMP/oidn.tgz" | sha256sum -c -
           mkdir -p "$RUSTY_OIDN" && tar -xzf "$RUNNER_TEMP/oidn.tgz" -C "$RUSTY_OIDN" --strip-components=1
