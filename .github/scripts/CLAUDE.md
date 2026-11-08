@@ -1,7 +1,7 @@
 # CLAUDE.md — the merge and batch tooling
 
 This file loads when you work under `.github/scripts/`: the Python behind `make queue`,
-`make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make conflicts`, `make board`,
+`make queue-status`, `make queue-events`, `make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make conflicts`, `make board`,
 `make coder`, `make review-level`, `make rebriefs` and `make mutants-remote`, and the CI helpers
 beside them. The root `CLAUDE.md` keeps the
 project-wide rules (merging is serialized, gates vs. signals, issues and labels); the
@@ -19,7 +19,9 @@ coder *changing* it must know.
   records every conflict met (#1723); `merging/train/` is the merge train (#1785:
   forming a group, its chain of squash commits, its `merge-train/*` branch, its wait,
   landing it and checking `main`'s tree); `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how
-  it ends, and the trains across passes, `watch/trains.py`). `mergeable.py` and `merge-queue.py` are only the command lines. A new
+  it ends, and the trains across passes, `watch/trains.py`). `merging/view/` is the orchestrator's read of it (#1876: `make queue-status`'s liveness from the
+  supervisor's worktree lock, `make queue-events`'s filtered log and stand-down poll); the watch
+  never imports it. `mergeable.py`, `merge-queue.py` and `queue-view.py` are only the command lines. A new
   concern is a new module, not a longer one.
 - **`.github/scripts/dispatch/` is the batch's dispatch steps** (#1569): the brief,
   the coder's routine, the routines API, the review level, the re-brief counts.
@@ -41,7 +43,7 @@ coder *changing* it must know.
 - **`make scripts` is a hard gate** (in `make gates` and `lint.yml`): `unittest` over
   `.github/scripts/tests/` (and `tools/launcher/tests/`). Tests are grouped there by area — `verdict/`, `queue/`,
   `watch/`, `reclaim/`, `board/`, `checks/`, `mutants/`, `dispatch/`, `health/`,
-  `resolved/`, `ruleset/`, `proved/` (#1784) — each a package; a new area gets its own folder. A test never
+  `resolved/`, `ruleset/`, `proved/` (#1784), `view/` (#1876) — each a package; a new area gets its own folder. A test never
   reaches GitHub or pushes: it fakes `gh` and `git` the way
   `.github/scripts/tests/watch/fakes.py` and the `fixtures.py` files do.
 - **The size gate measures `.py`** (#926): 300 lines of code, 150 for a file under a
@@ -127,3 +129,10 @@ coder *changing* it must know.
   format (`merge-queue supervisor pid <pid>`) and `tenancy.pid_of` in step. It also reads the
   harness's own lock on agent worktrees (`claude agent agent-<id> (pid <pid> start <ticks>)`,
   `tenancy.agent_pid_of`, #1658): keep that parser in step with the harness's wording.
+  `make queue-status` and `make queue-events` read the same lock for liveness (`merging/view/status.py`).
+- **The log's wording is read by `make queue-events`** (`merging/view/events.py`, #1876): it passes a
+  line by `HANDED BACK`, `#N: merged` (a single take's, and a train member's `#N: merged — landed with
+  the train <sha>.`, said as it lands), every `supervisor:` line but the ones that carry on
+  (`events.CARRIES_ON`), `watch: STOPPED:`, `HELD #N` and the `watch: #N turned ready.` family of
+  `watch.board.transitions`. A change to one of those lines updates `events.KEEP` and its tests
+  (`.github/scripts/tests/view/test_wording.py`, built from the watch's own functions) in the same pull request.

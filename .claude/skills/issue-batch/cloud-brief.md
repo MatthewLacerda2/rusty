@@ -29,7 +29,7 @@ take them, and say so in the PR. A committed copy conflicts with the original.
 
 ## Check the issue's blockers yourself
 
-Before writing code, read the issue body for "Blocked by" and check each blocker's state on GitHub; a blocker written only in prose slips past the orchestrator. If one is still open, stand down (comment on the issue, no branch) and say which issue should go first.
+Before writing code, read the issue body for "Blocked by" and check each blocker's state on GitHub; a blocker written only in prose slips past the orchestrator. If one is still open, stand down (comment on the issue, its first line `Standing down`, which `make queue-events` passes to the orchestrator; no branch) and say which issue should go first.
 
 ## Read first
 

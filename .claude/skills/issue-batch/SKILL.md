@@ -220,13 +220,21 @@ lines and exits non-zero, and one never seen holding it says *unconfirmed*. A st
 request left for a supervisor that is gone is removed at a fresh start (not when the
 supervisor restarts itself on a change to its own code, which keeps it).
 The supervisor's own endings are status 7 (`supervisor: worktree <path> is gone;
-stopped.`) and 8 (`supervisor: crashed: <error>; stopped.`). Put a `Monitor` on `tail -n 30 -F
-.git/merge-queue/queue.log | grep --line-buffered -E 'HANDED BACK|supervisor:.*stopped'` and on new issue comments matching `Standing down` (a coder that stops says so on its issue, not on a PR),
-never on the watch itself (a `Monitor` dies at 30 minutes and takes its command
-with it). Re-arm it with `-n 30`, never `-n0`: a `-n0` re-arm drops whatever the
-log said while no `Monitor` ran, and two PRs sat ready and unread for an hour
-that way (2026-10-31). The log's `watch:` lines are the whole view of the coders: no second
-poller. **Stop it with `make queue-stop`**, between pull requests; never by
+stopped.`) and 8 (`supervisor: crashed: <error>; stopped.`). **Watch it with `make queue-events`**, the one `Monitor` command (#1876), never a
+hand-typed `tail | grep`: it replays the log from 30 lines back (a re-arm from the
+end drops what the log said while no `Monitor` ran; two PRs sat ready and unread for
+an hour that way on 2026-10-31), passes hand-backs, merges (each once, a train's members as they land), every
+supervisor line that ends its run, the watch's stops, a held
+Dependabot PR and every PR turning ready, opening ready, going back to draft or
+closing unmerged, plus coders' `STANDING DOWN #N` comments (a coder that stops says so
+on its issue, not on a PR), and **exits 1 when the supervisor is not running**, so a
+dead queue is an event. Put the `Monitor` on it, never on the watch itself (a `Monitor`
+dies at 30 minutes and takes its command with it); re-arm it the same way.
+**Ask `make queue-status` whether the queue runs** (at a batch start, a resume, after a
+reboot): it reads the supervisor's worktree lock's PID and checks it alive (exit 0
+running, 1 not), and prints the log's last line and its age. Never `pgrep -f`: after a
+reboot on 2026-11-07 it matched the checking shell's own command line, and a dead
+supervisor was reported running for an hour. **Stop it with `make queue-stop`**, between pull requests; never by
 pattern: `pkill -f` kills scorsese's watch too. Never `pkill -f` a pattern your own
 command line contains either: it kills the shell running it. Run bare (`make queue ARGS="--watch
 --no-check --for 70"` in the background), the watch needs relaunching by hand on
