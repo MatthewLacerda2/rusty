@@ -13,7 +13,7 @@
 //! - **One cache per thread**, keyed by the path as written, like the import cache
 //!   (`asset::import_cache`): each asset file is read once. Every lookup drains the
 //!   write log (`core::fs::written`) through a [`Freshness`], so a file the engine
-//!   wrote ([`write`]) or the editor's file watch saw change outside it is read
+//!   wrote ([`write()`]) or the editor's file watch saw change outside it is read
 //!   again, and opening another project drops every entry (keys are relative).
 //! - **A missing or unreadable file is a miss**, warned of once per path: the
 //!   collider takes the default material (Unity drops a missing reference to the
