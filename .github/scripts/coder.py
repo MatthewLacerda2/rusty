@@ -32,6 +32,7 @@ from. Exits 0 on a launch, 1 on a refusal, 2 when GitHub or claude.ai failed.
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import subprocess
@@ -77,13 +78,22 @@ def environment_id(env: dict, listed: list[dict]) -> str:
 
 def github(gh, repository: str, now: datetime) -> running.GitHub:
     """What placing a fired coder reads from GitHub, over REST (#1866): one listing of open
-    pull requests, and per issue its comments and, when it has no open pull request, itself."""
+    pull requests, and per issue its comments and, when it has no open pull request, itself
+    and its closed pull requests. Those come from one page of the newest closed pull requests,
+    read at most once (#1913): a coder's PR closed after its fire is hours old at most."""
     pulls = ghrest.pages(gh, f"repos/{repository}/pulls?state=open")
     if pulls is None:
         raise remote.RemoteError("could not list the open pull requests from GitHub")
+    newest_closed = functools.cache(lambda: gh(f"repos/{repository}/pulls?state=closed&sort=updated"
+                                               f"&direction=desc&per_page={ghrest.PER_PAGE}"))
+
+    def closed(number: int) -> list | None:
+        got = newest_closed()
+        return running.pulls_for(number, got) if isinstance(got, list) else None
+
     return running.GitHub(pulls=pulls,
                           comments=lambda n: ghrest.pages(gh, f"repos/{repository}/issues/{n}/comments"),
-                          issue=lambda n: gh(f"repos/{repository}/issues/{n}"), now=now)
+                          issue=lambda n: gh(f"repos/{repository}/issues/{n}"), now=now, closed=closed)
 
 
 def check_limit(listed: list[dict], number: int, over: bool, reader: running.GitHub) -> None:
