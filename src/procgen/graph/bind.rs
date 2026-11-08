@@ -6,7 +6,8 @@
 //! Only a node's own top-level values bind: a whole param (a colour, an enum, a
 //! number, a seed), never part of one. An instance's `params` map keeps its
 //! placeholders as written: they are values for the graph it instances, filled in
-//! by [`super::expand`] from the recipe's own.
+//! by [`super::expand`] from the recipe's own. An instance's `path` takes no
+//! placeholder: the graph files are read before any param has a value.
 
 use serde::de::Error as _;
 use serde::ser::Error as _;
@@ -100,13 +101,26 @@ fn bind(nodes: &mut [Value], params: &BTreeMap<String, ParamDecl>) -> Result<Vec
             .and_then(Value::as_str)
             .unwrap_or("?")
             .to_string();
+        let instance = node.get("op").and_then(Value::as_str) == Some("graph");
         for (key, value) in node
             .iter_mut()
             .filter(|(k, _)| !WIRING.contains(&k.as_str()))
         {
+            // An instance's `params` map holds values for its graph (placeholders
+            // among them, filled at expansion), never one placeholder itself.
+            if instance && key == "params" {
+                continue;
+            }
             let Some(param) = placeholder(value).map(str::to_string) else {
                 continue;
             };
+            if instance && key == "path" {
+                return Err(format!(
+                    "node {id:?} (graph): path = {{ param = {param:?} }}: an instance's \
+                     path is a file, never a param, since its graph is read before any \
+                     param has a value"
+                ));
+            }
             *value = params
                 .get(&param)
                 .map(|d| d.default.clone())

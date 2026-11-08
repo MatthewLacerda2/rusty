@@ -43,7 +43,7 @@ pub fn read_graph(path: &str, root: &Path) -> Result<TextureRecipe, String> {
 }
 
 /// Every `.graph.json` under `root`, as its path from the root, sorted. Hidden
-/// folders and `target/` (a build's output, never a project's assets) are skipped,
+/// folders and the root's `target/` (a build's output, never a project's assets) are skipped,
 /// and a symlinked folder is not followed.
 pub fn project_graphs(root: &Path) -> Vec<String> {
     let mut found = Vec::new();
@@ -60,7 +60,7 @@ fn walk(dir: &Path, root: &Path, found: &mut Vec<String>) {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
         match entry.file_type() {
-            Ok(kind) if kind.is_dir() && !name.starts_with('.') && name != "target" => {
+            Ok(kind) if kind.is_dir() && !skipped(dir == root, &name) => {
                 walk(&path, root, found);
             }
             Ok(kind) if kind.is_file() && name.ends_with(EXTENSION) => {
@@ -71,6 +71,11 @@ fn walk(dir: &Path, root: &Path, found: &mut Vec<String>) {
             _ => {}
         }
     }
+}
+
+/// A hidden folder anywhere, and the project root's own `target/`.
+fn skipped(at_root: bool, name: &str) -> bool {
+    name.starts_with('.') || (at_root && name == "target")
 }
 
 fn owned_paths(recipe: &TextureRecipe) -> Vec<(String, String)> {

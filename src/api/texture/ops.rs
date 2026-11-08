@@ -7,8 +7,9 @@
 
 use std::path::Path;
 
-use mlua::{Lua, LuaSerdeExt, Table, Value};
+use mlua::{Lua, Table, Value};
 
+use crate::api::lua_json::to_lua;
 use crate::procgen::graph::ParamDecl;
 use crate::procgen::recipe::{Lit, OpInfo, OpParam, OPS};
 use crate::procgen::TextureRecipe;
@@ -56,8 +57,8 @@ fn graph_table(lua: &Lua, path: &str, graph: &TextureRecipe) -> mlua::Result<Tab
 fn graph_param(lua: &Lua, name: &str, d: &ParamDecl) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("name", name)?;
-    t.set("type", lua.to_value(&d.ty)?)?;
-    t.set("default", lua.to_value(&d.default)?)?;
+    t.set("type", to_lua(lua, &d.ty)?)?;
+    t.set("default", to_lua(lua, &d.default)?)?;
     t.set("required", false)?;
     t.set("socket", false)?;
     t.set("min", d.min)?;

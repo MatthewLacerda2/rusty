@@ -109,5 +109,7 @@ Some(Lit::Text("…")), ..choice("output", &[…]) }`.
   that evaluates a recipe goes through `scene::authoring::material::load_recipe`
   and runs the `Loaded` recipe it returns, never the one it was handed. A new op
   needs nothing for graphs: placeholders, id prefixes, link rewrites and seed
-  folding all work on its serde form (a `seed` key is folded, an object with a
-  `node` key is a link).
+  folding all work on its serde form (a top-level `seed` key is folded, a
+  top-level object with a `node` key is a link). `graph/shape_tests.rs` holds that
+  shape to `OpKind::links` and `Op::seed` for every row, so an op that nests a
+  link deeper or keeps its seed elsewhere fails there, not in a bake.

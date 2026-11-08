@@ -49,6 +49,10 @@ pub const EXTENSION: &str = ".graph.json";
 /// How many graphs deep instances may nest.
 pub const MAX_DEPTH: usize = 16;
 
+/// How many nodes an expansion may hold: a graph instancing the next one 4 times
+/// per level, 16 levels down, would be about 4^16, and is refused instead.
+pub const MAX_NODES: usize = 65_536;
+
 /// An `op = "graph"` node's own fields: the graph file, the values it gives the
 /// graph's params, and the seed folded into the graph's nodes. Its `inputs` are the
 /// node's, wired to the graph's `inputs` in order.
@@ -110,8 +114,12 @@ impl TextureRecipe {
 }
 
 #[cfg(test)]
+mod guard_tests;
+#[cfg(test)]
 mod nest_tests;
 #[cfg(test)]
 mod refuse_tests;
+#[cfg(test)]
+mod shape_tests;
 #[cfg(test)]
 mod tests;

@@ -735,7 +735,9 @@ file is refused. Every recipe may be one; two optional fields give it an interfa
 - **`params`**: name → `{ type, default, min?, max? }`, `type` one of `number`,
   `integer`, `bool`, `color`, `text` (`min`/`max` for the first two). Any node value
   may be the placeholder `{ param = "age" }`, a whole param (a number, a colour, an
-  enum or path as `text`, a seed), whether the param takes a link or not. A recipe
+  enum or an `image` node's path as `text`, a seed), whether the param takes a link
+  or not. An instance's own `path` is the one value that takes none, and is refused:
+  the graph files are read before any param has a value. A recipe
   with `params` baked on its own bakes at the defaults, and `Texture.ToJson` writes
   the placeholders back.
 - **`inputs`**: an ordered list of names inner nodes read like node ids (in
@@ -774,7 +776,11 @@ under those ids.
 **Errors** name the nesting path and the file: `node "brick/wear/blur_2" (blur):
 references unknown input "brick/wear/nowhere" (in textures/wear.graph.json)`. A graph
 reached twice on one chain of instances is refused with the chain
-(`a.graph.json → b.graph.json → a.graph.json`), and instances nest at most 16 deep.
+(`a.graph.json → b.graph.json → a.graph.json`), instances nest at most 16 deep, and
+an expansion holds at most 65 536 nodes (past that it is refused, naming the chain of
+graphs it was in). Two nodes sharing an id in one recipe or one graph are refused,
+an instance's id included, and every error from inside an instance names its graph
+file.
 
 **`Texture.Ops()`** lists the project's graphs after the ops, each as `op = "graph"`
 with its `path`, `category = "graph"`, `min_inputs` = `max_inputs` = its input count,

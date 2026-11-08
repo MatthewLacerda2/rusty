@@ -69,12 +69,18 @@ fn the_project_graphs_are_found_outside_hidden_and_build_folders() {
             ("a.graph.json", doc.clone()),
             ("textures/b.graph.json", doc.clone()),
             (".cache/c.graph.json", doc.clone()),
-            ("target/d.graph.json", doc),
+            ("target/d.graph.json", doc.clone()),
+            ("levels/target/e.graph.json", doc),
         ],
     );
+    // Only the root's `target/` is a build's; a deeper one is the project's own.
     assert_eq!(
         project_graphs(&root),
-        ["a.graph.json", "textures/b.graph.json"]
+        [
+            "a.graph.json",
+            "levels/target/e.graph.json",
+            "textures/b.graph.json"
+        ]
     );
 }
 

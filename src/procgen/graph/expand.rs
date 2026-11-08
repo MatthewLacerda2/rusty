@@ -10,11 +10,11 @@
 
 use std::collections::BTreeMap;
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use super::params::values;
-use super::placeholder;
 use super::resolve::{enter, Scope};
+use super::{placeholder, MAX_NODES};
 use crate::core::naming::variant_case::decode;
 use crate::procgen::hash::instance_seed;
 use crate::procgen::recipe::{Node, OpKind, TextureRecipe};
@@ -47,12 +47,16 @@ impl Expanded {
     /// [`validate`] the flat recipe; an error about a node from a graph names its
     /// file too.
     pub fn validate(&self) -> Result<(), String> {
-        validate(&self.recipe).map_err(|e| match &e {
-            RunError::Node(n) => match self.file_of(&n.node) {
+        validate(&self.recipe).map_err(|e| {
+            let id = match &e {
+                RunError::Node(n) => Some(&n.node),
+                RunError::DuplicateId(id) | RunError::UnknownOutput(id) => Some(id),
+                RunError::Empty | RunError::BadResolution => None,
+            };
+            match id.and_then(|id| self.file_of(id)) {
                 Some(file) => format!("{e} (in {file})"),
                 None => e.to_string(),
-            },
-            _ => e.to_string(),
+            }
         })
     }
 }
@@ -101,7 +105,17 @@ struct Out {
 
 /// Paste `scope`'s nodes into `out`, each instance expanded in its place.
 fn paste(scope: &Scope, out: &mut Out) -> Result<(), String> {
+    check_ids(scope)?;
     for node in &scope.graph.nodes {
+        if out.nodes.len() >= MAX_NODES {
+            return Err(scope.in_file(format!(
+                "the expansion passes {MAX_NODES} nodes{}",
+                match scope.chain.is_empty() {
+                    true => String::new(),
+                    false => format!(", inside {}", scope.chain.join(" → ")),
+                }
+            )));
+        }
         let mut value = scope.bound_value(node)?;
         match &node.op {
             OpKind::Graph(_) => {
@@ -110,6 +124,19 @@ fn paste(scope: &Scope, out: &mut Out) -> Result<(), String> {
                 paste_instance(scope, &instance, out)?;
             }
             _ => out.nodes.push(rewrite(scope, value)?),
+        }
+    }
+    Ok(())
+}
+
+/// Refuse two of `scope`'s own nodes sharing an id, instances included: an
+/// instance leaves no node of its own in the flat recipe for the runner to catch.
+fn check_ids(scope: &Scope) -> Result<(), String> {
+    let nodes = &scope.graph.nodes;
+    for (i, node) in nodes.iter().enumerate() {
+        if nodes[..i].iter().any(|n| n.id == node.id) {
+            let e = RunError::DuplicateId(scope.id(&node.id));
+            return Err(scope.in_file(e.to_string()));
         }
     }
     Ok(())
@@ -183,19 +210,13 @@ fn rewrite(scope: &Scope, mut value: Value) -> Result<Node, String> {
             }
         }
     }
-    for (key, v) in map.iter_mut() {
-        match (key.as_str(), &mut *v) {
-            ("seed", Value::Number(n)) if scope.fold != 0 => {
-                let seed = n.as_u64().and_then(|s| u32::try_from(s).ok()).unwrap_or(0);
-                *v = Value::from(instance_seed(seed, scope.fold));
-            }
-            (_, Value::Object(link)) => {
-                if let Some(Value::String(r)) = link.get_mut("node") {
-                    *r = scope.resolve(r)?;
-                }
-            }
-            _ => {}
-        }
+    for r in link_refs(map) {
+        *r = scope.resolve(r)?;
+    }
+    // A seed that isn't a `u32` is left as written, for the strict parse below to
+    // refuse whatever the instance's seed.
+    if let (Some(seed), true) = (seed_of(map), scope.fold != 0) {
+        map.insert("seed".into(), Value::from(instance_seed(seed, scope.fold)));
     }
     let named = |e: String| {
         let (bare, prefixed) = (format!("node {id:?}"), format!("node {:?}", scope.id(&id)));
@@ -204,4 +225,21 @@ fn rewrite(scope: &Scope, mut value: Value) -> Result<Node, String> {
     let mut node: Node = decode(value).map_err(named)?;
     node.id = scope.id(&node.id);
     Ok(node)
+}
+
+/// A node's own seed, where [`rewrite`] finds it: its top-level `seed`, when a `u32`.
+pub(super) fn seed_of(node: &Map<String, Value>) -> Option<u32> {
+    let seed = node.get("seed")?.as_u64()?;
+    u32::try_from(seed).ok()
+}
+
+/// A node's link references, where [`rewrite`] finds them: the `node` of each
+/// top-level object value (#1494's links). A catalog-wide test holds this to
+/// [`crate::procgen::recipe::OpKind::links`], so an op nesting a link deeper fails it.
+pub(super) fn link_refs(node: &mut Map<String, Value>) -> impl Iterator<Item = &mut String> {
+    node.values_mut()
+        .filter_map(|v| match v.as_object_mut()?.get_mut("node")? {
+            Value::String(r) => Some(r),
+            _ => None,
+        })
 }
