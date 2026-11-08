@@ -1,6 +1,6 @@
 //! Scene-hierarchy tree rendering (VS Code Explorer style): a genuine collapsible
 //! tree with per-entity expand state, type glyphs and full-row selection. Kept in
-//! its own module so `hierarchy.rs` stays under the size gate.
+//! its own module so `hierarchy`'s root stays under the size gate.
 
 use egui::collapsing_header::CollapsingState;
 use egui_phosphor::regular as icon;
@@ -8,66 +8,72 @@ use egui_phosphor::regular as icon;
 use crate::editor::theme::Theme;
 use crate::scene::Scene;
 
-/// Draw `entity_id` and (when expanded) its subtree. `sel_entity` / `sel_asset`
-/// are the editor's selection fields; clicking a row updates them.
-pub fn draw_node(
-    ui: &mut egui::Ui,
-    scene: &Scene,
-    entity_id: u32,
-    sel_entity: &mut Option<u32>,
-    sel_asset: &mut Option<String>,
-    t: Theme,
-) {
-    let Some(name) = scene.world.name(entity_id).map(|n| n.clone()) else {
-        return;
-    };
-    let children = scene.world.children(entity_id);
-    let (glyph, glyph_color) = node_glyph(scene, entity_id, t);
-    let is_selected = *sel_entity == Some(entity_id);
+/// What a row reads and writes besides the scene: the editor's selection fields
+/// (clicking a row updates them), the row a context-menu *Delete* asked for
+/// (`hierarchy::delete` applies it after the tree is drawn), and the theme.
+pub(super) struct Rows<'a> {
+    pub sel_entity: &'a mut Option<u32>,
+    pub sel_asset: &'a mut Option<String>,
+    pub delete: &'a mut Option<u32>,
+    pub theme: Theme,
+}
 
-    // The clickable row: type glyph + name. Selecting toggles off to None (which
-    // the inspector reads as "show scene settings"). Right-click offers "Save as
-    // Prefab", which extracts this entity's subtree to a `.prefab` asset (#215).
-    let mut row = |ui: &mut egui::Ui| {
-        ui.colored_label(glyph_color, glyph);
-        let label = ui.selectable_label(is_selected, &name);
-        if label.clicked() {
-            if is_selected {
-                *sel_entity = None;
-            } else {
-                *sel_entity = Some(entity_id);
-                *sel_asset = None;
-            }
+impl Rows<'_> {
+    /// Draw `entity_id` and (when expanded) its subtree.
+    pub(super) fn draw_node(&mut self, ui: &mut egui::Ui, scene: &Scene, entity_id: u32) {
+        let Some(name) = scene.world.name(entity_id).map(|n| n.clone()) else {
+            return;
+        };
+        let children = scene.world.children(entity_id);
+        if children.is_empty() {
+            // Leaf: indent to line up with the parents' twisty, then the row.
+            ui.horizontal(|ui| {
+                ui.add_space(ui.spacing().icon_width);
+                self.row(ui, scene, entity_id, &name);
+            });
+            return;
         }
-        label.context_menu(|ui| {
-            if ui
-                .button(format!("{}  Save as Prefab", icon::PACKAGE))
-                .clicked()
-            {
-                save_as_prefab(scene, entity_id, &name);
-                ui.close();
-            }
-        });
-    };
-
-    if children.is_empty() {
-        // Leaf: indent to line up with the parents' twisty, then the row.
-        ui.horizontal(|ui| {
-            ui.add_space(ui.spacing().icon_width);
-            row(ui);
-        });
-    } else {
         // Branch: a real collapsible node. egui's body indent draws the guide line.
         let id = ui.make_persistent_id(("hierarchy_node", entity_id));
         // A skeleton is ~65 bones (#453): its subtrees start collapsed.
         let default_open = !scene.is_bone(entity_id);
         CollapsingState::load_with_default_open(ui.ctx(), id, default_open)
-            .show_header(ui, row)
+            .show_header(ui, |ui| self.row(ui, scene, entity_id, &name))
             .body(|ui| {
                 for child in children {
-                    draw_node(ui, scene, child, sel_entity, sel_asset, t);
+                    self.draw_node(ui, scene, child);
                 }
             });
+    }
+
+    /// The clickable row: type glyph + name. Selecting toggles off to None (which
+    /// the inspector reads as "show scene settings"). Right-click offers "Save as
+    /// Prefab", which extracts this entity's subtree to a `.prefab` asset (#215),
+    /// and "Delete", which deletes it and its subtree (#1915).
+    fn row(&mut self, ui: &mut egui::Ui, scene: &Scene, entity_id: u32, name: &str) {
+        let (glyph, glyph_color) = node_glyph(scene, entity_id, self.theme);
+        let is_selected = *self.sel_entity == Some(entity_id);
+        ui.colored_label(glyph_color, glyph);
+        let label = ui.selectable_label(is_selected, name);
+        if label.clicked() {
+            if is_selected {
+                *self.sel_entity = None;
+            } else {
+                *self.sel_entity = Some(entity_id);
+                *self.sel_asset = None;
+            }
+        }
+        label.context_menu(|ui| {
+            let prefab = format!("{}  Save as Prefab", icon::PACKAGE);
+            if ui.button(prefab).clicked() {
+                save_as_prefab(scene, entity_id, name);
+                ui.close();
+            }
+            if ui.button(format!("{}  Delete", icon::TRASH)).clicked() {
+                *self.delete = Some(entity_id);
+                ui.close();
+            }
+        });
     }
 }
 
