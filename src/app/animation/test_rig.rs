@@ -105,6 +105,7 @@ pub fn graph(base: Vec<GraphNode>, layers: Vec<GraphLayer>) -> AnimationGraph {
         parameters: BTreeMap::from([("speed".to_string(), ParameterDeclaration::Float(0.0))]),
         base: machine(base),
         layers,
+        ..AnimationGraph::default()
     }
 }
 

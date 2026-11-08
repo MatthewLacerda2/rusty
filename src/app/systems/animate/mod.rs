@@ -87,7 +87,7 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
                 "Animator on '{name}' ({id}): root bone '{bone}' is not in its skeleton; root motion moves nothing"
             ));
         }
-        let events = crossed.into_iter().map(|e| (id, e.name));
+        let events = crossed.into_iter().map(|e| (id, e.name, e.montage));
         res.animation_events.extend(events);
         for (bone, local) in writes.unwrap_or_default() {
             if let Some(mut t) = s.world.transform_mut(bone) {

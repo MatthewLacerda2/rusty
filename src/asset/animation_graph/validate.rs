@@ -43,13 +43,16 @@ impl AnimationGraph {
     /// Check every internal reference and value, in every layer: unique named
     /// nodes, an entry that exists, edges between existing nodes with sane
     /// durations, conditions over declared, type-matching parameters, well-formed
-    /// motions (#457), and unique, sanely weighted layers. `Ok(())` or ALL the
+    /// motions (#457), unique, sanely weighted layers, and sound slots and
+    /// montages (#1894, each problem named by its path: `montages[1].clip: empty`). `Ok(())` or ALL the
     /// violations. A base-layer problem is reported bare; an extra layer's carries
     /// a `layer 'name': ` prefix.
     pub fn validate(&self) -> Result<(), GraphError> {
         let mut problems = Vec::new();
         self.check_machine("", &self.base, &mut problems);
         self.check_layers(&mut problems);
+        self.check_slots(&mut problems);
+        self.check_montages(&mut problems);
         if problems.is_empty() {
             Ok(())
         } else {
