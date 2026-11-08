@@ -28,7 +28,11 @@ impl FixedTicks {
     /// Add a frame of `raw` wall-clock seconds (negative or NaN as zero, at most
     /// [`MAXIMUM_DELTA_TIME`]) and take the whole ticks now owed.
     pub fn owe(&mut self, raw: f32) -> u32 {
-        let frame = raw.max(0.0).min(MAXIMUM_DELTA_TIME);
+        let frame = if raw > 0.0 {
+            raw.min(MAXIMUM_DELTA_TIME)
+        } else {
+            0.0
+        }; // NaN too
         self.owed += f64::from(frame);
         let tick = f64::from(FIXED_DELTA_TIME);
         // The slack absorbs f32 rounding (1/3 s over 1/60 s is 19.9999999 in f32

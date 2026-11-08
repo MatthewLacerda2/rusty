@@ -30,7 +30,9 @@ pub use start::{launch, launch_picker};
 use winit::event::WindowEvent;
 use winit::keyboard::KeyCode;
 
-use super::{frame::Host, frame::Step, pace::Pace, Frontend, Shell};
+#[cfg(feature = "dev")]
+use super::frame::Step;
+use super::{frame::Host, pace::Pace, Frontend, Shell};
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::input::CursorState;
 use crate::editor::{EditorUi, ViewportInteraction, ViewportTab};
@@ -193,7 +195,6 @@ impl Frontend for EditorFrontend {
 
     #[cfg(feature = "dev")]
     fn advance(&mut self, game: &mut GameWorld, mut step: Step<'_>, dt: f32) -> PlayTransition {
-        // A demo plays on its own timeline, drawn at its ticks' poses.
         let demo = self
             .editor_ui
             .advance_demo(game, dt)
