@@ -85,9 +85,11 @@ pub(super) fn kept_equals_fresh(r: &Renderer, scene: &Scene) -> Result<(), Strin
     gathers_what_a_walk_keeps(kept)
 }
 
-/// The shadow sweeps' gather through the caster BVH (#1874): for short point-light
-/// faces every half metre along the yard, and a degenerate volume, every object whose bounds the frustum
-/// keeps (or that has none) is gathered, and the gather is in walk order.
+/// The shadow sweeps' gather through the caster BVH (#1874), for short point-light
+/// faces every half metre along the yard and a degenerate volume, in walk order:
+/// a static bake's holds every static object whose bounds the frustum keeps (or
+/// that has none), a per-frame sweep's every dynamic object and every static one
+/// that casts per frame.
 fn gathers_what_a_walk_keeps(kept: &RenderScene) -> Result<(), String> {
     let face = directx::perspective(std::f32::consts::FRAC_PI_2, 1.0, 0.05, 0.8);
     let mut views = vec![Mat4::ZERO];
@@ -95,13 +97,10 @@ fn gathers_what_a_walk_keeps(kept: &RenderScene) -> Result<(), String> {
         let at = Vec3::new(x, 0.0, -4.0);
         views.extend([Vec3::X, -Vec3::Y].map(|d| face * look_to_mat4(at, d, Vec3::Z)));
     }
-    for view in views {
-        let near: Vec<u32> = kept
-            .casters_near(&[view])
-            .iter()
-            .map(|&(id, _)| id)
-            .collect();
-        let walk: Vec<u32> = kept.objects().map(|(id, _)| id).collect();
+    let walk: Vec<u32> = kept.objects().map(|(id, _)| id).collect();
+    for (view, baked) in views.into_iter().flat_map(|v| [(v, true), (v, false)]) {
+        let near = kept.casters_near(&[view], baked);
+        let near: Vec<u32> = near.iter().map(|&(id, _)| id).collect();
         let ordered: Vec<u32> = walk
             .iter()
             .copied()
@@ -111,12 +110,18 @@ fn gathers_what_a_walk_keeps(kept: &RenderScene) -> Result<(), String> {
             return Err(format!("gathered {near:?}, out of walk order {walk:?}"));
         }
         let frustum = Frustum::from_view_proj(view);
-        let mut kept_by = kept.objects().filter(|(_, o)| {
-            o.bounds
-                .is_none_or(|(lo, hi)| frustum.intersects_aabb(lo, hi))
+        let mut taken = kept.objects().filter(|&(id, o)| match baked {
+            true => {
+                o.is_static
+                    && o.bounds
+                        .is_none_or(|(lo, hi)| frustum.intersects_aabb(lo, hi))
+            }
+            false => !o.is_static || o.moving || kept.unbaked.holds(id, o.casting.culls_small()),
         });
-        if let Some((id, _)) = kept_by.find(|(id, _)| !near.contains(id)) {
-            return Err(format!("object {id} is in the volume but was not gathered"));
+        if let Some((id, _)) = taken.find(|(id, _)| !near.contains(id)) {
+            return Err(format!(
+                "object {id} is taken (baked: {baked}) but not gathered"
+            ));
         }
     }
     Ok(())

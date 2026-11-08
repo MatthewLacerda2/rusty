@@ -50,6 +50,9 @@ impl<'a> Reach<'a> {
                 None => always.push(g as u32),
             }
         }
+        // A sweep the index answers for no candidate of (a per-frame one, mostly)
+        // visits no node.
+        let index = index.filter(|_| always.len() < groups.len());
         Self {
             index,
             groups,

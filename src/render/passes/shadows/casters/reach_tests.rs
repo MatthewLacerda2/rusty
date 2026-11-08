@@ -57,7 +57,7 @@ fn level(n: u32, s: &mut u64) -> (Vec<Candidate>, CasterIndex) {
     }
     (
         candidates,
-        CasterIndex::build(indexed.into_iter().map(|(id, b)| (id, Some(b)))),
+        CasterIndex::build(indexed.into_iter().map(|(id, b)| (id, Some(b), false))),
     )
 }
 

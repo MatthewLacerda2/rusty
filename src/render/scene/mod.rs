@@ -104,7 +104,7 @@ pub(crate) use occlusion::OcclusionBinding;
 pub(crate) use records::{MaterialRecords, Variant};
 pub(crate) use table::{ObjectTable, SlotTable, Slotted};
 
-use crate::render::passes::shadows::{StaticsKey, UnbakedCasters};
+use crate::render::passes::shadows::UnbakedCasters;
 use crate::render::{GpuMesh, Renderer};
 use crate::scene::{Scene, SceneId};
 
@@ -199,11 +199,8 @@ pub(crate) struct RenderScene {
     /// The scene's baked PVS bound to these objects (#1714), re-bound after a static
     /// one changed or the PVS was replaced.
     pub(crate) occlusion: OcclusionBinding,
-    /// Its static objects' BVH (#1874), the statics key it was built under, and
-    /// the objects that are not static, which every shadow volume gathers.
-    casters: CasterIndex,
-    casters_key: Option<StaticsKey>,
-    dynamic: BTreeSet<u32>,
+    /// What its shadow sweeps gather through (#1874): the static objects' BVH.
+    casters: casters::Gathering,
 }
 
 impl RenderScene {
@@ -214,7 +211,6 @@ impl RenderScene {
 
     /// Replace (or, with `None`, remove) entity `id`'s object.
     fn set(&mut self, id: u32, object: Option<RenderObject>) {
-        self.dynamic.remove(&id);
         if let Some(old) = self.objects.remove(&id) {
             self.order.remove(&old.seq);
             self.forget_casting(id, old.is_static);
@@ -228,15 +224,13 @@ impl RenderScene {
         }
         if let Some(object) = object {
             self.forget_casting(id, object.is_static);
-            if !object.is_static {
-                self.dynamic.insert(id);
-            }
             self.order.insert(object.seq, id);
             for name in &object.materials {
                 self.by_material.entry(name.clone()).or_default().insert(id);
             }
             self.objects.insert(id, object);
         }
+        self.casters.set(id, self.objects.get(&id));
     }
 
     /// The objects drawing any library material in `names`.
@@ -261,10 +255,9 @@ impl RenderScene {
         self.objects.clear();
         self.order.clear();
         self.by_material.clear();
-        self.dynamic.clear();
         self.casting = None;
         self.occlusion.forget();
-        (self.casters, self.casters_key) = (CasterIndex::default(), None);
+        self.casters = casters::Gathering::default();
     }
 
     /// Static object `id` came or went: the digest is refolded, and the PVS
@@ -284,6 +277,7 @@ impl RenderScene {
         if unbaked != self.unbaked {
             self.unbaked = unbaked;
             self.casting = None;
+            self.casters.stale();
         }
     }
 }

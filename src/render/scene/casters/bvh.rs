@@ -46,16 +46,21 @@ pub(crate) struct CasterIndex {
     nodes: Vec<Node>,
     /// The objects built with no finite bounds.
     loose: Vec<u32>,
+    /// The objects that cast from the per-frame sweeps when built.
+    per_frame: Vec<u32>,
     /// The objects re-derived or moved since the build (`touch`).
     strays: BTreeSet<u32>,
 }
 
 impl CasterIndex {
-    /// The index of `objects` (entities and their world bounds); one with no
-    /// finite bounds is kept loose.
-    pub(crate) fn build(objects: impl Iterator<Item = (u32, Option<(Vec3, Vec3)>)>) -> Self {
-        let (mut entries, mut loose) = (Vec::new(), Vec::new());
-        for (id, bounds) in objects {
+    /// The index of `objects` (entities, their world bounds, and whether each
+    /// casts from the per-frame sweeps); one with no finite bounds is kept loose.
+    pub(crate) fn build(objects: impl Iterator<Item = (u32, Option<(Vec3, Vec3)>, bool)>) -> Self {
+        let (mut entries, mut loose, mut per_frame) = (Vec::new(), Vec::new(), Vec::new());
+        for (id, bounds, frame) in objects {
+            if frame {
+                per_frame.push(id);
+            }
             match bounds.filter(|(lo, hi)| lo.is_finite() && hi.is_finite()) {
                 Some((lo, hi)) => entries.push(Entry { id, lo, hi }),
                 None => loose.push(id),
@@ -72,6 +77,7 @@ impl CasterIndex {
             entries,
             nodes,
             loose,
+            per_frame,
             strays: BTreeSet::new(),
         }
     }
@@ -87,15 +93,24 @@ impl CasterIndex {
         self.strays.len()
     }
 
-    /// The objects any of `frustums` could reach: every entry [`Self::visit`]
-    /// reaches, and every loose object and stray; unordered, maybe repeated.
+    /// The entries any of `frustums` reach ([`Self::visit`]); unordered, maybe
+    /// repeated.
     pub(crate) fn near(&self, frustums: &[Frustum]) -> Vec<u32> {
-        let mut ids = self.loose.clone();
-        ids.extend(self.strays.iter().copied());
+        let mut ids = Vec::new();
         for frustum in frustums {
             self.visit(frustum, |e| ids.push(self.entries[e as usize].id));
         }
         ids
+    }
+
+    /// The objects that cast from the per-frame sweeps when built.
+    pub(crate) fn per_frame(&self) -> Vec<u32> {
+        self.per_frame.clone()
+    }
+
+    /// The objects it cannot answer for: the loose ones and the strays.
+    pub(crate) fn unanswered(&self) -> impl Iterator<Item = u32> + '_ {
+        self.loose.iter().chain(&self.strays).copied()
     }
 
     /// How many entries it holds.

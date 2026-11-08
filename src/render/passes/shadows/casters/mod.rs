@@ -160,7 +160,10 @@ impl ShadowRenderer {
         let start = std::time::Instant::now();
         let views: Vec<Mat4> = volumes.iter().map(|v| v.view_proj).collect();
         let (candidates, joints) = match self.index_casters {
-            true => self.collect_casters(frame, lod, sweep, frame.objects.casters_near(&views)),
+            true => {
+                let near = frame.objects.casters_near(&views, sweep.baked());
+                self.collect_casters(frame, lod, sweep, near)
+            }
             false => self.collect_casters(frame, lod, sweep, frame.objects.objects()),
         };
         let walls = frame.objects.walls();
