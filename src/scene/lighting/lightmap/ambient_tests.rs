@@ -23,10 +23,7 @@ fn open_light(sky: AmbientRadiance, normal: Vec3) -> TexelLight {
         ..Default::default()
     };
     let rays = Rays::build(Vec::new());
-    let tracer = Tracer {
-        scene: &scene,
-        rays: &rays,
-    };
+    let tracer = Tracer::new(&scene, &rays);
     let mut rng = Rng::new(7, 0, 0);
     tracer.texel(Vec3::ZERO, normal, 40_000, 1, &mut rng)
 }

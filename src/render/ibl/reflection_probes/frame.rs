@@ -38,6 +38,7 @@ impl Renderer {
     fn place_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) -> bool {
         let probes = &scene.reflection_probes.probes;
         let budget = scene.lighting_settings.reflections.budget_bytes();
+        let format = self.reflection_probes.format();
         let mut wanted: Vec<(usize, CubeShape)> = Vec::new();
         let (mut face, mut paths) = (0, Vec::new());
         for i in ranked(probes, camera_pos) {
@@ -49,7 +50,7 @@ impl Renderer {
             // Exempt from the budget until the nearest probe is taken: the fallback
             // first, if any, never evicts the camera's own room's probe (#1697).
             let exempt = wanted.iter().all(|&(j, _)| probes[j].fallback);
-            let over = |size: u32| !exempt && array_bytes(face.max(size), cubes) > budget;
+            let over = |size: u32| !exempt && array_bytes(face.max(size), cubes, format) > budget;
             if over(0) {
                 continue; // full: no cube is read
             }
@@ -120,11 +121,14 @@ impl ProbeArray {
     }
 }
 
-/// The bytes an array of `cubes` cubes at a `face`-texel face takes: six
-/// `Rgba16Float` faces each (8 bytes a texel, #1696), and a third more for the mips.
-pub(crate) fn array_bytes(face: u32, cubes: usize) -> u64 {
-    let texel = crate::render::ibl::reflection_prefilter::TEXEL_BYTES as u64;
-    let level = u64::from(face) * u64::from(face) * texel * 6;
+/// The bytes an array of `cubes` cubes at a `face`-texel face takes in `format`:
+/// six faces each, at a byte a texel for BC6H (#1885) or 8 for `Rgba16Float`
+/// (#1696), and a third more for the mips.
+pub(crate) fn array_bytes(face: u32, cubes: usize, format: wgpu::TextureFormat) -> u64 {
+    let (edge, _) = format.block_dimensions();
+    let block = u64::from(format.block_copy_size(None).unwrap_or(8));
+    let blocks = u64::from(face.div_ceil(edge));
+    let level = blocks * blocks * block * 6;
     level * 4 / 3 * cubes as u64
 }
 
@@ -162,6 +166,10 @@ mod frame_tests;
 #[cfg(test)]
 #[path = "budget_tests.rs"]
 mod budget_tests;
+
+#[cfg(test)]
+#[path = "format_tests.rs"]
+mod format_tests;
 
 #[cfg(test)]
 #[path = "refuse_tests.rs"]

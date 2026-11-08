@@ -88,16 +88,18 @@ box the camera stands in counts as distance zero; ties go to the lower index), a
 32, while the cubes stay within the budget: a cube that would pass it is skipped and
 farther ones that fit are still taken; the nearest is always kept, and so is the
 fallback probe (above). They share one
-texture whose face is the largest resident cube's, so a 512 cube costs 16 MB there
-(half-float texels, with their mips) and a smaller cube rides in its lower mips. That
+texture whose face is the largest resident cube's, so a 512 cube costs 2 MB there
+(BC6H, a byte a texel, with its mips; 16 MB of half floats on a GPU without BC
+compression, where cubes are decoded when they load) and a smaller cube rides in its
+lower mips. That
 texture is the only copy of a resident cube (a file is read, copied in and dropped), and
 it keeps two spare cubes inside the budget for the ones that just left range, so a
-256 MB budget shades with 14 512 cubes (32, the cap, at 256) and pacing back and forth across its
+256 MB budget shades with 32 512 cubes, the cap (14 on a GPU without BC), and pacing back and forth across its
 edge reads nothing from disk. A cube is judged by
 its file header before it is read, and once the budget is full no file is read at
 all. A cubemap whose size is not a power of two up to 2048 is skipped with
 a console warning (repeated after the next bake), and its objects reflect the skybox;
-so is an 8-bit cube baked before HDR probes, with a warning to re-bake it.
+so is a half-float or 8-bit cube baked before BC6H probes, with a warning to re-bake it.
 Probes may share one cubemap file; each keeps its own box. An object whose probes are
 not resident blends the ones that are, or reflects the skybox.
 
@@ -131,8 +133,9 @@ cube (#1696). It runs a GGX
 importance-sample prefilter to build a roughness mip chain (mip ↔ roughness — a mirror
 reads the sharp base level, a rough surface a blurrier one; each sample reads the
 capture's mip its solid angle covers, so a small bright lamp blurs into a smooth glow
-on rough metal instead of speckle), encodes the result to a half-float
-(`R16G16B16A16_SFLOAT`) **KTX2** file written to the scene's own folder (`<scene file>.reflections/reflection_probe_<i>.ktx2`,
+on rough metal instead of speckle), encodes every face and mip as BC6H unsigned float
+(`BC6H_UFLOAT_BLOCK`, Unity's desktop format for an HDR cubemap, an eighth of half
+floats; a 2×2 or 1×1 mip is one padded 4×4 block) into a **KTX2** file written to the scene's own folder (`<scene file>.reflections/reflection_probe_<i>.ktx2`,
 as Unity keeps a scene's baked probes in a folder named after it, so two scenes in one
 folder never overwrite each other's cubes; cubes there past the probe count are removed,
 nothing outside it is touched), and points the
