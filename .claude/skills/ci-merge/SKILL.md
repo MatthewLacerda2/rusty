@@ -243,7 +243,8 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   crashed: <error>; stopped.`). `make queue-daemon` exits non-zero, printing the
   log's tail, when the supervisor it started exits in its first few seconds; one
   still running but never seen holding its lock is reported as *unconfirmed*
-  (exit 0): read `queue.log` before trusting it. Stop a supervisor with `make
+  (exit 0): ask `make queue-status` (the supervisor's lock PID, checked alive, and the
+  log's last line) before trusting it; `make queue-events` is the stream to watch (#1876). Stop a supervisor with `make
   queue-stop` (the watch exits **6** between pull requests and the supervisor
   passes it through), or `kill <pid>` (its worktree lock is released either way).
 - By hand, the same loop is: `git merge origin/main` in the branch's worktree,

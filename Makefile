@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture export launcher bench bless-converters
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder review-level rebriefs mutants-remote test-explore test-one-process dead-pub editor-capture export launcher bench bless-converters
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -257,6 +257,17 @@ queue-daemon: ## Keep the merge-queue watch running, detached; log in .git/merge
 
 queue-stop: ## Ask the watch and its supervisor to stop, between pull requests
 	@python3 .github/scripts/queue-daemon.py --stop
+
+# The orchestrator's read of the queue (#1876), two fixed commands so the watch
+# is never retyped: liveness from the supervisor's worktree lock (its PID, asked
+# alive; never a pattern matched against every command line), and the stream a
+# `Monitor` runs: the log from 30 lines back, filtered to what someone acts on,
+# plus coders' "Standing down" comments. `merging/view/` has the incidents.
+queue-status: ## Does the queue's supervisor run (its lock's PID, checked alive)? Plus the log's last line and age
+	@python3 .github/scripts/queue-view.py status
+
+queue-events: ## The stream a Monitor runs: hand-backs, merges, ready flips, stand-downs; exits 1 once the supervisor is gone
+	@python3 .github/scripts/queue-view.py events
 
 # "Blocked by #N" written in an issue body but never recorded as a GitHub
 # relationship is invisible to everything that plans from the graph (#624).
