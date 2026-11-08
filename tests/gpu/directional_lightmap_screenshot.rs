@@ -81,6 +81,7 @@ fn shot(directional: bool) -> Option<image::RgbImage> {
         bounces: 1,
         seed: 5,
         max_lightmap_size: 64,
+        denoiser: rusty::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional,
     };

@@ -108,6 +108,7 @@ pub(super) fn bake(scene: &mut Scene, name: &str, directional: bool) -> String {
         bounces: 1,
         seed: 5,
         max_lightmap_size: 64,
+        denoiser: rusty::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional,
     };

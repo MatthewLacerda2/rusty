@@ -195,5 +195,8 @@ fn set_reflections(t: &Table, r: &mut ReflectionSettings) -> mlua::Result<()> {
 }
 
 #[cfg(test)]
+#[path = "generate_denoiser_tests.rs"]
+mod denoiser_tests;
+#[cfg(test)]
 #[path = "generate_tests.rs"]
 mod tests;

@@ -37,6 +37,7 @@ pub(super) fn quick() -> BakeSettings {
         bounces: 1,
         seed: 1,
         max_lightmap_size: 32,
+        denoiser: crate::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional: true,
     }

@@ -95,7 +95,7 @@ pub fn lent(settings: &BakeSettings) -> Option<Arc<Oidn>> {
     match library() {
         Ok(_) => Some(Arc::new(Oidn::default())),
         Err(why) => {
-            log::warn!("{}", missing(why, settings.samples));
+            log::warn!("[LightmapBake] {}", missing(why, settings.samples));
             None
         }
     }
@@ -105,8 +105,15 @@ pub fn lent(settings: &BakeSettings) -> Option<Arc<Oidn>> {
 /// Gaussian at the lower default samples looks noisier.
 pub fn missing(why: &str, samples: u32) -> String {
     format!(
-        "[LightmapBake] {why}: filtering instead. To denoise, {INSTALL}. \
+        "{why}: filtering instead. To denoise, {INSTALL}. \
          The filter at {samples} samples looks noisier than OIDN; raise Samples \
          (128 or more) or pick the Filter denoiser to silence this."
     )
 }
+
+/// The environment variable CI sets so a missing OIDN fails the canary test
+/// instead of letting every OIDN test skip (as `RUSTY_REQUIRE_GPU` does for the GPU).
+pub const REQUIRE_OIDN_ENV: &str = "RUSTY_REQUIRE_OIDN";
+
+#[cfg(test)]
+mod tests;

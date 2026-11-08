@@ -85,6 +85,8 @@ mod casting_tests;
 #[cfg(test)]
 mod coverage_tests;
 #[cfg(test)]
+mod denoise_tests;
+#[cfg(test)]
 mod direction_tests;
 #[cfg(test)]
 mod falloff_tests;
