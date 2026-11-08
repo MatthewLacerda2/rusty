@@ -73,10 +73,6 @@ class Target(unittest.TestCase):
         self.assertIsNone(comment.target([]))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class Named(unittest.TestCase):
     """A run the merge queue dispatched on `main` names its pull request (#1934)."""
 
@@ -97,3 +93,7 @@ class Named(unittest.TestCase):
             comment.main([str(report), "--repo", "o/r", "--branch", "main", "--run-url", URL, "--pr", "42"])
         self.assertFalse(any("pulls?" in a for call in calls for a in call), "no branch lookup")
         self.assertIn("repos/o/r/issues/42/comments", calls[-1])
+
+
+if __name__ == "__main__":
+    unittest.main()

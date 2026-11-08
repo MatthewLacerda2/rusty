@@ -20,29 +20,62 @@ CAP = 2
 # taken as lost and its slot freed: a dispatch returns no run id to ask after.
 LOST_SECONDS = 15 * 60
 
-# A request GitHub refuses this many times in a row is dropped, and said.
+# A request GitHub refuses this many times in a row is dropped, and said. A
+# network failure is not a refusal and never counts (#847's lesson, the
+# independent review of PR #1935: a one-minute outage used to burn all three).
 TRIES = 3
+
+KEYS = ("unread", "waiting", "running")
+
+
+class Busy(str):
+    """Why a call failed for the network's reasons, not GitHub's answer: the
+    request keeps its place and its tries ([`pump`])."""
 
 
 def empty() -> dict:
-    return {"waiting": [], "running": []}
+    return {key: [] for key in KEYS}
 
 
-def load(path: Path) -> dict:
-    """The requests on disk; none when the file is missing or unreadable."""
+def load(path: Path, say=lambda line: None) -> dict:
+    """The requests on disk; none when the file is missing or unreadable. An
+    entry that cannot be read is dropped and said, never raised (a watch killed
+    by its own state file stops every merge, not one signal)."""
     try:
         state = json.loads(path.read_text())
-    except (OSError, ValueError):
+    except FileNotFoundError:
+        return empty()
+    except (OSError, ValueError) as failed:
+        say(f"after: the mutation requests in {path} are unreadable; dropped: {failed}")
         return empty()
     if not isinstance(state, dict):
+        say(f"after: the mutation requests in {path} are unreadable; dropped.")
         return empty()
-    return {key: [e for e in state.get(key) or [] if readable(e)] for key in ("waiting", "running")}
+    kept = empty()
+    for key in KEYS:
+        entries = state.get(key, [])
+        entries = entries if isinstance(entries, list) else [entries]
+        kept[key] = [e for e in entries if readable(key, e)]
+        if len(kept[key]) != len(entries):
+            say(f"after: {len(entries) - len(kept[key])} unreadable {key} mutation request(s) dropped.")
+    return kept
 
 
-def readable(entry: object) -> bool:
-    """Whether a stored request has what dispatching it needs; one that does not is dropped."""
-    return (isinstance(entry, dict) and isinstance(entry.get("pr"), int)
-            and isinstance(entry.get("scope"), str) and isinstance(entry.get("commit"), str))
+def number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def readable(key: str, entry: object) -> bool:
+    """Whether a stored request has, in the right types, what handling it needs."""
+    if not isinstance(entry, dict) or not isinstance(entry.get("pr"), int) or isinstance(entry["pr"], bool):
+        return False
+    if not number(entry.get("tries", 0)):
+        return False
+    if key == "unread":
+        return True
+    if not (isinstance(entry.get("scope"), str) and isinstance(entry.get("commit"), str)):
+        return False
+    return key == "waiting" or (isinstance(entry.get("request"), str) and number(entry.get("since")))
 
 
 def save(path: Path, state: dict) -> str | None:
@@ -57,18 +90,22 @@ def save(path: Path, state: dict) -> str | None:
     return None
 
 
-def enqueue(state: dict, number: int, scope: str, commit: str) -> bool:
+def known(state: dict, pr: int) -> bool:
+    return any(e["pr"] == pr for key in KEYS for e in state[key])
+
+
+def enqueue(state: dict, pr: int, scope: str, commit: str) -> bool:
     """Add a merged pull request's request; `False` when it is already known."""
-    if any(e.get("pr") == number for e in state["waiting"] + state["running"]):
+    if any(e["pr"] == pr for e in state["waiting"] + state["running"]):
         return False
-    state["waiting"].append({"pr": number, "scope": scope, "commit": commit})
+    state["waiting"].append({"pr": pr, "scope": scope, "commit": commit})
     return True
 
 
 def found(runs: list[dict], request: str) -> dict | None:
     """The run a request started, recognised by the id the workflow puts in its name."""
     tag = f"[{request}]"
-    return next((r for r in runs if tag in (r.get("display_title") or "")), None)
+    return next((r for r in runs if isinstance(r, dict) and tag in (r.get("display_title") or "")), None)
 
 
 def free(state: dict, runs: list[dict] | None, now: float, say) -> bool:
@@ -78,10 +115,10 @@ def free(state: dict, runs: list[dict] | None, now: float, say) -> bool:
         return False
     kept = []
     for entry in state["running"]:
-        run = found(runs, entry.get("request", ""))
+        run = found(runs, entry["request"])
         if run is not None and run.get("status") == "completed":
             say(f"after: #{entry['pr']}'s mutation run ended {run.get('conclusion')}: {run.get('html_url', '')}")
-        elif run is None and now - float(entry.get("since", now)) > LOST_SECONDS:
+        elif run is None and now - float(entry["since"]) > LOST_SECONDS:
             say(f"after: #{entry['pr']}'s mutation run never appeared; its slot is freed.")
         else:
             kept.append(entry)
@@ -90,28 +127,43 @@ def free(state: dict, runs: list[dict] | None, now: float, say) -> bool:
     return changed
 
 
+def failed(entry: dict, why: str, what: str, say) -> bool:
+    """Count a failed call against `entry`; whether it is now dropped. A
+    [`Busy`] failure counts nothing and is said once, on its first pass."""
+    if isinstance(why, Busy):
+        if not entry.get("busy"):
+            say(f"after: GitHub did not answer for #{entry['pr']}'s {what}; asking again next pass: {why}")
+        entry["busy"] = True
+        return False
+    entry["busy"] = False
+    entry["tries"] = int(entry.get("tries", 0)) + 1
+    if entry["tries"] >= TRIES:
+        say(f"after: GitHub refused #{entry['pr']}'s {what} {TRIES} times; dropped: {why}")
+        return True
+    say(f"after: GitHub refused #{entry['pr']}'s {what}; asking again next pass: {why}")
+    return False
+
+
 def pump(state: dict, runs: list[dict] | None, dispatch, now: float, say, token=None) -> bool:
     """Free what finished, then dispatch the oldest waiting requests while a
-    slot is open. `dispatch(entry, request)` says why GitHub refused, or `None`.
-    A refusal keeps the request first in line for the next pass, until [`TRIES`].
-    Returns whether the state changed."""
+    slot is open. `dispatch(entry, request)` says why it failed ([`Busy`] for
+    the network), or `None`. A failure keeps the request first in line for the
+    next pass; a refusal counts toward [`TRIES`]. Returns whether the state changed."""
     token = token or (lambda: secrets.token_hex(3))
     changed = free(state, runs, now, say)
     while state["waiting"] and len(state["running"]) < CAP:
         entry = state["waiting"][0]
         request = f"pr{entry['pr']}-{token()}"
-        refused = dispatch(entry, request)
+        why = dispatch(entry, request)
         changed = True
-        if refused is None:
+        if why is None:
             state["waiting"].pop(0)
+            entry.pop("tries", None), entry.pop("busy", None)
             state["running"].append({**entry, "request": request, "since": now})
             say(f"after: dispatched #{entry['pr']}'s mutation run ({entry['scope']}) as {request}.")
             continue
-        entry["tries"] = int(entry.get("tries", 0)) + 1
-        if entry["tries"] >= TRIES:
+        if failed(entry, why, "mutation run", say):
             state["waiting"].pop(0)
-            say(f"after: GitHub refused #{entry['pr']}'s mutation run {TRIES} times; dropped: {refused}")
             continue
-        say(f"after: GitHub refused #{entry['pr']}'s mutation run; asking again next pass: {refused}")
         break
     return changed

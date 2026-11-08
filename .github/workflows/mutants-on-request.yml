@@ -7,10 +7,11 @@
 # What replaces it is not silence: whoever just wrote tricky code asks for
 # exactly that code to be mutated, and reads the answer.
 #
-# The way in is `make mutants-remote SCOPE=...`, which dispatches this on the
-# current branch, waits, downloads the report and prints it
-# (`.github/scripts/mutants-remote.py`). By hand, or from a cloud session's
-# GitHub tools (`actions_run_trigger`), with the same two inputs:
+# By hand, the way in is `make mutants-remote SCOPE=...`, which dispatches this
+# on the current branch, waits, downloads the report and prints it
+# (`.github/scripts/mutants-remote.py`). Or directly, from `gh` or a cloud
+# session's GitHub tools (`actions_run_trigger`), with `scope` and optionally
+# `request` (`commit` and `pr` are the merge queue's, below):
 #
 #   gh workflow run mutants-on-request.yml --ref <branch> -f scope='<scope>'
 #

@@ -587,7 +587,12 @@ queue, nor slows the CI the queue waits on:
 - **Where the report lands:** the merged PR, named by the run's `pr` input, as
   one comment edited in place (#912). Lines starting `after:` in the queue's log
   say each dispatch, each run's end and any refusal (a request GitHub refuses
-  three times is dropped, and said).
+  three times is dropped, and said). A network failure is not a refusal: the
+  request keeps its place and its tries, and a merged PR whose description could
+  not be read is read again on the next pass. `make queue-events` passes the
+  lines that mean a request was lost (`dropped`, `could not …`, `never
+  appeared`), so a lost report is told from a slow one. A named take beside the
+  watch shares the file under its lock, and the cap with it.
 
 By hand, `make mutants-remote SCOPE=...` still dispatches on your branch and
 prints the report; keep that for a question you are waiting on, not for every

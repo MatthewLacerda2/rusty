@@ -28,6 +28,15 @@ So the coder **asks** and the queue **dispatches, after the merge**:
   a full cap never drops one ([`slots.pump`]). Nothing is lost to GitHub's one
   pending run per concurrency group either: on `main` each run is its own group.
 
+- **Nothing waiting is lost to a fault** (the independent review of PR
+  #1935): a network failure (`verdict.github.transient`, #847's lesson) keeps
+  a request's place and its [`slots.TRIES`]; a merged pull request is noted by
+  number first and its description read on the next pass, so a failed read is
+  retried like a refused dispatch; the file is the state, read and written
+  under its lock by every call, so a named take beside the watch shares the
+  cap; and an entry the file cannot give in the right types is dropped and
+  said, never raised into the watch.
+
 Losing nothing costs little: a scoped run takes up to 2 h 45, and the queue
 usually merged the branch before its report came anyway (#912's comment on
 the merged pull request). A failure here is a lost signal, never a stopped

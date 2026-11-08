@@ -10,13 +10,15 @@ class GitHub:
 
     def __init__(self, pulls: dict[int, dict], files: dict[str, list[str]] | None = None):
         self.pulls, self.files, self.runs, self.dispatched, self.refuse = pulls, files or {}, [], [], 0
+        self.refusal = "HTTP 422: no"  # what a refused dispatch says; a 502 is the network's
+        self.down = 0  # this many reads of a pull request fail with a 502 first
 
     def __call__(self, *args: str, stdin: str | None = None) -> tuple[bool, str]:
         path = next(a for a in args if a.startswith("repos/"))
         if path.endswith("/dispatches"):
             if self.refuse:
                 self.refuse -= 1
-                return False, "HTTP 422: no"
+                return False, self.refusal
             sent = json.loads(stdin)
             self.dispatched.append(sent)
             self.runs.insert(0, {"display_title": f"mutants: x [{sent['inputs']['request']}]", "status": "queued"})
@@ -27,6 +29,9 @@ class GitHub:
             sha = path.rsplit("/", 1)[1]
             return True, json.dumps({"files": [{"filename": f} for f in self.files.get(sha, ["src/a.rs"])]})
         number = int(path.rsplit("/", 1)[1])
+        if self.down:
+            self.down -= 1
+            return False, "HTTP 502: Bad Gateway"
         return (True, json.dumps(self.pulls[number])) if number in self.pulls else (False, "HTTP 404")
 
     def finish(self, number: int) -> None:
