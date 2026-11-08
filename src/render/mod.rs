@@ -122,6 +122,8 @@ pub struct Renderer {
     vertex_line_pipeline: gpu::pipelines::LazyPipeline,
     /// Each collider's gizmo shape, kept until physics' inputs for it change (#1882).
     wire_cache: std::cell::RefCell<crate::physics::WireCache>,
+    /// The reflection probes' mirror-ball gizmo (#1911).
+    probe_ball_pipeline: gpu::pipelines::LazyPipeline,
     /// The editor's selection outline (#1175).
     outline: passes::outline::OutlinePasses,
 

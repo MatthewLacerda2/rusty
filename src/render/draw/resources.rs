@@ -6,7 +6,7 @@
 
 use super::batch::sort::back_to_front;
 use super::batch::{DrawItem, FrameDraws};
-use super::overlays::{ColliderScope, OverlayBindings, OverlayDraws};
+use super::overlays::{BallResource, ColliderScope, OverlayBindings, OverlayDraws};
 use super::visibility::{CameraCulls, ViewCull};
 use crate::core::application::{Gizmo, SceneGizmos};
 use crate::render::gpu::draw_buffers::{FrameUpload, JointMatrix};
@@ -60,6 +60,8 @@ pub(crate) struct Overlays {
     // Light- and reflection-probe gizmos (#284): probe markers tinted by baked SH plus
     // reflection parallax-box wireframes. Editor-only, like the rest of `Overlays`.
     pub probes: Vec<ProbeResource>,
+    /// The reflection probes' mirror balls (#1911).
+    pub balls: Vec<BallResource>,
     /// The collider and `Debug.Draw*` line gizmos (#1882): one draw, coloured per
     /// vertex, through the vertex-colour line pipeline.
     pub wires: Option<ProbeResource>,
@@ -87,6 +89,7 @@ impl Renderer {
         let aabb = self.precreate_occlusion(scene, &mut draws);
         let axis = self.precreate_axis_arrows(scene, &mut draws);
         let probes = self.precreate_probes(scene, gizmos, &mut draws);
+        let balls = self.precreate_probe_balls(scene, gizmos, &mut draws);
         let scope = match gizmos.on(Gizmo::Colliders) {
             true => ColliderScope::All,
             false => ColliderScope::Selected,
@@ -98,6 +101,7 @@ impl Renderer {
             aabb,
             axis,
             probes,
+            balls,
             wires,
         }
     }

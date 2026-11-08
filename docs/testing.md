@@ -123,7 +123,11 @@ outside it, and the replay runs each tick on the `dt` it was recorded with. Ever
 recorded as a **host act** before its tick: a console, MCP or command-channel
 line (the one evaluator, `ScriptManager::eval`), a scenario's API calls with their
 plain-data arguments, and the `Harness` verbs that change the world without a
-tick (`Harness.AttachPlayerBot`, `Harness.LoadStress`). Acts made before Play is
+tick (`Harness.AttachPlayerBot`, `Harness.LoadStress`). A call the scenario
+runs in the gameplay VM (`Damage.*`, `CharacterController.Move`) replays in the
+gameplay VM too, so the handlers it calls fire again; made before the game is up,
+it replays as it was made (`Move` in the caller's own VM, `Damage.*` refused), by
+the one rule both sides read (`dev::demo::forwards`, #1929). Acts made before Play is
 entered (a scenario's set-up, a console line in edit mode) replay before
 entering it, on an edit-mode runtime the replay brings up, acts made after it
 after. `Editor.EnterPlay()` and `Editor.ExitPlay()` are not acts: the transition

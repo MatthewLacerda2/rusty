@@ -200,6 +200,7 @@ impl Renderer {
             line_pipeline: forward.line_pipeline,
             vertex_line_pipeline: forward.vertex_line_pipeline,
             wire_cache: Default::default(),
+            probe_ball_pipeline: forward.probe_ball_pipeline,
             outline: forward.outline,
             prepass_pipeline: forward.prepass_pipeline,
             ssao,

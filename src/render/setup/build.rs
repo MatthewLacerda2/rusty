@@ -6,6 +6,7 @@
 use crate::core::settings::quality::QualityValues;
 use crate::render::clusters::ClusterBuffers;
 use crate::render::decals::DecalBuffers;
+use crate::render::draw::ball_pipeline;
 use crate::render::gpu::bind_layouts;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::lightmaps::Lightmaps;
@@ -51,6 +52,8 @@ pub(crate) struct ForwardPasses {
     pub depth_postpass_pipelines: pipelines::DepthPostpassPipelines,
     pub line_pipeline: pipelines::LazyPipeline,
     pub vertex_line_pipeline: pipelines::LazyPipeline,
+    /// The reflection-probe ball gizmo (#1911), over post-FX like the lines.
+    pub probe_ball_pipeline: pipelines::LazyPipeline,
     /// The selection outline's mask and edge pipelines (#1175).
     pub outline: crate::render::passes::outline::OutlinePasses,
     pub prepass_pipeline: pipelines::FacedPipeline,
@@ -271,6 +274,7 @@ fn create_forward_passes(
         depth_postpass_pipelines: pl.depth_postpass,
         line_pipeline: pl.line,
         vertex_line_pipeline: pl.vertex_line,
+        probe_ball_pipeline: ball_pipeline(device, registry, &pl.layout, output_format),
         outline: OutlinePasses::new(device, registry, &pl.layout, output_format),
         prepass_pipeline: pl.prepass,
         skybox_renderer,
