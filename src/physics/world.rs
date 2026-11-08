@@ -77,7 +77,7 @@ pub struct PhysicsWorld {
     /// The fixed body world-anchored joints attach to, made on first use.
     pub(super) world_body: Option<RigidBodyHandle>,
     /// The joints whose motors the last step drove (#1895, `joints::drive`).
-    pub(super) driven: std::collections::BTreeSet<u32>,
+    pub(super) driven: std::collections::BTreeMap<u32, super::joints::drive::MotorSet>,
     /// What the sync before each step needs to sync only what changed (#1707).
     pub(super) tracked: Tracked,
     /// What the world remembers about its own steps (#1795, #1797, see `recover`).

@@ -20,20 +20,29 @@
 //! A joint whose body is kinematic, or whose drive is off, carries no motor, so a
 //! scene without drives pays one body-type check per joint here.
 
-use glam::Quat;
+use glam::{Mat4, Quat};
 use rapier3d::prelude::*;
 
 use super::super::compound::body_owner;
 use super::super::world::PhysicsWorld;
 use super::BuiltJoint;
+use crate::components::transform::world_rotation;
 use crate::scene::skeleton::Drive;
 use crate::scene::Scene;
 
+/// What a driven joint's motors were last set to: the target, per free axis
+/// the angle rapier takes, and the drive. Equal next step means nothing to set.
+pub(in crate::physics) type MotorSet = ([f32; 3], Drive);
+
 impl PhysicsWorld {
     /// Set this step's motors on the driven joints and take them off the joints
-    /// driven last step that no longer are. Ascending joint order.
-    pub(in crate::physics) fn drive_joints(&mut self, scene: &Scene) {
-        let mut driven = std::collections::BTreeSet::new();
+    /// driven last step that no longer are. Ascending joint order. A joint is
+    /// touched only when its target or drive changed since it was last set, so
+    /// a driven body holding still can fall asleep (touching a joint wakes both
+    /// its bodies). Returns how many joints it touched.
+    pub(in crate::physics) fn drive_joints(&mut self, scene: &Scene) -> usize {
+        let mut driven = std::collections::BTreeMap::new();
+        let mut touched = 0;
         for (&id, built) in &self.joints {
             let dynamic = self
                 .bodies
@@ -43,34 +52,38 @@ impl PhysicsWorld {
             let Some(drive) = drive.filter(|d| d.strength > 0.0) else {
                 continue;
             };
-            let Some(live) = self.impulse_joints.get_mut(built.handle, true) else {
-                continue;
-            };
             let q = target(scene, id, built);
             let q = if q.w < 0.0 { -q } else { q };
             let angle = |s: f32| 2.0 * s.clamp(-1.0, 1.0).asin();
-            for (axis, s) in [
-                (JointAxis::AngX, q.x),
-                (JointAxis::AngY, q.y),
-                (JointAxis::AngZ, q.z),
-            ] {
+            let set: MotorSet = ([angle(q.x), angle(q.y), angle(q.z)], drive);
+            driven.insert(id, set);
+            if self.driven.get(&id) == Some(&set) {
+                continue;
+            }
+            let Some(live) = self.impulse_joints.get_mut(built.handle, true) else {
+                continue;
+            };
+            touched += 1;
+            let axes = [JointAxis::AngX, JointAxis::AngY, JointAxis::AngZ];
+            for (axis, a) in axes.into_iter().zip(set.0) {
                 if live.data.locked_axes.contains(axis.into()) {
                     continue; // rapier would solve a motor row against the lock
                 }
                 live.data
-                    .set_motor_position(axis, angle(s), drive.strength, drive.damping);
+                    .set_motor_position(axis, a, drive.strength, drive.damping);
             }
-            driven.insert(id);
         }
-        for id in self.driven.difference(&driven) {
+        for id in self.driven.keys().filter(|id| !driven.contains_key(id)) {
             let Some(built) = self.joints.get(id) else {
                 continue; // dropped or broken: its motors went with it
             };
             if let Some(live) = self.impulse_joints.get_mut(built.handle, true) {
                 live.data.motor_axes = JointAxesMask::empty();
+                touched += 1;
             }
         }
         self.driven = driven;
+        touched
     }
 }
 
@@ -96,23 +109,53 @@ fn target(scene: &Scene, id: u32, built: &BuiltJoint) -> Quat {
 }
 
 /// The animated rotation of joint entity `id`'s body relative to its connected
-/// body: the animated local rotations from below the connected body's owner
-/// down to `id`. `None` when `id` has no animated pose or no connected body
-/// above it.
+/// body: both animated world rotations, `R_top⁻¹ · R_id`, composed from the
+/// animated local poses below the connected body's owner `top` the way the
+/// engine poses them, a mirroring parent included (`F·R_local·F`, #1119), so a
+/// mirrored rig is driven toward the pose it draws. `None` when `id` has no
+/// animated pose or no connected body above it.
 fn animated_turn(scene: &Scene, id: u32) -> Option<Quat> {
-    let (_, mut turn) = scene.ragdolls.animated(id)?;
+    scene.ragdolls.animated(id)?;
     let top = body_owner(scene, scene.world.joint(id)?.connected_body?);
-    let local = |e: u32| match scene.ragdolls.animated(e) {
-        Some((_, rot)) => Some(rot),
-        None => scene.world.transform(e).map(|t| t.rotation),
-    };
+    let mut chain = vec![id];
     let mut up = scene.world.parent_id(id);
-    while let Some(e) = up {
+    loop {
+        let e = up?;
         if e == top {
-            return Some(turn);
+            break;
         }
-        turn = local(e)? * turn;
+        chain.push(e);
         up = scene.world.parent_id(e);
     }
-    None
+    let local = |e: u32| {
+        let t = scene.world.transform(e)?;
+        let (pos, rot) = scene
+            .ragdolls
+            .animated(e)
+            .unwrap_or((t.position, t.rotation));
+        Some((
+            Mat4::from_scale_rotation_translation(t.scale, rot, pos),
+            rot,
+        ))
+    };
+    // Only the mirror and scale above `top` matter to the relative turn, and
+    // those the Animator doesn't move: the live parent matrix is enough.
+    let above = scene
+        .world
+        .parent_id(top)
+        .map(|p| scene.world.local_to_world(p));
+    let (top_m, top_local) = local(top)?;
+    let top_rot = above.map_or(top_local, |p| world_rotation(p, top_local));
+    let mut parent = above.unwrap_or(Mat4::IDENTITY) * top_m;
+    let mut rot = top_rot;
+    for &e in chain.iter().rev() {
+        let (m, r) = local(e)?;
+        rot = world_rotation(parent, r);
+        parent *= m;
+    }
+    Some((top_rot.inverse() * rot).normalize())
 }
+
+#[cfg(test)]
+#[path = "drive_tests.rs"]
+mod tests;

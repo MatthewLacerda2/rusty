@@ -76,13 +76,15 @@ impl PhysicsWorld {
 /// Draw bone `id` between its animated local pose and the one physics just
 /// wrote, by its blend weight (#1895): translation lerped, rotation slerped, as a
 /// crossfade blends; at weight 0 exactly the animated pose. A bone at weight 1,
-/// or without an animated pose, keeps the physics pose.
+/// or without an animated pose, keeps the physics pose. The physics pose is
+/// noted, so `Scene::solve_ik` can redo the blend over the IK'd animation.
 fn blend_with_animation(scene: &mut Scene, id: u32) {
     let w = scene.ragdolls.weight(id);
     let Some((pos, rot)) = scene.ragdolls.animated(id).filter(|_| w < 1.0) else {
         return;
     };
     if let Some(mut t) = scene.world.transform_mut(id) {
+        scene.ragdolls.note_physics(id, (t.position, t.rotation));
         if w <= 0.0 {
             (t.position, t.rotation) = (pos, rot);
         } else {

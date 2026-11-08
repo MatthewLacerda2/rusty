@@ -9,9 +9,13 @@
 //! - **Hit reactions** (`Ragdoll.HitReact`), keyed by the root bone of the branch
 //!   they simulate. A reaction's weight eases from 1 to 0 over its duration; the
 //!   bones it switched to physics (`reacting`) go back to the Animator once no
-//!   reaction covers them. Where reactions overlap, the **outermost** one (the
-//!   root nearest the hips) decides a bone's weight and drive, as Unreal's
-//!   `SetAllBodiesBelowPhysicsBlendWeight` on a parent overrides its children.
+//!   reaction covers them. Where reactions overlap (a chest hit, then an arm
+//!   hit), a bone takes the **largest** weight of the reactions holding it, and
+//!   that reaction's drive: each weight eases continuously to 0, so their
+//!   maximum does too, and no bone jumps when one of them ends.
+//! - **The physics pose** each blended bone had this tick before the blend
+//!   (`note_physics`), so IK can solve on the animated side and the blend be
+//!   redone after it (`Scene::solve_ik`).
 //!
 //! Every map is ordered, so the state reads the same way every run.
 
@@ -39,8 +43,6 @@ pub struct Drive {
 /// One running hit reaction.
 #[derive(Clone, Debug)]
 struct Reaction {
-    /// How many ancestors its root has: the smallest is the outermost.
-    depth: usize,
     /// The ragdoll bones of its branch, ascending.
     bones: Vec<u32>,
     elapsed: f32,
@@ -70,6 +72,7 @@ pub struct RagdollRuntime {
     weights: BTreeMap<u32, f32>,
     reactions: BTreeMap<u32, Reaction>,
     reacting: BTreeSet<u32>,
+    physics: BTreeMap<u32, (Vec3, Quat)>,
 }
 
 impl RagdollRuntime {
@@ -88,6 +91,23 @@ impl RagdollRuntime {
         self.animated.remove(&bone);
         self.weights.remove(&bone);
         self.reacting.remove(&bone);
+        self.physics.remove(&bone);
+    }
+
+    /// Whether `bone`'s animated pose is tracked.
+    pub fn is_tracked(&self, bone: u32) -> bool {
+        self.animated.contains_key(&bone)
+    }
+
+    /// The local pose physics gave blended `bone` this tick, before the blend.
+    pub fn note_physics(&mut self, bone: u32, pose: (Vec3, Quat)) {
+        self.physics.insert(bone, pose);
+    }
+
+    /// The bones blended this tick, ascending, with their physics poses; and
+    /// forget them, so the next tick starts empty.
+    pub fn take_physics(&mut self) -> BTreeMap<u32, (Vec3, Quat)> {
+        std::mem::take(&mut self.physics)
     }
 
     /// The Animator sampled `bone` at `pose` this tick; kept when it is tracked.
@@ -102,23 +122,29 @@ impl RagdollRuntime {
         self.animated.get(&bone).copied()
     }
 
+    /// Whether `bone` has an explicit blend weight.
+    pub fn has_weight(&self, bone: u32) -> bool {
+        self.weights.contains_key(&bone)
+    }
+
     /// Set `bone`'s explicit blend weight (`0..=1`).
     pub fn set_weight(&mut self, bone: u32, weight: f32) {
         self.weights.insert(bone, weight);
     }
 
-    /// How much of `bone`'s drawn pose is physics: its outermost reaction's
-    /// weight while a reaction holds it, else its explicit weight, else 1.
+    /// How much of `bone`'s drawn pose is physics: the largest weight of the
+    /// reactions holding it, else its explicit weight, else 1.
     pub fn weight(&self, bone: u32) -> f32 {
-        match self.outermost(bone) {
+        match self.strongest(bone) {
             Some(r) => r.weight(),
             None => self.weights.get(&bone).copied().unwrap_or(1.0),
         }
     }
 
-    /// The drive a reaction holding `bone` puts on its joint, over the joint's own.
+    /// The drive a reaction holding `bone` puts on its joint, over the joint's
+    /// own: the one whose weight [`Self::weight`] draws it at.
     pub fn drive_override(&self, bone: u32) -> Option<Drive> {
-        self.outermost(bone).map(|r| r.drive)
+        self.strongest(bone).map(|r| r.drive)
     }
 
     /// Whether a reaction switched `bone` to physics and still holds it.
@@ -126,29 +152,22 @@ impl RagdollRuntime {
         self.reacting.contains(&bone)
     }
 
-    /// The outermost reaction holding `bone`, when one does.
-    fn outermost(&self, bone: u32) -> Option<&Reaction> {
+    /// The reaction holding `bone` at the largest weight, when one does; the
+    /// first by root on a tie.
+    fn strongest(&self, bone: u32) -> Option<&Reaction> {
         if !self.reacting.contains(&bone) {
             return None;
         }
         let covering = self.reactions.values().filter(|r| r.covers(bone));
-        covering.min_by_key(|r| r.depth)
+        covering.reduce(|a, b| if b.weight() > a.weight() { b } else { a })
     }
 
     /// Start (or restart) the reaction rooted at `root`: `bones` is its branch,
     /// `owned` the bones it holds (it switched them to physics, or another
     /// reaction had).
-    pub fn start(
-        &mut self,
-        root: u32,
-        depth: usize,
-        bones: Vec<u32>,
-        owned: &[u32],
-        timing: (f32, Drive),
-    ) {
+    pub fn start(&mut self, root: u32, bones: Vec<u32>, owned: &[u32], timing: (f32, Drive)) {
         let (duration, drive) = timing;
         let reaction = Reaction {
-            depth,
             bones,
             elapsed: 0.0,
             duration,
@@ -195,6 +214,7 @@ impl RagdollRuntime {
         self.animated.retain(|&b, _| keep(b));
         self.weights.retain(|&b, _| keep(b));
         self.reacting.retain(|&b| keep(b));
+        self.physics.retain(|&b, _| keep(b));
         self.reactions.retain(|&b, _| keep(b));
         for r in self.reactions.values_mut() {
             r.bones.retain(|&b| keep(b));

@@ -92,12 +92,16 @@ id from `Ragdoll.Build`'s table — and returns how many bodies (or joints) it s
   few thousand lets a hit knock an arm well back and still brings it most of the
   way home within half a second; tens of thousands hold the animated pose
   tightly. `damping` (1/s) defaults to `2·√strength`. A full `Enable` is driven
-  the same way (a powered ragdoll).
+  the same way (a powered ragdoll), under a mirrored rig too (the target is the
+  turn the bone is drawn with). The motors are set before the physics step, which
+  runs before the Animator, so a drive chases the animated pose of the tick
+  before: one tick behind. A driven body holding still is not woken by its drive,
+  so a powered corpse at rest falls asleep.
 - `Ragdoll.SetBlendWeight(id, bone, w)` (`0..1`) draws each simulated bone of
   the branch that far between its animated pose (`0`) and its body's (`1`, the
   default): translation lerped, rotation slerped, as a crossfade. The bodies
   themselves stay physics'; only what renders (and what the next tick's raycasts
-  hit) blends. A weight set on a parent overrides its children's.
+  hit) blends. Setting it on a parent sets its whole branch.
 - `Ragdoll.HitReact(id, bone, ix, iy, iz, px, py, pz [, opts])` is the one call a
   game makes, from `OnTakeDamage` (see [`Damage`](Damage.md)): it simulates a
   branch, drives it, applies the impulse `(ix, iy, iz)` (N·s) at the world point
@@ -107,18 +111,28 @@ id from `Ragdoll.Build`'s table — and returns how many bodies (or joints) it s
   `strength` (`5000`) and `damping` (`2·√strength`), and `up_to` (a bone: its branch
   reacts instead). Returns `true`, or `false` — with one warning per entity —
   when `id` has no ragdoll at that bone. A NaN or infinite impulse or point
-  starts the reaction but pushes nothing.
+  starts the reaction but pushes nothing; a NaN or infinite `strength` or
+  `damping` counts as `0`, a NaN or infinite `duration` as the default. The
+  impulse goes on the hit body when it is simulated; when it isn't (a hips shot,
+  whose branch starts below the hips, or an `up_to` branch that doesn't hold the
+  hit), on the reacting branch's body nearest the point.
   - **Which branch.** By default the hit body's ragdolled parent's: a forearm shot
     moves the arm, a chest shot the torso. The hips never react: a hit on a bone
     whose parent is the hips reacts from the hit bone, and a hit on the hips
     from the hips' child body nearest the point. A bone with no body (a finger)
     counts as its nearest ragdolled ancestor.
   - **Repeated and overlapping hits.** A second hit on the same branch restarts
-    its reaction. Several branches react at once; where they nest, the
-    **outermost** reaction decides a bone's weight and drive (Unreal's
-    parent-overrides-children rule). A reaction only hands back the bones it
+    its reaction. Several branches react at once; where they nest (a chest
+    hit, then an arm hit), a bone is drawn at the **largest** weight of the
+    reactions holding it, with that reaction's drive, so the arm takes its own
+    fresh reaction and nothing jumps when either one ends. A reaction only hands back the bones it
     switched itself: a branch a script simulated, or a full `Enable`, takes the
     impulse and nothing else.
+  - **IK.** A bone drawn blended (a reacting one, or one under
+    `SetBlendWeight`) keeps its IK: IK solves on the animated side, and the
+    blend is drawn over the result, so an aiming enemy hit in the chest keeps
+    its aim and the reaction ends where the IK'd pose is. A fully simulated
+    bone (weight 1, or `Enable`) is physics' alone, and IK skips it.
   - **Time.** Reactions run on the fixed tick, so they pause with the game, scale
     with `Time.timeScale`, and two runs of the same hits give the same bones.
 - **Runtime state.** Simulated branches, weights and running reactions are not

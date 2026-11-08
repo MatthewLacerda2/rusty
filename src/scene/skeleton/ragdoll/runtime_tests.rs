@@ -1,4 +1,5 @@
-//! The reaction bookkeeping on its own: easing, the outermost branch winning,
+//! The reaction bookkeeping on its own: easing, overlapping reactions blending
+//! with no jump,
 //! and which bones are handed back when.
 
 use glam::{Quat, Vec3};
@@ -17,7 +18,7 @@ const HARD: Drive = Drive {
 #[test]
 fn a_reaction_eases_its_weight_to_zero_then_releases_its_bones() {
     let mut rt = RagdollRuntime::default();
-    rt.start(4, 2, vec![4, 5], &[4, 5], (0.4, SOFT));
+    rt.start(4, vec![4, 5], &[4, 5], (0.4, SOFT));
     assert_eq!(rt.weight(5), 1.0);
     rt.advance(0.2);
     assert!(
@@ -34,29 +35,39 @@ fn a_reaction_eases_its_weight_to_zero_then_releases_its_bones() {
 }
 
 #[test]
-fn the_outermost_reaction_decides_a_nested_bones_weight_and_drive() {
+fn a_newer_inner_reaction_under_a_fading_outer_one_never_jumps() {
+    // A chest hit (branch 4..5), then an arm hit (branch 5) 0.3 s later.
     let mut rt = RagdollRuntime::default();
-    rt.start(5, 3, vec![5], &[5], (0.4, HARD));
+    rt.start(4, vec![4, 5], &[4, 5], (0.4, SOFT));
     rt.advance(0.3);
-    rt.start(4, 2, vec![4, 5], &[4, 5], (0.4, SOFT));
-    assert_eq!(rt.weight(5), 1.0, "the arm's fresh reaction wins");
-    assert_eq!(rt.drive_override(5), Some(SOFT));
-    rt.advance(0.1);
-    assert!(
-        rt.release().is_empty(),
-        "the inner one ended, the outer still holds 5"
+    rt.start(5, vec![5], &[5], (0.4, HARD));
+    assert_eq!(rt.weight(5), 1.0, "the arm's fresh reaction draws it");
+    assert_eq!(rt.drive_override(5), Some(HARD));
+    assert!(rt.weight(4) < 0.2, "the chest keeps fading");
+    let mut last = rt.weight(5);
+    let mut released = Vec::new();
+    for _ in 0..30 {
+        rt.advance(1.0 / 60.0);
+        let w = rt.weight(5);
+        if rt.is_reacting(5) {
+            assert!((w - last).abs() < 0.07, "no frame jumps: {last} -> {w}");
+        }
+        last = w;
+        released.extend(rt.release());
+    }
+    assert_eq!(
+        released,
+        vec![4, 5],
+        "the chest first, the arm when it ends"
     );
-    assert!(rt.is_reacting(5));
-    rt.advance(0.3);
-    assert_eq!(rt.release(), vec![4, 5]);
 }
 
 #[test]
 fn a_repeated_hit_restarts_and_a_script_switch_forgets() {
     let mut rt = RagdollRuntime::default();
-    rt.start(4, 2, vec![4], &[4], (0.4, SOFT));
+    rt.start(4, vec![4], &[4], (0.4, SOFT));
     rt.advance(0.35);
-    rt.start(4, 2, vec![4], &[4], (0.4, SOFT));
+    rt.start(4, vec![4], &[4], (0.4, SOFT));
     assert_eq!(rt.weight(4), 1.0, "restarted");
     rt.forget(&[4]);
     assert!(!rt.is_reacting(4) && rt.release().is_empty());

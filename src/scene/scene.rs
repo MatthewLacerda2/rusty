@@ -123,7 +123,8 @@ pub struct Scene {
     /// Entities marked `Scene.DontDestroyOnLoad` (#432): they and their descendants
     /// survive a scene swap. Transient runtime state, never serialized.
     pub persistent: std::collections::BTreeSet<u32>,
-    /// The sim's game time (`Time::time`): the shaders' `camera.time` (#398). Never serialized.
+    /// The sim's game time (`Time::time`) the renderer uploads as the shaders'
+    /// `camera.time` (#398). Written by the tick; `0` outside Play. Never serialized.
     pub shader_time: f32,
     /// The sim's unscaled clock (`Time::unscaled_time`) custom UI shaders read (#427):
     /// it keeps running at time scale 0, so a paused menu still animates. Written by
@@ -209,25 +210,6 @@ impl Scene {
         Self::default()
     }
 
-    /// This scene's runtime identity (#355) — stable for the life of the object,
-    /// distinct from every other live scene's.
-    pub fn id(&self) -> SceneId {
-        self.id
-    }
-
-    /// Mint a fresh runtime identity (#355): the World now holds a different scene
-    /// (a load replaced it), so GPU caches keyed by the old identity must not apply.
-    pub fn renew_id(&mut self) {
-        self.id = SceneId::next();
-    }
-
-    /// Take back `id`, an identity this World held before (Stop's restore after a
-    /// play-mode `Scene.Load`, #1374): the restored World is that scene again, so a
-    /// Generate Lighting waiting for Stop still recognises it.
-    pub(crate) fn restore_id(&mut self, id: SceneId) {
-        self.id = id;
-    }
-
     pub fn add_entity(&mut self, name: String) -> u32 {
         self.world.spawn(name)
     }
@@ -251,6 +233,7 @@ impl Scene {
     }
 
     pub fn set_parent(&mut self, entity_id: u32, parent_id: Option<u32>) -> Result<(), String> {
+        // 1. Detect cycles
         if let Some(p_id) = parent_id {
             if entity_id == p_id {
                 return Err("An entity cannot be parented to itself.".to_string());
@@ -262,7 +245,7 @@ impl Scene {
             }
         }
 
-        // Validate everything before touching a link, so a failed call changes
+        // 2. Validate everything before touching a link, so a failed call changes
         // nothing: a child dropped from its old parent's `children` while keeping its
         // `parent_id` is a one-sided link the world store never dirties again.
         if !self.world.contains(entity_id) {
@@ -275,6 +258,7 @@ impl Scene {
             self.world.remove_child(old_p, entity_id);
         }
 
+        // 3. Set new parent and update children list
         if let Some(new_p) = parent_id {
             self.world.add_child(new_p, entity_id);
         }

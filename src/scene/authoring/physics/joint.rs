@@ -108,6 +108,12 @@ pub fn set_break_torque(j: &mut JointComponent, torque: f32) {
     j.break_torque = non_negative(torque);
 }
 
+/// A drive strength or damping as the setters below store it: floored at 0, and
+/// 0 when NaN or infinite. For a drive held outside a joint (a hit reaction's).
+pub fn drive_value(v: f32) -> f32 {
+    non_negative(v)
+}
+
 /// Set the drive's strength (1/s²), floored at 0 (no motor).
 pub fn set_drive_strength(j: &mut JointComponent, strength: f32) {
     j.drive_strength = non_negative(strength);

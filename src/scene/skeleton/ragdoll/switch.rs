@@ -36,7 +36,7 @@ impl Scene {
         self.ragdolls.forget(&bones);
         for &bone in &bones {
             let velocity = on.then(|| velocity(bone).unwrap_or_default());
-            self.switch_body(bone, velocity);
+            self.switch_body(bone, velocity, false);
             if let (Some(from), Some(to)) = (from, to) {
                 self.move_part_layers(bone, from, to);
             }
@@ -45,16 +45,24 @@ impl Scene {
     }
 
     /// Turn `bone`'s body dynamic, moving at `velocity` (linear, angular), and
-    /// track its animated pose from the one it has now (`Some`); or kinematic,
-    /// stopped and untracked (`None`).
-    pub(super) fn switch_body(&mut self, bone: u32, velocity: Option<(Vec3, Vec3)>) {
+    /// track its animated pose from the one it has now when something needs it
+    /// (`track`, a drive on its joint, or a blend weight set on it: a body at blend weight 1 with no
+    /// drive never reads it, so a plain dead ragdoll costs the animate hook
+    /// nothing); or kinematic, stopped and untracked (`None`).
+    pub(super) fn switch_body(&mut self, bone: u32, velocity: Option<(Vec3, Vec3)>, track: bool) {
         let (v, w) = velocity.unwrap_or_default();
         if let Some(mut rb) = self.world.rigidbody_mut(bone) {
             rb.is_kinematic = velocity.is_none();
             rb.velocity = v;
             rb.angular_velocity = w;
         }
+        let driven = self
+            .world
+            .joint(bone)
+            .is_some_and(|j| j.drive_strength > 0.0);
+        let needed = track || driven || self.ragdolls.has_weight(bone);
         match velocity {
+            Some(_) if !needed => self.ragdolls.untrack(bone),
             Some(_) => {
                 let pose = self.world.transform(bone).map(|t| (t.position, t.rotation));
                 self.ragdolls.track(bone, pose.unwrap_or_default());
@@ -67,7 +75,7 @@ impl Scene {
     pub fn ragdoll_enabled(&self, id: u32) -> bool {
         self.ragdoll_bones(id)
             .into_iter()
-            .any(|b| self.world.rigidbody(b).is_some_and(|rb| !rb.is_kinematic))
+            .any(|b| self.is_simulated_body(b))
     }
 
     /// Move the colliders that are `bone`'s body parts — its own and its

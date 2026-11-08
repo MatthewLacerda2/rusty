@@ -49,7 +49,7 @@ use frame::{joint_basis, joint_builder, local_frame};
 
 #[cfg(test)]
 mod disabled_tests;
-mod drive;
+pub(super) mod drive;
 mod frame;
 #[cfg(test)]
 mod frame_tests;

@@ -4,6 +4,9 @@
 
 mod blend;
 mod drive;
+mod hit;
+mod ik;
+mod mirror;
 mod partial;
 mod react;
 

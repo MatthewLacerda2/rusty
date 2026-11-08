@@ -129,6 +129,6 @@ fn ten_resting_ragdolls_drive_no_joint_and_track_nothing() {
     scene.hit_react(rigs[3], (spine, Vec3::ZERO), &drive, &none);
     physics.step(&mut scene, 1.0 / 60.0);
     let head = scene.find_bone(rigs[3], "head").unwrap();
-    let driven: Vec<u32> = physics.driven.iter().copied().collect();
+    let driven: Vec<u32> = physics.driven.keys().copied().collect();
     assert_eq!(driven, vec![spine, head], "the reacting branch's joints");
 }
