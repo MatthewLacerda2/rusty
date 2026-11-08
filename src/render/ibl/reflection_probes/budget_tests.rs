@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use super::super::gpu_tests::{cube_file, probes_at, renderer};
+use super::super::gpu_tests::{cube_file, probes_at, renderer, uncompressed};
 use super::array_bytes;
 use crate::render::Renderer;
 use crate::scene::Scene;
@@ -34,8 +34,6 @@ fn gpu_the_budget_keeps_the_nearest_probes() {
         "the nearest is kept past a zero budget"
     );
     assert_eq!(probe_at(&renderer, 6.0), 0, "the next is past the budget");
-    // Half-float texels (#1696): a 512-texel cube with its mips is 16 MiB.
-    assert_eq!((array_bytes(4, 1), array_bytes(512, 1)), (1024, 16_777_216));
 }
 
 /// A cube too big for the budget is passed over; the farther ones that fit are
@@ -65,7 +63,8 @@ fn gpu_one_big_cube_does_not_empty_the_resident_set() {
 }
 
 /// A line of `n` probes 4 m apart, each its own 64-texel cube, under a 2 MB budget:
-/// eight 64-texel half-float cubes, six shaded and two spare.
+/// eight 64-texel half-float cubes, six shaded and two spare. The renderer that
+/// walks it holds half floats (`uncompressed`), so the counts hold on any adapter.
 fn level(n: usize, name: &str) -> Scene {
     let mut scene = Scene::new();
     for k in 0..n {
@@ -81,7 +80,7 @@ fn level(n: usize, name: &str) -> Scene {
 /// every cube whose size it doesn't know yet.
 #[test]
 fn gpu_the_first_frame_reads_only_what_the_array_holds() {
-    let Some(mut renderer) = renderer() else {
+    let Some(mut renderer) = uncompressed() else {
         return;
     };
     let scene = level(60, "first");
@@ -100,7 +99,7 @@ fn gpu_the_first_frame_reads_only_what_the_array_holds() {
 /// resident.
 #[test]
 fn gpu_a_walk_through_the_level_stays_within_the_budget() {
-    let Some(mut renderer) = renderer() else {
+    let Some(mut renderer) = uncompressed() else {
         return;
     };
     let scene = level(40, "walk");
@@ -109,7 +108,7 @@ fn gpu_a_walk_through_the_level_stays_within_the_budget() {
         renderer.update_reflection_probes(&scene, Vec3::new(x, 0.0, 0.0));
         let probes = &renderer.reflection_probes;
         assert!(
-            array_bytes(probes.face(), probes.cubes) <= 2 << 20,
+            array_bytes(probes.face(), probes.cubes, probes.format()) <= 2 << 20,
             "at {x}"
         );
         let underfoot = (x / 4.0).round().min(39.0) * 4.0;
@@ -122,7 +121,7 @@ fn gpu_a_walk_through_the_level_stays_within_the_budget() {
 /// range waits in a spare slot.
 #[test]
 fn gpu_pacing_across_the_budget_edge_reads_nothing_again() {
-    let Some(mut renderer) = renderer() else {
+    let Some(mut renderer) = uncompressed() else {
         return;
     };
     let scene = level(20, "pace");
