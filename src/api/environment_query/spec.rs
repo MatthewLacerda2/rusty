@@ -69,45 +69,10 @@ fn generator(g: &Table, contexts: &Contexts) -> mlua::Result<Generator> {
         return fail("generator", "needs exactly one of donut, grid or points");
     }
     if let Value::Table(d) = g.get::<Value>("donut")? {
-        let path = "generator.donut";
-        only(
-            &d,
-            path,
-            &["context", "inner", "outer", "rings", "per_ring"],
-        )?;
-        let center = place(&d, path, "context", QUERIER, contexts)?.position;
-        let inner = number(&d, path, "inner", Some(0.0))?;
-        let outer = number(&d, path, "outer", None)?;
-        if inner < 0.0 || outer < inner {
-            return fail(
-                path,
-                format!("needs 0 ≤ inner ≤ outer, got {inner} and {outer}"),
-            );
-        }
-        let rings = count(&d, path, "rings", 1, 1)?;
-        let per_ring = count(&d, path, "per_ring", 8, 1)?;
-        return Ok(Generator::Donut {
-            center,
-            inner,
-            outer,
-            rings,
-            per_ring,
-        });
+        return donut(&d, contexts);
     }
-    if let Value::Table(s) = g.get::<Value>("grid")? {
-        let path = "generator.grid";
-        only(&s, path, &["context", "half_size", "spacing"])?;
-        let center = place(&s, path, "context", QUERIER, contexts)?.position;
-        let half_size = number(&s, path, "half_size", None)?;
-        let spacing = number(&s, path, "spacing", Some(1.0))?;
-        if half_size < 0.0 || spacing <= 0.0 {
-            return fail(path, "needs half_size ≥ 0 and spacing > 0");
-        }
-        return Ok(Generator::Grid {
-            center,
-            half_size,
-            spacing,
-        });
+    if let Value::Table(t) = g.get::<Value>("grid")? {
+        return grid(&t, contexts);
     }
     Ok(Generator::Points(point_list(
         g,
@@ -115,6 +80,47 @@ fn generator(g: &Table, contexts: &Contexts) -> mlua::Result<Generator> {
         "points",
         contexts,
     )?))
+}
+
+/// `generator.donut`.
+fn donut(d: &Table, contexts: &Contexts) -> mlua::Result<Generator> {
+    let path = "generator.donut";
+    only(d, path, &["context", "inner", "outer", "rings", "per_ring"])?;
+    let center = place(d, path, "context", QUERIER, contexts)?.position;
+    let inner = number(d, path, "inner", Some(0.0))?;
+    let outer = number(d, path, "outer", None)?;
+    if inner < 0.0 || outer < inner {
+        return fail(
+            path,
+            format!("needs 0 ≤ inner ≤ outer, got {inner} and {outer}"),
+        );
+    }
+    let rings = count(d, path, "rings", 1, 1)?;
+    let per_ring = count(d, path, "per_ring", 8, 1)?;
+    Ok(Generator::Donut {
+        center,
+        inner,
+        outer,
+        rings,
+        per_ring,
+    })
+}
+
+/// `generator.grid`.
+fn grid(t: &Table, contexts: &Contexts) -> mlua::Result<Generator> {
+    let path = "generator.grid";
+    only(t, path, &["context", "half_size", "spacing"])?;
+    let center = place(t, path, "context", QUERIER, contexts)?.position;
+    let half_size = number(t, path, "half_size", None)?;
+    let spacing = number(t, path, "spacing", Some(1.0))?;
+    if half_size < 0.0 || spacing <= 0.0 {
+        return fail(path, "needs half_size ≥ 0 and spacing > 0");
+    }
+    Ok(Generator::Grid {
+        center,
+        half_size,
+        spacing,
+    })
 }
 
 /// One test entry: its measure (the one kind key), then what it filters and scores.
@@ -134,35 +140,8 @@ fn test(entry: &Table, path: &str, contexts: &Contexts) -> mlua::Result<Test> {
         optional_number(entry, path, "min")?,
         optional_number(entry, path, "max")?,
     );
-    let score = match entry.get::<Value>("score")? {
-        Value::Nil => None,
-        Value::Table(s) => Some(score(&s, &at(path, "score"))?),
-        other => {
-            return fail(
-                &at(path, "score"),
-                format!("expected a table, got {}", other.type_name()),
-            )
-        }
-    };
-    let purpose = text(entry, path, "purpose")?;
-    let (filters, scores) = match purpose.as_deref() {
-        // Unspecified: a yes/no test with no score filters; min/max filter; a
-        // score scores.
-        None => (
-            range != (None, None) || (wanted.is_some() && score.is_none()),
-            score.is_some(),
-        ),
-        Some("filter") => (true, false),
-        Some("score") => (false, true),
-        Some("filter_score") => (true, true),
-        Some(other) => {
-            let here = at(path, "purpose");
-            return fail(
-                &here,
-                format!("unknown purpose '{other}' (expected filter, score, filter_score)"),
-            );
-        }
-    };
+    let score = score_of(entry, path)?;
+    let (filters, scores) = purpose(entry, path, wanted.is_some(), range, score.is_some())?;
     let filter = match (filters, wanted, range) {
         (false, ..) => None,
         (true, Some(want), _) => Some(Filter::Is(want)),
@@ -186,6 +165,39 @@ fn test(entry: &Table, path: &str, contexts: &Contexts) -> mlua::Result<Test> {
         filter,
         score,
     })
+}
+
+/// The entry's `score` table, if any.
+fn score_of(entry: &Table, path: &str) -> mlua::Result<Option<Score>> {
+    match entry.get::<Value>("score")? {
+        Value::Nil => Ok(None),
+        Value::Table(s) => Ok(Some(score(&s, &at(path, "score"))?)),
+        other => fail(
+            &at(path, "score"),
+            format!("expected a table, got {}", other.type_name()),
+        ),
+    }
+}
+
+/// Whether the entry filters and whether it scores. Unspecified: a yes/no test
+/// with no score filters, `min`/`max` filter, a score scores.
+fn purpose(
+    entry: &Table,
+    path: &str,
+    yes_no: bool,
+    range: (Option<f32>, Option<f32>),
+    has_score: bool,
+) -> mlua::Result<(bool, bool)> {
+    match text(entry, path, "purpose")?.as_deref() {
+        None => Ok((range != (None, None) || (yes_no && !has_score), has_score)),
+        Some("filter") => Ok((true, false)),
+        Some("score") => Ok((false, true)),
+        Some("filter_score") => Ok((true, true)),
+        Some(other) => fail(
+            &at(path, "purpose"),
+            format!("unknown purpose '{other}' (expected filter, score, filter_score)"),
+        ),
+    }
 }
 
 /// The measure `kind` names, and for a yes/no test the answer its filter keeps.

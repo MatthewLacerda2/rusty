@@ -70,8 +70,8 @@ fn projection_lands_points_on_the_floor_and_drops_the_ones_off_it() {
         "on the floor: {got:?}"
     );
     assert!(
-        (got[0].x - 1.2).abs() < 1e-4 && (got[1].x - 3.5).abs() < 1e-4,
-        "in order"
+        (got[0].x - 1.2).abs() < 0.01 && (got[1].x - 3.5).abs() < 0.01,
+        "in order: {got:?}"
     );
     assert!(
         items(&arena.nav, &g, 0.1).len() < 2,

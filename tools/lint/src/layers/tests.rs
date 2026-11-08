@@ -176,6 +176,7 @@ fn sim_set_is_pinned() {
     let mut dirs = super::sim_dirs();
     dirs.sort();
     let want = [
+        "ai",
         "api",
         "app",
         "asset",

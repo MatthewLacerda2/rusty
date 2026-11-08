@@ -1,9 +1,8 @@
 //! What one environment query costs on the Dust2-sized bench level (#1892):
 //! a 64-point donut with `trace` and `path` tests, the dear pair. The gate run
 //! (`n = 5`) checks the query works at level scale and that its one flood stays
-//! local; the timing is a release-build measurement run by hand.
-
-use std::time::Instant;
+//! local; the timing is a release-build measurement run by hand, in
+//! `dev::bench::query_cost_tests` (a sim module may not read a clock).
 
 use glam::{Vec2, Vec3};
 
@@ -15,7 +14,7 @@ use crate::scene::lighting::occlusion::bench_level::rooms;
 use crate::scene::{Camera, ColliderComponent, Scene};
 
 /// The bench level with a box collider on every block, baked at `cell` metres.
-fn level(n: usize, cell: f32) -> (Scene, NavigationGraph, PhysicsWorld) {
+pub(crate) fn level(n: usize, cell: f32) -> (Scene, NavigationGraph, PhysicsWorld) {
     let mut scene = rooms(n);
     let ids: Vec<u32> = scene.world.ids_with_mesh();
     for id in ids {
@@ -58,7 +57,7 @@ fn spec(target: Anchor) -> QuerySpec {
     }
 }
 
-fn query(scene: &Scene, nav: &NavigationGraph, physics: &PhysicsWorld) -> usize {
+pub(crate) fn query(scene: &Scene, nav: &NavigationGraph, physics: &PhysicsWorld) -> usize {
     let camera = Camera::new(Vec3::new(25.0, 1.5, 25.0), 0.0, 0.0);
     let world = QueryWorld {
         scene,
@@ -86,22 +85,4 @@ fn a_query_on_the_bench_level_finds_spots_and_floods_locally() {
         flood.reached(),
         nav.spans.len()
     );
-}
-
-#[test]
-// lint: allow(skip) a timing measurement in a release build, run by hand, never a gate
-#[ignore = "a release-build measurement, run by hand"]
-fn query_cost() {
-    for (n, cell) in [(5, 1.0), (20, 1.0), (5, 0.25), (20, 0.25)] {
-        let (scene, nav, physics) = level(n, cell);
-        let runs = 50;
-        let t = Instant::now();
-        let mut found = 0;
-        for _ in 0..runs {
-            found = query(&scene, &nav, &physics);
-        }
-        let per = t.elapsed().as_secs_f64() * 1e3 / runs as f64;
-        let spans = nav.spans.len();
-        println!("n={n} cell={cell} m: {per:.3} ms per query, {found} of 64 kept, {spans} spans");
-    }
 }

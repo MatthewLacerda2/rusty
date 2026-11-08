@@ -6,4 +6,8 @@
 //! reachability and how far they sit from other agents. Perception or behaviour
 //! trees would live here too if they come, as they sit in Unreal's `AIModule`.
 
+// Panic-free sim (#195): bare `.unwrap()` is denied here (use `?` or a documented
+// `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+#![deny(clippy::unwrap_used)]
+
 pub mod query;

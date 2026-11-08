@@ -48,21 +48,7 @@ pub fn read(
                 None,
             )
         }
-        "trace" => {
-            let keys = ["from", "visible", "from_height", "item_height", "mask"];
-            only(t, path, &keys)?;
-            let mask = match t.get::<Option<i64>>("mask") {
-                Ok(m) => m.map(|m| m as u32),
-                Err(_) => return fail(&at(path, "mask"), "expected a layer mask (an integer)"),
-            };
-            let measure = Measure::Trace {
-                from: place(t, path, "from", "target", contexts)?,
-                from_height: number(t, path, "from_height", Some(EYE_HEIGHT))?,
-                item_height: number(t, path, "item_height", Some(EYE_HEIGHT))?,
-                mask,
-            };
-            (measure, Some(wanted(t, path, "visible")?))
-        }
+        "trace" => trace(t, path, contexts)?,
         "view" => {
             only(t, path, &["inside", "margin", "height"])?;
             let measure = Measure::View {
@@ -86,6 +72,23 @@ pub fn read(
         }
         other => return fail(path, format!("unknown test '{other}'")),
     })
+}
+
+/// `trace = { from, visible, from_height, item_height, mask }`.
+fn trace(t: &Table, path: &str, contexts: &Contexts) -> mlua::Result<(Measure, Option<bool>)> {
+    let keys = ["from", "visible", "from_height", "item_height", "mask"];
+    only(t, path, &keys)?;
+    let mask = match t.get::<Option<i64>>("mask") {
+        Ok(m) => m.map(|m| m as u32),
+        Err(_) => return fail(&at(path, "mask"), "expected a layer mask (an integer)"),
+    };
+    let measure = Measure::Trace {
+        from: place(t, path, "from", "target", contexts)?,
+        from_height: number(t, path, "from_height", Some(EYE_HEIGHT))?,
+        item_height: number(t, path, "item_height", Some(EYE_HEIGHT))?,
+        mask,
+    };
+    Ok((measure, Some(wanted(t, path, "visible")?)))
 }
 
 /// `mode = "3d"` (the default) or `"2d"`, which measures on the XZ plane.

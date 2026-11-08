@@ -3,8 +3,8 @@
 
 use glam::Vec3;
 
-use super::test_support::{add_box, add_floor, bake_pinned};
-use super::{Flood, NavigationGraph, ALL_AREAS};
+use crate::navigation::test_support::{add_box, add_floor, bake_pinned};
+use crate::navigation::{Flood, NavigationGraph, ALL_AREAS};
 use crate::scene::Scene;
 
 fn open_floor() -> NavigationGraph {
@@ -64,8 +64,9 @@ fn a_wall_the_flood_cannot_cross_leaves_the_far_side_unreached() {
 
 #[test]
 fn off_the_navmesh_is_no_flood() {
-    let nav = open_floor();
+    // No floor at all: no span to start from.
+    let nav = bake_pinned(&mut Scene::new());
     assert!(nav
-        .flood(Vec3::new(500.0, 0.0, 500.0), 10.0, ALL_AREAS)
+        .flood(Vec3::new(2.5, 0.0, 2.5), 10.0, ALL_AREAS)
         .is_none());
 }

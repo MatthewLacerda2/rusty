@@ -19,9 +19,6 @@
 //! and the spec; only [`pick`]'s random modes draw from the seeded
 //! [`Random`](crate::core::random::Random), once per query that found anything.
 
-// Panic-free sim (#195): bare `.unwrap()` is denied here.
-#![deny(clippy::unwrap_used)]
-
 mod generate;
 mod measure;
 mod rank;
@@ -34,7 +31,7 @@ mod filter_tests;
 #[cfg(test)]
 mod generate_tests;
 #[cfg(all(test, feature = "dev"))]
-mod query_cost_tests;
+pub(crate) mod query_cost_tests;
 #[cfg(test)]
 mod rank_tests;
 #[cfg(test)]

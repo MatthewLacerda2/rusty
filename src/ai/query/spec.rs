@@ -79,7 +79,7 @@ impl Generator {
 /// Points along one side of a grid: `floor(2·half / spacing) + 1`, and 0 for a
 /// spacing that isn't positive or a half size below zero.
 pub(super) fn grid_side(half_size: f32, spacing: f32) -> usize {
-    if !(spacing > 0.0) || !(half_size >= 0.0) {
+    if spacing.is_nan() || half_size.is_nan() || spacing <= 0.0 || half_size < 0.0 {
         return 0;
     }
     let side = (2.0 * half_size / spacing).floor() + 1.0;
