@@ -27,6 +27,9 @@ enum Volume {
     Capsule(Vec3, Vec3, f32),
 }
 
+/// A verb's checked volume and its `layer_mask, query_triggers`.
+type Query = (Volume, Option<u32>, Option<bool>);
+
 /// The two cells every volume query reads.
 type Cells = (ApiCell<Scene>, ApiCell<Option<PhysicsWorld>>);
 
@@ -61,7 +64,7 @@ fn register_pair<A: mlua::FromLuaMulti + 'static>(
     table: &Table,
     cells: Cells,
     name: &str,
-    volume: fn(&str, A) -> mlua::Result<(Volume, Option<u32>, Option<bool>)>,
+    volume: fn(&str, A) -> mlua::Result<Query>,
 ) -> Reg {
     let verb = |prefix: &str| format!("{prefix}{name}");
     let (overlap, check) = (verb("Overlap"), verb("Check"));
