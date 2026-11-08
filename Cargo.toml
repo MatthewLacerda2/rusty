@@ -73,7 +73,7 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["dep:scorsese-providers", "dep:scorsese-core"]
+dev = ["dep:scorsese-providers", "dep:scorsese-core", "dep:libloading"]
 # The egui editor (#431): `src/editor` and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
 editor = ["dep:egui", "dep:egui-wgpu", "dep:egui-winit", "dep:egui-phosphor", "dep:notify"]
@@ -187,6 +187,11 @@ scorsese-providers = { git = "https://github.com/MatthewLacerda2/scorsese", rev 
 # (#384) is the same answer in both trees. Already in the lockfile through the line
 # above; same rev, same `dev` gate. Nothing of its `Project` model is used.
 scorsese-core = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "342523ca32baf69d7423f8942953bb26d0a4b246", optional = true }
+# Open Image Denoise, opened at run time (#1884, `src/dev/bake/denoise/`): the
+# lightmap bake's trained denoiser is a native library a machine may lack, so it is
+# `dlopen`ed, never linked, and a bake without it filters. Already in the tree
+# through wgpu; same version. `dev` only: a shipped game never bakes.
+libloading = { version = "0.8.9", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # The editor's Dock icon (#669): winit has no window icon on macOS, so it is set on

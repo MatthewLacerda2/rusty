@@ -42,8 +42,14 @@ impl StepRun {
 }
 
 /// The summary's lines, before the total: a line per step, each ending where the
-/// next began or at `end`, then the [`SLOWEST`] meshes (sorted in place).
-pub(super) fn lines(steps: &[StepRun], end: Duration, meshes: &mut [MeshCost]) -> Vec<String> {
+/// next began or at `end`, then OIDN's lightmaps and time when it ran (#1884), then
+/// the [`SLOWEST`] meshes (sorted in place).
+pub(super) fn lines(
+    steps: &[StepRun],
+    end: Duration,
+    meshes: &mut [MeshCost],
+    denoised: Option<(u64, Duration)>,
+) -> Vec<String> {
     let ends = steps.iter().skip(1).map(|s| s.from).chain([end]);
     let mut out: Vec<String> = steps
         .iter()
@@ -53,6 +59,12 @@ pub(super) fn lines(steps: &[StepRun], end: Duration, meshes: &mut [MeshCost]) -
             format!("[Lighting] {} took {took}{}", step(run.step), size(run))
         })
         .collect();
+    out.extend(denoised.map(|(charts, busy)| {
+        let (n, took) = (count(charts), duration(busy));
+        format!(
+            "[Lighting] denoise (OIDN) took {took} over {n} lightmaps, within the lightmaps step"
+        )
+    }));
     meshes.sort_by_key(|m| std::cmp::Reverse(m.busy));
     if !meshes.is_empty() {
         out.push("[Lighting] slowest lightmap meshes (worker time over every thread):".into());

@@ -13,7 +13,9 @@
 //!   point, and the per-texel estimate (the units it stores are explained in `trace`).
 //!   `rays` and `raster` are shared with the mesh-map baker (`lighting::mesh_maps`,
 //!   #1849), which walks a model's UV0 the same way;
-//! * `filter` — the edge-aware Gaussian that smooths the baked bounce;
+//! * `filter` — the edge-aware Gaussian that smooths the baked bounce, and
+//!   `bake::denoise` the choice between it, OIDN and nothing (#1884), with the
+//!   [`LightmapDenoiser`] seam the platform lends OIDN through;
 //! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
 //!   `progress` ([`BakeProgress`], #808); its `pool` is the one work pool every
 //!   mesh's texels share, in fixed-size batches (#1656), and the mesh-map baker
@@ -53,7 +55,7 @@ pub use atlas::{
     MAX_PAGES, MIN_PAGE, MIP_LEVELS, PAD,
 };
 pub(in crate::scene::lighting) use bake::pool::run as run_pool;
-pub use bake::{bake, bake_with_progress, BakeSettings, Lightmap};
+pub use bake::{bake, bake_with_progress, BakeSettings, Denoiser, Lightmap, LightmapDenoiser};
 pub use encode::{
     decode_direction, decode_mask, decode_rgbm, encode_directions, encode_masks, encode_texels,
 };

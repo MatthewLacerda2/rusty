@@ -4,6 +4,7 @@
 //! the log a script's bake reports its progress to
 //! (`progress`, #1667).
 
+pub mod denoise;
 pub mod generate_lighting;
 pub mod lighting;
 pub mod lightmap;
