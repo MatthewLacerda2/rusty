@@ -13,3 +13,7 @@ pub(crate) mod reflection_prefilter;
 pub(crate) mod reflection_probes;
 pub(crate) mod sky_cube;
 pub(crate) mod skybox;
+pub(crate) mod upload;
+
+#[cfg(test)]
+mod tap_tests;

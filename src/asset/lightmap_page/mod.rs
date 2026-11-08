@@ -13,13 +13,16 @@
 //! light); a directional bake's direction page is BC7 ([`PageFormat::Bc7`]). The
 //! bake (`scene::lighting::lightmap`) makes the levels; this module only encodes,
 //! decodes and stores them (`blocks`), as Unity, Godot 4 and Unreal store theirs.
+//! Baked reflection cubes share the BC6H level encoder ([`bc6h_level`], #1885).
 
 mod blocks;
 mod container;
 
 use std::path::Path;
 
-pub use blocks::{decode_bc6h, decode_bc7, encode_bc6h, encode_bc7, to_rgba16f};
+pub use blocks::{
+    bc6h_level, bc6h_texels, decode_bc6h, decode_bc7, encode_bc6h, encode_bc7, to_rgba16f,
+};
 pub use container::{read, write};
 
 /// The suffix of the folder beside a scene file that holds its baked lightmap

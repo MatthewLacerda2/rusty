@@ -11,9 +11,7 @@ use crate::scene::{MeshComponent, ReflectionProbe, Scene};
 
 const RES: u32 = 64;
 
-#[path = "tap_tests.rs"]
-mod tap;
-use tap::sample;
+use super::super::tap_tests::sample;
 
 /// Off-axis directions, each with the colour of the patch placed along it: on a face
 /// edge, and inside each of the six faces off both of its in-plane axes.
