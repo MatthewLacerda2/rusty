@@ -1,4 +1,4 @@
-//! src/physics/shape/decompose.rs — a concave mesh as convex pieces, for a dynamic
+//! src/physics/shape/decompose/mod.rs — a concave mesh as convex pieces, for a dynamic
 //! body (#1886).
 //!
 //! A triangle mesh has no volume, so on a dynamic body it gets no real mass or
@@ -10,7 +10,7 @@
 //! **Determinism.** parry's V-HACD is single-threaded and has no randomness: it
 //! voxelises the mesh, cuts the voxels along planes picked by a fixed search, and
 //! hulls each part. The same points and triangles give the same hulls, bit for bit
-//! (`decompose_tests`).
+//! (`tests`).
 //!
 //! **Cost.** A decomposition takes milliseconds to seconds, so the result is kept
 //! for the session, keyed by the scaled points (the world scale is baked in, and a
@@ -24,6 +24,13 @@ use rapier3d::parry::transformation::vhacd::{VHACDParameters, VHACD};
 use rapier3d::prelude::*;
 
 use super::hull::has_volume;
+
+#[cfg(test)]
+mod body_tests;
+#[cfg(test)]
+mod refit_tests;
+#[cfg(test)]
+mod tests;
 
 /// How many decompositions are kept: every distinct concave prop of a level at its
 /// scales. Past it the oldest is dropped.

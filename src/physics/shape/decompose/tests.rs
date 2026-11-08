@@ -1,4 +1,4 @@
-//! src/physics/shape/decompose_tests.rs — a concave mesh on a dynamic body becomes
+//! src/physics/shape/decompose/tests.rs — a concave mesh on a dynamic body becomes
 //! convex pieces, the same ones every run, made once per mesh and scale (#1886).
 
 use std::cell::RefCell;
@@ -7,11 +7,11 @@ use std::sync::atomic::Ordering;
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::build::{try_build_body_shape, try_build_shape};
-use super::build_tests::mesh_shape;
-use super::decompose::{decompose, decomposition, RUNS};
-use super::fit::build_shape_for;
-use super::fixture::{arch, bowl};
+use super::{decompose, decomposition, RUNS};
+use crate::physics::shape::build::{try_build_body_shape, try_build_shape};
+use crate::physics::shape::build_tests::mesh_shape;
+use crate::physics::shape::fit::build_shape_for;
+use crate::physics::shape::fixture::{arch, bowl};
 use crate::scripting::ConsoleLogs;
 
 fn build(mesh: &(Vec<[f32; 3]>, Vec<u32>), scale: Vec3, dynamic: bool) -> Collider {
@@ -129,5 +129,8 @@ fn a_non_finite_vertex_is_skipped_before_vhacd() {
     mesh.0[3][1] = f32::NAN;
     let geom = Some((mesh.0.as_slice(), mesh.1.as_slice()));
     let skip = try_build_body_shape(&mesh_shape(false), Vec3::ONE, geom, true).unwrap_err();
-    assert_eq!(skip, super::mesh::Skip::NonFinite { vertex: 3 });
+    assert_eq!(
+        skip,
+        crate::physics::shape::mesh::Skip::NonFinite { vertex: 3 }
+    );
 }

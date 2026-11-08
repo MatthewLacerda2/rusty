@@ -1,10 +1,10 @@
-//! src/physics/shape/decompose_refit_tests.rs — a body that changes type in Play
+//! src/physics/shape/decompose/refit_tests.rs — a body that changes type in Play
 //! re-fits its concave mesh collider in place (#1886): pieces when it turns
 //! dynamic, the exact trimesh when it turns kinematic or static again.
 
 use glam::Vec3;
 
-use super::fixture::{arch, floor, prop, steps};
+use crate::physics::shape::fixture::{arch, floor, prop, steps};
 use crate::physics::PhysicsWorld;
 use crate::scene::Scene;
 
