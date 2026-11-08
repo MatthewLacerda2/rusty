@@ -72,6 +72,14 @@ impl Outgoing {
 }
 
 impl MotionContext<'_> {
+    /// Ready `playback` for its step: rebase its trees' leaders (#1896), then,
+    /// when root motion is measured (`rooted`), capture where its motions
+    /// start, so a change of leader isn't measured as travel.
+    pub fn before_step(&self, playback: &mut Playback, rooted: bool) -> Option<Before> {
+        self.rebase_leaders(playback);
+        rooted.then(|| Before::of(playback))
+    }
+
     /// `playback`'s root motion this step: its current motion over `step`'s
     /// travel, crossfaded from the outgoing one (as `before` the step) by the
     /// crossfade weight the step left. `None` when neither keys the bone.

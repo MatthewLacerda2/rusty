@@ -190,17 +190,12 @@ pub fn step(
     // One layer's step: its events and, with a root bone, its root motion.
     let advance_layer = |playback: &mut Playback, layer: usize| {
         let ctx = context(layer);
-        // Rebased first, so root motion starts from where the leader change
-        // put the playheads (#1896).
-        ctx.rebase_leaders(playback);
-        let before = bone.as_ref().map(|_| root_motion::Before::of(playback));
+        let before = ctx.before_step(playback, bone.is_some());
         let (events, step) = ctx.advance(playback, dt, *speed, layer);
-        let root = skin
-            .zip(bone.as_ref())
-            .zip(before)
-            .and_then(|((skin, bone), before)| {
-                ctx.playback_root(skin, bone, playback, step, &before)
-            });
+        let root = before.and_then(|b| {
+            let (skin, bone) = (skin?, bone.as_ref()?);
+            ctx.playback_root(skin, bone, playback, step, &b)
+        });
         (events, root)
     };
     let (mut events, mut root) = advance_layer(base, 0);
