@@ -12,8 +12,10 @@ use glam::Vec3;
 use super::super::rng::Rng;
 use super::{cosine_sample, Tracer, SURFACE_OFFSET, T_MIN};
 
-/// Probe rays per texel that decide its validity, whatever the bake's samples.
-pub(in crate::scene::lighting::lightmap) const PROBES: u32 = 64;
+/// Probe rays per texel that decide its validity, whatever the bake's samples. 32
+/// removed the same blobs as 64 on `quality_tests`' interior at 64 samples for a
+/// third of the cost (about +5% of the bake against +32%, #1949).
+pub(in crate::scene::lighting::lightmap) const PROBES: u32 = 32;
 
 impl Tracer<'_> {
     /// Whether the texel at `position` facing `normal` is valid: at least

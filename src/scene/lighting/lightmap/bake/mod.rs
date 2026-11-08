@@ -139,8 +139,8 @@ pub(super) fn bake_on(
     let orphans = orphans.into_inner();
     if orphans > 0 {
         log::warn!(
-            "lightmap bake: {orphans} lightmap UV island(s) lie wholly inside geometry; \
-             their texels were filled from the islands beside them"
+            "[Lighting] lightmap bake: {orphans} lightmap UV island(s) lie wholly inside \
+             geometry; their texels were filled from the islands beside them"
         );
     }
     Some(maps)

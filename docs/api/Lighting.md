@@ -309,7 +309,7 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   under a crate) is filled from its neighbours rather than baked black (*Backface
   Tolerance*, below). No GPU is needed; it runs headless.
 - **Backface Tolerance** (`backfaceTolerance`, #1949, Unity's setting of that name,
-  default `0.9`, `0`–`1`). Each texel shoots 64 probe rays of its own; it is
+  default `0.9`, `0`–`1`). Each texel shoots 32 probe rays of its own; it is
   *valid* when at least that share of them reach a front face or escape. A texel
   below it sits inside geometry (a floor texel under a crate, one inside a wall): its
   light is dropped and it is filled from the valid texels of **its own chart** (the
