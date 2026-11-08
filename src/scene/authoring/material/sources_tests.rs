@@ -27,7 +27,9 @@ fn a_path_is_read_from_the_root() {
     let root = crate::test_temp::dir().join("rusty_sources_root_1491");
     std::fs::create_dir_all(root.join("textures")).unwrap();
     write_png(&root.join("textures").join("red.png"));
-    let sources = load_sources(&image_recipe("textures/red.png"), &root).unwrap();
+    let sources = load_recipe(&image_recipe("textures/red.png"), &root)
+        .unwrap()
+        .sources;
     let source = sources
         .get("textures/red.png")
         .expect("loaded under its path");
@@ -39,7 +41,7 @@ fn a_path_is_read_from_the_root() {
 fn a_missing_file_is_an_error_naming_the_node_and_the_path() {
     let root = crate::test_temp::dir().join("rusty_sources_missing_1491");
     std::fs::create_dir_all(&root).unwrap();
-    let err = load_sources(&image_recipe("textures/nope.png"), &root).unwrap_err();
+    let err = load_recipe(&image_recipe("textures/nope.png"), &root).unwrap_err();
     assert!(
         err.contains("'photo'") && err.contains("textures/nope.png"),
         "{err}"
@@ -55,7 +57,7 @@ fn a_file_beside_the_root_is_outside_it() {
     write_png(&file);
     assert!(outside_root(&file, &root).is_some());
     // Read all the same: outside is allowed, it only warns.
-    assert!(load_sources(&image_recipe("../shared.png"), &root).is_ok());
+    assert!(load_recipe(&image_recipe("../shared.png"), &root).is_ok());
 }
 
 #[test]
@@ -66,6 +68,6 @@ fn a_broken_recipe_is_reported_before_any_file_is_read() {
         op: OpKind::Invert,
         inputs: vec!["nowhere".into()],
     });
-    let err = load_sources(&recipe, Path::new("")).unwrap_err();
+    let err = load_recipe(&recipe, Path::new("")).unwrap_err();
     assert!(err.contains("unknown input \"nowhere\""), "{err}");
 }

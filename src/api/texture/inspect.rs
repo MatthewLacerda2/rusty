@@ -49,10 +49,11 @@ pub fn stats_table(
             .set_resolution(r)
             .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Stats: {e}")))?;
     }
-    let all = stats(&recipe, &super::sources(&recipe)?)
+    let loaded = super::load(&recipe)?;
+    let all = stats(&loaded.recipe, &loaded.sources)
         .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
     let out = lua.create_table()?;
-    for (node, s) in recipe.nodes.iter().zip(&all) {
+    for (node, s) in loaded.recipe.nodes.iter().zip(&all) {
         out.set(node.id.as_str(), node_table(lua, s)?)?;
     }
     Ok(out)
@@ -82,12 +83,13 @@ pub fn preview_table(
     size: Option<u32>,
 ) -> mlua::Result<Table> {
     let size = size.unwrap_or(PREVIEW_SIZE.min(recipe.extent().longer()));
-    let columns = write_preview(recipe, &super::sources(recipe)?, path, size)
+    let loaded = super::load(recipe)?;
+    let columns = write_preview(&loaded.recipe, &loaded.sources, path, size)
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Preview: {e}")))?;
     let t = lua.create_table()?;
     t.set("path", path)?;
     t.set("columns", columns)?;
-    let order = recipe.nodes.iter().map(|n| n.id.as_str());
+    let order = loaded.recipe.nodes.iter().map(|n| n.id.as_str());
     t.set("order", lua.create_sequence_from(order)?)?;
     Ok(t)
 }

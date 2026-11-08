@@ -26,7 +26,7 @@ wall-clock or unseeded RNG).
 | `Texture.ToJson` | `(recipe)` | the recipe's canonical JSON string |
 | `Texture.Stats` | `(recipe, [resolution])` | `{ [node_id] = { min, max, mean, std, p1, p99 }, … }` for **every** node, each field an `{r, g, b, a}` array |
 | `Texture.Preview` | `(recipe, path, [size = 128])` | `{ path, columns, order = { node ids } }` — a PNG contact sheet of every node |
-| `Texture.Ops` | `()` | the op catalog: `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, values} } }, … }` |
+| `Texture.Ops` | `()` | the op catalog: `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, values} } }, … }`, then the project's graphs (`op = "graph"`, with `path` and `inputs`; *Graphs* below) |
 
 `recipe` is a table **or** its serialized JSON string (from `Texture.ToJson`, or a
 saved `.json`) — both forms decode alike, with the same errors. `slot` names the target map and selects the **glTF encoding** applied on the
@@ -210,6 +210,9 @@ everywhere in a recipe — on the recipe itself, on a node, on a ramp stop: `{ o
 "noise", scael = 8 }` is refused with a message naming `scael` and the params `noise`
 takes, rather than baking with the default scale. The runner evaluates the DAG
 in dependency order in linear `[f32]` RGBA, then the bake encodes/packs per `slot`.
+A node `id` holds no `/` or `.`: those name a graph's inner nodes and outputs. A
+recipe may also declare `params` and `inputs`, which make it a graph another recipe
+instances as one node (*Graphs* below).
 
 ### Checking a recipe — `Texture.Stats` and `Texture.Preview`
 
@@ -697,6 +700,92 @@ Texture.Bake({ resolution = 512, nodes = {
   { id = "n", op = "bump_to_normal", strength = 0.3, inputs = { "h" } } },
 }, "textures/logo_n.png", "normal")
 ```
+
+### Graphs — a recipe as one node
+
+A recipe can use another recipe as **one node**, as Substance Designer instances a
+graph and Blender a node group: build "worn brick" once, then drop it into any
+material with its `age`, `tint` and `mortar_width` knobs.
+
+**The file.** A graph is a recipe saved as `<name>.graph.json` (the
+`Texture.ToJson` form), anywhere in the project, named by its path from the project
+root as an `image` node names its file (outside the project it is read, with a
+once-per-file warning). The extension is what makes it a graph: instancing any other
+file is refused. Every recipe may be one; two optional fields give it an interface:
+
+```json
+{
+  "resolution": 256,
+  "params": {
+    "age":  { "type": "number", "default": 0.3, "min": 0, "max": 1 },
+    "tint": { "type": "color",  "default": "#8a4b32" }
+  },
+  "inputs": ["mask"],
+  "nodes": [
+    { "id": "mortar", "op": "brick", "rows": 8, "cols": 4 },
+    { "id": "wear", "op": "noise", "kind": "fbm", "scale": 6, "gain": { "param": "age" } },
+    { "id": "color", "op": "constant", "color": { "param": "tint" } },
+    { "id": "out", "op": "mix", "mode": "multiply", "inputs": ["color", "mortar", "mask"] }
+  ],
+  "output": "out",
+  "outputs": { "height": "wear" }
+}
+```
+
+- **`params`**: name → `{ type, default, min?, max? }`, `type` one of `number`,
+  `integer`, `bool`, `color`, `text` (`min`/`max` for the first two). Any node value
+  may be the placeholder `{ param = "age" }`, a whole param (a number, a colour, an
+  enum or an `image` node's path as `text`, a seed), whether the param takes a link
+  or not. An instance's own `path` is the one value that takes none, and is refused:
+  the graph files are read before any param has a value. A recipe
+  with `params` baked on its own bakes at the defaults, and `Texture.ToJson` writes
+  the placeholders back.
+- **`inputs`**: an ordered list of names inner nodes read like node ids (in
+  `inputs` and in links). A graph with inputs bakes only through an instance.
+- **Outputs** are the recipe's own `output` (or its last node) and `outputs`. An
+  output names a node, never an input.
+
+**The instance.**
+
+```lua no-run
+{ id = "brick", op = "graph", path = "textures/brick.graph.json",
+  params = { age = 0.5 }, seed = 3, inputs = { "damage" } }
+```
+
+- `params` sets any of the graph's params; the rest keep their defaults. A value of
+  the wrong type, outside `min`/`max`, or naming no declared param is an error naming
+  it (rusty refuses where Blender clamps). Inside a graph, an instance's `params` may
+  pass the outer graph's on: `params = { age = { param = "wear" } }`.
+- `inputs` wires the graph's `inputs` in order, exactly as many as it declares.
+- Downstream, `brick` reads the graph's `output` and `brick.height` its named output
+  `height`: in `inputs`, in a link's `node`, and in the recipe's `output`/`outputs`.
+- `seed` (default 0) folds into every inner node's seed. 0 leaves them as written, so
+  the instance bakes byte-identically to its nodes pasted by hand; any other seed
+  changes every stochastic inner node, unseeded ones included, so two instances of
+  one graph differ. The recipe `seed`, `resolution` and `size` are the outer
+  recipe's; the graph's own are used only when it bakes alone.
+
+**What is stored is the instance.** `Texture.ToJson` and a material's `maps` keep the
+`op = "graph"` node, never its expansion, so editing the graph file changes every
+recipe that uses it on its next bake (`Material.Rebake` included). Each verb reads the
+graph files when it runs, nested ones too, and expands every instance into one flat
+graph before anything is checked: inner ids become `brick/<inner id>` (nested,
+`brick/wear/blur_2`), and `Texture.Stats` and `Texture.Preview` show the inner nodes
+under those ids.
+
+**Errors** name the nesting path and the file: `node "brick/wear/blur_2" (blur):
+references unknown input "brick/wear/nowhere" (in textures/wear.graph.json)`. A graph
+reached twice on one chain of instances is refused with the chain
+(`a.graph.json → b.graph.json → a.graph.json`), instances nest at most 16 deep, and
+an expansion holds at most 65 536 nodes (past that it is refused, naming the chain of
+graphs it was in). Two nodes sharing an id in one recipe or one graph are refused,
+an instance's id included, and every error from inside an instance names its graph
+file.
+
+**`Texture.Ops()`** lists the project's graphs after the ops, each as `op = "graph"`
+with its `path`, `category = "graph"`, `min_inputs` = `max_inputs` = its input count,
+its `inputs` names and its `params` (`name`, `type`, `default`, `min`, `max`). A graph
+file that does not parse is left out, with a warning naming it.
 
 ### Tiling
 

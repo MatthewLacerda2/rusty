@@ -18,6 +18,8 @@
 //! - [`runner`] — DAG → [`image_buf::Image`] in dependency order.
 //! - [`bake`] — buffer → PNG with per-slot glTF encoding/packing.
 //! - `bake_set` — a recipe's named `outputs` → one PNG per slot, one evaluation (#403).
+//! - [`graph`] — a recipe instanced as one node (#1744): params, placeholders, and
+//!   the expansion into one flat graph that runs before anything validates.
 //! - [`catalog`] — the op registry: one file per op (params, catalog row, run),
 //!   one row each (#1751). Adding an op: `src/procgen/CLAUDE.md`.
 //! - [`ops`] — the ops' math, grouped by category, and the per-node entry point.
@@ -34,6 +36,7 @@ pub mod bake;
 mod bake_set;
 pub mod bands;
 pub mod catalog;
+pub mod graph;
 pub mod hash;
 pub mod image_buf;
 pub mod ops;

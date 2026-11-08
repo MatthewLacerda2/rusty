@@ -13,7 +13,7 @@ use super::TextureRecipe;
 use crate::procgen::image_buf::Size;
 
 /// Parse `size = [w, h]`, refusing a side that is not a positive power of two.
-pub(super) fn power_of_two_sides<'de, D: Deserializer<'de>>(
+pub(crate) fn power_of_two_sides<'de, D: Deserializer<'de>>(
     d: D,
 ) -> Result<Option<[u32; 2]>, D::Error> {
     let sides = Option::<[u32; 2]>::deserialize(d)?;
