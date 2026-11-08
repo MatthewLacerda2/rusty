@@ -1,6 +1,8 @@
 //! The island check (#1892): whether a goal's piece of navmesh is cut off from
 //! the flood's start, so the flood can drop it instead of running to its bound.
 
+use std::collections::VecDeque;
+
 use super::DIRS;
 use crate::core::collections::Set;
 use crate::navigation::{NavigationGraph, SpanRef};
@@ -54,15 +56,18 @@ impl<'a> Islands<'a> {
         // own region, all of it walkable to and from the goal. Only those may
         // be cached as "not cut off"; a span past a one-way link may be a crate
         // top that drops into the goal's region but is an island itself. The
-        // tied stack drains first, so a span is found tied whenever it can be.
+        // tied queue drains first, so a span is found tied whenever it can be.
+        // It is breadth-first, so a capped walk keeps the disc round the goal
+        // (about 11 m across at 0.25 m cells), not a depth-first snake: a later
+        // goal near this one reaches the cached region in a few steps.
         let mut seen: Set<u32> = Set::default();
         let mut tied: Set<u32> = Set::default();
         seen.insert(goal.index);
         tied.insert(goal.index);
-        let (mut tied_stack, mut loose_stack) = (vec![goal], Vec::new());
+        let (mut tied_queue, mut loose_stack) = (VecDeque::from([goal]), Vec::new());
         let mut not_cut = false;
-        while let Some((s, is_tied)) = tied_stack
-            .pop()
+        while let Some((s, is_tied)) = tied_queue
+            .pop_front()
             .map(|s| (s, true))
             .or_else(|| loose_stack.pop().map(|s| (s, false)))
         {
@@ -78,7 +83,7 @@ impl<'a> Islands<'a> {
             {
                 if tie && tied.insert(n.index) {
                     seen.insert(n.index);
-                    tied_stack.push(n);
+                    tied_queue.push_back(n);
                 } else if seen.insert(n.index) {
                     loose_stack.push(n);
                 }
