@@ -86,6 +86,7 @@ pub fn bake_lighting(
     log: &mut BakeLog,
 ) -> Result<LightingBakeReport, String> {
     super::generate_lighting::refuse_while_baking(scene)?;
+    log.enter(crate::dev::bake::progress::Step::ProbePlacement);
     let mut job = start_lighting(scene, scene_path, nav, params)?;
     run_to_end(&mut job, scene, say, log)?;
     job.commit(scene)?;
