@@ -6,9 +6,9 @@
 
 use super::batch::sort::back_to_front;
 use super::batch::{DrawItem, FrameDraws};
-use super::overlays::{BallResource, OverlayBindings, OverlayDraws};
+use super::overlays::{BallResource, ColliderScope, OverlayBindings, OverlayDraws};
 use super::visibility::{CameraCulls, ViewCull};
-use crate::core::application::SceneGizmos;
+use crate::core::application::{Gizmo, SceneGizmos};
 use crate::render::gpu::draw_buffers::{FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
 use crate::render::motion::MotionHistory;
@@ -16,6 +16,7 @@ use crate::render::passes::outline::{outlined, OutlineBounds};
 use crate::render::scene::CameraSolids;
 use crate::render::{Frustum, Renderer};
 use crate::scene::Scene;
+use glam::Vec3;
 
 /// One camera's solids as instanced draws (#470), split into the two passes a frame
 /// draws (#242): `draws.opaque` (Opaque + Cutout; REPLACE, depth write on) and
@@ -61,6 +62,9 @@ pub(crate) struct Overlays {
     pub probes: Vec<ProbeResource>,
     /// The reflection probes' mirror balls (#1911).
     pub balls: Vec<BallResource>,
+    /// The collider and `Debug.Draw*` line gizmos (#1882): one draw, coloured per
+    /// vertex, through the vertex-colour line pipeline.
+    pub wires: Option<ProbeResource>,
 }
 
 impl Renderer {
@@ -73,13 +77,24 @@ impl Renderer {
     /// Pre-create the editor overlay resources for one handles pass. Only an editor
     /// camera draws one (`draw::camera`'s `handles` stage).
     /// `gizmos` is the Scene view's set (#1909): what it leaves off is not built.
-    pub(crate) fn precreate_overlays(&self, scene: &Scene, gizmos: &SceneGizmos) -> Overlays {
+    /// `eye` orders the colliders' wires nearest first (#1882).
+    pub(crate) fn precreate_overlays(
+        &self,
+        scene: &Scene,
+        gizmos: &SceneGizmos,
+        eye: Vec3,
+    ) -> Overlays {
         let mut draws = OverlayDraws::default();
         let grid = self.precreate_grid(&mut draws);
         let aabb = self.precreate_occlusion(scene, &mut draws);
         let axis = self.precreate_axis_arrows(scene, &mut draws);
         let probes = self.precreate_probes(scene, gizmos, &mut draws);
         let balls = self.precreate_probe_balls(scene, gizmos, &mut draws);
+        let scope = match gizmos.on(Gizmo::Colliders) {
+            true => ColliderScope::All,
+            false => ColliderScope::Selected,
+        };
+        let wires = self.precreate_wires(scene, (scope, eye), &mut draws);
         Overlays {
             bindings: self.overlay_bindings(&draws),
             grid,
@@ -87,6 +102,19 @@ impl Renderer {
             axis,
             probes,
             balls,
+            wires,
+        }
+    }
+
+    /// A game frame's gizmos (#1882): every collider and the debug lines, nothing
+    /// of the editor's own (no grid, arrows or probes).
+    pub(crate) fn precreate_game_overlays(&self, scene: &Scene, eye: Vec3) -> Overlays {
+        let mut draws = OverlayDraws::default();
+        let wires = self.precreate_wires(scene, (ColliderScope::All, eye), &mut draws);
+        Overlays {
+            bindings: self.overlay_bindings(&draws),
+            wires,
+            ..Default::default()
         }
     }
 

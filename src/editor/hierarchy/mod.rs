@@ -1,18 +1,24 @@
+//! LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree
+//! (`tree`). Object creation lives in the menu bar's GameObject menu (#255);
+//! deleting is Unity's (#1915): Edit ▸ Delete, the Delete key (Cmd+Backspace on
+//! macOS) and a row's right-click *Delete*, all through `delete`.
+
 use egui_phosphor::regular as icon;
 
 use crate::editor::theme::chrome;
-use crate::editor::{hierarchy_tree, EditorUi};
+use crate::editor::EditorUi;
 use crate::scene::Scene;
 
-/// LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree. Object
-/// creation lives in the menu bar's GameObject menu (#255); the panel keeps only a
-/// Destroy affordance for the current selection above the tree.
+mod tree;
+
+/// Draw the Hierarchy panel, or its collapsed rail.
 pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let t = editor.theme;
     if !editor.hierarchy_open {
         draw_collapsed(ui, t, &mut editor.hierarchy_open);
         return;
     }
+    let mut doomed = None;
     let frame = chrome::panel_frame(&t);
     egui::Panel::left("Hierarchy Panel")
         .resizable(true)
@@ -23,26 +29,42 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
             if chrome::panel_header(ui, &t, title.0, title.1, icon::CARET_LEFT) {
                 editor.hierarchy_open = false;
             }
-            draw_actions(editor, scene, ui);
-
             egui::ScrollArea::vertical().show(ui, |ui| {
                 let root_ids: Vec<u32> = scene
                     .entity_ids()
                     .into_iter()
                     .filter(|&id| scene.world.parent_id(id).is_none())
                     .collect();
+                let mut rows = tree::Rows {
+                    sel_entity: &mut editor.selected_entity_id,
+                    sel_asset: &mut editor.selected_asset_path,
+                    delete: &mut doomed,
+                    theme: t,
+                };
                 for entity_id in root_ids {
-                    hierarchy_tree::draw_node(
-                        ui,
-                        scene,
-                        entity_id,
-                        &mut editor.selected_entity_id,
-                        &mut editor.selected_asset_path,
-                        t,
-                    );
+                    rows.draw_node(ui, scene, entity_id);
                 }
             });
         });
+    if let Some(id) = doomed {
+        delete(editor, scene, id);
+    }
+}
+
+/// Delete `id` and its whole subtree, as Unity's Edit ▸ Delete does: the one
+/// path behind the menu item, the Delete key and the row's context menu, so the
+/// three cannot drift. In edit mode it removes at once and the frame's Undo step
+/// records it (`shell::editor::undo`); the selection is cleared when it was in
+/// the subtree, and the scene has unsaved changes.
+pub(crate) fn delete(editor: &mut EditorUi, scene: &mut Scene, id: u32) {
+    if !scene.world.contains(id) {
+        return;
+    }
+    scene.destroy(id);
+    editor.selected_entity_id = editor
+        .selected_entity_id
+        .filter(|&sel| scene.world.contains(sel));
+    editor.is_dirty = true;
 }
 
 /// Collapsed state: a thin rail with a caret that reopens the hierarchy panel.
@@ -57,18 +79,4 @@ fn draw_collapsed(ui: &mut egui::Ui, t: crate::editor::theme::Theme, open: &mut 
                 *open = true;
             }
         });
-}
-
-/// Selection action bar: a Destroy affordance for the current selection (creation
-/// now lives in the menu bar's GameObject menu). Lives above the tree so the tree
-/// owns the whole scroll area. Destroy only shows when something is selected.
-fn draw_actions(editor: &mut EditorUi, scene: &mut Scene, ui: &mut egui::Ui) {
-    if let Some(selected_id) = editor.selected_entity_id {
-        if ui.button(format!("{}  Destroy", icon::TRASH)).clicked() {
-            scene.destroy(selected_id);
-            editor.selected_entity_id = None;
-            editor.is_dirty = true;
-        }
-        chrome::hairline(ui, &editor.theme);
-    }
 }

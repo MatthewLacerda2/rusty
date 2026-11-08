@@ -22,7 +22,11 @@ class Level(unittest.TestCase):
             "scripting sandbox": "src/scripting/sandbox/files.rs",
             "merge path": ".github/workflows/ci.yml",
         }
-        cases_by_path = {"tests/scene_format/scene.fingerprint": "stored format"}
+        cases_by_path = {
+            "tests/scene_format/scene.fingerprint": "stored format",
+            "src/asset/import_cache/hulls/file.rs": "stored format",
+            "src/asset/animation_graph/mod.rs": "stored format",
+        }
         for path, why in cases_by_path.items():
             with self.subTest(path):
                 self.assertEqual(review_level.level([path]), ("high", [(why, path)]))

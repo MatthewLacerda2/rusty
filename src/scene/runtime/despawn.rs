@@ -37,7 +37,8 @@ impl Scene {
     /// also empties every `AIPerception`'s memory (#1900), before any `Start`
     /// can report a noise or a hit, so an agent starts Play knowing nothing.
     /// Leaving it drops what Play asked for and never got (a load or destroy a
-    /// paused Play left queued, #1298) and every `DontDestroyOnLoad` mark: the
+    /// paused Play left queued, #1298), every `DontDestroyOnLoad` mark and every
+    /// `Debug.Draw*` line still held (#1882): the
     /// scene state inventory's runtime class (`scene::state`, #1649).
     pub(crate) fn set_playing(&mut self, playing: bool) {
         if playing && !self.playing {
@@ -48,6 +49,7 @@ impl Scene {
             self.pending_load = None;
             self.pending_destroy.clear(); // the next Play must not destroy edit entities
             self.persistent.clear();
+            self.debug_lines = Default::default();
         }
         self.playing = playing;
     }

@@ -19,10 +19,13 @@ use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
 
 mod assemble;
+mod denoise;
 pub(super) mod direction;
 pub(in crate::scene::lighting) mod pool;
 
 use assemble::assemble;
+use denoise::{Chart, Cleaner};
+pub use denoise::{Denoiser, LightmapDenoiser};
 
 /// The bake's knobs, Unity's Lightmapping settings in miniature. The scene stores
 /// them in its lighting settings (#832); a field a scene file omits takes its default.
@@ -43,8 +46,13 @@ pub struct BakeSettings {
     /// ([`max_map_edge`]); the packer picks the smallest page that holds the bake,
     /// up to this edge, then adds pages. Read through [`Self::page`].
     pub max_lightmap_size: u32,
+    /// What cleans the baked bounce (#1884, Unity's *Denoiser* and *Filter*): OIDN
+    /// then the Gaussian below, the Gaussian alone, or nothing. Baked direct light
+    /// is never cleaned.
+    pub denoiser: Denoiser,
     /// Radius, in texels, of the Gaussian that smooths the baked bounce (Unity's
-    /// indirect filter); 0 leaves it raw. Baked direct light is never filtered.
+    /// indirect filter): alone under [`Denoiser::Filter`] or where OIDN cannot run,
+    /// after OIDN under `Oidn`; 0 leaves it as traced or as OIDN gave it.
     pub filter_radius: u32,
     /// Also bake each texel's dominant incoming light direction and its `Baked`
     /// lamps' share (#810, Unity's *Directional* mode; #1695), so normal maps
@@ -58,10 +66,11 @@ impl Default for BakeSettings {
     fn default() -> Self {
         Self {
             texels_per_unit: 8.0,
-            samples: 128,
+            samples: Self::DEFAULT_SAMPLES,
             bounces: 3,
             seed: 0,
             max_lightmap_size: 1024,
+            denoiser: Denoiser::Oidn,
             filter_radius: 3,
             directional: true,
         }
@@ -69,6 +78,13 @@ impl Default for BakeSettings {
 }
 
 impl BakeSettings {
+    /// The default paths per texel: the fewest at which an OIDN bake (OIDN, then
+    /// the Gaussian) is as close to a converged one as the Gaussian alone was at
+    /// its old default of 128, within a point of mean relative error, in about 60%
+    /// of the time (#1884, `dev::bake::denoise::quality_tests`; 32 missed by 1.3 to
+    /// 1.7 points). A bake that falls back to the Gaussian alone is blurrier and
+    /// blotchier at this count.
+    pub const DEFAULT_SAMPLES: u32 = 64;
     /// The texel densities a bake takes (Unity's Lightmap Resolution, in miniature).
     pub const TEXELS_PER_UNIT: RangeInclusive<f32> = 0.25..=64.0;
     /// The samples per texel a bake takes.
@@ -193,9 +209,14 @@ pub(super) fn bake_on(
         traced
     };
     // The pool hands each chart its points back once traced, so they die with it.
+    let cleaner = Cleaner {
+        denoiser: settings.denoiser,
+        radius: settings.filter_radius,
+        trained: progress.denoiser(),
+    };
     let finish = |c: usize, points: Vec<TexelPoint>, light: Vec<TexelLight>| {
         let (index, size) = heads[c];
-        let map = lightmap(scene, index, size, points, light, settings);
+        let map = lightmap(scene, (index, size), points, light, settings, cleaner);
         progress.mesh_done();
         map
     };
@@ -205,11 +226,11 @@ pub(super) fn bake_on(
 /// One mesh's lightmap from its traced texels.
 fn lightmap(
     scene: &BakeScene,
-    index: usize,
-    size: u32,
+    (index, size): (usize, u32),
     points: Vec<TexelPoint>,
     light: Vec<TexelLight>,
     settings: &BakeSettings,
+    cleaner: Cleaner,
 ) -> Lightmap {
     let mesh = &scene.meshes[index];
     // Texels inside other geometry are dropped here and filled by dilation below.
@@ -220,7 +241,12 @@ fn lightmap(
         .unzip();
     let texel_world = world_per_uv(&mesh.surface()).unwrap_or(1.0) / size as f32;
     let masked = scene.shadowmask.any();
-    let maps = assemble(&points, &light, size, texel_world, settings, masked);
+    let chart = Chart {
+        points: &points,
+        size,
+        texel_world,
+    };
+    let maps = assemble(chart, &light, settings, cleaner, masked);
     Lightmap {
         entity: mesh.entity,
         size,

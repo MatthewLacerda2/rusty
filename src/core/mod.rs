@@ -10,6 +10,7 @@ pub mod curve;
 pub mod frame_stats;
 pub mod fs;
 pub mod hash;
+pub mod hulls;
 pub mod input;
 pub mod naming;
 pub mod paths;

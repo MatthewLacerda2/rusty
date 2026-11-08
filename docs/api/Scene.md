@@ -159,7 +159,7 @@ and **`Joint` requires `RigidBody`** (a joint constrains a body — Unity's `Joi
 
 **`Scene.Deactivate`** is Unity's deferred `Object.Destroy`: it sets `active =
 false` but leaves the entity in the scene. **`Scene.DestroyEntity`** is the
-editor's Destroy button: it actually removes the entity **and its whole subtree**,
+editor's Edit ▸ Delete (#1915): it actually removes the entity **and its whole subtree**,
 as Unity's `Object.Destroy` does (#1283): its children and theirs, so a skinned
 entity's bones and what hangs from them, and a bone's descendant bones (see
 [`Animator`](Animator.md), *Bones are GameObjects*). In Play every script on the

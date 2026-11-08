@@ -1,13 +1,12 @@
 //! src/physics/shape/decompose/tests.rs — a concave mesh on a dynamic body becomes
-//! convex pieces, the same ones every run, made once per mesh and scale (#1886).
+//! convex pieces, the same ones every run, made once per mesh (#1886).
 
 use std::cell::RefCell;
-use std::sync::Arc;
 
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::{decompose, decomposition};
+use super::{assemble, decompose, decomposition};
 use crate::physics::shape::build::{try_build_body_shape, try_build_shape};
 use crate::physics::shape::build_tests::mesh_shape;
 use crate::physics::shape::fit::build_shape_for;
@@ -19,14 +18,14 @@ fn build(mesh: &(Vec<[f32; 3]>, Vec<u32>), scale: Vec3, dynamic: bool) -> Collid
     try_build_body_shape(&mesh_shape(false), scale, mesh, dynamic).expect("builds")
 }
 
-fn points(mesh: &(Vec<[f32; 3]>, Vec<u32>)) -> (Vec<Vector>, Vec<[u32; 3]>) {
+pub(super) fn points(mesh: &(Vec<[f32; 3]>, Vec<u32>)) -> (Vec<Vector>, Vec<[u32; 3]>) {
     let p = mesh.0.iter().map(|&p| Vector::from_array(p)).collect();
     let t = mesh.1.chunks_exact(3).map(|c| [c[0], c[1], c[2]]).collect();
     (p, t)
 }
 
 /// Every hull's points, in order: the decomposition's bits.
-fn hull_bits(shape: &SharedShape) -> Vec<[u32; 3]> {
+pub(super) fn hull_bits(shape: &SharedShape) -> Vec<[u32; 3]> {
     let compound = shape.as_compound().expect("a compound");
     (compound.shapes().iter())
         .flat_map(|(_, s)| s.as_convex_polyhedron().expect("a hull").points().to_vec())
@@ -72,23 +71,9 @@ fn static_kinematic_and_convex_keep_their_shapes() {
 #[test]
 fn the_same_mesh_decomposes_to_the_same_bits() {
     let (p, t) = points(&bowl());
-    let a = decompose(&p, &t).expect("pieces");
-    let b = decompose(&p, &t).expect("pieces");
+    let a = assemble(&decompose(&p, &t), Vec3::ONE).expect("pieces");
+    let b = assemble(&decompose(&p, &t), Vec3::ONE).expect("pieces");
     assert_eq!(hull_bits(&a), hull_bits(&b));
-}
-
-#[test]
-fn a_second_copy_reuses_the_decomposition_and_a_new_scale_does_not() {
-    // The cache hands back the shape it kept, so a hit is the same allocation.
-    // No global counter: other tests decompose concurrently in one process.
-    let mesh = arch();
-    let first = build(&mesh, Vec3::splat(1.5), true);
-    let second = build(&mesh, Vec3::splat(1.5), true);
-    let same = |a: &Collider, b: &Collider| Arc::ptr_eq(&a.shared_shape().0, &b.shared_shape().0);
-    assert!(same(&first, &second), "the copy is a cache hit");
-    let stretched = build(&mesh, Vec3::new(1.5, 2.0, 1.5), true);
-    assert!(stretched.shape().as_compound().is_some());
-    assert!(!same(&first, &stretched), "a new scale is a new key");
 }
 
 #[test]
@@ -100,7 +85,7 @@ fn a_flat_concave_mesh_falls_back_to_the_trimesh() {
              [1.0, 0.0, 2.0], [0.0, 0.0, 2.0]],
         vec![0, 2, 1, 0, 3, 2, 0, 4, 3, 0, 5, 4],
     );
-    assert!(decomposition(&points(&flat).0, &points(&flat).1).is_none());
+    assert!(decomposition(&flat.0, &flat.1, Vec3::ONE).is_none());
     assert!(build(&flat, Vec3::ONE, true).shape().as_trimesh().is_some());
     // One warning, naming the entity; never a body without a collider.
     crate::logging::init();

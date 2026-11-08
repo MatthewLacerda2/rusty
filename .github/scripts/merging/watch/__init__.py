@@ -24,7 +24,10 @@ the background is woken then. A hand-back is not one of those (#751):
   runner outage, or a flaky job re-run by hand, re-queues it without a push. **A
   hand-back for outwaiting its runs comes back when they go green** (#1831,
   [`stalls`], [`handbacks.STALLS_MEMORY`]): #1820 and #1827 sat parked after
-  their runs went green during GitHub's Actions incidents of 2026-11-04. **A hand-back no push fixes waits for what does**
+  their runs went green during GitHub's Actions incidents of 2026-11-04. **A
+  hand-back for a red run comes back when its head reads green** (#1951,
+  [`handbacks.greened`], [`handbacks.RED_MEMORY`]): #1920 sat seven hours green
+  on 2026-11-08, its run mark read after the re-run that fixed it. **A hand-back no push fixes waits for what does**
   (#1279, [`handbacks`]): one for the description or labels comes back when they
   change ([`handbacks.CLAIMS_MEMORY`]), one the closed issue refuses when that
   issue no longer does ([`handbacks.ISSUES_MEMORY`]), and one no review

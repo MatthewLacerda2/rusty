@@ -74,11 +74,12 @@ class Requeue(unittest.TestCase):
         again = handbacks.rerun_heads([pr(1, draft=True)], memory, marks, lambda n, sha: asked.append(n) or "1.2")
         self.assertEqual((again, asked), ([], []))
 
-    def test_an_entry_from_before_869_takes_todays_runs_as_its_mark(self):
-        marks = {}
-        again = handbacks.rerun_heads([pr(1)], {1: "sha1"}, marks, lambda n, sha: "1.1")
-        self.assertEqual((again, marks), ([], {1: "1.1"}))
-        self.assertEqual(handbacks.rerun_heads([pr(1)], {1: "sha1"}, marks, lambda n, sha: "1.2"), [1])
+    def test_an_entry_with_no_mark_never_takes_a_later_read_as_one(self):
+        # #1951: #1920's mark failed at the hand-back, and the first read after
+        # its green re-run became the mark, so nothing ever differed from it.
+        marks, asked = {}, []
+        again = handbacks.rerun_heads([pr(1)], {1: "sha1"}, marks, lambda n, sha: asked.append(n) or "1.2")
+        self.assertEqual((again, marks, asked), ([], {}, []))
 
     def test_a_recalled_hand_back_re_run_while_no_watch_ran_is_taken(self):
         recalled = {handbacks.MEMORY.split("/")[-1]: {1: "sha1"}, handbacks.RUNS_MEMORY: {1: "1.1"}}

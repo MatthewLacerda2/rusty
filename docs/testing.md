@@ -272,6 +272,17 @@ its check and its command changed to match).
   `ScreenCapture.CaptureScreenshot(path, superSize)` does:
   `Harness.Screenshot(path, { width = 2940, height = 1388 })`; the run keeps its size.
   Each side is a whole 1 to 8192 (`video::MAX_SIDE`), else an error.
+- **A shot can show what the game cannot** (#1882): `Harness.Screenshot(path, {
+  gizmos = true })` draws every collider's real shape (Unity's green, a trigger
+  paler) and the `Debug.DrawLine` / `Debug.DrawRay` lines over the frame, as the
+  editor's Game view **Gizmos** toggle does: the fastest way to see why a shot
+  missed or a crate snagged. It takes a size too (`{ width =, height =, gizmos = }`).
+  Without it a shot is the plain frame, byte for byte. A line drawn with no
+  duration lasts one tick, so take the shot right after the step that drew it.
+  The gizmos follow the main (base) camera, even under a viewmodel camera, and
+  are left out while TAA upscales the view (a render scale below 1 with TAA on;
+  the console says so once). The editor's Game view captures the same with
+  `make editor-capture ARGS="--game --gizmo GameGizmos=on"`.
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
   scenarios, the bot-player script and its `project.rusty`, opened like any other
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project
@@ -456,6 +467,15 @@ under `tests/gpu/` fails rather than skips, and
 `dev::capture::capture_required_tests::gpu_capture_renders_when_required` fails if a
 capture path wrongly reports no adapter. Without the variable (any local machine)
 the skip contract above is unchanged.
+
+**OIDN tests skip the same way** (#1884): the lightmap denoiser's tests
+(`dev::bake::denoise::tests` and `bake_tests`) need Open Image Denoise installed and skip without it.
+CI's `build-test` (the pinned release, where `RUSTY_OIDN` points) and the macOS leg
+(Homebrew's) install it and set `RUSTY_REQUIRE_OIDN=1`, which turns the canary
+`oidn_is_present_where_ci_requires_it` into a failure when OIDN does not open. The
+other jobs build `--features dev` without it (rusty opens OIDN at run time, never
+links it) and skip those tests. The bake's own denoiser logic is tested with mocks
+(`scene::lighting::lightmap::denoise_tests`) and runs everywhere.
 
 **Running them on a GPU-less Linux box** (a container, a cloud session): install
 lavapipe — `sudo apt-get install -y mesa-vulkan-drivers libvulkan1` — and the same

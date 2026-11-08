@@ -145,6 +145,12 @@ jobs:
       # A missing adapter fails the canary test instead of skipping every GPU test
       # (#489): the lavapipe step below is what gives this runner one.
       RUSTY_REQUIRE_GPU: "1"
+      # The lightmap denoiser (#1884): the OIDN step below installs it, and a
+      # missing one fails its canary instead of skipping every OIDN test.
+      RUSTY_REQUIRE_OIDN: "1"
+      RUSTY_OIDN: ${{ github.workspace }}/../oidn
+      OIDN_VERSION: "2.3.3"
+      OIDN_SHA256: 3c385230d9e6f63527ba72f2229594dbac5051674219d72e0044b5d0b841796f
     steps:
       - uses: actions/checkout@v7
         if: needs.changes.outputs.code != 'false'
@@ -176,6 +182,25 @@ jobs:
       - name: Driver version (Mesa / lavapipe)
         if: needs.changes.outputs.code != 'false'
         run: dpkg-query -W mesa-vulkan-drivers libvulkan1
+      # Open Image Denoise (#1884): no apt package, so the pinned, checksummed
+      # release, unpacked where RUSTY_OIDN points. rusty opens it at run time, so
+      # only the tests need it; a build never links it. Cached by version, as the
+      # Blender job caches Blender, and the download retries: one GitHub-releases
+      # 504 failed the whole job on its first run.
+      - name: Cache Open Image Denoise
+        if: needs.changes.outputs.code != 'false'
+        id: oidn-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.RUSTY_OIDN }}
+          key: oidn-${{ env.OIDN_VERSION }}-x86_64-linux
+      - name: Install Open Image Denoise
+        if: needs.changes.outputs.code != 'false' && steps.oidn-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -sSfL --retry 5 --retry-all-errors --retry-delay 10 -o "$RUNNER_TEMP/oidn.tgz" \
+            "https://github.com/RenderKit/oidn/releases/download/v${OIDN_VERSION}/oidn-${OIDN_VERSION}.x86_64.linux.tar.gz"
+          echo "${OIDN_SHA256}  $RUNNER_TEMP/oidn.tgz" | sha256sum -c -
+          mkdir -p "$RUSTY_OIDN" && tar -xzf "$RUNNER_TEMP/oidn.tgz" -C "$RUSTY_OIDN" --strip-components=1
       - name: Install cargo-nextest
         if: needs.changes.outputs.code != 'false'
         uses: taiki-e/install-action@v2
@@ -245,6 +270,8 @@ jobs:
     env:
       # Metal is always there on macOS; require it (#489).
       RUSTY_REQUIRE_GPU: "1"
+      # Homebrew's OIDN, installed below (#1884); require it too.
+      RUSTY_REQUIRE_OIDN: "1"
     steps:
       - uses: actions/checkout@v7
       - name: Toolchain (from rust-toolchain.toml)
@@ -257,6 +284,9 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
+      # The lightmap denoiser (#1884), opened at run time from Homebrew's lib.
+      - name: Install Open Image Denoise
+        run: brew install open-image-denoise
       # macOS uses its native backend and needs no extra system libs; the apt
       # step is Linux-only and lives on the `build-test` job above. Same runner
       # and steps as build-test (#484); bash so `windows.yml` can run the same script.

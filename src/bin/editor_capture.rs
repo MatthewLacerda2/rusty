@@ -19,9 +19,9 @@
 //!   --demo <file>       open this demo on the Game view's timeline (#1598)
 //!   --demo-tick <n>     replay the demo to tick n first (default 0)
 //!   --pointer <X>,<Y>   hold the pointer here, in pixels (a hover label shows)
-//!   --gizmo <Name>=on|off  draw a Scene-view gizmo or not, as `Editor.SetGizmo`
-//!                       names it (`UI`, `LightProbes`, `ReflectionProbes`,
-//!                       `NavMesh`); repeatable (#1909)
+//!   --gizmo <Name>=on|off  draw a gizmo or not, as `Editor.SetGizmo` names it
+//!                       (`UI`, `LightProbes`, `ReflectionProbes`, `Colliders`,
+//!                       `NavMesh`; `GameGizmos` over `--game`); repeatable (#1909)
 //!   --picker [<page>]   the project picker the editor starts on (#854), over a
 //!                       sample recent list; <page> is `new`, `open`,
 //!                       `mismatch` (the different-engine prompt) or `focus`

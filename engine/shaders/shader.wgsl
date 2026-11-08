@@ -15,6 +15,7 @@
 #import forward::specular_aa
 #import forward::lightmap::lightmap_light
 #import forward::motion::{motion_texel}
+#import forward::shadow_caster::{casters, shadow_light}
 
 // The forward pass (and its SSAO prepass and shadow-cascade entry points). Its
 // resources are `forward/bindings.wgsl`, its lighting helpers `forward/lighting.wgsl`.
@@ -121,34 +122,7 @@ fn fs_prepass(in: VertexOutput) {
 // `materials` (group 1 bindings 1, 0, 4; #1616: `material()` reads the clip's record). Group 2 is the material's, as
 // in the forward pass: only the clipping pipelines bind it.
 
-struct ShadowLight {
-    light_space: mat4x4<f32>,
-};
-
-// The cascade being drawn: one matrix per cascade, picked by dynamic offset.
-@group(0) @binding(6)
-var<uniform> shadow_light: ShadowLight;
-
-// One caster (#470): its world matrix, where its joint palette starts in `bones`
-// (#599; 0, the shared identity, for a mesh with no skin), and its cutout alpha test
-// (#648): the albedo map's alpha when `use_texture == 1` (a cutout's tint alpha is
-// always 1), read where its material's `mapping` puts it (#1594), clipped below
-// `alpha_cutoff` (0 for a material that does not clip).
-// Mirrors `CasterData` (src/render/passes/shadows/casters/buffer.rs) byte-for-byte.
-struct Caster {
-    model: mat4x4<f32>,
-    bone_base: u32,
-    alpha_cutoff: f32,
-    use_texture: u32,
-    _pad0: u32,
-    // Its material's mapping (#1594); not named `mapping`, which is the module's.
-    terms: mapping::Mapping,
-};
-
-// Every caster, one per instance: a draw covers a run of casters sharing one mesh
-// (and material, when it clips), indexed by `instance_index`.
-@group(1) @binding(3)
-var<storage, read> casters: array<Caster>;
+// The cascade's matrix and the casters: `forward/shadow_caster.wgsl`.
 
 // A caster's vertex in the cascade's light space. Only what a clip reads is filled:
 // the UVs, world position and normal (a triplanar clip weighs by it); the tangent
@@ -197,6 +171,21 @@ fn fs_shadow(in: VertexOutput) {
 @fragment
 fn fs_gizmo(in: VertexOutput) -> @location(0) vec4<f32> {
     return material().color_tint;
+}
+
+// The collider and debug-line gizmos (#1882): `fs_gizmo`'s lines, each vertex its own
+// colour, carried in the vertex's `tangent` (lines have no tangent basis) and passed
+// through untransformed, so one draw holds lines of every colour.
+@vertex
+fn vs_gizmo_vertex(model: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
+    var out = forward_vertex(model, instance);
+    out.world_tangent = model.tangent;
+    return out;
+}
+
+@fragment
+fn fs_gizmo_vertex(in: VertexOutput) -> @location(0) vec4<f32> {
+    return material().color_tint * in.world_tangent;
 }
 
 @fragment

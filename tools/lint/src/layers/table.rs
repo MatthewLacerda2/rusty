@@ -163,6 +163,8 @@ pub const LAYERS: &[Layer] = &[
             "components",
             "core",
             "ecs",
+            // The collider gizmo draws the shape physics collides with (#1882).
+            "physics",
             "scene",
             "shadergen",
             "ui",
@@ -192,6 +194,7 @@ pub const LAYERS: &[Layer] = &[
     )
     .uses(&[
         "image",
+        "libloading",
         "mlua",
         "pollster",
         "scorsese_core",

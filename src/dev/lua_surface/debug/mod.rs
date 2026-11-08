@@ -5,12 +5,14 @@
 //! named-material twin `Debug.PreviewMaterial` (#404),
 //! the frame stats `Debug.Stats` (#433), and the audio reads `Debug.AudioEvents` /
 //! `Debug.AudioVoices` (`audio.rs`, #1247), and the GPU readback
-//! `Debug.GetAdaptedExposure` (#1444) — the agent's observation channels:
+//! `Debug.GetAdaptedExposure` (#1444), and the debug lines `Debug.DrawLine` /
+//! `Debug.DrawRay` (`draw.rs`, #1882) — the agent's observation channels:
 //! structured, visual, performance and aural. Registered
 //! only in dev builds — stripped from the shipped game, like Unity `Debug.*` under
 //! `[Conditional]`: it lives in `dev`, which installs it onto the surface (#737).
 
 mod audio;
+mod draw;
 
 use mlua::{Lua, Table};
 
@@ -31,6 +33,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     register_stats(lua, &table, ctx.stats)?;
     register_adapted_exposure(lua, &table, ctx.scene)?;
     audio::register(lua, &table, ctx)?;
+    draw::register(lua, &table, ctx.scene)?;
 
     lua.globals().set("Debug", table).map_err(|e| e.to_string())
 }

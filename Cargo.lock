@@ -3226,6 +3226,7 @@ dependencies = [
  "image",
  "kira",
  "ktx2",
+ "libloading",
  "log",
  "mlua",
  "naga",

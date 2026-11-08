@@ -81,6 +81,7 @@ fn bake(scene: &mut Scene, name: &str) {
         bounces: 2,
         seed: 3,
         max_lightmap_size: 64,
+        denoiser: rusty::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 2,
         directional: true,
     };

@@ -10,8 +10,10 @@ fn session() -> Session {
 #[test]
 fn settings_read_back_the_scenes_defaults() {
     let read = "local s = Lighting.GetSettings() \
-        return table.concat({s.texelsPerUnit, s.samples, s.bounces, s.seed, tostring(s.directional), s.maxLightmapSize}, ' ')";
-    assert_eq!(session().eval(read).unwrap(), "8.0 128 3 0 true 1024");
+        return table.concat({s.texelsPerUnit, s.samples, s.bounces, s.seed, tostring(s.directional), s.maxLightmapSize, s.denoiser}, ' ')";
+    let samples = crate::scene::lighting::lightmap::BakeSettings::DEFAULT_SAMPLES;
+    let want = format!("8.0 {samples} 3 0 true 1024 OIDN");
+    assert_eq!(session().eval(read).unwrap(), want);
 }
 
 #[test]
@@ -102,7 +104,7 @@ fn bake_lightmaps_applies_every_named_argument_and_clamps() {
         bounces: Some(2),
         seed: Some(11),
         directional: Some(false),
-        max_lightmap_size: None,
+        ..Overrides::default()
     }
     .apply(base);
     let got = (named.texels_per_unit, named.samples, named.bounces);

@@ -62,6 +62,7 @@ pub(super) fn settings() -> BakeSettings {
         bounces: 2,
         seed: 7,
         max_lightmap_size: 32,
+        denoiser: Denoiser::Filter,
         filter_radius: 0,
         directional: true,
     }

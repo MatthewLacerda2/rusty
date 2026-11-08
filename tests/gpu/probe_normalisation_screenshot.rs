@@ -92,6 +92,7 @@ fn probe_and_bake(scene: &mut Scene, name: &str, normalised: bool) {
         bounces: 1,
         seed: 3,
         max_lightmap_size: 64,
+        denoiser: rusty::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional: false,
     };
