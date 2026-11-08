@@ -62,6 +62,18 @@ pub const ON_JOINT_BREAK: &str = "OnJointBreak";
 /// Dispatched after the animation step and ragdoll posing, before `LateUpdate`,
 /// in the order the playheads crossed them.
 pub const ON_ANIMATION_EVENT: &str = "OnAnimationEvent";
+/// Called the step the owning entity's Animator enters a graph state (#1901) —
+/// `(id, info)`, Unity's `StateMachineBehaviour.OnStateEnter`: as a transition
+/// into it starts, or on a hard cut (`PlayNode`, binding the entry node), in
+/// every layer. Dispatched with the animation events, before them.
+pub const ON_STATE_ENTER: &str = "OnStateEnter";
+/// Called every step a graph state stays active (#1901) — `(id, info)` — from
+/// the step after its enter to the step before its exit, both states of a
+/// crossfade included. Only scripts that define it are called.
+pub const ON_STATE_UPDATE: &str = "OnStateUpdate";
+/// Called the step a graph state stops being active (#1901) — `(id, info)`:
+/// as a crossfade out of it ends, or at once on a hard cut away.
+pub const ON_STATE_EXIT: &str = "OnStateExit";
 /// Called once per perception update the owning entity's `AIPerception` raised
 /// this tick (#1900) — `(id, target, info)`, Unreal's `OnTargetPerceptionUpdated`:
 /// a target gained (first sensed, or sensed again after not being), lost from
@@ -145,6 +157,9 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_CONTROLLER_COLLIDER_HIT,
     ON_JOINT_BREAK,
     ON_ANIMATION_EVENT,
+    ON_STATE_ENTER,
+    ON_STATE_UPDATE,
+    ON_STATE_EXIT,
     ON_PERCEPTION_UPDATED,
     ON_TAKE_DAMAGE,
     ON_POINTER_ENTER,
