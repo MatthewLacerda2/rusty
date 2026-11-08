@@ -57,7 +57,10 @@ And on demand: when the user asks for a PR to be reviewed, open or merged
   behind (three times in the 2026-10-20 batch). Remove a reviewer's worktree
   only after its report is in, by its own path, never by a pattern: a blanket
   `agent-*` cleanup removed a running reviewer's checkout and lost its report
-  (2026-10-23).
+  (2026-10-23). The harness locks it for the orchestrator's whole session, so
+  `make reclaim` leaves it as `PROTECTED` and a plain `git worktree remove`
+  refuses: once the report is in, `git worktree remove -f -f <its path>`
+  (2026-11-07 and 11-08).
 - **Read-only, and no build.** It reads the PR, the repository and the issue,
   and runs read-only commands (`gh pr view`, `gh pr diff`, `gh issue view`,
   `git show`). It makes no edits, commits, pushes or comments, and it does not
