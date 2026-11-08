@@ -2,7 +2,7 @@
 //! `UAIPerceptionComponent` with *Sight*, *Hearing* and *Damage*, so an agent
 //! acts on what it knows instead of reading the player's transform.
 //!
-//! - **Sight** ([`sight`]) is stepped every fixed tick by [`step`]: each
+//! - **Sight** (`sight`) is stepped every fixed tick by [`step`]: each
 //!   `AIPerception` looks for the targets on its `sight_mask` inside its range and
 //!   view cone, one ray each through [`ray`](super::ray). Rays are **budgeted**
 //!   across all perceivers ([`SightRays`], Unreal's `MaxTracesPerTick`): the
