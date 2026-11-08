@@ -9,6 +9,7 @@ use super::super::lights::area::{grid, AreaShape};
 use super::super::rays::Rays;
 use super::super::rng::Rng;
 use super::super::tests::{floor, quad};
+use super::sources::{Picks, Source};
 use super::Tracer;
 
 fn lamp(shape: LightShape, radiance: f32) -> BakeLight {
@@ -21,7 +22,7 @@ fn lamp(shape: LightShape, radiance: f32) -> BakeLight {
 }
 
 /// Every kind of source near the origin, one point lamp behind a blocker.
-fn scene() -> BakeScene {
+pub(super) fn scene() -> BakeScene {
     let at = |x, y, z| Vec3::new(x, y, z);
     let point = |k: usize| LightShape::Point {
         position: at(k as f32 - 2.0, 2.0, 1.0),
@@ -73,50 +74,30 @@ fn scene() -> BakeScene {
 }
 
 #[test]
-fn one_picked_source_averages_to_every_source_counted() {
+fn one_picked_lamp_averages_to_every_lamp_counted() {
     let scene = scene();
     let rays = Rays::build(triangles(&scene));
     let tracer = Tracer::new(&scene, &rays);
     let (point, normal) = (Vec3::new(0.1, 1e-3, 0.2), Vec3::Y);
-    // Every lamp counted once (an Area panel over a fine grid of points), and the
-    // emitter over many uniform points.
-    let mut exact = Vec3::ZERO;
-    for light in &scene.lights {
-        exact += match light.shape {
-            LightShape::Area(_) => grid()
-                .map(|u| tracer.lamp(light, point, normal, u, 1.0 / 64.0).0)
-                .sum(),
+    // Every lamp counted once, an Area panel over a fine grid of points.
+    let exact: Vec3 = (scene.lights.iter())
+        .map(|light| match light.shape {
+            LightShape::Area(_) => {
+                (grid().map(|u| tracer.lamp(light, point, normal, u, 1.0 / 64.0).0)).sum()
+            }
             _ => tracer.lamp(light, point, normal, Vec2::ZERO, 1.0).0,
-        };
-    }
-    let mut rng = Rng::new(5, 0, 0);
-    let draws = 200_000;
-    let emitter = &tracer.sources.emitters[0];
-    for _ in 0..draws {
-        let u = [rng.next_f32(), rng.next_f32(), rng.next_f32()];
-        exact += tracer
-            .shadowed(
-                point,
-                emitter
-                    .arrival(point, normal, u)
-                    .map(|(t, d, l, _)| (t, d, l)),
-            )
-            .0
-            / draws as f32;
-    }
-    let mut picks = super::sources::Picks::default();
-    let sampled: Vec3 = (0..draws)
-        .map(|_| {
-            tracer
-                .next_event(point, normal, (true, false), &mut rng, &mut picks)
-                .0
         })
-        .sum::<Vec3>()
-        / draws as f32;
-    assert!(
-        (sampled - exact).abs().max_element() < exact.x * 0.02,
-        "{sampled} vs {exact}"
-    );
+        .sum();
+    let (mut rng, mut picks) = (Rng::new(5, 0, 0), Picks::default());
+    let draws = 200_000;
+    let mut once = || {
+        tracer
+            .next_event(point, normal, (true, false), &mut rng, &mut picks)
+            .0
+    };
+    let sampled = (0..draws).map(|_| once()).sum::<Vec3>() / draws as f32;
+    let err = (sampled - exact).abs().max_element();
+    assert!(err < exact.x * 0.02, "{sampled} vs {exact}");
 }
 
 #[test]
@@ -124,25 +105,21 @@ fn a_vertex_no_source_reaches_draws_nothing_and_lamps_can_be_left_out() {
     let scene = scene();
     let rays = Rays::build(triangles(&scene));
     let tracer = Tracer::new(&scene, &rays);
-    let mut rng = Rng::new(5, 0, 0);
-    let mut picks = super::sources::Picks::default();
-    // Facing straight down, under everything: nothing is in front of it but the sun's
-    // back, which a Lambert receiver ignores.
-    let below = tracer.next_event(
-        Vec3::new(0.0, -1.0, 0.0),
-        Vec3::NEG_Y,
-        (true, false),
-        &mut rng,
-        &mut picks,
+    let (mut rng, mut picks) = (Rng::new(5, 0, 0), Picks::default());
+    // Facing straight down, under everything: nothing lies in front of it.
+    let below = Vec3::new(0.0, -1.0, 0.0);
+    let lit = tracer.next_event(below, Vec3::NEG_Y, (true, true), &mut rng, &mut picks);
+    assert_eq!(lit.0, Vec3::ZERO);
+    let up = Vec3::new(0.0, 0.5, 0.0);
+    tracer.next_event(up, Vec3::Y, (false, true), &mut rng, &mut picks);
+    assert_eq!(
+        picks.list,
+        vec![(Source::Emitter(0), picks.total)],
+        "lamps left out"
     );
-    assert_eq!(below.0, Vec3::ZERO);
-    let only_emitters = tracer.next_event(
-        Vec3::new(5.0, 0.0, 5.0),
-        Vec3::Y,
-        (false, false),
-        &mut rng,
-        &mut picks,
-    );
-    assert!(picks.list.len() <= 1, "lamps left out");
-    assert!(only_emitters.0.is_finite());
+    tracer.next_event(up, Vec3::Y, (true, false), &mut rng, &mut picks);
+    assert!(!picks
+        .list
+        .iter()
+        .any(|(s, _)| matches!(s, Source::Emitter(_))));
 }

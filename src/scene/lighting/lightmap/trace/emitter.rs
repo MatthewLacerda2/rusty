@@ -33,6 +33,14 @@ pub(super) struct Emitter {
     hi: Vec3,
 }
 
+/// How far around an emitter, in multiples of its size (`√area`), vertices aim
+/// at it: there it fills about 1/(π · 16²) of the sky, so a bounce ray would find
+/// it one time in 800.
+const REACH: f32 = 16.0;
+/// The most that reach goes past an emitter's bounds, in world units: a whole
+/// glowing floor is found well enough by bounce rays from a room away.
+const MAX_REACH: f32 = 16.0;
+
 /// No emitter: [`emitters`]' mark for a run that emits nothing a ray can see.
 pub(super) const NONE: u32 = u32::MAX;
 
@@ -107,6 +115,16 @@ impl Emitter {
         }
         let d2 = (point.clamp(self.lo, self.hi) - point).length_squared();
         luminance(self.radiance) * self.area / d2.max(self.area / std::f32::consts::PI)
+    }
+
+    /// The sphere a vertex aims shadow rays at it from (#1883): its bounds and
+    /// [`REACH`] times its size around them, at most [`MAX_REACH`] past them.
+    /// Farther off it is small in the sky and a bounce ray is the better way to
+    /// find it; the two are weighed by MIS, so leaving it out there is unbiased.
+    pub(super) fn reach(&self) -> (Vec3, f32) {
+        let centre = (self.lo + self.hi) * 0.5;
+        let near = (REACH * self.area.sqrt()).min(MAX_REACH);
+        (centre, (self.hi - self.lo).length() * 0.5 + near)
     }
 
     /// Its emitted radiance.

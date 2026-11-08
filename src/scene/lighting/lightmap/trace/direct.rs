@@ -61,17 +61,18 @@ impl Tracer<'_> {
 
     /// One sample of the light reaching a path vertex at `point` facing `normal`
     /// (next-event estimation, #1883): one source picked from the lamps in range
-    /// (when `lamps`) and the emitters, with probability `p` proportional to its
-    /// weight (`sources::lamp_weight`, `Emitter::weight`), one point on it, and its
-    /// light over `p`. Unbiased, and its cost grows with the lamps in range, not
-    /// the level's. When `mis`, the path's next bounce ray may land on the same
-    /// emitter, so an emitter's light is weighed against that ray by the balance
-    /// heuristic (`Tracer::path` takes the other share). `picks` keeps the weights.
+    /// (when `lamps`) and the emitters near it (when `emitters`), with probability
+    /// `p` proportional to its weight (`sources::lamp_weight`, `Emitter::weight`),
+    /// one point on it, and its light over `p`. Unbiased, and its cost grows with
+    /// the sources in range, not the level's. An emitter's light is weighed
+    /// against the path's next bounce ray, which may land on the same point, by
+    /// the balance heuristic (`Tracer::path` takes the other share), so emitters
+    /// are only asked for where that ray follows. `picks` keeps the weights.
     pub(super) fn next_event(
         &self,
         point: Vec3,
         normal: Vec3,
-        (lamps, mis): (bool, bool),
+        (lamps, emitters): (bool, bool),
         rng: &mut Rng,
         picks: &mut Picks,
     ) -> Lit {
@@ -85,8 +86,8 @@ impl Tracer<'_> {
                 }
             }
         }
-        for (k, emitter) in self.sources.emitters.iter().enumerate() {
-            let w = emitter.weight(point, normal);
+        for k in self.sources.near.near(point).filter(|_| emitters) {
+            let w = self.sources.emitters[k].weight(point, normal);
             if w > 0.0 {
                 picks.list.push((Source::Emitter(k), w));
             }
@@ -124,9 +125,8 @@ impl Tracer<'_> {
             Source::Emitter(k) => {
                 let u = [rng.next_f32(), rng.next_f32(), rng.next_f32()];
                 let arrived = self.sources.emitters[k].arrival(point, normal, u);
-                let share = arrived.map_or(1.0, |(to, _, _, pdf)| match mis {
-                    true => balance(chance * pdf, normal.dot(to) / PI),
-                    false => 1.0,
+                let share = arrived.map_or(1.0, |(to, _, _, pdf)| {
+                    balance(chance * pdf, normal.dot(to) / PI)
                 });
                 let (lit, dir) = self.shadowed(point, arrived.map(|(to, d, lit, _)| (to, d, lit)));
                 (lit * share, dir * share)

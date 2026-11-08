@@ -1,6 +1,6 @@
 //! What a path vertex can aim a shadow ray at (#1883): the scene's lamps, found
 //! through a [`LightGrid`] so only those in range are weighed, and its emissive
-//! surfaces ([`Emitter`]). [`Tracer::next_event`](super::Tracer) picks one per
+//! surfaces ([`Emitter`]) near enough to be worth aiming at. [`Tracer::next_event`](super::Tracer) picks one per
 //! vertex, with probability proportional to its weight here.
 
 use glam::{Vec2, Vec3};
@@ -27,6 +27,8 @@ pub(super) enum Source {
 pub(super) struct Sources {
     pub grid: LightGrid,
     pub emitters: Vec<Emitter>,
+    /// The emitters by [reach](Emitter::reach).
+    pub near: LightGrid,
     /// Per mesh and material run, the emitter it is (`emitter::NONE` if none).
     by_run: Vec<Vec<u32>>,
 }
@@ -36,6 +38,7 @@ impl Sources {
         let (emitters, by_run) = emitters(scene);
         Self {
             grid: LightGrid::build(&scene.lights),
+            near: LightGrid::of(emitters.iter().map(|e| Some(e.reach())).collect()),
             emitters,
             by_run,
         }

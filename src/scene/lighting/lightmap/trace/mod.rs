@@ -34,6 +34,8 @@ mod grid;
 #[cfg(test)]
 mod grid_tests;
 #[cfg(test)]
+mod mis_tests;
+#[cfg(test)]
 mod pick_tests;
 mod sources;
 
@@ -139,10 +141,12 @@ impl<'a> Tracer<'a> {
     /// direction (#810), and whether its first ray hit a back face. The texel's
     /// own view of the emitters is one next-event sample; then a cosine-weighted
     /// ray, and at each front face it lands on, `albedo / π` times one next-event
-    /// sample of every lamp and emitter, `bounces` surfaces deep (#1883). A ray
-    /// that lands on an emitter adds its glow too, weighed against the next-event
-    /// sample that could have picked that point (MIS, the balance heuristic), so
-    /// emitted light is counted once whether a panel is small or a whole floor.
+    /// sample of the lamps (and the emitters, where another bounce follows),
+    /// `bounces` surfaces deep (#1883). A ray that lands on an emitter adds its
+    /// glow, weighed against the next-event sample that could have picked that
+    /// point (MIS, the balance heuristic), so emitted light is counted once and
+    /// stays smooth whether a panel is small or a whole floor. Emission reaches
+    /// `bounces` surfaces deep and lamps one deeper, as they always did.
     /// After the second bounce a path goes on with probability `p`, its throughput
     /// held to [`ROULETTE`], and a survivor's throughput is divided by `p`.
     fn path(

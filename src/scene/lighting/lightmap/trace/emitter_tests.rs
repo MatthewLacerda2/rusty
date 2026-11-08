@@ -43,9 +43,7 @@ fn indirect(scene: &BakeScene, p: Vec3, n: Vec3, samples: u32, bounces: u32, see
 
 #[test]
 fn a_glowing_box_bakes_the_furnace_sum_at_any_depth() {
-    // Dim, so no path reaches `INDIRECT_CLAMP`: the clamp cuts the tail of a
-    // vertex in a corner (by design), which would read here as bias.
-    let (glow, albedo) = (0.02, 0.8);
+    let (glow, albedo) = (0.5, 0.8);
     let axes = [
         Vec3::X,
         Vec3::NEG_X,
@@ -56,11 +54,12 @@ fn a_glowing_box_bakes_the_furnace_sum_at_any_depth() {
     ];
     let scene = dark(axes.map(|n| face(n, glow, albedo)).to_vec());
     // Seen from inside, every direction meets glow `L`: the texel's own view is
-    // `L`, and each bounce adds `albedo` times the last, `bounces` deep. Past the
+    // `L`, and each bounce but the last adds `albedo` times the one before (the
+    // last surface's own view of the glow is a bounce past `bounces`). Past the
     // second, Russian roulette ends paths early; unbiased, it keeps the sum.
     let at = Vec3::new(0.3, -1.0, -0.2);
     for bounces in [1, 2, 8] {
-        let expected: f32 = (0..=bounces).map(|k| glow * albedo.powi(k as i32)).sum();
+        let expected: f32 = (0..bounces).map(|k| glow * albedo.powi(k as i32)).sum();
         let got = (0..8)
             .map(|seed| indirect(&scene, at, Vec3::Y, 4096, bounces, seed))
             .sum::<f32>()

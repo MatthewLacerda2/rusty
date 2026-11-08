@@ -1,8 +1,9 @@
-//! Which lamps can reach a point (#1883): a uniform grid over the lamps' spheres
-//! of influence, so a path vertex weighs only the lamps in range of it, however
-//! many the level holds. A lamp lands in every cell its sphere's box touches; a
-//! lamp with no finite reach (a directional, a NaN or unbounded range) is in every
-//! cell, through `global`. Built once per bake, read by every vertex.
+//! Which sources can reach a point (#1883): a uniform grid over spheres of
+//! influence, so a path vertex weighs only the lamps in range of it (and the
+//! emitters near it), however many the level holds. A source lands in every cell
+//! its sphere's box touches; one with no finite reach (a directional, a NaN or
+//! unbounded range) is in every cell, through `global`. Built once per bake, read
+//! by every vertex.
 
 use glam::Vec3;
 
@@ -13,7 +14,7 @@ const MAX_CELLS: f32 = 64.0;
 /// The smallest cell edge, in world units.
 const MIN_CELL: f32 = 2.0;
 
-/// The lamps by cell: `items[starts[c]..starts[c + 1]]` are cell `c`'s, each in
+/// The sources by cell: `items[starts[c]..starts[c + 1]]` are cell `c`'s, each in
 /// ascending lamp order, so a walk over them is deterministic.
 #[derive(Debug, Default)]
 pub(super) struct LightGrid {
@@ -35,13 +36,22 @@ fn reach(light: &BakeLight) -> Option<(Vec3, f32)> {
         } => (position, range),
         LightShape::Area(area) => (area.center, area.range),
     };
-    (centre.is_finite() && range.is_finite() && range >= 0.0).then_some((centre, range))
+    Some((centre, range))
 }
 
 impl LightGrid {
+    /// The grid of `lights`, each by its sphere of influence.
     pub(super) fn build(lights: &[BakeLight]) -> Self {
-        let spheres: Vec<Option<(Vec3, f32)>> = lights.iter().map(reach).collect();
-        let global = (0..lights.len() as u32)
+        Self::of(lights.iter().map(reach).collect())
+    }
+
+    /// The grid of `spheres` (centre, radius), item `i` reaching only inside the
+    /// `i`th; one with `None` (or not finite) reaches everywhere.
+    pub(super) fn of(spheres: Vec<Option<(Vec3, f32)>>) -> Self {
+        let finite =
+            |s: Option<(Vec3, f32)>| s.filter(|(c, r)| c.is_finite() && r.is_finite() && *r >= 0.0);
+        let spheres: Vec<_> = spheres.into_iter().map(finite).collect();
+        let global = (0..spheres.len() as u32)
             .filter(|&i| spheres[i as usize].is_none())
             .collect();
         let bounded = spheres.iter().flatten();
