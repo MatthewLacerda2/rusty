@@ -29,7 +29,7 @@ fn faced_cube(name: &str) -> String {
     let face = |c: [f32; 3]| {
         let texel: Vec<u8> = [c[0], c[1], c[2], 1.0]
             .iter()
-            .flat_map(|v| half::f16::from_f32(*v).to_le_bytes())
+            .flat_map(|v| crate::core::color::f32_to_f16(*v).to_le_bytes())
             .collect();
         texel.repeat(16)
     };
