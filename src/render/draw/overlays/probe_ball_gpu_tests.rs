@@ -9,13 +9,13 @@ use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
 use crate::render::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::{Camera, Scene};
 
-const RES: u32 = 64;
+pub(super) const RES: u32 = 64;
 /// Where the probe sits: off the floor grid, which the camera would see edge-on.
 const AT: Vec3 = Vec3::new(0.0, 1.0, 0.0);
 
 /// Linear colour of each cube face, in `+X, -X, +Y, -Y, +Z, -Z` order: all distinct,
 /// so the centre pixel names the face it reflected.
-const FACES: [[f32; 3]; 6] = [
+pub(super) const FACES: [[f32; 3]; 6] = [
     [0.9, 0.1, 0.1],
     [0.1, 0.9, 0.1],
     [0.1, 0.1, 0.9],
@@ -25,7 +25,7 @@ const FACES: [[f32; 3]; 6] = [
 ];
 
 /// A one-mip 4² cube file whose faces are [`FACES`], in half floats; returns its path.
-fn faced_cube(name: &str) -> String {
+pub(super) fn faced_cube(name: &str) -> String {
     let face = |c: [f32; 3]| {
         let texel: Vec<u8> = [c[0], c[1], c[2], 1.0]
             .iter()
@@ -50,26 +50,33 @@ fn probe_scene(path: &str) -> Scene {
     scene
 }
 
-/// The centre pixel (RGBA8, sRGB) of the editor frame looking down -Z at the probe
-/// from 2 m, with `gizmos`.
-fn centre(r: &mut Renderer, scene: &Scene, gizmos: SceneGizmos) -> [u8; 4] {
+/// The editor frame (RGBA8, sRGB, `RES`²) `cam` renders of `scene` with `gizmos`.
+pub(super) fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera, gizmos: SceneGizmos) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     view.gizmos = gizmos;
     let out = view.color_target_view().unwrap();
-    let cam = Camera::new(AT + Vec3::Z * 2.0, -90.0, 0.0);
-    r.render(&mut view, scene, &cam, &out, true);
-    let px =
-        readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), RES, RES);
-    let i = ((RES / 2) * RES + RES / 2) as usize * 4;
+    r.render(&mut view, scene, cam, &out, true);
+    readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), RES, RES)
+}
+
+/// The pixel at column `x`, row `y` of a [`frame`].
+pub(super) fn pixel(px: &[u8], x: u32, y: u32) -> [u8; 4] {
+    let i = (y * RES + x) as usize * 4;
     [px[i], px[i + 1], px[i + 2], px[i + 3]]
 }
 
+/// The centre pixel of the editor frame looking down -Z at the probe from 2 m.
+fn centre(r: &mut Renderer, scene: &Scene, gizmos: SceneGizmos) -> [u8; 4] {
+    let cam = Camera::new(AT + Vec3::Z * 2.0, -90.0, 0.0);
+    pixel(&frame(r, scene, &cam, gizmos), RES / 2, RES / 2)
+}
+
 /// `linear` as the sRGB target stores it.
-fn srgb(linear: [f32; 3]) -> [u8; 3] {
+pub(super) fn srgb(linear: [f32; 3]) -> [u8; 3] {
     linear.map(|c| (crate::core::color::linear_to_srgb(c) * 255.0).round() as u8)
 }
 
-fn assert_near(got: [u8; 4], want: [u8; 3], what: &str) {
+pub(super) fn assert_near(got: [u8; 4], want: [u8; 3], what: &str) {
     let close = (0..3).all(|k| got[k].abs_diff(want[k]) <= 8);
     assert!(close, "{what}: got {got:?}, want about {want:?}");
 }

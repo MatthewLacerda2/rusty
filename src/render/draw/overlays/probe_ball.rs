@@ -154,3 +154,7 @@ mod tests {
 #[cfg(test)]
 #[path = "probe_ball_gpu_tests.rs"]
 mod gpu_tests;
+
+#[cfg(test)]
+#[path = "probe_ball_ortho_gpu_tests.rs"]
+mod ortho_gpu_tests;

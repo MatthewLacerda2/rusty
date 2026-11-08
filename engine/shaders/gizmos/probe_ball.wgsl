@@ -40,17 +40,31 @@ fn vs_ball(@builtin(vertex_index) corner: u32, @builtin(instance_index) resident
     );
     let center = draw.model_matrix[3].xyz;
     let radius = length(draw.model_matrix[0].xyz);
+    // An orthographic projection leaves clip w at 1: view_proj's bottom row is (0,0,0,1).
+    let m = camera.view_proj;
+    let ortho = m[0].w == 0.0 && m[1].w == 0.0 && m[2].w == 0.0;
     let to_eye = camera.camera_pos - center;
-    let d = max(length(to_eye), 1e-6);
-    let toward = to_eye / d;
+    let d = length(to_eye);
+    // The quad faces back along the camera's ray through the centre. In perspective that
+    // is toward the eye; in orthographic every ray is parallel, so it is the ray through
+    // the centre's NDC, unprojected at depth 0 and 1 (facing the eye there would clip an
+    // off-axis ball's silhouette).
+    let c_clip = m * vec4<f32>(center, 1.0);
+    let c_ndc = c_clip.xy / c_clip.w;
+    let near = camera.inv_view_proj * vec4<f32>(c_ndc, 0.0, 1.0);
+    let far = camera.inv_view_proj * vec4<f32>(c_ndc, 1.0, 1.0);
+    let toward = select(to_eye / d, normalize(near.xyz / near.w - far.xyz / far.w), ortho);
     let helper = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(toward.y) > 0.99);
     let right = normalize(cross(helper, toward));
     let up = cross(toward, right);
-    // The silhouette cone's radius on the plane through the centre facing the eye;
-    // an eye inside the ball collapses the quad (the ball is not drawn).
-    let half = select(0.0, radius * d / sqrt(max(d * d - radius * radius, 1e-8)), d > radius);
+    // The silhouette's radius on the plane through the centre facing the ray: the
+    // ball's own in orthographic, the cone's in perspective. An eye inside (or on) the
+    // ball collapses the quad to the centre (the ball is not drawn), before the basis,
+    // which is NaN for an eye exactly on the probe, can reach the position.
+    let cone = radius * d / sqrt(max(d * d - radius * radius, 1e-8));
+    let inside = !ortho && d <= radius;
     let c = corners[corner];
-    let world = center + (right * c.x + up * c.y) * half;
+    let world = select(center + (right * c.x + up * c.y) * select(cone, radius, ortho), center, inside);
     var out: BallVertex;
     out.clip_position = camera.view_proj * vec4<f32>(world, 1.0);
     out.clip = out.clip_position.xyw;
@@ -72,10 +86,13 @@ fn fs_ball(in: BallVertex) -> BallFragment {
     let oc = origin - in.center;
     let b = dot(oc, dir);
     let h = b * b - (dot(oc, oc) - in.radius * in.radius);
-    if (h < 0.0) {
+    // A miss, or a near hit behind the near plane (an eye just outside the ball): the
+    // near plane clips the ball as it clips a solid.
+    let t = -b - sqrt(max(h, 0.0));
+    if (h < 0.0 || t < 0.0) {
         discard;
     }
-    let hit = origin + dir * (-b - sqrt(h));
+    let hit = origin + dir * t;
     let reflected = reflect(dir, normalize(hit - in.center));
     var colour = UNBAKED_GREY;
     if (in.resident > 0u) {
