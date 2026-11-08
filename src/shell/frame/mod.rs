@@ -1,4 +1,4 @@
-//! src/shell/frame.rs — the frame clock, the sim advance, quit semantics, and
+//! src/shell/frame/mod.rs — the frame clock, the sim advance, quit semantics, and
 //! swapchain acquisition: the per-frame logic both frontends share.
 //!
 //! Everything but [`acquire_frame`] is window- and GPU-free, so it is unit-tested
@@ -7,12 +7,17 @@
 use std::time::{Duration, Instant};
 
 use crate::app::{GameWorld, PlayTransition};
+use crate::render::interpolate::DrawPoses;
 use crate::render::Renderer;
+use crate::time::FIXED_DELTA_TIME;
 use wgpu::CurrentSurfaceTexture;
 
-/// Wall-clock frame timing for the windowed loop: the raw delta handed to the sim and
-/// a once-a-second FPS counter the editor shows. Platform-side only — the sim never
-/// reads it (the paused/stepped mode uses the fixed dt instead).
+pub mod ticks;
+pub use ticks::FixedTicks;
+
+/// Wall-clock frame timing for the windowed loop: the raw delta handed to
+/// [`advance_sim`] and a once-a-second FPS counter the editor shows. Platform-side
+/// only — the sim never reads it (in Play it ticks on the fixed dt).
 pub struct FrameClock {
     last_frame: Instant,
     last_delta: f32,
@@ -57,21 +62,68 @@ impl FrameClock {
     }
 }
 
-/// Advance the simulation for one rendered frame, honouring the "playing-but-stepped"
-/// mode (#283): not paused, a normal real-time tick with the wall-clock `delta_time`;
-/// paused, [`GameWorld::paused_frame`] (only the queued fixed-dt steps move the world,
-/// and a Play/Stop still takes effect). Rendering continues every frame regardless.
+/// What the shell keeps across frames for [`advance_sim`]: the time owed to the
+/// fixed tick and the poses drawing blends between.
+pub struct Step<'a> {
+    pub ticks: &'a mut FixedTicks,
+    pub poses: &'a mut DrawPoses,
+}
+
+impl<'a> Step<'a> {
+    pub fn of(ticks: &'a mut FixedTicks, poses: &'a mut DrawPoses) -> Self {
+        Self { ticks, poses }
+    }
+
+    /// The sim is off the tick this frame: nothing owed, everything drawn as it is.
+    pub fn clear(&mut self) {
+        self.ticks.clear();
+        self.poses.clear();
+    }
+}
+
+/// Advance the simulation for one rendered frame of `raw` wall-clock seconds (#1877).
+///
+/// * **Play:** on the fixed tick. `ticks` takes the frame's time and runs every whole
+///   [`FIXED_DELTA_TIME`] tick now owed (none on a frame shorter than a tick, at most
+///   20 after a hitch); `poses` records each one and is told how far the frame is into
+///   the next, so drawing blends between the last two ticks. A frame that owes no tick
+///   leaves the input it saw pending for the next one.
+/// * **Entering or leaving Play:** one fixed tick runs the transition now (`Start` and
+///   the first `Update`, or the Stop), and the clock starts afresh.
+/// * **Edit mode:** one frame of `raw` time, as the editor always ran it.
+/// * **Paused** ("playing-but-stepped", #283): [`GameWorld::paused_frame`] (only the
+///   queued fixed-dt steps move the world, and a Play/Stop still takes effect).
 ///
 /// Every edit-mode follower (a re-written model reloading into its entities, a
 /// moved bone skinning, the UI's texture sizes) hangs off [`GameWorld::edit_frame`],
 /// which runs on every frame outside Play, stepped or frozen. Add a new one there,
 /// not here. In Play, a tick reads the UI's texture sizes itself.
-pub fn advance_sim(game: &mut GameWorld, delta_time: f32) -> PlayTransition {
-    let paused = game.time().borrow().paused;
-    if !paused {
-        return game.tick(delta_time);
+pub fn advance_sim(game: &mut GameWorld, mut step: Step<'_>, raw: f32) -> PlayTransition {
+    if game.time().borrow().paused {
+        step.clear();
+        return game.paused_frame();
     }
-    game.paused_frame()
+    let playing = game.scene().borrow().is_playing();
+    let heading = game.resources.application.borrow().play_heading();
+    if !playing && !heading {
+        step.clear();
+        return game.tick(raw);
+    }
+    if playing != heading {
+        step.clear();
+        return game.tick(FIXED_DELTA_TIME);
+    }
+    for _ in 0..step.ticks.owe(raw) {
+        let transition = game.tick(FIXED_DELTA_TIME);
+        if transition != PlayTransition::None {
+            // A Stop a tick ran (a script's `Editor.ExitPlay`): the rest is edit mode.
+            step.clear();
+            return transition;
+        }
+        step.poses.record(&game.scene().borrow());
+    }
+    step.poses.set_alpha(step.ticks.alpha());
+    PlayTransition::None
 }
 
 /// Which frontend is hosting the game — it decides what `Application.Quit()` means.
@@ -132,9 +184,23 @@ pub fn acquire_frame(renderer: &mut Renderer) -> Option<wgpu::SurfaceTexture> {
     }
 }
 
+/// One frame through [`advance_sim`] with a fresh accumulator: each frame's ticks
+/// are its own whole ticks (a test of a single frame needs nothing kept).
+#[cfg(test)]
+fn advance(game: &mut GameWorld, raw: f32) -> PlayTransition {
+    let (mut ticks, mut poses) = Default::default();
+    advance_sim(game, Step::of(&mut ticks, &mut poses), raw)
+}
+
+#[cfg(test)]
+#[path = "fixed_tick_tests.rs"]
+mod fixed_tick_tests;
 #[cfg(test)]
 #[path = "frame_edit_tests.rs"]
 mod frame_edit_tests;
 #[cfg(test)]
 #[path = "frame_tests.rs"]
 mod frame_tests;
+#[cfg(test)]
+#[path = "tick_input_tests.rs"]
+mod tick_input_tests;

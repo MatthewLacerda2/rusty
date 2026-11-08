@@ -10,6 +10,7 @@ mod debug_meshes;
 pub(crate) mod decals;
 mod draw;
 mod frustum;
+pub mod interpolate;
 pub(crate) mod lod;
 pub(crate) mod motion;
 mod preview;
@@ -258,6 +259,9 @@ pub struct Renderer {
 
     /// The retained render scene (#1706): mesh handles and each drawn scene's objects.
     pub(crate) retained: scene::Retained,
+    /// What a frame draws between two fixed ticks (#1877): filled by the shell, read
+    /// by the retained scene and the game view's camera.
+    pub draw_poses: interpolate::DrawPoses,
 
     /// What the last `render` call submitted (#433) — read by the dev layer's stats.
     pub frame_counters: RenderCounters,

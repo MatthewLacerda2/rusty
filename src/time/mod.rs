@@ -1,7 +1,7 @@
 //! src/time/mod.rs — Time resource + fixed clock
 //!
-//! Holds the per-frame `delta_time`, the fixed-timestep `fixed_delta_time` the
-//! headless harness drives, and a monotonic `frame_count`. The simulation advances
+//! Holds the per-tick `delta_time`, the fixed timestep `fixed_delta_time` every host
+//! ticks Play on (#1877), and a monotonic `frame_count`. The simulation advances
 //! it once per tick; Lua reads it through the `Time` namespace (Unity: `Time`).
 
 // Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
@@ -12,14 +12,21 @@
 /// here too so non-dev builds have the value without pulling in the dev tree.
 pub const FIXED_DELTA_TIME: f32 = 1.0 / 60.0;
 
+/// The most wall-clock time one windowed frame hands the sim (Unity's
+/// `Time.maximumDeltaTime`, 1/3 s): a hitch owes at most 20 ticks (#1877), and an
+/// on-demand editor frame after a sleep steps its clock by no more (#1721).
+pub const MAXIMUM_DELTA_TIME: f32 = 1.0 / 3.0;
+
 /// Frame-clock resource. One instance lives in the `GameWorld`, shared into the
 /// script runtime so scripts can query time deterministically.
 #[derive(Clone, Debug)]
 pub struct Time {
-    /// Seconds elapsed during the current frame, scaled by `time_scale`.
+    /// Seconds the current tick advances, scaled by `time_scale`: in Play every
+    /// host ticks on `fixed_delta_time`, so this is `fixed_delta_time × time_scale`
+    /// (#1877); an edit-mode frame passes its wall-clock seconds.
     pub delta_time: f32,
-    /// Seconds elapsed during the current frame, ignoring `time_scale`. Used by
-    /// pause menus / UI that keep animating while the sim is paused.
+    /// The same, ignoring `time_scale`. Used by pause menus / UI that keep animating
+    /// while the sim is paused.
     pub unscaled_delta_time: f32,
     /// The fixed timestep used by the deterministic clock. Always unscaled — it's
     /// the engine's fixed step.

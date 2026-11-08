@@ -31,6 +31,8 @@ pub fn draw(
     // A post-processing path field (the Color Lookup, the bloom dirt, #1441, #1442)
     // typed and left by selecting something else.
     editor.is_dirty |= camera::commit_abandoned_paths(ui.ctx(), scene);
+    // The Collider's asset path left the same way, and an asset edit whose drag ended.
+    editor.is_dirty |= components::gameplay::commit_abandoned_collider(ui.ctx(), scene);
     let t = editor.theme;
     if !editor.inspector_open {
         draw_collapsed(ui, t, &mut editor.inspector_open);

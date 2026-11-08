@@ -1,17 +1,25 @@
 //! Headless tests for the KTX2 cubemap loader (no GPU): a hand-built minimal cubemap
-//! blob parses to six faces; garbage / non-cube / non-RGBA8 inputs are rejected.
+//! blob parses to six faces; garbage / non-cube / non-BC6H inputs are rejected.
 
 use super::*;
 
-/// Build a minimal-but-valid KTX2 byte blob for a `size × size` RGBA8 cubemap with one
-/// mip level, each face a solid colour `face_index` in the red channel. Layout: 80-byte
-/// header, one 24-byte level-index entry, a tiny DFD placeholder, then the packed faces.
+/// Build a minimal-but-valid KTX2 byte blob for a `size × size` cubemap in `format`
+/// with one mip level, each face's first byte its `face_index`. Layout: 80-byte
+/// header, one 24-byte level-index entry, a tiny DFD placeholder, then the packed
+/// faces (whole 16-byte blocks for BC6H).
 pub(super) fn build_cubemap_ktx2(size: u32, format: u32, face_count: u32) -> Vec<u8> {
     const MAGIC: [u8; 12] = [
         0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
     ];
-    let texel = if format == R16G16B16A16_SFLOAT { 8 } else { 4 };
-    let face_bytes = (size as usize) * (size as usize) * texel;
+    let texel = match format {
+        BC6H_UFLOAT => 1,
+        R16G16B16A16_SFLOAT => 8,
+        _ => 4,
+    };
+    let face_bytes = match format {
+        BC6H_UFLOAT => crate::asset::texture_import::blocks_len(size, size, 16),
+        _ => (size as usize) * (size as usize) * texel,
+    };
     let level_len = face_bytes * face_count as usize;
 
     let header_len = 80usize;
@@ -24,7 +32,7 @@ pub(super) fn build_cubemap_ktx2(size: u32, format: u32, face_count: u32) -> Vec
     buf[0..12].copy_from_slice(&MAGIC);
     let put = |b: &mut [u8], at: usize, v: u32| b[at..at + 4].copy_from_slice(&v.to_le_bytes());
     put(&mut buf, 12, format); // vkFormat
-    put(&mut buf, 16, texel as u32 / 4); // typeSize
+    put(&mut buf, 16, (texel as u32 / 4).max(1)); // typeSize
     put(&mut buf, 20, size); // pixelWidth
     put(&mut buf, 24, size); // pixelHeight
     put(&mut buf, 28, 0); // pixelDepth
@@ -50,27 +58,29 @@ pub(super) fn build_cubemap_ktx2(size: u32, format: u32, face_count: u32) -> Vec
 
 pub(super) const R8G8B8A8_UNORM: u32 = 37;
 pub(super) const R8G8B8A8_SRGB: u32 = 43;
-pub(super) const R16G16B16A16_SFLOAT: u32 = 97; // what the bake writes (#1696)
+pub(super) const R16G16B16A16_SFLOAT: u32 = 97; // what the bake wrote (#1696)
+pub(super) const BC6H_UFLOAT: u32 = 143; // what the bake writes (#1885)
 const R32G32B32A32_SFLOAT: u32 = 109;
 
 #[test]
-fn parses_valid_rgba16f_cubemap() {
-    let bytes = build_cubemap_ktx2(2, R16G16B16A16_SFLOAT, 6);
+fn parses_valid_bc6h_cubemap() {
+    let bytes = build_cubemap_ktx2(8, BC6H_UFLOAT, 6);
     let cube = parse_ktx2_cubemap_mips(&bytes).expect("should parse");
-    assert_eq!(cube.size, 2);
-    assert_eq!(cube.mips[0].len(), 2 * 2 * 8 * 6);
+    assert_eq!(cube.size, 8);
+    assert_eq!(cube.mips[0].len(), 4 * 16 * 6);
     // Face order preserved: face f tagged with f at its start.
-    let face_bytes = 2 * 2 * 8;
+    let face_bytes = 4 * 16;
     assert_eq!(cube.mips[0][0], 0);
     assert_eq!(cube.mips[0][face_bytes], 1);
     assert_eq!(cube.mips[0][5 * face_bytes], 5);
 }
 
-/// An 8-bit cube baked before HDR probes is refused, and the reason says to re-bake
-/// it: the probe array holds half floats, so it cannot be copied in (#1696).
+/// An 8-bit cube baked before HDR probes, or a half-float one baked before BC6H
+/// probes, is refused, and the reason says to re-bake it: the probe array holds
+/// BC6H, so it cannot be copied in (#1696, #1885). One warning, never a crash.
 #[test]
-fn an_8_bit_cube_from_before_hdr_probes_asks_for_a_rebake() {
-    for format in [R8G8B8A8_UNORM, R8G8B8A8_SRGB] {
+fn a_cube_from_before_bc6h_probes_asks_for_a_rebake() {
+    for format in [R8G8B8A8_UNORM, R8G8B8A8_SRGB, R16G16B16A16_SFLOAT] {
         let why = parse_ktx2_cubemap_mips(&build_cubemap_ktx2(1, format, 6)).err();
         assert!(why.is_some_and(|w| w.contains("re-bake")), "{why:?}");
     }
@@ -79,7 +89,7 @@ fn an_8_bit_cube_from_before_hdr_probes_asks_for_a_rebake() {
 #[test]
 fn rejects_non_cube() {
     // A 2D texture (1 face) is not a cubemap.
-    let bytes = build_cubemap_ktx2(1, R16G16B16A16_SFLOAT, 1);
+    let bytes = build_cubemap_ktx2(4, BC6H_UFLOAT, 1);
     assert!(parse_ktx2_cubemap_mips(&bytes).is_err());
 }
 
@@ -88,7 +98,7 @@ fn rejects_another_float_format() {
     let bytes = build_cubemap_ktx2(1, R32G32B32A32_SFLOAT, 6);
     assert_eq!(
         parse_ktx2_cubemap_mips(&bytes).err(),
-        Some("it is not RGBA16F")
+        Some("it is not BC6H")
     );
 }
 
@@ -108,7 +118,7 @@ fn gpu_rebaking_a_resident_cubemap_recopies_it() {
     };
     let path = crate::test_temp::dir().join("bound.ktx2");
     let write = || {
-        let bytes = build_cubemap_ktx2(2, R16G16B16A16_SFLOAT, 6);
+        let bytes = build_cubemap_ktx2(4, BC6H_UFLOAT, 6);
         crate::core::fs::written::write(&path, &bytes).unwrap();
     };
     write();

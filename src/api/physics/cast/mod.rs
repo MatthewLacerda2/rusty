@@ -23,10 +23,11 @@ pub(super) use all::{set_owner, set_surface};
 pub(super) use filter::{reach, Filter};
 
 /// A single cast's Lua returns:
-/// `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root`.
-/// Each addition is appended (point and normal by #446, the bone and root by
-/// #464), so shorter callers are untouched. hit=false ⇒ every number is 0 and
-/// the rest nil; `bone`/`bone_name` are nil for a hit off any skeleton.
+/// `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root,
+/// material`. Each addition is appended (point and normal by #446, the bone and
+/// root by #464, the physics material asset by #1878), so shorter callers are
+/// untouched. hit=false ⇒ every number is 0 and the rest nil; `bone`/`bone_name`
+/// are nil for a hit off any skeleton, `material` for an inline material.
 type CastResult = (
     bool,
     u32,
@@ -40,6 +41,7 @@ type CastResult = (
     Option<u32>,
     Option<String>,
     Option<u32>,
+    Option<String>,
 );
 
 /// Fold an optional hit into the [`CastResult`] both single casts return.
@@ -65,10 +67,11 @@ fn cast_result(scene: &Scene, hit: Option<RayHit>) -> CastResult {
                 bone,
                 bone.and_then(|b| scene.world.name(b).map(|n| n.clone())),
                 Some(scene.root_of(id)),
+                all::hit_material(scene, id),
             )
         }
         None => (
-            false, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, None, None, None,
+            false, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, None, None, None, None,
         ),
     }
 }

@@ -2,6 +2,7 @@
 //! a baked cube into one of its layers.
 
 use super::super::cubemap::CubemapTexture;
+use super::super::upload::block_extent;
 use super::ProbeArray;
 
 impl ProbeArray {
@@ -13,19 +14,27 @@ impl ProbeArray {
             return false;
         }
         self.table.clear();
-        (self.texture, self.view) = array_texture(device, 1, 1, 1);
+        (self.texture, self.view) = stand_in(device);
         (self.face, self.mips, self.cubes) = (1, 1, 1);
         true
     }
 }
 
-/// A cube-array texture of `cubes` black cubes, `face` texels square with `mips`
-/// levels, and its `CubeArray` view.
+/// The array before any cube is resident: one black 1×1 `Rgba16Float` cube (a BC
+/// texture cannot be smaller than a block). No cube is ever copied into it: the
+/// first resident cube rebuilds the array at its face and format.
+pub(super) fn stand_in(device: &wgpu::Device) -> (wgpu::Texture, wgpu::TextureView) {
+    array_texture(device, 1, 1, 1, wgpu::TextureFormat::Rgba16Float)
+}
+
+/// A cube-array texture of `cubes` black cubes in `format`, `face` texels square
+/// with `mips` levels, and its `CubeArray` view.
 pub(super) fn array_texture(
     device: &wgpu::Device,
     face: u32,
     mips: u32,
     cubes: usize,
+    format: wgpu::TextureFormat,
 ) -> (wgpu::Texture, wgpu::TextureView) {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Reflection Probe Array"),
@@ -37,7 +46,7 @@ pub(super) fn array_texture(
         mip_level_count: mips,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba16Float,
+        format,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
@@ -50,6 +59,7 @@ pub(super) fn array_texture(
 }
 
 /// Record the copy of every mip of `cube` into array layer `slot`, `shift` mips down.
+/// A BC6H level under 4×4 copies its one padded block (`block_extent`).
 pub(super) fn copy_cube(
     encoder: &mut wgpu::CommandEncoder,
     cube: &CubemapTexture,
@@ -58,7 +68,7 @@ pub(super) fn copy_cube(
     shift: u32,
 ) {
     for level in 0..cube.texture.mip_level_count() {
-        let size = (cube.size >> level).max(1);
+        let size = block_extent(cube.texture.format(), (cube.size >> level).max(1));
         encoder.copy_texture_to_texture(
             wgpu::TexelCopyTextureInfo {
                 texture: &cube.texture,

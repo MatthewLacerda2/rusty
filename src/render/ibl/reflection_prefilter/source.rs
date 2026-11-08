@@ -1,6 +1,7 @@
 //! What both GGX prefilters read and write (#1696): the captured cube's source mip
 //! chain, the mip a sample reads from it (filtered importance sampling), and the
-//! half-float texels a baked cube stores.
+//! half-float texels a prefiltered face comes out as, before `ktx2_encode` turns
+//! them into the BC6H blocks a baked cube stores (#1885).
 //!
 //! **Filtered importance sampling** (Křivánek & Colbert 2008, as Filament's `cmgen`
 //! and UE's prefilter do): a sample drawn where the GGX lobe is thin covers a small
@@ -23,7 +24,8 @@ use super::mip_count;
 use crate::core::color::{f16_to_f32, f32_to_f16};
 use crate::render::CubemapCapture;
 
-/// Bytes per texel of a baked cube: `Rgba16Float`, `R16G16B16A16_SFLOAT` in KTX2.
+/// Bytes per texel of a prefiltered cube before it is encoded, and of a baked cube
+/// decoded on an adapter without BC: `Rgba16Float`.
 pub(crate) const TEXEL_BYTES: usize = 8;
 
 /// The capture's source mip chain: level 0 the capture itself, each later level a
@@ -61,8 +63,8 @@ fn quantize(face: &[Vec3]) -> Vec<Vec3> {
         .collect()
 }
 
-/// A face's texels as `Rgba16Float` bytes, alpha 1: what the GPU uploads and the
-/// KTX2 file stores.
+/// A face's texels as `Rgba16Float` bytes, alpha 1: the prefilter's output, which
+/// `ktx2_encode` compresses to BC6H for the file (and the CPU fallback decodes back to).
 pub(crate) fn encode_face(face: &[Vec3]) -> Vec<u8> {
     let mut out = Vec::with_capacity(face.len() * TEXEL_BYTES);
     for c in face {

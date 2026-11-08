@@ -67,6 +67,7 @@ impl Frontend for PlayerFrontend {
         // the frame to draw the in-game UI on (#418).
         view.set_ui_output(Some(shell.renderer.surface_ui_view(frame)));
 
+        // The tick's main view; the renderer blends it between ticks (#1877).
         let camera = game.main_view();
         let scene = game.scene().borrow();
         // No debug overlays in a shipped game: editor mode off.

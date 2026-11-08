@@ -82,7 +82,9 @@ fn gpu_an_emissive_past_the_half_range_stays_finite() {
 
     let probe = crate::scene::ReflectionProbe::new(Vec3::ZERO, Vec3::splat(5.0));
     let bytes = renderer.bake_reflection(&scene, &probe, RES).bytes;
-    let cube = crate::render::ibl::cubemap::parse_ktx2_cubemap_mips(&bytes).unwrap();
+    let cube = crate::render::ibl::cubemap::parse_ktx2_cubemap_mips(&bytes)
+        .unwrap()
+        .decoded();
     let decode = crate::render::ibl::reflection_prefilter::source::decode_face;
     for level in &cube.mips {
         assert!(
@@ -102,7 +104,9 @@ fn gpu_a_sky_only_reflection_capture_keeps_the_sky() {
     let scene = crate::scene::Scene::new();
     let probe = crate::scene::ReflectionProbe::new(Vec3::ZERO, Vec3::splat(5.0));
     let bytes = renderer.bake_reflection(&scene, &probe, RES).bytes;
-    let cube = crate::render::ibl::cubemap::parse_ktx2_cubemap_mips(&bytes).unwrap();
+    let cube = crate::render::ibl::cubemap::parse_ktx2_cubemap_mips(&bytes)
+        .unwrap()
+        .decoded();
     let texels = crate::render::ibl::reflection_prefilter::source::decode_face(&cube.mips[0]);
     for face in texels.chunks_exact((RES * RES) as usize) {
         let mean = face.iter().sum::<Vec3>() / face.len() as f32;
