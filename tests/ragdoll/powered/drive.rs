@@ -11,11 +11,6 @@ use super::{at_rest, rig, step, turn};
 /// far (radians) the forearm is off its animated turn after 3 ticks and after
 /// 0.6 s.
 fn knocked(strength: f32) -> (f32, f32) {
-    knocked_then(strength, |_, _| {})
-}
-
-/// [`knocked`], with `between` run on the scene and forearm after the 3 ticks.
-fn knocked_then(strength: f32, between: impl Fn(&mut rusty::scene::Scene, u32)) -> (f32, f32) {
     let (mut scene, rig) = crate::ragdoll::ragdolled();
     let arm = rig::bone(&scene, rig, "LeftArm");
     let fore = rig::bone(&scene, rig, "LeftForeArm");
@@ -30,7 +25,6 @@ fn knocked_then(strength: f32, between: impl Fn(&mut rusty::scene::Scene, u32)) 
     scene.world.rigidbody_mut(fore).unwrap().velocity = Vec3::new(0.0, 0.0, -3.0);
     step(&mut scene, &mut physics, 3);
     let early = turn(&scene, rig, "LeftForeArm").angle_between(animated);
-    between(&mut scene, fore);
     step(&mut scene, &mut physics, 33);
     let late = turn(&scene, rig, "LeftForeArm").angle_between(animated);
     (early, late)
