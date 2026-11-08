@@ -15,6 +15,12 @@
 //! places it. A concave mesh on a dynamic body is built as convex pieces (#1886),
 //! and draws as those pieces.
 //!
+//! **Where the drawn and the collided shape differ.** The wire is the Collider as
+//! it stands; in Play, rapier reads a primitive's shape only when the body is built
+//! (entering Play, a hierarchy change: `docs/api/Physics.md`). So after
+//! `Physics.SetColliderShape` the wire shows the new shape before physics collides
+//! with it, until that body is built again.
+//!
 //! **Built once, placed every frame.** The shape, in its own space, is the costly
 //! half (a hull, a level's trimesh); [`WireCache`] keeps it per entity and builds it
 //! again only when the inputs physics builds from change. Placing it at the
