@@ -34,9 +34,12 @@ pub const DEFAULT_MAX_STEP: f32 = 0.5;
 /// not traversable. `1.0` ≈ 45° at unit spacing.
 pub const DEFAULT_MAX_SLOPE: f32 = 1.0;
 /// Default grid cell size in world units — the spacing every runtime
-/// `NavigationGraph` is created with. The [`NavMeshSettings`] default matches this so
-/// an unconfigured scene bakes at the historical resolution.
-pub const DEFAULT_GRID_SPACING: f32 = 1.0;
+/// `NavigationGraph` is created with, and the [`NavMeshSettings`] default. Half the
+/// default agent radius (#1887), inside Recast's radius/2–radius/3 guidance, so a
+/// doorway, a gap between crates or a narrow corridor keeps its shape. A full bake of
+/// a Dust2-sized level at this cell took 1.06 s in a release build
+/// (`dev::bake::navmesh_cost_tests`); a saved navmesh skips it.
+pub const DEFAULT_GRID_SPACING: f32 = 0.25;
 
 /// A sensible default agent radius (world units). Consumed at bake time (#277): the bake
 /// erodes the walkable surface inward by this radius (clearance off walls/world-edge).

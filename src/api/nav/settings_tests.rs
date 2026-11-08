@@ -21,6 +21,7 @@ use crate::scene::Scene;
 /// AABB, plus a freshly baked graph over a 0..10 × 0..10 grid at unit spacing.
 fn scene_and_nav(min: Vec3, max: Vec3) -> (Rc<RefCell<Scene>>, Rc<RefCell<NavigationGraph>>) {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     add_floor(&mut scene, 0.0, 10.0, 0.0, 10.0);
     add_box(&mut scene, min, max);
     // Pin the grid (#452) so the cell indices asserted below stay put, and keep the

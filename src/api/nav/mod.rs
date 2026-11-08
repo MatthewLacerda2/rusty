@@ -48,6 +48,17 @@ fn register_navigation(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<Navigation
         ),
     )?;
 
+    // `Navigation.Bake()` (#1887): a full bake now. A dev build replaces it with the
+    // one that also saves `<scene>.navmesh` (`dev::lua_surface::bake`).
+    put(
+        &table,
+        "Bake",
+        lua.create_function(move |lua, ()| {
+            let (scene, nav) = (&*scene.get(lua)?, &*nav.get(lua)?);
+            nav.borrow_mut().bake(&scene.borrow());
+            Ok(false)
+        }),
+    )?;
     settings::register(lua, &table, scene, nav)?;
     query::register(lua, &table, nav)?;
     offmesh::register_navigation(lua, &table, scene, nav)?;

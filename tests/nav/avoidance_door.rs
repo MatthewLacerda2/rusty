@@ -14,6 +14,7 @@ const RADIUS: f32 = 0.5;
 /// two agent diameters), eight agents west of it bound for spread-out goals east.
 fn door_scene() -> (Scene, NavigationGraph, Vec<(u32, Vec3)>) {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     add_wall(
         &mut scene,
         Vec3::new(0.0, -0.2, 0.0),

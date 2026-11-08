@@ -11,7 +11,9 @@
 //! covers, so a restored graph rebakes incrementally exactly as a baked one does.
 
 use super::super::super::NavigationGraph;
-use super::super::inputs::{collider_keys, obstacle_keys, sources, BakeInputs, Source};
+use super::super::inputs::{
+    collider_keys, obstacle_keys, sources, BakeInputs, ColliderKey, Source,
+};
 use super::super::modifiers::modifier_keys;
 use super::super::{link_rect, raster};
 use super::file::FORMAT;
@@ -40,25 +42,7 @@ pub(super) fn read(scene: &Scene, raw: &NavigationGraph) -> (BakeInputs, u64) {
     let grid = [raw.min_x, raw.max_x, raw.min_z, raw.max_z, raw.grid_spacing];
     grid.iter()
         .for_each(|f| bytes.extend(f.to_bits().to_le_bytes()));
-    let mut colliders = Vec::new();
-    for (id, key) in collider_keys(scene) {
-        bytes.extend(id.to_le_bytes());
-        let tris = collider_world_triangles(scene, id);
-        let rect = tris.as_ref().and_then(|m| {
-            bytes.push(u8::from(m.convex));
-            bytes.extend((m.vertices.len() as u32).to_le_bytes());
-            let coords = m.vertices.iter().flat_map(|v| v.to_array());
-            coords.for_each(|f| bytes.extend(f.to_bits().to_le_bytes()));
-            bytes.extend((m.triangles.len() as u32).to_le_bytes());
-            let corners = m.triangles.iter().flatten();
-            corners.for_each(|i| bytes.extend(i.to_le_bytes()));
-            raster::footprint(raw, &m.vertices)
-        });
-        if tris.is_none() {
-            bytes.push(2);
-        }
-        colliders.push(Source { id, key, rect });
-    }
+    let colliders = colliders(scene, raw, &mut bytes);
     let obstacles = obstacle_keys(scene);
     let modifiers = modifier_keys(scene);
     let links = authored_keys(scene);
@@ -83,6 +67,38 @@ pub(super) fn read(scene: &Scene, raw: &NavigationGraph) -> (BakeInputs, u64) {
         links: sources(links, |k| link_rect(raw, k)),
     };
     (inputs, crate::core::hash::content(&bytes))
+}
+
+/// The static colliders' records, each with its cells on `raw`'s grid, hashing
+/// each one's id and world triangles onto `bytes`.
+fn colliders(
+    scene: &Scene,
+    raw: &NavigationGraph,
+    bytes: &mut Vec<u8>,
+) -> Vec<Source<ColliderKey>> {
+    let mut out = Vec::new();
+    for (id, key) in collider_keys(scene) {
+        bytes.extend(id.to_le_bytes());
+        let Some(m) = collider_world_triangles(scene, id) else {
+            bytes.push(2);
+            out.push(Source {
+                id,
+                key,
+                rect: None,
+            });
+            continue;
+        };
+        bytes.push(u8::from(m.convex));
+        bytes.extend((m.vertices.len() as u32).to_le_bytes());
+        let coords = m.vertices.iter().flat_map(|v| v.to_array());
+        coords.for_each(|f| bytes.extend(f.to_bits().to_le_bytes()));
+        bytes.extend((m.triangles.len() as u32).to_le_bytes());
+        let corners = m.triangles.iter().flatten();
+        corners.for_each(|i| bytes.extend(i.to_le_bytes()));
+        let rect = raster::footprint(raw, &m.vertices);
+        out.push(Source { id, key, rect });
+    }
+    out
 }
 
 /// `text` as a length-prefixed word of the fingerprint.

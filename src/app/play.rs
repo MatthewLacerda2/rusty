@@ -227,5 +227,9 @@ mod standalone_tests;
 mod play_tests;
 
 #[cfg(test)]
+#[path = "play_navmesh_tests.rs"]
+mod play_navmesh_tests;
+
+#[cfg(test)]
 #[path = "import_tests/mod.rs"]
 mod import_tests;

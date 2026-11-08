@@ -46,6 +46,8 @@ pub fn draw(
 
     draw_scene_operations(ui, editor, scene, console, path);
     draw_navmesh(ui, scene, nav);
+    #[cfg(feature = "dev")]
+    draw_bake_navigation(ui, scene, console, nav, path);
     reflections::draw(ui, editor, scene);
     bake::draw(ui, editor, scene, console, path);
 }
@@ -112,6 +114,29 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
             }
             super::nav_areas::draw(ui, scene, nav);
         });
+}
+
+/// *Bake Navigation* (#1887, Unity's Navigation window *Bake*): the same full bake
+/// and `<scene>.navmesh` write `Navigation.Bake()` runs, so Play starts from the
+/// saved navmesh. Generate Lighting does not run it: the two bakes are independent.
+#[cfg(feature = "dev")]
+fn draw_bake_navigation(
+    ui: &mut egui::Ui,
+    scene: &mut Scene,
+    console: &mut ConsoleLogs,
+    nav: &mut NavigationGraph,
+    path: &str,
+) {
+    let button = egui::Button::new(format!("{}  Bake Navigation", icon::PATH));
+    let hover = "Bake the navmesh in full and save it beside the scene";
+    if !ui.add(button).on_hover_text(hover).clicked() {
+        return;
+    }
+    match crate::dev::bake::navmesh::bake_navmesh(scene, nav, Some(path)) {
+        Ok(Some(file)) => console.info(format!("[Navigation] wrote {file}")),
+        Ok(None) => console.info("[Navigation] baked the live navmesh (Play)".to_string()),
+        Err(e) => console.error(format!("[Navigation] {e}")),
+    }
 }
 
 /// The off-mesh link generation knobs (#462): drop height, jump distance and jump

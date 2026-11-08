@@ -20,6 +20,10 @@
 //! record of its inputs (`state`), and a change re-runs 1–3 over the dirty cells
 //! and erosion over those grown by its reach — the same result a full bake gives.
 //!
+//! A full bake can be saved and restored (`saved`, #1887): the `<scene>.navmesh`
+//! file holds its result and the fingerprint of what it read, so Play's first tick
+//! restores it instead of baking, and rebakes incrementally from there.
+//!
 //! Deterministic: pure geometry, a total order on every sort, no RNG or clock.
 
 mod carve;

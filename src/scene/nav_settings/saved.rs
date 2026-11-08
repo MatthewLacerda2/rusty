@@ -58,8 +58,10 @@ mod tests {
         let dir = crate::test_temp::dir().join("rusty_navmesh_sidecar");
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("n.scene").to_string_lossy().into_owned();
-        let mut scene = Scene::default();
-        scene.navmesh = Some(Arc::from(vec![1u8, 2, 3]));
+        let scene = Scene {
+            navmesh: Some(Arc::from(vec![1u8, 2, 3])),
+            ..Scene::default()
+        };
         save_navmesh(&scene, &path).unwrap();
         save_navmesh(&Scene::default(), &path).unwrap();
         let mut back = Scene::default();
