@@ -44,3 +44,12 @@ fn clear_drops_the_remainder() {
     assert_eq!(ticks.alpha(), 0.0);
     assert_eq!(ticks.owe(0.01), 0);
 }
+
+#[test]
+fn the_frame_after_a_clear_owes_nothing() {
+    let mut ticks = FixedTicks::default();
+    ticks.clear(); // entering Play
+    assert_eq!(ticks.owe(0.5), 0, "the entry's cost is not game time");
+    assert_eq!(ticks.alpha(), 0.0);
+    assert_eq!(ticks.owe(FIXED_DELTA_TIME), 1, "then the tick as before");
+}

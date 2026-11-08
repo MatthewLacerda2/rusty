@@ -130,7 +130,7 @@ fn another_scene_is_never_blended_and_keeps_what_is_owed() {
 }
 
 #[test]
-fn the_main_camera_is_drawn_blended() {
+fn a_camera_entity_is_posed_blended() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Eye", None);
     scene.world.set_camera(id, Some(CameraComponent::default()));
@@ -140,7 +140,8 @@ fn the_main_camera_is_drawn_blended() {
     poses.record(&scene);
     poses.set_alpha(0.5);
     let base = Camera::new(Vec3::ZERO, 0.0, 0.0);
-    let camera = poses.game_camera(&base, &scene);
+    let mut camera = crate::scene::game_camera_from_scene(&base, &scene);
+    poses.pose_camera(&mut camera, &scene, id);
     assert!(
         (camera.position.x - 0.5).abs() < 1e-5,
         "{:?}",
@@ -148,7 +149,9 @@ fn the_main_camera_is_drawn_blended() {
     );
     poses.set_alpha(1.0);
     let live = crate::scene::game_camera_from_scene(&base, &scene);
-    assert_eq!(poses.game_camera(&base, &scene).position, live.position);
+    let mut at_live = live.clone();
+    poses.pose_camera(&mut at_live, &scene, id);
+    assert_eq!(at_live.position, live.position);
 }
 
 #[test]

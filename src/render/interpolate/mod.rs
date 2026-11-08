@@ -8,7 +8,7 @@
 //!
 //! [`DrawPoses`] is the renderer's, never the sim's: the shell [`record`]s it after
 //! each tick and sets the blend, the retained scene draws a mesh entity at
-//! [`DrawPoses::world`] and the game view's camera is [`DrawPoses::game_camera`]. No
+//! [`DrawPoses::world`] and every camera entity through [`DrawPoses::pose_camera`]. No
 //! sim module reads it, and nothing is written back into the World.
 //!
 //! **Which entities blend.** Every entity with a mesh or a camera whose world pose
@@ -22,10 +22,20 @@
 //! smeared along the way. Anything that fast moves further than the eye follows in a
 //! tick, so drawing it at the tick loses nothing.
 //!
-//! **What is not blended** (drawn at the tick's pose): a skinned mesh's bones (its
-//! root moves blended, its animation steps at 60 Hz), particles, ribbons, decals,
-//! lights, render-texture and stacked cameras, and the free camera `Camera.*` drives
-//! when no camera entity is main.
+//! **Every camera entity blends in the renderer, in one place** (`Renderer::render`
+//! through [`DrawPoses::pose_camera`]): the main camera, a stacked viewmodel camera
+//! and a render-texture camera alike, so a gun parented to a stacked camera's head
+//! stays fixed on screen between ticks. The frontends hand `render` the tick's main
+//! view, as the headless harness does.
+//!
+//! **What hangs from a bone is not blended**: an entity with a bone at or above it
+//! (a gun on `hand_r`, a camera on the head bone) is drawn at the tick's pose, the
+//! one the skinned palette is built from, so it never drifts off the hand that holds
+//! it. Its skinned owner's root still blends, and its animation steps at 60 Hz.
+//!
+//! **What else is not blended** (drawn at the tick's pose): particles, ribbons,
+//! decals, lights, and the free camera `Camera.*` drives when no camera entity is
+//! main.
 //!
 //! [`record`]: DrawPoses::record
 
@@ -83,8 +93,12 @@ impl DrawPoses {
             Changes::Ids(ids) => {
                 for id in ids {
                     let drawn = world.mesh(id).is_some() || world.camera(id).is_some();
-                    let Some(now) = world.world_pose(id).filter(|_| drawn) else {
-                        self.at_tick.remove(&id); // gone, or nothing to draw
+                    let now = world
+                        .world_pose(id)
+                        .filter(|_| drawn && !on_bone(scene, id));
+                    let Some(now) = now else {
+                        // Gone, nothing to draw, or posed by a bone (the module docs).
+                        self.at_tick.remove(&id);
                         continue;
                     };
                     match self.at_tick.insert(id, now) {
@@ -115,21 +129,25 @@ impl DrawPoses {
         self.alpha = 1.0;
     }
 
-    /// Whether `id` of `scene` is drawn blended this frame.
-    fn blends(&self, scene: &Scene, id: u32) -> Option<Pose> {
+    /// The two poses `id` of `scene` is drawn between this frame (the tick before,
+    /// and its live pose), or `None` when it is drawn as it is. A live pose that
+    /// jumped from the tick before (a teleport made between ticks: the console, MCP,
+    /// a gizmo drag in Play) is drawn where it landed too.
+    fn blends(&self, scene: &Scene, id: u32) -> Option<(Pose, Pose)> {
         let (tracked, _) = self.tracked.as_ref()?;
         if *tracked != scene.id() || self.alpha >= 1.0 {
             return None;
         }
-        self.from.get(&id).copied()
+        let before = *self.from.get(&id)?;
+        let now = scene.world.world_pose(id)?; // only for what blends
+        (!jumped(before, now)).then_some((before, now))
     }
 
     /// Entity `id`'s world matrix as this frame draws it: blended between its last
     /// two ticks while it moves, its live matrix otherwise.
     pub fn world(&self, scene: &Scene, id: u32) -> Mat4 {
         let matrix = scene.world.local_to_world(id);
-        let blended = self.blends(scene, id).zip(scene.world.world_pose(id));
-        match blended {
+        match self.blends(scene, id) {
             Some((before, now)) => blend(before, now, self.alpha) * rigid(now).inverse() * matrix,
             None => matrix,
         }
@@ -156,16 +174,26 @@ impl DrawPoses {
         ids
     }
 
-    /// The game view's camera (`scene::game_camera_from_scene`), its main camera
-    /// entity's pose blended like any other.
-    pub fn game_camera(&self, base: &Camera, scene: &Scene) -> Camera {
-        let mut camera = crate::scene::game_camera_from_scene(base, scene);
-        let main = crate::scene::camera::main_camera(scene);
-        if let Some(id) = main.filter(|&id| self.blends(scene, id).is_some()) {
-            crate::scene::camera::pose_at(&mut camera, self.world(scene, id));
+    /// Put `camera`, camera entity `id`'s view, where this frame draws that entity:
+    /// blended between its last two ticks while it moves, left as it is otherwise.
+    /// Every camera entity the renderer draws from goes through here.
+    pub fn pose_camera(&self, camera: &mut Camera, scene: &Scene, id: u32) {
+        if self.blends(scene, id).is_some() {
+            crate::scene::camera::pose_at(camera, self.world(scene, id));
         }
-        camera
     }
+}
+
+/// Whether `id` hangs from a bone (itself one, or under one): the skinned owner
+/// above lists a bone at or below that owner on `id`'s chain. Its pose is the
+/// animation's at the tick, the one the owner's palette skins by.
+fn on_bone(scene: &Scene, id: u32) -> bool {
+    let chain: Vec<u32> = scene.world.self_and_ancestors(id).collect();
+    chain.iter().enumerate().skip(1).any(|(above, &owner)| {
+        let mesh = scene.world.mesh(owner);
+        let bones = mesh.as_ref().map(|m| &m.skeleton.bones);
+        bones.is_some_and(|b| chain[..above].iter().any(|&c| b.contains(&Some(c))))
+    })
 }
 
 /// Whether going from `before` to `now` in one tick is a teleport.
@@ -189,6 +217,9 @@ fn blend(before: Pose, now: Pose, alpha: f32) -> Mat4 {
     Mat4::from_rotation_translation(rot, before.pos.lerp(now.pos, alpha))
 }
 
+#[cfg(test)]
+#[path = "bone_tests.rs"]
+mod bone_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;

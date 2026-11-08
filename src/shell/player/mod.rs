@@ -67,12 +67,9 @@ impl Frontend for PlayerFrontend {
         // the frame to draw the in-game UI on (#418).
         view.set_ui_output(Some(shell.renderer.surface_ui_view(frame)));
 
+        // The tick's main view; the renderer blends it between ticks (#1877).
+        let camera = game.main_view();
         let scene = game.scene().borrow();
-        // The main camera blended between the last two ticks (#1877).
-        let camera = shell
-            .renderer
-            .draw_poses
-            .game_camera(&game.camera().borrow(), &scene);
         // No debug overlays in a shipped game: editor mode off.
         let textures = std::rc::Rc::clone(game.resources.screen.borrow().textures());
         shell.renderer.set_ui_textures(textures);

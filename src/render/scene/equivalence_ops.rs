@@ -32,6 +32,11 @@ pub(super) enum R {
     Shadow(S),
     /// An edit of the second scene's library, which holds the first's names.
     Other(u8),
+    /// A fixed tick recorded for drawing between ticks (#1877), a blend set (in
+    /// quarters of a tick), or the blend dropped.
+    Tick,
+    Blend(u8),
+    Unblend,
     Frame,
 }
 
@@ -53,6 +58,9 @@ pub(super) fn r_op() -> impl Strategy<Value = R> {
         1 => at().prop_map(R::Reshape),
         1 => Just(R::Rewind),
         3 => s_op().prop_map(R::Shadow),
+        2 => Just(R::Tick),
+        2 => (0u8..5).prop_map(R::Blend),
+        1 => Just(R::Unblend),
         4 => Just(R::Frame),
     ]
 }
@@ -71,6 +79,9 @@ pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         R::Capture(on) => r.capture.static_only = on,
         R::Rewind => scene.world.rewind_changes(),
         R::Shadow(ref op) => shadow_ops::edit(scene, op),
+        R::Tick => r.draw_poses.record(scene),
+        R::Blend(q) => r.draw_poses.set_alpha(f32::from(q) / 4.0),
+        R::Unblend => r.draw_poses.clear(),
         R::Frame | R::Other(_) => {}
         R::Material(i, m, two) => on(scene, pick(scene, i), |s, id| {
             let name = m.map(|m| ["red", "glass", "blue"][m as usize].to_string());

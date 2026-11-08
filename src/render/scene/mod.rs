@@ -85,6 +85,8 @@ mod records_gpu_tests;
 #[cfg(test)]
 mod shadow_ops;
 #[cfg(test)]
+mod stack_blend_gpu_tests;
+#[cfg(test)]
 mod stack_gpu_tests;
 mod table;
 

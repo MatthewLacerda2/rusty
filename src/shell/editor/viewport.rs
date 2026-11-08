@@ -95,13 +95,7 @@ impl EditorFrontend {
         let scene = game.scene().borrow();
         view.ui.screen_in_editor = scene_tab && self.editor_ui.ui_overlay;
         view.set_pixel_scale(pixels_per_point);
-        let camera = match interaction.tab {
-            // The main camera blended between the last two ticks (#1877).
-            ViewportTab::Game => renderer
-                .draw_poses
-                .game_camera(&game.camera().borrow(), &scene),
-            tab => viewport_camera(&self.editor_ui, game, &scene, tab),
-        };
+        let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
         renderer.set_ui_textures(std::rc::Rc::clone(
             game.resources.screen.borrow().textures(),
         ));

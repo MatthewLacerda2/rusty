@@ -30,6 +30,11 @@
 //!   switch. A mesh
 //!   (re-)upload marks only the objects drawing that geometry
 //!   ([`super::MeshHandles::uploaded`]).
+//! - **On the renderer, between ticks** (#1877): the drawn world matrix reads
+//!   `Renderer::draw_poses` (`interpolate::DrawPoses::world`), outside the log. A
+//!   blend moves an object with no log entry, so each extract re-poses every object
+//!   drawn blended now or at the last extract (`DrawPoses::repose`); nothing else
+//!   it feeds is re-derived, since a blend moves only the pose.
 //! - **Per camera, on purpose** (`draw.rs`): `LodSelection`, the culling mask, the
 //!   frustum, the small-object cull's eye, the view depth, `MotionHistory`, the
 //!   reflection probe pick (`ProbeArray::probe_for`, whose resident probes follow the

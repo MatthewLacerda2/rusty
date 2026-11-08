@@ -43,15 +43,20 @@ between ticks reaches the next tick only: a frame that runs no tick leaves a pre
 pending, and of several ticks in one frame only the first sees the frame's key edges,
 mouse delta and text.
 
-**Drawing blends between ticks.** Each frame draws every moving mesh and the main
-camera between their last two tick poses, by how far the frame is into the next tick
+**Drawing blends between ticks.** Each frame draws every moving mesh and every
+camera entity (the main camera, a stacked viewmodel camera, a render-texture camera)
+between their last two tick poses, by how far the frame is into the next tick
 (Unity's `Rigidbody.interpolation`, for everything that moves), so motion is smooth at
-any refresh rate and what is drawn lags the sim by at most one tick. An entity that
-moved more than 2 m or turned more than 90° in one tick jumped (a respawn, a script
-setting its Transform) and is drawn where it landed. Paused, stepped or in edit mode,
-everything is drawn exactly where it is. Skinned bones, particles, ribbons, decals,
-lights and stacked or render-texture cameras are drawn at the tick. The sim never
-reads a blended pose: `Transform` and every API return the tick's.
+any refresh rate and what is drawn lags the sim by at most one tick. A gun parented to
+a stacked camera stays fixed on screen. An entity that moved more than 2 m or turned
+more than 90° in one tick, or since the last tick (a respawn, a script, the console
+or a gizmo setting its Transform), jumped and is drawn where it landed. Paused,
+stepped or in edit mode, everything is drawn exactly where it is, and the first frame
+after entering Play or resuming owes no tick (its time is the entry's own cost).
+Drawn at the tick: skinned bones and **everything hanging from a bone** (a gun on
+`hand_r`, a camera on the head bone, so they never drift off the skinned hand that
+holds them), particles, ribbons, decals and lights. The sim never reads a blended
+pose: `Transform` and every API return the tick's.
 
 > Only `deltaTime` is scaled — read `unscaledDeltaTime` for anything that must
 > keep ticking through a pause or slow-mo (UI, debug cameras). `SetTimeScale` is

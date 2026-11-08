@@ -56,12 +56,36 @@ fn uneven_frames_reach_the_state_the_harness_reaches_in_as_many_ticks() {
     );
 }
 
+/// Enter Play (one tick), then the frame after it, whose time (the entry's own
+/// cost) is dropped.
+fn enter(game: &mut GameWorld, ticks: &mut FixedTicks, poses: &mut DrawPoses) {
+    advance_sim(game, Step::of(ticks, poses), 0.016);
+    advance_sim(game, Step::of(ticks, poses), 0.5);
+}
+
+#[test]
+fn the_frame_after_entering_play_owes_no_tick() {
+    let (mut game, _) = falling();
+    let (mut ticks, mut poses) = Default::default();
+    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.016);
+    let entered = game.play_frame();
+    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.5); // a slow `Start`
+    assert_eq!(game.play_frame(), entered, "the entry's cost is not owed");
+    assert_eq!(ticks.alpha(), 0.0, "the accumulator starts empty");
+    advance_sim(
+        &mut game,
+        Step::of(&mut ticks, &mut poses),
+        FIXED_DELTA_TIME,
+    );
+    assert_eq!(game.play_frame(), entered + 1);
+}
+
 #[test]
 fn a_hitch_runs_at_most_twenty_ticks() {
     let (mut game, _) = falling();
     let mut ticks = FixedTicks::default();
     let mut poses = DrawPoses::default();
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.016); // enter Play: one tick
+    enter(&mut game, &mut ticks, &mut poses);
     let entered = game.play_frame();
     advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 2.0);
     assert_eq!(game.play_frame(), entered + 20);
@@ -78,7 +102,7 @@ fn time_scale_zero_still_ticks_scripts_with_no_game_time() {
     let (mut game, id) = falling();
     let mut ticks = FixedTicks::default();
     let mut poses = DrawPoses::default();
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.016);
+    enter(&mut game, &mut ticks, &mut poses);
     game.time().borrow_mut().set_time_scale(0.0);
     let (frame, y) = (game.play_frame(), height(&game, id));
     advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.05);
