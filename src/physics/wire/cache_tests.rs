@@ -101,3 +101,29 @@ fn the_cache_builds_only_on_a_change() {
     frame(&mut cache, &scene);
     assert_eq!(cache.builds(), 3, "a refused mesh is kept refused");
 }
+
+/// A child of a turning parent reads a world scale that drifts by float noise from
+/// angle to angle: its wire is still the one built, never rebuilt.
+#[test]
+fn a_turning_parent_rebuilds_no_wire() {
+    let (mut scene, id) = with_mesh(quad(), vec![0, 1, 2, 0, 2, 3]);
+    let parent = scene.add_entity("p".to_string());
+    scene.world.set_parent_id(id, Some(parent));
+    scene.world.transform_mut(parent).expect("live").scale = Vec3::splat(1.7);
+    scene.world.transform_mut(id).expect("live").scale = Vec3::new(1.3, 0.6, 2.1);
+    let mut cache = WireCache::default();
+    let mut scales = std::collections::BTreeSet::new();
+    for step in 0..360 {
+        let turn = glam::Quat::from_euler(glam::EulerRot::YXZ, step as f32 * 0.37, 0.2, 0.1);
+        scene.world.transform_mut(parent).expect("live").rotation = turn;
+        let scale = scene.world.world_pose(id).expect("live").scale;
+        scales.insert(scale.to_array().map(f32::to_bits));
+        cache.refresh(&scene);
+        assert!(cache.wire(&scene, id).is_some());
+    }
+    assert!(
+        scales.len() > 1,
+        "the lossy scale drifts, or this tests nothing"
+    );
+    assert_eq!(cache.builds(), 1, "noise is no new scale");
+}

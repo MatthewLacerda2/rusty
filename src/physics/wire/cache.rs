@@ -3,7 +3,8 @@
 //!
 //! **What moves a wire.** The inputs `shape::build::collider_inputs` reads: the
 //! Collider (shape, `active`, `is_trigger`, its shared mesh), the entity's Mesh, a
-//! CharacterController, the world scale and whether its body is dynamic (a concave
+//! CharacterController, the world scale (within a relative 1e-5, so a turning
+//! parent's float noise is no change) and whether its body is dynamic (a concave
 //! mesh is decomposed on one, #1886). The three columns are read off the World's
 //! change log (`ecs::changes`), as physics' own sync reads them
 //! (`physics::watch`); the scale and the body's class (it may be a parent's) are
@@ -92,7 +93,10 @@ impl WireCache {
     pub fn wire(&mut self, scene: &Scene, id: u32) -> Option<&ShapeWire> {
         let scale = scene.world.world_pose(id)?.scale;
         let built_for = (scale, on_dynamic_body(scene, id));
-        let kept = self.wires.get(&id).is_some_and(|(at, _)| *at == built_for);
+        let kept = self
+            .wires
+            .get(&id)
+            .is_some_and(|((at, fit), _)| *fit == built_for.1 && same_scale(*at, built_for.0));
         if !kept {
             self.builds += 1;
             self.wires.insert(id, (built_for, shape_wire(scene, id)));
@@ -104,4 +108,19 @@ impl WireCache {
     pub fn builds(&self) -> u64 {
         self.builds
     }
+}
+
+/// The most a world scale may move, relative to its size, and still be the one a
+/// wire was built for. A child of a turning parent reads a lossy scale that drifts
+/// by an ulp or two from tick to tick, though nothing changed: compared bit for bit,
+/// that rebuilt its wire (and re-ran a decomposition) every frame.
+const SCALE_TOLERANCE: f32 = 1e-5;
+
+/// Whether `a` and `b` are the same scale, within [`SCALE_TOLERANCE`].
+fn same_scale(a: Vec3, b: Vec3) -> bool {
+    if a.to_array().map(f32::to_bits) == b.to_array().map(f32::to_bits) {
+        return true; // a NaN scale too: refused once, not every frame
+    }
+    let size = a.abs().max(b.abs()).max(Vec3::splat(f32::MIN_POSITIVE));
+    ((a - b).abs()).cmple(size * SCALE_TOLERANCE).all()
 }

@@ -45,7 +45,8 @@ never shows one.
   it keeps to the tick rate, not to the game's clock. `0` (or none) is
   one tick: drawn from `Update`, it shows on the frame after that tick and is gone
   at the next. Outside Play no tick passes, so a line drawn in edit mode stays until
-  Play starts; Stop clears every line.
+  Play starts; Stop clears every line, and so does any scene load (opening another
+  scene in edit mode, or `Scene.Load` in Play).
 - Draw-only: nothing in the sim reads a line back. A non-finite end or colour is
   dropped; past 16384 held lines the oldest go.
 

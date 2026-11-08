@@ -123,7 +123,8 @@ authored_fields!(scene_state {
         playing: Runtime, No;
         pending_load: Runtime, No;
         persistent: Runtime, Dropped;
-        // Draw-only (#1882): a line's ends are points, not entities.
+        // Draw-only (#1882): a line's ends are points, not entities. Every
+        // document applied clears them (`serialize::apply`), as Stop does.
         debug_lines: Runtime, No;
         // Every document applied clears them (`serialize::apply`).
         shader_overrides: Runtime, Dropped;

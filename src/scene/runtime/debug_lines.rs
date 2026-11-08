@@ -8,7 +8,9 @@
 //! (`app::play::age_debug_lines`), so a one-tick line drawn by `Update` is still
 //! there when the frame after that tick renders, and gone at the next tick.
 //! Outside Play no tick passes: a line drawn from the console in edit mode stays
-//! until Play or Stop (Play's own state, cleared by Stop).
+//! until Play, Stop or a scene document is applied (Play's own state, cleared by
+//! Stop; a load, Play's restore or another scene opened drops them with the World
+//! they were drawn over).
 
 use std::collections::VecDeque;
 
