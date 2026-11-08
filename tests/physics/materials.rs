@@ -32,7 +32,8 @@ fn slab(scene: &mut Scene, z: f32, depth: f32, asset: Option<&str>) -> u32 {
     id
 }
 
-/// The range in Play, one tick in, with its two assets written: (`game`, wood
+/// The range in Play, its two assets written a tick after its colliders were
+/// built, then one more tick: (`game`, wood
 /// path, concrete path).
 fn range() -> (GameWorld, String, String) {
     let dir = crate::temp::dir();
@@ -43,6 +44,8 @@ fn range() -> (GameWorld, String, String) {
     slab(&mut s, 10.0, 1.0, Some(&concrete));
     slab(&mut s, 20.0, 1.0, None);
     let mut game = playing(Rc::new(RefCell::new(s)), 30.0);
+    // The colliders are built naming assets not written yet: they start dangling.
+    run(&mut game, 1);
     let make = format!(
         "Physics.CreateMaterialAsset('{wood}', {{friction = 0.5}})\n\
          Physics.CreateMaterialAsset('{concrete}', {{friction = 0.75}})"
@@ -66,7 +69,7 @@ fn a_wallbang_prices_each_crossing_by_its_material() {
          return damage, table.concat(seen, ' ')"
     );
     let got = game.script_manager().eval(&lua).expect("evaluates");
-    assert_eq!(got, "25, wood.physmat@0.5 concrete.physmat@1 inline@1");
+    assert_eq!(got, "25, wood.physmat@0.5 concrete.physmat@1.0 inline@1.0");
 }
 
 #[test]

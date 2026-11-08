@@ -44,7 +44,7 @@ fn a_file_missing_fields_or_out_of_range_reads_clamped_defaults() {
 
 #[test]
 fn a_malformed_file_is_an_error_and_its_lookup_a_miss() {
-    for text in ["", "{\"friction\": ", "{\"friction\": 1e999}", "[1, 2]"] {
+    for text in ["", "{\"friction\": ", "{\"friction\": 1e999}", "\"wood\""] {
         assert!(parse(text).is_err(), "{text:?} must not parse");
     }
     let path = path_in("torn.physmat");
