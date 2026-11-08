@@ -34,8 +34,9 @@ use glam::{Mat4, Quat, Vec3};
 use crate::app::animation;
 use crate::app::resources::Resources;
 use crate::app::world::World;
+use crate::asset::animation_graph::AnimationGraph;
 use crate::asset::mesh_data::SkinData;
-use crate::components::{root_chain, AnimatorComponent, RootMotion, StateCallback};
+use crate::components::{root_chain, AnimatorComponent, MeshComponent, RootMotion, StateCallback};
 use crate::scene::Scene;
 use apply::apply_root_motion;
 use std::collections::BTreeSet;
@@ -50,13 +51,7 @@ mod apply;
 /// scripts, physics) may override a bone before the palette build.
 pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
-    let ids = world.scene.borrow().world.ids_with_animator();
-    // Read before the scene is borrowed mutably: the check reads the scene.
-    let hears: BTreeSet<u32> = ids
-        .iter()
-        .copied()
-        .filter(|&id| res.script_manager.hears_states(id))
-        .collect();
+    let (ids, hears) = listening(world, res);
     let mut s = world.scene.borrow_mut();
     for id in ids {
         if !s.world.is_active_in_hierarchy(id) {
@@ -70,11 +65,7 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
         // helper (#344) — the animate system's re-pose step.
         let stepped = s.world.with_animator_mut_and_mesh(id, |anim, mesh| {
             let stepped = animation::step(anim, mesh, graph, dt);
-            let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
-            let states = match hears.contains(&id) {
-                true => animation::state_callbacks(anim, clips, graph),
-                false => forget_states(anim),
-            };
+            let states = states_of(anim, mesh, graph, hears.contains(&id));
             let skin = mesh.and_then(|m| m.skin.as_ref());
             let model = model_in_entity(skin);
             let motion = stepped
@@ -113,6 +104,16 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
     }
 }
 
+/// Every animator's entity, and those whose scripts hear the state callbacks
+/// (#1901); read before the scene is borrowed mutably, since the check reads it.
+fn listening(world: &World, res: &Resources) -> (Vec<u32>, BTreeSet<u32>) {
+    let ids = world.scene.borrow().world.ids_with_animator();
+    let hears = ids.iter().copied();
+    let hears = hears.filter(|&id| res.script_manager.hears_states(id));
+    let hears = hears.collect();
+    (ids, hears)
+}
+
 /// Keep this step's world-space root `motion` on `anim`, before anything
 /// moves; travel carried for a CharacterController lapses when root motion
 /// no longer `drives` the entity.
@@ -139,6 +140,20 @@ fn settle(s: &mut Scene, id: u32) {
         a.root_motion.last = RootMotion::ZERO;
         a.root_motion.moved = Vec3::ZERO;
         forget_states(&mut a);
+    }
+}
+
+/// The state callbacks `anim`'s step raises (#1901) when its scripts `hear`
+/// them; otherwise its reported states are forgotten.
+fn states_of(
+    anim: &mut AnimatorComponent,
+    mesh: Option<&MeshComponent>,
+    graph: Option<&AnimationGraph>,
+    hear: bool,
+) -> Vec<StateCallback> {
+    match hear {
+        true => animation::state_callbacks(anim, mesh.map_or(&[][..], |m| &m.clips[..]), graph),
+        false => forget_states(anim),
     }
 }
 
