@@ -63,6 +63,7 @@ fn baked_shot(model: DiffuseModel, name: &str) -> image::RgbImage {
         texels_per_unit: 24.0,
         samples: 4,
         bounces: 1,
+        denoiser: rusty::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 0,
         ..BakeSettings::default()
     };

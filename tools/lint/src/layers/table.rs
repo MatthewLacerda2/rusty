@@ -193,6 +193,7 @@ pub const LAYERS: &[Layer] = &[
     )
     .uses(&[
         "image",
+        "libloading",
         "mlua",
         "pollster",
         "scorsese_core",

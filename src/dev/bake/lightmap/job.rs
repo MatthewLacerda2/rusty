@@ -16,8 +16,8 @@ use std::thread::{self, JoinHandle};
 
 use super::UNSAVED;
 use super::{
-    apply_encoded, encode_pages, gather_bake_input, lightmap_receivers, warn_missing_uvs,
-    EncodedPages,
+    apply_encoded, encode_pages, gather_bake_input, lend_denoiser, lightmap_receivers,
+    warn_missing_uvs, EncodedPages,
 };
 use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeSettings};
 use crate::scene::Scene;
@@ -59,7 +59,7 @@ impl LightmapBakeJob {
         let lights = crate::scene::lighting::lightmap::taken_lights(scene);
         let shadowmask = input.shadowmask.clone();
         let static_meshes = lightmap_receivers(&input);
-        let progress = Arc::new(BakeProgress::default());
+        let progress = Arc::new(lend_denoiser(BakeProgress::default(), &settings).0);
         let watch = Arc::clone(&progress);
         let worker = thread::Builder::new()
             .name("lightmap-bake".into())

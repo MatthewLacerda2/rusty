@@ -21,8 +21,8 @@ first.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
@@ -30,7 +30,7 @@ first.
 ### Generate Lighting
 
 - **Settings live with the scene** (Unity's Lighting Settings): texels per unit, samples,
-  bounces, seed, Max Lightmap Size and the directional mode are saved in the scene file's
+  bounces, seed, Max Lightmap Size, the denoiser and the directional mode are saved in the scene file's
   `lighting_settings` block, so a rebake never asks for them again.
   `Lighting.SetSettings{ samples = 256 }` changes only the fields it names (each clamped
   to the editor's range: `0.25`–`64` texels per unit, `1`–`4096` samples, `1`–`16`
@@ -43,6 +43,10 @@ first.
   *Reflection Probes* section (see `Reflection.md`). A scene whose settings are all
   at their defaults leaves the block out of its file. `Lighting.BakeLightmaps` takes the
   same settings for every argument it is not given.
+- **The denoiser** (`denoiser`, #1884, Unity's Lightmapping *Denoiser* and *Filter*) cleans the baked
+  bounce: `"OIDN"` (the default), `"Filter"` or `"None"`, read in any case; an unknown
+  name is an error and changes nothing. The editor's card picks it under the bake knobs.
+  See *Denoising* under the lightmaps below for what each does and what OIDN needs.
 - **The diffuse model** (`diffuseModel`, #1698) is how a lamp's direct light falls off
   across a surface, scene-wide: `"Lambert"` (the default, the physical `max(N·L, 0)`)
   or `"HalfLambert"` (the retro squared wrap `((N·L + 1) / 2)²`: a quarter of the light
@@ -278,9 +282,10 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   `"ShadowsOnly"` one blocks light but bounces, emits and receives nothing. A mesh at
   Scale In Lightmap `0` (below) gets no lightmap and reads the light probes. Dynamic objects keep
   the light probes; bake those with `Lighting.Bake()` so both read the same lights.
-- **What it bakes.** A deterministic CPU path tracer: `samples` (default `128`) paths
+- **What it bakes.** A deterministic CPU path tracer: `samples` (default `64`, enough for OIDN, below) paths
   per texel, `bounces` (default `3`) surfaces deep, seeded by `seed` (default `0`) — the
-  same scene and seed always write byte-identical lightmaps, however many cores ran it.
+  same scene and seed always write byte-identical lightmaps, however many cores ran it
+  (on any machine under the `"Filter"` denoiser; on one machine under OIDN).
   Each surface a path lands on aims one shadow ray at one source picked from the lamps
   in range and the emissive surfaces near it, by how much each could light it (#1883,
   Unity's Progressive Lightmapper does the same): a level with 150 lamps bakes about as
@@ -296,13 +301,38 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   mesh's **Scale In Lightmap** (below). A mesh's lightmap follows its surface area at that
   density, from 4 texels square up to the largest map one atlas page holds with its
   ring: `maxLightmapSize − 8` (1016 at the default 1024, #1704). A map above half the page
-  leaves the rest of it to smaller maps. The bounce is smoothed with a 3-texel edge-aware
-  Gaussian (Unity's indirect filter) that never crosses a crease; baked direct light is
-  not filtered, so a point, spot or directional light's shadows stay sharp; an Area
+  leaves the rest of it to smaller maps. The bounce is then cleaned by the denoiser
+  (*Denoising*, below); baked direct light never is, so a point, spot or directional light's shadows stay sharp; an Area
   light's (#1674) are soft, its rectangle integrated over `samples` or more jittered
   points per texel. A texel buried inside other geometry (floor
   under a crate) is filled from its neighbours rather than baked black. No GPU is needed;
   it runs headless.
+- **Denoising** (#1884). Only the bounce (indirect light, and a directional bake's
+  directions) is cleaned, chart by chart; the direct light stays as traced.
+  - `"OIDN"`: Intel **Open Image Denoise 2**'s `RTLightmap` filter, a network trained
+    on lightmaps, then the `"Filter"` Gaussian below, as Unity runs its denoiser and
+    then its filter (OIDN alone leaves a faint mottling on flat walls at low
+    samples, which the Gaussian takes out). At `64` samples the pair comes as close
+    to a converged bake as the Gaussian alone did at `128` (within a point of mean
+    relative error, measured on a primitive interior, #1884), in about 60% of the
+    time, so it is the default and `64` the default `samples`. OIDN is a native library the machine must have, the way
+    Blender is for a `.blend`: **macOS** `brew install open-image-denoise`, **Arch**
+    `pacman -S openimagedenoise`, elsewhere the release from
+    `github.com/RenderKit/oidn/releases`, unpacked anywhere with the `RUSTY_OIDN`
+    environment variable naming its folder (or the library file). rusty opens it when
+    a bake asks, never at build time, so a machine without it still builds, runs and
+    bakes: the bake warns once, naming what to install, and only filters, which at
+    `64` samples is blurrier and blotchier (raise `samples`, or pick `"Filter"` to
+    silence it). Installed mid-session, the next bake finds it; no restart. Each bake
+    worker denoises its own lightmaps on an OIDN device of one thread, beside the
+    trace. Its output may differ in the last bits between CPUs (its SIMD path),
+    never between runs on one machine.
+  - `"Filter"`: an edge-aware Gaussian, 3 texels wide (Unity's indirect filter), that
+    never crosses a crease. Byte-identical on every machine.
+  - `"None"`: the raw trace, grain and all.
+  A logged bake (`Lighting.BakeLightmaps()`, `Lighting.Generate()`) says OIDN's
+  worker time and how many lightmaps it cleaned, in a line of its own in the
+  summary: it runs inside the lightmaps step.
 - **Max Lightmap Size** (`maxLightmapSize`, Unity's setting; the editor's
   **"Max Lightmap Size"** under the Generate Lighting button). The atlas page's edge in
   texels, a power of two from `32` to `4096`, default `1024`; any other value is held to

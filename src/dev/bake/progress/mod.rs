@@ -103,6 +103,8 @@ pub struct BakeLog<'a> {
     plan: Vec<Step>,
     steps: Vec<summary::StepRun>,
     meshes: Vec<MeshCost>,
+    /// The lightmaps OIDN cleaned and its worker time (#1884).
+    denoised: Option<(u64, Duration)>,
 }
 
 impl<'a> BakeLog<'a> {
@@ -139,6 +141,7 @@ impl<'a> BakeLog<'a> {
             plan: Vec::new(),
             steps: Vec::new(),
             meshes: Vec::new(),
+            denoised: None,
         }
     }
 
@@ -165,6 +168,15 @@ impl<'a> BakeLog<'a> {
     pub fn mesh_costs(&mut self, meshes: Vec<MeshCost>) {
         if self.is_on() {
             self.meshes = meshes;
+        }
+    }
+
+    /// The lightmaps OIDN cleaned and the time it took (#1884), for the end's
+    /// denoise line. It runs on the trace's workers, chart by chart, so it is no
+    /// step of its own: its time is inside the lightmaps step's.
+    pub fn denoised(&mut self, charts: u64, busy: Duration) {
+        if self.is_on() {
+            self.denoised = Some((charts, busy));
         }
     }
 
@@ -243,7 +255,8 @@ impl<'a> BakeLog<'a> {
             return;
         };
         let now = clock();
-        for text in summary::lines(&self.steps, now, &mut self.meshes) {
+        let denoised = self.denoised.take();
+        for text in summary::lines(&self.steps, now, &mut self.meshes, denoised) {
             out(Line {
                 text,
                 milestone: false,

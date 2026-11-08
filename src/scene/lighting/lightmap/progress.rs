@@ -9,10 +9,16 @@
 //! mesh each batch of texels belongs to as it starts and ends (#1891), so the
 //! platform can time the meshes on its own clock. The calls return nothing, so
 //! nothing an observer does can reach a texel, and the sim never reads time.
+//!
+//! A progress made [`BakeProgress::with_denoiser`] also lends the bake the trained
+//! denoiser its `Oidn` charts go through (#1884): the platform owns the native
+//! library, the sim only calls it.
 
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+
+use super::bake::LightmapDenoiser;
 
 /// Who hears a lightmap bake's batches (#1891): the platform, which times them. Every
 /// call returns nothing, so an observer can watch the bake but never steer it. A
@@ -41,6 +47,16 @@ impl fmt::Debug for Observer {
     }
 }
 
+/// The trained denoiser a progress lends, if any; `Debug` says only whether.
+#[derive(Clone, Default)]
+struct Trained(Option<Arc<dyn LightmapDenoiser>>);
+
+impl fmt::Debug for Trained {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(if self.0.is_some() { "lent" } else { "none" })
+    }
+}
+
 /// Texels traced so far out of the bake's total, the meshes finished out of theirs
 /// (#1667), the pages encoded out of theirs (#1694), plus a cancel request, and for an
 /// observed one the [`BakeObserver`] its batches are reported to (#1891).
@@ -54,6 +70,7 @@ pub struct BakeProgress {
     pages_total: AtomicU64,
     cancelled: AtomicBool,
     observer: Observer,
+    denoiser: Trained,
 }
 
 impl BakeProgress {
@@ -64,6 +81,21 @@ impl BakeProgress {
             observer: Observer(Some(observer)),
             ..Self::default()
         }
+    }
+
+    /// This progress, also lending the bake `denoiser` for its
+    /// [`Denoiser::Oidn`](super::Denoiser::Oidn) charts (#1884). Without one they
+    /// are filtered.
+    pub fn with_denoiser(self, denoiser: Arc<dyn LightmapDenoiser>) -> Self {
+        Self {
+            denoiser: Trained(Some(denoiser)),
+            ..self
+        }
+    }
+
+    /// The denoiser lent, if any.
+    pub(super) fn denoiser(&self) -> Option<&dyn LightmapDenoiser> {
+        self.denoiser.0.as_deref()
     }
 
     /// Texels traced so far.

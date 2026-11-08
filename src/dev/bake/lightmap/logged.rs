@@ -5,13 +5,15 @@
 //! `bake_with_progress` and `encode_pages` the editor's job runs, so the pages are
 //! byte-identical with or without a log. A logged bake also times each mesh's
 //! batches (#1891) for the log's slowest-meshes lines: the sim says where each batch
-//! starts and ends to a [`MeshClocks`], which reads the clock on this side.
+//! starts and ends to a [`MeshClocks`], which reads the clock on this side. Both
+//! paths lend the bake OIDN when its settings pick it (#1884, [`lend_denoiser`]),
+//! and a logged one says what OIDN took.
 
 use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::Duration;
 
-use super::{encode_pages, EncodedPages};
+use super::{encode_pages, lend_denoiser, EncodedPages};
 use crate::dev::bake::progress::{BakeLog, MeshClocks, MeshTime, Progress, Step};
 use crate::scene::lighting::lightmap::BakeSettings;
 use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeScene};
@@ -32,11 +34,15 @@ pub(super) fn bake_logged(
         encode_pages(&maps, settings.page(), progress)?.ok_or_else(|| "never cancelled".to_string())
     };
     if !log.is_on() {
-        return Ok((run(&BakeProgress::default())?, Vec::new()));
+        let (progress, _) = lend_denoiser(BakeProgress::default(), settings);
+        return Ok((run(&progress)?, Vec::new()));
     }
     let clocks = Arc::new(MeshClocks::default());
-    let progress = BakeProgress::observed(clocks.clone());
+    let (progress, oidn) = lend_denoiser(BakeProgress::observed(clocks.clone()), settings);
     let pages = watch(&progress, read, log, run)?;
+    if let Some((charts, busy)) = oidn.map(|o| o.spent()) {
+        log.denoised(charts, busy);
+    }
     Ok((pages, clocks.times()))
 }
 
