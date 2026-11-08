@@ -46,9 +46,11 @@ pub fn add_floor(scene: &mut Scene, x0: f32, x1: f32, z0: f32, z1: f32) -> u32 {
     add_box(scene, Vec3::new(x0, -0.1, z0), Vec3::new(x1, 0.0, z1))
 }
 
-/// Bake `scene` onto the pinned 0..10 × 0..10 unit grid most tests assert cells on.
+/// Bake `scene` onto the pinned 0..10 × 0..10 unit grid most tests assert cells on
+/// (1 m cells, not the 0.25 m default, #1887).
 pub fn bake_pinned(scene: &mut Scene) -> NavigationGraph {
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
+    scene.nav_settings.grid_spacing = 1.0;
     let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     g.bake(scene);
     g

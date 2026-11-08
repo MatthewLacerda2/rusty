@@ -252,8 +252,9 @@ Per pull request:
    bump, need neither), since the queue takes neither without its record (`independent-review`,
    *Answering the findings*, step 2). What the read turns up goes back to the
    coder unlabelled; removing the label pulls a PR out of line. File its
-   "follow-up" notes as issues now. If it dispatched a scoped mutation run, read
-   the report when it lands (`ci-merge`, *Triaging a survivor*).
+   "follow-up" notes as issues now. If it asked for a scoped mutation run (a
+   `Mutation:` line, which the queue dispatches after the merge), read the
+   report when it lands on the merged PR (`ci-merge`, *Triaging a survivor*).
 2. **A hand-back** skips that PR and the watch carries on. A one-line fix is
    yours: under `--no-check` nothing compiles it before CI, so grep every use of
    what either side moved and check the 300-line and 50-line caps first; the

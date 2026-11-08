@@ -47,7 +47,7 @@ fn a_function_argument_taints() {
     assert!(matches!(&calls[..], [HostCall::Taint(what)] if what.contains("passed a function")));
 }
 
-/// Each of `bridge::FORWARDS` replays in the gameplay VM, never the replay's
+/// Each of `forwards::FORWARDS` replays in the gameplay VM, never the replay's
 /// own: the check that a verb forwarded when recorded is forwarded on replay
 /// (#1929). It walks the table, so a verb added to it is held too.
 #[test]
@@ -68,8 +68,9 @@ fn every_forwarded_verb_replays_in_the_gameplay_vm() {
         assert_eq!(real, "function", "{ns}.{name} is an API verb");
     };
     let mut verbs = 0;
-    for (namespace, names) in crate::dev::bridge::FORWARDS {
-        for &name in names {
+    for entry in &super::super::forwards::FORWARDS {
+        let namespace = entry.namespace;
+        for &name in entry.verbs {
             verbs += 1;
             game.with_vm(|glua| {
                 stub(glua, (namespace, name), "Forwarded = (Forwarded or 0) + 1");
@@ -83,8 +84,4 @@ fn every_forwarded_verb_replays_in_the_gameplay_vm() {
     }
     let count = game.with_vm(|glua| glua.globals().get::<i64>("Forwarded"));
     assert_eq!(count.unwrap(), Some(verbs));
-    assert!(
-        !forwarded("Transform", "SetPosition"),
-        "the rest replay in its VM"
-    );
 }

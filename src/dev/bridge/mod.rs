@@ -12,19 +12,18 @@
 //! (Step, StepUntil, Snapshot, Log, Expect, Frame, Stats, AssertBudget, Screenshot,
 //! Render, AttachPlayerBot, LoadStress, Bench, RecordAudio, StopAudio, and the demo verbs
 //! FindInDemo, SeekDemo, CutDemo, DemoPath in `demo`), `Scene.GetScript` answered across
-//! the VM boundary (`script_ref`), `Damage.*` run in the gameplay VM, where the
-//! `OnTakeDamage` handlers live (`damage`), and the refusal of what entering Play
-//! would wipe (`before_play`).
+//! the VM boundary (`script_ref`), `Damage.*` and `CharacterController.Move` run
+//! in the gameplay VM, where the `OnTakeDamage` and `OnControllerColliderHit`
+//! handlers live (`forward`), and the refusal of what entering Play would wipe
+//! (`before_play`).
 
 mod before_play;
 mod copy;
-mod damage;
 mod demo;
+mod forward;
 mod script_ref;
 #[cfg(test)]
 mod tests;
-
-pub use damage::FORWARDS;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -41,11 +40,12 @@ fn world_of(h: &Shared) -> Rc<RefCell<GameWorld>> {
 }
 
 /// Register the scenario-only surface on `lua`'s globals, after the API (it
-/// replaces the API's `Scene.GetScript` and `Damage`, and guards what Play would wipe).
+/// replaces the API's `Scene.GetScript`, `Damage` and `CharacterController.Move`,
+/// and guards what Play would wipe).
 pub fn register(lua: &Lua, harness: &Shared) -> LuaResult<()> {
     register_harness(lua, harness)?;
     before_play::register(lua, &world_of(harness))?;
-    damage::register(lua, &world_of(harness))?;
+    forward::register(lua, &world_of(harness))?;
     script_ref::register(lua, &world_of(harness))
 }
 

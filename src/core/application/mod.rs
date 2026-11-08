@@ -61,12 +61,14 @@ use crate::core::settings::quality::QualityPresets;
 use crate::core::settings::render_scale::ProjectGraphics;
 
 mod demo;
+mod gizmos;
 mod host;
 mod quality;
 mod render_scale;
 mod reread;
 
 pub use demo::DemoRequest;
+pub use gizmos::{Gizmo, GizmoRow, SceneGizmos};
 
 /// The startup scene when none is configured: the seeded demo scene. Kept equal to
 /// `scene::DEFAULT_SCENE_PATH` (a unit test pins it) without `core` importing `scene`.
@@ -145,6 +147,8 @@ pub struct Application {
     standalone: bool,
     /// The editor's demo timeline mailbox (#1598).
     demo: demo::DemoDesk,
+    /// The Scene view's gizmo mailbox (#1909).
+    gizmos: gizmos::GizmoDesk,
 }
 
 impl Application {

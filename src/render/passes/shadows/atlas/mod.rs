@@ -223,6 +223,8 @@ mod active_tests;
 mod budget_tests;
 #[cfg(test)]
 mod contact_tests;
+#[cfg(all(test, feature = "dev"))]
+mod index_gpu_tests;
 #[cfg(test)]
 #[path = "persist_tests.rs"]
 mod persist_tests;

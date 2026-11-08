@@ -38,7 +38,7 @@ class Yard:
     head's gates passed), `claims(number)` (a hand-back result its description or
     review refuses it with, or `None`), `check(sha)` (why the train's tree does not
     compile, empty when it does or `--no-check`), `push(train)`, `dispatch(branch)`,
-    `wait(sha, tick)` ([`train.ride.wait`]), `delete(branch)`, `look(number)`,
+    `wait(sha, tick, paths)` ([`train.ride.wait`]; `paths` every member's files), `delete(branch)`, `look(number)`,
     `squash(pull, sha)`, `main_state(base)` (`main`'s tree and its first-parent count
     since `base`), `pause(seconds)`, `say`, `bots`, `dry_run` and `no_merge`."""
 
@@ -193,6 +193,7 @@ class Yard:
             if refused:
                 return outcomes.STOPPED, [refused]
             self.fx.say(f"watch: testing {', '.join(f'#{n}' for n in train.numbers)} together on {name} ({train.tip[:7]}).")
-            return self.fx.wait(train.tip, tick)
+            paths = [p for car in train.cars for p in self.fx.files(car.number, car.head) or []]
+            return self.fx.wait(train.tip, tick, paths)
         finally:
             self.fx.delete(name)

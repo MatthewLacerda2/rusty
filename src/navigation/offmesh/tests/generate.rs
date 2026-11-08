@@ -56,6 +56,7 @@ fn a_crate_under_the_jump_height_is_jumped_onto_and_dropped_off() {
 #[test]
 fn a_gap_is_jumped_both_ways_within_the_jump_distance() {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 20.0, 0.0, 6.0));
     scene.nav_settings.jump_distance = 2.0;
     add_floor(&mut scene, -1.0, 9.0, -1.0, 7.0);
@@ -74,6 +75,7 @@ fn a_gap_is_jumped_both_ways_within_the_jump_distance() {
 #[test]
 fn walls_and_trimmed_floor_make_no_links() {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 20.0, 0.0, 20.0));
     scene.nav_settings.jump_distance = 3.0;
     scene.nav_settings.jump_height = 1.0;

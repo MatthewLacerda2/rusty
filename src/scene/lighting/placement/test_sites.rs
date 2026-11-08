@@ -20,15 +20,17 @@ pub fn yard() -> Scene {
     scene
 }
 
-/// A 10 × 10 m room at the yard's middle, 4 m high, 2 m thick walls, a door on
-/// −z, under a flat roof as wide as its walls: walkable, reached by nothing.
+/// A 10 × 10 m room at the yard's middle, 4 m high, 2 m thick walls, a 2 m door
+/// on −z (under `RoomParams::doorway`, so the room is its own; a 3 m one read as a
+/// doorway only on the old 1 m navmesh, #1887), under a flat roof as wide as its
+/// walls: walkable, reached by nothing.
 pub fn roofed_house(scene: &mut Scene) {
     let (o, i, h) = (7.0, 5.0, 4.0);
     block(scene, Vec3::new(-o, 0.0, i), Vec3::new(o, h, o));
     block(scene, Vec3::new(-o, 0.0, -i), Vec3::new(-i, h, i));
     block(scene, Vec3::new(i, 0.0, -i), Vec3::new(o, h, i));
-    block(scene, Vec3::new(-o, 0.0, -o), Vec3::new(-1.5, h, -i));
-    block(scene, Vec3::new(1.5, 0.0, -o), Vec3::new(o, h, -i));
+    block(scene, Vec3::new(-o, 0.0, -o), Vec3::new(-1.0, h, -i));
+    block(scene, Vec3::new(1.0, 0.0, -o), Vec3::new(o, h, -i));
     block(scene, Vec3::new(-o, h, -o), Vec3::new(o, h + 0.3, o));
 }
 

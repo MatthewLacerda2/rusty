@@ -33,6 +33,7 @@ inspect! {
         ro!("crossfade_duration", PLAYBACK),
         ro!("current_node", PLAYBACK),
         ro!("node_speed", PLAYBACK),
+        ro!("sync", PLAYBACK),
         op!("speed", animator::set_speed),
         op!("is_playing", animator::set_playing),
         op!("freeze", animator::set_freeze),

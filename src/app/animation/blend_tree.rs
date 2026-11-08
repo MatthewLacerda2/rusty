@@ -24,7 +24,7 @@
 
 use glam::Vec2;
 
-use crate::asset::animation_graph::{AnimationEvent, BlendTree, MAX_TREE_DEPTH};
+use crate::asset::animation_graph::{AnimationEvent, BlendTree, SyncMarker, MAX_TREE_DEPTH};
 use crate::components::{AnimatorParameter, AnimatorParameters};
 
 /// How strongly the angle counts against the speed difference in the polar
@@ -40,6 +40,8 @@ const EPSILON: f32 = 1e-6;
 pub struct Leaf<'a> {
     pub clip: &'a str,
     pub events: &'a [AnimationEvent],
+    /// The leaf clip's sync markers (#1896).
+    pub sync_markers: &'a [SyncMarker],
     pub weight: f32,
 }
 
@@ -75,6 +77,7 @@ fn walk<'a>(
             None => visit(Leaf {
                 clip: &motion.clip,
                 events: &motion.events,
+                sync_markers: &motion.sync_markers,
                 weight,
             }),
         }
@@ -154,6 +157,7 @@ fn dominant<'a>(
             None => resolves(&motion.clip).then_some(Leaf {
                 clip: &motion.clip,
                 events: &motion.events,
+                sync_markers: &motion.sync_markers,
                 weight: scale * w,
             }),
         };

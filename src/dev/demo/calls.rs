@@ -5,7 +5,7 @@
 //! [`journal_calls`] wraps every API namespace function in that VM so each call
 //! notes `Namespace.Function` and its plain-data arguments in the world's journal;
 //! [`invoke`] makes the same call on replay, in the gameplay VM when the
-//! scenario's VM forwards it there (`bridge::FORWARDS`, #1929). The `Harness`
+//! scenario's VM forwards it there (`forwards`, #1929). The `Harness`
 //! verbs that change the world ([`HARNESS_VERBS`]) are noted the same way and
 //! replayed by [`invoke_harness`]; the rest only read it, or step it (the steps
 //! are ticks).
@@ -17,7 +17,7 @@ use std::rc::Rc;
 
 use mlua::{Function, Lua, MultiValue, Table, Value};
 
-use crate::dev::bridge::FORWARDS;
+use super::forwards;
 use crate::scene::Scene;
 use crate::scripting::{HostCall, HostJournal, Plain, ScriptManager};
 
@@ -163,8 +163,10 @@ fn to_lua(lua: &Lua, value: &Plain) -> mlua::Result<Value> {
 /// did before this tick, again. It is made in `lua`, the replay's VM, with the
 /// surface over the world's cells from `replay::replay_vm` (a restart builds a
 /// new one), unless the scenario's VM forwards it into the gameplay VM
-/// ([`FORWARDS`]): then it is made in `game`'s VM, as it was recorded, so the
-/// callbacks it fires (an `OnTakeDamage`) fire again (#1929).
+/// ([`forwards::FORWARDS`]): then it is made in `game`'s VM, as it was recorded, so the
+/// callbacks it fires (an `OnTakeDamage`) fire again, and while that VM is down
+/// it is made by the same rule the recording followed ([`forwards::Forward::run`],
+/// #1929).
 pub fn invoke(
     lua: &Lua,
     game: &ScriptManager,
@@ -174,20 +176,15 @@ pub fn invoke(
     let (namespace, name) = function
         .split_once('.')
         .ok_or_else(|| format!("{function} is not Namespace.Function"))?;
-    let made = if forwarded(namespace, name) {
-        game.with_vm(|glua| call(glua, (namespace, name), args))
-            .and_then(|ran| ran.ok_or_else(|| mlua::Error::runtime("the game's runtime is down")))
-    } else {
-        call(lua, (namespace, name), args)
+    let made = match forwards::find(namespace, name) {
+        Some(entry) => entry.run(
+            name,
+            || game.with_vm(|glua| call(glua, (namespace, name), args)),
+            || call(lua, (namespace, name), args),
+        ),
+        None => call(lua, (namespace, name), args),
     };
     made.map_err(|e| format!("{function}: {e}"))
-}
-
-/// Whether the scenario's VM forwards `namespace.name` into the gameplay VM.
-fn forwarded(namespace: &str, name: &str) -> bool {
-    FORWARDS
-        .iter()
-        .any(|(ns, verbs)| *ns == namespace && verbs.contains(&name))
 }
 
 /// Call `namespace.name` in `lua` with `args`.
