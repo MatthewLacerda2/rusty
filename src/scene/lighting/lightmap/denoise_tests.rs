@@ -1,7 +1,7 @@
 //! The bake's denoiser choice (#1884): `None` leaves the bounce raw, an `Oidn` bake
 //! with no denoiser lent (or one that fails) is the `Filter` bake to the byte, a lent
-//! denoiser's output is what the lightmap keeps (bad texels excepted), and a bake
-//! through one is byte-identical on one worker or many. The mocks stand in for OIDN;
+//! denoiser's output is what the Gaussian then smooths (bad texels excepted), and a
+//! bake through one is byte-identical on one worker or many. The mocks stand in for OIDN;
 //! the real one is tested beside its binding (`dev::bake::denoise`).
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -115,10 +115,14 @@ fn a_lent_denoiser_cleans_the_bounce_and_its_directions() {
 
 #[test]
 fn a_denoiser_that_returns_nan_keeps_the_trace() {
-    let raw = baked(&with(Denoiser::None, 0), None, 2).0;
+    let kept = baked(&with(Denoiser::Oidn, 0), Some(Mock::Poison), 2).0;
+    for (k, r) in kept.iter().zip(&baked(&with(Denoiser::None, 0), None, 2).0) {
+        assert_eq!(k.texels, r.texels, "no radius: the raw trace");
+    }
     let poisoned = baked(&with(Denoiser::Oidn, 2), Some(Mock::Poison), 2).0;
-    for (p, r) in poisoned.iter().zip(&raw) {
-        assert_eq!(p.texels, r.texels, "the colour is the raw trace");
+    let filtered = baked(&with(Denoiser::Filter, 2), None, 2).0;
+    for (p, f) in poisoned.iter().zip(&filtered) {
+        assert_eq!(p.texels, f.texels, "the trace, then the Gaussian");
         assert!(p.directions.iter().all(|d| d.is_finite()));
     }
 }

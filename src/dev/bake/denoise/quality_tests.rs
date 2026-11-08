@@ -61,12 +61,15 @@ fn level(direct: bool) -> BakeScene {
     scene
 }
 
-/// `scene` baked at `samples` through `denoiser`, the seconds it took, and those
-/// of them OIDN spent.
-fn baked(scene: &BakeScene, samples: u32, denoiser: Denoiser) -> (Vec<Lightmap>, f64, f64) {
+/// One bake: its samples, its denoiser and its Gaussian's radius.
+type Row = (u32, Denoiser, u32);
+
+/// `scene` baked as `row` says, the seconds it took, and those of them OIDN spent.
+fn baked(scene: &BakeScene, (samples, denoiser, radius): Row) -> (Vec<Lightmap>, f64, f64) {
     let settings = BakeSettings {
         samples,
         denoiser,
+        filter_radius: radius,
         ..Default::default()
     };
     let oidn = std::sync::Arc::new(Oidn::default());
@@ -103,26 +106,27 @@ fn denoised_bake_error() {
     available().expect("this measurement needs OIDN");
     for (direct, label) in [(true, "baked"), (false, "bounce")] {
         let scene = level(direct);
-        let (reference, secs, _) = baked(&scene, REFERENCE, Denoiser::None);
+        let (reference, secs, _) = baked(&scene, (REFERENCE, Denoiser::None, 0));
         dump(&reference, &format!("{label}_reference"));
         let count = reference.len();
         println!("{label} lamps: reference {REFERENCE} spp raw, {count} lightmaps, {secs:.1} s");
-        println!("| spp | denoiser | relative | MAE / mean | RMSE / mean | bake | of it OIDN |");
-        let rows = [
-            (128, Denoiser::Filter),
-            (32, Denoiser::Filter),
-            (32, Denoiser::None),
-        ];
+        println!("| spp | denoiser | relative | MAE / mean | bake | of it OIDN |");
+        let r = BakeSettings::default().filter_radius;
+        let rows = [(128, Denoiser::Filter, r), (32, Denoiser::Filter, r)];
         let rows = rows
             .into_iter()
-            .chain([8, 16, 32, 64].map(|spp| (spp, Denoiser::Oidn)));
-        for (samples, denoiser) in rows {
-            let (maps, secs, oidn) = baked(&scene, samples, denoiser);
+            .chain([(32, Denoiser::None, 0), (32, Denoiser::Oidn, 0)]);
+        for row in rows.chain([8, 16, 32, 64].map(|spp| (spp, Denoiser::Oidn, r))) {
+            let (maps, secs, oidn) = baked(&scene, row);
             let e = error(&scene, &maps, &reference);
-            let name = denoiser.name();
+            let alone = match (row.1, row.2) {
+                (Denoiser::Oidn, 0) => " alone",
+                _ => "",
+            };
+            let (samples, name) = (row.0, format!("{}{alone}", row.1.name()));
             dump(&maps, &format!("{label}_{name}_{samples}"));
-            let [rmse, mae, rel] = [e.rmse, e.mae, e.relative].map(|x| x * 100.0);
-            println!("| {samples} | {name} | {rel:.1}% | {mae:.1}% | {rmse:.1}% | {secs:.1} s | {oidn:.1} s |");
+            let [mae, rel] = [e.mae, e.relative].map(|x| x * 100.0);
+            println!("| {samples} | {name} | {rel:.1}% | {mae:.1}% | {secs:.1} s | {oidn:.1} s |");
         }
     }
 }

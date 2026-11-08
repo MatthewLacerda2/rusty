@@ -56,8 +56,8 @@ fn draw_denoiser(ui: &mut egui::Ui, denoiser: &mut Denoiser) -> bool {
         })
         .response
         .on_hover_text(
-            "OIDN cleans the bounce from few samples (needs Open Image Denoise); \
-             Filter blurs it, edge-aware; None leaves it raw",
+            "OIDN cleans the bounce from few samples, then Filter smooths it (needs \
+             Open Image Denoise); Filter alone blurs it, edge-aware; None leaves it raw",
         );
     *denoiser != before
 }

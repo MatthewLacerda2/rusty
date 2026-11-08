@@ -43,7 +43,7 @@ first.
   *Reflection Probes* section (see `Reflection.md`). A scene whose settings are all
   at their defaults leaves the block out of its file. `Lighting.BakeLightmaps` takes the
   same settings for every argument it is not given.
-- **The denoiser** (`denoiser`, #1884, Unity's Lightmapping *Denoiser*) cleans the baked
+- **The denoiser** (`denoiser`, #1884, Unity's Lightmapping *Denoiser* and *Filter*) cleans the baked
   bounce: `"OIDN"` (the default), `"Filter"` or `"None"`, read in any case; an unknown
   name is an error and changes nothing. The editor's card picks it under the bake knobs.
   See *Denoising* under the lightmaps below for what each does and what OIDN needs.
@@ -282,7 +282,7 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   `"ShadowsOnly"` one blocks light but bounces, emits and receives nothing. A mesh at
   Scale In Lightmap `0` (below) gets no lightmap and reads the light probes. Dynamic objects keep
   the light probes; bake those with `Lighting.Bake()` so both read the same lights.
-- **What it bakes.** A deterministic CPU path tracer: `samples` (default `32`, enough for OIDN, below) paths
+- **What it bakes.** A deterministic CPU path tracer: `samples` (default `64`, enough for OIDN, below) paths
   per texel, `bounces` (default `3`) surfaces deep, seeded by `seed` (default `0`) — the
   same scene and seed always write byte-identical lightmaps, however many cores ran it
   (on any machine under the `"Filter"` denoiser; on one machine under OIDN).
@@ -310,15 +310,20 @@ scene's lighting settings (above), whose defaults are the ones listed here.
 - **Denoising** (#1884). Only the bounce (indirect light, and a directional bake's
   directions) is cleaned, chart by chart; the direct light stays as traced.
   - `"OIDN"`: Intel **Open Image Denoise 2**'s `RTLightmap` filter, a network trained
-    on lightmaps. It gets from `32` samples what the filter needs about `128` or more
-    for, so it is the default. OIDN is a native library the machine must have, the way
+    on lightmaps, then the `"Filter"` Gaussian below, as Unity runs its denoiser and
+    then its filter (OIDN alone leaves a faint mottling on flat walls at low
+    samples, which the Gaussian takes out). At `64` samples the pair comes as close
+    to a converged bake as the Gaussian alone did at `128` (within a point of mean
+    relative error, measured on a primitive interior, #1884), in about 60% of the
+    time, so it is the default and `64` the default `samples`. OIDN is a native library the machine must have, the way
     Blender is for a `.blend`: **macOS** `brew install open-image-denoise`, **Arch**
     `pacman -S openimagedenoise`, elsewhere the release from
     `github.com/RenderKit/oidn/releases`, unpacked anywhere with the `RUSTY_OIDN`
     environment variable naming its folder (or the library file). rusty opens it when
     a bake asks, never at build time, so a machine without it still builds, runs and
-    bakes: the bake warns once, naming what to install, and filters instead, which at
-    `32` samples looks noisier (raise `samples`, or pick `"Filter"` to silence it). Its
+    bakes: the bake warns once, naming what to install, and only filters, which at
+    `64` samples is blurrier and blotchier (raise `samples`, or pick `"Filter"` to
+    silence it). Its
     output may differ in the last bits between CPUs (its SIMD path), never between
     runs or core counts on one machine.
   - `"Filter"`: an edge-aware Gaussian, 3 texels wide (Unity's indirect filter), that

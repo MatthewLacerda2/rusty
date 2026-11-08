@@ -2,11 +2,13 @@
 //! seam a trained one plugs into.
 //!
 //! Unity's Progressive Lightmapper picks a *Denoiser* (OIDN, OptiX, None) and a
-//! *Filter* (Gaussian, A-Trous, None). rusty folds both into one choice,
-//! [`Denoiser`]: Intel Open Image Denoise's lightmap model (`Oidn`), our own
-//! edge-aware Gaussian (`Filter`, `filter::smooth`), or the raw trace (`None`).
-//! A trained denoiser gets from a few dozen paths per texel what the Gaussian needs
-//! a few hundred for, which is the bake's largest speed-up.
+//! *Filter* (Gaussian, A-Trous, None), and runs the denoiser first, then the
+//! filter. rusty folds both into one choice, [`Denoiser`]: Intel Open Image
+//! Denoise's lightmap model followed by our edge-aware Gaussian (`Oidn`), the
+//! Gaussian alone (`Filter`, `filter::smooth`), or the raw trace (`None`). The pair
+//! gets from 64 paths per texel what the Gaussian alone needed 128 for. OIDN alone
+//! at 32 or 64 leaves a few-texel mottling on flat bounce-lit walls, which the
+//! Gaussian after it removes (measured and looked at in #1884's PR).
 //!
 //! OIDN is a native library and authoring-only, so the sim never names it: the
 //! platform lends the bake a [`LightmapDenoiser`] on its `BakeProgress`
@@ -35,7 +37,8 @@ const PAD_PASSES: u32 = 4;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Denoiser {
     /// Intel Open Image Denoise's `RTLightmap` filter (HDR, trained on lightmaps),
-    /// run by the platform; where OIDN is not installed the bake warns and filters.
+    /// run by the platform, then the Gaussian as under [`Denoiser::Filter`]; where
+    /// OIDN is not installed the bake warns and only filters.
     #[default]
     Oidn,
     /// The edge-aware Gaussian, [`BakeSettings::filter_radius`](super::BakeSettings::filter_radius) texels wide.
@@ -101,16 +104,16 @@ impl Cleaner<'_> {
         indirect: &[Vec3],
         dirs: Option<&[Vec3]>,
     ) -> (Vec<Vec3>, Option<Vec<Vec3>>) {
-        if let (Denoiser::Oidn, Some(trained)) = (self.denoiser, self.trained) {
-            if let Some(clean) = trained_clean(trained, chart, indirect, dirs) {
-                return clean;
-            }
-        }
         let radius = match self.denoiser {
             Denoiser::None => 0,
             Denoiser::Oidn | Denoiser::Filter => self.radius,
         };
         let filter = |v: &[Vec3]| smooth(chart.points, v, chart.size, radius, chart.texel_world);
+        if let (Denoiser::Oidn, Some(trained)) = (self.denoiser, self.trained) {
+            if let Some((clean, cleaned_dirs)) = trained_clean(trained, chart, indirect, dirs) {
+                return (filter(&clean), cleaned_dirs.as_deref().map(filter));
+            }
+        }
         (filter(indirect), dirs.map(filter))
     }
 }

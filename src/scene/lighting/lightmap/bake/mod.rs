@@ -46,12 +46,13 @@ pub struct BakeSettings {
     /// ([`max_map_edge`]); the packer picks the smallest page that holds the bake,
     /// up to this edge, then adds pages. Read through [`Self::page`].
     pub max_lightmap_size: u32,
-    /// What cleans the baked bounce (#1884, Unity's *Denoiser*): OIDN, the
-    /// Gaussian below, or nothing. Baked direct light is never cleaned.
+    /// What cleans the baked bounce (#1884, Unity's *Denoiser* and *Filter*): OIDN
+    /// then the Gaussian below, the Gaussian alone, or nothing. Baked direct light
+    /// is never cleaned.
     pub denoiser: Denoiser,
-    /// Radius, in texels, of the Gaussian that smooths the baked bounce under
-    /// [`Denoiser::Filter`] (Unity's indirect filter), and under `Oidn` where OIDN
-    /// cannot run; 0 leaves it raw.
+    /// Radius, in texels, of the Gaussian that smooths the baked bounce (Unity's
+    /// indirect filter): alone under [`Denoiser::Filter`] or where OIDN cannot run,
+    /// after OIDN under `Oidn`; 0 leaves it as traced or as OIDN gave it.
     pub filter_radius: u32,
     /// Also bake each texel's dominant incoming light direction and its `Baked`
     /// lamps' share (#810, Unity's *Directional* mode; #1695), so normal maps
@@ -77,10 +78,13 @@ impl Default for BakeSettings {
 }
 
 impl BakeSettings {
-    /// The default paths per texel: what OIDN needs to land within a few percent
-    /// of a converged bake (#1884, measured in its PR). The Gaussian filter wanted
-    /// 128 for the same; a bake that falls back to it looks noisier.
-    pub const DEFAULT_SAMPLES: u32 = 32;
+    /// The default paths per texel: the fewest at which an OIDN bake (OIDN, then
+    /// the Gaussian) is as close to a converged one as the Gaussian alone was at
+    /// its old default of 128, within a point of mean relative error, in about 60%
+    /// of the time (#1884, `dev::bake::denoise::quality_tests`; 32 missed by 1.3 to
+    /// 1.7 points). A bake that falls back to the Gaussian alone is blurrier and
+    /// blotchier at this count.
+    pub const DEFAULT_SAMPLES: u32 = 64;
     /// The texel densities a bake takes (Unity's Lightmap Resolution, in miniature).
     pub const TEXELS_PER_UNIT: RangeInclusive<f32> = 0.25..=64.0;
     /// The samples per texel a bake takes.

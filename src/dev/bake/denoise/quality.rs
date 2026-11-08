@@ -38,9 +38,6 @@ fn interior(mesh: &BakeMesh, size: u32) -> Vec<bool> {
 
 /// How far a bake is from the reference, over every chart interior, in luminance.
 pub struct Error {
-    /// Root-mean-square error over the reference's mean: the bright texels and any
-    /// firefly weigh most.
-    pub rmse: f64,
     /// Mean absolute error over the reference's mean.
     pub mae: f64,
     /// The mean of each texel's own relative error, `|v − r| / (r + 1% of the
@@ -62,10 +59,10 @@ pub fn error(scene: &BakeScene, maps: &[Lightmap], reference: &[Lightmap]) -> Er
     }
     let n = pairs.len() as f64;
     let mean = pairs.iter().map(|(_, r)| r).sum::<f64>() / n;
-    let sum = |f: &dyn Fn(f64, f64) -> f64| pairs.iter().map(|&(v, r)| f(v, r)).sum::<f64>() / n;
+    let average =
+        |f: &dyn Fn(f64, f64) -> f64| pairs.iter().map(|&(v, r)| f(v, r)).sum::<f64>() / n;
     Error {
-        rmse: sum(&|v, r| (v - r).powi(2)).sqrt() / mean,
-        mae: sum(&|v, r| (v - r).abs()) / mean,
-        relative: sum(&|v, r| (v - r).abs() / (r + 0.01 * mean)),
+        mae: average(&|v, r| (v - r).abs()) / mean,
+        relative: average(&|v, r| (v - r).abs() / (r + 0.01 * mean)),
     }
 }
