@@ -27,7 +27,8 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_knowledge(lua, &t, scene)?;
     register_noise(lua, &t, scene)?;
-    register_settings(lua, &t, scene)?;
+    register_distances(lua, &t, scene)?;
+    register_masks(lua, &t, scene)?;
     lua.globals().set(NS, t).map_err(|e| e.to_string())
 }
 
@@ -139,8 +140,8 @@ fn register_noise(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     put(t, "ReportNoise", f)
 }
 
-/// `Get*` / `Set*` for every setting: the distances and ages, then the masks.
-fn register_settings(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+/// `Get*` / `Set*` for the distances, the angle, the eye height and the ages.
+fn register_distances(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Float = (
         &'static str,
         fn(&Perception) -> f32,
@@ -181,6 +182,11 @@ fn register_settings(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
         });
         put(t, &format!("Set{name}"), f)?;
     }
+    Ok(())
+}
+
+/// `Get*` / `Set*` for the two layer masks.
+fn register_masks(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Mask = (
         &'static str,
         fn(&Perception) -> u32,

@@ -15,14 +15,9 @@ use crate::scene::authoring::sanitize::{at_least, finite_or, saturated};
 /// The widest view half-angle: 180° sees all round.
 pub const MAX_SIGHT_ANGLE: f32 = 180.0;
 
-/// `v` floored at 0, or `current` when `v` is NaN or infinite.
-fn distance(v: f32, current: f32) -> f32 {
-    at_least(finite_or(v, current), 0.0)
-}
-
 /// Set the range sight starts at; the lose-sight range is raised to it if below.
 pub fn set_sight_range(p: &mut Perception, range: f32) {
-    p.sight_range = distance(range, p.sight_range);
+    p.sight_range = at_least(finite_or(range, p.sight_range), 0.0);
     p.lose_sight_range = p.lose_sight_range.max(p.sight_range);
 }
 
@@ -53,22 +48,22 @@ pub fn set_blocking_mask(p: &mut Perception, mask: u32) {
 
 /// Set how far a noise of loudness 1 is heard.
 pub fn set_hearing_range(p: &mut Perception, range: f32) {
-    p.hearing_range = distance(range, p.hearing_range);
+    p.hearing_range = at_least(finite_or(range, p.hearing_range), 0.0);
 }
 
 /// Set how long a seen target is remembered out of sight (0 = forever).
 pub fn set_sight_max_age(p: &mut Perception, seconds: f32) {
-    p.sight_max_age = distance(seconds, p.sight_max_age);
+    p.sight_max_age = at_least(finite_or(seconds, p.sight_max_age), 0.0);
 }
 
 /// Set how long a heard noise is remembered (0 = forever).
 pub fn set_hearing_max_age(p: &mut Perception, seconds: f32) {
-    p.hearing_max_age = distance(seconds, p.hearing_max_age);
+    p.hearing_max_age = at_least(finite_or(seconds, p.hearing_max_age), 0.0);
 }
 
 /// Set how long a damage stimulus is remembered (0 = forever).
 pub fn set_damage_max_age(p: &mut Perception, seconds: f32) {
-    p.damage_max_age = distance(seconds, p.damage_max_age);
+    p.damage_max_age = at_least(finite_or(seconds, p.damage_max_age), 0.0);
 }
 
 #[cfg(test)]

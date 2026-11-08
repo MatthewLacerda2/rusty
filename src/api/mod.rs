@@ -100,9 +100,11 @@ use crate::scene::Scene;
 pub type Reg = Result<(), String>;
 
 /// The navigation namespaces: `Navigation` + `NavMeshAgent`, `NavMeshObstacle`,
-/// `NavMeshModifierVolume` (#460) and `OffMeshLink`.
+/// `NavMeshModifierVolume` (#460) and `OffMeshLink`, and the agents' senses,
+/// `AIPerception` (#1900).
 fn register_navigation(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // sorted: each registrar makes its own global table
+    ai_perception::register(lua, ctx.scene)?;
     nav::register(lua, ctx.scene, ctx.nav)?;
     nav_modifier::register(lua, ctx.scene)?;
     nav_obstacle::register(lua, ctx.scene)?;
@@ -135,7 +137,6 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // sorted: each registrar makes its own global table; the ones extending a table
     // (`register_hitscan`, `register_reimport`, `register_events`)
     // sort after the one that made it
-    ai_perception::register(lua, ctx.scene)?;
     animator::register(lua, ctx.scene, ctx.console)?;
     application::register(lua, ctx.application)?;
     // `Assets` mostly reads no engine cell (it walks the project asset root on each

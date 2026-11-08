@@ -12,9 +12,12 @@ use crate::editor::widgets::DragRange;
 use crate::scene::authoring::ai::perception as ops;
 use crate::scene::authoring::ComponentKind;
 use egui_phosphor::regular as icon;
+use std::ops::RangeInclusive;
 
 /// A shared scalar setter, one per drag row.
 type Op = fn(&mut Perception, f32);
+/// A shared mask setter.
+type MaskOp = fn(&mut Perception, u32);
 
 /// Route one edit through the shared ops and mark the scene dirty.
 fn write(
@@ -42,82 +45,132 @@ pub fn draw_ai_perception(
     let d = is_dirty;
     let mut remove = false;
     component_card(ui, icon::EYE, "AI Perception", Some(&mut remove), |ui| {
-        let rows: [(&str, f32, _, Op); 8] = [
-            (
-                "Sight Range:",
-                p.sight_range,
-                0.0..=500.0,
-                ops::set_sight_range,
-            ),
-            (
-                "Lose Sight Range:",
-                p.lose_sight_range,
-                0.0..=500.0,
-                ops::set_lose_sight_range,
-            ),
-            (
-                "Sight Angle (°):",
-                p.sight_angle,
-                0.0..=ops::MAX_SIGHT_ANGLE,
-                ops::set_sight_angle,
-            ),
-            (
-                "Eye Height:",
-                p.eye_height,
-                -10.0..=10.0,
-                ops::set_eye_height,
-            ),
-            (
-                "Hearing Range:",
-                p.hearing_range,
-                0.0..=500.0,
-                ops::set_hearing_range,
-            ),
-            (
-                "Sight Max Age (s):",
-                p.sight_max_age,
-                0.0..=600.0,
-                ops::set_sight_max_age,
-            ),
-            (
-                "Hearing Max Age (s):",
-                p.hearing_max_age,
-                0.0..=600.0,
-                ops::set_hearing_max_age,
-            ),
-            (
-                "Damage Max Age (s):",
-                p.damage_max_age,
-                0.0..=600.0,
-                ops::set_damage_max_age,
-            ),
-        ];
-        for (label, mut value, range, op) in rows {
-            let edited = ui
-                .horizontal(|ui| {
-                    ui.label(label);
-                    ui.add(egui::DragValue::new(&mut value).speed(0.05).ranged(range))
-                        .changed()
-                })
-                .inner;
-            if edited {
-                write(world, id, &mut *d, |p| op(p, value));
-            }
-        }
-        ui.label("Max age 0: remembered forever");
-        let masks: [(&str, u32, fn(&mut Perception, u32)); 2] = [
-            ("Sight Mask:", p.sight_mask, ops::set_sight_mask),
-            ("Blocking Mask:", p.blocking_mask, ops::set_blocking_mask),
-        ];
-        for (label, mask, op) in masks {
-            if let Some(next) = mask_row(ui, label, mask) {
-                write(world, id, &mut *d, |p| op(p, next));
-            }
-        }
+        draw_distances(ui, world, id, &p, &mut *d);
+        draw_ages(ui, world, id, &p, &mut *d);
+        draw_masks(ui, world, id, &p, &mut *d);
         draw_known(ui, &p);
     });
     if remove {
         remove_component(world, id, ComponentKind::AIPerception, d);
+    }
+}
+
+/// One drag row: its label, value, range and shared setter.
+type Row<'a> = (&'a str, f32, RangeInclusive<f32>, Op);
+
+/// The ranges, the cone and the eye height, one drag row each.
+fn draw_distances(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    p: &Perception,
+    d: &mut bool,
+) {
+    let sight: [Row; 5] = [
+        (
+            "Sight Range:",
+            p.sight_range,
+            0.0..=500.0,
+            ops::set_sight_range,
+        ),
+        (
+            "Lose Sight Range:",
+            p.lose_sight_range,
+            0.0..=500.0,
+            ops::set_lose_sight_range,
+        ),
+        (
+            "Sight Angle (°):",
+            p.sight_angle,
+            0.0..=ops::MAX_SIGHT_ANGLE,
+            ops::set_sight_angle,
+        ),
+        (
+            "Eye Height:",
+            p.eye_height,
+            -10.0..=10.0,
+            ops::set_eye_height,
+        ),
+        (
+            "Hearing Range:",
+            p.hearing_range,
+            0.0..=500.0,
+            ops::set_hearing_range,
+        ),
+    ];
+    drag_rows(ui, world, id, d, sight);
+}
+
+/// The three max ages.
+fn draw_ages(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    p: &Perception,
+    d: &mut bool,
+) {
+    let ages: [Row; 3] = [
+        (
+            "Sight Max Age (s):",
+            p.sight_max_age,
+            0.0..=600.0,
+            ops::set_sight_max_age,
+        ),
+        (
+            "Hearing Max Age (s):",
+            p.hearing_max_age,
+            0.0..=600.0,
+            ops::set_hearing_max_age,
+        ),
+        (
+            "Damage Max Age (s):",
+            p.damage_max_age,
+            0.0..=600.0,
+            ops::set_damage_max_age,
+        ),
+    ];
+    drag_rows(ui, world, id, d, ages);
+    ui.label("Max age 0: remembered forever");
+}
+
+/// Draw `rows`, routing each edit through its setter.
+fn drag_rows<const N: usize>(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    d: &mut bool,
+    rows: [Row; N],
+) {
+    for (label, mut value, range, op) in rows {
+        let edited = ui
+            .horizontal(|ui| {
+                ui.label(label);
+                ui.add(egui::DragValue::new(&mut value).speed(0.05).ranged(range))
+                    .changed()
+            })
+            .inner;
+        if edited {
+            write(world, id, d, |p| op(p, value));
+        }
+    }
+}
+
+/// The sight and blocking layer masks.
+fn draw_masks(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    p: &Perception,
+    d: &mut bool,
+) {
+    let masks: [(&str, u32, MaskOp); 2] = [
+        ("Sight Mask:", p.sight_mask, ops::set_sight_mask),
+        ("Blocking Mask:", p.blocking_mask, ops::set_blocking_mask),
+    ];
+    for (label, mask, op) in masks {
+        if let Some(next) = mask_row(ui, label, mask) {
+            write(world, id, d, |p| op(p, next));
+        }
     }
 }
 
