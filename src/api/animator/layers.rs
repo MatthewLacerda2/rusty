@@ -1,6 +1,7 @@
 //! src/api/animator/layers.rs — the `Animator` layer surface (#457).
 //!
-//! `SetLayerWeight` / `GetLayerWeight` and the layer-aware `GetCurrentNode`. A
+//! `SetLayerWeight` / `GetLayerWeight` and the layer-aware `GetCurrentNode` /
+//! `GetCurrentTag`. A
 //! layer is addressed Unity's way, by index — 0 is the base layer, 1.. the
 //! graph's extra layers in order — or, rusty's convenience, by its name in the
 //! graph. A script's `Start` runs before the evaluator's first step, so a layer
@@ -15,7 +16,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::asset::animation_graph;
-use crate::components::AnimatorComponent;
+use crate::components::{AnimatorComponent, Playback};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
@@ -115,25 +116,27 @@ fn register_layer_weight(
 
 /// `GetCurrentNode(id [, layer])` — the active graph node's name in `layer`
 /// (default: the base layer), or `nil` when there is no animator, no such layer,
-/// or the evaluator hasn't bound it yet.
+/// or the evaluator hasn't bound it yet. `GetCurrentTag(id [, layer])` — that
+/// node's tag (#1901), `nil` when it has none.
 fn register_get_current_node(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
-    put(
-        table,
-        "GetCurrentNode",
-        lua.create_function(move |lua, (id, layer): (EntityArg, Option<Value>)| {
+    let reader = |read: fn(&Playback) -> Option<String>| {
+        move |lua: &mlua::Lua, (id, layer): (EntityArg, Option<Value>)| {
             let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let Some(anim) = scene.world.animator(id.read()) else {
                 return Ok(None);
             };
-            let playback = match layer.map_or(Some(0), |l| lookup(&anim, &l)) {
-                Some(0) => &anim.base,
-                Some(index) => &anim.layers[index - 1].playback,
-                None => return Ok(None),
-            };
-            Ok(playback.current_node.clone())
-        }),
-    )
+            Ok(match layer.map_or(Some(0), |l| lookup(&anim, &l)) {
+                Some(0) => read(&anim.base),
+                Some(index) => read(&anim.layers[index - 1].playback),
+                None => None,
+            })
+        }
+    };
+    let node = reader(|p| p.current_node.clone());
+    put(table, "GetCurrentNode", lua.create_function(node))?;
+    let tag = reader(|p| p.current_node.as_ref().and(p.states.tag.clone()));
+    put(table, "GetCurrentTag", lua.create_function(tag))
 }
 
 /// A layer argument as a warning shows it.

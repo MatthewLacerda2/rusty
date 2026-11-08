@@ -21,6 +21,7 @@ fn run_node() -> GraphNode {
         events: Vec::new(),
         sync_group: None,
         sync_markers: Vec::new(),
+        tag: String::new(),
     }
 }
 

@@ -91,8 +91,8 @@ impl GameWorld {
 /// tick is done with it, right before `advance_frame`. The skin palette build (#453)
 /// runs in `Render`, after every stage that may move a bone. The post-animation
 /// writers, in order: `animate` writes the clip pose; `pose_ragdolls` (#466) puts each simulated
-/// ragdoll bone back where physics left it; `OnAnimationEvent` (#459) then
-/// fires for the events this tick's playheads crossed; `LateUpdate` scripts set this tick's
+/// ragdoll bone back where physics left it; the state callbacks (#1901) and
+/// `OnAnimationEvent` (#459) then fire for the states and events of this tick's step; `LateUpdate` scripts set this tick's
 /// targets; `solve_ik` (#461) post-processes the final pose, skipping any bone a
 /// dynamic body carries (physics wins over IK); `follow_bones` (#464) then moves
 /// the hitbox query poses to the pose that renders; `carry_local_particles` (#1529)
@@ -202,14 +202,17 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
     nav.tick_nav_agents(&mut s, res.frame_dt);
 }
 
+/// `OnStateExit` / `OnStateEnter` / `OnStateUpdate` (#1901), then
 /// `OnAnimationEvent(id, name, info)` (#459) for every event `animate` queued this
-/// tick: after the animation step and ragdoll posing, so a handler reads the
+/// tick, so a state's first marker follows its enter: after the animation step and ragdoll posing, so a handler reads the
 /// pose this tick renders (bar `LateUpdate` and IK), and before `LateUpdate`, as
 /// in Unity, where animation events fire during the Animator's update. Then the
 /// `OnControllerColliderHit`s of the moves root motion made (#1879): a script's
 /// own `Move` raises its hits inside the call, but root motion moves outside any
 /// script, so its hits wait for this point, the animation step's callbacks.
 fn dispatch_animation_events(_world: &mut World, res: &mut Resources) {
+    let states = std::mem::take(&mut res.state_callbacks);
+    res.script_manager.dispatch_state_callbacks(&states);
     let events = std::mem::take(&mut res.animation_events);
     res.script_manager.dispatch_animation_events(&events);
     let hits = std::mem::take(&mut res.controller_hits);

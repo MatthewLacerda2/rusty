@@ -113,6 +113,9 @@ pub struct Resources {
     /// The animation events (#459) `animate` found this tick, `(entity, name,
     /// whose montage)` in firing order, drained by `dispatch_animation_events`.
     pub(super) animation_events: Vec<(u32, String, Option<MontageEvent>)>,
+    /// The graph-state callbacks (#1901) `animate` queued this tick, `(entity,
+    /// callback)` in firing order, dispatched before `animation_events`.
+    pub(super) state_callbacks: Vec<(u32, crate::components::StateCallback)>,
     /// What each CharacterController moved by root motion touched this tick
     /// (#1879), in move order, drained with `animation_events`.
     pub(super) controller_hits: Vec<(u32, Vec<crate::physics::ControllerHit>)>,
@@ -189,6 +192,7 @@ impl Resources {
             schedule: super::build().into_schedule(),
             animation_graphs: GraphCache::default(),
             animation_events: Vec::new(),
+            state_callbacks: Vec::new(),
             controller_hits: Vec::new(),
             probe: None,
             tap: None,

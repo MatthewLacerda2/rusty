@@ -1,8 +1,8 @@
 //! src/app/systems/animate/ — the `animate` system (#80, #453) and root
 //! motion's application (#1745).
 //!
-//! Each active animator's playheads advance, the sampled pose is written onto
-//! its bone GameObjects, and the step's root motion is stored world-space on
+//! Each active animator's playheads advance, its graph-state callbacks are
+//! queued (#1901), the sampled pose is written onto its bone GameObjects, and the step's root motion is stored world-space on
 //! the component (`Animator.GetRootMotion`; zeroed while the entity is
 //! inactive). When root motion drives the entity
 //! (`AnimatorComponent::drives_root_motion`: *Apply Root Motion* on, the
@@ -62,6 +62,8 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
         // helper (#344) — the animate system's re-pose step.
         let stepped = s.world.with_animator_mut_and_mesh(id, |anim, mesh| {
             let stepped = animation::step(anim, mesh, graph, dt);
+            let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
+            let states = animation::state_callbacks(anim, clips, graph, &stepped.travel);
             let skin = mesh.and_then(|m| m.skin.as_ref());
             let model = model_in_entity(skin);
             let motion = stepped
@@ -71,14 +73,10 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
             measured(anim, motion, drives);
             let unknown = skin.and_then(|skin| unknown_bone(anim, skin));
             let writes = mesh.map(|m| animation::bone_writes(anim, m, graph));
-            (
-                stepped.events,
-                writes,
-                drives.then_some((motion, model)),
-                unknown,
-            )
+            let events = (states, stepped.events);
+            (events, writes, drives.then_some((motion, model)), unknown)
         });
-        let Some((crossed, writes, applied, unknown)) = stepped else {
+        let Some(((states, crossed), writes, applied, unknown)) = stepped else {
             continue;
         };
         if let Some(bone) = unknown {
@@ -87,6 +85,8 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
                 "Animator on '{name}' ({id}): root bone '{bone}' is not in its skeleton; root motion moves nothing"
             ));
         }
+        res.state_callbacks
+            .extend(states.into_iter().map(|c| (id, c)));
         let events = crossed.into_iter().map(|e| (id, e.name, e.montage));
         res.animation_events.extend(events);
         for (bone, local) in writes.unwrap_or_default() {

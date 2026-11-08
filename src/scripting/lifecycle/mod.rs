@@ -49,6 +49,16 @@ impl ScriptManager {
         }
     }
 
+    /// Whether instance `key`'s script defines `hook` — so a dispatch builds
+    /// its arguments only for a callback someone will receive.
+    fn defines(&self, lua: &Lua, key: (u32, usize), hook: &str) -> bool {
+        let Some(inst) = self.entity_scripts.get(&key) else {
+            return false;
+        };
+        let table = lua.registry_value::<Table>(&inst.table);
+        table.is_ok_and(|t| t.get::<mlua::Function>(hook).is_ok())
+    }
+
     /// The generic hook call every dispatch loop shares: resolve the instance's
     /// lifecycle table, look up `hook`, call it with `args`, log a Lua error to
     /// the console. A script that doesn't define `hook` is silently skipped
