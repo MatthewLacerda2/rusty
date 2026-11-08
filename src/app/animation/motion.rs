@@ -10,7 +10,7 @@
 //! rather than a pose per leaf.
 
 use crate::asset::anim_data::AnimationClip;
-use crate::asset::animation_graph::{GraphNode, StateMachine};
+use crate::asset::animation_graph::{GraphNode, StateMachine, SyncMarker};
 use crate::asset::mesh_data::{JointTransform, SkinData};
 use crate::components::{AnimatorParameters, Motion, Playback, Playhead, Step};
 
@@ -97,12 +97,16 @@ impl MotionContext<'_> {
             }
             Motion::Tree(node) => {
                 let phase = Playhead::tree(0.0).bounds(looping).apply(time);
+                let sync = self.tree_sync(node, phase, looping);
                 let mut blended: Option<Sampled> = None;
                 let mut scratch = Vec::new();
                 let mut total = 0.0;
-                self.for_each_leaf_clip(node, |clip, weight| {
+                self.for_each_leaf_clip(node, |clip, weight, markers| {
                     total += weight;
-                    sample_into(skin, clip, phase * clip.duration, &mut scratch);
+                    let at = sync
+                        .as_ref()
+                        .map_or(phase * clip.duration, |s| s.leaf_time(clip, markers, phase));
+                    sample_into(skin, clip, at, &mut scratch);
                     let Some(acc) = &mut blended else {
                         // The first leaf is the pose as sampled; its buffer
                         // becomes the output, and later leaves reuse a fresh one.
@@ -124,18 +128,19 @@ impl MotionContext<'_> {
     }
 
     /// Call `visit` with every resolvable leaf clip of the blend-tree node
-    /// `node` that has a positive weight, depth first in authored order.
+    /// `node` that has a positive weight, depth first in authored order, with
+    /// its weight and sync markers (#1896).
     pub(super) fn for_each_leaf_clip(
         &self,
         node: &str,
-        mut visit: impl FnMut(&AnimationClip, f32),
+        mut visit: impl FnMut(&AnimationClip, f32, &[SyncMarker]),
     ) {
         let Some(tree) = self.tree_node(node).and_then(|n| n.blend_tree.as_ref()) else {
             return;
         };
         for_each_leaf(tree, self.parameters, &mut |leaf| {
             if let Some(clip) = self.clip(leaf.clip) {
-                visit(clip, leaf.weight);
+                visit(clip, leaf.weight, leaf.sync_markers);
             }
         });
     }
@@ -151,7 +156,7 @@ impl MotionContext<'_> {
                 .map_or(Playhead::unresolved(), |c| Playhead::clip(c.duration)),
             Motion::Tree(node) => {
                 let (mut sum, mut total) = (0.0, 0.0);
-                self.for_each_leaf_clip(node, |clip, w| {
+                self.for_each_leaf_clip(node, |clip, w, _| {
                     sum += clip.duration * w;
                     total += w;
                 });
@@ -164,7 +169,9 @@ impl MotionContext<'_> {
     /// Advance `playback` by `dt` at `speed`, each playhead at its motion's rate,
     /// and return the animation events (#459) the current motion crossed, tagged
     /// with `layer`, and the current playhead's [`Step`] (what root motion is
-    /// measured over, #1745).
+    /// measured over, #1745). A synced crossfade's lighter motion follows the
+    /// heavier one, and a marker-synced tree carries its phase across a change
+    /// of leader (#1896, `sync`).
     pub fn advance(
         &self,
         playback: &mut Playback,
@@ -172,11 +179,46 @@ impl MotionContext<'_> {
         speed: f32,
         layer: usize,
     ) -> (Vec<Crossed>, Step) {
+        self.rebase_leaders(playback);
         let current = self.playhead(playback.motion());
         let previous = playback
             .previous_motion()
             .map_or(1.0, |m| self.playhead(m).per_second);
-        let step = playback.advance(dt, speed, current, previous);
+        let step = if playback.sync.following && playback.is_crossfading() {
+            self.advance_synced(playback, (dt, speed), current, previous)
+        } else {
+            playback.advance(dt, speed, current, previous)
+        };
         (self.crossed(playback, current, step, layer), step)
+    }
+
+    /// [`rebase`](Self::rebase) the current tree and, while it fades out, the
+    /// previous one.
+    fn rebase_leaders(&self, playback: &mut Playback) {
+        let Playback {
+            current_clip,
+            current_tree,
+            time,
+            loop_clip,
+            previous_tree,
+            previous_time,
+            previous_loop,
+            sync,
+            ..
+        } = playback;
+        let motion = match current_tree {
+            Some(node) => Motion::Tree(node),
+            None => Motion::Clip(current_clip),
+        };
+        self.rebase(motion, time, *loop_clip, &mut sync.leader);
+        if let (true, Some(node)) = (sync.following, previous_tree) {
+            let looping = *previous_loop;
+            self.rebase(
+                Motion::Tree(node),
+                previous_time,
+                looping,
+                &mut sync.previous_leader,
+            );
+        }
     }
 }

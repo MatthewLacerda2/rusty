@@ -10,7 +10,7 @@
 //! scaled by its weight.
 
 use crate::asset::mesh_data::SkinData;
-use crate::components::{Motion, Playback, Playhead, RootMotion, Step};
+use crate::components::{Bounds, Motion, Playback, Playhead, RootMotion, Step};
 
 use super::super::motion::MotionContext;
 use super::RootBone;
@@ -96,17 +96,60 @@ impl MotionContext<'_> {
             }
             Motion::Tree(node) => {
                 let bounds = Playhead::tree(0.0).bounds(looping);
+                let at = |phase: f32| bounds.apply(phase);
+                let sync = (span.0 != span.1)
+                    .then(|| {
+                        self.tree_sync(node, at(span.0), looping)
+                            .zip(self.tree_sync(node, at(span.1), looping))
+                    })
+                    .flatten();
                 let (mut sum, mut total, mut keyed) = (RootMotion::ZERO, 0.0, false);
-                self.for_each_leaf_clip(node, |clip, weight| {
+                self.for_each_leaf_clip(node, |clip, weight, markers| {
                     total += weight;
-                    if bone.keyed_by(clip) {
-                        keyed = true;
-                        let leaf = bone.travel(skin, clip, bounds, clip.duration, span);
-                        sum = sum.add_scaled(leaf, weight);
+                    if !bone.keyed_by(clip) {
+                        return;
                     }
+                    keyed = true;
+                    let leaf = match &sync {
+                        // A follower in a marker-synced tree (#1896) travels
+                        // between where the leader's ends put it.
+                        Some((a, b)) => {
+                            let from = a.leaf_time(clip, markers, at(span.0));
+                            let to = b.leaf_time(clip, markers, at(span.1));
+                            let (bounds, to) = leaf_travel(bounds, clip.duration, from, to, span);
+                            bone.travel(skin, clip, bounds, 1.0, (from, to))
+                        }
+                        None => bone.travel(skin, clip, bounds, clip.duration, span),
+                    };
+                    sum = sum.add_scaled(leaf, weight);
                 });
                 (keyed && total > 0.0).then(|| RootMotion::ZERO.add_scaled(sum, 1.0 / total))
             }
         }
+    }
+}
+
+/// A marker-synced leaf's travel in its own seconds, from `from` to `to`
+/// (both within the clip): the tree's `bounds` scaled to the clip, and `to`
+/// unwrapped round a loop's seam the way the tree's `span` went.
+fn leaf_travel(
+    bounds: Bounds,
+    duration: f32,
+    from: f32,
+    to: f32,
+    span: (f32, f32),
+) -> (Bounds, f32) {
+    match bounds {
+        Bounds::Wrap(_) if duration > 0.0 => {
+            let ahead = (to - from).rem_euclid(duration);
+            let to = match span.1 >= span.0 {
+                true => from + ahead,
+                false if ahead > 0.0 => from + ahead - duration,
+                false => from,
+            };
+            (Bounds::Wrap(duration), to)
+        }
+        Bounds::Clamp(_) => (Bounds::Clamp(duration), to),
+        _ => (Bounds::Open, to),
     }
 }

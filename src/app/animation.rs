@@ -29,6 +29,7 @@ mod layers;
 mod montage;
 mod motion;
 pub(crate) mod root_motion;
+mod sync;
 
 pub use events::{Crossed, END_EVENT};
 pub use motion::Pose;
@@ -167,10 +168,11 @@ pub fn step(
     graph: Option<&AnimationGraph>,
     dt: f32,
 ) -> Stepped {
+    let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
+    sync::place_pending(anim, clips, graph);
     if !anim.is_running() {
         return Stepped::default();
     }
-    let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
     let skin = mesh.and_then(|m| m.skin.as_ref());
     let bone = skin.and_then(|s| RootBone::resolve(s, &anim.root_bone));
     let AnimatorComponent {

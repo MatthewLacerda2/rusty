@@ -27,6 +27,7 @@ mod event;
 mod io;
 mod layer;
 mod montage;
+mod sync;
 mod validate;
 mod validate_motion;
 
@@ -35,6 +36,7 @@ pub use event::AnimationEvent;
 pub use io::{load, save};
 pub use layer::{GraphLayer, LayerBlending};
 pub use montage::{GraphSlot, Montage, MontageSection, DEFAULT_MONTAGE_BLEND, DEFAULT_SLOT};
+pub use sync::SyncMarker;
 pub use validate::GraphError;
 
 /// The graph asset's file extension: `guard.animgraph` (rusty-only format, JSON
@@ -80,6 +82,14 @@ pub struct GraphNode {
     /// carries none of its own: each child carries its clip's.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<AnimationEvent>,
+    /// The sync group this node keeps step in (#1896): crossfading in from a
+    /// node of the same group (in this layer) starts at the matching phase.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync_group: Option<String>,
+    /// The clip's sync markers (#1896), in its own seconds. A blend-tree node
+    /// carries none of its own: each child carries its clip's.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sync_markers: Vec<SyncMarker>,
 }
 
 /// A directed transition `from → to`. It fires when **all** its conditions hold

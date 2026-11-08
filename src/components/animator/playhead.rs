@@ -68,6 +68,43 @@ impl Bounds {
     }
 }
 
+/// What one [`Playback::advance`](super::Playback::advance) did to the current playhead.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Step {
+    /// The playhead's travel, `(from, to)` before any wrap or clamp — what
+    /// animation events (#459) are crossed against. A clamped playhead already
+    /// resting on the end it is pushed against travels nothing, so a marker there
+    /// fires once per pass, not every step; nor does the step a clip's length
+    /// becomes known, since its unresolved run already crossed the markers (#1386).
+    pub span: (f32, f32),
+    /// The part of `span` whose events fire: all of it, except where a
+    /// sync-group follower re-crosses travel it was re-matched back over
+    /// (#1896), so a marker fires once, not twice.
+    pub events: (f32, f32),
+    /// A non-looping playhead reached its end this step, playing forwards or
+    /// standing still: once per pass, including the step a clip's length became
+    /// known with the playhead already past it, and a zero-length clip's first
+    /// (#1386). What fires the automatic `End` event.
+    pub end: bool,
+}
+
+impl Step {
+    pub(super) fn travel(from: f32, to: f32) -> Self {
+        Self {
+            span: (from, to),
+            events: (from, to),
+            end: false,
+        }
+    }
+}
+
+/// `delta` taken the shortest way round a loop of length `wrap`, in
+/// `[-wrap / 2, wrap / 2)`: how a sync-group follower (#1896) moves to a
+/// re-matched phase.
+pub fn wrap_delta(delta: f32, wrap: f32) -> f32 {
+    (delta + wrap * 0.5).rem_euclid(wrap) - wrap * 0.5
+}
+
 /// `x` held within `f32` range, NaN as `0` (a node's `speed: 0` × an infinite one).
 pub(super) fn finite(x: f32) -> f32 {
     if x.is_nan() {

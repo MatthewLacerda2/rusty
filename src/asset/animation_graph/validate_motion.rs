@@ -10,6 +10,7 @@
 //! children by value.
 
 use super::event::check_events;
+use super::sync::check_markers;
 use super::{AnimationGraph, BlendTree, GraphNode, ParameterDeclaration, MAX_TREE_DEPTH};
 
 impl AnimationGraph {
@@ -33,6 +34,15 @@ impl AnimationGraph {
             ));
         }
         check_events(&label, &node.events, problems);
+        if node.blend_tree.is_some() && !node.sync_markers.is_empty() {
+            problems.push(format!(
+                "{label} is a blend tree with sync markers of its own; put them on its children"
+            ));
+        }
+        check_markers(&label, &node.sync_markers, problems);
+        if node.sync_group.as_deref() == Some("") {
+            problems.push(format!("{label} has an empty sync group name"));
+        }
     }
 
     /// Check `tree`, reported under `label`, at `path` and nesting `depth` (the
@@ -108,13 +118,16 @@ impl AnimationGraph {
                         "{nested_label} has events of its own; put them on its children"
                     ));
                 }
+                if !motion.sync_markers.is_empty() {
+                    problems.push(format!(
+                        "{nested_label} has sync markers of its own; put them on its children"
+                    ));
+                }
             }
             let named = if has_clip { &motion.clip } else { &child };
-            check_events(
-                &format!("{label} child '{named}'"),
-                &motion.events,
-                problems,
-            );
+            let child_label = format!("{label} child '{named}'");
+            check_events(&child_label, &motion.events, problems);
+            check_markers(&child_label, &motion.sync_markers, problems);
         }
     }
 }
