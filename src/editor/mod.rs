@@ -50,6 +50,10 @@ pub struct EditorUi {
     /// File ▸ Open/New, saving to a scene asset, `Scene.Load` and `Scene.Save(path)`
     /// all change it, and nothing reconciles two copies.
     scene_path: Rc<RefCell<Option<String>>>,
+    /// The edit scene has changes its file lacks: an edit sets it; the editor's own
+    /// open, save, New and Reset clear it, and so does a scene swapped in by a script
+    /// outside Play. Play's own edits never count (the shell restores it on Stop).
+    /// The window title's `*` (#1914).
     pub is_dirty: bool,
 
     // Custom asset inspector properties
@@ -144,7 +148,7 @@ impl EditorUi {
             selected_entity_id: None,
             selected_asset_path: None,
             scene_path,
-            is_dirty: true,
+            is_dirty: false,
 
             asset_script_content: String::new(),
             show_about: false,

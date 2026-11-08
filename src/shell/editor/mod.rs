@@ -20,6 +20,7 @@ mod navmesh;
 mod paint;
 mod start;
 mod sync;
+mod title;
 mod undo;
 mod viewport;
 mod watch;
@@ -79,6 +80,8 @@ pub struct EditorFrontend {
     last_scene: Option<String>,
     /// When egui wants its next frame; `None` when it doesn't (#1721).
     repaint_at: Option<std::time::Instant>,
+    /// The window title: project, scene and its unsaved mark (#1914).
+    title: title::Title,
 }
 
 impl EditorFrontend {
@@ -100,10 +103,7 @@ impl EditorFrontend {
             shell.renderer.config.format,
             paint::EGUI_RENDERER,
         );
-        #[cfg_attr(not(feature = "dev"), expect(unused_mut, reason = "dev loads prefs"))]
-        let mut editor_ui = EditorUi::new(game.script_manager().scene_path_cell());
-        #[cfg(feature = "dev")]
-        editor_ui.dev.load_prefs(&game.resources.storage.borrow());
+        let editor_ui = EditorUi::new(game.script_manager().scene_path_cell());
         Self {
             egui_ctx,
             egui_winit,
@@ -121,6 +121,7 @@ impl EditorFrontend {
             follow: watch::follow::SceneFollow::new(),
             last_scene: None,
             repaint_at: None,
+            title: title::Title::new(),
         }
     }
 
@@ -162,10 +163,7 @@ impl EditorFrontend {
             crate::shell::settings::report_display_scale(shell, game);
         }
         self.sync_shared(shell, game);
-        #[cfg(feature = "dev")]
-        self.editor_ui
-            .dev
-            .store_prefs(&mut game.resources.storage.borrow_mut());
+        self.title.sync(&shell.window, &mut self.editor_ui, game);
         interaction
     }
 }
@@ -249,7 +247,7 @@ impl Frontend for EditorFrontend {
     }
 
     /// Esc in Play frees the cursor and still reaches the game (Unity's behaviour);
-    /// Ctrl/Cmd+P or the toolbar stops Play.
+    /// Ctrl/Cmd+P or the menu bar's Stop button stops Play.
     fn on_key(&mut self, game: &mut GameWorld, key: KeyCode, pressed: bool) {
         let has_input = self.game_has_input(game);
         self.cursor_release.on_key(key, pressed, has_input);

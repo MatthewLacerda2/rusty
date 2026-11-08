@@ -61,7 +61,7 @@ held keys, with their `GetKeyUp` edges.
 game's own pause menu can be play-tested there (Unity's behaviour). The game's lock
 request is untouched — `SetCursorLocked` is not called for it — and a click inside
 the Game view captures the cursor again. Stopping Play is Ctrl+P (Cmd+P on macOS)
-or the toolbar. The standalone player has no such override: Esc is only a key.
+or the menu bar's Stop button. The standalone player has no such override: Esc is only a key.
 
 | Function | Signature | Returns |
 |---|---|---|
