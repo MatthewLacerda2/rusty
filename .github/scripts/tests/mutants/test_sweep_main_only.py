@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The full mutation sweep runs on `main` and nowhere else (#972).
 
-A sweep holds seven runners for a day and a half (#705), so `mutants-plan` refuses
+A sweep holds up to ten runners for a weekend (#705), so `mutants-plan` refuses
 any other ref before it looks at anything. These tests run that step's own
 shell, lifted from the workflow, with `gh` stubbed to fail: on `main` a failed
 lookup sweeps (fail open), so the refusal is the only way to get no sweep.
