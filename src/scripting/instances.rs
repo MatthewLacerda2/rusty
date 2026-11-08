@@ -86,6 +86,13 @@ pub fn handlers(lua: &Lua, id: u32, callback: &str) -> mlua::Result<Vec<Table>> 
 }
 
 impl super::ScriptManager {
+    /// Run `f` in this runtime's VM: `None` when the runtime is down. For a caller
+    /// in another VM that forwards a whole API call here (the scenario's `Damage`,
+    /// #1893), so the call sees this VM's script instances.
+    pub fn with_vm<R>(&self, f: impl FnOnce(&Lua) -> mlua::Result<R>) -> mlua::Result<Option<R>> {
+        self.lua.as_ref().map(f).transpose()
+    }
+
     /// Run `f` on entity `id`'s live script named `name`, in this runtime's VM:
     /// `None` when the runtime is down or the entity has no such script. For a
     /// caller in another VM (the dev layer's scenario proxy, #1384), which cannot

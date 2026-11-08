@@ -14,6 +14,9 @@ delivery, the hit information and the radial query.
 | `Damage.ApplyPoint` | `(hit, amount, dx, dy, dz [, opts])` — a shot: `hit` is a [`Physics.RaycastAll` / `RaycastThrough`](Physics.md) entry, `dx, dy, dz` the shot's direction (`event.kind = "point"`). An error when `hit` has no `id`. | the damage taken; `0` when nothing received it |
 | `Damage.ApplyRadial` | `(x, y, z, amount, opts)` — a blast centred at `x, y, z` (`event.kind = "radial"`); see *Radial damage* below. `opts.outer` is required. | an array of `{ id, amount, distance }`, one per receiver, nearest first |
 
+A harness scenario's `Damage.*` runs in the gameplay VM, so it reaches the game
+scripts' handlers too (`docs/testing.md`, *What a scenario can call*).
+
 `amount` and every number in `opts` must be finite (`0/0` is an error). In edit mode
 (no physics world) `ApplyRadial` finds nothing and returns `{}`; `Apply` and
 `ApplyPoint` still deliver.

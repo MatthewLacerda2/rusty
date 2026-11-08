@@ -17,7 +17,7 @@ screenshots, benches; `dev::bridge`). `Input`'s injection verbs (`Press`,
 `MoveMouse`, `SetAxis`, …) are the API's own, so a scenario plays as the user.
 
 It runs in a Lua VM of its own, beside the gameplay scripts' (which Play rebuilds
-on its first tick), and steps the world between calls, never inside one. Five
+on its first tick), and steps the world between calls, never inside one. Six
 things follow:
 
 - `Scene.GetScript(id, name)` answers a live **handle** on the gameplay instance,
@@ -38,6 +38,10 @@ things follow:
   `pairs`. It is `nil` before Play loads the
   script, and errors once that instance is gone, even when a new one (a restarted
   Play) has the same entity id and script name: look it up again.
+- `Damage.Apply` / `ApplyPoint` / `ApplyRadial` run **in the gameplay VM**
+  (#1893), arguments and returns copied the same way, because the `OnTakeDamage`
+  handlers they call synchronously live there: a scenario's shot reaches the game
+  script's handler, and a handler's error is raised as the scenario's.
 - A Lua function a scenario passes `Timer.Invoke` / `InvokeRepeating` /
   `StartCoroutine` or a tween's `on_complete` is refused with an error: it belongs
   to the scenario's VM, which the gameplay tick never calls. Drive time with

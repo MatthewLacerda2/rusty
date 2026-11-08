@@ -4,6 +4,8 @@
 //! (`chain`), and the radial falloff, cover and grouping (`radial`).
 
 mod chain;
+#[cfg(feature = "dev")]
+mod content;
 mod radial;
 
 use std::cell::RefCell;
@@ -100,7 +102,7 @@ fn a_point_impulse_pushes_the_struck_dynamic_body() {
     let body = rusty::components::RigidBodyComponent {
         use_gravity: false,
         is_kinematic: false,
-        ..Default::default()
+        ..rusty::scene::authoring::default_rigidbody()
     };
     scene.world.set_rigidbody(crate_id, Some(body));
     let game = play(scene);

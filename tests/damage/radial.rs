@@ -14,18 +14,18 @@ const BLAST: &str = "Damage.ApplyRadial(0,0,0, 100, { inner = 1, outer = 5 })";
 fn listed(call: &str) -> String {
     format!(
         "local out = {{}} for _, r in ipairs({call}) do \
-         out[#out + 1] = r.id .. ':' .. r.amount .. ':' .. r.distance end \
+         out[#out + 1] = string.format('%d:%g:%g', r.id, r.amount, r.distance) end \
          return table.concat(out, ' ')"
     )
 }
 
-/// Targets at 0.25 m (inside), 3 m (halfway out), 6 m (past it) and one 3 m
-/// behind a wall; returns the game and their ids.
+/// Targets at 0.25 m (inside, +x), 3 m (halfway out, -z), 6 m (past it, +x) and
+/// one 3 m behind a wall (+z); returns the game and their ids.
 fn range() -> (rusty::app::GameWorld, [u32; 4]) {
     let mut s = Scene::new();
     let half = Vec3::splat(0.5);
     let near = static_box(&mut s, Vec3::X * 0.5, half, Some(RECORDER));
-    let mid = static_box(&mut s, Vec3::X * 3.25, half, Some(RECORDER));
+    let mid = static_box(&mut s, Vec3::Z * -3.25, half, Some(RECORDER));
     let far = static_box(&mut s, Vec3::X * 6.25, half, Some(RECORDER));
     let hidden = static_box(&mut s, Vec3::Z * 3.25, half, Some(RECORDER));
     static_box(&mut s, Vec3::Z * 1.5, Vec3::new(2.0, 2.0, 0.2), None);
