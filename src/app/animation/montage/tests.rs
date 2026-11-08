@@ -109,3 +109,21 @@ fn the_weight_ramps_in_then_out_and_both_events_fire_once() {
     let at = |n: &str| events.iter().position(|e| e == n).unwrap();
     assert!(at("MagOut") < at("MagIn") && at(MONTAGE_BLEND_OUT) < at(MONTAGE_END));
 }
+
+#[test]
+fn an_additive_slot_adds_the_change_from_the_clips_first_frame() {
+    let (m, mut anim) = (rig(), animator(Motion::Clip("Run"), None, 0.5));
+    let slots = r#"[{ "name": "Hit", "blending": "Additive" }]"#;
+    let g = with_montages(
+        slots,
+        r#"[{ "name": "Hit", "clip": "Reload", "slot": "Hit", "blend_in": 0 }]"#,
+    );
+    start(&mut anim, &g, &m, "Hit");
+    anim.montages.playing[0].time = 1.0;
+    let pose = sample_pose(&anim, &m, Some(&g)).unwrap().1;
+    // Run's +1 plus Reload's change from its first frame, -2.
+    assert!(
+        pose.iter().all(|j| j.unwrap().translation.x == -1.0),
+        "{pose:?}"
+    );
+}

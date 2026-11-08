@@ -20,6 +20,7 @@
 //! does (`layers::compose`). Pure functions of (skin, clips, montages, dt).
 
 use crate::asset::anim_data::AnimationClip;
+use crate::asset::animation_graph::LayerBlending;
 use crate::asset::mesh_data::SkinData;
 use crate::components::{
     ActiveMontage, AnimatorComponent, Bounds, Montages, RootMotion, MONTAGE_BLEND_OUT, MONTAGE_END,
@@ -58,7 +59,11 @@ pub(super) fn compose(
                 .collect()
         };
         let top = keyed(m.time);
-        let reference = keyed(0.0);
+        // Only an additive slot reads its reference pose (the clip's first frame).
+        let reference = match m.slot.blending {
+            LayerBlending::Additive => keyed(0.0),
+            LayerBlending::Override => Vec::new(),
+        };
         let mask = mask_slots(skin, &m.slot.mask);
         let layer = LayerPose {
             blending: m.slot.blending,

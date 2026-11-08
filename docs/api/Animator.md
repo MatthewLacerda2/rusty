@@ -314,7 +314,8 @@ end
 
 **Playing.** A montage blends in over `blend_in` and out over `blend_out`, on
 unscaled time like a crossfade, while its playhead runs at its `rate` times the
-animator's speed (a reversed or stopped animator holds it; `Pause` freezes it).
+animator's speed (a reversed animator holds it; `Pause` and `Stop` freeze it,
+events and blends included).
 It starts blending out when it is in a section with no `next` and that
 section's end is no further than `blend_out` away, so it is gone as the clip
 ends (Unreal's default). Playing a montage into a slot that already plays one
