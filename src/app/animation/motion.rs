@@ -215,10 +215,11 @@ impl MotionContext<'_> {
         (self.crossed(playback, current, step, layer), step)
     }
 
-    /// [`rebase`](Self::rebase) the current tree and, while it fades out, the
-    /// previous one: a change of leader carries a marker-synced tree's phase
-    /// over (#1896). Before the step, and before root motion reads where the
-    /// motions start from.
+    /// [`rebase`](Self::rebase) the current tree and, while any crossfade (synced
+    /// or not) fades it out, the previous one: a change of leader carries a
+    /// marker-synced tree's phase over (#1896), so neither the pose nor the
+    /// root motion read from its leaves jumps. Before the step, and before root
+    /// motion reads where the motions start from.
     pub(super) fn rebase_leaders(&self, playback: &mut Playback) {
         let Playback {
             current_clip,
@@ -236,7 +237,7 @@ impl MotionContext<'_> {
             None => Motion::Clip(current_clip),
         };
         self.rebase(motion, (time, *loop_clip), &mut sync.leader, &sync.leaves);
-        if let (true, Some(node)) = (sync.following, previous_tree) {
+        if let Some(node) = previous_tree {
             let at = (previous_time, *previous_loop);
             let (leader, leaves) = (&mut sync.previous_leader, &sync.previous_leaves);
             self.rebase(Motion::Tree(node), at, leader, leaves);

@@ -45,8 +45,10 @@ pub struct SyncState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_leader: Option<String>,
     /// How far, in playhead units, a following current motion was re-matched
-    /// against the direction of play: its events stay silent until it has
-    /// travelled that far forward again, so none fires twice.
+    /// against the direction of play, signed by that direction (positive while
+    /// playing forward): its events stay silent until it has travelled that
+    /// far along it again, so none fires twice. A flip of the direction of
+    /// play drops it, so the first crossing the other way fires.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub rewind: f32,
     /// Where each leaf of a marker-synced current tree was last placed, so a
@@ -158,11 +160,20 @@ impl Playback {
         let dir = if forward { 1.0 } else { -1.0 };
         let along = (step.events.1 - step.events.0) * dir;
         if along < 0.0 {
-            self.sync.rewind -= along;
+            self.drop_flipped_rewind(dir);
+            self.sync.rewind -= along * dir;
             step.events.1 = step.events.0;
             return step;
         }
         self.repay(step, forward)
+    }
+
+    /// Forget travel owed against the other direction of play: once play
+    /// turns round, what was re-matched back is ahead again, not owed.
+    fn drop_flipped_rewind(&mut self, dir: f32) {
+        if self.sync.rewind * dir < 0.0 {
+            self.sync.rewind = 0.0;
+        }
     }
 
     /// `step` with the part of its travel still owed to an earlier re-match
@@ -171,9 +182,13 @@ impl Playback {
     pub fn repay(&mut self, mut step: Step, forward: bool) -> Step {
         let dir = if forward { 1.0 } else { -1.0 };
         let along = (step.events.1 - step.events.0) * dir;
-        if along > 0.0 && self.sync.rewind > 0.0 {
-            let owed = along.min(self.sync.rewind);
-            self.sync.rewind -= owed;
+        if along <= 0.0 {
+            return step; // nothing travelled: a pause turns nothing round
+        }
+        self.drop_flipped_rewind(dir);
+        let owed = along.min(self.sync.rewind * dir);
+        if owed > 0.0 {
+            self.sync.rewind -= owed * dir;
             step.events.0 += owed * dir;
         }
         step
@@ -217,13 +232,14 @@ impl Playback {
 
 /// Where a non-looping follower of length `end` at `from` goes when its
 /// leader re-matches it to `target` (#1896): there, except that one resting
-/// on its end stays, and a jump against `forward` of over half its length is
+/// on its end (its start, playing backwards) stays, and a jump against `forward` of over half its length is
 /// the leader wrapping round its seam, which sends it on to its end (back to
 /// its start, playing backwards), never back across itself.
 pub fn follow_clamped(from: f32, target: f32, end: f32, forward: bool) -> f32 {
     let seam = (target - from).abs() > end * 0.5;
     match () {
         _ if forward && from >= end => from,
+        _ if !forward && from <= 0.0 => from,
         _ if forward && target < from && seam => end,
         _ if !forward && target > from && seam => 0.0,
         _ => target,

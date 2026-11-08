@@ -75,16 +75,35 @@ impl MotionContext<'_> {
             leaves.clear();
             return;
         };
-        let mut placed = Vec::with_capacity(leaves.len());
+        // Updated in place while the leaf set is the one last stored (every
+        // step but a change of tree), so a step allocates nothing.
+        let (mut i, mut rebuilt) = (0, None::<Vec<LeafTime>>);
         self.for_each_leaf_clip(node, |clip, _, markers| {
             let near = stored_leaf(leaves, &clip.name);
             let time = sync.leaf_time(clip, markers, phase, near);
-            placed.push(LeafTime {
-                clip: clip.name.clone(),
-                time,
-            });
+            match &mut rebuilt {
+                None if leaves.get(i).is_some_and(|l| l.clip == clip.name) => {
+                    leaves[i].time = time;
+                }
+                None => {
+                    let mut placed = leaves[..i].to_vec();
+                    placed.push(LeafTime {
+                        clip: clip.name.clone(),
+                        time,
+                    });
+                    rebuilt = Some(placed);
+                }
+                Some(placed) => placed.push(LeafTime {
+                    clip: clip.name.clone(),
+                    time,
+                }),
+            }
+            i += 1;
         });
-        *leaves = placed;
+        match rebuilt {
+            Some(placed) => *leaves = placed,
+            None => leaves.truncate(i),
+        }
     }
 }
 

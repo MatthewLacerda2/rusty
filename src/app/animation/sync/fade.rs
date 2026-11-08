@@ -37,7 +37,10 @@ impl MotionContext<'_> {
         );
         let lead_out = self.lead(out.motion(), out.node.as_deref(), out.leader.as_deref());
         let (Some(lead_in), Some(lead_out)) = (lead_in, lead_out) else {
-            return moved.unwrap_or_else(|| playback.advance_current(step, current));
+            return moved.unwrap_or_else(|| {
+                let moved = playback.advance_current(step, current);
+                playback.repay(moved, forward)
+            });
         };
         if let Some(moved) = moved {
             if playback.is_crossfading() {

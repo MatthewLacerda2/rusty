@@ -292,8 +292,8 @@ between clips whose feet land at different fractions of their cycles.
   crossfade blends, the **heavier** motion (the incoming one on a tie, so from
   halfway) plays at its own rate and the lighter one **follows** its phase,
   re-matched every step, so the two can't drift apart however long the fade.
-  A non-looping follower, incoming or outgoing, follows until its end, then
-  holds: a looping leader wrapping round its seam never sends it back. Nodes
+  A non-looping follower, incoming or outgoing, follows until its end (its
+  start, played backwards), then holds: a looping leader wrapping round its seam never sends it back. Nodes
   in different groups, or in none, crossfade exactly as without groups: the
   incoming motion from its start. Re-entering the node already playing
   restarts it, as without groups. Entering two nodes of the group before a
@@ -307,13 +307,15 @@ between clips whose feet land at different fractions of their cycles.
   the leader, never jumping to another; where each leaf was is runtime state
   on the playback. When the dominant leaf changes, the new leader carries on
   from where it was being sampled, so neither the pose nor the root motion
-  jumps. A tree with markers on some leaves and not
+  jumps, including while the tree fades out through any crossfade, synced or
+  not. A tree with markers on some leaves and not
   others syncs by normalized time, and loading it warns in the console.
 - **Events stay exact.** A following motion still crosses its own events once
   each: placing it at the matched phase fires nothing, and when a re-match moves
   it back over an event, the event doesn't fire again until it has played back
   past where it was, whether it still follows, leads by then, or plays on
-  alone after the fade.
+  alone after the fade. Once the direction of play turns round (a negative
+  speed set later), nothing is owed: the first crossing the other way fires.
 - **Loading checks**, every problem named: a marker with an empty name or a
   negative or non-finite time, two markers on one clip sharing a name *and* a
   time, markers on a node or child holding a tree, and an empty `sync_group`.
