@@ -22,7 +22,7 @@ pub struct BakeSettings {
     /// Unity's *Max Lightmap Size* (#1704): the atlas page's edge, in texels, a
     /// power of two in [`Self::MAX_LIGHTMAP_SIZE`]. A mesh's lightmap follows its
     /// area × `texels_per_unit` up to the largest map such a page holds
-    /// ([`max_map_edge`]); the packer picks the smallest page that holds the bake,
+    /// ([`max_map_edge`](super::super::atlas::max_map_edge)); the packer picks the smallest page that holds the bake,
     /// up to this edge, then adds pages. Read through [`Self::page`].
     pub max_lightmap_size: u32,
     /// What cleans the baked bounce (#1884, Unity's *Denoiser* and *Filter*): OIDN

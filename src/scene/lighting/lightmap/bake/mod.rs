@@ -107,14 +107,7 @@ pub(super) fn bake_on(
     progress.set_meshes(sizes.map(|((i, _), p)| (scene.meshes[*i].entity, p.len() as u64)));
     let trace = |c: usize, _: usize, batch: &[TexelPoint]| {
         let mesh = heads[c].0 as u64;
-        let one = |p: &TexelPoint| {
-            let (s, texel) = (settings, p.index as u64);
-            let mut rng = Rng::new(s.seed, mesh, texel);
-            let mut light = tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng);
-            let mut probes = Rng::probes(s.seed, mesh, texel);
-            light.valid = tracer.valid(p.position, p.normal, s.backface_tolerance, &mut probes);
-            light
-        };
+        let one = |p: &TexelPoint| texel(&tracer, settings, mesh, p);
         // An observed bake (#1891) says each batch's mesh; it never touches a texel.
         progress.batch_started(c);
         let traced = batch.iter().map(one).collect();
@@ -136,14 +129,29 @@ pub(super) fn bake_on(
         map
     };
     let maps = pool::run(points, threads, progress, trace, finish)?;
-    let orphans = orphans.into_inner();
+    warn_orphans(orphans.into_inner());
+    Some(maps)
+}
+
+/// Texel `p` of receiving mesh `mesh` traced: its light from its own seeded stream,
+/// and its validity from a stream of its own the sample count never moves (#1949).
+fn texel(tracer: &Tracer, s: &BakeSettings, mesh: u64, p: &TexelPoint) -> TexelLight {
+    let index = p.index as u64;
+    let mut rng = Rng::new(s.seed, mesh, index);
+    let mut light = tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng);
+    let mut probes = Rng::probes(s.seed, mesh, index);
+    light.valid = tracer.valid(p.position, p.normal, s.backface_tolerance, &mut probes);
+    light
+}
+
+/// The bake's one warning for UV islands with no valid texel (#1949).
+fn warn_orphans(orphans: usize) {
     if orphans > 0 {
         log::warn!(
             "[Lighting] lightmap bake: {orphans} lightmap UV island(s) lie wholly inside \
              geometry; their texels were filled from the islands beside them"
         );
     }
-    Some(maps)
 }
 
 /// One mesh's lightmap from its traced texels, and how many of its charts had no
