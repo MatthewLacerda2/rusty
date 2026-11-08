@@ -12,6 +12,11 @@
 /// here too so non-dev builds have the value without pulling in the dev tree.
 pub const FIXED_DELTA_TIME: f32 = 1.0 / 60.0;
 
+/// The most wall-clock time one windowed frame hands the sim (Unity's
+/// `Time.maximumDeltaTime`, 1/3 s): a hitch owes at most 20 ticks (#1877), and an
+/// on-demand editor frame after a sleep steps its clock by no more (#1721).
+pub const MAXIMUM_DELTA_TIME: f32 = 1.0 / 3.0;
+
 /// Frame-clock resource. One instance lives in the `GameWorld`, shared into the
 /// script runtime so scripts can query time deterministically.
 #[derive(Clone, Debug)]

@@ -1,4 +1,4 @@
-//! src/shell/frame.rs — the frame clock, the sim advance, quit semantics, and
+//! src/shell/frame/mod.rs — the frame clock, the sim advance, quit semantics, and
 //! swapchain acquisition: the per-frame logic both frontends share.
 //!
 //! Everything but [`acquire_frame`] is window- and GPU-free, so it is unit-tested
