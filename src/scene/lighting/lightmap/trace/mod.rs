@@ -26,13 +26,25 @@ use glam::{Vec2, Vec3, Vec4};
 
 #[cfg(test)]
 pub(super) mod bench;
+mod direct;
+mod emitter;
+#[cfg(test)]
+mod emitter_tests;
+mod grid;
+#[cfg(test)]
+mod grid_tests;
+#[cfg(test)]
+mod pick_tests;
+mod sources;
 
-use super::input::{BakeLight, BakeRun, BakeScene, LightShape};
-use super::lights::area::{strata, stratified};
+pub(super) use direct::arrival;
+
+use super::input::{BakeRun, BakeScene};
 use super::rays::{Hit, Rays};
 use super::rng::Rng;
-use crate::components::{falloff, spot_cone};
 use crate::core::color::luminance;
+use direct::balance;
+use sources::{Picks, Source, Sources};
 
 /// Ray offset along the surface normal, against self-intersection, in world units.
 const SURFACE_OFFSET: f32 = 1e-3;
@@ -48,6 +60,10 @@ pub(super) const INDIRECT_CLAMP: f32 = 10.0;
 /// The share of a texel's rays that may start out on back faces before the texel is
 /// judged to be inside geometry (Unity's backface tolerance, inverted).
 const BACKFACE_TOLERANCE: f32 = 0.5;
+/// The bounds a path's survival odds are held to under Russian roulette (#1883):
+/// never below the low one, so a dim path is never reweighted into a firefly, and
+/// never above the high one, so even a bright path's depth costs a little less.
+const ROULETTE: (f32, f32) = (0.05, 0.95);
 
 /// One texel's light, split so the bake can smooth the noisy part only.
 #[derive(Clone, Copy, Debug)]
@@ -72,12 +88,19 @@ pub(super) struct TexelLight {
 pub(super) struct Tracer<'a> {
     pub scene: &'a BakeScene,
     pub rays: &'a Rays,
+    /// The lamps by reach and the emitters, what next-event estimation picks from.
+    sources: Sources,
 }
 
 impl<'a> Tracer<'a> {
     /// The tracer over `scene`, its rays cast against `rays`.
     pub(super) fn new(scene: &'a BakeScene, rays: &'a Rays) -> Self {
-        Self { scene, rays }
+        let sources = Sources::build(scene);
+        Self {
+            scene,
+            rays,
+            sources,
+        }
     }
 
     /// The lightmap value at `position` facing `normal`, in its two parts: the bounce
@@ -93,14 +116,15 @@ impl<'a> Tracer<'a> {
     ) -> TexelLight {
         let origin = position + normal * SURFACE_OFFSET;
         let (mut sum, mut dir_sum, mut inside) = (Vec3::ZERO, Vec3::ZERO, 0);
+        let mut picks = Picks::default();
         for _ in 0..samples {
-            let (radiance, dir, backface) = self.path(origin, normal, bounces, rng);
+            let (radiance, dir, backface) = self.path(origin, normal, bounces, rng, &mut picks);
             sum += radiance;
-            dir_sum += dir * luminance(radiance);
+            dir_sum += dir;
             inside += u32::from(backface);
         }
         let n = samples.max(1) as f32;
-        let (direct, direct_dir) = self.direct(origin, normal, true, samples, rng);
+        let (direct, direct_dir) = self.direct(origin, normal, samples, rng);
         TexelLight {
             indirect: sum / n,
             direct: direct / PI,
@@ -111,18 +135,36 @@ impl<'a> Tracer<'a> {
         }
     }
 
-    /// The radiance one cosine-weighted path from `origin` brings back, the
-    /// direction its first ray left in, and whether that ray hit a back face.
+    /// The radiance one path from `origin` brings back, its luminance-weighted
+    /// direction (#810), and whether its first ray hit a back face. The texel's
+    /// own view of the emitters is one next-event sample; then a cosine-weighted
+    /// ray, and at each front face it lands on, `albedo / π` times one next-event
+    /// sample of every lamp and emitter, `bounces` surfaces deep (#1883). A ray
+    /// that lands on an emitter adds its glow too, weighed against the next-event
+    /// sample that could have picked that point (MIS, the balance heuristic), so
+    /// emitted light is counted once whether a panel is small or a whole floor.
+    /// After the second bounce a path goes on with probability `p`, its throughput
+    /// held to [`ROULETTE`], and a survivor's throughput is divided by `p`.
     fn path(
         &self,
         mut origin: Vec3,
         mut normal: Vec3,
         bounces: u32,
         rng: &mut Rng,
+        picks: &mut Picks,
     ) -> (Vec3, Vec3, bool) {
+        let bounces = bounces.max(1);
+        let (own, own_dir) = self.next_event(origin, normal, (false, true), rng, picks);
         let (mut radiance, mut throughput) = (Vec3::ZERO, Vec3::ONE);
-        let mut first = Vec3::ZERO;
-        for depth in 0..bounces.max(1) {
+        let (mut first, mut backface) = (Vec3::ZERO, false);
+        for depth in 0..bounces {
+            if depth >= 2 {
+                let p = throughput.max_element().clamp(ROULETTE.0, ROULETTE.1);
+                if rng.next_f32() >= p {
+                    break;
+                }
+                throughput /= p;
+            }
             let dir = cosine_sample(normal, rng);
             if depth == 0 {
                 first = dir;
@@ -133,14 +175,38 @@ impl<'a> Tracer<'a> {
             };
             let Some((point, hit_normal, m)) = self.surface(&hit, dir) else {
                 // A back face: nothing comes through.
-                return (clamp_indirect(radiance), first, depth == 0);
+                backface = depth == 0;
+                break;
             };
-            let lit = self.direct(point, hit_normal, false, 1, rng).0;
-            radiance += throughput * (m.emissive + m.albedo * lit / PI);
+            radiance += throughput * self.glow(&hit, origin, normal, dir, picks);
+            let more = depth + 1 < bounces;
+            let lit = self
+                .next_event(point, hit_normal, (true, more), rng, picks)
+                .0;
+            radiance += throughput * m.albedo * lit / PI;
             throughput *= m.albedo;
             (origin, normal) = (point, hit_normal);
         }
-        (clamp_indirect(radiance), first, false)
+        let total = own / PI + radiance;
+        let clamped = clamp_indirect(total);
+        let scale = luminance(clamped) / luminance(total).max(f32::MIN_POSITIVE);
+        let dir = (own_dir / PI + first * luminance(radiance)) * scale.min(1.0);
+        (clamped, dir, backface)
+    }
+
+    /// The glow a bounce ray from `origin` (facing `normal`) along `dir` finds at
+    /// `hit`, times its MIS share against the next-event sample `picks` drew there:
+    /// zero off an emitter.
+    fn glow(&self, hit: &Hit, origin: Vec3, normal: Vec3, dir: Vec3, picks: &Picks) -> Vec3 {
+        let tri = &self.rays.tris[hit.tri];
+        let Some(k) = self.sources.emitter_at(self.scene, tri) else {
+            return Vec3::ZERO;
+        };
+        let emitter = &self.sources.emitters[k];
+        let at = tri.a + tri.e1 * hit.u + tri.e2 * hit.v;
+        let cos_emit = -dir.dot(tri.normal().normalize_or_zero());
+        let light = picks.chance(Source::Emitter(k)) * emitter.pdf(at.distance(origin), cos_emit);
+        emitter.radiance() * balance(normal.dot(dir) / PI, light)
     }
 
     /// The offset hit point, its shading normal and the material run it landed on
@@ -158,52 +224,6 @@ impl<'a> Tracer<'a> {
             .unwrap_or(tri.normal().try_normalize().unwrap_or(Vec3::Y));
         let point = tri.a + tri.e1 * hit.u + tri.e2 * hit.v;
         Some((point + n * SURFACE_OFFSET, n, mesh.run_at(tri.first)))
-    }
-
-    /// The direct irradiance at `point` facing `normal`, shadowed, each lamp weighted
-    /// by the scene's diffuse model (`DiffuseModel::response`, #1698), and the
-    /// luminance-weighted sum of the directions it arrived from. `baked_only` keeps
-    /// just the `Baked` lights (a receiving texel's own direct light); a bounce hit
-    /// sees every baked-in light. An Area light that [reaches](super::lights::area::AreaShape::reaches)
-    /// `point` is integrated over `area_samples` or more stratified points drawn
-    /// from `rng` (#1674); one out of range or behind draws nothing, and no other
-    /// light draws at all, so a scene without one bakes exactly as before.
-    fn direct(
-        &self,
-        point: Vec3,
-        normal: Vec3,
-        baked_only: bool,
-        area_samples: u32,
-        rng: &mut Rng,
-    ) -> (Vec3, Vec3) {
-        let (mut e, mut dir) = (Vec3::ZERO, Vec3::ZERO);
-        let mut add = |light: &BakeLight, u: Vec2, weight: f32| {
-            if let Some((to_light, distance, received)) = arrival(light, point, u) {
-                let response = self.scene.diffuse.response(normal.dot(to_light));
-                if response > 0.0 && !self.rays.occluded(point, to_light, T_MIN, distance) {
-                    let lit = received * response * weight;
-                    e += lit;
-                    dir += to_light * luminance(lit);
-                }
-            }
-        };
-        for light in &self.scene.lights {
-            if baked_only && !light.bakes_direct {
-                continue;
-            }
-            match light.shape {
-                LightShape::Area(area) if area.reaches(point) => {
-                    let m = strata(area_samples);
-                    let weight = 1.0 / (m * m) as f32;
-                    for u in stratified(m, || rng.next_f32()) {
-                        add(light, u, weight);
-                    }
-                }
-                LightShape::Area(_) => {}
-                _ => add(light, Vec2::ZERO, 1.0),
-            }
-        }
-        (e, dir)
     }
 
     /// The shadowmask at `point` (#1695): per channel, 0 where one shadow ray to
@@ -244,47 +264,6 @@ pub(super) fn clamp_indirect(radiance: Vec3) -> Vec3 {
     } else {
         radiance
     }
-}
-
-/// Unit direction to `light`, distance to it, and the radiance arriving at `point`
-/// (before the cosine), with the forward shader's falloff and cone (#1699):
-/// [`falloff`] inside `range`, and for a spot [`spot_cone`]. An Area light is
-/// asked about its point at `u` in `[0, 1]²` (`area`'s model); the rest ignore
-/// `u`. `None` out of reach.
-pub(super) fn arrival(light: &BakeLight, point: Vec3, u: Vec2) -> Option<(Vec3, f32, Vec3)> {
-    match light.shape {
-        LightShape::Area(area) => {
-            let (dir, d, scale) = area.arrival(point, u)?;
-            Some((dir, d, light.radiance * scale))
-        }
-        LightShape::Directional { direction } => Some((-direction, f32::MAX, light.radiance)),
-        LightShape::Point { position, range } => {
-            let (dir, d) = toward(position, point, range)?;
-            Some((dir, d, light.radiance * falloff(d, range)))
-        }
-        LightShape::Spot {
-            position,
-            direction,
-            range,
-            cos_inner,
-            cos_outer,
-        } => {
-            let (dir, d) = toward(position, point, range)?;
-            let theta = dir.dot(-direction);
-            if theta <= cos_outer {
-                return None;
-            }
-            let cone = spot_cone(theta, cos_inner, cos_outer);
-            Some((dir, d, light.radiance * cone * falloff(d, range)))
-        }
-    }
-}
-
-/// Unit direction and distance from `point` to `position`, if within `range`.
-fn toward(position: Vec3, point: Vec3, range: f32) -> Option<(Vec3, f32)> {
-    let offset = position - point;
-    let d = offset.length();
-    (d <= range && d > 0.0).then(|| (offset / d, d))
 }
 
 /// A cosine-weighted direction on the hemisphere around `normal`.
