@@ -60,7 +60,8 @@ class Fx:
     def yard(self) -> trains.Yard:
         return trains.Yard(self.ns)
 
-    def wait(self, sha, tick):
+    def wait(self, sha, tick, paths=()):
+        self.paths = list(paths)  # every member's files, as the tip carries them (#1932)
         verdict = self.verdicts.pop(0) if len(self.verdicts) > 1 else self.verdicts[0]
         return verdict, [f"the train {sha} is {verdict}."]
 

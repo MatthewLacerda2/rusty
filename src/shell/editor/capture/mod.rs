@@ -27,6 +27,7 @@ mod paint;
 use std::{cell::RefCell, path::Path, rc::Rc};
 
 use crate::app::{GameWorld, ProjectSource};
+use crate::core::application::{Gizmo, SceneGizmos};
 use crate::core::input::InputState;
 use crate::dev::capture::CaptureHost;
 use crate::editor::{viewport::scene_nav::selection_bounds, EditorUi, ViewportTab};
@@ -66,6 +67,8 @@ pub struct EditorCaptureOptions {
     pub tab: ViewportTab,
     /// Hold the pointer here, in window pixels, every frame: a hover shows.
     pub pointer: Option<(f32, f32)>,
+    /// The Scene view's gizmos (#1909), as its toggles or `Editor.SetGizmo` set them.
+    pub gizmos: SceneGizmos,
 }
 
 impl Default for EditorCaptureOptions {
@@ -80,6 +83,7 @@ impl Default for EditorCaptureOptions {
             playing: false,
             tab: ViewportTab::Scene,
             pointer: None,
+            gizmos: SceneGizmos::default(),
         }
     }
 }
@@ -184,6 +188,7 @@ fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi,
     game.refresh_ui_textures();
     super::sync_ui_textures(&mut ui, game);
     ui.viewport_tab = opts.tab;
+    ui.gizmos = opts.gizmos;
     if let Some(name) = &opts.select {
         let id = game.scene().borrow().find_entity_by_name(name);
         ui.selected_entity_id = Some(id.ok_or_else(|| format!("no entity named {name:?}"))?);
@@ -275,7 +280,8 @@ fn render_viewport(
         return;
     };
     let scene = game.scene().borrow();
-    view.ui.screen_in_editor = scene_tab && ui.ui_overlay;
+    view.gizmos = ui.gizmos;
+    view.ui.screen_in_editor = scene_tab && ui.gizmos.on(Gizmo::Ui);
     let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
     renderer.set_ui_textures(Rc::clone(&ui.ui_textures));
     renderer.render(view, &scene, &camera, &target, scene_tab);

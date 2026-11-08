@@ -75,8 +75,10 @@ pub struct NavigationGraph {
     /// Off-mesh links (#462): generated drops and jumps, and authored links.
     pub(super) offmesh: super::offmesh::OffMeshLinks,
     /// The play loop's view of the static geometry's changes (#1707,
-    /// `bake::still`); `None` until `bake_tracked` or `sync_changes` opens it.
+    /// `bake::still`); `None` until `start_tracked` or `sync_changes` opens it.
     pub(super) static_watch: Option<super::bake::StaticWatch>,
+    /// The scene the play loop last started on (`bake::still::start_tracked`).
+    pub(super) tracked_scene: Option<crate::scene::SceneId>,
 }
 
 impl NavigationGraph {
@@ -111,6 +113,7 @@ impl NavigationGraph {
             bake_state: None,
             offmesh: Default::default(),
             static_watch: None,
+            tracked_scene: None,
         }
     }
 

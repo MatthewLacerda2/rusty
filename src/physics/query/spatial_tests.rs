@@ -5,7 +5,7 @@
 //! geometry, so a broken filter, a wrong shape placement, or a dropped hit is
 //! caught — not merely that the calls return.
 
-use glam::Vec3;
+use glam::{Quat, Vec3};
 
 use crate::components::{ColliderComponent, ColliderShape};
 use crate::physics::PhysicsWorld;
@@ -62,10 +62,20 @@ fn overlap_box_and_capsule_respect_their_extents() {
     let (_, world, near, far) = two_box_world();
     // A thin box centered between the two entities touches neither…
     assert!(world
-        .overlap_box(Vec3::new(0.0, 0.0, 5.0), Vec3::splat(0.5), |_| true)
+        .overlap_box(
+            Vec3::new(0.0, 0.0, 5.0),
+            Vec3::splat(0.5),
+            Quat::IDENTITY,
+            |_| true
+        )
         .is_empty());
     // …but stretched along z (half-extent 5 ⇒ spans z∈[0,10]) it touches both.
-    let hits = world.overlap_box(Vec3::new(0.0, 0.0, 5.0), Vec3::new(0.5, 0.5, 5.0), |_| true);
+    let hits = world.overlap_box(
+        Vec3::new(0.0, 0.0, 5.0),
+        Vec3::new(0.5, 0.5, 5.0),
+        Quat::IDENTITY,
+        |_| true,
+    );
     assert_eq!(hits.len(), 2, "stretched box should reach both: {hits:?}");
     // A capsule running from the origin to z=10 also spans both.
     let capsule = world.overlap_capsule(Vec3::ZERO, Vec3::new(0.0, 0.0, 10.0), 0.5, |_| true);

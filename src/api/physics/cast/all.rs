@@ -1,6 +1,6 @@
-//! src/api/physics/cast/all.rs — `Physics.RaycastAll` and its non-allocating
-//! form `RaycastAllNonAlloc` (#1720, Unity's `RaycastNonAlloc`), plus the hit
-//! table writers `RaycastThrough` shares.
+//! src/api/physics/cast/all.rs — `Physics.RaycastAll`, its non-allocating
+//! form `RaycastAllNonAlloc` (#1720, Unity's `RaycastNonAlloc`) and
+//! `SphereCastAll` (#1881), plus the hit table writers `RaycastThrough` shares.
 //!
 //! The writers fill a table in place, reusing its `point` / `normal` tables
 //! and clearing fields a hit lacks, so the same code writes a fresh entry and
@@ -12,9 +12,10 @@ use glam::Vec3;
 use mlua::{Table, Value};
 
 use super::super::super::{put, Reg};
+use super::check;
 use super::filter::{reach, Filter};
 use crate::api::ApiCell;
-use crate::physics::{PhysicsWorld, RayHit};
+use crate::physics::{PhysicsWorld, RayHit, Sweep};
 use crate::scene::Scene;
 
 /// Write `{x, y, z}` into `t[key]`, reusing the table already there.
@@ -63,30 +64,52 @@ pub(in crate::api::physics) fn set_surface(
     vec_into(lua, t, "normal", hit.normal)
 }
 
-/// Every accepted hit along the ray within `max` (see [`reach`]), nearest
-/// first; empty with no live physics world.
+/// What a multi-hit cast sweeps: a ray, or a shape.
+#[derive(Clone, Copy)]
+enum Along {
+    Ray(Vec3),
+    Shape(Sweep),
+}
+
+/// Every accepted hit of `along` moving in `dir` within `max` (see
+/// [`reach`]), nearest first; empty with no live physics world.
 fn hits_along(
     physics: &RefCell<Option<PhysicsWorld>>,
     scene: &Scene,
-    origin: Vec3,
+    along: Along,
     dir: Vec3,
     max: f32,
     filter: Filter,
 ) -> Vec<RayHit> {
     let physics = physics.borrow();
-    match (physics.as_ref(), reach(Some(max))) {
-        (Some(world), Some(max)) => {
-            world.raycast_all(origin, dir, max, |id| filter.accepts(scene, id))
-        }
-        _ => Vec::new(),
+    let (Some(world), Some(max)) = (physics.as_ref(), reach(Some(max))) else {
+        return Vec::new();
+    };
+    let accept = |id| filter.accepts(scene, id);
+    match along {
+        Along::Ray(origin) => world.raycast_all(origin, dir, max, accept),
+        Along::Shape(sweep) => world.shape_cast_all(sweep, dir, max, accept),
     }
+}
+
+/// A fresh Lua array of `hits`' tables, nearest first.
+fn hit_array(lua: &mlua::Lua, scene: &Scene, hits: &[RayHit]) -> mlua::Result<Table> {
+    let out = lua.create_table_with_capacity(hits.len(), 0)?;
+    for (i, hit) in hits.iter().enumerate() {
+        let t = lua.create_table()?;
+        set_owner(&t, scene, hit.id)?;
+        set_surface(lua, &t, hit)?;
+        out.raw_set(i + 1, t)?;
+    }
+    Ok(out)
 }
 
 /// `RaycastAll(ox,oy,oz, dx,dy,dz, max_distance [, layer_mask [,
 /// query_triggers]])` — a fresh array of hit tables `{id, distance, point,
 /// normal, bone, bone_name, root, material}`, nearest first (ties by entity id).
 /// `RaycastAllNonAlloc(results, <the same arguments>)` writes the same hits
-/// into `results` instead and returns their count.
+/// into `results` instead and returns their count. `SphereCastAll` is
+/// `RaycastAll` with a radius after the direction.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,
@@ -103,17 +126,12 @@ pub(super) fn register(
             let scene = scene.borrow();
             let (o, d) = (Vec3::new(ox, oy, oz), Vec3::new(dx, dy, dz));
             let filter = Filter::new(None, mask, triggers);
-            let hits = hits_along(&*physics.get(lua)?, &scene, o, d, max, filter);
-            let out = lua.create_table_with_capacity(hits.len(), 0)?;
-            for (i, hit) in hits.iter().enumerate() {
-                let t = lua.create_table()?;
-                set_owner(&t, &scene, hit.id)?;
-                set_surface(lua, &t, hit)?;
-                out.raw_set(i + 1, t)?;
-            }
-            Ok(out)
+            let along = Along::Ray(o);
+            let hits = hits_along(&*physics.get(lua)?, &scene, along, d, max, filter);
+            hit_array(lua, &scene, &hits)
         }),
     )?;
+    register_sphere_all(lua, table, scene, physics)?;
     type NonAllocArgs = (
         Table,
         f32,
@@ -135,9 +153,52 @@ pub(super) fn register(
             let scene = scene.borrow();
             let (o, d) = (Vec3::new(ox, oy, oz), Vec3::new(dx, dy, dz));
             let filter = Filter::new(None, mask, triggers);
-            let hits = hits_along(&*physics.get(lua)?, &scene, o, d, max, filter);
+            let along = Along::Ray(o);
+            let hits = hits_along(&*physics.get(lua)?, &scene, along, d, max, filter);
             fill(lua, &results, &scene, &hits)?;
             Ok(hits.len())
+        }),
+    )
+}
+
+/// `SphereCastAll(ox,oy,oz, dx,dy,dz, radius, max_distance [, layer_mask [,
+/// query_triggers]])` — every collider a swept sphere strikes, as
+/// `RaycastAll`'s entries. Bad sizes and directions are Lua errors.
+fn register_sphere_all(
+    lua: &mlua::Lua,
+    table: &Table,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
+) -> Reg {
+    type Args = (
+        f32,
+        f32,
+        f32,
+        f32,
+        f32,
+        f32,
+        f32,
+        f32,
+        Option<u32>,
+        Option<bool>,
+    );
+    put(
+        table,
+        "SphereCastAll",
+        lua.create_function(move |lua, args: Args| {
+            let (ox, oy, oz, dx, dy, dz, radius, max, mask, triggers) = args;
+            let verb = "SphereCastAll";
+            let sweep = Sweep::Sphere {
+                center: check::point(verb, "origin", [ox, oy, oz])?,
+                radius: check::radius(verb, radius)?,
+            };
+            let dir = check::direction(verb, [dx, dy, dz])?;
+            let scene = &*scene.get(lua)?;
+            let scene = scene.borrow();
+            let filter = Filter::new(None, mask, triggers);
+            let along = Along::Shape(sweep);
+            let hits = hits_along(&*physics.get(lua)?, &scene, along, dir, max, filter);
+            hit_array(lua, &scene, &hits)
         }),
     )
 }

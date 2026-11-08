@@ -547,7 +547,9 @@ buttons, an image, audio or prefab card; exclusive with `--select`), `--frame` (
 (the Play-mode chrome; the sim is not stepped), `--game` (the Game tab), `--size <W>x<H>`
 (default 1600x900), `--demo <file>` and `--demo-tick <n>` (a demo open on the Game
 view's timeline, replayed to tick `n`, default 0; #1598), `--pointer <X>,<Y>` (the
-pointer held there, in pixels, so a hover shows), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
+pointer held there, in pixels, so a hover shows), `--gizmo <Name>=on|off` (a Scene-view
+gizmo drawn or not, by its `Editor.SetGizmo` name, e.g. `--gizmo NavMesh=on`;
+repeatable, #1909), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
 on, #854, over a sample recent list dated against a fixed time; the page names show
 *New Project*, *Open* and the different-engine prompt). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a

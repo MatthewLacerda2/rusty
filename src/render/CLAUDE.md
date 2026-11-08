@@ -35,7 +35,11 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   static bakes' key is `RenderScene::statics_key`, refolded only when a static object
   was re-derived. A new input a shadow reads is kept or read per frame the same way,
   and `passes::shadows::statics_key` (the from-scratch digest the tests compare)
-  folds it too.
+  folds it too. A sweep gathers through the scene's BVH of its static objects
+  (#1874, `scene/casters/`), rebuilt when that key moves: a new path that moves a
+  static object's bounds or flags without re-deriving it touches it there
+  (`Gathering::touch`, as a pose does), or the sweeps miss it where it went;
+  `casters/gather_gpu_tests.rs` and the equivalence tests hold the gather exact.
 - **What an object holds lives on the GPU in its slot** (part 3 of #1706): its
   `ObjectData` (world matrix, probe SH, lightmap) sits at its slot of the object table
   (`scene/table.rs`), written where it changed (`gpu/draw_buffers/objects.rs`). A

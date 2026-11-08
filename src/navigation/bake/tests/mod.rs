@@ -7,6 +7,7 @@
 
 mod areas;
 mod carving;
+mod cell;
 mod doorway;
 mod erosion;
 mod headroom;

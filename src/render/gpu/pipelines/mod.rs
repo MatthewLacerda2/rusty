@@ -37,7 +37,7 @@ pub(crate) struct ForwardPipelines {
     pub transparent: TransparentPipelines,
     /// The translucents' depth postpass (#1523).
     pub depth_postpass: DepthPostpassPipelines,
-    /// The editor's line gizmos (grid, collider boxes, axis arrows, probes), drawn
+    /// The editor's line gizmos (grid, axis arrows, probes, the occlusion view), drawn
     /// over the post-FX output (#1224), so built against the output format.
     pub line: LazyPipeline,
     /// The SSAO depth prepass (#436): the forward vertex stage, no colour target.

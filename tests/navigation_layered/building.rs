@@ -11,6 +11,7 @@ use super::{add_box, bake, heights};
 /// stair blocks over x = 3.5..9.5, z = 2..6, climbing from the ground to it.
 pub fn building() -> (Scene, NavigationGraph) {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     add_box(
         &mut scene,
         Vec3::new(0.0, -0.2, 0.0),
