@@ -48,8 +48,10 @@ fn a_moving_entity_is_drawn_between_its_last_two_ticks() {
 #[test]
 fn a_scaled_and_turned_entity_keeps_its_scale_between_ticks() {
     let (mut scene, id) = scene_with_box();
-    let t = scene.world.transform_mut(id).unwrap();
-    (t.scale, t.rotation) = (Vec3::new(2.0, 0.5, 1.0), glam::Quat::from_rotation_y(0.3));
+    {
+        let mut t = scene.world.transform_mut(id).unwrap();
+        (t.scale, t.rotation) = (Vec3::new(2.0, 0.5, 1.0), glam::Quat::from_rotation_y(0.3));
+    }
     let before = scene.world.local_to_world(id);
     let mut poses = DrawPoses::default();
     poses.record(&scene);
