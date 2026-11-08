@@ -62,6 +62,8 @@ pub(crate) struct Overlays {
     pub probes: Vec<ProbeResource>,
     /// The reflection probes' mirror balls (#1911).
     pub balls: Vec<BallResource>,
+    /// The navmesh gizmo's slot (#1910); its vertex buffer is the renderer's, kept.
+    pub navmesh: Option<u32>,
     /// The collider and `Debug.Draw*` line gizmos (#1882): one draw, coloured per
     /// vertex, through the vertex-colour line pipeline.
     pub wires: Option<ProbeResource>,
@@ -90,6 +92,7 @@ impl Renderer {
         let axis = self.precreate_axis_arrows(scene, &mut draws);
         let probes = self.precreate_probes(scene, gizmos, &mut draws);
         let balls = self.precreate_probe_balls(scene, gizmos, &mut draws);
+        let navmesh = self.precreate_navmesh(gizmos, &mut draws);
         let scope = match gizmos.on(Gizmo::Colliders) {
             true => ColliderScope::All,
             false => ColliderScope::Selected,
@@ -102,6 +105,7 @@ impl Renderer {
             axis,
             probes,
             balls,
+            navmesh,
             wires,
         }
     }

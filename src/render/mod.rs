@@ -124,6 +124,8 @@ pub struct Renderer {
     wire_cache: std::cell::RefCell<crate::physics::WireCache>,
     /// The reflection probes' mirror-ball gizmo (#1911).
     probe_ball_pipeline: gpu::pipelines::LazyPipeline,
+    /// The navmesh gizmo (#1910): its pipeline and the kept triangles the shell hands it.
+    navmesh: draw::NavMeshGizmo,
     /// The editor's selection outline (#1175).
     outline: passes::outline::OutlinePasses,
 

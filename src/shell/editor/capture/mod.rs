@@ -281,6 +281,7 @@ fn render_viewport(
     };
     let scene = game.scene().borrow();
     view.gizmos = ui.gizmos;
+    super::navmesh::hand(renderer, &view.gizmos, &game.resources.nav.borrow());
     view.ui.screen_in_editor = scene_tab && ui.gizmos.on(Gizmo::Ui);
     view.game_gizmos = !scene_tab && ui.gizmos.on(Gizmo::GameGizmos);
     let camera = super::viewport::viewport_camera(ui, game, &scene, ui.viewport_tab);
