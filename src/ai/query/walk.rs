@@ -29,7 +29,7 @@ pub fn lengths(world: &QueryWorld, querier: Anchor, items: &[Vec3]) -> Vec<Optio
     let from = querier.position;
     let farthest = items.iter().map(|p| p.distance(from)).fold(0.0, f32::max);
     let bound = (farthest * SLACK).max(farthest + MIN_REACH);
-    let Some(flood) = world.nav.flood(from, bound, mask) else {
+    let Some(flood) = world.nav.flood_to(from, items, bound, mask) else {
         return vec![None; items.len()];
     };
     items

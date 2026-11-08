@@ -83,9 +83,31 @@ impl NavigationGraph {
     /// `mask`, as far as `max_length` metres of travel cost. `None` when `start`
     /// is off the navmesh.
     pub fn flood(&self, start: Vec3, max_length: f32, mask: u32) -> Option<Flood> {
+        self.flood_to(start, &[], max_length, mask)
+    }
+
+    /// [`Self::flood`] that stops early once the span each of `goals` snaps to is
+    /// settled (its cost final), instead of covering the whole bound: the
+    /// environment query asks about a few dozen spots and the flood around them
+    /// is most of its cost. Exact for the goals; another span it reports may
+    /// hold a cost a longer flood would still lower. A goal off the navmesh is
+    /// ignored; with none left, it runs to the bound.
+    pub fn flood_to(
+        &self,
+        start: Vec3,
+        goals: &[Vec3],
+        max_length: f32,
+        mask: u32,
+    ) -> Option<Flood> {
         let from = self.snap(start)?;
         let spacing = self.grid_spacing.max(f32::EPSILON);
         let bound = (max_length / spacing).max(0.0);
+        let mut waiting: crate::core::collections::Set<u32> = goals
+            .iter()
+            .filter_map(|&g| self.snap(g))
+            .map(|s| s.index)
+            .collect();
+        let stop_early = !waiting.is_empty();
         let mut cost: Map<u32, f32> = Map::default();
         let mut open = BinaryHeap::new();
         cost.insert(from.index, 0.0);
@@ -93,6 +115,9 @@ impl NavigationGraph {
         while let Some(here) = open.pop() {
             if cost.get(&here.node.index).is_some_and(|&g| here.g > g) {
                 continue; // a stale heap entry
+            }
+            if waiting.remove(&here.node.index) && stop_early && waiting.is_empty() {
+                break; // every goal settled
             }
             for (next, g) in self.moves(here, mask) {
                 let best = cost.get(&next.index).copied().unwrap_or(f32::INFINITY);

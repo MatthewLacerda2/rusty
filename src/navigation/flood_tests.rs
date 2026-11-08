@@ -70,3 +70,26 @@ fn off_the_navmesh_is_no_flood() {
         .flood(Vec3::new(2.5, 0.0, 2.5), 10.0, ALL_AREAS)
         .is_none());
 }
+
+#[test]
+fn a_flood_to_goals_stops_once_they_settle_with_the_same_costs() {
+    let nav = open_floor();
+    let from = Vec3::new(2.5, 0.0, 2.5);
+    let goal = Vec3::new(4.5, 0.0, 2.5);
+    let full = flood(&nav, from, 100.0);
+    let to = nav
+        .flood_to(from, &[goal], 100.0, ALL_AREAS)
+        .expect("on the navmesh");
+    assert_eq!(to.length_to(&nav, goal), full.length_to(&nav, goal));
+    assert!(
+        to.reached() < full.reached(),
+        "{} vs {}",
+        to.reached(),
+        full.reached()
+    );
+    let far = Vec3::new(500.0, 0.0, 500.0); // clamps onto the grid's corner
+    let both = nav
+        .flood_to(from, &[goal, far], 100.0, ALL_AREAS)
+        .expect("flood");
+    assert_eq!(both.length_to(&nav, goal), full.length_to(&nav, goal));
+}
