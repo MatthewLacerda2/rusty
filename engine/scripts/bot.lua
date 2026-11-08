@@ -12,6 +12,11 @@ function BotAI.Start(entity_id)
 end
 
 function BotAI.Update(entity_id, delta_time)
+    -- A dead bot stops chasing, so its death animation is not walked over.
+    if BotAI.health <= 0.0 then
+        NavMeshAgent.ResetPath(entity_id)
+        return
+    end
     -- Fetch the player position from the engine scene system
     local player_id = Scene.FindEntityByName("Player")
     if player_id == nil then
@@ -35,16 +40,24 @@ function BotAI.Update(entity_id, delta_time)
     end
 end
 
-function BotAI.Damage(entity_id, amount)
+-- OnTakeDamage: the engine delivers every Damage.Apply / ApplyPoint / ApplyRadial
+-- that reaches this bot (a hit on any of its colliders, or a child's, bubbles up
+-- to it). Health is this script's: the engine stores none. The return value is
+-- the damage actually taken.
+function BotAI.OnTakeDamage(entity_id, amount, event)
+    if BotAI.health <= 0.0 then
+        return 0
+    end
     BotAI.health = BotAI.health - amount
-    print("[Lua] Bot took " .. amount .. " damage! Remaining HP: " .. BotAI.health)
-    
+    print("[Lua] Bot took " .. amount .. " " .. event.type .. " damage! Remaining HP: " .. BotAI.health)
+
     if BotAI.health <= 0.0 then
         Animator.Play(entity_id, "Death")
         print("[Lua] Bot is DEAD! Triggering death animation.")
     else
         Animator.Play(entity_id, "Hit")
     end
+    return amount
 end
 
 -- OnTrigger callback hook triggered when this entity overlaps with a trigger

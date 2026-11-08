@@ -33,6 +33,8 @@ local LOOK_SPEED = 90.0     -- degrees/second of camera turn
 local PITCH_LIMIT = 80.0    -- clamp camera pitch to +/- this
 local FOLLOW_BACK = 4.5     -- how far the camera trails behind the Player
 local FOLLOW_UP = 1.5       -- how high above the Player the camera sits
+local SHOT_RANGE = 100.0    -- metres the hitscan reaches
+local SHOT_DAMAGE = 25.0    -- what one shot deals (a bot has 100)
 local JUMP_KEY = "SPACE"    -- jumps on its rising edge, while grounded
 local SHOOT_KEY = "Mouse0"  -- the trigger: the left mouse button
 local START_YAW = 90.0      -- initial camera yaw: looking down +Z, across the arena
@@ -88,15 +90,25 @@ local function aim_camera(entity_id, dt)
     Camera.SetPosition(px - fx * FOLLOW_BACK, py - fy * FOLLOW_BACK + FOLLOW_UP, pz - fz * FOLLOW_BACK)
 end
 
--- Cast a hitscan on the rising edge of the shoot key (one cast per press).
--- Passes entity_id as the ignore id so the cast can't hit the shooter itself —
--- the "don't hit the Player" rule lives HERE, not as a name check in the engine.
+-- Cast a hitscan on the rising edge of the shoot key (one cast per press) and
+-- deliver its damage to whatever it struck (`Damage.ApplyPoint`, which reaches
+-- the target's OnTakeDamage). Hits on the Player's own hierarchy are skipped, so
+-- the shot can't hit the shooter — the "don't hit the Player" rule lives HERE,
+-- not as a name check in the engine.
 local function shoot(self, entity_id)
     local down = Input.IsKeyDown(SHOOT_KEY)
     if down and not self.shoot_was_down then
         local cx, cy, cz = Camera.GetPosition()
         local fx, fy, fz = Camera.GetForward()
-        Physics.Raycast(cx, cy, cz, fx, fy, fz, entity_id)
+        -- The nearest hit that isn't the Player itself takes the shot.
+        -- Triggers (pickups, zones) don't stop a bullet: query_triggers = false.
+        for _, hit in ipairs(Physics.RaycastAll(cx, cy, cz, fx, fy, fz, SHOT_RANGE, nil, false)) do
+            if hit.root ~= entity_id then
+                Damage.ApplyPoint(hit, SHOT_DAMAGE, fx, fy, fz,
+                    { type = "bullet", instigator = entity_id })
+                break
+            end
+        end
     end
     self.shoot_was_down = down
 end

@@ -123,7 +123,7 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   local hits = {}                         -- kept across frames
   function Update(id)
     local n = Physics.RaycastAllNonAlloc(hits, ox,oy,oz, dx,dy,dz, 30, SHOT, false)
-    for i = 1, n do Damage(hits[i].root, 10) end
+    for i = 1, n do Damage.ApplyPoint(hits[i], 10, dx,dy,dz) end
   end
   ```
 - **`RaycastThrough`** (#830) is `RaycastAll` with exits: one entry per stretch
@@ -152,7 +152,7 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   local power = 1.0                       -- penetration budget; game data, not engine
   for _, s in ipairs(Physics.RaycastThrough(ox,oy,oz, dx,dy,dz, 100, SHOT)) do
     if s.root ~= self_id then
-      Damage(s.root, 30 * power)
+      Damage.ApplyPoint(s, 30 * power, dx,dy,dz)
       power = power - s.thickness * Resistance(s.id)  -- e.g. 0.5 per metre of wood
       if power <= 0 or not s.exit then break end
     end
@@ -369,8 +369,9 @@ the shot's `layer_mask` leaves out, and the hitbox layer in it:
 local SHOT = (1 << Layers.NameToIndex("Default")) | (1 << Layers.NameToIndex("Hitbox"))
 local hit, id, dist, px, py, pz, nx, ny, nz, bone, part, root =
   Physics.Raycast(ox, oy, oz, dx, dy, dz, self_id, SHOT)
-if hit and bone then
-  Damage(root, part == "head" and 4 or 1)     -- "head", "spine", ...; multipliers are game-side Lua
+if hit and bone then  -- reaches the character's OnTakeDamage; event.hit.bone_name is "head", "spine", ...
+  Damage.ApplyPoint({ id = id, point = { x = px, y = py, z = pz }, bone = bone, bone_name = part,
+    root = root }, part == "head" and 4 or 1, dx, dy, dz)  -- multipliers are game-side Lua
 end
 ```
 
