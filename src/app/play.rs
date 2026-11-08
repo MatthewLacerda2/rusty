@@ -23,7 +23,7 @@ use super::game::GameWorld;
 use super::registry::App;
 use super::resources::Resources;
 use super::stage::Stage;
-use super::systems::physics;
+use super::systems::{perception, physics};
 use super::world::World;
 
 /// Play-enter helpers, split out of `GameWorld::enter_play` so each phase stays
@@ -129,8 +129,8 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::systems::animate::animate)
         .add_system(Stage::FixedUpdate, physics::pose_ragdolls)
         .add_system(Stage::FixedUpdate, dispatch_animation_events)
-        .add_system(Stage::FixedUpdate, perceive)
-        .add_system(Stage::FixedUpdate, dispatch_perception_updates)
+        .add_system(Stage::FixedUpdate, perception::perceive)
+        .add_system(Stage::FixedUpdate, perception::dispatch_perception_updates)
         .add_system(
             Stage::FixedUpdate,
             super::systems::particles::tick_particles,
@@ -148,7 +148,7 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
         .add_system(Stage::FixedUpdate, advance_frame)
         .add_system(Stage::Render, build_skin_palettes)
-        .add_system(Stage::Startup, reset_sight_rays);
+        .add_system(Stage::Startup, perception::reset_sight_rays);
 }
 
 /// The tick's head: the `Debug.Draw*` lines (#1882) lose a tick before any script
@@ -246,35 +246,6 @@ fn dispatch_animation_events(_world: &mut World, res: &mut Resources) {
     res.script_manager.dispatch_animation_events(&queued.events);
     let hits = std::mem::take(&mut res.controller_hits);
     res.script_manager.dispatch_queued_controller_hits(&hits);
-}
-
-/// The perception step (#1900): sight for every active `AIPerception`, on the
-/// round-robin ray budget, then each memory ages by the tick's scaled dt. After
-/// physics and the post-animation pose, so the rays see where things stand now.
-fn perceive(world: &mut World, res: &mut Resources) {
-    let physics = res.physics.borrow();
-    let mut scene = world.scene.borrow_mut();
-    crate::ai::perception::step(
-        &mut scene,
-        physics.as_ref(),
-        &mut res.sight_rays,
-        res.frame_dt,
-    );
-}
-
-/// `OnPerceptionUpdated(id, target, info)` (#1900) for every update the step, a
-/// noise or a hit raised since the last dispatch: after `perceive`, before
-/// `LateUpdate`, perceivers in id order.
-fn dispatch_perception_updates(world: &mut World, res: &mut Resources) {
-    let updates = crate::ai::perception::drain_updates(&mut world.scene.borrow_mut());
-    res.script_manager.dispatch_perception_updates(&updates);
-}
-
-/// Every Play session starts the sight round-robin from the first pair (#1900),
-/// so two runs of the same scene trace the same pairs on the same ticks. (The
-/// perceivers' memories were emptied on Play entry, `Scene::set_playing`.)
-fn reset_sight_rays(_world: &mut World, res: &mut Resources) {
-    res.sight_rays.reset();
 }
 
 /// The palette build (#453): once every pose writer of the frame has run, skin
