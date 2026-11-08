@@ -21,7 +21,7 @@
 //!   --pointer <X>,<Y>   hold the pointer here, in pixels (a hover label shows)
 //!   --gizmo <Name>=on|off  draw a Scene-view gizmo or not, as `Editor.SetGizmo`
 //!                       names it (`UI`, `LightProbes`, `ReflectionProbes`,
-//!                       `NavMesh`); repeatable (#1909)
+//!                       `Colliders`, `NavMesh`); repeatable (#1909)
 //!   --picker [<page>]   the project picker the editor starts on (#854), over a
 //!                       sample recent list; <page> is `new`, `open`,
 //!                       `mismatch` (the different-engine prompt) or `focus`
