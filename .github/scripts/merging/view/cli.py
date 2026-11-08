@@ -8,7 +8,10 @@ import os
 import time
 from datetime import datetime, timezone
 
-from merging.view import events, standing, status
+import ghrest
+from merging.queue import pulls
+from merging.view import events, standing, status, stranded
+from merging.watch import handbacks
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -21,6 +24,10 @@ def main(argv: list[str] | None = None) -> int:
     say = functools.partial(print, flush=True)
     if opts.what == "status":
         code, lines = status.report(root)
+        # A ready, labelled, green pull request the watch still passes over (#1951).
+        lines += stranded.report(status.common_dir(root) / handbacks.MEMORY, time.time(),
+                                 lambda: pulls.open_pulls(ghrest.slug()),
+                                 lambda pull: pulls.head_reading(ghrest.slug(), pull, early=True))
         for line in lines:
             say(line)
         return code

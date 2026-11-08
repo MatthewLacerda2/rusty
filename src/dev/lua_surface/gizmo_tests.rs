@@ -67,6 +67,6 @@ fn an_unknown_name_warns() {
     let mut s = windowed();
     assert_eq!(run(&mut s, r#"Editor.SetGizmo("navmesh", true)"#), "false");
     assert!(warned(&s, r#"no gizmo "navmesh""#));
-    assert_eq!(run(&mut s, r#"Editor.GetGizmo("Colliders")"#), "nil");
-    assert!(warned(&s, r#"no gizmo "Colliders""#));
+    assert_eq!(run(&mut s, r#"Editor.GetGizmo("colliders")"#), "nil");
+    assert!(warned(&s, r#"no gizmo "colliders""#));
 }

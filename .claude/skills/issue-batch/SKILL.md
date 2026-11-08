@@ -233,7 +233,8 @@ dead queue is an event. Put the `Monitor` on it, never on the watch itself (a `M
 dies at 30 minutes and takes its command with it); re-arm it the same way.
 **Ask `make queue-status` whether the queue runs** (at a batch start, a resume, after a
 reboot): it reads the supervisor's worktree lock's PID and checks it alive (exit 0
-running, 1 not), and prints the log's last line and its age. Never `pgrep -f`: after a
+running, 1 not), and prints the log's last line and its age, and a `STRANDED #N` line for
+each ready, labelled pull request passed over for over an hour on a green head (#1951). Never `pgrep -f`: after a
 reboot on 2026-11-07 it matched the checking shell's own command line, and a dead
 supervisor was reported running for an hour. **Stop it with `make queue-stop`**, between pull requests; never by
 pattern: `pkill -f` kills scorsese's watch too. Never `pkill -f` a pattern your own

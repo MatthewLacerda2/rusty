@@ -91,7 +91,7 @@ fn register_destroy(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>)
         }),
     )?;
 
-    // Hard delete — the editor's Destroy button: actually removes the entity.
+    // Hard delete — the editor's Edit ▸ Delete: actually removes the entity.
     // Returns whether an entity actually existed at `id`.
     //
     // During PLAY the removal is DEFERRED (#323): the id is queued and the entity

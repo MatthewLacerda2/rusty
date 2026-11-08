@@ -98,7 +98,7 @@ class RunnerLag(unittest.TestCase):
         state, lines, calls = waited([lagging, ci_cancelled(), ci_cancelled(2)])
         self.assertEqual(calls, [["gh", "run", "rerun", "--failed", "1"]])
         self.assertTrue(lines[0].startswith(outcomes.RUNNERS), lines)
-        self.assertEqual(state, outcomes.STOP)
+        self.assertEqual(state, outcomes.RED)
 
 
 if __name__ == "__main__":

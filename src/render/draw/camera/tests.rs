@@ -28,6 +28,7 @@ fn stages_run_in_the_frames_order() {
             "depth_postpass",
             "world_ui",
             "effects",
+            "gizmo_depth",
             "count",
             "post_fx",
             "outline",
@@ -67,6 +68,10 @@ fn every_stage_reads_only_what_an_earlier_stage_wrote() {
     assert!(position("effects") < position("post_fx"));
     assert_eq!(position("outline"), position("post_fx") + 1);
     assert_eq!(position("handles"), CAMERA_PASSES.len() - 1);
+    // The game gizmos keep the base camera's depth after everything it draws
+    // depth with (the depth postpass, #1882), before the next camera clears it.
+    assert!(position("depth_postpass") < position("gizmo_depth"));
+    assert!(position("gizmo_depth") < position("post_fx"));
 }
 
 #[test]

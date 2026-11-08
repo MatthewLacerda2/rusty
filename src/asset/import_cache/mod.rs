@@ -46,6 +46,7 @@
 //! (`asset::convert::texture_ref::resolved`): a bake or preview thread keeps its
 //! own, and nothing takes a lock across a parse.
 
+pub mod hulls;
 mod reads;
 mod revision;
 mod size;
@@ -181,7 +182,8 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
     PARSES.set(PARSES.get() + 1);
     // Stamped before the parse: a write during it is a change next time.
     let files = files_of(&read, &settings.humanoid.clips_from);
-    let fresh = super::import_with(path, &read, &settings);
+    // With its meshes' decompositions, from the hull sidecar (#1940).
+    let fresh = super::import_with(path, &read, &settings).inspect(|a| hulls::load(path, a));
     CACHE.with_borrow_mut(|cache| match fresh {
         Ok(asset) => Ok(cache.insert(key, geometry, files, asset, BUDGET_BYTES)),
         Err(e) => {

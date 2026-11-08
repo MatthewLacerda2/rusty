@@ -176,6 +176,26 @@ fn take_materials(scene: &mut Scene, data: &mut SceneData) {
     }
 }
 
+/// Clear the World and what named or was drawn over its entities, before a
+/// document's entities come in.
+fn drop_old_world(scene: &mut Scene) {
+    scene.world.clear();
+    // The Undo history named the replaced World's entities (#1631).
+    scene.clear_undo();
+    // The overrides named the replaced World's entities; they are runtime-only (#670).
+    scene.shader_overrides.clear_all();
+    // So did the decals stamped on it: a load drops them, as Unity's scene load
+    // destroys everything of the old scene (#1649). A Play load took the
+    // persistent ones out first (`swap_in`), and Stop's snapshot puts its own back.
+    scene.clear_decals(false);
+    // An edit-mode load drops the `Debug.Draw*` lines drawn over the old World
+    // (#1882), as Stop does; a Play load leaves them to age out, as it leaves
+    // Play's other runtime state (`scene::state`).
+    if !scene.is_playing() {
+        scene.debug_lines = Default::default();
+    }
+}
+
 /// `from_disk`: the document came from a file, so its values are held; a World
 /// snapshot's already were.
 fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
@@ -186,15 +206,7 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
 
     let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
     let bone_refs = crate::scene::skeleton::take_bone_refs(&mut data.entities);
-    scene.world.clear();
-    // The Undo history named the replaced World's entities (#1631).
-    scene.clear_undo();
-    // The overrides named the replaced World's entities; they are runtime-only (#670).
-    scene.shader_overrides.clear_all();
-    // So did the decals stamped on it: a load drops them, as Unity's scene load
-    // destroys everything of the old scene (#1649). A Play load took the
-    // persistent ones out first (`swap_in`), and Stop's snapshot puts its own back.
-    scene.clear_decals(false);
+    drop_old_world(scene);
     for entity in data.entities {
         scene.world.insert_entity(entity);
     }

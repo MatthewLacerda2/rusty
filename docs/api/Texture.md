@@ -40,7 +40,7 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 | `normal` | linear | tangent-space (use a `bump_to_normal` op) |
 | `roughness` | linear | — |
 | `metallic` | linear | — |
-| `metallic_roughness` / `orm` | linear | **metallic → B, roughness → G**, R = 0 (glTF's packed metallic-roughness map) |
+| `metallic_roughness` / `orm` | linear | reads **metallic from the input's R, roughness from its G** (input B is ignored), and writes them as glTF's packed map: **metallic → B, roughness → G**, R = 0 |
 | `data` | linear, **16-bit** | — (height/masks/anything raw; the explicit way to get unencoded output) |
 
 Every slot bakes 8 bits per channel except `data`, which bakes a **16-bit** PNG

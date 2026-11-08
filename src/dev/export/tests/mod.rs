@@ -36,6 +36,12 @@ fn project(root: &Path) {
             "texture".into(),
         ),
         (&cached("gone.fbx.glb"), "an orphan cache".into()),
+        (&cached("rock.obj.hulls"), "a model's hulls".into()),
+        (
+            &cached("soldier.fbx.hulls"),
+            "a converted model's hulls".into(),
+        ),
+        (&cached("gone.obj.hulls"), "an orphan's hulls".into()),
     ] {
         let path = root.join(rel);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -71,6 +77,8 @@ fn the_runtime_files_are_copied_in_order_and_the_sources_left_behind() {
             &cached("soldier.fbx.glb"),
             &cached("soldier.fbx.glb.0123456789abcdef.textures/skin.png"),
             &cached("soldier.fbx.glb.source"),
+            &cached("rock.obj.hulls"),
+            &cached("soldier.fbx.hulls"),
         ]
     );
     for file in &files {
@@ -81,8 +89,14 @@ fn the_runtime_files_are_copied_in_order_and_the_sources_left_behind() {
         let gone = format!("assets/models/{gone}");
         assert!(!out.join(&gone).exists(), "{gone} is not exported");
     }
-    let orphan = cached("gone.fbx.glb");
-    for gone in ["cache", "saved", &orphan, "assets/generated/theme.mp3"] {
+    let (orphan, hulls) = (cached("gone.fbx.glb"), cached("gone.obj.hulls"));
+    for gone in [
+        "cache",
+        "saved",
+        &orphan,
+        &hulls,
+        "assets/generated/theme.mp3",
+    ] {
         assert!(!out.join(gone).exists(), "{gone} is not exported");
     }
 }
