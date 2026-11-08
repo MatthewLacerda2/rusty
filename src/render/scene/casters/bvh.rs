@@ -1,29 +1,20 @@
-//! A scene's static shadow casters: their digest and the static bakes' key
-//! (`RenderScene::statics_key`, part 2 of #1706), and their bounding-volume
-//! hierarchy (#1874): which of them a shadow view could reach, so a light's tile
-//! tests the few casters near it and not every caster in the level.
-//!
-//! Unity culls each shadow view over the scene's spatial structure, Unreal through
-//! `FScene`'s primitive octree; this is a BVH over the static objects' world bounds,
-//! rebuilt when the scene's [`StaticsKey`] moves (`RenderScene::refresh_casters`).
-//! A static object that moved since, a dynamic or skinned one, or one whose bounds
-//! are unknown or not finite is not in it: the sweep tests those linearly
-//! (`passes::shadows::casters::reach`), so the index only ever narrows.
+//! The static casters' bounding-volume hierarchy (#1874): which of a scene's
+//! static objects a shadow view could reach, so a light's tile tests the few
+//! casters near it and not every caster in the level.
 //!
 //! **Exact, not approximate.** A node's box is the union of its children's, and the
 //! light's frustum test (`Frustum::intersects_aabb`, its positive vertex per plane)
 //! is monotone in the box, in floating point too: a box that passes, every box
 //! holding it passes. So [`CasterIndex::visit`] reaches every entry whose own box
-//! passes, and a caster the linear pass would test and keep is never missed.
+//! passes, and exactly those: a caster the linear pass would keep is never missed. A
+//! static object it cannot answer for (no finite bounds when built: `loose`; or
+//! re-derived or moved since: `strays`) is handed to every volume instead.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use glam::Vec3;
 
-use super::RenderScene;
-use crate::render::passes::shadows::{casting_key, StaticsKey};
 use crate::render::Frustum;
-use crate::scene::Scene;
 
 /// Entries a leaf holds at most.
 const LEAF: usize = 4;
@@ -49,20 +40,27 @@ struct Node {
 /// The static objects' BVH.
 #[derive(Default)]
 pub(crate) struct CasterIndex {
-    /// Entities by their entry.
+    /// Entities by their entry; a stray's is dropped.
     slots: HashMap<u32, u32>,
     entries: Vec<Entry>,
     nodes: Vec<Node>,
+    /// The objects built with no finite bounds.
+    loose: Vec<u32>,
+    /// The objects re-derived or moved since the build (`touch`).
+    strays: BTreeSet<u32>,
 }
 
 impl CasterIndex {
-    /// The index of `objects` (entities and their world bounds), leaving out any
-    /// whose bounds are not finite.
-    pub(crate) fn build(objects: impl Iterator<Item = (u32, (Vec3, Vec3))>) -> Self {
-        let mut entries: Vec<Entry> = objects
-            .map(|(id, (lo, hi))| Entry { id, lo, hi })
-            .filter(|e| e.lo.is_finite() && e.hi.is_finite())
-            .collect();
+    /// The index of `objects` (entities and their world bounds); one with no
+    /// finite bounds is kept loose.
+    pub(crate) fn build(objects: impl Iterator<Item = (u32, Option<(Vec3, Vec3)>)>) -> Self {
+        let (mut entries, mut loose) = (Vec::new(), Vec::new());
+        for (id, bounds) in objects {
+            match bounds.filter(|(lo, hi)| lo.is_finite() && hi.is_finite()) {
+                Some((lo, hi)) => entries.push(Entry { id, lo, hi }),
+                None => loose.push(id),
+            }
+        }
         let mut nodes = Vec::with_capacity(entries.len() / 2 + 1);
         if !entries.is_empty() {
             split(&mut nodes, &mut entries, 0);
@@ -73,7 +71,31 @@ impl CasterIndex {
             slots,
             entries,
             nodes,
+            loose,
+            strays: BTreeSet::new(),
         }
+    }
+
+    /// Object `id` was re-derived or moved: no entry answers for it any more.
+    pub(crate) fn touch(&mut self, id: u32) {
+        self.slots.remove(&id);
+        self.strays.insert(id);
+    }
+
+    /// How many objects were touched since the build.
+    pub(crate) fn strays(&self) -> usize {
+        self.strays.len()
+    }
+
+    /// The objects any of `frustums` could reach: every entry [`Self::visit`]
+    /// reaches, and every loose object and stray; unordered, maybe repeated.
+    pub(crate) fn near(&self, frustums: &[Frustum]) -> Vec<u32> {
+        let mut ids = self.loose.clone();
+        ids.extend(self.strays.iter().copied());
+        for frustum in frustums {
+            self.visit(frustum, |e| ids.push(self.entries[e as usize].id));
+        }
+        ids
     }
 
     /// How many entries it holds.
@@ -94,8 +116,7 @@ impl CasterIndex {
         self.entries[entry as usize].id
     }
 
-    /// Every entry in a leaf whose box and every ancestor's `frustum` keeps; a
-    /// superset of the entries whose own boxes it keeps.
+    /// Every entry whose own box `frustum` keeps: the nodes it culls hold none.
     pub(crate) fn visit(&self, frustum: &Frustum, mut hit: impl FnMut(u32)) {
         let mut stack = Vec::new();
         if !self.nodes.is_empty() {
@@ -108,40 +129,15 @@ impl CasterIndex {
             }
             match node.count {
                 0 => stack.extend([node.first, at + 1]),
-                n => (node.first..node.first + n).for_each(&mut hit),
+                n => {
+                    let leaf = node.first..node.first + n;
+                    let entries = leaf.filter(|&e| {
+                        let e = &self.entries[e as usize];
+                        frustum.intersects_aabb(e.lo, e.hi)
+                    });
+                    entries.for_each(&mut hit);
+                }
             }
-        }
-    }
-}
-
-impl RenderScene {
-    /// The digest, refolded if forgotten.
-    pub(super) fn refold_casting(&mut self) {
-        if self.casting.is_none() {
-            let statics = self.objects().filter(|(_, o)| o.is_static);
-            let statics = statics.map(|(id, o)| (id, &o.casting));
-            self.casting = Some(casting_key(statics, &self.unbaked));
-        }
-    }
-
-    /// The static bakes' key for `scene` (whose objects these are) now: what a
-    /// cascade layer or an atlas tile keeps beside what it baked.
-    pub(crate) fn statics_key(&self, scene: &Scene) -> StaticsKey {
-        let casting = self.casting.expect("an extract folds the digest");
-        (scene.id(), scene.world.static_revision(), casting)
-    }
-
-    /// The caster index rebuilt over the static objects' bounds if `scene`'s
-    /// statics key moved since it was built (#1874). A static object moved without
-    /// refolding the key is answered linearly by the sweeps until then
-    /// (`passes::shadows::casters::reach`).
-    pub(super) fn refresh_casters(&mut self, scene: &Scene) {
-        let key = self.statics_key(scene);
-        if self.casters_key != Some(key) {
-            let statics = self.objects().filter(|(_, o)| o.is_static);
-            let bounded = statics.filter_map(|(id, o)| o.bounds.map(|b| (id, b)));
-            self.casters = CasterIndex::build(bounded);
-            self.casters_key = Some(key);
         }
     }
 }
@@ -181,5 +177,5 @@ fn split(nodes: &mut Vec<Node>, entries: &mut [Entry], base: u32) {
 }
 
 #[cfg(test)]
-#[path = "casters_tests.rs"]
+#[path = "bvh_tests.rs"]
 mod tests;

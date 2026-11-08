@@ -158,9 +158,14 @@ impl ShadowRenderer {
         volumes: &[LightVolume],
     ) -> Vec<Vec<CasterBatch>> {
         let start = std::time::Instant::now();
-        let (candidates, joints, walls) = self.collect_casters(frame, lod, sweep);
+        let views: Vec<Mat4> = volumes.iter().map(|v| v.view_proj).collect();
+        let (candidates, joints) = match self.index_casters {
+            true => self.collect_casters(frame, lod, sweep, frame.objects.casters_near(&views)),
+            false => self.collect_casters(frame, lod, sweep, frame.objects.objects()),
+        };
+        let walls = frame.objects.walls();
         let pvs = &frame.objects.occlusion;
-        let index = self.index_casters.then_some(&frame.objects.casters);
+        let index = self.index_casters.then(|| frame.objects.caster_index());
         let reach = Reach::new(&candidates, index);
         let mut matrices = Vec::new();
         let mut per_volume = Vec::with_capacity(volumes.len());

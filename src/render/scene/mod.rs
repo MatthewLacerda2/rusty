@@ -42,7 +42,7 @@
 //! **Shadows** (part 2): the cascades' and the atlas's sweeps gather their casters
 //! from the objects (`passes::shadows::casters`), each slot carrying its shadow
 //! clip, and the static bakes' key is the scene's [`RenderScene::statics_key`],
-//! folded from the objects (`casters.rs`). A light volume finds its candidates
+//! folded from the objects (`casters/`). A light volume finds its candidates
 //! through the static objects' BVH there (#1874), rebuilt when that key moves.
 //!
 //! **On the GPU** (part 3): each object's `ObjectData` (world matrix, probe SH,
@@ -199,9 +199,11 @@ pub(crate) struct RenderScene {
     /// The scene's baked PVS bound to these objects (#1714), re-bound after a static
     /// one changed or the PVS was replaced.
     pub(crate) occlusion: OcclusionBinding,
-    /// Its static objects' BVH (#1874), and the statics key it was built under.
-    pub(crate) casters: CasterIndex,
+    /// Its static objects' BVH (#1874), the statics key it was built under, and
+    /// the objects that are not static, which every shadow volume gathers.
+    casters: CasterIndex,
     casters_key: Option<StaticsKey>,
+    dynamic: BTreeSet<u32>,
 }
 
 impl RenderScene {
@@ -212,6 +214,7 @@ impl RenderScene {
 
     /// Replace (or, with `None`, remove) entity `id`'s object.
     fn set(&mut self, id: u32, object: Option<RenderObject>) {
+        self.dynamic.remove(&id);
         if let Some(old) = self.objects.remove(&id) {
             self.order.remove(&old.seq);
             self.forget_casting(id, old.is_static);
@@ -225,6 +228,9 @@ impl RenderScene {
         }
         if let Some(object) = object {
             self.forget_casting(id, object.is_static);
+            if !object.is_static {
+                self.dynamic.insert(id);
+            }
             self.order.insert(object.seq, id);
             for name in &object.materials {
                 self.by_material.entry(name.clone()).or_default().insert(id);
@@ -255,6 +261,7 @@ impl RenderScene {
         self.objects.clear();
         self.order.clear();
         self.by_material.clear();
+        self.dynamic.clear();
         self.casting = None;
         self.occlusion.forget();
         (self.casters, self.casters_key) = (CasterIndex::default(), None);
@@ -266,6 +273,7 @@ impl RenderScene {
         if is_static {
             self.casting = None;
             self.occlusion.touch(id);
+            self.casters.touch(id);
         }
     }
 

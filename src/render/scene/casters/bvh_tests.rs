@@ -62,7 +62,7 @@ fn reached(index: &CasterIndex, view_proj: Mat4) -> Vec<u32> {
 fn the_index_reaches_every_caster_a_light_volume_keeps() {
     for (n, seed) in [(1, 7), (5, 11), (300, 3), (2000, 1874)] {
         let boxes = level(n, seed);
-        let index = CasterIndex::build(boxes.iter().copied());
+        let index = CasterIndex::build(boxes.iter().map(|&(id, b)| (id, Some(b))));
         assert_eq!(index.len(), n);
         let mut s = seed * 31 + 1;
         for _ in 0..12 {
@@ -88,7 +88,7 @@ fn the_index_reaches_every_caster_a_light_volume_keeps() {
 #[test]
 fn a_small_volume_reaches_few_of_a_large_level() {
     let boxes = level(6000, 20);
-    let index = CasterIndex::build(boxes.iter().copied());
+    let index = CasterIndex::build(boxes.iter().map(|&(id, b)| (id, Some(b))));
     let at = Vec3::new(100.0, 2.0, 100.0);
     let face = directx::perspective(std::f32::consts::FRAC_PI_2, 1.0, 0.05, 9.0);
     let hits = reached(&index, face * look_to_mat4(at, Vec3::X, Vec3::Y));
@@ -99,7 +99,7 @@ fn a_small_volume_reaches_few_of_a_large_level() {
 fn an_entity_is_answered_for_only_under_the_bounds_it_was_indexed_with() {
     let a = (Vec3::ZERO, Vec3::ONE);
     let nan = (Vec3::ZERO, Vec3::new(f32::NAN, 1.0, 1.0));
-    let index = CasterIndex::build([(4, a), (9, nan)].into_iter());
+    let mut index = CasterIndex::build([(4, Some(a)), (9, Some(nan)), (7, None)].into_iter());
     assert_eq!(index.len(), 1, "a box that is not finite is left out");
     assert_eq!(index.entry(4, Some(a)), Some(0));
     assert_eq!(index.entry(4, Some((Vec3::ZERO, Vec3::splat(2.0)))), None);
@@ -108,8 +108,18 @@ fn an_entity_is_answered_for_only_under_the_bounds_it_was_indexed_with() {
         None,
         "unbounded: tested by every volume"
     );
-    assert_eq!(index.entry(9, Some(nan)), None);
-    assert_eq!(index.entry(5, Some(a)), None);
+    assert_eq!(
+        (index.entry(9, Some(nan)), index.entry(5, Some(a))),
+        (None, None)
+    );
+    // Out of every volume: only the loose ones are handed over, then a stray too.
+    let nowhere = [Frustum::from_view_proj(directx::orthographic(
+        90.0, 91.0, 90.0, 91.0, 0.0, 1.0,
+    ))];
+    assert_eq!(index.near(&nowhere), [9, 7]);
+    index.touch(4);
+    assert_eq!((index.entry(4, Some(a)), index.strays()), (None, 1));
+    assert_eq!(index.near(&nowhere), [9, 7, 4]);
     let empty = CasterIndex::build(std::iter::empty());
     let mut hits = 0;
     empty.visit(&Frustum::from_view_proj(Mat4::ZERO), |_| hits += 1);

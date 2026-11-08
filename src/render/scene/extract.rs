@@ -188,6 +188,7 @@ impl Renderer {
                 moved += 1;
                 if object.is_static {
                     rs.occlusion.touch(id);
+                    rs.casters.touch(id);
                 }
             }
         }
