@@ -36,8 +36,10 @@ impl<T> Texel for T where
 {
 }
 
+mod charts;
 mod clip;
 
+pub(super) use charts::{chart_of_triangles, fill_within, texel_charts};
 use clip::Clipper;
 #[cfg(test)]
 pub(super) use clip::INSET;

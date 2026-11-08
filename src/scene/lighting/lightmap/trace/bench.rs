@@ -52,6 +52,14 @@ pub fn trace_texels(
                     let mut rng = Rng::new(settings.seed, *mesh, p.index as u64);
                     let (n, b) = (settings.samples, settings.bounces);
                     std::hint::black_box(tracer.texel(p.position, p.normal, n, b, &mut rng));
+                    let mut probes = Rng::probes(settings.seed, *mesh, p.index as u64);
+                    let tolerance = settings.backface_tolerance;
+                    std::hint::black_box(tracer.valid(
+                        p.position,
+                        p.normal,
+                        tolerance,
+                        &mut probes,
+                    ));
                 }
             });
         }
