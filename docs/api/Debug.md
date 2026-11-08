@@ -294,7 +294,10 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "graph": "guard.animgraph", "graph_enabled": true, "node": "Locomotion",
                  "layers": [ { "name": "UpperBody", "weight": 1.0, "node": "Aim" } ],
                  "apply_root_motion": false, "root_bone": "",         // #1745
-                 "root_motion": { "position": [x,y,z], "yaw": .. } }, // last step, degrees
+                 "root_motion": { "position": [x,y,z], "yaw": .. },   // last step, degrees
+                 "montages": [ { "slot": "UpperBody", "montage": "Reload",  // #1894, runtime
+                                 "section": "Default", "time": .., "weight": ..,
+                                 "blending_out": false } ] },
   "audio":     { "clip": "music/theme.ogg", "volume": .., "loop": false,
                  "play_on_start": false, "is_time_scaled": true,
                  "spatial_blend": 0.0, "initial_distance": .., "final_distance": ..,

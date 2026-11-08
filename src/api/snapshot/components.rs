@@ -9,8 +9,8 @@ use serde_json::{json, Value};
 pub(crate) use super::mesh::mesh_value;
 use super::vec3;
 use crate::components::{
-    AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape, LayerState,
-    LightComponent, MaterialAsset, NavMeshAgentComponent, ParticleEmitterComponent,
+    ActiveMontage, AnimatorComponent, CameraComponent, ColliderComponent, ColliderShape,
+    LayerState, LightComponent, MaterialAsset, NavMeshAgentComponent, ParticleEmitterComponent,
     RigidBodyComponent,
 };
 use crate::components::{
@@ -172,7 +172,8 @@ pub(crate) fn particle_value(p: &ParticleEmitterComponent) -> Value {
 /// animation-graph binding (#316), so a script can read back what `Animator.Set*`
 /// wrote and which graph state the evaluator holds active. Each parameter
 /// serializes externally tagged, e.g. `{"Bool": true}` / `{"Trigger": false}`; the
-/// `BTreeMap` keeps the keys name-sorted. `layers` lists the extra layers (#457).
+/// `BTreeMap` keeps the keys name-sorted. `layers` lists the extra layers (#457),
+/// `montages` what plays in the slots (#1894).
 pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
     json!({
         "clip": a.base.current_clip,
@@ -192,6 +193,19 @@ pub(crate) fn animator_value(a: &AnimatorComponent) -> Value {
             "position": a.root_motion.last.position.to_array(),
             "yaw": a.root_motion.last.yaw.to_degrees(),
         },
+        "montages": a.montages.playing.iter().map(montage_value).collect::<Vec<_>>(),
+    })
+}
+
+/// One playing montage (#1894): runtime only, never saved.
+fn montage_value(m: &ActiveMontage) -> Value {
+    json!({
+        "slot": m.slot.name,
+        "montage": m.montage.name,
+        "section": m.section_name(),
+        "time": m.time,
+        "weight": m.weight(),
+        "blending_out": m.out.is_some(),
     })
 }
 fn layer_value(l: &LayerState) -> Value {

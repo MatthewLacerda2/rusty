@@ -12,11 +12,13 @@ use serde::{Deserialize, Serialize};
 
 mod graph_state;
 mod ik;
+mod montage;
 mod parameters;
 mod playback;
 mod playhead;
 mod root_motion;
 pub use ik::{IkChain, IkConstraint, IkTarget};
+pub use montage::{ActiveMontage, MontageRefused, Montages, MONTAGE_BLEND_OUT, MONTAGE_END};
 pub use parameters::{AnimatorParameter, AnimatorParameters};
 pub use playback::{Motion, Playback, Step};
 pub use playhead::{Bounds, Playhead};
@@ -77,6 +79,10 @@ pub struct AnimatorComponent {
     /// runtime only, never saved.
     #[serde(skip)]
     pub root_motion: RootMotionState,
+    /// The montages playing in its slots (#1894); runtime only, never saved,
+    /// so a load or a Play/Stop restore leaves every slot empty.
+    #[serde(skip)]
+    pub montages: Montages,
 }
 
 /// One extra layer's runtime state (#457).
@@ -116,6 +122,7 @@ impl Default for AnimatorComponent {
             apply_root_motion: false,
             root_bone: String::new(),
             root_motion: RootMotionState::default(),
+            montages: Montages::default(),
         }
     }
 }
