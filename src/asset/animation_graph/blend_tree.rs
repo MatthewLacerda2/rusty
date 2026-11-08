@@ -14,7 +14,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::AnimationEvent;
+use super::{AnimationEvent, SyncMarker};
 
 /// How many trees may nest inside one another, the node's own tree included.
 /// Validation refuses a deeper graph; the runtime stops descending there.
@@ -64,6 +64,10 @@ pub struct ChildMotion {
     /// tree carries none of its own: its leaves carry their clips'.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<AnimationEvent>,
+    /// The child clip's sync markers (#1896), in its own seconds; a nested
+    /// tree carries none of its own.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sync_markers: Vec<SyncMarker>,
 }
 
 impl ChildMotion {

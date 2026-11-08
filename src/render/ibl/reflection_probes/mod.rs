@@ -24,7 +24,8 @@
 //! shader where its chain starts, so a 128-texel cube shares an array of 512-texel
 //! ones. The array is the only copy of a resident cube: a cube is read from disk,
 //! copied into its slot, and its own texture dropped, so the scene's byte budget
-//! (`LightingSettings::reflections`, counted at the array's face) bounds all the
+//! (`LightingSettings::reflections`, counted at the array's face in the array's
+//! format: BC6H, a byte a texel, where the adapter has BC, #1885) bounds all the
 //! probe memory there is. The frame fills it nearest box first, judging each cube by
 //! its KTX2 header before reading the rest of it, and leaves room in it for
 //! [`SPARE_SLOTS`] cubes that just left range (`frame.rs`, `slots.rs`). A cube
@@ -47,7 +48,7 @@ pub(crate) use self::pack::pack_blend;
 use self::slots::SlotTable;
 pub(crate) use self::slots::{MAX_REFLECTION_PROBES, SPARE_SLOTS};
 pub(crate) use self::uniform::ReflectionProbeUniform;
-use super::cubemap::{CubeShape, CubemapTexture};
+use super::cubemap::{CubeShape, CubemapTexture, CUBE_FORMAT};
 use crate::scene::{ReflectionProbe, ReflectionProbeSet};
 
 /// The largest face a resident cube may have: the largest a probe bakes at.
@@ -70,6 +71,9 @@ pub(crate) struct ProbeArray {
     face: u32,
     mips: u32,
     cubes: usize,
+    /// The format resident cubes are held in: BC6H where the adapter has
+    /// `TEXTURE_COMPRESSION_BC`, else `Rgba16Float`, decoded at load (#1885).
+    format: wgpu::TextureFormat,
     table: SlotTable,
     /// The shape of every cube path the frame has looked at, from its KTX2 header;
     /// `None` for a file that is missing or that the array does not admit.
@@ -88,7 +92,14 @@ pub(crate) struct ProbeArray {
 impl ProbeArray {
     /// One black 1×1 cube: the array before any probe is resident.
     pub(crate) fn new(device: &wgpu::Device) -> Self {
-        let (texture, view) = gpu::array_texture(device, 1, 1, 1);
+        let (texture, view) = gpu::stand_in(device);
+        let format = match device
+            .features()
+            .contains(wgpu::Features::TEXTURE_COMPRESSION_BC)
+        {
+            true => CUBE_FORMAT,
+            false => wgpu::TextureFormat::Rgba16Float,
+        };
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Reflection Probe Sampler"),
             mag_filter: wgpu::FilterMode::Linear,
@@ -103,6 +114,7 @@ impl ProbeArray {
             face: 1,
             mips: 1,
             cubes: 1,
+            format,
             table: SlotTable::default(),
             shapes: HashMap::new(),
             active: ReflectionProbeSet::new(),
@@ -123,6 +135,19 @@ impl ProbeArray {
     /// Every resident probe, as `LightingUniforms.refl_probes` holds them.
     pub(crate) fn uniforms(&self) -> &[ReflectionProbeUniform; MAX_REFLECTION_PROBES] {
         &self.uniforms
+    }
+
+    /// The format resident cubes are held in, and loaded as.
+    pub(crate) fn format(&self) -> wgpu::TextureFormat {
+        self.format
+    }
+
+    /// Hold cubes as `Rgba16Float`, decoded at load, as on an adapter without BC
+    /// (#1885): lavapipe has BC, so a test forces the fallback. Call it before any
+    /// cube is resident.
+    #[cfg(test)]
+    pub(crate) fn force_uncompressed(&mut self) {
+        self.format = wgpu::TextureFormat::Rgba16Float;
     }
 
     /// The array's face size: the largest resident cube's.
@@ -172,12 +197,13 @@ impl ProbeArray {
             .iter()
             .map(|(p, ..)| p.cubemap_path.as_str())
             .collect();
-        let room = budget / frame::array_bytes(face, 1).max(1);
+        let room = budget / frame::array_bytes(face, 1, self.format).max(1);
         let plan = self.table.plan(&paths, room as usize);
         let rebuilt = plan.capacity != self.cubes || face != self.face || mips != self.mips;
         if rebuilt {
             self.cubes = plan.capacity;
-            (self.texture, self.view) = gpu::array_texture(device, face, mips, self.cubes);
+            (self.texture, self.view) =
+                gpu::array_texture(device, face, mips, self.cubes, self.format);
             (self.face, self.mips) = (face, mips);
         }
         let copies = (plan.copies.iter())

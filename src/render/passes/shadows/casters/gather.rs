@@ -8,6 +8,7 @@ use super::{caster_facing, CasterFrame, CasterKey, ShadowRenderer, Sweep};
 use crate::components::ShadowCasting;
 use crate::render::gpu::draw_buffers::{push_palette, JointMatrix};
 use crate::render::lod::LodSelection;
+use crate::render::scene::RenderObject;
 
 impl ShadowRenderer {
     /// Every active caster `sweep` takes — a caster a surface variant cuts counts as
@@ -16,20 +17,17 @@ impl ShadowRenderer {
     /// index — one palette per caster per sweep, however many cascades draw it. Only
     /// what the frame decides is read here: the LOD level, the small-object verdict,
     /// and a palette object's pose and posed bounds, which animation writes unstamped.
-    /// Last, whether every unchanged baked occluder has its buffers: one that has
-    /// none draws into no map, so no light may cull by the PVS (#1714).
-    pub(super) fn collect_casters(
+    /// Taken of `objects`, in their order: every object, or those the sweep's
+    /// volumes could reach (`RenderScene::casters_near`, #1874).
+    pub(super) fn collect_casters<'a>(
         &self,
         frame: &CasterFrame,
         lod: &LodSelection,
         sweep: Sweep,
-    ) -> (Vec<Candidate>, Vec<JointMatrix>, bool) {
+        objects: impl IntoIterator<Item = (u32, &'a RenderObject)>,
+    ) -> (Vec<Candidate>, Vec<JointMatrix>) {
         let (mut casters, mut joints) = (Vec::new(), Vec::new());
-        let mut walls = true;
-        for (id, object) in frame.objects.objects() {
-            if !object.resident && frame.objects.occlusion.occludes(id) {
-                walls = false;
-            }
+        for (id, object) in objects {
             // An inactive caster, one set to cast nothing (#1571), or a level of detail
             // this sweep does not draw (#472).
             let off = !object.cast.casts() || !object.active;
@@ -78,6 +76,6 @@ impl ShadowRenderer {
                 });
             }
         }
-        (casters, joints, walls)
+        (casters, joints)
     }
 }

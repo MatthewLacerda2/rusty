@@ -31,14 +31,18 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.SetCollisionDetection` | `(id, mode)` | — (`mode` is `"Discrete"` or `"Continuous"`, case-insensitive; an unknown name is an error) |
 | `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask [, max_distance [, query_triggers]]]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root, material` |
 | `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask [, max_distance [, query_triggers]]]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root, material` |
+| `Physics.CapsuleCast` | `(x0, y0, z0, x1, y1, z1, radius, dx, dy, dz [, ignore_id [, layer_mask [, max_distance [, query_triggers]]]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root, material` |
+| `Physics.BoxCast` | `(cx, cy, cz, hx, hy, hz, dx, dy, dz [, rx, ry, rz [, ignore_id [, layer_mask [, max_distance [, query_triggers]]]]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root, material` |
 | `Physics.RaycastAll` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | array of `{id, distance, point = {x,y,z}, normal = {x,y,z}, bone, bone_name, root, material}`, nearest first |
+| `Physics.SphereCastAll` | `(ox, oy, oz, dx, dy, dz, radius, max_distance [, layer_mask [, query_triggers]])` | `RaycastAll`'s array, nearest first |
 | `Physics.RaycastAllNonAlloc` | `(results, ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | hit count; `results[1..count]` refilled with `RaycastAll`'s entries |
 | `Physics.RaycastThrough` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | array of `{id, bone, bone_name, root, material, thickness, enter = {distance, point, normal}, exit = {distance, point, normal} or nil}`, nearest entry first |
 | `Physics.OverlapSphere` | `(cx, cy, cz, radius [, layer_mask [, query_triggers]])` | array of entity ids |
-| `Physics.OverlapBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask [, query_triggers]])` | array of entity ids |
+| `Physics.OverlapBox` | `(cx, cy, cz, hx, hy, hz [, rx, ry, rz [, layer_mask [, query_triggers]]])` | array of entity ids |
 | `Physics.OverlapCapsule` | `(x0, y0, z0, x1, y1, z1, radius [, layer_mask [, query_triggers]])` | array of entity ids |
 | `Physics.CheckSphere` | `(cx, cy, cz, radius [, layer_mask [, query_triggers]])` | `bool` |
-| `Physics.CheckBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask [, query_triggers]])` | `bool` |
+| `Physics.CheckBox` | `(cx, cy, cz, hx, hy, hz [, rx, ry, rz [, layer_mask [, query_triggers]]])` | `bool` |
+| `Physics.CheckCapsule` | `(x0, y0, z0, x1, y1, z1, radius [, layer_mask [, query_triggers]])` | `bool` |
 | `Physics.ClosestPoint` | `(id, x, y, z)` | `found, cx, cy, cz` |
 | `Physics.ContainsPoint` | `(id, x, y, z)` | `bool` |
 | `Physics.GetBounds` | `(id)` | `found, min_x, min_y, min_z, max_x, max_y, max_z` |
@@ -60,7 +64,7 @@ own id so a shot can't hit its source. The engine has no built-in "don't hit the
 player" rule; an entity is hittable simply if it exists **and is active**.
 
 **Inactive entities are invisible to queries (#521).** A deactivated entity
-(`SetActive(false)`) is skipped by every query — `Raycast`, `SphereCast`, the
+(`SetActive(false)`) is skipped by every query — `Raycast`, the shape casts, the
 `Overlap*`/`Check*` family, and the engine's own hitscan pass through it, and
 `ClosestPoint`/`ContainsPoint` answer as if it had no collider — and a
 `CharacterController.Move` passes through it instead of being blocked. Deactivating a
@@ -80,7 +84,7 @@ Matrix** (Scene Settings), which governs which layers physically collide.
 so `Physics.Raycast(ox,oy,oz, dx,dy,dz, nil, nil, 5)` is a 5 m cast with no ignore
 id and no mask.
 
-- `max_distance` on `Raycast` / `SphereCast` defaults to unlimited (`math.huge`
+- `max_distance` on `Raycast` and the single shape casts defaults to unlimited (`math.huge`
   is the same). The cast's traversal stops there, so a short line-of-sight check
   costs a short ray, not one across the level. A negative or NaN distance hits
   nothing, on every cast that takes one, as Unity's PhysX casts reject it.
@@ -95,12 +99,36 @@ id and no mask.
 Every query except `GetBounds` asks the **live rapier world**, so it needs Play
 mode — before Play, casts and checks miss/return `false` and overlaps are empty,
 exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` /
-`OverlapCapsule` / `CheckSphere` / `CheckBox` / `SphereCast`,
+`OverlapCapsule` / `CheckSphere` / `CheckBox` / `CheckCapsule` / `SphereCast` /
+`CapsuleCast` / `BoxCast` / `SphereCastAll`,
 `Collider.ClosestPoint`, and `Collider.bounds`.
 
 - **`SphereCast`** is a raycast with thickness — the melee-swing / thick-projectile
   query. `distance` is how far the sphere's *center* traveled before impact; the
   point is where the sphere touched the struck surface.
+- **`CapsuleCast` / `BoxCast`** (#1881) sweep a capsule or a box the same way:
+  *will an enemy's body fit through here?* is a capsule cast, a melee or shield
+  sweep a box cast. Unity's argument order, flattened: the capsule's two sphere
+  centers, its radius, then the direction; the box's center, half-extents,
+  direction, then an optional orientation as Euler degrees (`rx, ry, rz`, as
+  `Transform.GetRotation` returns; omit all three for none). Same trailing
+  options and returns as `SphereCast`; `distance` is how far the shape moved,
+  the point is the contact on the struck surface.
+- **`SphereCastAll`** (#1881) is `RaycastAll` for a swept sphere: every collider
+  it strikes within `max_distance`, each at its first contact, nearest first
+  (ties by entity id, as `RaycastAll`, where Unity's order is undefined).
+- **A shape cast that starts overlapping a collider hits it at distance `0`**,
+  the single casts and `SphereCastAll` alike; its normal is the way out of the
+  overlap that the physics engine finds, and its point is not a meaningful
+  contact. Unity's single casts skip such a collider, and its `SphereCastAll`
+  reports it with a zero point and the normal opposite the sweep; rusty keeps
+  its own `SphereCast`'s rule for all of them, so a script tests `distance == 0`.
+- **Bad arguments are errors** on every shape cast and volume query: a radius or
+  half-extent that is negative or not finite, a non-finite position, a
+  zero-length direction (where Unity returns `false`), or an orientation with
+  only some of its three angles raises a Lua error naming the argument. A
+  direction of any finite non-zero length is normalized, however tiny or huge. A size of `0` is valid, as in Unity: a zero radius overlaps a point
+  (or a segment, for a capsule) and casts like a ray.
 - **`RaycastAll`** reports *every* collider the ray crosses within `max_distance`,
   sorted by distance (equal distances by entity id, so the order is
   deterministic). Each entry is where the ray *enters* that collider; for how
@@ -167,10 +195,13 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
 - **`OverlapSphere` / `OverlapBox` / `OverlapCapsule`** return the ids of every
   entity whose collider intersects the volume *right now* (the grenade-radius /
   zone-check query), as a Lua array sorted ascending. `OverlapBox` takes
-  half-extents (`hx, hy, hz`, Unity's `halfExtents`) and is axis-aligned;
+  half-extents (`hx, hy, hz`, Unity's `halfExtents`) and an optional
+  orientation in Euler degrees (`rx, ry, rz`, #1881; omitted, the box is
+  axis-aligned), so an explosion or a trigger volume can lie along a wall;
   `OverlapCapsule` spans the two sphere centers `p0`→`p1` with `radius`.
-- **`CheckSphere` / `CheckBox`** are the boolean fast-path when you only need
-  "is anything there?".
+- **`CheckSphere` / `CheckBox` / `CheckCapsule`** are the boolean fast-path
+  when you only need "is anything there?"; each takes its `Overlap*` sibling's
+  arguments.
 - **`ClosestPoint`** returns the nearest point on that entity's collider to the
   query point; a point inside the collider is its own closest point.
   `found=false` ⇒ the entity has no live collider (edit mode, or no collider) and
@@ -272,6 +303,20 @@ must be `> 0`. The shape is read when the body is built (entering Play, or a
 hierarchy change); `SetColliderShape` refreshes the bounds (`GetBounds`)
 immediately.
 
+**Mesh** (Unity: `MeshCollider`) with `convex = true` is one convex hull of the
+mesh, on any body. A **concave** one (`convex = false`) depends on its body: on a
+static or kinematic body it is the exact triangle mesh; on a dynamic Rigidbody,
+where a triangle mesh has only surfaces (an object driven inside it falls
+through), it is split into convex pieces (V-HACD), which simulate as one solid
+with the mass spread over its volume and keep its hollows open (a bowl holds
+what lands in it). Unity refuses that case and asks for *Convex*; rusty splits it
+instead (#1886). The split is made once per mesh and scale for the session (a few
+hundred milliseconds for a prop, the first time) and redone when the body changes
+type in Play (`SetKinematic`, a Rigidbody added to a static mesh). A mesh too
+flat or too degenerate to split stays a triangle mesh, with one console warning
+naming the entity.
+`RaycastThrough` reads the pieces as one solid.
+
 The **physics material** (Unity: `PhysicMaterial`) sets how a collider grips
 and bounces:
 
@@ -312,8 +357,8 @@ behaviour throughout:
   Play. A change made to the file outside the engine is picked up the same way
   while the editor watches the project. The inspector writes the file when a
   drag on a value ends, not on every frame of it.
-- **Every hit names its material.** `Raycast` and `SphereCast` return the asset's
-  path as their 13th value; `RaycastAll`, `RaycastAllNonAlloc` and each crossing
+- **Every hit names its material.** `Raycast` and the single shape casts return the asset's
+  path as their 13th value; `RaycastAll`, `RaycastAllNonAlloc`, `SphereCastAll` and each crossing
   of `RaycastThrough` carry it as `material`; a collision callback's `contact`
   names the other collider's as `contact.material` (Unity's
   `hit.collider.sharedMaterial`). It is `nil` for a collider with inline values.
@@ -367,7 +412,7 @@ world `x = 11`. Unity semantics:
   the entity is its own body, as before (static, or an implicit kinematic body).
   A `CharacterController` counts as a body here too: colliders under it ride its
   capsule's body.
-- **Hits name the part.** `Raycast`, `SphereCast`, the overlaps, `ClosestPoint`,
+- **Hits name the part.** `Raycast`, the shape casts, the overlaps, `ClosestPoint`,
   `ContainsPoint`, trigger and collision events report the entity that **owns the collider**
   that was hit, never the body's root — so a script can tell a head hit from a
   torso hit. A deactivated part's collider stops generating contacts, trigger and
@@ -420,10 +465,10 @@ card) fits one collider per bone of `id`'s skinned mesh and returns
   under a bone is moved to its bone's pose for queries, so a cast in the next
   `Update` hits the pose that was on screen.
 
-**Hits name the bone and the character.** `Raycast` / `SphereCast` return the
+**Hits name the bone and the character.** `Raycast` and the single shape casts return the
 struck `bone` (the hit entity itself when it is a bone, else its nearest bone
 ancestor; `nil` off a skeleton), its `bone_name` (the glTF joint name) and `root`, the top of the hit entity's hierarchy
-(Unity's `Transform.root`: the character). `RaycastAll` and `RaycastThrough`
+(Unity's `Transform.root`: the character). `RaycastAll`, `SphereCastAll` and `RaycastThrough`
 entries carry `bone`, `bone_name` and `root`.
 
 **Convention: the capsule moves, the hitboxes take the shots.** Put the

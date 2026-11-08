@@ -181,14 +181,16 @@ fn advance_frame(_world: &mut World, res: &mut Resources) {
 /// Keep the navmesh in step with the scene every tick (#456): advance the
 /// obstacles' carving bookkeeping, then rebake only the cells whose static
 /// colliders or carving obstacles changed; a tick no static entity changed in
-/// skips the static colliders altogether (#1707). Play frame 0 bakes in full, so a Play
-/// session starts from the same navmesh whatever edit mode left behind.
+/// skips the static colliders altogether (#1707). Play frame 0 starts afresh from the
+/// scene's saved navmesh, or bakes in full when it has none that matches (#1887), so a
+/// Play session starts from the same navmesh whatever edit mode left behind; a
+/// play-mode `Scene.Load` starts its scene the same way, in the load step.
 fn rebake_nav(world: &mut World, res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
     crate::navigation::tick_obstacles(&mut scene, res.frame_dt);
     let mut nav = res.nav.borrow_mut();
-    if res.play_frame == 0 {
-        nav.bake_tracked(&mut scene);
+    if res.play_frame == 0 || !nav.tracks(&scene) {
+        nav.start_tracked(&mut scene);
     } else {
         nav.sync_changes(&mut scene);
     }
@@ -200,13 +202,18 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
     nav.tick_nav_agents(&mut s, res.frame_dt);
 }
 
-/// `OnAnimationEvent(id, name)` (#459) for every event `animate` queued this
+/// `OnAnimationEvent(id, name, info)` (#459) for every event `animate` queued this
 /// tick: after the animation step and ragdoll posing, so a handler reads the
 /// pose this tick renders (bar `LateUpdate` and IK), and before `LateUpdate`, as
-/// in Unity, where animation events fire during the Animator's update.
+/// in Unity, where animation events fire during the Animator's update. Then the
+/// `OnControllerColliderHit`s of the moves root motion made (#1879): a script's
+/// own `Move` raises its hits inside the call, but root motion moves outside any
+/// script, so its hits wait for this point, the animation step's callbacks.
 fn dispatch_animation_events(_world: &mut World, res: &mut Resources) {
     let events = std::mem::take(&mut res.animation_events);
     res.script_manager.dispatch_animation_events(&events);
+    let hits = std::mem::take(&mut res.controller_hits);
+    res.script_manager.dispatch_queued_controller_hits(&hits);
 }
 
 /// The palette build (#453): once every pose writer of the frame has run, skin
@@ -223,6 +230,10 @@ mod standalone_tests;
 #[cfg(test)]
 #[path = "play_tests.rs"]
 mod play_tests;
+
+#[cfg(test)]
+#[path = "play_navmesh_tests.rs"]
+mod play_navmesh_tests;
 
 #[cfg(test)]
 #[path = "import_tests/mod.rs"]

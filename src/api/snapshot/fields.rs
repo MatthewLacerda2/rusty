@@ -6,11 +6,12 @@
 
 use serde_json::Value;
 
+use super::animator::animator_value;
 use super::audio::{audio_value, reverb_zone_value};
 use super::components::character_controller_value as cc_value;
 use super::components::{
-    animator_value, camera_component_value, collider_value, light_value, material_value,
-    mesh_value, nav_agent_value, particle_value, rigidbody_value,
+    camera_component_value, collider_value, light_value, material_value, mesh_value,
+    nav_agent_value, particle_value, rigidbody_value,
 };
 use super::components::{joint_value, line_value, lod_group_value, trail_value};
 use super::navigation::{nav_modifier_value, nav_obstacle_value, offmesh_link_value};

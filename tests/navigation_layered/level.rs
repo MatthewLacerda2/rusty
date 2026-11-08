@@ -19,6 +19,7 @@ pub const BOUNDS: NavBounds = NavBounds::new(0.0, 200.0, 0.0, 200.0);
 /// Build the level into a fresh scene.
 pub fn build() -> Scene {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     add_box(
         &mut scene,
         Vec3::new(0.0, -0.5, 0.0),

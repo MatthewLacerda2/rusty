@@ -39,9 +39,14 @@ def failed(tip: dict, runs: list[dict], jobs: dict[int, list[dict]], expired: ru
     )
 
 
-def wait(repo: str, sha: str, deadline: float, poll: float, tick=None, say=outcomes.say) -> tuple[str, list[str]]:
+def wait(
+    repo: str, sha: str, deadline: float, poll: float, tick=None, say=outcomes.say, files: tuple[str, ...] | list[str] = ()
+) -> tuple[str, list[str]]:
     """Poll until the gates on `sha` settle: [`outcomes.GO`], [`RED`] or
     [`STALLED`], with why. Past `deadline` seconds it is stalled, nothing red.
+    `files` are every member's changed paths: the tip carries them as a pull
+    request does, so a member editing what the setup steps run makes a setup
+    failure the train's code's ([`verdict.setup.edited`], #1932).
     A poll GitHub fails (out of retries, or a `gh` refusal) is *wait*, until the
     deadline (#1785's review: one HTTP 500 at minute 20 stopped the watch, and its
     relaunch built a new sha, so every member paid the CI round again)."""
@@ -50,7 +55,8 @@ def wait(repo: str, sha: str, deadline: float, poll: float, tick=None, say=outco
         waited = time.monotonic() - began
         try:
             runs, jobs = github.evidence(repo, sha)
-            tip = {"headRefOid": sha, "isDraft": False, "statusCheckRollup": github.rollup(repo, sha)}
+            tip = {"headRefOid": sha, "isDraft": False, "statusCheckRollup": github.rollup(repo, sha),
+                   "files": [{"path": p} for p in files]}
         except (github.Unreachable, SystemExit) as down:
             lines = [f"GitHub did not answer this poll ({down}); waiting on."]
         else:

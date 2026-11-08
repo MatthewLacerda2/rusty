@@ -11,6 +11,7 @@ use super::{add_box, add_ramp, bake, heights};
 /// x = 8..22, all over z = 7..13.
 fn bridge() -> NavigationGraph {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     add_box(
         &mut scene,
         Vec3::new(0.0, -0.2, 0.0),

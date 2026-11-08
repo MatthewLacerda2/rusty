@@ -114,3 +114,24 @@ fn levels_stop_at_whole_blocks() {
     assert_eq!(max_levels(4), 1);
     assert_eq!(max_levels(6), 0);
 }
+
+/// A level under a block (a cube's 2×2 and 1×1 mips, #1885) is one padded block,
+/// and decodes to its own texels.
+#[test]
+fn a_level_under_a_block_is_one_padded_block() {
+    for edge in [1u32, 2] {
+        let texels: Vec<Vec3> = (0..edge * edge)
+            .map(|i| Vec3::new(1.0 + i as f32, 0.5, 4.0))
+            .collect();
+        let blocks = super::bc6h_level(edge, &texels, 3);
+        assert_eq!(blocks.len(), 16);
+        let back = super::bc6h_texels(edge, &blocks);
+        assert_eq!(back.len(), texels.len());
+        for (got, want) in back.iter().zip(&texels) {
+            assert!(
+                (*got - *want).abs().max_element() < 0.05 * want.max_element(),
+                "{got} {want}"
+            );
+        }
+    }
+}

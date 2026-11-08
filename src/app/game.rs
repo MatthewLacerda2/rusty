@@ -267,7 +267,7 @@ impl GameWorld {
             self.resources
                 .nav
                 .borrow_mut()
-                .bake(&self.world.scene.borrow());
+                .restore_or_bake(&self.world.scene.borrow());
         }
         self.restore_play_origin();
         self.apply_project_settings(); // a `SetLimits` made in Play ends with it

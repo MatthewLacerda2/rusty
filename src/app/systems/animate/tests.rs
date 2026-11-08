@@ -42,8 +42,8 @@ pub(super) fn playing(scene: &mut Scene, metres: f32) -> u32 {
     id
 }
 
-/// A static box of `size` centred on `at`.
-pub(super) fn add_box(scene: &mut Scene, at: Vec3, size: Vec3) {
+/// A static box of `size` centred on `at`; its id.
+pub(super) fn add_box(scene: &mut Scene, at: Vec3, size: Vec3) -> u32 {
     let id = scene.add_entity("Box".to_string());
     scene.world.transform_mut(id).unwrap().position = at;
     scene.world.set_static(id, true);
@@ -52,6 +52,7 @@ pub(super) fn add_box(scene: &mut Scene, at: Vec3, size: Vec3) {
         ..crate::scene::authoring::default_collider()
     };
     scene.world.set_collider(id, Some(collider));
+    id
 }
 
 /// Play `scene` for 1.5 s; the guard's world position each tick, and the

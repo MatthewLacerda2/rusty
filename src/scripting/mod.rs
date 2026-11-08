@@ -35,6 +35,7 @@ mod timers;
 pub use console::{ConsoleLogs, DemoFeed, LogLevel, Mark};
 pub use discovery::{monobehaviour_scripts, script_label};
 pub use journal::{HostCall, HostJournal, Plain};
+pub use lifecycle::dispatch_controller_hits;
 pub use manager::ScriptManager;
 pub(crate) use sandbox::require_sim_vm;
 #[cfg(feature = "dev")]

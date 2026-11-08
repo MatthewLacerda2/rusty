@@ -42,7 +42,8 @@
 //! **Shadows** (part 2): the cascades' and the atlas's sweeps gather their casters
 //! from the objects (`passes::shadows::casters`), each slot carrying its shadow
 //! clip, and the static bakes' key is the scene's [`RenderScene::statics_key`],
-//! folded from the objects.
+//! folded from the objects (`casters/`). A light volume finds its candidates
+//! through the static objects' BVH there (#1874), rebuilt when that key moves.
 //!
 //! **On the GPU** (part 3): each object's `ObjectData` (world matrix, probe SH,
 //! lightmap) sits at its slot of the renderer's [`ObjectTable`] (`table.rs`),
@@ -58,6 +59,7 @@
 //! re-derives only the objects whose slots name the material
 //! (`RenderScene::by_material`).
 
+mod casters;
 mod classes;
 #[cfg(test)]
 mod classes_gpu_tests;
@@ -92,6 +94,7 @@ mod table;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub(crate) use casters::CasterIndex;
 pub(crate) use draw::CameraSolids;
 pub(crate) use handles::{MeshHandle, MeshHandles};
 pub(crate) use object::{RenderObject, SlotDraw};
@@ -101,7 +104,7 @@ pub(crate) use occlusion::OcclusionBinding;
 pub(crate) use records::{MaterialRecords, Variant};
 pub(crate) use table::{ObjectTable, SlotTable, Slotted};
 
-use crate::render::passes::shadows::{casting_key, StaticsKey, UnbakedCasters};
+use crate::render::passes::shadows::UnbakedCasters;
 use crate::render::{GpuMesh, Renderer};
 use crate::scene::{Scene, SceneId};
 
@@ -196,6 +199,8 @@ pub(crate) struct RenderScene {
     /// The scene's baked PVS bound to these objects (#1714), re-bound after a static
     /// one changed or the PVS was replaced.
     pub(crate) occlusion: OcclusionBinding,
+    /// What its shadow sweeps gather through (#1874): the static objects' BVH.
+    casters: casters::Gathering,
 }
 
 impl RenderScene {
@@ -225,6 +230,7 @@ impl RenderScene {
             }
             self.objects.insert(id, object);
         }
+        self.casters.set(id, self.objects.get(&id));
     }
 
     /// The objects drawing any library material in `names`.
@@ -251,6 +257,7 @@ impl RenderScene {
         self.by_material.clear();
         self.casting = None;
         self.occlusion.forget();
+        self.casters = casters::Gathering::default();
     }
 
     /// Static object `id` came or went: the digest is refolded, and the PVS
@@ -259,6 +266,7 @@ impl RenderScene {
         if is_static {
             self.casting = None;
             self.occlusion.touch(id);
+            self.casters.touch(id);
         }
     }
 
@@ -269,23 +277,8 @@ impl RenderScene {
         if unbaked != self.unbaked {
             self.unbaked = unbaked;
             self.casting = None;
+            self.casters.stale();
         }
-    }
-
-    /// The digest, refolded if forgotten.
-    fn refold_casting(&mut self) {
-        if self.casting.is_none() {
-            let statics = self.objects().filter(|(_, o)| o.is_static);
-            let statics = statics.map(|(id, o)| (id, &o.casting));
-            self.casting = Some(casting_key(statics, &self.unbaked));
-        }
-    }
-
-    /// The static bakes' key for `scene` (whose objects these are) now: what a
-    /// cascade layer or an atlas tile keeps beside what it baked.
-    pub(crate) fn statics_key(&self, scene: &Scene) -> StaticsKey {
-        let casting = self.casting.expect("an extract folds the digest");
-        (scene.id(), scene.world.static_revision(), casting)
     }
 }
 

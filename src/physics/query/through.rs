@@ -8,7 +8,10 @@
 //! at most once, and its exit is a reverse cast from beyond its far side. A
 //! triangle mesh (a whole building) can be crossed many times — wall, room, wall
 //! — so its faces are walked along the ray and paired by winding: a face whose
-//! outward normal opposes the ray is an entry, one facing along it an exit.
+//! outward normal opposes the ray is an entry, one facing along it an exit. A
+//! compound (a concave mesh on a dynamic body, split into convex pieces, #1886)
+//! is crossed piece by piece, and pieces the ray passes from one straight into
+//! the next are one stretch of solid.
 
 use glam::Vec3;
 use rapier3d::prelude::*;
@@ -71,10 +74,36 @@ pub(in crate::physics) fn spans(
     ray: &Ray,
     max_toi: f32,
 ) -> Vec<Span> {
+    if let Some(compound) = shape.as_compound() {
+        return compound_spans(compound, pose, ray, max_toi);
+    }
     match shape.as_trimesh() {
         Some(mesh) => mesh_spans(mesh, pose, ray, max_toi),
         None => convex_span(shape, pose, ray, max_toi).into_iter().collect(),
     }
+}
+
+/// A compound's crossings: each convex piece's, nearest first, with a piece the
+/// ray enters within [`SKIN`] of leaving the last (touching or overlapping hulls)
+/// joined to it, so a solid split into pieces reads as the solid.
+fn compound_spans(compound: &Compound, pose: &Pose, ray: &Ray, max_toi: f32) -> Vec<Span> {
+    let mut pieces: Vec<Span> = (compound.shapes().iter())
+        .filter_map(|(at, part)| convex_span(part.as_ref(), &(*pose * *at), ray, max_toi))
+        .collect();
+    pieces.sort_by(|a, b| a.enter.total_cmp(&b.enter));
+    let mut spans: Vec<Span> = Vec::new();
+    for piece in pieces {
+        match spans.last_mut() {
+            Some(last) if last.exit.is_none_or(|(t, _)| piece.enter <= t + SKIN) => {
+                let far = |s: &Span| s.exit.map_or(f32::INFINITY, |(t, _)| t);
+                if far(&piece) > far(last) {
+                    last.exit = piece.exit;
+                }
+            }
+            _ => spans.push(piece),
+        }
+    }
+    spans
 }
 
 /// A convex shape's single crossing. The exit comes from a reverse cast that

@@ -14,6 +14,8 @@
 //! bone subtrees and blended by override or addition (`layers`). Every layer is
 //! the same kind of pose — per-joint local TRS, `None` where it is not driven —
 //! so they compose joint by joint, and only joints something keys are written.
+//! Since #1894 **montages** play one-off clips in named slots above every layer
+//! (`montage`), composed the same way.
 //!
 //! Purity / determinism: every function here is a pure function of (skin, clips,
 //! graph, parameters, time) — no wall clock, no RNG — so a headless replay at the fixed timestep is
@@ -24,8 +26,10 @@ mod clip;
 mod events;
 pub(crate) mod graph;
 mod layers;
+mod montage;
 mod motion;
 pub(crate) mod root_motion;
+mod sync;
 
 pub use events::{Crossed, END_EVENT};
 pub use motion::Pose;
@@ -87,8 +91,8 @@ fn bone_local(skin: &SkinData, slot: usize, local: JointTransform) -> TransformC
 }
 
 /// The pose `anim` puts `mesh`'s skeleton in: the base layer's playback, then
-/// each extra layer of `graph` composed over it in order. `None` for a skinless or
-/// clipless mesh.
+/// each extra layer of `graph` composed over it in order, then the montages in
+/// their slots (#1894). `None` for a skinless or clipless mesh.
 pub fn sample_pose<'m>(
     anim: &AnimatorComponent,
     mesh: &'m MeshComponent,
@@ -127,6 +131,7 @@ pub fn sample_pose<'m>(
         };
         compose(&mut pose, &layer_pose, &skin.local_bind);
     }
+    montage::compose(&mut pose, skin, &mesh.clips, &anim.montages);
     Some((skin, pose))
 }
 
@@ -156,17 +161,18 @@ pub struct Stepped {
 /// [`advance`], also measuring the step's root motion over the root bone
 /// (`anim.root_bone`, see `root_motion`): each layer's delta, crossfades and
 /// blend trees blended as their poses are, then the layers stacked over the
-/// base one the way [`sample_pose`] stacks their poses.
+/// base one the way [`sample_pose`] stacks their poses, the montages' over them.
 pub fn step(
     anim: &mut AnimatorComponent,
     mesh: Option<&MeshComponent>,
     graph: Option<&AnimationGraph>,
     dt: f32,
 ) -> Stepped {
+    let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
+    sync::place_pending(anim, clips, graph);
     if !anim.is_running() {
         return Stepped::default();
     }
-    let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
     let skin = mesh.and_then(|m| m.skin.as_ref());
     let bone = skin.and_then(|s| RootBone::resolve(s, &anim.root_bone));
     let AnimatorComponent {
@@ -184,12 +190,11 @@ pub fn step(
     // One layer's step: its events and, with a root bone, its root motion.
     let advance_layer = |playback: &mut Playback, layer: usize| {
         let ctx = context(layer);
-        let outgoing = bone
-            .as_ref()
-            .and_then(|_| root_motion::Outgoing::of(playback));
+        let before = ctx.before_step(playback, bone.is_some());
         let (events, step) = ctx.advance(playback, dt, *speed, layer);
-        let root = skin.zip(bone.as_ref()).and_then(|(skin, bone)| {
-            ctx.playback_root(skin, bone, playback, step, outgoing.as_ref())
+        let root = before.and_then(|b| {
+            let (skin, bone) = (skin?, bone.as_ref()?);
+            ctx.playback_root(skin, bone, playback, step, &b)
         });
         (events, root)
     };
@@ -210,6 +215,9 @@ pub fn step(
             root = Some(stack(below, delta, layer.blending, state.weight));
         }
     }
+    // The montages' slots sit above every layer (#1894).
+    let (rooted, base) = (skin.zip(bone.as_ref()), graph_layers.len() + 1);
+    events.extend(montage::step(anim, clips, dt, base, rooted, &mut root));
     events::sort(&mut events);
     Stepped { events, root }
 }

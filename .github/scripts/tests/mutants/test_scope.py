@@ -65,6 +65,15 @@ class Repo(unittest.TestCase):
         with self.assertRaises(SystemExit):
             scope.resolve("src/nowhere/**", "main")
 
+    def test_a_commit_diff_is_that_commit_s_rust_whatever_the_base(self) -> None:
+        sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+        plan, diff = scope.resolve("diff", "origin/absent", commit=sha)
+        self.assertEqual((plan["files"], plan["commit"]), (["src/physics/a.rs"], sha))
+        self.assertIn("+fn f() -> u32 { 2 }", diff)
+        line, go = scope.check(plan, [{"file": "src/physics/a.rs"}])
+        self.assertTrue(go)
+        self.assertIn(f"commit `{sha[:9]}`", line)
+
     def test_a_missing_base_is_refused_not_read_as_empty(self) -> None:
         with self.assertRaises(SystemExit):
             scope.resolve("diff", "origin/absent")

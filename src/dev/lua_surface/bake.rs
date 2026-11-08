@@ -1,6 +1,7 @@
 //! src/dev/lua_surface/bake.rs — the bake verbs: `Probe.Bake` (#241),
 //! `Reflection.Bake` (#245), the one-button `Lighting.Bake` (#246), and the lightmap
-//! pair `Lighting.BakeLightmaps` / `ClearLightmaps` (#438).
+//! pair `Lighting.BakeLightmaps` / `ClearLightmaps` (#438), and `Navigation.Bake`
+//! (#1887), which here also saves the navmesh beside the scene.
 //!
 //! Each is an authoring action, so each is added here, onto the namespace table `api`
 //! registered, rather than in `api` itself (#737). The three GPU bakes return `true`
@@ -13,8 +14,8 @@ use mlua::Lua;
 
 use super::super::{
     bake::generate_lighting::refuse_while_baking, bake::lighting as lighting_bake,
-    bake::lightmap as lightmap_bake, bake::probe as probe_bake, bake::progress::BakeLog,
-    bake::reflection as reflection_bake,
+    bake::lightmap as lightmap_bake, bake::navmesh::bake_navmesh, bake::probe as probe_bake,
+    bake::progress::BakeLog, bake::reflection as reflection_bake,
 };
 use super::generate::Overrides;
 use crate::api::{global_table, put, ApiCtx, Reg};
@@ -25,7 +26,35 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     register_probe(lua, ctx)?;
     register_reflection(lua, ctx)?;
     register_lighting(lua, ctx)?;
-    register_lightmaps(lua, ctx)
+    register_lightmaps(lua, ctx)?;
+    register_navigation(lua, ctx)
+}
+
+/// `Navigation.Bake()` (#1887): bake the navmesh in full and, in edit mode, keep it
+/// on the scene and write `<scene>.navmesh`. `true` when the file was written; `false`
+/// for an unsaved scene (its first save writes it) and during Play (the live navmesh
+/// only).
+fn register_navigation(lua: &Lua, ctx: &ApiCtx) -> Reg {
+    let (scene, scene_path, nav, console) = (ctx.scene, ctx.scene_path, ctx.nav, ctx.console);
+    put(
+        &global_table(lua, "Navigation")?,
+        "Bake",
+        lua.create_function(move |lua, ()| {
+            let scene = &*scene.get(lua)?;
+            let path = scene_path.get(lua)?.borrow().clone();
+            let nav = &*nav.get(lua)?;
+            let mut scene = scene.borrow_mut();
+            let written = bake_navmesh(&mut scene, &mut nav.borrow_mut(), path.as_deref())
+                .map_err(mlua::Error::external)?;
+            if let Some(file) = &written {
+                console
+                    .get(lua)?
+                    .borrow_mut()
+                    .info(format!("[Navigation] wrote {file}"));
+            }
+            Ok(written.is_some())
+        }),
+    )
 }
 
 /// `Probe.Bake()`: capture each probe's static surroundings to a cubemap and project

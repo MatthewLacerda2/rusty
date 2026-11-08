@@ -15,6 +15,10 @@ says a signal only earns its keep where the agent acts on it.
   usually merges a branch before its run finishes, and the report still
   belongs on it (#1530). A pull request closed unmerged gets nothing: its run
   is cancelled by `mutants-cancel.yml`, and nobody reads it.
+- **A run the merge queue dispatched names its pull request** (`--pr`,
+  #1934). The queue asks for a merged pull request's run on `main`, after the
+  merge, so the branch lookup has nothing to find; the run carries the number
+  as an input and the report goes there.
 - **No such pull request, no comment.** A by-hand run on `main` or a scratch
   branch has nowhere to post, and that is not an error.
 - **Never longer than GitHub takes.** A comment holds [`LIMIT`] characters; a
@@ -89,11 +93,13 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--repo", required=True, help="owner/name")
     parser.add_argument("--branch", required=True, help="the dispatched ref's branch name")
     parser.add_argument("--run-url", required=True)
+    parser.add_argument("--pr", type=int, help="post on this pull request, not the branch's (the queue's runs on `main`, #1934)")
     args = parser.parse_args(argv)
 
-    owner = args.repo.split("/")[0]
-    prs = json.loads(gh("api", f"repos/{args.repo}/pulls?state=all&head={owner}:{args.branch}"))
-    number = target(prs)
+    number = args.pr
+    if number is None:
+        owner = args.repo.split("/")[0]
+        number = target(json.loads(gh("api", f"repos/{args.repo}/pulls?state=all&head={owner}:{args.branch}")))
     if number is None:
         print(f"mutants-pr-comment: no open or merged pull request from {args.branch}; nothing to post")
         return 0

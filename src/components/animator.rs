@@ -12,15 +12,21 @@ use serde::{Deserialize, Serialize};
 
 mod graph_state;
 mod ik;
+mod montage;
 mod parameters;
 mod playback;
 mod playhead;
 mod root_motion;
+mod sync;
 pub use ik::{IkChain, IkConstraint, IkTarget};
+pub use montage::{
+    ActiveMontage, MontageEvent, MontageRefused, Montages, MONTAGE_BLEND_OUT, MONTAGE_END,
+};
 pub use parameters::{AnimatorParameter, AnimatorParameters};
-pub use playback::{Motion, Playback, Step};
-pub use playhead::{Bounds, Playhead};
+pub use playback::{Motion, Playback};
+pub use playhead::{wrap_delta, Bounds, Playhead, Step};
 pub use root_motion::{root_chain, RootMotion, RootMotionState};
+pub use sync::{follow_clamped, stored_leaf, LeafTime, SyncSource, SyncState};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AnimatorComponent {
@@ -77,6 +83,10 @@ pub struct AnimatorComponent {
     /// runtime only, never saved.
     #[serde(skip)]
     pub root_motion: RootMotionState,
+    /// The montages playing in its slots (#1894); runtime only, never saved,
+    /// so a load or a Play/Stop restore leaves every slot empty.
+    #[serde(skip)]
+    pub montages: Montages,
 }
 
 /// One extra layer's runtime state (#457).
@@ -116,6 +126,7 @@ impl Default for AnimatorComponent {
             apply_root_motion: false,
             root_bone: String::new(),
             root_motion: RootMotionState::default(),
+            montages: Montages::default(),
         }
     }
 }
@@ -180,5 +191,7 @@ impl AnimatorComponent {
 mod graph_state_tests;
 #[cfg(test)]
 mod parameters_tests;
+#[cfg(test)]
+mod sync_tests;
 #[cfg(test)]
 mod tests;

@@ -128,7 +128,7 @@ pub(super) fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraC
     }
 }
 
-/// The editor's handles and gizmos (grid, collider boxes, axis arrows, probes) over
+/// The editor's handles and gizmos (grid, axis arrows, probes, the occlusion view) over
 /// the outline, depth-tested against this camera's scene (#1224).
 pub(super) fn handles(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     if ctx.is_last && ctx.stack.editor_mode {

@@ -9,14 +9,16 @@ use std::path::Path;
 
 use super::{AnimationGraph, GraphError};
 
-/// Load and validate the graph at `path`. This is what rehydrates the
+/// Load and validate the graph at `path`, its sync markers sorted by time
+/// (#1896). This is what rehydrates the
 /// `AnimatorComponent`'s path reference on scene load (#316) — a graph that loads
 /// is a graph whose references resolve.
 pub fn load(path: &Path) -> Result<AnimationGraph, GraphError> {
     let text = std::fs::read_to_string(path).map_err(|e| GraphError::Io(e.to_string()))?;
-    let graph: AnimationGraph =
+    let mut graph: AnimationGraph =
         serde_json::from_str(&text).map_err(|e| GraphError::Parse(e.to_string()))?;
     graph.validate()?;
+    graph.sort_sync_markers();
     Ok(graph)
 }
 

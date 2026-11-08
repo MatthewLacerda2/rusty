@@ -31,7 +31,7 @@ fn gpu_a_big_fallback_keeps_the_nearest_probe_resident() {
     );
     let mut scene = probes_at(&[(30.0, &far), (0.0, &near), (60.0, &big)]);
     scene.reflection_probes.set_fallback(Some(2));
-    scene.lighting_settings.reflections.budget_mb = 8;
+    scene.lighting_settings.reflections.budget_mb = 1;
     renderer.update_reflection_probes(&scene, Vec3::ZERO);
     let probes = &renderer.reflection_probes;
     let uniforms = probes.uniforms();
