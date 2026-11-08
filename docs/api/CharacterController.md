@@ -52,6 +52,58 @@ then (`0, 1, 0` when airborne). Getters return a neutral default (`false`, zeros
 A NaN or infinite value (`math.huge`) takes the setter's floor: `0`, or `0.0001` for
 the radius and skin width. `SetCenter` with a NaN or infinite part keeps the old centre.
 
+### Hits and pushing
+
+Each `Move` calls **`OnControllerColliderHit(id, hit)`** on the scripts of the
+controller's entity (Unity's callback, #1879), before `Move` returns: once per
+collider the move touched, in the order the sweep met them. **Static colliders
+count**, as in Unity: a move that presses into the floor (its gravity) reports
+the floor, so a script that only cares about walls checks `hit.normal.y`, and
+so do slopes steeper than the slope limit, which block like a wall. Not
+every grounded frame does: a move whose small downward part stays inside the
+skin gap touches nothing. A move that touched nothing calls nothing; a
+move root motion makes (an `Animator` driving the controller) reports its hits
+with the tick's `OnAnimationEvent`s instead. A handler that calls `Move` on its
+own controller moves it, but that nested move reports no hits (it would
+recurse). A handler's error stops the rest and is raised by the `Move` call.
+
+| `hit` field | What |
+|---|---|
+| `id` | the entity whose collider was hit (Unity's `hit.collider` / `gameObject`) |
+| `root` | the hierarchy root of `id` |
+| `rigidbody` | the entity whose Rigidbody `id` rides (kinematic or not: read `is_kinematic` with `Component.Get`); `nil` for static geometry or another character |
+| `point` | `{x, y, z}`: where the collider was hit, in world space |
+| `normal` | `{x, y, z}`: the hit surface's outward normal |
+| `moveDirection` | `{x, y, z}`: the direction of the `Move` (unit length) |
+| `moveLength` | how far the controller had travelled in this `Move` when it hit |
+| `material` | the physics material asset `id`'s collider names, or `nil` |
+
+**A controller pushes nothing on its own**: it stops at a crate as at a wall.
+Pushing is a script, as in Unity, so a game decides what yields (a door can
+refuse). The engine bundles Unity's documented one as
+`assets/scripts/controller_push.lua`: add it beside the walking script and each
+dynamic body the controller walks into takes the walk's direction as its
+velocity, times its `push_power` field (default `2` m/s), keeping its own
+vertical speed. It skips kinematic bodies, static geometry and hits while moving
+down (`moveDirection.y < -0.3`: standing on the crate). `moveDirection` is the
+whole move's, gravity included, so a slow walk pressed hard into the ground
+(3 m/s with the player's `-1.33` m/s ground stick) reads as moving down and
+pushes nothing; the bundled player walks at 5 m/s and pushes. Its core:
+
+```lua with=id:CharacterController
+local Push = { fields = { push_power = { type = "number", default = 2.0 } } }
+function Push.OnControllerColliderHit(id, hit)
+    local body = hit.rigidbody
+    if not body then return end
+    local rb = Component.Get(body, "RigidBody")
+    if not rb or rb.is_kinematic or hit.moveDirection.y < -0.3 then return end
+    local _, vy, _ = Physics.GetVelocity(body)
+    local d, p = hit.moveDirection, Push.push_power
+    Physics.SetVelocity(body, d.x * p, vy, d.z * p)
+end
+return Push
+```
+
 Defaults are Unity's: height `2`, radius `0.5`, centre `0, 0, 0`, step offset `0.3`,
 slope limit `45`, skin width `0.08`, min move distance `0.001`.
 

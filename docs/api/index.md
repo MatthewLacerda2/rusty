@@ -145,6 +145,7 @@ Component menu offers.
 | `OnCollisionEnter` | `OnCollisionEnter(id, other, contact)` | Once, when a solid (non-trigger) contact between the entity's collider and another begins — the tick the solver first pushes the two apart, so `contact.impulse` is the impact. At least one side must be a dynamic body: a kinematic body against static geometry never collides (Unity's rule). Before that tick's `OnCollisionStay`. |
 | `OnCollisionStay` | `OnCollisionStay(id, other, contact)` | After the physics step, once per touching solid pair, every frame the contact persists — including the frame `OnCollisionEnter` fires (the same edge rule as `OnTrigger`). |
 | `OnCollisionExit` | `OnCollisionExit(id, other)` | Once, on the first frame the pair's surfaces no longer touch (or either collider is deactivated, or both sides are now static: `Scene.SetStatic`) — after that frame's `OnCollisionStay`. No `contact`: nothing is touching any more. |
+| `OnControllerColliderHit` | `OnControllerColliderHit(id, hit)` | Synchronously, inside a [`CharacterController.Move`](CharacterController.md) (#1879) — once per collider the move touched, in the order the sweep met them, on the controller's own entity's scripts. Static colliders count: the floor fires every move that presses into it. A move root motion makes is dispatched with the tick's `OnAnimationEvent`s. `hit` carries `id`, `root`, `rigidbody`, `point`, `normal`, `moveDirection`, `moveLength`, `material`. Rules: [`CharacterController`](CharacterController.md), *Hits and pushing*. |
 | `OnJointBreak` | `OnJointBreak(id, force, torque)` | Once, on the tick the entity's `Joint` carried more than its non-zero `break_force` (newtons) or `break_torque` (newton-metres) — after that tick's collision callbacks. `force` / `torque` are what it carried. The `Joint` component is already destroyed (Unity), so the bodies are free. |
 | `OnAnimationEvent` | `OnAnimationEvent(id, name, info)` | Once per animation event the entity's `Animator` crossed this tick (#459): an authored marker on the playing graph node, blend-tree child or montage, `"End"` when a non-looping clip or tree reaches its end, or a montage's `"MontageBlendOut"` / `"MontageEnd"` (#1894). `info` is `{ montage, slot, interrupted }` for those two and `nil` for every other event. After the animation step (and ragdoll posing), before `LateUpdate`. Rules and order: [`Animator`](Animator.md), *Animation events*. |
 | `OnTakeDamage` | `OnTakeDamage(id, amount, event)` | Synchronously, inside a [`Damage`](Damage.md) call (#1893) — not by the tick. It bubbles: the nearest active entity from the one struck upward whose script defines it receives it. `event` carries the kind, type, instigator, causer and the hit or blast; a number return is the damage taken. Rules: [`Damage`](Damage.md). |
@@ -234,6 +235,10 @@ headless replays stay byte-identical):
 - `OnAnimationEvent`s fire after the tick's animation step and before
   `LateUpdate`: by entity id ascending, each entity's events in the order its
   playheads crossed them, then layer, then authored order.
+- `OnControllerColliderHit` is not a phase of the tick: it fires inside the
+  `CharacterController.Move` that touched the colliders, each collider once,
+  in sweep order. The moves root motion made this tick dispatch theirs right
+  after the tick's `OnAnimationEvent`s, in move order.
 - `OnEnable`/`OnDisable` are detected at the head of the script phase by diffing
   each instance's `active` state against the previous tick, in the order
   `OnDisable` (falling edges) → `Awake` → `OnEnable` (rising edges) → `Start` —

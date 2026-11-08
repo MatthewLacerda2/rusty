@@ -205,10 +205,15 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
 /// `OnAnimationEvent(id, name, info)` (#459) for every event `animate` queued this
 /// tick: after the animation step and ragdoll posing, so a handler reads the
 /// pose this tick renders (bar `LateUpdate` and IK), and before `LateUpdate`, as
-/// in Unity, where animation events fire during the Animator's update.
+/// in Unity, where animation events fire during the Animator's update. Then the
+/// `OnControllerColliderHit`s of the moves root motion made (#1879): a script's
+/// own `Move` raises its hits inside the call, but root motion moves outside any
+/// script, so its hits wait for this point, the animation step's callbacks.
 fn dispatch_animation_events(_world: &mut World, res: &mut Resources) {
     let events = std::mem::take(&mut res.animation_events);
     res.script_manager.dispatch_animation_events(&events);
+    let hits = std::mem::take(&mut res.controller_hits);
+    res.script_manager.dispatch_queued_controller_hits(&hits);
 }
 
 /// The palette build (#453): once every pose writer of the frame has run, skin

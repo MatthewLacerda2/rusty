@@ -113,6 +113,9 @@ pub struct Resources {
     /// The animation events (#459) `animate` found this tick, `(entity, name,
     /// whose montage)` in firing order, drained by `dispatch_animation_events`.
     pub(super) animation_events: Vec<(u32, String, Option<MontageEvent>)>,
+    /// What each CharacterController moved by root motion touched this tick
+    /// (#1879), in move order, drained with `animation_events`.
+    pub(super) controller_hits: Vec<(u32, Vec<crate::physics::ControllerHit>)>,
     /// The schedule's observer (#433) — the dev layer's frame-stats timer. `None`
     /// unless installed via `GameWorld::set_probe`; it only watches the frame.
     pub(super) probe: Option<Box<dyn super::SystemProbe>>,
@@ -186,6 +189,7 @@ impl Resources {
             schedule: super::build().into_schedule(),
             animation_graphs: GraphCache::default(),
             animation_events: Vec::new(),
+            controller_hits: Vec::new(),
             probe: None,
             tap: None,
             model_writes: Default::default(),

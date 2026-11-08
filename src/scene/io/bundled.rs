@@ -9,6 +9,10 @@
 pub const SCRIPTS: &[(&str, &str)] = &[
     ("bot.lua", include_str!("../../../engine/scripts/bot.lua")),
     (
+        "controller_push.lua",
+        include_str!("../../../engine/scripts/controller_push.lua"),
+    ),
+    (
         "player_controller.lua",
         include_str!("../../../engine/scripts/player_controller.lua"),
     ),

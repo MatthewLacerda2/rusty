@@ -15,9 +15,9 @@ use super::compound::{plan, relative_pose, world_pose, BodyPlan, WorldPose};
 use super::convert::to_pose;
 use super::material::apply_material;
 use super::shape::build::{
-    body_inputs, build_shape_for, ccd_enabled, collider_inputs, gravity_scale, interaction_groups,
-    BodyClass,
+    body_inputs, ccd_enabled, collider_inputs, gravity_scale, interaction_groups, BodyClass,
 };
+use super::shape::fit::build_shape_for;
 use super::watch::{carriers, Owners};
 use super::world::{body_to_write, collider_to_write, PhysicsWorld};
 use crate::scene::Scene;
@@ -98,14 +98,15 @@ impl PhysicsWorld {
         let Some(owner_pose) = world_pose(scene, owner) else {
             return;
         };
+        let inp = body_inputs(&scene.world, owner);
+        let dynamic = matches!(inp.class, BodyClass::Dynamic);
         let parts: Vec<(u32, Collider)> = ids
             .iter()
-            .filter_map(|&id| Some((id, self.build_collider(scene, &owner_pose, id)?)))
+            .filter_map(|&id| Some((id, self.build_collider(scene, &owner_pose, id, dynamic)?)))
             .collect();
         if parts.is_empty() {
             return;
         }
-        let inp = body_inputs(&scene.world, owner);
         let body_builder = match inp.class {
             BodyClass::Static => RigidBodyBuilder::fixed(),
             BodyClass::Kinematic => RigidBodyBuilder::kinematic_position_based(),
@@ -133,15 +134,23 @@ impl PhysicsWorld {
     }
 
     /// Build collider entity `id`'s rapier collider, positioned relative to its
-    /// owner's pose. `None` for a dead entity or a degenerate mesh.
-    fn build_collider(&self, scene: &Scene, owner_pose: &WorldPose, id: u32) -> Option<Collider> {
+    /// owner's pose, for a body that is `dynamic` or not (a concave mesh is split
+    /// into convex pieces on a dynamic one, #1886). `None` for a dead entity or a
+    /// degenerate mesh.
+    fn build_collider(
+        &self,
+        scene: &Scene,
+        owner_pose: &WorldPose,
+        id: u32,
+        dynamic: bool,
+    ) -> Option<Collider> {
         let inp = collider_inputs(&scene.world, id)?;
         let pose = world_pose(scene, id)?;
         let mesh_ref = inp
             .mesh_geom
             .as_ref()
             .map(|(p, i)| (p.as_slice(), i.as_slice()));
-        let mut collider = build_shape_for(id, &inp.shape, pose.scale, mesh_ref)?;
+        let mut collider = build_shape_for(id, &inp.shape, pose.scale, mesh_ref, dynamic)?;
         let (offset_pos, offset_rot) = relative_pose(owner_pose, &pose);
         let offset = if inp.upright {
             upright_offset(

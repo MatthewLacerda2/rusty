@@ -10,7 +10,7 @@ use glam::Vec3;
 
 use super::fixture;
 use super::hull::beyond_faces;
-use super::mesh::build_mesh_shape;
+use super::mesh::{build_mesh_shape, MeshFit};
 
 /// The off-centre Cylinder's points.
 fn off_centre_cylinder() -> Vec<[f32; 3]> {
@@ -21,7 +21,7 @@ fn off_centre_cylinder() -> Vec<[f32; 3]> {
 /// How far the worst of `points`, scaled, lies beyond a face plane of the hull built
 /// at `scale`: zero or less when the hull holds them all.
 fn worst_outside(points: &[[f32; 3]], scale: Vec3) -> f32 {
-    let collider = build_mesh_shape(true, scale, (points, &[])).expect("a hull");
+    let collider = build_mesh_shape(MeshFit::Hull, scale, (points, &[])).expect("a hull");
     let hull = collider
         .shape()
         .as_convex_polyhedron()
