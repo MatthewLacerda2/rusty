@@ -9,8 +9,7 @@ use crate::render::ibl::ktx2_encode::encode_cubemap;
 use crate::render::ibl::reflection_prefilter::source::encode_face;
 use crate::render::ibl::reflection_prefilter::{mip_count, PrefilteredCubemap};
 
-#[path = "tap_tests.rs"]
-mod tap;
+use super::super::tap_tests as tap;
 
 /// Mip `level`'s colour: each level its own, so a tap shows which one it read.
 fn colour(level: u32) -> Vec3 {

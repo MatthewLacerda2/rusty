@@ -79,13 +79,16 @@ fn encode_round_trips_full_mip_chain() {
 #[test]
 fn a_baked_cube_round_trips_within_bc6h_error_and_deterministically() {
     let size = 16u32;
+    // Smooth light, as a capture holds: a tint per face over a brightness ramp,
+    // HDR past 1 and up to a few hundred on face 2 (a lamp).
     let texel = |f: usize, i: u32| {
         let (x, y) = ((i % size) as f32, (i / size) as f32);
-        glam::Vec3::new(
-            0.02 + x * 0.3,
-            y * 2.0 + f as f32,
-            (x * y) * 0.05 + 100.0 * (f == 2) as u8 as f32,
-        )
+        let tint = [
+            glam::Vec3::new(1.0, 0.6, 0.3),
+            glam::Vec3::new(0.2, 0.5, 1.0),
+        ][f % 2];
+        let lamp = if f == 2 { 300.0 } else { 1.0 };
+        tint * (0.5 + 2.0 * x / size as f32 + y / size as f32) * lamp
     };
     let faces = |f: usize| (0..size * size).map(|i| texel(f, i)).collect::<Vec<_>>();
     let cube = PrefilteredCubemap {
@@ -98,13 +101,19 @@ fn a_baked_cube_round_trips_within_bc6h_error_and_deterministically() {
         encode_cubemap(&cube),
         "the same cube, the same bytes"
     );
+    // BC6H's error is relative to its block's range: within 5% of the block's
+    // brightest channel, as the lightmap pages hold.
+    let block_max = |want: &[glam::Vec3], i: u32| {
+        let (bx, by) = (i % size / 4 * 4, i / size / 4 * 4);
+        let at = |k: u32| want[((by + k / 4) * size + bx + k % 4) as usize];
+        (0..16).map(|k| at(k).max_element()).fold(0.0, f32::max)
+    };
     for f in 0..6 {
-        for (got, want) in face(&bytes, 0, f).iter().zip(faces(f)) {
-            let err = (*got - want).abs().max_element();
-            assert!(
-                err <= 0.08 * want.max_element() + 0.02,
-                "{f}: {got} vs {want}"
-            );
+        let want = faces(f);
+        for (i, got) in face(&bytes, 0, f).iter().enumerate() {
+            let err = (*got - want[i]).abs().max_element();
+            let limit = 0.05 * block_max(&want, i as u32);
+            assert!(err <= limit, "{f}: {got} vs {}", want[i]);
         }
     }
 }
