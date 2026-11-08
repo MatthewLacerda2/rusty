@@ -15,6 +15,7 @@ use crate::components::{CapsuleAxis, CombineMode, PhysicsMaterial};
 use crate::editor::inspector::components::card::{component_card, remove_component};
 use crate::scene::authoring::physics::collider as collider_ops;
 use crate::scene::authoring::ComponentKind;
+use crate::scene::physics_material;
 use crate::scene::ColliderShape;
 
 pub fn draw_collider(
@@ -58,12 +59,7 @@ pub fn draw_collider(
                 }
                 *is_dirty = true;
             }
-            if let Some(material) = draw_material(ui, collider.material) {
-                if let Some(mut c) = world.collider_mut(id) {
-                    collider_ops::set_material(&mut c, material);
-                }
-                *is_dirty = true;
-            }
+            draw_material_section(ui, world, id, &collider, is_dirty);
         },
     );
     if remove {
@@ -170,12 +166,57 @@ fn axis_combo(ui: &mut egui::Ui, axis: &mut CapsuleAxis) -> bool {
     *axis != before
 }
 
-/// The Physics Material section (Unity: the collider's `PhysicMaterial`):
-/// friction, bounciness and a combine mode for each. Edits a copy; returns the
-/// new material when any widget changed it.
-fn draw_material(ui: &mut egui::Ui, mut m: PhysicsMaterial) -> Option<PhysicsMaterial> {
+/// The Physics Material section: the shared asset the collider names (#1878, a
+/// project path; empty for inline values), then the values. With an asset, an edit
+/// writes the asset, retuning every collider that uses it, as Unity's inspector
+/// edits a `PhysicMaterial` asset; without one, it writes the inline values.
+fn draw_material_section(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    collider: &crate::components::ColliderComponent,
+    is_dirty: &mut bool,
+) {
     ui.separator();
     ui.label("Physics Material");
+    let mut path = collider.material_asset.clone().unwrap_or_default();
+    let field = ui.horizontal(|ui| {
+        ui.label("Asset:");
+        ui.text_edit_singleline(&mut path)
+    });
+    let typed =
+        field.inner.lost_focus() && path != collider.material_asset.clone().unwrap_or_default();
+    if typed {
+        let path = Some(path.trim().to_string()).filter(|p| !p.is_empty());
+        if let Some(mut c) = world.collider_mut(id) {
+            collider_ops::set_material_asset(&mut c, path);
+        }
+        *is_dirty = true;
+        return;
+    }
+    let Some(asset) = &collider.material_asset else {
+        if let Some(material) = draw_material(ui, collider.material) {
+            if let Some(mut c) = world.collider_mut(id) {
+                collider_ops::set_material(&mut c, material);
+            }
+            *is_dirty = true;
+        }
+        return;
+    };
+    let Some(values) = physics_material::lookup(asset) else {
+        ui.label("Missing: the default material is used");
+        return;
+    };
+    if let Some(material) = draw_material(ui, values) {
+        if let Err(e) = physics_material::write(asset, material) {
+            log::warn!("[Physics] {e}");
+        }
+    }
+}
+
+/// Friction, bounciness and a combine mode for each (Unity's `PhysicMaterial`).
+/// Edits a copy; returns the new material when any widget changed it.
+fn draw_material(ui: &mut egui::Ui, mut m: PhysicsMaterial) -> Option<PhysicsMaterial> {
     let mut changed = ui
         .horizontal(|ui| {
             ui.label("Friction:");

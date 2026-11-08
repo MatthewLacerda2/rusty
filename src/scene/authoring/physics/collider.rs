@@ -2,7 +2,8 @@
 //!
 //! The ONE place the engine knows how to mutate an entity's first-class
 //! `ColliderComponent` field by field: the `active` / `is_trigger` flags, the
-//! collider `shape` (its variant + extents) and its physics `material` (#447). The
+//! collider `shape` (its variant + extents), its physics `material` (#447) and the
+//! shared asset it names instead (`material_asset`, #1878). The
 //! editor's Collider card routes every write through these (#287), and so do the
 //! `Physics.SetColliderShape` / `Physics.SetPhysicsMaterial` bindings — one write
 //! for both surfaces.
@@ -33,9 +34,10 @@ pub fn set_shape(c: &mut ColliderComponent, shape: ColliderShape) {
     c.shape = shape;
 }
 
-/// Replace the collider's physics material, clamping its coefficients into range
-/// (friction `>= 0`, bounciness `[0, 1]`) so neither surface can author an
-/// out-of-range value.
+/// Replace the collider's inline physics material, clamping its coefficients into
+/// range (friction `>= 0`, bounciness `[0, 1]`) so neither surface can author an
+/// out-of-range value. A shared asset it named is dropped: the collider now has its
+/// own values (Unity's `Collider.material`).
 // lint: allow(sanitize) both coefficients go through a helper below
 pub fn set_material(c: &mut ColliderComponent, material: PhysicsMaterial) {
     c.material = PhysicsMaterial {
@@ -43,6 +45,13 @@ pub fn set_material(c: &mut ColliderComponent, material: PhysicsMaterial) {
         bounce_combine: material.bounce_combine,
         ..PhysicsMaterial::new(non_negative(material.friction), unit(material.bounciness))
     };
+    c.material_asset = None;
+}
+
+/// Name the shared physics material asset the collider uses (#1878), or `None`
+/// for its inline values. The path is kept as given, whether it loads or not.
+pub fn set_material_asset(c: &mut ColliderComponent, path: Option<String>) {
+    c.material_asset = path;
 }
 
 #[cfg(test)]

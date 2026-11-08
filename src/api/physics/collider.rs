@@ -147,8 +147,11 @@ fn shape_from_table(t: &Table) -> mlua::Result<ColliderShape> {
 }
 
 /// `GetPhysicsMaterial(id)` → `friction, bounciness, friction_combine,
-/// bounce_combine` (the defaults without a collider);
-/// `SetPhysicsMaterial(id, friction, bounciness [, friction_combine [, bounce_combine]])`.
+/// bounce_combine`: the values the solver uses, its asset's when it names one
+/// (#1878), the defaults without a collider;
+/// `SetPhysicsMaterial(id, friction, bounciness [, friction_combine [, bounce_combine]])`
+/// gives the collider its own inline values, dropping a shared asset (Unity's
+/// `Collider.material`, which instances the shared one).
 fn register_material(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     type MaterialArgs = (EntityArg, f32, f32, Option<String>, Option<String>);
     put(
@@ -160,7 +163,7 @@ fn register_material(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> R
                 .borrow()
                 .world
                 .collider(id.read())
-                .map(|c| c.material)
+                .map(|c| crate::scene::physics_material::effective(&c))
                 .unwrap_or_default();
             Ok((
                 m.friction,
@@ -183,8 +186,8 @@ fn register_material(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> R
                     ));
                 }
                 let material = PhysicsMaterial {
-                    friction_combine: combine_mode(fc)?,
-                    bounce_combine: combine_mode(bc)?,
+                    friction_combine: combine_mode(fc, "SetPhysicsMaterial")?,
+                    bounce_combine: combine_mode(bc, "SetPhysicsMaterial")?,
                     ..PhysicsMaterial::new(friction, bounciness)
                 };
                 let mut scene = scene.borrow_mut();
@@ -197,14 +200,15 @@ fn register_material(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> R
     )
 }
 
-/// An optional combine-mode name; absent means `Average`.
-fn combine_mode(name: Option<String>) -> mlua::Result<CombineMode> {
+/// An optional combine-mode name; absent means `Average`. `verb` names the
+/// caller in the error.
+pub(super) fn combine_mode(name: Option<String>, verb: &str) -> mlua::Result<CombineMode> {
     let Some(name) = name else {
         return Ok(CombineMode::default());
     };
     CombineMode::parse(&name).ok_or_else(|| {
         err(format!(
-            "SetPhysicsMaterial: unknown combine mode {name:?} (want one of {})",
+            "{verb}: unknown combine mode {name:?} (want one of {})",
             CombineMode::names()
         ))
     })
