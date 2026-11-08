@@ -8,8 +8,8 @@
 //! The cube is the forward pass's own: the resident probe cube array at group 0
 //! (`render::ibl::reflection_probes`), sampled at the probe's layer, so the gizmo
 //! loads nothing. The ball is drawn by `engine/shaders/gizmos/probe_ball.wgsl` (a
-//! ray-cast sphere on an eye-facing quad, writing its depth) through the forward
-//! pipeline layout, so it binds the handles pass's groups as the lines do: its
+//! ray-cast sphere on a quad facing the view ray, writing its depth) through the
+//! forward pipeline layout, so it binds the handles pass's groups as the lines do: its
 //! placement rides an overlay draw slot, and its resident slot the instance index.
 
 use glam::{Mat4, Vec3};

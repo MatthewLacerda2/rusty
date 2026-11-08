@@ -3,10 +3,11 @@
 // capture, mip 0, no box projection, no lighting. `render::draw::overlays::probe_ball`
 // draws it in the editor's handles pass, through the forward pipeline layout.
 //
-// The ball is a true sphere, not a mesh: each one is a quad facing the eye, sized to
-// cover the sphere's silhouette, and each fragment casts the camera's ray at the
-// sphere, discards a miss and writes the hit's depth, so the ball is round at any
-// distance and depth-tests against the scene and the other gizmos as a solid does.
+// The ball is a true sphere, not a mesh: each one is a quad facing back along the
+// view ray through its centre, sized to cover the sphere's silhouette, and each
+// fragment casts the camera's ray at the sphere, discards a miss and writes the
+// hit's depth, so the ball is round at any distance and depth-tests against the
+// scene and the other gizmos as a solid does.
 //
 // Its placement is the overlay draw's (`draw.model_matrix`: the probe's position, a
 // uniform scale of the ball's radius); the instance index is the probe's resident
