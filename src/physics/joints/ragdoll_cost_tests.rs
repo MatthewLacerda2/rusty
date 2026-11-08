@@ -92,3 +92,43 @@ fn bone_subtrees_hold_bones_and_what_hangs_from_them_only() {
         "a child of the rig is not under a bone"
     );
 }
+
+/// Ten rigs, each ragdolled (kinematic, following the Animator).
+fn ten_ragdolls(scene: &mut Scene) -> Vec<u32> {
+    let opts = crate::scene::skeleton::RagdollOptions::default();
+    let rigs: Vec<u32> = (0..10).map(|_| armature_owner(scene)).collect();
+    for &rig in &rigs {
+        scene.sync_skeleton(rig);
+        for name in ["hips", "spine", "head"] {
+            let bone = scene.find_bone(rig, name).unwrap();
+            let hb = scene.add_entity(crate::scene::skeleton::HITBOX_NAME.to_string());
+            scene.set_parent(hb, Some(bone)).unwrap();
+            scene.world.set_collider(hb, Some(collider()));
+        }
+        scene.build_ragdoll(rig, &opts).unwrap();
+    }
+    rigs
+}
+
+#[test]
+fn ten_resting_ragdolls_drive_no_joint_and_track_nothing() {
+    let mut scene = Scene::new();
+    let rigs = ten_ragdolls(&mut scene);
+    let mut physics = PhysicsWorld::from_scene(&scene);
+    assert_eq!(physics.joints.len(), 20, "two joints a rig");
+    physics.step(&mut scene, 1.0 / 60.0);
+    assert!(physics.driven.is_empty(), "no motor on a kinematic ragdoll");
+    assert!(
+        scene.ragdolls.is_idle(),
+        "the animate hook has nothing to note"
+    );
+    // One reacting: only its own joints carry motors.
+    let spine = scene.find_bone(rigs[3], "spine").unwrap();
+    let drive = crate::scene::skeleton::HitReact::default();
+    let none = |_: u32| None;
+    scene.hit_react(rigs[3], (spine, Vec3::ZERO), &drive, &none);
+    physics.step(&mut scene, 1.0 / 60.0);
+    let head = scene.find_bone(rigs[3], "head").unwrap();
+    let driven: Vec<u32> = physics.driven.keys().copied().collect();
+    assert_eq!(driven, vec![spine, head], "the reacting branch's joints");
+}
