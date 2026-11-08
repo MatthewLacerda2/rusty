@@ -14,6 +14,9 @@
 
 use crate::time::{FIXED_DELTA_TIME, MAXIMUM_DELTA_TIME};
 
+/// How close to a whole tick counts as one, in ticks.
+const TICK_SLACK: f64 = 1e-6;
+
 /// Wall-clock seconds handed in and not yet ticked. `f64` so a long session's
 /// remainder never drifts off the tick.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -28,8 +31,10 @@ impl FixedTicks {
         let frame = raw.max(0.0).min(MAXIMUM_DELTA_TIME);
         self.owed += f64::from(frame);
         let tick = f64::from(FIXED_DELTA_TIME);
-        let whole = (self.owed / tick).floor();
-        self.owed -= whole * tick;
+        // The slack absorbs f32 rounding (1/3 s over 1/60 s is 19.9999999 in f32
+        // terms): a remainder within a millionth of a tick is a whole tick.
+        let whole = (self.owed / tick + TICK_SLACK).floor();
+        self.owed = (self.owed - whole * tick).max(0.0);
         whole as u32
     }
 

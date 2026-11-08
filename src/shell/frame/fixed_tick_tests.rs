@@ -1,24 +1,21 @@
-//! The windowed loop on the fixed tick (#1877): the harness's state, input seen by one
-//! tick, drawing between the last two ticks.
-
-use std::cell::RefCell;
-use std::rc::Rc;
+//! The windowed loop on the fixed tick (#1877): the harness's state, the clamp, time
+//! scale, and drawing between the last two ticks.
 
 use glam::Vec3;
 
 use super::frame_tests::playing_world;
 use super::*;
-use crate::app::{TapPoint, TickTap};
-use crate::scene::authoring::{create_entity, default_rigidbody, Primitive};
+use crate::scene::authoring::{create_entity, default_collider, default_rigidbody, Primitive};
 
 /// A world about to enter Play with one box falling from 10 m.
-fn falling() -> (GameWorld, u32) {
+pub(super) fn falling() -> (GameWorld, u32) {
     let game = playing_world();
     let id = {
         let mut scene = game.scene().borrow_mut();
         let id = create_entity(&mut scene, "Crate", Some(Primitive::Box));
         scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 10.0, 0.0);
         scene.world.set_rigidbody(id, Some(default_rigidbody()));
+        scene.world.set_collider(id, Some(default_collider()));
         id
     };
     (game, id)
@@ -47,8 +44,7 @@ fn uneven_frames_reach_the_state_the_harness_reaches_in_as_many_ticks() {
     let (mut window, id) = falling();
     let frames = [0.007, 0.033, 0.5, 0.007, 0.007, 0.007, 0.016, 0.1];
     windowed(&mut window, &mut DrawPoses::default(), &frames);
-    let (mut harness, same) = falling();
-    // The harness's loop (`dev::harness`): one fixed tick per step.
+    let (mut harness, same) = falling(); // `dev::harness`: one fixed tick per step
     for _ in 0..window.play_frame() {
         harness.tick(FIXED_DELTA_TIME);
     }
@@ -94,48 +90,22 @@ fn time_scale_zero_still_ticks_scripts_with_no_game_time() {
     assert_eq!(height(&game, id), y, "but nothing moves");
 }
 
-/// What each tick saw of a held key's edge and of the mouse delta.
-#[derive(Default)]
-struct Seen(Rc<RefCell<Vec<(bool, f64)>>>);
-
-impl TickTap for Seen {
-    fn at(&mut self, point: TapPoint, world: &mut GameWorld) {
-        if point == TapPoint::AfterTick {
-            let input = world.input().borrow();
-            let seen = (input.get_key_down("W"), input.mouse_delta().0);
-            self.0.borrow_mut().push(seen);
-        }
-    }
-}
-
-#[test]
-fn input_reaches_the_first_tick_of_a_frame_and_waits_for_a_frame_with_none() {
-    let (mut game, _) = falling();
-    let mut ticks = FixedTicks::default();
-    let mut poses = DrawPoses::default();
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.016);
-    let log = Rc::new(RefCell::new(Vec::new()));
-    game.set_tap(Some(Box::new(Seen(Rc::clone(&log)))));
-    game.input().borrow_mut().press("W");
-    game.input().borrow_mut().add_mouse_delta(4.0, 0.0);
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.005); // no tick owed
-    assert!(log.borrow().is_empty(), "nothing ran");
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.05); // three ticks
-    assert_eq!(*log.borrow(), vec![(true, 4.0), (false, 0.0), (false, 0.0)]);
-}
-
 #[test]
 fn a_body_is_drawn_between_its_last_two_tick_positions() {
     let (mut game, id) = falling();
     let mut ticks = FixedTicks::default();
     let mut poses = DrawPoses::default();
-    let mut checked = 0;
-    for frame in 0..40 {
+    let (mut checked, mut ticked) = (0, 0);
+    for _ in 0..40 {
         let before = height(&game, id);
         let frames = game.play_frame();
         advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.007);
-        if frame < 2 || game.play_frame() != frames + 1 || ticks.alpha() >= 1.0 {
+        if game.play_frame() != frames + 1 || ticks.alpha() >= 1.0 {
             continue;
+        }
+        ticked += 1;
+        if ticked < 3 {
+            continue; // Play's own tick, then the first recorded: no tick before it
         }
         let after = height(&game, id);
         let drawn = poses.world(&game.scene().borrow(), id).w_axis.y;

@@ -201,3 +201,6 @@ mod frame_edit_tests;
 #[cfg(test)]
 #[path = "frame_tests.rs"]
 mod frame_tests;
+#[cfg(test)]
+#[path = "tick_input_tests.rs"]
+mod tick_input_tests;

@@ -75,6 +75,8 @@ mod handles;
 #[cfg(test)]
 mod idle_tests;
 mod inputs;
+#[cfg(test)]
+mod interpolate_gpu_tests;
 mod object;
 mod occlusion;
 pub(crate) mod records;
