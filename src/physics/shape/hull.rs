@@ -11,7 +11,7 @@ use rapier3d::prelude::{ConvexPolyhedron, Pose};
 
 /// The rounding a hull's planes may leave, relative to the size of the numbers in
 /// play: the hull's own and the query point's distance from the origin.
-const SLACK: f32 = 1e-5;
+pub(in crate::physics) const SLACK: f32 = 1e-5;
 
 /// The face planes of `hull`, each as its normal and a point it passes through.
 fn planes(hull: &ConvexPolyhedron) -> impl Iterator<Item = (Vec3, Vec3)> + '_ {

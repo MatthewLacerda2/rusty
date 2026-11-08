@@ -79,7 +79,8 @@ impl MeshFit {
 /// non-zero area whose indices all point at a vertex (#1132, #1141). Either
 /// shape needs every coordinate finite (#1880). A hull reads no
 /// indices, so a stale one never drops it. A decomposition is held to a trimesh's
-/// checks, and falls back to the trimesh when V-HACD finds no piece with volume.
+/// checks, made from the unscaled mesh and scaled after (#1940), and falls back to
+/// the trimesh when V-HACD finds no piece with volume.
 pub(in crate::physics) fn build_mesh_shape(
     fit: MeshFit,
     scale: Vec3,
@@ -109,7 +110,7 @@ pub(in crate::physics) fn build_mesh_shape(
     }
     let triangles = triangles(&points, indices, scale)?;
     let pieces = (fit == MeshFit::Decomposed)
-        .then(|| super::decompose::decomposition(&points, &triangles))
+        .then(|| super::decompose::decomposition(positions, indices, scale))
         .flatten();
     match pieces {
         Some(shape) => Ok(ColliderBuilder::new(shape).build()),
