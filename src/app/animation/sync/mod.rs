@@ -150,9 +150,18 @@ impl MotionContext<'_> {
         }
     }
 
+    /// Whether tree `node` of this layer has sync markers on every leaf.
+    fn marker_synced(&self, node: &str) -> bool {
+        let tree = self.machine.and_then(|m| m.node(node)?.blend_tree.as_ref());
+        tree.is_some_and(BlendTree::marker_synced)
+    }
+
     /// The marker sync of tree `node` at `phase`, when every leaf carries
     /// markers.
     pub(super) fn tree_sync(&self, node: &str, phase: f32, looping: bool) -> Option<TreeSync<'_>> {
+        if !self.marker_synced(node) {
+            return None; // checked first: a tree without markers pays no leader search
+        }
         let lead = self.lead(Motion::Tree(node), None, None)?;
         if lead.markers.is_empty() {
             return None;
@@ -180,9 +189,9 @@ impl MotionContext<'_> {
         looping: bool,
         stored: &mut Option<String>,
     ) {
-        let now = self
-            .lead(motion, None, None)
-            .filter(|l| l.tree && !l.markers.is_empty());
+        let synced = matches!(motion, Motion::Tree(node) if self.marker_synced(node));
+        let now = synced.then(|| self.lead(motion, None, None)).flatten();
+        let now = now.filter(|l| !l.markers.is_empty());
         let Some(now) = now else {
             *stored = None;
             return;

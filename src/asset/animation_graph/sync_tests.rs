@@ -18,16 +18,9 @@ const SYNCED: &str = r#"{
 }"#;
 
 fn load_text(text: &str) -> Result<AnimationGraph, GraphError> {
-    let name = format!(
-        "rusty-sync-{}-{:x}.animgraph",
-        std::process::id(),
-        text.len()
-    );
-    let path = std::env::temp_dir().join(name);
+    let path = crate::test_temp::dir().join("synced.animgraph");
     std::fs::write(&path, text).unwrap();
-    let loaded = load(&path);
-    let _ = std::fs::remove_file(&path);
-    loaded
+    load(&path)
 }
 
 fn problems(graph: &AnimationGraph) -> String {
