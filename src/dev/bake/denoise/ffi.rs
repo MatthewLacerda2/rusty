@@ -47,10 +47,8 @@ pub struct Api {
     commit_device: unsafe extern "C" fn(Device),
     device_error: unsafe extern "C" fn(Device, *mut *const c_char) -> c_int,
     new_filter: unsafe extern "C" fn(Device, *const c_char) -> Filter,
-    #[expect(
-        clippy::type_complexity,
-        reason = "oidnSetSharedFilterImage's C signature"
-    )]
+    /// `oidnSetSharedFilterImage`: filter, name, data, format, width, height,
+    /// byte offset, pixel stride, row stride.
     set_image: unsafe extern "C" fn(
         Filter,
         *const c_char,

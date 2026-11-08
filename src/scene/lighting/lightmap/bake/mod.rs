@@ -24,7 +24,7 @@ pub(super) mod direction;
 pub(in crate::scene::lighting) mod pool;
 
 use assemble::assemble;
-use denoise::Cleaner;
+use denoise::{Chart, Cleaner};
 pub use denoise::{Denoiser, LightmapDenoiser};
 
 /// The bake's knobs, Unity's Lightmapping settings in miniature. The scene stores
@@ -237,15 +237,12 @@ fn lightmap(
         .unzip();
     let texel_world = world_per_uv(&mesh.surface()).unwrap_or(1.0) / size as f32;
     let masked = scene.shadowmask.any();
-    let maps = assemble(
-        &points,
-        &light,
+    let chart = Chart {
+        points: &points,
         size,
         texel_world,
-        settings,
-        cleaner,
-        masked,
-    );
+    };
+    let maps = assemble(chart, &light, settings, cleaner, masked);
     Lightmap {
         entity: mesh.entity,
         size,
