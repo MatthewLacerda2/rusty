@@ -89,17 +89,21 @@ fn collider_shape_value(shape: &ColliderShape) -> Value {
     }
 }
 
+/// A collider: `material` is what the solver uses (its asset's values when it
+/// names one, #1878), `material_asset` the asset's path or null.
 pub(crate) fn collider_value(c: &ColliderComponent) -> Value {
+    let m = crate::scene::physics_material::effective(c);
     json!({
         "active": c.active,
         "is_trigger": c.is_trigger,
         "shape": collider_shape_value(&c.shape),
         "material": {
-            "friction": c.material.friction,
-            "bounciness": c.material.bounciness,
-            "friction_combine": c.material.friction_combine.name(),
-            "bounce_combine": c.material.bounce_combine.name(),
+            "friction": m.friction,
+            "bounciness": m.bounciness,
+            "friction_combine": m.friction_combine.name(),
+            "bounce_combine": m.bounce_combine.name(),
         },
+        "material_asset": c.material_asset,
     })
 }
 

@@ -5,13 +5,17 @@
 //! way Unity does (the higher-priority mode wins, `Average < Minimum < Multiply <
 //! Maximum`), so the mapping is one-to-one and the solver does the combining.
 //! Applied at collider build and re-applied whenever the Collider changes, so a material edited
-//! mid-play (`Physics.SetPhysicsMaterial`) takes effect on the next step.
+//! mid-play (`Physics.SetPhysicsMaterial`) takes effect on the next step. A collider
+//! naming a shared asset (#1878) takes that asset's values
+//! (`scene::physics_material::effective`), and an asset edit re-applies every
+//! collider's material on the next step (`sync_to_rapier`).
 
 use rapier3d::prelude::*;
 
 use super::watch::Owners;
 use super::world::{collider_to_write, PhysicsWorld};
 use crate::components::{CombineMode, PhysicsMaterial};
+use crate::scene::physics_material::effective;
 use crate::scene::Scene;
 
 /// rapier's rule for a combine mode.
@@ -62,9 +66,10 @@ impl PhysicsWorld {
                 else {
                     continue;
                 };
-                let differs = |held: &Collider| material_differs(held, &c.material);
+                let material = effective(&c);
+                let differs = |held: &Collider| material_differs(held, &material);
                 if let Some(collider) = collider_to_write(&mut self.colliders, handle, differs) {
-                    apply_material(collider, &c.material);
+                    apply_material(collider, &material);
                 }
             }
         }

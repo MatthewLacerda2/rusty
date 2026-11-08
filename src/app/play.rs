@@ -16,8 +16,8 @@
 //!
 //! Each system is the canonical `fn(&mut World, &mut Resources)` (#39): the scene
 //! is reached through `world.scene` (a short-lived borrow, so re-entrant scripts can
-//! borrow it too), the engine singletons through `res`, and the scaled per-frame
-//! delta through `res.frame_dt`.
+//! borrow it too), the engine singletons through `res`, and the tick's scaled delta
+//! through `res.frame_dt` (the fixed dt × time scale in every host's Play, #1877).
 
 use super::game::GameWorld;
 use super::registry::App;

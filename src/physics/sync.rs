@@ -50,8 +50,12 @@ impl PhysicsWorld {
         if matrix_moved {
             self.tracked.matrix = Some(scene.collision_matrix.clone());
         }
+        // An asset is no entity's column either: an edit re-applies every material.
+        let assets = crate::scene::physics_material::generation();
+        let assets_moved = self.tracked.material_assets != Some(assets);
+        self.tracked.material_assets = Some(assets);
         self.sync_enabled(scene, &owners);
-        self.sync_materials(scene, &owners);
+        self.sync_materials(scene, if assets_moved { &Owners::All } else { &owners });
         // The matrix is no entity's column: a change re-derives every collider's groups.
         self.sync_layers(scene, if matrix_moved { &Owners::All } else { &owners });
         self.sync_sensors(scene, &owners);

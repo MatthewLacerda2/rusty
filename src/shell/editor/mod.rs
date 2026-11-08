@@ -30,6 +30,8 @@ pub use start::{launch, launch_picker};
 use winit::event::WindowEvent;
 use winit::keyboard::KeyCode;
 
+#[cfg(feature = "dev")]
+use super::frame::Step;
 use super::{frame::Host, pace::Pace, Frontend, Shell};
 use crate::app::{GameWorld, PlayTransition};
 use crate::core::input::CursorState;
@@ -192,10 +194,12 @@ impl Frontend for EditorFrontend {
     }
 
     #[cfg(feature = "dev")]
-    fn advance(&mut self, game: &mut GameWorld, dt: f32) -> PlayTransition {
-        let ui = &mut self.editor_ui;
-        ui.advance_demo(game, dt)
-            .unwrap_or_else(|| super::frame::advance_sim(game, dt))
+    fn advance(&mut self, game: &mut GameWorld, mut step: Step<'_>, dt: f32) -> PlayTransition {
+        let demo = self
+            .editor_ui
+            .advance_demo(game, dt)
+            .inspect(|_| step.clear());
+        demo.unwrap_or_else(|| super::frame::advance_sim(game, step, dt))
     }
 
     /// A demo open at quit is closed first, so the quit flush writes the editor's

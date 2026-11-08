@@ -6,7 +6,8 @@
 //! split by shape: line casts (`Raycast`/`SphereCast`) in `cast`, volume
 //! overlaps (`Overlap*`/`Check*`) in `volume`, per-collider point queries
 //! (`ClosestPoint`/`ContainsPoint`/`GetBounds`) in `point`, and the collider's
-//! authorable shape + physics material (#447) in `collider`, the per-bone
+//! authorable shape + inline physics material (#447) in `collider`, the shared
+//! physics material assets (#1878) in `material`, the per-bone
 //! hitbox generator (#464) in `hitbox`, forces / impulses at a point (#466)
 //! in `impulse`, mass, gravity and the trigger flag (#1365) in `body`, the layer collision matrix (#827) in `matrix`, and the
 //! enter/exit penetration cast (`RaycastThrough`, #830) in `through`.
@@ -18,6 +19,7 @@ mod cast;
 mod collider;
 mod hitbox;
 mod impulse;
+mod material;
 mod matrix;
 mod point;
 mod through;
@@ -48,6 +50,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     collider::register(lua, &table, scene)?;
     hitbox::register(lua, &table, scene)?;
     matrix::register(lua, &table, scene)?;
+    material::register(lua, &table, scene)?;
 
     lua.globals()
         .set("Physics", table)

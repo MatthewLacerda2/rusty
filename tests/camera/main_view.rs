@@ -54,7 +54,7 @@ fn a_scripted_camera_move_is_one_pose_on_every_path() {
     // What the player and every headless capture pass the renderer (#1619).
     let main = game.main_view();
     let scene = scene.borrow();
-    let stack = build_camera_stack(&main, &scene, true);
+    let stack = build_camera_stack(&main, &scene, true, &Default::default());
     assert_eq!(stack.entities[0], Some(cam));
     assert_pose("screen stack", &stack.cameras[0], want.0, want.1, want.2);
     // The editor's Game view, and the camera entity itself.

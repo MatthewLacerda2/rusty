@@ -279,8 +279,10 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
                  "inner_cone": .., "outer_cone": .. },
   "collider":  { "active": true, "is_trigger": false,
                  "shape": { "kind": "Box", "size": [x,y,z] },   // or Capsule: radius, height, axis
-                 "material": { "friction": 0.5, "bounciness": 0.0,
-                               "friction_combine": "Average", "bounce_combine": "Average" } },
+                 "material": { "friction": 0.5, "bounciness": 0.0,   // what the solver uses:
+                               "friction_combine": "Average", "bounce_combine": "Average" },
+                 "material_asset": null },  // or "assets/materials/wood.physmat" (#1878),
+                                            // whose values `material` then shows
   "rigidbody": { "active": true, "is_kinematic": false, "mass": .., "velocity": [x,y,z],
                  "use_gravity": true },
   "camera":    { "active": true, "fov": .., "near": .., "far": .., "culling_mask": ..,
