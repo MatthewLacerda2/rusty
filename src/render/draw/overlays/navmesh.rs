@@ -144,13 +144,13 @@ pub(crate) fn vertices_that_fit(len: usize, max_bytes: u64) -> usize {
 
 impl Renderer {
     /// What the kept navmesh shows, for the shell to diff against (#1910).
-    pub(crate) fn navmesh_revision(&self) -> Option<NavMeshRevision> {
+    pub fn navmesh_revision(&self) -> Option<NavMeshRevision> {
         self.navmesh.revision
     }
 
     /// Apply the shell's `patch` to the kept navmesh: upload only the tiles it
     /// names. Returns the bytes uploaded.
-    pub(crate) fn set_navmesh<I>(&mut self, patch: NavMeshPatch<I>) -> u64
+    pub fn set_navmesh<I>(&mut self, patch: NavMeshPatch<I>) -> u64
     where
         I: IntoIterator<Item = (usize, Vec<Vec3>)>,
     {
