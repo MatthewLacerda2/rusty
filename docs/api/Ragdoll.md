@@ -106,7 +106,8 @@ id from `Ragdoll.Build`'s table — and returns how many bodies (or joints) it s
   already drawn animated, so it never snaps. Options: `duration` (seconds, `0.4`),
   `strength` (`5000`) and `damping` (`2·√strength`), and `up_to` (a bone: its branch
   reacts instead). Returns `true`, or `false` — with one warning per entity —
-  when `id` has no ragdoll at that bone.
+  when `id` has no ragdoll at that bone. A NaN or infinite impulse or point
+  starts the reaction but pushes nothing.
   - **Which branch.** By default the hit body's ragdolled parent's: a forearm shot
     moves the arm, a chest shot the torso. The hips never react: a hit on a bone
     whose parent is the hips reacts from the hit bone, and a hit on the hips
