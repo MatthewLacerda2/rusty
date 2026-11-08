@@ -103,6 +103,10 @@ impl PhysicsWorld {
     /// Rebuild each concave mesh collider whose fit (its `user_data`, stamped by
     /// `build_shape_for`) no longer matches its body's class: a body turned
     /// dynamic gets convex pieces, one turned static or kinematic the exact mesh.
+    /// The stamp is compared before any mesh is copied, so a moving body costs a
+    /// lookup per collider. A collider that is no longer a concave mesh waits for
+    /// the body rebuild, like every other shape edit. A rebuild that fails keeps
+    /// the old shape but takes the new stamp, so it warns once, not every step.
     /// Runs before [`Self::sync_masses`], which reads the new volume.
     pub(super) fn sync_mesh_fits(&mut self, scene: &Scene, owners: &Owners) {
         for (&owner, ids) in owners.pick(&self.plan) {
@@ -111,25 +115,23 @@ impl PhysicsWorld {
                 let Some(&handle) = self.id_to_collider.get(id) else {
                     continue;
                 };
-                let Some(inp) = collider_inputs(&scene.world, *id) else {
-                    continue;
-                };
-                let want = fit_mark(&inp.shape, dynamic);
-                let differs = |c: &Collider| c.user_data != 0 && c.user_data != want;
-                if !self.colliders.get(handle).is_some_and(differs) {
-                    continue;
-                }
-                let Some(pose) = world_pose(scene, *id) else {
-                    continue;
-                };
-                let mesh = (inp.mesh_geom.as_ref()).map(|(p, i)| (p.as_slice(), i.as_slice()));
-                let Some(built) = build_shape_for(*id, &inp.shape, pose.scale, mesh, dynamic)
+                let Some(want) = scene
+                    .world
+                    .collider(*id)
+                    .map(|c| fit_mark(&c.shape, dynamic))
                 else {
                     continue;
                 };
+                let differs = |c: &Collider| c.user_data != 0 && want != 0 && c.user_data != want;
+                if !self.colliders.get(handle).is_some_and(differs) {
+                    continue;
+                }
+                let built = refit(scene, *id, dynamic);
                 if let Some(c) = collider_to_write(&mut self.colliders, handle, differs) {
-                    c.set_shape(built.shared_shape().clone());
-                    c.user_data = built.user_data;
+                    if let Some(built) = built {
+                        c.set_shape(built.shared_shape().clone());
+                    }
+                    c.user_data = want;
                 }
             }
         }
@@ -165,4 +167,13 @@ impl PhysicsWorld {
             }
         }
     }
+}
+
+/// Collider entity `id`'s shape built for a body that is `dynamic` or not, or
+/// `None` when it cannot be (logged by `build_shape_for`).
+fn refit(scene: &Scene, id: u32, dynamic: bool) -> Option<Collider> {
+    let inp = collider_inputs(&scene.world, id)?;
+    let pose = world_pose(scene, id)?;
+    let mesh = (inp.mesh_geom.as_ref()).map(|(p, i)| (p.as_slice(), i.as_slice()));
+    build_shape_for(id, &inp.shape, pose.scale, mesh, dynamic)
 }

@@ -65,3 +65,28 @@ fn a_static_mesh_given_a_rigidbody_in_play_is_decomposed() {
         "dynamic: pieces"
     );
 }
+
+#[test]
+fn a_refit_that_fails_warns_once_not_every_step() {
+    let mut scene = Scene::new();
+    floor(&mut scene);
+    let id = prop(&mut scene, arch(), Vec3::new(0.0, 0.5, 0.0), true);
+    let mut world = PhysicsWorld::from_scene(&scene);
+    steps(&mut scene, &mut world, 1);
+    // The mesh goes bad in Play; the body then turns dynamic and keeps moving.
+    scene.world.mesh_mut(id).unwrap().vertices[3].position[1] = f32::NAN;
+    crate::logging::init();
+    let console = std::cell::RefCell::new(crate::scripting::ConsoleLogs::new());
+    crate::logging::forward(&console);
+    let at = scene.world.transform(id).unwrap().position;
+    scene.world.rigidbody_mut(id).unwrap().is_kinematic = false;
+    steps(&mut scene, &mut world, 5);
+    assert_ne!(at, scene.world.transform(id).unwrap().position, "it moves");
+    let logged = crate::logging::forward(&console);
+    let named = (logged.iter())
+        .filter(|m| m.contains(&format!("entity {id}:")))
+        .count();
+    // The console folds a repeat into "(×N)": one line, never folded.
+    assert_eq!(named, 1, "{logged:?}");
+    assert!(!logged.iter().any(|m| m.contains('×')), "{logged:?}");
+}

@@ -313,7 +313,8 @@ what lands in it). Unity refuses that case and asks for *Convex*; rusty splits i
 instead (#1886). The split is made once per mesh and scale for the session (a few
 hundred milliseconds for a prop, the first time) and redone when the body changes
 type in Play (`SetKinematic`, a Rigidbody added to a static mesh). A mesh too
-flat to split stays a triangle mesh, with one console warning naming the entity.
+flat or too degenerate to split stays a triangle mesh, with one console warning
+naming the entity.
 `RaycastThrough` reads the pieces as one solid.
 
 The **physics material** (Unity: `PhysicMaterial`) sets how a collider grips

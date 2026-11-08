@@ -2,12 +2,12 @@
 //! convex pieces, the same ones every run, made once per mesh and scale (#1886).
 
 use std::cell::RefCell;
-use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::{decompose, decomposition, RUNS};
+use super::{decompose, decomposition};
 use crate::physics::shape::build::{try_build_body_shape, try_build_shape};
 use crate::physics::shape::build_tests::mesh_shape;
 use crate::physics::shape::fit::build_shape_for;
@@ -79,25 +79,16 @@ fn the_same_mesh_decomposes_to_the_same_bits() {
 
 #[test]
 fn a_second_copy_reuses_the_decomposition_and_a_new_scale_does_not() {
+    // The cache hands back the shape it kept, so a hit is the same allocation.
+    // No global counter: other tests decompose concurrently in one process.
     let mesh = arch();
-    let before = RUNS.load(Ordering::Relaxed);
     let first = build(&mesh, Vec3::splat(1.5), true);
     let second = build(&mesh, Vec3::splat(1.5), true);
-    assert_eq!(
-        RUNS.load(Ordering::Relaxed),
-        before + 1,
-        "the copy is a cache hit"
-    );
-    assert_eq!(
-        hull_bits(first.shared_shape()),
-        hull_bits(second.shared_shape())
-    );
-    build(&mesh, Vec3::new(1.5, 2.0, 1.5), true);
-    assert_eq!(
-        RUNS.load(Ordering::Relaxed),
-        before + 2,
-        "a new scale is a new key"
-    );
+    let same = |a: &Collider, b: &Collider| Arc::ptr_eq(&a.shared_shape().0, &b.shared_shape().0);
+    assert!(same(&first, &second), "the copy is a cache hit");
+    let stretched = build(&mesh, Vec3::new(1.5, 2.0, 1.5), true);
+    assert!(stretched.shape().as_compound().is_some());
+    assert!(!same(&first, &stretched), "a new scale is a new key");
 }
 
 #[test]

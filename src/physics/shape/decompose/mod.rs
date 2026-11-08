@@ -17,6 +17,11 @@
 //! non-uniform one changes the hulls) and the triangles: entering Play again, or
 //! the twentieth copy of a prop, reuses it. A mesh with no usable decomposition is
 //! kept too, as `None`, so it is not retried.
+//!
+//! **Panics.** V-HACD's plane search hulls clipped points through parry's
+//! `convex_hull`, which unwraps quickhull and so panics on a degeneracy. A panic
+//! inside a decomposition is caught and treated as no decomposition: kept as
+//! `None`, so the caller falls back to the trimesh and warns, naming the entity.
 
 use std::sync::Mutex;
 
@@ -27,6 +32,8 @@ use super::hull::has_volume;
 
 #[cfg(test)]
 mod body_tests;
+#[cfg(test)]
+mod panic_tests;
 #[cfg(test)]
 mod refit_tests;
 #[cfg(test)]
@@ -55,7 +62,7 @@ pub(in crate::physics) fn decomposition(
     if let Some((_, shape)) = kept.iter().find(|(k, _)| *k == key) {
         return shape.clone();
     }
-    let shape = decompose(points, triangles);
+    let shape = decompose_or_none(points, triangles);
     if kept.len() == KEPT {
         kept.remove(0);
     }
@@ -79,14 +86,24 @@ fn key(points: &[Vector], triangles: &[[u32; 3]]) -> Key {
     )
 }
 
-/// Run V-HACD (parry's `SharedShape::convex_decomposition`, which panics on a mesh
-/// that yields no hull) and keep only the pieces that enclose a volume.
+/// [`decompose`], with a panic inside V-HACD caught and read as `None`.
+fn decompose_or_none(points: &[Vector], triangles: &[[u32; 3]]) -> Option<SharedShape> {
+    // AssertUnwindSafe: the closure only reads the two slices; nothing it could
+    // leave half-written is read after a panic.
+    let run = std::panic::AssertUnwindSafe(|| decompose(points, triangles));
+    std::panic::catch_unwind(run).ok().flatten()
+}
+
+/// Run V-HACD and keep only the pieces that enclose a volume. Not parry's
+/// `SharedShape::convex_decomposition`, which panics on an empty compound.
 pub(in crate::physics) fn decompose(
     points: &[Vector],
     triangles: &[[u32; 3]],
 ) -> Option<SharedShape> {
     #[cfg(test)]
-    RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    if PANIC_NEXT.with(|p| p.replace(false)) {
+        panic!("forced V-HACD panic (test seam)");
+    }
     let params = VHACDParameters::default();
     let vhacd = VHACD::decompose(&params, points, triangles, true);
     let parts: Vec<(Pose, SharedShape)> = vhacd
@@ -99,7 +116,10 @@ pub(in crate::physics) fn decompose(
     (!parts.is_empty()).then(|| SharedShape::compound(parts))
 }
 
-/// How many decompositions this process ran: a test's handle on the cache.
 #[cfg(test)]
-pub(in crate::physics) static RUNS: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
+thread_local! {
+    /// Set by a test to make this thread's next [`decompose`] panic, as quickhull
+    /// does on a degenerate imported prop.
+    pub(in crate::physics) static PANIC_NEXT: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
