@@ -21,7 +21,9 @@ of that caliber on it. Keep this goal in mind when weighing features, architectu
 craft — it is the reason the gates below are strict.
 
 The engine behind that game matches **Unity** in quality and capability: everything
-Unity gives a developer, rusty has to give too (the operator, 2026-10-27). What Unity
+Unity gives a developer, rusty has to give too (the operator, 2026-10-27), and where
+Unreal goes deeper at a bounded cost, rusty follows Unreal (*Unity is the shape; Unreal
+is the depth*, in *Conventions that matter*). What Unity
 lacks, rusty has from the start: **the agent can create and edit the whole game, and
 the developer only says what they want done** (*Conventions that matter*). It gets
 there one piece at a time. A capability is built when the work needs it, in the
@@ -438,11 +440,11 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   `Converter::version` is not a format version: it only tells the import cache to
   re-make its files, and still bumps when a converter's output changes (a test holds
   it: `asset::convert::fingerprint`, #1286).
-- **Unity is the bar; rusty reaches it as needed** (the operator, 2026-10-27). Unity
-  Engine is the measure of what rusty must be capable of, in quality and in capability:
-  everything it gives a developer is the destination, never a menu to pick a subset
-  from. What keeps rusty smaller *today* is the order, not a cap: a piece is built when
-  the work needs it, by the priority in *Issues, labels & priority*, and a Unity
+- **Unity is the floor; rusty reaches it as needed** (the operator, 2026-10-27). Unity
+  Engine is the least rusty must be capable of, in quality and in capability:
+  everything it gives a developer is the destination (and, where Unreal goes deeper,
+  the bullet below raises it), never a menu to pick a subset from. What keeps rusty
+  smaller *today* is the order, not a cap: a piece is built when the work needs it, by the priority in *Issues, labels & priority*, and a Unity
   capability is never turned down as "something no game needs" (only deferred, or
   ruled out by the north star: multiplayer, networking, online services). Nor is a gap
   filed just because Unity has it: a missing capability becomes an issue when the work
@@ -452,6 +454,13 @@ only its adapter (Lua → zimmer document, file writes, patch-path resolution).
   write or even read the engine's code. As long as the docs stay current, Claude can tell
   the developer how anything is done — so keeping documentation truthful is load-bearing,
   not a nicety.
+- **Unity is the shape; Unreal is the depth** (the operator, 2026-11-08). rusty reads
+  like Unity, how far a subsystem goes is a separate question. When the work extends a
+  system the north star leans on and Unreal does more there, Unreal's version is the
+  bar, provided it is bounded: it builds on what the engine has, fits in a few issues,
+  and needs no new kind of moving part or rewrite. Where Unity has nothing (EQS),
+  Unreal is the design to follow. Heavy machinery (Nanite, Lumen, Blueprints) stays
+  out. Nothing is built until the work needs it.
 - **When in doubt on how to approach, just follow Unity Engine and you should be
   good** (the operator, 2026-10-24). This holds when planning an issue and when the work
   hits a call its issue never foresaw (a default, an edge-case behaviour, how an API
