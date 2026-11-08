@@ -67,6 +67,24 @@ pub fn find(lua: &Lua, id: u32, name: &str) -> mlua::Result<Option<Table>> {
     Ok(hits.into_iter().next().map(|(_, t)| t))
 }
 
+/// Entity `id`'s live script tables that define the function `callback`, in slot
+/// order: who a callback delivered through the index (`Damage`, #1893) calls.
+pub fn handlers(lua: &Lua, id: u32, callback: &str) -> mlua::Result<Vec<Table>> {
+    let Value::Table(slots) = index(lua)?.get::<Value>(id)? else {
+        return Ok(Vec::new());
+    };
+    let mut hits: Vec<(i64, Table)> = Vec::new();
+    for pair in slots.pairs::<i64, Table>() {
+        let (slot, entry) = pair?;
+        let table: Table = entry.get("table")?;
+        if matches!(table.get::<Value>(callback)?, Value::Function(_)) {
+            hits.push((slot, table));
+        }
+    }
+    hits.sort_by_key(|(slot, _)| *slot);
+    Ok(hits.into_iter().map(|(_, t)| t).collect())
+}
+
 impl super::ScriptManager {
     /// Run `f` on entity `id`'s live script named `name`, in this runtime's VM:
     /// `None` when the runtime is down or the entity has no such script. For a
