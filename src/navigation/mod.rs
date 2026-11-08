@@ -45,7 +45,7 @@ pub use areas::{
     area_index, cost_table, default_areas, in_mask, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST,
     NOT_WALKABLE_AREA, WALKABLE_AREA,
 };
-pub use bake::{CellRect, Rebake};
+pub use bake::{CellRect, Rebake, Start};
 pub use bounds::NavBounds;
 pub use grid::{NavSpan, NavigationGraph, SpanRef, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
 pub use obstacle::{tick_obstacles, ObstacleVolume};

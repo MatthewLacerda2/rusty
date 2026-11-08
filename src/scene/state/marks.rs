@@ -108,6 +108,8 @@ pub const MARKS: &[Mark] = marks! {
     "occlusion" => |s, _| *s.occlusion = Some(std::sync::Arc::new(marked_occlusion())),
         s.occlusion.as_ref().is_some_and(|d| d.grid.cell == 7.0);
     "occlusion_unread" => |s, _| s.occlusion_unread = true, s.occlusion_unread;
+    "navmesh" => |s, _| s.navmesh = Some(std::sync::Arc::from(vec![7u8])),
+        s.navmesh.as_deref() == Some(&[7u8][..]);
     "lighting_settings" => |s, _| s.lighting_settings.reflections.budget_mb = 77,
         s.lighting_settings.reflections.budget_mb == 77;
     "pending_destroy" => |s, b| s.pending_destroy.push(b), s.pending_destroy.contains(&b);

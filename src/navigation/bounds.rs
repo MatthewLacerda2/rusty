@@ -219,7 +219,7 @@ impl NavigationGraph {
     }
 
     /// The bounds and spacing a bake of `scene` covers.
-    fn target_shape(&self, scene: &Scene) -> (NavBounds, f32) {
+    pub(super) fn target_shape(&self, scene: &Scene) -> (NavBounds, f32) {
         let spacing = scene.nav_settings.grid_spacing;
         let spacing = if spacing.is_finite() && spacing > 0.0 {
             spacing

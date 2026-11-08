@@ -8,12 +8,13 @@
 //! serde defaults equal those constants, so a scene that omits the block bakes with
 //! the engine defaults.
 //!
-//! Submodules: `area` (the area table's rows and limits, #460) and `bounds` (the
-//! authored XZ nav volume, #452). `navigation` re-exports all of it under its old
-//! paths.
+//! Submodules: `area` (the area table's rows and limits, #460), `bounds` (the
+//! authored XZ nav volume, #452) and `saved` (the `<scene>.navmesh` file the bake
+//! writes, #1887). `navigation` re-exports the settings under their old paths.
 
 mod area;
 mod bounds;
+mod saved;
 #[cfg(test)]
 mod tests;
 
@@ -23,6 +24,7 @@ pub use area::{
     default_areas, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST, NOT_WALKABLE_AREA, WALKABLE_AREA,
 };
 pub use bounds::{NavBounds, EMPTY_SCENE_HALF_EXTENT};
+pub use saved::{load_navmesh, navmesh_path, save_navmesh};
 
 /// Default maximum height an agent can step up/down between two adjacent cells
 /// while still treating them as connected (stairs, curbs). World units.

@@ -31,6 +31,7 @@ mod modifiers;
 mod plane;
 mod raster;
 mod region;
+mod saved;
 mod state;
 mod still;
 mod sync;
@@ -40,6 +41,7 @@ mod tests;
 
 pub use region::CellRect;
 pub use state::BakeState;
+pub use still::Start;
 pub(super) use still::StaticWatch;
 pub use sync::Rebake;
 
@@ -58,10 +60,7 @@ impl NavigationGraph {
         let log = self.bake_state.take().map(|s| s.log).unwrap_or_default();
         self.reshape_for(scene);
         let settings = &scene.nav_settings;
-        self.max_step = settings.max_step;
-        self.max_slope = settings.max_slope;
-        self.agent_height = settings.agent_height.max(0.0);
-        self.area_costs = super::cost_table(&settings.areas);
+        self.adopt_settings(settings);
         // A new bake may change any span, so agents planned against an older one
         // re-plan (#126).
         self.bake_generation = self.bake_generation.wrapping_add(1);
@@ -119,6 +118,14 @@ impl NavigationGraph {
         modifiers::apply(self, &mut cols, region, modifiers);
         self.splice(region, &cols);
         rects
+    }
+
+    /// Take the traversal limits and the area costs a bake with `settings` uses.
+    fn adopt_settings(&mut self, settings: &super::NavMeshSettings) {
+        self.max_step = settings.max_step;
+        self.max_slope = settings.max_slope;
+        self.agent_height = settings.agent_height.max(0.0);
+        self.area_costs = super::cost_table(&settings.areas);
     }
 
     /// A graph of the same grid and traversal limits with no spans at all.

@@ -33,14 +33,12 @@ fn default_skybox_path() -> String {
     "".to_string()
 }
 
-/// The default hemisphere-ambient SKY colour (the up-facing tint) — a soft daylight
-/// blue. This is the engine's single source of truth for the default ambient: the
-/// serde defaults in `serialize.rs` re-export it, and the procedural gradient sky
-/// (#256) derives its dome from the same `lighting.ambient` uniform the surface
-/// shader reads, so background and lighting always agree. The ground term is this
-/// colour scaled down in the shader. Bright/coloured enough that two differently
-/// oriented faces visibly differ with NO baked probes and without a direct light on
-/// every face.
+/// The default hemisphere-ambient SKY colour (the up-facing tint), a soft daylight
+/// blue: the one default ambient. The serde defaults in `serialize.rs` re-export it,
+/// and the procedural gradient sky (#256) derives its dome from the same uniform the
+/// surface shader reads, so background and lighting agree; the shader scales it down
+/// for the ground term. Two differently oriented faces differ under it with no baked
+/// probes and no direct light.
 pub const DEFAULT_AMBIENT_COLOR: Vec3 = Vec3::new(0.45, 0.55, 0.70);
 /// The default hemisphere-ambient intensity (scales [`DEFAULT_AMBIENT_COLOR`]).
 pub const DEFAULT_AMBIENT_INTENSITY: f32 = 0.55;
@@ -105,9 +103,11 @@ pub struct Scene {
         crate::scene::revision::Revisioned<crate::scene::lighting::lightmap::LightmapSet>,
     /// The baked occlusion culling (#1714), from `<scene>.occlusion`: see its type.
     pub occlusion: crate::scene::lighting::occlusion::SceneOcclusion,
-    /// The `<scene>.occlusion` file was there but could not be read (not a missing
-    /// file, not a refused one): a save keeps it rather than removing it as absent.
+    /// `<scene>.occlusion` was there but unreadable (not missing, not refused): a
+    /// save keeps it rather than removing it as absent.
     pub occlusion_unread: bool,
+    /// The `<scene>.navmesh` bytes (#1887, `nav_settings::saved`), checked on use.
+    pub navmesh: Option<std::sync::Arc<[u8]>>,
     /// What Generate Lighting bakes with (#832), saved with the scene.
     pub lighting_settings: crate::scene::lighting::LightingSettings,
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
@@ -181,6 +181,7 @@ impl Default for Scene {
             lightmaps: Default::default(),
             occlusion: Default::default(),
             occlusion_unread: false,
+            navmesh: None,
             lighting_settings: Default::default(),
             pending_destroy: Vec::new(),
             playing: false,
