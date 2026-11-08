@@ -89,6 +89,9 @@ pub struct CaptureHost {
     /// The automatic exposure the last [`draw`](Self::draw) applied, read back exactly
     /// (#1444): what the harness publishes as `Scene::screen_exposure`.
     pub exposure: Option<f32>,
+    /// Draw the colliders and the `Debug.Draw*` lines over the next frames (#1882),
+    /// as the Game view's **Gizmos** toggle does: `Harness.Screenshot`'s `gizmos`.
+    pub gizmos: bool,
 }
 
 impl CaptureHost {
@@ -156,14 +159,17 @@ impl CaptureHost {
         // A capture of the screen renders at its render scale (#1498), read as the
         // player and the Game view read it.
         let scale = self.renderer(width, height).map(|r| r.render_scale(false));
+        let gizmos = self.gizmos;
         let Some((renderer, view)) = self.frame(width, height, scale.unwrap_or_default()) else {
             no_adapter("draw a capture")?;
             return Ok(None);
         };
+        view.game_gizmos = gizmos;
         let target = view
             .color_target_view()
             .ok_or_else(|| "capture view owns no colour target".to_string())?;
-        // The editor's exact render path (editor_mode = false: no gizmos/grid),
+        // The Game view's exact render path (editor_mode = false: no grid or editor
+        // gizmos; the colliders and debug lines only with `gizmos`),
         // timed for the frame stats: the dev layer may read the clock.
         let start = std::time::Instant::now();
         renderer.render(view, scene, camera, &target, false);

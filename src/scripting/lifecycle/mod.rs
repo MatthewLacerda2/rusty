@@ -22,13 +22,18 @@
 //! The transition-specific dispatch — the `OnDisable` falling-edge sweep and the
 //! deferred-destroy drain (`OnDisable`→`OnDestroy`) — lives in the `transitions`
 //! submodule, the UI callbacks (#420) in `ui`, the trigger and collision callbacks
-//! (#310, #448) in `physics`, `OnAnimationEvent` (#459) in `animation`; this file holds the shared dispatch core and the
+//! (#310, #448) in `physics`, `OnAnimationEvent` (#459) in `animation`,
+//! `OnControllerColliderHit` (#1879, raised inside `CharacterController.Move`) in
+//! `controller`; this file holds the shared dispatch core and the
 //! per-frame hooks.
 
 mod animation;
+mod controller;
 mod physics;
 mod transitions;
 mod ui;
+
+pub use controller::dispatch_controller_hits;
 
 use mlua::{Lua, Table};
 
@@ -44,20 +49,33 @@ impl ScriptManager {
         }
     }
 
-    /// The generic hook call every dispatch loop shares: resolve the instance's
-    /// lifecycle table, look up `hook`, call it with `args`, log a Lua error to
+    /// Instance `key`'s `hook` function, `None` when its script doesn't define
+    /// it — the one lookup every dispatch shares, so a dispatch can build its
+    /// arguments only for a callback someone will receive.
+    fn hook(&self, lua: &Lua, key: (u32, usize), hook: &str) -> Option<mlua::Function> {
+        let inst = self.entity_scripts.get(&key)?;
+        let table = lua.registry_value::<Table>(&inst.table).ok()?;
+        table.get::<mlua::Function>(hook).ok()
+    }
+
+    /// The generic hook call every dispatch loop shares: look up `hook` on the
+    /// instance ([`hook`](Self::hook)), call it with `args`, log a Lua error to
     /// the console. A script that doesn't define `hook` is silently skipped
     /// (every callback is optional).
     fn call_hook(&self, lua: &Lua, key: (u32, usize), hook: &str, args: impl mlua::IntoLuaMulti) {
-        let Some(inst) = self.entity_scripts.get(&key) else {
-            return;
-        };
-        let Ok(table) = lua.registry_value::<Table>(&inst.table) else {
-            return;
-        };
-        let Ok(func) = table.get::<mlua::Function>(hook) else {
-            return;
-        };
+        if let Some(func) = self.hook(lua, key, hook) {
+            self.call(&func, key, hook, args);
+        }
+    }
+
+    /// Call `func`, instance `key`'s `hook`, logging a Lua error to the console.
+    fn call(
+        &self,
+        func: &mlua::Function,
+        key: (u32, usize),
+        hook: &str,
+        args: impl mlua::IntoLuaMulti,
+    ) {
         if let Err(e) = func.call::<()>(args) {
             self.cells.console.borrow_mut().error(format!(
                 "[Lua Error] {} on entity {} failed: {}",

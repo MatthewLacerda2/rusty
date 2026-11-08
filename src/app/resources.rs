@@ -110,9 +110,12 @@ pub struct Resources {
     /// entity referencing the same graph. Cleared on Play enter so per-session
     /// edits to the asset files are picked up.
     pub(super) animation_graphs: GraphCache,
-    /// The animation events (#459) `animate` found this tick, `(entity, name,
-    /// whose montage)` in firing order, drained by `dispatch_animation_events`.
-    pub(super) animation_events: Vec<(u32, String, Option<MontageEvent>)>,
+    /// The animation events (#459) and graph-state callbacks (#1901) `animate`
+    /// queued this tick, drained by `dispatch_animation_events`.
+    pub(super) animation_events: AnimationQueue,
+    /// What each CharacterController moved by root motion touched this tick
+    /// (#1879), in move order, drained with `animation_events`.
+    pub(super) controller_hits: Vec<(u32, Vec<crate::physics::ControllerHit>)>,
     /// The schedule's observer (#433) — the dev layer's frame-stats timer. `None`
     /// unless installed via `GameWorld::set_probe`; it only watches the frame.
     pub(super) probe: Option<Box<dyn super::SystemProbe>>,
@@ -185,7 +188,8 @@ impl Resources {
             frame_dt: 0.0,
             schedule: super::build().into_schedule(),
             animation_graphs: GraphCache::default(),
-            animation_events: Vec::new(),
+            animation_events: AnimationQueue::default(),
+            controller_hits: Vec::new(),
             probe: None,
             tap: None,
             model_writes: Default::default(),
@@ -232,3 +236,12 @@ impl Resources {
 #[cfg(test)]
 #[path = "resources_tests.rs"]
 mod resources_tests;
+
+/// What the animation step queues for the scripts each tick, in firing order.
+#[derive(Default)]
+pub(super) struct AnimationQueue {
+    /// `(entity, name, whose montage)` per crossed event (#459).
+    pub(super) events: Vec<(u32, String, Option<MontageEvent>)>,
+    /// `(entity, callback)` per graph-state callback (#1901), dispatched first.
+    pub(super) states: Vec<(u32, crate::components::StateCallback)>,
+}

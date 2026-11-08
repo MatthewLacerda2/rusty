@@ -108,6 +108,8 @@ pub const MARKS: &[Mark] = marks! {
     "occlusion" => |s, _| *s.occlusion = Some(std::sync::Arc::new(marked_occlusion())),
         s.occlusion.as_ref().is_some_and(|d| d.grid.cell == 7.0);
     "occlusion_unread" => |s, _| s.occlusion_unread = true, s.occlusion_unread;
+    "navmesh" => |s, _| s.navmesh.bytes = Some(std::sync::Arc::from(vec![7u8])),
+        s.navmesh.bytes.as_deref() == Some(&[7u8][..]);
     "lighting_settings" => |s, _| s.lighting_settings.reflections.budget_mb = 77,
         s.lighting_settings.reflections.budget_mb == 77;
     "pending_destroy" => |s, b| s.pending_destroy.push(b), s.pending_destroy.contains(&b);
@@ -116,6 +118,8 @@ pub const MARKS: &[Mark] = marks! {
     "persistent" => |s, b| s.persistent.insert(b), s.persistent.contains(&b);
     "shader_overrides" => |s, b| s.shader_overrides.set(b, "marked".into(), vec![1.0]),
         s.shader_overrides.has(b);
+    "debug_lines" => |s, _| s.debug_lines.push(Vec3::ZERO, Vec3::X, [1.0; 4], 7),
+        s.debug_lines.lines().len() == 1;
     "shader_time" => |s, _| s.shader_time = 7.5, s.shader_time == 7.5;
     "ui_time" => |s, _| s.ui_time = 7.5, s.ui_time == 7.5;
     "meshes_read_at" => |s, _| s.meshes_read_at = u64::MAX - 1, s.meshes_read_at == u64::MAX - 1;

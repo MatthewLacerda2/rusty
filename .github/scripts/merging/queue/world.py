@@ -7,6 +7,7 @@ import functools
 import time
 from pathlib import Path
 
+from merging.after import slots, world as after_world
 from merging.queue import gitio, outcomes, pulls, stopping, taking
 from merging.queue.conflict import record
 from merging.train import world as train_world
@@ -40,6 +41,12 @@ def consume(path: Path) -> bool:
     return True
 
 
+def mutations(repo: str, root: str) -> after_world.Mutations:
+    """[`after.world.Mutations`] with its requests kept in the common git directory."""
+    common = gitio.git("rev-parse", "--git-common-dir", cwd=root).stdout.strip() or ".git"
+    return after_world.Mutations(repo, Path(root, common, slots.FILE), outcomes.say)
+
+
 def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
     """What [`watch.loop.run`] does to the world, bound to this repository.
     Called once, at launch: that is when the running code's blobs are noted."""
@@ -58,6 +65,8 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         ),
         # Up to `train.group.CAP` pull requests tested on one tree (#1785).
         trains=trains.Yard(train_world.effects(repo, opts, functools.partial(merge_tree_git, opts.root))),
+        # The mutation runs merged pull requests asked for, dispatched after the merge (#1934).
+        mutants=None if opts.dry_run else mutations(repo, opts.root),
         stop_requested=lambda: consume(Path(opts.root, common, ending.STOP_FILE)),
         stale_code=lambda: freshness.changed(code, functools.partial(merge_tree_git, opts.root)),
         turn=lambda number, tick: taking.unready(

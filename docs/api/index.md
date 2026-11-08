@@ -145,8 +145,12 @@ Component menu offers.
 | `OnCollisionEnter` | `OnCollisionEnter(id, other, contact)` | Once, when a solid (non-trigger) contact between the entity's collider and another begins — the tick the solver first pushes the two apart, so `contact.impulse` is the impact. At least one side must be a dynamic body: a kinematic body against static geometry never collides (Unity's rule). Before that tick's `OnCollisionStay`. |
 | `OnCollisionStay` | `OnCollisionStay(id, other, contact)` | After the physics step, once per touching solid pair, every frame the contact persists — including the frame `OnCollisionEnter` fires (the same edge rule as `OnTrigger`). |
 | `OnCollisionExit` | `OnCollisionExit(id, other)` | Once, on the first frame the pair's surfaces no longer touch (or either collider is deactivated, or both sides are now static: `Scene.SetStatic`) — after that frame's `OnCollisionStay`. No `contact`: nothing is touching any more. |
+| `OnControllerColliderHit` | `OnControllerColliderHit(id, hit)` | Synchronously, inside a [`CharacterController.Move`](CharacterController.md) (#1879) — once per collider the move touched, in the order the sweep met them, on the controller's own entity's scripts. Static colliders count: the floor fires every move that presses into it. A move root motion makes is dispatched with the tick's `OnAnimationEvent`s. `hit` carries `id`, `root`, `rigidbody`, `point`, `normal`, `moveDirection`, `moveLength`, `material`. Rules: [`CharacterController`](CharacterController.md), *Hits and pushing*. |
 | `OnJointBreak` | `OnJointBreak(id, force, torque)` | Once, on the tick the entity's `Joint` carried more than its non-zero `break_force` (newtons) or `break_torque` (newton-metres) — after that tick's collision callbacks. `force` / `torque` are what it carried. The `Joint` component is already destroyed (Unity), so the bodies are free. |
 | `OnAnimationEvent` | `OnAnimationEvent(id, name, info)` | Once per animation event the entity's `Animator` crossed this tick (#459): an authored marker on the playing graph node, blend-tree child or montage, `"End"` when a non-looping clip or tree reaches its end, or a montage's `"MontageBlendOut"` / `"MontageEnd"` (#1894). `info` is `{ montage, slot, interrupted }` for those two and `nil` for every other event. After the animation step (and ragdoll posing), before `LateUpdate`. Rules and order: [`Animator`](Animator.md), *Animation events*. |
+| `OnStateEnter` | `OnStateEnter(id, info)` | The step the entity's `Animator` enters a graph state (#1901), Unity's `StateMachineBehaviour.OnStateEnter`: as a transition into it **starts**, or on a hard cut (`PlayNode`, binding the entry node), in every layer. `info` is the state's `{ layer, layer_name, state, tag, time, normalized_time, length }`. Rules and order: [`Animator`](Animator.md), *State callbacks*. |
+| `OnStateUpdate` | `OnStateUpdate(id, info)` | Every step a graph state stays active (#1901), from the step after its enter to the step before its exit — both states of a crossfade, each step it blends. Only scripts that define it are called. |
+| `OnStateExit` | `OnStateExit(id, info)` | The step a graph state stops being active (#1901): as a crossfade out of it **ends**, or at once on a hard cut away. `info` is as the state's last step left it. |
 | `OnTakeDamage` | `OnTakeDamage(id, amount, event)` | Synchronously, inside a [`Damage`](Damage.md) call (#1893) — not by the tick. It bubbles: the nearest active entity from the one struck upward whose script defines it receives it. `event` carries the kind, type, instigator, causer and the hit or blast; a number return is the damage taken. Rules: [`Damage`](Damage.md). |
 | `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script's `Scene.SetActive(id, true)` re-enabling a pooled object). Detected by diffing whether the entity is active in the hierarchy against the previous tick (so a parent's `SetActive` fires its children's edges too), so it fires **exactly once** per rising edge. |
 | `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`/`OnCollision*`). |
@@ -231,9 +235,19 @@ headless replays stay byte-identical):
   sides of its pair — A about B, then B about A — and an entity carrying
   several scripts is notified in ascending script-index order. The tick's
   `OnJointBreak`s come last, ascending by joint entity id.
+- The state callbacks (`OnStateExit` / `OnStateEnter` / `OnStateUpdate`) fire
+  after the tick's animation step and before its `OnAnimationEvent`s: by
+  entity id ascending, then layer (base first), each layer's exits, then
+  enters, then updates, each in the order the states became active. They reach
+  only scripts that are awake and enabled: a spawned or reactivated entity's
+  states enter afresh after its `OnEnable`.
 - `OnAnimationEvent`s fire after the tick's animation step and before
   `LateUpdate`: by entity id ascending, each entity's events in the order its
   playheads crossed them, then layer, then authored order.
+- `OnControllerColliderHit` is not a phase of the tick: it fires inside the
+  `CharacterController.Move` that touched the colliders, each collider once,
+  in sweep order. The moves root motion made this tick dispatch theirs right
+  after the tick's `OnAnimationEvent`s, in move order.
 - `OnEnable`/`OnDisable` are detected at the head of the script phase by diffing
   each instance's `active` state against the previous tick, in the order
   `OnDisable` (falling edges) → `Awake` → `OnEnable` (rising edges) → `Start` —
@@ -335,6 +349,7 @@ where it reads best. -->
 - [`NavMeshObstacle`](NavMeshObstacle.md)
 - [`OffMeshLink`](OffMeshLink.md)
 - [`NavMeshModifierVolume`](NavMeshModifierVolume.md)
+- [`EnvironmentQuery`](EnvironmentQuery.md)
 - [`Physics`](Physics.md)
 - [`Joint`](Joint.md)
 - [`Ragdoll`](Ragdoll.md)

@@ -2,7 +2,7 @@
 //! uniform in one array and every distinct tint's record in one material array,
 //! behind one group-1 bind group, as the solids' `DrawBuffers` are. A gizmo keeps only
 //! its uniform's slot and binds the group at that slot's dynamic offset, so a frame
-//! with a hundred collider boxes builds three buffers, not two per box.
+//! with a hundred probe boxes builds three buffers, not two per box.
 
 use glam::Mat4;
 use wgpu::util::DeviceExt;

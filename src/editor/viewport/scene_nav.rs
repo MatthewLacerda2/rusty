@@ -11,11 +11,13 @@
 //! | Alt + LMB drag | orbit around the pivot |
 //! | Alt + RMB drag, mouse wheel, or pinch | zoom toward the pivot |
 //! | two-finger trackpad scroll | look (Shift: pan), [`scroll`] (#1344) |
-//! | arrow keys (viewport hovered) | look |
+//! | arrow keys (viewport hovered) | move: Up/Down forward/back, Left/Right strafe, Shift faster |
 //! | F (viewport hovered) | frame the selection |
 //!
 //! WASD/QE fly only while RMB is held, as in Unity, which keeps them free for tool
-//! hotkeys. [`BINDINGS`] is this table as the viewport's help hint shows it.
+//! hotkeys. The arrow keys move with or without RMB, at the same fly speed (so the
+//! scroll-adjusted speed carries over), and add to WASD while flying (#1912).
+//! [`BINDINGS`] is this table as the viewport's help hint shows it.
 //!
 //! A gesture only starts with the button pressed on the viewport, so a drag that
 //! began on a panel never turns the camera. Plain LMB stays the gizmo/pick/rect tool.
@@ -27,16 +29,13 @@ use crate::scene::Scene;
 
 pub mod scroll;
 
-/// Points of look the arrow keys turn per second (90 degrees).
-pub const ARROW_POINTS_PER_SECOND: f32 = 360.0;
-
 /// The navigation bindings, (input, gesture), for the viewport's help hint.
 pub const BINDINGS: &[(&str, &str)] = &[
     ("RMB drag", "look"),
     ("RMB + WASD / Q E", "fly (Shift faster, scroll = speed)"),
     ("Two-finger scroll", "look"),
     ("Shift + two-finger scroll", "pan"),
-    ("Arrow keys", "look"),
+    ("Arrow keys", "move (Shift faster)"),
     ("MMB drag", "pan"),
     ("Alt + LMB drag", "orbit"),
     ("Mouse wheel, pinch, Alt + RMB drag", "zoom"),
@@ -104,8 +103,9 @@ pub struct NavFrame {
     pub swipe_pan: Vec2,
     /// Zoom steps from a pinch this frame, [`pinch_steps`].
     pub pinch: f32,
-    /// Arrow-key look axes (right, down), each in -1..=1.
-    pub turn: Vec2,
+    /// Arrow-key move axes (right, forward), each in -1..=1: Up/Down move along the
+    /// view direction, Left/Right strafe, at the fly speed.
+    pub arrows: Vec2,
     /// Fly axes (right, up, forward) from WASD/QE, each in -1..=1.
     pub fly: Vec3,
     /// Shift held.
@@ -120,19 +120,21 @@ impl NavFrame {
     /// Whether the camera goes on moving with no new event: a held gesture, or a held
     /// arrow key. The editor draws on demand outside Play (#1721), so this asks.
     pub fn keeps_moving(&self) -> bool {
-        self.gesture.is_some() || self.turn != Vec2::ZERO
+        self.gesture.is_some() || self.arrows != Vec2::ZERO
     }
 }
 
 /// Apply one frame of navigation to the camera. Scroll zooms, except while looking,
 /// where it changes the fly speed (Unity's behaviour); a trackpad swipe looks or pans.
+/// The arrow keys fly the camera; while RMB looks they add to WASD in one fly step.
 pub fn apply(camera: &mut SceneCamera, f: &NavFrame) {
     let steps = f.scroll / POINTS_PER_STEP;
-    let turn = f.turn * ARROW_POINTS_PER_SECOND * f.dt;
+    let arrows = Vec3::new(f.arrows.x, 0.0, f.arrows.y);
     match f.gesture {
         Some(Gesture::Look) => {
-            look(camera, f.motion + turn);
-            camera.fly(f.fly, f.fast, f.dt);
+            look(camera, f.motion);
+            let axes = (f.fly + arrows).clamp(Vec3::NEG_ONE, Vec3::ONE);
+            camera.fly(axes, f.fast, f.dt);
             camera.adjust_fly_speed(steps + f.swipe.y / POINTS_PER_STEP);
             return;
         }
@@ -143,7 +145,8 @@ pub fn apply(camera: &mut SceneCamera, f: &NavFrame) {
         None => {}
     }
     camera.zoom(steps + f.pinch);
-    look(camera, f.swipe + turn);
+    look(camera, f.swipe);
+    camera.fly(arrows, f.fast, f.dt);
     if f.swipe_pan != Vec2::ZERO {
         camera.pan(f.swipe_pan, f.viewport_height);
     }
@@ -213,7 +216,7 @@ pub fn read(response: &egui::Response, held: bool) -> NavFrame {
         };
         let arrows = Vec2::new(
             axis(Key::ArrowRight, Key::ArrowLeft),
-            axis(Key::ArrowDown, Key::ArrowUp),
+            axis(Key::ArrowUp, Key::ArrowDown),
         );
         NavFrame {
             gesture,
@@ -227,7 +230,7 @@ pub fn read(response: &egui::Response, held: bool) -> NavFrame {
             } else {
                 0.0
             },
-            turn: if keys { arrows } else { Vec2::ZERO },
+            arrows: if keys { arrows } else { Vec2::ZERO },
             fly: Vec3::new(
                 axis(Key::D, Key::A),
                 axis(Key::E, Key::Q),
@@ -256,3 +259,7 @@ mod scene_nav_tests;
 #[cfg(test)]
 #[path = "scene_nav/trackpad_tests.rs"]
 mod trackpad_tests;
+
+#[cfg(test)]
+#[path = "scene_nav/arrow_tests.rs"]
+mod arrow_tests;

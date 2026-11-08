@@ -3,6 +3,7 @@
 
 use super::EditorFrontend;
 use crate::app::GameWorld;
+use crate::core::application::Gizmo;
 use crate::ecs::World;
 use crate::editor::viewport::rect_tool::{self, OverlayFrame};
 use crate::editor::viewport::{gizmo, pick};
@@ -93,7 +94,9 @@ impl EditorFrontend {
         };
 
         let scene = game.scene().borrow();
-        view.ui.screen_in_editor = scene_tab && self.editor_ui.ui_overlay;
+        view.gizmos = self.editor_ui.gizmos;
+        view.game_gizmos = !scene_tab && view.gizmos.on(Gizmo::GameGizmos);
+        view.ui.screen_in_editor = scene_tab && view.gizmos.on(Gizmo::Ui);
         view.set_pixel_scale(pixels_per_point);
         let camera = viewport_camera(&self.editor_ui, game, &scene, interaction.tab);
         renderer.set_ui_textures(std::rc::Rc::clone(
@@ -232,7 +235,7 @@ impl EditorFrontend {
         // 2. A plain click selects the UI under the cursor — the overlay, then world
         // canvases in front of the nearest mesh — else that mesh, else deselects.
         if interaction.clicked {
-            let hit = click_pick(&scene, &frame, point, ui.ui_overlay, ray);
+            let hit = click_pick(&scene, &frame, point, ui.gizmos.on(Gizmo::Ui), ray);
             ui.selected_entity_id = hit;
             ui.selected_asset_path = None;
             scene.selected_entity_id = hit;
@@ -267,7 +270,7 @@ fn drive_rect_tool(
 ) -> bool {
     if interaction.drag_started {
         let grab = || rect_tool::begin(world, frame, id, point);
-        ui.rect_drag = ui.ui_overlay.then(grab).flatten();
+        ui.rect_drag = ui.gizmos.on(Gizmo::Ui).then(grab).flatten();
     }
     let Some(drag) = ui.rect_drag else {
         return false;

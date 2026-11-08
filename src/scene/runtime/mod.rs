@@ -1,6 +1,7 @@
 //! src/scene/runtime/ — the scene half of play-mode requests that cannot happen
 //! mid-dispatch, so a script only *queues* them and the tick drains them at its tail:
 //!
+//!   debug_lines   — `Debug.DrawLine`/`DrawRay`'s lines, aged at the tick's head (#1882)
 //!   destroy_queue — `Scene.DestroyEntity`'s deferred removal (#323)
 //!   despawn       — the one despawn door and the play state guarding it (#1302)
 //!   load          — `Scene.Load`'s deferred swap and `DontDestroyOnLoad` (#432)
@@ -8,6 +9,7 @@
 //! The script-side teardown (`OnDisable`/`OnDestroy`) lives in `scripting`; the
 //! systems that sequence both live in `app::play`.
 
+pub mod debug_lines;
 pub mod despawn;
 pub mod destroy_queue;
 pub mod load;

@@ -21,7 +21,7 @@ fn bounds(min_x: f32, max_x: f32, min_z: f32, max_z: f32) -> NavBounds {
 fn empty_scene_bakes_the_default_box() {
     let g = NavigationGraph::from_scene(&Scene::new());
     assert_eq!(g.bounds(), bounds(-20.0, 20.0, -20.0, 20.0));
-    assert_eq!((g.width, g.height), (41, 41));
+    assert_eq!((g.width, g.height), (161, 161), "0.25 m cells (#1887)");
 }
 
 /// Derived = geometry extent grown by `BOUNDS_MARGIN + agent_radius` (2.0 + 0.5), snapped
@@ -106,6 +106,7 @@ fn is_valid_needs_finite_positive_extent_on_both_axes() {
 #[test]
 fn geometry_at_x60_is_reachable_from_the_origin() {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     add_box(
         &mut scene,
         Vec3::new(-5.0, -0.1, -5.0),
@@ -123,6 +124,7 @@ fn geometry_at_x60_is_reachable_from_the_origin() {
 #[test]
 fn rebake_reshapes_to_new_geometry() {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     add_box(&mut scene, Vec3::ZERO, Vec3::ONE, true);
     let mut g = NavigationGraph::from_scene(&scene);
     assert_eq!(g.bake_generation, 1);
@@ -146,10 +148,15 @@ fn rebake_reshapes_to_new_geometry() {
 fn invalid_spacing_keeps_the_current_one() {
     let mut scene = Scene::new();
     add_box(&mut scene, Vec3::ZERO, Vec3::ONE, true);
+    let good = NavigationGraph::from_scene(&scene);
     for bad in [0.0, -1.0, f32::INFINITY, f32::NAN] {
         scene.nav_settings.grid_spacing = bad;
         let g = NavigationGraph::from_scene(&scene);
-        assert_eq!(g.grid_spacing, 1.0, "spacing {bad} ignored");
-        assert_eq!((g.width, g.height), (8, 8));
+        assert_eq!(
+            g.grid_spacing,
+            grid::DEFAULT_GRID_SPACING,
+            "spacing {bad} ignored"
+        );
+        assert_eq!((g.width, g.height), (good.width, good.height));
     }
 }

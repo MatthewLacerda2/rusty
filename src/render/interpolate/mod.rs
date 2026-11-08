@@ -11,7 +11,9 @@
 //! [`DrawPoses::world`] and every camera entity through [`DrawPoses::pose_camera`]. No
 //! sim module reads it, and nothing is written back into the World.
 //!
-//! **Which entities blend.** Every entity with a mesh or a camera whose world pose
+//! **Which entities blend.** Every entity with a mesh, a camera or a collider gizmo
+//! (a Collider or a CharacterController: its wire is placed at [`DrawPoses::pose`],
+//! so an outline never runs a tick ahead of its mesh, #1882) whose world pose
 //! the last tick changed (the World's `WorldPose` change log, which a parent's move
 //! stamps on its descendants too). An entity with no pose at the tick before (just
 //! spawned, the first tick after a load, Play or Stop) is drawn where it is.
@@ -84,7 +86,9 @@ impl DrawPoses {
             Changes::Rebuild => {
                 self.at_tick.clear();
                 let drawn = world.ids_with_mesh().into_iter();
-                for id in drawn.chain(world.ids_with_camera()) {
+                let drawn = drawn.chain(world.ids_with_camera());
+                let drawn = drawn.chain(world.ids_with_collider());
+                for id in drawn.chain(world.ids_with_character_controller()) {
                     if let Some(pose) = world.world_pose(id) {
                         self.at_tick.insert(id, pose);
                     }
@@ -92,7 +96,10 @@ impl DrawPoses {
             }
             Changes::Ids(ids) => {
                 for id in ids {
-                    let drawn = world.mesh(id).is_some() || world.camera(id).is_some();
+                    let drawn = world.mesh(id).is_some()
+                        || world.camera(id).is_some()
+                        || world.has_collider(id)
+                        || world.has_character_controller(id);
                     let now = world
                         .world_pose(id)
                         .filter(|_| drawn && !on_bone(scene, id));
@@ -151,6 +158,21 @@ impl DrawPoses {
             Some((before, now)) => blend(before, now, self.alpha) * rigid(now).inverse() * matrix,
             None => matrix,
         }
+    }
+
+    /// Entity `id`'s world pose as this frame draws it: [`Self::world`]'s blend, as
+    /// a pose (position and rotation blended, the live scale). What a collider's
+    /// wire is placed at. `None` when the entity is gone.
+    pub fn pose(&self, scene: &Scene, id: u32) -> Option<Pose> {
+        let live = scene.world.world_pose(id)?;
+        Some(match self.blends(scene, id) {
+            Some((before, now)) => Pose {
+                pos: before.pos.lerp(now.pos, self.alpha),
+                rot: before.rot.slerp(now.rot, self.alpha),
+                scale: now.scale,
+            },
+            None => live,
+        })
     }
 
     /// The mesh entities of `scene` to re-pose this frame though the log names none:

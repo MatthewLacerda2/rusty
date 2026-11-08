@@ -77,6 +77,9 @@ pub fn node(name: &str, clip: &str) -> GraphNode {
         is_loop: true,
         speed: None,
         events: Vec::new(),
+        sync_group: None,
+        sync_markers: Vec::new(),
+        tag: String::new(),
     }
 }
 

@@ -54,6 +54,22 @@ impl GameWorld {
         self.resources.play_hold = Some(PlayHold::take());
     }
 
+    /// Build the rapier world from the scene as it stands, and (authoring builds) write
+    /// the convex decompositions it ran into their models' hull sidecars, so the
+    /// next launch runs none (#1940).
+    pub(super) fn build_physics(&mut self) {
+        let world = crate::physics::PhysicsWorld::from_scene(&self.world.scene.borrow());
+        *self.resources.physics.borrow_mut() = Some(world);
+        save_hulls();
+    }
+
+    /// Drop the rapier world at Stop, and write what a body that turned dynamic
+    /// in Play decomposed.
+    pub(super) fn drop_physics(&mut self) {
+        *self.resources.physics.borrow_mut() = None;
+        save_hulls();
+    }
+
     /// Whether the game called `Application.Quit()` and no host has consumed it yet.
     pub fn quit_requested(&self) -> bool {
         self.resources.application.borrow().quit_requested()
@@ -77,7 +93,8 @@ impl GameWorld {
 }
 
 /// Register the play-mode systems into the schedule, in the exact order the old
-/// hand-wired loop ran them. The sim systems live in `FixedUpdate`.
+/// hand-wired loop ran them. The sim systems live in `FixedUpdate`, headed by the
+/// `Debug.Draw*` lines ageing (#1882).
 /// The graph evaluator (#316) sits after the scripts (so parameters set this tick
 /// are seen) and right before `animate` (so a fired transition is sampled the
 /// same tick). `late_update_scripts` (#324) runs after physics, animation and
@@ -91,14 +108,15 @@ impl GameWorld {
 /// tick is done with it, right before `advance_frame`. The skin palette build (#453)
 /// runs in `Render`, after every stage that may move a bone. The post-animation
 /// writers, in order: `animate` writes the clip pose; `pose_ragdolls` (#466) puts each simulated
-/// ragdoll bone back where physics left it; `OnAnimationEvent` (#459) then
-/// fires for the events this tick's playheads crossed; `LateUpdate` scripts set this tick's
+/// ragdoll bone back where physics left it; the state callbacks (#1901) and
+/// `OnAnimationEvent` (#459) then fire for the states and events of this tick's step; `LateUpdate` scripts set this tick's
 /// targets; `solve_ik` (#461) post-processes the final pose, skipping any bone a
 /// dynamic body carries (physics wins over IK); `follow_bones` (#464) then moves
 /// the hitbox query poses to the pose that renders; `carry_local_particles` (#1529)
 /// then moves a `Local` emitter's particles to where all of that left the emitter.
 pub(super) fn register(app: &mut App) {
-    app.add_system(Stage::FixedUpdate, rebake_nav)
+    app.add_system(Stage::FixedUpdate, age_debug_lines)
+        .add_system(Stage::FixedUpdate, rebake_nav)
         .add_system(Stage::FixedUpdate, init_scripts)
         .add_system(Stage::FixedUpdate, super::systems::ui::dispatch_ui_events)
         .add_system(Stage::FixedUpdate, update_scripts)
@@ -125,6 +143,12 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
         .add_system(Stage::FixedUpdate, advance_frame)
         .add_system(Stage::Render, build_skin_palettes);
+}
+
+/// The tick's head: the `Debug.Draw*` lines (#1882) lose a tick before any script
+/// draws, so a one-tick line drawn this tick is drawn by the frame after it.
+fn age_debug_lines(world: &mut World, _res: &mut Resources) {
+    world.scene.borrow_mut().debug_lines.tick();
 }
 
 /// The script phase's head: drain queued script loads — entities spawned during
@@ -181,14 +205,16 @@ fn advance_frame(_world: &mut World, res: &mut Resources) {
 /// Keep the navmesh in step with the scene every tick (#456): advance the
 /// obstacles' carving bookkeeping, then rebake only the cells whose static
 /// colliders or carving obstacles changed; a tick no static entity changed in
-/// skips the static colliders altogether (#1707). Play frame 0 bakes in full, so a Play
-/// session starts from the same navmesh whatever edit mode left behind.
+/// skips the static colliders altogether (#1707). Play frame 0 starts afresh from the
+/// scene's saved navmesh, or bakes in full when it has none that matches (#1887), so a
+/// Play session starts from the same navmesh whatever edit mode left behind; a
+/// play-mode `Scene.Load` starts its scene the same way, in the load step.
 fn rebake_nav(world: &mut World, res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
     crate::navigation::tick_obstacles(&mut scene, res.frame_dt);
     let mut nav = res.nav.borrow_mut();
-    if res.play_frame == 0 {
-        nav.bake_tracked(&mut scene);
+    if res.play_frame == 0 || !nav.tracks(&scene) {
+        nav.start_tracked(&mut scene);
     } else {
         nav.sync_changes(&mut scene);
     }
@@ -200,13 +226,20 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
     nav.tick_nav_agents(&mut s, res.frame_dt);
 }
 
+/// `OnStateExit` / `OnStateEnter` / `OnStateUpdate` (#1901), then
 /// `OnAnimationEvent(id, name, info)` (#459) for every event `animate` queued this
-/// tick: after the animation step and ragdoll posing, so a handler reads the
+/// tick, so a state's first marker follows its enter: after the animation step and ragdoll posing, so a handler reads the
 /// pose this tick renders (bar `LateUpdate` and IK), and before `LateUpdate`, as
-/// in Unity, where animation events fire during the Animator's update.
+/// in Unity, where animation events fire during the Animator's update. Then the
+/// `OnControllerColliderHit`s of the moves root motion made (#1879): a script's
+/// own `Move` raises its hits inside the call, but root motion moves outside any
+/// script, so its hits wait for this point, the animation step's callbacks.
 fn dispatch_animation_events(_world: &mut World, res: &mut Resources) {
-    let events = std::mem::take(&mut res.animation_events);
-    res.script_manager.dispatch_animation_events(&events);
+    let queued = std::mem::take(&mut res.animation_events);
+    res.script_manager.dispatch_state_callbacks(&queued.states);
+    res.script_manager.dispatch_animation_events(&queued.events);
+    let hits = std::mem::take(&mut res.controller_hits);
+    res.script_manager.dispatch_queued_controller_hits(&hits);
 }
 
 /// The palette build (#453): once every pose writer of the frame has run, skin
@@ -225,5 +258,17 @@ mod standalone_tests;
 mod play_tests;
 
 #[cfg(test)]
+#[path = "play_navmesh_tests.rs"]
+mod play_navmesh_tests;
+
+#[cfg(test)]
 #[path = "import_tests/mod.rs"]
 mod import_tests;
+
+/// Write the decompositions made since the last call into their hull sidecars: an
+/// authoring build only (the editor or `dev`, `core::hulls::WRITES`), since a
+/// shipped player reads sidecars and never writes one.
+fn save_hulls() {
+    #[cfg(any(feature = "editor", feature = "dev"))]
+    crate::asset::import_cache::hulls::save_pending();
+}

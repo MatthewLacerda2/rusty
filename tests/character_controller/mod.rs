@@ -5,6 +5,8 @@
 
 mod crouch;
 mod flags;
+mod hits;
+mod push;
 mod stairs;
 mod steep;
 mod walls;

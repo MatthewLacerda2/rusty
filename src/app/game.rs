@@ -18,7 +18,6 @@ use glam::Vec3;
 
 use crate::core::input::{CursorState, InputState};
 use crate::navigation::NavigationGraph;
-use crate::physics::PhysicsWorld;
 use crate::scene::{Camera, Scene, SceneSnapshot};
 use crate::scripting::{ConsoleLogs, ScriptManager};
 use crate::time::Time;
@@ -242,8 +241,7 @@ impl GameWorld {
         // Build the rapier world from the (post-start) scene: bodies + colliders
         // for every entity with a ColliderComponent. Stepped each frame in play.
         // Shared with the script runtime's Physics.Raycast binding.
-        *self.resources.physics.borrow_mut() =
-            Some(PhysicsWorld::from_scene(&self.world.scene.borrow()));
+        self.build_physics();
 
         self.run_startup_stage();
     }
@@ -256,7 +254,7 @@ impl GameWorld {
         self.resources.flush_storage();
         self.resources.script_manager.shutdown();
         self.resources.play_frame = 0;
-        *self.resources.physics.borrow_mut() = None;
+        self.drop_physics();
         // Silence every voice on Stop (Unity stops play-mode audio at exit), and
         // discard play-mode mixer changes (#465) as the scene's are below.
         self.resources.audio.borrow_mut().exit_play();
@@ -267,7 +265,7 @@ impl GameWorld {
             self.resources
                 .nav
                 .borrow_mut()
-                .bake(&self.world.scene.borrow());
+                .restore_or_bake(&self.world.scene.borrow());
         }
         self.restore_play_origin();
         self.apply_project_settings(); // a `SetLimits` made in Play ends with it

@@ -29,9 +29,12 @@ mod layers;
 mod montage;
 mod motion;
 pub(crate) mod root_motion;
+mod states;
+mod sync;
 
 pub use events::{Crossed, END_EVENT};
 pub use motion::Pose;
+pub use states::state_callbacks;
 
 use crate::asset::animation_graph::{AnimationGraph, LayerBlending};
 use crate::asset::mesh_data::{JointTransform, SkinData};
@@ -167,10 +170,11 @@ pub fn step(
     graph: Option<&AnimationGraph>,
     dt: f32,
 ) -> Stepped {
+    let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
+    sync::place_pending(anim, clips, graph);
     if !anim.is_running() {
         return Stepped::default();
     }
-    let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
     let skin = mesh.and_then(|m| m.skin.as_ref());
     let bone = skin.and_then(|s| RootBone::resolve(s, &anim.root_bone));
     let AnimatorComponent {
@@ -188,12 +192,11 @@ pub fn step(
     // One layer's step: its events and, with a root bone, its root motion.
     let advance_layer = |playback: &mut Playback, layer: usize| {
         let ctx = context(layer);
-        let outgoing = bone
-            .as_ref()
-            .and_then(|_| root_motion::Outgoing::of(playback));
+        let before = ctx.before_step(playback, bone.is_some());
         let (events, step) = ctx.advance(playback, dt, *speed, layer);
-        let root = skin.zip(bone.as_ref()).and_then(|(skin, bone)| {
-            ctx.playback_root(skin, bone, playback, step, outgoing.as_ref())
+        let root = before.and_then(|b| {
+            let (skin, bone) = (skin?, bone.as_ref()?);
+            ctx.playback_root(skin, bone, playback, step, &b)
         });
         (events, root)
     };

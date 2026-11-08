@@ -5,22 +5,27 @@
 //! grid/AABB/axis overlays, in the handles pass an editor camera runs after post-FX
 //! (`overlays::handles`, #1224), never in a shipped game render.
 //!
-//! Two families, both line-list geometry on the `line_pipeline`:
+//! Two families, line-list geometry on the `line_pipeline`:
 //!   * Light probes — a small 3-axis cross marker at each probe position, TINTED by the
 //!     probe's baked SH irradiance (sampled toward world-up), so dead/dark or
 //!     mis-bounced probes read at a glance.
 //!   * Reflection probes — a wireframe of the parallax box (`box_min`..`box_max`, via
-//!     the shared `aabb_wireframe` helper) plus a cross marker at the capture position.
+//!     the shared `aabb_wireframe` helper). The capture position is not a line: it is
+//!     a mirror ball showing the probe's cube, or grey when the cube is not resident
+//!     (`probe_ball`, #1911), drawn before these lines through its own pipeline.
 //!
 //! The pure helpers (`sh_marker_tint`, `probe_marker_verts`) are GPU-free and unit
 //! tested; the GPU pre-creation builds per-probe vertex + uniform buffers per frame,
-//! exactly like `precreate_aabb`.
+//! like the occlusion view's boxes. Each family draws only while the Scene view's
+//! gizmo set has it on (`Gizmo::LightProbes`, `Gizmo::ReflectionProbes`, #1909);
+//! Area lights are not probes and always draw.
 
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
 use super::{aabb_wireframe, OverlayBindings, OverlayDraws};
 use crate::components::mesh::Vertex;
+use crate::core::application::{Gizmo, SceneGizmos};
 use crate::render::draw::resources::ProbeResource;
 use crate::render::Renderer;
 use crate::scene::lighting::sh::Sh9;
@@ -28,34 +33,38 @@ use crate::scene::Scene;
 
 /// Half-length of a probe cross marker's arms, in world units.
 const MARKER_HALF: f32 = 0.15;
-/// Tint for reflection-probe gizmos (capture marker + parallax box): a warm amber, kept
-/// distinct from the SH-driven light-probe markers and the cyan collider AABBs.
+/// Tint for the reflection-probe gizmo's parallax box: a warm amber, kept
+/// distinct from the SH-driven light-probe markers.
 const REFLECTION_TINT: [f32; 4] = [1.0, 0.65, 0.1, 0.9];
 
 impl Renderer {
     /// Pre-create the light- and reflection-probe gizmo resources for one editor pass,
     /// and the Area lights' (`lights`, #1674).
     /// Each entry owns its line-list vertex buffer and a slot of `draws` (its flat
-    /// tint), mirroring `precreate_aabb`. Empty when there are no probes of either kind
-    /// and no active Area light.
+    /// tint). Empty when `gizmos` leaves both probe kinds off (or there are none)
+    /// and no Area light is active.
     pub(crate) fn precreate_probes(
         &self,
         scene: &Scene,
+        gizmos: &SceneGizmos,
         draws: &mut OverlayDraws,
     ) -> Vec<ProbeResource> {
         let mut resources = Vec::new();
         // Light probes: a marker per probe, tinted by its baked SH irradiance.
-        for probe in scene.probes.probes() {
-            let verts = probe_marker_verts(probe.position, MARKER_HALF);
-            let tint = sh_marker_tint(&probe.sh);
-            resources.push(self.build_probe_resource(draws, &verts, tint));
+        if gizmos.on(Gizmo::LightProbes) {
+            for probe in scene.probes.probes() {
+                let verts = probe_marker_verts(probe.position, MARKER_HALF);
+                let tint = sh_marker_tint(&probe.sh);
+                resources.push(self.build_probe_resource(draws, &verts, tint));
+            }
         }
-        // Reflection probes: a parallax-box wireframe + a capture-position marker.
-        for probe in &scene.reflection_probes.probes {
-            let box_verts = aabb_wireframe(probe.box_min, probe.box_max);
-            resources.push(self.build_probe_resource(draws, &box_verts, REFLECTION_TINT));
-            let marker_verts = probe_marker_verts(probe.position, MARKER_HALF);
-            resources.push(self.build_probe_resource(draws, &marker_verts, REFLECTION_TINT));
+        // Reflection probes: a parallax-box wireframe; the capture point is a mirror
+        // ball (`probe_ball`, #1911).
+        if gizmos.on(Gizmo::ReflectionProbes) {
+            for probe in &scene.reflection_probes.probes {
+                let box_verts = aabb_wireframe(probe.box_min, probe.box_max);
+                resources.push(self.build_probe_resource(draws, &box_verts, REFLECTION_TINT));
+            }
         }
         // Area lights (#1674), baked only, ride the same line path.
         for (verts, tint) in super::lights::area_light_gizmos(scene) {
@@ -115,8 +124,7 @@ pub(crate) fn sh_marker_tint(sh: &Sh9) -> [f32; 4] {
 }
 
 /// Line-list vertices for a 3-axis cross marker centred at `center`, each arm extending
-/// `half` along ±X, ±Y, ±Z. Three line segments → 6 vertices. Used for both light-probe
-/// and reflection-probe capture markers.
+/// `half` along ±X, ±Y, ±Z. Three line segments → 6 vertices: a light probe's marker.
 pub(crate) fn probe_marker_verts(center: Vec3, half: f32) -> Vec<Vertex> {
     let normal = Vec3::Y;
     let uv = [0.0, 0.0];

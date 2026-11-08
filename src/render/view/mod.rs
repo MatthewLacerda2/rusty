@@ -97,6 +97,18 @@ pub struct RenderView {
     /// The selection outline's mask (#1175), allocated the first frame this view
     /// outlines; it checks its own size, so `resize` leaves it alone.
     pub(crate) selection_mask: Option<crate::render::passes::outline::SelectionMask>,
+    /// Which editor gizmos an editor camera draws into this view (#1909): the Scene
+    /// view's set, handed over by the shell each frame. Unread by a game camera.
+    pub gizmos: crate::core::application::SceneGizmos,
+    /// Draw the colliders and the `Debug.Draw*` lines over a game frame (#1882):
+    /// the Game view's **Gizmos** toggle, `Harness.Screenshot`'s `gizmos` option.
+    /// Off, a game frame is what it was. Unread by an editor camera.
+    pub game_gizmos: bool,
+    /// Those gizmos' copy of the base camera's depth (#1882), kept before a stacked
+    /// camera (a viewmodel) clears it; made on first use, at the scene's size.
+    pub(crate) gizmo_depth: Option<(wgpu::Texture, wgpu::TextureView)>,
+    /// Whether the console was told once that those gizmos skip a TAA-upscaled view.
+    pub(crate) gizmo_upscale_told: bool,
 }
 
 impl RenderView {
@@ -180,6 +192,10 @@ impl RenderView {
             render_textures: Default::default(),
             pixel_scale: 1.0,
             selection_mask: None,
+            gizmos: Default::default(),
+            game_gizmos: false,
+            gizmo_depth: None,
+            gizmo_upscale_told: false,
         }
     }
 

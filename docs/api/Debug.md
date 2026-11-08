@@ -1,8 +1,14 @@
 ## `Debug` — **dev builds only**
 
 Mirrors Unity's `[Conditional]` `Debug`. Registered only under the `dev` Cargo
-feature and stripped from ship builds; calling it from a ship build is a no-op
-because the namespace is absent.
+feature and stripped from ship builds. Unlike Unity's, a call is **not** compiled
+away there: the `Debug` global is absent, so `Debug.DrawRay(...)` in a shipped
+player raises "attempt to index a nil value" every time it runs. A game script
+that ships guards each call:
+
+```lua
+if Debug then Debug.Log("only in a dev build") end
+```
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -18,6 +24,39 @@ because the namespace is absent.
 | `Debug.AudioEvents` | `([after_seq])` | an **array** of the audio event log's entries whose `seq` is greater than `after_seq` (default `0`, all), oldest first, **and** the oldest `seq` the log still holds (below) |
 | `Debug.GetAdaptedExposure` | `()` | `number` (EV): the automatic exposure the screen last applied, read back from the GPU a frame or so late (exactly, in a headless capture); `nil` before an `Automatic` frame has metered (#1444; see `Graphics.md`, *Automatic exposure*) |
 | `Debug.AudioVoices` | `()` | an **array**: one roster row per entity carrying an `AudioSource` (below) |
+| `Debug.DrawLine` | `(fx, fy, fz, tx, ty, tz [, r, g, b, a [, duration]])` | — : a line from `f` to `t` in the colour (default white), held `duration` seconds of sim time (default `0`: one frame). See *Debug lines* (#1882) |
+| `Debug.DrawRay` | `(ox, oy, oz, dx, dy, dz [, r, g, b, a [, duration]])` | — : the line from `o` to `o + d` (the direction's length is the ray's), as `DrawLine` |
+
+### Debug lines (#1882)
+
+Unity's `Debug.DrawLine` / `Debug.DrawRay`: a line seen, never collided with. It
+draws in the editor's Scene view always, and over the game when its gizmos are on:
+the Game view's **Gizmos** toggle (`Editor.SetGizmo("GameGizmos", true)`), or
+`Harness.Screenshot(path, { gizmos = true })`
+(`docs/testing.md`), with every collider's shape beside it. A plain game frame
+never shows one.
+
+- Vectors and the colour cross flat, as everywhere in the API: six numbers, then
+  all four of `r, g, b, a` (0..1) or none, then `duration`. Any other count raises.
+- `duration` is **counted in fixed ticks** (1/60 s each, rounded up), never the
+  clock, so a replay draws the same lines on the same frames. The ticks are
+  unscaled: under `Time.SetTimeScale(0.25)` a 2 s line lasts 120 ticks, which is
+  0.5 s of `Time.time`. A debug line is the developer's overlay, not gameplay, so
+  it keeps to the tick rate, not to the game's clock. `0` (or none) is
+  one tick: drawn from `Update`, it shows on the frame after that tick and is gone
+  at the next. Outside Play no tick passes, so a line drawn in edit mode stays until
+  Play starts; Stop clears every line, and so does opening a scene in edit mode. A
+  `Scene.Load` in Play leaves them to run out their duration.
+- Draw-only: nothing in the sim reads a line back. A non-finite end or colour is
+  dropped; past 16384 held lines the oldest go.
+
+```lua
+local ox, oy, oz, dx, dy, dz = 0, 1, -5, 0, 0, 1
+local hit, id, dist, px, py, pz = Physics.Raycast(ox, oy, oz, dx, dy, dz)
+if hit and Debug then -- `Debug` is absent in a ship build
+    Debug.DrawRay(ox, oy, oz, px - ox, py - oy, pz - oz, 1, 0, 0, 1, 2) -- red, 2 s
+end
+```
 
 ### The preview — eyes on an authored asset (#353)
 
@@ -101,7 +140,7 @@ end
 | `visible_entities` / `culled_entities` | mesh entities drawn / skipped by the frustum cull, summed over the camera views (the stack and render-texture cameras) |
 | `cull_tested` / `size_culled_entities` | mesh entities tested against a camera's frustum (every one the camera draws at all whose LOD level it shows) / kept by the frustum but past their max draw distance or under their min screen size (#1714, [`Mesh`](Mesh.md)), summed over the camera views |
 | `occlusion_culled` | static mesh entities inside a camera's frustum and over its small-object limits, but out of sight of its cell by the scene's baked occlusion (#1714; `Lighting.md`, *Occlusion culling*), summed over the camera views. `0` with no bake, for a camera with `use_occlusion_culling` off, an orthographic one or one whose near plane is past 1 m, and while the bake is older than a static occluder. A light's shadow casters are counted apart, in `shadow_occlusion_culled` |
-| `shadow_cull_tested` / `shadow_frustum_culled` / `shadow_size_culled` / `shadow_occlusion_culled` | shadow casters tested against a light volume (a cascade or an atlas tile), one per entity per volume / outside it / inside it but too far or too small from the main camera (#1714) / kept by both but out of sight of the point or spot light's cell by the scene's baked occlusion (#1714; never for a sun, a shadowmasked light, a light outside every cell, or while a baked occluder is older than the bake or casts no shadow), summed over every shadow view the frame drew: the per-frame passes, and the cached static bakes on a frame they re-bake |
+| `shadow_cull_tested` / `shadow_frustum_culled` / `shadow_size_culled` / `shadow_occlusion_culled` | shadow casters tested against a light volume (a cascade or an atlas tile), one per entity per volume, counting only the casters the scene's spatial index finds near the volume (#1874), so a far **static** caster is neither tested nor culled (dynamic, skinned and just-moved casters are still tested by every volume) / outside it / inside it but too far or too small from the main camera (#1714) / kept by both but out of sight of the point or spot light's cell by the scene's baked occlusion (#1714; never for a sun, a shadowmasked light, a light outside every cell, or while a baked occluder is older than the bake or casts no shadow), summed over every shadow view the frame drew: the per-frame passes, and the cached static bakes on a frame they re-bake |
 | `shadow_gather_us` | CPU **microseconds** the shadow sweeps took to gather, cull and batch their casters (#1714), summed over the sweeps the frame ran (a cached static bake costs nothing on a frame it does not re-bake), inside `renderer_ms` — wall-clock |
 | `lod_hidden_entities` | mesh entities skipped because their `LODGroup` showed another level (#472), summed over the camera stack |
 | `lights` / `lights_dropped` | active lights, and those left unlit: realtime directional lights past 4, every ambient but the last, and per camera the point/spot lights in view past the clustered budget of 64 (the least contributing go first, #434, #834) |
@@ -160,7 +199,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `motion_blur` | per-object motion blur (#1436): its TileMax and NeighborMax tile passes and the gather |
 | `lens_flare` | the screen-space lens flare (#1443): its flare pass (the composite adds it, under `post_fx`) |
 | `post_fx` | bloom, the composite, authored effects, FXAA |
-| `outline` | the editor's selection outline (its mask, dilation and ring) and the gizmos drawn over it after post-FX: grid, collider boxes, axis arrows, probes (editor only) |
+| `outline` | the editor's selection outline (its mask, dilation and ring) and the gizmos drawn over it after post-FX: grid, the occlusion view's boxes, axis arrows, probes (editor only) |
 | `ui` | world and screen UI, Mask textures and the backdrop blur |
 
 A kind appears once a frame ran it (`samples` counts those frames). GPUs overlap

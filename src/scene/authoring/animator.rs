@@ -55,14 +55,19 @@ pub fn set_looping(a: &mut AnimatorComponent, loop_clip: bool) {
 /// Resets the active-node state so the evaluator re-binds: its next step seeds the
 /// new graph's declared defaults and enters its entry node — and its layers'
 /// (#457), whose old state is dropped. Every montage slot is emptied, firing
-/// nothing (#1894).
+/// nothing (#1894), and the old graph's states end without `OnStateExit` (#1901).
 pub fn set_graph(a: &mut AnimatorComponent, graph: Option<String>) {
     a.graph = graph;
     a.base.current_node = None;
+    a.base.states = Default::default();
     a.base.node_speed = 1.0;
+    // The old graph's sync group would otherwise match a new node's (#1896).
+    a.base.sync = Default::default();
     a.layers.clear();
     // A montage is what a script just did against the old graph (#1894).
     a.montages.clear();
+    // The old graph's states end without an `OnStateExit` (#1901).
+    a.states.clear();
 }
 
 /// Enable/disable graph auto-evaluation (#316). Disabled, the graph is inert and

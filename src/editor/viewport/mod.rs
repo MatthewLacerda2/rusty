@@ -9,7 +9,8 @@
 //! owns no GPU state; the shell's editor frontend registers the texture and feeds the [`egui::TextureId`]
 //! in, and reads the returned [`ViewportInteraction`] back to drive picking/gizmo.
 //! The Scene tab's **UI** toggle draws the screen-space canvases over the scene and
-//! enables the rect tool on them (`rect_tool`, #423).
+//! enables the rect tool on them (`rect_tool`, #423). The Game tab's **Gizmos**
+//! toggle draws the colliders and the `Debug.Draw*` lines over the game (#1882).
 
 pub mod gizmo;
 pub mod pick;
@@ -19,6 +20,7 @@ pub mod scene_nav;
 
 use egui_phosphor::regular as icon;
 
+use crate::core::application::{Gizmo, SceneGizmos};
 use crate::editor::theme::chrome;
 
 /// Which view the viewport tab strip is showing.
@@ -68,12 +70,12 @@ pub fn draw(
 ) -> ViewportInteraction {
     let t = editor.theme;
     let mut tab = editor.viewport_tab;
-    let mut overlay = editor.ui_overlay;
+    let mut gizmos = editor.gizmos;
 
     let response = egui::CentralPanel::default()
         .frame(egui::Frame::NONE.fill(t.bg_tier0))
         .show(ui, |ui| {
-            draw_tab_strip(ui, &mut tab, &mut overlay, t);
+            draw_tab_strip(ui, &mut tab, &mut gizmos, t);
             #[cfg_attr(not(feature = "dev"), expect(unused_mut, reason = "a demo fits it"))]
             let mut fit = None;
             #[cfg(feature = "dev")]
@@ -87,7 +89,7 @@ pub fn draw(
             } else {
                 editor.scene_view.looking = false;
             }
-            if tab == ViewportTab::Scene && overlay {
+            if tab == ViewportTab::Scene && gizmos.on(Gizmo::Ui) {
                 let frame = rect_tool::OverlayFrame {
                     size: glam::Vec2::new(response.rect.width(), response.rect.height()),
                     pixels_per_point: ui.ctx().pixels_per_point(),
@@ -103,7 +105,7 @@ pub fn draw(
         .inner;
 
     editor.viewport_tab = tab;
-    editor.ui_overlay = overlay;
+    editor.gizmos = gizmos;
     let interaction = build_interaction(tab, &response, editor.scene_view.navigating);
     // Record the image rect's pixel size so the front-end resizes the offscreen
     // target to match (points scaled by the egui pixels-per-point).
@@ -112,11 +114,13 @@ pub fn draw(
 }
 
 /// The tab strip: Scene / Game selectors (Unity's viewport tabs), and on the Scene
-/// tab the UI overlay toggle and the navigation help.
+/// tab the gizmo toggles (#1909, one per shown row of `Gizmo`'s table) and the
+/// navigation help; on the Game tab its one **Gizmos** toggle (#1882), the
+/// `GameGizmos` row.
 fn draw_tab_strip(
     ui: &mut egui::Ui,
     tab: &mut ViewportTab,
-    overlay: &mut bool,
+    gizmos: &mut SceneGizmos,
     t: crate::editor::theme::Theme,
 ) {
     egui::Frame::NONE
@@ -134,11 +138,15 @@ fn draw_tab_strip(
                 if chrome::tab(ui, &t, *tab == ViewportTab::Game, &game).clicked() {
                     *tab = ViewportTab::Game;
                 }
-                if *tab == ViewportTab::Scene {
-                    ui.separator();
-                    ui.toggle_value(overlay, "UI").on_hover_text(
-                        "Draw the screen-space canvases and edit them with the rect tool",
-                    );
+                let game_tab = *tab == ViewportTab::Game;
+                ui.separator();
+                let rows = Gizmo::ALL.iter().filter(|g| g.row().shown);
+                for &gizmo in rows.filter(|g| g.row().game == game_tab) {
+                    let row = gizmo.row();
+                    ui.toggle_value(gizmos.flag_mut(gizmo), row.label)
+                        .on_hover_text(row.hover);
+                }
+                if !game_tab {
                     ui.label(egui::RichText::new(icon::QUESTION).color(t.text_secondary))
                         .on_hover_ui(navigation_help);
                 }

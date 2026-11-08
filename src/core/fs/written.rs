@@ -33,6 +33,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use crate::core::paths::stored;
+
 /// Each written path with the generation of its latest write; the counter is the
 /// newest generation handed out. Ordered, so [`written_since`] lists paths by name.
 static WRITES: Mutex<(u64, BTreeMap<String, u64>)> = Mutex::new((0, BTreeMap::new()));
@@ -76,8 +78,11 @@ pub fn written_since(seen: u64) -> (u64, Vec<String>) {
 }
 
 /// The paths a consumer just drained, as a test for its cache keys: a key is stale
-/// when it names one of them, by the same string or by another spelling of the same
-/// file (relative vs absolute, a symlink).
+/// when it names one of them, by the same [`stored`] form or by another
+/// spelling of the same file (relative vs absolute, a symlink). The stored form is
+/// what lets a deleted file match (#1937): the editor's watch notes it with native
+/// separators (`\` on Windows) while a cache keys it slashed, and a file that no
+/// longer exists has no canonical form to fall back on.
 pub struct Stale {
     paths: Vec<String>,
     canonical: Vec<PathBuf>,
@@ -86,6 +91,7 @@ pub struct Stale {
 impl Stale {
     pub fn new(paths: Vec<String>) -> Self {
         let canonical = paths.iter().filter_map(|p| canonical(p)).collect();
+        let paths = paths.iter().map(|p| stored(p)).collect();
         Self { paths, canonical }
     }
 
@@ -96,7 +102,7 @@ impl Stale {
 
     /// Whether cache key `key` names a written file.
     pub fn matches(&self, key: &str) -> bool {
-        self.paths.iter().any(|p| p == key)
+        self.paths.contains(&stored(key))
             || (!self.canonical.is_empty()
                 && canonical(key).is_some_and(|c| self.canonical.contains(&c)))
     }
@@ -182,5 +188,18 @@ mod tests {
         let roundabout = dir.join(".").join("noted.bin");
         assert!(stale.matches(&roundabout.to_string_lossy()), "same file");
         assert!(!stale.matches(&dir.join("other.bin").to_string_lossy()));
+    }
+
+    #[test]
+    fn a_deleted_file_noted_with_native_separators_matches_its_slashed_key() {
+        // Windows' watch notes `assets\gone.physmat`; the file is gone, so only the
+        // stored form can tie it to the cache's `assets/gone.physmat` (#1937).
+        let stale = Stale::new(vec![".\\assets\\deleted\\gone.physmat".to_string()]);
+        assert!(stale.matches("assets/deleted/gone.physmat"));
+        assert!(stale.matches("./assets/deleted/gone.physmat"));
+        assert!(!stale.matches("assets/deleted/kept.physmat"));
+        // And the other way round: a slashed note, a cache keyed natively.
+        let stale = Stale::new(vec!["assets/deleted/gone.physmat".to_string()]);
+        assert!(stale.matches("assets\\deleted\\gone.physmat"));
     }
 }

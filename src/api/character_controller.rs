@@ -1,8 +1,9 @@
 //! src/api/character_controller.rs — `CharacterController` namespace (#451).
 //!
 //! Unity's `CharacterController`: `Move` sweeps the entity's capsule by a
-//! displacement with collide-and-slide against the live physics world and
-//! returns what it touched; the getters read back the grounded state that move
+//! displacement with collide-and-slide against the live physics world, raises
+//! `OnControllerColliderHit` on the controller's scripts for each collider it
+//! touched (#1879) and returns what it touched; the getters read back the grounded state that move
 //! left; the size and tuning setters route through the shared
 //! `scene::authoring::physics::character_controller` ops the inspector card uses.
 //! Getters return a neutral default without a controller; setters and `Move` are
@@ -23,6 +24,7 @@ use crate::components::CharacterControllerComponent as Cc;
 use crate::physics::{self, PhysicsWorld};
 use crate::scene::authoring::physics::character_controller as ops;
 use crate::scene::Scene;
+use crate::scripting::dispatch_controller_hits;
 
 /// A field's reader and its shared-op writer.
 type Field<T> = (fn(&Cc) -> T, fn(&mut Cc, T));
@@ -68,10 +70,17 @@ fn register_motion(
         let scene = &*scene.get(lua)?;
         let physics = &*physics.get(lua)?;
         let id = id.live("CharacterController", "Move")?;
-        let world = physics.borrow();
-        let mut scene = scene.borrow_mut();
-        let hit = physics::move_character(world.as_ref(), &mut scene, id, Vec3::new(x, y, z));
-        Ok(flags(hit.map_or(0, |m| m.flags)))
+        let moved = {
+            let world = physics.borrow();
+            let mut scene = scene.borrow_mut();
+            physics::move_character(world.as_ref(), &mut scene, id, Vec3::new(x, y, z))
+        };
+        let Some(moved) = moved else {
+            return Ok(flags(0));
+        };
+        // Unity raises `OnControllerColliderHit` inside `Move` (#1879).
+        dispatch_controller_hits(lua, scene, id, &moved.hits)?;
+        Ok(flags(moved.flags))
     });
     put(t, "Move", f)?;
     let f = lua.create_function(move |lua, id: EntityArg| {

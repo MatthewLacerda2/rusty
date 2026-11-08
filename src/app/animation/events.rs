@@ -74,11 +74,17 @@ impl MotionContext<'_> {
             }
         }
         let mut out = Vec::new();
+        // How far into the step's whole travel a point of its firing part is.
+        let (fired, travel) = (step.events, span.1 - span.0);
+        let into = |at: f32| match travel != 0.0 && fired != span {
+            true => ((fired.0 + at * (fired.1 - fired.0) - span.0) / travel).clamp(0.0, 1.0),
+            false => at,
+        };
         for (mark, name) in marks {
-            for at in crossings(span, mark, bounds) {
+            for at in crossings(fired, mark, bounds) {
                 out.push(Crossed {
                     name: name.to_string(),
-                    at,
+                    at: into(at),
                     layer,
                     montage: None,
                 });

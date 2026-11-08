@@ -45,6 +45,13 @@ pub const ON_COLLISION_STAY: &str = "OnCollisionStay";
 /// Called once, the tick after a solid contact involving the owning entity ends
 /// (#448) — `(id, other)`, after that tick's `OnCollisionStay` dispatches.
 pub const ON_COLLISION_EXIT: &str = "OnCollisionExit";
+/// Called synchronously inside a `CharacterController.Move` (#1879) —
+/// `(id, hit)` — once per collider the move touched, in the order the sweep met
+/// them, on the scripts of the controller's own entity. Static colliders count
+/// (the floor, each move that presses into it). Not dispatched by the tick,
+/// except for a move root motion made, which is queued and dispatched with the
+/// tick's animation events.
+pub const ON_CONTROLLER_COLLIDER_HIT: &str = "OnControllerColliderHit";
 /// Called once, the tick the owning entity's `Joint` breaks past its
 /// `break_force` / `break_torque` (#449) — `(id, force, torque)`, after that
 /// tick's collision callbacks. The component is already gone.
@@ -55,6 +62,18 @@ pub const ON_JOINT_BREAK: &str = "OnJointBreak";
 /// Dispatched after the animation step and ragdoll posing, before `LateUpdate`,
 /// in the order the playheads crossed them.
 pub const ON_ANIMATION_EVENT: &str = "OnAnimationEvent";
+/// Called the step the owning entity's Animator enters a graph state (#1901) —
+/// `(id, info)`, Unity's `StateMachineBehaviour.OnStateEnter`: as a transition
+/// into it starts, or on a hard cut (`PlayNode`, binding the entry node), in
+/// every layer. Dispatched with the animation events, before them.
+pub const ON_STATE_ENTER: &str = "OnStateEnter";
+/// Called every step a graph state stays active (#1901) — `(id, info)` — from
+/// the step after its enter to the step before its exit, both states of a
+/// crossfade included. Only scripts that define it are called.
+pub const ON_STATE_UPDATE: &str = "OnStateUpdate";
+/// Called the step a graph state stops being active (#1901) — `(id, info)`:
+/// as a crossfade out of it ends, or at once on a hard cut away.
+pub const ON_STATE_EXIT: &str = "OnStateExit";
 /// Called synchronously inside a `Damage.Apply` / `ApplyPoint` / `ApplyRadial`
 /// call (#1893) — `(id, amount, event)` — on the nearest active ancestor-or-self
 /// of the struck entity whose script defines it (it bubbles, like the UI pointer
@@ -127,8 +146,12 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_COLLISION_ENTER,
     ON_COLLISION_STAY,
     ON_COLLISION_EXIT,
+    ON_CONTROLLER_COLLIDER_HIT,
     ON_JOINT_BREAK,
     ON_ANIMATION_EVENT,
+    ON_STATE_ENTER,
+    ON_STATE_UPDATE,
+    ON_STATE_EXIT,
     ON_TAKE_DAMAGE,
     ON_POINTER_ENTER,
     ON_POINTER_EXIT,

@@ -11,23 +11,57 @@ function BotAI.Start(entity_id)
     print("[Lua] Bot initialized")
 end
 
+-- Where to stand (#1892): an environment query around the player, reachable,
+-- with a line of sight to the player and away from the other bots' spots, so a
+-- group spreads round the player instead of funnelling into one file. The
+-- `separation` test reads the other agents' NavMeshAgent targets, so each bot's
+-- target is its claim. Built once: the player is a context, not part of the spec.
+local SPOT = {
+    generator = { donut = { context = "target", inner = 3, outer = 8, rings = 2, per_ring = 16 } },
+    tests = {
+        { path = "exists" },
+        { trace = { from = "target", visible = true, item_height = 1.0 } },
+        { distance = { to = "querier" }, score = { curve = "inverse", weight = 0.5 } },
+        { separation = { radius = 3 }, score = { weight = 1 } },
+    },
+}
+-- Re-query about once a second, or sooner when the player moved this far (m).
+local REQUERY_SECONDS = 1.0
+local REQUERY_MOVE = 2.0
+
+-- Per bot: when it last queried and where the player stood then.
+local plans = {}
+
+-- Pick a spot around the player, or chase the player itself when none is found
+-- (no navmesh yet, or the player boxed in).
+local function choose_spot(entity_id, player_id, px, py, pz)
+    local found, x, y, z = EnvironmentQuery.Run(entity_id, SPOT, { target = player_id })
+    if found then
+        return x, y, z
+    end
+    return px, py, pz
+end
+
 function BotAI.Update(entity_id, delta_time)
-    -- A dead bot stops chasing, so its death animation is not walked over.
+    -- A dead bot stops chasing (and querying), so its death animation is not
+    -- walked over.
     if BotAI.health <= 0.0 then
         NavMeshAgent.ResetPath(entity_id)
         return
     end
-    -- Fetch the player position from the engine scene system
     local player_id = Scene.FindEntityByName("Player")
     if player_id == nil then
         return
     end
 
-    local pos_x, pos_y, pos_z = Transform.GetPosition(entity_id)
-    local target_x, target_y, target_z = Transform.GetPosition(player_id)
-    
-    -- Dynamic path target tracking
-    NavMeshAgent.SetTarget(entity_id, target_x, target_y, target_z)
+    local px, py, pz = Transform.GetPosition(player_id)
+    local plan = plans[entity_id]
+    local moved = plan and ((px - plan.px) ^ 2 + (pz - plan.pz) ^ 2) > REQUERY_MOVE ^ 2
+    if plan == nil or moved or Time.time() - plan.at >= REQUERY_SECONDS then
+        local x, y, z = choose_spot(entity_id, player_id, px, py, pz)
+        NavMeshAgent.SetTarget(entity_id, x, y, z)
+        plans[entity_id] = { at = Time.time(), px = px, pz = pz }
+    end
 
     -- The agent turns itself to face where it steers, at its authored angular speed
     -- (Update Rotation on the inspector card); the script only picks the animation.

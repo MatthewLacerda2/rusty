@@ -8,6 +8,7 @@ use glam::Vec3;
 #[test]
 fn bake_sources_max_step_from_scene_settings() {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     add_floor(&mut scene, 0.0, 10.0, 0.0, 10.0);
     add_box(
         &mut scene,
@@ -32,6 +33,7 @@ fn bake_sources_max_step_from_scene_settings() {
 #[test]
 fn bake_reshapes_grid_from_grid_spacing() {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     g.bake(&scene);

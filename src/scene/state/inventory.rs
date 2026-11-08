@@ -115,11 +115,18 @@ authored_fields!(scene_state {
         // Set by the load that could not read `<scene>.occlusion`, so a save keeps
         // it: put back on Stop with the PVS, and a load reads its own file afresh.
         occlusion_unread: EditRuntime, No;
+        // The saved navmesh (#1887) is no document field either: it is the
+        // `<scene>.navmesh` file a save writes beside the scene, read on load. Checked
+        // against the scene's fingerprint on use, so a despawn leaves it as it is.
+        navmesh: BakeOutput, No as ["nav_settings"];
         pending_destroy: Runtime, Dropped;
         playing: Runtime, No;
         pending_load: Runtime, No;
         persistent: Runtime, Dropped;
-        // Every document applied clears them (`serialize::apply`).
+        // Draw-only (#1882): a line's ends are points, not entities. An
+        // edit-mode load clears them (`serialize::drop_old_world`), as Stop does.
+        debug_lines: Runtime, No;
+        // Every document applied clears them (`serialize::drop_old_world`).
         shader_overrides: Runtime, Dropped;
         shader_time: Frame, No;
         ui_time: Frame, No;

@@ -51,6 +51,7 @@ mod fallback_probe_screenshot;
 mod fog;
 mod frame_stats_render;
 mod fxaa_screenshot;
+mod gizmo_screenshot;
 mod harness_size_screenshot;
 mod hdr_overflow_screenshot;
 mod instancing_budget;

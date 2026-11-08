@@ -1,22 +1,28 @@
-//! Pre-creation of editor overlay resources: the floor grid, per-collider AABB
-//! wireframes, the selected camera's occlusion view (`occlusion`, #1714) (the selection outline is its own pass, `passes::outline`), and the
-//! pass that draws them over the finished image ([`handles`], #1224).
+//! Pre-creation of editor overlay resources: the floor grid, the selected camera's
+//! occlusion view (`occlusion`, #1714), the selection's axis arrows and the probe
+//! gizmos the Scene view's set leaves on (#1909) (the selection outline is its own
+//! pass, `passes::outline`), the colliders' real shapes and the `Debug.Draw*` lines
+//! ([`wires`], #1882, also over a game frame with its gizmos on), and the pass that
+//! draws them over the finished image ([`handles`], #1224).
 
 mod axis;
 mod batch;
+mod game;
 mod handles;
 mod lights;
 mod occlusion;
+mod probe_ball;
 mod probes;
+mod wires;
 
 use glam::{Mat4, Vec3};
-use wgpu::util::DeviceExt;
 
 use crate::components::mesh::Vertex;
-use crate::render::draw::resources::{AabbResource, GridResource, Overlays};
+use crate::render::draw::resources::{GridResource, Overlays};
 use crate::render::Renderer;
-use crate::scene::Scene;
 pub(crate) use batch::{OverlayBindings, OverlayDraws};
+pub(crate) use probe_ball::{ball_pipeline, BallResource};
+pub(crate) use wires::ColliderScope;
 
 impl Renderer {
     pub(crate) fn precreate_grid(&self, draws: &mut OverlayDraws) -> Option<GridResource> {
@@ -25,57 +31,8 @@ impl Renderer {
         Some(draws.push(Mat4::IDENTITY, [0.15, 0.15, 0.22, 1.0]))
     }
 
-    pub(crate) fn precreate_aabb(
-        &self,
-        scene: &Scene,
-        draws: &mut OverlayDraws,
-    ) -> Vec<AabbResource> {
-        let mut aabb_resources = Vec::new();
-        for id in scene.world.ids_with_collider() {
-            if !scene.world.is_active_in_hierarchy(id) {
-                continue;
-            }
-            if scene.selected_entity_id == Some(id) {
-                continue;
-            }
-            let col = scene
-                .world
-                .collider(id)
-                .expect("id came from ids_with_collider");
-            if !col.active {
-                continue;
-            }
-
-            drop(col);
-            let Some((min, max)) = scene.world.collider_bounds(id) else {
-                continue;
-            };
-            let line_vertices = aabb_wireframe(min, max);
-            let aabb_wire_buffer =
-                self.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: None,
-                        contents: bytemuck::cast_slice(&line_vertices),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
-
-            // Bright glowing green if selected, cyan otherwise
-            let is_selected = scene.selected_entity_id == Some(id);
-            let tint_color = if is_selected {
-                [0.0, 1.0, 0.4, 1.0]
-            } else {
-                [0.0, 0.8, 1.0, 0.8]
-            };
-
-            // Its vertices are already in world space.
-            let slot = draws.push(Mat4::IDENTITY, tint_color);
-            aabb_resources.push((aabb_wire_buffer, slot));
-        }
-        aabb_resources
-    }
-
-    /// Draw the editor overlays (floor grid, collider AABBs, selected-entity axis
-    /// arrows) into the handles pass, each at its slot of `overlays`' one group 1.
+    /// Draw the editor overlays (floor grid, the occlusion view's boxes, selected-entity
+    /// axis arrows, probe balls and gizmos) into the handles pass, each at its slot of `overlays`' one group 1.
     /// Editor-mode only; called from `draw_handles`.
     pub(crate) fn draw_editor_overlays<'a>(
         &'a self,
@@ -85,6 +42,9 @@ impl Renderer {
         let Some(bindings) = &overlays.bindings else {
             return;
         };
+        // The reflection probes' mirror balls (#1911) first: they write depth, so the
+        // lines drawn after them hide behind a ball as behind a solid.
+        self.draw_probe_balls(render_pass, bindings, &overlays.balls);
         // A. Floor grid
         if let (Some(slot), Some(grid_buf)) = (overlays.grid, &self.grid_vertex_buffer) {
             render_pass.set_vertex_buffer(0, grid_buf.slice(..));
@@ -92,7 +52,7 @@ impl Renderer {
             render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
             render_pass.draw(0..self.grid_count, 0..1);
         }
-        // B. AABB outlines for active colliders
+        // B. Box outlines: the selected camera's occlusion view (#1714)
         for (aabb_wire_buffer, slot) in &overlays.aabb {
             render_pass.set_vertex_buffer(0, aabb_wire_buffer.slice(..));
             bindings.bind(render_pass, *slot);
@@ -114,6 +74,15 @@ impl Renderer {
         }
         // D. Light- & reflection-probe gizmos (#284) and Area lights (#1674).
         self.draw_probe_overlays(render_pass, bindings, &overlays.probes);
+        // E. Collider shapes and `Debug.Draw*` lines (#1882): one draw, each vertex
+        // its own colour, so through the vertex-colour line pipeline. Last: it
+        // leaves that pipeline set.
+        if let Some((buffer, slot, count)) = &overlays.wires {
+            render_pass.set_pipeline(self.vertex_line_pipeline.get());
+            render_pass.set_vertex_buffer(0, buffer.slice(..));
+            bindings.bind(render_pass, *slot);
+            render_pass.draw(0..*count, 0..1);
+        }
     }
 }
 

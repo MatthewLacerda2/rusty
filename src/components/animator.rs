@@ -17,14 +17,18 @@ mod parameters;
 mod playback;
 mod playhead;
 mod root_motion;
+mod states;
+mod sync;
 pub use ik::{IkChain, IkConstraint, IkTarget};
 pub use montage::{
     ActiveMontage, MontageEvent, MontageRefused, Montages, MONTAGE_BLEND_OUT, MONTAGE_END,
 };
 pub use parameters::{AnimatorParameter, AnimatorParameters};
-pub use playback::{Motion, Playback, Step};
-pub use playhead::{Bounds, Playhead};
+pub use playback::{Motion, Playback};
+pub use playhead::{wrap_delta, Bounds, Playhead, Step};
 pub use root_motion::{root_chain, RootMotion, RootMotionState};
+pub use states::{NodeStates, Reported, StateCallback, StateEvent, StateInfo, StateTracker};
+pub use sync::{follow_clamped, stored_leaf, LeafTime, SyncSource, SyncState};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AnimatorComponent {
@@ -85,6 +89,9 @@ pub struct AnimatorComponent {
     /// so a load or a Play/Stop restore leaves every slot empty.
     #[serde(skip)]
     pub montages: Montages,
+    /// The graph states last reported to the scripts (#1901); runtime only.
+    #[serde(skip)]
+    pub states: StateTracker,
 }
 
 /// One extra layer's runtime state (#457).
@@ -125,6 +132,7 @@ impl Default for AnimatorComponent {
             root_bone: String::new(),
             root_motion: RootMotionState::default(),
             montages: Montages::default(),
+            states: StateTracker::default(),
         }
     }
 }
@@ -189,5 +197,7 @@ impl AnimatorComponent {
 mod graph_state_tests;
 #[cfg(test)]
 mod parameters_tests;
+#[cfg(test)]
+mod sync_tests;
 #[cfg(test)]
 mod tests;

@@ -21,6 +21,7 @@ mod inactive_parent_tests;
 /// The frame's ambient uniform, for the GPU probe that runs it (`ambient_gpu_tests`).
 #[cfg(test)]
 pub(crate) use lighting::scene_ambient;
+pub(crate) use overlays::ball_pipeline;
 
 use self::stack::StackPass;
 use crate::asset::MapRef;

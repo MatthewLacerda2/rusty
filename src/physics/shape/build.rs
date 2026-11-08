@@ -14,7 +14,7 @@ use crate::components::{
 use crate::ecs::World;
 use crate::scene::Scene;
 
-use super::mesh::{build_mesh_shape, Skip};
+use super::mesh::{build_mesh_shape, MeshFit, Skip};
 use crate::physics::compound::world_pose;
 
 /// Body class derived from the entity flags. Mirrors the legacy solver's encoding:
@@ -199,19 +199,6 @@ pub(in crate::physics) fn build_shape(
     try_build_shape(shape, scale, mesh).ok()
 }
 
-/// [`try_build_shape`] for collider entity `id`: a skipped mesh collider is logged once,
-/// naming the entity and the reason (#1141).
-pub(in crate::physics) fn build_shape_for(
-    id: u32,
-    shape: &ColliderShape,
-    scale: Vec3,
-    mesh: Option<(&[[f32; 3]], &[u32])>,
-) -> Option<Collider> {
-    try_build_shape(shape, scale, mesh)
-        .map_err(|skip| log::warn!("[Physics] entity {id}: mesh collider skipped: {skip}"))
-        .ok()
-}
-
 /// Build a parry collider shape from the engine's `ColliderShape`, baking in the
 /// transform's (lossy, non-uniform) world scale by [`ColliderShape::scaled`], the
 /// sizing rule the collider's world AABB reads too (#1140).
@@ -222,10 +209,22 @@ pub(in crate::physics) fn build_shape_for(
 ///
 /// A mesh collider that cannot be built is a [`Skip`] saying why (#1132, #1141).
 /// `mesh` is the entity's rest-pose positions + indices, for [`ColliderShape::Mesh`].
+#[cfg(test)]
 pub(in crate::physics) fn try_build_shape(
     shape: &ColliderShape,
     scale: Vec3,
     mesh: Option<(&[[f32; 3]], &[u32])>,
+) -> Result<Collider, Skip> {
+    try_build_body_shape(shape, scale, mesh, false)
+}
+
+/// `try_build_shape` on a body that is `dynamic` or not: a concave mesh on a
+/// dynamic one is decomposed into convex pieces (`MeshFit`, #1886).
+pub(in crate::physics) fn try_build_body_shape(
+    shape: &ColliderShape,
+    scale: Vec3,
+    mesh: Option<(&[[f32; 3]], &[u32])>,
+    dynamic: bool,
 ) -> Result<Collider, Skip> {
     let collider = match shape.scaled(scale) {
         ScaledShape::Cuboid { half } => ColliderBuilder::cuboid(half.x, half.y, half.z),
@@ -244,7 +243,8 @@ pub(in crate::physics) fn try_build_shape(
             CapsuleAxis::Z => ColliderBuilder::capsule_z(half_segment, radius),
         },
         ScaledShape::Mesh { convex, .. } => {
-            return build_mesh_shape(convex, scale, mesh.ok_or(Skip::NoMesh)?)
+            let fit = MeshFit::of(convex, dynamic);
+            return build_mesh_shape(fit, scale, mesh.ok_or(Skip::NoMesh)?);
         }
     };
     Ok(collider.build())

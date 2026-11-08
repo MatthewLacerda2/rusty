@@ -90,6 +90,12 @@ pub const LAYERS: &[Layer] = &[
         "navigation",
         &["components", "core", "ecs", "physics", "scene"],
     ),
+    // Agents' decisions over the world (#1892): the environment query reads the
+    // navmesh, rays through physics and the active camera. Unreal's `AIModule`.
+    sim(
+        "ai",
+        &["components", "core", "navigation", "physics", "scene"],
+    ),
     // `scripting` and `api` are one layer (see PEERS): scripting installs the Lua
     // surface, and the surface reads runtime state scripting owns.
     sim(
@@ -112,6 +118,7 @@ pub const LAYERS: &[Layer] = &[
     sim(
         "api",
         &[
+            "ai",
             "asset",
             "audio",
             "components",
@@ -155,6 +162,8 @@ pub const LAYERS: &[Layer] = &[
             "components",
             "core",
             "ecs",
+            // The collider gizmo draws the shape physics collides with (#1882).
+            "physics",
             "scene",
             "shadergen",
             "ui",

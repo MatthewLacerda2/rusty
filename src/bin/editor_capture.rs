@@ -19,6 +19,9 @@
 //!   --demo <file>       open this demo on the Game view's timeline (#1598)
 //!   --demo-tick <n>     replay the demo to tick n first (default 0)
 //!   --pointer <X>,<Y>   hold the pointer here, in pixels (a hover label shows)
+//!   --gizmo <Name>=on|off  draw a gizmo or not, as `Editor.SetGizmo` names it
+//!                       (`UI`, `LightProbes`, `ReflectionProbes`, `Colliders`,
+//!                       `NavMesh`; `GameGizmos` over `--game`); repeatable (#1909)
 //!   --picker [<page>]   the project picker the editor starts on (#854), over a
 //!                       sample recent list; <page> is `new`, `open`,
 //!                       `mismatch` (the different-engine prompt) or `focus`
@@ -31,6 +34,7 @@
 use std::process::exit;
 
 use rusty::app::ProjectSource;
+use rusty::core::application::Gizmo;
 use rusty::core::project::{Access, BootPlan};
 use rusty::core::settings::video::parse_size;
 use rusty::dev::session::Session;
@@ -119,6 +123,10 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             }
             "--demo-tick" => source.tick = value()?.parse().map_err(|e| format!("{flag}: {e}"))?,
             "--pointer" => opts.pointer = Some(parse_point(&value()?)?),
+            "--gizmo" => {
+                let (gizmo, on) = parse_gizmo(&value()?)?;
+                opts.gizmos.set(gizmo, on);
+            }
             "--select" => opts.select = Some(value()?),
             "--select-asset" => opts.select_asset = Some(value()?),
             "--frame" => opts.frame_selected = true,
@@ -137,6 +145,21 @@ fn parse_point(text: &str) -> Result<(f32, f32), String> {
     let (x, y) = text.split_once(',').ok_or_else(bad)?;
     let (x, y) = (x.trim().parse(), y.trim().parse());
     Ok((x.map_err(|_| bad())?, y.map_err(|_| bad())?))
+}
+
+/// `Name=on` or `Name=off`, `Name` a row of the gizmo table.
+fn parse_gizmo(text: &str) -> Result<(Gizmo, bool), String> {
+    let bad = || format!("--gizmo wants <Name>=on|off, got {text:?}");
+    let (name, state) = text.split_once('=').ok_or_else(bad)?;
+    let gizmo = Gizmo::named(name).ok_or_else(|| {
+        let names: Vec<_> = Gizmo::ALL.iter().map(|g| g.row().name).collect();
+        format!("--gizmo: no gizmo {name:?} (one of {})", names.join(", "))
+    })?;
+    match state {
+        "on" => Ok((gizmo, true)),
+        "off" => Ok((gizmo, false)),
+        _ => Err(bad()),
+    }
 }
 
 fn fail(msg: &str) -> ! {
