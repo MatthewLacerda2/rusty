@@ -27,16 +27,14 @@ impl NavigationGraph {
             return Some(from);
         }
         let a = self.spans[from.index as usize];
-        let (dx, dz) = ((gx - from.gx) as f32, (gz - from.gz) as f32);
-        let run = self.grid_spacing * (dx * dx + dz * dz).sqrt();
+        let run = self.run_between(from, gx, gz);
         let mut best: Option<(f32, usize)> = None;
         for i in self.span_range(gx, gz) {
             let b = self.spans[i];
-            let dh = (b.y - a.y).abs();
-            let gap = a.ceiling.min(b.ceiling) - a.y.max(b.y);
-            if dh > self.max_step || dh > self.max_slope * run || gap < self.agent_height {
+            if !self.steps(a, b, run) {
                 continue;
             }
+            let dh = (b.y - a.y).abs();
             if best.is_none_or(|(d, _)| dh < d) {
                 best = Some((dh, i));
             }
@@ -46,6 +44,21 @@ impl NavigationGraph {
             gz,
             index: i as u32,
         })
+    }
+
+    /// Whether an agent can walk between spans `a` and `b` whose cells lie `run`
+    /// metres apart: the floor delta clears `max_step` and `max_slope`, and the
+    /// gap they share fits `agent_height`. Symmetric in `a` and `b`.
+    pub(super) fn steps(&self, a: super::NavSpan, b: super::NavSpan, run: f32) -> bool {
+        let dh = (b.y - a.y).abs();
+        let gap = a.ceiling.min(b.ceiling) - a.y.max(b.y);
+        dh <= self.max_step && dh <= self.max_slope * run && gap >= self.agent_height
+    }
+
+    /// Centre-to-centre metres from `from`'s cell to cell `(gx, gz)`.
+    pub(super) fn run_between(&self, from: SpanRef, gx: i32, gz: i32) -> f32 {
+        let (dx, dz) = ((gx - from.gx) as f32, (gz - from.gz) as f32);
+        self.grid_spacing * (dx * dx + dz * dz).sqrt()
     }
 
     /// The span an 8-way grid step `(dx, dz)` from `from` lands on. A diagonal step

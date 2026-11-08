@@ -29,10 +29,12 @@ mod layers;
 mod montage;
 mod motion;
 pub(crate) mod root_motion;
+mod states;
 mod sync;
 
 pub use events::{Crossed, END_EVENT};
 pub use motion::Pose;
+pub use states::state_callbacks;
 
 use crate::asset::animation_graph::{AnimationGraph, LayerBlending};
 use crate::asset::mesh_data::{JointTransform, SkinData};

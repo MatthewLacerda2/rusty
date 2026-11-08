@@ -80,7 +80,7 @@ fn a_collider_resolves_inline_asset_or_default() {
     assert_eq!(named(&inline), None);
     let shared = with_asset(Some(&path));
     assert_eq!(effective(&shared), concrete);
-    assert_eq!(named(&shared), Some(path));
+    assert_eq!(named(&shared), Some(key(&path)));
     let dangling = with_asset(Some(&path_in("gone.physmat")));
     assert_eq!(effective(&dangling), PhysicsMaterial::default());
     assert_eq!(named(&dangling), None);

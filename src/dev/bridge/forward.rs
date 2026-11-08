@@ -9,10 +9,9 @@
 //! `Scene.GetScript` handle calls a game function (`script_ref`). A handler's
 //! error is raised as the scenario's.
 //!
-//! Before the first `Harness.Step` there is no gameplay VM. `Move` then runs
-//! the scenario's own, as before #1879: it moves the edit-mode controller and
-//! calls no handler (there are none yet). `Damage.*` refuses: a hit with no
-//! handler to hear it is a scenario's mistake.
+//! The verbs, and what each does before the first `Harness.Step` (no gameplay
+//! VM yet), are `demo::forwards`' table: the replay makes them by the same
+//! rule, so a demo recorded through these forwards replays (#1929).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -21,52 +20,38 @@ use mlua::{Function, Lua, MultiValue, Result as LuaResult, Table};
 
 use super::copy::Copier;
 use crate::app::GameWorld;
-
-/// The verbs forwarded, by namespace: each one whose callbacks run inside it,
-/// and whether it falls back to the scenario's own while the game is down.
-const FORWARDS: [(&str, &[&str], bool); 2] = [
-    ("Damage", &["Apply", "ApplyPoint", "ApplyRadial"], false),
-    ("CharacterController", &["Move"], true),
-];
+use crate::dev::demo::{Forward, FORWARDS};
 
 /// Replace the scenario's [`FORWARDS`] with forwards into the gameplay VM.
 pub fn register(lua: &Lua, world: &Rc<RefCell<GameWorld>>) -> LuaResult<()> {
-    for (namespace, verbs, falls_back) in FORWARDS {
-        let table: Table = lua.globals().get(namespace)?;
-        for &verb in verbs {
-            let own = if falls_back {
-                Some(table.get(verb)?)
-            } else {
-                None
-            };
-            table.set(verb, forward(lua, world, namespace, verb, own)?)?;
+    for entry in &FORWARDS {
+        let table: Table = lua.globals().get(entry.namespace)?;
+        for &verb in entry.verbs {
+            let own: Function = table.get(verb)?;
+            table.set(verb, forward(lua, world, entry, verb, own)?)?;
         }
     }
     Ok(())
 }
 
-/// `namespace.verb`, run in the gameplay VM; `own`, the scenario's, while
-/// that VM is down (an error without it).
+/// `entry`'s `verb`, run in the gameplay VM, or as [`Forward::run`] says while
+/// that VM is down (`own`, the scenario's, for a verb that falls back).
 fn forward(
     lua: &Lua,
     world: &Rc<RefCell<GameWorld>>,
-    namespace: &'static str,
+    entry: &'static Forward,
     verb: &'static str,
-    own: Option<Function>,
+    own: Function,
 ) -> LuaResult<Function> {
     let world = Rc::clone(world);
     lua.create_function(move |lua, args: MultiValue| {
-        let ran = in_game(lua, &world.borrow(), namespace, verb, &args)?;
-        match (ran, &own) {
-            (Some(returns), _) => Ok(returns),
-            (None, Some(own)) => own.call(args),
-            (None, None) => Err(mlua::Error::RuntimeError(format!(
-                "{namespace}.{verb}: the game's runtime is down"
-            ))),
-        }
+        entry.run(
+            verb,
+            || in_game(lua, &world.borrow(), entry.namespace, verb, &args),
+            || own.call(args.clone()),
+        )
     })
 }
-
 /// `namespace.verb(args)` in the gameplay VM, its returns copied back to
 /// `lua`; `None` while that VM is down.
 fn in_game(

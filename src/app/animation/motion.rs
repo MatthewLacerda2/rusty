@@ -22,6 +22,7 @@ use super::blend_poses;
 use super::blend_tree::for_each_leaf;
 use super::clip::{driven_slots, mark_driven, sample_into, sampled_locals};
 use super::events::Crossed;
+use super::states::clamped_travel;
 
 /// Per joint slot, the local TRS a layer gives it, or `None` where it is not
 /// driven.
@@ -212,6 +213,7 @@ impl MotionContext<'_> {
         let at = (playback.previous_time, playback.previous_loop);
         self.track_leaves(playback.previous_motion(), at, &mut leaves);
         playback.sync.previous_leaves = leaves;
+        playback.states.travel = clamped_travel(current.bounds(playback.loop_clip), step);
         (self.crossed(playback, current, step, layer), step)
     }
 

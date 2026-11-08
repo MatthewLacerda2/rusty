@@ -41,7 +41,8 @@ impl Renderer {
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &view.depth_view,
-                    // The lines test the scene's depth but never write it.
+                    // The lines test the scene's depth but never write it; the probe
+                    // balls (#1911) write it, and draw first so a line hides behind one.
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,
