@@ -23,6 +23,8 @@ pub(super) fn sample_graph() -> AnimationGraph {
         is_loop,
         speed,
         events: Vec::new(),
+        sync_group: None,
+        sync_markers: Vec::new(),
     };
     AnimationGraph {
         parameters,

@@ -23,8 +23,6 @@
 
 mod blend;
 
-pub use blend::Outgoing;
-
 use std::f32::consts::{PI, TAU};
 
 use glam::{Mat4, Quat, Vec3};
