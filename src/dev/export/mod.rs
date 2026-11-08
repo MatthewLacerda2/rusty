@@ -24,7 +24,8 @@
 //! the import cache project-relative), the seed manifest, everything under
 //! `assets/` but the convertible sources (Blender's backups of them, and every
 //! `.mp3`, whose `.wav` ships), and the
-//! import cache of each source and each image, under its lock; a cache whose
+//! import cache of each source and each image, under its lock, and each model's
+//! hull sidecar (#1940), so the player runs no V-HACD; a cache whose
 //! source is gone stays behind. What is not: `cache/` (machine-local, regenerable) and `saved/` (this
 //! machine's save data), which the export makes empty, with the rest of the
 //! project skeleton, so the player's first launch writes nothing into an install.
@@ -165,6 +166,7 @@ fn copy_runtime_files(root: &Path, sources: &[PathBuf], out: &Path) -> Result<Ve
         .map(|i| i.strip_prefix(root).unwrap_or(i).to_path_buf())
         .collect();
     copy::texture_caches(root, &images, out, &mut files)?;
+    copy::hull_caches(root, out, &mut files)?;
     let missing = textures::missing(out, &glbs, &files);
     if !missing.is_empty() {
         return Err(format!(

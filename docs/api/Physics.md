@@ -310,9 +310,16 @@ where a triangle mesh has only surfaces (an object driven inside it falls
 through), it is split into convex pieces (V-HACD), which simulate as one solid
 with the mass spread over its volume and keep its hollows open (a bowl holds
 what lands in it). Unity refuses that case and asks for *Convex*; rusty splits it
-instead (#1886). The split is made once per mesh and scale for the session (a few
-hundred milliseconds for a prop, the first time) and redone when the body changes
-type in Play (`SetKinematic`, a Rigidbody added to a static mesh). A mesh too
+instead (#1886). The split is made once per mesh, at the mesh's own scale, and
+the body's scale is applied to the pieces (#1940), as Unity's PhysX scales a
+cooked mesh: a stretched or mirrored prop gets the stretched pieces, not a fresh
+split of the stretched shape, and a scaled copy costs nothing. A split takes a
+few hundred milliseconds for a prop, so a dev build writes it into the model's
+hull sidecar (`<model>.hulls`, beside its cached glTF in
+`assets/generated/imported/`, shipped by an export): the next launch reads it at
+import and splits nothing. A changed model misses its old entries and is split
+again. The body's collider is rebuilt when the body changes type in Play
+(`SetKinematic`, a Rigidbody added to a static mesh). A mesh too
 flat or too degenerate to split stays a triangle mesh, with one console warning
 naming the entity.
 `RaycastThrough` reads the pieces as one solid.

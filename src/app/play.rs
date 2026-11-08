@@ -54,6 +54,22 @@ impl GameWorld {
         self.resources.play_hold = Some(PlayHold::take());
     }
 
+    /// Build the rapier world from the scene as it stands, and (dev builds) write
+    /// the convex decompositions it ran into their models' hull sidecars, so the
+    /// next launch runs none (#1940).
+    pub(super) fn build_physics(&mut self) {
+        let world = crate::physics::PhysicsWorld::from_scene(&self.world.scene.borrow());
+        *self.resources.physics.borrow_mut() = Some(world);
+        save_hulls();
+    }
+
+    /// Drop the rapier world at Stop, and write what a body that turned dynamic
+    /// in Play decomposed.
+    pub(super) fn drop_physics(&mut self) {
+        *self.resources.physics.borrow_mut() = None;
+        save_hulls();
+    }
+
     /// Whether the game called `Application.Quit()` and no host has consumed it yet.
     pub fn quit_requested(&self) -> bool {
         self.resources.application.borrow().quit_requested()
@@ -238,3 +254,10 @@ mod play_navmesh_tests;
 #[cfg(test)]
 #[path = "import_tests/mod.rs"]
 mod import_tests;
+
+/// Write the decompositions made since the last call into their hull sidecars: a
+/// dev build only, since a shipped player reads sidecars and never writes one.
+fn save_hulls() {
+    #[cfg(feature = "dev")]
+    crate::asset::import_cache::hulls::save_pending();
+}
