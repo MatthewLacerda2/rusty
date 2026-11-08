@@ -12,7 +12,6 @@ pub mod demo;
 mod dev_state;
 pub mod header;
 pub mod hierarchy;
-mod hierarchy_tree;
 pub mod inspector;
 mod menu_create;
 pub mod project_picker;
