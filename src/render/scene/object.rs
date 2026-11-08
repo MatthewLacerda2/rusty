@@ -125,7 +125,7 @@ impl Renderer {
         let slot = slot.unwrap_or_else(|| self.retained.objects.alloc());
         let mesh_id = MeshId::from_mesh(&mesh);
         let handle = self.retained.meshes.intern(&mesh_id);
-        let model = world.local_to_world(id);
+        let model = self.draw_poses.world(scene, id);
         let gpu = self.gpu_meshes.get(&mesh_id);
         let runs = gpu.map_or_else(Vec::new, |g| g.runs(&mesh, world.material(id).as_deref()));
         let local_aabb = gpu.map_or((Vec3::ZERO, Vec3::ZERO), |g| g.local_aabb);
@@ -205,7 +205,7 @@ impl Renderer {
     /// lightmap) and each slot's facing. All a move changes; what else it changes is
     /// a full extract's.
     pub(crate) fn pose_object(&mut self, scene: &Scene, id: u32, object: &mut RenderObject) {
-        let model = scene.world.local_to_world(id);
+        let model = self.draw_poses.world(scene, id); // blended between ticks (#1877)
         object.world = model;
         let (min, max) = object.local_aabb;
         let posed = object.resident && !object.palette;

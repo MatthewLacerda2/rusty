@@ -14,7 +14,9 @@ fn a_frame_shorter_than_a_tick_owes_nothing_until_the_time_adds_up() {
 #[test]
 fn frames_on_the_tick_owe_one_each_for_an_hour() {
     let mut ticks = FixedTicks::default();
-    let total: u64 = (0..216_000).map(|_| u64::from(ticks.owe(FIXED_DELTA_TIME))).sum();
+    let total: u64 = (0..216_000)
+        .map(|_| u64::from(ticks.owe(FIXED_DELTA_TIME)))
+        .sum();
     assert_eq!(total, 216_000);
 }
 

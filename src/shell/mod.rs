@@ -16,8 +16,8 @@
 //! The shell is platform layer (like `render`), so it may read the wall clock; the
 //! sim it drives stays a pure function of `(seed, inputs, fixed dt)`.
 //!
-//! [`Frontend`] is not a plugin trait: it has exactly two compile-time
-//! implementations, one per binary, and exists so the loop is written once.
+//! [`Frontend`] is not a plugin trait: it has exactly two compile-time implementations,
+//! one per binary, and exists so the loop is written once.
 
 #![allow(
     clippy::disallowed_methods,
@@ -51,7 +51,7 @@ use crate::core::settings::video::VideoSettings;
 use crate::render::Renderer;
 
 pub use event_loop::{run, Launch};
-use frame::{FrameClock, Host, QuitAction};
+use frame::{FrameClock, Host, QuitAction, Step};
 pub use prelude::{run_after, Prelude};
 
 /// The frontend-independent window state threaded through the event loop.
@@ -59,6 +59,7 @@ pub struct Shell {
     pub window: Arc<winit::window::Window>,
     pub renderer: Renderer,
     pub clock: FrameClock,
+    pub ticks: frame::FixedTicks, // wall-clock time owed to the fixed tick (#1877)
     /// What the loop owes a trigger before it may sleep (#1721).
     pub pacer: pace::Pacer,
     /// The physical→logical key remap, loaded once from `Storage` at boot.
@@ -109,17 +110,16 @@ pub trait Frontend {
         pace::Pace::Continuous
     }
 
-    /// Where the game view sits in the window, for mapping the pointer into
-    /// game-view pixels. Default: the whole window.
+    /// Where the game view sits in the window (the pointer's game-view pixels).
     fn game_view(&self, shell: &Shell) -> input::GameViewRect {
         let config = &shell.renderer.config;
         input::GameViewRect::full_window(config.width, config.height)
     }
 
-    /// Advance the sim one rendered frame. The editor plays a demo on its timeline
-    /// here (#1598); every other frontend runs the live sim.
-    fn advance(&mut self, game: &mut GameWorld, delta_time: f32) -> PlayTransition {
-        frame::advance_sim(game, delta_time)
+    /// Advance the sim one frame of `raw` seconds ([`frame::advance_sim`]). The editor
+    /// plays a demo on its timeline here (#1598); every other frontend runs the sim.
+    fn advance(&mut self, game: &mut GameWorld, step: Step<'_>, raw: f32) -> PlayTransition {
+        frame::advance_sim(game, step, raw)
     }
 
     /// The loop is exiting, before the quit boundary persists the store: put back
@@ -222,7 +222,8 @@ fn run_frame<F: Frontend>(
     // Like raw mouse motion, pads keep reporting while the window is unfocused.
     let pads_live = shell.window_focused && frontend.game_has_input(game);
     pump_pads(shell, game, pads_live);
-    let transition = frontend.advance(game, delta_time);
+    let step = Step::of(&mut shell.ticks, &mut shell.renderer.draw_poses);
+    let transition = frontend.advance(game, step, delta_time);
     if let Some(clipboard) = shell.clipboard.as_mut() {
         input::clipboard::apply_request(clipboard, &mut game.input().borrow_mut());
     }
