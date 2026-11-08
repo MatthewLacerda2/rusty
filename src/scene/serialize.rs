@@ -176,16 +176,9 @@ fn take_materials(scene: &mut Scene, data: &mut SceneData) {
     }
 }
 
-/// `from_disk`: the document came from a file, so its values are held; a World
-/// snapshot's already were.
-fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
-    rehydrate_meshes(&mut data);
-    scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
-
-    take_materials(scene, &mut data);
-
-    let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
-    let bone_refs = crate::scene::skeleton::take_bone_refs(&mut data.entities);
+/// Clear the World and what named or was drawn over its entities, before a
+/// document's entities come in.
+fn drop_old_world(scene: &mut Scene) {
     scene.world.clear();
     // The Undo history named the replaced World's entities (#1631).
     scene.clear_undo();
@@ -201,6 +194,19 @@ fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
     if !scene.is_playing() {
         scene.debug_lines = Default::default();
     }
+}
+
+/// `from_disk`: the document came from a file, so its values are held; a World
+/// snapshot's already were.
+fn apply(scene: &mut Scene, mut data: SceneData, from_disk: bool) {
+    rehydrate_meshes(&mut data);
+    scene.meshes_read_at = crate::core::fs::written::written_since(u64::MAX).0;
+
+    take_materials(scene, &mut data);
+
+    let bone_parents = crate::scene::skeleton::take_bone_parents(&mut data.entities);
+    let bone_refs = crate::scene::skeleton::take_bone_refs(&mut data.entities);
+    drop_old_world(scene);
     for entity in data.entities {
         scene.world.insert_entity(entity);
     }
