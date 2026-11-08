@@ -21,16 +21,17 @@
 //! it casts from the per-frame sweeps, with the base camera's verdict, so its shadow
 //! goes when it does.
 //!
-//! The casters are the retained scene's objects (`render::scene`, #1706): a sweep
-//! walks them, never the ECS, and reads per frame only what the frame decides (the
-//! LOD level, the small-object verdict) and a skinned caster's pose.
+//! The casters are the retained scene's objects (`render::scene`, #1706), never the
+//! ECS: a sweep reads per frame only what the frame decides (the LOD level, the
+//! small-object verdict) and a skinned caster's pose.
 //!
 //! Casters are gathered once per sweep (`gather`) and culled per light volume — a
 //! cascade (#435) or an atlas tile (#468) — so a prop inside two volumes is drawn
-//! into both. A volume tests only the static casters the scene's BVH reaches
-//! (#1874, `reach`) and every caster the BVH cannot answer for, so a tile pays for
-//! the casters near its light, not for the level: it draws the same casters in
-//! the same order as testing them all. A point or spot light's tile also drops the baked casters its light's
+//! into both. A sweep gathers only the objects its volumes could reach, through the
+//! scene's BVH of its static objects (#1874, `RenderScene::casters_near`), and a
+//! volume tests only those the BVH reaches for it and every one it cannot answer
+//! for (`reach`): a tile pays for the casters near its light, not for the level,
+//! and draws the same casters in the same order as testing them all. A point or spot light's tile also drops the baked casters its light's
 //! PVS cell cannot see (#1714, [`LightVolume`]): the wall that hides them is in the
 //! same map, so the map is the same without them, but for the bake's own miss (a
 //! caster seen only through a gap of under about a metre may be dropped, and a still
