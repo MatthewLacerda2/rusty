@@ -131,6 +131,16 @@ fn register_partial(
             .set_blend_weight(id, bone.read(), w))
     });
     put(t, "SetBlendWeight", f)?;
+    register_hit_react(lua, t, scene, physics)
+}
+
+/// `HitReact`: one warning per entity without a ragdoll there.
+fn register_hit_react(
+    lua: &Lua,
+    t: &Table,
+    scene: ApiCell<Scene>,
+    physics: ApiCell<Option<PhysicsWorld>>,
+) -> Reg {
     let warned = Rc::new(RefCell::new(BTreeSet::new()));
     let f = lua.create_function(move |lua, (id, bone, ix, iy, iz, px, py, pz, opts): HitArgs| {
         let id = id.live("Ragdoll", "HitReact")?;
@@ -142,12 +152,16 @@ fn register_partial(
             let hit = scene.borrow_mut().hit_react(id, (bone.read(), point), &opts, &velocity);
             let Some(hit) = hit else {
                 if warned.borrow_mut().insert(id) {
-                    log::warn!("Ragdoll.HitReact: entity {id} has no ragdoll at that bone (Ragdoll.Build it first)");
+                    log::warn!(
+                        "[Ragdoll] HitReact: entity {id} has no ragdoll at that bone (Ragdoll.Build it first)"
+                    );
                 }
                 return Ok(false);
             };
             let impulse = Vec3::new(ix, iy, iz);
-            crate::api::physics::impulse::apply(&scene, physics, hit, impulse, point);
+            if impulse.is_finite() && point.is_finite() {
+                crate::api::physics::impulse::apply(&scene, physics, hit, impulse, point);
+            }
             Ok(true)
         })
     });

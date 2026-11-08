@@ -15,7 +15,7 @@
 //! joint is driven toward its rest pose (the pose it was built in). rapier
 //! measures a joint's angle as `frame1⁻¹ · frame2`, per axis the sine of half the
 //! angle, so the target is that rotation for the animated pose, turned into the
-//! three angles rapier's motors take; the axes a joint's kind locks drop out.
+//! three angles rapier's motors take, on the axes the joint's kind leaves free.
 //!
 //! A joint whose body is kinematic, or whose drive is off, carries no motor, so a
 //! scene without drives pays one body-type check per joint here.
@@ -54,6 +54,9 @@ impl PhysicsWorld {
                 (JointAxis::AngY, q.y),
                 (JointAxis::AngZ, q.z),
             ] {
+                if live.data.locked_axes.contains(axis.into()) {
+                    continue; // rapier would solve a motor row against the lock
+                }
                 live.data
                     .set_motor_position(axis, angle(s), drive.strength, drive.damping);
             }

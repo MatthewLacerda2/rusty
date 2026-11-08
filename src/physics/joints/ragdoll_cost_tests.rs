@@ -99,6 +99,12 @@ fn ten_ragdolls(scene: &mut Scene) -> Vec<u32> {
     let rigs: Vec<u32> = (0..10).map(|_| armature_owner(scene)).collect();
     for &rig in &rigs {
         scene.sync_skeleton(rig);
+        for name in ["hips", "spine", "head"] {
+            let bone = scene.find_bone(rig, name).unwrap();
+            let hb = scene.add_entity(crate::scene::skeleton::HITBOX_NAME.to_string());
+            scene.set_parent(hb, Some(bone)).unwrap();
+            scene.world.set_collider(hb, Some(collider()));
+        }
         scene.build_ragdoll(rig, &opts).unwrap();
     }
     rigs
