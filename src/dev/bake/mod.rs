@@ -16,6 +16,8 @@ pub mod reflection;
 pub mod steps;
 
 #[cfg(test)]
+mod lightmap_cost_tests;
+#[cfg(test)]
 mod navmesh_cost_tests;
 #[cfg(test)]
 mod occlusion_cost_tests;

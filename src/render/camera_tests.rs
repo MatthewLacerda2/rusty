@@ -4,6 +4,11 @@ use super::*;
 use crate::components::{CameraComponent, ClearFlags, Projection, RenderTarget};
 use glam::Vec3;
 
+/// No blend: every camera at its live pose.
+fn still() -> DrawPoses {
+    DrawPoses::default()
+}
+
 fn cam_component(order: i32, mask: u32, flags: ClearFlags) -> CameraComponent {
     CameraComponent {
         fov: 60.0,
@@ -30,7 +35,12 @@ fn edit_mode_is_a_single_base_pass() {
     let comp = cam_component(0, u32::MAX, ClearFlags::Skybox);
     add_camera(&mut scene, "Cam", comp, Vec3::ZERO);
     // Edit mode ignores the scene cameras entirely.
-    assert_eq!(build_camera_stack(&base, &scene, false).cameras.len(), 1);
+    assert_eq!(
+        build_camera_stack(&base, &scene, false, &still())
+            .cameras
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -43,7 +53,7 @@ fn play_mode_sorts_by_render_order_and_layers_lens() {
     let world = cam_component(0, 0b01, ClearFlags::Skybox);
     add_camera(&mut scene, "World", world, Vec3::new(-9.0, 0.0, 0.0));
 
-    let stack = build_camera_stack(&base, &scene, true).cameras;
+    let stack = build_camera_stack(&base, &scene, true, &still()).cameras;
     assert_eq!(stack.len(), 2);
     assert_eq!(stack[0].culling_mask, 0b01);
     assert_eq!(stack[0].clear_flags, ClearFlags::Skybox);
@@ -63,7 +73,12 @@ fn inactive_cameras_are_skipped_with_base_fallback() {
     let mut off = cam_component(0, u32::MAX, ClearFlags::Skybox);
     off.active = false;
     add_camera(&mut scene, "Off", off, Vec3::ZERO);
-    assert_eq!(build_camera_stack(&base, &scene, true).cameras.len(), 1);
+    assert_eq!(
+        build_camera_stack(&base, &scene, true, &still())
+            .cameras
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -82,11 +97,11 @@ fn texture_cameras_leave_the_screen_stack_and_keep_their_own_pose() {
     add_camera(&mut scene, "Minimap", mini, Vec3::new(0.0, 50.0, 0.0));
 
     // A lower render_order must not make the texture camera the screen's base.
-    let stack = build_camera_stack(&base, &scene, true).cameras;
+    let stack = build_camera_stack(&base, &scene, true, &still()).cameras;
     assert_eq!(stack.len(), 1);
     assert_eq!(stack[0].position, base.position);
 
-    let rts = texture_cameras(&base, &scene);
+    let rts = texture_cameras(&base, &scene, &still());
     assert_eq!(rts.len(), 1);
     assert_eq!(rts[0].target.path(), "rt:minimap");
     assert_eq!(rts[0].camera.position, Vec3::new(0.0, 50.0, 0.0));
@@ -103,7 +118,7 @@ fn only_texture_cameras_falls_back_to_the_base_screen_pass() {
     let mut rt = cam_component(0, u32::MAX, ClearFlags::Skybox);
     rt.target_texture = Some(RenderTarget::new("pip", 64, 64));
     add_camera(&mut scene, "Pip", rt, Vec3::ZERO);
-    let stack = build_camera_stack(&base, &scene, true).cameras;
+    let stack = build_camera_stack(&base, &scene, true, &still()).cameras;
     assert_eq!(stack.len(), 1);
     assert_eq!(stack[0].clear_flags, ClearFlags::Skybox);
 }
@@ -122,13 +137,16 @@ fn base_id_is_the_lowest_order_screen_camera_in_either_mode() {
     let world = add_camera(&mut scene, "World", world, Vec3::ZERO);
     for playing in [true, false] {
         assert_eq!(
-            build_camera_stack(&base, &scene, playing).base_id,
+            build_camera_stack(&base, &scene, playing, &still()).base_id,
             Some(world)
         );
     }
-    let entities = |playing| build_camera_stack(&base, &scene, playing).entities;
+    let entities = |playing| build_camera_stack(&base, &scene, playing, &still()).entities;
     assert_eq!(entities(true), [Some(world), Some(overlay)]);
     assert_eq!(entities(false), [None], "the free camera has no entity");
-    assert_eq!(texture_cameras(&base, &scene)[0].id, pip);
-    assert_eq!(build_camera_stack(&base, &Scene::new(), true).base_id, None);
+    assert_eq!(texture_cameras(&base, &scene, &still())[0].id, pip);
+    assert_eq!(
+        build_camera_stack(&base, &Scene::new(), true, &still()).base_id,
+        None
+    );
 }

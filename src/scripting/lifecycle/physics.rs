@@ -79,6 +79,9 @@ impl ScriptManager {
             (ON_COLLISION_STAY, &events.stayed),
         ];
         self.with_lua(|lua| {
+            let scene = crate::api::ApiCell::<crate::scene::Scene>::new()
+                .get(lua)
+                .ok();
             for (hook, pairs) in touching {
                 for pair in pairs {
                     for (id, other, contact) in pair.sides() {
@@ -86,7 +89,8 @@ impl ScriptManager {
                         if keys.is_empty() {
                             continue; // no listener: skip building the table
                         }
-                        let Ok(table) = contact_table(lua, &contact) else {
+                        let material = scene.as_ref().and_then(|s| material_of(&s.borrow(), other));
+                        let Ok(table) = contact_table(lua, &contact, material) else {
                             continue;
                         };
                         for key in keys {
@@ -112,9 +116,15 @@ impl ScriptManager {
     }
 }
 
+/// The physics material asset `other`'s collider names (#1878), as a hit does.
+fn material_of(scene: &crate::scene::Scene, other: u32) -> Option<String> {
+    let collider = scene.world.collider(other)?;
+    crate::scene::physics_material::named(&collider)
+}
+
 /// `{ point = {x,y,z}, normal = {x,y,z}, relativeVelocity = {x,y,z}, impulse,
-/// otherBody }` — the contact a collision callback receives.
-fn contact_table(lua: &Lua, c: &Contact) -> mlua::Result<Table> {
+/// otherBody, material }` — the contact a collision callback receives.
+fn contact_table(lua: &Lua, c: &Contact, material: Option<String>) -> mlua::Result<Table> {
     let vec = |v: Vec3| -> mlua::Result<Table> {
         let t = lua.create_table()?;
         t.set("x", v.x)?;
@@ -128,5 +138,6 @@ fn contact_table(lua: &Lua, c: &Contact) -> mlua::Result<Table> {
     t.set("relativeVelocity", vec(c.relative_velocity)?)?;
     t.set("impulse", c.impulse)?;
     t.set("otherBody", c.other_body)?;
+    t.set("material", material)?;
     Ok(t)
 }

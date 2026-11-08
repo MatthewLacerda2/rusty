@@ -116,7 +116,7 @@ pub(in crate::physics) fn collider_inputs(world: &World, id: u32) -> Option<Coll
         upright: false,
         mesh_geom,
         is_trigger: collider.is_trigger,
-        material: collider.material,
+        material: crate::scene::physics_material::effective(&collider),
         layer: world.layer(id),
     })
 }

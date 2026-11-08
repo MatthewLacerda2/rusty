@@ -15,15 +15,16 @@
 //! | body plan (`resync_topology`) | a Collider's presence and `active`, a CharacterController's presence, a Rigidbody's presence, the parent chain (`body_carrier`) | `ColliderComponent`, `CharacterControllerComponent`, `RigidBodyComponent`; a re-parent on `WorldPose` (subtree) |
 //! | joints (`resync_joints`) | every `Joint`, the joint entity's `activeInHierarchy`, both bodies' owners, handles and `activeInHierarchy` (a disabled body's joint is inert) | `JointComponent`; the joint and connected ids and the connected body's owner on `Activity`, `WorldPose`; a plan change |
 //! | `sync_enabled` | `activeInHierarchy` of the owner and each collider | `Activity` |
-//! | `sync_materials`, `sync_sensors` | the Collider's material and `is_trigger`, a CharacterController's presence | `ColliderComponent`, `CharacterControllerComponent` |
+//! | `sync_materials`, `sync_sensors` | the Collider's material (inline, or its asset's) and `is_trigger`, a CharacterController's presence | `ColliderComponent`, `CharacterControllerComponent`; an asset is not an entity column, so a move of the assets' `generation` re-runs the material pass over every collider |
 //! | `sync_layers` | the entity's layer, **and the scene's collision matrix** | `Layer`; the matrix is not an entity column, so it is compared to the copy kept here and a change re-runs the pass over every collider |
 //! | `sync_masses` | the Rigidbody's `mass`, each collider's volume and sensor flag (a crouch resizes a capsule) | `RigidBodyComponent`, `ColliderComponent`, `CharacterControllerComponent`, `WorldPose` (scale) |
 //! | `sync_characters` | the CharacterController, the owner's and the capsule's world pose | `CharacterControllerComponent`, `WorldPose` |
 //! | body state (`apply_body_state`) | the owner's world pose, its Rigidbody (class, velocities, gravity, CCD), its static flag, a CharacterController's presence | `WorldPose`, `RigidBodyComponent`, `StaticSet`, `CharacterControllerComponent` |
 //! | compound parts | the owner's and each part's world pose | `WorldPose` |
 //!
-//! No pass reads a settings value or an asset: gravity is the world's own, and a
-//! mesh collider's triangles are read when its body is built, never synced.
+//! No pass reads a settings value, and the one asset a pass reads is a physics
+//! material (above): gravity is the world's own, and a mesh collider's triangles
+//! are read when its body is built, never synced.
 //!
 //! **Rebuild.** A cursor reading [`Changes::Rebuild`] (the first step, a scene
 //! load, Play's restore, an Undo or Redo, a reader that fell behind) runs today's
@@ -209,6 +210,9 @@ pub(in crate::physics) struct Tracked {
     pub static_poses: Map<RigidBodyHandle, Pose>,
     /// The collision matrix the colliders' groups were last derived from.
     pub matrix: Option<CollisionMatrix>,
+    /// The physics material assets' generation the materials were last synced
+    /// against (`scene::physics_material::generation`, #1878).
+    pub material_assets: Option<u64>,
     /// Ignore the log and run the full pass every step: the reference the
     /// equivalence tests compare against.
     #[cfg(test)]

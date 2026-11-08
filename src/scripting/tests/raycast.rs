@@ -8,15 +8,16 @@ use super::spatial::spatial_runtime;
 fn raycast_appends_the_hit_point_and_surface_normal() {
     let (m, a, _) = spatial_runtime();
     // From z=-5 along +Z: `a`'s -Z face at z=-1, 4 m away, facing back. `a` is
-    // on no skeleton (no bone, no bone name) and is its own root (#464).
+    // on no skeleton (no bone, no bone name), is its own root (#464) and has an
+    // inline material (no asset, #1878).
     assert_eq!(
         m.eval("Physics.Raycast(0,0,-5, 0,0,1)").unwrap(),
-        format!("true, {a}, 4, 0, 0, -1, 0, 0, -1, nil, nil, {a}")
+        format!("true, {a}, 4, 0, 0, -1, 0, 0, -1, nil, nil, {a}, nil")
     );
     // A miss zeroes every number after `hit` and leaves the rest nil.
     assert_eq!(
         m.eval("Physics.Raycast(0,0,-5, 0,0,-1)").unwrap(),
-        "false, 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, nil"
+        "false, 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, nil, nil"
     );
 }
 
