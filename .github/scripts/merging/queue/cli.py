@@ -148,6 +148,11 @@ def start(opts: argparse.Namespace, argv: list[str]) -> int:
         results, why, status = loop.run(world.effects(repo, opts), opts)
     else:
         results = stopping.drain(outcomes.ordered(opts.prs), lambda number: taking.take(repo, number, opts))
+        if not opts.dry_run:
+            # A named take asks for its mutation runs too (#1934); the next watch pumps what waits.
+            after = world.mutations(repo, opts.root)
+            for number in (n for n, state, _ in results if state == outcomes.MERGED):
+                after.merged(number)
     print()
     for line in outcomes.summary(results):
         outcomes.say(line)

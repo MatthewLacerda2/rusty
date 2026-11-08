@@ -3,7 +3,7 @@
 //! real triangles, with A\* over spans and the per-frame agent steering tick. Split
 //! into focused submodules — `grid` (the `NavigationGraph` model and its compact span
 //! storage), `bounds` (the XZ area the grid covers, resolved from the scene, #452),
-//! `bake` (rasterise → spans → agent-radius erosion), `links` (which span a move
+//! `bake` (rasterise → spans → agent-radius erosion, and the saved `<scene>.navmesh`, #1887), `links` (which span a move
 //! reaches), `snap` (which span a world point means), `astar` (the span search),
 //! `areas` (per-span area ids, their costs and agent masks, #460), `offmesh` (drop, jump and authored links between spans, #462),
 //! `path` (smoothed paths, `SamplePosition`, `Raycast`), `flood` (one bounded Dijkstra
@@ -47,7 +47,7 @@ pub use areas::{
     area_index, cost_table, default_areas, in_mask, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST,
     NOT_WALKABLE_AREA, WALKABLE_AREA,
 };
-pub use bake::{CellRect, Rebake};
+pub use bake::{CellRect, Rebake, Start};
 pub use bounds::NavBounds;
 pub use flood::Flood;
 pub use grid::{NavSpan, NavigationGraph, SpanRef, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};

@@ -13,6 +13,10 @@ pub(super) mod fixture;
 pub(super) mod hull;
 #[cfg(test)]
 mod hull_tests;
+#[cfg(test)]
+mod internal_edges_tests;
+#[cfg(test)]
+mod merge_skip_tests;
 pub(super) mod mesh;
 #[cfg(test)]
 mod mesh_tests;

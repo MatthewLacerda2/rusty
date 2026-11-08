@@ -95,6 +95,9 @@ pub struct ShadowRenderer {
     pub(crate) culls: ShadowCulls,
     /// Mirrors `Renderer::instancing`: off draws one caster per call (#470 tests).
     pub(crate) instancing: bool,
+    /// Whether a light volume finds its candidates through the scene's caster index
+    /// (#1874); off tests every caster, the comparison the tests hold it equal to.
+    pub(crate) index_casters: bool,
     /// The point and spot lights' shadow atlas (#468).
     pub(crate) atlas: ShadowAtlas,
 }
@@ -161,6 +164,7 @@ impl ShadowRenderer {
             drawn: Vec::new(),
             culls: ShadowCulls::default(),
             instancing: true,
+            index_casters: true,
             atlas,
         }
     }

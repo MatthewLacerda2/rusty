@@ -21,13 +21,17 @@
 //! it casts from the per-frame sweeps, with the base camera's verdict, so its shadow
 //! goes when it does.
 //!
-//! The casters are the retained scene's objects (`render::scene`, #1706): a sweep
-//! walks them, never the ECS, and reads per frame only what the frame decides (the
-//! LOD level, the small-object verdict) and a skinned caster's pose.
+//! The casters are the retained scene's objects (`render::scene`, #1706), never the
+//! ECS: a sweep reads per frame only what the frame decides (the LOD level, the
+//! small-object verdict) and a skinned caster's pose.
 //!
 //! Casters are gathered once per sweep (`gather`) and culled per light volume — a
 //! cascade (#435) or an atlas tile (#468) — so a prop inside two volumes is drawn
-//! into both. A point or spot light's tile also drops the baked casters its light's
+//! into both. A sweep gathers only the objects its volumes could reach, through the
+//! scene's BVH of its static objects (#1874, `RenderScene::casters_near`), and a
+//! volume tests only those the BVH reaches for it and every one it cannot answer
+//! for (`reach`): a tile pays for the casters near its light, not for the level,
+//! and draws the same casters in the same order as testing them all. A point or spot light's tile also drops the baked casters its light's
 //! PVS cell cannot see (#1714, [`LightVolume`]): the wall that hides them is in the
 //! same map, so the map is the same without them, but for the bake's own miss (a
 //! caster seen only through a gap of under about a metre may be dropped, and a still
@@ -40,6 +44,7 @@
 mod buffer;
 mod cull;
 mod gather;
+mod reach;
 mod runs;
 mod sweep;
 
@@ -62,6 +67,7 @@ use buffer::{CasterData, CasterRecords, CasterUpload};
 pub(super) use cull::LightVolume;
 pub(crate) use cull::ShadowCulls;
 use glam::Mat4;
+use reach::Reach;
 use runs::batch_casters;
 pub(crate) use runs::{shadow_runs, ShadowRun};
 pub(super) use sweep::Sweep;
@@ -139,8 +145,9 @@ impl CasterFrame<'_> {
 }
 
 impl ShadowRenderer {
-    /// Gather every active caster `sweep` takes whose LOD level `lod` shows, cull it
-    /// against each of `volumes` (light view-projections, and the PVS rows of
+    /// Gather every active caster `sweep` takes whose LOD level `lod` shows, cull
+    /// the ones the scene's caster index reaches (#1874, `reach`) against each of
+    /// `volumes` (light view-projections, and the PVS rows of
     /// their lights' cells), and upload every volume's
     /// batches into that sweep's one caster buffer. Returns the batches per volume,
     /// in the order given.
@@ -152,13 +159,25 @@ impl ShadowRenderer {
         volumes: &[LightVolume],
     ) -> Vec<Vec<CasterBatch>> {
         let start = std::time::Instant::now();
-        let (candidates, joints, walls) = self.collect_casters(frame, lod, sweep);
+        let views: Vec<Mat4> = volumes.iter().map(|v| v.view_proj).collect();
+        let (candidates, joints) = match self.index_casters {
+            true => {
+                let near = frame.objects.casters_near(&views, sweep.baked());
+                self.collect_casters(frame, lod, sweep, near)
+            }
+            false => self.collect_casters(frame, lod, sweep, frame.objects.objects()),
+        };
+        let walls = frame.objects.walls();
         let pvs = &frame.objects.occlusion;
+        let index = self.index_casters.then(|| frame.objects.caster_index());
+        let reach = Reach::new(&candidates, index);
         let mut matrices = Vec::new();
         let mut per_volume = Vec::with_capacity(volumes.len());
         for &volume in volumes {
             let volume = volume.resident(walls);
-            let casters = cull::cull(&candidates, volume, pvs, &mut self.culls);
+            let picked = reach.of(volume.view_proj);
+            let picked = picked.into_iter().flat_map(|runs| &candidates[runs]);
+            let casters = cull::cull(picked, volume, pvs, &mut self.culls);
             let (packed, mut batches) = batch_casters(casters, self.instancing);
             let base = matrices.len() as u32;
             for batch in &mut batches {
@@ -244,5 +263,7 @@ mod cull_tests;
 mod layout_tests;
 #[cfg(test)]
 mod material_tests;
+#[cfg(test)]
+mod reach_tests;
 #[cfg(test)]
 mod tests;

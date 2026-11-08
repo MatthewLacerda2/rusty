@@ -99,8 +99,10 @@ pub struct EditorUi {
     pub ui_textures: std::rc::Rc<crate::ui::TextureSizes>,
     /// Live move-gizmo drag, if an axis handle is currently grabbed (#183).
     pub gizmo_drag: Option<viewport::gizmo::GizmoDrag>,
-    /// The Scene tab's UI overlay: screen canvases drawn, the rect tool live (#423).
-    pub ui_overlay: bool,
+    /// Which gizmos the Scene tab draws (#1909): its tab strip's toggles, and
+    /// `Editor.SetGizmo` through the shell. `Gizmo::Ui` is the UI overlay: screen
+    /// canvases drawn, the rect tool live (#423).
+    pub gizmos: crate::core::application::SceneGizmos,
     /// Live rect-tool drag on a UI element's handle (#423).
     pub rect_drag: Option<viewport::rect_tool::RectDrag>,
     /// The Scene tab's own camera and what the pointer is doing with it (#745).
@@ -162,7 +164,7 @@ impl EditorUi {
             viewport_image_size: egui::Vec2::ZERO,
             ui_textures: Default::default(),
             gizmo_drag: None,
-            ui_overlay: true,
+            gizmos: Default::default(),
             rect_drag: None,
             scene_view: Default::default(),
 

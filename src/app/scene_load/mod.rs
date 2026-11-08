@@ -89,9 +89,11 @@ pub(super) fn apply_scene_load(world: &mut World, res: &mut Resources) {
         .borrow_mut()
         .retain_entities(|id| survivors.contains(&id));
     {
-        let scene = world.scene.borrow();
+        let mut scene = world.scene.borrow_mut();
         *res.physics.borrow_mut() = Some(PhysicsWorld::from_scene(&scene));
-        res.nav.borrow_mut().bake(&scene);
+        // Restored from the new scene's saved navmesh or baked, once (#1887): the
+        // play loop's next tick finds it tracking this scene and only syncs.
+        res.nav.borrow_mut().start_tracked(&mut scene);
     }
     *res.script_manager.scene_path_cell().borrow_mut() = Some(path.clone());
     super::audio::start_sources(world, res, |id| !survivors.contains(&id));

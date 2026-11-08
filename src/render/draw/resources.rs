@@ -8,6 +8,7 @@ use super::batch::sort::back_to_front;
 use super::batch::{DrawItem, FrameDraws};
 use super::overlays::{OverlayBindings, OverlayDraws};
 use super::visibility::{CameraCulls, ViewCull};
+use crate::core::application::SceneGizmos;
 use crate::render::gpu::draw_buffers::{FrameUpload, JointMatrix};
 use crate::render::lod::LodSelection;
 use crate::render::motion::MotionHistory;
@@ -45,7 +46,7 @@ pub(crate) type AxisResource = (usize, u32);
 // slot, and the vertex count to draw.
 pub(crate) type ProbeResource = (wgpu::Buffer, u32, u32);
 
-/// The editor-only overlay resources for one handles pass (grid, collider AABBs,
+/// The editor-only overlay resources for one handles pass (grid, occlusion boxes,
 /// axis arrows, probe gizmos), drawn after post-FX (#1224). Bundled so the pass
 /// takes a single value instead of four (#93).
 #[derive(Default)]
@@ -69,13 +70,13 @@ impl Renderer {
 
     /// Pre-create the editor overlay resources for one handles pass. Only an editor
     /// camera draws one (`draw::camera`'s `handles` stage).
-    pub(crate) fn precreate_overlays(&self, scene: &Scene) -> Overlays {
+    /// `gizmos` is the Scene view's set (#1909): what it leaves off is not built.
+    pub(crate) fn precreate_overlays(&self, scene: &Scene, gizmos: &SceneGizmos) -> Overlays {
         let mut draws = OverlayDraws::default();
         let grid = self.precreate_grid(&mut draws);
-        let mut aabb = self.precreate_aabb(scene, &mut draws);
-        aabb.extend(self.precreate_occlusion(scene, &mut draws));
+        let aabb = self.precreate_occlusion(scene, &mut draws);
         let axis = self.precreate_axis_arrows(scene, &mut draws);
-        let probes = self.precreate_probes(scene, &mut draws);
+        let probes = self.precreate_probes(scene, gizmos, &mut draws);
         Overlays {
             bindings: self.overlay_bindings(&draws),
             grid,
