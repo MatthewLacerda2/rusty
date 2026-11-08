@@ -10,7 +10,8 @@
 //! and texels no triangle touches. Dilation fills the ones bordering a chart so
 //! filtering never reads black at a seam, and [`fill_rest`] the rest of the map
 //! from its nearest chart, so no mip level averages the empty background in
-//! (#1694).
+//! (#1694). Before either, a texel the bake judged inside geometry is filled from
+//! its own chart's valid texels ([`charts`], #1949).
 //!
 //! The walk reads a [`Surface`]: positions, normals, one UV set and the triangles.
 //! The lightmap bake hands it a mesh's lightmap UV; the mesh-map baker
@@ -37,6 +38,8 @@ impl<T> Texel for T where
 }
 
 mod charts;
+#[cfg(test)]
+mod charts_tests;
 mod clip;
 
 pub(super) use charts::{chart_of_triangles, fill_within, texel_charts};
