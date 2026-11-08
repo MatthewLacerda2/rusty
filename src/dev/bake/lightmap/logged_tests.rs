@@ -30,6 +30,10 @@ fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
     assert_eq!(logged, plain, "a log never changes a byte");
     // Only a logged bake times its meshes (#1891), one entry per lightmap.
     assert_eq!((times.len(), untimed.len()), (plain.maps, 0));
+    assert!(
+        times.iter().all(|t| t.texels > 0 && !t.busy.is_zero()),
+        "{times:?}"
+    );
     let lines = lines.into_inner();
     assert!(lines[0].milestone, "the step's first line is a milestone");
     // The trace, then the encode, whose last line is its last page.

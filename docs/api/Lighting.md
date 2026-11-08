@@ -117,7 +117,9 @@ first.
   `light probes, bounce 2 of at most 5: …, ~1 min left in this bounce` and
   `reflection probes 19% (3/16 probes), ~4 min left`. At the end (#1891) it prints what
   each step took (`[Lighting] lightmaps took 1 h 4 min (7.6M texels)`, one line per
-  step and per light-probe bounce; the steps add up to the total), the 15 lightmap
+  step and per light-probe bounce, plus the work between them: `writing lightmaps`,
+  `probe placement` and `saving`; every second is in one line, so they add up to the
+  total), the 15 lightmap
   meshes whose texels cost the most worker time, summed over every thread
   (`[Lighting]   Hall_Ceiling: 210.4k texels, 312.5 s, 673 texels/s`), and
   `[Lighting] done in 1 h 9 min`.

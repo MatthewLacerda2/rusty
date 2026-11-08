@@ -45,6 +45,48 @@ fn each_step_takes_until_the_next_begins_and_they_add_up() {
     );
 }
 
+/// Every second has a line (#1891): the first step begins with the plan, and the work
+/// between two steps is its own line, so a Generate-shaped run adds up.
+#[test]
+fn the_plan_and_the_work_between_steps_are_counted_and_add_up() {
+    let probes = Progress {
+        step: Step::LightProbes { bounce: 1, max: 5 },
+        done: 0,
+        total: 9,
+        meshes: None,
+    };
+    let lines = texts(|log, at| {
+        log.plan(&Step::GENERATE);
+        at(3);
+        log.observe(lightmaps(0, 1000, (0, 2)));
+        at(10);
+        log.observe(pages(0));
+        at(12);
+        log.enter(Step::WritingLightmaps);
+        at(15);
+        log.enter(Step::ProbePlacement);
+        at(20);
+        log.observe(probes);
+        at(30);
+        log.enter(Step::Saving);
+        at(40);
+        log.finish();
+    });
+    let end = &lines[lines.len() - 7..];
+    assert_eq!(
+        end,
+        [
+            "[Lighting] lightmaps took 10 s (1.0k texels)",
+            "[Lighting] lightmap pages took 2 s (3 pages)",
+            "[Lighting] writing lightmaps took 3 s",
+            "[Lighting] probe placement took 5 s",
+            "[Lighting] light probes (bounce 1) took 10 s (9 probes)",
+            "[Lighting] saving took 10 s",
+            "[Lighting] done in 40 s",
+        ]
+    );
+}
+
 #[test]
 fn the_slowest_meshes_are_named_slowest_first_and_cut_at_fifteen() {
     let mesh = |i: u64| MeshCost {

@@ -33,8 +33,8 @@ use std::path::PathBuf;
 use glam::Vec3;
 
 use crate::asset::MapRef;
-use crate::dev::bake::progress::{BakeLog, MeshCost};
-use crate::scene::lighting::lightmap::{BakeScene, BakeSettings, MeshTime};
+use crate::dev::bake::progress::{BakeLog, MeshCost, MeshTime, Step};
+use crate::scene::lighting::lightmap::{BakeScene, BakeSettings};
 use crate::scene::Scene;
 
 pub mod job;
@@ -77,6 +77,7 @@ pub fn bake_scene_lightmaps_logged(
     let scene_path = scene_path.ok_or(UNSAVED)?;
     let input = gather_bake_input(scene);
     let (mut encoded, times) = logged::bake_logged(&input, settings, log)?;
+    log.enter(Step::WritingLightmaps);
     log.mesh_costs(times.iter().map(|t| mesh_cost(scene, t)).collect());
     encoded.lights = crate::scene::lighting::lightmap::taken_lights(scene);
     encoded.shadowmask = input.shadowmask.clone();

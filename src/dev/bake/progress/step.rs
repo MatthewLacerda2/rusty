@@ -4,7 +4,9 @@ use super::Progress;
 use crate::dev::bake::steps::Stage;
 use crate::render::ibl::probe::bounce::MAX_BOUNCES;
 
-/// Which part of a bake is running.
+/// Which part of a bake is running. The last three are the work between two steps
+/// ([`BakeLog::enter`](super::BakeLog::enter)): they report no progress, and only
+/// say what they took.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Step {
     Lightmaps,
@@ -18,6 +20,12 @@ pub enum Step {
     ReflectionProbes,
     /// The occlusion culling's PVS (#1714): cells baked of the grid's.
     Occlusion,
+    /// Writing the lightmap pages and pointing the scene at them, after the encode.
+    WritingLightmaps,
+    /// Placing the probes and preparing their bake, before the first bounce.
+    ProbePlacement,
+    /// Writing the baked lighting into the scene file.
+    Saving,
 }
 
 impl Step {
@@ -38,6 +46,9 @@ impl Step {
             Step::LightProbes { .. } => "light probes",
             Step::ReflectionProbes => "reflection probes",
             Step::Occlusion => "occlusion",
+            Step::WritingLightmaps => "writing lightmaps",
+            Step::ProbePlacement => "probe placement",
+            Step::Saving => "saving",
         }
     }
 }

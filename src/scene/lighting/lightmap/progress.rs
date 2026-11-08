@@ -5,37 +5,45 @@
 //! atomics, so the sim depends on nothing above it. Neither ever touches a texel's
 //! sample stream: a bake that ran to the end is byte-identical with or without one.
 //!
-//! A progress made [`BakeProgress::timed`] also adds up each mesh's worker time
-//! (#1891), on a [`Clock`] the platform lends it: the sim never reads time itself,
-//! and the times only ever reach a log.
+//! A progress made [`BakeProgress::observed`] also tells a [`BakeObserver`] which
+//! mesh each batch of texels belongs to as it starts and ends (#1891), so the
+//! platform can time the meshes on its own clock. The calls return nothing, so
+//! nothing an observer does can reach a texel, and the sim never reads time.
 
+use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::OnceLock;
-use std::time::Duration;
+use std::sync::Arc;
 
-/// Time since any fixed start, lent by the platform (#1891).
-pub type Clock = fn() -> Duration;
-
-/// One mesh's share of a timed bake: its entity, its texels, and the worker time its
-/// batches took, summed over every thread that traced one.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MeshTime {
-    pub entity: u32,
-    pub texels: u64,
-    pub busy: Duration,
+/// Who hears a lightmap bake's batches (#1891): the platform, which times them. Every
+/// call returns nothing, so an observer can watch the bake but never steer it. A
+/// batch's start and end come from the same thread, with no other batch between.
+pub trait BakeObserver: Send + Sync {
+    /// The meshes the bake traces, as (entity, texels), indexed by the `chart` the
+    /// batch calls name; once, before the first batch.
+    fn meshes(&self, meshes: &[(u32, u64)]);
+    /// A batch of chart `chart`'s texels begins tracing on this thread.
+    fn batch_started(&self, chart: usize);
+    /// That batch is traced: `texels` of them.
+    fn batch_finished(&self, chart: usize, texels: usize);
 }
 
-/// A mesh's entity and texels, and the nanoseconds its batches took so far.
-#[derive(Debug)]
-struct MeshClock {
-    entity: u32,
-    texels: u64,
-    nanos: AtomicU64,
+/// The observer a progress was given, if any; `Debug` says only whether.
+#[derive(Clone, Default)]
+struct Observer(Option<Arc<dyn BakeObserver>>);
+
+impl fmt::Debug for Observer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(if self.0.is_some() {
+            "observed"
+        } else {
+            "unobserved"
+        })
+    }
 }
 
 /// Texels traced so far out of the bake's total, the meshes finished out of theirs
-/// (#1667), the pages encoded out of theirs (#1694), plus a cancel request, and for a
-/// timed one each mesh's worker time (#1891).
+/// (#1667), the pages encoded out of theirs (#1694), plus a cancel request, and for an
+/// observed one the [`BakeObserver`] its batches are reported to (#1891).
 #[derive(Debug, Default)]
 pub struct BakeProgress {
     done: AtomicU64,
@@ -45,31 +53,17 @@ pub struct BakeProgress {
     pages_done: AtomicU64,
     pages_total: AtomicU64,
     cancelled: AtomicBool,
-    clock: Option<Clock>,
-    meshes: OnceLock<Vec<MeshClock>>,
+    observer: Observer,
 }
 
 impl BakeProgress {
-    /// A progress that also times each mesh's batches on `clock` (#1891): two reads
-    /// per batch of texels, none per texel or ray.
-    pub fn timed(clock: Clock) -> Self {
+    /// A progress that also reports each batch of texels to `observer` (#1891): two
+    /// calls per batch, none per texel or ray.
+    pub fn observed(observer: Arc<dyn BakeObserver>) -> Self {
         Self {
-            clock: Some(clock),
+            observer: Observer(Some(observer)),
             ..Self::default()
         }
-    }
-
-    /// Each mesh's worker time, in bake order; empty unless [`timed`](Self::timed).
-    pub fn mesh_times(&self) -> Vec<MeshTime> {
-        let meshes = self.meshes.get().map_or(&[][..], Vec::as_slice);
-        meshes
-            .iter()
-            .map(|m| MeshTime {
-                entity: m.entity,
-                texels: m.texels,
-                busy: Duration::from_nanos(m.nanos.load(Ordering::Relaxed)),
-            })
-            .collect()
     }
 
     /// Texels traced so far.
@@ -127,32 +121,23 @@ impl BakeProgress {
         self.total.store(total, Ordering::Relaxed);
     }
 
-    /// The meshes the bake traces, as (entity, texels), in its chart order; kept only
-    /// when timed.
+    /// The meshes the bake traces, as (entity, texels), in its chart order; built
+    /// only for an observer.
     pub(super) fn set_meshes(&self, meshes: impl Iterator<Item = (u32, u64)>) {
-        if self.clock.is_some() {
-            let clocks = meshes.map(|(entity, texels)| MeshClock {
-                entity,
-                texels,
-                nanos: AtomicU64::new(0),
-            });
-            let _ = self.meshes.set(clocks.collect());
+        if let Some(observer) = &self.observer.0 {
+            observer.meshes(&meshes.collect::<Vec<_>>());
         }
     }
 
-    /// The lent clock's time, when timed.
-    pub(super) fn now(&self) -> Option<Duration> {
-        self.clock.map(|clock| clock())
+    pub(super) fn batch_started(&self, chart: usize) {
+        if let Some(observer) = &self.observer.0 {
+            observer.batch_started(chart);
+        }
     }
 
-    /// Add the time since `from` ([`now`](Self::now)) to chart `chart`'s mesh.
-    pub(super) fn charge(&self, chart: usize, from: Option<Duration>) {
-        let (Some(from), Some(now)) = (from, self.now()) else {
-            return;
-        };
-        if let Some(mesh) = self.meshes.get().and_then(|m| m.get(chart)) {
-            let took = now.saturating_sub(from).as_nanos() as u64;
-            mesh.nanos.fetch_add(took, Ordering::Relaxed);
+    pub(super) fn batch_finished(&self, chart: usize, texels: usize) {
+        if let Some(observer) = &self.observer.0 {
+            observer.batch_finished(chart, texels);
         }
     }
 

@@ -186,10 +186,10 @@ pub(super) fn bake_on(
             let s = settings;
             tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng)
         };
-        // A timed bake (#1891) charges each batch to its mesh; it never touches a texel.
-        let from = progress.now();
+        // An observed bake (#1891) says each batch's mesh; it never touches a texel.
+        progress.batch_started(c);
         let traced = batch.iter().map(one).collect();
-        progress.charge(c, from);
+        progress.batch_finished(c, batch.len());
         traced
     };
     // The pool hands each chart its points back once traced, so they die with it.

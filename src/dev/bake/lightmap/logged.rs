@@ -4,16 +4,17 @@
 //! reports as it goes, a line per encoded page included. The worker is the same
 //! `bake_with_progress` and `encode_pages` the editor's job runs, so the pages are
 //! byte-identical with or without a log. A logged bake also times each mesh's
-//! batches (#1891) for the log's slowest-meshes lines.
+//! batches (#1891) for the log's slowest-meshes lines: the sim says where each batch
+//! starts and ends to a [`MeshClocks`], which reads the clock on this side.
 
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::Duration;
 
 use super::{encode_pages, EncodedPages};
-use crate::dev::bake::progress::{since_start, BakeLog, Progress, Step};
+use crate::dev::bake::progress::{BakeLog, MeshClocks, MeshTime, Progress, Step};
 use crate::scene::lighting::lightmap::BakeSettings;
-use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeScene, MeshTime};
+use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeScene};
 
 /// How often the calling thread reads the counters (the log decides what prints).
 const POLL: Duration = Duration::from_millis(200);
@@ -33,9 +34,10 @@ pub(super) fn bake_logged(
     if !log.is_on() {
         return Ok((run(&BakeProgress::default())?, Vec::new()));
     }
-    let progress = BakeProgress::timed(since_start);
+    let clocks = Arc::new(MeshClocks::default());
+    let progress = BakeProgress::observed(clocks.clone());
     let pages = watch(&progress, read, log, run)?;
-    Ok((pages, progress.mesh_times()))
+    Ok((pages, clocks.times()))
 }
 
 /// Run `work` on a scoped worker while this thread logs `progress`, as `read`

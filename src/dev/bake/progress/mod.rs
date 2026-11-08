@@ -9,7 +9,9 @@
 //! encoded. Each line carries the time since the bake began (#1891), an ETA from the
 //! step's rate over its last 2 minutes (`rate::WINDOW`, #1890), and the steps still to come.
 //! At the end it prints what each step took, the slowest lightmap meshes and the
-//! total (`summary`, #1891):
+//! total (`summary`, #1891). Every second of the bake belongs to one step's line, so
+//! they add up to the total: work between two steps that is neither (writing the
+//! lightmaps, placing probes, saving) is a step of its own ([`BakeLog::enter`]):
 //!
 //! ```text
 //! [Lighting] steps: lightmaps → lightmap pages → light probes → reflection probes → occlusion
@@ -24,8 +26,9 @@
 //! ```
 //!
 //! Platform-side on purpose: the clock is read here, never in the sim. The lightmap
-//! bake only counts into its atomic `BakeProgress` (and, when logged, times each
-//! mesh's batches on the clock this module lends it, [`since_start`]); the probe
+//! bake only counts into its atomic `BakeProgress` (and, when logged, says where each
+//! batch starts and ends to the [`MeshClocks`] this module lends it, which times
+//! them); the probe
 //! bakes step on the caller's thread. Each [`Line`] says whether it is a milestone
 //! (the lightmap step's start or the total; a probe step's start is already in the
 //! console as the job's own `Baking …` line), which the script verbs keep in the
@@ -33,12 +36,12 @@
 //! client shows while the call blocks (`session-mcp`'s stdout carries only JSON-RPC).
 
 use std::cell::RefCell;
-use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use crate::scripting::ConsoleLogs;
 
 mod format;
+mod mesh_clock;
 #[cfg(test)]
 mod pages_tests;
 #[cfg(test)]
@@ -55,6 +58,7 @@ mod summary_tests;
 #[cfg(test)]
 mod tests;
 
+pub use mesh_clock::{MeshClocks, MeshTime};
 pub use step::{stage_progress, Step};
 pub use summary::MeshCost;
 
@@ -99,12 +103,6 @@ pub struct BakeLog<'a> {
     plan: Vec<Step>,
     steps: Vec<summary::StepRun>,
     meshes: Vec<MeshCost>,
-}
-
-/// The clock a timed lightmap bake reads (#1891): time since the first read.
-pub fn since_start() -> Duration {
-    static START: OnceLock<Instant> = OnceLock::new();
-    START.get_or_init(Instant::now).elapsed()
 }
 
 impl<'a> BakeLog<'a> {
@@ -170,6 +168,20 @@ impl<'a> BakeLog<'a> {
         }
     }
 
+    /// Begin `step`, work between two reported steps that is neither (#1891): it
+    /// prints no line of its own, only what it took at the end. The next
+    /// [`observe`](Self::observe) begins the step after it.
+    pub fn enter(&mut self, step: Step) {
+        let Some((clock, _)) = self.on.as_mut() else {
+            return;
+        };
+        let now = clock();
+        let started = *self.started.get_or_insert(now);
+        let from = if self.steps.is_empty() { started } else { now };
+        self.steps.push(summary::StepRun::new(step, from));
+        self.since = None;
+    }
+
     /// Note where the bake is: a line when the step changed or [`INTERVAL`] passed.
     pub fn observe(&mut self, p: Progress) {
         let Some((clock, out)) = self.on.as_mut() else {
@@ -185,7 +197,9 @@ impl<'a> BakeLog<'a> {
         // (`LightingBake::step`'s own lines), so only the lightmaps' start is kept there.
         let milestone = changed && p.step == Step::Lightmaps;
         if changed {
-            self.steps.push(summary::StepRun::new(p.step, now));
+            // The first step owns the time since the bake began, so none is lost.
+            let from = if self.steps.is_empty() { started } else { now };
+            self.steps.push(summary::StepRun::new(p.step, from));
             let rate = rate::Window::default();
             self.since = Some(Since {
                 step: p.step,
@@ -219,8 +233,8 @@ impl<'a> BakeLog<'a> {
     }
 
     /// What each step took, the slowest lightmap meshes, and the total time since
-    /// the first [`observe`](Self::observe) as a milestone; nothing when nothing was
-    /// observed.
+    /// the bake began (its [`plan`](Self::plan), or else its first step) as a
+    /// milestone; nothing when nothing began.
     pub fn finish(&mut self) {
         let Some((clock, out)) = self.on.as_mut() else {
             return;

@@ -1,6 +1,8 @@
 //! Progress and cancel (#808): watching a bake never changes its bytes, the counter
 //! ends at the total, and a cancelled bake returns nothing.
 
+use std::sync::{Arc, Mutex};
+
 use glam::Vec3;
 
 use super::tests::{floor, settings, sun, wall};
@@ -35,24 +37,51 @@ fn a_watched_bake_is_byte_identical_to_an_unwatched_one() {
     assert_eq!(bits(&watched), bits(&plain));
 }
 
-/// A fake clock that moves a millisecond each time it is read.
-fn ticking() -> std::time::Duration {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static NOW: AtomicU64 = AtomicU64::new(0);
-    std::time::Duration::from_millis(NOW.fetch_add(1, Ordering::Relaxed))
+/// An observer that counts what it hears: the meshes, and each chart's batches
+/// started, finished and the texels those finished.
+#[derive(Default)]
+struct Counting {
+    meshes: Mutex<Vec<(u32, u64)>>,
+    batches: Mutex<Vec<(usize, usize, usize)>>,
+}
+
+impl Counting {
+    fn chart(&self, chart: usize, add: impl FnOnce(&mut (usize, usize, usize))) {
+        let mut batches = self.batches.lock().unwrap();
+        if batches.len() <= chart {
+            batches.resize(chart + 1, (0, 0, 0));
+        }
+        add(&mut batches[chart]);
+    }
+}
+
+impl BakeObserver for Counting {
+    fn meshes(&self, meshes: &[(u32, u64)]) {
+        self.meshes.lock().unwrap().extend_from_slice(meshes);
+    }
+    fn batch_started(&self, chart: usize) {
+        self.chart(chart, |b| b.0 += 1);
+    }
+    fn batch_finished(&self, chart: usize, texels: usize) {
+        self.chart(chart, |b| (b.1, b.2) = (b.1 + 1, b.2 + texels));
+    }
 }
 
 #[test]
-fn a_timed_bake_charges_every_mesh_and_keeps_its_bytes() {
-    let timed = BakeProgress::timed(ticking);
-    let maps = bake_with_progress(&scene(), &settings(), &timed).expect("not cancelled");
+fn an_observed_bake_reports_every_batch_and_keeps_its_bytes() {
+    let counting = Arc::new(Counting::default());
+    let observed = BakeProgress::observed(counting.clone());
+    let maps = bake_with_progress(&scene(), &settings(), &observed).expect("not cancelled");
     assert_eq!(bits(&maps), bits(&bake(&scene(), &settings())));
-    let times = timed.mesh_times();
+    let meshes = counting.meshes.lock().unwrap().clone();
     let entities: Vec<u32> = maps.iter().map(|m| m.entity).collect();
-    assert_eq!(times.iter().map(|t| t.entity).collect::<Vec<_>>(), entities);
-    assert_eq!(times.iter().map(|t| t.texels).sum::<u64>(), timed.total());
-    assert!(times.iter().all(|t| !t.busy.is_zero()), "{times:?}");
-    assert!(BakeProgress::default().mesh_times().is_empty());
+    assert_eq!(meshes.iter().map(|m| m.0).collect::<Vec<_>>(), entities);
+    let batches = counting.batches.lock().unwrap().clone();
+    assert_eq!(batches.len(), meshes.len(), "every mesh had a batch");
+    for (&(started, finished, texels), &(_, size)) in batches.iter().zip(&meshes) {
+        assert!(started > 0 && started == finished, "{batches:?}");
+        assert_eq!(texels as u64, size, "each mesh's batches cover its texels");
+    }
 }
 
 #[test]

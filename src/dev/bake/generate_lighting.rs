@@ -105,10 +105,14 @@ pub fn generate_lighting(
     log.plan(&Step::GENERATE);
     scene.unrecorded(|scene| {
         let lightmaps = bake_scene_lightmaps_logged(scene, Some(path), &settings, log)?;
+        // Every second has a step (#1891): placing probes and saving are their own.
+        log.enter(Step::ProbePlacement);
         let mut probes = start_probes(scene, path, nav)?;
         run_to_end(&mut probes, scene, say, log)?;
+        log.enter(Step::Saving);
         probes.commit(scene)?;
         let saved = write_lighting(scene, path)?;
+        // The PVS file `finish` writes is occlusion's own output, and counts there.
         let occlusion = bake_occlusion_logged(scene, log)?;
         let lighting = (lightmaps, probes.report(), saved);
         let report = finish(scene, path, lighting, occlusion)?;

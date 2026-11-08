@@ -1,8 +1,9 @@
 //! The end of a bake's log (#1891): what each step took, and the lightmap meshes
 //! that cost the most, so a long bake can say where its time went.
 //!
-//! A step runs from its first line to the next step's (or the end), so the steps add
-//! up to the total: the writes between two steps count in the one before. A mesh's
+//! A step runs from when it began to when the next one did (or the end), and the
+//! first from the bake's start, so the steps add up to the total: the work between
+//! two steps is a step of its own (`BakeLog::enter`). A mesh's
 //! cost is its worker time: the bake's pool (#1656) traces one mesh's batches on
 //! every core at once, so a wall-clock span per mesh would overlap its neighbours,
 //! while the time its batches took, summed over the threads, is what it cost.
@@ -75,6 +76,7 @@ fn size(run: &StepRun) -> String {
         Step::LightmapPages => "pages",
         Step::Occlusion => "cells",
         Step::LightProbes { .. } | Step::ReflectionProbes => "probes",
+        Step::WritingLightmaps | Step::ProbePlacement | Step::Saving => return String::new(),
     };
     match run.total {
         0 => String::new(),
