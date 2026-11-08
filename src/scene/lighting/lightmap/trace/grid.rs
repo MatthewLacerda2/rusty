@@ -94,31 +94,36 @@ impl LightGrid {
         let span = |e: f32| ((e / grid.cell).floor() as usize + 1).min(MAX_CELLS as usize);
         let size = hi - lo;
         grid.dims = [span(size.x), span(size.y), span(size.z)];
-        let mut buckets = vec![Vec::new(); grid.dims.iter().product()];
-        let span = grid.span();
+        grid.fill(boxes);
+        grid
+    }
+
+    /// List each item in every cell its box touches, and as spilling when its box
+    /// reaches past the cells (or lies wholly outside them, then in no cell).
+    fn fill(&mut self, boxes: impl Iterator<Item = (u32, Bounds)>) {
+        let mut buckets = vec![Vec::new(); self.dims.iter().product()];
+        let span = self.span();
         for (i, (a, b)) in boxes {
-            if b.cmplt(span.0).any() || a.cmpgt(span.1).any() {
-                grid.spill.push((i, (a, b))); // Wholly outside the cells.
-                continue;
-            }
             if a.cmplt(span.0).any() || b.cmpgt(span.1).any() {
-                grid.spill.push((i, (a, b)));
+                self.spill.push((i, (a, b)));
             }
-            let (a, b) = (grid.coords(a), grid.coords(b));
+            if b.cmplt(span.0).any() || a.cmpgt(span.1).any() {
+                continue; // Wholly outside the cells.
+            }
+            let (a, b) = (self.coords(a), self.coords(b));
             for z in a[2]..=b[2] {
                 for y in a[1]..=b[1] {
                     for x in a[0]..=b[0] {
-                        buckets[grid.index([x, y, z])].push(i);
+                        buckets[self.index([x, y, z])].push(i);
                     }
                 }
             }
         }
-        grid.starts.push(0);
+        self.starts.push(0);
         for bucket in buckets {
-            grid.items.extend(bucket);
-            grid.starts.push(grid.items.len() as u32);
+            self.items.extend(bucket);
+            self.starts.push(self.items.len() as u32);
         }
-        grid
     }
 
     /// The cell coordinates of `p`, clamped into the grid.
