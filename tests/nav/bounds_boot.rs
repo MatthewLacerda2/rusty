@@ -22,8 +22,9 @@ fn harness_graph_is_the_from_scene_bake_of_its_scene() {
     assert_eq!(nav.spans, fresh.spans);
     assert_eq!(nav.cell_start, fresh.cell_start);
     assert!(!nav.spans.is_empty(), "the yard is walkable");
-    // The yard spans ±15 × ±22.5; + 2.0 margin + 0.5 radius, snapped outward.
-    assert_eq!(nav.bounds(), NavBounds::new(-18.0, 18.0, -25.0, 25.0));
+    // The yard spans ±15 × ±22.5; + 2.0 margin + 0.5 radius, snapped outward to the
+    // 0.25 m cell (#1887).
+    assert_eq!(nav.bounds(), NavBounds::new(-17.5, 17.5, -25.0, 25.0));
 }
 
 #[test]

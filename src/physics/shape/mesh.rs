@@ -17,6 +17,8 @@ pub(in crate::physics) enum Skip {
     NoMesh,
     /// Fewer vertices than a hull (4) or a trimesh (3) needs.
     TooFewVertices { have: usize, need: usize },
+    /// A vertex has a NaN or infinite coordinate.
+    NonFinite { vertex: usize },
     /// A triangle index points past the end of the vertex list.
     IndexOutOfRange { index: u32, vertices: usize },
     /// A trimesh without a whole triangle.
@@ -34,6 +36,7 @@ impl fmt::Display for Skip {
         match self {
             Self::NoMesh => write!(f, "has a Mesh collider but no mesh"),
             Self::TooFewVertices { have, need } => write!(f, "{have} vertices, {need} needed"),
+            Self::NonFinite { vertex } => write!(f, "vertex {vertex} is not finite"),
             Self::IndexOutOfRange { index, vertices } => {
                 write!(f, "index {index} is past the {vertices} vertices")
             }
@@ -50,7 +53,8 @@ impl fmt::Display for Skip {
 /// axes) would turn every triangle inside out, so it swaps two indices of each
 /// (#1124). The [`Skip`] says why not, when the geometry cannot form a valid shape:
 /// a hull needs 4 vertices and some volume to span, a trimesh one triangle of
-/// non-zero area whose indices all point at a vertex (#1132, #1141). A hull reads no
+/// non-zero area whose indices all point at a vertex (#1132, #1141). Either
+/// shape needs every coordinate finite (#1880). A hull reads no
 /// indices, so a stale one never drops it.
 pub(in crate::physics) fn build_mesh_shape(
     convex: bool,
@@ -69,6 +73,9 @@ pub(in crate::physics) fn build_mesh_shape(
         .iter()
         .map(|p| Vector::new(p[0] * scale.x, p[1] * scale.y, p[2] * scale.z))
         .collect();
+    if let Some(vertex) = points.iter().position(|p| !p.is_finite()) {
+        return Err(Skip::NonFinite { vertex });
+    }
 
     if convex {
         // A convex hull is the cheaper, dynamic-body-friendly option.
@@ -79,6 +86,14 @@ pub(in crate::physics) fn build_mesh_shape(
         trimesh(points, indices, scale)
     }
 }
+
+/// Every trimesh collider's flags (#1880). `FIX_INTERNAL_EDGES` corrects a contact
+/// on the shared edge of two triangles to the neighbours' normal, so a body sliding
+/// over a floor of tiles does not snag or hop at the seams ("ghost collisions").
+/// It implies `MERGE_DUPLICATE_VERTICES`, which lets two triangles that repeat a
+/// vertex share the edge; it removes no triangle, so the checks below, made on the
+/// unmerged geometry, still decide every [`Skip`].
+pub(in crate::physics) const TRIMESH_FLAGS: TriMeshFlags = TriMeshFlags::FIX_INTERNAL_EDGES;
 
 /// An exact triangle mesh — static geometry only, but a tight fit. Mirrors the
 /// winding for a reflecting `scale`; refuses a bad index, an empty or an
@@ -113,7 +128,7 @@ fn trimesh(points: Vec<Vector>, indices: &[u32], scale: Vec3) -> Result<Collider
     if triangles.iter().all(|t| is_degenerate(&points, t, epsilon)) {
         return Err(Skip::ZeroArea);
     }
-    ColliderBuilder::trimesh(points, triangles)
+    ColliderBuilder::trimesh_with_flags(points, triangles, TRIMESH_FLAGS)
         .map(|b| b.build())
         .map_err(|e| Skip::Rejected(e.to_string()))
 }

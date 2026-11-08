@@ -56,6 +56,8 @@ fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
 #[cfg(test)]
 mod editor_tests;
 #[cfg(test)]
+mod gizmo_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod undo_tests;

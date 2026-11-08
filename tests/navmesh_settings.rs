@@ -12,10 +12,10 @@ use rusty::scene::Scene;
 fn fresh_scene_uses_default_nav_settings() {
     let scene = Scene::new();
     assert_eq!(scene.nav_settings, NavMeshSettings::default());
-    // The defaults equal the historical hardcoded bake constants.
+    // The defaults equal the historical bake constants, bar the cell (#1887).
     assert_eq!(scene.nav_settings.max_step, 0.5);
     assert_eq!(scene.nav_settings.max_slope, 1.0);
-    assert_eq!(scene.nav_settings.grid_spacing, 1.0);
+    assert_eq!(scene.nav_settings.grid_spacing, 0.25);
     assert_eq!(scene.nav_settings.agent_radius, 0.5);
     assert_eq!(scene.nav_settings.agent_height, 2.0);
 }
@@ -99,7 +99,7 @@ fn partial_nav_settings_block_fills_missing_fields() {
         "missing field defaulted"
     );
     assert_eq!(
-        loaded.nav_settings.grid_spacing, 1.0,
+        loaded.nav_settings.grid_spacing, 0.25,
         "missing field defaulted"
     );
     assert_eq!(

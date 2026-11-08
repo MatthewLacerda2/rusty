@@ -1,5 +1,6 @@
-//! The editor's handles and gizmos (#1224): the floor grid, collider boxes, the
-//! selection's axis arrows and the probe gizmos, drawn the way Unity draws them —
+//! The editor's handles and gizmos (#1224): the floor grid, the occlusion view's
+//! boxes, the selection's axis arrows and the probe gizmos (as the Scene view's set
+//! has them, #1909), drawn the way Unity draws them —
 //! after post-FX and the selection outline, before the UI. On the finished image no
 //! grade, bloom, SSR, motion blur or FXAA treats them as scene colour, and the
 //! outline's ring never paints over an arrow shaft. They are still depth-tested
@@ -19,7 +20,7 @@ impl Renderer {
         scene: &Scene,
         output: &wgpu::TextureView,
     ) {
-        let overlays = self.precreate_overlays(scene);
+        let overlays = self.precreate_overlays(scene, &view.gizmos);
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {

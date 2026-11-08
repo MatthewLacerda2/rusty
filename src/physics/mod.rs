@@ -4,9 +4,10 @@
 //! queries — both the in-engine hitscan and the Lua `Physics.Raycast` binding —
 //! go through rapier/parry's query pipeline (`PhysicsWorld::raycast_hit` /
 //! `raycast_all`), so a script's cast and the engine's cast agree for the same
-//! ray. The area-shaped queries (`spatial`: overlap, sphere-cast via
-//! `sphere_cast_hit`, closest-point, containment, #311) ride the same pipeline,
-//! so every spatial answer comes from the one live world.
+//! ray. The area-shaped queries (`spatial`: overlap, closest-point,
+//! containment, #311) and the shape casts (`sweep`: sphere, capsule and box
+//! casts, single or every hit, #1881) ride the same pipeline, so every spatial
+//! answer comes from the one live world.
 
 // Panic-free sim core (#195): bare `.unwrap()` is denied here (use `?` or a
 // documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
@@ -53,6 +54,7 @@ pub use events::trigger::TriggerEvents;
 pub use joints::JointBreak;
 #[cfg(test)]
 pub(crate) use query::convex_fixture::turned_hull;
+pub use query::sweep::Sweep;
 pub use query::through::RayCrossing;
 pub use query::RayHit;
 pub use shape::triangles::{collider_world_triangles, ColliderTriangles};

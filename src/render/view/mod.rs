@@ -97,6 +97,9 @@ pub struct RenderView {
     /// The selection outline's mask (#1175), allocated the first frame this view
     /// outlines; it checks its own size, so `resize` leaves it alone.
     pub(crate) selection_mask: Option<crate::render::passes::outline::SelectionMask>,
+    /// Which editor gizmos an editor camera draws into this view (#1909): the Scene
+    /// view's set, handed over by the shell each frame. Unread by a game camera.
+    pub gizmos: crate::core::application::SceneGizmos,
 }
 
 impl RenderView {
@@ -180,6 +183,7 @@ impl RenderView {
             render_textures: Default::default(),
             pixel_scale: 1.0,
             selection_mask: None,
+            gizmos: Default::default(),
         }
     }
 
