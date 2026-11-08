@@ -49,15 +49,7 @@ pub fn read(
             )
         }
         "trace" => trace(t, path, contexts)?,
-        "view" => {
-            only(t, path, &["inside", "margin", "height"])?;
-            let measure = Measure::View {
-                margin: number(t, path, "margin", Some(0.0))?,
-                item_height: number(t, path, "height", Some(EYE_HEIGHT))?,
-                inside: wanted(t, path, "inside")?,
-            };
-            (measure, true)
-        }
+        "view" => (view(t, path)?, true),
         "separation" => {
             only(t, path, &["radius"])?;
             let radius = number(t, path, "radius", Some(SEPARATION_RADIUS))?;
@@ -72,6 +64,16 @@ pub fn read(
             (Measure::NearPoints { points }, false)
         }
         other => return fail(path, format!("unknown test '{other}'")),
+    })
+}
+
+/// `view = { inside, margin, height }`.
+fn view(t: &Table, path: &str) -> mlua::Result<Measure> {
+    only(t, path, &["inside", "margin", "height"])?;
+    Ok(Measure::View {
+        margin: number(t, path, "margin", Some(0.0))?,
+        item_height: number(t, path, "height", Some(EYE_HEIGHT))?,
+        inside: wanted(t, path, "inside")?,
     })
 }
 
