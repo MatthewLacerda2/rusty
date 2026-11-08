@@ -1,7 +1,7 @@
 //! LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree
 //! (`tree`). Object creation lives in the menu bar's GameObject menu (#255);
 //! deleting is Unity's (#1915): Edit ▸ Delete, the Delete key (Cmd+Backspace on
-//! macOS) and a row's right-click *Delete*, all through [`delete`].
+//! macOS) and a row's right-click *Delete*, all through `delete`.
 
 use egui_phosphor::regular as icon;
 
