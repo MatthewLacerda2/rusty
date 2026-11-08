@@ -1,7 +1,6 @@
 //! OIDN's binding (#1884): where it looks, what a bake without it says, and, on a
 //! machine that has it, that it cleans a noisy lightmap and gives the same bytes
-//! every time, a whole bake's too, whatever order its workers finish the charts in.
-//! The tests that run OIDN skip without it, except where
+//! every time (a whole bake: `bake_tests`). The tests that run OIDN skip without it, except where
 //! [`REQUIRE_OIDN_ENV`] is set (CI), whose canary then fails.
 
 use std::path::{Path, PathBuf};
@@ -9,14 +8,10 @@ use std::path::{Path, PathBuf};
 use glam::Vec3;
 
 use super::{available, ffi, missing, Oidn, REQUIRE_OIDN_ENV};
-use crate::scene::lighting::lightmap::{
-    bake_with_progress, BakeLight, BakeProgress, BakeScene, BakeSettings, LightShape,
-    LightmapDenoiser,
-};
-use crate::scene::lighting::occlusion::bench_level::rooms;
+use crate::scene::lighting::lightmap::LightmapDenoiser;
 
 /// OIDN's denoiser, or `None` (skip) on a machine without it.
-fn oidn_or_skip() -> Option<Oidn> {
+pub(super) fn oidn_or_skip() -> Option<Oidn> {
     available().ok().map(|()| Oidn::default())
 }
 
@@ -49,6 +44,26 @@ fn a_missing_library_is_an_error_not_a_crash() {
     let nowhere = [PathBuf::from("/nowhere/libOpenImageDenoise.so.2")];
     let err = ffi::Api::open(&nowhere).err().expect("nothing there");
     assert!(err.contains("not found"), "{err}");
+}
+
+#[test]
+fn a_library_that_loads_without_oidns_calls_is_passed_over() {
+    let decoy = PathBuf::from(match cfg!(target_os = "macos") {
+        true => "/usr/lib/libSystem.B.dylib",
+        false => "libm.so.6",
+    });
+    let err = ffi::Api::open(std::slice::from_ref(&decoy))
+        .err()
+        .expect("no OIDN in it");
+    assert!(err.contains("oidnNewDevice"), "{err}");
+    let Some(_) = oidn_or_skip() else { return };
+    let explicit = std::env::var_os(super::RUSTY_OIDN).map(PathBuf::from);
+    let mut paths = vec![decoy];
+    paths.extend(ffi::candidates(explicit.as_deref()));
+    assert!(
+        ffi::Api::open(&paths).is_ok(),
+        "the real OIDN after the decoy"
+    );
 }
 
 #[test]
@@ -101,35 +116,4 @@ fn oidn_refuses_an_image_of_the_wrong_size() {
     let mut short = vec![Vec3::ONE; 10];
     assert!(oidn.denoise(&mut short, 32, false).is_err());
     assert_eq!(oidn.spent().0, 0);
-}
-
-#[test]
-fn a_whole_oidn_bake_repeats_its_bytes_whichever_worker_finishes_first() {
-    let Some(_) = oidn_or_skip() else { return };
-    let mut scene = BakeScene::gather(&rooms(1), &|_| None);
-    let position = Vec3::new(3.0, 3.0, 3.0);
-    let shape = LightShape::Point {
-        position,
-        range: 10.0,
-    };
-    let (radiance, bakes_direct, mask_channel) = (Vec3::splat(3.0), true, None);
-    scene.lights.push(BakeLight {
-        shape,
-        radiance,
-        bakes_direct,
-        mask_channel,
-    });
-    let settings = BakeSettings {
-        texels_per_unit: 2.0,
-        samples: 4,
-        ..Default::default()
-    };
-    let bake = || {
-        let oidn = std::sync::Arc::new(Oidn::default());
-        let progress = BakeProgress::default().with_denoiser(oidn.clone());
-        let maps = bake_with_progress(&scene, &settings, &progress).expect("not cancelled");
-        assert!(oidn.spent().0 > 0, "OIDN cleaned the charts");
-        maps
-    };
-    assert_eq!(bake(), bake(), "the same bytes, colour and directions");
 }

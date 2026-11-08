@@ -323,14 +323,16 @@ scene's lighting settings (above), whose defaults are the ones listed here.
     a bake asks, never at build time, so a machine without it still builds, runs and
     bakes: the bake warns once, naming what to install, and only filters, which at
     `64` samples is blurrier and blotchier (raise `samples`, or pick `"Filter"` to
-    silence it). Its
-    output may differ in the last bits between CPUs (its SIMD path), never between
-    runs or core counts on one machine.
+    silence it). Installed mid-session, the next bake finds it; no restart. Each bake
+    worker denoises its own lightmaps on an OIDN device of one thread, beside the
+    trace. Its output may differ in the last bits between CPUs (its SIMD path),
+    never between runs on one machine.
   - `"Filter"`: an edge-aware Gaussian, 3 texels wide (Unity's indirect filter), that
     never crosses a crease. Byte-identical on every machine.
   - `"None"`: the raw trace, grain and all.
-  A logged bake (`Lighting.BakeLightmaps()`, `Lighting.Generate()`) says what OIDN
-  took, in a line of its own in the summary: it runs inside the lightmaps step.
+  A logged bake (`Lighting.BakeLightmaps()`, `Lighting.Generate()`) says OIDN's
+  worker time and how many lightmaps it cleaned, in a line of its own in the
+  summary: it runs inside the lightmaps step.
 - **Max Lightmap Size** (`maxLightmapSize`, Unity's setting; the editor's
   **"Max Lightmap Size"** under the Generate Lighting button). The atlas page's edge in
   texels, a power of two from `32` to `4096`, default `1024`; any other value is held to

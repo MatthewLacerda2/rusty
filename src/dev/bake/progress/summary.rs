@@ -42,7 +42,8 @@ impl StepRun {
 }
 
 /// The summary's lines, before the total: a line per step, each ending where the
-/// next began or at `end`, then OIDN's lightmaps and time when it ran (#1884), then
+/// next began or at `end`, then OIDN's lightmaps and worker time when it ran
+/// (#1884, summed over its devices as a mesh's is over threads), then
 /// the [`SLOWEST`] meshes (sorted in place).
 pub(super) fn lines(
     steps: &[StepRun],
@@ -62,7 +63,7 @@ pub(super) fn lines(
     out.extend(denoised.map(|(charts, busy)| {
         let (n, took) = (count(charts), duration(busy));
         format!(
-            "[Lighting] denoise (OIDN) took {took} over {n} lightmaps, within the lightmaps step"
+            "[Lighting] denoise (OIDN): {took} of worker time over {n} lightmaps, within the lightmaps step"
         )
     }));
     meshes.sort_by_key(|m| std::cmp::Reverse(m.busy));
