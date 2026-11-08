@@ -81,7 +81,7 @@ pub struct Playback {
     /// and a crossfade whose lighter motion follows the heavier.
     #[serde(default, skip_serializing_if = "SyncState::is_idle")]
     pub sync: SyncState,
-    /// The node a crossfade leaves, the node's tag and entry counts (#1901).
+    /// The node a crossfade leaves and the entry counts (#1901).
     #[serde(skip)]
     pub states: NodeStates,
 }
@@ -180,7 +180,7 @@ impl Playback {
         self.node_speed = node.speed.unwrap_or(1.0);
         let previous = self.current_node.replace(node.name.clone());
         let fading = self.is_crossfading();
-        self.states.entered(previous.clone(), &node.tag, fading);
+        self.states.entered(previous.clone(), fading);
         self.start_sync(node, previous, source);
     }
 

@@ -16,7 +16,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::asset::animation_graph;
-use crate::components::{AnimatorComponent, Playback};
+use crate::components::AnimatorComponent;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
@@ -117,26 +117,43 @@ fn register_layer_weight(
 /// `GetCurrentNode(id [, layer])` — the active graph node's name in `layer`
 /// (default: the base layer), or `nil` when there is no animator, no such layer,
 /// or the evaluator hasn't bound it yet. `GetCurrentTag(id [, layer])` — that
-/// node's tag (#1901), `nil` when it has none.
+/// node's tag (#1901), read from the graph asset, `nil` when it has none.
 fn register_get_current_node(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
-    let reader = |read: fn(&Playback) -> Option<String>| {
+    let reader = |read: fn(&AnimatorComponent, usize, &str) -> Option<String>| {
         move |lua: &mlua::Lua, (id, layer): (EntityArg, Option<Value>)| {
             let scene = &*scene.get(lua)?;
             let scene = scene.borrow();
             let Some(anim) = scene.world.animator(id.read()) else {
                 return Ok(None);
             };
-            Ok(match layer.map_or(Some(0), |l| lookup(&anim, &l)) {
-                Some(0) => read(&anim.base),
-                Some(index) => read(&anim.layers[index - 1].playback),
-                None => None,
-            })
+            let Some(index) = layer.map_or(Some(0), |l| lookup(&anim, &l)) else {
+                return Ok(None);
+            };
+            let playback = match index {
+                0 => &anim.base,
+                i => &anim.layers[i - 1].playback,
+            };
+            Ok(playback
+                .current_node
+                .as_deref()
+                .and_then(|node| read(&anim, index, node)))
         }
     };
-    let node = reader(|p| p.current_node.clone());
+    let node = reader(|_, _, node| Some(node.to_string()));
     put(table, "GetCurrentNode", lua.create_function(node))?;
-    let tag = reader(|p| p.current_node.as_ref().and(p.states.tag.clone()));
-    put(table, "GetCurrentTag", lua.create_function(tag))
+    put(
+        table,
+        "GetCurrentTag",
+        lua.create_function(reader(node_tag)),
+    )
+}
+
+/// The tag of `node` in layer `index` of `anim`'s graph, from the asset, so a
+/// loaded scene's saved node reads its tag before the first step.
+fn node_tag(anim: &AnimatorComponent, index: usize, node: &str) -> Option<String> {
+    let graph = animation_graph::load(Path::new(anim.graph.as_deref()?)).ok()?;
+    let tag = &graph.machine(index)?.node(node)?.tag;
+    (!tag.is_empty()).then(|| tag.clone())
 }
 
 /// A layer argument as a warning shows it.

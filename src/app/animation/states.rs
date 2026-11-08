@@ -10,13 +10,20 @@
 //! count, [`NodeStates`](crate::components::NodeStates), changes).
 //!
 //! The order is deterministic: layer by layer (base first), and within a layer
-//! every exit, then every enter, then every update, the current state before
-//! the one fading out.
+//! every exit, then every enter, then every update, each in the order the
+//! states became active (the one fading out before the current one), so the
+//! last state entered is the current one.
+//!
+//! The animate system diffs only an animator whose scripts can hear it (an
+//! awoken script defining a state callback); for any other it forgets the
+//! reported states instead, so a spawned or reactivated entity's scripts hear
+//! every active state enter the first step they listen.
 
 use crate::asset::anim_data::AnimationClip;
 use crate::asset::animation_graph::AnimationGraph;
 use crate::components::{
-    AnimatorComponent, Motion, Playback, Reported, StateCallback, StateEvent, StateInfo,
+    AnimatorComponent, Bounds, Motion, Playback, Reported, StateCallback, StateEvent, StateInfo,
+    Step,
 };
 
 use super::motion::MotionContext;
@@ -57,7 +64,6 @@ pub fn state_callbacks(
         *prior = diff_layer(anim, layer, &ctx, std::mem::take(prior), moved, &mut out);
     }
     tracker.layers.truncate(layer_count);
-    refresh_tags(anim, graph);
     anim.states = tracker;
     out
 }
@@ -150,19 +156,10 @@ fn layer_name(anim: &AnimatorComponent, layer: usize) -> String {
     }
 }
 
-/// `playback`'s active states: its current node, then the node a crossfade
-/// leaves.
+/// `playback`'s active states in the order they became active: the node a
+/// crossfade leaves, then its current node.
 fn actives(playback: &Playback) -> Vec<Active<'_>> {
     let mut out = Vec::with_capacity(2);
-    if let Some(node) = playback.current_node.as_deref() {
-        out.push(Active {
-            node,
-            entry: playback.states.entry,
-            raw: playback.time,
-            current: true,
-            motion: playback.motion(),
-        });
-    }
     let leaving = playback.states.previous_node.as_deref();
     if let (Some(node), Some(motion)) = (leaving, playback.previous_motion()) {
         out.push(Active {
@@ -173,7 +170,28 @@ fn actives(playback: &Playback) -> Vec<Active<'_>> {
             motion,
         });
     }
+    if let Some(node) = playback.current_node.as_deref() {
+        out.push(Active {
+            node,
+            entry: playback.states.entry,
+            raw: playback.time,
+            current: true,
+            motion: playback.motion(),
+        });
+    }
     out
+}
+
+/// How far a step moved a playhead bounded by `bounds`, for its state's time:
+/// a clamped playhead's change once clamped, so a non-looping state holds at
+/// its end (`normalized_time` exactly 1), where the step's raw span runs on
+/// past it for the events.
+pub(super) fn clamped_travel(bounds: Bounds, step: Step) -> f32 {
+    let (from, to) = step.span;
+    match bounds {
+        Bounds::Clamp(_) => bounds.apply(to) - bounds.apply(from),
+        Bounds::Wrap(_) | Bounds::Open => to - from,
+    }
 }
 
 /// A state's `time`, `normalized_time` and `length` from its playhead
@@ -199,21 +217,10 @@ fn timing(ctx: &MotionContext<'_>, motion: Motion<'_>, total: f32) -> StateInfo 
     }
 }
 
-/// Every layer's active-node tag from `graph` (`Animator.GetCurrentTag`), so
-/// a load or a graph edit is picked up without a re-entry.
-fn refresh_tags(anim: &mut AnimatorComponent, graph: Option<&AnimationGraph>) {
-    let Some(graph) = graph else { return };
-    let layers = anim.layers.iter_mut().map(|l| &mut l.playback);
-    for (layer, playback) in std::iter::once(&mut anim.base).chain(layers).enumerate() {
-        let node = playback.current_node.as_deref();
-        let node = node.and_then(|n| graph.machine(layer)?.node(n));
-        let tag = node.map(|n| n.tag.as_str()).filter(|t| !t.is_empty());
-        if playback.states.tag.as_deref() != tag {
-            playback.states.tag = tag.map(str::to_string);
-        }
-    }
-}
-
 #[cfg(test)]
 #[path = "states_tests.rs"]
 mod states_tests;
+
+#[cfg(test)]
+#[path = "states_edge_tests.rs"]
+mod states_edge_tests;

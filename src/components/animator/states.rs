@@ -12,7 +12,8 @@
 //! each difference: `OnStateExit` for a state no longer active, `OnStateEnter`
 //! for a new one, `OnStateUpdate` for one still active. Both trackers are
 //! runtime state: a load or a Play enter starts with none reported, so every
-//! active state is entered afresh.
+//! active state is entered afresh, and so does an entity deactivated and
+//! activated again (Unity's default, `keepAnimatorStateOnDisable` off).
 
 /// The graph-state bookkeeping a [`Playback`](super::Playback) carries beside
 /// its motion (#1901); runtime only, never saved (a load mid-crossfade keeps
@@ -22,9 +23,6 @@ pub struct NodeStates {
     /// The graph node a crossfade is leaving, while it blends. `None` outside
     /// one, and when the motion fading out is not a node's (`Animator.Crossfade`).
     pub previous_node: Option<String>,
-    /// The active node's tag (Unity's state *Tag*), refreshed from the graph
-    /// by each animation step.
-    pub tag: Option<String>,
     /// Which entry of the current node this is: bumped by every node entry.
     pub entry: u32,
     /// The entry of `previous_node`.
@@ -35,13 +33,12 @@ pub struct NodeStates {
 }
 
 impl NodeStates {
-    /// A node tagged `tag` (empty: none) was entered from `left` (the node
-    /// active before it, if any); `fading` when a crossfade now blends out of it.
-    pub fn entered(&mut self, left: Option<String>, tag: &str, fading: bool) {
+    /// A node was entered from `left` (the node active before it, if any);
+    /// `fading` when a crossfade now blends out of it.
+    pub fn entered(&mut self, left: Option<String>, fading: bool) {
         self.previous_node = left.filter(|_| fading);
         self.previous_entry = self.entry;
         self.entry = self.entry.wrapping_add(1);
-        self.tag = (!tag.is_empty()).then(|| tag.to_string());
     }
 }
 
@@ -106,8 +103,14 @@ pub struct StateTracker {
 }
 
 impl StateTracker {
-    /// Forget every reported state, firing nothing (`Animator.SetGraph`).
+    /// Forget every reported state, firing nothing: `Animator.SetGraph`, an
+    /// inactive entity, scripts that cannot hear the callbacks yet.
     pub fn clear(&mut self) {
         self.layers.clear();
+    }
+
+    /// Whether any state is reported.
+    pub fn is_empty(&self) -> bool {
+        self.layers.iter().all(Vec::is_empty)
     }
 }

@@ -11,11 +11,11 @@ use crate::asset::animation_graph::{
 };
 use crate::components::MeshComponent;
 
-const DT: f32 = 1.0 / 60.0;
+pub(super) const DT: f32 = 1.0 / 60.0;
 
 /// Base `A → B` on `go` (a 0.1 s crossfade), `C` reached only by a jump, with
 /// `A` and `C` tagged `"attack"`; a one-node layer `Aim`.
-fn rig() -> (AnimatorComponent, MeshComponent, AnimationGraph) {
+pub(super) fn rig() -> (AnimatorComponent, MeshComponent, AnimationGraph) {
     let tagged = |name: &str| GraphNode {
         tag: "attack".to_string(),
         ..node(name, name)
@@ -38,7 +38,11 @@ fn rig() -> (AnimatorComponent, MeshComponent, AnimationGraph) {
 }
 
 /// One fixed step — evaluate, advance, diff — as `Enter A@0`-style lines.
-fn tick(anim: &mut AnimatorComponent, mesh: &MeshComponent, graph: &AnimationGraph) -> Vec<String> {
+pub(super) fn tick(
+    anim: &mut AnimatorComponent,
+    mesh: &MeshComponent,
+    graph: &AnimationGraph,
+) -> Vec<String> {
     step_graph(anim, graph);
     step(anim, Some(mesh), Some(graph), DT);
     let callbacks = state_callbacks(anim, &mesh.clips, Some(graph));
@@ -72,7 +76,7 @@ fn a_crossfade_enters_at_its_start_and_exits_at_its_end() {
             assert_eq!(lines, ["Exit A@0", "Update B@0", "Update Aim@1"]);
             break;
         }
-        assert_eq!(lines, ["Update B@0", "Update A@0", "Update Aim@1"]);
+        assert_eq!(lines, ["Update A@0", "Update B@0", "Update Aim@1"]);
         between += 1;
         assert!(between < 10, "the 0.1 s crossfade never ended");
     }
@@ -101,9 +105,7 @@ fn a_hard_cut_exits_then_enters_in_one_step_and_reentry_counts() {
 #[test]
 fn info_carries_the_tag_layer_and_unwrapped_time() {
     let (mut anim, mesh, graph) = rig();
-    tick(&mut anim, &mesh, &graph);
-    assert_eq!(anim.base.states.tag.as_deref(), Some("attack"));
-    for _ in 0..89 {
+    for _ in 0..90 {
         tick(&mut anim, &mesh, &graph);
     }
     let reported = &anim.states.layers[0][0].info;
@@ -118,9 +120,6 @@ fn info_carries_the_tag_layer_and_unwrapped_time() {
     assert!((reported.time - 1.5).abs() < 1e-3);
     assert_eq!(anim.states.layers[1][0].info.layer_name, "Upper");
     assert_eq!(anim.states.layers[1][0].info.tag, None);
-    anim.enter_node(graph.node("B").unwrap(), 0.0);
-    tick(&mut anim, &mesh, &graph);
-    assert_eq!(anim.base.states.tag, None, "B has no tag");
 }
 
 #[test]

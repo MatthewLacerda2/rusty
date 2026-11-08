@@ -55,7 +55,7 @@ path + active state are saved with the entity.
 | `Animator.GetBone` | `(id, name)` | The id of the bone GameObject named `name` (the glTF joint name, e.g. `"hand_r"`) in the entity's skeleton, or `nil` when the entity has no skinned mesh or no such bone. Bones are ordinary entities — see *Bones are GameObjects* below. |
 | `Animator.GetClip` | `(id)` | The clip the base layer is playing (`""` before any has played), or `nil` when the entity has no animator. |
 | `Animator.GetCurrentNode` | `(id [, layer])` | The active graph node's name in `layer` (default: the base layer), or `nil` when there is no animator/graph/such layer or evaluation hasn't bound it yet. |
-| `Animator.GetCurrentTag` | `(id [, layer])` | The active graph node's **tag** in `layer` (default: the base layer), or `nil` when it has none, or there is no animator/graph/such layer or bound node. See *State callbacks*. |
+| `Animator.GetCurrentTag` | `(id [, layer])` | The active graph node's **tag** in `layer` (default: the base layer), or `nil` when it has none, or there is no animator/graph/such layer or bound node. Read from the graph asset on each call, so a loaded scene's saved node answers before the first step; a script reacting every tick reads `info.tag` in the state callbacks instead. See *State callbacks*. |
 | `Animator.SetLayerWeight` | `(id, layer, weight)` | Set an extra layer's weight, clamped to `[0, 1]` (0 hides it, 1 applies it fully); returns `true` when set. `layer` is an index (1 = the first extra layer) or the layer's name. The base layer (0) is always at full weight, so it is refused with a warning, as is an unknown layer. |
 | `Animator.GetLayerWeight` | `(id, layer)` | A layer's live weight (`1` for the base layer), or `nil` for an unknown layer. |
 | `Animator.AddTwoBoneIK` | `(id, name, root, mid, tip)` | Add (or replace) a **two-bone IK** constraint named `name` over three bones of the entity's skeleton, by bone name: `root` (upper arm / thigh), `mid` (forearm / shin), `tip` (hand / foot). Saved with the animator at full weight; it does nothing until it has a target. Returns `true`; `false` with a warning when the entity has no animator or a bone doesn't exist. See *Inverse kinematics*. |
@@ -332,11 +332,21 @@ after the step with those last reported, so a change made anywhere in the
 tick — the graph's transitions, a script's `PlayNode` in `Update` — is heard
 the same tick; one made in `LateUpdate` is heard the next. Entities go in id
 order; within one, layer by layer (base first), and within a layer every exit,
-then every enter, then every update (the current state before the one fading
-out). The dispatch is deterministic. An inactive entity's animator raises
-none; a scene load or entering Play starts with nothing reported, so every
-active state is entered afresh, and `SetGraph` drops the old graph's states
-without an exit.
+then every enter, then every update, each in the order the states became
+active (the one fading out before the current one, so when a cut and a
+crossfade start in one step the last `OnStateEnter` is the current state). The
+dispatch is deterministic.
+
+**Who hears them, and when they start over.** A state is reported only to a
+script that is awake and enabled (its `OnEnable` has fired) and defines one of
+the three callbacks; until one does, nothing is reported. So a bot instantiated
+in `Update` hears its entry state enter on its first tick, after its `Awake`,
+`OnEnable` and `Start`. A deactivated entity's animator raises none and forgets
+its states without an exit; activated again, its states enter afresh after its
+`OnEnable` (Unity's default, `keepAnimatorStateOnDisable` off), which is what a
+pool of enemies relies on. A scene load or entering Play starts with nothing
+reported, so every active state is entered afresh, and `SetGraph` drops the old
+graph's states without an exit.
 
 ### Sync groups and markers (#1896)
 

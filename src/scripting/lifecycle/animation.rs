@@ -12,7 +12,9 @@
 //! The graph-state callbacks (#1901) go the same way, just before the events:
 //! `OnStateEnter` / `OnStateUpdate` / `OnStateExit(id, info)`, `info` Unity's
 //! `AnimatorStateInfo` as a table. `OnStateUpdate` fires every step for every
-//! active state, so its table is built only when a script defines it.
+//! active state, so the step queues callbacks only for an entity whose scripts
+//! define one ([`ScriptManager::hears_states`]), and a table is built only for
+//! a callback some script defines.
 
 use mlua::{Lua, Table};
 
@@ -39,7 +41,29 @@ impl ScriptManager {
     }
 }
 
+/// The three state callbacks, in the order an entity checks for them.
+const STATE_HOOKS: [&str; 3] = [ON_STATE_ENTER, ON_STATE_UPDATE, ON_STATE_EXIT];
+
 impl ScriptManager {
+    /// Whether entity `id` has a script that defines a state callback and has
+    /// been told it is enabled (`OnEnable` fired; the entity is active): the
+    /// animation step diffs an animator's states only then, and otherwise
+    /// forgets them, so scripts that wake later (a spawn, a reactivation) hear
+    /// every active state enter, after their `OnEnable`.
+    pub fn hears_states(&self, id: u32) -> bool {
+        let Some(lua) = &self.lua else {
+            return false;
+        };
+        self.state_keys(id)
+            .any(|key| STATE_HOOKS.iter().any(|h| self.hook(lua, key, h).is_some()))
+    }
+
+    /// Entity `id`'s instances the state callbacks reach: awoken and enabled.
+    fn state_keys(&self, id: u32) -> impl Iterator<Item = (u32, usize)> + '_ {
+        let enabled = |key: &(u32, usize)| self.entity_scripts[key].enabled_last;
+        self.awoken_keys_for(id).into_iter().filter(enabled)
+    }
+
     /// `OnStateEnter` / `OnStateUpdate` / `OnStateExit(id, info)` for each
     /// queued `(entity, callback)`, in order.
     pub fn dispatch_state_callbacks(&mut self, callbacks: &[(u32, StateCallback)]) {
@@ -53,16 +77,18 @@ impl ScriptManager {
                     StateEvent::Update => ON_STATE_UPDATE,
                     StateEvent::Exit => ON_STATE_EXIT,
                 };
-                let keys = self.awoken_keys_for(*id).into_iter();
-                let keys: Vec<_> = keys.filter(|k| self.defines(lua, *k, hook)).collect();
-                if keys.is_empty() {
+                let funcs: Vec<_> = self
+                    .state_keys(*id)
+                    .filter_map(|key| Some((key, self.hook(lua, key, hook)?)))
+                    .collect();
+                if funcs.is_empty() {
                     continue;
                 }
                 let Ok(info) = state_table(lua, &callback.info) else {
                     continue;
                 };
-                for key in keys {
-                    self.call_hook(lua, key, hook, (*id, info.clone()));
+                for (key, func) in funcs {
+                    self.call(&func, key, hook, (*id, info.clone()));
                 }
             }
         });

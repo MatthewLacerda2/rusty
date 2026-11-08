@@ -238,7 +238,9 @@ headless replays stay byte-identical):
 - The state callbacks (`OnStateExit` / `OnStateEnter` / `OnStateUpdate`) fire
   after the tick's animation step and before its `OnAnimationEvent`s: by
   entity id ascending, then layer (base first), each layer's exits, then
-  enters, then updates.
+  enters, then updates, each in the order the states became active. They reach
+  only scripts that are awake and enabled: a spawned or reactivated entity's
+  states enter afresh after its `OnEnable`.
 - `OnAnimationEvent`s fire after the tick's animation step and before
   `LateUpdate`: by entity id ascending, each entity's events in the order its
   playheads crossed them, then layer, then authored order.

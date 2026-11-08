@@ -49,30 +49,33 @@ impl ScriptManager {
         }
     }
 
-    /// Whether instance `key`'s script defines `hook` — so a dispatch builds
-    /// its arguments only for a callback someone will receive.
-    fn defines(&self, lua: &Lua, key: (u32, usize), hook: &str) -> bool {
-        let Some(inst) = self.entity_scripts.get(&key) else {
-            return false;
-        };
-        let table = lua.registry_value::<Table>(&inst.table);
-        table.is_ok_and(|t| t.get::<mlua::Function>(hook).is_ok())
+    /// Instance `key`'s `hook` function, `None` when its script doesn't define
+    /// it — the one lookup every dispatch shares, so a dispatch can build its
+    /// arguments only for a callback someone will receive.
+    fn hook(&self, lua: &Lua, key: (u32, usize), hook: &str) -> Option<mlua::Function> {
+        let inst = self.entity_scripts.get(&key)?;
+        let table = lua.registry_value::<Table>(&inst.table).ok()?;
+        table.get::<mlua::Function>(hook).ok()
     }
 
-    /// The generic hook call every dispatch loop shares: resolve the instance's
-    /// lifecycle table, look up `hook`, call it with `args`, log a Lua error to
+    /// The generic hook call every dispatch loop shares: look up `hook` on the
+    /// instance ([`hook`](Self::hook)), call it with `args`, log a Lua error to
     /// the console. A script that doesn't define `hook` is silently skipped
     /// (every callback is optional).
     fn call_hook(&self, lua: &Lua, key: (u32, usize), hook: &str, args: impl mlua::IntoLuaMulti) {
-        let Some(inst) = self.entity_scripts.get(&key) else {
-            return;
-        };
-        let Ok(table) = lua.registry_value::<Table>(&inst.table) else {
-            return;
-        };
-        let Ok(func) = table.get::<mlua::Function>(hook) else {
-            return;
-        };
+        if let Some(func) = self.hook(lua, key, hook) {
+            self.call(&func, key, hook, args);
+        }
+    }
+
+    /// Call `func`, instance `key`'s `hook`, logging a Lua error to the console.
+    fn call(
+        &self,
+        func: &mlua::Function,
+        key: (u32, usize),
+        hook: &str,
+        args: impl mlua::IntoLuaMulti,
+    ) {
         if let Err(e) = func.call::<()>(args) {
             self.cells.console.borrow_mut().error(format!(
                 "[Lua Error] {} on entity {} failed: {}",
