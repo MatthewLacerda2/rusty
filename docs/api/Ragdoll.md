@@ -65,8 +65,80 @@ function OnShot(root, bone, px, py, pz, dx, dy, dz)
 end
 ```
 
-Dismemberment, powered (motor-driven) ragdolls and blending back to animation for a
-get-up are not part of this.
+### Powered ragdoll and hit reactions
+
+A shot that doesn't kill should **whip the part it hit** the way the bullet went,
+and the enemy keeps fighting (#1895). That is physics blended with animation, one
+branch of the body at a time — Unreal's `SetAllBodiesBelowSimulatePhysics`,
+`PhysicsBlendWeight` and physical animation; Unity has no built-in equivalent. A
+**branch** is a ragdoll bone and every ragdoll bone below it. Each call takes the
+character (or any ancestor) and a bone of it — the `bone` a raycast returns, or an
+id from `Ragdoll.Build`'s table — and returns how many bodies (or joints) it set.
+
+- `Ragdoll.SetSimulated(id, bone, on)` switches the branch at `bone` to physics,
+  or back to the Animator, and leaves the rest of the body as it is: the branch
+  hangs from its animated parent by its joint. Each body starts moving at the
+  velocity its animation gave it. A partly simulated branch **stays on the
+  `Hitbox` layer**, which collides with nothing, so a flinching arm can't snag a
+  door frame; only `Enable` moves bodies to `Ragdoll`. Switching off moves a
+  branch on `Ragdoll` back to `Hitbox`.
+- `Ragdoll.SetDrive(id, bone, { strength, damping })` sets every joint of the
+  branch's [drive](Joint.md): a motor pulling each simulated body toward the
+  rotation its **Animator** gives it relative to its parent (a bone the clip
+  doesn't key is held to the pose it had when it went simulated). `strength` is
+  a stiffness in 1/s² (rapier's acceleration-based motor: it scales with the
+  bone's own mass, but not with the limbs hanging below it, so an upper arm
+  carrying its forearm needs more than a hand). `0` is today's limp ragdoll; a
+  few thousand lets a hit knock an arm well back and still brings it most of the
+  way home within half a second; tens of thousands hold the animated pose
+  tightly. `damping` (1/s) defaults to `2·√strength`. A full `Enable` is driven
+  the same way (a powered ragdoll).
+- `Ragdoll.SetBlendWeight(id, bone, w)` (`0..1`) draws each simulated bone of
+  the branch that far between its animated pose (`0`) and its body's (`1`, the
+  default): translation lerped, rotation slerped, as a crossfade. The bodies
+  themselves stay physics'; only what renders (and what the next tick's raycasts
+  hit) blends. A weight set on a parent overrides its children's.
+- `Ragdoll.HitReact(id, bone, ix, iy, iz, px, py, pz [, opts])` is the one call a
+  game makes, from `OnTakeDamage` (see [`Damage`](Damage.md)): it simulates a
+  branch, drives it, applies the impulse `(ix, iy, iz)` (N·s) at the world point
+  `(px, py, pz)` and sets its weight to 1, then over `duration` eases the weight
+  back to 0 (smoothstep) and hands the branch back to the Animator on a tick it is
+  already drawn animated, so it never snaps. Options: `duration` (seconds, `0.4`),
+  `strength` (`5000`) and `damping` (`2·√strength`), and `up_to` (a bone: its branch
+  reacts instead). Returns `true`, or `false` — with one warning per entity —
+  when `id` has no ragdoll at that bone.
+  - **Which branch.** By default the hit body's ragdolled parent's: a forearm shot
+    moves the arm, a chest shot the torso. The hips never react: a hit on a bone
+    whose parent is the hips reacts from the hit bone, and a hit on the hips
+    from the hips' child body nearest the point. A bone with no body (a finger)
+    counts as its nearest ragdolled ancestor.
+  - **Repeated and overlapping hits.** A second hit on the same branch restarts
+    its reaction. Several branches react at once; where they nest, the
+    **outermost** reaction decides a bone's weight and drive (Unreal's
+    parent-overrides-children rule). A reaction only hands back the bones it
+    switched itself: a branch a script simulated, or a full `Enable`, takes the
+    impulse and nothing else.
+  - **Time.** Reactions run on the fixed tick, so they pause with the game, scale
+    with `Time.timeScale`, and two runs of the same hits give the same bones.
+- **Runtime state.** Simulated branches, weights and running reactions are not
+  saved, like `Enable`'s switch; `Enable` and `Disable` (the whole body) drop the
+  reactions and partial switches they cover. A drive is a field of each `Joint`,
+  so it is saved: set a character's drives once (in `Start`, or the inspector).
+
+```lua
+-- A shot flinches the limb it hit, harder the more damage it did.
+function OnTakeDamage(id, amount, event)
+  local hit = event.hit
+  if event.kind == "point" and hit.bone then
+    local d, p, s = hit.direction, hit.point, 0.4 * amount
+    Ragdoll.HitReact(id, hit.bone, d.x * s, d.y * s, d.z * s,
+      p.x, p.y, p.z, { duration = 0.35 })
+  end
+end
+```
+
+A get-up (blending a fallen ragdoll back to a get-up clip) and dismemberment are
+not part of this.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -74,3 +146,7 @@ get-up are not part of this.
 | `Ragdoll.Enable` | `(id)` | how many bodies switched to physics |
 | `Ragdoll.Disable` | `(id)` | how many bodies switched back to the Animator |
 | `Ragdoll.IsEnabled` | `(id)` | `bool` |
+| `Ragdoll.SetSimulated` | `(id, bone, on)` | how many bodies of the branch switched |
+| `Ragdoll.SetDrive` | `(id, bone, { strength, damping })` | how many joints of the branch it set |
+| `Ragdoll.SetBlendWeight` | `(id, bone, w)` | how many bones of the branch it set (`w` clamped to `0..1`) |
+| `Ragdoll.HitReact` | `(id, bone, ix, iy, iz, px, py, pz [, { duration, strength, damping, up_to }])` | `true`, or `false` without a ragdoll there |

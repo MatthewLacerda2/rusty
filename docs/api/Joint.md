@@ -45,6 +45,17 @@ one above it; for a static collider with no Rigidbody, its own GameObject or one
 it). The other body moves freely in the meantime. `enable_collision` (off
 by default, as in Unity) lets the two joined bodies still collide.
 
+**Drive.** A non-zero **drive strength** puts a motor on the joint's free
+rotations (Unity's `ConfigurableJoint` slerp drive, Unreal's physical animation;
+#1895), turning the entity's body toward a target relative to the connected one:
+its **rest pose**, or, on a ragdoll bone (see [`Ragdoll`](Ragdoll.md), *Powered
+ragdoll*), the pose its Animator samples. The strength is a stiffness in 1/s²
+(an acceleration-based motor: scaled by the two joined bodies' own mass, not by
+what hangs further down a chain, which makes a loaded joint softer); the **drive
+damping** (1/s) resists the turning speed, `2·√strength` being critical. `0`
+(the default) is no motor. A motor only acts on a dynamic body, and both are read
+live, so changing them never rebuilds the joint. A Fixed joint has nothing to drive.
+
 **Breaking.** A non-zero break force (newtons) or torque (newton-metres) breaks the
 joint on the first tick it carries more: the joint and its `Joint` component are
 destroyed and `OnJointBreak(id, force, torque)` fires on the entity's scripts. A
@@ -72,6 +83,8 @@ are then no-ops. Add or remove one with `Scene.AddComponent(id, "Joint")` /
 | `Joint.GetBreakForce` / `SetBreakForce` | `(id)` / `(id, newtons)` | the breaking force (`0` = never, ≥ 0) |
 | `Joint.GetBreakTorque` / `SetBreakTorque` | `(id)` / `(id, newtonMetres)` | the breaking torque (`0` = never, ≥ 0) |
 | `Joint.GetEnableCollision` / `SetEnableCollision` | `(id)` / `(id, bool)` | whether the joined bodies collide |
+| `Joint.GetDriveStrength` / `SetDriveStrength` | `(id)` / `(id, strength)` | the drive's strength, 1/s² (`0` = no motor, ≥ 0) |
+| `Joint.GetDriveDamping` / `SetDriveDamping` | `(id)` / `(id, damping)` | the drive's damping, 1/s (≥ 0) |
 
 ```lua with=door,arm:Joint,lamp:Joint
 -- A door: hinged to the world about its left edge, swinging 0..110 degrees.

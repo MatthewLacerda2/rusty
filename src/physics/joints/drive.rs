@@ -5,8 +5,9 @@
 //! reaction's drive (`scene.ragdolls.drive_override`) over the joint's own
 //! `drive_strength` / `drive_damping`. Unity's `ConfigurableJoint` slerp drive
 //! toward `targetRotation`, Unreal's physical animation in local space. The motors
-//! are rapier's position motors, acceleration-based, so a strength turns a hand
-//! and a chest alike.
+//! are rapier's position motors, acceleration-based: the strength is scaled by
+//! the two joined bodies' mass, not by the bodies hanging further down the
+//! chain, so a joint carrying a limb is softer than its number says.
 //!
 //! **The target.** A ragdoll bone with an animated pose (`RagdollRuntime`) is
 //! driven toward the rotation its Animator gives it relative to the parent body:

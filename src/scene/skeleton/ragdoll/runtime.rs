@@ -22,7 +22,7 @@ use glam::{Quat, Vec3};
 /// A hit reaction's length when the call names none (seconds).
 pub const REACT_DURATION: f32 = 0.4;
 /// A hit reaction's drive strength when the call names none (1/s²).
-pub const REACT_STRENGTH: f32 = 500.0;
+pub const REACT_STRENGTH: f32 = 5000.0;
 
 /// The damping that settles a drive of `strength` fastest without overshoot.
 pub fn critical_damping(strength: f32) -> f32 {

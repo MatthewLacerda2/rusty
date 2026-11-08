@@ -82,8 +82,9 @@ pub struct JointComponent {
     pub break_torque: f32,
     /// Whether the two joined bodies still collide with each other.
     pub enable_collision: bool,
-    /// How hard the joint's motor turns it toward its target (1/s²: an angular
-    /// acceleration per radian off, whatever the bodies weigh); `0` is no motor.
+    /// How hard the joint's motor turns it toward its target: a stiffness in
+    /// 1/s², scaled by the two bodies' mass (rapier's acceleration-based motor);
+    /// `0` is no motor.
     pub drive_strength: f32,
     /// How much the motor resists the joint's turning speed (1/s).
     pub drive_damping: f32,
