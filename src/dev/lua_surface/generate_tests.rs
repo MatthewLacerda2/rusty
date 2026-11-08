@@ -11,7 +11,9 @@ fn session() -> Session {
 fn settings_read_back_the_scenes_defaults() {
     let read = "local s = Lighting.GetSettings() \
         return table.concat({s.texelsPerUnit, s.samples, s.bounces, s.seed, tostring(s.directional), s.maxLightmapSize, s.denoiser}, ' ')";
-    assert_eq!(session().eval(read).unwrap(), "8.0 32 3 0 true 1024 OIDN");
+    let samples = crate::scene::lighting::lightmap::BakeSettings::DEFAULT_SAMPLES;
+    let want = format!("8.0 {samples} 3 0 true 1024 OIDN");
+    assert_eq!(session().eval(read).unwrap(), want);
 }
 
 #[test]

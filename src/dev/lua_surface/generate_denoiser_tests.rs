@@ -2,7 +2,7 @@
 //! taken, and an unknown one raises and changes nothing.
 
 use super::super::super::session::Session;
-use crate::scene::lighting::lightmap::Denoiser;
+use crate::scene::lighting::lightmap::{BakeSettings, Denoiser};
 
 #[test]
 fn the_denoiser_sets_by_name_and_refuses_an_unknown_one() {
@@ -32,7 +32,7 @@ fn the_denoiser_sets_by_name_and_refuses_an_unknown_one() {
         .samples;
     assert_eq!(
         (denoiser(), samples),
-        (Denoiser::Filter, 32),
+        (Denoiser::Filter, BakeSettings::DEFAULT_SAMPLES),
         "nothing changed"
     );
 }
