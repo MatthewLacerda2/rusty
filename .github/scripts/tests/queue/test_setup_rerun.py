@@ -69,16 +69,21 @@ class PullRequest(unittest.TestCase):
 
 
 class Train(unittest.TestCase):
-    def ridden(self, listings):
+    def ridden(self, listings, files=()):
         calls, patch = reruns()
         with patch, mock.patch.object(github, "evidence", side_effect=listings), \
                 mock.patch.object(github, "rollup", return_value=[]), mock.patch.object(time, "sleep"), \
                 mock.patch.object(time, "monotonic", side_effect=[0.0] * 2 * len(listings) + [9999.0] * 4):
-            return ride.wait("o/r", SHA, 3600.0, 30, say=lambda *a: None)[0], calls
+            return ride.wait("o/r", SHA, 3600.0, 30, say=lambda *a: None, files=files)[0], calls
 
     def test_a_train_red_only_in_setup_is_re_run_not_split(self):
         state, calls = self.ridden([setup_red(), GREEN])
         self.assertEqual((state, calls), (outcomes.GO, [["gh", "run", "rerun", "--failed", "1"]]))
+
+    def test_a_train_whose_member_edits_its_setup_is_red_at_once(self):
+        # PR #1933's review: the members' files ride on the tip ([`setup.edited`]).
+        state, calls = self.ridden([setup_red()], ["rust-toolchain.toml"])
+        self.assertEqual((state, calls), (ride.RED, []))
 
     def test_a_train_red_in_a_test_step_is_red(self):
         state, calls = self.ridden([tested_red()])

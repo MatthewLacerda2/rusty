@@ -4,11 +4,15 @@
 
 When GitHub's hosted runners stop being acquired, every run in flight comes
 back red at once with nothing compiled (2026-10-05, #869): the only jobs not
-green are `cancelled`, or a gate that failed because the job it gates was. That
-is GitHub's failure, not the branch's, so [`waiting.wait_for`] re-runs those runs once
-(`gh run rerun --failed`, [`rerun_step`]) and keeps waiting inside the same
-`--deadline`; only a second cancellation hands back, as [`outcomes.RUNNERS`]. A red with
-any job `failure` besides a gate is the code's, and hands back at once as ever.
+green are `cancelled`, or a gate that failed because the job it gates was. A
+job that failed in a setup step, installing a tool before anything built, is
+the same (#1932, [`verdict.setup`]), unless the pull request edits what its
+setup runs. That is GitHub's failure, not the branch's, so [`waiting.wait_for`]
+re-runs those runs once (`gh run rerun --failed`, [`rerun_step`]) and keeps
+waiting inside the same `--deadline`; only a second such red hands back, as
+[`outcomes.RUNNERS`]. Both lines name what was red: each job cancelled, or the
+setup step it failed in. A red with any other job `failure` besides a gate is
+the code's, and hands back at once as ever.
 A red whose jobs do not yet show it over (the gate unconcluded, or any job
 still listed going, #1182) is neither: it waits
 ([`verdict.runners.unread`], #1109), but only for [`GATE_SHOWS_SECONDS`] from
@@ -73,7 +77,9 @@ def sighted(pull: dict, runs: list[dict]) -> set[str]:
     }
 
 
-def rerun_step(stalled: list[dict], rerun: dict[int, int], short: str) -> tuple[str, list[str]]:
+def rerun_step(
+    stalled: list[dict], rerun: dict[int, int], short: str, jobs: dict[int, list[dict]] | None = None
+) -> tuple[str, list[str]]:
     """What to do about runs red only for the runners (#869): re-run them,
     wait for the re-run to show, or hand back as [`outcomes.RUNNERS`].
 
@@ -81,17 +87,21 @@ def rerun_step(stalled: list[dict], rerun: dict[int, int], short: str) -> tuple[
     not in it is re-run ([`outcomes.RERUN`]); one whose listed attempt is not past
     that is the listing lagging the re-run, and waits; one already re-run
     and red again is the hand-back. Once per run, inside the same deadline.
+    Both lines say what was red ([`verdict.runners.why`]), naming a failed step.
     """
     names = ", ".join(sorted({f"`{r.get('name')}`" for r in stalled}))
+    what = "; ".join(f"`{r.get('name')}`: {runners.why(r, jobs or {})}" for r in stalled)
     if any(r.get("id") not in rerun for r in stalled):
         return outcomes.RERUN, [
-            f"{names} on {short} came back cancelled with nothing failed: GitHub's runners, not the branch.",
-            "Re-running the cancelled jobs once (#869).",
+            f"{names} on {short} came back cancelled, or failed in a setup step, with nothing built"
+            f" ({what}): GitHub's runners, not the branch.",
+            "Re-running those jobs once (#869, #1932).",
         ]
     if any(r.get("run_attempt", 1) <= rerun[r.get("id")] for r in stalled):
         return outcomes.WAIT, [f"the re-run of {names} on {short} has not shown up yet."]
     return outcomes.STOP, [
-        f"{outcomes.RUNNERS}: {names} on {short} was cancelled again after one re-run, with nothing failed.",
+        f"{outcomes.RUNNERS}: {names} on {short} was cancelled, or failed in a setup step, again after one"
+        f" re-run, with nothing built ({what}).",
         "The branch is not known to be wrong. Once GitHub's runners are back, re-run it"
         " (`gh run rerun --failed ID`): a new run attempt re-queues it, no push needed.",
     ]
@@ -116,7 +126,7 @@ def progress(
     absence — no run, or only runs that built nothing — waits out
     [`RUN_APPEARS_SECONDS`], because the commit was pushed seconds ago and
     scorsese watched the runs listing omit a live run beside a skipped one.
-    A red that is only cancelled jobs is the runners' ([`rerun_step`]).
+    A red that is only cancelled jobs, or setup steps, is the runners' ([`rerun_step`]).
     """
     if pull.get("isDraft"):
         return outcomes.STOP, ["the pull request is a draft.", "CI does not check drafts. Mark it ready before queueing it."]
@@ -125,7 +135,7 @@ def progress(
     expired = expiry(waited, red_since)
     stalled = runners.outage(pull, runs, jobs, expired)
     if stalled:
-        return rerun_step(stalled, rerun or {}, sha[:7])
+        return rerun_step(stalled, rerun or {}, sha[:7], jobs)
     unread = [(w, r) for w, r in runners.unread(pull, runs, jobs, expired) if lagging(r, waited, red_since)]
     if unread:
         workflow, run = unread[0]

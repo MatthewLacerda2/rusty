@@ -198,8 +198,11 @@ built (installing a tool, the toolchain, the cargo-deny image: #1932,
 `merging/verdict/setup.py`), or a gate failed because such a job did, nothing
 compiled and nothing failed, so the queue re-runs those runs once
 (`gh run rerun --failed`) inside the same `--deadline`, and hands back only if they
-come back that way again, as `runners unavailable …`. A train red only this way is
-re-run, not split. That hand-back needs no
+come back that way again, as `runners unavailable …`; both lines name each job
+cancelled or the setup step it failed in. A train red only this way is
+re-run, not split. A pull request that edits what its setup runs
+(`rust-toolchain.toml`, `.github/workflows/`; for a train, any member) is judged
+on its setup failures: they are its code's, handed back at once. That hand-back needs no
 push: once GitHub's runners are back, re-run the run and the watch retakes it.
 
 It **stops the whole queue** — one message, the rest named *not taken* — when a

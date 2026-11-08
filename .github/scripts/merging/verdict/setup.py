@@ -18,9 +18,24 @@ failure: there is no evidence either way.
 [`SETUP`] is matched by the name the jobs API reports. A step written with
 `name:` reports that name; one written only with `uses:` reports `Run <uses>`,
 and a Docker action's image build `Build <uses>`. `Set up job` is GitHub's own.
-`tests/verdict/test_setup_steps.py` holds that every other name still appears in
-a workflow, so renaming a step (or bumping `actions/checkout`) fails `make
-scripts` rather than silently turning the rule off.
+`tests/verdict/test_setup_order.py` reads every gated job's steps in order and
+holds two things: every [`SETUP`] name is still a step's (renaming one, or
+bumping `actions/checkout`, fails `make scripts` rather than silently turning
+the rule off), and every step before a job's last setup step is a setup step
+too. The review of PR #1933 found `Driver version (Mesa / lavapipe)` between
+the lavapipe install and `Install cargo-nextest` in `build-test`, so a 504 in
+that install was still the code's there; and `lint` ran `Doc references` before
+its setup steps. Both are fixed, and the next version print inserted before an
+install fails the test.
+
+## A pull request that edits its own setup is judged on it
+
+The toolchain, the install steps and `Set up job` itself run what the pull
+request's own `rust-toolchain.toml` and `.github/workflows/` say. A bad channel
+or action version there fails a setup step every time, so read as the runners'
+it would be re-run once and handed back as `runners unavailable`, never as the
+code's. [`edited`] is that case: such a failure is the code's, and for a train
+it is so when any member touched those files (PR #1933's review).
 """
 
 from __future__ import annotations
@@ -32,6 +47,7 @@ SETUP: tuple[str, ...] = (
     "Build EmbarkStudios/cargo-deny-action@v2",
     "Cache Blender",
     "Cache cargo registry + target",
+    "Driver version (Mesa / lavapipe)",
     "Ensure rustfmt + clippy",
     "Install Blender",
     "Install cargo-nextest",
@@ -41,6 +57,23 @@ SETUP: tuple[str, ...] = (
     "System libs for winit/wgpu builds",
     "Toolchain (from rust-toolchain.toml)",
 )
+
+
+# What a job's setup steps run is written in these: a pull request changing one
+# is judged on its own setup ([`edited`]).
+OWN_SETUP: tuple[str, ...] = (".github/workflows/", "rust-toolchain.toml")
+
+
+def edited(paths: list[str]) -> bool:
+    """Whether `paths` (a pull request's, or every member's of a train) change
+    what the setup steps run, so that a setup failure is the code's."""
+    return any(p == own or (own.endswith("/") and p.startswith(own)) for p in paths for own in OWN_SETUP)
+
+
+def step(job: dict) -> str | None:
+    """The name of the step `job` failed in, or `None` when none is listed failed."""
+    steps = sorted(job.get("steps") or [], key=lambda s: s.get("number", 0))
+    return next((s.get("name") for s in steps if s.get("conclusion") == "failure"), None)
 
 
 def failed_in_setup(job: dict) -> bool:

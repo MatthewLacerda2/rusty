@@ -2,20 +2,17 @@
 
 Driven over the two runs the queue lost a round to on 2026-11-08
 ([`setup_runs`]); the queue's and the train's re-run is
-`tests/queue/test_setup_rerun.py`.
+`tests/queue/test_setup_rerun.py`, and the list against the workflows
+`tests/verdict/test_setup_order.py`.
 """
 
 from __future__ import annotations
 
-import pathlib
-import re
 import unittest
 
 from merging.verdict import runners, setup
 from tests.verdict import setup_runs as real
 from tests.verdict.fixtures import built, run
-
-WORKFLOWS = pathlib.Path(__file__).resolve().parents[3] / "workflows"
 
 
 def ci_red(*failed: dict) -> dict[int, list[dict]]:
@@ -69,18 +66,6 @@ class RunnerRed(unittest.TestCase):
 class TheList(unittest.TestCase):
     def test_it_is_sorted_and_has_no_duplicates(self):
         self.assertEqual(list(setup.SETUP), sorted(set(setup.SETUP)))
-
-    def test_every_name_still_appears_in_a_workflow(self):
-        # `name: X` reports as X; a bare `uses: X` as `Run X`, a Docker action's image as `Build X`.
-        text = "\n".join(p.read_text() for p in WORKFLOWS.glob("*.yml"))
-        written = set(re.findall(r"^\s*-?\s*name:\s*(.+?)\s*$", text, re.M))
-        used = set(re.findall(r"^\s*-?\s*uses:\s*(\S+)", text, re.M))
-        for name in setup.SETUP:
-            if name == "Set up job":  # GitHub's own first step, in every job
-                continue
-            with self.subTest(name=name):
-                bare = re.sub(r"^(Run|Build) ", "", name)
-                self.assertTrue(name in written or (bare != name and bare in used), f"no workflow step reports as {name!r}")
 
 
 if __name__ == "__main__":
