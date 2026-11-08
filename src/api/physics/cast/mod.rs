@@ -1,5 +1,6 @@
-//! src/api/physics/cast/mod.rs — `Physics.Raycast` / `SphereCast`, and (in
-//! `all`) `RaycastAll` / `RaycastAllNonAlloc`.
+//! src/api/physics/cast/mod.rs — `Physics.Raycast`, the shape casts (in
+//! `sweep`: `SphereCast` / `CapsuleCast` / `BoxCast`, #1881), and (in `all`)
+//! `RaycastAll` / `RaycastAllNonAlloc` / `SphereCastAll`.
 //!
 //! Query-only line casts through the live rapier world. A hit carries the
 //! entity, distance, world point and surface normal (#446), plus the bone it
@@ -9,7 +10,9 @@
 //! (#91, #311, #1720), and one `max_distance` rule (`filter::reach`).
 
 mod all;
+pub(super) mod check;
 mod filter;
+mod sweep;
 
 use glam::Vec3;
 use mlua::Table;
@@ -44,7 +47,7 @@ type CastResult = (
     Option<String>,
 );
 
-/// Fold an optional hit into the [`CastResult`] both single casts return.
+/// Fold an optional hit into the [`CastResult`] every single cast returns.
 fn cast_result(scene: &Scene, hit: Option<RayHit>) -> CastResult {
     match hit {
         Some(RayHit {
@@ -76,8 +79,8 @@ fn cast_result(scene: &Scene, hit: Option<RayHit>) -> CastResult {
     }
 }
 
-/// Register `Raycast`, `SphereCast`, `RaycastAll` and `RaycastAllNonAlloc`
-/// onto the `Physics` table.
+/// Register `Raycast`, the shape casts and the multi-hit casts onto the
+/// `Physics` table.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,
@@ -85,7 +88,7 @@ pub(super) fn register(
     physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     register_raycast(lua, table, scene, physics)?;
-    register_spherecast(lua, table, scene, physics)?;
+    sweep::register(lua, table, scene, physics)?;
     all::register(lua, table, scene, physics)
 }
 
@@ -125,55 +128,6 @@ fn register_raycast(
                 world.raycast_hit(Vec3::new(ox, oy, oz), Vec3::new(dx, dy, dz), max, |id| {
                     filter.accepts(&scene, id)
                 })
-            });
-            Ok(cast_result(&scene, hit))
-        }),
-    )
-}
-
-/// `SphereCast` — a raycast with a radius (Unity `Physics.SphereCast`): the
-/// first accepted collider touched by a sphere swept along the ray. Same
-/// arguments after the radius and same [`CastResult`] as `Raycast`; distance
-/// is how far the sphere's center traveled before impact, the point is the
-/// contact on the struck surface.
-fn register_spherecast(
-    lua: &mlua::Lua,
-    table: &Table,
-    scene: ApiCell<Scene>,
-    physics: ApiCell<Option<PhysicsWorld>>,
-) -> Reg {
-    // The ray, the radius, then Raycast's four optional arguments.
-    type Args = (
-        f32,
-        f32,
-        f32,
-        f32,
-        f32,
-        f32,
-        f32,
-        Option<u32>,
-        Option<u32>,
-        Option<f32>,
-        Option<bool>,
-    );
-    put(
-        table,
-        "SphereCast",
-        lua.create_function(move |lua, args: Args| {
-            let (ox, oy, oz, dx, dy, dz, radius, ignore, mask, max, triggers) = args;
-            let filter = Filter::new(ignore, mask, triggers);
-            let scene = &*scene.get(lua)?;
-            let physics = &*physics.get(lua)?;
-            let physics = physics.borrow();
-            let scene = scene.borrow();
-            let hit = physics.as_ref().zip(reach(max)).and_then(|(world, max)| {
-                world.sphere_cast_hit(
-                    Vec3::new(ox, oy, oz),
-                    Vec3::new(dx, dy, dz),
-                    radius,
-                    max,
-                    |id| filter.accepts(&scene, id),
-                )
             });
             Ok(cast_result(&scene, hit))
         }),

@@ -3,8 +3,9 @@
 //! Rigidbody velocity/force/kinematic controls plus the spatial query surface
 //! over the live rapier/parry `PhysicsWorld` — the same query pipeline the
 //! engine uses, so script and engine queries agree (#31, #311). The queries
-//! split by shape: line casts (`Raycast`/`SphereCast`) in `cast`, volume
-//! overlaps (`Overlap*`/`Check*`) in `volume`, per-collider point queries
+//! split by shape: line and shape casts (`Raycast`, `SphereCast`/`CapsuleCast`/
+//! `BoxCast`, the `*All` forms) in `cast`, volume overlaps (`Overlap*`/`Check*`)
+//! in `volume`, per-collider point queries
 //! (`ClosestPoint`/`ContainsPoint`/`GetBounds`) in `point`, and the collider's
 //! authorable shape + inline physics material (#447) in `collider`, the shared
 //! physics material assets (#1878) in `material`, the per-bone
@@ -206,9 +207,10 @@ fn register_force(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
     )
 }
 
-/// Extend `Physics` with the spatial query surface (#31, #311): the line casts
-/// (`Raycast`/`SphereCast`), the volume overlaps (`OverlapSphere`/`OverlapBox`/
-/// `OverlapCapsule` + `CheckSphere`/`CheckBox`), and the per-collider point
+/// Extend `Physics` with the spatial query surface (#31, #311, #1881): the
+/// line and shape casts (`Raycast`, `SphereCast`/`CapsuleCast`/`BoxCast`,
+/// `RaycastAll`/`SphereCastAll`), the volume overlaps (`Overlap*` +
+/// `Check*` for spheres, oriented boxes and capsules), and the per-collider point
 /// queries (`ClosestPoint`/`ContainsPoint`/`GetBounds`). All route through the
 /// live rapier/parry `PhysicsWorld` — the same query pipeline the engine uses —
 /// so a script's query and the engine's return identical answers.

@@ -25,6 +25,7 @@ mod raycast_tests;
 pub(super) mod spatial;
 #[cfg(test)]
 mod spatial_tests;
+pub(super) mod sweep;
 #[cfg(test)]
 mod tests;
 pub(super) mod through;

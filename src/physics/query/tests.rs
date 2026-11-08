@@ -10,7 +10,7 @@
 //! of those tests runs both directions — deactivate → miss, reactivate → hit — so a
 //! filter that always rejects or never rejects is caught.
 
-use glam::Vec3;
+use glam::{Quat, Vec3};
 
 use crate::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use crate::physics::PhysicsWorld;
@@ -119,8 +119,12 @@ fn hit_below(world: &PhysicsWorld, x: f32) -> Option<u32> {
 
 /// Every query family's answer about a unit box `target` at the origin, as
 /// seen from outside it (casts from -z, volumes and points at its center).
-fn answers(world: &PhysicsWorld, target: u32) -> [bool; 10] {
+fn answers(world: &PhysicsWorld, target: u32) -> [bool; 11] {
     let from = Vec3::new(0.0, 0.0, -5.0);
+    let sweep = crate::physics::Sweep::Sphere {
+        center: from,
+        radius: 0.2,
+    };
     let only = |id: u32| id == target;
     [
         world.raycast_hit(from, Vec3::Z, 20.0, |_| true).is_some(),
@@ -130,8 +134,9 @@ fn answers(world: &PhysicsWorld, target: u32) -> [bool; 10] {
         world
             .sphere_cast_hit(from, Vec3::Z, 0.2, 20.0, only)
             .is_some(),
+        world.shape_cast_all(sweep, Vec3::Z, 20.0, only).len() == 1,
         world.overlap_sphere(Vec3::ZERO, 0.2, only) == [target],
-        world.overlap_box(Vec3::ZERO, Vec3::splat(0.2), only) == [target],
+        world.overlap_box(Vec3::ZERO, Vec3::splat(0.2), Quat::IDENTITY, only) == [target],
         world.overlap_capsule(Vec3::ZERO, Vec3::Y * 0.1, 0.2, only) == [target],
         world.closest_point_on(target, Vec3::X * 3.0).is_some(),
         world.collider_contains_point(target, Vec3::ZERO) == Some(true),
@@ -145,19 +150,19 @@ fn every_query_family_skips_an_inactive_entity_and_sees_it_again() {
     let mut world = PhysicsWorld::from_scene(&scene);
     assert_eq!(
         answers(&world, target),
-        [true; 10],
+        [true; 11],
         "active: every query hits"
     );
     set_active(&mut scene, &mut world, target, false);
     assert_eq!(
         answers(&world, target),
-        [false; 10],
+        [false; 11],
         "inactive: every query misses"
     );
     set_active(&mut scene, &mut world, target, true);
     assert_eq!(
         answers(&world, target),
-        [true; 10],
+        [true; 11],
         "reactivated: hits again"
     );
 }
@@ -168,11 +173,11 @@ fn an_entity_inactive_at_build_is_hidden_until_activated() {
     let target = add_box(&mut scene, None, Vec3::ZERO, Vec3::ONE);
     scene.world.set_active(target, false);
     let mut world = PhysicsWorld::from_scene(&scene);
-    assert_eq!(answers(&world, target), [false; 10], "built inactive");
+    assert_eq!(answers(&world, target), [false; 11], "built inactive");
     set_active(&mut scene, &mut world, target, true);
     assert_eq!(
         answers(&world, target),
-        [true; 10],
+        [true; 11],
         "its own collider re-enabled"
     );
 }
