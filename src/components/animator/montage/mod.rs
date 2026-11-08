@@ -1,4 +1,4 @@
-//! src/components/animator/montage.rs — the montages an animator plays (#1894).
+//! src/components/animator/montage/ — the montages an animator plays (#1894).
 //!
 //! Runtime only, like an IK target: what a script just did is never saved, so a
 //! scene load, a Play/Stop restore and a change of graph all leave every slot
