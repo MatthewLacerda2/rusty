@@ -1,10 +1,11 @@
 //! The Edit menu and its shortcuts (#1631): Undo / Redo over the scene's history
-//! (`scene::undo`), Unity's Edit ▸ Undo and Ctrl+Z / Ctrl+Shift+Z (Cmd on macOS).
+//! (`scene::undo`), Unity's Edit ▸ Undo and Ctrl+Z / Ctrl+Shift+Z (Cmd on macOS),
+//! and Edit ▸ Delete with the Delete key, Cmd+Backspace on macOS (#1915).
 
 use egui::{Key, KeyboardShortcut, Modifiers};
 use egui_phosphor::regular as icon;
 
-use crate::editor::EditorUi;
+use crate::editor::{hierarchy, EditorUi};
 use crate::scene::Scene;
 
 const UNDO: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Z);
@@ -12,6 +13,10 @@ const REDO: KeyboardShortcut =
     KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::Z);
 /// Ctrl+Y, Unity's Redo on Windows and Linux.
 const REDO_Y: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Y);
+const DELETE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::NONE, Key::Delete);
+/// Cmd+Backspace, Unity's Delete on macOS, whose `delete` key is Backspace. It
+/// names the Mac's own Cmd, so Ctrl+Backspace elsewhere is not a delete.
+const DELETE_MAC: KeyboardShortcut = KeyboardShortcut::new(Modifiers::MAC_CMD, Key::Backspace);
 
 /// The REPL line's widget id: its lines are Undo steps of their own.
 pub(crate) fn repl_input_id() -> egui::Id {
@@ -27,10 +32,10 @@ pub fn typing_holds_step(ctx: &egui::Context) -> bool {
     ctx.text_edit_focused() && ctx.memory(|m| m.focused()) != Some(repl_input_id())
 }
 
-/// Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y, in edit mode, unless a text field has the
-/// keyboard: there they edit the text, as in Unity. Focus on any other widget
-/// (the viewport after a camera gesture, a slider after its drag) does not
-/// take the shortcut away.
+/// Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y and Delete, in edit mode, unless a text field
+/// has the keyboard: there they edit the text, as in Unity. Focus on any other
+/// widget (the viewport after a camera gesture, a slider after its drag) does
+/// not take the shortcut away.
 pub(super) fn shortcuts(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut Scene) {
     if scene.is_playing() || ctx.text_edit_focused() {
         return;
@@ -43,10 +48,16 @@ pub(super) fn shortcuts(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut 
     } else if ctx.input_mut(|i| i.consume_shortcut(&UNDO)) {
         step(editor, scene, true);
     }
+    let Some(selected) = editor.selected_entity_id else {
+        return;
+    };
+    if ctx.input_mut(|i| i.consume_shortcut(&DELETE) || i.consume_shortcut(&DELETE_MAC)) {
+        hierarchy::delete(editor, scene, selected);
+    }
 }
 
-/// The Edit menu: Undo and Redo, each naming its step; greyed out in Play and
-/// when there is nothing to step.
+/// The Edit menu: Undo and Redo, each naming its step, then Delete for the
+/// selection; greyed out in Play and when there is nothing to act on.
 pub(super) fn edit_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let playing = scene.is_playing();
     ui.menu_button("Edit", |ui| {
@@ -58,6 +69,15 @@ pub(super) fn edit_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
         let redo = scene.redo_name().map(|n| format!("Redo {n}"));
         if item(ui, icon::ARROW_U_UP_RIGHT, redo, "Redo", &REDO, playing) {
             step(editor, scene, false);
+            ui.close();
+        }
+        ui.separator();
+        let selected = editor.selected_entity_id;
+        let delete = selected.map(|_| "Delete".to_owned());
+        if item(ui, icon::TRASH, delete, "Delete", &DELETE, playing) {
+            if let Some(id) = selected {
+                hierarchy::delete(editor, scene, id);
+            }
             ui.close();
         }
     });
@@ -90,3 +110,7 @@ fn item(
 #[cfg(test)]
 #[path = "edit_menu_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "delete_tests.rs"]
+mod delete_tests;
