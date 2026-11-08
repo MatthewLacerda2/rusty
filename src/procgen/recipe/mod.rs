@@ -15,6 +15,11 @@
 //! Parsing is strict (#395): an unknown key anywhere — on the recipe, a node, or a
 //! ramp stop — is an error naming it, so a typo (`scael = 8`) never bakes silently
 //! with a default. [`Node`]'s check lives in `recipe/node.rs`.
+//!
+//! Every recipe can also be a **graph** another recipe instances (#1744): its
+//! `params` and `inputs` are its interface, and a `{ param = "age" }` placeholder
+//! in a node stands for a param's value. The placeholders are read, and written
+//! back, by [`crate::procgen::graph`]'s serde hooks; the expansion is there too.
 
 mod arity;
 pub mod color;
@@ -43,6 +48,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::graph::{Bound, ParamDecl};
+
 /// One stop in a [`ColorRamp`](OpKind::ColorRamp): position in `[0, 1]` and its color.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -55,8 +62,12 @@ pub struct RampStop {
 /// The whole authored texture: the canvas extent (`resolution` squared, or `size`),
 /// the RNG seed (folded into every stochastic op), and the flat node list. The last node in topological order
 /// that nothing else consumes is the recipe's output (or the explicit `output` id).
+///
+/// Its serde impls are [`crate::procgen::graph`]'s: they read a node's
+/// `{ param = … }` placeholders into [`TextureRecipe::bound`] around this derive
+/// (`remote = "Self"` makes the derive inherent functions they call).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(remote = "Self", deny_unknown_fields)]
 pub struct TextureRecipe {
     /// The side of a square bake. Ignored when `size` is set, so it may be left out
     /// then (it reads 0, and is not written).
@@ -81,6 +92,18 @@ pub struct TextureRecipe {
     /// recipe, and omitted from its JSON.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub outputs: BTreeMap<String, String>,
+    /// The params an instance of this recipe sets (#1744): name → type, default and
+    /// range. Baked on its own, the recipe uses the defaults.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub params: BTreeMap<String, ParamDecl>,
+    /// The named inputs an instance wires, in order (#1744). Inner nodes name them
+    /// like node ids. A recipe with inputs bakes only through an instance.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inputs: Vec<String>,
+    /// Which node values are `{ param = … }` placeholders: parsed at the param's
+    /// default, written back as the placeholder (#1744).
+    #[serde(skip)]
+    pub bound: Vec<Bound>,
 }
 
 impl TextureRecipe {
@@ -96,6 +119,9 @@ impl TextureRecipe {
             nodes,
             output: None,
             outputs: BTreeMap::new(),
+            params: BTreeMap::new(),
+            inputs: Vec::new(),
+            bound: Vec::new(),
         }
     }
 

@@ -25,11 +25,14 @@
 //!   image, with the grid's column count and node order (#1486).
 //! - `Texture.Ops()` — the op catalog: each op's tag, category, input count and
 //!   params with their types and defaults (#411), so the agent discovers the op-set
-//!   from the engine rather than the docs.
+//!   from the engine rather than the docs; then the project's `.graph.json` graphs,
+//!   each as `op = "graph"` with its path, inputs and params (#1744).
 //!
-//! A recipe's `image` nodes read their files from the project root before any verb
-//! evaluates it (`scene::authoring::material::load_sources`, #1491): procgen itself
-//! reads no files.
+//! A recipe's graph instances (#1744) and `image` nodes read their files from the
+//! project root before any verb evaluates it (`scene::authoring::material::load_recipe`,
+//! #1491): procgen itself reads no files. Each verb evaluates the expanded recipe,
+//! so `Stats` and `Preview` show an instance's nodes under their prefixed ids
+//! (`brick/mortar`); `ToJson` writes the recipe as given, instances unexpanded.
 //!
 //! `Bake` and `BakeSet` make the missing folders above their target inside the
 //! project (`folder`, #1850), and a failed write names the verb and the path.
@@ -56,8 +59,8 @@ use std::path::Path;
 use mlua::{Lua, Value};
 
 use super::{put, Reg};
-use crate::procgen::{bake_recipe, bake_set, check_set, Slot, Sources, TextureRecipe};
-use crate::scene::authoring::material::load_sources;
+use crate::procgen::{bake_recipe, bake_set, check_set, Slot, TextureRecipe};
+use crate::scene::authoring::material::{load_recipe, Loaded};
 use from_lua::parse_recipe;
 
 /// Register the `Texture` namespace onto `lua`.
@@ -99,7 +102,7 @@ pub fn register(lua: &Lua) -> Reg {
     put(
         &table,
         "Ops",
-        lua.create_function(|lua, ()| ops::ops_table(lua)),
+        lua.create_function(|lua, ()| ops::ops_table(lua, &crate::core::project::root())),
     )?;
 
     lua.globals()
@@ -111,9 +114,9 @@ pub fn register(lua: &Lua) -> Reg {
 /// The missing folders above `path` are made first when they lie inside `root`.
 fn bake(recipe: &TextureRecipe, path: &str, slot: &str, root: &Path) -> mlua::Result<String> {
     let slot = Slot::parse(slot).map_err(mlua::Error::RuntimeError)?;
-    let sources = sources(recipe)?;
+    let loaded = load(recipe)?;
     folder::make_parents(path, root)
-        .and_then(|()| bake_recipe(recipe, &sources, slot, path))
+        .and_then(|()| bake_recipe(&loaded.recipe, &loaded.sources, slot, path))
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Bake: {e}")))
 }
 
@@ -124,22 +127,23 @@ fn bake_whole_set(
     prefix: &str,
     root: &Path,
 ) -> mlua::Result<BTreeMap<String, String>> {
-    let sources = set_sources(recipe)?;
+    let loaded = load_set(recipe)?;
     folder::make_parents(prefix, root)
-        .and_then(|()| bake_set(recipe, &sources, prefix))
+        .and_then(|()| bake_set(&loaded.recipe, &loaded.sources, prefix))
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.BakeSet: {e}")))
 }
 
-/// [`sources`] for a set bake: its `outputs` are checked first, so a recipe with
+/// [`load`] for a set bake: its `outputs` are checked first, so a recipe with
 /// none says so rather than naming a file it couldn't read.
-fn set_sources(recipe: &TextureRecipe) -> mlua::Result<Sources> {
+fn load_set(recipe: &TextureRecipe) -> mlua::Result<Loaded> {
     check_set(recipe).map_err(mlua::Error::RuntimeError)?;
-    sources(recipe)
+    load(recipe)
 }
 
-/// The decoded files `recipe`'s `image` nodes read, from the project root.
-fn sources(recipe: &TextureRecipe) -> mlua::Result<Sources> {
-    load_sources(recipe, &crate::core::project::root()).map_err(mlua::Error::RuntimeError)
+/// `recipe` ready to run: its graphs expanded and its images decoded, from the
+/// project root.
+fn load(recipe: &TextureRecipe) -> mlua::Result<Loaded> {
+    load_recipe(recipe, &crate::core::project::root()).map_err(mlua::Error::RuntimeError)
 }
 
 #[cfg(test)]

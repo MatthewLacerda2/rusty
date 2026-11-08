@@ -28,6 +28,19 @@ pub fn node_seed(recipe: u64, node: u32) -> u64 {
     recipe ^ mix64(u64::from(node).wrapping_mul(0xd1b5_4a32_d192_ed03))
 }
 
+/// A graph instance's node seed (#1744): `node` (the inner node's own `seed`) with
+/// the instance's `seed` folded in. An instance seed of 0 returns `node` untouched,
+/// so an instance bakes like its nodes pasted by hand; any other changes every
+/// inner seed, a node written without one included.
+#[inline]
+pub fn instance_seed(node: u32, instance: u32) -> u32 {
+    if instance == 0 {
+        return node;
+    }
+    let word = (u64::from(instance) << 32) | u64::from(node);
+    (mix64(word ^ 0xa076_1d64_78bd_642f) >> 32) as u32
+}
+
 /// Hash a 2-D integer lattice cell `(x, y)` under `seed` to a `u32`. The two axes
 /// and the seed are folded into one 64-bit word with distinct odd primes so that
 /// `(x, y)` and `(y, x)` (and different seeds) decorrelate.

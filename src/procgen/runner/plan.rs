@@ -6,7 +6,7 @@
 use crate::core::collections::Map;
 
 use super::RunError;
-use crate::procgen::recipe::{Fault, Link, Node, TextureRecipe};
+use crate::procgen::recipe::{Fault, Link, Node, OpKind, TextureRecipe};
 
 /// The nodes to evaluate and how they connect, as indices into `recipe.nodes`.
 pub(super) struct Plan {
@@ -99,6 +99,10 @@ pub(super) fn plan(
 /// nodes, counts as a consumer, and closes a cycle like one.
 fn wire(recipe: &TextureRecipe, by_id: &Map<&str, usize>) -> Result<Vec<Vec<usize>>, RunError> {
     let wire_node = |node: &Node| {
+        if let OpKind::Graph(g) = &node.op {
+            let fault = Fault::Unexpanded(g.path.clone());
+            return Err(RunError::Node(node.error(fault)));
+        }
         node.check_arity().map_err(RunError::Node)?;
         let index = |input: &String| {
             by_id

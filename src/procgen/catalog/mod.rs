@@ -32,6 +32,7 @@ pub use op::{Cx, Op, Row};
 
 use serde::{Deserialize, Serialize};
 
+use super::graph::Instance;
 use super::image_buf::Image;
 use super::recipe::{Arity, Link, OpInfo, Param};
 
@@ -53,6 +54,10 @@ macro_rules! catalog {
         pub enum OpKind {
             $($($pd)* $($pc)* $pv($pt),)*
             $($($ud)* $($uc)* $uv,)*
+            /// Another recipe used as one node (#1744): not a row, so not in [`OPS`].
+            /// [`crate::procgen::graph::expand`] replaces it with the graph's nodes
+            /// before anything validates or runs; the runner refuses one left over.
+            Graph(Instance),
         }
 
         $($($pc)* pub use $pt;)*
@@ -66,6 +71,7 @@ macro_rules! catalog {
                 match self {
                     $($($pc)* OpKind::$pv(_) => &<$pt as Row>::INFO,)*
                     $($($uc)* OpKind::$uv => &<$ut as Row>::INFO,)*
+                    OpKind::Graph(_) => &<Instance as Row>::INFO,
                 }
             }
 
@@ -74,6 +80,7 @@ macro_rules! catalog {
                 match self {
                     $($($pc)* OpKind::$pv(p) => p,)*
                     $($($uc)* OpKind::$uv => &$ut,)*
+                    OpKind::Graph(g) => g,
                 }
             }
         }

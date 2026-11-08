@@ -1,21 +1,68 @@
 //! src/api/texture/ops.rs — `Texture.Ops()`: the op catalog as Lua tables (#411).
 //!
 //! Straight from [`crate::procgen::recipe::OPS`], so what the agent reads is what
-//! the parser accepts, which params take a link included.
+//! the parser accepts, which params take a link included. After the ops come the
+//! project's graphs (#1744), each `.graph.json` under the project root as one
+//! `op = "graph"` entry with its `path`, its inputs and its declared params.
 
-use mlua::{Lua, Table, Value};
+use std::path::Path;
 
+use mlua::{Lua, LuaSerdeExt, Table, Value};
+
+use crate::procgen::graph::ParamDecl;
 use crate::procgen::recipe::{Lit, OpInfo, OpParam, OPS};
+use crate::procgen::TextureRecipe;
+use crate::scene::authoring::material::{project_graphs, read_graph};
 
 /// `{ {op, category, min_inputs, max_inputs, params = { {name, type, default, required, socket, values?} } }, … }`.
 /// `socket` says whether the param takes a link to another node as well as a
-/// number (#1494).
-pub fn ops_table(lua: &Lua) -> mlua::Result<Table> {
-    lua.create_sequence_from(
-        OPS.iter()
-            .map(|info| op_table(lua, info))
-            .collect::<mlua::Result<Vec<_>>>()?,
-    )
+/// number (#1494). The graphs under `root` follow, each with `path` and `inputs`
+/// (the names it wires, in order) too, its params carrying `min` / `max` when
+/// declared. A graph file that doesn't parse is left out, with a warning naming it.
+pub fn ops_table(lua: &Lua, root: &Path) -> mlua::Result<Table> {
+    let mut rows = OPS
+        .iter()
+        .map(|info| op_table(lua, info))
+        .collect::<mlua::Result<Vec<_>>>()?;
+    for path in project_graphs(root) {
+        match read_graph(&path, root) {
+            Ok(graph) => rows.push(graph_table(lua, &path, &graph)?),
+            Err(e) => log::warn!("[Texture] Ops() leaves out graph {path:?}: {e}"),
+        }
+    }
+    lua.create_sequence_from(rows)
+}
+
+fn graph_table(lua: &Lua, path: &str, graph: &TextureRecipe) -> mlua::Result<Table> {
+    let t = lua.create_table()?;
+    t.set("op", "graph")?;
+    t.set("path", path)?;
+    t.set("category", "graph")?;
+    t.set("min_inputs", graph.inputs.len())?;
+    t.set("max_inputs", graph.inputs.len())?;
+    t.set(
+        "inputs",
+        lua.create_sequence_from(graph.inputs.iter().map(String::as_str))?,
+    )?;
+    let params = graph
+        .params
+        .iter()
+        .map(|(name, d)| graph_param(lua, name, d))
+        .collect::<mlua::Result<Vec<_>>>()?;
+    t.set("params", lua.create_sequence_from(params)?)?;
+    Ok(t)
+}
+
+fn graph_param(lua: &Lua, name: &str, d: &ParamDecl) -> mlua::Result<Table> {
+    let t = lua.create_table()?;
+    t.set("name", name)?;
+    t.set("type", lua.to_value(&d.ty)?)?;
+    t.set("default", lua.to_value(&d.default)?)?;
+    t.set("required", false)?;
+    t.set("socket", false)?;
+    t.set("min", d.min)?;
+    t.set("max", d.max)?;
+    Ok(t)
 }
 
 fn op_table(lua: &Lua, info: &OpInfo) -> mlua::Result<Table> {
