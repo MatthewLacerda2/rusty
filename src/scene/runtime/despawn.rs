@@ -45,6 +45,7 @@ impl Scene {
             self.pending_load = None;
             self.pending_destroy.clear(); // the next Play must not destroy edit entities
             self.persistent.clear();
+            self.ragdolls = Default::default();
         }
         self.playing = playing;
     }
@@ -78,7 +79,7 @@ impl Scene {
 
     /// Despawn every entity of `ids` together, then drop the scene's own references
     /// to them (#1264): the selection, `DontDestroyOnLoad`, a queued destroy, their
-    /// lightmap entries, the decals they own and their shader overrides. The World's references go in
+    /// lightmap entries, the decals they own, their shader overrides and ragdoll state. The World's references go in
     /// `World::despawn_all`, one pass for the batch. Every despawn in the scene runs
     /// through here, saying `why` it may skip script teardown.
     pub(crate) fn despawn_batch(&mut self, ids: &BTreeSet<u32>, why: Despawn) {
@@ -93,6 +94,7 @@ impl Scene {
         for &id in ids {
             self.shader_overrides.clear(id, None);
         }
+        self.ragdolls.retain(|id| !ids.contains(&id));
         if self.selected_entity_id.is_some_and(|s| ids.contains(&s)) {
             self.selected_entity_id = None;
         }

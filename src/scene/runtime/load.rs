@@ -56,7 +56,8 @@ impl Scene {
     /// themselves, appended after the incoming entities. A survivor whose parent does
     /// not survive becomes a root. The materials survivors reference come along
     /// unless the incoming library already defines that name. Persistent decals
-    /// come along (#1518, `scene::decal::persist`); the rest, and queued destroys
+    /// and the survivors' ragdoll state (#1895) come along (#1518,
+    /// `scene::decal::persist`); the rest, and queued destroys
     /// of the outgoing scene, are dropped, and the scene takes a fresh
     /// runtime identity — it is a different scene now.
     pub fn swap_in(
@@ -79,8 +80,11 @@ impl Scene {
             .collect();
 
         let decals = self.take_persistent_decals(survivors);
+        let mut ragdolls = std::mem::take(&mut self.ragdolls);
+        ragdolls.retain(|id| survivors.contains(&id));
         let moved = make_room(&mut data, survivors);
         apply_scene_data(self, data);
+        self.ragdolls = ragdolls;
         for mut entity in carried {
             if entity.parent_id.is_some_and(|p| !survivors.contains(&p)) {
                 entity.parent_id = None;

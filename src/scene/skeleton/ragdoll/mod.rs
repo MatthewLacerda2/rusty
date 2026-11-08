@@ -20,9 +20,18 @@
 //! `Ragdoll` layer — created on first use, colliding with every layer except
 //! `Hitbox` — so the body falls on the floor and onto other bodies. Joined bones
 //! never collide with each other (`Joint::enable_collision` off).
+//!
+//! **In part** (#1895, `partial`): one branch of the body on physics, its joints
+//! driven toward the animated pose, its drawn pose blended between the two, and
+//! the hit reaction built from them; the runtime state they keep is `runtime`'s.
 
+mod partial;
 mod preset;
+mod runtime;
 mod switch;
+
+pub use partial::HitReact;
+pub use runtime::{critical_damping, Drive, RagdollRuntime, REACT_DURATION, REACT_STRENGTH};
 
 use glam::Vec3;
 

@@ -125,6 +125,9 @@ authored_fields!(scene_state {
         persistent: Runtime, Dropped;
         // Every document applied clears them (`serialize::apply`).
         shader_overrides: Runtime, Dropped;
+        // Partial ragdolls (#1895): every document applied clears them, a Play
+        // load keeps the survivors' (`swap_in`).
+        ragdolls: Runtime, Dropped;
         shader_time: Frame, No;
         ui_time: Frame, No;
         meshes_read_at: Follow, No;

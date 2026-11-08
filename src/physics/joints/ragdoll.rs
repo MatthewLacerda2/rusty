@@ -9,7 +9,9 @@
 //!   bones it keys — and any animated bone *above* a ragdolled one drags it along.
 //!   [`PhysicsWorld::pose_bones`] runs right after the Animator and puts every
 //!   bone carried by a dynamic body back where its body is, parents first, so
-//!   `LateUpdate` and skinning see the simulated pose.
+//!   `LateUpdate` and skinning see the simulated pose; a bone with a blend
+//!   weight under 1 (#1895, a partial ragdoll's) is drawn that far between its
+//!   animated pose and its body's, the body itself left to physics.
 //! - **The handoff's velocities.** While animated, a bone's body is kinematic and
 //!   rapier derives its velocity from how far the Animator moved it.
 //!   [`PhysicsWorld::body_velocity`] reads it so a ragdoll starts moving the way
@@ -41,6 +43,7 @@ impl PhysicsWorld {
         owners.sort_unstable();
         for (_, id) in owners {
             self.write_back(scene, id);
+            blend_with_animation(scene, id);
         }
     }
 
@@ -67,6 +70,25 @@ impl PhysicsWorld {
         let torque = (point - com).cross(j);
         let dw = props.world_inv_inertia(body.rotation()) * torque;
         Some((impulse * props.inv_mass, dw))
+    }
+}
+
+/// Draw bone `id` between its animated local pose and the one physics just
+/// wrote, by its blend weight (#1895): translation lerped, rotation slerped, as a
+/// crossfade blends; at weight 0 exactly the animated pose. A bone at weight 1,
+/// or without an animated pose, keeps the physics pose.
+fn blend_with_animation(scene: &mut Scene, id: u32) {
+    let w = scene.ragdolls.weight(id);
+    let Some((pos, rot)) = scene.ragdolls.animated(id).filter(|_| w < 1.0) else {
+        return;
+    };
+    if let Some(mut t) = scene.world.transform_mut(id) {
+        if w <= 0.0 {
+            (t.position, t.rotation) = (pos, rot);
+        } else {
+            t.position = pos.lerp(t.position, w);
+            t.rotation = rot.slerp(t.rotation, w);
+        }
     }
 }
 

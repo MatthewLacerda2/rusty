@@ -90,6 +90,11 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
         let events = crossed.into_iter().map(|e| (id, e.name, e.montage));
         res.animation_events.extend(events);
         for (bone, local) in writes.unwrap_or_default() {
+            if !s.ragdolls.is_idle() {
+                // A simulated bone's animated pose: its drive's target (#1895).
+                s.ragdolls
+                    .note_animated(bone, (local.position, local.rotation));
+            }
             if let Some(mut t) = s.world.transform_mut(bone) {
                 *t = local;
             }
