@@ -25,7 +25,8 @@ struct Caster {
     bone_base: u32,
     alpha_cutoff: f32,
     use_texture: u32,
-    _pad0: u32,
+    // Padding; a module's names may not start with `_` or end in a digit (naga_oil).
+    caster_pad: u32,
     // Its material's mapping (#1594); not named `mapping`, which is the module's.
     terms: mapping::Mapping,
 };

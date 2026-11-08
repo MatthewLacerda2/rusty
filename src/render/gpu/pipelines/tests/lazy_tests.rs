@@ -94,7 +94,8 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     // resample, downsample and upsample (#1700) + the lens flare's (#1443; the composite adds it, #1473)
     // + 2 particle + 2 ribbon, each again reactive (#1845) + one world canvas per blend mode + 2 mirrored and 2
     // two-sided shadow (#1571) + the data-mip one + the opaque copy (#1523) + the
-    // editor's line, the outline's mask (one per facing), dilation and edge.
+    // editor's line and vertex-coloured line (#1882), the outline's mask (one per
+    // facing), dilation and edge.
     assert_eq!(
         every.len(),
         2 * super::TransparentBlend::ALL.len() * F
@@ -119,7 +120,7 @@ fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
             + 2
             + 1
             + 1
-            + (1 + F + 2)
+            + (2 + F + 2)
     );
     assert!(every.iter().all(|p| !p.is_built()), "headless stays lazy");
 
