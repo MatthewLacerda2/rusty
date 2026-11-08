@@ -289,7 +289,10 @@ Material.Rebake("rusty_panel", 2048)          -- iterate at 256, ship at 2048
 
 - The **recipe is stored on the asset** (`maps` in its JSON and the scene file), so
   the material describes itself: `GetAsset` returns it, and that JSON redefines the
-  same material. The baked PNGs are a cache the recipe regenerates.
+  same material. The baked PNGs are a cache the recipe regenerates. A graph instance
+  in it (`op = "graph"`, `Texture`, *Graphs*) is stored as the instance, and its
+  file is read on every bake, so an edited graph reaches the maps on the next
+  `Rebake`.
 - `Material.Rebake(name [, resolution])` re-bakes from the stored recipe to the same
   paths; a `resolution` given is kept in the recipe for the next rebake. A `maps`
   recipe with a `size` (a non-square bake) keeps its aspect, its longer side

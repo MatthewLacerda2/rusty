@@ -161,15 +161,18 @@ fn fill_placeholders(scope: &Scope, node: &mut Value) -> Result<(), String> {
     Ok(())
 }
 
-/// A typed node's value, its id prefixed, its inputs and links resolved and its
-/// seed folded, parsed back strictly.
+/// A typed node's value, its inputs and links resolved and its seed folded, parsed
+/// back strictly, then its id prefixed (a parse refuses the `/` the prefix adds, so
+/// the id goes on after; an error names the prefixed id all the same).
 fn rewrite(scope: &Scope, mut value: Value) -> Result<Node, String> {
     let Some(map) = value.as_object_mut() else {
         return Err(scope.in_file("a node is not an object".into()));
     };
-    if let Some(Value::String(id)) = map.get_mut("id") {
-        *id = scope.id(id);
-    }
+    let id = map
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or("?")
+        .to_string();
     if let Some(Value::Array(inputs)) = map.get_mut("inputs") {
         for input in inputs {
             if let Value::String(r) = input {
@@ -191,5 +194,11 @@ fn rewrite(scope: &Scope, mut value: Value) -> Result<Node, String> {
             _ => {}
         }
     }
-    decode(value).map_err(|e| scope.in_file(e))
+    let named = |e: String| {
+        let (bare, prefixed) = (format!("node {id:?}"), format!("node {:?}", scope.id(&id)));
+        scope.in_file(e.replacen(&bare, &prefixed, 1))
+    };
+    let mut node: Node = decode(value).map_err(named)?;
+    node.id = scope.id(&node.id);
+    Ok(node)
 }

@@ -167,4 +167,37 @@ mod tests {
             "min_inputs and max_inputs both reach Lua"
         );
     }
+
+    #[test]
+    fn ops_lists_the_projects_graphs_with_their_interface() {
+        let root = crate::test_temp::dir().join("rusty_texture_ops_graphs_1744");
+        std::fs::create_dir_all(root.join("textures")).unwrap();
+        let graph = serde_json::json!({
+            "resolution": 8, "inputs": ["mask"],
+            "params": { "age": { "type": "number", "default": 0.5, "min": 0, "max": 1 } },
+            "nodes": [{ "id": "i", "op": "invert", "inputs": ["mask"] }]
+        });
+        let file = root.join("textures").join("wear.graph.json");
+        std::fs::write(file, graph.to_string()).unwrap();
+        std::fs::write(root.join("broken.graph.json"), "{").unwrap();
+        let lua = Lua::new();
+        lua.globals()
+            .set("OPS", super::ops_table(&lua, &root).unwrap())
+            .unwrap();
+        let (count, path, inputs, name, max): (usize, String, u8, String, f64) = lua
+            .load(
+                r#"local g = OPS[#OPS]
+                   return #OPS, g.path, g.max_inputs, g.inputs[1] .. "/" .. g.params[1].name,
+                     g.params[1].max"#,
+            )
+            .eval()
+            .unwrap();
+        assert_eq!(
+            count,
+            crate::procgen::recipe::OPS.len() + 1,
+            "broken one left out"
+        );
+        assert_eq!(path, "textures/wear.graph.json");
+        assert_eq!((inputs, name.as_str(), max), (1, "mask/age", 1.0));
+    }
 }

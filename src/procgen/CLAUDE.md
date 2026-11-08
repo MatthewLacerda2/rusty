@@ -103,3 +103,11 @@ Some(Lit::Text("…")), ..choice("output", &[…]) }`.
   (`ops::generators::count`), and a neighbourhood op wraps, so every map tiles.
 - **Resolution-free units.** A reach is in tile units (`cx.px` turns it into
   pixels per axis), so a recipe looks the same at any resolution and aspect.
+- **Graphs are expanded before anything runs** (#1744). `op = "graph"` is an
+  `OpKind` variant outside `catalog!` and `OPS`; `graph::expand` pastes its nodes
+  into one flat recipe, and the runner refuses an instance left in one. A caller
+  that evaluates a recipe goes through `scene::authoring::material::load_recipe`
+  and runs the `Loaded` recipe it returns, never the one it was handed. A new op
+  needs nothing for graphs: placeholders, id prefixes, link rewrites and seed
+  folding all work on its serde form (a `seed` key is folded, an object with a
+  `node` key is a link).

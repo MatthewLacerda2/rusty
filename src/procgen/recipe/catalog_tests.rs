@@ -41,6 +41,8 @@ fn round_trip(info: &OpInfo) -> serde_json::Map<String, Value> {
 fn every_op_kind_variant_has_exactly_one_entry() {
     let mut variants = expected_tags(json!({ "op": "__not_an_op__" }));
     let mut table: Vec<String> = OPS.iter().map(|o| o.op.to_string()).collect();
+    // `graph` (#1744) is a variant with no row: each project graph is its own entry.
+    table.push("graph".into());
     assert!(!variants.is_empty(), "serde's variant list wasn't found");
     variants.sort();
     table.sort();

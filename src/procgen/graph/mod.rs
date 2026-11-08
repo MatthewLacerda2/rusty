@@ -110,4 +110,8 @@ impl TextureRecipe {
 }
 
 #[cfg(test)]
+mod nest_tests;
+#[cfg(test)]
+mod refuse_tests;
+#[cfg(test)]
 mod tests;
