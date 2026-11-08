@@ -54,6 +54,22 @@ impl GameWorld {
         self.resources.play_hold = Some(PlayHold::take());
     }
 
+    /// Build the rapier world from the scene as it stands, and (authoring builds) write
+    /// the convex decompositions it ran into their models' hull sidecars, so the
+    /// next launch runs none (#1940).
+    pub(super) fn build_physics(&mut self) {
+        let world = crate::physics::PhysicsWorld::from_scene(&self.world.scene.borrow());
+        *self.resources.physics.borrow_mut() = Some(world);
+        save_hulls();
+    }
+
+    /// Drop the rapier world at Stop, and write what a body that turned dynamic
+    /// in Play decomposed.
+    pub(super) fn drop_physics(&mut self) {
+        *self.resources.physics.borrow_mut() = None;
+        save_hulls();
+    }
+
     /// Whether the game called `Application.Quit()` and no host has consumed it yet.
     pub fn quit_requested(&self) -> bool {
         self.resources.application.borrow().quit_requested()
@@ -92,8 +108,8 @@ impl GameWorld {
 /// tick is done with it, right before `advance_frame`. The skin palette build (#453)
 /// runs in `Render`, after every stage that may move a bone. The post-animation
 /// writers, in order: `animate` writes the clip pose; `pose_ragdolls` (#466) puts each simulated
-/// ragdoll bone back where physics left it; `OnAnimationEvent` (#459) then
-/// fires for the events this tick's playheads crossed; `LateUpdate` scripts set this tick's
+/// ragdoll bone back where physics left it; the state callbacks (#1901) and
+/// `OnAnimationEvent` (#459) then fire for the states and events of this tick's step; `LateUpdate` scripts set this tick's
 /// targets; `solve_ik` (#461) post-processes the final pose, skipping any bone a
 /// dynamic body carries (physics wins over IK); `follow_bones` (#464) then moves
 /// the hitbox query poses to the pose that renders; `carry_local_particles` (#1529)
@@ -210,16 +226,18 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
     nav.tick_nav_agents(&mut s, res.frame_dt);
 }
 
+/// `OnStateExit` / `OnStateEnter` / `OnStateUpdate` (#1901), then
 /// `OnAnimationEvent(id, name, info)` (#459) for every event `animate` queued this
-/// tick: after the animation step and ragdoll posing, so a handler reads the
+/// tick, so a state's first marker follows its enter: after the animation step and ragdoll posing, so a handler reads the
 /// pose this tick renders (bar `LateUpdate` and IK), and before `LateUpdate`, as
 /// in Unity, where animation events fire during the Animator's update. Then the
 /// `OnControllerColliderHit`s of the moves root motion made (#1879): a script's
 /// own `Move` raises its hits inside the call, but root motion moves outside any
 /// script, so its hits wait for this point, the animation step's callbacks.
 fn dispatch_animation_events(_world: &mut World, res: &mut Resources) {
-    let events = std::mem::take(&mut res.animation_events);
-    res.script_manager.dispatch_animation_events(&events);
+    let queued = std::mem::take(&mut res.animation_events);
+    res.script_manager.dispatch_state_callbacks(&queued.states);
+    res.script_manager.dispatch_animation_events(&queued.events);
     let hits = std::mem::take(&mut res.controller_hits);
     res.script_manager.dispatch_queued_controller_hits(&hits);
 }
@@ -246,3 +264,11 @@ mod play_navmesh_tests;
 #[cfg(test)]
 #[path = "import_tests/mod.rs"]
 mod import_tests;
+
+/// Write the decompositions made since the last call into their hull sidecars: an
+/// authoring build only (the editor or `dev`, `core::hulls::WRITES`), since a
+/// shipped player reads sidecars and never writes one.
+fn save_hulls() {
+    #[cfg(any(feature = "editor", feature = "dev"))]
+    crate::asset::import_cache::hulls::save_pending();
+}

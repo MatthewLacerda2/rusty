@@ -89,6 +89,48 @@ Run that `git log`, read what changed, and bring the game up to date (scenes,
 scripts, prefabs) before carrying on. Only an **older** engine, or a branch build,
 warns and asks before it opens.
 
+## Enemy AI: the animation graph is the state machine
+
+Build an enemy's decisions the way the animation is built, with no behaviour
+tree and no separate state-machine asset: the enemy's **animation graph is its
+state machine** (`docs/api/Animator.md`, *State callbacks*).
+
+- **States and transitions are authored once**, in the enemy's `.animgraph`,
+  shared by every bot of that kind: `Idle`, `Aim`, `Cover`, `Flank`, `Melee`,
+  `Stagger`, each with its clip, edges whose conditions read parameters
+  (`distPlayer < 15`, `canShoot`, `numShooters < 2`), and a `tag` on states
+  that act alike (`"attack"` on `Aim` and `Fire`). A layer at weight 0 can hold
+  decision states with no motion of their own.
+- **A director script feeds the parameters** each `Update`: it reads the
+  world (distances, line of sight with `Physics.Raycast`), counts how many
+  bots are in each state (`Animator.GetCurrentNode` / `GetCurrentTag`), and
+  sets every bot's parameters (`Animator.SetFloat(bot, "distPlayer", d)`,
+  `SetInt(bot, "numShooters", n)`, `SetBool(bot, "isInPlayerView", seen)`). The
+  graph picks the state; no script decides it.
+- **The bot acts on `OnStateEnter`**: it switches on `info.state` or
+  `info.tag` and starts the action (move to cover, open fire, charge), keeping
+  per-state data in its own script. `OnStateUpdate` runs the action each step
+  if it needs to; `OnStateExit` stops it.
+- **Hits** reach the bot as `OnTakeDamage` (`docs/api/Damage.md`): the bot
+  keeps its own health and sets a trigger (`Animator.SetTrigger(id,
+  "stagger")`), so getting hit is one more transition of the same graph.
+
+```lua
+-- bot.lua, on each enemy (the director sets its parameters)
+local M, action, health = {}, "idle", 100
+function M.OnStateEnter(id, info)
+  if info.tag == "attack" then action = "shoot"
+  elseif info.state == "Cover" then action = "take_cover"
+  elseif info.state == "Stagger" then action = "none" end
+end
+function M.OnTakeDamage(id, amount)
+  health = health - amount
+  Animator.SetTrigger(id, "stagger")
+  return amount
+end
+return M
+```
+
 ## Play-testing headlessly
 
 A scenario is a Lua file under `scenarios/` that drives the game through the same

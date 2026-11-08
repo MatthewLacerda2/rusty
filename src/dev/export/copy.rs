@@ -135,3 +135,32 @@ pub(super) fn texture_caches(
     }
     Ok(())
 }
+
+/// Copy the hull sidecar (`.hulls`, #1940) of each model under the project's
+/// assets that has one: the exported game builds its dynamic concave props from
+/// it and never runs V-HACD for them.
+pub(super) fn hull_caches(
+    root: &Path,
+    out: &Path,
+    written: &mut Vec<String>,
+) -> Result<(), String> {
+    let mut models = Vec::new();
+    crate::asset::manifest::walk(&root.join(crate::core::project::ASSETS_DIR), &mut |p| {
+        if crate::asset::is_model_path(p) {
+            models.push(p.strip_prefix(root).unwrap_or(p).to_path_buf());
+        }
+    });
+    models.sort();
+    for model in models {
+        let cache = cache_path_as(root, &model, crate::asset::import_cache::hulls::SUFFIX);
+        if cache.is_file() {
+            file(
+                root,
+                cache.strip_prefix(root).unwrap_or(&cache),
+                out,
+                written,
+            )?;
+        }
+    }
+    Ok(())
+}

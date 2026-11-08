@@ -20,6 +20,7 @@ fn node(name: &str, clip: &str, is_loop: bool, speed: Option<f32>) -> GraphNode 
         events: Vec::new(),
         sync_group: None,
         sync_markers: Vec::new(),
+        tag: String::new(),
     }
 }
 

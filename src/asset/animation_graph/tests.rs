@@ -25,6 +25,7 @@ pub(super) fn sample_graph() -> AnimationGraph {
         events: Vec::new(),
         sync_group: None,
         sync_markers: Vec::new(),
+        tag: String::new(),
     };
     AnimationGraph {
         parameters,
