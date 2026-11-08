@@ -92,14 +92,14 @@ gizmos! {
         shown: true,
         game: false,
     },
-    // Hidden until the navmesh gizmo draws something (#1910); off, as Unity's is:
-    // it paints the whole floor.
+    // The baked navmesh as translucent cyan (#1910); off, as Unity's is: it paints
+    // the whole floor.
     NavMesh => GizmoRow {
         name: "NavMesh",
         label: "NavMesh",
-        hover: "Draw the baked navigation mesh",
+        hover: "Draw the baked navigation mesh, where agents can walk",
         on: false,
-        shown: false,
+        shown: true,
         game: false,
     },
     // The Game tab's one toggle (#1882), Unity's Game-view **Gizmos**: the colliders

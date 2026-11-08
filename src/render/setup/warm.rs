@@ -56,6 +56,7 @@ impl Renderer {
             all.push(&self.line_pipeline);
             all.push(&self.vertex_line_pipeline);
             all.push(&self.probe_ball_pipeline);
+            all.push(self.navmesh.pipeline());
             all.extend(self.outline.lazy_pipelines());
         }
         all

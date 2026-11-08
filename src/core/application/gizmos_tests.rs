@@ -1,7 +1,7 @@
 use super::*;
 
 /// Unity's defaults: UI and the probes on, every collider and the navmesh off; the
-/// navmesh's toggle hidden for now.
+/// navmesh's toggle shown (#1910).
 #[test]
 fn defaults_follow_unity() {
     let set = SceneGizmos::default();
@@ -11,7 +11,7 @@ fn defaults_follow_unity() {
     assert!(!set.on(Gizmo::Colliders));
     assert!(Gizmo::Colliders.row().shown);
     assert!(!set.on(Gizmo::NavMesh));
-    assert!(!Gizmo::NavMesh.row().shown);
+    assert!(Gizmo::NavMesh.row().shown);
     assert!(
         !set.on(Gizmo::GameGizmos),
         "Unity's Game view starts without"

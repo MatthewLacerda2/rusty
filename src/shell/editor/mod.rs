@@ -16,6 +16,7 @@ mod demo;
 mod game_focus;
 mod icon;
 mod last_scene;
+mod navmesh;
 mod paint;
 mod start;
 mod sync;

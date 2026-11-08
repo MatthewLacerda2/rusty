@@ -2,7 +2,8 @@
 //! occlusion view (`occlusion`, #1714), the selection's axis arrows and the probe
 //! gizmos the Scene view's set leaves on (#1909) (the selection outline is its own
 //! pass, `passes::outline`), the colliders' real shapes and the `Debug.Draw*` lines
-//! ([`wires`], #1882, also over a game frame with its gizmos on), and the pass that
+//! ([`wires`], #1882, also over a game frame with its gizmos on), the baked navmesh
+//! ([`navmesh`], #1910), and the pass that
 //! draws them over the finished image ([`handles`], #1224).
 
 mod axis;
@@ -10,6 +11,7 @@ mod batch;
 mod game;
 mod handles;
 mod lights;
+mod navmesh;
 mod occlusion;
 mod probe_ball;
 mod probes;
@@ -21,6 +23,8 @@ use crate::components::mesh::Vertex;
 use crate::render::draw::resources::{GridResource, Overlays};
 use crate::render::Renderer;
 pub(crate) use batch::{OverlayBindings, OverlayDraws};
+pub(crate) use navmesh::NavMeshGizmo;
+pub use navmesh::{NavMeshPatch, NavMeshRevision, NavMeshSource};
 pub(crate) use probe_ball::{ball_pipeline, BallResource};
 pub(crate) use wires::ColliderScope;
 
@@ -45,6 +49,8 @@ impl Renderer {
         // The reflection probes' mirror balls (#1911) first: they write depth, so the
         // lines drawn after them hide behind a ball as behind a solid.
         self.draw_probe_balls(render_pass, bindings, &overlays.balls);
+        // The navmesh (#1910): translucent, after the opaque balls, under the lines.
+        self.draw_navmesh(render_pass, bindings, overlays.navmesh);
         // A. Floor grid
         if let (Some(slot), Some(grid_buf)) = (overlays.grid, &self.grid_vertex_buffer) {
             render_pass.set_vertex_buffer(0, grid_buf.slice(..));
