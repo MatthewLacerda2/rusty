@@ -97,18 +97,20 @@ fn a_flood_to_goals_stops_once_they_settle_with_the_same_costs() {
 #[test]
 fn a_goal_on_an_island_is_dropped_without_flooding_to_the_bound() {
     let mut scene = Scene::new();
-    add_floor(&mut scene, -5.0, 15.0, -5.0, 15.0);
+    add_floor(&mut scene, -30.0, 30.0, -30.0, 30.0);
     // A 2 m high crate: its top is walkable, nothing leads up to it.
     add_box(
         &mut scene,
-        Vec3::new(7.0, 0.0, 7.0),
-        Vec3::new(9.0, 2.0, 9.0),
+        Vec3::new(3.0, 0.0, -1.0),
+        Vec3::new(5.0, 2.0, 1.0),
     );
-    let nav = bake_pinned(&mut scene);
+    scene.nav_settings.bounds = Some(crate::navigation::NavBounds::new(-30.0, 30.0, -30.0, 30.0));
+    let mut nav = NavigationGraph::new(-30.0, 30.0, -30.0, 30.0, 1.0);
+    nav.bake(&scene);
     let (from, near, top) = (
-        Vec3::new(5.0, 0.0, 8.0),
-        Vec3::new(4.0, 0.0, 8.0),
-        Vec3::new(8.0, 2.0, 8.0),
+        Vec3::ZERO,
+        Vec3::new(-1.0, 0.0, 0.0),
+        Vec3::new(4.0, 2.0, 0.0),
     );
     assert!(nav.snap(top).is_some(), "the crate top is navmesh");
     let full = flood(&nav, from, 100.0);
@@ -118,7 +120,7 @@ fn a_goal_on_an_island_is_dropped_without_flooding_to_the_bound() {
     assert_eq!(to.length_to(&nav, near), full.length_to(&nav, near));
     assert_eq!(to.length_to(&nav, top), None, "unreachable");
     assert!(
-        to.reached() * 2 < full.reached(),
+        to.reached() * 10 < full.reached(),
         "the island does not hold the flood open: {} vs {}",
         to.reached(),
         full.reached()

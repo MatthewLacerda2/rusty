@@ -102,12 +102,17 @@ impl NavigationGraph {
         let from = self.snap(start)?;
         let spacing = self.grid_spacing.max(f32::EPSILON);
         let bound = (max_length / spacing).max(0.0);
-        // Each goal with the least cost a path to it could have (its flat
-        // distance in cells), so the flood knows when one is overdue.
+        // Each goal with the cost past which it is overdue: its flat distance
+        // in cells (the least a path to it could cost), stretched as a path
+        // round a wall or two would be, so a goal on the start's own floor
+        // settles before it is ever checked.
         let mut overdue: Vec<(f32, SpanRef)> = goals
             .iter()
             .filter_map(|&g| self.snap(g))
-            .map(|s| (self.run_between(from, s.gx, s.gz) / spacing, s))
+            .map(|s| {
+                let least = self.run_between(from, s.gx, s.gz) / spacing;
+                (least * OVERDUE_STRETCH + OVERDUE_CELLS, s)
+            })
             .collect();
         overdue.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.index.cmp(&b.1.index)));
         let mut waiting: Set<u32> = overdue.iter().map(|(_, s)| s.index).collect();
@@ -191,6 +196,11 @@ impl NavigationGraph {
         out
     }
 }
+
+/// When a goal counts as overdue: its least possible cost times this, plus
+/// [`OVERDUE_CELLS`].
+const OVERDUE_STRETCH: f32 = 1.5;
+const OVERDUE_CELLS: f32 = 4.0;
 
 /// The most spans an island check visits before it calls a goal's piece of the
 /// navmesh "too big to be an island" and leaves it to the flood. A crate top or
