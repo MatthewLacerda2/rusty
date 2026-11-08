@@ -58,10 +58,15 @@ fn raw_values_normalize_over_the_survivors_and_shape_by_curve() {
 
 #[test]
 fn equal_raw_values_give_each_item_the_full_weight() {
-    let raw = vec![vec![7.0; 3], vec![f32::INFINITY; 3]];
-    let s = spec(&[score(Curve::Linear, 0.5), score(Curve::Linear, 1.0)]);
+    let raw = vec![vec![7.0; 3], vec![f32::INFINITY; 3], vec![2.0; 3]];
+    // Whatever the curve: an inverse one must not turn "all alike" into zero.
+    let s = spec(&[
+        score(Curve::Linear, 0.5),
+        score(Curve::Square, 1.0),
+        score(Curve::Inverse, 2.0),
+    ]);
     let ranked = rank(&s, &items(3), &[0, 1, 2], &raw);
-    assert!(ranked.iter().all(|i| i.score == 1.5), "{ranked:?}");
+    assert!(ranked.iter().all(|i| i.score == 3.5), "{ranked:?}");
     let order: Vec<f32> = ranked.iter().map(|i| i.position.x).collect();
     assert_eq!(
         order,

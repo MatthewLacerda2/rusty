@@ -17,7 +17,7 @@ use std::collections::BinaryHeap;
 use glam::Vec3;
 
 use super::{in_mask, NavSpan, NavigationGraph, SpanRef, MIN_AREA_COST};
-use crate::core::collections::Map;
+use crate::core::collections::{Map, Set};
 
 /// The spans a flood reached, each with its travel cost from the start.
 pub struct Flood {
@@ -102,12 +102,18 @@ impl NavigationGraph {
         let from = self.snap(start)?;
         let spacing = self.grid_spacing.max(f32::EPSILON);
         let bound = (max_length / spacing).max(0.0);
-        let mut waiting: crate::core::collections::Set<u32> = goals
+        // Each goal with the least cost a path to it could have (its flat
+        // distance in cells), so the flood knows when one is overdue.
+        let mut overdue: Vec<(f32, SpanRef)> = goals
             .iter()
             .filter_map(|&g| self.snap(g))
-            .map(|s| s.index)
+            .map(|s| (self.run_between(from, s.gx, s.gz) / spacing, s))
             .collect();
+        overdue.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.index.cmp(&b.1.index)));
+        let mut waiting: Set<u32> = overdue.iter().map(|(_, s)| s.index).collect();
         let stop_early = !waiting.is_empty();
+        let mut islands = Islands::new(self);
+        let mut next_overdue = 0;
         let mut cost: Map<u32, f32> = Map::default();
         let mut open = BinaryHeap::new();
         cost.insert(from.index, 0.0);
@@ -116,8 +122,20 @@ impl NavigationGraph {
             if cost.get(&here.node.index).is_some_and(|&g| here.g > g) {
                 continue; // a stale heap entry
             }
-            if waiting.remove(&here.node.index) && stop_early && waiting.is_empty() {
-                break; // every goal settled
+            waiting.remove(&here.node.index);
+            // A goal still unsettled past its least possible cost may sit on an
+            // island the flood can never reach: check once, and drop it if so.
+            while let Some(&(least, goal)) = overdue.get(next_overdue) {
+                if least >= here.g {
+                    break;
+                }
+                next_overdue += 1;
+                if waiting.contains(&goal.index) && islands.cut_off(goal, from) {
+                    waiting.remove(&goal.index);
+                }
+            }
+            if stop_early && waiting.is_empty() {
+                break; // every goal settled, or proven out of reach
             }
             for (next, g) in self.moves(here, mask) {
                 let best = cost.get(&next.index).copied().unwrap_or(f32::INFINITY);
@@ -172,6 +190,93 @@ impl NavigationGraph {
         }
         out
     }
+}
+
+/// The most spans an island check visits before it calls a goal's piece of the
+/// navmesh "too big to be an island" and leaves it to the flood. A crate top or
+/// a roof is a few hundred spans at most.
+const ISLAND_SPANS: usize = 512;
+
+/// The island check: whether a goal's piece of navmesh is cut off from the start.
+/// It walks out from the goal over every connection in **either** direction
+/// (every span of a neighbouring column within a step, no corner rule, every
+/// off-mesh link both ways, no area mask): a superset of what can reach the
+/// goal, so a closed piece without the start proves the goal unreachable.
+struct Islands<'a> {
+    nav: &'a NavigationGraph,
+    /// Off-mesh link ends as `(span, other end's span)`, both ways, sorted; built
+    /// the first time a check runs.
+    links: Option<Vec<(u32, SpanRef)>>,
+    /// Spans already proven cut off.
+    cut: Set<u32>,
+}
+
+impl<'a> Islands<'a> {
+    fn new(nav: &'a NavigationGraph) -> Self {
+        Self {
+            nav,
+            links: None,
+            cut: Set::default(),
+        }
+    }
+
+    /// Whether `goal` lies on a piece of at most [`ISLAND_SPANS`] spans that
+    /// does not hold `start`.
+    fn cut_off(&mut self, goal: SpanRef, start: SpanRef) -> bool {
+        if self.cut.contains(&goal.index) {
+            return true;
+        }
+        let nav = self.nav;
+        let links = self.links.get_or_insert_with(|| link_ends(nav));
+        let mut seen: Set<u32> = Set::default();
+        seen.insert(goal.index);
+        let mut stack = vec![goal];
+        while let Some(s) = stack.pop() {
+            if s.index == start.index {
+                return false;
+            }
+            let a = nav.spans[s.index as usize];
+            let first = links.partition_point(|l| l.0 < s.index);
+            let jumps = links[first..].iter().take_while(|l| l.0 == s.index);
+            let mut next: Vec<SpanRef> = jumps.map(|l| l.1).collect();
+            for &(dx, dz, _) in &DIRS {
+                let (gx, gz) = (s.gx + dx, s.gz + dz);
+                let run = nav.run_between(s, gx, gz);
+                for i in nav.span_range(gx, gz) {
+                    if nav.steps(a, nav.spans[i], run) {
+                        next.push(SpanRef {
+                            gx,
+                            gz,
+                            index: i as u32,
+                        });
+                    }
+                }
+            }
+            for n in next {
+                if seen.insert(n.index) {
+                    if seen.len() > ISLAND_SPANS {
+                        return false;
+                    }
+                    stack.push(n);
+                }
+            }
+        }
+        self.cut.extend(seen);
+        true
+    }
+}
+
+/// Every off-mesh link's two end spans, each way round, sorted by the first.
+fn link_ends(nav: &NavigationGraph) -> Vec<(u32, SpanRef)> {
+    let mut out = Vec::new();
+    for link in nav.offmesh_links() {
+        if let (Some(a), Some(b)) = (nav.link_span(link.from), nav.link_span(link.to)) {
+            out.push((a.index, b));
+            out.push((b.index, a));
+        }
+    }
+    out.sort_unstable_by_key(|l| (l.0, l.1.index));
+    out
 }
 
 #[cfg(test)]

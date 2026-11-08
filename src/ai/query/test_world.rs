@@ -67,12 +67,7 @@ impl Arena {
 
     /// `id` as a query context.
     pub fn anchor(&self, id: u32) -> Anchor {
-        let w = &self.scene.world;
-        Anchor {
-            position: w.world_position(id),
-            facing: Some(w.world_rotation(id) * Vec3::Z),
-            entity: Some(id),
-        }
+        Anchor::of_entity(&self.scene, id)
     }
 }
 

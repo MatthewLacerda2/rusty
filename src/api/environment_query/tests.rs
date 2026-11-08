@@ -16,7 +16,7 @@ use crate::ui::ScreenSize;
 
 /// A VM over an open arena, with a querier `bot` and a `player` entity bound as
 /// globals; the seeded `Random` cell for checking draws.
-fn vm() -> (Lua, Rc<RefCell<Random>>) {
+pub(super) fn vm() -> (Lua, Rc<RefCell<Random>>) {
     let mut arena = Arena::new(|_| {});
     let bot = arena.agent(Vec3::new(-6.0, 0.0, 0.0));
     let player = arena.scene.add_entity("Player".to_string());
@@ -35,12 +35,12 @@ fn vm() -> (Lua, Rc<RefCell<Random>>) {
     (lua, rng)
 }
 
-const RING: &str = r#"
+pub(super) const RING: &str = r#"
     spec = { generator = { donut = { context = "target", inner = 3, outer = 3, per_ring = 8 } },
              tests = { { path = "exists" },
                        { distance = { to = "querier" }, score = { curve = "inverse" } } } }"#;
 
-fn error(lua: &Lua, code: &str) -> String {
+pub(super) fn error(lua: &Lua, code: &str) -> String {
     let err = lua.load(code).exec().expect_err("an error");
     err.to_string()
 }

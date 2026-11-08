@@ -1,6 +1,6 @@
 //! Each test kind's own table (#1892): `distance = { to = "target" }` and the
-//! rest, read into a [`Measure`] and, for a yes/no test, the answer its filter
-//! keeps.
+//! rest, read into a [`Measure`] and whether it is a yes/no test (its answer
+//! asked for inside the measure: `visible`, `inside`).
 
 use mlua::Table;
 
@@ -21,7 +21,7 @@ pub fn read(
     kind: &str,
     path: &str,
     contexts: &Contexts,
-) -> mlua::Result<(Measure, Option<bool>)> {
+) -> mlua::Result<(Measure, bool)> {
     Ok(match kind {
         "distance" => {
             only(t, path, &["to", "mode"])?;
@@ -31,7 +31,7 @@ pub fn read(
                     to,
                     flat: flat(t, path)?,
                 },
-                None,
+                false,
             )
         }
         "dot" => {
@@ -45,7 +45,7 @@ pub fn read(
                     from,
                     flat: flat(t, path)?,
                 },
-                None,
+                false,
             )
         }
         "trace" => trace(t, path, contexts)?,
@@ -54,8 +54,9 @@ pub fn read(
             let measure = Measure::View {
                 margin: number(t, path, "margin", Some(0.0))?,
                 item_height: number(t, path, "height", Some(EYE_HEIGHT))?,
+                inside: wanted(t, path, "inside")?,
             };
-            (measure, Some(wanted(t, path, "inside")?))
+            (measure, true)
         }
         "separation" => {
             only(t, path, &["radius"])?;
@@ -63,19 +64,19 @@ pub fn read(
             if radius <= 0.0 {
                 return fail(&at(path, "radius"), "must be above 0");
             }
-            (Measure::Separation { radius }, None)
+            (Measure::Separation { radius }, false)
         }
         "near_points" => {
             only(t, path, &["points"])?;
             let points = point_list(t, path, "points", contexts)?;
-            (Measure::NearPoints { points }, None)
+            (Measure::NearPoints { points }, false)
         }
         other => return fail(path, format!("unknown test '{other}'")),
     })
 }
 
 /// `trace = { from, visible, from_height, item_height, mask }`.
-fn trace(t: &Table, path: &str, contexts: &Contexts) -> mlua::Result<(Measure, Option<bool>)> {
+fn trace(t: &Table, path: &str, contexts: &Contexts) -> mlua::Result<(Measure, bool)> {
     let keys = ["from", "visible", "from_height", "item_height", "mask"];
     only(t, path, &keys)?;
     let mask = match t.get::<Option<i64>>("mask") {
@@ -87,8 +88,9 @@ fn trace(t: &Table, path: &str, contexts: &Contexts) -> mlua::Result<(Measure, O
         from_height: number(t, path, "from_height", Some(EYE_HEIGHT))?,
         item_height: number(t, path, "item_height", Some(EYE_HEIGHT))?,
         mask,
+        visible: wanted(t, path, "visible")?,
     };
-    Ok((measure, Some(wanted(t, path, "visible")?)))
+    Ok((measure, true))
 }
 
 /// `mode = "3d"` (the default) or `"2d"`, which measures on the XZ plane.

@@ -75,18 +75,11 @@ impl Contexts {
     }
 }
 
-/// An entity as a context: where it stands (an agent's feet, its Transform
-/// otherwise) and its world forward. A destroyed or inactive entity is an error.
+/// An entity as a context ([`Anchor::of_entity`]: where it stands and its
+/// world forward). A destroyed or inactive entity is an error.
 pub fn entity(scene: &Scene, id: u32, path: &str) -> mlua::Result<Anchor> {
-    let world = &scene.world;
-    if !world.is_active_in_hierarchy(id) {
+    if !scene.world.is_active_in_hierarchy(id) {
         return fail(path, format!("entity {id} is destroyed or inactive"));
     }
-    let at = world.world_position(id);
-    let position = world.nav_agent(id).map_or(at, |a| a.feet(at));
-    Ok(Anchor {
-        position,
-        facing: Some(world.world_rotation(id) * Vec3::Z),
-        entity: Some(id),
-    })
+    Ok(Anchor::of_entity(scene, id))
 }

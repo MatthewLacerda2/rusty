@@ -20,7 +20,7 @@ local SPOT = {
     generator = { donut = { context = "target", inner = 3, outer = 8, rings = 2, per_ring = 16 } },
     tests = {
         { path = "exists" },
-        { trace = { from = "target", visible = true, from_height = 0.6, item_height = 1.0 } },
+        { trace = { from = "target", visible = true, item_height = 1.0 } },
         { distance = { to = "querier" }, score = { curve = "inverse", weight = 0.5 } },
         { separation = { radius = 3 }, score = { weight = 1 } },
     },

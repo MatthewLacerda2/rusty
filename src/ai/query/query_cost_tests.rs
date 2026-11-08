@@ -33,7 +33,7 @@ pub(crate) fn level(n: usize, cell: f32) -> (Scene, NavigationGraph, PhysicsWorl
 fn spec(target: Anchor) -> QuerySpec {
     let filter = |measure| Test {
         measure,
-        filter: Some(Filter::Is(true)),
+        filter: Some(Filter::Wanted),
         score: None,
     };
     QuerySpec {
@@ -51,6 +51,7 @@ fn spec(target: Anchor) -> QuerySpec {
                 from_height: 1.5,
                 item_height: 1.5,
                 mask: None,
+                visible: true,
             }),
             filter(Measure::PathExists),
         ],
@@ -69,6 +70,53 @@ pub(crate) fn query(scene: &Scene, nav: &NavigationGraph, physics: &PhysicsWorld
     let target = Anchor::point(Vec3::new(25.0, 0.0, 25.0));
     let bot = Anchor::point(Vec3::new(35.0, 0.0, 24.0));
     run(&world, bot, &spec(target)).len()
+}
+
+/// The worst case for `path`: a bot 40 m from the target, and one survivor on
+/// the upper storey, which no stair reaches, so the flood runs to its bound.
+/// Eight spots on the ground round the target, then the one upstairs; the ones
+/// the bot can reach. (At 1 m cells the doorways erode shut, so this wants the
+/// 0.25 m navmesh.)
+pub(crate) fn query_far(
+    scene: &Scene,
+    nav: &NavigationGraph,
+    physics: &PhysicsWorld,
+) -> Vec<super::Item> {
+    let camera = Camera::new(Vec3::new(25.0, 1.5, 25.0), 0.0, 0.0);
+    let world = QueryWorld {
+        scene,
+        nav,
+        physics: Some(physics),
+        view: &camera,
+        screen: Vec2::new(1600.0, 900.0),
+    };
+    let target = Vec3::new(5.0, 0.0, 25.0);
+    let mut points: Vec<Vec3> = (0..8)
+        .map(|k| {
+            let a = k as f32 * std::f32::consts::FRAC_PI_4;
+            target + 3.0 * Vec3::new(a.cos(), 0.0, a.sin())
+        })
+        .collect();
+    points.push(target + Vec3::Y * 4.0);
+    let spec = QuerySpec {
+        generator: Generator::Points(points),
+        project: 2.0,
+        tests: vec![Test {
+            measure: Measure::PathExists,
+            filter: Some(Filter::Wanted),
+            score: None,
+        }],
+    };
+    let bot = Anchor::point(Vec3::new(45.0, 0.0, 25.0));
+    run(&world, bot, &spec)
+}
+
+#[test]
+fn a_far_bot_reaches_the_ground_spots_and_not_the_upper_storey() {
+    let (scene, nav, physics) = level(5, 0.25);
+    let found = query_far(&scene, &nav, &physics);
+    assert!(!found.is_empty(), "the ground spots are reachable");
+    assert!(found.iter().all(|i| i.position.y < 1.0), "{found:?}");
 }
 
 #[test]

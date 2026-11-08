@@ -44,15 +44,16 @@ fn trace_rejects_a_point_behind_a_wall() {
     let target = arena.agent(Vec3::ZERO);
     let from = arena.anchor(target);
     let points = [Vec3::new(3.0, 0.0, 0.5), Vec3::new(9.0, 0.0, 0.5)];
-    let trace = Measure::Trace {
+    let trace = |visible| Measure::Trace {
         from,
         from_height: 1.5,
         item_height: 1.5,
         mask: None,
+        visible,
     };
-    let seen = survivors(&arena, from, &points, trace.clone(), Filter::Is(true));
+    let seen = survivors(&arena, from, &points, trace(true), Filter::Wanted);
     assert!(near(&seen, &points[..1]), "{seen:?}");
-    let hidden = survivors(&arena, from, &points, trace, Filter::Is(false));
+    let hidden = survivors(&arena, from, &points, trace(false), Filter::Wanted);
     assert!(near(&hidden, &points[1..]), "cover: {hidden:?}");
 }
 
@@ -77,7 +78,7 @@ fn path_exists_rejects_a_point_on_an_unreachable_roof() {
         arena.anchor(querier),
         &points,
         Measure::PathExists,
-        Filter::Is(true),
+        Filter::Wanted,
     );
     assert!(near(&got, &points[..1]), "{got:?}");
 }
@@ -116,20 +117,18 @@ fn view_keeps_only_the_points_outside_the_camera_frustum() {
     let behind = Vec3::new(-15.0, 0.0, 0.0);
     let aside = Vec3::new(-5.0, 0.0, 15.0);
     let points = [behind, aside, ahead];
-    let view = Measure::View {
-        margin: 0.0,
+    let view = |margin, inside| Measure::View {
+        margin,
         item_height: 1.0,
+        inside,
     };
     let q = arena.anchor(querier);
-    let outside = survivors(&arena, q, &points, view.clone(), Filter::Is(false));
+    let outside = survivors(&arena, q, &points, view(0.0, false), Filter::Wanted);
     assert!(near(&outside, &[behind, aside]), "{outside:?}");
-    let inside = survivors(&arena, q, &points, view, Filter::Is(true));
+    let inside = survivors(&arena, q, &points, view(0.0, true), Filter::Wanted);
     assert!(near(&inside, &[ahead]), "{inside:?}");
     // A wide margin takes the point off to the side into view.
-    let wide = Measure::View {
-        margin: 40.0,
-        item_height: 1.0,
-    };
-    let got = survivors(&arena, q, &points, wide, Filter::Is(true));
+    let wide = view(40.0, true);
+    let got = survivors(&arena, q, &points, wide, Filter::Wanted);
     assert!(near(&got, &[aside, ahead]), "{got:?}");
 }

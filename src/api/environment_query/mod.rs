@@ -5,10 +5,13 @@
 //! `measures`, `fields`) and resolves the names it uses (`contexts`).
 
 mod contexts;
+mod entry;
 mod fields;
 mod measures;
 mod spec;
 
+#[cfg(test)]
+mod purpose_tests;
 #[cfg(test)]
 mod tests;
 

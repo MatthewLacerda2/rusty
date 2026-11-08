@@ -14,7 +14,7 @@ fn spec(target: Vec3, spread: bool) -> QuerySpec {
     let mut tests = vec![
         Test {
             measure: Measure::PathExists,
-            filter: Some(Filter::Is(true)),
+            filter: Some(Filter::Wanted),
             score: None,
         },
         Test {

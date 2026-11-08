@@ -22,6 +22,32 @@ pub struct Anchor {
 }
 
 impl Anchor {
+    /// Entity `id` as a context: where it **stands** (its feet, not its
+    /// Transform, which for a character is its middle) and its world forward
+    /// (+Z). The feet are a `NavMeshAgent`'s, else the bottom of a
+    /// `CharacterController`'s capsule, else the bottom of its collider, else its
+    /// Transform. So a trace's eye height and a distance read the same for every
+    /// kind of body.
+    pub fn of_entity(scene: &crate::scene::Scene, id: u32) -> Self {
+        let w = &scene.world;
+        let at = w.world_position(id);
+        let feet_y = if let Some(agent) = w.nav_agent(id) {
+            agent.feet(at).y
+        } else if let (Some(cc), Some(pose)) = (w.character_controller(id), w.world_pose(id)) {
+            let center = pose.pos + pose.rot * (cc.center * pose.scale);
+            center.y - 0.5 * cc.height.max(2.0 * cc.radius) * pose.scale.y.abs()
+        } else if let Some((min, _)) = w.collider_bounds(id) {
+            min.y
+        } else {
+            at.y
+        };
+        Self {
+            position: at.with_y(feet_y),
+            facing: Some(w.world_rotation(id) * Vec3::Z),
+            entity: Some(id),
+        }
+    }
+
     /// A bare point: no facing, no entity.
     pub fn point(position: Vec3) -> Self {
         Self {
@@ -98,17 +124,24 @@ pub enum Measure {
     /// The cosine between `from`'s facing and the direction from it to the item
     /// (on the XZ plane when `flat`): 1 straight ahead, -1 straight behind.
     Dot { from: Anchor, flat: bool },
-    /// 1 when a ray from `from` (raised `from_height`) to the item (raised
-    /// `item_height`) hits nothing on `mask`'s layers, else 0.
+    /// 1 when whether a ray from `from` (raised `from_height`) to the item
+    /// (raised `item_height`) hits nothing on `mask`'s layers is `visible`, else
+    /// 0: `visible = false` asks for cover, and scores it.
     Trace {
         from: Anchor,
         from_height: f32,
         item_height: f32,
         mask: Option<u32>,
+        visible: bool,
     },
-    /// 1 when the item (raised `item_height`) is inside the active camera's view,
-    /// its frustum widened by `margin` degrees each side, else 0.
-    View { margin: f32, item_height: f32 },
+    /// 1 when whether the item (raised `item_height`) is inside the active
+    /// camera's view, its frustum widened by `margin` degrees each side, is
+    /// `inside`, else 0.
+    View {
+        margin: f32,
+        item_height: f32,
+        inside: bool,
+    },
     /// 1 when the querier can walk to the item, else 0.
     PathExists,
     /// Travel cost from the querier to the item along the navmesh, metres; an item
@@ -133,7 +166,8 @@ impl Measure {
         }
     }
 
-    /// Whether the raw value is a yes/no (1 or 0), filtered by [`Filter::Is`].
+    /// Whether the raw value is a yes/no (1 when the answer is the one the test
+    /// asks for, else 0), filtered by [`Filter::Wanted`].
     pub fn is_bool(&self) -> bool {
         matches!(
             self,
@@ -143,11 +177,12 @@ impl Measure {
 }
 
 /// How a test drops items. A numeric test keeps raw values within `min..=max`
-/// (either end open); a yes/no test keeps the items whose answer is the one asked.
+/// (either end open); a yes/no test keeps the items whose answer is the one its
+/// measure asks for (`visible`, `inside`, reachable).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Filter {
     Range { min: Option<f32>, max: Option<f32> },
-    Is(bool),
+    Wanted,
 }
 
 impl Filter {
@@ -156,7 +191,7 @@ impl Filter {
             Self::Range { min, max } => {
                 min.is_none_or(|m| raw >= m) && max.is_none_or(|m| raw <= m)
             }
-            Self::Is(want) => (raw > 0.5) == want,
+            Self::Wanted => raw > 0.5,
         }
     }
 }

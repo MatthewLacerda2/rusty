@@ -24,37 +24,26 @@ pub fn raw(
             from_height,
             item_height,
             mask,
+            visible,
         } => {
             let ignore = [from.entity, querier.entity];
             let eye = from.position + Vec3::Y * *from_height;
             each(items, |p| {
                 let seen = sight::clear(world, eye, p + Vec3::Y * *item_height, ignore, *mask);
-                if seen {
-                    1.0
-                } else {
-                    0.0
-                }
+                answer(seen == *visible)
             })
         }
         Measure::View {
             margin,
             item_height,
+            inside,
         } => each(items, |p| {
-            let seen = sight::in_view(
-                world.view,
-                world.screen,
-                p + Vec3::Y * *item_height,
-                *margin,
-            );
-            if seen {
-                1.0
-            } else {
-                0.0
-            }
+            let at = p + Vec3::Y * *item_height;
+            answer(sight::in_view(world.view, world.screen, at, *margin) == *inside)
         }),
         Measure::PathExists => walk::lengths(world, querier, items)
             .into_iter()
-            .map(|l| Some(if l.is_some() { 1.0 } else { 0.0 }))
+            .map(|l| Some(answer(l.is_some())))
             .collect(),
         Measure::PathLength => walk::lengths(world, querier, items),
         Measure::Separation { radius } => {
@@ -62,6 +51,15 @@ pub fn raw(
             each(items, |p| nearest(&others, p).min(*radius))
         }
         Measure::NearPoints { points } => each(items, |p| nearest(points, p)),
+    }
+}
+
+/// A yes/no test's raw value: 1 for the answer it asks for.
+fn answer(matches: bool) -> f32 {
+    if matches {
+        1.0
+    } else {
+        0.0
     }
 }
 

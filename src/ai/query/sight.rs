@@ -8,8 +8,8 @@ use crate::physics::is_hittable;
 use crate::scene::{layer_in_mask, Camera};
 
 /// Whether the segment `eye → at` is clear: no collider on `mask`'s layers in the
-/// way. The entities in `ignore` and everything in their hierarchies (a character's
-/// hitboxes) never block, nor do triggers. With no physics world nothing blocks.
+/// way. The entities in `ignore` and their descendants (a character's hitboxes)
+/// never block, nor do triggers. With no physics world nothing blocks.
 pub fn clear(
     world: &QueryWorld,
     eye: Vec3,
@@ -26,12 +26,15 @@ pub fn clear(
         return true;
     }
     let scene = world.scene;
-    let roots = ignore.map(|id| id.map(|id| scene.root_of(id)));
+    let w = &scene.world;
+    // An ignored entity's own colliders and its descendants' (a character's
+    // hitboxes), never its parent's: a level grouped under an empty parent
+    // keeps its walls when the Player sits in the same group.
+    let ignored = |id: u32| w.self_and_ancestors(id).any(|a| ignore.contains(&Some(a)));
     let accept = |id: u32| {
-        if !is_hittable(scene, id) || roots.contains(&Some(scene.root_of(id))) {
+        if !is_hittable(scene, id) || ignored(id) {
             return false;
         }
-        let w = &scene.world;
         if w.collider(id).is_some_and(|c| c.is_trigger) && !w.has_character_controller(id) {
             return false;
         }

@@ -27,6 +27,8 @@ pub mod spec;
 mod walk;
 
 #[cfg(test)]
+mod context_tests;
+#[cfg(test)]
 mod filter_tests;
 #[cfg(test)]
 mod generate_tests;

@@ -8,8 +8,9 @@ use crate::core::random::Random;
 
 /// The surviving items `alive` ranked best first, a tie to the earliest
 /// generated. A scoring test normalizes its raw values to 0..1 over the
-/// survivors; when they are all equal it gives each its full weight (no
-/// division by zero, and a test that cannot tell items apart favours none).
+/// survivors; when they are all equal it skips the curve and gives each its
+/// full weight (no division by zero, and a test that cannot tell items apart
+/// favours none, whatever its curve).
 pub fn rank(spec: &QuerySpec, items: &[Vec3], alive: &[usize], raws: &[Vec<f32>]) -> Vec<Item> {
     let mut scores = vec![0.0f32; alive.len()];
     for (test, row) in spec.tests.iter().zip(raws) {
@@ -17,13 +18,15 @@ pub fn rank(spec: &QuerySpec, items: &[Vec3], alive: &[usize], raws: &[Vec<f32>]
         let values: Vec<f32> = alive.iter().map(|&i| row[i]).collect();
         let lo = values.iter().copied().fold(f32::INFINITY, f32::min);
         let hi = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let spread = hi > lo && (hi - lo).is_finite();
         for (s, v) in scores.iter_mut().zip(&values) {
-            let n = if hi > lo && (hi - lo).is_finite() {
-                (v - lo) / (hi - lo)
+            // Every survivor alike: no curve, each takes the full weight.
+            let shaped = if spread {
+                score.curve.shape(((v - lo) / (hi - lo)).clamp(0.0, 1.0))
             } else {
                 1.0
             };
-            *s += score.weight * score.curve.shape(n.clamp(0.0, 1.0));
+            *s += score.weight * shaped;
         }
     }
     let mut ranked: Vec<(usize, f32)> = alive.iter().copied().zip(scores).collect();
