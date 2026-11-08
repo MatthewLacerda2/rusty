@@ -68,6 +68,6 @@ pub fn mixed_occlusion(scene: &BakeScene, positions: &[Vec3]) -> Vec<Vec4> {
         return vec![Vec4::ONE; positions.len()];
     }
     let rays = Rays::build(triangles(scene));
-    let tracer = Tracer { scene, rays: &rays };
+    let tracer = Tracer::new(scene, &rays);
     positions.iter().map(|&p| tracer.mask(p)).collect()
 }
