@@ -18,6 +18,34 @@ because the namespace is absent.
 | `Debug.AudioEvents` | `([after_seq])` | an **array** of the audio event log's entries whose `seq` is greater than `after_seq` (default `0`, all), oldest first, **and** the oldest `seq` the log still holds (below) |
 | `Debug.GetAdaptedExposure` | `()` | `number` (EV): the automatic exposure the screen last applied, read back from the GPU a frame or so late (exactly, in a headless capture); `nil` before an `Automatic` frame has metered (#1444; see `Graphics.md`, *Automatic exposure*) |
 | `Debug.AudioVoices` | `()` | an **array**: one roster row per entity carrying an `AudioSource` (below) |
+| `Debug.DrawLine` | `(fx, fy, fz, tx, ty, tz [, r, g, b, a [, duration]])` | — : a line from `f` to `t` in the colour (default white), held `duration` seconds of sim time (default `0`: one frame). See *Debug lines* (#1882) |
+| `Debug.DrawRay` | `(ox, oy, oz, dx, dy, dz [, r, g, b, a [, duration]])` | — : the line from `o` to `o + d` (the direction's length is the ray's), as `DrawLine` |
+
+### Debug lines (#1882)
+
+Unity's `Debug.DrawLine` / `Debug.DrawRay`: a line seen, never collided with. It
+draws in the editor's Scene view always, and over the game when its gizmos are on:
+the Game view's **Gizmos** toggle, or `Harness.Screenshot(path, { gizmos = true })`
+(`docs/testing.md`), with every collider's shape beside it. A plain game frame
+never shows one.
+
+- Vectors and the colour cross flat, as everywhere in the API: six numbers, then
+  all four of `r, g, b, a` (0..1) or none, then `duration`. Any other count raises.
+- `duration` is sim time **counted in fixed ticks** (1/60 s each, rounded up), never
+  the clock, so a replay draws the same lines on the same frames. `0` (or none) is
+  one tick: drawn from `Update`, it shows on the frame after that tick and is gone
+  at the next. Outside Play no tick passes, so a line drawn in edit mode stays until
+  Play starts; Stop clears every line.
+- Draw-only: nothing in the sim reads a line back. A non-finite end or colour is
+  dropped; past 16384 held lines the oldest go.
+
+```lua
+local ox, oy, oz, dx, dy, dz = 0, 1, -5, 0, 0, 1
+local hit, id, dist, px, py, pz = Physics.Raycast(ox, oy, oz, dx, dy, dz)
+if hit then
+    Debug.DrawRay(ox, oy, oz, px - ox, py - oy, pz - oz, 1, 0, 0, 1, 2) -- red, 2 s
+end
+```
 
 ### The preview — eyes on an authored asset (#353)
 

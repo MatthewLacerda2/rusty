@@ -264,6 +264,13 @@ its check and its command changed to match).
   `ScreenCapture.CaptureScreenshot(path, superSize)` does:
   `Harness.Screenshot(path, { width = 2940, height = 1388 })`; the run keeps its size.
   Each side is a whole 1 to 8192 (`video::MAX_SIDE`), else an error.
+- **A shot can show what the game cannot** (#1882): `Harness.Screenshot(path, {
+  gizmos = true })` draws every collider's real shape (Unity's green, a trigger
+  paler) and the `Debug.DrawLine` / `Debug.DrawRay` lines over the frame, as the
+  editor's Game view **Gizmos** toggle does: the fastest way to see why a shot
+  missed or a crate snagged. It takes a size too (`{ width =, height =, gizmos = }`).
+  Without it a shot is the plain frame, byte for byte. A line drawn with no
+  duration lasts one tick, so take the shot right after the step that drew it.
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
   scenarios, the bot-player script and its `project.rusty`, opened like any other
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project
