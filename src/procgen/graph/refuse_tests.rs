@@ -24,6 +24,12 @@ fn wear_err(params: Value, inputs: &[&str]) -> String {
     expand_err(doc, &[("wear.graph.json", wear())])
 }
 
+/// Instancing `graph` as `wear.graph.json`, wired to `base`.
+fn wear_err_in(params: Value, graph: Value) -> String {
+    let doc = instancing("wear.graph.json", params, &["base"]);
+    expand_err(doc, &[("wear.graph.json", graph)])
+}
+
 #[test]
 fn a_param_value_is_checked_by_name() {
     let err = wear_err(json!({ "scale": "big" }), &["base"]);
@@ -86,7 +92,11 @@ fn ids_inputs_and_placeholders_are_refused_at_parse() {
     assert!(err.contains("names no param"), "{err}");
     let mut bad_default = wear();
     bad_default["params"]["scale"]["default"] = json!(99);
-    assert!(parse(bad_default).contains("as its default"));
+    let err = wear_err_in(json!({}), bad_default);
+    assert!(
+        err.contains("as its default") && err.contains("wear.graph.json"),
+        "{err}"
+    );
 }
 
 #[test]

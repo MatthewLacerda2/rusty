@@ -36,6 +36,7 @@ mod sample;
 pub use super::catalog::*;
 pub use arity::Arity;
 pub(crate) use arity::{arity, ONE, SOURCE};
+pub(crate) use extent::power_of_two_sides;
 pub use kinds::*;
 pub use node::{Fault, Node, NodeError};
 pub(crate) use op_info::{choice, op, opt, req, socket, SEED};
@@ -64,10 +65,11 @@ pub struct RampStop {
 /// that nothing else consumes is the recipe's output (or the explicit `output` id).
 ///
 /// Its serde impls are [`crate::procgen::graph`]'s: they read a node's
-/// `{ param = … }` placeholders into [`TextureRecipe::bound`] around this derive
-/// (`remote = "Self"` makes the derive inherent functions they call).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(remote = "Self", deny_unknown_fields)]
+/// `{ param = … }` placeholders into [`TextureRecipe::bound`] and write them back
+/// (`remote = "Self"` makes this derive an inherent function the writer calls; the
+/// reader parses a field-for-field mirror, so a change here is made there too).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(remote = "Self")]
 pub struct TextureRecipe {
     /// The side of a square bake. Ignored when `size` is set, so it may be left out
     /// then (it reads 0, and is not written).

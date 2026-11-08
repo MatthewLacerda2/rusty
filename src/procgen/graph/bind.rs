@@ -13,9 +13,11 @@ use serde::ser::Error as _;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Map, Value};
 
-use super::params::check_decls;
+use std::collections::BTreeMap;
+
+use super::params::ParamDecl;
 use super::placeholder;
-use crate::procgen::recipe::TextureRecipe;
+use crate::procgen::recipe::{power_of_two_sides, Node, TextureRecipe};
 
 /// One node value that is a placeholder: node `node`'s `key` takes param `param`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,14 +30,46 @@ pub struct Bound {
 /// The keys of a node that are its wiring, never a param value.
 const WIRING: [&str; 3] = ["id", "op", "inputs"];
 
+/// [`TextureRecipe`] as read, field for field: its nodes stay JSON until their
+/// placeholders are bound. Typed fields (not one `Value` for the whole recipe), so
+/// the scene format's tracer still sees every field a stored recipe holds.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Doc {
+    #[serde(default)]
+    resolution: u32,
+    #[serde(default, deserialize_with = "power_of_two_sides")]
+    size: Option<[u32; 2]>,
+    #[serde(default)]
+    seed: u64,
+    nodes: Vec<Value>,
+    #[serde(default)]
+    output: Option<String>,
+    #[serde(default)]
+    outputs: BTreeMap<String, String>,
+    #[serde(default)]
+    params: BTreeMap<String, ParamDecl>,
+    #[serde(default)]
+    inputs: Vec<String>,
+}
+
 impl<'de> Deserialize<'de> for TextureRecipe {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        let mut doc = Value::deserialize(d)?;
-        let bound = bind(&mut doc).map_err(D::Error::custom)?;
-        let mut recipe = TextureRecipe::deserialize(doc).map_err(D::Error::custom)?;
-        check_decls(&recipe.params).map_err(D::Error::custom)?;
+        let mut doc = Doc::deserialize(d)?;
+        let bound = bind(&mut doc.nodes, &doc.params).map_err(D::Error::custom)?;
+        let nodes = doc.nodes.into_iter().map(Node::deserialize);
+        let recipe = TextureRecipe {
+            resolution: doc.resolution,
+            size: doc.size,
+            seed: doc.seed,
+            nodes: nodes.collect::<Result<_, _>>().map_err(D::Error::custom)?,
+            output: doc.output,
+            outputs: doc.outputs,
+            params: doc.params,
+            inputs: doc.inputs,
+            bound,
+        };
         check_inputs(&recipe).map_err(D::Error::custom)?;
-        recipe.bound = bound;
         Ok(recipe)
     }
 }
@@ -56,22 +90,11 @@ impl Serialize for TextureRecipe {
     }
 }
 
-/// Swap every placeholder among `doc`'s node values for its param's default, and
+/// Swap every placeholder among the `nodes`' values for its param's default, and
 /// return where each one was. A placeholder naming no declared param is refused.
-fn bind(doc: &mut Value) -> Result<Vec<Bound>, String> {
-    let Some(doc) = doc.as_object_mut() else {
-        return Ok(Vec::new());
-    };
-    let defaults: Map<String, Value> = match doc.get("params").and_then(Value::as_object) {
-        Some(params) => params
-            .iter()
-            .filter_map(|(name, d)| Some((name.clone(), d.get("default")?.clone())))
-            .collect(),
-        None => Map::new(),
-    };
+fn bind(nodes: &mut [Value], params: &BTreeMap<String, ParamDecl>) -> Result<Vec<Bound>, String> {
     let mut bound = Vec::new();
-    let nodes = doc.get_mut("nodes").and_then(Value::as_array_mut);
-    for node in nodes.into_iter().flatten().filter_map(Value::as_object_mut) {
+    for node in nodes.iter_mut().filter_map(Value::as_object_mut) {
         let id = node
             .get("id")
             .and_then(Value::as_str)
@@ -84,14 +107,17 @@ fn bind(doc: &mut Value) -> Result<Vec<Bound>, String> {
             let Some(param) = placeholder(value).map(str::to_string) else {
                 continue;
             };
-            *value = defaults.get(&param).cloned().ok_or_else(|| {
-                let declared: Vec<&str> = defaults.keys().map(String::as_str).collect();
-                format!(
-                    "node {id:?}: {key} = {{ param = {param:?} }} names no param of the \
+            *value = params
+                .get(&param)
+                .map(|d| d.default.clone())
+                .ok_or_else(|| {
+                    let declared: Vec<&str> = params.keys().map(String::as_str).collect();
+                    format!(
+                        "node {id:?}: {key} = {{ param = {param:?} }} names no param of the \
                      recipe; it declares [{}]",
-                    declared.join(", ")
-                )
-            })?;
+                        declared.join(", ")
+                    )
+                })?;
             bound.push(Bound {
                 node: id.clone(),
                 key: key.clone(),

@@ -68,6 +68,9 @@ pub fn expand(recipe: &TextureRecipe, graphs: &Graphs) -> Result<Expanded, Strin
             recipe.inputs.join(", ")
         ));
     }
+    for (name, d) in &recipe.params {
+        d.check_self(name)?;
+    }
     let top = Scope::top(recipe, graphs);
     let mut out = Out::default();
     paste(&top, &mut out)?;

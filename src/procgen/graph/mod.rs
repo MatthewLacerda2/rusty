@@ -13,7 +13,7 @@
 //!
 //! and downstream nodes read `brick` (the graph's `output`) or `brick.height` (its
 //! named output `height`). Inside the graph a node's value may be the placeholder
-//! `{ param = "age" }` ([`params`]), which a parse reads at the param's default and
+//! `{ param = "age" }` ([`placeholder`]), which a parse reads at the param's default and
 //! a save writes back ([`TextureRecipe::bound`]).
 //!
 //! What a recipe stores is the instance, never its expansion. [`expand`] turns a

@@ -60,10 +60,8 @@ fn walk(dir: &Path, root: &Path, found: &mut Vec<String>) {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
         match entry.file_type() {
-            Ok(kind) if kind.is_dir() => {
-                if !name.starts_with('.') && name != "target" {
-                    walk(&path, root, found);
-                }
+            Ok(kind) if kind.is_dir() && !name.starts_with('.') && name != "target" => {
+                walk(&path, root, found);
             }
             Ok(kind) if kind.is_file() && name.ends_with(EXTENSION) => {
                 if let Ok(relative) = path.strip_prefix(root) {

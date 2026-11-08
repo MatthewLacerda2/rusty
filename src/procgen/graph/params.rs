@@ -84,7 +84,7 @@ impl ParamDecl {
 
     /// Refuse a declaration whose range does not fit its type or whose default
     /// fails its own check.
-    fn check_self(&self, name: &str) -> Result<(), String> {
+    pub(super) fn check_self(&self, name: &str) -> Result<(), String> {
         let ranged = matches!(self.ty, ParamType::Number | ParamType::Integer);
         if !ranged && (self.min.is_some() || self.max.is_some()) {
             return Err(format!(
@@ -97,19 +97,19 @@ impl ParamDecl {
     }
 }
 
-/// Check every declaration of `params`.
-pub fn check_decls(params: &BTreeMap<String, ParamDecl>) -> Result<(), String> {
-    params.iter().try_for_each(|(name, d)| d.check_self(name))
-}
-
 /// The values a graph's params take under an instance giving `given`: each
 /// default, overridden by the given value once it passes its check. `graph` names
-/// the file in the errors.
+/// the file in the errors. Each declaration is checked first (its range fits its
+/// type, its default passes its own check).
 pub fn values(
     params: &BTreeMap<String, ParamDecl>,
     given: &BTreeMap<String, Value>,
     graph: &str,
 ) -> Result<BTreeMap<String, Value>, String> {
+    for (name, d) in params {
+        d.check_self(name)
+            .map_err(|e| format!("graph {graph}: {e}"))?;
+    }
     let mut values: BTreeMap<String, Value> = params
         .iter()
         .map(|(name, d)| (name.clone(), d.default.clone()))

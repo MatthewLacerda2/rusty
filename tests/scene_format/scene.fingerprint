@@ -859,6 +859,8 @@ scene.materials{}.emissive[]: f32
 scene.materials{}.emissive_map: option
 scene.materials{}.emissive_map: string
 scene.materials{}.ior: f32
+scene.materials{}.maps.inputs: seq
+scene.materials{}.maps.inputs[]: string
 scene.materials{}.maps.nodes: seq
 scene.materials{}.maps.nodes[]: any
 scene.materials{}.maps.output: option
@@ -866,6 +868,14 @@ scene.materials{}.maps.output: string
 scene.materials{}.maps.outputs: map
 scene.materials{}.maps.outputs{key}: string
 scene.materials{}.maps.outputs{}: string
+scene.materials{}.maps.params: map
+scene.materials{}.maps.params{key}: string
+scene.materials{}.maps.params{}.default: any
+scene.materials{}.maps.params{}.max: f64
+scene.materials{}.maps.params{}.max: option
+scene.materials{}.maps.params{}.min: f64
+scene.materials{}.maps.params{}.min: option
+scene.materials{}.maps.params{}.type: enum number|integer|bool|color|text
 scene.materials{}.maps.resolution: u32
 scene.materials{}.maps.seed: u64
 scene.materials{}.maps.size: option
