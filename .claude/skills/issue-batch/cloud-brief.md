@@ -63,17 +63,17 @@ nothing to wait for.
   `actions_run_trigger` does the same). It runs the gates and nothing else.
   Never dispatch `mutants-sweep.yml`: that is the full sweep, up to ten
   runners for a weekend the batch's gates need (#705).
-- **A branch that adds mechanism asks for a scoped mutation run** (#750), and
-  readies **in the same step**: dispatch `mutants-on-request.yml` on your branch
-  with input `scope` set to `diff` (or path globs like `src/physics/**`) —
-  `make mutants-remote SCOPE=diff` with `gh`, or the GitHub MCP
-  `actions_run_trigger` without it — then mark the PR ready and end. Say in the
-  PR that you dispatched it. The report lands as a comment on your PR when it
-  finishes (#912); the orchestrator reads it there and launches a follow-up
-  only for survivors in code this branch wrote. One run per branch: a later
-  dispatch on the same branch cancels the earlier run, and an unmerged close
-  of the PR cancels what is left (a merged PR's run finishes and reports,
-  #1530), so dispatch once, when you ready.
+- **A branch that adds mechanism asks for a scoped mutation run** (#750) with
+  a line of its own in the PR description: `Mutation: diff` (or path globs,
+  `Mutation: src/physics/**`). **Never dispatch `mutants-on-request.yml`
+  yourself** (#1934): on 2026-11-08 six coders' runs, dispatched at ready, held
+  a third of the account's runners and the gating CI that merges PRs waited
+  20-40 minutes behind them. The merge queue dispatches the run after it merges
+  your PR, on `main` at the squash commit, two at a time, and the report lands
+  as a comment on your merged PR; the orchestrator reads it there and launches
+  a follow-up only for survivors in code this branch wrote. The line is the
+  whole ask: write it, mark the PR ready and end. A branch that changed no Rust
+  gets no run even when it asks.
 - **Before readying, check your change at its edges**: zero, one and a
   Dust2-sized level (memory held, work per frame, the first frame after a load or
   bake) and a malformed input file (truncated, a value out of range, a NaN):

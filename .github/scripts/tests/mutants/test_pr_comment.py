@@ -75,3 +75,25 @@ class Target(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Named(unittest.TestCase):
+    """A run the merge queue dispatched on `main` names its pull request (#1934)."""
+
+    def test_pr_posts_there_without_looking_the_branch_up(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        calls: list[tuple] = []
+
+        def gh(*args, stdin=None):
+            calls.append(args)
+            return ""
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(comment, "gh", gh):
+            report = Path(tmp, "report.md")
+            report.write_text("## Mutation on request\n")
+            comment.main([str(report), "--repo", "o/r", "--branch", "main", "--run-url", URL, "--pr", "42"])
+        self.assertFalse(any("pulls?" in a for call in calls for a in call), "no branch lookup")
+        self.assertIn("repos/o/r/issues/42/comments", calls[-1])
