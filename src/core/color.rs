@@ -1,6 +1,7 @@
 //! src/core/color.rs — the colour maths more than one module needs (#939): the sRGB
 //! transfer pair, Rec. 709 luminance, `#rrggbb` hex parsing and IEEE half floats
-//! (the `Rgba16Float` texels baked cubes store, #1696). Kept in `core` because `procgen`, `scene`,
+//! (the `Rgba16Float` texels a prefiltered cube face holds before BC6H, #1696,
+//! #1885). Kept in `core` because `procgen`, `scene`,
 //! `render` and `dev` all reach it. The shaders keep their own WGSL copies.
 
 /// Inverse-sRGB transfer (IEC 61966-2-1) for one 8-bit channel, to linear `[0, 1]`.

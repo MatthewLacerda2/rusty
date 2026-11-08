@@ -5,13 +5,23 @@
 //! validates and parses (`cubemap::parse_ktx2_cubemap_mips`, #244). A KTX2 file is a
 //! fixed 80-byte header, a level index (one 24-byte entry per mip, largest mip first), a
 //! Basic Data Format Descriptor, then the level data. We emit exactly that for an HDR
-//! `R16G16B16A16_SFLOAT` cubemap with a full roughness mip chain (#1696), so the loader
-//! reads back what we wrote. BC6H would hold the same cube in an eighth of the size; it waits on a cube encoder.
+//! cubemap with a full roughness mip chain (#1696), so the loader
+//! reads back what we wrote. Since #1885 every face of every mip is BC6H unsigned
+//! float (`VK_FORMAT_BC6H_UFLOAT_BLOCK`, Unity's desktop default for an HDR
+//! cubemap), an eighth of the half-float cube, encoded by the block encoder the
+//! lightmap pages use (`asset::lightmap_page::bc6h_level`). A mip under a block
+//! (2×2, 1×1) is stored as one padded 4×4 block a face, as wgpu uploads it.
 //!
 //! Output is plain baked-asset bytes — a pure function of the prefiltered faces, no
-//! wall-clock / RNG — so the encode is clean under the determinism guard.
+//! wall-clock / RNG — so the encode is clean under the determinism guard. The
+//! blocks are the same at any thread count (`texture_import::banded`), so a bake's
+//! cubes never depend on the machine.
 
-use crate::render::ibl::reflection_prefilter::PrefilteredCubemap;
+use glam::Vec3;
+
+use crate::asset::lightmap_page::bc6h_level;
+use crate::core::color::f16_to_f32;
+use crate::render::ibl::reflection_prefilter::{PrefilteredCubemap, TEXEL_BYTES};
 use crate::render::CubemapFace;
 
 const MAGIC: [u8; 12] = [
@@ -19,13 +29,13 @@ const MAGIC: [u8; 12] = [
 ];
 const HEADER_LEN: usize = 80;
 const LEVEL_INDEX_ENTRY_LEN: usize = 24;
-/// `VK_FORMAT_R16G16B16A16_SFLOAT` — the half-float format the bake emits and the
-/// loader accepts (#1696).
-pub(crate) const VK_FORMAT_R16G16B16A16_SFLOAT: u32 = 97;
+/// `VK_FORMAT_BC6H_UFLOAT_BLOCK` — the format the bake emits and the loader accepts
+/// (#1885).
+pub(crate) const VK_FORMAT_BC6H_UFLOAT_BLOCK: u32 = 143;
 
-/// Encode a prefiltered cubemap into KTX2 bytes: an `R16G16B16A16_SFLOAT` cubemap with one level
-/// per roughness mip (largest first), each level holding the six faces packed in
-/// `CubemapFace::ALL` order. The bytes parse with `ktx2::Reader` and
+/// Encode a prefiltered cubemap into KTX2 bytes: a BC6H unsigned-float cubemap with
+/// one level per roughness mip (largest first), each level holding the six faces'
+/// blocks packed in `CubemapFace::ALL` order. The bytes parse with `ktx2::Reader` and
 /// `parse_ktx2_cubemap_mips`.
 pub fn encode_cubemap(cube: &PrefilteredCubemap) -> Vec<u8> {
     debug_assert!(
@@ -43,8 +53,10 @@ pub fn encode_cubemap(cube: &PrefilteredCubemap) -> Vec<u8> {
     for level in 0..levels {
         let offset = level_data_offset as u64 + level_bytes.len() as u64;
         let start = level_bytes.len();
+        let edge = cube.level_size(level);
         for face in CubemapFace::ALL {
-            level_bytes.extend_from_slice(&cube.mips[level][face as usize]);
+            let texels = half_texels(&cube.mips[level][face as usize]);
+            level_bytes.extend_from_slice(&bc6h_level(edge, &texels, threads()));
         }
         index.push((offset, (level_bytes.len() - start) as u64));
     }
@@ -63,12 +75,26 @@ pub fn encode_cubemap(cube: &PrefilteredCubemap) -> Vec<u8> {
     buf
 }
 
-/// Write the 80-byte KTX2 header for a `size × size` RGBA16F cubemap (`face_count = 6`,
+/// A face's `Rgba16Float` bytes as linear HDR texels (alpha dropped).
+fn half_texels(bytes: &[u8]) -> Vec<Vec3> {
+    let half = |b: &[u8]| f16_to_f32(u16::from_le_bytes([b[0], b[1]]));
+    (bytes.chunks_exact(TEXEL_BYTES))
+        .map(|t| Vec3::new(half(&t[..2]), half(&t[2..4]), half(&t[4..6])))
+        .collect()
+}
+
+/// The threads a face encodes on: the machine's cores. The blocks do not depend on
+/// it.
+fn threads() -> usize {
+    std::thread::available_parallelism().map_or(1, usize::from)
+}
+
+/// Write the 80-byte KTX2 header for a `size × size` BC6H cubemap (`face_count = 6`,
 /// no array layers, no supercompression) with `levels` mips and the given DFD location.
 fn write_header(buf: &mut [u8], size: u32, levels: u32, dfd_offset: usize, dfd_len: usize) {
     buf[0..12].copy_from_slice(&MAGIC);
-    put_u32(buf, 12, VK_FORMAT_R16G16B16A16_SFLOAT); // vkFormat
-    put_u32(buf, 16, 2); // typeSize (2 bytes per channel)
+    put_u32(buf, 12, VK_FORMAT_BC6H_UFLOAT_BLOCK); // vkFormat
+    put_u32(buf, 16, 1); // typeSize (1 for a block-compressed format)
     put_u32(buf, 20, size); // pixelWidth
     put_u32(buf, 24, size); // pixelHeight
     put_u32(buf, 28, 0); // pixelDepth (2D)

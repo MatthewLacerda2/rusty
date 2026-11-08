@@ -36,6 +36,7 @@ pub(super) fn sample_graph() -> AnimationGraph {
             entry: "idle".into(),
         },
         layers: Vec::new(),
+        ..AnimationGraph::default()
     }
 }
 

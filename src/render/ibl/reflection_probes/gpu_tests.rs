@@ -40,6 +40,13 @@ pub(super) fn renderer() -> Option<Renderer> {
     crate::render::test_gpu::headless_or_skip(4, 4)
 }
 
+/// A renderer whose probe array holds half floats, whatever the adapter.
+pub(super) fn uncompressed() -> Option<Renderer> {
+    let mut renderer = renderer()?;
+    renderer.reflection_probes.force_uncompressed();
+    Some(renderer)
+}
+
 /// The Inspector preview renders a probe-less scene every frame beside the viewport:
 /// it must leave the viewport's cubes resident, so going back costs no copy.
 #[test]

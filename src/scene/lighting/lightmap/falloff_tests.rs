@@ -76,10 +76,7 @@ fn bounce_under_a_ceiling_lamp() -> Vec<f32> {
     };
     let scene = lit(vec![lamp], vec![floor(), ceiling]);
     let rays = Rays::build(triangles(&scene));
-    let tracer = Tracer {
-        scene: &scene,
-        rays: &rays,
-    };
+    let tracer = Tracer::new(&scene, &rays);
     (0..25)
         .map(|k| {
             let at = Vec3::new((k % 5) as f32 * 0.5 - 1.0, 0.0, (k / 5) as f32 * 0.5 - 1.0);

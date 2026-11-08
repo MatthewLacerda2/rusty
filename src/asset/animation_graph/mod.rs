@@ -5,7 +5,9 @@
 //! crossfade duration), the typed **parameter declarations** the conditions read,
 //! and the designated **entry node**. Since #457 the top-level machine is the
 //! *base layer*, and `layers` stacks further machines over it, each with a weight,
-//! a blend mode and an optional bone mask ([`GraphLayer`]). This is Unity's AnimatorController *asset*,
+//! a blend mode and an optional bone mask ([`GraphLayer`]); since #1894 it also
+//! declares montage **slots** and **montages** ([`Montage`]). This is Unity's
+//! AnimatorController *asset*,
 //! named for what it is. The per-entity runtime — live parameter values, active
 //! node, playhead — stays on the `AnimatorComponent` (#314/#316); the component
 //! references a graph **by path** (`guard.animgraph`), exactly like a mesh
@@ -24,6 +26,7 @@ mod blend_tree;
 mod event;
 mod io;
 mod layer;
+mod montage;
 mod validate;
 mod validate_motion;
 
@@ -31,6 +34,7 @@ pub use blend_tree::{BlendChild1D, BlendChild2D, BlendTree, ChildMotion, MAX_TRE
 pub use event::AnimationEvent;
 pub use io::{load, save};
 pub use layer::{GraphLayer, LayerBlending};
+pub use montage::{GraphSlot, Montage, MontageSection, DEFAULT_MONTAGE_BLEND, DEFAULT_SLOT};
 pub use validate::GraphError;
 
 /// The graph asset's file extension: `guard.animgraph` (rusty-only format, JSON
@@ -184,6 +188,12 @@ pub struct AnimationGraph {
     /// Layers 1.. in composition order, each blended over everything below it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub layers: Vec<GraphLayer>,
+    /// The montage slots (#1894), above every layer in this order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub slots: Vec<GraphSlot>,
+    /// The montages scripts play into the slots (#1894).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub montages: Vec<Montage>,
 }
 
 impl AnimationGraph {
@@ -203,6 +213,8 @@ impl AnimationGraph {
 
 #[cfg(test)]
 mod event_tests;
+#[cfg(test)]
+mod montage_tests;
 #[cfg(test)]
 mod nested_tests;
 #[cfg(test)]

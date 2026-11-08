@@ -156,7 +156,7 @@ pub(super) fn bake_on(
     threads: usize,
 ) -> Option<Vec<Lightmap>> {
     let rays = Rays::build(triangles(scene));
-    let tracer = Tracer { scene, rays: &rays };
+    let tracer = Tracer::new(scene, &rays);
     // Every lightmap must fit a page with its ring around it.
     let max = max_map_edge(settings.page());
     // Rasterize everything first, so the total is known before the first texel.

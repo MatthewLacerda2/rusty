@@ -5,19 +5,25 @@
 //! rebalance is 1 on a flat plane, which a GPU may round to a hair off it.
 
 use glam::Vec3;
+use rusty::asset::lightmap_page::bc6h_texels;
 use rusty::components::LightMode;
-use rusty::core::color::f16_to_f32;
 use rusty::dev::bake::progress::BakeLog;
 use rusty::dev::bake::reflection::{bake_scene_reflections, reflection_dir};
 
 use super::{bake, scene};
 
-/// Every level's texels of the `Rgba16Float` cube a reflection bake wrote.
+/// Every level's channels of the BC6H cube a reflection bake wrote (#1885), decoded.
 fn texels(bytes: &[u8]) -> Vec<f32> {
     let reader = ktx2::Reader::new(bytes).expect("a KTX2 cube");
-    let halves = reader.levels().flat_map(|level| level.chunks_exact(2));
-    halves
-        .map(|b| f16_to_f32(u16::from_le_bytes([b[0], b[1]])))
+    let size = reader.header().pixel_width;
+    let levels = reader.levels().enumerate();
+    let faces = levels.flat_map(|(l, level)| {
+        let edge = (size >> l).max(1);
+        level.chunks_exact(level.len() / 6).map(move |f| (edge, f))
+    });
+    faces
+        .flat_map(|(edge, face)| bc6h_texels(edge, face))
+        .flat_map(|t| t.to_array())
         .collect()
 }
 
