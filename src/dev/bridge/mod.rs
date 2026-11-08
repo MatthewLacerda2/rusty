@@ -24,6 +24,8 @@ mod script_ref;
 #[cfg(test)]
 mod tests;
 
+pub use damage::FORWARDS;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 

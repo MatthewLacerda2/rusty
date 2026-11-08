@@ -15,33 +15,46 @@ use mlua::{Function, Lua, MultiValue, Result as LuaResult, Table};
 use super::copy::Copier;
 use crate::app::GameWorld;
 
-/// The verbs forwarded: every function of `Damage`.
-const VERBS: [&str; 3] = ["Apply", "ApplyPoint", "ApplyRadial"];
+/// The verbs forwarded, by namespace: each one whose callbacks run inside it.
+/// A demo's replay reads it too (`demo::calls::invoke`, #1929), so a forwarded
+/// call replays forwarded and its callbacks fire again.
+pub const FORWARDS: [(&str, &[&str]); 1] = [("Damage", &["Apply", "ApplyPoint", "ApplyRadial"])];
 
-/// Replace the scenario's `Damage.<verb>`s with forwards into the gameplay VM.
+/// Replace the scenario's [`FORWARDS`] with forwards into the gameplay VM.
 pub fn register(lua: &Lua, world: &Rc<RefCell<GameWorld>>) -> LuaResult<()> {
-    let table: Table = lua.globals().get("Damage")?;
-    for verb in VERBS {
-        let world = Rc::clone(world);
-        let f = lua.create_function(move |lua, args: MultiValue| {
-            let world = world.borrow();
-            let ran: Option<MultiValue> = world.script_manager().with_vm(|glua| {
-                let damage: Table = glua.globals().get("Damage")?;
-                let f: Function = damage.get(verb)?;
-                let mut into_game = Copier::new(glua);
-                let crossed = args
-                    .iter()
-                    .map(|v| into_game.value(v))
-                    .collect::<LuaResult<MultiValue>>()?;
-                let returns = f.call::<MultiValue>(crossed)?;
-                let mut back = Copier::new(lua);
-                returns.iter().map(|v| back.value(v)).collect()
-            })?;
-            ran.ok_or_else(|| {
-                mlua::Error::RuntimeError(format!("Damage.{verb}: the game's runtime is down"))
-            })
-        })?;
-        table.set(verb, f)?;
+    for (namespace, verbs) in FORWARDS {
+        let table: Table = lua.globals().get(namespace)?;
+        for &verb in verbs {
+            table.set(verb, forward(lua, world, namespace, verb)?)?;
+        }
     }
     Ok(())
+}
+
+/// `namespace.verb`, run in the gameplay VM.
+fn forward(
+    lua: &Lua,
+    world: &Rc<RefCell<GameWorld>>,
+    namespace: &'static str,
+    verb: &'static str,
+) -> LuaResult<Function> {
+    let world = Rc::clone(world);
+    lua.create_function(move |lua, args: MultiValue| {
+        let world = world.borrow();
+        let ran: Option<MultiValue> = world.script_manager().with_vm(|glua| {
+            let table: Table = glua.globals().get(namespace)?;
+            let f: Function = table.get(verb)?;
+            let mut into_game = Copier::new(glua);
+            let crossed = args
+                .iter()
+                .map(|v| into_game.value(v))
+                .collect::<LuaResult<MultiValue>>()?;
+            let returns = f.call::<MultiValue>(crossed)?;
+            let mut back = Copier::new(lua);
+            returns.iter().map(|v| back.value(v)).collect()
+        })?;
+        ran.ok_or_else(|| {
+            mlua::Error::RuntimeError(format!("{namespace}.{verb}: the game's runtime is down"))
+        })
+    })
 }
