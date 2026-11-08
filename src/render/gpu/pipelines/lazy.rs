@@ -10,6 +10,8 @@
 
 use std::sync::OnceLock;
 
+use super::specs::{make_pipeline, PipelineSpec};
+
 /// Builds the pipeline, the first time it is asked for.
 type Build<P> = Box<dyn Fn(&wgpu::Device) -> P + Send + Sync>;
 
@@ -48,4 +50,18 @@ impl<P> LazyPipeline<P> {
     pub(crate) fn is_built(&self) -> bool {
         self.cell.get().is_some()
     }
+}
+
+/// `spec`'s pipeline over `shader`, built on its first draw (#985).
+pub(super) fn lazy_pipeline(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    format: wgpu::TextureFormat,
+    layout: &wgpu::PipelineLayout,
+    spec: PipelineSpec,
+) -> LazyPipeline {
+    let (shader, layout) = (shader.clone(), layout.clone());
+    LazyPipeline::new(device, move |device| {
+        make_pipeline(device, &shader, format, &layout, &spec)
+    })
 }

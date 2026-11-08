@@ -93,7 +93,8 @@ impl GameWorld {
 }
 
 /// Register the play-mode systems into the schedule, in the exact order the old
-/// hand-wired loop ran them. The sim systems live in `FixedUpdate`.
+/// hand-wired loop ran them. The sim systems live in `FixedUpdate`, headed by the
+/// `Debug.Draw*` lines ageing (#1882).
 /// The graph evaluator (#316) sits after the scripts (so parameters set this tick
 /// are seen) and right before `animate` (so a fired transition is sampled the
 /// same tick). `late_update_scripts` (#324) runs after physics, animation and
@@ -114,7 +115,8 @@ impl GameWorld {
 /// the hitbox query poses to the pose that renders; `carry_local_particles` (#1529)
 /// then moves a `Local` emitter's particles to where all of that left the emitter.
 pub(super) fn register(app: &mut App) {
-    app.add_system(Stage::FixedUpdate, rebake_nav)
+    app.add_system(Stage::FixedUpdate, age_debug_lines)
+        .add_system(Stage::FixedUpdate, rebake_nav)
         .add_system(Stage::FixedUpdate, init_scripts)
         .add_system(Stage::FixedUpdate, super::systems::ui::dispatch_ui_events)
         .add_system(Stage::FixedUpdate, update_scripts)
@@ -141,6 +143,12 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
         .add_system(Stage::FixedUpdate, advance_frame)
         .add_system(Stage::Render, build_skin_palettes);
+}
+
+/// The tick's head: the `Debug.Draw*` lines (#1882) lose a tick before any script
+/// draws, so a one-tick line drawn this tick is drawn by the frame after it.
+fn age_debug_lines(world: &mut World, _res: &mut Resources) {
+    world.scene.borrow_mut().debug_lines.tick();
 }
 
 /// The script phase's head: drain queued script loads — entities spawned during

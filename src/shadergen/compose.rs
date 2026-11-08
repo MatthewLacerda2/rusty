@@ -46,6 +46,7 @@ pub const MODULES: &[&str] = &[
     "forward/facing.wgsl",
     "forward/specular_aa.wgsl",
     "forward/motion.wgsl",
+    "forward/shadow_caster.wgsl",
     "forward/proxy_volume.wgsl",
     "forward/transparent.wgsl",
     "forward/lighting.wgsl",
