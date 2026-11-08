@@ -62,7 +62,7 @@ pub use lights::area::AreaShape;
 pub use lights::{assign_channels, taken_lights, MaskChannels, MASK_CHANNELS};
 pub use pages::{colour_page, direction_levels, direction_page, level_count, levels, mask_levels};
 pub use probe_direct::{baked_direct_sh, mixed_occlusion};
-pub use progress::BakeProgress;
+pub use progress::{BakeProgress, Clock, MeshTime};
 pub use raster::{lightmap_size, MIN_RESOLUTION};
 pub(in crate::scene::lighting) use raster::{rasterize_surface, world_per_uv, Surface, TexelPoint};
 pub(in crate::scene::lighting) use rays::{Rays, Tri};

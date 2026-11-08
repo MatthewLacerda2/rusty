@@ -33,8 +33,8 @@ use std::path::PathBuf;
 use glam::Vec3;
 
 use crate::asset::MapRef;
-use crate::dev::bake::progress::BakeLog;
-use crate::scene::lighting::lightmap::{BakeScene, BakeSettings};
+use crate::dev::bake::progress::{BakeLog, MeshCost};
+use crate::scene::lighting::lightmap::{BakeScene, BakeSettings, MeshTime};
 use crate::scene::Scene;
 
 pub mod job;
@@ -76,11 +76,22 @@ pub fn bake_scene_lightmaps_logged(
 ) -> Result<usize, String> {
     let scene_path = scene_path.ok_or(UNSAVED)?;
     let input = gather_bake_input(scene);
-    let mut encoded = logged::bake_logged(&input, settings, log)?;
+    let (mut encoded, times) = logged::bake_logged(&input, settings, log)?;
+    log.mesh_costs(times.iter().map(|t| mesh_cost(scene, t)).collect());
     encoded.lights = crate::scene::lighting::lightmap::taken_lights(scene);
     encoded.shadowmask = input.shadowmask.clone();
     warn_missing_uvs(lightmap_receivers(&input), encoded.maps);
     apply_encoded(scene, scene_path, &encoded)
+}
+
+/// A timed mesh as the log names it: its entity's name, or `#<id>` without one.
+fn mesh_cost(scene: &Scene, time: &MeshTime) -> MeshCost {
+    let name = scene.world.name(time.entity).map(|n| n.to_string());
+    MeshCost {
+        name: name.unwrap_or_else(|| format!("#{}", time.entity)),
+        texels: time.texels,
+        busy: time.busy,
+    }
 }
 
 /// The static meshes asking for a lightmap (`BakeMesh::receives_lightmap`): not a

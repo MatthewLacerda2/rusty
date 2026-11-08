@@ -3,10 +3,10 @@
 use std::cell::{Cell, RefCell};
 use std::time::Duration;
 
-use super::format::{count, duration};
+use super::format::{clock, count, duration};
 use super::{BakeLog, Line, Progress, Step, INTERVAL};
 
-fn lightmaps(done: u64, total: u64, meshes: (u64, u64)) -> Progress {
+pub(super) fn lightmaps(done: u64, total: u64, meshes: (u64, u64)) -> Progress {
     Progress {
         step: Step::Lightmaps,
         done,
@@ -25,7 +25,7 @@ fn reflections(done: u64, total: u64) -> Progress {
 }
 
 /// Run `observe` against a log on a clock it can set, and return the lines.
-fn logged(run: impl FnOnce(&mut BakeLog, &dyn Fn(u64))) -> Vec<Line> {
+pub(super) fn logged(run: impl FnOnce(&mut BakeLog, &dyn Fn(u64))) -> Vec<Line> {
     let now = Cell::new(Duration::ZERO);
     let lines = RefCell::new(Vec::new());
     {
@@ -45,13 +45,13 @@ fn the_issue_line_reads_as_written() {
     });
     assert_eq!(
         lines[0].text,
-        "[Lighting] lightmaps 0% (0/1501 meshes, 0/7.6M texels)"
+        "[Lighting] 0:00 lightmaps 0% (0/1501 meshes, 0/7.6M texels)"
     );
     assert!(lines[0].milestone);
     // 3.1M texels in 26 min leaves 4.5M at the same rate: ~37.7 min.
     assert_eq!(
         lines[1].text,
-        "[Lighting] lightmaps 40% (612/1501 meshes, 3.1M/7.6M texels), ~37 min left"
+        "[Lighting] 26:00 lightmaps 40% (612/1501 meshes, 3.1M/7.6M texels), ~37 min left"
     );
     assert!(!lines[1].milestone);
 }
@@ -70,10 +70,11 @@ fn a_step_prints_at_most_once_per_interval_but_every_step_change() {
         log.observe(reflections(0, 4)); // a new step prints at once
         log.finish();
     });
-    // A probe step's start is no milestone: the job says it in the console already.
+    // A probe step's start is no milestone: the job says it in the console already,
+    // nor is the summary (#1891): only the total is.
     let milestones: Vec<bool> = lines.iter().map(|l| l.milestone).collect();
-    assert_eq!(milestones, [true, false, false, true]);
-    assert_eq!(lines[3].text, format!("[Lighting] done in {} s", step + 1));
+    assert_eq!(milestones, [true, false, false, false, false, true]);
+    assert_eq!(lines[5].text, format!("[Lighting] done in {} s", step + 1));
 }
 
 #[test]
@@ -93,7 +94,7 @@ fn a_bounce_is_its_own_step_and_its_eta_says_so() {
     });
     assert_eq!(
         lines[1].text,
-        "[Lighting] light probes, bounce 1 of at most 5: 50% (60/120 probes), ~1 min 0 s left in this bounce"
+        "[Lighting] 1:00 light probes, bounce 1 of at most 5: 50% (60/120 probes), ~1 min 0 s left in this bounce"
     );
     assert_eq!(lines.len(), 3, "a new bounce prints at once");
     assert!(
@@ -112,11 +113,11 @@ fn no_eta_before_any_work_or_while_the_total_is_unknown() {
         at(60);
         log.observe(lightmaps(0, 1000, (0, 3)));
     });
-    assert_eq!(lines[0].text, "[Lighting] lightmaps preparing");
+    assert_eq!(lines[0].text, "[Lighting] 0:00 lightmaps preparing");
     // The rate starts when the total is known, so rasterizing never skews it.
     assert_eq!(
         lines[2].text,
-        "[Lighting] lightmaps 0% (0/3 meshes, 0/1.0k texels)"
+        "[Lighting] 1:00 lightmaps 0% (0/3 meshes, 0/1.0k texels)"
     );
 }
 
@@ -139,5 +140,10 @@ fn counts_and_durations_read_short() {
     assert_eq!(
         [d(45), d(9 * 60 + 5), d(38 * 60 + 59), d(64 * 60 + 12)],
         ["45 s", "9 min 5 s", "38 min", "1 h 4 min"]
+    );
+    let c = |s| clock(Duration::from_secs(s));
+    assert_eq!(
+        [c(5), c(26 * 60 + 2), c(3910)],
+        ["0:05", "26:02", "1:05:10"]
     );
 }

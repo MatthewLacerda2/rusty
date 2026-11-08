@@ -22,7 +22,7 @@ use crate::dev::bake::lighting::{
 };
 use crate::dev::bake::lightmap::bake_scene_lightmaps_logged;
 use crate::dev::bake::occlusion::{bake_occlusion_logged, BakedOcclusion};
-use crate::dev::bake::progress::BakeLog;
+use crate::dev::bake::progress::{BakeLog, Step};
 use crate::dev::bake::steps::LightingBake;
 use crate::navigation::NavigationGraph;
 use crate::scene::lighting::occlusion::OcclusionBakeReport;
@@ -102,6 +102,7 @@ pub fn generate_lighting(
     let path = scene_path.ok_or(UNSAVED)?;
     let settings = scene.lighting_settings.lightmaps;
     // A bake is no edit (#1631): the console line's Undo step leaves it out.
+    log.plan(&Step::GENERATE);
     scene.unrecorded(|scene| {
         let lightmaps = bake_scene_lightmaps_logged(scene, Some(path), &settings, log)?;
         let mut probes = start_probes(scene, path, nav)?;

@@ -35,6 +35,26 @@ fn a_watched_bake_is_byte_identical_to_an_unwatched_one() {
     assert_eq!(bits(&watched), bits(&plain));
 }
 
+/// A fake clock that moves a millisecond each time it is read.
+fn ticking() -> std::time::Duration {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NOW: AtomicU64 = AtomicU64::new(0);
+    std::time::Duration::from_millis(NOW.fetch_add(1, Ordering::Relaxed))
+}
+
+#[test]
+fn a_timed_bake_charges_every_mesh_and_keeps_its_bytes() {
+    let timed = BakeProgress::timed(ticking);
+    let maps = bake_with_progress(&scene(), &settings(), &timed).expect("not cancelled");
+    assert_eq!(bits(&maps), bits(&bake(&scene(), &settings())));
+    let times = timed.mesh_times();
+    let entities: Vec<u32> = maps.iter().map(|m| m.entity).collect();
+    assert_eq!(times.iter().map(|t| t.entity).collect::<Vec<_>>(), entities);
+    assert_eq!(times.iter().map(|t| t.texels).sum::<u64>(), timed.total());
+    assert!(times.iter().all(|t| !t.busy.is_zero()), "{times:?}");
+    assert!(BakeProgress::default().mesh_times().is_empty());
+}
+
 #[test]
 fn progress_counts_every_texel_up_to_the_total() {
     let progress = BakeProgress::default();

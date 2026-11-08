@@ -3,37 +3,39 @@
 //! `BakeProgress` and logs, so a script's `Lighting.BakeLightmaps()` / `Generate()`
 //! reports as it goes, a line per encoded page included. The worker is the same
 //! `bake_with_progress` and `encode_pages` the editor's job runs, so the pages are
-//! byte-identical with or without a log.
+//! byte-identical with or without a log. A logged bake also times each mesh's
+//! batches (#1891) for the log's slowest-meshes lines.
 
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
 use super::{encode_pages, EncodedPages};
-use crate::dev::bake::progress::{BakeLog, Progress, Step};
+use crate::dev::bake::progress::{since_start, BakeLog, Progress, Step};
 use crate::scene::lighting::lightmap::BakeSettings;
-use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeScene};
+use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeScene, MeshTime};
 
 /// How often the calling thread reads the counters (the log decides what prints).
 const POLL: Duration = Duration::from_millis(200);
 
-/// Bake and encode `input`, reporting into `log`. An off log runs in line, with
-/// no worker.
+/// Bake and encode `input`, reporting into `log`, with each mesh's worker time
+/// (#1891). An off log runs in line, with no worker and no timing.
 pub(super) fn bake_logged(
     input: &BakeScene,
     settings: &BakeSettings,
     log: &mut BakeLog,
-) -> Result<EncodedPages, String> {
-    let progress = BakeProgress::default();
+) -> Result<(EncodedPages, Vec<MeshTime>), String> {
     let run = |progress: &BakeProgress| {
         // Nobody cancels this one, so it always runs to the end.
         let maps = bake_with_progress(input, settings, progress).unwrap_or_default();
         encode_pages(&maps, settings.page(), progress)?.ok_or_else(|| "never cancelled".to_string())
     };
     if !log.is_on() {
-        return run(&progress);
+        return Ok((run(&BakeProgress::default())?, Vec::new()));
     }
-    watch(&progress, read, log, run)
+    let progress = BakeProgress::timed(since_start);
+    let pages = watch(&progress, read, log, run)?;
+    Ok((pages, progress.mesh_times()))
 }
 
 /// Run `work` on a scoped worker while this thread logs `progress`, as `read`

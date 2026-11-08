@@ -177,6 +177,8 @@ pub(super) fn bake_on(
         .into_iter()
         .map(|(i, size, p)| ((i, size), p))
         .unzip();
+    let sizes = heads.iter().zip(&points);
+    progress.set_meshes(sizes.map(|((i, _), p)| (scene.meshes[*i].entity, p.len() as u64)));
     let trace = |c: usize, _: usize, batch: &[TexelPoint]| {
         let mesh = heads[c].0 as u64;
         let one = |p: &TexelPoint| {
@@ -184,7 +186,11 @@ pub(super) fn bake_on(
             let s = settings;
             tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng)
         };
-        batch.iter().map(one).collect()
+        // A timed bake (#1891) charges each batch to its mesh; it never touches a texel.
+        let from = progress.now();
+        let traced = batch.iter().map(one).collect();
+        progress.charge(c, from);
+        traced
     };
     // The pool hands each chart its points back once traced, so they die with it.
     let finish = |c: usize, points: Vec<TexelPoint>, light: Vec<TexelLight>| {
