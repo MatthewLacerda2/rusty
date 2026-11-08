@@ -17,13 +17,16 @@
 //! the playback-speed surface (#1342: `SetSpeed`, `GetSpeed`) in `speed.rs`, the
 //! typed parameters (`SetBool`/`SetFloat`/`SetInt`/`SetTrigger`) in `parameters.rs`,
 //! root motion (#1745: `SetApplyRootMotion`, `GetApplyRootMotion`, `SetRootBone`,
-//! `GetRootBone`, `GetRootMotion`) in `root_motion.rs`,
+//! `GetRootBone`, `GetRootMotion`) in `root_motion.rs`, montages (#1894:
+//! `PlayMontage`, `StopMontage`, `IsMontagePlaying`, `GetMontage`,
+//! `JumpToSection`, `SetNextSection`) in `montage.rs`,
 //! and `Play`/`Crossfade` themselves in `play.rs` —
 //! one namespace, split to stay under the size cap.
 
 mod graph;
 mod ik;
 mod layers;
+mod montage;
 mod parameters;
 mod play;
 mod root_motion;
@@ -53,6 +56,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, console: ApiCell<ConsoleLogs>)
     graph::register(lua, &table, scene, console)?;
     layers::register(lua, &table, scene, console)?;
     ik::register(lua, &table, scene, console)?;
+    montage::register(lua, &table, scene, console)?;
 
     lua.globals()
         .set("Animator", table)

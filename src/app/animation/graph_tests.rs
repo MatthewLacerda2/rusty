@@ -77,6 +77,7 @@ fn locomotion() -> AnimationGraph {
             entry: "Idle".to_string(),
         },
         layers: Vec::new(),
+        ..AnimationGraph::default()
     }
 }
 

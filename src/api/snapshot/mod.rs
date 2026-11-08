@@ -15,6 +15,7 @@
 use glam::{Mat4, Vec3};
 use serde_json::{json, Value};
 
+mod animator;
 mod audio;
 mod components;
 mod fields;

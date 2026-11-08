@@ -54,12 +54,15 @@ pub fn set_looping(a: &mut AnimatorComponent, loop_clip: bool) {
 /// Set (or clear, with `None`) the animator's `AnimationGraph` asset path (#316).
 /// Resets the active-node state so the evaluator re-binds: its next step seeds the
 /// new graph's declared defaults and enters its entry node — and its layers'
-/// (#457), whose old state is dropped.
+/// (#457), whose old state is dropped. Every montage slot is emptied, firing
+/// nothing (#1894).
 pub fn set_graph(a: &mut AnimatorComponent, graph: Option<String>) {
     a.graph = graph;
     a.base.current_node = None;
     a.base.node_speed = 1.0;
     a.layers.clear();
+    // A montage is what a script just did against the old graph (#1894).
+    a.montages.clear();
 }
 
 /// Enable/disable graph auto-evaluation (#316). Disabled, the graph is inert and
