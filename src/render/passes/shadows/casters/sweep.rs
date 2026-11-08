@@ -15,11 +15,13 @@ pub(in crate::render::passes::shadows) enum Sweep {
 }
 
 impl Sweep {
+    /// Whether this is a cached bake of the static casters.
+    pub(super) fn baked(self) -> bool {
+        matches!(self, Sweep::Static | Sweep::AtlasStatic)
+    }
+
     /// Whether a caster whose static flag is `is_static` is drawn in this sweep.
     pub(super) fn takes(self, is_static: bool) -> bool {
-        match self {
-            Sweep::Static | Sweep::AtlasStatic => is_static,
-            Sweep::Dynamic | Sweep::AtlasDynamic => !is_static,
-        }
+        self.baked() == is_static
     }
 }
