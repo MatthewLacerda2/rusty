@@ -2,7 +2,9 @@
 //!
 //! The navmesh (#454) rasterises the geometry physics actually collides with, so it
 //! builds the same parry shape [`build_shape`] gives rapier (world scale baked in,
-//! Unity-style) and tessellates it at the entity's world pose. Boxes, hulls and
+//! Unity-style) and tessellates it at the entity's world pose. A concave mesh is
+//! its exact triangles here even on a dynamic body, whose physics shape is
+//! convex pieces (#1886): the bake wants the surface, not an approximation. Boxes, hulls and
 //! trimeshes come out exact; spheres, cylinders and capsules are tessellated finely
 //! enough for a grid whose cells are tens of centimetres wide.
 

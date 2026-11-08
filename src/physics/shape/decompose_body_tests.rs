@@ -89,3 +89,26 @@ fn a_fast_ball_that_ends_a_tick_inside_the_arch_is_pushed_out() {
     let y = scene.world.transform(ball).unwrap().position.y;
     assert!(y > 0.9, "the ball went into the arch's top: y = {y}");
 }
+
+#[test]
+fn a_ray_through_a_decomposed_arch_crosses_each_leg_and_the_whole_top() {
+    let mut scene = Scene::new();
+    let id = prop(&mut scene, arch(), Vec3::ZERO, false);
+    scene.world.rigidbody_mut(id).unwrap().use_gravity = false;
+    let world = PhysicsWorld::from_scene(&scene);
+    let thick = |y: f32| -> Vec<f32> {
+        let from = Vec3::new(-3.0, y, 0.0);
+        let crossings = world.raycast_through(from, Vec3::X, 10.0, |_| true);
+        crossings.iter().map(|c| c.thickness).collect()
+    };
+    let legs = thick(0.3);
+    assert_eq!(
+        legs.len(),
+        2,
+        "one crossing per leg, not one over the gap: {legs:?}"
+    );
+    assert!(legs.iter().all(|t| (t - 0.4).abs() < 0.1), "{legs:?}");
+    let top = thick(0.8);
+    assert_eq!(top.len(), 1, "the top's pieces read as one solid: {top:?}");
+    assert!((top[0] - 2.0).abs() < 0.1, "{top:?}");
+}
