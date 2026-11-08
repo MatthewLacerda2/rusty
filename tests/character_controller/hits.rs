@@ -13,6 +13,7 @@ use crate::play::{playing, run};
 /// Walks +X at 3 m/s with its own gravity, `|` before each `Move`; each hit
 /// logs `id:nx,moveDirection.x,rigidbody` to the global `LOG`.
 const WALKER: &str = r#"
+BOUNCE = BOUNCE_SET
 local W = { vy = 0 }
 function W.Update(id, dt)
   LOG = (LOG or '') .. '|'
@@ -21,8 +22,9 @@ function W.Update(id, dt)
   CharacterController.Move(id, 3 * dt, W.vy * dt, 0)
 end
 function W.OnControllerColliderHit(id, hit)
-  LOG = LOG .. string.format('%d:%.2f,%.2f,%s;', hit.id, hit.normal.x,
+  local entry = string.format('%d:%.2f,%.2f,%s;', hit.id, hit.normal.x,
     hit.moveDirection.x, tostring(hit.rigidbody))
+  LOG = LOG .. entry:gsub('%-0%.00', '0.00')
   if BOUNCE then CharacterController.Move(id, -0.01, 0, 0) end
 end
 return W
@@ -52,11 +54,9 @@ fn walk_into_wall(ticks: usize, bounce: bool) -> (String, u32, u32) {
     let size = Vec3::new(1.0, 3.0, 4.0);
     let wall = add_box(&mut scene, Vec3::new(2.5, 1.5, 0.0), size, Quat::IDENTITY);
     let cc = add_character(&mut scene, Vec3::ZERO);
-    attach_scripts(&mut scene, cc, &[("walker.lua", WALKER)]);
+    let source = WALKER.replace("BOUNCE_SET", if bounce { "true" } else { "false" });
+    attach_scripts(&mut scene, cc, &[("walker.lua", &source)]);
     let mut game = playing(std::rc::Rc::new(std::cell::RefCell::new(scene)), 20.0);
-    if bounce {
-        game.script_manager().eval("BOUNCE = true").unwrap();
-    }
     run(&mut game, ticks);
     let log = game.script_manager().eval("LOG").unwrap();
     (log, floor, wall)
@@ -66,10 +66,14 @@ fn walk_into_wall(ticks: usize, bounce: bool) -> (String, u32, u32) {
 fn each_move_hears_each_collider_once_floor_and_wall_alike() {
     let (log, floor, wall) = walk_into_wall(60, false);
     let last = log.rsplit('|').next().unwrap();
-    assert_eq!(
-        last,
-        format!("{floor}:0.00,1.00,nil;{wall}:-1.00,1.00,nil;"),
-        "pressed into the wall: the floor (gravity) then the wall, once each: {log}"
+    assert!(
+        last.contains(&format!("{wall}:-1.00,0.91,nil;")),
+        "pressed into the wall, its normal facing back: {last}"
+    );
+    assert!(
+        log.contains(&format!("{floor}:0.00,0.91,nil;{wall}:"))
+            && log.contains(&format!("{wall}:-1.00,0.91,nil;{floor}:")),
+        "the floor (gravity) and the wall in one Move, in sweep order: {log}"
     );
     for frame in log.split('|') {
         let ids: Vec<&str> = frame

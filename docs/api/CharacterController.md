@@ -57,9 +57,10 @@ the radius and skin width. `SetCenter` with a NaN or infinite part keeps the old
 Each `Move` calls **`OnControllerColliderHit(id, hit)`** on the scripts of the
 controller's entity (Unity's callback, #1879), before `Move` returns: once per
 collider the move touched, in the order the sweep met them. **Static colliders
-count**, as in Unity: a move that presses into the floor (gravity, every frame
-the character stands on it) reports the floor, so a script that only cares
-about walls checks `hit.normal.y`. A move that touched nothing calls nothing; a
+count**, as in Unity: a move that presses into the floor (its gravity) reports
+the floor, so a script that only cares about walls checks `hit.normal.y`. Not
+every grounded frame does: a move whose small downward part stays inside the
+skin gap touches nothing. A move that touched nothing calls nothing; a
 move root motion makes (an `Animator` driving the controller) reports its hits
 with the tick's `OnAnimationEvent`s instead. A handler that calls `Move` on its
 own controller moves it, but that nested move reports no hits (it would
@@ -83,7 +84,10 @@ refuse). The engine bundles Unity's documented one as
 dynamic body the controller walks into takes the walk's direction as its
 velocity, times its `push_power` field (default `2` m/s), keeping its own
 vertical speed. It skips kinematic bodies, static geometry and hits while moving
-down (`moveDirection.y < -0.3`: standing on the crate). Its core:
+down (`moveDirection.y < -0.3`: standing on the crate). `moveDirection` is the
+whole move's, gravity included, so a slow walk pressed hard into the ground
+(3 m/s with the player's `-1.33` m/s ground stick) reads as moving down and
+pushes nothing; the bundled player walks at 5 m/s and pushes. Its core:
 
 ```lua with=id:CharacterController
 local Push = { fields = { push_power = { type = "number", default = 2.0 } } }

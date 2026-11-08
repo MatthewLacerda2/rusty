@@ -179,4 +179,6 @@ mod armature_tests;
 #[cfg(test)]
 mod body_tests;
 #[cfg(test)]
+mod hits_tests;
+#[cfg(test)]
 mod tests;

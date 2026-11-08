@@ -14,13 +14,14 @@ use super::hits::attach_scripts;
 use super::{add_character, add_floor, pos_of};
 use crate::play::{playing, run};
 
-/// Walks +X at 3 m/s with its own gravity.
+/// Walks +X at 5 m/s with its own gravity, as the bundled player does (a slow
+/// walk pressed down hard reads as pushing down: `moveDirection.y < -0.3`).
 const WALKER: &str = r#"
 local W = { vy = 0 }
 function W.Update(id, dt)
   if CharacterController.IsGrounded(id) and W.vy < 0 then W.vy = -1 end
   W.vy = W.vy - 20 * dt
-  CharacterController.Move(id, 3 * dt, W.vy * dt, 0)
+  CharacterController.Move(id, 5 * dt, W.vy * dt, 0)
 end
 return W
 "#;
