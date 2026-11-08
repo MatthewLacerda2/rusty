@@ -19,7 +19,9 @@ mod container;
 
 use std::path::Path;
 
-pub use blocks::{decode_bc6h, decode_bc7, encode_bc6h, encode_bc7, to_rgba16f};
+pub use blocks::{
+    bc6h_level, bc6h_texels, decode_bc6h, decode_bc7, encode_bc6h, encode_bc7, to_rgba16f,
+};
 pub use container::{read, write};
 
 /// The suffix of the folder beside a scene file that holds its baked lightmap

@@ -94,7 +94,7 @@ fn gpu_bake_shows_room_and_mips_blur() {
     let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(5.0));
     let bytes = renderer.bake_reflection(&scene, &probe, RES).bytes;
 
-    let mips = parse_ktx2_cubemap_mips(&bytes).expect("baked KTX2 parses");
+    let mips = (parse_ktx2_cubemap_mips(&bytes).expect("baked KTX2 parses")).decoded();
     assert_eq!(mips.size, RES);
     assert!(mips.mips.len() >= 3, "expected a roughness mip chain");
 

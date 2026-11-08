@@ -23,7 +23,8 @@ use super::mip_count;
 use crate::core::color::{f16_to_f32, f32_to_f16};
 use crate::render::CubemapCapture;
 
-/// Bytes per texel of a baked cube: `Rgba16Float`, `R16G16B16A16_SFLOAT` in KTX2.
+/// Bytes per texel of a prefiltered cube before it is encoded, and of a baked cube
+/// decoded on an adapter without BC: `Rgba16Float`.
 pub(crate) const TEXEL_BYTES: usize = 8;
 
 /// The capture's source mip chain: level 0 the capture itself, each later level a
