@@ -158,9 +158,6 @@ pub fn advance(
 pub struct Stepped {
     pub events: Vec<Crossed>,
     pub root: Option<RootMotion>,
-    /// Each layer's current playhead travel this step (playhead units, index 0
-    /// the base layer); empty when nothing moved. What a state's time counts.
-    pub travel: Vec<f32>,
 }
 
 /// [`advance`], also measuring the step's root motion over the root bone
@@ -192,13 +189,11 @@ pub fn step(
         machine: graph.and_then(|g| g.machine(layer)),
         parameters,
     };
-    let mut travel = Vec::with_capacity(layers.len() + 1);
     // One layer's step: its events and, with a root bone, its root motion.
-    let mut advance_layer = |playback: &mut Playback, layer: usize| {
+    let advance_layer = |playback: &mut Playback, layer: usize| {
         let ctx = context(layer);
         let before = ctx.before_step(playback, bone.is_some());
         let (events, step) = ctx.advance(playback, dt, *speed, layer);
-        travel.push(step.span.1 - step.span.0);
         let root = before.and_then(|b| {
             let (skin, bone) = (skin?, bone.as_ref()?);
             ctx.playback_root(skin, bone, playback, step, &b)
@@ -226,11 +221,7 @@ pub fn step(
     let (rooted, base) = (skin.zip(bone.as_ref()), graph_layers.len() + 1);
     events.extend(montage::step(anim, clips, dt, base, rooted, &mut root));
     events::sort(&mut events);
-    Stepped {
-        events,
-        root,
-        travel,
-    }
+    Stepped { events, root }
 }
 
 /// A layer's root motion `delta` stacked over the `below` layers' at `weight`.

@@ -34,81 +34,91 @@ struct Active<'a> {
 }
 
 /// The state callbacks `anim`'s layers raise this step, in firing order, and
-/// the tracker brought up to date. `travel` is each layer's current-playhead
-/// travel this step ([`Stepped::travel`](super::Stepped)); `clips` and `graph`
-/// give the states' lengths and tags.
+/// the tracker brought up to date; `clips` and `graph` give the states'
+/// lengths and tags. A state's time counts each step's travel, which the step
+/// leaves on its playback ([`NodeStates::travel`](crate::components::NodeStates)).
 pub fn state_callbacks(
     anim: &mut AnimatorComponent,
     clips: &[AnimationClip],
     graph: Option<&AnimationGraph>,
-    travel: &[f32],
 ) -> Vec<StateCallback> {
     let layer_count = anim.layers.len() + 1;
     let mut tracker = std::mem::take(&mut anim.states);
-    tracker
-        .layers
-        .resize(layer_count.max(tracker.layers.len()), Vec::new());
+    let tracked = layer_count.max(tracker.layers.len());
+    tracker.layers.resize(tracked, Vec::new());
     let mut out = Vec::new();
     for (layer, prior) in tracker.layers.iter_mut().enumerate() {
-        let Some(playback) = playback(anim, layer) else {
-            out.extend(prior.drain(..).map(|r| exit(r.info)));
-            continue;
-        };
-        let machine = graph.and_then(|g| g.machine(layer));
-        let tag_of = |node: &str| {
-            let tag = machine.and_then(|m| m.node(node)).map(|n| n.tag.as_str());
-            tag.filter(|t| !t.is_empty()).map(str::to_string)
-        };
+        let moved = playback_mut(anim, layer).map_or(0.0, |p| std::mem::take(&mut p.states.travel));
         let ctx = MotionContext {
             clips,
-            machine,
+            machine: graph.and_then(|g| g.machine(layer)),
             parameters: &anim.parameters,
         };
-        let name = layer_name(anim, layer);
-        let moved = travel.get(layer).copied().unwrap_or(0.0);
-        let mut next = Vec::new();
-        let (mut entered, mut updated) = (Vec::new(), Vec::new());
-        for active in actives(playback) {
-            let known = prior
-                .iter()
-                .position(|r| r.node == active.node && r.entry == active.entry);
-            let total = match known.map(|i| prior.remove(i)) {
-                Some(r) if r.current && active.current => r.total + moved,
-                Some(r) => r.total + (active.raw - r.raw),
-                None => active.raw,
-            };
-            let info = StateInfo {
-                layer,
-                layer_name: name.clone(),
-                state: active.node.to_string(),
-                tag: tag_of(active.node),
-                ..timing(&ctx, active.motion, total)
-            };
-            let list = if known.is_some() {
-                &mut updated
-            } else {
-                &mut entered
-            };
-            list.push(info.clone());
-            next.push(Reported {
-                node: active.node.to_string(),
-                entry: active.entry,
-                raw: active.raw,
-                total,
-                current: active.current,
-                info,
-            });
-        }
-        out.extend(prior.drain(..).map(|r| exit(r.info)));
-        let callback = |event| move |info| StateCallback { event, info };
-        out.extend(entered.into_iter().map(callback(StateEvent::Enter)));
-        out.extend(updated.into_iter().map(callback(StateEvent::Update)));
-        *prior = next;
+        *prior = diff_layer(anim, layer, &ctx, std::mem::take(prior), moved, &mut out);
     }
     tracker.layers.truncate(layer_count);
     refresh_tags(anim, graph);
     anim.states = tracker;
     out
+}
+
+/// Layer `layer`'s callbacks against its `prior` reported states, appended to
+/// `out`; returns the states it reports now. `moved` is its current
+/// playhead's travel this step.
+fn diff_layer(
+    anim: &AnimatorComponent,
+    layer: usize,
+    ctx: &MotionContext<'_>,
+    mut prior: Vec<Reported>,
+    moved: f32,
+    out: &mut Vec<StateCallback>,
+) -> Vec<Reported> {
+    let tag_of = |node: &str| {
+        let tag = ctx
+            .machine
+            .and_then(|m| m.node(node))
+            .map(|n| n.tag.as_str());
+        tag.filter(|t| !t.is_empty()).map(str::to_string)
+    };
+    let actives = playback(anim, layer).map_or_else(Vec::new, actives);
+    let (mut next, mut entered, mut updated) = (Vec::new(), Vec::new(), Vec::new());
+    for active in actives {
+        let known = prior
+            .iter()
+            .position(|r| r.node == active.node && r.entry == active.entry);
+        let total = match known.map(|i| prior.remove(i)) {
+            Some(r) if r.current && active.current => r.total + moved,
+            Some(r) => r.total + (active.raw - r.raw),
+            None => active.raw,
+        };
+        let info = StateInfo {
+            layer,
+            layer_name: layer_name(anim, layer),
+            state: active.node.to_string(),
+            tag: tag_of(active.node),
+            ..timing(ctx, active.motion, total)
+        };
+        [&mut entered, &mut updated][usize::from(known.is_some())].push(info.clone());
+        next.push(active.reported(total, info));
+    }
+    out.extend(prior.into_iter().map(|r| exit(r.info)));
+    let callback = |event| move |info| StateCallback { event, info };
+    out.extend(entered.into_iter().map(callback(StateEvent::Enter)));
+    out.extend(updated.into_iter().map(callback(StateEvent::Update)));
+    next
+}
+
+impl Active<'_> {
+    fn reported(&self, total: f32, info: StateInfo) -> Reported {
+        Reported {
+            node: self.node.to_string(),
+            entry: self.entry,
+            raw: self.raw,
+            total,
+            current: self.current,
+            info,
+        }
+    }
 }
 
 fn exit(info: StateInfo) -> StateCallback {
@@ -123,6 +133,13 @@ fn playback(anim: &AnimatorComponent, layer: usize) -> Option<&Playback> {
     match layer {
         0 => Some(&anim.base),
         i => anim.layers.get(i - 1).map(|l| &l.playback),
+    }
+}
+
+fn playback_mut(anim: &mut AnimatorComponent, layer: usize) -> Option<&mut Playback> {
+    match layer {
+        0 => Some(&mut anim.base),
+        i => anim.layers.get_mut(i - 1).map(|l| &mut l.playback),
     }
 }
 

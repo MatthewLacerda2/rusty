@@ -212,6 +212,7 @@ impl MotionContext<'_> {
         let at = (playback.previous_time, playback.previous_loop);
         self.track_leaves(playback.previous_motion(), at, &mut leaves);
         playback.sync.previous_leaves = leaves;
+        playback.states.travel = step.span.1 - step.span.0; // a state's time (#1901)
         (self.crossed(playback, current, step, layer), step)
     }
 

@@ -40,8 +40,8 @@ fn rig() -> (AnimatorComponent, MeshComponent, AnimationGraph) {
 /// One fixed step — evaluate, advance, diff — as `Enter A@0`-style lines.
 fn tick(anim: &mut AnimatorComponent, mesh: &MeshComponent, graph: &AnimationGraph) -> Vec<String> {
     step_graph(anim, graph);
-    let stepped = step(anim, Some(mesh), Some(graph), DT);
-    let callbacks = state_callbacks(anim, &mesh.clips, Some(graph), &stepped.travel);
+    step(anim, Some(mesh), Some(graph), DT);
+    let callbacks = state_callbacks(anim, &mesh.clips, Some(graph));
     callbacks
         .iter()
         .map(|c| format!("{:?} {}@{}", c.event, c.info.state, c.info.layer))
@@ -134,13 +134,8 @@ fn two_runs_raise_the_same_sequence() {
                 anim.enter_node(graph.node("C").unwrap(), 0.0);
             }
             step_graph(&mut anim, &graph);
-            let stepped = step(&mut anim, Some(&mesh), Some(&graph), DT);
-            all.extend(state_callbacks(
-                &mut anim,
-                &mesh.clips,
-                Some(&graph),
-                &stepped.travel,
-            ));
+            step(&mut anim, Some(&mesh), Some(&graph), DT);
+            all.extend(state_callbacks(&mut anim, &mesh.clips, Some(&graph)));
         }
         all
     };

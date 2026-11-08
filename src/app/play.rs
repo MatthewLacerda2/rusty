@@ -211,10 +211,9 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
 /// own `Move` raises its hits inside the call, but root motion moves outside any
 /// script, so its hits wait for this point, the animation step's callbacks.
 fn dispatch_animation_events(_world: &mut World, res: &mut Resources) {
-    let states = std::mem::take(&mut res.state_callbacks);
-    res.script_manager.dispatch_state_callbacks(&states);
-    let events = std::mem::take(&mut res.animation_events);
-    res.script_manager.dispatch_animation_events(&events);
+    let queued = std::mem::take(&mut res.animation_events);
+    res.script_manager.dispatch_state_callbacks(&queued.states);
+    res.script_manager.dispatch_animation_events(&queued.events);
     let hits = std::mem::take(&mut res.controller_hits);
     res.script_manager.dispatch_queued_controller_hits(&hits);
 }

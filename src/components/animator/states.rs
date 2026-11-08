@@ -29,6 +29,9 @@ pub struct NodeStates {
     pub entry: u32,
     /// The entry of `previous_node`.
     pub previous_entry: u32,
+    /// The current playhead's travel in its last step (playhead units), until
+    /// the state diff takes it.
+    pub travel: f32,
 }
 
 impl NodeStates {

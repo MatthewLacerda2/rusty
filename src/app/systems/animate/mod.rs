@@ -63,7 +63,7 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
         let stepped = s.world.with_animator_mut_and_mesh(id, |anim, mesh| {
             let stepped = animation::step(anim, mesh, graph, dt);
             let clips = mesh.map_or(&[][..], |m| &m.clips[..]);
-            let states = animation::state_callbacks(anim, clips, graph, &stepped.travel);
+            let states = animation::state_callbacks(anim, clips, graph);
             let skin = mesh.and_then(|m| m.skin.as_ref());
             let model = model_in_entity(skin);
             let motion = stepped
@@ -85,10 +85,10 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
                 "Animator on '{name}' ({id}): root bone '{bone}' is not in its skeleton; root motion moves nothing"
             ));
         }
-        res.state_callbacks
-            .extend(states.into_iter().map(|c| (id, c)));
+        let queue = &mut res.animation_events;
+        queue.states.extend(states.into_iter().map(|c| (id, c)));
         let events = crossed.into_iter().map(|e| (id, e.name, e.montage));
-        res.animation_events.extend(events);
+        queue.events.extend(events);
         for (bone, local) in writes.unwrap_or_default() {
             if let Some(mut t) = s.world.transform_mut(bone) {
                 *t = local;

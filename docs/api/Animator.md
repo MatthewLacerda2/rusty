@@ -290,7 +290,8 @@ So a crossfade from *A* to *B* fires `Enter(B)` as it starts, `Update(A)` and
 `Exit(A)` then `Enter(B)` in one step. Re-entering the playing state (a
 self-transition, `PlayNode` on the current node) exits it and enters it again.
 Every layer fires, whatever its weight, so a game can keep its decision states
-on a weight-0 layer of their own. A raw `Play` / `Crossfade` of a clip changes
+on a weight-0 layer of their own, and a stopped or paused animator's states
+still update (their `time` holds), as with Unity's speed 0. A raw `Play` / `Crossfade` of a clip changes
 no state (the node stays current), though one that ends a crossfade between
 two nodes exits the node it was leaving.
 
