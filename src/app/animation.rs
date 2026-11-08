@@ -178,7 +178,6 @@ pub fn step(
         layers,
         parameters,
         speed,
-        montages,
         ..
     } = anim;
     let context = |layer: usize| MotionContext {
@@ -216,14 +215,8 @@ pub fn step(
         }
     }
     // The montages' slots sit above every layer (#1894).
-    let rooted = skin
-        .zip(bone.as_ref())
-        .map(|(skin, bone)| montage::Root { skin, bone });
-    let layer_base = graph_layers.len() + 1;
-    let speeds = (dt, *speed);
-    events.extend(montage::step(
-        montages, clips, speeds, layer_base, rooted, &mut root,
-    ));
+    let (rooted, base) = (skin.zip(bone.as_ref()), graph_layers.len() + 1);
+    events.extend(montage::step(anim, clips, dt, base, rooted, &mut root));
     events::sort(&mut events);
     Stepped { events, root }
 }
@@ -270,12 +263,6 @@ mod end_resolve_tests;
 mod end_tests;
 #[cfg(test)]
 mod layer_tests;
-#[cfg(test)]
-mod montage_play_tests;
-#[cfg(test)]
-mod montage_root_tests;
-#[cfg(test)]
-mod montage_tests;
 #[cfg(test)]
 mod nested_pose_tests;
 #[cfg(test)]

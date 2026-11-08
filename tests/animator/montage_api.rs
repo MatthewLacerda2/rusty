@@ -32,66 +32,43 @@ fn with_flinch() -> (Rc<RefCell<Scene>>, u32) {
 #[test]
 fn a_clip_plays_as_a_montage_and_the_reads_see_it() {
     let (scene, id) = with_flinch();
-    assert_eq!(
-        run(&scene, &format!("Animator.IsMontagePlaying({id})")),
-        "false"
-    );
-    assert_eq!(
-        run(&scene, &format!("Animator.PlayMontage({id}, 'Flinch')")),
-        "true"
-    );
-    let read = format!("select(2, Animator.GetMontage({id}, 'DefaultSlot'))");
-    assert_eq!(run(&scene, &read), "Default");
-    let read = format!("Animator.GetMontage({id}, 'DefaultSlot')");
-    assert_eq!(run(&scene, &read), "Flinch");
-    assert_eq!(
+    // `Animator.<call>` with the rig's id spliced in for `ID`.
+    let call = |c: &str| {
         run(
             &scene,
-            &format!("Animator.IsMontagePlaying({id}, 'DefaultSlot')")
-        ),
-        "true"
-    );
+            &format!("Animator.{}", c.replace("ID", &id.to_string())),
+        )
+    };
+    let expect = [
+        ("IsMontagePlaying(ID)", "false"),
+        ("PlayMontage(ID, 'Flinch')", "true"),
+        ("GetMontage(ID, 'DefaultSlot')", "Flinch"),
+        ("IsMontagePlaying(ID, 'DefaultSlot')", "true"),
+        ("JumpToSection(ID, 'Default')", "true"),
+        ("SetNextSection(ID, 'Default', 'Default')", "true"),
+        ("SetNextSection(ID, 'Default', 'Nope')", "false"),
+        ("StopMontage(ID, 'DefaultSlot', 0)", "true"),
+        ("IsMontagePlaying(ID)", "false"),
+        ("StopMontage(ID)", "false"),
+        ("PlayMontage(ID, 'Flinch')", "true"),
+    ];
+    for (c, want) in expect {
+        assert_eq!(call(c), want, "{c}");
+        if c == "GetMontage(ID, 'DefaultSlot')" {
+            let section = format!("select(2, Animator.GetMontage({id}, 'DefaultSlot'))");
+            assert_eq!(run(&scene, &section), "Default");
+        }
+    }
     assert!(scene.borrow().world.animator(id).unwrap().is_playing);
-    assert_eq!(
-        run(&scene, &format!("Animator.JumpToSection({id}, 'Default')")),
-        "true"
-    );
-    assert_eq!(
-        run(
-            &scene,
-            &format!("Animator.SetNextSection({id}, 'Default', 'Default')")
-        ),
-        "true"
-    );
-    assert_eq!(
-        run(
-            &scene,
-            &format!("Animator.SetNextSection({id}, 'Default', 'Nope')")
-        ),
-        "false"
-    );
-    assert_eq!(
-        run(
-            &scene,
-            &format!("Animator.StopMontage({id}, 'DefaultSlot', 0)")
-        ),
-        "true"
-    );
-    assert_eq!(
-        run(&scene, &format!("Animator.IsMontagePlaying({id})")),
-        "false"
-    );
-    assert_eq!(run(&scene, &format!("Animator.StopMontage({id})")), "false");
-    run(&scene, &format!("Animator.PlayMontage({id}, 'Flinch')"));
-    run(&scene, &format!("Animator.SetGraph({id}, '')"));
-    let anim = scene
+    call("SetGraph(ID, '')");
+    let empty = scene
         .borrow()
         .world
         .animator(id)
         .unwrap()
         .montages
         .is_empty();
-    assert!(anim, "a new graph empties every slot, firing nothing");
+    assert!(empty, "a new graph empties every slot, firing nothing");
 }
 
 #[test]

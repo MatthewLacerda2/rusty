@@ -2,8 +2,8 @@
 //! and weights ramp over the blends while markers and the two engine events
 //! fire once each. The helpers here serve every montage test.
 
-use super::test_rig::*;
-use super::*;
+use super::super::test_rig::*;
+use super::super::*;
 use crate::asset::animation_graph::{GraphSlot, Montage};
 use crate::components::{ActiveMontage, Motion, MONTAGE_BLEND_OUT, MONTAGE_END};
 

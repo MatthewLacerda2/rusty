@@ -2,9 +2,9 @@
 //! once, a looping section holds until a jump, and a clip plays as a montage
 //! with no graph.
 
-use super::montage_tests::{count, rig, run, start, with_montages, UPPER};
-use super::test_rig::*;
-use super::*;
+use super::super::test_rig::*;
+use super::super::*;
+use super::tests::{count, rig, run, start, with_montages, UPPER};
 use crate::components::{ActiveMontage, MontageRefused, Motion, MONTAGE_BLEND_OUT, MONTAGE_END};
 
 #[test]

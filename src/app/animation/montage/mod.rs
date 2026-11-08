@@ -1,4 +1,4 @@
-//! src/app/animation/montage.rs — playing montages over the layers (#1894).
+//! src/app/animation/montage/ — playing montages over the layers (#1894).
 //!
 //! Each step, every montage an animator plays ([`Montages`]):
 //! - blends in over its `blend_in` and out over its blend out, on unscaled
@@ -22,7 +22,7 @@
 use crate::asset::anim_data::AnimationClip;
 use crate::asset::mesh_data::SkinData;
 use crate::components::{
-    ActiveMontage, Bounds, Montages, RootMotion, MONTAGE_BLEND_OUT, MONTAGE_END,
+    ActiveMontage, AnimatorComponent, Bounds, Montages, RootMotion, MONTAGE_BLEND_OUT, MONTAGE_END,
 };
 
 use super::clip::{driven_slots, sampled_locals};
@@ -71,23 +71,19 @@ pub(super) fn compose(
     }
 }
 
-/// What the root motion of a step is measured against.
-pub(super) struct Root<'a> {
-    pub skin: &'a SkinData,
-    pub bone: &'a RootBone,
-}
-
-/// Advance every montage by `dt` at the animator's `speed`, returning the
+/// Advance every montage of `anim` by `dt` at its speed, returning the
 /// events crossed; each montage's layer index is `layer_base` + its slot's
-/// place. Its root motion stacks onto `root`.
+/// place. With the skin and its root bone (`rooted`), their root motion
+/// stacks onto `root`.
 pub(super) fn step(
-    montages: &mut Montages,
+    anim: &mut AnimatorComponent,
     clips: &[AnimationClip],
-    (dt, speed): (f32, f32),
+    dt: f32,
     layer_base: usize,
-    rooted: Option<Root<'_>>,
+    rooted: Option<(&SkinData, &RootBone)>,
     root: &mut Option<RootMotion>,
 ) -> Vec<Crossed> {
+    let (montages, speed) = (&mut anim.montages, anim.speed);
     let mut events: Vec<Crossed> = std::mem::take(&mut montages.pending)
         .into_iter()
         .map(|name| Crossed {
@@ -116,7 +112,7 @@ pub(super) fn step(
         if m.out.is_none() && ends_within_blend_out(m, rate) && m.blend_out(m.montage.blend_out) {
             events.push(event(MONTAGE_BLEND_OUT, 1.0));
         }
-        if let Some(r) = &rooted {
+        if let Some(r) = rooted {
             add_root(m, clips, r, &segments, root);
         }
         if m.out.is_some_and(|o| o.elapsed >= o.duration) {
@@ -212,20 +208,20 @@ fn ends_within_blend_out(m: &ActiveMontage, rate: f32) -> bool {
 fn add_root(
     m: &ActiveMontage,
     clips: &[AnimationClip],
-    r: &Root<'_>,
+    (skin, bone): (&SkinData, &RootBone),
     segments: &[Segment],
     root: &mut Option<RootMotion>,
 ) {
     let weight = m.weight();
-    let covers = mask_slots(r.skin, &m.slot.mask).get(r.bone.slot()) == Some(&true);
+    let covers = mask_slots(skin, &m.slot.mask).get(bone.slot()) == Some(&true);
     let Some(clip) = find(clips, &m.montage.clip) else {
         return;
     };
-    if weight <= 0.0 || !covers || !r.bone.keyed_by(clip) {
+    if weight <= 0.0 || !covers || !bone.keyed_by(clip) {
         return;
     }
     let delta = segments.iter().fold(RootMotion::ZERO, |acc, seg| {
-        acc.then(r.bone.travel(r.skin, clip, Bounds::Open, 1.0, seg.span))
+        acc.then(bone.travel(skin, clip, Bounds::Open, 1.0, seg.span))
     });
     let below = root.unwrap_or_default();
     *root = Some(super::stack(below, delta, m.slot.blending, weight));
@@ -250,3 +246,10 @@ fn finite(x: f32) -> f32 {
         x.clamp(f32::MIN, f32::MAX)
     }
 }
+
+#[cfg(test)]
+mod play_tests;
+#[cfg(test)]
+mod root_tests;
+#[cfg(test)]
+mod tests;

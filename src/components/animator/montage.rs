@@ -23,7 +23,7 @@ pub const MONTAGE_BLEND_OUT: &str = "MontageBlendOut";
 /// Fired when a montage has fully blended out and is gone (`OnMontageEnded`).
 pub const MONTAGE_END: &str = "MontageEnd";
 /// The one section of a montage that declares none.
-pub const DEFAULT_SECTION: &str = "Default";
+const DEFAULT_SECTION: &str = "Default";
 
 /// Every montage an animator plays, and the engine events a script call queued.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -47,7 +47,7 @@ pub struct BlendOut {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ActiveMontage {
     /// What plays; its sections never empty (a montage declaring none gets
-    /// one [`DEFAULT_SECTION`] spanning the clip).
+    /// one `"Default"` section spanning the clip).
     pub montage: Montage,
     pub slot: GraphSlot,
     /// The slot's place in the slot stack (`AnimationGraph::slot`).

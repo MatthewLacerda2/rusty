@@ -1,9 +1,9 @@
 //! Montages (#1894): a full-body montage's root motion moves the entity, a
 //! masked one's does not, and two runs of the same inputs pose identically.
 
-use super::montage_tests::{start, with_montages, DT};
-use super::test_rig::*;
-use super::*;
+use super::super::test_rig::*;
+use super::super::*;
+use super::tests::{start, with_montages, DT};
 use crate::components::{Motion, RootMotion};
 
 /// The hips lunge 2 m along +X over one second; the legs idle.
