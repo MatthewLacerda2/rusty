@@ -15,13 +15,13 @@ use super::Tracer;
 
 /// Trace about `count` texels of `scene` spread evenly over its receiving meshes,
 /// on `threads` workers, exactly as the bake traces each one; returns how many
-/// were traced.
+/// were traced, and how many rays that cast (a cost that holds on any machine).
 pub fn trace_texels(
     scene: &BakeScene,
     settings: &BakeSettings,
     count: usize,
     threads: usize,
-) -> usize {
+) -> (usize, u64) {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer::new(scene, &rays);
     let max = max_map_edge(settings.page());
@@ -56,5 +56,6 @@ pub fn trace_texels(
             });
         }
     });
-    points.len()
+    let cast = rays.cast.load(std::sync::atomic::Ordering::Relaxed);
+    (points.len(), cast)
 }

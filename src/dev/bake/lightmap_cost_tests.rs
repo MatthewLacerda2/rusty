@@ -4,7 +4,8 @@
 //! traces a spread of texels (`lightmap::trace_texels`) of the occlusion bench's
 //! levels, lit three lamps a room (two points and an Area panel, a spot in every
 //! fifth room) with a few emissive props, at the default bake settings, and
-//! prints texels per second on 4 threads.
+//! prints texels per second on 4 threads. The gate beside it counts rays, never
+//! time: a timing is not deterministic (`docs/testing.md`).
 
 use std::time::Instant;
 
@@ -69,7 +70,7 @@ fn lightmap_trace_cost() {
     for (name, n, count) in [("Kolvik-sized", 5, 12000), ("Dust2-sized", 20, 6000)] {
         let scene = lit_level(n);
         let t = Instant::now();
-        let traced = trace_texels(&scene, &settings, count, 4);
+        let (traced, _) = trace_texels(&scene, &settings, count, 4);
         let secs = t.elapsed().as_secs_f64();
         println!(
             "{name}: {} meshes, {} lights, {traced} texels in {secs:.2} s, {:.0} texels/s",
@@ -104,22 +105,21 @@ fn crowded(lamps: usize) -> BakeScene {
 }
 
 #[test]
-fn a_hundred_and_fifty_lamps_cost_a_small_factor_of_one() {
+fn a_hundred_and_fifty_lamps_cast_a_small_factor_of_ones_rays() {
+    // The rays cast are the bake's cost: one pick per path vertex, however many
+    // lamps are in range, plus the texel's own shadow ray per `Baked` lamp.
     let settings = BakeSettings {
         samples: 16,
         ..Default::default()
     };
-    let (one, many) = (crowded(1), crowded(150));
-    let time = |scene: &BakeScene| {
-        let t = Instant::now();
-        trace_texels(scene, &settings, 96, 1);
-        t.elapsed().as_secs_f64()
-    };
-    // Interleaved, best of three: a busy machine slows both alike.
-    let (mut a, mut b) = (f64::MAX, f64::MAX);
-    for _ in 0..3 {
-        (a, b) = (a.min(time(&one)), b.min(time(&many)));
-    }
-    println!("1 lamp {a:.3} s, 150 lamps {b:.3} s: {:.2}×", b / a);
-    assert!(b < a * 3.0, "150 lamps {b:.3} s against one's {a:.3} s");
+    let rays = |lamps| trace_texels(&crowded(lamps), &settings, 96, 1).1;
+    let (one, many) = (rays(1), rays(150));
+    println!(
+        "1 lamp {one} rays, 150 lamps {many}: {:.2}×",
+        many as f64 / one as f64
+    );
+    assert!(
+        many < one * 3,
+        "150 lamps cast {many} rays against one's {one}"
+    );
 }

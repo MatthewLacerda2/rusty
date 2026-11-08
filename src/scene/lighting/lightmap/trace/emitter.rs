@@ -1,8 +1,12 @@
 //! Emissive surfaces as lights (#1883): every material run that emits and that a
 //! bounce ray could see becomes one [`Emitter`], its triangles an area light a
 //! path vertex aims shadow rays at, so a small bright panel is found on purpose
-//! rather than by a bounce ray's luck. The tracer then counts no emission where a
-//! bounce ray lands, so no emitted light is counted twice.
+//! rather than by a bounce ray's luck. A bounce ray that lands on an emitter
+//! still counts its glow (`Tracer::glow`), and the two strategies split the light
+//! by MIS, the balance heuristic: at any point of an emitter, the next-event
+//! share and the bounce share sum to one, so no emitted light is counted twice
+//! and none is lost. Both look past the same triangles (those a bounce ray sees,
+//! `Tracer::unhidden`), which that sum needs.
 
 use glam::Vec3;
 

@@ -285,8 +285,13 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   in range and the emissive surfaces near it, by how much each could light it (#1883,
   Unity's Progressive Lightmapper does the same): a level with 150 lamps bakes about as
   fast as one with a few, and a small bright emissive panel bakes smooth instead of
-  speckled. Past the second bounce a dim path may end early (Russian roulette); none of
-  it changes what the bake converges to.
+  speckled. Past the second bounce a dim path may end early (Russian roulette), which
+  changes only the noise. What the bake converges to changes in one way: a strong
+  emitter (emission past about 10) lights its surroundings brighter than before, since
+  its light now arrives through those aimed samples rather than through bounce paths
+  the per-path clamp (Blender's *Clamp Indirect*) cut down. Each path is still clamped,
+  the texel's own sample of an emitter included, so the pool right beside a very
+  bright emitter still bakes under its true value.
   `texelsPerUnit` (default `8`) is the lightmap resolution per world unit, times each
   mesh's **Scale In Lightmap** (below). A mesh's lightmap follows its surface area at that
   density, from 4 texels square up to the largest map one atlas page holds with its

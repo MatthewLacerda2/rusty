@@ -105,7 +105,7 @@ pub(super) struct Tracer<'a> {
 impl<'a> Tracer<'a> {
     /// The tracer over `scene`, its rays cast against `rays`.
     pub(super) fn new(scene: &'a BakeScene, rays: &'a Rays) -> Self {
-        let sources = Sources::build(scene);
+        let sources = Sources::build(scene, &rays.tris);
         Self {
             scene,
             rays,

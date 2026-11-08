@@ -2,8 +2,12 @@
 //! influence, so a path vertex weighs only the lamps in range of it (and the
 //! emitters near it), however many the level holds. A source lands in every cell
 //! its sphere's box touches; one with no finite reach (a directional, a NaN or
-//! unbounded range) is in every cell, through `global`. Built once per bake, read
-//! by every vertex.
+//! unbounded range) is in every cell, through `global`. The grid spans the spheres'
+//! bounds clipped to the scene's geometry (`clip`), so one long-range lamp (a
+//! 1000 m point standing in for a sun) does not stretch every cell to tens of
+//! metres; a point outside the grid (a probe above the level) is offered the
+//! spheres that spill past it and hold it (`spill`). Built once per bake, read by
+//! every vertex.
 
 use glam::Vec3;
 
@@ -13,6 +17,12 @@ use super::super::input::{BakeLight, LightShape};
 const MAX_CELLS: f32 = 64.0;
 /// The smallest cell edge, in world units.
 const MIN_CELL: f32 = 2.0;
+/// How far past the geometry's bounds the grid reaches, in world units: the
+/// offset hit points and texels a hair off the outermost surfaces stay inside.
+const CLIP_PAD: f32 = 0.5;
+
+/// A box, low and high corners.
+pub(super) type Bounds = (Vec3, Vec3);
 
 /// The sources by cell: `items[starts[c]..starts[c + 1]]` are cell `c`'s, each in
 /// ascending lamp order, so a walk over them is deterministic.
@@ -24,6 +34,9 @@ pub(super) struct LightGrid {
     starts: Vec<u32>,
     items: Vec<u32>,
     global: Vec<u32>,
+    /// The bounded items whose sphere's box reaches past the grid, with that box,
+    /// in ascending order: all a point outside the grid can be reached by.
+    spill: Vec<(u32, Bounds)>,
 }
 
 /// The sphere lamp `light` lights, if it has a finite one.
@@ -40,14 +53,15 @@ fn reach(light: &BakeLight) -> Option<(Vec3, f32)> {
 }
 
 impl LightGrid {
-    /// The grid of `lights`, each by its sphere of influence.
-    pub(super) fn build(lights: &[BakeLight]) -> Self {
-        Self::of(lights.iter().map(reach).collect())
+    /// The grid of `lights`, each by its sphere of influence, over at most `clip`.
+    pub(super) fn build(lights: &[BakeLight], clip: Option<Bounds>) -> Self {
+        Self::of(lights.iter().map(reach).collect(), clip)
     }
 
     /// The grid of `spheres` (centre, radius), item `i` reaching only inside the
-    /// `i`th; one with `None` (or not finite) reaches everywhere.
-    pub(super) fn of(spheres: Vec<Option<(Vec3, f32)>>) -> Self {
+    /// `i`th; one with `None` (or not finite) reaches everywhere. Its cells cover
+    /// the spheres' bounds, cut to `clip` (padded by [`CLIP_PAD`]) when given.
+    pub(super) fn of(spheres: Vec<Option<(Vec3, f32)>>, clip: Option<Bounds>) -> Self {
         let finite =
             |s: Option<(Vec3, f32)>| s.filter(|(c, r)| c.is_finite() && r.is_finite() && *r >= 0.0);
         let spheres: Vec<_> = spheres.into_iter().map(finite).collect();
@@ -59,12 +73,20 @@ impl LightGrid {
             .clone()
             .fold(Vec3::INFINITY, |m, (c, r)| m.min(*c - *r));
         let hi = bounded.fold(Vec3::NEG_INFINITY, |m, (c, r)| m.max(*c + *r));
+        let (lo, hi) = match clip.filter(|(a, b)| a.is_finite() && b.is_finite()) {
+            Some((a, b)) => (lo.max(a - CLIP_PAD), hi.min(b + CLIP_PAD)),
+            None => (lo, hi),
+        };
         let mut grid = LightGrid {
             global,
             ..Default::default()
         };
+        let boxes = spheres.iter().enumerate().filter_map(|(i, s)| {
+            s.map(|(c, r)| (i as u32, (c - Vec3::splat(r), c + Vec3::splat(r))))
+        });
         if !(lo.cmple(hi).all()) {
-            return grid; // No bounded lamp.
+            grid.spill = boxes.collect(); // No cell: every bounded item spills.
+            return grid;
         }
         let extent = (hi - lo).max_element();
         grid.cell = (extent / MAX_CELLS).max(MIN_CELL);
@@ -73,13 +95,20 @@ impl LightGrid {
         let size = hi - lo;
         grid.dims = [span(size.x), span(size.y), span(size.z)];
         let mut buckets = vec![Vec::new(); grid.dims.iter().product()];
-        for (i, sphere) in spheres.iter().enumerate() {
-            let Some((c, r)) = sphere else { continue };
-            let (a, b) = (grid.coords(*c - *r), grid.coords(*c + *r));
+        let span = grid.span();
+        for (i, (a, b)) in boxes {
+            if b.cmplt(span.0).any() || a.cmpgt(span.1).any() {
+                grid.spill.push((i, (a, b))); // Wholly outside the cells.
+                continue;
+            }
+            if a.cmplt(span.0).any() || b.cmpgt(span.1).any() {
+                grid.spill.push((i, (a, b)));
+            }
+            let (a, b) = (grid.coords(a), grid.coords(b));
             for z in a[2]..=b[2] {
                 for y in a[1]..=b[1] {
                     for x in a[0]..=b[0] {
-                        buckets[grid.index([x, y, z])].push(i as u32);
+                        buckets[grid.index([x, y, z])].push(i);
                     }
                 }
             }
@@ -103,22 +132,32 @@ impl LightGrid {
         ]
     }
 
+    /// The box the cells cover.
+    fn span(&self) -> Bounds {
+        let dims = Vec3::new(
+            self.dims[0] as f32,
+            self.dims[1] as f32,
+            self.dims[2] as f32,
+        );
+        (self.origin, self.origin + dims * self.cell)
+    }
+
     fn index(&self, [x, y, z]: [usize; 3]) -> usize {
         (z * self.dims[1] + y) * self.dims[0] + x
     }
 
     /// Every lamp that may reach `p`: the unbounded ones, then those whose sphere
-    /// touches `p`'s cell. A point outside every sphere's box gets only the first.
+    /// touches `p`'s cell, or for a point outside the cells, the spilling ones
+    /// whose box holds it. A point outside every sphere's box gets only the first.
     pub(super) fn near(&self, p: Vec3) -> impl Iterator<Item = usize> + '_ {
         let inside = self.starts.len() > 1 && {
-            let f = (p - self.origin) / self.cell;
-            let dims = Vec3::new(
-                self.dims[0] as f32,
-                self.dims[1] as f32,
-                self.dims[2] as f32,
-            );
-            f.cmpge(Vec3::ZERO).all() && f.cmple(dims).all()
+            let (lo, hi) = self.span();
+            p.cmpge(lo).all() && p.cmple(hi).all()
         };
+        let spill = self
+            .spill
+            .iter()
+            .filter(move |(_, (a, b))| !inside && p.cmpge(*a).all() && p.cmple(*b).all());
         let cell: &[u32] = match inside {
             true => {
                 let c = self.index(self.coords(p));
@@ -126,6 +165,11 @@ impl LightGrid {
             }
             false => &[],
         };
-        self.global.iter().chain(cell).map(|&i| i as usize)
+        let spill = spill.map(|(i, _)| i);
+        self.global
+            .iter()
+            .chain(cell)
+            .chain(spill)
+            .map(|&i| i as usize)
     }
 }

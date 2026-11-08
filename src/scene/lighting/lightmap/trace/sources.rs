@@ -35,11 +35,20 @@ pub(super) struct Sources {
 }
 
 impl Sources {
-    pub(super) fn build(scene: &BakeScene) -> Self {
+    /// The sources of `scene`, their grids clipped to the bounds of `tris` (every
+    /// triangle a ray can meet, so every point a path reaches).
+    pub(super) fn build(scene: &BakeScene, tris: &[Tri]) -> Self {
         let (emitters, by_run) = emitters(scene);
+        let clip = tris
+            .iter()
+            .flat_map(|t| [t.a, t.a + t.e1, t.a + t.e2])
+            .fold((Vec3::INFINITY, Vec3::NEG_INFINITY), |(lo, hi), p| {
+                (lo.min(p), hi.max(p))
+            });
+        let clip = Some(clip).filter(|(lo, hi)| lo.cmple(*hi).all());
         Self {
-            grid: LightGrid::build(&scene.lights),
-            near: LightGrid::of(emitters.iter().map(|e| Some(e.reach())).collect()),
+            grid: LightGrid::build(&scene.lights, clip),
+            near: LightGrid::of(emitters.iter().map(|e| Some(e.reach())).collect(), clip),
             emitters,
             by_run,
         }

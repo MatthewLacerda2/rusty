@@ -112,7 +112,7 @@ impl Tracer<'_> {
                 let share = arrived.map_or(1.0, |(to, _, _, pdf)| {
                     balance(chance * pdf, normal.dot(to) / PI)
                 });
-                let (lit, dir) = self.shadowed(point, arrived.map(|(to, d, lit, _)| (to, d, lit)));
+                let (lit, dir) = self.unhidden(point, arrived.map(|(to, d, lit, _)| (to, d, lit)));
                 (lit * share, dir * share)
             }
         };
@@ -137,13 +137,34 @@ impl Tracer<'_> {
     }
 
     /// `arrived`'s light (direction, distance, irradiance) if it is positive and
-    /// no blocker stands between `point` and it.
+    /// no blocker stands between `point` and it: a lamp's shadow ray, stopped by
+    /// the triangles that cast (`Tri::blocks`).
     pub(super) fn shadowed(&self, point: Vec3, arrived: Option<(Vec3, f32, Vec3)>) -> Lit {
+        self.visible(point, arrived, |i| self.rays.tris[i].blocks)
+    }
+
+    /// `arrived`'s light if it is positive and nothing a bounce ray could land on
+    /// stands between `point` and it (`Tri::seen`): an emitter's shadow ray. Its
+    /// light is weighed by MIS against the bounce ray that may find the same point
+    /// (`Tracer::glow`), and the balance heuristic is only unbiased when the two
+    /// see the same thing, so a Cast Shadows `Off` pane hides an emitter here as
+    /// it does from a bounce ray, and a `ShadowsOnly` proxy hides it from neither.
+    pub(super) fn unhidden(&self, point: Vec3, arrived: Option<(Vec3, f32, Vec3)>) -> Lit {
+        self.visible(point, arrived, |i| self.rays.tris[i].seen)
+    }
+
+    fn visible(
+        &self,
+        point: Vec3,
+        arrived: Option<(Vec3, f32, Vec3)>,
+        stops: impl Fn(usize) -> bool,
+    ) -> Lit {
         match arrived {
-            Some((to_light, d, lit))
-                if lit.max_element() > 0.0 && !self.rays.occluded(point, to_light, T_MIN, d) =>
+            Some((to, d, lit))
+                if lit.max_element() > 0.0
+                    && !self.rays.occluded_by(point, to, (T_MIN, d), stops) =>
             {
-                (lit, to_light * luminance(lit))
+                (lit, to * luminance(lit))
             }
             _ => (Vec3::ZERO, Vec3::ZERO),
         }
