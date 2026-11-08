@@ -1,6 +1,7 @@
 //! OIDN's binding (#1884): where it looks, what a bake without it says, and, on a
 //! machine that has it, that it cleans a noisy lightmap and gives the same bytes
-//! every time. The tests that run OIDN skip without it, except where
+//! every time, a whole bake's too, whatever order its workers finish the charts in.
+//! The tests that run OIDN skip without it, except where
 //! [`REQUIRE_OIDN_ENV`] is set (CI), whose canary then fails.
 
 use std::path::{Path, PathBuf};
@@ -8,7 +9,11 @@ use std::path::{Path, PathBuf};
 use glam::Vec3;
 
 use super::{available, ffi, missing, Oidn, REQUIRE_OIDN_ENV};
-use crate::scene::lighting::lightmap::LightmapDenoiser;
+use crate::scene::lighting::lightmap::{
+    bake_with_progress, BakeLight, BakeProgress, BakeScene, BakeSettings, LightShape,
+    LightmapDenoiser,
+};
+use crate::scene::lighting::occlusion::bench_level::rooms;
 
 /// OIDN's denoiser, or `None` (skip) on a machine without it.
 fn oidn_or_skip() -> Option<Oidn> {
@@ -96,4 +101,35 @@ fn oidn_refuses_an_image_of_the_wrong_size() {
     let mut short = vec![Vec3::ONE; 10];
     assert!(oidn.denoise(&mut short, 32, false).is_err());
     assert_eq!(oidn.spent().0, 0);
+}
+
+#[test]
+fn a_whole_oidn_bake_repeats_its_bytes_whichever_worker_finishes_first() {
+    let Some(_) = oidn_or_skip() else { return };
+    let mut scene = BakeScene::gather(&rooms(1), &|_| None);
+    let position = Vec3::new(3.0, 3.0, 3.0);
+    let shape = LightShape::Point {
+        position,
+        range: 10.0,
+    };
+    let (radiance, bakes_direct, mask_channel) = (Vec3::splat(3.0), true, None);
+    scene.lights.push(BakeLight {
+        shape,
+        radiance,
+        bakes_direct,
+        mask_channel,
+    });
+    let settings = BakeSettings {
+        texels_per_unit: 2.0,
+        samples: 4,
+        ..Default::default()
+    };
+    let bake = || {
+        let oidn = std::sync::Arc::new(Oidn::default());
+        let progress = BakeProgress::default().with_denoiser(oidn.clone());
+        let maps = bake_with_progress(&scene, &settings, &progress).expect("not cancelled");
+        assert!(oidn.spent().0 > 0, "OIDN cleaned the charts");
+        maps
+    };
+    assert_eq!(bake(), bake(), "the same bytes, colour and directions");
 }

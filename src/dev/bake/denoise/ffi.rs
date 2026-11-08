@@ -63,16 +63,19 @@ pub struct Api {
     set_bool: unsafe extern "C" fn(Filter, *const c_char, bool),
     commit_filter: unsafe extern "C" fn(Filter),
     execute_filter: unsafe extern "C" fn(Filter),
-    release_filter: unsafe extern "C" fn(Filter),
     /// Kept open for as long as the calls above are: they point into it.
     _library: Library,
 }
 
-/// OIDN opened, with its one committed CPU device. It lives as long as the
-/// process (OIDN's devices are made once and shared), so it is never released.
+/// OIDN opened, with its one committed CPU device and its two `RTLightmap`
+/// filters (colour, directional), each made the first time it is asked for and
+/// then reused: making one loads its trained weights, about as long as cleaning a
+/// small chart, and a bake cleans one or two per mesh. It lives as long as the
+/// process (OIDN's devices are made once and shared), so none is ever released.
 pub struct Oidn {
     api: Api,
     device: Device,
+    filters: [Filter; 2],
 }
 
 // SAFETY: an OIDN device may be used from any thread, one call at a time; the one
@@ -134,7 +137,6 @@ impl Api {
                 set_bool: get!("oidnSetFilterBool"),
                 commit_filter: get!("oidnCommitFilter"),
                 execute_filter: get!("oidnExecuteFilter"),
-                release_filter: get!("oidnReleaseFilter"),
                 _library: library,
             })
         }
@@ -151,7 +153,12 @@ impl Api {
         // SAFETY: as above.
         unsafe { (self.commit_device)(device) };
         self.error(device)?;
-        Ok(Oidn { api: self, device })
+        let filters = [std::ptr::null_mut(); 2];
+        Ok(Oidn {
+            api: self,
+            device,
+            filters,
+        })
     }
 
     /// The device's pending error, if any, and clears it.
@@ -189,14 +196,11 @@ impl Oidn {
         if color.len() != n * n || output.len() != n * n {
             return Err(format!("a {n}² image of {} texels", color.len()));
         }
-        // SAFETY: both images are `n`² packed FLOAT3 texels that outlive the
-        // filter, which is released before this returns; names are C strings.
+        let filter = self.filter(directional)?;
+        // SAFETY: both images are `n`² packed FLOAT3 texels that outlive this
+        // execution; the filter is re-committed with them before it runs, so it
+        // never reads a previous call's images; names are C strings.
         unsafe {
-            let filter = (self.api.new_filter)(self.device, c"RTLightmap".as_ptr());
-            if filter.is_null() {
-                self.api.error(self.device)?;
-                return Err("Open Image Denoise has no RTLightmap filter".into());
-            }
             for (name, image) in [
                 (c"color", color.as_mut_ptr()),
                 (c"output", output.as_mut_ptr()),
@@ -204,11 +208,28 @@ impl Oidn {
                 let at = image.cast::<c_void>();
                 (self.api.set_image)(filter, name.as_ptr(), at, OIDN_FORMAT_FLOAT3, n, n, 0, 0, 0);
             }
-            (self.api.set_bool)(filter, c"directional".as_ptr(), directional);
             (self.api.commit_filter)(filter);
             (self.api.execute_filter)(filter);
-            (self.api.release_filter)(filter);
         }
         self.api.error(self.device)
+    }
+
+    /// The `RTLightmap` filter for colour or for `directional` vectors, made on
+    /// first use.
+    fn filter(&mut self, directional: bool) -> Result<Filter, String> {
+        let slot = &mut self.filters[directional as usize];
+        if slot.is_null() {
+            // SAFETY: the device is committed and owned by `self`; names are C
+            // strings.
+            let filter = unsafe { (self.api.new_filter)(self.device, c"RTLightmap".as_ptr()) };
+            if filter.is_null() {
+                self.api.error(self.device)?;
+                return Err("Open Image Denoise has no RTLightmap filter".into());
+            }
+            // SAFETY: as above, on the filter just made.
+            unsafe { (self.api.set_bool)(filter, c"directional".as_ptr(), directional) };
+            *slot = filter;
+        }
+        Ok(*slot)
     }
 }
