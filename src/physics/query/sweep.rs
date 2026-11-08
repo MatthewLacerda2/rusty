@@ -15,8 +15,8 @@
 //! collider instead, and its `*CastAll` reports it with a zeroed point.
 
 use glam::{Quat, Vec3};
-use rapier3d::parry::bounding_volume::{Aabb, BoundingVolume};
-use rapier3d::parry::query::{ShapeCastHit, ShapeCastOptions};
+use rapier3d::parry::bounding_volume::Aabb;
+use rapier3d::parry::query::{Ray, RayCast, ShapeCastHit, ShapeCastOptions};
 use rapier3d::prelude::*;
 
 use super::{sort_hits, RayHit};
@@ -24,7 +24,7 @@ use crate::physics::convert::to_pose;
 use crate::physics::world::PhysicsWorld;
 
 /// A volume to sweep, placed at its start: what a shape cast moves along its
-/// direction. Sizes are trusted here (the Lua layer rejects a non-positive or
+/// direction. Sizes are trusted here (the Lua layer rejects a negative or
 /// non-finite one).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Sweep {
@@ -116,7 +116,8 @@ impl PhysicsWorld {
     /// Every accepted collider `sweep` strikes moving along `dir` within
     /// `max_toi`, each at its own first contact, nearest first (ties by entity
     /// id): Unity's `SphereCastAll` and kin. The candidates are the colliders
-    /// whose query-tree boxes meet the swept box; each is then cast exactly.
+    /// whose query-tree boxes the shape's box meets along the way
+    /// ([`swept_candidates`]); each is then cast exactly.
     pub fn shape_cast_all(
         &self,
         sweep: Sweep,
@@ -130,10 +131,7 @@ impl PhysicsWorld {
         let queries = self.queries(filter);
         let options = ShapeCastOptions::with_max_time_of_impact(max_toi);
         let mut hits: Vec<RayHit> = sweep.with_shape(|pose, shape| {
-            let start = shape.compute_aabb(pose);
-            let end = Aabb::new(start.mins + dir * max_toi, start.maxs + dir * max_toi);
-            queries
-                .intersect_aabb_conservative(start.merged(&end))
+            swept_candidates(&queries, shape.compute_aabb(pose), dir, max_toi)
                 .filter_map(|(handle, collider)| {
                     let at = collider.position();
                     let hit = queries
@@ -171,4 +169,31 @@ impl PhysicsWorld {
             normal: hit.normal1,
         })
     }
+}
+
+/// The accepted colliders whose query-tree boxes the box `start` touches when
+/// moved along the unit `dir` for up to `max_toi`: a ray from its center
+/// against each tree node grown by its half-size, the way parry's own
+/// composite shape cast prunes (#1881). Unlike the box around the whole
+/// sweep, a long diagonal or unlimited cast only visits the nodes on its path.
+pub(super) fn swept_candidates<'q>(
+    queries: &'q QueryPipeline<'q>,
+    start: Aabb,
+    dir: Vec3,
+    max_toi: f32,
+) -> impl Iterator<Item = (ColliderHandle, &'q Collider)> + 'q {
+    let half = start.half_extents();
+    let ray = Ray::new(start.center(), dir);
+    queries
+        .bvh
+        .leaves(move |node| {
+            let node = node.aabb();
+            let grown = Aabb::new(node.mins - half, node.maxs + half);
+            grown.cast_local_ray(&ray, max_toi, true).is_some()
+        })
+        .filter_map(move |leaf| {
+            let (collider, handle) = queries.colliders.get_unknown_gen(leaf)?;
+            let accepted = queries.filter.test(queries.bodies, handle, collider);
+            accepted.then_some((handle, collider))
+        })
 }

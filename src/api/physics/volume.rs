@@ -8,7 +8,7 @@
 //! arrays of entity ids sorted ascending. Every verb takes an optional trailing
 //! `query_triggers` after `layer_mask` (#1720; absent hits triggers); with no
 //! live physics world (edit mode) every overlap is empty and every check is
-//! false. A non-positive or non-finite size is a Lua error (`cast::check`).
+//! false. A negative or non-finite size is a Lua error (`cast::check`).
 
 use glam::{Quat, Vec3};
 use mlua::{Function, Table};

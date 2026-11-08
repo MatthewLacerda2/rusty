@@ -1,6 +1,7 @@
 //! The oriented volumes (#1881): an `OverlapBox` / `CheckBox` with an
-//! orientation and `CheckCapsule`, each with a hit and a miss, plus the
-//! argument errors every shape query shares. The corridor is `shape_casts`'.
+//! orientation and `CheckCapsule`, each with a hit and a miss, a zero size
+//! (valid, as in Unity), plus the argument errors every shape query shares.
+//! The corridor is `shape_casts`'.
 
 use super::shape_casts::{corridor, eval};
 
@@ -33,6 +34,17 @@ fn check_capsule_is_true_inside_a_collider_and_false_beside_it() {
 }
 
 #[test]
+fn a_zero_size_is_a_point_overlap_and_a_ray_like_cast() {
+    let (game, near, _) = corridor();
+    let inside = "local t = Physics.OverlapSphere(0,0,10, 0) return #t, t[1]";
+    assert_eq!(eval(&game, inside), format!("1, {near}"));
+    assert_eq!(eval(&game, "return #Physics.OverlapSphere(0,0,5, 0)"), "0");
+    let cast = "local h, id, d = Physics.SphereCast(0,0,0, 0,0,1, 0) \
+                return h, id, string.format('%.2f', d)";
+    assert_eq!(eval(&game, cast), format!("true, {near}, 9.00"));
+}
+
+#[test]
 fn a_bad_size_direction_or_orientation_is_an_error_naming_it() {
     let (game, _, _) = corridor();
     let error = |call: &str| {
@@ -42,7 +54,10 @@ fn a_bad_size_direction_or_orientation_is_an_error_naming_it() {
         eval(&game, &line)
     };
     for (call, named) in [
-        ("CapsuleCast(0,0,0, 0,2,0, 0, 0,0,1)", "CapsuleCast: radius"),
+        (
+            "CapsuleCast(0,0,0, 0,2,0, -0.1, 0,0,1)",
+            "CapsuleCast: radius",
+        ),
         ("BoxCast(0,0,0, 1,-1,1, 0,0,1)", "BoxCast: half_extents"),
         ("BoxCast(0,0,0, 1,1,1, 0,0,0)", "BoxCast: direction"),
         ("SphereCast(0,0,0, 0,0,0, 0.5)", "SphereCast: direction"),

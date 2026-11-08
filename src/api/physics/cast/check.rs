@@ -1,9 +1,10 @@
 //! src/api/physics/cast/check.rs — the argument checks the shape queries
 //! share (#1881).
 //!
-//! A shape cast or volume query given a size it cannot build (zero, negative,
-//! NaN), a non-finite position or a zero-length direction is a Lua error naming
-//! the argument, instead of a NaN sweep that silently hits or misses. Unity
+//! A shape cast or volume query given a size it cannot build (negative, NaN,
+//! infinite), a non-finite position or a direction with no length is a Lua
+//! error naming the argument, instead of a NaN sweep that silently hits or
+//! misses. A zero size is valid, as in Unity: a point overlap, a ray-like cast. Unity
 //! returns `false` for a zero direction; an error is louder, and the API's
 //! other argument checks already raise one.
 
@@ -26,39 +27,39 @@ pub(in crate::api::physics) fn point(verb: &str, name: &str, v: [f32; 3]) -> mlu
     }
 }
 
-/// A sweep direction: finite and not zero-length.
+/// A sweep direction, returned as a unit vector: finite and not zero. It is
+/// scaled by its largest component first, so a tiny or huge one whose squared
+/// length would underflow or overflow still normalizes.
 pub(in crate::api::physics) fn direction(verb: &str, v: [f32; 3]) -> mlua::Result<Vec3> {
     let v = point(verb, "direction", v)?;
-    if v.length_squared() > 0.0 {
-        Ok(v)
-    } else {
-        Err(bad(verb, "direction", "must not be zero-length"))
-    }
+    (v / v.abs().max_element())
+        .try_normalize()
+        .ok_or_else(|| bad(verb, "direction", "must not be zero-length"))
 }
 
-/// A radius: finite and greater than zero.
+/// A radius: finite and not negative.
 pub(in crate::api::physics) fn radius(verb: &str, r: f32) -> mlua::Result<f32> {
-    if r.is_finite() && r > 0.0 {
+    if r.is_finite() && r >= 0.0 {
         Ok(r)
     } else {
         Err(bad(
             verb,
             "radius",
-            &format!("must be above zero (got {r})"),
+            &format!("must be zero or more (got {r})"),
         ))
     }
 }
 
-/// A box's half-extents: each finite and greater than zero.
+/// A box's half-extents: each finite and not negative.
 pub(in crate::api::physics) fn half_extents(verb: &str, v: [f32; 3]) -> mlua::Result<Vec3> {
     let v = Vec3::from(v);
-    if v.is_finite() && v.min_element() > 0.0 {
+    if v.is_finite() && v.min_element() >= 0.0 {
         Ok(v)
     } else {
         Err(bad(
             verb,
             "half_extents",
-            &format!("must each be above zero (got {v})"),
+            &format!("must each be zero or more (got {v})"),
         ))
     }
 }
@@ -84,21 +85,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sizes_must_be_positive_and_finite() {
+    fn sizes_must_be_finite_and_not_negative() {
         assert_eq!(radius("V", 0.5).unwrap(), 0.5);
-        for r in [0.0, -1.0, f32::NAN, f32::INFINITY] {
+        assert_eq!(radius("V", 0.0).unwrap(), 0.0);
+        for r in [-1.0, f32::NAN, f32::INFINITY] {
             let err = radius("V", r).unwrap_err().to_string();
             assert!(err.contains("Physics.V: radius"), "{err}");
         }
         assert!(half_extents("V", [1.0, 2.0, 3.0]).is_ok());
-        assert!(half_extents("V", [1.0, 0.0, 3.0]).is_err());
+        assert!(half_extents("V", [1.0, 0.0, 3.0]).is_ok());
+        assert!(half_extents("V", [1.0, -0.1, 3.0]).is_err());
         assert!(half_extents("V", [1.0, f32::NAN, 3.0]).is_err());
     }
 
     #[test]
     fn a_direction_is_finite_and_not_zero() {
-        assert_eq!(direction("V", [0.0, 0.0, 2.0]).unwrap(), Vec3::Z * 2.0);
+        assert_eq!(direction("V", [0.0, 0.0, 2.0]).unwrap(), Vec3::Z);
+        assert_eq!(direction("V", [0.0, 0.0, 1e-25]).unwrap(), Vec3::Z);
         assert!(direction("V", [0.0; 3]).is_err());
+        assert_eq!(direction("V", [0.0, 0.0, -1e20]).unwrap(), -Vec3::Z);
         assert!(direction("V", [f32::NAN, 0.0, 1.0]).is_err());
         assert!(point("V", "p", [f32::INFINITY, 0.0, 0.0]).is_err());
     }
