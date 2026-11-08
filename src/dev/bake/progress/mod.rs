@@ -7,7 +7,7 @@
 //! will run when its caller names them ([`BakeLog::plan`], #1897), then a line at
 //! each step change, every [`INTERVAL`] in between and for each lightmap page
 //! encoded. Each line carries the time since the bake began (#1891), an ETA from the
-//! step's rate over its last [`rate::WINDOW`] (#1890), and the steps still to come.
+//! step's rate over its last 2 minutes (`rate::WINDOW`, #1890), and the steps still to come.
 //! At the end it prints what each step took, the slowest lightmap meshes and the
 //! total (`summary`, #1891):
 //!

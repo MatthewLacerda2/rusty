@@ -52,7 +52,7 @@ pub(super) fn lines(steps: &[StepRun], end: Duration, meshes: &mut [MeshCost]) -
             format!("[Lighting] {} took {took}{}", step(run.step), size(run))
         })
         .collect();
-    meshes.sort_by(|a, b| b.busy.cmp(&a.busy));
+    meshes.sort_by_key(|m| std::cmp::Reverse(m.busy));
     if !meshes.is_empty() {
         out.push("[Lighting] slowest lightmap meshes (worker time over every thread):".into());
     }

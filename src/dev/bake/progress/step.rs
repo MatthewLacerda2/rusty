@@ -21,7 +21,7 @@ pub enum Step {
 }
 
 impl Step {
-    /// Every step Generate Lighting runs, in order (#1897): its [`BakeLog::plan`].
+    /// Every step Generate Lighting runs, in order (#1897): its [`BakeLog::plan`](super::BakeLog::plan).
     pub const GENERATE: [Step; 5] = [
         Step::Lightmaps,
         Step::LightmapPages,
