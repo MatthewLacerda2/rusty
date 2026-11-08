@@ -2,7 +2,7 @@
 
 [`Yard.form`] decides each round: a half of a red train first, else a new train
 walked from the head of the line ([`train.group.form`]). [`Yard.ride`] runs one:
-the local compile check unless `--no-check`, the push to its `merge-train/*`
+the local compile check unless `--no-check` and `tools/lint` either way (#1956), the push to its `merge-train/*`
 branch, the gates dispatched on it, the wait, the branch deleted, then landing
 ([`train.land`]) or splitting. A dry run prints the train it would form and pushes
 nothing; `--no-merge` stops a green train at green. What the members' own claims
@@ -37,7 +37,7 @@ class Yard:
     head)` (the paths it changes, or `None`), `green(number, head)` (whether its own
     head's gates passed), `claims(number)` (a hand-back result its description or
     review refuses it with, or `None`), `check(sha)` (why the train's tree does not
-    compile, empty when it does or `--no-check`), `push(train)`, `dispatch(branch)`,
+    compile, unless `--no-check`, or fails `tools/lint`; empty when it passes), `push(train)`, `dispatch(branch)`,
     `wait(sha, tick, paths)` ([`train.ride.wait`]; `paths` every member's files), `delete(branch)`, `look(number)`,
     `squash(pull, sha)`, `main_state(base)` (`main`'s tree and its first-parent count
     since `base`), `pause(seconds)`, `say`, `bots`, `dry_run` and `no_merge`."""

@@ -9,7 +9,7 @@ import tempfile
 import time
 
 import ghrest
-from merging.queue import checks, gitio, landing, pulls, outcomes, stopping, taking
+from merging.queue import checks, gitio, lints, landing, pulls, outcomes, stopping, taking
 from merging.train import build, rails, ride
 from merging.verdict import decide, github, runlist
 
@@ -43,9 +43,11 @@ def claimed(repo: str, number: int) -> tuple[int, str, str] | None:
 
 
 def compiles(sha: str, opts: argparse.Namespace) -> list[str]:
-    """Why the train's tree fails the queue's local check ([`queue.checks.verify`]),
-    in a throwaway worktree; empty under `--no-check` or a dry run."""
-    if opts.no_check or opts.dry_run:
+    """Why the train's tree fails the queue's local check ([`queue.checks.verify`],
+    skipped under `--no-check`) or `tools/lint` ([`queue.lints.Linter.check`],
+    #1956: the members' combined tree is what can breach a cap neither breaches
+    alone), in a throwaway worktree; empty in a dry run."""
+    if opts.dry_run:
         return []
     with tempfile.TemporaryDirectory(prefix="rusty-train-") as tmp:
         work = os.path.join(tmp, "wt")
@@ -55,7 +57,9 @@ def compiles(sha: str, opts: argparse.Namespace) -> list[str]:
             # a full disk must not mark every member red.
             raise stopping.Stopped([f"could not check the train out: {made.stderr.strip()}"])
         try:
-            return checks.verify(work, target=checks.target_dir(opts))
+            lint = lints.shared(lints.target_dir(opts.root))
+            broken = [] if opts.no_check else checks.verify(work, target=checks.target_dir(opts))
+            return broken or lint.check(work, since="origin/main", upto=sha)
         finally:
             gitio.git("worktree", "remove", "--force", work, cwd=opts.root)
 

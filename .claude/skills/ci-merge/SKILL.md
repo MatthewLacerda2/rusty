@@ -163,7 +163,15 @@ otherwise, and always for named pull requests, it is one pull request:
    --locked --all-targets` with `dev` and with `--no-default-features`, then
    the size gate, building into the queue's own `target/merge-queue`. A clean
    textual merge still breaks when a merge ahead changed a signature. Skipped
-   for a Markdown-only branch, Dependabot, and `ARGS=--no-check`.
+   for a Markdown-only branch, Dependabot, and `ARGS=--no-check`. Under
+   `--no-check` the merged tree still gets every build-free pass of `tools/lint`
+   CI's `lint` job runs (size, `--rules`, `--layers`, `--determinism`,
+   `--direction`, `--components`, `--parity`; `merging/queue/lints.py`, #1956):
+   `tools/lint` is built once per `tools/lint` tree into the queue's
+   `target/merge-queue-lint`, and a violation hands the head back unpushed with
+   the report's first lines and the merged pull requests that touched the file,
+   re-admitted by a push. A tool that cannot build or crashes is said once and
+   the tree is left to CI, as before.
 3. Push it as a fast-forward leased on the head the take began from
    (`--force-with-lease=refs/heads/<branch>:<head>`, a compare-and-swap: the
    queue's own push is the one deliberate lease in the normal flow) — both
@@ -296,7 +304,8 @@ The train's tip is pushed to `merge-train/<main>-<a>-<b>…` (never forced: one 
 behind is deleted first) and `ci.yml` and `lint.yml` are dispatched on it
 (`workflow_dispatch` runs every gating job; `lint.yml` first, so a dispatch that
 fails halfway leaves only the cheap run going); without `--no-check` the tip is
-compile-checked first, as step 2, and a checkout that fails stops the watch as a
+compile-checked first, as step 2 (under it, `tools/lint` alone runs on it, and a
+violation is a red train, split the same way, #1956), and a checkout that fails stops the watch as a
 machine failure, not a red train. Its runs are read by the same rules as a pull
 request's (the grace, the runner re-run, the lagging jobs; a runner outage is
 stalled, never red). The branch is deleted once they settle. Then:
