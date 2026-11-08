@@ -63,7 +63,7 @@ class Edited(unittest.TestCase):
         calls, patch = reruns()
         with patch:
             state, _ = flicker.waited([setup_red()], pull)
-        self.assertEqual((state, calls), (outcomes.STOP, []))
+        self.assertEqual((state, calls), (outcomes.RED, []))
 
 
 if __name__ == "__main__":
