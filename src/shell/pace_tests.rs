@@ -71,7 +71,7 @@ fn a_refused_frame_is_retried_later_not_in_a_spin_and_not_forgotten() {
 
 #[test]
 fn time_asleep_is_not_a_step_while_a_running_game_keeps_its_real_one() {
-    assert_eq!(ASLEEP.frame_step(3600.0), LONGEST_DEMAND_STEP);
+    assert_eq!(ASLEEP.frame_step(3600.0), MAXIMUM_DELTA_TIME);
     assert_eq!(ASLEEP.frame_step(0.016), 0.016);
     assert_eq!(Pace::Continuous.frame_step(3600.0), 3600.0);
 }

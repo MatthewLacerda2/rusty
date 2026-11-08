@@ -15,7 +15,7 @@ use crate::time::Time;
 use glam::Vec3;
 
 /// A live `ScriptManager` over a scene with one Box-collider entity at y = 3.
-fn manager_with_collider() -> (ScriptManager, Rc<RefCell<Scene>>, u32) {
+pub(super) fn manager_with_collider() -> (ScriptManager, Rc<RefCell<Scene>>, u32) {
     let mut raw = Scene::new();
     let id = raw.add_entity("Body".to_string());
     raw.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 3.0, 0.0);

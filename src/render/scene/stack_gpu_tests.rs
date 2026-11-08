@@ -15,7 +15,7 @@ use crate::scene::{ClearFlags, Scene};
 /// A blue wall, a red prop at the left and, with `overlay`, a green gun low and
 /// right, drawn by a `DepthOnly` camera alone. The world camera runs TAA and skips
 /// the gun's layer. Returns the scene and the prop.
-fn stack(overlay: bool) -> (Scene, u32) {
+pub(super) fn stack(overlay: bool) -> (Scene, u32) {
     let (mut scene, world) = scene(false);
     let mut lens = scene.world.camera_mut(world).unwrap();
     (lens.taa_active, lens.culling_mask) = (true, !(1 << VIEWMODEL));

@@ -78,12 +78,21 @@ pub(in crate::scene::lighting) struct Hit {
 pub(in crate::scene::lighting) struct Rays {
     pub tris: Vec<Tri>,
     mesh: Option<TriMesh>,
+    /// How many rays were cast, either kind: what a cost test counts instead of
+    /// timing (#1883), so it holds on any machine.
+    #[cfg(test)]
+    pub cast: std::sync::atomic::AtomicU64,
 }
 
 impl Rays {
     pub(in crate::scene::lighting) fn build(tris: Vec<Tri>) -> Self {
         if tris.is_empty() {
-            return Rays { tris, mesh: None };
+            return Rays {
+                tris,
+                mesh: None,
+                #[cfg(test)]
+                cast: Default::default(),
+            };
         }
         let vertices = tris
             .iter()
@@ -98,6 +107,8 @@ impl Rays {
         Rays {
             tris,
             mesh: Some(mesh),
+            #[cfg(test)]
+            cast: Default::default(),
         }
     }
 
@@ -110,6 +121,7 @@ impl Rays {
         t_min: f32,
         t_max: f32,
     ) -> Option<Hit> {
+        self.count();
         let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);
         let (tri, (_, weights)) = mesh.bvh().find_best(
@@ -158,6 +170,7 @@ impl Rays {
         (t_min, t_max): (f32, f32),
         blocks: impl Fn(usize) -> bool,
     ) -> Option<usize> {
+        self.count();
         let mesh = self.mesh.as_ref()?;
         let ray = Ray::new(origin + dir * t_min, dir);
         let reach = t_max - t_min;
@@ -175,6 +188,12 @@ impl Rays {
             TraversalAction::Continue
         });
         blocker
+    }
+
+    /// One more ray cast, in a test build; nothing otherwise.
+    fn count(&self) {
+        #[cfg(test)]
+        self.cast.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 }
 

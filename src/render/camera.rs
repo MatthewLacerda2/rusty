@@ -2,8 +2,17 @@
 //! renderer draws each frame. The camera itself is sim-side (`scene::camera`).
 
 use crate::components::RenderTarget;
+use crate::render::interpolate::DrawPoses;
 use crate::scene::camera::{active_cameras, render_order, screen_cameras};
 use crate::scene::{camera_for_entity, Camera, Scene};
+
+/// Camera entity `id`'s view as this frame draws it: its lens, and its pose blended
+/// between the last two ticks while it moves (#1877).
+fn entity_camera(base: &Camera, scene: &Scene, id: u32, poses: &DrawPoses) -> Option<Camera> {
+    let mut camera = camera_for_entity(base, scene, id)?;
+    poses.pose_camera(&mut camera, scene, id);
+    Some(camera)
+}
 
 /// The screen's camera stack for one frame, and the entity whose settings post-FX
 /// reads (#1434).
@@ -30,21 +39,27 @@ pub struct ScreenStack {
 /// The first (base) camera keeps `base`'s pose: the caller owns the main view. The
 /// player, the Game view and the headless harness and screenshots all pass
 /// `scene::game_camera_from_scene` (`GameWorld::main_view`), that same entity's pose,
-/// which `Camera.*` moves (#1619). Every later camera renders from **its own entity's
-/// transform** (#430) — a viewmodel camera parented to the player's head follows
-/// it, a split view looks elsewhere. Each carries its own lens, projection, mask and
+/// which `Camera.*` moves (#1619); `Renderer::render` has already blended it between
+/// ticks. Every later camera renders from **its own entity's transform** (#430),
+/// blended by `poses` like the meshes it draws — a viewmodel camera parented to the
+/// player's head follows it, a split view looks elsewhere. Each carries its own lens, projection, mask and
 /// clear flags. Render-texture cameras are not on the screen stack (see
 /// [`texture_cameras`]).
 ///
 /// In edit mode (or when no active camera component exists) the free-fly `base`
 /// camera is the single pass, preserving the editor viewport behavior.
-pub fn build_camera_stack(base: &Camera, scene: &Scene, is_playing: bool) -> ScreenStack {
+pub fn build_camera_stack(
+    base: &Camera,
+    scene: &Scene,
+    is_playing: bool,
+    poses: &DrawPoses,
+) -> ScreenStack {
     let ids = screen_cameras(scene);
     let base_id = ids.first().copied();
     let mut stack: Vec<(Option<u32>, Camera)> = match is_playing {
         true => ids
             .iter()
-            .filter_map(|&id| Some((Some(id), camera_for_entity(base, scene, id)?)))
+            .filter_map(|&id| Some((Some(id), entity_camera(base, scene, id, poses)?)))
             .collect(),
         false => Vec::new(),
     };
@@ -70,13 +85,14 @@ pub struct TextureCamera {
     pub target: RenderTarget,
 }
 
-/// The scene's active render-texture cameras, each from its own entity's transform,
-/// sorted by `render_order` (a later camera may show an earlier one's texture).
-/// Two cameras naming one texture: the last in that order owns it.
-pub fn texture_cameras(base: &Camera, scene: &Scene) -> Vec<TextureCamera> {
+/// The scene's active render-texture cameras, each from its own entity's transform
+/// (blended by `poses`), sorted by `render_order` (a later camera may show an
+/// earlier one's texture). Two cameras naming one texture: the last in that order
+/// owns it.
+pub fn texture_cameras(base: &Camera, scene: &Scene, poses: &DrawPoses) -> Vec<TextureCamera> {
     let mut cams: Vec<(i32, TextureCamera)> = active_cameras(scene)
         .filter_map(|(id, target)| {
-            let camera = camera_for_entity(base, scene, id)?;
+            let camera = entity_camera(base, scene, id, poses)?;
             Some((
                 render_order(scene, id),
                 TextureCamera {
