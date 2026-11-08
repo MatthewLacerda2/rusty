@@ -19,7 +19,8 @@ use super::super::super::{
 
 const MAGIC: &[u8; 4] = b"RNAV";
 /// Bumped whenever the layout or the bake's output changes, so an older file is
-/// refused rather than misread or trusted.
+/// refused rather than misread or trusted. A test pins the bake's output to it
+/// (`tests::format`), and fails asking for the bump.
 pub(super) const FORMAT: u32 = 1;
 /// The most cells a file may declare: 16k × 16k, a 4 km level at 0.25 m.
 const MAX_CELLS: u64 = 1 << 28;

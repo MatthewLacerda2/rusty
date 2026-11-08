@@ -1,5 +1,5 @@
 //! src/navigation/bake/saved/ — a navmesh baked once and saved beside the scene
-//! (#1887, Unity's baked `NavMeshData`), so Play's first tick need not bake it.
+//! (#1887, Unity's baked `NavMeshData`), so loading the scene need not bake it.
 //!
 //! [`NavigationGraph::bake_to_bytes`] bakes in full and returns the `<scene>.navmesh`
 //! bytes: the baked spans, the pre-erosion ones the incremental rebake splices
@@ -69,6 +69,7 @@ impl NavigationGraph {
         let log = self.bake_state.take().map(|s| s.log).unwrap_or_default();
         g.bake_generation = self.bake_generation.wrapping_add(1);
         g.static_watch = self.static_watch.take();
+        g.tracked_scene = self.tracked_scene;
         let mut state = BakeState { raw, inputs, log };
         state.log.record(g.bake_generation, None);
         g.bake_state = Some(Box::new(state));

@@ -8,14 +8,13 @@
 //! file's format.
 //!
 //! The same pass records the bake's inputs (`BakeInputs`) with the cells each
-//! covers, so a restored graph rebakes incrementally exactly as a baked one does.
+//! covers, through the builder a full bake uses (`bake::record_inputs`), so a
+//! restored graph rebakes incrementally exactly as a baked one does.
 
 use super::super::super::NavigationGraph;
-use super::super::inputs::{
-    collider_keys, obstacle_keys, sources, BakeInputs, ColliderKey, Source,
-};
+use super::super::inputs::{collider_keys, obstacle_keys, BakeInputs, ColliderKey, Source};
 use super::super::modifiers::modifier_keys;
-use super::super::{link_rect, raster};
+use super::super::{raster, record_inputs};
 use super::file::FORMAT;
 use crate::navigation::offmesh::authored_keys;
 use crate::navigation::NavMeshSettings;
@@ -57,15 +56,8 @@ pub(super) fn read(scene: &Scene, raw: &NavigationGraph) -> (BakeInputs, u64) {
     for (id, k) in &links {
         word(&mut bytes, format!("l{id}{k:?}").as_bytes());
     }
-    let inputs = BakeInputs {
-        settings: scene.nav_settings.clone(),
-        colliders,
-        obstacles: sources(obstacles, |v| {
-            raster::footprint(raw, &v.triangles().concat())
-        }),
-        modifiers: sources(modifiers, |v| v.footprint(raw)),
-        links: sources(links, |k| link_rect(raw, k)),
-    };
+    let keys = (obstacles, modifiers, links);
+    let inputs = record_inputs(raw, &scene.nav_settings, colliders, keys);
     (inputs, crate::core::hash::content(&bytes))
 }
 

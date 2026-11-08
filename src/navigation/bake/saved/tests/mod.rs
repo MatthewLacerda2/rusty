@@ -2,6 +2,7 @@
 //! is refused whole when stale or malformed, and a restored graph rebakes
 //! incrementally like a baked one.
 
+mod format;
 mod malformed;
 mod restore;
 

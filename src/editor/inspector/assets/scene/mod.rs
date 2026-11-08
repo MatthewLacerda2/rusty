@@ -47,7 +47,7 @@ pub fn draw(
     draw_scene_operations(ui, editor, scene, console, path);
     draw_navmesh(ui, scene, nav);
     #[cfg(feature = "dev")]
-    draw_bake_navigation(ui, scene, console, nav, path);
+    draw_bake_navigation(ui, editor, scene, console, nav, path);
     reflections::draw(ui, editor, scene);
     bake::draw(ui, editor, scene, console, path);
 }
@@ -122,14 +122,24 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
 #[cfg(feature = "dev")]
 fn draw_bake_navigation(
     ui: &mut egui::Ui,
+    editor: &EditorUi,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
     nav: &mut NavigationGraph,
     path: &str,
 ) {
+    // The live scene is the open one: on another scene's card its navmesh would
+    // overwrite that scene's file, so the button is live on the open card alone, as
+    // Generate Lighting's is (#1394).
+    let open = bake::is_open_scene(editor, path);
     let button = egui::Button::new(format!("{}  Bake Navigation", icon::PATH));
     let hover = "Bake the navmesh in full and save it beside the scene";
-    if !ui.add(button).on_hover_text(hover).clicked() {
+    let clicked = ui
+        .add_enabled(open, button)
+        .on_hover_text(hover)
+        .on_disabled_hover_text(bake::NOT_OPEN)
+        .clicked();
+    if !clicked {
         return;
     }
     match crate::dev::bake::navmesh::bake_navmesh(scene, nav, Some(path)) {

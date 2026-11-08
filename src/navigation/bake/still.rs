@@ -78,27 +78,32 @@ impl NavigationGraph {
         rebake
     }
 
-    /// The play loop's first tick, and its first after a play-mode scene load: the
-    /// scene's saved navmesh (`Scene::navmesh`, #1887) when it still matches the
-    /// scene ([`Self::restore`]), else a full [`Self::bake`], with one warning when a
-    /// saved one was refused. Opens the watch [`Self::sync_changes`] reads from then
-    /// on, and remembers which scene it started on ([`Self::tracks`]).
-    pub fn start_tracked(&mut self, scene: &mut Scene) -> Start {
-        let watch = StaticWatch::open(&mut scene.world);
-        let start = match scene.navmesh.clone() {
-            Some(bytes) => match self.restore(scene, &bytes) {
-                Ok(()) => Start::Restored,
-                Err(why) => {
-                    log::warn!("[Navigation] the saved navmesh was refused ({why}): baking it");
-                    self.bake(scene);
-                    Start::Baked
-                }
-            },
-            None => {
+    /// The navmesh of a scene as it is loaded (#1887): its saved navmesh
+    /// (`Scene::navmesh`) when it still matches the scene ([`Self::restore`]), else
+    /// a full [`Self::bake`], with one warning when a saved one was refused. The one
+    /// way a loaded scene gets its navmesh: boot ([`Self::from_scene`]), Play's first
+    /// tick and a play-mode `Scene.Load` ([`Self::start_tracked`]), and Stop.
+    pub fn restore_or_bake(&mut self, scene: &Scene) -> Start {
+        let Some(bytes) = scene.navmesh.bytes.clone() else {
+            self.bake(scene);
+            return Start::Baked;
+        };
+        match self.restore(scene, &bytes) {
+            Ok(()) => Start::Restored,
+            Err(why) => {
+                log::warn!("[Navigation] the saved navmesh was refused ({why}): baking it");
                 self.bake(scene);
                 Start::Baked
             }
-        };
+        }
+    }
+
+    /// The play loop's first tick, and a play-mode scene load (`app::scene_load`):
+    /// [`Self::restore_or_bake`], then open the watch [`Self::sync_changes`] reads
+    /// from, and remember which scene it started on ([`Self::tracks`]).
+    pub fn start_tracked(&mut self, scene: &mut Scene) -> Start {
+        let watch = StaticWatch::open(&mut scene.world);
+        let start = self.restore_or_bake(scene);
         self.static_watch = Some(watch);
         self.tracked_scene = Some(scene.id());
         start

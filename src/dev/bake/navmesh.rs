@@ -1,9 +1,9 @@
 //! The navmesh bake (#1887, Unity's `NavMeshSurface.BuildNavMesh`): the full bake
 //! `Navigation.Bake()` and the editor's *Bake Navigation* button run, which keeps the
 //! result on the scene and writes `<scene>.navmesh` beside a saved one. A save writes
-//! it again (`scene::nav_settings::save_navmesh`), so a scene baked unsaved, or saved
-//! under another name, carries its navmesh to its file. Independent of Generate
-//! Lighting, as in Unity.
+//! it when the file lacks it (`scene::nav_settings::save_navmesh`), so a scene baked
+//! unsaved, or saved under another name, carries its navmesh to its file. Independent
+//! of Generate Lighting, as in Unity.
 
 use crate::navigation::NavigationGraph;
 use crate::scene::nav_settings::{navmesh_path, save_navmesh};
@@ -22,7 +22,7 @@ pub fn bake_navmesh(
         nav.bake(scene);
         return Ok(None);
     }
-    scene.navmesh = Some(nav.bake_to_bytes(scene).into());
+    scene.navmesh.bytes = Some(nav.bake_to_bytes(scene).into());
     let Some(path) = path else {
         return Ok(None);
     };

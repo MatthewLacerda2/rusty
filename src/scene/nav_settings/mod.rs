@@ -24,7 +24,7 @@ pub use area::{
     default_areas, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST, NOT_WALKABLE_AREA, WALKABLE_AREA,
 };
 pub use bounds::{NavBounds, EMPTY_SCENE_HALF_EXTENT};
-pub use saved::{load_navmesh, navmesh_path, save_navmesh};
+pub use saved::{load_navmesh, navmesh_path, save_navmesh, SavedNavmesh};
 
 /// Default maximum height an agent can step up/down between two adjacent cells
 /// while still treating them as connected (stairs, curbs). World units.

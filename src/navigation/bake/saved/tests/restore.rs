@@ -90,7 +90,7 @@ fn a_restored_graph_rebakes_only_what_changed() {
 fn start_tracked_restores_a_matching_file_and_bakes_a_stale_one() {
     let (mut scene, crate_id) = level();
     let (_, bytes) = saved(&scene);
-    scene.navmesh = Some(bytes.into());
+    scene.navmesh.bytes = Some(bytes.into());
     let mut g = NavigationGraph::from_scene(&scene);
     assert_eq!(g.start_tracked(&mut scene), Start::Restored);
     assert!(g.tracks(&scene));
@@ -98,6 +98,20 @@ fn start_tracked_restores_a_matching_file_and_bakes_a_stale_one() {
     let mut fresh = NavigationGraph::from_scene(&scene);
     assert_eq!(fresh.start_tracked(&mut scene), Start::Baked);
     assert_same_mesh(&fresh, &baked(&scene));
+}
+
+/// A bake that re-shapes the grid during Play (`Navigation.SetGridSpacing`,
+/// `Navigation.Bake`) keeps the play loop's tracking, so the next tick syncs
+/// rather than refusing the saved navmesh and baking again.
+#[test]
+fn a_reshaping_bake_keeps_tracking_the_scene() {
+    let (mut scene, _) = level();
+    let mut g = NavigationGraph::from_scene(&scene);
+    g.start_tracked(&mut scene);
+    scene.nav_settings.grid_spacing = 0.25;
+    g.bake(&scene);
+    assert_eq!(g.grid_spacing, 0.25, "re-shaped");
+    assert!(g.tracks(&scene));
 }
 
 /// Zero: an empty scene's navmesh (no span, no link) saves and restores too.

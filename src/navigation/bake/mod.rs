@@ -21,8 +21,9 @@
 //! and erosion over those grown by its reach — the same result a full bake gives.
 //!
 //! A full bake can be saved and restored (`saved`, #1887): the `<scene>.navmesh`
-//! file holds its result and the fingerprint of what it read, so Play's first tick
-//! restores it instead of baking, and rebakes incrementally from there.
+//! file holds its result and the fingerprint of what it read, so a scene's load and
+//! Play's first tick restore it instead of baking (`still::restore_or_bake`), and
+//! rebake incrementally from there.
 //!
 //! Deterministic: pure geometry, a total order on every sort, no RNG or clock.
 
@@ -90,17 +91,9 @@ impl NavigationGraph {
         self.index_links();
 
         let colliders = colliders.into_iter().zip(rects);
-        let inputs = BakeInputs {
-            settings: settings.clone(),
-            colliders: colliders
-                .map(|((id, key), rect)| Source { id, key, rect })
-                .collect(),
-            obstacles: sources(obstacles, |v| {
-                raster::footprint(&raw, &v.triangles().concat())
-            }),
-            modifiers: sources(modifiers, |v| v.footprint(&raw)),
-            links: sources(links, |k| link_rect(self, k)),
-        };
+        let colliders = colliders.map(|((id, key), rect)| Source { id, key, rect });
+        let keys = (obstacles, modifiers, links);
+        let inputs = record_inputs(&raw, settings, colliders.collect(), keys);
         let mut state = BakeState { raw, inputs, log };
         state.log.record(self.bake_generation, None);
         self.bake_state = Some(Box::new(state));
@@ -151,6 +144,33 @@ impl NavigationGraph {
 }
 
 /// The cells an authored link spans: the box its two ends bound.
+/// What a bake on `g`'s grid read, each input with the cells it covers: the one
+/// record a full bake keeps and a saved navmesh's restore rebuilds
+/// (`saved::fingerprint`, #1887), so a restored graph rebakes incrementally over
+/// the very cells a baked one would. The colliders come measured: a bake has their
+/// cells from rasterising them.
+fn record_inputs(
+    g: &NavigationGraph,
+    settings: &super::NavMeshSettings,
+    colliders: Vec<Source<inputs::ColliderKey>>,
+    (obstacles, modifiers, links): InputKeys,
+) -> BakeInputs {
+    BakeInputs {
+        settings: settings.clone(),
+        colliders,
+        obstacles: sources(obstacles, |v| raster::footprint(g, &v.triangles().concat())),
+        modifiers: sources(modifiers, |v| v.footprint(g)),
+        links: sources(links, |k| link_rect(g, k)),
+    }
+}
+
+/// The obstacles, modifier volumes and authored links a bake reads, by ascending id.
+type InputKeys = (
+    Vec<(u32, ObstacleVolume)>,
+    Vec<(u32, ModifierVolume)>,
+    Vec<(u32, AuthoredKey)>,
+);
+
 fn link_rect(g: &NavigationGraph, k: &AuthoredKey) -> Option<CellRect> {
     CellRect::covering(g, k.start.min(k.end), k.start.max(k.end))
 }

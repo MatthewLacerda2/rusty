@@ -43,7 +43,7 @@ pub struct SceneSnapshot {
     /// Whether the PVS's file could not be read, so the next save keeps it.
     occlusion_unread: bool,
     /// The saved navmesh's bytes (#1887): no document field either.
-    navmesh: Option<std::sync::Arc<[u8]>>,
+    navmesh: crate::scene::nav_settings::SavedNavmesh,
 }
 
 impl SceneSnapshot {

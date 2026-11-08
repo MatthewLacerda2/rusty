@@ -107,7 +107,7 @@ pub struct Scene {
     /// save keeps it rather than removing it as absent.
     pub occlusion_unread: bool,
     /// The `<scene>.navmesh` bytes (#1887, `nav_settings::saved`), checked on use.
-    pub navmesh: Option<std::sync::Arc<[u8]>>,
+    pub navmesh: crate::scene::nav_settings::SavedNavmesh,
     /// What Generate Lighting bakes with (#832), saved with the scene.
     pub lighting_settings: crate::scene::lighting::LightingSettings,
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
@@ -181,7 +181,7 @@ impl Default for Scene {
             lightmaps: Default::default(),
             occlusion: Default::default(),
             occlusion_unread: false,
-            navmesh: None,
+            navmesh: Default::default(),
             lighting_settings: Default::default(),
             pending_destroy: Vec::new(),
             playing: false,
