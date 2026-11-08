@@ -27,7 +27,10 @@
 //!
 //! Casters are gathered once per sweep (`gather`) and culled per light volume — a
 //! cascade (#435) or an atlas tile (#468) — so a prop inside two volumes is drawn
-//! into both. A point or spot light's tile also drops the baked casters its light's
+//! into both. A volume tests only the static casters the scene's BVH reaches
+//! (#1874, `reach`) and every caster the BVH cannot answer for, so a tile pays for
+//! the casters near its light, not for the level: it draws the same casters in
+//! the same order as testing them all. A point or spot light's tile also drops the baked casters its light's
 //! PVS cell cannot see (#1714, [`LightVolume`]): the wall that hides them is in the
 //! same map, so the map is the same without them, but for the bake's own miss (a
 //! caster seen only through a gap of under about a metre may be dropped, and a still
@@ -40,6 +43,7 @@
 mod buffer;
 mod cull;
 mod gather;
+mod reach;
 mod runs;
 mod sweep;
 
@@ -62,6 +66,7 @@ use buffer::{CasterData, CasterRecords, CasterUpload};
 pub(super) use cull::LightVolume;
 pub(crate) use cull::ShadowCulls;
 use glam::Mat4;
+use reach::Reach;
 use runs::batch_casters;
 pub(crate) use runs::{shadow_runs, ShadowRun};
 pub(super) use sweep::Sweep;
@@ -139,8 +144,9 @@ impl CasterFrame<'_> {
 }
 
 impl ShadowRenderer {
-    /// Gather every active caster `sweep` takes whose LOD level `lod` shows, cull it
-    /// against each of `volumes` (light view-projections, and the PVS rows of
+    /// Gather every active caster `sweep` takes whose LOD level `lod` shows, cull
+    /// the ones the scene's caster index reaches (#1874, `reach`) against each of
+    /// `volumes` (light view-projections, and the PVS rows of
     /// their lights' cells), and upload every volume's
     /// batches into that sweep's one caster buffer. Returns the batches per volume,
     /// in the order given.
@@ -154,11 +160,15 @@ impl ShadowRenderer {
         let start = std::time::Instant::now();
         let (candidates, joints, walls) = self.collect_casters(frame, lod, sweep);
         let pvs = &frame.objects.occlusion;
+        let index = self.index_casters.then_some(&frame.objects.casters);
+        let reach = Reach::new(&candidates, index);
         let mut matrices = Vec::new();
         let mut per_volume = Vec::with_capacity(volumes.len());
         for &volume in volumes {
             let volume = volume.resident(walls);
-            let casters = cull::cull(&candidates, volume, pvs, &mut self.culls);
+            let picked = reach.of(volume.view_proj);
+            let picked = picked.into_iter().flat_map(|runs| &candidates[runs]);
+            let casters = cull::cull(picked, volume, pvs, &mut self.culls);
             let (packed, mut batches) = batch_casters(casters, self.instancing);
             let base = matrices.len() as u32;
             for batch in &mut batches {
@@ -244,5 +254,7 @@ mod cull_tests;
 mod layout_tests;
 #[cfg(test)]
 mod material_tests;
+#[cfg(test)]
+mod reach_tests;
 #[cfg(test)]
 mod tests;

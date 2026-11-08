@@ -69,6 +69,7 @@ impl Renderer {
         }
         rs.refold_casting();
         rs.occlusion.refresh(scene);
+        rs.refresh_casters(scene);
         stats
     }
 
