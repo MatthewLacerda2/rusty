@@ -7,7 +7,8 @@ use glam::Vec3;
 
 use super::{turns, world_poses, SCALES};
 use crate::components::{CapsuleAxis, ColliderShape};
-use crate::physics::shape::build::{build_shape_for, try_build_shape};
+use crate::physics::shape::build::try_build_shape;
+use crate::physics::shape::fit::build_shape_for;
 use crate::physics::shape::mesh::Skip;
 use crate::scripting::ConsoleLogs;
 
@@ -119,7 +120,7 @@ fn a_skipped_mesh_logs_a_warning_naming_its_entity() {
             local_min: Vec3::ZERO,
             local_max: Vec3::ONE,
         };
-        let built = build_shape_for(id, &shape, Vec3::ONE, mesh).is_some();
+        let built = build_shape_for(id, &shape, Vec3::ONE, mesh, false).is_some();
         let logged = crate::logging::forward(&console);
         let named = logged.iter().any(|m| m.contains(&format!("entity {id}:")));
         assert!(built != named, "{what}: built {built}, warned {logged:?}");

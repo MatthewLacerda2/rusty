@@ -2,14 +2,17 @@
 //!
 //! The navmesh (#454) rasterises the geometry physics actually collides with, so it
 //! builds the same parry shape [`build_shape`] gives rapier (world scale baked in,
-//! Unity-style) and tessellates it at the entity's world pose. Boxes, hulls and
+//! Unity-style) and tessellates it at the entity's world pose. A concave mesh is
+//! its exact triangles here even on a dynamic body, whose physics shape is
+//! convex pieces (#1886): the bake wants the surface, not an approximation. Boxes, hulls and
 //! trimeshes come out exact; spheres, cylinders and capsules are tessellated finely
 //! enough for a grid whose cells are tens of centimetres wide.
 
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::build::{build_shape_for, collider_inputs};
+use super::build::collider_inputs;
+use super::fit::build_shape_for;
 use crate::physics::compound::world_pose;
 use crate::scene::Scene;
 
@@ -37,7 +40,7 @@ pub fn collider_world_triangles(scene: &Scene, id: u32) -> Option<ColliderTriang
         .mesh_geom
         .as_ref()
         .map(|(p, i)| (p.as_slice(), i.as_slice()));
-    let collider = build_shape_for(id, &inp.shape, pose.scale, mesh)?;
+    let collider = build_shape_for(id, &inp.shape, pose.scale, mesh, false)?;
     let (points, triangles, convex) = tessellate(collider.shape())?;
     let vertices = points
         .into_iter()
