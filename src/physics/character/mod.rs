@@ -30,6 +30,7 @@
 
 mod body;
 mod hits;
+mod pass;
 mod sweep;
 
 pub(super) use body::{character_collider_inputs, upright_offset};

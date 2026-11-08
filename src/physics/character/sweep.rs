@@ -3,13 +3,12 @@
 //! and the collision flags and ground normal read off what it touched.
 
 use glam::Vec3;
-use rapier3d::control::{
-    CharacterAutostep, CharacterCollision, CharacterLength, KinematicCharacterController,
-};
+use rapier3d::control::{CharacterAutostep, CharacterLength, KinematicCharacterController};
 use rapier3d::parry::query::ShapeCastOptions;
 use rapier3d::parry::shape::Capsule;
 use rapier3d::prelude::*;
 
+use super::pass::{off_slope, stalled, Pass};
 use super::{capsule, CharacterMove};
 use crate::components::physics::character_controller::{
     COLLIDED_ABOVE, COLLIDED_BELOW, COLLIDED_SIDES,
@@ -107,7 +106,8 @@ impl PhysicsWorld {
     fn pass(&self, m: &MoveCtx, motion: Vec3) -> Pass {
         let (pass, flat_hit) = self.run(m, motion);
         if motion.y < 0.0 && flat_hit && stalled(motion, &pass) {
-            return self.run(m, Vec3::new(motion.x, 0.0, motion.z)).0;
+            let rerun = self.run(m, Vec3::new(motion.x, 0.0, motion.z)).0;
+            return rerun.after(pass.collisions);
         }
         pass
     }
@@ -150,9 +150,14 @@ impl PhysicsWorld {
     /// to climb); Unity's controller treats such a slope as a wall. The surface
     /// is read a radius ahead of the feet, from a step's height up: a slope is
     /// still steep there, while a step's edge gives way to its flat tread.
+    /// Only a pass that touched something too steep to walk counts: a rise of
+    /// float noise on the floor, with a slope a radius ahead but not yet
+    /// reached, would stop the walk short of it (and of its hit, #1879).
     fn steep_climb(&self, m: &MoveCtx, motion: Vec3, pass: &Pass) -> Option<Vec3> {
         let ahead = Vec3::new(motion.x, 0.0, motion.z).normalize_or_zero();
-        if pass.translation.y <= motion.y.max(0.0) + 1e-5 || ahead == Vec3::ZERO {
+        let steep = |n: Vec3| n.y > FLAG_EPS && !m.walkable(n);
+        let touched = pass.collisions.iter().any(|c| steep(c.hit.normal1));
+        if !touched || pass.translation.y <= motion.y.max(0.0) + 1e-5 || ahead == Vec3::ZERO {
             return None;
         }
         let center = m.start.translation + pass.translation;
@@ -164,7 +169,7 @@ impl PhysicsWorld {
             .queries(m.filter)
             .cast_ray_and_get_normal(&ray, drop * 2.0, true)?;
         let n = hit.normal.try_normalize()?;
-        (n.y > FLAG_EPS && !m.walkable(n)).then_some(n)
+        steep(n).then_some(n)
     }
 
     /// Run the controller for one move: the corrected translation and what it hit.
@@ -191,7 +196,9 @@ impl PhysicsWorld {
         let mut pass = self.pass(&m, motion);
         if let Some(steep) = self.steep_climb(&m, motion, &pass) {
             // Again, without the push into the slope: it blocks like a wall.
-            pass = self.pass(&m, off_slope(motion, steep));
+            pass = self
+                .pass(&m, off_slope(motion, steep))
+                .after(pass.collisions);
         }
         let end = m.start.append_translation(pass.translation);
         let below = pass.ground.or_else(|| self.ground_below(&m, &end));
@@ -230,41 +237,5 @@ struct MoveCtx<'a> {
 impl MoveCtx<'_> {
     fn walkable(&self, normal: Vec3) -> bool {
         normal.y >= self.slope_cos - 1e-4
-    }
-}
-
-/// What one run of the controller produced.
-struct Pass {
-    translation: Vec3,
-    grounded: bool,
-    flags: u8,
-    /// The normal of the last floor the sweep hit below the capsule.
-    ground: Option<Vec3>,
-    /// Every contact of the sweep, in the order it met them.
-    collisions: Vec<CharacterCollision>,
-}
-
-/// Whether a pass lost horizontal travel. A floor never blocks walking, but
-/// rapier 0.36's controller can: against a near-flat floor its "no slipping on
-/// a walkable slope" rule reads float noise in the downward (gravity) part as a
-/// slip and drops the whole slide, stalling the character for a tick, on open
-/// ground and sliding along a wall alike. Without the downward part there is
-/// nothing to misread, and snap-to-ground still keeps the capsule on the floor.
-/// A wall that took the travel takes it again on the rerun, so the rerun only
-/// ever gives back what the floor ate.
-fn stalled(motion: Vec3, pass: &Pass) -> bool {
-    let wanted = Vec3::new(motion.x, 0.0, motion.z).length();
-    let got = Vec3::new(pass.translation.x, 0.0, pass.translation.z).length();
-    got < wanted * 0.99
-}
-
-/// `motion` without its horizontal push into the steep surface `normal`.
-fn off_slope(motion: Vec3, normal: Vec3) -> Vec3 {
-    let away = Vec3::new(normal.x, 0.0, normal.z).normalize_or_zero();
-    let into = motion.dot(away);
-    if into < 0.0 {
-        motion - away * into
-    } else {
-        motion
     }
 }

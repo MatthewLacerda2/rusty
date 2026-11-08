@@ -42,6 +42,10 @@ things follow:
   (#1893), arguments and returns copied the same way, because the `OnTakeDamage`
   handlers they call synchronously live there: a scenario's shot reaches the game
   script's handler, and a handler's error is raised as the scenario's.
+- `CharacterController.Move` runs in the gameplay VM the same way (#1879), so
+  the move's `OnControllerColliderHit` handlers hear it. Before the first
+  `Harness.Step` there is no gameplay VM: the scenario's own `Move` runs, moving
+  the edit-mode controller unobstructed and calling no handler.
 - A Lua function a scenario passes `Timer.Invoke` / `InvokeRepeating` /
   `StartCoroutine` or a tween's `on_complete` is refused with an error: it belongs
   to the scenario's VM, which the gameplay tick never calls. Drive time with

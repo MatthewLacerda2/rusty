@@ -58,7 +58,8 @@ Each `Move` calls **`OnControllerColliderHit(id, hit)`** on the scripts of the
 controller's entity (Unity's callback, #1879), before `Move` returns: once per
 collider the move touched, in the order the sweep met them. **Static colliders
 count**, as in Unity: a move that presses into the floor (its gravity) reports
-the floor, so a script that only cares about walls checks `hit.normal.y`. Not
+the floor, so a script that only cares about walls checks `hit.normal.y`, and
+so do slopes steeper than the slope limit, which block like a wall. Not
 every grounded frame does: a move whose small downward part stays inside the
 skin gap touches nothing. A move that touched nothing calls nothing; a
 move root motion makes (an `Animator` driving the controller) reports its hits

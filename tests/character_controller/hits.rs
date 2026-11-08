@@ -71,9 +71,8 @@ fn each_move_hears_each_collider_once_floor_and_wall_alike() {
         "pressed into the wall, its normal facing back: {last}"
     );
     assert!(
-        log.contains(&format!("{floor}:0.00,0.91,nil;{wall}:"))
-            && log.contains(&format!("{wall}:-1.00,0.91,nil;{floor}:")),
-        "the floor (gravity) and the wall in one Move, in sweep order: {log}"
+        last.starts_with(&format!("{floor}:0.00,0.91,nil;{wall}:")),
+        "the floor (gravity, met first) and the wall in one Move: {last}"
     );
     for frame in log.split('|') {
         let ids: Vec<&str> = frame
