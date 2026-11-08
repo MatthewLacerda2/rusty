@@ -32,6 +32,7 @@ fn saved_graph() -> String {
                 events: Vec::new(),
                 sync_group: None,
                 sync_markers: Vec::new(),
+                tag: String::new(),
             }],
             edges: Vec::new(),
             entry: "Run".to_string(),

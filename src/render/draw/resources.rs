@@ -6,7 +6,7 @@
 
 use super::batch::sort::back_to_front;
 use super::batch::{DrawItem, FrameDraws};
-use super::overlays::{OverlayBindings, OverlayDraws};
+use super::overlays::{BallResource, OverlayBindings, OverlayDraws};
 use super::visibility::{CameraCulls, ViewCull};
 use crate::core::application::SceneGizmos;
 use crate::render::gpu::draw_buffers::{FrameUpload, JointMatrix};
@@ -59,6 +59,8 @@ pub(crate) struct Overlays {
     // Light- and reflection-probe gizmos (#284): probe markers tinted by baked SH plus
     // reflection parallax-box wireframes. Editor-only, like the rest of `Overlays`.
     pub probes: Vec<ProbeResource>,
+    /// The reflection probes' mirror balls (#1911).
+    pub balls: Vec<BallResource>,
 }
 
 impl Renderer {
@@ -77,12 +79,14 @@ impl Renderer {
         let aabb = self.precreate_occlusion(scene, &mut draws);
         let axis = self.precreate_axis_arrows(scene, &mut draws);
         let probes = self.precreate_probes(scene, gizmos, &mut draws);
+        let balls = self.precreate_probe_balls(scene, gizmos, &mut draws);
         Overlays {
             bindings: self.overlay_bindings(&draws),
             grid,
             aabb,
             axis,
             probes,
+            balls,
         }
     }
 

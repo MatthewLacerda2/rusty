@@ -132,6 +132,12 @@ impl ProbeArray {
         pack_blend(self.active.blend(centre))
     }
 
+    /// Where `probe` sits among this frame's resident probes (its uniform's index),
+    /// or `None` when its cube is not resident: the probe-ball gizmo's lookup (#1911).
+    pub(crate) fn resident(&self, probe: &ReflectionProbe) -> Option<usize> {
+        self.active.probes.iter().position(|r| r == probe)
+    }
+
     /// Every resident probe, as `LightingUniforms.refl_probes` holds them.
     pub(crate) fn uniforms(&self) -> &[ReflectionProbeUniform; MAX_REFLECTION_PROBES] {
         &self.uniforms

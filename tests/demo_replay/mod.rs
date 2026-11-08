@@ -10,6 +10,7 @@ use rusty::dev::scenario;
 mod display_scale;
 mod edit_mode;
 mod ends;
+mod forwards;
 mod hosts;
 mod index;
 mod index_edges;

@@ -90,6 +90,10 @@ pub struct GraphNode {
     /// carries none of its own: each child carries its clip's.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sync_markers: Vec<SyncMarker>,
+    /// The state's tag (Unity's *Tag*, #1901): shared by several states so a
+    /// script switches on it (`"attack"` on *Aim*, *Fire*, *Burst*). Empty is none.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tag: String,
 }
 
 /// A directed transition `from → to`. It fires when **all** its conditions hold
@@ -229,6 +233,8 @@ mod montage_tests;
 mod nested_tests;
 #[cfg(test)]
 mod sync_tests;
+#[cfg(test)]
+mod tag_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

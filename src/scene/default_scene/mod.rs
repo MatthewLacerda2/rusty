@@ -13,7 +13,8 @@
 //! built from boxes and planes only: a walled yard, a sunken pool between the two
 //! spawns with a ramp at each end, translucent water with no collider, a raised
 //! jacuzzi you jump into, and crates for cover. It exercises layered navigation
-//! (the bot chases down one ramp and up the other), character-controller slopes,
+//! (the bot closes in down one ramp and up the other, to a spot its `EnvironmentQuery`
+//! picks round the Player, #1892), character-controller slopes,
 //! and shadows at level scale. Enemy_1 starts behind a crate, so its first chase
 //! paths **around** it.
 //!

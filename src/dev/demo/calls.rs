@@ -4,9 +4,11 @@
 //! `Transform.SetPosition` reaches the world without passing through `InputState`.
 //! [`journal_calls`] wraps every API namespace function in that VM so each call
 //! notes `Namespace.Function` and its plain-data arguments in the world's journal;
-//! [`invoke`] makes the same call on replay. The `Harness` verbs that change the
-//! world ([`HARNESS_VERBS`]) are noted the same way and replayed by
-//! [`invoke_harness`]; the rest only read it, or step it (the steps are ticks).
+//! [`invoke`] makes the same call on replay, in the gameplay VM when the
+//! scenario's VM forwards it there (`forwards`, #1929). The `Harness`
+//! verbs that change the world ([`HARNESS_VERBS`]) are noted the same way and
+//! replayed by [`invoke_harness`]; the rest only read it, or step it (the steps
+//! are ticks).
 //! An argument or a returned value that is not plain data (a function, a script
 //! handle from `Scene.GetScript`) cannot be replayed, and taints the demo instead.
 
@@ -15,8 +17,9 @@ use std::rc::Rc;
 
 use mlua::{Function, Lua, MultiValue, Table, Value};
 
+use super::forwards;
 use crate::scene::Scene;
-use crate::scripting::{HostCall, HostJournal, Plain};
+use crate::scripting::{HostCall, HostJournal, Plain, ScriptManager};
 
 /// The `Harness` verbs that change the world without a tick: noted like an API
 /// call. Every other `Harness` verb reads the world, or steps it.
@@ -156,14 +159,32 @@ fn to_lua(lua: &Lua, value: &Plain) -> mlua::Result<Value> {
     })
 }
 
-/// Make the call `function` (`Namespace.Function`) with `args` in `lua`: what a
-/// scenario did before this tick, again. The replay's VM has the surface over the
-/// world's cells from `replay::replay_vm` (a restart builds a new one).
-pub fn invoke(lua: &Lua, function: &str, args: &[Plain]) -> Result<(), String> {
+/// Make the call `function` (`Namespace.Function`) with `args`: what a scenario
+/// did before this tick, again. It is made in `lua`, the replay's VM, with the
+/// surface over the world's cells from `replay::replay_vm` (a restart builds a
+/// new one), unless the scenario's VM forwards it into the gameplay VM
+/// ([`forwards::FORWARDS`]): then it is made in `game`'s VM, as it was recorded, so the
+/// callbacks it fires (an `OnTakeDamage`) fire again, and while that VM is down
+/// it is made by the same rule the recording followed ([`forwards::Forward::run`],
+/// #1929).
+pub fn invoke(
+    lua: &Lua,
+    game: &ScriptManager,
+    function: &str,
+    args: &[Plain],
+) -> Result<(), String> {
     let (namespace, name) = function
         .split_once('.')
         .ok_or_else(|| format!("{function} is not Namespace.Function"))?;
-    call(lua, (namespace, name), args).map_err(|e| format!("{function}: {e}"))
+    let made = match forwards::find(namespace, name) {
+        Some(entry) => entry.run(
+            name,
+            || game.with_vm(|glua| call(glua, (namespace, name), args)),
+            || call(lua, (namespace, name), args),
+        ),
+        None => call(lua, (namespace, name), args),
+    };
+    made.map_err(|e| format!("{function}: {e}"))
 }
 
 /// Call `namespace.name` in `lua` with `args`.
@@ -208,55 +229,5 @@ pub fn invoke_harness(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_wrapped_call_is_noted_and_a_handle_taints() {
-        let lua = Lua::new();
-        lua.load(
-            "Ns = { Echo = function(...) return ... end, Handle = function() return print end }",
-        )
-        .exec()
-        .unwrap();
-        let journal = Rc::new(RefCell::new(HostJournal::default()));
-        journal.borrow_mut().start();
-        journal_calls(&lua, &journal).unwrap();
-        let got: i64 = lua
-            .load("return Ns.Echo(7, 0.5, 'a', { 1, 2 }, { k = true }, nil)")
-            .eval()
-            .unwrap();
-        assert_eq!(got, 7, "the wrapped function still answers");
-        lua.load("Ns.Handle()").exec().unwrap();
-        let calls = journal.borrow_mut().take();
-        let echo = HostCall::Call {
-            function: "Ns.Echo".into(),
-            args: vec![
-                Plain::Int(7),
-                Plain::Number(0.5),
-                Plain::Str("a".into()),
-                Plain::List(vec![Plain::Int(1), Plain::Int(2)]),
-                Plain::Map(vec![("k".into(), Plain::Bool(true))]),
-                Plain::Nil,
-            ],
-        };
-        assert_eq!(calls[0], echo);
-        assert!(
-            matches!(&calls[2], HostCall::Taint(what) if what.contains("Ns.Handle returned a function"))
-        );
-    }
-
-    #[test]
-    fn a_function_argument_taints() {
-        let lua = Lua::new();
-        lua.load("Ns = { Take = function() end }").exec().unwrap();
-        let journal = Rc::new(RefCell::new(HostJournal::default()));
-        journal.borrow_mut().start();
-        journal_calls(&lua, &journal).unwrap();
-        lua.load("Ns.Take(print)").exec().unwrap();
-        let calls = journal.borrow_mut().take();
-        assert!(
-            matches!(&calls[..], [HostCall::Taint(what)] if what.contains("passed a function"))
-        );
-    }
-}
+#[path = "calls_tests.rs"]
+mod tests;
