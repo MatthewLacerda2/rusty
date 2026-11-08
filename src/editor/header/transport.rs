@@ -1,9 +1,10 @@
-//! The toolbar row under the menu bar: the open scene's name on the left and the
-//! Play / Stop transport centred, as in Unity. Play mode is shown by the lit Play
+//! The transport at the menu bar's right end: one Play button that turns into Stop
+//! during Play, in the same place, so stopping never moves the cursor (#1914). Then,
+//! in dev builds, the Developer Console button. Play mode reads from the lit Stop
 //! button and the editor-wide tint ([`crate::editor::theme::Theme::for_play_mode`]),
-//! not by a mode label.
+//! not from a mode label.
 
-use egui::{Button, CornerRadius, Rect, RichText, Ui, UiBuilder};
+use egui::{Button, CornerRadius, RichText, Ui};
 use egui_phosphor::regular as icon;
 
 use crate::editor::theme::Theme;
@@ -24,57 +25,42 @@ const CONSOLE_SHORTCUT: egui::KeyboardShortcut = egui::KeyboardShortcut::new(
     egui::Key::C,
 );
 
-const ROW_HEIGHT: f32 = 26.0;
 const BUTTON: egui::Vec2 = egui::vec2(34.0, 22.0);
 
-/// Draw the toolbar row and apply the transport's clicks and shortcut.
+/// Draw the transport, then the console button, left to right, in the menu bar's
+/// right-to-left tail (so the console button is drawn first), and apply their clicks
+/// and shortcuts.
 pub(super) fn draw(editor: &mut EditorUi, ui: &mut Ui, scene: &mut Scene, is_playing: &mut bool) {
     let t = editor.theme;
-    let row = ui.available_rect_before_wrap();
-    let row = Rect::from_min_size(row.min, egui::vec2(row.width(), ROW_HEIGHT));
-    ui.allocate_rect(row, egui::Sense::hover());
-
-    let layout = egui::Layout::left_to_right(egui::Align::Center);
-    let mut left = ui.new_child(UiBuilder::new().max_rect(row).layout(layout));
-    left.label(RichText::new(icon::FILM_SLATE).color(t.text_secondary));
-    left.label(RichText::new(scene_name(editor)).color(t.text_secondary));
-
-    let group = Rect::from_center_size(row.center(), egui::vec2(BUTTON.x * 2.0 + 2.0, BUTTON.y));
-    let mut center = ui.new_child(UiBuilder::new().max_rect(group).layout(layout));
-    center.spacing_mut().item_spacing.x = 2.0;
-    transport(editor, &mut center, scene, is_playing, &t);
-
     #[cfg(feature = "dev")]
-    {
-        let console = Rect::from_min_size(
-            egui::pos2(group.right() + 8.0, group.top()),
-            egui::vec2(BUTTON.x, BUTTON.y),
-        );
-        let mut right = ui.new_child(UiBuilder::new().max_rect(console).layout(layout));
-        console_toggle(editor, &mut right, &t);
-    }
+    console_toggle(editor, ui, &t);
+    transport(editor, ui, scene, is_playing, &t);
 }
 
-/// The Developer Console button beside Play / Stop: lit while the console shows.
+/// A transport-sized button showing `glyph`, lit in the accent when `lit`.
+fn button(glyph: &str, lit: bool, t: &Theme) -> Button<'static> {
+    let (fill, text) = if lit {
+        (t.accent, egui::Color32::WHITE)
+    } else {
+        (t.bg_hover, t.text_primary)
+    };
+    Button::new(RichText::new(glyph.to_string()).size(14.0).color(text))
+        .fill(fill)
+        .corner_radius(CornerRadius::same(4))
+        .min_size(BUTTON)
+}
+
+/// The Developer Console button beside the transport: lit while the console shows.
 #[cfg(feature = "dev")]
 fn console_toggle(editor: &mut EditorUi, ui: &mut Ui, t: &Theme) {
     if ui.input_mut(|i| i.consume_shortcut(&CONSOLE_SHORTCUT)) {
         editor.dev.show_play_console = !editor.dev.show_play_console;
     }
     let shown = editor.dev.show_play_console;
-    let (fill, text) = if shown {
-        (t.accent, egui::Color32::WHITE)
-    } else {
-        (t.bg_hover, t.text_primary)
-    };
     let shortcut = ui.ctx().format_shortcut(&CONSOLE_SHORTCUT);
-    let button = Button::new(RichText::new(icon::TERMINAL_WINDOW).size(14.0).color(text))
-        .fill(fill)
-        .corner_radius(CornerRadius::same(4))
-        .min_size(BUTTON);
     let label = if shown { "Hide" } else { "Show" };
     if ui
-        .add(button)
+        .add(button(icon::TERMINAL_WINDOW, shown, t))
         .on_hover_text(format!(
             "{label} the Developer Console during Play ({shortcut})"
         ))
@@ -84,8 +70,8 @@ fn console_toggle(editor: &mut EditorUi, ui: &mut Ui, t: &Theme) {
     }
 }
 
-/// The Play / Stop pair. Play lights up in the accent while the game runs; the
-/// shortcut toggles. Clicking Stop always leaves Play and drops the selection.
+/// Play outside Play, Stop (lit in the accent) during it; a click or the shortcut
+/// toggles. Stop always leaves Play and drops the selection.
 fn transport(
     editor: &mut EditorUi,
     ui: &mut Ui,
@@ -95,58 +81,22 @@ fn transport(
 ) {
     let toggled = ui.input_mut(|i| i.consume_shortcut(&PLAY_SHORTCUT));
     let shortcut = ui.ctx().format_shortcut(&PLAY_SHORTCUT);
-    let (play_fill, play_text) = if *is_playing {
-        (t.accent, egui::Color32::WHITE)
+    let (glyph, verb) = if *is_playing {
+        (icon::STOP, "Stop")
     } else {
-        (t.bg_hover, t.text_primary)
+        (icon::PLAY, "Play")
     };
-    let play = Button::new(RichText::new(icon::PLAY).size(14.0).color(play_text))
-        .fill(play_fill)
-        .corner_radius(CornerRadius {
-            nw: 4,
-            sw: 4,
-            ne: 0,
-            se: 0,
-        })
-        .min_size(BUTTON);
-    let play = ui.add(play).on_hover_text(format!("Play ({shortcut})"));
-    if play.clicked() || (toggled && !*is_playing) {
-        *is_playing = true;
-    } else if toggled {
-        stop(editor, scene, is_playing);
+    let clicked = ui
+        .add(button(glyph, *is_playing, t))
+        .on_hover_text(format!("{verb} ({shortcut})"))
+        .clicked();
+    if clicked || toggled {
+        if *is_playing {
+            stop(editor, scene, is_playing);
+        } else {
+            *is_playing = true;
+        }
     }
-
-    let stop_text = if *is_playing {
-        t.text_primary
-    } else {
-        t.text_secondary
-    };
-    let stop_btn = Button::new(RichText::new(icon::STOP).size(14.0).color(stop_text))
-        .fill(t.bg_hover)
-        .corner_radius(CornerRadius {
-            nw: 0,
-            sw: 0,
-            ne: 4,
-            se: 4,
-        })
-        .min_size(BUTTON);
-    if ui
-        .add(stop_btn)
-        .on_hover_text(format!("Stop ({shortcut})"))
-        .clicked()
-    {
-        stop(editor, scene, is_playing);
-    }
-}
-
-/// The open scene's file stem, or "Untitled" for a scene never saved.
-fn scene_name(editor: &EditorUi) -> String {
-    editor
-        .current_scene_path()
-        .as_deref()
-        .and_then(|p| std::path::Path::new(p).file_stem())
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "Untitled".to_string())
 }
 
 /// Leave Play, dropping a selection that names an entity of the play copy.
@@ -155,3 +105,7 @@ fn stop(editor: &mut EditorUi, scene: &mut Scene, is_playing: &mut bool) {
     scene.selected_entity_id = None;
     editor.selected_entity_id = None;
 }
+
+#[cfg(test)]
+#[path = "transport_tests.rs"]
+mod tests;
