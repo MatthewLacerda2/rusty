@@ -51,20 +51,26 @@ STALLED = "handed back: stalled"
 RED = "handed back: red"
 
 
-class Red(tuple):
-    """A [`RED`] hand-back: `(number, RED, why)`, carrying `mark`, the gating
-    runs on the head as the verdict read them ([`watch.handbacks.attempts`])."""
+class Handed(tuple):
+    """A hand-back from the CI wait: `(number, state, why)`, carrying `mark`,
+    the gating runs on the head as the verdict read them
+    ([`watch.handbacks.attempts`]), so the watch never takes one from a later read."""
 
     mark: str
 
-    def __new__(cls, number: int, why: str, mark: str):
-        made = super().__new__(cls, (number, RED, why))
+    def __new__(cls, number: int, state: str, why: str, mark: str):
+        made = super().__new__(cls, (number, state, why))
         made.mark = mark
         return made
 
 
+def Red(number: int, why: str, mark: str) -> Handed:  # noqa: N802 - reads as the kind it builds
+    """A [`RED`] hand-back ([`Handed`])."""
+    return Handed(number, RED, why, mark)
+
+
 class Marked(list):
-    """A CI wait's lines that end [`RED`], carrying the runs' `mark` ([`Red.mark`])."""
+    """A CI wait's stop lines, carrying the runs' `mark` ([`Handed.mark`])."""
 
     mark: str
 

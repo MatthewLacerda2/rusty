@@ -118,14 +118,23 @@ def head_runs(repo: str, sha: str) -> str | None:
     return handbacks.attempts([r for w in runlist.WORKFLOWS for r in runlist.runs_for(runs, sha, w)])
 
 
-def head_reading(repo: str, pull: dict) -> tuple[str, str] | None:
+def head_reading(repo: str, pull: dict, early: bool = False) -> tuple[str, str] | None:
     """[`watch.stalls.reading`] of the gating runs on `pull`'s head and their
-    jobs, `None` when GitHub failed: what brings a stalled head back (#1831)."""
+    jobs, `None` when GitHub failed: what brings a stalled head back (#1831).
+
+    With `early`, a head whose runs listing already shows a red run
+    ([`early_red`]) is answered [`stalls.ENDED`] before any jobs are fetched
+    (#1951's review): the watch re-reads every red hand-back left labelled on
+    each idle pass, and jobs for every gating run cost hundreds of calls an hour
+    to learn "still red". Only for a caller that acts on green alone: a run
+    listed red whose jobs lag (#1182) reads ended here, not out."""
     sha = pull.get("headRefOid", "")
     listed = quietly("api", f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100")
     if listed is None:
         return None
     runs = [r for w in runlist.WORKFLOWS for r in runlist.runs_for(listed.get("workflow_runs", []), sha, w)]
+    if early and early_red(runs):
+        return stalls.ENDED, "a gating run is listed red."
     jobs = {}
     for run in runs:
         got = quietly("api", f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100")
@@ -133,3 +142,11 @@ def head_reading(repo: str, pull: dict) -> tuple[str, str] | None:
             return None
         jobs[run["id"]] = got.get("jobs", [])
     return stalls.reading(pull, runs, jobs)
+
+
+def early_red(runs: list[dict]) -> bool:
+    """Whether a gating workflow's runs, the superseded dropped
+    ([`runlist.live`]), include one completed red ([`runlist.failed_runs`]):
+    [`verdict.decide.assess`] reads that workflow failed whatever its jobs say,
+    since a completed run keeps GitHub's conclusion ([`runlist.by_gate`])."""
+    return any(runlist.failed_runs(runlist.live([r for r in runs if r.get("name") == w])) for w in runlist.WORKFLOWS)

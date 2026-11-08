@@ -99,9 +99,13 @@ class Rerun(unittest.TestCase):
         self.assertIn("no push needed", " ".join(lines))
 
     def test_a_refused_re_run_hands_back_saying_so(self):
+        # Still a red head (#1951's review): a red hand-back carrying the verdict's
+        # runs as its mark, so a later green re-run brings it back during an outage.
         state, lines, _ = waited([lint(conclusion="cancelled")], rerun_status=1)
-        self.assertEqual(state, outcomes.STOP)
+        self.assertEqual(state, outcomes.RED)
         self.assertIn("refused: HTTP 403", lines[0])
+        self.assertIsInstance(lines, outcomes.Marked)
+        self.assertTrue(lines.mark)
 
     def test_a_code_red_is_handed_back_at_once_and_never_re_run(self):
         state, _, calls = waited([([run("ci", conclusion="failure"), run("lint")], {1: CODE_RED, 2: built("lint")})])

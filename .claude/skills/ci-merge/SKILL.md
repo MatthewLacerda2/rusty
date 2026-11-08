@@ -98,7 +98,10 @@ green: …`, with the run's URL), and from there it is a red hand-back: it comes
 back once its runs read green, or on a re-run or a push. `make queue-status`
 names every ready, labelled pull request the watch has passed over for more
 than an hour on a green head (`STRANDED #N: … last handed back for: <why>`),
-so a parked one is seen without reading the log (#1951). **A hand-back no push
+so a parked one is seen without reading the log (#1951). A hand-back remembered
+*before* #1951 that went green afterwards has no red entry and no failed job, so
+nothing brings it back but a new attempt: re-run one cheap job, `gh run rerun
+--job <deny's id>`, to make one. Never do that for a stall. **A hand-back no push
 fixes waits for what does** (#1279). One for what the description or labels
 claim (a missing `Closes #N`, a stray keyword, a wrong number, an issue-less code
 change) says "no push needed", and the watch takes it again once the pull

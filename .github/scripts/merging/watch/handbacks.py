@@ -36,9 +36,11 @@ moves. Five things count as moving without a push:
   is re-admitted on **state**: its unmoved head's gating runs, read now, all
   green, whatever the marks say. A stall that ended red joins it.
 
-The mark itself is never taken from a later read (#1951): a red hand-back
-carries the runs its verdict read ([`outcomes.Red`]), and any other kind whose
-read failed at the hand-back has none, and waits for its own signal or a push.
+The mark itself is never taken from a later read (#1951): every stop of the CI
+wait carries the runs its verdict read ([`outcomes.Handed`], a refused re-run
+and a missing run included), and any other hand-back (a conflict, a landing
+refusal) whose read failed at the hand-back has none, and waits for its own
+signal or a push.
 
 A conflict, a refused description or a committed image has no state entry and
 waits for its head (or its own kind's signal): green CI never re-admits them.
@@ -163,7 +165,7 @@ def rerun_heads(pulls: list[dict], memory: dict[int, str], marks: dict[int, str]
     remembered one. An entry with no mark (GitHub failed at the hand-back) is
     not asked: a later read taken as its mark could already be the re-run that
     fixed it, and nothing would ever differ from it again (#1951, #1920). A red
-    hand-back always has one ([`outcomes.Red`]) and is re-read on state too.
+    hand-back always has one ([`outcomes.Handed`]) and is re-read on state too.
     """
     again = []
     for pull in pulls:
@@ -181,7 +183,8 @@ def greened(pulls: list[dict], memory: dict[int, str], reds: dict[int, str], ask
     green now (#1951), whatever any mark says. `ask(pull)` is
     [`stalls.reading`] of those runs, `None` when GitHub failed (no news).
     Asked only for ready pull requests that carry the `queue` label, once each
-    per pass: a red head that stays red costs a read a pass, nothing more."""
+    per pass; the watch passes [`queue.pulls.head_reading`] with `early`, so a
+    head still listed red costs one runs listing a pass, no jobs."""
     return [
         pull["number"] for pull in pulls
         if pull.get("number") in reds and not pull.get("isDraft") and board.queued(pull)

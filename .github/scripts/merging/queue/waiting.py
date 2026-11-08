@@ -52,11 +52,12 @@ def wait_for(
             red = state == outcomes.WAIT and bool(runners.unread(pull, runs, jobs))
             if state == outcomes.RERUN:
                 refused = rerun_failed(runners.outage(pull, runs, jobs, polling.expiry(waited, red_since)), rerun)
-                if refused:
-                    return outcomes.STOP, [f"{outcomes.RUNNERS}, and the re-run was refused: {refused}", *lines]
+                if refused:  # red for the runners, and still red: a red hand-back like any other
+                    return stopped(pull, runs, jobs, [f"{outcomes.RUNNERS}, and the re-run was refused: {refused}", *lines], red=True)
+            elif state == outcomes.STOP:
+                return stopped(pull, runs, jobs, lines)
             elif state != outcomes.WAIT:
-                mark = red_mark(pull, runs, jobs) if state == outcomes.STOP else None
-                return (outcomes.RED, outcomes.Marked(lines, mark)) if mark is not None else (state, lines)
+                return state, lines
         if waited > deadline:
             # Its own state, not a red one: the watch brings it back by itself
             # when the run it outwaited goes green ([`watch.stalls`], #1831).
@@ -71,12 +72,27 @@ def wait_for(
         time.sleep(poll)
 
 
+def stopped(pull: dict, runs: list[dict], jobs: dict[int, list[dict]], lines: list[str], red: bool = False):
+    """A stop of the CI wait, its lines carrying the mark of the very runs the
+    verdict read ([`outcomes.Marked`], #1951), never one from a later read: a
+    read GitHub failed after the hand-back left #1920 with none, and the first
+    read after its green re-run became the baseline. Every stop gets one, a
+    missing run's included (the mark is then empty, and the run appearing
+    re-admits it, #869). It is [`outcomes.RED`] when `red` (a re-run of a
+    runners' red was refused) or a gating run is red ([`red_mark`])."""
+    sha = pull.get("headRefOid", "")
+    mark = handbacks.attempts([r for w in runlist.WORKFLOWS for r in runlist.runs_for(runs, sha, w)])
+    red = red or red_mark(pull, runs, jobs) is not None
+    return (outcomes.RED if red else outcomes.STOP), outcomes.Marked(lines, mark)
+
+
 def red_mark(pull: dict, runs: list[dict], jobs: dict[int, list[dict]]) -> str | None:
     """The gating runs on `pull`'s head as [`handbacks.attempts`] spells them,
-    when one of them is red ([`decide.assess`] says failed); `None` when the
-    stop was not a red run (a draft, a missing run, the description). What makes
-    a stop an [`outcomes.RED`] hand-back, and its mark taken from the very runs
-    the verdict read (#1951), never from a later read."""
+    when one of them is red ([`decide.assess`] says failed) and the pull request
+    is not a draft; `None` otherwise (a draft, a missing run, the description).
+    What makes a stop an [`outcomes.RED`] hand-back."""
+    if pull.get("isDraft"):
+        return None
     sha = pull.get("headRefOid", "")
     gating = {w: runlist.runs_for(runs, sha, w) for w in runlist.WORKFLOWS}
     if not any(decide.assess(pull, w, listed, jobs)[0] == decide.FAILED for w, listed in gating.items()):

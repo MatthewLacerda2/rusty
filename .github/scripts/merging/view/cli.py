@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
         # A ready, labelled, green pull request the watch still passes over (#1951).
         lines += stranded.report(status.common_dir(root) / handbacks.MEMORY, time.time(),
                                  lambda: pulls.open_pulls(ghrest.slug()),
-                                 lambda pull: pulls.head_reading(ghrest.slug(), pull))
+                                 lambda pull: pulls.head_reading(ghrest.slug(), pull, early=True))
         for line in lines:
             say(line)
         return code

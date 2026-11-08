@@ -75,6 +75,7 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         head=functools.partial(pulls.head_of, repo),
         attempts=lambda number, sha: pulls.head_runs(repo, sha),
         stalled=functools.partial(pulls.head_reading, repo),
+        reddened=functools.partial(pulls.head_reading, repo, early=True),  # a red hand-back, read cheaply (#1951)
         blocks=functools.partial(pulls.issues_block, repo),
         decided=functools.partial(pulls.review_decided, repo),
         clock=time.monotonic,
