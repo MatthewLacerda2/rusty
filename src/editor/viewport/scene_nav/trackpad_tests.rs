@@ -1,5 +1,5 @@
 //! Unit tests for navigating without a mouse (#1344): trackpad swipe and pinch, and
-//! the arrow keys.
+//! which frames ask for a redraw. The arrow keys' move: `arrow_tests.rs`.
 
 use super::*;
 
@@ -55,21 +55,8 @@ fn pinch_spread_zooms_in_and_doubling_halves_the_distance() {
 }
 
 #[test]
-fn arrow_keys_turn_at_a_fixed_rate_and_swiping_while_looking_sets_fly_speed() {
+fn swiping_while_looking_sets_fly_speed() {
     let start = SceneCamera::default();
-    let mut cam = start;
-    let arrows = NavFrame {
-        turn: Vec2::new(1.0, -1.0),
-        dt: 0.5,
-        ..Default::default()
-    };
-    apply(&mut cam, &arrows);
-    assert!(
-        (cam.yaw - start.yaw - 45.0).abs() < 1e-3,
-        "right arrow, 90°/s"
-    );
-    assert!(cam.pitch > start.pitch, "up arrow looks up");
-
     let mut cam = start;
     let looking = NavFrame {
         gesture: Some(Gesture::Look),
@@ -83,9 +70,9 @@ fn arrow_keys_turn_at_a_fixed_rate_and_swiping_while_looking_sets_fly_speed() {
 
 #[test]
 fn a_held_gesture_or_arrow_asks_for_the_next_frame_and_a_still_one_does_not() {
-    let frame = |gesture, turn| NavFrame {
+    let frame = |gesture, arrows| NavFrame {
         gesture,
-        turn,
+        arrows,
         ..Default::default()
     };
     assert!(frame(Some(Gesture::Look), Vec2::ZERO).keeps_moving());
