@@ -1,7 +1,7 @@
 //! src/components/physics/collider/mod.rs — Collider component
 //!
 //! box/sphere/cylinder/capsule/mesh shapes, the inline physics material
-//! (`physics_material`), the mesh it keeps once its Mesh is gone (`shared_mesh`),
+//! (`physics_material`) or the path of a shared one, the mesh it keeps once its Mesh is gone (`shared_mesh`),
 //! the shape under a world scale (`scaled`), and the
 //! cached world AABB. Unity: Collider.
 
@@ -83,6 +83,12 @@ pub struct ColliderComponent {
     /// saved before it, which load with the defaults.
     #[serde(default)]
     pub material: PhysicsMaterial,
+    /// The shared physics material asset this collider uses instead of `material`
+    /// (#1878): a project path (`scene::physics_material`), Unity's
+    /// `Collider.sharedMaterial`. While set, the inline values are ignored; a path
+    /// that no longer loads falls back to the default material, never to them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub material_asset: Option<String>,
     /// The mesh a `Mesh` shape builds from once its entity has no Mesh (#1657):
     /// Unity's `MeshCollider.sharedMesh`. Set when the Mesh is removed, cleared when
     /// one is added; the entity's own Mesh wins while it has one.
@@ -106,6 +112,7 @@ impl ColliderComponent {
             shape: self.shape.clone(),
             is_trigger: self.is_trigger,
             material: self.material,
+            material_asset: self.material_asset.clone(),
             shared_mesh: self.shared_mesh.as_ref().map(SharedMesh::without_geometry),
             aabb_min: self.aabb_min,
             aabb_max: self.aabb_max,
@@ -125,6 +132,7 @@ impl ColliderComponent {
             },
             is_trigger: false,
             material: PhysicsMaterial::default(),
+            material_asset: None,
             shared_mesh: None,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,

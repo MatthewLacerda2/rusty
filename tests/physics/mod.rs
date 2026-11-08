@@ -4,5 +4,6 @@ mod character;
 mod contacts;
 mod gravity;
 mod live_edits;
+mod materials;
 mod queries;
 mod rapier;

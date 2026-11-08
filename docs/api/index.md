@@ -180,6 +180,7 @@ as the receiver sees it (every point per pair is out of scope):
 - `relativeVelocity` — `{x, y, z}` `other`'s velocity minus the receiver's at the point, taken before this tick's solve — the closing speed of an impact (a ball falling at 5 m/s onto a floor reads `y = 5`).
 - `impulse` — Total normal impulse (N·s) the solver applied across the pair this tick; divide by `Time.deltaTime` for force.
 - `otherBody` — The entity owning `other`'s rigid body (its compound root; `other` itself when it is its own body).
+- `material` — The project path of the physics material asset `other`'s collider uses (#1878, see [Physics material assets](Physics.md)), or `nil` for an inline material or a path that no longer loads — what a footstep or an impact sound is chosen by.
 
 A contact *touches* once the surfaces are within 5 mm; rapier's speculative
 contacts further apart are not reported.

@@ -4,9 +4,10 @@ Rigidbody control plus the spatial query surface over the live rapier world —
 line casts, volume overlaps, and per-collider point queries (#311). Every query
 routes through the same query pipeline the engine uses, so a script's query and
 the engine's agree. Casts return
-`(hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root)` — the world-space
+`(hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root, material)` — the world-space
 hit point and outward surface normal (#446), then the **bone** the hit struck, its
-name, and the hierarchy **root** of what was hit (#464; see *Per-bone hitboxes*). Each group
+name, and the hierarchy **root** of what was hit (#464; see *Per-bone hitboxes*), then the
+**physics material asset** the struck collider uses (#1878; see *Physics material assets*). Each group
 is appended, so a caller that takes only the first values is unaffected. On a miss
 every number after `hit` is `0` and the rest are `nil`.
 
@@ -28,11 +29,11 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.SetTrigger` | `(id, on)` | — (Unity `Collider.isTrigger`: a trigger reports overlaps and blocks nothing) |
 | `Physics.GetCollisionDetection` | `(id)` | `"Discrete"` \| `"Continuous"` |
 | `Physics.SetCollisionDetection` | `(id, mode)` | — (`mode` is `"Discrete"` or `"Continuous"`, case-insensitive; an unknown name is an error) |
-| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask [, max_distance [, query_triggers]]]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
-| `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask [, max_distance [, query_triggers]]]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root` |
-| `Physics.RaycastAll` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | array of `{id, distance, point = {x,y,z}, normal = {x,y,z}, bone, bone_name, root}`, nearest first |
+| `Physics.Raycast` | `(ox, oy, oz, dx, dy, dz [, ignore_id [, layer_mask [, max_distance [, query_triggers]]]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root, material` |
+| `Physics.SphereCast` | `(ox, oy, oz, dx, dy, dz, radius [, ignore_id [, layer_mask [, max_distance [, query_triggers]]]])` | `hit, entity_id, distance, px, py, pz, nx, ny, nz, bone, bone_name, root, material` |
+| `Physics.RaycastAll` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | array of `{id, distance, point = {x,y,z}, normal = {x,y,z}, bone, bone_name, root, material}`, nearest first |
 | `Physics.RaycastAllNonAlloc` | `(results, ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | hit count; `results[1..count]` refilled with `RaycastAll`'s entries |
-| `Physics.RaycastThrough` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | array of `{id, bone, bone_name, root, thickness, enter = {distance, point, normal}, exit = {distance, point, normal} or nil}`, nearest entry first |
+| `Physics.RaycastThrough` | `(ox, oy, oz, dx, dy, dz, max_distance [, layer_mask [, query_triggers]])` | array of `{id, bone, bone_name, root, material, thickness, enter = {distance, point, normal}, exit = {distance, point, normal} or nil}`, nearest entry first |
 | `Physics.OverlapSphere` | `(cx, cy, cz, radius [, layer_mask [, query_triggers]])` | array of entity ids |
 | `Physics.OverlapBox` | `(cx, cy, cz, hx, hy, hz [, layer_mask [, query_triggers]])` | array of entity ids |
 | `Physics.OverlapCapsule` | `(x0, y0, z0, x1, y1, z1, radius [, layer_mask [, query_triggers]])` | array of entity ids |
@@ -43,8 +44,13 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.GetBounds` | `(id)` | `found, min_x, min_y, min_z, max_x, max_y, max_z` |
 | `Physics.GetColliderShape` | `(id)` | shape table (see below), or `nil` without a collider |
 | `Physics.SetColliderShape` | `(id, shape)` | — (`shape` is the same table; errors on a bad one) |
-| `Physics.GetPhysicsMaterial` | `(id)` | `friction, bounciness, friction_combine, bounce_combine` |
-| `Physics.SetPhysicsMaterial` | `(id, friction, bounciness [, friction_combine [, bounce_combine]])` | — |
+| `Physics.GetPhysicsMaterial` | `(id)` | `friction, bounciness, friction_combine, bounce_combine` — the values the solver uses: the asset's when the collider names one |
+| `Physics.SetPhysicsMaterial` | `(id, friction, bounciness [, friction_combine [, bounce_combine]])` | — (inline values; drops a shared asset the collider named) |
+| `Physics.SetMaterial` | `(id, path)` | — (the collider uses the physics material asset at `path`; `nil` goes back to its inline values; errors when nothing loads from `path`) |
+| `Physics.GetMaterial` | `(id)` | the asset path the collider names, as authored, or `nil` |
+| `Physics.CreateMaterialAsset` | `(path [, fields])` | — (writes a new `.physmat` asset; errors when `path` exists) |
+| `Physics.GetMaterialAsset` | `(path)` | `{friction, bounciness, friction_combine, bounce_combine}`, or `nil` when nothing loads from `path` |
+| `Physics.SetMaterialAsset` | `(path, fields)` | — (rewrites the fields given; every collider using it is retuned) |
 | `Physics.IgnoreLayerCollision` | `(a, b [, ignore = true])` | — (layer indices `0..31`; `false` makes the pair collide again) |
 | `Physics.GetIgnoreLayerCollision` | `(a, b)` | `bool` — `true` when layers `a` and `b` don't collide |
 | `Physics.GenerateHitboxes` | `(id [, { bones = {..}, min_size = n, layer = "Hitbox" }])` | `{ [bone_name] = hitbox_id, .. }`; errors without a skinned mesh |
@@ -115,7 +121,7 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   returns how many it wrote, so a table kept across calls feeds the garbage
   collector nothing. Each slot that already holds a table is refilled in place
   (its `point` / `normal` tables too; `bone` / `bone_name` are cleared off a
-  skeleton). Slots past the count keep what they held, as in Unity, so loop to the
+  skeleton, `material` off an inline material). Slots past the count keep what they held, as in Unity, so loop to the
   count, not `#results`. Unlike Unity's fixed array, more hits than the table holds
   grow it: a Lua table has no fixed size.
 
@@ -131,7 +137,7 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   out (`exit`) and the material between (`thickness`, metres along the ray) — what
   a wallbang or over-penetration prices its damage on. No direct Unity
   equivalent; same arguments, filtering, sort order and `id`/`bone`/`bone_name`/
-  `root` fields as `RaycastAll`. Normals face out of the solid: back along the
+  `root`/`material` fields as `RaycastAll`. Normals face out of the solid: back along the
   ray at `enter`, along it at `exit`.
   - Each exit is found against *that* collider's own shape, so overlapping or
     nested colliders pair correctly.
@@ -281,9 +287,68 @@ and bounces:
 `SetPhysicsMaterial` clamps the coefficients into range, errors on a
 non-finite one or an unknown mode name, and treats an omitted mode as
 `"Average"`. Unlike the shape, a material edit reaches the solver on the next
-physics step, mid-play included. The material is stored **inline** on each
-collider rather than as a shared asset — four numbers, no asset to manage;
-give each collider of a "family" the same values.
+physics step, mid-play included. These values are stored **inline** on the
+collider; a family of colliders that should share them names one asset instead
+(below), and `SetPhysicsMaterial` on such a collider gives it its own values
+again, as Unity's `Collider.material` instances the shared one.
+
+### Physics material assets (#1878)
+
+Unity's `PhysicMaterial` asset: a small JSON file in the project holding the
+four fields above (any missing field reads as its default, a value out of range
+is clamped), by convention under `assets/materials/` with the extension
+`.physmat`. A collider names one by its project path (`SetMaterial`, or the
+**Asset** field of the inspector's Collider card, or `Component.Set(id,
+"Collider", {material_asset = path})`) and then takes its values instead of its
+inline ones. All three refuse a path no asset loads from, and store the path in
+one form (trimmed, forward slashes, no leading `./`), so every spelling of one
+file names one material. Setting the inline values through `Component.Set`
+(`material = {…}`) keeps the asset; only `SetPhysicsMaterial` drops it. Unity's
+behaviour throughout:
+
+- **One edit retunes every user.** `SetMaterialAsset` (or editing the values on
+  any card that names the asset) rewrites the file, and every collider naming
+  it takes the new values on the next physics step, in edit mode and during
+  Play. A change made to the file outside the engine is picked up the same way
+  while the editor watches the project. The inspector writes the file when a
+  drag on a value ends, not on every frame of it.
+- **Every hit names its material.** `Raycast` and `SphereCast` return the asset's
+  path as their 13th value; `RaycastAll`, `RaycastAllNonAlloc` and each crossing
+  of `RaycastThrough` carry it as `material`; a collision callback's `contact`
+  names the other collider's as `contact.material` (Unity's
+  `hit.collider.sharedMaterial`). It is `nil` for a collider with inline values.
+- **A missing asset is not an error.** A path that no longer loads (the file
+  deleted, renamed or unreadable) gives the collider the default material, warns
+  once in the console, and its hits name no material; saving the scene keeps the
+  path as authored, so putting the file back restores it. `GetMaterial` returns
+  the authored path either way.
+- **One material per collider.** A mesh collider whose mesh has several render
+  materials still has one physics material.
+
+The engine stores **no penetration power**: as in Unity, how much a bullet loses
+in each material is game data, a Lua table keyed by the asset path and read with
+`RaycastThrough`'s `thickness`:
+
+```lua no-run
+local WOOD, CONCRETE = "assets/materials/wood.physmat", "assets/materials/concrete.physmat"
+-- Once, when authoring:
+Physics.CreateMaterialAsset(WOOD, { friction = 0.6 })
+Physics.CreateMaterialAsset(CONCRETE, { friction = 0.9 })
+Physics.SetMaterial(door_id, WOOD)
+-- Per shot: damage lost per metre crossed, by material.
+local RESIST = { [WOOD] = 1.0, [CONCRETE] = 2.5 }
+local damage = 100
+for _, s in ipairs(Physics.RaycastThrough(ox,oy,oz, dx,dy,dz, 100, SHOT, false)) do
+  if s.root ~= self_id then
+    hurt(s.root, damage)                                  -- the game's own damage call
+    damage = damage * math.max(0, 1 - s.thickness * (RESIST[s.material] or 4))
+    if damage <= 0 or not s.exit then break end
+  end
+end
+```
+
+0.5 m of wood then 1 m of concrete leave a 100-damage shot `100 · 0.5 · 0`: the
+concrete stops it. The same table keys impact decals, particles and sounds.
 
 ### Colliders and the parent hierarchy (#445)
 
@@ -333,7 +398,7 @@ card) fits one collider per bone of `id`'s skinned mesh and returns
   its parent, so the hand's hitbox covers the fingers. `bones = {"head", ..}`
   limits generation to those bones (the others fold into their nearest listed
   ancestor). Same skin, same hitboxes: regenerating refits the existing ones in
-  place and removes those that no longer qualify. In Play that removal waits for
+  place (each keeps its physics material) and removes those that no longer qualify. In Play that removal waits for
   the tick's destroy phase, as `Scene.DestroyEntity` does, so a script under a
   dropped hitbox gets its `OnDisable`/`OnDestroy` (#1298). Until then the
   hitbox lookups skip it, as they skip one under a bone a `Scene.DestroyEntity`
