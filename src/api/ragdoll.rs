@@ -22,7 +22,7 @@ use super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::physics::PhysicsWorld;
-use crate::scene::skeleton::{critical_damping, Drive, HitReact, RagdollOptions};
+use crate::scene::skeleton::{Drive, HitReact, RagdollOptions};
 use crate::scene::Scene;
 
 /// `(id, bone, ix, iy, iz, px, py, pz, opts)`: `HitReact`'s arguments.
@@ -109,17 +109,11 @@ fn register_partial(
     let f = lua.create_function(
         move |lua, (id, bone, opts): (EntityArg, EntityArg, Table)| {
             let id = id.live("Ragdoll", "SetDrive")?;
-            let drive = drive_from(
-                Some(&opts),
-                Drive {
-                    strength: 0.0,
-                    damping: 0.0,
-                },
-            )?;
+            let given = [opts.get("strength")?, opts.get("damping")?];
             Ok(scene
                 .get(lua)?
                 .borrow_mut()
-                .set_drive(id, bone.read(), drive))
+                .set_drive(id, bone.read(), given))
         },
     );
     put(t, "SetDrive", f)?;
@@ -168,21 +162,12 @@ fn register_hit_react(
     put(t, "HitReact", f)
 }
 
-/// A drive from `{ strength, damping }`: each missing field from `base`, and a
-/// missing damping the critical one for the strength.
+/// `base` with the `{ strength, damping }` an options table gives ([`Drive::merged`]).
 fn drive_from(opts: Option<&Table>, base: Drive) -> mlua::Result<Drive> {
     let Some(o) = opts else {
         return Ok(base);
     };
-    let strength = o.get::<Option<f32>>("strength")?;
-    let damping = o.get::<Option<f32>>("damping")?;
-    let strength = strength.unwrap_or(base.strength).max(0.0);
-    let damping = match (damping, strength == base.strength) {
-        (Some(d), _) => d.max(0.0),
-        (None, true) if base.strength > 0.0 => base.damping,
-        (None, _) => critical_damping(strength),
-    };
-    Ok(Drive { strength, damping })
+    Ok(base.merged(o.get("strength")?, o.get("damping")?))
 }
 
 /// `HitReact`'s options: `{ duration, strength, damping, up_to }`.

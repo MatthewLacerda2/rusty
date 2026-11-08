@@ -5,7 +5,10 @@
 //!   for a bone the Animator doesn't key, the pose it had when it went simulated.
 //!   It is the drives' target and the blend's animated side.
 //! - **Blend weights** (`Ragdoll.SetBlendWeight`, Unreal's `PhysicsBlendWeight`):
-//!   how much of a simulated bone's drawn pose is physics; absent is `1`.
+//!   how much of a simulated bone's drawn pose is physics; absent is `1`. A
+//!   weight outlives the bone going back to the Animator (a reaction ending,
+//!   `Disable`, `SetSimulated(false)`) and goes only with the ragdoll (a
+//!   despawn, a load, a rebuild that takes the bone's body).
 //! - **Hit reactions** (`Ragdoll.HitReact`), keyed by the root bone of the branch
 //!   they simulate. A reaction's weight eases from 1 to 0 over its duration; the
 //!   bones it switched to physics (`reacting`) go back to the Animator once no
@@ -38,6 +41,22 @@ pub fn critical_damping(strength: f32) -> f32 {
 pub struct Drive {
     pub strength: f32,
     pub damping: f32,
+}
+
+impl Drive {
+    /// This drive with the fields a call gave replacing its own (each at
+    /// least 0): a missing strength keeps this one's; a missing damping keeps
+    /// this one's when the strength stays the same and this drive is on, and is
+    /// otherwise the critical damping for the new strength.
+    pub fn merged(self, strength: Option<f32>, damping: Option<f32>) -> Drive {
+        let strength = strength.unwrap_or(self.strength).max(0.0);
+        let damping = match damping {
+            Some(d) => d.max(0.0),
+            None if strength == self.strength && self.strength > 0.0 => self.damping,
+            None => critical_damping(strength),
+        };
+        Drive { strength, damping }
+    }
 }
 
 /// One running hit reaction.
@@ -86,10 +105,11 @@ impl RagdollRuntime {
         self.animated.entry(bone).or_insert(pose);
     }
 
-    /// Forget everything about `bone`: it is back on the Animator, or gone.
+    /// Stop tracking `bone`: it is back on the Animator. Its blend weight stays,
+    /// the bone's setting as Unreal's `PhysicsBlendWeight` stays on the body; it
+    /// goes only with the ragdoll ([`Self::retain`]).
     pub fn untrack(&mut self, bone: u32) {
         self.animated.remove(&bone);
-        self.weights.remove(&bone);
         self.reacting.remove(&bone);
         self.physics.remove(&bone);
     }

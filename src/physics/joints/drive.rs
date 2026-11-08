@@ -18,7 +18,9 @@
 //! three angles rapier's motors take, on the axes the joint's kind leaves free.
 //!
 //! A joint whose body is kinematic, or whose drive is off, carries no motor, so a
-//! scene without drives pays one body-type check per joint here.
+//! scene without drives pays one body-type check per joint here. What was set
+//! is remembered per joint with its rapier handle, so a joint `resync_joints`
+//! rebuilt (motorless) is set again even when its target hasn't moved.
 
 use glam::{Mat4, Quat};
 use rapier3d::prelude::*;
@@ -34,13 +36,18 @@ use crate::scene::Scene;
 /// the angle rapier takes, and the drive. Equal next step means nothing to set.
 pub(in crate::physics) type MotorSet = ([f32; 3], Drive);
 
+/// A driven joint's rapier joint and what its motors were set to. The handle
+/// tells a rebuilt joint (`Joint.SetLimits`, a body rebuilt), which comes back
+/// from rapier with no motors, from the one the motors were set on.
+pub(in crate::physics) type Driven = (ImpulseJointHandle, MotorSet);
+
 impl PhysicsWorld {
     /// Set this step's motors on the driven joints and take them off the joints
     /// driven last step that no longer are. Ascending joint order. A joint is
     /// touched only when its target or drive changed since it was last set, so
     /// a driven body holding still can fall asleep (touching a joint wakes both
     /// its bodies). Returns how many joints it touched.
-    pub(in crate::physics) fn drive_joints(&mut self, scene: &Scene) -> usize {
+    pub(in crate::physics) fn drive_joints(&mut self, scene: &mut Scene) -> usize {
         let mut driven = std::collections::BTreeMap::new();
         let mut touched = 0;
         for (&id, built) in &self.joints {
@@ -52,12 +59,15 @@ impl PhysicsWorld {
             let Some(drive) = drive.filter(|d| d.strength > 0.0) else {
                 continue;
             };
+            // However the drive was set (`Ragdoll.SetDrive`, `Joint.SetDriveStrength`,
+            // the inspector), a simulated ragdoll bone chases its animated pose.
+            scene.track_driven_bone(id);
             let q = target(scene, id, built);
             let q = if q.w < 0.0 { -q } else { q };
             let angle = |s: f32| 2.0 * s.clamp(-1.0, 1.0).asin();
             let set: MotorSet = ([angle(q.x), angle(q.y), angle(q.z)], drive);
-            driven.insert(id, set);
-            if self.driven.get(&id) == Some(&set) {
+            driven.insert(id, (built.handle, set));
+            if self.driven.get(&id) == Some(&(built.handle, set)) {
                 continue;
             }
             let Some(live) = self.impulse_joints.get_mut(built.handle, true) else {
@@ -73,9 +83,13 @@ impl PhysicsWorld {
                     .set_motor_position(axis, a, drive.strength, drive.damping);
             }
         }
-        for id in self.driven.keys().filter(|id| !driven.contains_key(id)) {
-            let Some(built) = self.joints.get(id) else {
-                continue; // dropped or broken: its motors went with it
+        for (id, (handle, _)) in self
+            .driven
+            .iter()
+            .filter(|(id, _)| !driven.contains_key(id))
+        {
+            let Some(built) = self.joints.get(id).filter(|b| b.handle == *handle) else {
+                continue; // dropped, broken or rebuilt: its motors went with it
             };
             if let Some(live) = self.impulse_joints.get_mut(built.handle, true) {
                 live.data.motor_axes = JointAxesMask::empty();

@@ -30,6 +30,7 @@ fn shot(ticks: usize) -> Vec<(Vec3, bool)> {
            n = n + 1\n\
            if n == 5 then\n\
              assert(Ragdoll.HitReact(id, {fore}, 0, 0, -6, 0.6, 1.45, 0, {{ duration = 0.25 }}))\n\
+             assert(not Ragdoll.IsEnabled(id), 'a flinch is not dead')\n\
              assert(Ragdoll.HitReact({bare}, {bare}, 0, 0, -6, 0, 0, 0) == false)\n\
            end\n\
          end }}"

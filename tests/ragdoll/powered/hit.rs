@@ -80,7 +80,7 @@ fn a_full_ragdoll_tracks_only_what_a_drive_or_weight_needs() {
         strength: 500.0,
         damping: 45.0,
     };
-    scene.set_drive(rig, arm, drive);
+    scene.set_drive(rig, arm, [Some(drive.strength), Some(drive.damping)]);
     assert!(
         scene.ragdolls.animated(arm).is_some(),
         "a drive needs its target"

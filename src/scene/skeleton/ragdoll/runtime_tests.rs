@@ -94,3 +94,29 @@ fn only_a_tracked_bone_takes_the_animators_pose() {
     rt.retain(|b| b != 7);
     assert!(rt.is_idle());
 }
+
+#[test]
+fn a_partial_drive_keeps_what_it_omits() {
+    let own = Drive {
+        strength: 900.0,
+        damping: 60.0,
+    };
+    assert_eq!(
+        own.merged(None, Some(80.0)),
+        Drive {
+            damping: 80.0,
+            ..own
+        }
+    );
+    assert_eq!(
+        own.merged(Some(900.0), None),
+        own,
+        "same strength, same damping"
+    );
+    let stronger = own.merged(Some(1600.0), None);
+    assert_eq!(
+        stronger.damping, 80.0,
+        "a new strength takes critical damping"
+    );
+    assert_eq!(own.merged(Some(-1.0), Some(f32::NAN)).strength, 0.0);
+}

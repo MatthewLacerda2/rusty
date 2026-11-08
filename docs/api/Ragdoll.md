@@ -38,7 +38,8 @@ and dropping. `Ragdoll.Disable(id)` hands them back: the bodies turn kinematic a
 stop, and the Animator poses the bones again from the next tick (no blend).
 Both take the skinned entity **or any ancestor of it** — the `root` a `Raycast`
 returns — and return how many bodies switched. `Ragdoll.IsEnabled(id)` is `true`
-while any body is simulated.
+while the ragdoll is on as a whole (`Enable`), so scripts can read it as "dead": a
+hit reaction or a `SetSimulated` branch leaves it `false`.
 
 - **Who poses a ragdolled bone.** The tick runs the physics step, then the
   Animator. Right after the Animator, every bone carried by a dynamic body is put
@@ -91,7 +92,12 @@ id from `Ragdoll.Build`'s table — and returns how many bodies (or joints) it s
   carrying its forearm needs more than a hand). `0` is today's limp ragdoll; a
   few thousand lets a hit knock an arm well back and still brings it most of the
   way home within half a second; tens of thousands hold the animated pose
-  tightly. `damping` (1/s) defaults to `2·√strength`. A full `Enable` is driven
+  tightly. `damping` (1/s) defaults to `2·√strength`. A field the table leaves
+  out keeps each joint's current value, so `{ damping = 80 }` changes only the
+  damping; the one exception is a call that changes `strength` and names no
+  `damping`, which then takes `2·√strength`. A drive set any other way
+  (`Joint.SetDriveStrength`, the inspector) chases the animation the same way
+  once its body is simulated. A full `Enable` is driven
   the same way (a powered ragdoll), under a mirrored rig too (the target is the
   turn the bone is drawn with). The motors are set before the physics step, which
   runs before the Animator, so a drive chases the animated pose of the tick
@@ -101,7 +107,11 @@ id from `Ragdoll.Build`'s table — and returns how many bodies (or joints) it s
   the branch that far between its animated pose (`0`) and its body's (`1`, the
   default): translation lerped, rotation slerped, as a crossfade. The bodies
   themselves stay physics'; only what renders (and what the next tick's raycasts
-  hit) blends. Setting it on a parent sets its whole branch.
+  hit) blends. Setting it on a parent sets its whole branch. A weight is the
+  bone's setting, like Unreal's `PhysicsBlendWeight`: it stays through a
+  reaction ending, `Disable` and `SetSimulated(false)`, and goes only with the
+  ragdoll (the character despawned, a scene load, a rebuild that takes the
+  bone's body).
 - `Ragdoll.HitReact(id, bone, ix, iy, iz, px, py, pz [, opts])` is the one call a
   game makes, from `OnTakeDamage` (see [`Damage`](Damage.md)): it simulates a
   branch, drives it, applies the impulse `(ix, iy, iz)` (N·s) at the world point
@@ -132,7 +142,9 @@ id from `Ragdoll.Build`'s table — and returns how many bodies (or joints) it s
     `SetBlendWeight`) keeps its IK: IK solves on the animated side, and the
     blend is drawn over the result, so an aiming enemy hit in the chest keeps
     its aim and the reaction ends where the IK'd pose is. A fully simulated
-    bone (weight 1, or `Enable`) is physics' alone, and IK skips it.
+    bone (weight 1, or `Enable`) is physics' alone, and IK skips it. A drive
+    chases the clip's pose before IK, so an aiming arm under a reaction sags
+    toward the clip by the weight, and comes back with no snap as it eases out.
   - **Time.** Reactions run on the fixed tick, so they pause with the game, scale
     with `Time.timeScale`, and two runs of the same hits give the same bones.
 - **Runtime state.** Simulated branches, weights and running reactions are not
@@ -160,7 +172,7 @@ not part of this.
 | `Ragdoll.Build` | `(id [, { mass = kg }])` | `{ [bone_name] = bone_id, .. }`; errors without a skinned mesh |
 | `Ragdoll.Enable` | `(id)` | how many bodies switched to physics |
 | `Ragdoll.Disable` | `(id)` | how many bodies switched back to the Animator |
-| `Ragdoll.IsEnabled` | `(id)` | `bool` |
+| `Ragdoll.IsEnabled` | `(id)` | `bool`: on as a whole (`Enable`); a reaction or a branch is not |
 | `Ragdoll.SetSimulated` | `(id, bone, on)` | how many bodies of the branch switched |
 | `Ragdoll.SetDrive` | `(id, bone, { strength, damping })` | how many joints of the branch it set |
 | `Ragdoll.SetBlendWeight` | `(id, bone, w)` | how many bones of the branch it set (`w` clamped to `0..1`) |

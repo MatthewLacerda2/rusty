@@ -17,6 +17,10 @@ fn set_simulated_on_the_upper_arm_switches_only_that_branch() {
     for other in ["Hips", "Spine", "Head", "RightArm", "LeftLeg"] {
         assert!(!dynamic(&scene, other), "{other} stays animated");
     }
+    assert!(
+        !scene.ragdoll_enabled(rig),
+        "a branch is not the ragdoll on"
+    );
     let hitbox = scene.hitbox_of(arm).unwrap();
     let hitbox_layer = scene.layers.index_of("Hitbox").unwrap();
     assert_eq!(scene.world.layer(hitbox), hitbox_layer, "no Ragdoll layer");
@@ -47,4 +51,18 @@ fn a_simulated_branch_hits_no_world_collider() {
     step(&mut scene, &mut physics, 1);
     let y = crate::ragdoll::hitbox_at(&scene, fore).y;
     assert!(y < at.y - 0.05, "it fell through the wall: {y} vs {}", at.y);
+}
+
+#[test]
+fn a_blend_weight_outlives_the_branch_going_back_and_is_enabled_means_enable() {
+    let (mut scene, rig) = crate::ragdoll::ragdolled();
+    let arm = rig::bone(&scene, rig, "LeftArm");
+    scene.set_simulated(rig, arm, true, &at_rest);
+    scene.set_blend_weight(rig, arm, 0.3);
+    scene.set_simulated(rig, arm, false, &at_rest);
+    scene.set_ragdoll(rig, true, at_rest).unwrap();
+    assert!(scene.ragdoll_enabled(rig), "a full Enable is on");
+    scene.set_ragdoll(rig, false, at_rest).unwrap();
+    assert!(!scene.ragdoll_enabled(rig));
+    assert_eq!(scene.ragdolls.weight(arm), 0.3, "the bone's setting stays");
 }

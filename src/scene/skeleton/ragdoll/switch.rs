@@ -71,24 +71,37 @@ impl Scene {
         }
     }
 
-    /// Whether any ragdoll body at or under `id` is simulated.
+    /// Whether the ragdoll at or under `id` is on as a whole (`Enable`): a body
+    /// is simulated with its hitboxes on the `Ragdoll` layer, where only a full
+    /// switch puts them. A hit reaction or a `SetSimulated` branch stays on the
+    /// hitbox layer, so it is not "the ragdoll is on" (scripts read it as dead).
     pub fn ragdoll_enabled(&self, id: u32) -> bool {
-        self.ragdoll_bones(id)
+        let Some(layer) = self.layers.index_of(RAGDOLL_LAYER) else {
+            return false;
+        };
+        self.ragdoll_bones(id).into_iter().any(|b| {
+            self.is_simulated_body(b) && self.body_parts(b).any(|p| self.world.layer(p) == layer)
+        })
+    }
+
+    /// `bone`'s body parts: itself and its non-bone children that carry a collider.
+    fn body_parts(&self, bone: u32) -> impl Iterator<Item = u32> + '_ {
+        let children = self
+            .world
+            .children(bone)
             .into_iter()
-            .any(|b| self.is_simulated_body(b))
+            .filter(|&c| !self.is_bone(c));
+        std::iter::once(bone)
+            .chain(children)
+            .filter(|&p| self.world.has_collider(p))
     }
 
     /// Move the colliders that are `bone`'s body parts — its own and its
     /// non-bone children's — from layer `from` to `to`.
     pub(super) fn move_part_layers(&mut self, bone: u32, from: u8, to: u8) {
-        let parts = std::iter::once(bone).chain(
-            self.world
-                .children(bone)
-                .into_iter()
-                .filter(|&c| !self.is_bone(c)),
-        );
-        let parts: Vec<u32> = parts
-            .filter(|&p| self.world.has_collider(p) && self.world.layer(p) == from)
+        let parts: Vec<u32> = self
+            .body_parts(bone)
+            .filter(|&p| self.world.layer(p) == from)
             .collect();
         for p in parts {
             self.world.set_layer(p, to);

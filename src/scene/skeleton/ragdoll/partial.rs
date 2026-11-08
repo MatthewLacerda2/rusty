@@ -104,12 +104,17 @@ impl Scene {
     }
 
     /// Set the drive on every joint of the branch at `bone`; how many joints.
-    /// A simulated bone given a drive starts tracking its animated pose, the
-    /// drive's target.
-    pub fn set_drive(&mut self, owner: u32, bone: u32, drive: Drive) -> usize {
+    /// Each joint's drive is its own merged with the fields given
+    /// ([`Drive::merged`]), so `{ damping = 80 }` changes only the damping.
+    pub fn set_drive(&mut self, owner: u32, bone: u32, given: [Option<f32>; 2]) -> usize {
         let mut n = 0;
         for b in self.ragdoll_branch(owner, bone) {
             if let Some(mut j) = self.world.joint_mut(b) {
+                let own = Drive {
+                    strength: j.drive_strength,
+                    damping: j.drive_damping,
+                };
+                let drive = own.merged(given[0], given[1]);
                 ops::set_drive_strength(&mut j, drive.strength);
                 ops::set_drive_damping(&mut j, drive.damping);
                 n += 1;
@@ -117,6 +122,16 @@ impl Scene {
             self.track_if_simulated(b);
         }
         n
+    }
+
+    /// Start tracking simulated ragdoll bone `joint`'s animated pose, when it
+    /// isn't: its joint is driven, however the drive was set. Physics calls it
+    /// as it reads the drive, so `Joint.SetDriveStrength` or the inspector on an
+    /// `Enable`d body chases the animation as `Ragdoll.SetDrive` does.
+    pub fn track_driven_bone(&mut self, joint: u32) {
+        if !self.ragdolls.is_tracked(joint) && self.is_bone(joint) {
+            self.track_if_simulated(joint);
+        }
     }
 
     /// Start tracking `bone`'s animated pose, from the pose it has now, when its

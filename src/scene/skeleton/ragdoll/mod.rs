@@ -88,6 +88,7 @@ impl Scene {
             let Some(volume) = volumes[slot] else {
                 self.world.set_rigidbody(bone, None);
                 self.world.set_joint(bone, None);
+                self.ragdolls.retain(|b| b != bone); // its runtime state goes with its body
                 continue;
             };
             let body = RigidBodyComponent {

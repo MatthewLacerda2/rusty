@@ -26,7 +26,7 @@ fn off_the_bend(scale: Vec3) -> f32 {
         strength: 2000.0,
         damping: 90.0,
     };
-    scene.set_drive(rig, arm, drive);
+    scene.set_drive(rig, arm, [Some(drive.strength), Some(drive.damping)]);
     // The elbow bent forward: under a mirror its drawn turn is not the plain one.
     let (pos, rot) = scene.ragdolls.animated(fore).unwrap();
     let bent = Quat::from_rotation_y(-0.6) * rot;
