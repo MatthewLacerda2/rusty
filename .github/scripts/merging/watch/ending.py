@@ -115,7 +115,8 @@ def handed_back(number: int, why: str, waits: str | None = None) -> str:
     (`waits` is `outcomes.AWAITS_EDIT`), a change to the issue it closes
     (`AWAITS_ISSUE`), a review decision's comment (`AWAITS_REVIEW`, #1764), the
     runs it outwaited (`STALLED`, #1831: no re-run, which would spend a runner
-    during the outage that stalled it), or else a push or a re-run."""
+    during the outage that stalled it), a red run's green re-read (`RED`, #1951),
+    or else a push or a re-run."""
     if waits == outcomes.AWAITS_EDIT:
         fix = "Fix the description or labels; no push needed: passed over until they change (or its head moves)"
     elif waits == outcomes.AWAITS_ISSUE:
@@ -129,6 +130,9 @@ def handed_back(number: int, why: str, waits: str | None = None) -> str:
     elif waits == outcomes.STALLED:
         fix = ("Nothing failed, so nothing to re-run: while a watch runs, it comes back by itself when the runs it"
                " outwaited go green (said here, as a hand-back, if they end otherwise)")
+    elif waits == outcomes.RED:
+        fix = ("Push a fix, or re-run the failed jobs (`gh run rerun --failed`) when it was runners or a flake:"
+               " passed over until its head moves or runs again, and back by itself once its runs read green")
     else:
         fix = ("Push a fix, or re-run the failed jobs (`gh run rerun --failed`) when it was runners or a flake:"
                " passed over until its head moves or runs again")
@@ -141,7 +145,8 @@ def stall_ended(number: int, why: str) -> str:
     runs and `ci-merge`'s grep wake only on that."""
     return (f"{HANDED_BACK_LINE} #{number}: the runs its hand-back outwaited ended without going green: {why}"
             " Re-run the failed jobs (`gh run rerun --failed`) or push a fix:"
-            " passed over until its head moves or runs again; the watch carries on.")
+            " passed over until its head moves or runs again, and back by itself once its runs read green;"
+            " the watch carries on.")
 
 
 def over_budget(for_minutes: float | None, deadline: float) -> str | None:

@@ -103,9 +103,12 @@ def read(root: str, check: Callable[[int], bool] = is_supervisor) -> Status:
     return judge(locks(listing.stdout), check)
 
 
+def common_dir(root: str) -> Path:
+    return Path(root, gitio.git("rev-parse", "--git-common-dir", cwd=root).stdout.strip() or ".git")
+
+
 def log_path(root: str) -> Path:
-    common = gitio.git("rev-parse", "--git-common-dir", cwd=root).stdout.strip() or ".git"
-    return Path(root, common) / supervisor.LOG
+    return common_dir(root) / supervisor.LOG
 
 
 def report(root: str, now: float | None = None) -> tuple[int, list[str]]:

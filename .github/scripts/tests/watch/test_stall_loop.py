@@ -3,9 +3,9 @@
 
 #1820's and #1827's runs went green after the queue had handed them back for
 outwaiting them, and nothing brought them back. A stall now returns once
-its runs are all green, and only a stall: a red or conflict hand-back waits
-for its head however its runs end, and a stall ending cancelled or red is
-said once and waits too, with no re-run made.
+its runs are all green, and only a stall: a conflict hand-back waits for its
+head however its runs end, and a stall ending cancelled or red is said once,
+with no re-run made, and is a red hand-back from then on (#1951).
 """
 
 from __future__ import annotations
@@ -83,14 +83,17 @@ class StallLoop(unittest.TestCase):
     def test_a_stall_ending_cancelled_stays_passed_over_and_is_said_once(self):
         taken, said, asked, kept = run([ENDED], [outcomes.STALLED])
         ended = [s for s in said if "ended without going green" in s]
-        self.assertEqual((taken, len(ended), asked, kept), ([1], 1, [1], {}))
+        # A red hand-back from here (#1951): its runs are read each pass, said once.
+        self.assertEqual((taken, len(ended), asked[:2], kept), ([1], 1, [1, 1], {}))
         self.assertIn("concluded cancelled", ended[0])
         self.assertTrue(ended[0].startswith(ending.HANDED_BACK_LINE + " #1"), ended[0])
 
-    def test_a_stall_ending_red_and_later_green_stays_passed_over(self):
+    def test_a_stall_ending_red_and_later_green_comes_back(self):
+        # #1951: a stall that ended red is a red hand-back, re-read on state.
         red = (stalls.ENDED, "a `ci` run for pushed1 concluded failure.")
-        taken, _, asked, _ = run([red, GREEN], [outcomes.STALLED])
-        self.assertEqual((taken, asked), ([1], [1]))
+        taken, said, _, _ = run([red, GREEN], [outcomes.STALLED, outcomes.MERGED])
+        self.assertEqual(taken, [1, 1])
+        self.assertIn("watch: #1's runs on its handed-back head read green now; back in line.", said)
 
     def test_a_run_still_out_keeps_it_passed_over(self):
         taken, said, _, kept = run([OUT], [outcomes.STALLED])

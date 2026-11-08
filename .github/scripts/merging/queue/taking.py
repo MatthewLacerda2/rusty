@@ -112,6 +112,8 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         return number, outcomes.REQUEUED, f"{lines[0]} Back in line on its new head."
     if state == outcomes.STALLED:  # outwaited, nothing red (#1831): the watch asks again
         return number, outcomes.STALLED, lines[0]
+    if state == outcomes.RED:  # a red run (#1951): the watch re-reads it, carrying the verdict's runs
+        return outcomes.Red(number, lines[0], lines.mark)
     if state != outcomes.GO:
         return number, outcomes.HANDED_BACK, lines[0]
     if opts.no_merge:

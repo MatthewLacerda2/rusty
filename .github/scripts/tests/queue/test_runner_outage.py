@@ -88,12 +88,12 @@ class Rerun(unittest.TestCase):
 
     def test_a_gate_failed_over_a_cancelled_changes_job_is_re_run_before_handing_back(self):
         state, lines, calls = waited([ci_cancelled(), ci_cancelled(2)])
-        self.assertEqual((state, calls), (outcomes.STOP, [["gh", "run", "rerun", "--failed", "1"]]))
+        self.assertEqual((state, calls), (outcomes.RED, [["gh", "run", "rerun", "--failed", "1"]]))
         self.assertTrue(lines[0].startswith(outcomes.RUNNERS), lines)
 
     def test_cancelled_again_after_the_re_run_hands_back_as_runners_unavailable(self):
         state, lines, calls = waited([lint(conclusion="cancelled"), lint(2, conclusion="cancelled")])
-        self.assertEqual(state, outcomes.STOP)
+        self.assertEqual(state, outcomes.RED)
         self.assertEqual(len(calls), 1)
         self.assertTrue(lines[0].startswith(outcomes.RUNNERS), lines)
         self.assertIn("no push needed", " ".join(lines))
@@ -105,7 +105,7 @@ class Rerun(unittest.TestCase):
 
     def test_a_code_red_is_handed_back_at_once_and_never_re_run(self):
         state, _, calls = waited([([run("ci", conclusion="failure"), run("lint")], {1: CODE_RED, 2: built("lint")})])
-        self.assertEqual((state, calls), (outcomes.STOP, []))
+        self.assertEqual((state, calls), (outcomes.RED, []))
 
 
 if __name__ == "__main__":

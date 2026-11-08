@@ -80,7 +80,13 @@ watch keeps merging the rest** (#751): it prints one line,
 head is remembered (under the checkout's git directory) and passed over, by
 this watch and later ones, until it moves — pushing a fix is the whole of
 re-queueing it. **A new run attempt on that head counts as moving** (#869): `gh
-run rerun --failed ID` re-queues it, no push, no relaunch. **A hand-back for
+run rerun --failed ID` re-queues it, no push, no relaunch. **A hand-back for a
+red `ci` or `lint` run also comes back by itself once its head's runs read
+green** (#1951): the watch re-reads them each pass while it is ready and
+labelled, so a re-run that went green is taken again whatever the run marks
+say (#1920 sat seven hours green because the mark had been read after its
+re-run). Green CI never brings back a conflict, a description or a review
+hand-back. **A hand-back for
 outwaiting its runs** (the deadline passed with nothing red and nothing green,
 runners busy or GitHub down; #1831) **comes back by itself while a watch
 runs**: the watch asks about its runs each listing and takes it again once
@@ -88,11 +94,11 @@ every one is green (a run missing from one listing is still out, #592). Re-run
 nothing for it, which would spend a runner during the outage that stalled it.
 If those runs end cancelled or red instead, the watch says so once, as a
 hand-back (`HANDED BACK #N: the runs its hand-back outwaited ended without going
-green: …`, with the run's URL), and from there it waits like a red run: re-run
-the failed jobs or push. A hand-back remembered *before* #1831 that went green
-afterwards has no failed job and is no stall to the watch: re-run one cheap
-job, `gh run rerun --job <deny's id>`, to make the attempt. Never do that for a
-stall. **A hand-back no push
+green: …`, with the run's URL), and from there it is a red hand-back: it comes
+back once its runs read green, or on a re-run or a push. `make queue-status`
+names every ready, labelled pull request the watch has passed over for more
+than an hour on a green head (`STRANDED #N: … last handed back for: <why>`),
+so a parked one is seen without reading the log (#1951). **A hand-back no push
 fixes waits for what does** (#1279). One for what the description or labels
 claim (a missing `Closes #N`, a stray keyword, a wrong number, an issue-less code
 change) says "no push needed", and the watch takes it again once the pull
@@ -249,8 +255,8 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   crashed: <error>; stopped.`). `make queue-daemon` exits non-zero, printing the
   log's tail, when the supervisor it started exits in its first few seconds; one
   still running but never seen holding its lock is reported as *unconfirmed*
-  (exit 0): ask `make queue-status` (the supervisor's lock PID, checked alive, and the
-  log's last line) before trusting it; `make queue-events` is the stream to watch (#1876). Stop a supervisor with `make
+  (exit 0): ask `make queue-status` (the supervisor's lock PID, checked alive, the
+  log's last line, and any `STRANDED` pull request) before trusting it; `make queue-events` is the stream to watch (#1876). Stop a supervisor with `make
   queue-stop` (the watch exits **6** between pull requests and the supervisor
   passes it through), or `kill <pid>` (its worktree lock is released either way).
 - By hand, the same loop is: `git merge origin/main` in the branch's worktree,

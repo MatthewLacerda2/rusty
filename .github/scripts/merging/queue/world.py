@@ -78,13 +78,14 @@ def effects(repo: str, opts: argparse.Namespace) -> argparse.Namespace:
         blocks=functools.partial(pulls.issues_block, repo),
         decided=functools.partial(pulls.review_decided, repo),
         clock=time.monotonic,
+        wall=time.time,  # when a hand-back happened, for `make queue-status` (#1951)
         sleep=time.sleep,
         say=outcomes.say,
         memory=Path(opts.root, common, handbacks.MEMORY),
         bots=pulls.BOTS,
         merged=outcomes.MERGED,
         # A dry run previews every ready one; it hands nothing back for real.
-        ends={outcomes.GREEN, outcomes.DRY} | ({outcomes.HANDED_BACK, *outcomes.AWAITING} if opts.dry_run else set()),
+        ends={outcomes.GREEN, outcomes.DRY} | ({outcomes.HANDED_BACK, outcomes.RED, *outcomes.AWAITING} if opts.dry_run else set()),
         stops={outcomes.STOPPED},
         skips={outcomes.NOT_READY},
     )

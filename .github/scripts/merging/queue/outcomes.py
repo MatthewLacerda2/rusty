@@ -40,6 +40,38 @@ AWAITING = (AWAITS_EDIT, AWAITS_ISSUE, AWAITS_REVIEW)
 # again ([`watch.stalls`]) and brings the head back once every run on it is green.
 STALLED = "handed back: stalled"
 
+# A hand-back for a red gating run on the head (#1951). #1920 was handed back on
+# 2026-11-08 for a `ci` run that failed during GitHub's 504 outage; the run was
+# re-run green an hour later and the PR sat passed over for seven more, because
+# the only thing that re-admitted it was a change from a run mark GitHub had
+# failed to give at the hand-back. So a red hand-back is its own kind: the watch
+# re-reads its head's runs and brings it back once they are green
+# ([`watch.handbacks.greened`]), and it carries the runs the verdict read red
+# ([`Red.mark`]), so the #869 mark never has to come from a later read.
+RED = "handed back: red"
+
+
+class Red(tuple):
+    """A [`RED`] hand-back: `(number, RED, why)`, carrying `mark`, the gating
+    runs on the head as the verdict read them ([`watch.handbacks.attempts`])."""
+
+    mark: str
+
+    def __new__(cls, number: int, why: str, mark: str):
+        made = super().__new__(cls, (number, RED, why))
+        made.mark = mark
+        return made
+
+
+class Marked(list):
+    """A CI wait's lines that end [`RED`], carrying the runs' `mark` ([`Red.mark`])."""
+
+    mark: str
+
+    def __init__(self, lines, mark: str):
+        super().__init__(lines)
+        self.mark = mark
+
 
 class Awaiting(tuple):
     """An `AWAITS_*` hand-back: the `(number, state, why)` every caller unpacks,

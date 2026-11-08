@@ -25,8 +25,24 @@ moves. Five things count as moving without a push:
   attempt. The check is on the runs' state, not a change of mark. A stall
   that ends cancelled or red is said once and then waits like a red run.
 
-A red run, a conflict or a committed image has no claim entry and waits for
-its head. Every side memory is kept only for numbers still in [`MEMORY`].
+- **its gating runs reading green now** ([`RED_MEMORY`], [`greened`], #1951): a
+  hand-back for a red `ci` or `lint` run. #1920 was handed back during
+  GitHub's 504 outage of 2026-11-08; GitHub failed to give the #869 mark at
+  the hand-back, the run was re-run green, and the first read after that
+  *became* the mark, so nothing ever differed from it and a ready, green,
+  labelled pull request sat passed over for seven hours. It was the fourth
+  hand-back parking a fix that had already happened (#881, #1279, #1831), each
+  fixed by teaching the change-based mark one more case. So a red hand-back
+  is re-admitted on **state**: its unmoved head's gating runs, read now, all
+  green, whatever the marks say. A stall that ended red joins it.
+
+The mark itself is never taken from a later read (#1951): a red hand-back
+carries the runs its verdict read ([`outcomes.Red`]), and any other kind whose
+read failed at the hand-back has none, and waits for its own signal or a push.
+
+A conflict, a refused description or a committed image has no state entry and
+waits for its head (or its own kind's signal): green CI never re-admits them.
+Every side memory is kept only for numbers still in [`MEMORY`].
 """
 
 from __future__ import annotations
@@ -35,7 +51,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from merging.watch import board
+from merging.watch import board, stalls
 
 
 # Where the remembered hand-backs live, under the checkout's git directory.
@@ -60,6 +76,15 @@ REVIEWS_MEMORY = "handed-back-reviews.json"
 # And for a hand-back that outwaited its runs, its number (#1831, [`stalls`]):
 # asked about until those runs end.
 STALLS_MEMORY = "handed-back-stalls.json"
+
+# And for a hand-back a red run caused, the runs the verdict read red (#1951,
+# [`greened`]): asked each pass until they read green.
+RED_MEMORY = "handed-back-red.json"
+
+# And for every hand-back, when (seconds since the epoch) and why, so
+# `make queue-status` can name one passed over for long with a green head
+# (#1951, [`view.stranded`]).
+WHY_MEMORY = "handed-back-why.json"
 
 
 def claim(pull: dict) -> str:
@@ -135,22 +160,34 @@ def rerun_heads(pulls: list[dict], memory: dict[int, str], marks: dict[int, str]
     `marks` holds [`attempts`] as each was handed back; `runs_now(number, sha)`
     asks GitHub for today's, `None` when it could not answer (no news, so
     still passed over). Asked only for ready pull requests whose head is the
-    remembered one. An entry with no mark (remembered before #869, or GitHub
-    failed at the hand-back) takes today's as its mark.
+    remembered one. An entry with no mark (GitHub failed at the hand-back) is
+    not asked: a later read taken as its mark could already be the re-run that
+    fixed it, and nothing would ever differ from it again (#1951, #1920). A red
+    hand-back always has one ([`outcomes.Red`]) and is re-read on state too.
     """
     again = []
     for pull in pulls:
         number, sha = pull.get("number"), pull.get("headRefOid")
-        if pull.get("isDraft") or memory.get(number) != sha:
+        if pull.get("isDraft") or memory.get(number) != sha or number not in marks:
             continue
         now = runs_now(number, sha)
-        if now is None:
-            continue
-        if number not in marks:
-            marks[number] = now
-        elif marks[number] != now:
+        if now is not None and marks[number] != now:
             again.append(number)
     return again
+
+
+def greened(pulls: list[dict], memory: dict[int, str], reds: dict[int, str], ask) -> list[int]:
+    """The remembered red hand-backs whose unmoved head's gating runs read
+    green now (#1951), whatever any mark says. `ask(pull)` is
+    [`stalls.reading`] of those runs, `None` when GitHub failed (no news).
+    Asked only for ready pull requests that carry the `queue` label, once each
+    per pass: a red head that stays red costs a read a pass, nothing more."""
+    return [
+        pull["number"] for pull in pulls
+        if pull.get("number") in reds and not pull.get("isDraft") and board.queued(pull)
+        and memory.get(pull.get("number")) == pull.get("headRefOid")
+        and (ask(pull) or ("",))[0] == stalls.GREEN
+    ]
 
 
 def recall(path: Path) -> dict[int, str]:

@@ -263,7 +263,7 @@ queue-stop: ## Ask the watch and its supervisor to stop, between pull requests
 # alive; never a pattern matched against every command line), and the stream a
 # `Monitor` runs: the log from 30 lines back, filtered to what someone acts on,
 # plus coders' "Standing down" comments. `merging/view/` has the incidents.
-queue-status: ## Does the queue's supervisor run (its lock's PID, checked alive)? Plus the log's last line and age
+queue-status: ## Does the queue's supervisor run (its lock's PID, checked alive)? Plus the log's last line and age, and green PRs passed over for an hour
 	@python3 .github/scripts/queue-view.py status
 
 queue-events: ## The stream a Monitor runs: hand-backs, merges, ready flips, stand-downs; exits 1 once the supervisor is gone

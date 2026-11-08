@@ -6,7 +6,8 @@ import subprocess
 import time
 
 from merging.queue import outcomes, polling, pulls
-from merging.verdict import github, runners
+from merging.verdict import decide, github, runlist, runners
+from merging.watch import handbacks
 
 
 # The deadline's last line when its last poll listed a run red whose jobs had
@@ -54,7 +55,8 @@ def wait_for(
                 if refused:
                     return outcomes.STOP, [f"{outcomes.RUNNERS}, and the re-run was refused: {refused}", *lines]
             elif state != outcomes.WAIT:
-                return state, lines
+                mark = red_mark(pull, runs, jobs) if state == outcomes.STOP else None
+                return (outcomes.RED, outcomes.Marked(lines, mark)) if mark is not None else (state, lines)
         if waited > deadline:
             # Its own state, not a red one: the watch brings it back by itself
             # when the run it outwaited goes green ([`watch.stalls`], #1831).
@@ -67,6 +69,19 @@ def wait_for(
         if tick is not None:
             tick()
         time.sleep(poll)
+
+
+def red_mark(pull: dict, runs: list[dict], jobs: dict[int, list[dict]]) -> str | None:
+    """The gating runs on `pull`'s head as [`handbacks.attempts`] spells them,
+    when one of them is red ([`decide.assess`] says failed); `None` when the
+    stop was not a red run (a draft, a missing run, the description). What makes
+    a stop an [`outcomes.RED`] hand-back, and its mark taken from the very runs
+    the verdict read (#1951), never from a later read."""
+    sha = pull.get("headRefOid", "")
+    gating = {w: runlist.runs_for(runs, sha, w) for w in runlist.WORKFLOWS}
+    if not any(decide.assess(pull, w, listed, jobs)[0] == decide.FAILED for w, listed in gating.items()):
+        return None
+    return handbacks.attempts([r for listed in gating.values() for r in listed])
 
 
 def rerun_failed(stalled: list[dict], rerun: dict[int, int]) -> str | None:
