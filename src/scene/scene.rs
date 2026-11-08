@@ -2,11 +2,9 @@
 //!
 //! Entity/component storage of record is `ecs::World` (one `Entity` bundle per
 //! hecs entity, generational handles + stable-id/name lookup). `Scene` owns that
-//! `World` together with the engine-level scene scalars (selection, skybox,
-//! ambient light) and the parenting / collider / serialization helpers that
-//! operate across the World — concerns that must NOT live inside `ecs::World`
-//! (whose deps are restricted to hecs + components). This wrapper lives in the
-//! `scene` layer, which is allowed to depend on `crate::scene` and rendering.
+//! `World` together with the engine-level scene state and the helpers that operate
+//! across the World — concerns that must NOT live inside `ecs::World` (whose deps
+//! are restricted to hecs + components).
 
 use std::collections::BTreeMap;
 
@@ -80,10 +78,9 @@ pub struct Scene {
     /// order is deterministic (the repo has a determinism guard).
     /// Every write moves its revision (`scene::revision`), which the renderer reads.
     pub materials: crate::scene::revision::Revisioned<BTreeMap<String, MaterialAsset>>,
-    /// Runtime box-projector decals (bullet holes, scorch, blood splats). These are
-    /// ephemeral *visual* state spawned from raycast hits, NOT serialized scene
-    /// data — the decal renderer reads them each frame and projects them onto the
-    /// surfaces they overlap. Bounded per owner, world and total (the oldest of a
+    /// Runtime box-projector decals (bullet holes, scorch, blood splats): ephemeral
+    /// *visual* state, NOT serialized, projected onto the surfaces they overlap
+    /// each frame. Bounded per owner, world and total (the oldest of a
     /// bucket fades out past its budget, #1517); aged on the fixed tick (#639).
     pub decals: crate::scene::decal::DecalSet,
     /// Scene-level light-probe dataset (#240): probe POSITIONS + grid layout live in
@@ -123,6 +120,8 @@ pub struct Scene {
     /// Entities marked `Scene.DontDestroyOnLoad` (#432): they and their descendants
     /// survive a scene swap. Transient runtime state, never serialized.
     pub persistent: std::collections::BTreeSet<u32>,
+    /// `Debug.DrawLine` / `DrawRay`'s lines (#1882): draw-only, aged by the tick.
+    pub debug_lines: crate::scene::runtime::debug_lines::DebugLines,
     /// The sim's game time (`Time::time`) the renderer uploads as the shaders'
     /// `camera.time` (#398). Written by the tick; `0` outside Play. Never serialized.
     pub shader_time: f32,
@@ -189,6 +188,7 @@ impl Default for Scene {
             playing: false,
             pending_load: None,
             persistent: std::collections::BTreeSet::new(),
+            debug_lines: Default::default(),
             shader_time: 0.0,
             ui_time: 0.0,
             #[cfg(feature = "dev")]

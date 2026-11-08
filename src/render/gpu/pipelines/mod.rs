@@ -11,14 +11,15 @@ pub(crate) mod transparent;
 pub(crate) mod winding;
 
 pub(crate) use depth_postpass::DepthPostpassPipelines;
+use lazy::lazy_pipeline;
 pub(crate) use lazy::{LazyCompute, LazyPipeline};
 pub(crate) use transparent::{TransparentBlend, TransparentPipelines};
 pub(crate) use winding::{FacedPipeline, Facing};
 
 use prepass::prepass_set;
 use specs::{
-    forward_spec, line_spec, make_pipeline, primed_spec, primed_velocity_spec, transparent_spec,
-    velocity_spec, PipelineSpec,
+    forward_spec, line_spec, primed_spec, primed_velocity_spec, transparent_spec, velocity_spec,
+    vertex_line_spec, PipelineSpec,
 };
 
 pub(crate) use specs::velocity_target;
@@ -40,6 +41,8 @@ pub(crate) struct ForwardPipelines {
     /// The editor's line gizmos (grid, axis arrows, probes, the occlusion view), drawn
     /// over the post-FX output (#1224), so built against the output format.
     pub line: LazyPipeline,
+    /// The collider and debug-line gizmos (#1882): lines coloured per vertex.
+    pub vertex_line: LazyPipeline,
     /// The SSAO depth prepass (#436): the forward vertex stage, no colour target.
     pub prepass: FacedPipeline,
     /// The opaque and velocity ones over a primed depth (#1499).
@@ -83,6 +86,13 @@ pub(crate) fn create_pipelines(
         }),
         depth_postpass: DepthPostpassPipelines::new(device, shader, &render_layout),
         line: lazy_pipeline(device, shader, output_format, &line_layout, line_spec()),
+        vertex_line: lazy_pipeline(
+            device,
+            shader,
+            output_format,
+            &line_layout,
+            vertex_line_spec(),
+        ),
         prepass: prepass_set(device, shader, &render_layout, "fs_prepass"),
         primed: PrimedPipelines::new(&set),
         layout: render_layout,
@@ -212,20 +222,6 @@ impl PrimedPipelines {
     pub(crate) fn lazies(&self) -> impl Iterator<Item = &LazyPipeline> {
         self.forward.lazies().chain(self.velocity.lazies())
     }
-}
-
-/// `spec`'s pipeline over `shader`, built on its first draw (#985).
-fn lazy_pipeline(
-    device: &wgpu::Device,
-    shader: &wgpu::ShaderModule,
-    format: wgpu::TextureFormat,
-    layout: &wgpu::PipelineLayout,
-    spec: PipelineSpec,
-) -> LazyPipeline {
-    let (shader, layout) = (shader.clone(), layout.clone());
-    LazyPipeline::new(device, move |device| {
-        make_pipeline(device, &shader, format, &layout, &spec)
-    })
 }
 
 /// The forward passes' pipeline layout — groups 0–3 — for a surface variant (#396).

@@ -10,8 +10,10 @@
 //! [`CameraCtx`]; a new camera-uniform field is set once, in [`CameraCtx::new`].
 //! No trait objects and no registration at runtime: a static, ordered table.
 //!
-//! Six stages are not every camera's: `volumetric_fog` (#1703), `ssil_source`
-//! (#1750) and `ssr` run only on the base camera, over its opaque image (#1526); `post_fx` runs only on the last
+//! Seven stages are not every camera's: `volumetric_fog` (#1703), `ssil_source`
+//! (#1750) and `ssr` run only on the base camera, over its opaque image (#1526),
+//! and `gizmo_depth` keeps its depth for a game frame's gizmos under a stacked
+//! camera (#1882); `post_fx` runs only on the last
 //! camera (it composites the whole stack) and returns early on the others, and the
 //! editor's `outline` and `handles` follow it there, onto the finished image, in
 //! Unity's order: scene, post-FX, outline, handles, then the UI (#1224). An
@@ -53,6 +55,7 @@ pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("depth_postpass", depth_postpass),
     ("world_ui", world_ui),
     ("effects", effects),
+    ("gizmo_depth", gizmo_depth),
     ("count", count),
     ("post_fx", post_fx),
     ("outline", outline),

@@ -13,9 +13,10 @@ use crate::scripting::ConsoleLogs;
 
 #[test]
 fn a_panicking_decomposition_keeps_the_trimesh_and_warns_once() {
-    // A scale no other test uses, so this mesh's cache key is this test's own.
+    // The arch moved where no other test puts it, so its cache key is this test's own.
     let scale = Vec3::new(1.31, 0.77, 1.13);
-    let (positions, indices) = arch();
+    let (mut positions, indices) = arch();
+    positions.iter_mut().for_each(|p| p[2] += 93.0);
     crate::logging::init();
     let console = RefCell::new(ConsoleLogs::new());
     crate::logging::forward(&console);

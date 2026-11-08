@@ -25,6 +25,12 @@ TABLE: dict[str, tuple[str, ...]] = {
         "src/core/storage.rs",  # Storage, the PlayerPrefs save file
         "src/asset/sidecar/",  # an asset's import settings beside it
         "src/asset/convert/",  # the import cache and its fingerprints
+        # files the import cache writes beside a model (#1946's hull sidecars read
+        # `medium`)
+        "src/asset/import_cache/",
+        # the `.animgraph` document (#1942 added a saved node field and read
+        # `medium`)
+        "src/asset/animation_graph/",
         # every serde change to the scene/prefab document moves it, wherever the
         # field lives (a component's own module): #1587 changed the format from
         # `src/components/mesh/` and read `medium`

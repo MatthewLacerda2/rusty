@@ -1,5 +1,6 @@
 //! The Scene view's gizmo set (#1909): which editor gizmos the Scene view draws,
-//! Unity's Gizmos menu and `GizmoUtility.SetGizmoEnabled`. Here, below the editor and
+//! Unity's Gizmos menu and `GizmoUtility.SetGizmoEnabled`, and the Game view's one
+//! **Gizmos** toggle (`GameGizmos`, #1882), a row like the others. Here, below the editor and
 //! the renderer, because both read it: the editor owns the set and shows its
 //! toggles, the shell hands it to the render view, the renderer gates its gizmos on
 //! it, and `Editor.SetGizmo` names a flag by its row.
@@ -33,11 +34,14 @@ pub struct GizmoRow {
     /// Whether the tab strip shows its toggle: `false` while nothing draws it yet,
     /// the flag still set and read through the API.
     pub shown: bool,
+    /// Whether its toggle sits on the Game tab's strip, not the Scene tab's: a flag
+    /// of what the Game view draws.
+    pub game: bool,
 }
 
 macro_rules! gizmos {
     ($($variant:ident => $row:expr,)*) => {
-        /// A Scene-view gizmo flag, one per row of the table.
+        /// A gizmo flag, one per row of the table.
         #[derive(Clone, Copy, Debug, PartialEq, Eq)]
         pub enum Gizmo {
             $($variant,)*
@@ -60,6 +64,7 @@ gizmos! {
         hover: "Draw the screen-space canvases and edit them with the rect tool",
         on: true,
         shown: true,
+        game: false,
     },
     LightProbes => GizmoRow {
         name: "LightProbes",
@@ -67,6 +72,7 @@ gizmos! {
         hover: "Draw a marker at each light probe, tinted by the light it baked",
         on: true,
         shown: true,
+        game: false,
     },
     ReflectionProbes => GizmoRow {
         name: "ReflectionProbes",
@@ -74,6 +80,17 @@ gizmos! {
         hover: "Draw each reflection probe's capture point and parallax box",
         on: true,
         shown: true,
+        game: false,
+    },
+    // Every collider's shape (#1882); off, as Unity draws only the selection's
+    // colliders until asked. The selected object's colliders draw either way.
+    Colliders => GizmoRow {
+        name: "Colliders",
+        label: "Colliders",
+        hover: "Draw every collider's shape (the selected object's always draw)",
+        on: false,
+        shown: true,
+        game: false,
     },
     // Hidden until the navmesh gizmo draws something (#1910); off, as Unity's is:
     // it paints the whole floor.
@@ -83,6 +100,17 @@ gizmos! {
         hover: "Draw the baked navigation mesh",
         on: false,
         shown: false,
+        game: false,
+    },
+    // The Game tab's one toggle (#1882), Unity's Game-view **Gizmos**: the colliders
+    // and the `Debug.Draw*` lines over the game frame. Off, as Unity's starts.
+    GameGizmos => GizmoRow {
+        name: "GameGizmos",
+        label: "Gizmos",
+        hover: "Draw the colliders and the Debug.Draw lines over the game",
+        on: false,
+        shown: true,
+        game: true,
     },
 }
 
