@@ -18,9 +18,9 @@ name: mutants-sweep
 on:
   # Saturdays, 04:41 UTC: off the hour, where GitHub's scheduler is least
   # backed up, clear of `ci.yml`'s nightly run (03:07) and two days clear of
-  # `coverage.yml` (Mondays 05:23). The sweep holds seven runners for about a
-  # day and a half (`max-parallel` on `mutants` has the arithmetic), so it
-  # ends on Sunday, and a weekend is when the fewest pull requests want them.
+  # `coverage.yml` (Mondays 05:23). `mutants-plan` picks the sweep's width
+  # (up to ten runners) so it ends by Sunday 23:59 UTC, and a weekend is when
+  # the fewest pull requests want them.
   schedule:
     - cron: '41 4 * * 6'
   workflow_dispatch:
@@ -33,7 +33,7 @@ on:
         default: false
 
 # One sweep at a time, repo-wide (#705): a second sweep waits for the first
-# instead of taking seven more runners. Workflow-level, so the group holds the
+# instead of taking up to ten more runners. Workflow-level, so the group holds the
 # whole run; a group on the `mutants` matrix would serialise its own shards.
 # GitHub keeps one pending run per group and a newer one replaces it, which is
 # right: it sweeps the newer commit.
@@ -70,11 +70,17 @@ jobs:
   #
   # When it sweeps, it also sizes the matrix (#1684): it counts the mutants
   # (`cargo mutants --list` builds nothing) and `mutants-shards.py` turns the
-  # count into the shard list, at `MINUTES_PER_MUTANT` (measured, its docstring
-  # says how) and ≈ 4 h a shard, under the 5 h 40 budget below. Past GitHub's
-  # 256-job matrix ceiling, or with nothing to mutate, this job goes red rather
-  # than sweep a capped matrix. A skipped sweep still hands `mutants` a valid
-  # matrix (`[0]`), never an empty one, so the skip reads as `skipped`.
+  # count into the shard list and the width, from the per-shard rates the
+  # newest earlier sweep measured (its `mutants-report` artifact keeps each
+  # shard's seconds and outcome lists under `shards/`): shards sized so the
+  # slowest rate ends in ≈ 4 h, under the 5 h 40 budget below, and the
+  # narrowest `max-parallel` (at most 10) whose waves end by Sunday 23:59 UTC.
+  # With no readable earlier report it falls back to `MINUTES_PER_MUTANT`, and
+  # the summary names the source it used. The script's docstring has the
+  # incidents and the arithmetic. Past GitHub's 256-job matrix ceiling, or with
+  # nothing to mutate, this job goes red rather than sweep a capped matrix. A
+  # skipped sweep still hands `mutants` a valid matrix (`[0]`) and width, never
+  # an empty one, so the skip reads as `skipped`.
   mutants-plan:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -84,6 +90,8 @@ jobs:
     outputs:
       sweep: ${{ steps.plan.outputs.sweep }}
       shards: ${{ steps.size.outputs.shards || '[0]' }}
+      parallel: ${{ steps.size.outputs.parallel || '1' }}
+      minutes: ${{ steps.size.outputs.minutes }}
       mutants: ${{ steps.size.outputs.mutants }}
     steps:
       - name: Look for a finished sweep of this commit
@@ -100,7 +108,7 @@ jobs:
             echo "$2" | tee -a "$GITHUB_STEP_SUMMARY"
           }
           # `main` only, `force` or not (#972): a dispatch on a branch would hold
-          # seven runners for a day and a half the batch's gates need (#705). Red, so
+          # up to ten runners for a weekend the batch's gates need (#705). Red, so
           # the dispatcher sees the refusal; main-health files only main's runs.
           if [ "$REF" != refs/heads/main ]; then
             decide false "Mutation sweep refused: it sweeps \`main\` only, and this run is on \`$REF\`. Mutate a branch with \`mutants-on-request.yml\` (\`make mutants-remote SCOPE=diff\`)."
@@ -136,9 +144,34 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-mutants
+      # The newest earlier sweep's report, for what a mutant cost (#1684). Only
+      # its `mutants-report` artifact: a shard's own artifact carries its logs,
+      # ≈ 40 MB each. A run whose report is missing or predates `shards/` gives
+      # no rate, and `mutants-shards.py` falls back. Never red: a failed lookup
+      # sizes from the fallback.
+      - name: Read what the last sweep measured
+        id: last
+        if: steps.plan.outputs.sweep == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          mkdir -p last
+          runs=$(gh api "repos/$REPO/actions/workflows/mutants-sweep.yml/runs?branch=main&per_page=20" \
+                   --jq ".workflow_runs[] | select(.id != $RUN_ID) | \"\(.id) \(.html_url)\"") \
+            || { echo '::warning::could not list past sweeps; sizing from MINUTES_PER_MUTANT'; runs=''; }
+          while read -r id url; do
+            [ -n "$id" ] || continue
+            if gh run download "$id" -R "$REPO" -n mutants-report -D last >/dev/null 2>&1; then
+              echo "source=$url" >> "$GITHUB_OUTPUT"; break
+            fi
+          done <<< "$runs"
       - name: Size the matrix from the mutant count
         id: size
         if: steps.plan.outputs.sweep == 'true'
+        env:
+          SOURCE: ${{ steps.last.outputs.source }}
         run: |
           set -f   # the globs are for cargo-mutants, not the shell
           files=()
@@ -149,12 +182,13 @@ jobs:
             echo "::error::cargo mutants --list failed, so the matrix could not be sized; see the job summary"
             exit 1
           fi
-          if ! python3 .github/scripts/mutants-shards.py plan < mutants-list.txt > shards.json 2> sizing.txt; then
+          if ! python3 .github/scripts/mutants-shards.py plan --reports last/shards --source "$SOURCE" \
+                 < mutants-list.txt > outputs.txt 2> sizing.txt; then
             cat sizing.txt | tee -a "$GITHUB_STEP_SUMMARY"
             echo "::error::$(cat sizing.txt)"
             exit 1
           fi
-          echo "shards=$(cat shards.json)" >> "$GITHUB_OUTPUT"
+          cat outputs.txt >> "$GITHUB_OUTPUT"
           echo "mutants=$(grep -c . mutants-list.txt)" >> "$GITHUB_OUTPUT"
           echo "Matrix: $(cat sizing.txt)." | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -162,27 +196,24 @@ jobs:
   # navigation), re-examining code no on-request run was asked about and
   # tracking the survivor backlog (#158–#161).
   #
-  # Sharded (#480), and the shard count is `mutants-plan`'s, not written here
-  # (#1684). Every mutant rebuilds the single crate, then runs the dev suite:
-  # ≈ 4.3 min a mutant, setup included, measured on 2026-10-31 (run
-  # 41193398365). A fixed count was outgrown twice: ten shards were cut off at
-  # 6 h on 2026-10-03 (#749, resized to 24), and all 24 stopped at their
-  # budget on 2026-10-31, 1909 of 3552 mutants measured, because the figure
-  # they were sized by (~2 min) was never re-measured. Now the count is
-  # recounted every sweep and the cost lives in one place
-  # (`MINUTES_PER_MUTANT`, `.github/scripts/mutants-shards.py`), which
-  # `mutants-report` checks against the run's own measured rate.
+  # Sharded (#480), and the shard count and width are `mutants-plan`'s, not
+  # written here (#1684). Every mutant rebuilds the single crate, then runs the
+  # dev suite: 3.7 to 6.7 min a mutant across the shards of 2026-11-07's run
+  # (42367735766), setup included. Every hand-set figure was outgrown: ten
+  # shards were cut off at 6 h on 2026-10-03 (#749, resized to 24), all 24
+  # stopped at their budget on 2026-10-31 (a ~2 min cost never re-measured),
+  # and four of 72 on 2026-11-07 (a re-measured 4.3 min mean, while the slow
+  # shards ran at 6.7). Now the count is recounted and the cost re-measured
+  # every sweep, from the last one's slowest shard (`mutants-shards.py`).
   # `round-robin` spreads each file's mutants over every shard, so no shard
   # draws a whole slow module; a single crate rebuilds fully per mutant
   # regardless, so `slice` sharding's build locality buys nothing.
-  # `max-parallel` leaves most of the account's concurrent-job allowance free
-  # for pull requests, and is sized so the sweep ends before `coverage.yml`
-  # (Mondays 05:23, 48 h 42 after the Saturday 04:41 start) cold-builds on the
-  # same runners. Wall clock ≈ shards × 4 h (`TARGET_HOURS`) ÷ max-parallel:
-  # today 64 shards (3552 mutants), so 5 wide is ≈ 51 h (past Monday 05:23),
-  # 6 is ≈ 43 h (Sunday ≈ 23:20, 6 h spare), 7 is ≈ 37 h (Sunday ≈ 17:20,
-  # ≈ 12 h spare, room for the count to grow by a sixth). Re-check it when the
-  # shard count in `mutants-plan`'s summary climbs past ≈ 75.
+  # `max-parallel` is the plan's too: the narrowest width, at most 10 (the
+  # rest of the account's concurrent jobs belong to pull requests), whose
+  # waves of mean-length shards end by Sunday 23:59 UTC, 5 h 24 before
+  # `coverage.yml` (Mondays 05:23) cold-builds on the same runners. When even
+  # 10 cannot, the plan's summary says so and the sweep runs late: a late
+  # sweep beats none. `strategy` may read `needs` (GitHub's context table).
   #
   # Skipped when `mutants-plan` finds a finished sweep of this very commit (#506).
   mutants:
@@ -202,7 +233,7 @@ jobs:
       RUSTY_REQUIRE_GPU: "1"
     strategy:
       fail-fast: false
-      max-parallel: 7
+      max-parallel: ${{ fromJSON(needs.mutants-plan.outputs.parallel) }}
       matrix:
         shard: ${{ fromJSON(needs.mutants-plan.outputs.shards) }}
     steps:
@@ -276,11 +307,13 @@ jobs:
               -- --features dev --fail-fast --test-threads 2 || rc=$?
           mkdir -p mutants.out
           echo "$rc" > mutants.out/exit-code
-          # Setup included, as the budget counts it: what `mutants-report`
-          # divides by the mutants measured to check `MINUTES_PER_MUTANT`.
+          # Setup included, as the budget counts it: what the next sweep's
+          # plan divides by the mutants measured to size itself (#1684).
           echo $(( $(date +%s) - JOB_STARTED )) > mutants.out/elapsed-seconds
           case "$rc" in
-            124|137) echo "::warning::shard ${{ matrix.shard }} stopped at its ${budget}s budget; raise MINUTES_PER_MUTANT in .github/scripts/mutants-shards.py" ;;
+            # Still red (main-health files it): its unmeasured mutants are a real
+            # gap. The next sweep sizes from this shard's rate.
+            124|137) echo "::warning::shard ${{ matrix.shard }} stopped at its ${budget}s budget; the next sweep sizes from its measured rate" ;;
             # 2 (missed mutants) and 3 (timeouts) are findings, not a failed run:
             # the report job reads them from exit-code, and a red shard would make
             # main-health file "red main" for a signal that worked (#918).
@@ -320,8 +353,19 @@ jobs:
       - name: Merge shards and summarize
         env:
           PLANNED: ${{ needs.mutants-plan.outputs.mutants }}
+          SIZED_AT: ${{ needs.mutants-plan.outputs.minutes }}
         run: |
           mkdir -p mutants.out
+          # Each shard's seconds and outcome lists, kept small, for the next
+          # sweep's plan to size from (#1684); the shard artifacts carry logs.
+          for dir in shards/mutants-shard-*/; do
+            [ -d "$dir" ] || continue   # no shard uploaded: the glob stayed literal
+            keep="mutants.out/shards/$(basename "$dir")"
+            mkdir -p "$keep"
+            for f in elapsed-seconds caught.txt missed.txt timeout.txt unviable.txt; do
+              [ -f "$dir$f" ] && cp "$dir$f" "$keep/"
+            done
+          done
           for kind in caught missed timeout unviable; do
             cat shards/*/"$kind".txt 2>/dev/null | sort > "mutants.out/$kind.txt" || true
           done
@@ -337,7 +381,6 @@ jobs:
           done
           count() { grep -c . "mutants.out/$1.txt" || true; }
           measured=$(cat mutants.out/{caught,missed,timeout,unviable}.txt | grep -c . || true)
-          seconds=$(cat shards/*/elapsed-seconds 2>/dev/null | awk '{s += $1} END {print s + 0}')
           {
             echo '### Mutation sweep — full deterministic sim (informational, non-blocking)'
             echo ''
@@ -347,12 +390,12 @@ jobs:
             echo ''
             echo "Measured $measured of the ${PLANNED:-?} mutants \`mutants-plan\` counted."
             echo ''
-            python3 .github/scripts/mutants-shards.py rate --mutants "$measured" --seconds "$seconds"
+            python3 .github/scripts/mutants-shards.py rate --reports mutants.out/shards ${SIZED_AT:+--sized-at "$SIZED_AT"}
             echo ''
             if [ -z "$total" ]; then
               echo '> ❌ No shard uploaded a report — nothing was measured.'
             elif [ -n "$unfinished" ]; then
-              echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their remaining mutants are unmeasured, not clean. \`budget\` means the shard stopped itself before the 6 h ceiling: the matrix was sized too small, so raise \`MINUTES_PER_MUTANT\` in \`.github/scripts/mutants-shards.py\` to the rate above. \`exit:none\` means it was cut off or failed before its run: check its log for a lost runner (\`received a shutdown signal\`, a one-off unless it recurs)."
+              echo "> ⚠️ Shards that did not finish (of $total):$unfinished — their remaining mutants are unmeasured, not clean. \`budget\` means the shard stopped itself before the 6 h ceiling: the matrix was sized too small for its slowest shard; the next sweep sizes from the rate above. \`exit:none\` means it was cut off or failed before its run: check its log for a lost runner (\`received a shutdown signal\`, a one-off unless it recurs)."
             else
               echo "> All $total shards finished."
               # The marker `mutants-plan` looks for (#506): this commit is covered.
