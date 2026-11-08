@@ -303,6 +303,20 @@ must be `> 0`. The shape is read when the body is built (entering Play, or a
 hierarchy change); `SetColliderShape` refreshes the bounds (`GetBounds`)
 immediately.
 
+**Mesh** (Unity: `MeshCollider`) with `convex = true` is one convex hull of the
+mesh, on any body. A **concave** one (`convex = false`) depends on its body: on a
+static or kinematic body it is the exact triangle mesh; on a dynamic Rigidbody,
+where a triangle mesh has only surfaces (an object driven inside it falls
+through), it is split into convex pieces (V-HACD), which simulate as one solid
+with the mass spread over its volume and keep its hollows open (a bowl holds
+what lands in it). Unity refuses that case and asks for *Convex*; rusty splits it
+instead (#1886). The split is made once per mesh and scale for the session (a few
+hundred milliseconds for a prop, the first time) and redone when the body changes
+type in Play (`SetKinematic`, a Rigidbody added to a static mesh). A mesh too
+flat or too degenerate to split stays a triangle mesh, with one console warning
+naming the entity.
+`RaycastThrough` reads the pieces as one solid.
+
 The **physics material** (Unity: `PhysicMaterial`) sets how a collider grips
 and bounces:
 
