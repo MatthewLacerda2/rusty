@@ -10,6 +10,7 @@ mod batch;
 mod handles;
 mod lights;
 mod occlusion;
+mod probe_ball;
 mod probes;
 
 use glam::{Mat4, Vec3};
@@ -18,6 +19,7 @@ use crate::components::mesh::Vertex;
 use crate::render::draw::resources::{GridResource, Overlays};
 use crate::render::Renderer;
 pub(crate) use batch::{OverlayBindings, OverlayDraws};
+pub(crate) use probe_ball::{ball_pipeline, BallResource};
 
 impl Renderer {
     pub(crate) fn precreate_grid(&self, draws: &mut OverlayDraws) -> Option<GridResource> {
@@ -27,7 +29,7 @@ impl Renderer {
     }
 
     /// Draw the editor overlays (floor grid, the occlusion view's boxes, selected-entity
-    /// axis arrows, probe gizmos) into the handles pass, each at its slot of `overlays`' one group 1.
+    /// axis arrows, probe balls and gizmos) into the handles pass, each at its slot of `overlays`' one group 1.
     /// Editor-mode only; called from `draw_handles`.
     pub(crate) fn draw_editor_overlays<'a>(
         &'a self,
@@ -37,6 +39,9 @@ impl Renderer {
         let Some(bindings) = &overlays.bindings else {
             return;
         };
+        // The reflection probes' mirror balls (#1911) first: they write depth, so the
+        // lines drawn after them hide behind a ball as behind a solid.
+        self.draw_probe_balls(render_pass, bindings, &overlays.balls);
         // A. Floor grid
         if let (Some(slot), Some(grid_buf)) = (overlays.grid, &self.grid_vertex_buffer) {
             render_pass.set_vertex_buffer(0, grid_buf.slice(..));
