@@ -46,10 +46,12 @@ from __future__ import annotations
 SETUP: tuple[str, ...] = (
     "Build EmbarkStudios/cargo-deny-action@v2",
     "Cache Blender",
+    "Cache Open Image Denoise",
     "Cache cargo registry + target",
     "Driver version (Mesa / lavapipe)",
     "Ensure rustfmt + clippy",
     "Install Blender",
+    "Install Open Image Denoise",
     "Install cargo-nextest",
     "Run actions/checkout@v7",
     "Set up job",
