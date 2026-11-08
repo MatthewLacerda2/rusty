@@ -12,7 +12,8 @@
 //!
 //! **Built once.** A collider's shape is kept in the renderer's
 //! [`WireCache`](crate::physics::WireCache) and built again only when what physics
-//! builds it from changes; a frame only places it.
+//! builds it from changes; a frame only places it, at the pose the frame draws its
+//! entity at (`DrawPoses::pose`, blended between two ticks as its mesh is, #1877).
 //!
 //! **Bounded per frame.** Colliders draw nearest the camera first (the selection
 //! before any), until [`MAX_COLLIDER_SEGMENTS`] segments: past it the farther ones,
@@ -27,6 +28,7 @@ use super::OverlayDraws;
 use crate::components::mesh::Vertex;
 use crate::physics::WireCache;
 use crate::render::draw::resources::ProbeResource;
+use crate::render::interpolate::DrawPoses;
 use crate::render::Renderer;
 use crate::scene::Scene;
 
@@ -84,7 +86,7 @@ fn end(p: Vec3, color: [f32; 4]) -> Vertex {
 /// (`scene::runtime::debug_lines`).
 pub(crate) fn wire_vertices(
     scene: &Scene,
-    cache: &mut WireCache,
+    (cache, poses): (&mut WireCache, &DrawPoses),
     (scope, eye): (ColliderScope, Vec3),
 ) -> Vec<Vertex> {
     cache.refresh(scene);
@@ -98,9 +100,10 @@ pub(crate) fn wire_vertices(
             continue;
         };
         let tint = if wire.trigger { TRIGGER } else { COLLIDER };
-        let Some(placed) = wire.placed(scene, id) else {
+        let Some(pose) = poses.pose(scene, id) else {
             continue;
         };
+        let placed = wire.placed_at(pose);
         for [a, b] in placed.take(budget) {
             out.extend([end(a, tint), end(b, tint)]);
             budget -= 1;
@@ -121,7 +124,8 @@ impl Renderer {
         view: (ColliderScope, Vec3),
         draws: &mut OverlayDraws,
     ) -> Option<ProbeResource> {
-        let verts = wire_vertices(scene, &mut self.wire_cache.borrow_mut(), view);
+        let wires = (&mut *self.wire_cache.borrow_mut(), &self.draw_poses);
+        let verts = wire_vertices(scene, wires, view);
         if verts.is_empty() {
             return None;
         }

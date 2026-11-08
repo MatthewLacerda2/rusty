@@ -13,7 +13,9 @@
 //!
 //! **Not under TAA upscaling.** There the finished image is the output's size and
 //! the depth the scene's, which no pass can attach together; the gizmos are left
-//! out, and the console says so once per view.
+//! out, and the console says so once per view. Their depth is not kept there, and
+//! the kept texture is freed whenever nothing will read it (gizmos off, or
+//! upscaling).
 
 use crate::render::draw::camera::CameraCtx;
 use crate::render::gpu::DEPTH_FORMAT;
@@ -56,13 +58,20 @@ impl Renderer {
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    /// Draw the game gizmos onto the stack's output, on its last camera.
-    pub(crate) fn draw_game_gizmos(&self, view: &mut RenderView, ctx: &CameraCtx) {
+    /// Whether TAA upscales this stack's view, where the game gizmos are not drawn
+    /// (the module docs), so their depth is not kept either.
+    pub(crate) fn gizmos_upscaled(&self, view: &RenderView, ctx: &CameraCtx) -> bool {
         let stack = ctx.stack;
         let editor = stack.editor_mode;
         let graphics = self.graphics(editor);
         let taa_on = taa::runs(view, stack.post, graphics, stack.full_post_fx, editor);
-        if taa::upscales(view, taa_on) {
+        taa::upscales(view, taa_on)
+    }
+
+    /// Draw the game gizmos onto the stack's output, on its last camera.
+    pub(crate) fn draw_game_gizmos(&self, view: &mut RenderView, ctx: &CameraCtx) {
+        let stack = ctx.stack;
+        if self.gizmos_upscaled(view, ctx) {
             if !view.gizmo_upscale_told {
                 view.gizmo_upscale_told = true;
                 log::warn!(

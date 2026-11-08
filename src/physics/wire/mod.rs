@@ -28,6 +28,7 @@ use glam::{Quat, Vec3};
 use super::compound::body_owner;
 use super::shape::build::{class_of, collider_inputs, BodyClass};
 use super::shape::fit::build_shape_for;
+use crate::components::transform::Pose;
 use crate::components::ScaledShape;
 use crate::scene::Scene;
 pub use cache::WireCache;
@@ -96,7 +97,12 @@ impl ShapeWire {
         scene: &Scene,
         id: u32,
     ) -> Option<impl Iterator<Item = [Vec3; 2]> + 'a> {
-        let pose = scene.world.world_pose(id)?;
+        Some(self.placed_at(scene.world.world_pose(id)?))
+    }
+
+    /// Its segments at `pose`, its entity's world pose (or the pose a frame draws
+    /// it at, blended between two ticks), as physics places the shape there.
+    pub fn placed_at(&self, pose: Pose) -> impl Iterator<Item = [Vec3; 2]> + '_ {
         let (pos, rot) = match self.upright {
             true => (
                 pose.pos + pose.rot * (self.center * pose.scale),
@@ -104,7 +110,7 @@ impl ShapeWire {
             ),
             false => (pose.pos, pose.rot),
         };
-        Some(self.segments.iter().map(move |s| s.map(|p| pos + rot * p)))
+        self.segments.iter().map(move |s| s.map(|p| pos + rot * p))
     }
 }
 

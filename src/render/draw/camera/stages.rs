@@ -130,8 +130,15 @@ pub(super) fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraC
 
 /// A game frame's gizmos test the base camera's depth (#1882): kept here, after
 /// its last draw and before a stacked camera (a viewmodel) clears it.
+/// Not under TAA upscaling, where they are not drawn; the kept texture is freed
+/// while the gizmos are off or upscaled.
 pub(super) fn gizmo_depth(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    if ctx.is_first && !ctx.is_last && game_gizmos(view, ctx) {
+    if !ctx.is_first {
+        return;
+    }
+    if !game_gizmos(view, ctx) || r.gizmos_upscaled(view, ctx) {
+        view.gizmo_depth = None;
+    } else if !ctx.is_last {
         r.keep_gizmo_depth(view);
     }
 }

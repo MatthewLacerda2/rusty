@@ -17,7 +17,11 @@ fn count(verts: &[Vertex], tint: [f32; 4]) -> usize {
 }
 
 fn segments(scene: &Scene, scope: ColliderScope) -> Vec<Vertex> {
-    wire_vertices(scene, &mut WireCache::default(), (scope, Vec3::ZERO))
+    wire_vertices(
+        scene,
+        (&mut WireCache::default(), &DrawPoses::default()),
+        (scope, Vec3::ZERO),
+    )
 }
 
 /// With `Colliders` off only the selection draws; on, every collider, the
@@ -65,4 +69,29 @@ fn the_cap_bounds_a_frame() {
     }
     let verts = segments(&scene, ColliderScope::All);
     assert_eq!(count(&verts, COLLIDER), MAX_COLLIDER_SEGMENTS);
+}
+
+/// A collider with no mesh (a CharacterController's body, a trigger) is placed
+/// where the frame draws it, blended between its last two ticks as a mesh is
+/// (#1877), so its outline never runs a tick ahead.
+#[test]
+fn a_wire_is_drawn_between_ticks() {
+    let mut scene = Scene::new();
+    let id = add_box(&mut scene, 0.0, false);
+    let mut poses = DrawPoses::default();
+    poses.record(&scene);
+    scene.world.transform_mut(id).expect("live").position = Vec3::X;
+    poses.record(&scene);
+    poses.set_alpha(0.25);
+    let mut cache = WireCache::default();
+    let verts = wire_vertices(
+        &scene,
+        (&mut cache, &poses),
+        (ColliderScope::All, Vec3::ZERO),
+    );
+    let centre = verts.iter().map(|v| v.position[0]).sum::<f32>() / verts.len() as f32;
+    assert!(
+        (centre - 0.25).abs() < 1e-4,
+        "drawn at the blend, not the tick"
+    );
 }

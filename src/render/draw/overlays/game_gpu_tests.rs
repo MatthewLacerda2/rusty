@@ -58,6 +58,21 @@ fn pixels_of(img: &[u8], color: [f32; 4]) -> Vec<usize> {
         .collect()
 }
 
+/// `scene` under a `DepthOnly` viewmodel camera with a narrow lens drawing nothing.
+fn with_viewmodel(mut scene: Scene) -> Scene {
+    let overlay = scene.add_entity("ViewmodelCamera".to_string());
+    let lens = CameraComponent {
+        render_order: 1,
+        clear_flags: ClearFlags::DepthOnly,
+        culling_mask: 0,
+        fov: 20.0,
+        near: 0.01,
+        ..Default::default()
+    };
+    scene.world.set_camera(overlay, Some(lens));
+    scene
+}
+
 /// Under a `DepthOnly` viewmodel camera with a narrow lens that draws nothing, the
 /// gizmos land where the world camera alone draws them, and the line behind the
 /// wall stays hidden though the viewmodel cleared the depth buffer.
@@ -73,18 +88,13 @@ fn gpu_game_gizmos_follow_the_base_camera_under_a_viewmodel() {
         "the wall hides the magenta"
     );
 
-    let mut stacked = lined(false);
-    let overlay = stacked.add_entity("ViewmodelCamera".to_string());
-    let lens = CameraComponent {
-        render_order: 1,
-        clear_flags: ClearFlags::DepthOnly,
-        culling_mask: 0,
-        fov: 20.0,
-        near: 0.01,
-        ..Default::default()
-    };
-    stacked.world.set_camera(overlay, Some(lens));
-    let (under, _) = shot(&mut r, &stacked, 1.0, true);
+    let stacked = with_viewmodel(lined(false));
+    let (under, mut v) = shot(&mut r, &stacked, 1.0, true);
+    assert!(v.gizmo_depth.is_some(), "the base camera's depth is kept");
+    v.game_gizmos = false;
+    let out = v.color_target_view().unwrap();
+    r.render(&mut v, &stacked, &eye(0.0), &out, false);
+    assert!(v.gizmo_depth.is_none(), "freed once the gizmos are off");
     eprintln!(
         "[gizmos] red alone {}, under a viewmodel {}",
         red.len(),
@@ -98,7 +108,8 @@ fn gpu_game_gizmos_follow_the_base_camera_under_a_viewmodel() {
 }
 
 /// While TAA upscales the view (render scale 0.75) the gizmos are left out, the
-/// console told once, and the frame is the plain one; at a scale of 1 they draw.
+/// console told once, the frame is the plain one and no depth is copied for them;
+/// at a scale of 1 they draw.
 #[test]
 fn gpu_game_gizmos_under_taa_upscaling_are_skipped_not_a_crash() {
     let Some(mut r) = renderer() else { return };
@@ -107,6 +118,8 @@ fn gpu_game_gizmos_under_taa_upscaling_are_skipped_not_a_crash() {
     let (gizmos, v) = shot(&mut r, &scene, 0.75, true);
     assert!(v.gizmo_upscale_told, "the console was told");
     assert_eq!(gizmos, plain, "nothing drawn while TAA upscales");
+    let (_, v) = shot(&mut r, &with_viewmodel(lined(true)), 0.75, true);
+    assert!(v.gizmo_depth.is_none(), "no depth kept where nothing draws");
     let (native, _) = shot(&mut r, &scene, 1.0, true);
     assert!(
         !pixels_of(&native, RED).is_empty(),
