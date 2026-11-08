@@ -71,12 +71,11 @@ pub fn draw(
     let t = editor.theme;
     let mut tab = editor.viewport_tab;
     let mut gizmos = editor.gizmos;
-    let mut game_gizmos = editor.game_gizmos;
 
     let response = egui::CentralPanel::default()
         .frame(egui::Frame::NONE.fill(t.bg_tier0))
         .show(ui, |ui| {
-            draw_tab_strip(ui, &mut tab, (&mut gizmos, &mut game_gizmos), t);
+            draw_tab_strip(ui, &mut tab, &mut gizmos, t);
             #[cfg_attr(not(feature = "dev"), expect(unused_mut, reason = "a demo fits it"))]
             let mut fit = None;
             #[cfg(feature = "dev")]
@@ -107,7 +106,6 @@ pub fn draw(
 
     editor.viewport_tab = tab;
     editor.gizmos = gizmos;
-    editor.game_gizmos = game_gizmos;
     let interaction = build_interaction(tab, &response, editor.scene_view.navigating);
     // Record the image rect's pixel size so the front-end resizes the offscreen
     // target to match (points scaled by the egui pixels-per-point).
@@ -117,11 +115,12 @@ pub fn draw(
 
 /// The tab strip: Scene / Game selectors (Unity's viewport tabs), and on the Scene
 /// tab the gizmo toggles (#1909, one per shown row of `Gizmo`'s table) and the
-/// navigation help; on the Game tab its one **Gizmos** toggle (#1882).
+/// navigation help; on the Game tab its one **Gizmos** toggle (#1882), the
+/// `GameGizmos` row.
 fn draw_tab_strip(
     ui: &mut egui::Ui,
     tab: &mut ViewportTab,
-    (gizmos, game_gizmos): (&mut SceneGizmos, &mut bool),
+    gizmos: &mut SceneGizmos,
     t: crate::editor::theme::Theme,
 ) {
     egui::Frame::NONE
@@ -139,19 +138,17 @@ fn draw_tab_strip(
                 if chrome::tab(ui, &t, *tab == ViewportTab::Game, &game).clicked() {
                     *tab = ViewportTab::Game;
                 }
-                if *tab == ViewportTab::Scene {
-                    ui.separator();
-                    for &gizmo in Gizmo::ALL.iter().filter(|g| g.row().shown) {
-                        let row = gizmo.row();
-                        ui.toggle_value(gizmos.flag_mut(gizmo), row.label)
-                            .on_hover_text(row.hover);
-                    }
+                let game_tab = *tab == ViewportTab::Game;
+                ui.separator();
+                let rows = Gizmo::ALL.iter().filter(|g| g.row().shown);
+                for &gizmo in rows.filter(|g| g.row().game == game_tab) {
+                    let row = gizmo.row();
+                    ui.toggle_value(gizmos.flag_mut(gizmo), row.label)
+                        .on_hover_text(row.hover);
+                }
+                if !game_tab {
                     ui.label(egui::RichText::new(icon::QUESTION).color(t.text_secondary))
                         .on_hover_ui(navigation_help);
-                } else {
-                    ui.separator();
-                    ui.toggle_value(game_gizmos, "Gizmos")
-                        .on_hover_text("Draw the colliders and the Debug.Draw lines over the game");
                 }
             });
         });

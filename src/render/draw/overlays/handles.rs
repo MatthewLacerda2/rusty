@@ -1,12 +1,14 @@
 //! The editor's handles and gizmos (#1224): the floor grid, the occlusion view's
 //! boxes, the selection's axis arrows and the probe gizmos (as the Scene view's set
-//! has them, #1909) and the colliders and debug lines (#1882, the only ones a game
-//! frame with its gizmos on draws), drawn the way Unity draws them —
-//! after post-FX and the selection outline, before the UI. On the finished image no
-//! grade, bloom, SSR, motion blur or FXAA treats them as scene colour, and the
-//! outline's ring never paints over an arrow shaft. They are still depth-tested
-//! against the scene's depth, which post-FX only reads.
+//! has them, #1909) and the colliders and debug lines (#1882), drawn the way Unity
+//! draws them — after post-FX and the selection outline, before the UI. On the
+//! finished image no grade, bloom, SSR, motion blur or FXAA treats them as scene
+//! colour, and the outline's ring never paints over an arrow shaft. They are still
+//! depth-tested against the scene's depth, which post-FX only reads. A game
+//! frame's gizmos (only the colliders and debug lines) draw through the same pass
+//! (`game`).
 
+use crate::render::draw::resources::Overlays;
 use crate::render::timing::GpuPass;
 use crate::render::{RenderView, Renderer};
 use crate::scene::Scene;
@@ -14,20 +16,26 @@ use crate::scene::Scene;
 impl Renderer {
     /// Draw `scene`'s editor gizmos onto `output`, the view's finished post-FX image,
     /// tested against the view's depth from the camera that just drew (the stack's
-    /// last, the editor's one camera). Group 0 still holds that camera's uniform.
-    /// `eye` is that camera's position; with `editor` false this is a game frame's
-    /// gizmos (#1882): only the colliders and the debug lines.
+    /// last, the editor's one camera, at `eye`). Group 0 still holds its uniform.
     pub(crate) fn draw_handles(
         &self,
         view: &RenderView,
         scene: &Scene,
         output: &wgpu::TextureView,
-        (eye, editor): (glam::Vec3, bool),
+        eye: glam::Vec3,
     ) {
-        let overlays = match editor {
-            true => self.precreate_overlays(scene, &view.gizmos, eye),
-            false => self.precreate_game_overlays(scene, eye),
-        };
+        let overlays = self.precreate_overlays(scene, &view.gizmos, eye);
+        self.draw_overlay_pass(&overlays, output, &view.depth_view);
+    }
+
+    /// Draw `overlays` onto `output`, tested against `depth` (never written), with
+    /// the camera uniform group 0 holds now.
+    pub(super) fn draw_overlay_pass(
+        &self,
+        overlays: &Overlays,
+        output: &wgpu::TextureView,
+        depth: &wgpu::TextureView,
+    ) {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -47,7 +55,7 @@ impl Renderer {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &view.depth_view,
+                    view: depth,
                     // The lines test the scene's depth but never write it.
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -64,7 +72,7 @@ impl Renderer {
             pass.set_bind_group(2, &self.default_material_bind_group, &[]);
             // Group 3 is in the forward layout; unlit lines read nothing from it.
             pass.set_bind_group(3, &self.shadow_bind_group, &[]);
-            self.draw_editor_overlays(&mut pass, &overlays);
+            self.draw_editor_overlays(&mut pass, overlays);
         }
         self.queue.submit(std::iter::once(encoder.finish()));
     }

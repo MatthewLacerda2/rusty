@@ -54,6 +54,7 @@ impl Renderer {
         all.extend(self.surface_shaders.lazy_pipelines());
         if editor_overlays {
             all.push(&self.line_pipeline);
+            all.push(&self.vertex_line_pipeline);
             all.extend(self.outline.lazy_pipelines());
         }
         all

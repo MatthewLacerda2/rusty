@@ -271,6 +271,10 @@ its check and its command changed to match).
   missed or a crate snagged. It takes a size too (`{ width =, height =, gizmos = }`).
   Without it a shot is the plain frame, byte for byte. A line drawn with no
   duration lasts one tick, so take the shot right after the step that drew it.
+  The gizmos follow the main (base) camera, even under a viewmodel camera, and
+  are left out while TAA upscales the view (a render scale below 1 with TAA on;
+  the console says so once). The editor's Game view captures the same with
+  `make editor-capture ARGS="--game --gizmo GameGizmos=on"`.
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
   scenarios, the bot-player script and its `project.rusty`, opened like any other
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project

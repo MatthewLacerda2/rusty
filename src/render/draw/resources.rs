@@ -60,8 +60,9 @@ pub(crate) struct Overlays {
     // Light- and reflection-probe gizmos (#284): probe markers tinted by baked SH plus
     // reflection parallax-box wireframes. Editor-only, like the rest of `Overlays`.
     pub probes: Vec<ProbeResource>,
-    /// The collider and `Debug.Draw*` line gizmos (#1882), one draw per tint.
-    pub wires: Vec<ProbeResource>,
+    /// The collider and `Debug.Draw*` line gizmos (#1882): one draw, coloured per
+    /// vertex, through the vertex-colour line pipeline.
+    pub wires: Option<ProbeResource>,
 }
 
 impl Renderer {

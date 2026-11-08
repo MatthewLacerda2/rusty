@@ -1,8 +1,14 @@
 ## `Debug` — **dev builds only**
 
 Mirrors Unity's `[Conditional]` `Debug`. Registered only under the `dev` Cargo
-feature and stripped from ship builds; calling it from a ship build is a no-op
-because the namespace is absent.
+feature and stripped from ship builds. Unlike Unity's, a call is **not** compiled
+away there: the `Debug` global is absent, so `Debug.DrawRay(...)` in a shipped
+player raises "attempt to index a nil value" every time it runs. A game script
+that ships guards each call:
+
+```lua
+if Debug then Debug.Log("only in a dev build") end
+```
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -25,14 +31,18 @@ because the namespace is absent.
 
 Unity's `Debug.DrawLine` / `Debug.DrawRay`: a line seen, never collided with. It
 draws in the editor's Scene view always, and over the game when its gizmos are on:
-the Game view's **Gizmos** toggle, or `Harness.Screenshot(path, { gizmos = true })`
+the Game view's **Gizmos** toggle (`Editor.SetGizmo("GameGizmos", true)`), or
+`Harness.Screenshot(path, { gizmos = true })`
 (`docs/testing.md`), with every collider's shape beside it. A plain game frame
 never shows one.
 
 - Vectors and the colour cross flat, as everywhere in the API: six numbers, then
   all four of `r, g, b, a` (0..1) or none, then `duration`. Any other count raises.
-- `duration` is sim time **counted in fixed ticks** (1/60 s each, rounded up), never
-  the clock, so a replay draws the same lines on the same frames. `0` (or none) is
+- `duration` is **counted in fixed ticks** (1/60 s each, rounded up), never the
+  clock, so a replay draws the same lines on the same frames. The ticks are
+  unscaled: under `Time.SetTimeScale(0.25)` a 2 s line lasts 120 ticks, which is
+  0.5 s of `Time.time`. A debug line is the developer's overlay, not gameplay, so
+  it keeps to the tick rate, not to the game's clock. `0` (or none) is
   one tick: drawn from `Update`, it shows on the frame after that tick and is gone
   at the next. Outside Play no tick passes, so a line drawn in edit mode stays until
   Play starts; Stop clears every line.
@@ -42,7 +52,7 @@ never shows one.
 ```lua
 local ox, oy, oz, dx, dy, dz = 0, 1, -5, 0, 0, 1
 local hit, id, dist, px, py, pz = Physics.Raycast(ox, oy, oz, dx, dy, dz)
-if hit then
+if hit and Debug then -- `Debug` is absent in a ship build
     Debug.DrawRay(ox, oy, oz, px - ox, py - oy, pz - oz, 1, 0, 0, 1, 2) -- red, 2 s
 end
 ```

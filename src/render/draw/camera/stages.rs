@@ -128,13 +128,30 @@ pub(super) fn outline(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraC
     }
 }
 
+/// A game frame's gizmos test the base camera's depth (#1882): kept here, after
+/// its last draw and before a stacked camera (a viewmodel) clears it.
+pub(super) fn gizmo_depth(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    if ctx.is_first && !ctx.is_last && game_gizmos(view, ctx) {
+        r.keep_gizmo_depth(view);
+    }
+}
+
+/// Whether this stack draws a game frame's gizmos (`overlays::game`).
+fn game_gizmos(view: &RenderView, ctx: &CameraCtx) -> bool {
+    view.game_gizmos && !ctx.stack.editor_mode
+}
+
 /// The editor's handles and gizmos (grid, axis arrows, probes, the occlusion view,
 /// colliders) over the outline, depth-tested against this camera's scene (#1224);
-/// over a game frame with its gizmos on, the colliders and debug lines (#1882).
+/// over a game frame with its gizmos on, the colliders and debug lines, through
+/// the base camera (#1882).
 pub(super) fn handles(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
-    let editor = ctx.stack.editor_mode;
-    if ctx.is_last && (editor || view.game_gizmos) {
-        let eye = (ctx.cam.position, editor);
-        r.draw_handles(view, ctx.scene, ctx.stack.output, eye);
+    if !ctx.is_last {
+        return;
+    }
+    if ctx.stack.editor_mode {
+        r.draw_handles(view, ctx.scene, ctx.stack.output, ctx.cam.position);
+    } else if game_gizmos(view, ctx) {
+        r.draw_game_gizmos(view, ctx);
     }
 }

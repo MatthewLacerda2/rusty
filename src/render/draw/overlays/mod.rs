@@ -7,6 +7,7 @@
 
 mod axis;
 mod batch;
+mod game;
 mod handles;
 mod lights;
 mod occlusion;
@@ -68,8 +69,15 @@ impl Renderer {
         }
         // D. Light- & reflection-probe gizmos (#284) and Area lights (#1674).
         self.draw_probe_overlays(render_pass, bindings, &overlays.probes);
-        // E. Collider shapes and `Debug.Draw*` lines (#1882), through the same draws.
-        self.draw_probe_overlays(render_pass, bindings, &overlays.wires);
+        // E. Collider shapes and `Debug.Draw*` lines (#1882): one draw, each vertex
+        // its own colour, so through the vertex-colour line pipeline. Last: it
+        // leaves that pipeline set.
+        if let Some((buffer, slot, count)) = &overlays.wires {
+            render_pass.set_pipeline(self.vertex_line_pipeline.get());
+            render_pass.set_vertex_buffer(0, buffer.slice(..));
+            bindings.bind(render_pass, *slot);
+            render_pass.draw(0..*count, 0..1);
+        }
     }
 }
 

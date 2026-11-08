@@ -12,6 +12,12 @@ fn defaults_follow_unity() {
     assert!(Gizmo::Colliders.row().shown);
     assert!(!set.on(Gizmo::NavMesh));
     assert!(!Gizmo::NavMesh.row().shown);
+    assert!(
+        !set.on(Gizmo::GameGizmos),
+        "Unity's Game view starts without"
+    );
+    let game: Vec<_> = Gizmo::ALL.iter().filter(|g| g.row().game).collect();
+    assert_eq!(game, [&Gizmo::GameGizmos], "the Game tab's one toggle");
 }
 
 /// Every row's name finds its own gizmo, and the names are unique.

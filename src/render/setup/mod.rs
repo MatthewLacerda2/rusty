@@ -198,6 +198,8 @@ impl Renderer {
             transparent_pipelines: forward.transparent_pipelines,
             depth_postpass_pipelines: forward.depth_postpass_pipelines,
             line_pipeline: forward.line_pipeline,
+            vertex_line_pipeline: forward.vertex_line_pipeline,
+            wire_cache: Default::default(),
             outline: forward.outline,
             prepass_pipeline: forward.prepass_pipeline,
             ssao,
