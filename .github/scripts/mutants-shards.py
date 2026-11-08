@@ -28,6 +28,12 @@ matrix ceiling, and on a count of zero (the `--file` globs match nothing).
   budget above it for the next spread. It costs nothing in runner-hours, only
   shards (a few minutes of setup each). A cut-off shard is measured too: its
   seconds over the mutants it finished is a rate, a slightly high one.
+- **One bad shard never sizes the sweep** (PR #1903's review): a shard that
+  measured fewer than `MIN_MEASURED` mutants is no rate (one mutant in 25 min,
+  from a degraded runner or a fatal error just after its baseline, read as
+  25 min a mutant, 419 shards at 4018 mutants: past the ceiling, so the plan
+  went red, no report was written, and the next plan read the same report),
+  and the slowest rate is capped at `OUTLIER_CAP` times the mean.
 - **The wall clock is the mean's**: shards run in waves of `parallel`, each
   wave about a mean shard long. `parallel` is the smallest width, up to
   `MAX_PARALLEL`, whose waves end `SPARE_HOURS` before Sunday 23:59 UTC
@@ -37,6 +43,9 @@ matrix ceiling, and on a count of zero (the `--file` globs match nothing).
   ends late it says so and the sweep runs at the cap: a late sweep beats none.
 - **`MINUTES_PER_MUTANT` is only the fallback**, for a first run or a lookup
   that found no readable report; the summary names which source sized it.
+
+`has-rate --reports DIR` exits 0 only when `DIR` holds a rate, so the lookup
+passes over a report that holds none and tries an older sweep.
 
 `rate` is the report's half: `mutants-report` prints this run's mean and
 slowest rate beside the figure the plan used, which the next sweep sizes from.
@@ -65,22 +74,34 @@ MAX_PARALLEL = 10
 #: Slack the width keeps before Sunday 23:59 UTC: the wave estimate counts no
 #: queueing for a runner and no shard slower than the mean.
 SPARE_HOURS = 2.0
+#: The fewest mutants a shard must have measured to count as a rate: a fifth of
+#: the ≈ 50 each shard of run 42367735766 measured. Below it, the baseline build
+#: and one timed-out mutant are most of the figure.
+MIN_MEASURED = 10
+#: The most the slowest rate may exceed the mean by: run 42367735766's spread was
+#: 6.7 / 5.1 ≈ 1.3, so 1.5 keeps headroom over a real spread and drops an outlier.
+OUTLIER_CAP = 1.5
 #: The outcome lists a shard appends one line a measured mutant to.
 OUTCOMES = ("caught", "missed", "timeout", "unviable")
 
 
 class Rate(NamedTuple):
-    """Minutes a mutant: `slowest` sizes the shards, `mean` the wall clock."""
+    """Minutes a mutant: `slowest` sizes the shards, `mean` the wall clock.
+
+    `measured` is False for the fallback: no shard report held a rate.
+    """
     slowest: float
     mean: float
     source: str
+    measured: bool = True
 
 
 def shard_rate(shard: Path) -> tuple[int, int] | None:
     """(seconds, mutants measured) of one shard's report, or None if it holds no rate.
 
     No rate: `elapsed-seconds` absent, not a whole number, or not positive, or
-    no mutant measured (a shard that never passed its baseline).
+    fewer than `MIN_MEASURED` mutants measured (a shard that never passed its
+    baseline, or stopped soon after).
     """
     try:
         seconds = int((shard / "elapsed-seconds").read_text().strip())
@@ -92,20 +113,24 @@ def shard_rate(shard: Path) -> tuple[int, int] | None:
             measured += sum(1 for line in (shard / f"{kind}.txt").read_text().splitlines() if line.strip())
         except OSError:
             pass
-    if seconds <= 0 or measured == 0:
+    if seconds <= 0 or measured < MIN_MEASURED:
         return None
     return seconds, measured
 
 
 def calibrate(reports: Path | None, source: str = "") -> Rate:
-    """The rate the shard reports under `reports` measured, or the fallback."""
+    """The rate the shard reports under `reports` measured, or the fallback.
+
+    The slowest shard's rate, capped at `OUTLIER_CAP` times the mean.
+    """
     rates = [r for shard in sorted(reports.iterdir()) if shard.is_dir()
              if (r := shard_rate(shard))] if reports and reports.is_dir() else []
     if not rates:
         return Rate(MINUTES_PER_MUTANT, MINUTES_PER_MUTANT,
-                    f"`MINUTES_PER_MUTANT` ({MINUTES_PER_MUTANT}): no earlier shard report held a rate")
-    slowest = max(s / 60 / m for s, m in rates)
+                    f"`MINUTES_PER_MUTANT` ({MINUTES_PER_MUTANT}): no earlier shard report held a rate",
+                    measured=False)
     mean = sum(s for s, _ in rates) / 60 / sum(m for _, m in rates)
+    slowest = min(max(s / 60 / m for s, m in rates), mean * OUTLIER_CAP)
     return Rate(slowest, mean, f"{len(rates)} shard reports of {source or 'an earlier sweep'}")
 
 
@@ -166,7 +191,7 @@ def plan(mutants: int, rate: Rate, now: dt.datetime) -> tuple[list[str], str]:
 
 def report_rate(rate: Rate, sized_at: float | None) -> str:
     """This run's measured rates, beside the figure its matrix was sized by."""
-    if rate.source.startswith("`MINUTES_PER_MUTANT`"):
+    if not rate.measured:
         return "Measured rate: no shard measured a mutant, so no rate."
     line = (f"Measured rate: {rate.mean:.1f} min a mutant on average, {rate.slowest:.1f} on"
             f" the slowest shard ({rate.source}); the matrix was sized at"
@@ -183,11 +208,15 @@ def main() -> None:
     planning.add_argument("--reports", type=Path, help="an earlier sweep's shard reports")
     planning.add_argument("--source", default="", help="what the reports are, for the summary")
     planning.add_argument("--now", type=dt.datetime.fromisoformat, help="ISO time (default: now)")
+    probe = sub.add_parser("has-rate", help="exit 0 if the shard reports hold a rate, else 1")
+    probe.add_argument("--reports", type=Path, required=True, help="a sweep's shard reports")
     measured = sub.add_parser("rate", help="this run's measured minutes a mutant")
     measured.add_argument("--reports", type=Path, required=True, help="this run's shard reports")
     measured.add_argument("--sized-at", type=float, help="the minutes the plan sized by")
     args = parser.parse_args()
 
+    if args.command == "has-rate":
+        sys.exit(0 if calibrate(args.reports).measured else 1)
     if args.command == "rate":
         print(report_rate(calibrate(args.reports, "this run"), args.sized_at))
         return

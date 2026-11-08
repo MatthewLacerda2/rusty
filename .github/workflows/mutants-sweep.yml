@@ -73,7 +73,9 @@ jobs:
   # count into the shard list and the width, from the per-shard rates the
   # newest earlier sweep measured (its `mutants-report` artifact keeps each
   # shard's seconds and outcome lists under `shards/`): shards sized so the
-  # slowest rate ends in ≈ 4 h, under the 5 h 40 budget below, and the
+  # slowest rate ends in ≈ 4 h (a shard that measured too few mutants is
+  # ignored, and the slowest is capped at a multiple of the mean, so one bad
+  # shard cannot push the plan past the ceiling), under the 5 h 40 budget below, and the
   # narrowest `max-parallel` (at most 10) whose waves end by Sunday 23:59 UTC.
   # With no readable earlier report it falls back to `MINUTES_PER_MUTANT`, and
   # the summary names the source it used. The script's docstring has the
@@ -146,9 +148,12 @@ jobs:
           tool: cargo-mutants
       # The newest earlier sweep's report, for what a mutant cost (#1684). Only
       # its `mutants-report` artifact: a shard's own artifact carries its logs,
-      # ≈ 40 MB each. A run whose report is missing or predates `shards/` gives
-      # no rate, and `mutants-shards.py` falls back. Never red: a failed lookup
-      # sizes from the fallback.
+      # ≈ 40 MB each. Each attempt downloads into its own directory, and the
+      # lookup stops only at a report whose `shards/` holds a rate
+      # (`mutants-shards.py has-rate`); a missing report, or one that predates
+      # `shards/` or measured nothing, passes to the next older run, and with
+      # none `mutants-shards.py` falls back. Never red: a failed lookup sizes
+      # from the fallback.
       - name: Read what the last sweep measured
         id: last
         if: steps.plan.outputs.sweep == 'true'
@@ -157,14 +162,16 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          mkdir -p last
           runs=$(gh api "repos/$REPO/actions/workflows/mutants-sweep.yml/runs?branch=main&per_page=20" \
                    --jq ".workflow_runs[] | select(.id != $RUN_ID) | \"\(.id) \(.html_url)\"") \
             || { echo '::warning::could not list past sweeps; sizing from MINUTES_PER_MUTANT'; runs=''; }
+          echo "reports=" >> "$GITHUB_OUTPUT"
           while read -r id url; do
             [ -n "$id" ] || continue
-            if gh run download "$id" -R "$REPO" -n mutants-report -D last >/dev/null 2>&1; then
-              echo "source=$url" >> "$GITHUB_OUTPUT"; break
+            dir=$(mktemp -d)
+            gh run download "$id" -R "$REPO" -n mutants-report -D "$dir" >/dev/null 2>&1 || continue
+            if python3 .github/scripts/mutants-shards.py has-rate --reports "$dir/shards"; then
+              { echo "source=$url"; echo "reports=$dir/shards"; } >> "$GITHUB_OUTPUT"; break
             fi
           done <<< "$runs"
       - name: Size the matrix from the mutant count
@@ -172,6 +179,7 @@ jobs:
         if: steps.plan.outputs.sweep == 'true'
         env:
           SOURCE: ${{ steps.last.outputs.source }}
+          REPORTS: ${{ steps.last.outputs.reports }}
         run: |
           set -f   # the globs are for cargo-mutants, not the shell
           files=()
@@ -182,7 +190,7 @@ jobs:
             echo "::error::cargo mutants --list failed, so the matrix could not be sized; see the job summary"
             exit 1
           fi
-          if ! python3 .github/scripts/mutants-shards.py plan --reports last/shards --source "$SOURCE" \
+          if ! python3 .github/scripts/mutants-shards.py plan --reports "${REPORTS:-none}" --source "$SOURCE" \
                  < mutants-list.txt > outputs.txt 2> sizing.txt; then
             cat sizing.txt | tee -a "$GITHUB_STEP_SUMMARY"
             echo "::error::$(cat sizing.txt)"
