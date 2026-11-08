@@ -10,6 +10,13 @@ and this is what the workflow asks to make sense of it. Two spellings:
   (`src/physics/query/through.rs`, `'src/navigation/**'`). `**` crosses
   directories and `*` does not, git's own `:(glob)` rules.
 
+A third form is the merge queue's (#1934): **`diff` with `--commit SHA`**, the
+Rust one squash commit changed against its parent. The queue dispatches a
+merged pull request's run on `main` with the commit checked out, so the
+branch is gone and `diff` against `origin/main` would be empty; the commit's
+own diff is the branch's diff as it landed, so the same mutants are asked
+about as a `diff` run on the branch would have been.
+
 Both become one cargo-mutants argument, `--in-diff`: it keeps only mutants
 whose span touches a changed line. A path scope becomes a diff that adds the
 named files whole, from `/dev/null`, which touches every line of them and of
@@ -81,17 +88,23 @@ def branch_diff(base: str) -> tuple[str, list[str]]:
     return git("diff", fork, "HEAD", "--", "*.rs"), sorted(names)
 
 
-def resolve(scope: str, base: str) -> tuple[dict, str]:
-    """The plan this scope asks for, and the diff `--in-diff` reads."""
+def resolve(scope: str, base: str, commit: str | None = None) -> tuple[dict, str]:
+    """The plan this scope asks for, and the diff `--in-diff` reads. With
+    `commit`, a `diff` is that commit's against its parent (the queue's, #1934)."""
     which = kind(scope)
     if which == "diff":
+        if commit:
+            base = f"{commit}^"
         diff, files = branch_diff(base)
     else:
         files = matching(scope.split())
         if not files:
             sys.exit(f"mutants-scope: no tracked Rust file matches {scope!r}")
         diff = whole(files)
-    return {"kind": which, "scope": scope, "base": base, "files": files}, diff
+    plan = {"kind": which, "scope": scope, "base": base, "files": files}
+    if commit:
+        plan["commit"] = commit
+    return plan, diff
 
 
 def check(plan: dict, planned: list[dict]) -> tuple[str, bool]:
@@ -103,7 +116,9 @@ def check(plan: dict, planned: list[dict]) -> tuple[str, bool]:
     count = len(planned)
     noun = "mutant" if count == 1 else "mutants"
     files = plan["files"]
-    if plan["kind"] == "diff":
+    if plan["kind"] == "diff" and plan.get("commit"):
+        subject = f"the Rust commit `{plan['commit'][:9]}` changed ({len(files)} files)"
+    elif plan["kind"] == "diff":
         subject = f"the Rust this branch changed against `{plan['base']}` ({len(files)} files)"
     else:
         shown = ", ".join(f"`{f}`" for f in files[:5])
@@ -129,6 +144,7 @@ def main() -> None:
     res = sub.add_parser("resolve", help="turn a scope into a plan and a diff")
     res.add_argument("scope", help="`diff`, or space-separated path globs")
     res.add_argument("--base", default=BASE, help="what a `diff` scope compares against")
+    res.add_argument("--commit", help="the checked-out commit a `diff` is that commit's own change (#1934)")
     res.add_argument("--out", type=Path, required=True, help="where the plan JSON goes")
     res.add_argument("--diff", type=Path, required=True, help="where the scope's diff goes")
     chk = sub.add_parser("check", help="the scope line, from what --list planned")
@@ -137,7 +153,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "resolve":
-        plan, diff = resolve(args.scope, args.base)
+        plan, diff = resolve(args.scope, args.base, args.commit or None)
         args.out.write_text(json.dumps(plan))
         args.diff.write_text(diff)
         return

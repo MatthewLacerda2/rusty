@@ -18,6 +18,9 @@ PASSED = [
     "queue: watch: #1871 opened as ready.",
     "queue: watch: #1871 back to draft.",
     "queue: watch: STOPPED: main's tree is not the train's.",
+    "queue: after: GitHub refused #5's mutation run 3 times; dropped: HTTP 422: no",
+    "queue: after: could not save the mutation requests: disk full",
+    "queue: after: 1 unreadable waiting mutation request(s) dropped.",
     "queue: HELD #12: Dependabot edits .github/workflows/ci.yml, which a pull-request run does not prove.",
 ]
 
@@ -26,6 +29,8 @@ DROPPED = [
     "queue: watch: #1871 opened as a draft.",
     "queue: watch: #1871 queued.",
     "queue: watch: taking #1870.",
+    "queue: after: dispatched #5's mutation run (diff) as pr5-abc123.",
+    "queue: after: GitHub did not answer for #5's mutation run; asking again next pass: HTTP 502",
     "supervisor: starting the watch.",
     "supervisor: the watch exited 0: its deadline; starting it again in 0 minute(s).",
 ]

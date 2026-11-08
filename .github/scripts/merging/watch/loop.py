@@ -40,6 +40,10 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     watch ([`ending.relaunch`]) with the pull request untaken.
     `stop_requested()` says whether [`ending.STOP_FILE`] asked it to stop (and
     removes the file); it is asked at the top of each pass, so only between takes.
+    `mutants`, when given ([`after.world.Mutations`], #1934), hears of each merge
+    (`merged(number)`) and is pumped on each pass and each poll of a take's CI
+    wait (`pump()`), so a scoped mutation run is dispatched after the merge and
+    a finished one's slot frees while the watch waits.
     `opts.for_minutes` (`--for`) is checked at the top of each pass, so only
     between takes; `opts.since` (`--since`) limits the board lines ([`board.recent`]).
     """
@@ -51,6 +55,7 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     stalled = handbacks.recall(fx.memory.with_name(handbacks.STALLS_MEMORY))
     line = aging.Line()
     shown = [None]  # the board as last reported; `None` until the first listing
+    after = getattr(fx, "mutants", None)  # the mutation runs merged pull requests asked for (#1934)
 
     def save() -> None:
         handbacks.remember(fx.memory, memory)
@@ -72,6 +77,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         shown[0] = now
 
     def tick() -> None:
+        if after:
+            after.pump()
         pulls = fx.pulls()
         if pulls is not None:
             report(pulls)
@@ -85,6 +92,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         if state == fx.merged:
             forget(number)
             landed.add(number)
+            if after:
+                after.merged(number)
         elif state in fx.ends:
             done.add(number)
         elif state == outcomes.REQUEUED:
@@ -132,6 +141,8 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             fx.sleep(opts.poll)
             continue
         failed = 0
+        if after:
+            after.pump()
         memory = handbacks.forget_closed(memory, pulls)
         for number in handbacks.rerun_heads(pulls, memory, marks, fx.attempts):
             forget(number)
