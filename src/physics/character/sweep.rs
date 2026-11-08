@@ -3,7 +3,9 @@
 //! and the collision flags and ground normal read off what it touched.
 
 use glam::Vec3;
-use rapier3d::control::{CharacterAutostep, CharacterLength, KinematicCharacterController};
+use rapier3d::control::{
+    CharacterAutostep, CharacterCollision, CharacterLength, KinematicCharacterController,
+};
 use rapier3d::parry::query::ShapeCastOptions;
 use rapier3d::parry::shape::Capsule;
 use rapier3d::prelude::*;
@@ -116,6 +118,7 @@ impl PhysicsWorld {
         let mut flags = 0;
         let mut ground = None;
         let mut flat_hit = false;
+        let mut collisions = Vec::new();
         let movement = m.controller.move_shape(
             FIXED_DELTA_TIME,
             &self.queries(m.filter),
@@ -129,6 +132,7 @@ impl PhysicsWorld {
                     flat_hit |= hit.hit.normal1.y > 1.0 - FLAT_FLOOR;
                 }
                 flags |= flag;
+                collisions.push(hit);
             },
         );
         let pass = Pass {
@@ -136,6 +140,7 @@ impl PhysicsWorld {
             grounded: movement.grounded,
             flags,
             ground,
+            collisions,
         };
         (pass, flat_hit)
     }
@@ -191,13 +196,16 @@ impl PhysicsWorld {
         let end = m.start.append_translation(pass.translation);
         let below = pass.ground.or_else(|| self.ground_below(&m, &end));
         let on_ground = pass.grounded || pass.flags & COLLIDED_BELOW != 0;
+        let hits = self.controller_hits(&pass.collisions, motion);
         if !(on_ground || below.is_some_and(|n| m.walkable(n))) {
-            return Some((pass.translation, CharacterMove::airborne(pass.flags)));
+            let result = CharacterMove::airborne(pass.flags, hits);
+            return Some((pass.translation, result));
         }
         let result = CharacterMove {
             flags: pass.flags | COLLIDED_BELOW,
             grounded: true,
             ground_normal: below.unwrap_or(Vec3::Y),
+            hits,
         };
         Some((pass.translation, result))
     }
@@ -232,6 +240,8 @@ struct Pass {
     flags: u8,
     /// The normal of the last floor the sweep hit below the capsule.
     ground: Option<Vec3>,
+    /// Every contact of the sweep, in the order it met them.
+    collisions: Vec<CharacterCollision>,
 }
 
 /// Whether a pass lost horizontal travel. A floor never blocks walking, but

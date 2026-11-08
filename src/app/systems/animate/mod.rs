@@ -95,7 +95,10 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
             }
         }
         if let Some((motion, model)) = applied {
-            apply_root_motion(&mut s, res, id, motion, model, dt);
+            let hits = apply_root_motion(&mut s, res, id, motion, model, dt);
+            if !hits.is_empty() {
+                res.controller_hits.push((id, hits));
+            }
         }
     }
 }

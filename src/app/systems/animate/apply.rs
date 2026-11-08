@@ -6,6 +6,7 @@ use glam::{Mat4, Quat, Vec3};
 
 use crate::app::resources::Resources;
 use crate::components::RootMotion;
+use crate::physics::ControllerHit;
 use crate::scene::Scene;
 
 /// What takes entity `id`'s root motion, in Unity's order of preference.
@@ -46,6 +47,8 @@ fn mover(s: &Scene, id: u32) -> Mover {
 
 /// Move entity `id` by the world-space root `motion` of a step of `dt`, and
 /// record on its animator what it really moved and any travel carried over.
+/// Returns what a CharacterController's `Move` touched, for
+/// `OnControllerColliderHit` (#1879); empty for every other mover.
 /// The turn is about the model's up axis: the entity's own +Y, or as `model`
 /// (model space in the entity's, when its mesh sits under a turned
 /// `Armature`, #1822) tips it.
@@ -56,13 +59,14 @@ pub(super) fn apply_root_motion(
     motion: RootMotion,
     model: Option<Mat4>,
     dt: f32,
-) {
+) -> Vec<ControllerHit> {
     let carried = s
         .world
         .animator(id)
         .map_or(Vec3::ZERO, |a| a.root_motion.carried);
     let before = s.world.world_position(id);
     let (mut moved, mut carry) = (None, Vec3::ZERO);
+    let mut hits = Vec::new();
     let turn = match mover(s, id) {
         Mover::Character(min) => {
             let step = carried + motion.position;
@@ -70,7 +74,8 @@ pub(super) fn apply_root_motion(
                 carry = step; // too short for `Move`: carried, not dropped
             } else {
                 let physics = res.physics.borrow();
-                crate::physics::move_character(physics.as_ref(), s, id, step);
+                let m = crate::physics::move_character(physics.as_ref(), s, id, step);
+                hits = m.map(|m| m.hits).unwrap_or_default();
             }
             true
         }
@@ -103,6 +108,7 @@ pub(super) fn apply_root_motion(
     }
     let moved = moved.unwrap_or_else(|| s.world.world_position(id) - before);
     record(s, id, moved, carry);
+    hits
 }
 
 /// Keep on `id`'s animator what it really `moved` and the travel `carry`

@@ -10,6 +10,12 @@
 //! physics tick carries the kinematic body there. No gravity is applied: scripts
 //! own it (Unity's `CharacterController.Move`).
 //!
+//! Each move also reports every collider it touched, once, in sweep order
+//! ([`ControllerHit`], `hits`): what `OnControllerColliderHit` hands scripts
+//! (#1879). The controller pushes nothing: rapier's automatic impulses
+//! (`solve_character_collision_impulses`) are deliberately unused, and a push is
+//! a script, as in Unity (the bundled `controller_push.lua`).
+//!
 //! Plain kinematic bodies are pure movers — they go exactly where their Transform
 //! says and never collide-and-slide (Unity's kinematic Rigidbody).
 //!
@@ -23,9 +29,11 @@
 //! fixed dt; no wall-clock or RNG.
 
 mod body;
+mod hits;
 mod sweep;
 
 pub(super) use body::{character_collider_inputs, upright_offset};
+pub use hits::ControllerHit;
 
 use glam::Vec3;
 use rapier3d::prelude::*;
@@ -36,12 +44,14 @@ use super::world::PhysicsWorld;
 use crate::components::{capsule_dims, CapsuleAxis, CharacterControllerComponent};
 use crate::scene::Scene;
 
-/// ended on the ground, and the ground's normal (`Vec3::Y` when airborne).
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// ended on the ground, the ground's normal (`Vec3::Y` when airborne), and each
+/// collider it touched, once, in sweep order (`OnControllerColliderHit`, #1879).
+#[derive(Clone, Debug, PartialEq)]
 pub struct CharacterMove {
     pub flags: u8,
     pub grounded: bool,
     pub ground_normal: Vec3,
+    pub hits: Vec<ControllerHit>,
 }
 
 /// Move character `id` by `motion` (world space, metres), colliding and sliding
@@ -61,11 +71,12 @@ pub fn move_character(
             flags: 0,
             grounded: cc.is_grounded,
             ground_normal: cc.ground_normal,
+            hits: Vec::new(),
         });
     }
     let (translation, result) = match physics {
         Some(world) => world.sweep(scene, id, &cc, motion)?,
-        None => (motion, CharacterMove::airborne(0)),
+        None => (motion, CharacterMove::airborne(0, Vec::new())),
     };
     let pose = world_pose(scene, id)?;
     let (local, _) = world_to_local(scene, id, pose.pos + translation, pose.rot);
@@ -115,11 +126,12 @@ pub fn can_stand(physics: Option<&PhysicsWorld>, scene: &Scene, id: u32, height:
 }
 
 impl CharacterMove {
-    pub(super) fn airborne(flags: u8) -> Self {
+    pub(super) fn airborne(flags: u8, hits: Vec<ControllerHit>) -> Self {
         Self {
             flags,
             grounded: false,
             ground_normal: Vec3::Y,
+            hits,
         }
     }
 }
