@@ -31,8 +31,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use glam::{Mat4, Quat, Vec3};
+use glam::{Mat4, Quat};
 
+use crate::components::transform::Pose;
 use crate::ecs::{Changes, Cursor, WorldPose};
 use crate::scene::{Camera, Scene, SceneId};
 
@@ -46,10 +47,10 @@ pub const JUMP_TURN: f32 = std::f32::consts::FRAC_PI_2;
 pub struct DrawPoses {
     /// The scene recorded, and the cursor on its `WorldPose` log.
     tracked: Option<(SceneId, Cursor<WorldPose>)>,
-    /// Every drawn entity's world matrix at the last tick.
-    at_tick: BTreeMap<u32, Mat4>,
-    /// The entities the last tick moved (not jumped): their matrix the tick before.
-    from: BTreeMap<u32, Mat4>,
+    /// Every drawn entity's world pose at the last tick.
+    at_tick: BTreeMap<u32, Pose>,
+    /// The entities the last tick moved (not jumped): their pose the tick before.
+    from: BTreeMap<u32, Pose>,
     /// How far the frame is into the next tick, `0..=1`.
     alpha: f32,
     /// What the last extract of that scene drew blended, so one that stops (or a
@@ -74,16 +75,18 @@ impl DrawPoses {
                 self.at_tick.clear();
                 let drawn = world.ids_with_mesh().into_iter();
                 for id in drawn.chain(world.ids_with_camera()) {
-                    self.at_tick.insert(id, world.local_to_world(id));
+                    if let Some(pose) = world.world_pose(id) {
+                        self.at_tick.insert(id, pose);
+                    }
                 }
             }
             Changes::Ids(ids) => {
                 for id in ids {
-                    if world.mesh(id).is_none() && world.camera(id).is_none() {
+                    let drawn = world.mesh(id).is_some() || world.camera(id).is_some();
+                    let Some(now) = world.world_pose(id).filter(|_| drawn) else {
                         self.at_tick.remove(&id); // gone, or nothing to draw
                         continue;
-                    }
-                    let now = world.local_to_world(id);
+                    };
                     match self.at_tick.insert(id, now) {
                         Some(before) if !jumped(before, now) => {
                             from.insert(id, before);
@@ -113,7 +116,7 @@ impl DrawPoses {
     }
 
     /// Whether `id` of `scene` is drawn blended this frame.
-    fn blends(&self, scene: &Scene, id: u32) -> Option<Mat4> {
+    fn blends(&self, scene: &Scene, id: u32) -> Option<Pose> {
         let (tracked, _) = self.tracked.as_ref()?;
         if *tracked != scene.id() || self.alpha >= 1.0 {
             return None;
@@ -124,10 +127,11 @@ impl DrawPoses {
     /// Entity `id`'s world matrix as this frame draws it: blended between its last
     /// two ticks while it moves, its live matrix otherwise.
     pub fn world(&self, scene: &Scene, id: u32) -> Mat4 {
-        let now = scene.world.local_to_world(id);
-        match self.blends(scene, id) {
-            Some(before) => blend(before, now, self.alpha),
-            None => now,
+        let matrix = scene.world.local_to_world(id);
+        let blended = self.blends(scene, id).zip(scene.world.world_pose(id));
+        match blended {
+            Some((before, now)) => blend(before, now, self.alpha) * rigid(now).inverse() * matrix,
+            None => matrix,
         }
     }
 
@@ -165,24 +169,24 @@ impl DrawPoses {
 }
 
 /// Whether going from `before` to `now` in one tick is a teleport.
-fn jumped(before: Mat4, now: Mat4) -> bool {
-    let (_, r0, t0) = before.to_scale_rotation_translation();
-    let (_, r1, t1) = now.to_scale_rotation_translation();
-    let far = t0.distance(t1) > JUMP_DISTANCE || !t0.is_finite() || !t1.is_finite();
-    far || r0.angle_between(r1) > JUMP_TURN
+fn jumped(before: Pose, now: Pose) -> bool {
+    let far = before.pos.distance(now.pos) > JUMP_DISTANCE;
+    let unknown = !before.pos.is_finite() || !now.pos.is_finite();
+    far || unknown || before.rot.angle_between(now.rot) > JUMP_TURN
 }
 
-/// `before` to `now` by `alpha`: translation and scale linearly, rotation along the
-/// shorter arc. Exactly `now` at `alpha == 1`.
-fn blend(before: Mat4, now: Mat4, alpha: f32) -> Mat4 {
-    if alpha >= 1.0 {
-        return now;
-    }
-    let (s0, r0, t0) = before.to_scale_rotation_translation();
-    let (s1, r1, t1) = now.to_scale_rotation_translation();
-    let scale: Vec3 = s0.lerp(s1, alpha);
-    let rotation: Quat = r0.slerp(r1, alpha);
-    Mat4::from_scale_rotation_translation(scale, rotation, t0.lerp(t1, alpha))
+/// The rigid frame (rotation, then position) of `pose`, without its scale.
+fn rigid(pose: Pose) -> Mat4 {
+    Mat4::from_rotation_translation(pose.rot, pose.pos)
+}
+
+/// The rigid frame `alpha` of the way from `before` to `now`: position linearly,
+/// rotation along the shorter arc. The drawn matrix is the live one carried from
+/// `now`'s frame to this one, so its scale (and any skew a parent gives it) is the
+/// live matrix's, untouched: only position and rotation blend.
+fn blend(before: Pose, now: Pose, alpha: f32) -> Mat4 {
+    let rot: Quat = before.rot.slerp(now.rot, alpha);
+    Mat4::from_rotation_translation(rot, before.pos.lerp(now.pos, alpha))
 }
 
 #[cfg(test)]

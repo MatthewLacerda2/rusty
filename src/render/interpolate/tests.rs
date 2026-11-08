@@ -46,6 +46,23 @@ fn a_moving_entity_is_drawn_between_its_last_two_ticks() {
 }
 
 #[test]
+fn a_scaled_and_turned_entity_keeps_its_scale_between_ticks() {
+    let (mut scene, id) = scene_with_box();
+    let t = scene.world.transform_mut(id).unwrap();
+    (t.scale, t.rotation) = (Vec3::new(2.0, 0.5, 1.0), glam::Quat::from_rotation_y(0.3));
+    let before = scene.world.local_to_world(id);
+    let mut poses = DrawPoses::default();
+    poses.record(&scene);
+    place(&mut scene, id, 1.0);
+    poses.record(&scene);
+    poses.set_alpha(0.0);
+    assert!(
+        poses.world(&scene, id).abs_diff_eq(before, 1e-5),
+        "alpha 0: the tick before"
+    );
+}
+
+#[test]
 fn a_jump_is_drawn_where_it_landed() {
     let (scene, id, mut poses) = moved(JUMP_DISTANCE + 0.5);
     poses.set_alpha(0.5);
@@ -134,10 +151,17 @@ fn the_main_camera_is_drawn_blended() {
 
 #[test]
 fn a_turn_past_a_quarter_is_a_jump() {
-    let a = Mat4::IDENTITY;
-    let quarter = Mat4::from_rotation_y(JUMP_TURN * 0.9);
-    let half = Mat4::from_rotation_y(std::f32::consts::PI * 0.75);
-    assert!(!jumped(a, quarter));
-    assert!(jumped(a, half));
-    assert!(jumped(a, Mat4::from_translation(Vec3::splat(f32::NAN))));
+    let turned = |angle| Pose {
+        pos: Vec3::ZERO,
+        rot: glam::Quat::from_rotation_y(angle),
+        scale: Vec3::ONE,
+    };
+    let a = turned(0.0);
+    assert!(!jumped(a, turned(JUMP_TURN * 0.9)));
+    assert!(jumped(a, turned(std::f32::consts::PI * 0.75)));
+    let lost = Pose {
+        pos: Vec3::splat(f32::NAN),
+        ..a
+    };
+    assert!(jumped(a, lost));
 }
