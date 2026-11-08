@@ -16,11 +16,16 @@ end
 -- the other bots' spots, so a group spreads round it instead of funnelling into
 -- one file. The `separation` test reads the other agents' NavMeshAgent targets,
 -- so each bot's target is its claim. Built once: the spot is a context.
+-- The last-known position is where the player stood (its feet), a bare point:
+-- the trace from 1.5 m over it starts inside the player's own body, which a
+-- point can't ignore, so it traces only against what blocks the bot's sight
+-- (its AIPerception's blocking mask, the level), set per bot before each run.
+local TRACE = { from = "target", visible = true, item_height = 1.0 }
 local SPOT = {
     generator = { donut = { context = "target", inner = 3, outer = 8, rings = 2, per_ring = 16 } },
     tests = {
         { path = "exists" },
-        { trace = { from = "target", visible = true, item_height = 1.0 } },
+        { trace = TRACE },
         { distance = { to = "querier" }, score = { curve = "inverse", weight = 0.5 } },
         { separation = { radius = 3 }, score = { weight = 1 } },
     },
@@ -36,6 +41,7 @@ local plans = {}
 -- Pick a spot around the last-known position `(kx, ky, kz)`, or head for that
 -- position itself when none is found (no navmesh yet, or the spot boxed in).
 local function choose_spot(entity_id, kx, ky, kz)
+    TRACE.mask = AIPerception.GetBlockingMask(entity_id)
     local found, x, y, z = EnvironmentQuery.Run(entity_id, SPOT, { target = { kx, ky, kz } })
     if found then
         return x, y, z

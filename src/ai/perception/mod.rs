@@ -21,8 +21,15 @@
 //!
 //! **Who is a sight target**: an active, non-static entity on the perceiver's
 //! `sight_mask` with a body to see (a Collider or a CharacterController), not the
-//! perceiver or under it, and not under another target (a character's hitboxes
-//! are the character). Static entities are the level, never a target.
+//! perceiver's own body (under it, or above it: a perceiver on a `Head` child),
+//! and not under another target (a character's hitboxes are the character).
+//! Static entities are the level, never a target. Every last-known position is
+//! where the target **stood** ([`stand::feet`](crate::ai::stand::feet)), so an
+//! environment query around it reads the ground, not a character's middle.
+//!
+//! **Play only**: entering Play empties every memory (`Scene::set_playing`,
+//! before any `Start` runs) and [`SightRays::reset`] restarts the round; the
+//! senses sense nothing outside Play, so edit mode never queues an update.
 
 mod sight;
 pub mod stimulus;
@@ -31,6 +38,8 @@ pub mod stimulus;
 mod budget_tests;
 #[cfg(all(test, feature = "dev"))]
 pub(crate) mod perception_cost_tests;
+#[cfg(test)]
+mod self_tests;
 #[cfg(test)]
 mod sight_tests;
 #[cfg(test)]
@@ -42,7 +51,7 @@ use std::collections::BTreeMap;
 
 use glam::Vec3;
 
-pub use stimulus::{forget, report_damage, report_noise};
+pub use stimulus::{forget, perceiver_of, report_damage, report_noise};
 
 use crate::components::{AIPerceptionComponent, Known, PerceptionUpdate as Update, Sense};
 use crate::physics::PhysicsWorld;

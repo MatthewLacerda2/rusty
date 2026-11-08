@@ -36,7 +36,7 @@ mod yard;
 use glam::{Quat, Vec3};
 
 use crate::scene::authoring::{
-    self, add_component, animator, create_entity, nav::agent as nav_agent,
+    self, add_component, ai::perception, animator, create_entity, nav::agent as nav_agent,
     physics::character_controller as cc, physics::collider, ComponentKind, Primitive,
 };
 use crate::scene::{ColliderShape, MaterialComponent, Scene};
@@ -51,6 +51,13 @@ pub const BOT_SCRIPT: &str = "assets/scripts/bot.lua";
 /// How far from the Player (centre to centre) Enemy_1 stops: its 0.65 m half-width
 /// plus the Player's 0.5 m radius plus clearance, so the two never overlap (#743).
 const ENEMY_STOPPING_DISTANCE: f32 = 1.5;
+/// The `Player` layer (#1900): the Player stands on it and the bots' sight looks
+/// only for it, so 30 bots trace 30 pairs, not 870. Slot 8, the first of Unity's
+/// user layers.
+pub const PLAYER_LAYER: u8 = 8;
+/// Enemy_1's eyes above its origin: its 2 m box is centred there, so 0.8 m puts
+/// them 0.2 m under its top, 1.8 m off the ground.
+const ENEMY_EYE_HEIGHT: f32 = 0.8;
 
 /// Build the default scene into `scene`. `bot_script` is Enemy_1's Lua brain; empty
 /// leaves it unscripted (the harness's default, so a test drives the enemy itself).
@@ -133,7 +140,7 @@ fn character(scene: &mut Scene, id: u32, height: f32, radius: f32) {
 }
 
 /// Player (id 2): a 1.6 m × 0.5 m cylinder — the 2 m primitive scaled, its 2 m capsule
-/// scaling with it.
+/// scaling with it — on the `Player` layer the bots' sight looks for.
 fn add_player(scene: &mut Scene) {
     let id = create_entity(scene, "Player", Some(Primitive::Cylinder));
     place(
@@ -143,6 +150,8 @@ fn add_player(scene: &mut Scene) {
         Vec3::new(1.0, 0.8, 1.0),
     );
     character(scene, id, 2.0, 0.5);
+    scene.layers.set_name(PLAYER_LAYER, "Player");
+    scene.world.set_layer(id, PLAYER_LAYER);
     wear(scene, id, looks::PLAYER);
     attach_script(scene, id, PLAYER_CONTROLLER_SCRIPT);
 }
@@ -182,6 +191,10 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
     // What it knows (#1900): `bot.lua` chases where it last saw, heard or was hit
     // by the Player, so it walks its authored course until it does.
     add_component(scene, id, ComponentKind::AIPerception);
+    if let Some(mut p) = scene.world.ai_perception_mut(id) {
+        perception::set_sight_mask(&mut p, 1 << PLAYER_LAYER);
+        perception::set_eye_height(&mut p, ENEMY_EYE_HEIGHT);
+    }
     wear(scene, id, looks::ENEMY);
     if !bot_script.is_empty() {
         attach_script(scene, id, bot_script);

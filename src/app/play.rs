@@ -247,7 +247,8 @@ fn dispatch_perception_updates(world: &mut World, res: &mut Resources) {
 }
 
 /// Every Play session starts the sight round-robin from the first pair (#1900),
-/// so two runs of the same scene trace the same pairs on the same ticks.
+/// so two runs of the same scene trace the same pairs on the same ticks. (The
+/// perceivers' memories were emptied on Play entry, `Scene::set_playing`.)
 fn reset_sight_rays(_world: &mut World, res: &mut Resources) {
     res.sight_rays.reset();
 }

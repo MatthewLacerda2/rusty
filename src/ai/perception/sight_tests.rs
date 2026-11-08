@@ -17,8 +17,8 @@ fn a_target_ahead_in_range_is_seen() {
     let k = a.memory(bot).known[&player].clone();
     assert!(k.sensed && k.age == 0.0, "{k:?}");
     assert!(
-        k.position.distance(Vec3::new(1.0, 0.9, 10.0)) < 1e-4,
-        "{k:?}"
+        k.position.distance(Vec3::new(1.0, 0.0, 10.0)) < 1e-4,
+        "where it stands, not its middle: {k:?}"
     );
 }
 
@@ -74,7 +74,7 @@ fn sight_is_kept_to_the_lose_range_then_lost_once() {
     let info = &lost[0].1.info;
     assert!(!info.sensed && !lost[0].1.forgotten);
     assert!(
-        info.position.distance(Vec3::new(0.0, 0.9, 23.0)) < 1e-4,
+        info.position.distance(Vec3::new(0.0, 0.0, 23.0)) < 1e-4,
         "last seen there"
     );
 }

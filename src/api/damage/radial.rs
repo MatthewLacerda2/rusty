@@ -19,8 +19,16 @@
 //! Every dynamic body in a reached group is pushed by `impulse` scaled by the same
 //! falloff, away from the origin (from its collider's bounds centre when the
 //! origin is on it), damaged or not.
+//!
+//! The damage sense (#1900) hears each blast **once per perceiver**: every
+//! reached group's struck collider leads to its perceiver
+//! (`ai::perception::perceiver_of`, a walk up from the struck body, as for
+//! `Apply`), which senses the **largest** amount any of its groups took, at
+//! the blast origin (or where a live instigator stands). A bot of five hitboxes
+//! and no `OnTakeDamage` is one report, not five.
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 
 use glam::Vec3;
 use mlua::{Lua, Table};
@@ -227,6 +235,7 @@ pub(super) fn function(
         let scene = &*scene.get(lua)?;
         let found = gather(lua, scene, &*physics.get(lua)?, &blast, common.causer);
         let results = lua.create_table()?;
+        let mut sensed: BTreeMap<u32, f64> = BTreeMap::new();
         for g in found {
             let Some(scale) = blast.scale(g.nearest.distance) else {
                 continue;
@@ -234,8 +243,11 @@ pub(super) fn function(
             let owner = g.nearest.owner;
             let active = scene.borrow().world.is_active_in_hierarchy(owner);
             let damage = blast.min + (blast.amount - blast.min) * scale;
-            let hit = (damage, common.kind.as_str());
-            deliver::sense(scene, owner, common.instigator, origin, hit);
+            let perceiver = crate::ai::perception::perceiver_of(&scene.borrow(), g.nearest.id);
+            if let Some(p) = perceiver {
+                let most = sensed.entry(p).or_insert(damage);
+                *most = most.max(damage);
+            }
             if g.nearest.receives && active {
                 let event = common.event(lua, "radial")?;
                 event.set("origin", vec_table(lua, origin)?)?;
@@ -252,6 +264,10 @@ pub(super) fn function(
                 let dir = away(scene, origin, point, id);
                 push(lua, body, dir * strength, point)?;
             }
+        }
+        for (p, damage) in sensed {
+            let hit = (damage, common.kind.as_str());
+            deliver::sense(scene, p, common.instigator, origin, hit);
         }
         Ok(results)
     })

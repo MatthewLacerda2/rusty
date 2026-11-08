@@ -3,6 +3,7 @@
 //! instigator, noises are heard and counted, and the settings round-trip
 //! through the shared ops.
 
+mod radial;
 mod surface;
 
 use std::cell::RefCell;

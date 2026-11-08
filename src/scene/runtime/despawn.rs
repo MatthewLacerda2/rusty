@@ -33,13 +33,16 @@ impl Scene {
     /// Enter or leave Play. Only `GameWorld`'s transition (`enter_play` /
     /// `exit_play`) calls this outside tests, so every reader sees the state
     /// change at the same moment.
-    /// Entering Play forgets the Undo history: Stop restores Play's changes.
+    /// Entering Play forgets the Undo history: Stop restores Play's changes. It
+    /// also empties every `AIPerception`'s memory (#1900), before any `Start`
+    /// can report a noise or a hit, so an agent starts Play knowing nothing.
     /// Leaving it drops what Play asked for and never got (a load or destroy a
     /// paused Play left queued, #1298) and every `DontDestroyOnLoad` mark: the
     /// scene state inventory's runtime class (`scene::state`, #1649).
     pub(crate) fn set_playing(&mut self, playing: bool) {
         if playing && !self.playing {
             self.clear_undo();
+            self.forget_perception();
         }
         if !playing && self.playing {
             self.pending_load = None;
@@ -47,6 +50,23 @@ impl Scene {
             self.persistent.clear();
         }
         self.playing = playing;
+    }
+
+    /// Empty every `AIPerception`'s memory: known targets, sight and pending
+    /// updates. A perceiver that knows nothing is not written (no stamp).
+    fn forget_perception(&mut self) {
+        for id in self.world.ids_with_ai_perception() {
+            if self
+                .world
+                .ai_perception(id)
+                .is_none_or(|c| c.memory.is_empty())
+            {
+                continue;
+            }
+            if let Some(mut c) = self.world.ai_perception_mut(id) {
+                c.memory = Default::default();
+            }
+        }
     }
 
     /// Replace this scene with an empty one in place, keeping its play state and

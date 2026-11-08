@@ -2,8 +2,11 @@
 //!
 //! The ONE place the engine mutates an entity's `AIPerceptionComponent` settings.
 //! The editor's card, `Component.Set` and the Lua `AIPerception.Set*` setters all
-//! route through these, so the rules live once: every distance and age is finite
-//! and non-negative (a bad input keeps the current value), the lose-sight range
+//! route through these, so the rules live once: every distance is finite and
+//! non-negative (a non-finite input keeps the current value, a negative one is
+//! floored to 0), every age is finite and non-negative (a bad input keeps the
+//! current value: 0 means forever, so a negative age is never floored to it;
+//! the Lua setters raise an error first), the lose-sight range
 //! never falls below the sight range, and the view half-angle stays in 0..=180°.
 //! The agent's memory is the senses' own (`ai::perception`), never written here.
 //!
@@ -51,19 +54,28 @@ pub fn set_hearing_range(p: &mut Perception, range: f32) {
     p.hearing_range = at_least(finite_or(range, p.hearing_range), 0.0);
 }
 
+/// `seconds` when it is a valid max age (finite, not negative), else `current`.
+fn age_or(seconds: f32, current: f32) -> f32 {
+    if seconds.is_finite() && seconds >= 0.0 {
+        seconds
+    } else {
+        current
+    }
+}
+
 /// Set how long a seen target is remembered out of sight (0 = forever).
 pub fn set_sight_max_age(p: &mut Perception, seconds: f32) {
-    p.sight_max_age = at_least(finite_or(seconds, p.sight_max_age), 0.0);
+    p.sight_max_age = age_or(seconds, p.sight_max_age);
 }
 
 /// Set how long a heard noise is remembered (0 = forever).
 pub fn set_hearing_max_age(p: &mut Perception, seconds: f32) {
-    p.hearing_max_age = at_least(finite_or(seconds, p.hearing_max_age), 0.0);
+    p.hearing_max_age = age_or(seconds, p.hearing_max_age);
 }
 
 /// Set how long a damage stimulus is remembered (0 = forever).
 pub fn set_damage_max_age(p: &mut Perception, seconds: f32) {
-    p.damage_max_age = at_least(finite_or(seconds, p.damage_max_age), 0.0);
+    p.damage_max_age = age_or(seconds, p.damage_max_age);
 }
 
 #[cfg(test)]
@@ -92,7 +104,7 @@ mod tests {
         set_eye_height(&mut p, f32::NEG_INFINITY);
         assert_eq!(p.eye_height, 1.6);
         set_hearing_max_age(&mut p, -1.0);
-        assert_eq!(p.hearing_max_age, 0.0);
+        assert_eq!(p.hearing_max_age, 3.0, "a negative age is not 0 (forever)");
         set_damage_max_age(&mut p, f32::NAN);
         assert_eq!(p.damage_max_age, 5.0);
         set_sight_mask(&mut p, 4);

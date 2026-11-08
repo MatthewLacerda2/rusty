@@ -4,8 +4,10 @@
 //! knows through sight, hearing and damage, the noises a game reports, and the
 //! component's settings. The senses themselves run in `ai::perception`; every
 //! setter routes through the shared `scene::authoring::ai::perception` ops the
-//! inspector card uses. Getters return a neutral value without the component;
-//! setters are then no-ops. Attach one with `Scene.AddComponent(id, "AIPerception")`.
+//! inspector card uses, after refusing a value it would not keep (a negative
+//! distance or age, a non-finite one, a NaN angle) with an error. Getters read
+//! the component in place and return a neutral value without it; setters are
+//! then no-ops. Attach one with `Scene.AddComponent(id, "AIPerception")`.
 
 use std::cell::RefCell;
 
@@ -56,9 +58,9 @@ pub fn known_table(
     Ok(t)
 }
 
-/// `id`'s perception, cloned, or `None` without one.
-fn get(scene: &RefCell<Scene>, id: u32) -> Option<Perception> {
-    scene.borrow().world.ai_perception(id).map(|p| p.clone())
+/// `read` of `id`'s perception, in place, or `None` without one.
+fn get<T>(scene: &RefCell<Scene>, id: u32, read: impl FnOnce(&Perception) -> T) -> Option<T> {
+    scene.borrow().world.ai_perception(id).map(|p| read(&p))
 }
 
 /// Apply a shared op to `id`'s perception, if it has one.
@@ -92,15 +94,17 @@ fn register_knowledge(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     });
     put(t, "GetKnown", f)?;
     let f = lua.create_function(move |lua, (id, target): (EntityArg, EntityArg)| {
-        let p = get(&*scene.get(lua)?, id.read());
-        let k = p.and_then(|p| p.memory.known.get(&target.read()).cloned());
-        k.map(|k| known_table(lua, Some(target.read()), &k, false))
+        let scene = scene.get(lua)?;
+        let s = scene.borrow();
+        let p = s.world.ai_perception(id.read());
+        let k = p.as_ref().and_then(|p| p.memory.known.get(&target.read()));
+        k.map(|k| known_table(lua, Some(target.read()), k, false))
             .transpose()
     });
     put(t, "Get", f)?;
     let f = lua.create_function(move |lua, (id, target): (EntityArg, EntityArg)| {
-        let p = get(&*scene.get(lua)?, id.read());
-        Ok(p.is_some_and(|p| p.memory.in_sight.contains(&target.read())))
+        let sees = |p: &Perception| p.memory.in_sight.contains(&target.read());
+        Ok(get(&*scene.get(lua)?, id.read(), sees).unwrap_or(false))
     });
     put(t, "CanSee", f)?;
     let f = lua.create_function(move |lua, (id, target): (EntityArg, Option<EntityArg>)| {
@@ -140,43 +144,95 @@ fn register_noise(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     put(t, "ReportNoise", f)
 }
 
+/// What a float setter accepts: a distance or an age (finite, not negative), the
+/// eye height (finite) or the view angle (any number but NaN; it is clamped).
+#[derive(Clone, Copy)]
+enum Accepts {
+    NonNegative,
+    Finite,
+    Number,
+}
+
+impl Accepts {
+    /// `v`, or the error a script sees for it.
+    fn check(self, verb: &str, v: f32) -> mlua::Result<f32> {
+        let (ok, wants) = match self {
+            Accepts::NonNegative => (v.is_finite() && v >= 0.0, "a finite number, not negative"),
+            Accepts::Finite => (v.is_finite(), "a finite number"),
+            Accepts::Number => (!v.is_nan(), "a number"),
+        };
+        if ok {
+            return Ok(v);
+        }
+        Err(mlua::Error::RuntimeError(format!(
+            "{NS}.{verb}: needs {wants}, got {v}"
+        )))
+    }
+}
+
 /// `Get*` / `Set*` for the distances, the angle, the eye height and the ages.
 fn register_distances(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    use Accepts::{Finite, NonNegative, Number};
     type Float = (
         &'static str,
+        Accepts,
         fn(&Perception) -> f32,
         fn(&mut Perception, f32),
     );
     let floats: [Float; 8] = [
-        ("SightRange", |p| p.sight_range, ops::set_sight_range),
+        (
+            "SightRange",
+            NonNegative,
+            |p| p.sight_range,
+            ops::set_sight_range,
+        ),
         (
             "LoseSightRange",
+            NonNegative,
             |p| p.lose_sight_range,
             ops::set_lose_sight_range,
         ),
-        ("SightAngle", |p| p.sight_angle, ops::set_sight_angle),
-        ("EyeHeight", |p| p.eye_height, ops::set_eye_height),
-        ("HearingRange", |p| p.hearing_range, ops::set_hearing_range),
-        ("SightMaxAge", |p| p.sight_max_age, ops::set_sight_max_age),
+        (
+            "SightAngle",
+            Number,
+            |p| p.sight_angle,
+            ops::set_sight_angle,
+        ),
+        ("EyeHeight", Finite, |p| p.eye_height, ops::set_eye_height),
+        (
+            "HearingRange",
+            NonNegative,
+            |p| p.hearing_range,
+            ops::set_hearing_range,
+        ),
+        (
+            "SightMaxAge",
+            NonNegative,
+            |p| p.sight_max_age,
+            ops::set_sight_max_age,
+        ),
         (
             "HearingMaxAge",
+            NonNegative,
             |p| p.hearing_max_age,
             ops::set_hearing_max_age,
         ),
         (
             "DamageMaxAge",
+            NonNegative,
             |p| p.damage_max_age,
             ops::set_damage_max_age,
         ),
     ];
-    for (name, read, set) in floats {
+    for (name, accepts, read, set) in floats {
         let f = lua.create_function(move |lua, id: EntityArg| {
-            Ok(get(&*scene.get(lua)?, id.read()).map_or(0.0, |p| read(&p)))
+            Ok(get(&*scene.get(lua)?, id.read(), read).unwrap_or(0.0))
         });
         put(t, &format!("Get{name}"), f)?;
         let verb = format!("Set{name}");
         let f = lua.create_function(move |lua, (id, v): (EntityArg, f32)| {
             let id = id.live(NS, &verb)?;
+            let v = accepts.check(&verb, v)?;
             write(&*scene.get(lua)?, id, |p| set(p, v));
             Ok(())
         });
@@ -198,7 +254,7 @@ fn register_masks(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     ];
     for (name, read, set) in masks {
         let f = lua.create_function(move |lua, id: EntityArg| {
-            Ok(get(&*scene.get(lua)?, id.read()).map_or(0, |p| read(&p)))
+            Ok(get(&*scene.get(lua)?, id.read(), read).unwrap_or(0))
         });
         put(t, &format!("Get{name}"), f)?;
         let verb = format!("Set{name}");

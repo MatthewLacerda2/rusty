@@ -86,3 +86,10 @@ pub struct Memory {
     /// Updates raised since the last dispatch, in the order they were raised.
     pub updates: Vec<Update>,
 }
+
+impl Memory {
+    /// Whether it knows nothing, sees nothing and has nothing pending.
+    pub fn is_empty(&self) -> bool {
+        self.known.is_empty() && self.in_sight.is_empty() && self.updates.is_empty()
+    }
+}

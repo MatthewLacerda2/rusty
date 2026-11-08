@@ -8,21 +8,24 @@ by, and where that was. Feed what it knows to an [`EnvironmentQuery`](Environmen
 and a state machine.
 
 Add one with `Scene.AddComponent(id, "AIPerception")` (alias `Perception`). Its settings
-save with the scene; what it knows is runtime state, empty on load and on Play.
+save with the scene; what it knows is runtime state, empty on load and on Play. The
+senses run **only during Play**: outside it (a console call in edit mode) `ReportNoise`
+hears nothing and returns `0`, and a hit is not sensed.
 `Debug.Snapshot` reports it as `ai_perception`, with the known and in-sight target ids.
 
 ### The senses
 
 - **Sight**, stepped every fixed tick after physics and animation. A **sight target** is
   an active, non-static entity on the perceiver's `sight_mask` with a body to see (a
-  `Collider` or a `CharacterController`), not the perceiver or under it, and not under
+  `Collider` or a `CharacterController`), not the perceiver's own body (under it, or
+  above it: a perceiver on a `Head` child never sees its character), and not under
   another target (a character's hitboxes are the character). Static entities are the
   level and are never targets. A target is **seen** when it is within `sight_range`
   (once seen, `lose_sight_range`), inside the view cone (`sight_angle` degrees either
   side of the entity's forward, +Z; 180 sees all round), and one ray from the eye
   (`eye_height` above the origin) to the target's bounds centre meets no collider on
-  `blocking_mask` (the perceiver's and the target's own colliders, and their
-  descendants', never block; nor do triggers).
+  `blocking_mask` (the perceiver's own body, the target, and their descendants, never
+  block; nor do triggers).
   Rays are **budgeted**: 64 a tick across every perceiver (Unreal's
   `MaxTracesPerTick`), served round-robin over the (perceiver, target) pairs in id
   order, from where the last tick stopped. A pair not traced this tick keeps its last
@@ -32,21 +35,28 @@ save with the scene; what it knows is runtime state, empty on load and on Play.
   `hearing_range × loudness` of the point hears it. **Walls do not block hearing**, as in
   Unreal. The engine never reports a noise itself: playing a sound is not a noise,
   because the game decides what an enemy reacts to. A gun script calls `ReportNoise`
-  beside its `Sfx` call. The instigator does not hear its own noise.
+  beside its `Sfx` call. The instigator's own hierarchy (the bot that fired, its body,
+  its gun) does not hear its noise. Its last-known position is the noise's point (a
+  grenade is heard where it lands, not where its thrower stands), as in Unreal.
 - **Damage**: every [`Damage`](Damage.md) `Apply` / `ApplyPoint` / `ApplyRadial` hit
   is sensed by the nearest active entity from the one struck upward that has an
   `AIPerception` (a hitbox under a bone is the character's), whether or not a script
-  receives the damage. It is placed at the instigator's position when the instigator is
-  alive, else at the hit point (`ApplyPoint`), the blast origin (`ApplyRadial`) or the
-  struck entity (`Apply`); `amount` is the damage dealt, before handlers, and `tag` the
-  damage type.
+  receives the damage. It is placed where the instigator **stands** when the instigator
+  is alive, else at the hit point (`ApplyPoint`), the blast origin (`ApplyRadial`) or
+  the struck entity (`Apply`); `amount` is the damage dealt, before handlers, and `tag`
+  the damage type. An `ApplyRadial` blast is sensed **once per perceiver**: walking up
+  from each struck collider, with the **largest** amount any of its colliders took (a
+  bot of five hitboxes hears one blast, not five). A hit whose instigator is the
+  perceiver's own hierarchy (its own grenade) is not sensed.
 
 ### What it knows
 
 One **known target** per entity, as a table: `{ id, sense, x, y, z, age, sensed, tag,
 amount }`. `sense` is `"sight"`, `"hearing"` or `"damage"`, the sense that placed it;
-`x, y, z` is the **last-known position** (where the target stood when seen, the
-noise's point, or where the instigator stood at the hit); `age` is seconds since it was
+`x, y, z` is the **last-known position**: where the target **stood** when seen, or
+where the instigator stood at the hit (its feet: a `NavMeshAgent`'s, else the bottom of
+its `CharacterController` capsule or collider, the same point an
+[`EnvironmentQuery`](EnvironmentQuery.md) context reads), or the noise's point; `age` is seconds since it was
 last sensed; `sensed` is true while it is sensed this tick (in view now, or heard or hit
 this tick); `tag` is the noise's tag or the damage type; `amount` the damage of a hit.
 While a target is in view, sight keeps its entry: a noise it makes is still reported
@@ -54,8 +64,8 @@ While a target is in view, sight keeps its entry: a noise it makes is still repo
 
 An entry not sensed ages on the fixed tick and is **forgotten** once its age passes its
 sense's max age (`sight_max_age`, `hearing_max_age`, `damage_max_age`; `0` keeps it
-forever). A noise or hit with no instigator is sensed (its update fires with a `nil`
-target) but stored under nobody: a known target is an entity.
+forever). A noise or hit with no instigator, or one destroyed since, is sensed (its
+update fires with a `nil` target) but stored under nobody: a known target is an entity.
 
 ### Updates
 
@@ -96,6 +106,7 @@ end
 | `AIPerception.GetHearingMaxAge` / `SetHearingMaxAge` | `(id)` / `(id, seconds)` | how long a noise is remembered (default 3; 0 = forever) |
 | `AIPerception.GetDamageMaxAge` / `SetDamageMaxAge` | `(id)` / `(id, seconds)` | how long a hit is remembered (default 5; 0 = forever) |
 
-Distances and ages are floored at 0; a non-finite value is ignored (the setting keeps
-its value). Getters return `0` without the component (or for a `nil` or dead id);
+A setter refuses a value the setting would not keep with an error: a negative or
+non-finite distance or age (a max age of `0` means forever, so a negative one is never
+read as it), a non-finite eye height, a NaN angle. Getters return `0` without the component (or for a `nil` or dead id);
 setters are then no-ops, and a setter (or `Forget`) given a `nil` id is an error.

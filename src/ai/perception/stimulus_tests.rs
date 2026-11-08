@@ -66,8 +66,8 @@ fn a_hit_is_sensed_at_the_instigator_by_the_struck_hierarchy() {
         (Sense::Damage, 25.0, "bullet")
     );
     assert!(
-        k.position.distance(Vec3::new(0.0, 0.9, -6.0)) < 1e-4,
-        "at the instigator"
+        k.position.distance(Vec3::new(0.0, 0.0, -6.0)) < 1e-4,
+        "where the instigator stands"
     );
     // No instigator: sensed at the hit point, stored under nobody.
     a.updates();

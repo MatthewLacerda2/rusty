@@ -35,7 +35,7 @@ fn the_settings_round_trip_through_the_shared_ops() {
     let game = play(scene, 1);
     let line = format!(
         "AIPerception.SetSightRange({bot}, 40) AIPerception.SetSightAngle({bot}, 999) \
-         AIPerception.SetHearingRange({bot}, -3) AIPerception.SetSightMask({bot}, 8) \
+         AIPerception.SetHearingRange({bot}, 0) AIPerception.SetSightMask({bot}, 8) \
          return AIPerception.GetSightRange({bot}), AIPerception.GetLoseSightRange({bot}), \
            AIPerception.GetSightAngle({bot}), AIPerception.GetHearingRange({bot}), \
            AIPerception.GetSightMask({bot}), AIPerception.GetEyeHeight(9999)"
@@ -48,4 +48,18 @@ fn the_settings_round_trip_through_the_shared_ops() {
         answer.starts_with("false"),
         "a dead id is a no-op, nil errors"
     );
+    // A value the component would not keep is refused, not floored: a max age
+    // of 0 means forever.
+    for call in [
+        "SetSightMaxAge({bot}, -1)",
+        "SetHearingRange({bot}, -3)",
+        "SetEyeHeight({bot}, 1/0)",
+    ] {
+        let line = format!("return pcall(function() AIPerception.{call} end)");
+        let line = line.replace("{bot}", &bot.to_string());
+        assert!(eval(&game, &line).starts_with("false"), "{call} errors");
+    }
+    let line =
+        format!("return AIPerception.GetSightMaxAge({bot}), AIPerception.GetHearingRange({bot})");
+    assert_eq!(eval(&game, &line), "5, 0", "unchanged");
 }

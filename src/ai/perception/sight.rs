@@ -1,6 +1,7 @@
 //! The sight sense (#1900): range, view cone and one budgeted ray per pair.
 //!
-//! For each perceiver, every sight target (see the module docs) within
+//! For each perceiver, every sight target (see the module docs) other than its
+//! own body (an ancestor or descendant of it), within
 //! `sight_range` (or `lose_sight_range` when it is already seen) and inside the
 //! cone around the entity's forward (+Z) needs a ray from the eye to the
 //! target's bounds centre. Those pairs, in (perceiver, target) id order, share
@@ -13,11 +14,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use glam::Vec3;
 
 use super::SightRays;
-use crate::ai::ray;
+use crate::ai::{ray, stand};
 use crate::physics::PhysicsWorld;
 use crate::scene::{layer_in_mask, Scene};
 
-/// A sight target: where a ray aims at it and where it stands.
+/// A sight target: where a ray aims at it and where it stands (its feet,
+/// [`stand::feet`]: the last-known position a script reads).
 struct Target {
     id: u32,
     layer: u8,
@@ -30,6 +32,9 @@ struct Pair {
     perceiver: usize,
     target: usize,
     eye: Vec3,
+    /// The perceiver's own body, which never blocks its sight: its outermost
+    /// ancestor-or-self that is a sight target's body, else itself.
+    body: u32,
     mask: u32,
     was_seen: bool,
 }
@@ -49,7 +54,7 @@ pub(super) fn look(
     for (pair, traced) in pairs.iter().zip(traced) {
         let target = &targets[pair.target];
         let visible = if traced {
-            let ignore = [Some(perceivers[pair.perceiver]), Some(target.id)];
+            let ignore = [Some(pair.body), Some(target.id)];
             ray::clear(
                 scene,
                 physics,
@@ -86,7 +91,7 @@ fn targets(scene: &Scene) -> Vec<Target> {
             id,
             layer: w.layer(id),
             aim: aim(scene, id),
-            position: w.world_position(id),
+            position: stand::feet(scene, id),
         })
         .collect()
 }
@@ -115,8 +120,18 @@ fn pairs(scene: &Scene, perceivers: &[u32], targets: &[Target]) -> Vec<Pair> {
         let eye = w.world_position(p) + Vec3::Y * c.eye_height;
         let forward = w.world_rotation(p) * Vec3::Z;
         let half = c.sight_angle.to_radians();
+        let lineage: BTreeSet<u32> = w.self_and_ancestors(p).collect();
+        let body = targets
+            .iter()
+            .filter(|t| lineage.contains(&t.id))
+            .map(|t| t.id)
+            .next()
+            .unwrap_or(p);
         for (ti, t) in targets.iter().enumerate() {
-            if !layer_in_mask(t.layer, c.sight_mask) || w.self_and_ancestors(t.id).any(|a| a == p) {
+            // Its own body: under the perceiver (its hitboxes) or above it (a
+            // perceiver on a `Head` child of the character).
+            let own = lineage.contains(&t.id) || w.self_and_ancestors(t.id).any(|a| a == p);
+            if own || !layer_in_mask(t.layer, c.sight_mask) {
                 continue;
             }
             let was_seen = c.memory.in_sight.contains(&t.id);
@@ -133,6 +148,7 @@ fn pairs(scene: &Scene, perceivers: &[u32], targets: &[Target]) -> Vec<Pair> {
                 perceiver: pi,
                 target: ti,
                 eye,
+                body,
                 mask: c.blocking_mask,
                 was_seen,
             });

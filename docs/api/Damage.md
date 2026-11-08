@@ -15,8 +15,9 @@ delivery, the hit information and the radial query.
 | `Damage.ApplyRadial` | `(x, y, z, amount, opts)` — a blast centred at `x, y, z` (`event.kind = "radial"`); see *Radial damage* below. `opts.outer` is required. | an array of `{ id, amount, distance }`, one per receiver, nearest first |
 
 Every hit is also the **damage sense** of [`AIPerception`](AIPerception.md) (#1900): the
-nearest entity from the one struck upward that has an `AIPerception` senses it, at the
-instigator's position, whether or not a script receives the damage. So pass
+nearest entity from the one struck upward that has an `AIPerception` senses it, where
+the instigator stands, whether or not a script receives the damage (an `ApplyRadial`
+blast once per perceiver, with the largest amount). So pass
 `instigator`: it is how a shot bot learns where the shooter is.
 
 A harness scenario's `Damage.*` runs in the gameplay VM, so it reaches the game

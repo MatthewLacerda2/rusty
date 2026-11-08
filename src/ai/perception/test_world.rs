@@ -24,9 +24,11 @@ pub struct Arena {
 }
 
 impl Arena {
-    /// A 100 m floor; `build` adds walls, perceivers and targets before physics.
+    /// A 100 m floor, in Play (the senses sense nothing outside it); `build`
+    /// adds walls, perceivers and targets before physics.
     pub fn new(build: impl FnOnce(&mut Scene)) -> Self {
         let mut scene = Scene::new();
+        scene.set_playing(true);
         add_floor(&mut scene, -50.0, 50.0, -50.0, 50.0);
         build(&mut scene);
         let physics = PhysicsWorld::from_scene(&scene);
