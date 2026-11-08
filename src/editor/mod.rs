@@ -99,7 +99,8 @@ pub struct EditorUi {
     pub ui_textures: std::rc::Rc<crate::ui::TextureSizes>,
     /// Live move-gizmo drag, if an axis handle is currently grabbed (#183).
     pub gizmo_drag: Option<viewport::gizmo::GizmoDrag>,
-    /// Which gizmos the Scene tab draws (#1909): its tab strip's toggles, and
+    /// Which gizmos the Scene tab draws (#1909), and the Game tab's `GameGizmos`
+    /// (#1882): their tab strips' toggles, and
     /// `Editor.SetGizmo` through the shell. `Gizmo::Ui` is the UI overlay: screen
     /// canvases drawn, the rect tool live (#423).
     pub gizmos: crate::core::application::SceneGizmos,

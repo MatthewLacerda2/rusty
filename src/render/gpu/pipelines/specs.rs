@@ -154,6 +154,17 @@ pub(super) fn line_spec() -> PipelineSpec {
     }
 }
 
+/// The collider and debug-line gizmos' lines (#1882): [`line_spec`]'s, each vertex
+/// its own colour (`vs_gizmo_vertex` / `fs_gizmo_vertex`), so one draw holds them all.
+pub(super) fn vertex_line_spec() -> PipelineSpec {
+    PipelineSpec {
+        label: "Vertex Colour Line Pipeline",
+        vertex: "vs_gizmo_vertex",
+        fragment: "fs_gizmo_vertex",
+        ..line_spec()
+    }
+}
+
 /// The velocity target of a pipeline that writes motion vectors (#1435), under
 /// `write_mask`. It is never blended: the nearest surface's motion wins.
 pub(crate) fn velocity_target(write_mask: wgpu::ColorWrites) -> wgpu::ColorTargetState {

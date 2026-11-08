@@ -118,6 +118,8 @@ pub const MARKS: &[Mark] = marks! {
     "persistent" => |s, b| s.persistent.insert(b), s.persistent.contains(&b);
     "shader_overrides" => |s, b| s.shader_overrides.set(b, "marked".into(), vec![1.0]),
         s.shader_overrides.has(b);
+    "debug_lines" => |s, _| s.debug_lines.push(Vec3::ZERO, Vec3::X, [1.0; 4], 7),
+        s.debug_lines.lines().len() == 1;
     "shader_time" => |s, _| s.shader_time = 7.5, s.shader_time == 7.5;
     "ui_time" => |s, _| s.ui_time = 7.5, s.ui_time == 7.5;
     "meshes_read_at" => |s, _| s.meshes_read_at = u64::MAX - 1, s.meshes_read_at == u64::MAX - 1;

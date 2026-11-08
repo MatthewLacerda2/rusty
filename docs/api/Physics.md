@@ -301,7 +301,9 @@ a capsule scaled wider than it is long can't follow its drawn Capsule exactly:
 the mesh's tube pokes out of the collider. Every extent
 must be `> 0`. The shape is read when the body is built (entering Play, or a
 hierarchy change); `SetColliderShape` refreshes the bounds (`GetBounds`)
-immediately.
+immediately. The collider gizmo (`Editor.SetGizmo("Colliders", …)`, a game
+screenshot's `gizmos`) draws the shape as it is now, so in Play it shows a
+`SetColliderShape` before the body collides with it.
 
 **Mesh** (Unity: `MeshCollider`) with `convex = true` is one convex hull of the
 mesh, on any body. A **concave** one (`convex = false`) depends on its body: on a

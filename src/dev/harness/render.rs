@@ -49,7 +49,20 @@ impl Harness {
     /// Returns `true` if a frame was captured, `false` if no GPU/software adapter
     /// is available (skipped gracefully — never panics). Logs the outcome.
     pub fn screenshot_at(&mut self, path: impl AsRef<Path>, size: (u32, u32)) -> bool {
+        self.screenshot_with(path, size, false)
+    }
+
+    /// [`screenshot_at`](Self::screenshot_at), with the colliders and the
+    /// `Debug.Draw*` lines drawn over the frame when `gizmos` (#1882), as the Game
+    /// view's **Gizmos** toggle draws them. Without, the frame is the plain one.
+    pub fn screenshot_with(
+        &mut self,
+        path: impl AsRef<Path>,
+        size: (u32, u32),
+        gizmos: bool,
+    ) -> bool {
         let path = path.as_ref().to_path_buf();
+        self.capture.gizmos = gizmos;
         let result = crate::dev::screenshot::capture_world_into(
             &mut self.capture,
             &self.world.borrow(),
@@ -57,6 +70,7 @@ impl Harness {
             size.0,
             size.1,
         );
+        self.capture.gizmos = false;
         if let (Ok(true), Some(frame)) = (&result, self.capture.last_frame.take()) {
             record_render(&mut self.stats.borrow_mut(), &frame);
             self.publish_exposure();

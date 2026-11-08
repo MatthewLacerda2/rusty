@@ -159,19 +159,21 @@ fn register_harness_stats(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaRe
 
 /// Screenshot / AttachPlayerBot — side-effecting harness actions.
 fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
-    // Screenshot(path [, { width =, height = }]) -> bool. Renders the current
-    // scene/camera offscreen to a PNG, at the run's size or the one given (#1583).
+    // Screenshot(path [, { width =, height =, gizmos = }]) -> bool. Renders the
+    // current scene/camera offscreen to a PNG, at the run's size or the one given
+    // (#1583), with the colliders and Debug.Draw lines over it when `gizmos` (#1882).
     // Returns false (no error) when no GPU/software adapter is available.
     let h = Rc::clone(harness);
     t.set(
         "Screenshot",
-        lua.create_function(move |_, (path, size): (String, Option<mlua::Table>)| {
+        lua.create_function(move |_, (path, opts): (String, Option<mlua::Table>)| {
             let mut h = h.borrow_mut();
-            let size = match size {
-                Some(size) => shot_size(&size)?,
-                None => h.size(),
+            let (size, gizmos) = match opts {
+                Some(opts) => shot_options(&opts)?,
+                None => (None, false),
             };
-            Ok(h.screenshot_at(path, size))
+            let size = size.unwrap_or_else(|| h.size());
+            Ok(h.screenshot_with(path, size, gizmos))
         })?,
     )?;
 
@@ -196,6 +198,22 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
             Ok(attached)
         })?,
     )
+}
+
+/// A `Screenshot`'s options: its size (both of `width` and `height`, or neither)
+/// and `gizmos` (a boolean, default false).
+fn shot_options(opts: &mlua::Table) -> LuaResult<(Option<(u32, u32)>, bool)> {
+    let gizmos = match opts.get::<mlua::Value>("gizmos")? {
+        mlua::Value::Nil => false,
+        mlua::Value::Boolean(on) => on,
+        _ => {
+            let msg = "Harness.Screenshot: gizmos must be a boolean";
+            return Err(mlua::Error::RuntimeError(msg.into()));
+        }
+    };
+    let sized = opts.contains_key("width")? || opts.contains_key("height")?;
+    let size = if sized { Some(shot_size(opts)?) } else { None };
+    Ok((size, gizmos))
 }
 
 /// A `Screenshot`'s `{ width =, height = }`: both whole pixels, 1 to

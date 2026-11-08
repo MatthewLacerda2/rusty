@@ -9,7 +9,8 @@
 //! owns no GPU state; the shell's editor frontend registers the texture and feeds the [`egui::TextureId`]
 //! in, and reads the returned [`ViewportInteraction`] back to drive picking/gizmo.
 //! The Scene tab's **UI** toggle draws the screen-space canvases over the scene and
-//! enables the rect tool on them (`rect_tool`, #423).
+//! enables the rect tool on them (`rect_tool`, #423). The Game tab's **Gizmos**
+//! toggle draws the colliders and the `Debug.Draw*` lines over the game (#1882).
 
 pub mod gizmo;
 pub mod pick;
@@ -114,7 +115,8 @@ pub fn draw(
 
 /// The tab strip: Scene / Game selectors (Unity's viewport tabs), and on the Scene
 /// tab the gizmo toggles (#1909, one per shown row of `Gizmo`'s table) and the
-/// navigation help.
+/// navigation help; on the Game tab its one **Gizmos** toggle (#1882), the
+/// `GameGizmos` row.
 fn draw_tab_strip(
     ui: &mut egui::Ui,
     tab: &mut ViewportTab,
@@ -136,13 +138,15 @@ fn draw_tab_strip(
                 if chrome::tab(ui, &t, *tab == ViewportTab::Game, &game).clicked() {
                     *tab = ViewportTab::Game;
                 }
-                if *tab == ViewportTab::Scene {
-                    ui.separator();
-                    for &gizmo in Gizmo::ALL.iter().filter(|g| g.row().shown) {
-                        let row = gizmo.row();
-                        ui.toggle_value(gizmos.flag_mut(gizmo), row.label)
-                            .on_hover_text(row.hover);
-                    }
+                let game_tab = *tab == ViewportTab::Game;
+                ui.separator();
+                let rows = Gizmo::ALL.iter().filter(|g| g.row().shown);
+                for &gizmo in rows.filter(|g| g.row().game == game_tab) {
+                    let row = gizmo.row();
+                    ui.toggle_value(gizmos.flag_mut(gizmo), row.label)
+                        .on_hover_text(row.hover);
+                }
+                if !game_tab {
                     ui.label(egui::RichText::new(icon::QUESTION).color(t.text_secondary))
                         .on_hover_ui(navigation_help);
                 }
