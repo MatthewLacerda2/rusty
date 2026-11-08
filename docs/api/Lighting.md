@@ -316,7 +316,11 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   UV island it lies on), never from a chart packed beside it in the map, so a texel
   at a floor's edge never takes the dark underside next to it. The probes are a fixed,
   seeded budget apart from `samples`, so a texel is valid or not the same way at 16
-  samples and at 4096. `0` keeps every texel; `1` drops any that sees a back face. A
+  samples and at 4096. `0` keeps every texel; `1` drops any that sees a back face.
+  **One-sided geometry counts as inside:** a floor under a single quad roof sees
+  only the roof's back, so at `0.9` its texels are dropped and filled from the
+  floor's lit part beyond the roof. The bake has no *Double Sided GI* yet, so close
+  such geometry (a box, not a plane) or lower the tolerance for that scene. A
   chart with no valid texel at all (one wholly buried) is filled from the charts beside
   it, as before, and the bake warns once naming how many.
 - **Denoising** (#1884). Only the bounce (indirect light, and a directional bake's
