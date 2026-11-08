@@ -34,6 +34,7 @@ fn one_node_graph() -> AnimationGraph {
             entry: "Run".to_string(),
         },
         layers: Vec::new(),
+        ..AnimationGraph::default()
     }
 }
 

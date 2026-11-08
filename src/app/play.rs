@@ -200,7 +200,7 @@ fn tick_nav(world: &mut World, res: &mut Resources) {
     nav.tick_nav_agents(&mut s, res.frame_dt);
 }
 
-/// `OnAnimationEvent(id, name)` (#459) for every event `animate` queued this
+/// `OnAnimationEvent(id, name, info)` (#459) for every event `animate` queued this
 /// tick: after the animation step and ragdoll posing, so a handler reads the
 /// pose this tick renders (bar `LateUpdate` and IK), and before `LateUpdate`, as
 /// in Unity, where animation events fire during the Animator's update.
