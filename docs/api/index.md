@@ -137,7 +137,7 @@ Component menu offers.
 |---|---|---|
 | `Awake` | `Awake(id)` | Once per script instance, when it first participates in the sim while its entity is `active`: at play-enter for active scene entities, at the head of the next tick's script phase for entities spawned during play (see the divergence note below) or loaded by `Scene.Load`, or on the entity's first active tick when it is loaded/spawned disabled. Always the instance's first callback. |
 | `Start` | `Start(id)` | Once per script instance, after its `Awake`, immediately before its first `Update` — deferred while the owning entity is inactive, so an object instantiated disabled initializes when first enabled (the spawn-pool pattern). |
-| `Update` | `Update(id, dt)` | Every frame of play while the owning entity is `active`, after the instance's `Start` has run. `dt` is the frame's scaled delta (`Time.deltaTime`); under the headless harness / `Time.Step` it is the fixed step. |
+| `Update` | `Update(id, dt)` | Every tick of play while the owning entity is `active`, after the instance's `Start` has run. `dt` is the tick's scaled delta (`Time.deltaTime`, the fixed step × `Time.timeScale`): every host runs it on the fixed tick (`Time.md`, *What runs at which rate*). |
 | `LateUpdate` | `LateUpdate(id, dt)` | Every frame of play while the owning entity is `active`, after **every** script's `Update` and after this tick's physics, animation and particle steps have resolved — the post-physics hook. Same scaled `dt` as `Update` (`Time.deltaTime`) and the same deterministic `(entity, script index)` order, still inside the one `FixedUpdate` sim tick — it is **not** a render-rate callback. Reach for it when a script must read *this* tick's settled transforms: follow-cameras, look-ats, aim, recoil recovery, and other post-move corrections that visibly lag by a step if run in `Update`. |
 | `OnTriggerEnter` | `OnTriggerEnter(id, other)` | Once, on the first frame an overlap involving a trigger collider (`is_trigger`) exists — before that frame's `OnTrigger`. A solid collider, static or not, never fires the trigger hooks: its contacts are `OnCollision*`. Two static colliders never pair: a static trigger reports only kinematic or dynamic colliders (Unity's rule). |
 | `OnTrigger` | `OnTrigger(id, other)` | After the physics step, once per overlapping pair involving a trigger collider (`is_trigger`). It is the overlap "stay": it repeats every frame the overlap persists, including the frame `OnTriggerEnter` fires. |
@@ -147,6 +147,7 @@ Component menu offers.
 | `OnCollisionExit` | `OnCollisionExit(id, other)` | Once, on the first frame the pair's surfaces no longer touch (or either collider is deactivated, or both sides are now static: `Scene.SetStatic`) — after that frame's `OnCollisionStay`. No `contact`: nothing is touching any more. |
 | `OnJointBreak` | `OnJointBreak(id, force, torque)` | Once, on the tick the entity's `Joint` carried more than its non-zero `break_force` (newtons) or `break_torque` (newton-metres) — after that tick's collision callbacks. `force` / `torque` are what it carried. The `Joint` component is already destroyed (Unity), so the bodies are free. |
 | `OnAnimationEvent` | `OnAnimationEvent(id, name)` | Once per animation event the entity's `Animator` crossed this tick (#459): an authored marker on the playing graph node or blend-tree child, or `"End"` when a non-looping clip or tree reaches its end. After the animation step (and ragdoll posing), before `LateUpdate`. Rules and order: [`Animator`](Animator.md), *Animation events*. |
+| `OnTakeDamage` | `OnTakeDamage(id, amount, event)` | Synchronously, inside a [`Damage`](Damage.md) call (#1893) — not by the tick. It bubbles: the nearest active entity from the one struck upward whose script defines it receives it. `event` carries the kind, type, instigator, causer and the hit or blast; a number return is the damage taken. Rules: [`Damage`](Damage.md). |
 | `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script's `Scene.SetActive(id, true)` re-enabling a pooled object). Detected by diffing whether the entity is active in the hierarchy against the previous tick (so a parent's `SetActive` fires its children's edges too), so it fires **exactly once** per rising edge. |
 | `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`/`OnCollision*`). |
 | `OnDestroy` | `OnDestroy(id)` | Once, when the entity is removed **during play** — by `Scene.DestroyEntity` on it or an ancestor, or because `Scene.Load` unloaded its scene (unless it was marked `Scene.DontDestroyOnLoad`) — after its `OnDisable` if it was active. The entity is still readable during the callback (removal happens just after). See the divergence note: **Stop does not fire `OnDestroy`.** |
@@ -179,6 +180,7 @@ as the receiver sees it (every point per pair is out of scope):
 - `relativeVelocity` — `{x, y, z}` `other`'s velocity minus the receiver's at the point, taken before this tick's solve — the closing speed of an impact (a ball falling at 5 m/s onto a floor reads `y = 5`).
 - `impulse` — Total normal impulse (N·s) the solver applied across the pair this tick; divide by `Time.deltaTime` for force.
 - `otherBody` — The entity owning `other`'s rigid body (its compound root; `other` itself when it is its own body).
+- `material` — The project path of the physics material asset `other`'s collider uses (#1878, see [Physics material assets](Physics.md)), or `nil` for an inline material or a path that no longer loads — what a footstep or an impact sound is chosen by.
 
 A contact *touches* once the surfaces are within 5 mm; rapier's speculative
 contacts further apart are not reported.
@@ -336,6 +338,7 @@ where it reads best. -->
 - [`Physics`](Physics.md)
 - [`Joint`](Joint.md)
 - [`Ragdoll`](Ragdoll.md)
+- [`Damage`](Damage.md)
 - [`CharacterController`](CharacterController.md)
 - [`Time`](Time.md)
 - [`Random`](Random.md)

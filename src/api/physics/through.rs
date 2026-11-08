@@ -11,7 +11,7 @@ use crate::api::ApiCell;
 use crate::physics::{PhysicsWorld, RayCrossing};
 use crate::scene::Scene;
 
-/// One crossing: `{id, bone, bone_name, root, thickness, enter = {distance,
+/// One crossing: `{id, bone, bone_name, root, material, thickness, enter = {distance,
 /// point, normal}, exit = {distance, point, normal} | nil}`.
 fn crossing_table(lua: &mlua::Lua, scene: &Scene, c: &RayCrossing) -> mlua::Result<Table> {
     let t = lua.create_table()?;

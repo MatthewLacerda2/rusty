@@ -408,8 +408,10 @@ per-bone overrides and what hangs from a bone.
 3. **Systems** — per-frame logic, a plain `fn(&mut World, &mut Resources)`, grouped
    into ordered stages (`Startup` once, then each frame
    `FixedUpdate → Update → LateUpdate → Render`). Order within a stage is the order
-   modules `register` them. `FixedUpdate` is the deterministic, fixed-dt stage the
-   headless harness steps, and today it holds the whole sim: the scripts' `Update`
+   modules `register` them. `FixedUpdate` is the deterministic, fixed-dt stage, and today it holds the whole
+   sim: every host runs it on the 1/60 s tick (the harness one tick per step, the
+   windowed loop through `shell::frame::ticks`' accumulator, drawing blended between
+   the last two ticks by `render::interpolate`, #1877), and the scripts' `Update`
    and `LateUpdate` callbacks run inside it as phases, between physics, animation
    and the rest, in `app::play::register`'s order. The `Update` stage is empty, and
    `LateUpdate` holds only UI sway.

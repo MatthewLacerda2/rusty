@@ -257,6 +257,7 @@ impl Renderer {
             probe_prefilter: Default::default(),
             capture: Default::default(),
             retained: Default::default(),
+            draw_poses: Default::default(),
             frame_counters: Default::default(),
             gpu_timer,
             render_texture_ids: Default::default(),

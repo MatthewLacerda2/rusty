@@ -106,16 +106,24 @@ impl Renderer {
         output: &wgpu::TextureView,
         editor_mode: bool,
     ) {
+        // The game's main view blended between the last two ticks (#1877): every
+        // camera entity is posed here, by `draw_poses`, never by a frontend.
+        let main = crate::scene::camera::main_camera(scene).filter(|_| !editor_mode);
+        let mut blended = camera.clone();
+        if let Some(id) = main {
+            self.draw_poses.pose_camera(&mut blended, scene, id);
+        }
+        let camera = &blended;
         let textures = match editor_mode {
             true => Vec::new(),
-            false => texture_cameras(camera, scene),
+            false => texture_cameras(camera, scene, &self.draw_poses),
         };
         self.gpu_timer.begin_frame();
         self.sync_render_textures(view, &textures);
         self.prepare_frame(view, scene, camera);
 
         // The ordered camera stack (one entry in edit mode / when no scene camera).
-        let screen = build_camera_stack(camera, scene, !editor_mode);
+        let screen = build_camera_stack(camera, scene, !editor_mode, &self.draw_poses);
         let stack = screen.cameras;
         // The screen's base camera's components, borrowed once for its post-FX,
         // SSAO and the sun's shadows (#1434).

@@ -47,10 +47,17 @@ impl Renderer {
             }
         };
         let rekeyed = self.apply_library(scene, rs, &library);
+        // Moving between two ticks moves what is drawn with no log entry (#1877); a
+        // rebuild poses them all anyway, but the set drawn blended is noted either way.
+        let between_ticks = self.draw_poses.repose(scene);
         let stats = match dirty {
             Dirty::Rebuild => self.rebuild_objects(scene, rs),
-            Dirty::Some { mut whole, posed } => {
+            Dirty::Some {
+                mut whole,
+                mut posed,
+            } => {
                 whole.extend(rekeyed);
+                posed.extend(between_ticks);
                 self.update_some(scene, rs, whole, posed)
             }
         };

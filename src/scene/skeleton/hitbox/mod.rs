@@ -22,7 +22,7 @@ pub use fit::{fit_hitboxes, HitboxFit, HitboxOptions};
 
 use glam::{Quat, Vec3};
 
-use crate::components::{ColliderComponent, PhysicsMaterial, TransformComponent};
+use crate::components::{ColliderComponent, TransformComponent};
 use crate::scene::layers::LAYER_COUNT;
 use crate::scene::Scene;
 
@@ -110,13 +110,20 @@ impl Scene {
             };
         }
         self.world.set_layer(id, layer);
+        // A refit keeps the hitbox's physics material (a "flesh" asset, #1878).
+        let (material, material_asset) = self
+            .world
+            .collider(id)
+            .map(|c| (c.material, c.material_asset.clone()))
+            .unwrap_or_default();
         self.world.set_collider(
             id,
             Some(ColliderComponent {
                 active: true,
                 shape: fit.shape.clone(),
                 is_trigger: false,
-                material: PhysicsMaterial::default(),
+                material,
+                material_asset,
                 shared_mesh: None,
                 aabb_min: Vec3::ZERO,
                 aabb_max: Vec3::ZERO,

@@ -15,6 +15,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+
+use crate::time::MAXIMUM_DELTA_TIME;
 use winit::window::Window;
 
 /// Frames drawn after a trigger, so what takes more than one frame to arrive does.
@@ -23,10 +25,6 @@ const SETTLE_FRAMES: u8 = 8;
 /// How long to wait before retrying a frame the swapchain refused (a hidden window,
 /// a GPU timeout), so a window hidden for hours doesn't spin on it.
 const RETRY_AFTER: Duration = Duration::from_millis(100);
-
-/// The longest step a frame drawn on demand hands the sim's clock: the gap before it
-/// was time asleep, not a frame. Unity's default `Time.maximumDeltaTime`, 1/3 s.
-const LONGEST_DEMAND_STEP: f32 = 1.0 / 3.0;
 
 /// How a frontend wants its frames right now.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -38,11 +36,14 @@ pub enum Pace {
 }
 
 impl Pace {
-    /// The step a frame `raw` seconds after the last one hands the sim's clock.
+    /// The step a frame `raw` seconds after the last one hands the sim's clock. A
+    /// frame drawn on demand follows time asleep, not a frame, so it is clamped to
+    /// [`MAXIMUM_DELTA_TIME`]; in Play the fixed-tick accumulator clamps
+    /// (`frame::ticks`).
     pub fn frame_step(self, raw: f32) -> f32 {
         match self {
             Pace::Continuous => raw,
-            Pace::OnDemand { .. } => raw.min(LONGEST_DEMAND_STEP),
+            Pace::OnDemand { .. } => raw.min(MAXIMUM_DELTA_TIME),
         }
     }
 }
