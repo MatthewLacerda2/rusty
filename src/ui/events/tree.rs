@@ -36,7 +36,8 @@ pub fn is_interactable(world: &World, id: u32) -> bool {
 }
 
 /// The nearest ancestor-or-self of `id` passing `pred` — Unity's
-/// `ExecuteEvents.GetEventHandler`, the walk every bubbled event takes.
+/// `ExecuteEvents.GetEventHandler`, the walk every bubbled event takes (the UI's
+/// and `Damage`'s, #1893).
 pub fn nearest(world: &World, id: u32, pred: impl Fn(u32) -> bool) -> Option<u32> {
     ancestors_or_self(world, id).into_iter().find(|&c| pred(c))
 }

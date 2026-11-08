@@ -1,5 +1,6 @@
 //! The bundled Player controller (#748): Space jumps — grounded only, on the rising
-//! edge, peaking ≈1.1 m — and left mouse (`Mouse0`) shoots once per press.
+//! edge, peaking ≈1.1 m — and left mouse (`Mouse0`) shoots once per press,
+//! delivering the shot through `Damage.ApplyPoint` (#1893).
 
 use rusty::dev::botplayer::attach_player_bot;
 use rusty::dev::harness::Harness;
@@ -70,15 +71,18 @@ fn no_double_jump_mid_air() {
 }
 
 /// Drives the bundled controller (the harness workspace's copy, #782), counting the
-/// casts it fires into `SHOTS`. The API is the VM's for its life (#1709), so the
+/// casts it fires into `SHOTS` and the hits it delivers into `DELIVERED`. The API is the VM's for its life (#1709), so the
 /// wrap is laid once, in `Start`.
 const SHOT_PROBE: &str = r#"
 local Controller = dofile("WORKSPACE/assets/scripts/player_controller.lua")
 local Probe = {}
 SHOTS = 0
+DELIVERED = 0
 function Probe.Start(id)
-    local cast = Physics.Raycast
-    Physics.Raycast = function(...) SHOTS = SHOTS + 1; return cast(...) end
+    local cast = Physics.RaycastAll
+    Physics.RaycastAll = function(...) SHOTS = SHOTS + 1; return cast(...) end
+    local apply = Damage.ApplyPoint
+    Damage.ApplyPoint = function(...) DELIVERED = DELIVERED + 1; return apply(...) end
     Controller.Start(id)
 end
 function Probe.Update(id, dt) Controller.drive(Controller, id, dt) end
@@ -121,4 +125,9 @@ fn left_mouse_shoots_once_per_press_and_space_does_not() {
     press(&h, "Mouse0");
     h.step(1);
     assert_eq!(shots(&h), "2", "the next press fires again");
+    assert_eq!(
+        eval(&h, "return DELIVERED"),
+        "2",
+        "each shot struck the level and was delivered"
+    );
 }

@@ -55,6 +55,12 @@ pub const ON_JOINT_BREAK: &str = "OnJointBreak";
 /// Dispatched after the animation step and ragdoll posing, before `LateUpdate`,
 /// in the order the playheads crossed them.
 pub const ON_ANIMATION_EVENT: &str = "OnAnimationEvent";
+/// Called synchronously inside a `Damage.Apply` / `ApplyPoint` / `ApplyRadial`
+/// call (#1893) — `(id, amount, event)` — on the nearest active ancestor-or-self
+/// of the struck entity whose script defines it (it bubbles, like the UI pointer
+/// callbacks). A number return is the damage taken. Not dispatched by the tick:
+/// `api::damage` calls it through the live instance index.
+pub const ON_TAKE_DAMAGE: &str = "OnTakeDamage";
 /// Called when the owning entity becomes active (#323): on its first activation
 /// — between `Awake` and `Start`, so the first-tick order is
 /// `Awake → OnEnable → Start` — and again on every later inactive→active edge.
@@ -123,6 +129,7 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_COLLISION_EXIT,
     ON_JOINT_BREAK,
     ON_ANIMATION_EVENT,
+    ON_TAKE_DAMAGE,
     ON_POINTER_ENTER,
     ON_POINTER_EXIT,
     ON_POINTER_DOWN,

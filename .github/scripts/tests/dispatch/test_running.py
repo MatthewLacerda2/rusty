@@ -32,9 +32,11 @@ def note(body: str, at: str, who: str = "OWNER") -> dict:
     return {"body": body, "created_at": at, "author_association": who}
 
 
-def hub(pulls=(), comments=None, closed=(), now=SOON) -> running.GitHub:
+def hub(pulls=(), comments=None, closed=(), now=SOON, shut=()) -> running.GitHub:
+    """`closed` names closed issues; `shut` lists closed pull requests (any issue's)."""
     return running.GitHub(pulls=list(pulls), comments=lambda n: (comments or {}).get(n, []),
-                          issue=lambda n: {"state": "closed" if n in closed else "open"}, now=now)
+                          issue=lambda n: {"state": "closed" if n in closed else "open"}, now=now,
+                          closed=lambda n: running.pulls_for(n, list(shut)))
 
 
 def placed(found: dict, github: running.GitHub) -> str:
@@ -89,10 +91,15 @@ class State(unittest.TestCase):
 
     def test_what_cannot_be_read_is_unknown(self):
         self.assertEqual(placed(NO_TIME, hub()), "unknown")
-        blind = running.GitHub(pulls=[], comments=lambda n: None, issue=lambda n: {"state": "open"}, now=SOON)
+        opened = {"state": "open"}
+        blind = running.GitHub(pulls=[], comments=lambda n: None, issue=lambda n: opened, now=SOON,
+                               closed=lambda n: [])
         self.assertEqual(placed(FIRED, blind), "unknown")
-        gone = running.GitHub(pulls=[], comments=lambda n: [], issue=lambda n: None, now=SOON)
+        gone = running.GitHub(pulls=[], comments=lambda n: [], issue=lambda n: None, now=SOON, closed=lambda n: [])
         self.assertEqual(placed(FIRED, gone), "unknown")
+        unlisted = running.GitHub(pulls=[], comments=lambda n: [], issue=lambda n: opened, now=SOON,
+                                  closed=lambda n: None)
+        self.assertEqual(placed(FIRED, unlisted), "unknown")
 
 
 class Coders(unittest.TestCase):
