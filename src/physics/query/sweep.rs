@@ -117,7 +117,7 @@ impl PhysicsWorld {
     /// `max_toi`, each at its own first contact, nearest first (ties by entity
     /// id): Unity's `SphereCastAll` and kin. The candidates are the colliders
     /// whose query-tree boxes the shape's box meets along the way
-    /// ([`swept_candidates`]); each is then cast exactly.
+    /// (`swept_candidates`); each is then cast exactly.
     pub fn shape_cast_all(
         &self,
         sweep: Sweep,

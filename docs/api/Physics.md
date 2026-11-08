@@ -125,9 +125,9 @@ exactly like `Raycast`. Unity analogues: `Physics.OverlapSphere` / `OverlapBox` 
   its own `SphereCast`'s rule for all of them, so a script tests `distance == 0`.
 - **Bad arguments are errors** on every shape cast and volume query: a radius or
   half-extent that is negative or not finite, a non-finite position, a
-  zero-length or overflowing direction (where Unity returns `false`), or an
-  orientation with only some of its three angles raises a Lua error naming the
-  argument. A size of `0` is valid, as in Unity: a zero radius overlaps a point
+  zero-length direction (where Unity returns `false`), or an orientation with
+  only some of its three angles raises a Lua error naming the argument. A
+  direction of any finite non-zero length is normalized, however tiny or huge. A size of `0` is valid, as in Unity: a zero radius overlaps a point
   (or a segment, for a capsule) and casts like a ray.
 - **`RaycastAll`** reports *every* collider the ray crosses within `max_distance`,
   sorted by distance (equal distances by entity id, so the order is
