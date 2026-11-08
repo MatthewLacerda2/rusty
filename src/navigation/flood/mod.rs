@@ -1,4 +1,4 @@
-//! src/navigation/flood.rs — one bounded Dijkstra flood from a point (#1892).
+//! src/navigation/flood/mod.rs — one bounded Dijkstra flood from a point (#1892).
 //!
 //! An environment query's `path` test asks, for every candidate spot, whether the
 //! querier can walk there and how far. One A\* per item is what Unreal pays; a
@@ -18,6 +18,9 @@ use glam::Vec3;
 
 use super::{in_mask, NavSpan, NavigationGraph, SpanRef, MIN_AREA_COST};
 use crate::core::collections::{Map, Set};
+use islands::Islands;
+
+mod islands;
 
 /// The spans a flood reached, each with its travel cost from the start.
 pub struct Flood {
@@ -202,93 +205,8 @@ impl NavigationGraph {
 const OVERDUE_STRETCH: f32 = 1.5;
 const OVERDUE_CELLS: f32 = 4.0;
 
-/// The most spans an island check visits before it calls a goal's piece of the
-/// navmesh "too big to be an island" and leaves it to the flood. A crate top or
-/// a roof is a few hundred spans at most.
-const ISLAND_SPANS: usize = 512;
-
-/// The island check: whether a goal's piece of navmesh is cut off from the start.
-/// It walks out from the goal over every connection in **either** direction
-/// (every span of a neighbouring column within a step, no corner rule, every
-/// off-mesh link both ways, no area mask): a superset of what can reach the
-/// goal, so a closed piece without the start proves the goal unreachable.
-struct Islands<'a> {
-    nav: &'a NavigationGraph,
-    /// Off-mesh link ends as `(span, other end's span)`, both ways, sorted; built
-    /// the first time a check runs.
-    links: Option<Vec<(u32, SpanRef)>>,
-    /// Spans already proven cut off.
-    cut: Set<u32>,
-}
-
-impl<'a> Islands<'a> {
-    fn new(nav: &'a NavigationGraph) -> Self {
-        Self {
-            nav,
-            links: None,
-            cut: Set::default(),
-        }
-    }
-
-    /// Whether `goal` lies on a piece of at most [`ISLAND_SPANS`] spans that
-    /// does not hold `start`.
-    fn cut_off(&mut self, goal: SpanRef, start: SpanRef) -> bool {
-        if self.cut.contains(&goal.index) {
-            return true;
-        }
-        let nav = self.nav;
-        let links = self.links.get_or_insert_with(|| link_ends(nav));
-        let mut seen: Set<u32> = Set::default();
-        seen.insert(goal.index);
-        let mut stack = vec![goal];
-        while let Some(s) = stack.pop() {
-            if s.index == start.index {
-                return false;
-            }
-            let a = nav.spans[s.index as usize];
-            let first = links.partition_point(|l| l.0 < s.index);
-            let jumps = links[first..].iter().take_while(|l| l.0 == s.index);
-            let mut next: Vec<SpanRef> = jumps.map(|l| l.1).collect();
-            for &(dx, dz, _) in &DIRS {
-                let (gx, gz) = (s.gx + dx, s.gz + dz);
-                let run = nav.run_between(s, gx, gz);
-                for i in nav.span_range(gx, gz) {
-                    if nav.steps(a, nav.spans[i], run) {
-                        next.push(SpanRef {
-                            gx,
-                            gz,
-                            index: i as u32,
-                        });
-                    }
-                }
-            }
-            for n in next {
-                if seen.insert(n.index) {
-                    if seen.len() > ISLAND_SPANS {
-                        return false;
-                    }
-                    stack.push(n);
-                }
-            }
-        }
-        self.cut.extend(seen);
-        true
-    }
-}
-
-/// Every off-mesh link's two end spans, each way round, sorted by the first.
-fn link_ends(nav: &NavigationGraph) -> Vec<(u32, SpanRef)> {
-    let mut out = Vec::new();
-    for link in nav.offmesh_links() {
-        if let (Some(a), Some(b)) = (nav.link_span(link.from), nav.link_span(link.to)) {
-            out.push((a.index, b));
-            out.push((b.index, a));
-        }
-    }
-    out.sort_unstable_by_key(|l| (l.0, l.1.index));
-    out
-}
+#[cfg(test)]
+mod tests;
 
 #[cfg(test)]
-#[path = "flood_tests.rs"]
-mod flood_tests;
+mod island_tests;
