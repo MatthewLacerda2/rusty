@@ -84,8 +84,13 @@ fn gpu_the_gather_follows_moved_flipped_and_new_casters() {
         "a stray, anywhere"
     );
     assert_eq!(near(&mut r, &scene, 90.0, false), [ids[0], ids[3], ids[4]]);
+}
 
-    // Past the strays' limit the BVH is rebuilt where they are now.
+#[test]
+fn gpu_past_the_strays_limit_the_bvh_is_rebuilt_where_they_are() {
+    let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
+        return;
+    };
     let mut big = yard(90);
     let all = big.world.ids_with_mesh();
     all.iter()
