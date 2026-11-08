@@ -98,7 +98,7 @@ pub struct Resources {
     /// The folder whose converted sources Play brings up to date before it starts
     /// (#1253): the project's `assets/`.
     pub(super) sources_root: std::path::PathBuf,
-    /// The scaled per-frame delta (`Time::delta_time`) for the tick in flight, set by
+    /// The scaled delta (`Time::delta_time`) of the tick in flight, set by
     /// `GameWorld::tick` before the schedule runs. Systems read it instead of taking
     /// `dt` as a third argument, keeping the call shape `(&mut World, &mut Resources)`.
     pub(super) frame_dt: f32,
