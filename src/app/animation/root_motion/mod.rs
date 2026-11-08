@@ -92,7 +92,7 @@ impl RootBone {
     }
 
     /// Whether `clip` keys any joint of the bone's chain.
-    fn keyed_by(&self, clip: &AnimationClip) -> bool {
+    pub(in crate::app::animation) fn keyed_by(&self, clip: &AnimationClip) -> bool {
         self.chain.iter().any(|&s| {
             clip.tracks
                 .get(s)

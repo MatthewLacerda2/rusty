@@ -23,7 +23,7 @@
 //! Every step's events are ordered by when in the step they were crossed, then
 //! by layer, then authored order — deterministic, and true time order.
 
-use crate::components::{Bounds, Motion, Playback, Playhead, Step};
+use crate::components::{Bounds, MontageEvent, Motion, Playback, Playhead, Step};
 
 use super::blend_tree::dominant_leaf;
 use super::motion::MotionContext;
@@ -43,6 +43,8 @@ pub struct Crossed {
     pub name: String,
     pub at: f32,
     pub layer: usize,
+    /// Whose it is, for a montage's engine events (#1894); `None` otherwise.
+    pub montage: Option<MontageEvent>,
 }
 
 /// Sort a step's events into firing order: by when in the step, then layer, then
@@ -78,6 +80,7 @@ impl MotionContext<'_> {
                     name: name.to_string(),
                     at,
                     layer,
+                    montage: None,
                 });
             }
         }
@@ -93,6 +96,7 @@ impl MotionContext<'_> {
                 name: END_EVENT.to_string(),
                 at,
                 layer,
+                montage: None,
             });
         }
         out

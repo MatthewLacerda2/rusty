@@ -1,22 +1,23 @@
 //! Corrupt and unsupported cube files (#1609): every one is refused, by the header
 //! read and the full parse alike, and none panics.
 
-use super::cubemap_tests::{build_cubemap_ktx2, R16G16B16A16_SFLOAT};
+use super::cubemap_tests::{build_cubemap_ktx2, BC6H_UFLOAT};
 use super::*;
 
 /// A valid 4-texel cube with its three mips, laid out as the bake writes them.
 fn mipped_cube() -> Vec<u8> {
-    let mut bytes = build_cubemap_ktx2(4, R16G16B16A16_SFLOAT, 6);
+    let mut bytes = build_cubemap_ktx2(4, BC6H_UFLOAT, 6);
     let index = HEADER + 3 * LEVEL_ENTRY;
     let base_at = u64_at(&bytes, HEADER) as usize;
-    // Room for two more index entries, then the 2- and 1-texel levels appended.
+    // Room for two more index entries, then the 2- and 1-texel levels appended,
+    // one padded block a face each.
     bytes.splice(index - 2 * LEVEL_ENTRY..index - 2 * LEVEL_ENTRY, [0; 48]);
     put_u32(&mut bytes, 40, 3);
     let dfd_at = u32_at(&bytes, 48);
     put_u32(&mut bytes, 48, dfd_at + 48);
     put_u64(&mut bytes, HEADER, base_at as u64 + 48);
-    for (level, edge) in [(1, 2u64), (2, 1)] {
-        let len = edge * edge * 48;
+    for level in [1, 2] {
+        let len = 16 * 6;
         let entry = HEADER + level * LEVEL_ENTRY;
         let at = bytes.len() as u64;
         put_u64(&mut bytes, entry, at);
@@ -63,7 +64,7 @@ fn a_mipped_cube_is_read_whole_by_both() {
 #[test]
 fn every_corrupt_or_unsupported_cube_is_refused_by_both() {
     const LAST: usize = HEADER + 2 * LEVEL_ENTRY;
-    let corrupt: [(&str, Corruption); 11] = [
+    let corrupt: [(&str, Corruption); 12] = [
         ("truncated", |b| b.truncate(b.len() - 1)),
         ("truncated in the header", |b| b.truncate(60)),
         ("truncated in the index", |b| b.truncate(HEADER + 30)),
@@ -76,6 +77,10 @@ fn every_corrupt_or_unsupported_cube_is_refused_by_both() {
         ("faces past the largest a probe bakes", |b| {
             put_u32(b, 20, 2 * MAX_FACE);
             put_u32(b, 24, 2 * MAX_FACE);
+        }),
+        ("faces not whole blocks", |b| {
+            put_u32(b, 20, 6);
+            put_u32(b, 24, 6);
         }),
         ("zstd-supercompressed", |b| put_u32(b, 44, 2)),
         ("a 3D cube", |b| put_u32(b, 28, 4)),

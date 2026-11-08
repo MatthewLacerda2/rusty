@@ -13,7 +13,8 @@
 /// are nearest the camera (its distance to each box, zero inside it, #1238), as many
 /// as the scene's byte budget holds (#1584); an object whose probe is past them
 /// reflects the sky. 32 cubes and the spares are 204 array layers (under wgpu's
-/// default limit of 256); the budget, not this cap, bounds their memory.
+/// default limit of 256). The budget bounds their memory; with BC6H cubes (#1885)
+/// the default budget pays for more 512-texel cubes than this cap shades.
 pub(crate) const MAX_REFLECTION_PROBES: usize = 32;
 
 /// The slots the array keeps past the ones it shades with, holding the cubes that
