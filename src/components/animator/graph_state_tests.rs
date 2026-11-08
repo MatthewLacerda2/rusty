@@ -19,6 +19,8 @@ fn run_node() -> GraphNode {
         is_loop: true,
         speed: Some(2.0),
         events: Vec::new(),
+        sync_group: None,
+        sync_markers: Vec::new(),
     }
 }
 

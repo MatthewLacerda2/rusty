@@ -60,6 +60,8 @@ pub fn set_graph(a: &mut AnimatorComponent, graph: Option<String>) {
     a.graph = graph;
     a.base.current_node = None;
     a.base.node_speed = 1.0;
+    // The old graph's sync group would otherwise match a new node's (#1896).
+    a.base.sync = Default::default();
     a.layers.clear();
     // A montage is what a script just did against the old graph (#1894).
     a.montages.clear();

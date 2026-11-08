@@ -48,7 +48,7 @@ mod watch;
 mod world;
 mod writes;
 
-pub use character::{can_stand, move_character, CharacterMove};
+pub use character::{can_stand, move_character, CharacterMove, ControllerHit};
 pub use events::collision::{CollisionEvents, CollisionPair, Contact};
 pub use events::trigger::TriggerEvents;
 pub use joints::JointBreak;

@@ -76,3 +76,21 @@ fn a_move_that_never_hits_the_ramp_still_reads_its_normal() {
         }
     }
 }
+
+/// Walking into a steep slope reports it to `OnControllerColliderHit` (#1879):
+/// the walk reaches the slope, and the contact of the pass the sweep reruns
+/// without the push into it is kept, so a push script can push a steep face.
+#[test]
+fn walking_into_a_steep_slope_reports_it_as_hit() {
+    for degrees in STEEP {
+        let (mut scene, id) = ramp_scene(degrees);
+        let mut physics = PhysicsWorld::from_scene(&scene);
+        let face = Vec3::new(-degrees.to_radians().sin(), degrees.to_radians().cos(), 0.0);
+        let mut heard = false;
+        for _ in 0..90 {
+            let moved = walk_for(&mut physics, &mut scene, id, Vec3::X * 4.0, 1);
+            heard |= moved.hits.iter().any(|h| (h.normal - face).length() < 0.05);
+        }
+        assert!(heard, "{degrees}°: the slope was never reported as hit");
+    }
+}

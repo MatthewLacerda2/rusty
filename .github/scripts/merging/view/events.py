@@ -11,7 +11,9 @@ hand-typed `tail -n 30 -F queue.log | grep` it replaced, and why:
   Dependabot PR, and a pull request turning ready, opening ready, going back
   to draft or closing unmerged (the watch's own `watch: #N …` lines,
   `watch.board.transitions`). PR #1870 sat ready for 90 minutes because the
-  hand-typed grep let no ready flip through. A CI poll line is dropped.
+  hand-typed grep let no ready flip through. A mutation request lost after a
+  merge (`after: …` dropped, could not, never appeared; #1934) passes, so a
+  lost report is told from a slow one. A CI poll line is dropped.
 - **Each merge once**: the watch says a merge as it lands (`#N: merged.` for
   a single take, `#N: merged — landed with the train <sha>.` for a train's
   member, `watch.trains.Yard.land`), and again in its closing summary; the
@@ -61,6 +63,8 @@ KEEP = re.compile(
     r"|watch: STOPPED:"
     r"|HELD #\d+"
     r"|watch: #\d+ (?:turned ready|opened as ready|back to draft|closed, not merged)"
+    # A mutation request lost, never a slow one (#1934): a signal nobody hears of is no signal.
+    r"|after: .*(?:dropped|could not|never appeared)"
 )
 
 MERGED = re.compile(r"#(\d+): merged\b")

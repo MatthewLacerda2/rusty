@@ -7,10 +7,11 @@
 # What replaces it is not silence: whoever just wrote tricky code asks for
 # exactly that code to be mutated, and reads the answer.
 #
-# The way in is `make mutants-remote SCOPE=...`, which dispatches this on the
-# current branch, waits, downloads the report and prints it
-# (`.github/scripts/mutants-remote.py`). By hand, or from a cloud session's
-# GitHub tools (`actions_run_trigger`), with the same two inputs:
+# By hand, the way in is `make mutants-remote SCOPE=...`, which dispatches this
+# on the current branch, waits, downloads the report and prints it
+# (`.github/scripts/mutants-remote.py`). Or directly, from `gh` or a cloud
+# session's GitHub tools (`actions_run_trigger`), with `scope` and optionally
+# `request` (`commit` and `pr` are the merge queue's, below):
 #
 #   gh workflow run mutants-on-request.yml --ref <branch> -f scope='<scope>'
 #
@@ -25,6 +26,14 @@
 # mutate, a baseline that does not build — because its caller must tell "no
 # survivors" from "no answer", and the run's conclusion is what it reads.
 # Survivors are a result and never turn it red.
+#
+# The merge queue is the usual caller (#1934): a coder writes a `Mutation:`
+# line in its pull request, and after the queue merges it, it dispatches this
+# on `main` with `commit` (the squash commit, checked out and diffed against
+# its parent) and `pr` (where the report goes), at most two at a time
+# (`.github/scripts/merging/after/`). Dispatching at ready, as coders did
+# before, held a third of the account's runners on 2026-11-08 while the
+# gating `ci` runs waited 20-40 minutes behind them.
 #
 # When the branch has an open or merged pull request, the report is also
 # posted on it, as one comment each later run edits in place (#912): a cloud
@@ -49,13 +58,24 @@ on:
         required: false
         default: by-hand
         type: string
+      commit:
+        description: Mutate this commit's own change, checked out (the merge queue's; with scope `diff`)
+        required: false
+        default: ""
+        type: string
+      pr:
+        description: Post the report on this pull request rather than the branch's
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
 
-# One run per branch (#1530). A coder dispatches a scoped run when it readies,
-# and a re-briefed coder again when it readies again; without this every older
-# run kept its runner for its full course, and on 2026-10-28 ten at once left
+# One run per branch (#1530). Coders used to dispatch a scoped run when they
+# readied, and again on each re-brief (the queue dispatches after the merge
+# now, #1934, but a by-hand `make mutants-remote` still runs on a branch);
+# without this every older run kept its runner for its full course, and on 2026-10-28 ten at once left
 # the merge queue's `ci` runs queued for 45 minutes. A newer dispatch on the
 # same ref cancels the older run. The group is a literal string, not
 # `${{ github.workflow }}`, because `mutants-cancel.yml` joins the same group
@@ -64,10 +84,12 @@ permissions:
 # `ci.yml` and `lint.yml` use groups of their own (`ci-…`, `lint-…`), so
 # nothing here can cancel a gating run.
 #
-# On `main` each run is its own group (its run id): once a branch has merged
-# and been deleted, the orchestrator re-asks narrower scopes there (`ci-merge`,
-# *Triaging a survivor*), and those requests are separate questions, not
-# replacements, so one must not cancel another.
+# On `main` each run is its own group (its run id): the merge queue's runs for
+# merged pull requests (#1934) and the orchestrator's narrower re-asks
+# (`ci-merge`, *Triaging a survivor*) are separate questions, not
+# replacements, so one must not cancel another. The queue holds its own runs
+# to two at a time, which a concurrency group could not do without
+# cancelling the waiting ones.
 #
 # Concurrency cannot rank runs: GitHub has no priority between workflows on
 # hosted runners, and one group for every branch would keep a single pending
@@ -99,9 +121,11 @@ jobs:
       - name: Start the clock
         run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       # Full history: a `diff` scope needs `origin/main` and the merge base.
+      # A queue request checks out its squash commit: `main` may have moved since.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ inputs.commit }}
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show
       - name: Cache cargo registry + target
@@ -128,7 +152,8 @@ jobs:
       - name: What was asked for
         env:
           SCOPE: ${{ inputs.scope }}
-        run: python3 .github/scripts/mutants-scope.py resolve "$SCOPE" --out plan.json --diff scope.diff
+          COMMIT: ${{ inputs.commit }}
+        run: python3 .github/scripts/mutants-scope.py resolve "$SCOPE" --commit "$COMMIT" --out plan.json --diff scope.diff
 
       # `--list` builds nothing and answers in seconds, so the size of the
       # request and what it covers are known before anything compiles.
@@ -189,7 +214,7 @@ jobs:
           cat report/report.md report/survivors.diff
 
       # The same report on the branch's open pull request, or its merged one
-      # when the queue merged it first, one comment edited in place by each
+      # when the queue merged it first (or the one the run names, `pr`), one comment edited in place by each
       # later run; a branch with neither (a run on `main`, a scratch branch, a
       # PR closed unmerged) gets no comment (#912, #1530).
       # `continue-on-error`: a comment that could not be posted is a lost
@@ -201,9 +226,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR: ${{ inputs.pr }}
         run: |
           python3 .github/scripts/mutants-pr-comment.py report/report.md \
-            --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --run-url "$RUN_URL"
+            --repo "$GITHUB_REPOSITORY" --branch "$BRANCH" --run-url "$RUN_URL" ${PR:+--pr "$PR"}
 
       - name: Keep the report
         uses: actions/upload-artifact@v7

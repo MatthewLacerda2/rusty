@@ -117,7 +117,7 @@ impl ScriptManager {
 }
 
 /// The physics material asset `other`'s collider names (#1878), as a hit does.
-fn material_of(scene: &crate::scene::Scene, other: u32) -> Option<String> {
+pub(super) fn material_of(scene: &crate::scene::Scene, other: u32) -> Option<String> {
     let collider = scene.world.collider(other)?;
     crate::scene::physics_material::named(&collider)
 }
