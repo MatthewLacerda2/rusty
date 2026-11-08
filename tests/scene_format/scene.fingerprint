@@ -161,6 +161,8 @@ scene.entities[].collider.material.bounce_combine: enum Average|Minimum|Multiply
 scene.entities[].collider.material.bounciness: f32
 scene.entities[].collider.material.friction: f32
 scene.entities[].collider.material.friction_combine: enum Average|Minimum|Multiply|Maximum
+scene.entities[].collider.material_asset: option
+scene.entities[].collider.material_asset: string
 scene.entities[].collider.shape: enum Box|Sphere|Cylinder|Capsule|Mesh
 scene.entities[].collider.shape<Box>.size: tuple(3)
 scene.entities[].collider.shape<Box>.size[]: f32

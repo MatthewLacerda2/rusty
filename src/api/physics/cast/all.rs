@@ -30,16 +30,26 @@ fn vec_into(lua: &mlua::Lua, t: &Table, key: &str, v: Vec3) -> mlua::Result<()> 
 }
 
 /// Set who a hit struck on `t`: `id`, its `bone`/`bone_name` (nil off a
-/// skeleton, clearing a reused entry's) and `root` (#464).
+/// skeleton, clearing a reused entry's), `root` (#464) and the physics `material`
+/// asset it is made of (#1878, nil for an inline one). Every hit table is written
+/// through here, so a new cast gets each field by calling it.
 pub(in crate::api::physics) fn set_owner(t: &Table, scene: &Scene, id: u32) -> mlua::Result<()> {
     let bone = scene.hit_bone(id);
     t.raw_set("id", id)?;
+    t.raw_set("material", hit_material(scene, id))?;
     t.raw_set("bone", bone)?;
     t.raw_set(
         "bone_name",
         bone.and_then(|b| scene.world.name(b).map(|n| n.clone())),
     )?;
     t.raw_set("root", scene.root_of(id))
+}
+
+/// The physics material asset a hit on entity `id`'s collider names (#1878):
+/// its path while the asset loads, else `None`.
+pub(super) fn hit_material(scene: &Scene, id: u32) -> Option<String> {
+    let collider = scene.world.collider(id)?;
+    crate::scene::physics_material::named(&collider)
 }
 
 /// Set where a hit landed on `t`: `distance`, `point = {x,y,z}`, `normal = {x,y,z}`.
@@ -74,7 +84,7 @@ fn hits_along(
 
 /// `RaycastAll(ox,oy,oz, dx,dy,dz, max_distance [, layer_mask [,
 /// query_triggers]])` — a fresh array of hit tables `{id, distance, point,
-/// normal, bone, bone_name, root}`, nearest first (ties by entity id).
+/// normal, bone, bone_name, root, material}`, nearest first (ties by entity id).
 /// `RaycastAllNonAlloc(results, <the same arguments>)` writes the same hits
 /// into `results` instead and returns their count.
 pub(super) fn register(

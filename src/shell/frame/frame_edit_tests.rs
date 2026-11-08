@@ -42,7 +42,7 @@ fn a_frozen_frame_outside_play_reloads_a_rewritten_model() {
     let triangle = "o Model\nv 0 0 0\nv 2 0 0\nv 2 2 0\nf 1 2 3\n";
     write(Path::new(&path), triangle.as_bytes()).unwrap();
 
-    advance_sim(&mut game, 0.02);
+    advance(&mut game, 0.02);
     assert!(!game.scene().borrow().is_playing());
     let indices = scene.borrow().world.mesh(id).unwrap().indices.len();
     assert_eq!(
@@ -68,7 +68,7 @@ fn a_frozen_frame_outside_play_reads_ui_texture_sizes() {
     let image = crate::procgen::Image::new(8);
     crate::procgen::bake::bake_to_png(&image, crate::procgen::Slot::BaseColor, &path).unwrap();
 
-    advance_sim(&mut game, 0.02);
+    advance(&mut game, 0.02);
     let size = game.resources.screen.borrow().textures().get(&path);
     assert_eq!(size, Some(glam::Vec2::splat(8.0)), "read on a frozen frame");
 }

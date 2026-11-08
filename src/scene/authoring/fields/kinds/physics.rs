@@ -26,6 +26,7 @@ inspect! {
         op!("shape", collider::set_shape),
         op!("is_trigger", collider::set_trigger),
         op!("material", collider::set_material),
+        with!("material_asset", |c, v: Option<String>| collider::set_material_asset(c, v)?),
         ro!("shared_mesh", "kept from the Mesh removed off a Mesh-shaped collider"),
     ];
     JointComponent => joint, joint_mut, &[

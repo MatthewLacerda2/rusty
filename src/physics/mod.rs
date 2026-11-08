@@ -32,6 +32,8 @@ mod live;
 mod live_tests;
 mod material;
 #[cfg(test)]
+mod material_asset_tests;
+#[cfg(test)]
 mod material_tests;
 mod query;
 mod recover;
