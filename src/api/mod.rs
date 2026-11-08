@@ -26,6 +26,7 @@ pub mod canvas;
 pub mod canvas_group;
 pub mod character_controller;
 pub mod component;
+pub mod damage;
 pub mod decals;
 pub mod entity_arg;
 pub mod graphics;
@@ -143,6 +144,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     camera::register(lua, ctx)?;
     canvas::register(lua, ctx.scene, ctx.screen, ctx.video)?;
     character_controller::register(lua, ctx.scene, ctx.physics)?;
+    damage::register(lua, ctx.scene, ctx.physics)?;
     decals::register(lua, ctx.scene)?;
     graphics::register(lua, ctx.scene, (ctx.graphics, ctx.screen), ctx.application)?;
     input::register(lua, ctx.input)?;

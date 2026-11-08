@@ -45,9 +45,20 @@ fn gpu_generate_bakes_lightmaps_then_probes_and_writes_the_scene() {
     let report = generate_lighting(&mut scene, Some(&path), None, &mut |_| {}, &mut log);
     drop(log);
     let report = report.unwrap();
-    // The log heard the lightmap step first and the total last (#1667).
+    // The log said its steps (#1897), heard the lightmap step first, and the total
+    // last (#1667), after what each step took (#1891).
     let lines = lines.into_inner();
-    assert!(lines[0].starts_with("[Lighting] lightmaps"), "{lines:?}");
+    assert!(
+        lines[0].starts_with("[Lighting] steps: lightmaps →"),
+        "{lines:?}"
+    );
+    assert!(
+        lines[1].starts_with("[Lighting] 0:01 lightmaps"),
+        "{lines:?}"
+    );
+    assert!(lines
+        .iter()
+        .any(|l| l.starts_with("[Lighting] occlusion took")));
     assert!(lines.last().unwrap().starts_with("[Lighting] done in"));
     assert_eq!(report.lightmaps, 1);
     assert!(report.probes.auto_placed_light, "the probe step ran after");

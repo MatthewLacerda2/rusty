@@ -30,6 +30,7 @@ mod camera;
 mod cast_shadows;
 mod character_controller;
 mod conversion_gate;
+mod damage;
 mod decals;
 mod default_ambient;
 mod entity_arg_api;
