@@ -29,8 +29,39 @@ a full bake of the scene would give, and an agent re-plans only when its path cr
 rebaked cell. A tick where no static entity changed skips the static colliders (the
 World's change log says so, #1707) and costs one pass over the obstacles, modifier volumes
 and links; a moving dynamic body never costs the static pass. So geometry can move every
-frame (a door swinging shut) and agents see it the same tick. Play's first frame bakes in full; so does a change of the bake settings or of
-the grid's bounds.
+frame (a door swinging shut) and agents see it the same tick. Wherever a scene gets its
+navmesh as a whole (loading the game, the player or the harness; Play's first frame; a
+play-mode `Scene.Load`; Stop) it starts from the scene's **saved navmesh** when it has one
+that still matches (below), and bakes in full when not, once; a change of the bake
+settings or of the grid's bounds bakes in full too.
+
+### The saved navmesh (#1887)
+
+A full bake can be **saved beside the scene**, as `<scene>.navmesh` (Unity's baked
+`NavMeshData`): the baked spans, the pre-erosion copy the incremental rebake splices, the
+generated off-mesh links, and a fingerprint of everything the bake read (the static
+colliders' world triangles, the carving obstacles, the modifier volumes, the authored links,
+the bake settings bar the area costs, and the grid). When a scene loads or Play starts, a
+file whose fingerprint matches the scene is used as is and **no bake runs**, so a shipped
+game pays no bake on a level load; the per-tick rebake then
+carries on from it exactly as from a bake. A stale, truncated or malformed file is ignored
+with one console warning, and Play bakes in full, as with no file: never a crash and never
+a half-loaded navmesh. Area costs are read at search time, so changing one keeps the file.
+
+`Navigation.Bake()` (and the editor's **Bake Navigation** button, under the scene's
+Navmesh section) bakes in full and, in a dev build in edit mode, keeps the result on the
+scene and writes the file. A scene save writes the navmesh the scene holds to its own path,
+so *Save As* carries it along and a scene baked before its first save gets its file on that
+save; a save never bakes. Generate Lighting does not bake the navmesh: the two are
+independent, as in Unity. Re-run `Navigation.Bake()` after editing the level: the file is
+only a head start, and a stale one costs a full bake on load, nothing more. A save rewrites
+the file only when the scene holds bytes it lacks: a Dust2-sized navmesh is tens of MB.
+The **Bake Navigation** button is live on the open scene's card only, as Generate
+Lighting's is, so it never writes the open scene's navmesh beside another scene.
+
+| Function | Signature | Returns / Effect |
+|---|---|---|
+| `Navigation.Bake` | `()` | bakes the navmesh in full now; in a dev build in edit mode also saves it beside the scene, returning `true` when `<scene>.navmesh` was written (`false`: an unsaved scene, whose first save writes it, Play, or a ship build) |
 
 Every query resolves the start and the target to spans with one rule: **the nearest
 span below the point, favouring the floor under a character's feet** — the highest floor
@@ -190,7 +221,7 @@ not a floor.
 | `Navigation.SetMaxSlope` | `(slope)` | writes `nav_settings.max_slope` + re-bakes |
 | `Navigation.GetMaxStep` | `()` | max step height between spans in adjacent cells |
 | `Navigation.SetMaxStep` | `(step)` | writes `nav_settings.max_step` + re-bakes |
-| `Navigation.GetGridSpacing` | `()` | grid cell size (world units) |
+| `Navigation.GetGridSpacing` | `()` | grid cell size (world units); `0.25` by default (#1887), half the default agent radius |
 | `Navigation.SetGridSpacing` | `(spacing)` | writes `nav_settings.grid_spacing` + re-bakes (re-shapes the grid) |
 
 ### Navmesh bounds (#452)

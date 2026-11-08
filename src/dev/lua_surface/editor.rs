@@ -3,6 +3,11 @@
 //! `Editor.Undo()` / `Editor.Redo()` walk the edit-mode history (`scene::undo`, #1631),
 //! Unity's `Undo.PerformUndo` / `PerformRedo`; `UndoName` / `RedoName` read it.
 //!
+//! `Editor.SetGizmo` / `Editor.GetGizmo` (#1909), Unity's
+//! `GizmoUtility.SetGizmoEnabled`: the Scene view's gizmo toggles, by the names of
+//! `core::application::Gizmo`'s table, through the same mailbox the demo verbs use
+//! (`gizmo_verbs`).
+//!
 //! Unity's `EditorApplication.isPlaying`: `Editor.EnterPlay()` / `Editor.ExitPlay()`
 //! make the same transition the Play/Stop button makes, and `Editor.IsPlaying()` reads
 //! the play state. A call only *requests* the transition (on the shared
@@ -19,7 +24,7 @@ use mlua::Lua;
 
 use crate::api::ApiCell;
 use crate::api::{put, ApiCtx, Reg};
-use crate::core::application::{Application, DemoRequest};
+use crate::core::application::{Application, DemoRequest, Gizmo};
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
@@ -46,6 +51,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     )?;
     undo_verbs(&table, lua, scene)?;
     demo_verbs(&table, lua, app, console)?;
+    gizmo_verbs(&table, lua, app, console)?;
     lua.globals()
         .set("Editor", table)
         .map_err(|e| e.to_string())
@@ -152,6 +158,58 @@ fn demo_verbs(
         "DemoLength",
         lua.create_function(move |lua, ()| {
             Ok(app.get(lua)?.borrow().demo_tick().map(|(_, of)| of))
+        }),
+    )
+}
+
+/// The Scene view's gizmo toggles (#1909), Unity's `GizmoUtility.SetGizmoEnabled`:
+/// `SetGizmo` lands in the shared `Application` (read back at once) and the editor
+/// window takes it at the frame boundary. Only the editor window has a Scene view, so
+/// any other host refuses a set; an unknown name warns.
+fn gizmo_verbs(
+    table: &mlua::Table,
+    lua: &mlua::Lua,
+    app: ApiCell<Application>,
+    console: ApiCell<ConsoleLogs>,
+) -> Reg {
+    let named = move |lua: &mlua::Lua, verb: &str, name: &str| -> mlua::Result<Option<Gizmo>> {
+        let gizmo = Gizmo::named(name);
+        if gizmo.is_none() {
+            let names: Vec<_> = Gizmo::ALL.iter().map(|g| g.row().name).collect();
+            console.get(lua)?.borrow_mut().warn(format!(
+                "Editor.{verb}: no gizmo {name:?} (one of {})",
+                names.join(", ")
+            ));
+        }
+        Ok(gizmo)
+    };
+    put(
+        table,
+        "SetGizmo",
+        lua.create_function(move |lua, (name, on): (String, bool)| {
+            let Some(gizmo) = named(lua, "SetGizmo", &name)? else {
+                return Ok(false);
+            };
+            let app = app.get(lua)?;
+            let mut app = app.borrow_mut();
+            if !app.gizmo_viewer() {
+                console.get(lua)?.borrow_mut().warn(
+                    "Editor.SetGizmo: refused: only the editor window has a Scene view".to_string(),
+                );
+                return Ok(false);
+            }
+            app.request_gizmo(gizmo, on);
+            Ok(true)
+        }),
+    )?;
+    put(
+        table,
+        "GetGizmo",
+        lua.create_function(move |lua, name: String| {
+            let Some(gizmo) = named(lua, "GetGizmo", &name)? else {
+                return Ok(None);
+            };
+            Ok(Some(app.get(lua)?.borrow().scene_gizmos().on(gizmo)))
         }),
     )
 }

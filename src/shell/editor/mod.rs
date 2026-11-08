@@ -160,8 +160,7 @@ impl EditorFrontend {
             // demo replays the scale it recorded.
             crate::shell::settings::report_display_scale(shell, game);
         }
-        self.sync_quality(shell, game);
-        self.sync_speaker_mode(game);
+        self.sync_shared(shell, game);
         #[cfg(feature = "dev")]
         self.editor_ui
             .dev

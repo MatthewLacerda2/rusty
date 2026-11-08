@@ -19,7 +19,7 @@ use crate::scene::{Camera, Scene};
 
 /// The bench level, `n × n` rooms, with three shadowed lamps of `range` in each
 /// ground room.
-fn lit(n: usize, range: f32) -> (Scene, Vec<(u32, Vec3)>) {
+pub(super) fn lit(n: usize, range: f32) -> (Scene, Vec<(u32, Vec3)>) {
     let mut scene = rooms(n);
     let mut lamps = Vec::new();
     for (i, j) in (0..n).flat_map(|i| (0..n).map(move |j| (i, j))) {

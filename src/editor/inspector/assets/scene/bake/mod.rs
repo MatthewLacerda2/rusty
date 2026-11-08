@@ -103,7 +103,7 @@ pub fn draw(
         .on_disabled_hover_text(if open {
             "Stop Play first, or wait for the bake"
         } else {
-            "Open this scene to bake it"
+            NOT_OPEN
         });
     // The diffuse model is greyed out with the knobs: lightmaps and probes bake one
     // after the other, and a change between them would save two models as one.
@@ -122,11 +122,14 @@ pub fn draw(
     draw_progress(ui, editor);
 }
 
+/// Why a bake button is greyed out on a scene card that is not the open scene.
+pub(super) const NOT_OPEN: &str = "Open this scene to bake it";
+
 /// Whether the card's scene file is the editor's open scene. Unity bakes the open
 /// scene only, so the button is live on that card alone (#1394). Compared
 /// canonically: the same file spelled relative and absolute is one scene, while
 /// `DiskText` keys the engine's own writes by exact spelling.
-fn is_open_scene(editor: &EditorUi, card: &str) -> bool {
+pub(super) fn is_open_scene(editor: &EditorUi, card: &str) -> bool {
     let Some(open) = editor.current_scene_path() else {
         return false;
     };

@@ -56,7 +56,9 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
     // Heavy baked SH lives beside the scene in `<scene>.lighting.json`, not inline in
     // the human-diffable scene doc (#240). Written only when probes are baked.
     crate::scene::lighting::io::save_lighting_sidecar(scene, path)?;
-    Ok(())
+    // The saved navmesh (#1887), when the scene holds one the file lacks: a save
+    // never bakes it.
+    crate::scene::nav_settings::save_navmesh(scene, path).map(|_| ())
 }
 
 /// Why [`save_to_file`] refused: the World holds the play state, not the scene.
@@ -106,6 +108,7 @@ pub fn load_parsed(
     // withholding the record would buy no retry, only a reload that discards
     // unsaved edits on the next Generate Lighting, `touch` or rescan (#1374).
     scene.disk_text.record(path, json);
+    crate::scene::nav_settings::load_navmesh(scene, path);
     // Merge the baked SH back onto the just-loaded probe positions (#240). A missing
     // sidecar is fine — probes load with zero SH (positions placed, never baked).
     crate::scene::lighting::io::load_lighting_sidecar(scene, path).map_err(LoadError::Sidecar)

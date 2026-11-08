@@ -27,6 +27,13 @@ class Riding(unittest.TestCase):
         self.assertEqual(results, [(n, outcomes.MERGED) for n in (1, 2, 3, 4)])
         self.assertEqual((fx.pushed, len(fx.deleted)), ([[1, 2, 3, 4]], 1))
 
+    def test_the_wait_is_given_every_members_files(self):
+        # #1932: a member editing what the setup steps run makes a setup red the train's code's.
+        fx = Fx(LINE)
+        go(fx)
+        self.assertEqual(sorted(fx.paths), sorted(p for n in (1, 2, 3, 4) for p in fx.ns.files(n, "")))
+        self.assertTrue(fx.paths)
+
     def test_a_tree_mismatch_stops_the_watch(self):
         fx = Fx(LINE)
         fx.tree_override = "something else"
