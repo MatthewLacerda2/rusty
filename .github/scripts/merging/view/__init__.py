@@ -12,7 +12,9 @@ wrong; these are the two fixed commands instead:
 
 - [`status`]: whether a supervisor runs, read from its worktree lock's PID
   (`watch.tenancy.pid_of`) and checked alive, never by matching a pattern
-  against every command line; and the log's last line, with its age.
+  against every command line; and the log's last line, with its age; and
+  ([`stranded`], #1951) each ready, labelled pull request the watch has
+  passed over for more than an hour on a green head, with why.
 - [`events`]: the log from 30 lines back, filtered to what the orchestrator
   acts on, plus coders' *Standing down* comments ([`standing`]), and an exit
   with status 1 the moment the supervisor is not running, so a dead queue is

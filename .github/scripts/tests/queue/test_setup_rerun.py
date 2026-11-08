@@ -58,14 +58,14 @@ class PullRequest(unittest.TestCase):
         calls, patch = reruns()
         with patch:
             state, lines = flicker.waited([setup_red(), setup_red(2)])
-        self.assertEqual((state, len(calls)), (outcomes.STOP, 1))
+        self.assertEqual((state, len(calls)), (outcomes.RED, 1))
         self.assertTrue(lines[0].startswith(outcomes.RUNNERS), lines)
 
     def test_a_failed_test_step_is_handed_back_at_once(self):
         calls, patch = reruns()
         with patch:
             state, _ = flicker.waited([tested_red()])
-        self.assertEqual((state, calls), (outcomes.STOP, []))
+        self.assertEqual((state, calls), (outcomes.RED, []))
 
 
 class Train(unittest.TestCase):

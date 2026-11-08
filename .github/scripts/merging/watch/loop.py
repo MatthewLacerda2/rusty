@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from merging.queue import outcomes
 from merging.watch import aging, board, ending, handbacks, mainline, order, stalls
 
@@ -34,7 +36,15 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     [`outcomes.STALLED`] one (it outwaited its runs, #1831) also comes back when
     `stalled(pull)` ([`stalls.reading`] of its head's runs, or `None`) says every
     run on it went green ([`stalls.returned`]); one that ended otherwise is said
-    once and waits like a red one.
+    once and waits like a red one. An [`outcomes.RED`] one (a red gating run,
+    #1951) comes back when `stalled(pull)` reads its unmoved head green
+    ([`handbacks.greened`]), and its #869 mark is the runs its verdict read
+    ([`outcomes.Handed.mark`]), never a later read, as every CI wait's stop's is.
+    `reddened(pull)` reads its head as `stalled` does, but answers red from the
+    runs listing alone (no jobs fetched) once a run there is red; it defaults
+    to `stalled`. Each hand-back's time
+    (`wall()`, seconds since the epoch) and reason are kept for `make
+    queue-status` ([`handbacks.WHY_MEMORY`]).
     `stale_code()` names the queue's files that changed on `main` since launch
     ([`freshness.changed`]); asked before each take, a non-empty answer ends the
     watch ([`ending.relaunch`]) with the pull request untaken.
@@ -53,6 +63,9 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
     issues = handbacks.recall(fx.memory.with_name(handbacks.ISSUES_MEMORY))
     reviews = handbacks.recall(fx.memory.with_name(handbacks.REVIEWS_MEMORY))
     stalled = handbacks.recall(fx.memory.with_name(handbacks.STALLS_MEMORY))
+    reds = handbacks.recall(fx.memory.with_name(handbacks.RED_MEMORY))
+    whys = handbacks.recall(fx.memory.with_name(handbacks.WHY_MEMORY))
+    wall = getattr(fx, "wall", time.time)
     line = aging.Line()
     shown = [None]  # the board as last reported; `None` until the first listing
     after = getattr(fx, "mutants", None)  # the mutation runs merged pull requests asked for (#1934)
@@ -64,10 +77,12 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
         handbacks.remember(fx.memory.with_name(handbacks.ISSUES_MEMORY), {n: i for n, i in issues.items() if n in memory})
         handbacks.remember(fx.memory.with_name(handbacks.REVIEWS_MEMORY), {n: r for n, r in reviews.items() if n in memory})
         handbacks.remember(fx.memory.with_name(handbacks.STALLS_MEMORY), {n: s for n, s in stalled.items() if n in memory})
+        handbacks.remember(fx.memory.with_name(handbacks.RED_MEMORY), {n: r for n, r in reds.items() if n in memory})
+        handbacks.remember(fx.memory.with_name(handbacks.WHY_MEMORY), {n: w for n, w in whys.items() if n in memory})
 
     def forget(number: int) -> None:
         """Drop everything remembered against `number`: it is back in line."""
-        for kept in (memory, marks, claims, issues, reviews, stalled):
+        for kept in (memory, marks, claims, issues, reviews, stalled, reds, whys):
             kept.pop(number, None)
 
     def report(pulls: list[dict]) -> None:
@@ -116,9 +131,17 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
                     issues[number] = handbacks.spell(result.issues)
                 if waits == outcomes.AWAITS_REVIEW:
                     reviews[number] = waits
-            mark = fx.attempts(number, memory[number])
+            # A CI wait's stop carries the verdict's own runs, never a later read (#1951);
+            # any other hand-back (a conflict, a landing refusal) asks GitHub now.
+            mark = getattr(result, "mark", None)
+            if mark is None:
+                mark = fx.attempts(number, memory[number])
             if mark is not None:
                 marks[number] = mark
+            if state == outcomes.RED:
+                reds[number] = mark
+                waits = outcomes.RED
+            whys[number] = {"at": wall(), "why": result[2]}
             handed.append(number)
             fx.say(ending.handed_back(number, result[2], waits))
         return None
@@ -152,8 +175,14 @@ def run(fx, opts) -> tuple[list[tuple[int, str, str]], str, int]:
             forget(number)
             fx.say(f"watch: #{number}'s runs, which its hand-back outwaited, went green; back in line.")
         for number, why in ended:
-            stalled.pop(number)  # an ordinary hand-back from here: a re-run or a push brings it back
+            stalled.pop(number)  # a red hand-back from here (#1951): green runs, a re-run or a push bring it back
+            reds[number] = marks.get(number, "")
             fx.say(ending.stall_ended(number, why))
+        # A stall just moved to `reds` was read this pass already: asked next pass.
+        fresh = {n: r for n, r in reds.items() if n not in dict(ended)}
+        for number in handbacks.greened(pulls, memory, fresh, getattr(fx, "reddened", fx.stalled)):
+            forget(number)
+            fx.say(f"watch: #{number}'s runs on its handed-back head read green now; back in line.")
         for number in handbacks.reworded(pulls, memory, claims):
             forget(number)
             fx.say(f"watch: #{number}'s description or labels changed since its hand-back; back in line.")

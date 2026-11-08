@@ -112,9 +112,12 @@ coder *changing* it must know.
   meant for rusty's watch killed scorsese's too. Find rusty's by its working directory
   (`lsof -a -p <pid> -d cwd`) and kill that PID.
 - **Each kind of hand-back is re-admitted by what fixes it, and only that**
-  (`merging/watch/handbacks.py`): a push or a new run attempt for all, an edit,
-  an issue, a review comment or (#1831, `merging/watch/stalls.py`) the outwaited
-  runs going green for its own kind, each in its own side memory. A signal
+  (`merging/watch/handbacks.py`): a push for all; a new run attempt against its
+  mark for every one that has a mark (every CI wait's stop carries the verdict's
+  own runs as its mark, never a later read, #1951); and for its own kind, each in
+  its own side memory, an edit, an issue, a review comment, or a state read now:
+  the outwaited runs going green (#1831, `merging/watch/stalls.py`) and a red
+  run's head reading green (#1951, `handbacks.greened`). A signal
   added to the mark every hand-back shares re-admits them all: #1831's first
   draft put "a run ended" there, which would have brought a red head back each
   time another run on it ended, and pushed a `main` merge onto unfixed code.

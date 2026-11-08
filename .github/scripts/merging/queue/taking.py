@@ -112,6 +112,10 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         return number, outcomes.REQUEUED, f"{lines[0]} Back in line on its new head."
     if state == outcomes.STALLED:  # outwaited, nothing red (#1831): the watch asks again
         return number, outcomes.STALLED, lines[0]
+    if state in (outcomes.RED, outcomes.STOP) and isinstance(lines, outcomes.Marked):
+        # Every stop of the CI wait carries the verdict's runs as its mark (#1951);
+        # a red one is its own kind, which the watch re-reads until it is green.
+        return outcomes.Handed(number, outcomes.RED if state == outcomes.RED else outcomes.HANDED_BACK, lines[0], lines.mark)
     if state != outcomes.GO:
         return number, outcomes.HANDED_BACK, lines[0]
     if opts.no_merge:
