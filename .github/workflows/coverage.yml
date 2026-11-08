@@ -18,8 +18,8 @@ name: coverage
 on:
   # Mondays, 05:23 UTC: off the hour, clear of `ci.yml`'s nightly run
   # (03:07), and two days after `mutants-sweep.yml` starts (Saturdays 04:41).
-  # The sweep's `max-parallel` is sized to end by Sunday evening (≈ 37 h, its
-  # comment has the arithmetic), so the two do not cold-build at once.
+  # The sweep's `mutants-plan` picks its width to end by Sunday 23:59 UTC
+  # (`.github/scripts/mutants-shards.py`), so the two do not cold-build at once.
   schedule:
     - cron: '23 5 * * 1'
   workflow_dispatch:
