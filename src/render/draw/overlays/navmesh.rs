@@ -6,11 +6,12 @@
 //! the span's floor plane) and hands them over with a revision through
 //! [`Renderer::set_navmesh`]. Render only uploads them.
 //!
-//! **Built when the graph changes, never per frame.** The other overlays rebuild
-//! their buffers every frame; a Dust2-sized navmesh is hundreds of thousands of
-//! quads, so the vertex buffer is kept ([`Kept`]) and rebuilt only when the revision
-//! the shell names moves (a bake, an edit-mode rebake, a load). A frame with the
-//! same revision builds no triangle and uploads nothing.
+//! **Patched where the graph changed, never rebuilt per frame.** The other overlays
+//! rebuild their buffers every frame; a Dust2-sized navmesh is hundreds of thousands
+//! of quads, so it is kept as one vertex buffer per tile of cells, and the shell
+//! hands over ([`NavMeshPatch`]) only the tiles a rebake touched: dragging a crate
+//! re-uploads the few tiles around it. A frame on which the graph did not change
+//! uploads nothing; a new graph or a re-shaped grid starts over.
 //!
 //! **Drawn translucent.** Its own pipeline over `engine/shaders/gizmos/navmesh.wgsl`:
 //! a bare 12-byte position per vertex, alpha-blended, depth-tested against the
@@ -33,43 +34,42 @@ pub(crate) const NAVMESH_TINT: [f32; 4] = [0.2, 0.8, 1.0, 0.4];
 /// One vertex's bytes: a world position.
 const VERTEX_BYTES: u64 = 12;
 
-/// A value built from a source named by a revision, rebuilt only when it moves.
-pub(crate) struct Kept<B> {
-    revision: Option<u64>,
-    built: Option<B>,
+/// The graph a navmesh was handed from, exactly: which instance (its address) and
+/// its grid's shape, so a replaced graph or a re-shaped grid reads as new whatever
+/// its generation says. Render cannot name the graph, so the shell fills it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NavMeshSource {
+    pub instance: usize,
+    pub width: i32,
+    pub height: i32,
+    /// The grid's `min_x`, `min_z` and spacing, as bits.
+    pub grid: [u32; 3],
 }
 
-impl<B> Default for Kept<B> {
-    fn default() -> Self {
-        Self {
-            revision: None,
-            built: None,
-        }
-    }
+/// What the kept buffers show: a source at one bake generation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NavMeshRevision {
+    pub source: NavMeshSource,
+    pub generation: u64,
 }
 
-impl<B> Kept<B> {
-    /// Rebuild with `build` when `revision` is not the one last built from; returns
-    /// whether it rebuilt. `build` returning `None` keeps nothing (an empty mesh).
-    pub(crate) fn refresh(&mut self, revision: u64, build: impl FnOnce() -> Option<B>) -> bool {
-        if self.revision == Some(revision) {
-            return false;
-        }
-        self.revision = Some(revision);
-        self.built = build();
-        true
-    }
-
-    /// What was last built, if anything.
-    pub(crate) fn get(&self) -> Option<&B> {
-        self.built.as_ref()
-    }
+/// A rewrite of the kept tiles: `reset` (a tile count) drops every tile first and
+/// starts over; `tiles` are the tiles rebuilt, each with its world-space
+/// triangles (three vertices a triangle). The tiling is the shell's.
+pub struct NavMeshPatch<I> {
+    pub revision: NavMeshRevision,
+    pub reset: Option<usize>,
+    pub tiles: I,
 }
 
-/// The gizmo's pipeline and its kept vertex buffer (with its vertex count).
+/// The gizmo's pipeline and its kept vertex buffers, one per tile (with its vertex
+/// count; `None`: nothing walkable there).
 pub(crate) struct NavMeshGizmo {
     pipeline: LazyPipeline,
-    mesh: Kept<(wgpu::Buffer, u32)>,
+    revision: Option<NavMeshRevision>,
+    tiles: Vec<Option<(wgpu::Buffer, u32)>>,
+    /// Whether the "too large to draw whole" warning was given (it is given once).
+    warned: bool,
 }
 
 impl NavMeshGizmo {
@@ -123,7 +123,9 @@ impl NavMeshGizmo {
         });
         Self {
             pipeline,
-            mesh: Kept::default(),
+            revision: None,
+            tiles: Vec::new(),
+            warned: false,
         }
     }
 
@@ -141,29 +143,46 @@ pub(crate) fn vertices_that_fit(len: usize, max_bytes: u64) -> usize {
 }
 
 impl Renderer {
-    /// The shell hands over the baked navmesh (#1910): `revision` names the graph it
-    /// comes from, and `triangles` (world space, three vertices a triangle) is called
-    /// only when it differs from the last one handed over. Returns whether the
-    /// vertex buffer was rebuilt.
-    pub fn set_navmesh(&mut self, revision: u64, triangles: impl FnOnce() -> Vec<Vec3>) -> bool {
-        let device = &self.device;
-        self.navmesh.mesh.refresh(revision, || {
-            let triangles = triangles();
-            let count = vertices_that_fit(triangles.len(), device.limits().max_buffer_size);
-            if count < triangles.len() {
-                log::warn!("[Gizmos] the navmesh is too large to draw whole: part is left out");
+    /// What the kept navmesh shows, for the shell to diff against (#1910).
+    pub(crate) fn navmesh_revision(&self) -> Option<NavMeshRevision> {
+        self.navmesh.revision
+    }
+
+    /// Apply the shell's `patch` to the kept navmesh: upload only the tiles it
+    /// names. Returns the bytes uploaded.
+    pub(crate) fn set_navmesh<I>(&mut self, patch: NavMeshPatch<I>) -> u64
+    where
+        I: IntoIterator<Item = (usize, Vec<Vec3>)>,
+    {
+        let gizmo = &mut self.navmesh;
+        if let Some(count) = patch.reset {
+            gizmo.tiles = (0..count).map(|_| None).collect();
+        }
+        gizmo.revision = Some(patch.revision);
+        let max_bytes = self.device.limits().max_buffer_size;
+        let mut bytes = 0;
+        for (index, triangles) in patch.tiles {
+            let Some(slot) = gizmo.tiles.get_mut(index) else {
+                continue;
+            };
+            let count = vertices_that_fit(triangles.len(), max_bytes);
+            if count < triangles.len() && !gizmo.warned {
+                gizmo.warned = true;
+                log::warn!("[Gizmos] a navmesh tile is too large to draw whole: part is left out");
             }
-            let positions: Vec<[f32; 3]> =
-                triangles[..count].iter().map(|p| p.to_array()).collect();
-            (count > 0).then(|| {
-                let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("NavMesh Gizmo Vertices"),
-                    contents: bytemuck::cast_slice(&positions),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+            bytes += count as u64 * VERTEX_BYTES;
+            *slot = (count > 0).then(|| {
+                let buffer = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("NavMesh Gizmo Tile"),
+                        contents: bytemuck::cast_slice(&triangles[..count]),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
                 (buffer, count as u32)
-            })
-        })
+            });
+        }
+        bytes
     }
 
     /// The gizmo's slot of `draws`, while `gizmos` has it on and a navmesh is kept.
@@ -172,7 +191,7 @@ impl Renderer {
         gizmos: &SceneGizmos,
         draws: &mut OverlayDraws,
     ) -> Option<u32> {
-        if !gizmos.on(Gizmo::NavMesh) || self.navmesh.mesh.get().is_none() {
+        if !gizmos.on(Gizmo::NavMesh) || self.navmesh.tiles.iter().all(Option::is_none) {
             return None;
         }
         Some(draws.push(Mat4::IDENTITY, NAVMESH_TINT))
@@ -185,13 +204,15 @@ impl Renderer {
         bindings: &'a OverlayBindings,
         slot: Option<u32>,
     ) {
-        let (Some(slot), Some((buffer, count))) = (slot, self.navmesh.mesh.get()) else {
+        let Some(slot) = slot else {
             return;
         };
         pass.set_pipeline(self.navmesh.pipeline.get());
-        pass.set_vertex_buffer(0, buffer.slice(..));
         bindings.bind(pass, slot);
-        pass.draw(0..*count, 0..1);
+        for (buffer, count) in self.navmesh.tiles.iter().flatten() {
+            pass.set_vertex_buffer(0, buffer.slice(..));
+            pass.draw(0..*count, 0..1);
+        }
         pass.set_pipeline(self.line_pipeline.get());
     }
 }

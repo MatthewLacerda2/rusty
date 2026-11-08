@@ -40,7 +40,7 @@ flag, `docs/testing.md`).
 | `"LightProbes"` | **Light Probes** | a cross at each light probe, tinted by the light it baked | on |
 | `"ReflectionProbes"` | **Reflection Probes** | each reflection probe's capture point and parallax box | on |
 | `"Colliders"` | **Colliders** | every collider's real shape (box, sphere, capsule, cylinder, hull and mesh edges) in Unity's green, triggers paler; the **selected** object's colliders draw with it off too, as Unity's do (#1882) | off |
-| `"NavMesh"` | **NavMesh** | the baked navmesh as translucent cyan over the floor: one quad per walkable span, on its floor plane (ramps tilt), holes where the agent radius erodes it; rebuilt only when the navmesh is re-baked (#1910). Scene view only, as Unity's | off |
+| `"NavMesh"` | **NavMesh** | the baked navmesh as translucent cyan over the floor: one quad per walkable span, on its floor plane (ramps tilt), holes where the agent radius erodes it; kept on the GPU in 32-cell tiles: a rebake (a dragged crate, a moving carving obstacle) re-uploads only the tiles it changed, and a full bake, an area-cost edit or a restored navmesh rebuilds it whole (#1910). Scene view only, as Unity's | off |
 | `"GameGizmos"` | **Gizmos**, on the **Game** tab's strip | Unity's Game-view Gizmos: every collider and the `Debug.Draw*` lines over the game frame, through the main (base) camera of its stack (#1882) | off |
 
 - Names are exact (case-sensitive). The set lasts the editor session, as Unity's

@@ -21,7 +21,7 @@ fn ramp_cell() -> NavigationGraph {
 /// One span is one quad (two triangles) covering its cell, on its floor plane.
 #[test]
 fn one_span_is_one_quad_on_its_plane() {
-    let tris = triangles(&ramp_cell());
+    let tris = tile_triangles(&ramp_cell(), 0);
     assert_eq!(tris.len(), 6, "two triangles");
     for p in &tris {
         assert!(p.x.abs() == 0.5 && p.z.abs() == 0.5, "a cell corner: {p}");
@@ -45,40 +45,30 @@ fn one_span_is_one_quad_on_its_plane() {
 fn a_not_walkable_span_gives_no_quad() {
     let mut g = ramp_cell();
     g.spans[0].area = NOT_WALKABLE_AREA;
-    assert!(triangles(&g).is_empty());
-}
-
-/// The revision holds while the graph is unchanged and moves on a bake.
-#[test]
-fn the_revision_moves_only_with_the_graph() {
-    let mut g = ramp_cell();
-    let r = revision(&g);
-    assert_eq!(revision(&g), r);
-    g.bake_generation += 1;
-    assert_ne!(revision(&g), r, "a rebake");
-    let other = NavigationGraph::new(0.0, 4.0, 0.0, 4.0, 1.0);
-    assert_ne!(
-        revision(&other),
-        revision(&ramp_cell()),
-        "another grid, same generation"
-    );
+    assert!(tile_triangles(&g, 0).is_empty());
 }
 
 /// A Dust2-sized graph (200 m square at 0.25 m cells: 641 601 spans) is built and
-/// uploaded once; a frame on which it did not change rebuilds nothing.
+/// uploaded once; a frame on which it did not change uploads nothing, and another
+/// graph of the same shape and generation (a wholesale replacement) is new.
 #[test]
 fn gpu_an_unchanged_dust2_graph_is_not_rebuilt() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(8, 8) else {
         return;
     };
-    let mut g = NavigationGraph::new(-100.0, 100.0, -100.0, 100.0, 0.25);
+    let g = NavigationGraph::new(-100.0, 100.0, -100.0, 100.0, 0.25);
     let mut on = SceneGizmos::default();
-    assert!(!hand(&mut r, &on, &g), "off: nothing built");
+    assert_eq!(hand(&mut r, &on, &g), 0, "off: nothing built");
     on.set(Gizmo::NavMesh, true);
-    assert!(hand(&mut r, &on, &g), "the first frame builds");
-    assert!(!hand(&mut r, &on, &g), "an unchanged frame does not");
-    g.bake_generation += 1;
-    assert!(hand(&mut r, &on, &g), "a rebake does");
+    let whole = 641_601 * 6 * 12;
+    assert_eq!(
+        hand(&mut r, &on, &g),
+        whole,
+        "the first frame builds it all"
+    );
+    assert_eq!(hand(&mut r, &on, &g), 0, "an unchanged frame does not");
+    let other = Box::new(NavigationGraph::new(-100.0, 100.0, -100.0, 100.0, 0.25));
+    assert_eq!(hand(&mut r, &on, &other), whole, "another graph does");
 }
 
 const RES: u32 = 32;

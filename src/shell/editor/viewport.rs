@@ -95,7 +95,9 @@ impl EditorFrontend {
 
         let scene = game.scene().borrow();
         view.gizmos = self.editor_ui.gizmos;
-        super::navmesh::hand(renderer, &view.gizmos, &game.resources.nav.borrow());
+        if scene_tab {
+            super::navmesh::hand(renderer, &view.gizmos, &game.resources.nav.borrow());
+        }
         view.game_gizmos = !scene_tab && view.gizmos.on(Gizmo::GameGizmos);
         view.ui.screen_in_editor = scene_tab && view.gizmos.on(Gizmo::Ui);
         view.set_pixel_scale(pixels_per_point);

@@ -23,7 +23,7 @@ use crate::components::mesh::Vertex;
 use crate::render::draw::resources::{GridResource, Overlays};
 use crate::render::Renderer;
 pub(crate) use batch::{OverlayBindings, OverlayDraws};
-pub(crate) use navmesh::NavMeshGizmo;
+pub(crate) use navmesh::{NavMeshGizmo, NavMeshPatch, NavMeshRevision, NavMeshSource};
 pub(crate) use probe_ball::{ball_pipeline, BallResource};
 pub(crate) use wires::ColliderScope;
 

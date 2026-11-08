@@ -40,6 +40,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub use camera::{build_camera_stack, texture_cameras, ScreenStack, TextureCamera};
+pub(crate) use draw::{NavMeshPatch, NavMeshRevision, NavMeshSource};
 pub use frustum::{Frustum, SkinBounds};
 pub(crate) use frustum::{SmallLimits, SmallObjectCull};
 pub use gpu::mesh::MeshId;
