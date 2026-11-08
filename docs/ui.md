@@ -832,7 +832,8 @@ demand.
 Everything below has an API equivalent — the editor writes through the same
 `scene::authoring::ui::layout::rect_transform` ops as `RectTransform.*` (#423).
 
-- **UI overlay.** The Scene tab's **UI** toggle (on by default) draws the screen-space
+- **UI overlay.** The Scene tab's **UI** gizmo toggle (on by default;
+  `Editor.SetGizmo("UI", on)` from a script) draws the screen-space
   canvases (`ScreenSpaceOverlay`, and `ScreenSpaceCamera` — its plane fills the view)
   over the scene, laid out on the viewport's pixel size, each canvas outlined.
 - **Click-select.** A click in the Scene tab selects the top-most UI element under
