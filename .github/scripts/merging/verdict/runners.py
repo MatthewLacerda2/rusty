@@ -19,13 +19,22 @@ Past the grace the jobs are judged as listed, the reading before #1182: only a
 `failure` whose gate has not concluded stays unknown (#1109), and the queue
 hands it back, red. A runner outage whose listing still shows a job going is
 therefore still re-run (#869), not handed back as the code's.
+
+## A job that failed installing a tool is the runners' too (#1932)
+
+A job that failed in a setup step ([`setup.failed_in_setup`]: fetching a tool,
+the toolchain, system libraries, the cargo-deny image) concludes `failure`,
+not `cancelled`, with nothing built. It counts as a cancelled job does: re-run
+once inside the same deadline, and a second such failure hands back as
+`runners unavailable …`. A train red only this way is re-run, not split
+([`train.ride.failed`] reads the same [`outage`]).
 """
 
 from __future__ import annotations
 
 from typing import Callable
 
-from merging.verdict import runlist
+from merging.verdict import runlist, setup
 
 # Whether the grace for `run`'s jobs listing to catch up is spent
 # ([`queue.polling.expiry`]); without one, it never is.
@@ -48,6 +57,8 @@ def runner_red(run: dict, jobs: dict[int, list[dict]], workflow: str, expired: E
     `failure`d over skipped jobs. So: some job was cancelled, and nothing but
     the gate failed. A run cancelled with no job to show for it counts too.
     A job still going (a signal, [`runlist.by_gate`]) is not evidence either way.
+    A job that failed in a setup step alone ([`setup.failed_in_setup`], #1932)
+    counts as a cancelled one.
     """
     if not runlist.agrees(run, jobs, workflow) and not expired(run):
         return None
@@ -60,9 +71,9 @@ def runner_red(run: dict, jobs: dict[int, list[dict]], workflow: str, expired: E
     ]
     if not bad:
         return run.get("conclusion") == "cancelled"
-    return any(j.get("conclusion") == "cancelled" for j in bad) and all(
-        j.get("conclusion") == "cancelled" or (j.get("name") == gate and j.get("conclusion") == "failure")
-        for j in bad
+    runners_own = [j for j in bad if j.get("conclusion") == "cancelled" or setup.failed_in_setup(j)]
+    return bool(runners_own) and all(
+        j in runners_own or (j.get("name") == gate and j.get("conclusion") == "failure") for j in bad
     )
 
 

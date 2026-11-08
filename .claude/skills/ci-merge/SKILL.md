@@ -193,10 +193,13 @@ appears, a head somebody else moved (named pull requests only; the watch puts it
 may not (next section; checked before any push), or a merge GitHub refused. A 502 on
 the merge call is followed by asking whether it merged. Exit status is non-zero
 if anything was handed back. **A runner outage is not a red run** (#869): when the
-only jobs not green are `cancelled` (or a gate failed because the job it gates
-was), nothing compiled and nothing failed, so the queue re-runs those runs once
+only jobs not green are `cancelled` or failed in a setup step before anything
+built (installing a tool, the toolchain, the cargo-deny image: #1932,
+`merging/verdict/setup.py`), or a gate failed because such a job did, nothing
+compiled and nothing failed, so the queue re-runs those runs once
 (`gh run rerun --failed`) inside the same `--deadline`, and hands back only if they
-come back cancelled again, as `runners unavailable …`. That hand-back needs no
+come back that way again, as `runners unavailable …`. A train red only this way is
+re-run, not split. That hand-back needs no
 push: once GitHub's runners are back, re-run the run and the watch retakes it.
 
 It **stops the whole queue** — one message, the rest named *not taken* — when a
