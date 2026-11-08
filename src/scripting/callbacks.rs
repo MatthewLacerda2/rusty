@@ -45,6 +45,13 @@ pub const ON_COLLISION_STAY: &str = "OnCollisionStay";
 /// Called once, the tick after a solid contact involving the owning entity ends
 /// (#448) — `(id, other)`, after that tick's `OnCollisionStay` dispatches.
 pub const ON_COLLISION_EXIT: &str = "OnCollisionExit";
+/// Called synchronously inside a `CharacterController.Move` (#1879) —
+/// `(id, hit)` — once per collider the move touched, in the order the sweep met
+/// them, on the scripts of the controller's own entity. Static colliders count
+/// (the floor, each move that presses into it). Not dispatched by the tick,
+/// except for a move root motion made, which is queued and dispatched with the
+/// tick's animation events.
+pub const ON_CONTROLLER_COLLIDER_HIT: &str = "OnControllerColliderHit";
 /// Called once, the tick the owning entity's `Joint` breaks past its
 /// `break_force` / `break_torque` (#449) — `(id, force, torque)`, after that
 /// tick's collision callbacks. The component is already gone.
@@ -127,6 +134,7 @@ pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     ON_COLLISION_ENTER,
     ON_COLLISION_STAY,
     ON_COLLISION_EXIT,
+    ON_CONTROLLER_COLLIDER_HIT,
     ON_JOINT_BREAK,
     ON_ANIMATION_EVENT,
     ON_TAKE_DAMAGE,

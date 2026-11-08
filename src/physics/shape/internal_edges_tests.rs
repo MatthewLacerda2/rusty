@@ -4,7 +4,7 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::mesh::{build_mesh_shape, TRIMESH_FLAGS};
+use super::mesh::{build_mesh_shape, MeshFit, TRIMESH_FLAGS};
 
 /// Tiles per side, each its own two triangles over four unshared vertices.
 const TILES: usize = 16;
@@ -81,7 +81,7 @@ fn worst_hop(floor: Collider, body: Collider, height: f32, speed: f32) -> f32 {
 fn tiled(engine: bool) -> Collider {
     let (positions, indices) = tiled_floor();
     let mut floor = if engine {
-        build_mesh_shape(false, Vec3::ONE, (&positions, &indices)).unwrap()
+        build_mesh_shape(MeshFit::Exact, Vec3::ONE, (&positions, &indices)).unwrap()
     } else {
         let points = positions.iter().map(|&p| Vector::from(p)).collect();
         let tris = indices.chunks_exact(3).map(|c| [c[0], c[1], c[2]]);

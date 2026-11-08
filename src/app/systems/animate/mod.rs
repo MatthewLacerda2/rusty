@@ -95,7 +95,9 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
             }
         }
         if let Some((motion, model)) = applied {
-            apply_root_motion(&mut s, res, id, motion, model, dt);
+            let hits = apply_root_motion(&mut s, res, id, motion, model, dt);
+            let touched = (!hits.is_empty()).then_some((id, hits));
+            res.controller_hits.extend(touched);
         }
     }
 }
@@ -175,5 +177,7 @@ mod agent_tests;
 mod armature_tests;
 #[cfg(test)]
 mod body_tests;
+#[cfg(test)]
+mod hits_tests;
 #[cfg(test)]
 mod tests;

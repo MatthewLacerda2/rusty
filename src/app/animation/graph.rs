@@ -43,7 +43,8 @@ pub struct GraphCache {
 
 impl GraphCache {
     /// The graph at `path`, loading (and validating) it on first request. A load
-    /// failure is logged to `console` once and remembered as absent.
+    /// failure is logged to `console` once and remembered as absent; what loads
+    /// but plays other than authored (`AnimationGraph::warnings`) is warned once.
     pub fn get_or_load(
         &mut self,
         path: &str,
@@ -51,10 +52,17 @@ impl GraphCache {
     ) -> Option<&AnimationGraph> {
         if !self.loaded.contains_key(path) {
             let result = animation_graph::load(Path::new(path));
-            if let Err(err) = &result {
-                console
+            match &result {
+                Err(err) => console
                     .borrow_mut()
-                    .error(format!("Animation graph '{path}': {err}"));
+                    .error(format!("Animation graph '{path}': {err}")),
+                Ok(graph) => {
+                    for warning in graph.warnings() {
+                        console
+                            .borrow_mut()
+                            .warn(format!("Animation graph '{path}': {warning}"));
+                    }
+                }
             }
             self.loaded.insert(path.to_string(), result.ok());
         }
