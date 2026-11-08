@@ -118,6 +118,8 @@ pub struct Renderer {
     /// The translucents' depth postpass (#1523).
     depth_postpass_pipelines: gpu::pipelines::DepthPostpassPipelines,
     line_pipeline: gpu::pipelines::LazyPipeline,
+    /// The reflection probes' mirror-ball gizmo (#1911).
+    probe_ball_pipeline: gpu::pipelines::LazyPipeline,
     /// The editor's selection outline (#1175).
     outline: passes::outline::OutlinePasses,
 

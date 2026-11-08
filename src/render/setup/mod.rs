@@ -198,6 +198,7 @@ impl Renderer {
             transparent_pipelines: forward.transparent_pipelines,
             depth_postpass_pipelines: forward.depth_postpass_pipelines,
             line_pipeline: forward.line_pipeline,
+            probe_ball_pipeline: forward.probe_ball_pipeline,
             outline: forward.outline,
             prepass_pipeline: forward.prepass_pipeline,
             ssao,
