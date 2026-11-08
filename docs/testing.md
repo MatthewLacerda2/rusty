@@ -42,6 +42,10 @@ things follow:
   (#1893), arguments and returns copied the same way, because the `OnTakeDamage`
   handlers they call synchronously live there: a scenario's shot reaches the game
   script's handler, and a handler's error is raised as the scenario's.
+- `CharacterController.Move` runs in the gameplay VM the same way (#1879), so
+  the move's `OnControllerColliderHit` handlers hear it. Before the first
+  `Harness.Step` there is no gameplay VM: the scenario's own `Move` runs, moving
+  the edit-mode controller unobstructed and calling no handler.
 - A Lua function a scenario passes `Timer.Invoke` / `InvokeRepeating` /
   `StartCoroutine` or a tween's `on_complete` is refused with an error: it belongs
   to the scenario's VM, which the gameplay tick never calls. Drive time with
@@ -547,7 +551,9 @@ buttons, an image, audio or prefab card; exclusive with `--select`), `--frame` (
 (the Play-mode chrome; the sim is not stepped), `--game` (the Game tab), `--size <W>x<H>`
 (default 1600x900), `--demo <file>` and `--demo-tick <n>` (a demo open on the Game
 view's timeline, replayed to tick `n`, default 0; #1598), `--pointer <X>,<Y>` (the
-pointer held there, in pixels, so a hover shows), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
+pointer held there, in pixels, so a hover shows), `--gizmo <Name>=on|off` (a Scene-view
+gizmo drawn or not, by its `Editor.SetGizmo` name, e.g. `--gizmo NavMesh=on`;
+repeatable, #1909), `--picker [new|open|mismatch|focus]` (the project picker the editor starts
 on, #854, over a sample recent list dated against a fixed time; the page names show
 *New Project*, *Open* and the different-engine prompt). From Rust, `capture::capture(&game,
 path, &EditorCaptureOptions { .. })` takes any `GameWorld`, and `capture_into` shares a
@@ -864,7 +870,7 @@ request** (#750). Two ways in:
 
 | Run | Trigger | Scope | Where it lands |
 |---|---|---|---|
-| **On request** (`mutants-on-request.yml`) | `make mutants-remote SCOPE=...`, or a dispatch with a `scope` input | `diff` (the branch against `origin/main`) or path globs, turned into one `--in-diff` by `.github/scripts/mutants-scope.py`; one runner, a 2 h 45 budget; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one, edited in place by later runs (#912) |
+| **On request** (`mutants-on-request.yml`) | a PR's `Mutation: diff` (or globs) line, which the merge queue dispatches on `main` after the merge, two at a time (#1934); `make mutants-remote SCOPE=...`; or a dispatch with a `scope` input | `diff` (the branch against `origin/main`, or with `commit` the merged squash commit against its parent) or path globs, turned into one `--in-diff` by `.github/scripts/mutants-scope.py`; one runner, a 2 h 45 budget; one run per branch, a newer dispatch cancelling the older and an unmerged close of the PR cancelling what is left, while a merged PR's run finishes (`mutants-cancel.yml`, #1530) | printed in the terminal by `make mutants-remote`; the run summary and a `mutants-report` artifact (`report.md`, `survivors.diff`); `report.md` also as one comment on the branch's open PR, or its merged one (the `pr` input for the queue's runs), edited in place by later runs (#912) |
 | **Full sweep** (`mutants-sweep.yml`, sharded) | weekly `schedule` (Saturdays) + `workflow_dispatch` (`force` re-sweeps a covered commit); `main` only, a dispatch on any other ref is refused red (#972); skipped by `mutants-plan` when a finished sweep already covered `main`'s head (#506); one sweep at a time (#705) | the full `--file` sim scope over a matrix `mutants-plan` sizes each run from the mutant count (`cargo mutants --list`, `.github/scripts/mutants-shards.py`: ≈ 4 h a shard at the slowest per-shard rate the previous sweep measured (a shard under `MIN_MEASURED` mutants ignored, the slowest capped at `OUTLIER_CAP` × the mean), `MINUTES_PER_MUTANT` only when none can be read, and a `max-parallel` of at most 10 chosen to end by Sunday 23:59 UTC; red past GitHub's 256-job ceiling, #1684), each shard stopping itself at a 5 h 40 budget under GitHub's 6 h limit (#749) | `mutants-report` job: merged job summary (totals, measured of planned, the run's mean and slowest measured minutes a mutant against the sizing figure, and each shard's seconds and outcome lists under `shards/` for the next plan, unfinished shards, survivors) and the merged `mutants-report` artifact |
 
 Why this shape: mutation is a signal, and a per-PR job held runners the merge

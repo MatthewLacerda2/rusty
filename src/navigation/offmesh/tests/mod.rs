@@ -18,6 +18,7 @@ use crate::scene::Scene;
 /// platform's +z edge down to the floor at z = 16. Drops and jump-ups enabled.
 fn platform() -> Scene {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 20.0, 0.0, 20.0));
     scene.nav_settings.drop_height = 4.0;
     scene.nav_settings.jump_height = 1.2;
@@ -39,6 +40,7 @@ fn platform() -> Scene {
 /// and a ladder link from the ground at x = 8 to the deck at x = 12.
 fn ladder() -> (Scene, u32) {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 20.0, 0.0, 10.0));
     add_floor(&mut scene, -1.0, 21.0, -1.0, 11.0);
     add_box(

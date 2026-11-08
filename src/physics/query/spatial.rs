@@ -2,16 +2,15 @@
 //!
 //! `query` holds the line-shaped ray casts; this file holds everything with a
 //! volume or a specific collider in mind: overlaps ("what colliders are inside
-//! this sphere/box/capsule right now?"), the sphere-cast (a raycast with
-//! thickness), and the per-collider point queries (closest point, containment).
+//! this sphere/box/capsule right now?") and the per-collider point queries
+//! (closest point, containment). The shape casts live in `sweep`.
 //! Every query routes through the same live query view the hitscan uses, so
 //! a script's area query and the engine's agree about the same world.
 
 use glam::{Quat, Vec3};
-use rapier3d::parry::query::ShapeCastOptions;
 use rapier3d::prelude::*;
 
-use super::{is_live, RayHit};
+use super::is_live;
 use crate::physics::convert::to_pose;
 use crate::physics::shape::hull;
 use crate::physics::world::PhysicsWorld;
@@ -25,18 +24,20 @@ impl PhysicsWorld {
         radius: f32,
         accept: impl Fn(u32) -> bool,
     ) -> Vec<u32> {
-        self.overlap(center, &Ball::new(radius), &accept)
+        self.overlap(to_pose(center, Quat::IDENTITY), &Ball::new(radius), &accept)
     }
 
-    /// Like [`Self::overlap_sphere`] with an axis-aligned box of `half_extents`
-    /// — Unity's `Physics.OverlapBox` (identity orientation).
+    /// Like [`Self::overlap_sphere`] with a box of `half_extents` turned by
+    /// `rotation` — Unity's `Physics.OverlapBox` and its `orientation`.
     pub fn overlap_box(
         &self,
         center: Vec3,
         half_extents: Vec3,
+        rotation: Quat,
         accept: impl Fn(u32) -> bool,
     ) -> Vec<u32> {
-        self.overlap(center, &Cuboid::new(half_extents), &accept)
+        let pose = to_pose(center, rotation);
+        self.overlap(pose, &Cuboid::new(half_extents), &accept)
     }
 
     /// Like [`Self::overlap_sphere`] with a capsule spanning `a`→`b` — Unity's
@@ -49,57 +50,23 @@ impl PhysicsWorld {
         accept: impl Fn(u32) -> bool,
     ) -> Vec<u32> {
         let capsule = Capsule::new(a, b, radius);
-        self.overlap(Vec3::ZERO, &capsule, &accept)
+        self.overlap(to_pose(Vec3::ZERO, Quat::IDENTITY), &capsule, &accept)
     }
 
     /// Shared overlap walk: every accepted collider intersecting `shape` placed
-    /// at `center`, as entity ids sorted ascending — the broad-phase traversal
+    /// at `pose`, as entity ids sorted ascending — the broad-phase traversal
     /// order is an implementation detail, so the result is normalized to keep
     /// script-visible output deterministic.
-    fn overlap(&self, center: Vec3, shape: &dyn Shape, accept: &dyn Fn(u32) -> bool) -> Vec<u32> {
+    fn overlap(&self, pose: Pose, shape: &dyn Shape, accept: &dyn Fn(u32) -> bool) -> Vec<u32> {
         let predicate = self.handle_accepts(accept);
         let filter = QueryFilter::default().predicate(&predicate);
         let mut ids: Vec<u32> = self
             .queries(filter)
-            .intersect_shape(to_pose(center, Quat::IDENTITY), shape)
+            .intersect_shape(pose, shape)
             .filter_map(|(handle, _)| self.collider_to_id.get(&handle).copied())
             .collect();
         ids.sort_unstable();
         ids
-    }
-
-    /// Closest accepted collider touched by a sphere of `radius` swept from
-    /// `origin` along `dir` — Unity's `Physics.SphereCast`, i.e. a thick
-    /// raycast, the volume sibling of [`Self::raycast_hit`]. `distance` is how
-    /// far the sphere's center traveled; `point` is the contact on the struck
-    /// surface and `normal` that surface's outward normal, both world-space.
-    pub fn sphere_cast_hit(
-        &self,
-        origin: Vec3,
-        dir: Vec3,
-        radius: f32,
-        max_toi: f32,
-        accept: impl Fn(u32) -> bool,
-    ) -> Option<RayHit> {
-        let predicate = self.handle_accepts(&accept);
-        let filter = QueryFilter::default().predicate(&predicate);
-        let (handle, hit) = self.queries(filter).cast_shape(
-            &to_pose(origin, Quat::IDENTITY),
-            dir.normalize(),
-            &Ball::new(radius),
-            ShapeCastOptions::with_max_time_of_impact(max_toi),
-        )?;
-        // rapier's normal1 is the struck surface's, in world space. Its witness
-        // point carries GJK slop; for a sphere the contact is exactly one
-        // radius from the impact-time center, against the normal.
-        let normal = hit.normal1;
-        let center = origin + dir.normalize() * hit.time_of_impact;
-        Some(RayHit {
-            id: *self.collider_to_id.get(&handle)?,
-            distance: hit.time_of_impact,
-            point: center - normal * radius,
-            normal,
-        })
     }
 
     /// Nearest point on `id`'s live collider to `point`, solid — a point inside

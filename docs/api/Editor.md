@@ -23,6 +23,33 @@ Unity's `EditorApplication` doesn't exist in a player: there `EnterPlay` and
 | `Editor.Redo` | `()` | the name of the step it redid; `nil` when there was none, or in Play |
 | `Editor.UndoName` | `()` | the name of the step `Undo` would revert, or `nil` |
 | `Editor.RedoName` | `()` | the name of the step `Redo` would re-apply, or `nil` |
+| `Editor.SetGizmo` | `(name, on)` | `true` when it set the Scene view's gizmo `name` on or off; `false` (a no-op, warned) for an unknown name or outside the editor window |
+| `Editor.GetGizmo` | `(name)` | whether the Scene view draws gizmo `name`; `nil` (warned) for an unknown name |
+
+### Scene-view gizmos
+
+Unity's Gizmos menu and `GizmoUtility.SetGizmoEnabled` (#1909): the toggles in the
+Scene tab strip, beside **Scene** / **Game**, from a script or an agent. The same set
+draws in the window and in `make editor-capture` (its `--gizmo <Name>=on|off`
+flag, `docs/testing.md`).
+
+| Name | Toggle | Draws | Default |
+|---|---|---|---|
+| `"UI"` | **UI** | the screen-space canvases over the scene, and the rect tool on them ([`ui.md`](../ui.md)) | on |
+| `"LightProbes"` | **Light Probes** | a cross at each light probe, tinted by the light it baked | on |
+| `"ReflectionProbes"` | **Reflection Probes** | each reflection probe's capture point and parallax box | on |
+| `"NavMesh"` | *(hidden)* | nothing yet: the navmesh gizmo is #1910; the flag is set and read already | off |
+
+- Names are exact (case-sensitive). The set lasts the editor session, as Unity's
+  does per user; a new editor starts from the defaults above.
+- A set takes effect at the next frame, as the toggle's click does, and
+  `Editor.GetGizmo` reads it back at once.
+- Area lights are not probes: their gizmo always draws. Colliders draw no box.
+
+```lua
+Editor.SetGizmo("NavMesh", true)
+Editor.GetGizmo("LightProbes")   -- true
+```
 
 ### Undo and Redo
 

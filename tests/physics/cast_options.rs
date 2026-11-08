@@ -103,9 +103,9 @@ fn multi_hit_and_volume_queries_skip_triggers_on_request() {
     assert_eq!(eval(through), "1");
     assert_eq!(eval("#Physics.RaycastAll(0,0,0, 0,0,1, -1)"), "0");
     let near = "#Physics.OverlapSphere(0,0,3, 1.5, nil, false), \
-                #Physics.OverlapBox(0,0,3, 1,1,1, nil, false), \
+                #Physics.OverlapBox(0,0,3, 1,1,1, nil,nil,nil, nil, false), \
                 #Physics.OverlapCapsule(0,0,2, 0,0,4, 0.5, nil, false), \
-                Physics.CheckSphere(0,0,3, 1.5), Physics.CheckBox(0,0,3, 1,1,1, nil, false)";
+                Physics.CheckSphere(0,0,3, 1.5), Physics.CheckBox(0,0,3, 1,1,1, nil,nil,nil, nil, false)";
     assert_eq!(eval(&format!("return {near}")), "0, 0, 0, true, false");
 }
 

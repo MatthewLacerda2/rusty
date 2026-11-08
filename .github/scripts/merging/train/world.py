@@ -117,7 +117,7 @@ def effects(repo: str, opts: argparse.Namespace, git) -> argparse.Namespace:
         check=functools.partial(compiles, opts=opts),
         push=functools.partial(rails.push, root=opts.root),
         dispatch=functools.partial(rails.dispatch, repo),
-        wait=lambda sha, tick: ride.wait(repo, sha, opts.deadline * 60, opts.poll, tick),
+        wait=lambda sha, tick, paths: ride.wait(repo, sha, opts.deadline * 60, opts.poll, tick, files=paths),
         delete=functools.partial(rails.delete, root=opts.root),
         look=pulls.look,
         squash=lambda pull, sha: landing.squash(repo, pull, sha, opts.root, opts.poll),

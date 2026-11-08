@@ -18,6 +18,8 @@ fn node(name: &str, clip: &str, is_loop: bool, speed: Option<f32>) -> GraphNode 
         is_loop,
         speed,
         events: Vec::new(),
+        sync_group: None,
+        sync_markers: Vec::new(),
     }
 }
 
@@ -77,6 +79,7 @@ fn locomotion() -> AnimationGraph {
             entry: "Idle".to_string(),
         },
         layers: Vec::new(),
+        ..AnimationGraph::default()
     }
 }
 

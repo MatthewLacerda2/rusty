@@ -9,6 +9,7 @@ use glam::Vec3;
 /// A 20 × 10 floor split by a wall at x = 10 with a doorway over z 3..8.
 pub(super) fn doorway() -> Scene {
     let mut scene = Scene::new();
+    scene.nav_settings.grid_spacing = 1.0;
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 20.0, 0.0, 10.0));
     scene.nav_settings.agent_radius = 0.4;
     add_floor(&mut scene, -1.0, 21.0, -1.0, 11.0);

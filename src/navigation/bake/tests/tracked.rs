@@ -84,7 +84,7 @@ proptest! {
         let mut scene = level();
         let mut fast = NavigationGraph::from_scene(&scene);
         let mut full = NavigationGraph::from_scene(&scene);
-        fast.bake_tracked(&mut scene);
+        fast.start_tracked(&mut scene);
         for (n, op) in ops.iter().enumerate() {
             apply(&mut scene, op);
             fast.sync_changes(&mut scene);
@@ -101,7 +101,7 @@ fn only_a_static_change_reads_the_static_colliders() {
     let mut scene = level();
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 6.0, 0.0, 6.0));
     let mut g = NavigationGraph::from_scene(&scene);
-    g.bake_tracked(&mut scene);
+    g.start_tracked(&mut scene);
     let ids = scene.world.ids().to_vec();
     let still = |s: &mut Scene, g: &mut NavigationGraph| {
         g.static_watch.as_mut().unwrap().still(&mut s.world)

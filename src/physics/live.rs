@@ -19,13 +19,24 @@
 //!   and start reporting overlaps; the mass sync after it re-spreads the body's
 //!   mass, since a trigger carries none.
 //!
+//! - **Mesh fit.** A concave mesh collider is the exact trimesh on a static or
+//!   kinematic body and convex pieces on a dynamic one (#1886). A body that
+//!   changes type in Play (`SetKinematic`, a static flag cleared) changes in
+//!   place, so its concave colliders are rebuilt here, as the load would build
+//!   them, and swapped onto the same collider: its handle, joints and contacts
+//!   survive, and the mass sync after it re-spreads the body's mass.
+//!
 //! All walk the sorted plan, or the bodies the change log named (`watch`; a
 //! step's changes reach only the body-state pass, `sync`), and touch a collider
 //! only when it differs.
 
 use rapier3d::prelude::*;
 
-use super::shape::build::{interaction_groups, EntityBodyState};
+use super::compound::world_pose;
+use super::shape::build::{
+    class_of, collider_inputs, interaction_groups, BodyClass, EntityBodyState,
+};
+use super::shape::fit::{build_shape_for, fit_mark};
 use super::watch::Owners;
 use super::world::{collider_to_write, PhysicsWorld};
 use crate::scene::Scene;
@@ -89,6 +100,43 @@ impl PhysicsWorld {
         }
     }
 
+    /// Rebuild each concave mesh collider whose fit (its `user_data`, stamped by
+    /// `build_shape_for`) no longer matches its body's class: a body turned
+    /// dynamic gets convex pieces, one turned static or kinematic the exact mesh.
+    /// The stamp is compared before any mesh is copied, so a moving body costs a
+    /// lookup per collider. A collider that is no longer a concave mesh waits for
+    /// the body rebuild, like every other shape edit. A rebuild that fails keeps
+    /// the old shape but takes the new stamp, so it warns once, not every step.
+    /// Runs before [`Self::sync_masses`], which reads the new volume.
+    pub(super) fn sync_mesh_fits(&mut self, scene: &Scene, owners: &Owners) {
+        for (&owner, ids) in owners.pick(&self.plan) {
+            let dynamic = matches!(class_of(&scene.world, owner), BodyClass::Dynamic);
+            for id in ids {
+                let Some(&handle) = self.id_to_collider.get(id) else {
+                    continue;
+                };
+                let Some(want) = scene
+                    .world
+                    .collider(*id)
+                    .map(|c| fit_mark(&c.shape, dynamic))
+                else {
+                    continue;
+                };
+                let differs = |c: &Collider| c.user_data != 0 && want != 0 && c.user_data != want;
+                if !self.colliders.get(handle).is_some_and(differs) {
+                    continue;
+                }
+                let built = refit(scene, *id, dynamic);
+                if let Some(c) = collider_to_write(&mut self.colliders, handle, differs) {
+                    if let Some(built) = built {
+                        c.set_shape(built.shared_shape().clone());
+                    }
+                    c.user_data = want;
+                }
+            }
+        }
+    }
+
     /// Spread each Rigidbody owner's `mass` over its body's solid colliders by
     /// volume; a trigger carries none. An owner whose colliders have no volume
     /// (a triangle mesh) keeps rapier's own mass.
@@ -119,4 +167,13 @@ impl PhysicsWorld {
             }
         }
     }
+}
+
+/// Collider entity `id`'s shape built for a body that is `dynamic` or not, or
+/// `None` when it cannot be (logged by `build_shape_for`).
+fn refit(scene: &Scene, id: u32, dynamic: bool) -> Option<Collider> {
+    let inp = collider_inputs(&scene.world, id)?;
+    let pose = world_pose(scene, id)?;
+    let mesh = (inp.mesh_geom.as_ref()).map(|(p, i)| (p.as_slice(), i.as_slice()));
+    build_shape_for(id, &inp.shape, pose.scale, mesh, dynamic)
 }

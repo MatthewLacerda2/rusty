@@ -69,6 +69,7 @@ impl Renderer {
         }
         rs.refold_casting();
         rs.occlusion.refresh(scene);
+        rs.refresh_casters(scene);
         stats
     }
 
@@ -187,6 +188,7 @@ impl Renderer {
                 moved += 1;
                 if object.is_static {
                     rs.occlusion.touch(id);
+                    rs.casters.touch(id);
                 }
             }
         }

@@ -23,6 +23,8 @@ pub(super) fn sample_graph() -> AnimationGraph {
         is_loop,
         speed,
         events: Vec::new(),
+        sync_group: None,
+        sync_markers: Vec::new(),
     };
     AnimationGraph {
         parameters,
@@ -36,6 +38,7 @@ pub(super) fn sample_graph() -> AnimationGraph {
             entry: "idle".into(),
         },
         layers: Vec::new(),
+        ..AnimationGraph::default()
     }
 }
 

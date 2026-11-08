@@ -6,6 +6,7 @@
 mod events;
 mod inactive_parent;
 mod layers;
+mod montage_events;
 mod rig;
 
 use glam::Vec3;

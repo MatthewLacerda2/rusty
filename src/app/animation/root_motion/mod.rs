@@ -23,8 +23,6 @@
 
 mod blend;
 
-pub use blend::Outgoing;
-
 use std::f32::consts::{PI, TAU};
 
 use glam::{Mat4, Quat, Vec3};
@@ -92,7 +90,7 @@ impl RootBone {
     }
 
     /// Whether `clip` keys any joint of the bone's chain.
-    fn keyed_by(&self, clip: &AnimationClip) -> bool {
+    pub(in crate::app::animation) fn keyed_by(&self, clip: &AnimationClip) -> bool {
         self.chain.iter().any(|&s| {
             clip.tracks
                 .get(s)

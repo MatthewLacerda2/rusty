@@ -71,6 +71,12 @@ path + active state are saved with the entity.
 | `Animator.SetRootBone` | `(id, bone)` | Name the bone root motion is read from (usually the hips); `""` (the default) is the skeleton's first root joint. A name the skeleton lacks measures nothing and warns once in the console (an agent then moves itself). Saved. |
 | `Animator.GetRootBone` | `(id)` | The root bone's name as set (`""`: the first root joint), or `nil` without an animator. |
 | `Animator.GetRootMotion` | `(id)` | The last fixed step's root motion: `dx, dy, dz, yaw` — the world-space displacement in metres and the turn about the model's up axis in degrees (counter-clockwise seen from above), Unity's `deltaPosition` / `deltaRotation`. Measured whether or not it is applied, so a script can move the entity itself; `0, 0, 0, 0` while stopped, paused or inactive, and `nil` without an animator. |
+| `Animator.PlayMontage` | `(id, montage [, opts])` | Play a **montage** (#1894) into its slot over the state machine; `true` when it started. `montage` is a montage of the graph or, failing that, a **clip** name played as a one-section montage in `DefaultSlot` with 0.25 s blends, so a quick flinch needs no authoring. `opts`: `rate` (default 1; ≤ 0 is a Lua error), `start_section` (default the first), `slot` (overrides the montage's) and `blend_in` / `blend_out` in seconds (override the montage's own, or the clip fallback's 0.25 s; Unreal's `PlaySlotAnimationAsDynamicMontage`). Whatever the slot was playing is interrupted. An unknown montage, clip, slot or section warns once in the console and returns `false`, and so does an animator whose graph file fails to load (the warning carries the load error): it never falls back to a clip of the same name then. Starts a stopped or paused animator, as `Play` does. See *Montages*. |
+| `Animator.StopMontage` | `(id [, slot [, blend_out]])` | Blend out the montage playing in `slot` (every slot's when omitted) over `blend_out` seconds (default: the montage's own); `true` when one was playing. |
+| `Animator.IsMontagePlaying` | `(id [, slot])` | Whether a montage plays in `slot` (any slot when omitted). One already blending out no longer counts. |
+| `Animator.GetMontage` | `(id, slot)` | The montage playing in `slot` and its current section's name, as two values, or `nil`. |
+| `Animator.JumpToSection` | `(id, section [, slot])` | Jump the montage in `slot` (or the first playing one with such a section) to the start of `section`; `true` when it had one. |
+| `Animator.SetNextSection` | `(id, from, to [, slot])` | Make section `from` go on to `to` when it ends (`""`: end the montage there) in the montage of `slot` (or the first playing one with a section `from`), Unreal's `Montage_SetNextSection`; `true` when both sections exist. Lasts for this play only. |
 
 ### Blend trees (#457)
 
@@ -81,7 +87,8 @@ parameters (`Animator.SetFloat(id, "speed", v)`); the weights follow each fixed
 step. The clips play **phase-synced**: one shared normalized time, each clip
 sampled at that fraction of its own length, so a walk and a run blended together
 keep their feet in step. The tree's cycle length is the weight-averaged length
-of its clips.
+of its clips. Clips whose feet land at different fractions are matched by
+**sync markers** instead (see *Sync groups and markers* below).
 
 | Kind | Reads | Weights |
 |---|---|---|
@@ -131,6 +138,8 @@ walk→run tree by `speed`:
   is skipped with its whole subtree.
 - **One phase for every clip**: the whole tree shares one normalized time, and
   its cycle length is the weight-averaged length of all its clips, at any depth.
+  When every leaf carries sync markers, the leaves are matched marker to marker
+  instead (*Sync groups and markers*).
 - **Loading checks every level**, naming the tree's path in the error
   (`blend tree 'Locomotion/children[0]' reads 'speed', which is not a declared
   Float parameter`): undeclared parameters, empty trees, duplicate points, a
@@ -147,7 +156,8 @@ own `nodes`, `edges` and `entry`, evaluated each fixed step against the same
 shared parameters:
 
 - **`weight`** (0..1, default 1): how much the layer shows. Change it at runtime
-  with `Animator.SetLayerWeight`; fade a reload layer in and out by tweening it.
+  with `Animator.SetLayerWeight`. A one-off action over whatever the character
+  is doing (a reload, a flinch, a throw) is a *montage* instead (below).
 - **`blending`**: `Override` (default) blends toward the layer's pose by the
   weight; `Additive` adds the layer's motion **measured against that motion's
   first frame** (Unity's default reference pose) — translation offset, rotation
@@ -256,6 +266,163 @@ what the handler did. Events crossed in the same step fire in the order the
 playheads crossed them, then by layer (base first), then in authored order; the
 whole dispatch is deterministic. Events are authored data only: there is no API
 to add them at runtime.
+
+### Sync groups and markers (#1896)
+
+Unreal's **sync groups** and **sync markers**, authored on the graph (no Lua API:
+it is data). They keep feet in phase in the two places a blend tree alone can't:
+across a transition between two nodes (Walk → Sprint, Stand → Crouch-walk), and
+between clips whose feet land at different fractions of their cycles.
+
+```json
+{ "name": "Walk", "clip": "Walk", "is_loop": true, "sync_group": "Locomotion",
+  "sync_markers": [ { "time": 0.02, "name": "FootL" }, { "time": 0.54, "name": "FootR" } ] }
+```
+
+- **Sync markers** name phase points on a clip, in its own seconds, beside its
+  `events`: on a clip node, or on a blend-tree child that plays a clip (a node
+  or child holding a tree carries none of its own). They fire nothing; they only
+  say where in its cycle the clip is. A clip's **phase** is the pair of markers
+  it is between and how far along (`FootL` → `FootR`, 40 %); another clip is put
+  at the same place between its own `FootL` and `FootR`. A clip without that
+  pair takes the normalized time instead (Unreal's length-based sync).
+- **A sync group** is a name on a node (`sync_group`). Entering a node of the
+  **same group, in the same layer**, as the node being left starts the incoming
+  motion at the outgoing one's phase instead of at 0 (a hard cut too). While the
+  crossfade blends, the **heavier** motion (the incoming one on a tie, so from
+  halfway) plays at its own rate and the lighter one **follows** its phase,
+  re-matched every step, so the two can't drift apart however long the fade.
+  A non-looping follower, incoming or outgoing, follows until its end (its
+  start, played backwards), then holds: a looping leader wrapping round its seam never sends it back. Nodes
+  in different groups, or in none, crossfade exactly as without groups: the
+  incoming motion from its start. Re-entering the node already playing
+  restarts it, as without groups. Entering two nodes of the group before a
+  step syncs both to what was playing before the first. Groups don't reach
+  across layers.
+- **Inside a blend tree** whose every leaf carries markers, the dominant leaf
+  (the one whose events fire, *Which motion fires*) leads: every other leaf is
+  sampled at the leader's place between its own pair of markers. A leaf whose
+  markers repeat the pair (a two-stride run under a one-stride walk) stays on
+  the occurrence it is on and plays on from there, one stride per stride of
+  the leader, never jumping to another; where each leaf was is runtime state
+  on the playback. When the dominant leaf changes, the new leader carries on
+  from where it was being sampled, so neither the pose nor the root motion
+  jumps, including while the tree fades out through any crossfade, synced or
+  not. A tree with markers on some leaves and not
+  others syncs by normalized time, and loading it warns in the console.
+- **Events stay exact.** A following motion still crosses its own events once
+  each: placing it at the matched phase fires nothing, and when a re-match moves
+  it back over an event, the event doesn't fire again until it has played back
+  past where it was, whether it still follows, leads by then, or plays on
+  alone after the fade. Once the direction of play turns round (a negative
+  speed set later), nothing is owed: the first crossing the other way fires.
+- **Loading checks**, every problem named: a marker with an empty name or a
+  negative or non-finite time, two markers on one clip sharing a name *and* a
+  time, markers on a node or child holding a tree, and an empty `sync_group`.
+  Each marker list is sorted by time on load.
+
+### Montages (#1894)
+
+A **montage** is Unreal's answer to one-off actions over whatever the character
+is doing: a reload, a melee swing, a grenade throw, a flinch. Instead of adding
+a state, a trigger and two edges to a layer and fading its weight from a script,
+the script says `Animator.PlayMontage(id, "Reload")` and hears
+`OnAnimationEvent(id, "MontageEnd", info)` when it is over.
+
+**Slots.** A montage plays into a **slot**: a named mask over the body, with a
+layer's `mask` and `blending` rules. Slots sit **above every layer**, in the
+order the graph's `slots` declares them, and show only while a montage plays in
+them, at its blend weight. Every animator also has the implicit full-body
+**`DefaultSlot`** (above the declared ones unless the graph declares it), so an
+animator with no graph can play a clip as a montage.
+
+**Montages** are declared on the graph, next to the events and masks:
+
+```json
+"slots": [ { "name": "UpperBody", "mask": ["spine_01"], "blending": "Override" } ],
+"montages": [
+  { "name": "Reload", "clip": "RifleReload", "slot": "UpperBody",
+    "blend_in": 0.15, "blend_out": 0.2,
+    "events": [ { "time": 0.9, "name": "MagOut" }, { "time": 1.6, "name": "MagIn" } ] },
+  { "name": "Throw", "clip": "GrenadeThrow", "slot": "DefaultSlot",
+    "sections": [ { "name": "Wind", "time": 0, "next": "Hold" },
+                  { "name": "Hold", "time": 0.4, "next": "Hold" },
+                  { "name": "Release", "time": 0.7 } ] }
+]
+```
+
+`slot` defaults to `DefaultSlot`, `blend_in` and `blend_out` to 0.25 s. A graph
+that fails its checks names the path of each problem
+(`montages[1].sections[0].next: no section 'Hodl'`).
+
+**Sections** split the clip by time, in ascending order. Each plays up to the
+next section's start (the last one to the clip's end), then goes on to its
+`next`: itself loops it, none ends the montage. A montage with no sections is
+one section, `"Default"`, spanning the clip. `JumpToSection` and
+`SetNextSection` steer it, e.g. hold the throw's wind-up until the button is
+released, then jump to `Release`:
+
+```lua no-run
+function M.Update(id)
+  if Input.GetKeyDown("G") then Animator.PlayMontage(id, "Throw") end
+  if Input.GetKeyUp("G") then Animator.JumpToSection(id, "Release") end
+end
+```
+
+**Playing.** A montage blends in over `blend_in` and out over `blend_out`, on
+unscaled time like a crossfade, while its playhead runs at its `rate` times the
+animator's speed (a reversed animator holds it; `Pause` and `Stop` freeze it,
+events and blends included).
+It starts blending out when it is in a section with no `next` and that
+section's end is no further than `blend_out` away, so it is gone as the clip
+ends (Unreal's default). Playing a montage into a slot that already plays one
+**interrupts** it: the old one blends out over the new one's `blend_in`, from
+the weight it had (a montage cut off mid-blend-in does not jump to full first).
+
+**Events.** A montage's `events` fire through `OnAnimationEvent` with exactly
+the crossing rules above (a looping section fires its markers once per loop),
+and like a faded-out motion, a montage that was **stopped or interrupted** is
+silent: once `StopMontage` or a new `PlayMontage` in its slot cuts it off, its
+markers no longer fire while it fades, so a reload cut off at 1.55 s never
+reaches `MagIn` at 1.6 s. One blending out at its own end still fires the
+markers left in its clip. Two engine events tell a script where it stands, once
+each per montage, also when it is stopped or interrupted:
+
+- **`"MontageBlendOut"`** when it starts blending out (Unreal's
+  `OnMontageBlendingOut`);
+- **`"MontageEnd"`** when it is fully gone (`OnMontageEnded`).
+
+These two pass `OnAnimationEvent` a third argument saying whose they are,
+`{ montage = <name>, slot = <slot>, interrupted = <bool> }` (Unreal's
+`OnMontageEnded(Montage, bInterrupted)`); every other event passes `nil`, so a
+two-argument handler is unchanged. Check the montage, or a flinch ending
+mid-reload, or a re-triggered reload's first `MontageEnd`, clears the wrong
+state:
+
+```lua no-run
+function M.OnAnimationEvent(id, name, info)
+  if name == "MagIn" then ammo = MAG_SIZE end
+  if name == "MontageEnd" and info.montage == "Reload"
+     and not Animator.IsMontagePlaying(id, info.slot) then
+    reloading = false
+  end
+end
+```
+
+A montage fires no `"End"`: that event belongs to the state machine's clips.
+
+**Root motion.** A montage whose slot's mask covers the root bone contributes
+root motion the way a layer does (*Root motion*, below): a melee lunge or a
+stagger moves the character.
+
+**Runtime only.** What plays in each slot is something a script just did, like
+an IK target: it is not saved, and a scene load, a Play/Stop restore and
+`Animator.SetGraph` empty every slot without firing anything. A montage keeps
+the copy of its montage, slot and clip length it started with, so editing the
+`.animgraph` while it plays changes nothing already playing; `PlayMontage`
+reads the graph file afresh on each call (as `PlayNode` does), so the next one
+plays the edit. `Debug.Snapshot` lists the
+playing montages under the animator's `montages` key.
 
 ### Root motion (#1745)
 
