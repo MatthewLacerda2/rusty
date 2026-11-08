@@ -83,8 +83,9 @@ fn gpu_an_unchanged_dust2_graph_is_not_rebuilt() {
 
 const RES: u32 = 32;
 
-/// The centre pixel of the editor frame looking straight down at a flat navmesh.
-fn centre(r: &mut Renderer, gizmos: SceneGizmos) -> [u8; 4] {
+/// A pixel of the editor frame looking straight down at a flat navmesh, a quarter
+/// in from a corner: off the floor grid's centre lines, which draw over it.
+fn sample(r: &mut Renderer, gizmos: SceneGizmos) -> [u8; 4] {
     let g = NavigationGraph::new(-2.0, 2.0, -2.0, 2.0, 0.5);
     hand(r, &gizmos, &g);
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
@@ -94,7 +95,7 @@ fn centre(r: &mut Renderer, gizmos: SceneGizmos) -> [u8; 4] {
     r.render(&mut view, &Scene::new(), &cam, &out, true);
     let px =
         readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), RES, RES);
-    let i = ((RES / 2) * RES + RES / 2) as usize * 4;
+    let i = ((RES / 4) * RES + RES / 4) as usize * 4;
     [px[i], px[i + 1], px[i + 2], px[i + 3]]
 }
 
@@ -104,10 +105,10 @@ fn gpu_the_navmesh_tints_the_floor_cyan_under_its_toggle() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    let off = centre(&mut r, SceneGizmos::default());
+    let off = sample(&mut r, SceneGizmos::default());
     let mut set = SceneGizmos::default();
     set.set(Gizmo::NavMesh, true);
-    let on = centre(&mut r, set);
+    let on = sample(&mut r, set);
     assert_ne!(on, off, "the toggle shows it");
     assert!(on[2] > on[0] && on[1] > on[0], "cyan: {on:?} over {off:?}");
 }
