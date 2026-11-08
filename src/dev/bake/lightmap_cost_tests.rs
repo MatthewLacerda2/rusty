@@ -17,7 +17,7 @@ use crate::scene::lighting::lightmap::{
 use crate::scene::lighting::occlusion::bench_level::rooms;
 
 /// The `n × n`-rooms bench level as the bake sees it, with its lamps.
-fn lit_level(n: usize) -> BakeScene {
+pub(in crate::dev::bake) fn lit_level(n: usize) -> BakeScene {
     let mut scene = BakeScene::gather(&rooms(n), &|_| None);
     let lamp = |shape, radiance: f32| BakeLight {
         shape,

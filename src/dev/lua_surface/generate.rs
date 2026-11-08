@@ -4,14 +4,14 @@
 //! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, its
 //! Max Lightmap Size included, #1704, and the
 //! reflection probes' default resolution, memory budget and probe ceiling, #1584,
-//! and the scene's diffuse model, #1698).
+//! and the scene's diffuse model, #1698, and the lightmaps' denoiser, #1884).
 
 use mlua::{Lua, Table};
 
 use super::super::bake::generate_lighting::generate_lighting;
 use super::super::bake::progress::BakeLog;
 use crate::api::{global_table, put, ApiCell, ApiCtx, Reg};
-use crate::scene::lighting::lightmap::BakeSettings;
+use crate::scene::lighting::lightmap::{BakeSettings, Denoiser};
 use crate::scene::lighting::settings::ReflectionSettings;
 use crate::scene::lighting::{DiffuseModel, MixedLightingMode};
 use crate::scene::Scene;
@@ -26,6 +26,8 @@ pub(super) struct Overrides {
     pub directional: Option<bool>,
     /// Max Lightmap Size, the atlas page edge (#1704).
     pub max_lightmap_size: Option<u32>,
+    /// What cleans the bounce (#1884).
+    pub denoiser: Option<Denoiser>,
 }
 
 impl Overrides {
@@ -39,6 +41,7 @@ impl Overrides {
             seed: self.seed.unwrap_or(base.seed),
             directional: self.directional.unwrap_or(base.directional),
             max_lightmap_size: self.max_lightmap_size.unwrap_or(base.max_lightmap_size),
+            denoiser: self.denoiser.unwrap_or(base.denoiser),
             ..base
         }
         .sanitized()
@@ -52,6 +55,7 @@ impl Overrides {
             seed: t.get("seed")?,
             directional: t.get("directional")?,
             max_lightmap_size: t.get("maxLightmapSize")?,
+            denoiser: denoiser(t)?,
         })
     }
 }
@@ -103,6 +107,7 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
             out.set("seed", s.seed)?;
             out.set("directional", s.directional)?;
             out.set("maxLightmapSize", s.max_lightmap_size)?;
+            out.set("denoiser", s.denoiser.name())?;
             out.set("diffuseModel", settings.diffuse_model.name())?;
             out.set("mixedLightingMode", settings.mixed_lighting_mode.name())?;
             put_reflections(&out, &r)?;
@@ -135,6 +140,16 @@ fn set_settings(scene: &mut crate::scene::Scene, t: &Table) -> mlua::Result<()> 
     settings.lightmaps = overrides.apply(settings.lightmaps);
     settings.reflections = reflections;
     Ok(())
+}
+
+/// The denoiser `t` names (#1884), if any; an unknown name is an error.
+fn denoiser(t: &Table) -> mlua::Result<Option<Denoiser>> {
+    let Some(name) = t.get::<Option<String>>("denoiser")? else {
+        return Ok(None);
+    };
+    Denoiser::from_name(&name).map(Some).ok_or_else(|| {
+        mlua::Error::runtime(format!("unknown denoiser '{name}' (OIDN, Filter or None)"))
+    })
 }
 
 /// The diffuse model `t` names (#1698), if any; an unknown name is an error.
@@ -179,6 +194,9 @@ fn set_reflections(t: &Table, r: &mut ReflectionSettings) -> mlua::Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+#[path = "generate_denoiser_tests.rs"]
+mod denoiser_tests;
 #[cfg(test)]
 #[path = "generate_tests.rs"]
 mod tests;

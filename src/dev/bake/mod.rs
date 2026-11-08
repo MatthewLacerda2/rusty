@@ -5,6 +5,7 @@
 //! (`progress`, #1667), and the navmesh bake (`navmesh`, #1887), which no
 //! lighting step runs.
 
+pub mod denoise;
 pub mod generate_lighting;
 pub mod lighting;
 pub mod lightmap;

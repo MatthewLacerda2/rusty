@@ -29,12 +29,14 @@
 //! I/O).
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use glam::Vec3;
 
 use crate::asset::MapRef;
+use crate::dev::bake::denoise::{self, Oidn};
 use crate::dev::bake::progress::{BakeLog, MeshCost, MeshTime, Step};
-use crate::scene::lighting::lightmap::{BakeScene, BakeSettings};
+use crate::scene::lighting::lightmap::{BakeProgress, BakeScene, BakeSettings};
 use crate::scene::Scene;
 
 pub mod job;
@@ -83,6 +85,19 @@ pub fn bake_scene_lightmaps_logged(
     encoded.shadowmask = input.shadowmask.clone();
     warn_missing_uvs(lightmap_receivers(&input), encoded.maps);
     apply_encoded(scene, scene_path, &encoded)
+}
+
+/// `progress` lending the bake OIDN when `settings` pick it and it opens (#1884,
+/// [`denoise::lent`], which warns once when it is missing), and the [`Oidn`]
+/// lent, whose time the log reads after.
+pub(super) fn lend_denoiser(
+    progress: BakeProgress,
+    settings: &BakeSettings,
+) -> (BakeProgress, Option<Arc<Oidn>>) {
+    match denoise::lent(settings) {
+        Some(oidn) => (progress.with_denoiser(oidn.clone()), Some(oidn)),
+        None => (progress, None),
+    }
 }
 
 /// A timed mesh as the log names it: its entity's name, or `#<id>` without one.

@@ -468,6 +468,15 @@ under `tests/gpu/` fails rather than skips, and
 capture path wrongly reports no adapter. Without the variable (any local machine)
 the skip contract above is unchanged.
 
+**OIDN tests skip the same way** (#1884): the lightmap denoiser's tests
+(`dev::bake::denoise::tests` and `bake_tests`) need Open Image Denoise installed and skip without it.
+CI's `build-test` (the pinned release, where `RUSTY_OIDN` points) and the macOS leg
+(Homebrew's) install it and set `RUSTY_REQUIRE_OIDN=1`, which turns the canary
+`oidn_is_present_where_ci_requires_it` into a failure when OIDN does not open. The
+other jobs build `--features dev` without it (rusty opens OIDN at run time, never
+links it) and skip those tests. The bake's own denoiser logic is tested with mocks
+(`scene::lighting::lightmap::denoise_tests`) and runs everywhere.
+
 **Running them on a GPU-less Linux box** (a container, a cloud session): install
 lavapipe — `sudo apt-get install -y mesa-vulkan-drivers libvulkan1` — and the same
 tests render there as in Linux CI. Set `RUSTY_REQUIRE_GPU=1` to be sure they did.

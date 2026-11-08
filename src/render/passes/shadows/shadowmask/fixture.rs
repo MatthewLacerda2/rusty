@@ -94,6 +94,7 @@ pub(super) fn bake(scene: &mut Scene, name: &str) {
         bounces: 1,
         seed: 1,
         max_lightmap_size: 256,
+        denoiser: crate::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional: false,
     };
