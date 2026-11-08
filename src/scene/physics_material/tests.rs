@@ -94,7 +94,10 @@ fn a_deleted_asset_turns_dangling_once_its_removal_is_noted() {
     std::fs::remove_file(&path).unwrap();
     // The editor's file watch notes a removed file as it notes a changed one.
     crate::core::fs::written::note_written(&path);
-    assert_eq!(named(&with_asset(Some(&path))), None);
+    let shared = with_asset(Some(&path));
+    assert!(named(&shared).is_some(), "a lookup alone does not poll");
+    poll();
+    assert_eq!(named(&shared), None);
     assert!(
         generation() > before,
         "a dropped asset moves the generation"

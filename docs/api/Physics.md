@@ -298,14 +298,20 @@ Unity's `PhysicMaterial` asset: a small JSON file in the project holding the
 four fields above (any missing field reads as its default, a value out of range
 is clamped), by convention under `assets/materials/` with the extension
 `.physmat`. A collider names one by its project path (`SetMaterial`, or the
-**Asset** field of the inspector's Collider card) and then takes its values
-instead of its inline ones. Unity's behaviour throughout:
+**Asset** field of the inspector's Collider card, or `Component.Set(id,
+"Collider", {material_asset = path})`) and then takes its values instead of its
+inline ones. All three refuse a path no asset loads from, and store the path in
+one form (trimmed, forward slashes, no leading `./`), so every spelling of one
+file names one material. Setting the inline values through `Component.Set`
+(`material = {…}`) keeps the asset; only `SetPhysicsMaterial` drops it. Unity's
+behaviour throughout:
 
 - **One edit retunes every user.** `SetMaterialAsset` (or editing the values on
   any card that names the asset) rewrites the file, and every collider naming
   it takes the new values on the next physics step, in edit mode and during
   Play. A change made to the file outside the engine is picked up the same way
-  while the editor watches the project.
+  while the editor watches the project. The inspector writes the file when a
+  drag on a value ends, not on every frame of it.
 - **Every hit names its material.** `Raycast` and `SphereCast` return the asset's
   path as their 13th value; `RaycastAll`, `RaycastAllNonAlloc` and each crossing
   of `RaycastThrough` carry it as `material`; a collision callback's `contact`

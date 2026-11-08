@@ -19,7 +19,7 @@ mod offmesh_link;
 mod physics;
 
 pub use character_controller::draw_character_controller;
-pub use collider::draw_collider;
+pub use collider::{commit_abandoned as commit_abandoned_collider, draw_collider};
 pub use joint::draw_joint;
 pub use nav::{draw_nav_agent, draw_nav_modifier, draw_nav_obstacle};
 pub use offmesh_link::draw_offmesh_link;

@@ -35,15 +35,9 @@ fn register_reference(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
         lua.create_function(move |lua, (id, path): (EntityArg, Option<String>)| {
             let scene = &*scene.get(lua)?;
             let id = id.live("Physics", "SetMaterial")?;
-            if let Some(p) = &path {
-                if physics_material::lookup(p).is_none() {
-                    return Err(err(format!(
-                        "SetMaterial: no physics material asset loads from {p:?}"
-                    )));
-                }
-            }
             if let Some(mut c) = scene.borrow_mut().world.collider_mut(id) {
-                collider_ops::set_material_asset(&mut c, path);
+                collider_ops::set_material_asset(&mut c, path)
+                    .map_err(|e| err(format!("SetMaterial: {e}")))?;
             }
             Ok(())
         }),

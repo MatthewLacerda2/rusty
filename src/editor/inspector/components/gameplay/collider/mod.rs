@@ -1,21 +1,26 @@
-//! src/editor/inspector/components/gameplay/collider.rs — the Collider inspector
+//! src/editor/inspector/components/gameplay/collider/mod.rs — the Collider inspector
 //! card. Split out of the physics-card module (`physics.rs`) to keep both files
 //! under the size cap; the RigidBody and NavMesh Agent cards stay in `physics`.
+//!
+//! Its Physics Material section is `material`.
 //!
 //! A THIN client (#287): widgets read fields from a snapshot and route every write
 //! through a shared `authoring::physics::collider` op, never a mutable component borrow — the
 //! same ops the `Physics.*` Lua setters call, so the panel and the bindings share
 //! one write.
 
+mod material;
+
+pub use material::commit_abandoned;
+
 use crate::editor::widgets::DragRange;
 use egui_phosphor::regular as icon;
 use glam::Vec3;
 
-use crate::components::{CapsuleAxis, CombineMode, PhysicsMaterial};
+use crate::components::CapsuleAxis;
 use crate::editor::inspector::components::card::{component_card, remove_component};
 use crate::scene::authoring::physics::collider as collider_ops;
 use crate::scene::authoring::ComponentKind;
-use crate::scene::physics_material;
 use crate::scene::ColliderShape;
 
 pub fn draw_collider(
@@ -59,7 +64,7 @@ pub fn draw_collider(
                 }
                 *is_dirty = true;
             }
-            draw_material_section(ui, world, id, &collider, is_dirty);
+            material::draw(ui, world, id, &collider, is_dirty);
         },
     );
     if remove {
@@ -164,96 +169,6 @@ fn axis_combo(ui: &mut egui::Ui, axis: &mut CapsuleAxis) -> bool {
             }
         });
     *axis != before
-}
-
-/// The Physics Material section: the shared asset the collider names (#1878, a
-/// project path; empty for inline values), then the values. With an asset, an edit
-/// writes the asset, retuning every collider that uses it, as Unity's inspector
-/// edits a `PhysicMaterial` asset; without one, it writes the inline values.
-fn draw_material_section(
-    ui: &mut egui::Ui,
-    world: &mut crate::ecs::World,
-    id: u32,
-    collider: &crate::components::ColliderComponent,
-    is_dirty: &mut bool,
-) {
-    ui.separator();
-    ui.label("Physics Material");
-    let mut path = collider.material_asset.clone().unwrap_or_default();
-    let field = ui.horizontal(|ui| {
-        ui.label("Asset:");
-        ui.text_edit_singleline(&mut path)
-    });
-    let typed =
-        field.inner.lost_focus() && path != collider.material_asset.clone().unwrap_or_default();
-    if typed {
-        let path = Some(path.trim().to_string()).filter(|p| !p.is_empty());
-        if let Some(mut c) = world.collider_mut(id) {
-            collider_ops::set_material_asset(&mut c, path);
-        }
-        *is_dirty = true;
-        return;
-    }
-    let Some(asset) = &collider.material_asset else {
-        if let Some(material) = draw_material(ui, collider.material) {
-            if let Some(mut c) = world.collider_mut(id) {
-                collider_ops::set_material(&mut c, material);
-            }
-            *is_dirty = true;
-        }
-        return;
-    };
-    let Some(values) = physics_material::lookup(asset) else {
-        ui.label("Missing: the default material is used");
-        return;
-    };
-    if let Some(material) = draw_material(ui, values) {
-        if let Err(e) = physics_material::write(asset, material) {
-            log::warn!("[Physics] {e}");
-        }
-    }
-}
-
-/// Friction, bounciness and a combine mode for each (Unity's `PhysicMaterial`).
-/// Edits a copy; returns the new material when any widget changed it.
-fn draw_material(ui: &mut egui::Ui, mut m: PhysicsMaterial) -> Option<PhysicsMaterial> {
-    let mut changed = ui
-        .horizontal(|ui| {
-            ui.label("Friction:");
-            let mut c = ui
-                .add(
-                    egui::DragValue::new(&mut m.friction)
-                        .speed(0.01)
-                        .ranged(0.0..=10.0),
-                )
-                .changed();
-            ui.label("Bounciness:");
-            c |= ui
-                .add(
-                    egui::DragValue::new(&mut m.bounciness)
-                        .speed(0.01)
-                        .ranged(0.0..=1.0),
-                )
-                .changed();
-            c
-        })
-        .inner;
-    changed |= combine_combo(ui, "Friction Combine", &mut m.friction_combine);
-    changed |= combine_combo(ui, "Bounce Combine", &mut m.bounce_combine);
-    changed.then_some(m)
-}
-
-/// A combine-mode combo box; returns whether the mode changed.
-fn combine_combo(ui: &mut egui::Ui, label: &str, mode: &mut CombineMode) -> bool {
-    let before = *mode;
-    egui::ComboBox::from_label(label)
-        .selected_text(mode.name())
-        .show_ui(ui, |ui| {
-            for m in CombineMode::ALL {
-                ui.selectable_value(mode, m, m.name());
-            }
-        });
-    *mode != before
 }
 
 /// A clamped collider-dimension drag field (shared between the shape variants).

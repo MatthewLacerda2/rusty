@@ -12,10 +12,11 @@
 //! (`world.collider_mut(id)`) carries the no-op-when-absent semantics (#344), and
 //! refreshes the world AABB when the edit lands (`ecs::world_space::collider`).
 //!
-//! Pure.
+//! Pure, but for `set_material_asset`, which reads the asset it is given.
 
 use crate::components::{ColliderComponent, ColliderShape, PhysicsMaterial};
 use crate::scene::authoring::sanitize::{non_negative, unit};
+use crate::scene::physics_material;
 
 /// Set the collider's `active` flag.
 pub fn set_active(c: &mut ColliderComponent, active: bool) {
@@ -36,8 +37,10 @@ pub fn set_shape(c: &mut ColliderComponent, shape: ColliderShape) {
 
 /// Replace the collider's inline physics material, clamping its coefficients into
 /// range (friction `>= 0`, bounciness `[0, 1]`) so neither surface can author an
-/// out-of-range value. A shared asset it named is dropped: the collider now has its
-/// own values (Unity's `Collider.material`).
+/// out-of-range value. It never touches `material_asset`: a scene load re-runs this
+/// op on a clamped inline value (`fields::hold`), and that must keep the asset. A
+/// caller that means "give the collider its own values" (`Physics.SetPhysicsMaterial`,
+/// Unity's `Collider.material`) clears the asset itself.
 // lint: allow(sanitize) both coefficients go through a helper below
 pub fn set_material(c: &mut ColliderComponent, material: PhysicsMaterial) {
     c.material = PhysicsMaterial {
@@ -45,13 +48,26 @@ pub fn set_material(c: &mut ColliderComponent, material: PhysicsMaterial) {
         bounce_combine: material.bounce_combine,
         ..PhysicsMaterial::new(non_negative(material.friction), unit(material.bounciness))
     };
-    c.material_asset = None;
 }
 
 /// Name the shared physics material asset the collider uses (#1878), or `None`
-/// for its inline values. The path is kept as given, whether it loads or not.
-pub fn set_material_asset(c: &mut ColliderComponent, path: Option<String>) {
+/// (or an empty path) for its inline values. The path is stored in its one form
+/// (`physics_material::key`), since it is the key every hit reports, and is
+/// refused when no asset loads from it: the one check `Physics.SetMaterial`, the
+/// inspector and `Component.Set` all go through. A scene file is not checked (it
+/// is read, not written through ops), so a dangling path loaded from one is kept
+/// and falls back to the default material.
+pub fn set_material_asset(c: &mut ColliderComponent, path: Option<String>) -> Result<(), String> {
+    let path = path
+        .map(|p| physics_material::key(&p))
+        .filter(|p| !p.is_empty());
+    if let Some(p) = &path {
+        if physics_material::lookup(p).is_none() {
+            return Err(format!("no physics material asset loads from {p:?}"));
+        }
+    }
     c.material_asset = path;
+    Ok(())
 }
 
 #[cfg(test)]

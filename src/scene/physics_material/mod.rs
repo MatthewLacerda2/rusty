@@ -10,20 +10,27 @@
 //! key a game's own tables (penetration power, impact effects, footsteps) are read
 //! with. The engine stores no penetration value: that is game data.
 //!
-//! - **One cache per thread**, keyed by the path as written, like the import cache
-//!   (`asset::import_cache`): each asset file is read once. Every lookup drains the
-//!   write log (`core::fs::written`) through a [`Freshness`], so a file the engine
-//!   wrote ([`write()`]) or the editor's file watch saw change outside it is read
-//!   again, and opening another project drops every entry (keys are relative).
+//! - **One cache per thread**, keyed by the stored form of the path
+//!   (`core::paths::stored`: `./assets/x.physmat` and `assets/x.physmat` are one
+//!   asset and name one material), like the import cache (`asset::import_cache`):
+//!   each asset file is read once. [`poll`] drains the write log
+//!   (`core::fs::written`) through a [`Freshness`], once per physics step (through
+//!   [`generation`]) and once per inspector frame, never per lookup, so a file the
+//!   editor's file watch saw change outside the engine is read again on the next
+//!   step. A [`write()`] updates the cache itself. Opening another project drops
+//!   every entry (keys are relative).
 //! - **A missing or unreadable file is a miss**, warned of once per path: the
 //!   collider takes the default material (Unity drops a missing reference to the
 //!   default) and its hits name no material. The miss is retried on the
-//!   freshness beat, so a file that appears later is picked up.
+//!   freshness beat (every `MISS_RETRY_FRAMES` polls), so a file that appears
+//!   later is picked up.
 //! - **[`generation`]** moves whenever an asset's values may have changed: physics
 //!   compares it with the one it last synced against and, when it moved,
 //!   re-applies the material of every built collider (a re-sync, never a rebuild).
 //!   It only decides whether to compare, so the sim never depends on it.
 
+#[cfg(test)]
+mod collider_tests;
 mod file;
 #[cfg(test)]
 mod tests;
@@ -64,13 +71,18 @@ impl Cache {
         }
     }
 
-    /// Drop what another project or a write made stale.
-    fn refresh(&mut self) {
+    /// Drop every entry when another project was opened (an atomic read).
+    fn follow_project(&mut self) {
         if self.project != project::moves() {
             let generation = self.generation + 1;
             *self = Self::new();
             self.generation = generation;
         }
+    }
+
+    /// Drop what another project or a write made stale.
+    fn refresh(&mut self) {
+        self.follow_project();
         let changes = self.freshness.poll_with(|p| Path::new(p).exists());
         if changes.stale.is_empty() {
             return;
@@ -85,7 +97,7 @@ impl Cache {
     }
 
     fn lookup(&mut self, path: &str) -> Option<PhysicsMaterial> {
-        self.refresh();
+        self.follow_project();
         if let Some(m) = self.entries.get(path) {
             return Some(*m);
         }
@@ -113,13 +125,21 @@ thread_local! {
 }
 
 /// The asset at project path `path`, or `None` when it is missing or unreadable
-/// (warned of once).
+/// (warned of once). Reads the cache as of the last [`poll`].
 pub fn lookup(path: &str) -> Option<PhysicsMaterial> {
-    CACHE.with(|c| c.borrow_mut().lookup(path))
+    let path = key(path);
+    CACHE.with(|c| c.borrow_mut().lookup(&path))
 }
 
-/// A counter that moves whenever an asset's values may have changed: an asset
-/// written, re-read or dropped, or another project opened.
+/// Drain the write log: drop the assets written since the last poll, and on the
+/// retry beat the misses whose file appeared. Called once per physics step (by
+/// [`generation`]) and by the inspector once per frame.
+pub fn poll() {
+    CACHE.with(|c| c.borrow_mut().refresh());
+}
+
+/// [`poll`], then a counter that moves whenever an asset's values may have
+/// changed: an asset written, re-read or dropped, or another project opened.
 pub fn generation() -> u64 {
     CACHE.with(|c| {
         let mut cache = c.borrow_mut();
@@ -128,17 +148,23 @@ pub fn generation() -> u64 {
     })
 }
 
+/// The one form a path is cached, reported and stored under.
+pub fn key(path: &str) -> String {
+    crate::core::paths::stored(path)
+}
+
 /// Create or replace the asset at `path` with `material` (clamped into range), and
 /// make every collider that names it use the new values from its next lookup.
 /// `path` must end in `.physmat`; its folder is created when absent.
 pub fn write(path: &str, material: PhysicsMaterial) -> Result<PhysicsMaterial, String> {
+    let path = key(path);
     let material = file::sanitized(material)?;
-    file::write(Path::new(path), &material)?;
+    file::write(Path::new(&path), &material)?;
     CACHE.with(|c| {
         let mut cache = c.borrow_mut();
         cache.refresh();
-        cache.entries.insert(path.to_string(), material);
-        cache.warned.remove(path);
+        cache.entries.insert(path.clone(), material);
+        cache.warned.remove(&path);
         cache.generation += 1;
     });
     Ok(material)
@@ -158,5 +184,5 @@ pub fn effective(collider: &ColliderComponent) -> PhysicsMaterial {
 /// material, or a dangling path).
 pub fn named(collider: &ColliderComponent) -> Option<String> {
     let path = collider.material_asset.as_ref()?;
-    lookup(path).map(|_| path.clone())
+    lookup(path).map(|_| key(path))
 }

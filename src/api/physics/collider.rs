@@ -193,6 +193,7 @@ fn register_material(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> R
                 let mut scene = scene.borrow_mut();
                 if let Some(mut c) = scene.world.collider_mut(id) {
                     collider_ops::set_material(&mut c, material);
+                    c.material_asset = None; // its own values now, not the asset's
                 }
                 Ok(())
             },
