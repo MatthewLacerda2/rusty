@@ -79,9 +79,7 @@ pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         R::Capture(on) => r.capture.static_only = on,
         R::Rewind => scene.world.rewind_changes(),
         R::Shadow(ref op) => shadow_ops::edit(scene, op),
-        R::Tick => r.draw_poses.record(scene),
-        R::Blend(q) => r.draw_poses.set_alpha(f32::from(q) / 4.0),
-        R::Unblend => r.draw_poses.clear(),
+        R::Tick | R::Blend(_) | R::Unblend => between_ticks(r, scene, op),
         R::Frame | R::Other(_) => {}
         R::Material(i, m, two) => on(scene, pick(scene, i), |s, id| {
             let name = m.map(|m| ["red", "glass", "blue"][m as usize].to_string());
@@ -118,6 +116,15 @@ pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
                 mesh.revision = MeshRevision::next(); // every sharer's buffers change
             }
         }),
+    }
+}
+
+/// A tick recorded, a blend set or dropped (#1877).
+fn between_ticks(r: &mut Renderer, scene: &Scene, op: &R) {
+    match *op {
+        R::Tick => r.draw_poses.record(scene),
+        R::Blend(q) => r.draw_poses.set_alpha(f32::from(q) / 4.0),
+        _ => r.draw_poses.clear(),
     }
 }
 
