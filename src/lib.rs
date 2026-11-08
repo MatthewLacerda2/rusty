@@ -7,6 +7,7 @@
 //! egui editor, `src/editor` + `shell::editor`). A shipped game is the `player` binary
 //! built with `--no-default-features` — neither layer.
 
+pub mod ai;
 pub mod api;
 pub mod app;
 pub mod asset;

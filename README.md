@@ -235,7 +235,8 @@ A new project's first launch seeds a **default scene** into
 greybox of fy_pool_day, built from boxes and planes — a walled yard with a sunken pool
 between two spawns (a ramp at each end, translucent water you walk through), a raised
 jacuzzi you jump into, and crates for cover. The Player starts at one end, and Enemy_1
-starts behind a crate at the other and chases it down one ramp and up the other.
+starts behind a crate at the other and closes in down one ramp and up the other, to a
+spot round the Player with a line of sight to it that an `EnvironmentQuery` picks.
 Seeding also bakes the scene's checker texture (`assets/textures/`) and an
 example surface shader, `default_rim`, with its recipe (`assets/shaders/`). A default
 scene you never edited follows the engine's newer one on a later launch; one you

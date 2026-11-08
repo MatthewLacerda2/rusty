@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::asset::animation_graph::GraphNode;
 
 use super::playhead::{finite, Bounds, Playhead, Step};
+use super::states::NodeStates;
 use super::sync::SyncState;
 
 /// What a playback plays: a clip by name, or the blend tree of the named graph
@@ -80,6 +81,9 @@ pub struct Playback {
     /// and a crossfade whose lighter motion follows the heavier.
     #[serde(default, skip_serializing_if = "SyncState::is_idle")]
     pub sync: SyncState,
+    /// The node a crossfade leaves and the entry counts (#1901).
+    #[serde(skip)]
+    pub states: NodeStates,
 }
 
 fn default_node_speed() -> f32 {
@@ -107,6 +111,7 @@ impl Default for Playback {
             current_node: None,
             node_speed: 1.0,
             sync: SyncState::default(),
+            states: NodeStates::default(),
         }
     }
 }
@@ -152,6 +157,7 @@ impl Playback {
         self.previous_tree = self.current_tree.take();
         self.previous_time = self.time;
         self.previous_loop = self.loop_clip;
+        self.states.previous_node = None; // `enter_node` names a node it leaves
         self.sync.begin_fade();
         self.set_current(motion);
         self.time = 0.0;
@@ -173,6 +179,8 @@ impl Playback {
         self.loop_clip = node.is_loop;
         self.node_speed = node.speed.unwrap_or(1.0);
         let previous = self.current_node.replace(node.name.clone());
+        let fading = self.is_crossfading();
+        self.states.entered(previous.clone(), fading);
         self.start_sync(node, previous, source);
     }
 
@@ -286,6 +294,7 @@ impl Playback {
         self.previous_tree = None;
         self.crossfade_elapsed = 0.0;
         self.crossfade_duration = 0.0;
+        self.states.previous_node = None;
         self.sync.end_fade();
     }
 }

@@ -1,8 +1,8 @@
 //! src/app/systems/animate/ — the `animate` system (#80, #453) and root
 //! motion's application (#1745).
 //!
-//! Each active animator's playheads advance, the sampled pose is written onto
-//! its bone GameObjects, and the step's root motion is stored world-space on
+//! Each active animator's playheads advance, its graph-state callbacks are
+//! queued (#1901), the sampled pose is written onto its bone GameObjects, and the step's root motion is stored world-space on
 //! the component (`Animator.GetRootMotion`; zeroed while the entity is
 //! inactive). When root motion drives the entity
 //! (`AnimatorComponent::drives_root_motion`: *Apply Root Motion* on, the
@@ -34,10 +34,12 @@ use glam::{Mat4, Quat, Vec3};
 use crate::app::animation;
 use crate::app::resources::Resources;
 use crate::app::world::World;
+use crate::asset::animation_graph::AnimationGraph;
 use crate::asset::mesh_data::SkinData;
-use crate::components::{root_chain, AnimatorComponent, RootMotion};
+use crate::components::{root_chain, AnimatorComponent, MeshComponent, RootMotion, StateCallback};
 use crate::scene::Scene;
 use apply::apply_root_motion;
+use std::collections::BTreeSet;
 
 mod apply;
 
@@ -49,8 +51,9 @@ mod apply;
 /// scripts, physics) may override a bone before the palette build.
 pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
+    let (ids, hears) = listening(world, res);
     let mut s = world.scene.borrow_mut();
-    for id in s.world.ids_with_animator() {
+    for id in ids {
         if !s.world.is_active_in_hierarchy(id) {
             settle(&mut s, id);
             continue;
@@ -62,6 +65,7 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
         // helper (#344) — the animate system's re-pose step.
         let stepped = s.world.with_animator_mut_and_mesh(id, |anim, mesh| {
             let stepped = animation::step(anim, mesh, graph, dt);
+            let states = states_of(anim, mesh, graph, hears.contains(&id));
             let skin = mesh.and_then(|m| m.skin.as_ref());
             let model = model_in_entity(skin);
             let motion = stepped
@@ -71,14 +75,10 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
             measured(anim, motion, drives);
             let unknown = skin.and_then(|skin| unknown_bone(anim, skin));
             let writes = mesh.map(|m| animation::bone_writes(anim, m, graph));
-            (
-                stepped.events,
-                writes,
-                drives.then_some((motion, model)),
-                unknown,
-            )
+            let events = (states, stepped.events);
+            (events, writes, drives.then_some((motion, model)), unknown)
         });
-        let Some((crossed, writes, applied, unknown)) = stepped else {
+        let Some(((states, crossed), writes, applied, unknown)) = stepped else {
             continue;
         };
         if let Some(bone) = unknown {
@@ -87,8 +87,10 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
                 "Animator on '{name}' ({id}): root bone '{bone}' is not in its skeleton; root motion moves nothing"
             ));
         }
+        let queue = &mut res.animation_events;
+        queue.states.extend(states.into_iter().map(|c| (id, c)));
         let events = crossed.into_iter().map(|e| (id, e.name, e.montage));
-        res.animation_events.extend(events);
+        queue.events.extend(events);
         for (bone, local) in writes.unwrap_or_default() {
             if let Some(mut t) = s.world.transform_mut(bone) {
                 *t = local;
@@ -100,6 +102,16 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
             res.controller_hits.extend(touched);
         }
     }
+}
+
+/// Every animator's entity, and those whose scripts hear the state callbacks
+/// (#1901); read before the scene is borrowed mutably, since the check reads it.
+fn listening(world: &World, res: &Resources) -> (Vec<u32>, BTreeSet<u32>) {
+    let ids = world.scene.borrow().world.ids_with_animator();
+    let hears = ids.iter().copied();
+    let hears = hears.filter(|&id| res.script_manager.hears_states(id));
+    let hears = hears.collect();
+    (ids, hears)
 }
 
 /// Keep this step's world-space root `motion` on `anim`, before anything
@@ -115,17 +127,43 @@ fn measured(anim: &mut AnimatorComponent, motion: RootMotion, drives: bool) {
 }
 
 /// An inactive entity's animator measures nothing: its last root motion is
-/// zeroed, so `GetRootMotion` doesn't report a step it no longer takes.
+/// zeroed, so `GetRootMotion` doesn't report a step it no longer takes, and
+/// its reported states are forgotten, so a reactivation enters them afresh.
 fn settle(s: &mut Scene, id: u32) {
-    let idle =
-        |a: &AnimatorComponent| a.root_motion.last.is_zero() && a.root_motion.moved == Vec3::ZERO;
+    let idle = |a: &AnimatorComponent| {
+        a.root_motion.last.is_zero() && a.root_motion.moved == Vec3::ZERO && a.states.is_empty()
+    };
     if s.world.animator(id).is_some_and(|a| idle(&a)) {
         return; // compared first: a borrow stamps the animator as edited
     }
     if let Some(mut a) = s.world.animator_mut(id) {
         a.root_motion.last = RootMotion::ZERO;
         a.root_motion.moved = Vec3::ZERO;
+        forget_states(&mut a);
     }
+}
+
+/// The state callbacks `anim`'s step raises (#1901) when its scripts `hear`
+/// them; otherwise its reported states are forgotten.
+fn states_of(
+    anim: &mut AnimatorComponent,
+    mesh: Option<&MeshComponent>,
+    graph: Option<&AnimationGraph>,
+    hear: bool,
+) -> Vec<StateCallback> {
+    match hear {
+        true => animation::state_callbacks(anim, mesh.map_or(&[][..], |m| &m.clips[..]), graph),
+        false => forget_states(anim),
+    }
+}
+
+/// Forget the states reported to `anim`'s scripts, firing nothing (#1901): an
+/// inactive entity, or scripts that can't hear the callbacks (none awake yet,
+/// none defining one). They are entered afresh once the scripts listen, as
+/// Unity enters a reactivated or freshly spawned Animator's states.
+fn forget_states(anim: &mut AnimatorComponent) -> Vec<StateCallback> {
+    anim.states.clear();
+    Vec::new()
 }
 
 /// The root bone `anim` names when root motion is on and `skin` lacks it,

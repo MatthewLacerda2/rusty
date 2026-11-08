@@ -6,7 +6,8 @@
 //! `bake` (rasterise → spans → agent-radius erosion, and the saved `<scene>.navmesh`, #1887), `links` (which span a move
 //! reaches), `snap` (which span a world point means), `astar` (the span search),
 //! `areas` (per-span area ids, their costs and agent masks, #460), `offmesh` (drop, jump and authored links between spans, #462),
-//! `path` (smoothed paths, `SamplePosition`, `Raycast`), `agents` (cached-path planning + the steering tick), and
+//! `path` (smoothed paths, `SamplePosition`, `Raycast`), `flood` (one bounded Dijkstra
+//! answering many reachability questions at once, #1892), `agents` (cached-path planning + the steering tick), and
 //! `avoidance` (ORCA local avoidance between agents, #463) — all hanging off the
 //! single re-exported [`NavigationGraph`] type.
 
@@ -24,6 +25,7 @@ mod bake;
 mod bounds;
 #[cfg(test)]
 mod bounds_tests;
+mod flood;
 mod grid;
 mod links;
 mod obstacle;
@@ -47,6 +49,7 @@ pub use areas::{
 };
 pub use bake::{CellRect, Rebake, Start};
 pub use bounds::NavBounds;
+pub use flood::Flood;
 pub use grid::{NavSpan, NavigationGraph, SpanRef, DEFAULT_MAX_SLOPE, DEFAULT_MAX_STEP};
 pub use obstacle::{tick_obstacles, ObstacleVolume};
 pub use offmesh::{LinkEnd, OffMeshLink, OffMeshLinkData, OffMeshLinkKind};

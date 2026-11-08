@@ -30,8 +30,13 @@ const GROUND_TOLERANCE: f32 = 0.02;
 /// The default scene as the editor boots it (built, then through its saved
 /// document), and Enemy_1's id in it.
 pub fn default_scene() -> (Scene, u32) {
+    default_scene_with(rusty::scene::default_scene::BOT_SCRIPT)
+}
+
+/// [`default_scene`] with `bot_script` as Enemy_1's brain.
+pub fn default_scene_with(bot_script: &str) -> (Scene, u32) {
     let mut built = Scene::new();
-    rusty::scene::default_scene::build(&mut built, rusty::scene::default_scene::BOT_SCRIPT);
+    rusty::scene::default_scene::build(&mut built, bot_script);
     let mut scene = Scene::new();
     apply_scene_data(&mut scene, to_scene_data(&built));
     let enemy = scene.find_entity_by_name("Enemy_1").expect("Enemy_1");
