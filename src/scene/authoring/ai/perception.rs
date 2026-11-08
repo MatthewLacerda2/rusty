@@ -54,28 +54,29 @@ pub fn set_hearing_range(p: &mut Perception, range: f32) {
     p.hearing_range = at_least(finite_or(range, p.hearing_range), 0.0);
 }
 
-/// `seconds` when it is a valid max age (finite, not negative), else `current`.
+/// `seconds` (already finite) when it is a valid max age, not negative, else
+/// `current`: a negative age is never floored to 0, which means forever.
 fn age_or(seconds: f32, current: f32) -> f32 {
-    if seconds.is_finite() && seconds >= 0.0 {
-        seconds
-    } else {
+    if seconds < 0.0 {
         current
+    } else {
+        seconds
     }
 }
 
 /// Set how long a seen target is remembered out of sight (0 = forever).
 pub fn set_sight_max_age(p: &mut Perception, seconds: f32) {
-    p.sight_max_age = age_or(seconds, p.sight_max_age);
+    p.sight_max_age = age_or(finite_or(seconds, p.sight_max_age), p.sight_max_age);
 }
 
 /// Set how long a heard noise is remembered (0 = forever).
 pub fn set_hearing_max_age(p: &mut Perception, seconds: f32) {
-    p.hearing_max_age = age_or(seconds, p.hearing_max_age);
+    p.hearing_max_age = age_or(finite_or(seconds, p.hearing_max_age), p.hearing_max_age);
 }
 
 /// Set how long a damage stimulus is remembered (0 = forever).
 pub fn set_damage_max_age(p: &mut Perception, seconds: f32) {
-    p.damage_max_age = age_or(seconds, p.damage_max_age);
+    p.damage_max_age = age_or(finite_or(seconds, p.damage_max_age), p.damage_max_age);
 }
 
 #[cfg(test)]

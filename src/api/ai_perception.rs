@@ -170,16 +170,18 @@ impl Accepts {
     }
 }
 
-/// `Get*` / `Set*` for the distances, the angle, the eye height and the ages.
-fn register_distances(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+/// A float setting: its name, what its setter accepts, its getter and its op.
+type Float = (
+    &'static str,
+    Accepts,
+    fn(&Perception) -> f32,
+    fn(&mut Perception, f32),
+);
+
+/// The distances, the angle, the eye height and the ages.
+fn floats() -> [Float; 8] {
     use Accepts::{Finite, NonNegative, Number};
-    type Float = (
-        &'static str,
-        Accepts,
-        fn(&Perception) -> f32,
-        fn(&mut Perception, f32),
-    );
-    let floats: [Float; 8] = [
+    [
         (
             "SightRange",
             NonNegative,
@@ -223,8 +225,12 @@ fn register_distances(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
             |p| p.damage_max_age,
             ops::set_damage_max_age,
         ),
-    ];
-    for (name, accepts, read, set) in floats {
+    ]
+}
+
+/// `Get*` / `Set*` for the distances, the angle, the eye height and the ages.
+fn register_distances(lua: &Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
+    for (name, accepts, read, set) in floats() {
         let f = lua.create_function(move |lua, id: EntityArg| {
             Ok(get(&*scene.get(lua)?, id.read(), read).unwrap_or(0.0))
         });
