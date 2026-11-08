@@ -86,33 +86,17 @@ impl Tracer<'_> {
                 }
             }
         }
-        for k in self.sources.near.near(point).filter(|_| emitters) {
-            let w = self.sources.emitters[k].weight(point, normal);
-            if w > 0.0 {
-                picks.list.push((Source::Emitter(k), w));
+        if emitters {
+            for k in self.sources.near.near(point) {
+                let w = self.sources.emitters[k].weight(point, normal);
+                if w > 0.0 {
+                    picks.list.push((Source::Emitter(k), w));
+                }
             }
         }
-        picks.total = picks.list.iter().map(|(_, w)| w).sum();
-        let Some(&(last, last_w)) = picks.list.last() else {
+        let Some((source, chance)) = picks.pick(rng) else {
             return (Vec3::ZERO, Vec3::ZERO);
         };
-        if !picks.total.is_finite() {
-            picks.total = 0.0;
-            return (Vec3::ZERO, Vec3::ZERO);
-        }
-        let mut u = rng.next_f32() * picks.total;
-        let (source, w) = picks
-            .list
-            .iter()
-            .copied()
-            .find(|&(_, w)| {
-                u < w || {
-                    u -= w;
-                    false
-                }
-            })
-            .unwrap_or((last, last_w));
-        let chance = w / picks.total;
         let (lit, dir) = match source {
             Source::Lamp(i) => {
                 let light = &self.scene.lights[i];

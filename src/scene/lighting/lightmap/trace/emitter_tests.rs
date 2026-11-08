@@ -104,3 +104,25 @@ fn a_small_bright_panel_bakes_smooth_and_true() {
     // ~73% noise. Aimed at, it is a few percent.
     assert!(var.sqrt() < exact * 0.05, "noise {} of {exact}", var.sqrt());
 }
+
+#[test]
+fn glowing_panels_and_many_lamps_bake_the_same_bytes_on_any_worker_count() {
+    use super::super::bake::bake_on;
+    use super::super::input::{BakeLight, LightShape};
+    use super::super::tests::{floor, settings};
+    let mut scene = dark(vec![floor(), panel(0.3, 5.0), panel(1.0, 0.5)]);
+    scene.lights = (0..40)
+        .map(|k| BakeLight {
+            shape: LightShape::Point {
+                position: Vec3::new(k as f32 * 0.1 - 2.0, 1.5, 0.5),
+                range: 4.0,
+            },
+            radiance: Vec3::splat(0.1),
+            bakes_direct: k % 2 == 0,
+            mask_channel: None,
+        })
+        .collect();
+    let progress = Default::default();
+    let on = |threads| bake_on(&scene, &settings(), &progress, threads);
+    assert_eq!(on(1), on(4));
+}

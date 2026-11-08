@@ -7,6 +7,7 @@ use glam::{Vec2, Vec3};
 
 use super::super::input::{BakeLight, BakeScene, LightShape};
 use super::super::rays::Tri;
+use super::super::rng::Rng;
 use super::arrival;
 use super::emitter::{emitters, Emitter, NONE};
 use super::grid::LightGrid;
@@ -65,6 +66,26 @@ pub(super) struct Picks {
 }
 
 impl Picks {
+    /// Sum the weights and pick one source by them, with the probability it was
+    /// picked with; `None` when nothing was weighed (or the sum is not finite).
+    pub(super) fn pick(&mut self, rng: &mut Rng) -> Option<(Source, f32)> {
+        self.total = self.list.iter().map(|(_, w)| w).sum();
+        if !self.total.is_finite() {
+            self.total = 0.0;
+        }
+        let &(last, last_w) = self.list.last().filter(|_| self.total > 0.0)?;
+        let mut u = rng.next_f32() * self.total;
+        let (source, w) = (self.list.iter().copied())
+            .find(|&(_, w)| {
+                u < w || {
+                    u -= w;
+                    false
+                }
+            })
+            .unwrap_or((last, last_w));
+        Some((source, w / self.total))
+    }
+
     /// The probability `source` was picked with (0 if it was not weighed).
     pub(super) fn chance(&self, source: Source) -> f32 {
         let w = self

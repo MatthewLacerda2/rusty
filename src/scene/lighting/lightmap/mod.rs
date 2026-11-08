@@ -68,7 +68,7 @@ pub(in crate::scene::lighting) use raster::{rasterize_surface, world_per_uv, Sur
 pub(in crate::scene::lighting) use rays::{Rays, Tri};
 pub(in crate::scene::lighting) use rng::Rng;
 pub use set::{LightmapEntry, LightmapSet};
-#[cfg(test)]
+#[cfg(all(test, feature = "dev"))]
 pub(crate) use trace::bench::trace_texels;
 pub(in crate::scene::lighting) use trace::cosine_sample;
 

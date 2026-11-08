@@ -10,11 +10,19 @@
 //!
 //! Each sample shoots a cosine-weighted ray; the mean of the radiance the rays bring
 //! back is exactly `E / π`. A ray that escapes returns the sky; one that hits a front
-//! face returns that surface's emission plus `albedo / π` times its direct light (a
-//! shadow ray per light), and keeps bouncing, `bounces` surfaces deep. A back face
+//! face returns `albedo / π` times its direct light and keeps bouncing, `bounces`
+//! surfaces deep. That direct light is one next-event sample (#1883, `direct`): one
+//! lamp or emissive surface picked by how much it could light the point, its light
+//! over the pick's probability, so the cost follows the sources in range, not the
+//! level's (`grid`), and a small bright panel is aimed at rather than found by luck
+//! (`emitter`). An emitter a ray lands on adds its glow, weighed by MIS against the
+//! sample that could have picked it, so no light is counted twice. Past the second
+//! bounce, Russian roulette ends dim paths early. A back face
 //! returns nothing, so light never leaks through a closed wall. A path's light is
 //! clamped at [`INDIRECT_CLAMP`] (Cycles' *Clamp Indirect*, #1699), so a lamp hung
-//! against a surface bakes no speckle; the texel's own direct light is not.
+//! against a surface bakes no speckle. The texel's own direct light (its `Baked`
+//! lamps) is not clamped, and not sampled either: never filtered, it counts every
+//! lamp in range.
 //!
 //! Alongside each part the tracer sums where the light came from (#810): every ray's
 //! direction weighted by the luminance it brought back, so the bake can store the
@@ -24,7 +32,7 @@ use std::f32::consts::{PI, TAU};
 
 use glam::{Vec2, Vec3, Vec4};
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dev"))]
 pub(super) mod bench;
 mod direct;
 mod emitter;

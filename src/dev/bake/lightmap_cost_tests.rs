@@ -79,3 +79,47 @@ fn lightmap_trace_cost() {
         );
     }
 }
+
+/// The 2 × 2-rooms level with `lamps` points spread through it, every one in range
+/// of most of it.
+fn crowded(lamps: usize) -> BakeScene {
+    let mut scene = BakeScene::gather(&rooms(2), &|_| None);
+    scene.lights = (0..lamps)
+        .map(|k| {
+            let f = k as f32 / lamps as f32;
+            let position = Vec3::new(1.0 + 18.0 * f, 3.0 + 4.0 * (k % 2) as f32, 19.0 - 18.0 * f);
+            let shape = LightShape::Point {
+                position,
+                range: 12.0,
+            };
+            BakeLight {
+                shape,
+                radiance: Vec3::splat(3.0 / lamps as f32),
+                bakes_direct: k % 3 == 0,
+                mask_channel: None,
+            }
+        })
+        .collect();
+    scene
+}
+
+#[test]
+fn a_hundred_and_fifty_lamps_cost_a_small_factor_of_one() {
+    let settings = BakeSettings {
+        samples: 16,
+        ..Default::default()
+    };
+    let (one, many) = (crowded(1), crowded(150));
+    let time = |scene: &BakeScene| {
+        let t = Instant::now();
+        trace_texels(scene, &settings, 96, 1);
+        t.elapsed().as_secs_f64()
+    };
+    // Interleaved, best of three: a busy machine slows both alike.
+    let (mut a, mut b) = (f64::MAX, f64::MAX);
+    for _ in 0..3 {
+        (a, b) = (a.min(time(&one)), b.min(time(&many)));
+    }
+    println!("1 lamp {a:.3} s, 150 lamps {b:.3} s: {:.2}×", b / a);
+    assert!(b < a * 3.0, "150 lamps {b:.3} s against one's {a:.3} s");
+}

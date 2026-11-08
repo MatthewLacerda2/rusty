@@ -268,6 +268,12 @@ scene's lighting settings (above), whose defaults are the ones listed here.
 - **What it bakes.** A deterministic CPU path tracer: `samples` (default `128`) paths
   per texel, `bounces` (default `3`) surfaces deep, seeded by `seed` (default `0`) — the
   same scene and seed always write byte-identical lightmaps, however many cores ran it.
+  Each surface a path lands on aims one shadow ray at one source picked from the lamps
+  in range and the emissive surfaces near it, by how much each could light it (#1883,
+  Unity's Progressive Lightmapper does the same): a level with 150 lamps bakes about as
+  fast as one with a few, and a small bright emissive panel bakes smooth instead of
+  speckled. Past the second bounce a dim path may end early (Russian roulette); none of
+  it changes what the bake converges to.
   `texelsPerUnit` (default `8`) is the lightmap resolution per world unit, times each
   mesh's **Scale In Lightmap** (below). A mesh's lightmap follows its surface area at that
   density, from 4 texels square up to the largest map one atlas page holds with its

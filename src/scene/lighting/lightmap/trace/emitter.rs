@@ -72,7 +72,7 @@ pub(super) fn emitters(scene: &BakeScene) -> (Vec<Emitter>, Vec<Vec<u32>>) {
                 let [a, b, c] = [t[0], t[1], t[2]].map(|i| mesh.positions[i as usize]);
                 let cross = (b - a).cross(c - a);
                 let twice = cross.length();
-                if !(twice > 0.0) || !twice.is_finite() {
+                if !twice.is_finite() || twice <= 0.0 {
                     continue;
                 }
                 e.area += twice * 0.5;
@@ -165,7 +165,7 @@ impl Emitter {
         let target = t.a + t.e1 * s + t.e2 * r + t.normal * EMIT_OFFSET;
         let offset = target - point;
         let d = offset.length();
-        if !(d > 0.0) {
+        if !d.is_finite() || d <= 0.0 {
             return None;
         }
         let dir = offset / d;
