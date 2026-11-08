@@ -3,9 +3,11 @@
 //!
 //! **What moves a wire.** The inputs `shape::build::collider_inputs` reads: the
 //! Collider (shape, `active`, `is_trigger`, its shared mesh), the entity's Mesh, a
-//! CharacterController, and the world scale. The three columns are read off the
-//! World's change log (`ecs::changes`), as physics' own sync reads them
-//! (`physics::watch`); the scale is compared with the one the wire was built at.
+//! CharacterController, the world scale and whether its body is dynamic (a concave
+//! mesh is decomposed on one, #1886). The three columns are read off the World's
+//! change log (`ecs::changes`), as physics' own sync reads them
+//! (`physics::watch`); the scale and the body's class (it may be a parent's) are
+//! compared with what the wire was built for.
 //! A log that cannot say (a scene load, an Undo, Play's restore, a reader that
 //! fell behind, another scene) forgets every wire. A mesh physics refuses is kept
 //! as refused, so its warning is logged once per change, not once per frame.
@@ -14,7 +16,7 @@ use std::collections::BTreeMap;
 
 use glam::Vec3;
 
-use super::{shape_wire, ShapeWire};
+use super::{on_dynamic_body, shape_wire, ShapeWire};
 use crate::components::{CharacterControllerComponent, ColliderComponent, MeshComponent};
 use crate::ecs::{Changes, Cursor, World};
 use crate::scene::{Scene, SceneId};
@@ -58,8 +60,9 @@ impl Cursors {
 pub struct WireCache {
     scene: Option<SceneId>,
     cursors: Option<Cursors>,
-    /// Per entity: the scale it was built at, and the wire (`None`: no shape).
-    wires: BTreeMap<u32, (Vec3, Option<ShapeWire>)>,
+    /// Per entity: the scale and the body fit (dynamic or not) it was built for,
+    /// and the wire (`None`: no shape).
+    wires: BTreeMap<u32, ((Vec3, bool), Option<ShapeWire>)>,
     /// Wires built since the cache was made: what a test counts a rebuild by.
     builds: u64,
 }
@@ -84,14 +87,15 @@ impl WireCache {
         }
     }
 
-    /// `id`'s wire, built now if it is not kept or its scale moved. Call
-    /// [`refresh`](Self::refresh) first, once per frame.
+    /// `id`'s wire, built now if it is not kept, or its scale or its body's fit
+    /// moved. Call [`refresh`](Self::refresh) first, once per frame.
     pub fn wire(&mut self, scene: &Scene, id: u32) -> Option<&ShapeWire> {
         let scale = scene.world.world_pose(id)?.scale;
-        let kept = self.wires.get(&id).is_some_and(|(at, _)| *at == scale);
+        let built_for = (scale, on_dynamic_body(scene, id));
+        let kept = self.wires.get(&id).is_some_and(|(at, _)| *at == built_for);
         if !kept {
             self.builds += 1;
-            self.wires.insert(id, (scale, shape_wire(scene, id)));
+            self.wires.insert(id, (built_for, shape_wire(scene, id)));
         }
         self.wires.get(&id)?.1.as_ref()
     }

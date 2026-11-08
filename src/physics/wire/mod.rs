@@ -12,7 +12,8 @@
 //! box hull shows twelve, not its diagonals); a triangle mesh draws each edge of
 //! the built mesh once, by position, so a seam split for its normals draws once.
 //! A CharacterController's capsule draws too, upright at its centre, as physics
-//! places it.
+//! places it. A concave mesh on a dynamic body is built as convex pieces (#1886),
+//! and draws as those pieces.
 //!
 //! **Built once, placed every frame.** The shape, in its own space, is the costly
 //! half (a hull, a level's trimesh); [`WireCache`] keeps it per entity and builds it
@@ -24,7 +25,9 @@ mod edges;
 
 use glam::{Quat, Vec3};
 
-use super::shape::build::{build_shape_for, collider_inputs};
+use super::compound::body_owner;
+use super::shape::build::{class_of, collider_inputs, BodyClass};
+use super::shape::fit::build_shape_for;
 use crate::components::ScaledShape;
 use crate::scene::Scene;
 pub use cache::WireCache;
@@ -60,11 +63,12 @@ pub struct ShapeWire {
 pub fn shape_wire(scene: &Scene, id: u32) -> Option<ShapeWire> {
     let inp = collider_inputs(&scene.world, id)?;
     let scale = scene.world.world_pose(id)?.scale;
+    let dynamic = on_dynamic_body(scene, id);
     let mut segments = match inp.shape.scaled(scale) {
         ScaledShape::Mesh { .. } => {
             let mesh = inp.mesh_geom.as_ref();
             let mesh = mesh.map(|(p, i)| (p.as_slice(), i.as_slice()));
-            edges::built(&build_shape_for(id, &inp.shape, scale, mesh)?)?
+            edges::built(&build_shape_for(id, &inp.shape, scale, mesh, dynamic)?)?
         }
         primitive => edges::primitive(primitive),
     };
@@ -75,6 +79,13 @@ pub fn shape_wire(scene: &Scene, id: u32) -> Option<ShapeWire> {
         upright: inp.upright,
         center: inp.center,
     })
+}
+
+/// Whether `id`'s collider joins a dynamic body: a concave mesh is then built as
+/// convex pieces (#1886), so its wire is too.
+pub fn on_dynamic_body(scene: &Scene, id: u32) -> bool {
+    let owner = body_owner(scene, id);
+    matches!(class_of(&scene.world, owner), BodyClass::Dynamic)
 }
 
 impl ShapeWire {
@@ -110,5 +121,7 @@ pub fn collider_wire(scene: &Scene, id: u32) -> Option<ColliderWire> {
 
 #[cfg(test)]
 mod cache_tests;
+#[cfg(test)]
+mod fit_tests;
 #[cfg(test)]
 mod tests;

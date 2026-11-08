@@ -92,17 +92,20 @@ fn box_edges(h: Vec3) -> Vec<[Vec3; 2]> {
     out
 }
 
-/// A mesh collider's edges, read off the shape physics built: a hull's edges, or
-/// a triangle mesh's, each once.
+/// A mesh collider's edges, read off the shape physics built: a hull's edges, each
+/// convex piece's of a decomposed concave mesh on a dynamic body (#1886), or a
+/// triangle mesh's, each once.
 pub(super) fn built(collider: &rapier3d::prelude::Collider) -> Option<Vec<[Vec3; 2]>> {
     let shape = collider.shape();
     if let Some(hull) = shape.as_convex_polyhedron() {
-        let points = hull.points();
-        let edges = hull
-            .edges()
-            .iter()
-            .map(|e| e.vertices.map(|i| points[i as usize]));
-        return Some(edges.collect());
+        return Some(hull_edges(hull));
+    }
+    if let Some(compound) = shape.as_compound() {
+        let pieces = compound.shapes().iter().filter_map(|(at, part)| {
+            let edges = hull_edges(part.as_convex_polyhedron()?);
+            Some(edges.into_iter().map(|s| s.map(|p| at.transform_point(p))))
+        });
+        return Some(pieces.flatten().take(super::MAX_SEGMENTS).collect());
     }
     let mesh = shape.as_trimesh()?;
     let tris = mesh
@@ -110,6 +113,15 @@ pub(super) fn built(collider: &rapier3d::prelude::Collider) -> Option<Vec<[Vec3;
         .iter()
         .map(|t| t.map(|i| mesh.vertices()[i as usize]));
     Some(unique_edges(tris))
+}
+
+/// A convex hull's edges (parry merges coplanar faces: a box hull has twelve).
+fn hull_edges(hull: &rapier3d::parry::shape::ConvexPolyhedron) -> Vec<[Vec3; 2]> {
+    let points = hull.points();
+    let edges = hull.edges().iter();
+    edges
+        .map(|e| e.vertices.map(|i| points[i as usize]))
+        .collect()
 }
 
 /// Each edge of `triangles` once, by its ends' positions (not their indices: a
