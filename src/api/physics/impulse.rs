@@ -52,8 +52,9 @@ pub(super) fn register(
     Ok(())
 }
 
-/// Add the velocity change `impulse` at `point` causes to `id`'s Rigidbody.
-fn apply(
+/// Add the velocity change `impulse` at `point` causes to `id`'s Rigidbody
+/// (`Ragdoll.HitReact`'s impulse too, #1895).
+pub(in crate::api) fn apply(
     scene: &RefCell<Scene>,
     physics: &RefCell<Option<PhysicsWorld>>,
     id: u32,

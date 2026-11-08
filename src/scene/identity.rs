@@ -38,6 +38,27 @@ impl SceneId {
     }
 }
 
+impl crate::scene::Scene {
+    /// This scene's runtime identity (#355) — stable for the life of the object,
+    /// distinct from every other live scene's.
+    pub fn id(&self) -> SceneId {
+        self.id
+    }
+
+    /// Mint a fresh runtime identity (#355): the World now holds a different scene
+    /// (a load replaced it), so GPU caches keyed by the old identity must not apply.
+    pub fn renew_id(&mut self) {
+        self.id = SceneId::next();
+    }
+
+    /// Take back `id`, an identity this World held before (Stop's restore after a
+    /// play-mode `Scene.Load`, #1374): the restored World is that scene again, so a
+    /// Generate Lighting waiting for Stop still recognises it.
+    pub(crate) fn restore_id(&mut self, id: SceneId) {
+        self.id = id;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

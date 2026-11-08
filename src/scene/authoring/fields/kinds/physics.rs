@@ -44,6 +44,8 @@ inspect! {
         op!("break_force", joint::set_break_force),
         op!("break_torque", joint::set_break_torque),
         op!("enable_collision", joint::set_enable_collision),
+        op!("drive_strength", joint::set_drive_strength),
+        op!("drive_damping", joint::set_drive_damping),
     ];
     CharacterControllerComponent => character_controller, character_controller_mut, &[
         op!("height", cc::set_height),

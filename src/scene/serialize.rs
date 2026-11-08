@@ -184,6 +184,8 @@ fn drop_old_world(scene: &mut Scene) {
     scene.clear_undo();
     // The overrides named the replaced World's entities; they are runtime-only (#670).
     scene.shader_overrides.clear_all();
+    // The ragdolls' runtime state named them too (#1895).
+    scene.ragdolls = Default::default();
     // So did the decals stamped on it: a load drops them, as Unity's scene load
     // destroys everything of the old scene (#1649). A Play load took the
     // persistent ones out first (`swap_in`), and Stop's snapshot puts its own back.

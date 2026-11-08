@@ -22,7 +22,10 @@
 //! wherever `anchor` sits when the joint is built (Unity's default). The joint's
 //! rest pose is the pose the two bodies are in when it is built. A non-zero
 //! `break_force` / `break_torque` breaks the joint when exceeded (see
-//! `physics::joints`). The one entity reference, `connected_body`, follows the
+//! `physics::joints`). A non-zero `drive_strength` motors the joint toward its
+//! target, `drive_damping` slowing it (Unity's `ConfigurableJoint` slerp drive,
+//! Unreal's physical animation; #1895): the rest pose, or for a ragdoll bone the
+//! pose its Animator samples. The one entity reference, `connected_body`, follows the
 //! entity through prefab save / stamp (its `EntityRefs` impl, the one id-field walk).
 
 use glam::{Vec2, Vec3};
@@ -79,6 +82,12 @@ pub struct JointComponent {
     pub break_torque: f32,
     /// Whether the two joined bodies still collide with each other.
     pub enable_collision: bool,
+    /// How hard the joint's motor turns it toward its target: a stiffness in
+    /// 1/s², scaled by the two bodies' mass (rapier's acceleration-based motor);
+    /// `0` is no motor.
+    pub drive_strength: f32,
+    /// How much the motor resists the joint's turning speed (1/s).
+    pub drive_damping: f32,
 }
 
 impl Default for JointComponent {
@@ -98,6 +107,8 @@ impl Default for JointComponent {
             break_force: 0.0,
             break_torque: 0.0,
             enable_collision: false,
+            drive_strength: 0.0,
+            drive_damping: 0.0,
         }
     }
 }
