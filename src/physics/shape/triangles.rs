@@ -9,7 +9,8 @@
 use glam::Vec3;
 use rapier3d::prelude::*;
 
-use super::build::{build_shape_for, collider_inputs};
+use super::build::collider_inputs;
+use super::fit::build_shape_for;
 use crate::physics::compound::world_pose;
 use crate::scene::Scene;
 
@@ -37,7 +38,7 @@ pub fn collider_world_triangles(scene: &Scene, id: u32) -> Option<ColliderTriang
         .mesh_geom
         .as_ref()
         .map(|(p, i)| (p.as_slice(), i.as_slice()));
-    let collider = build_shape_for(id, &inp.shape, pose.scale, mesh)?;
+    let collider = build_shape_for(id, &inp.shape, pose.scale, mesh, false)?;
     let (points, triangles, convex) = tessellate(collider.shape())?;
     let vertices = points
         .into_iter()

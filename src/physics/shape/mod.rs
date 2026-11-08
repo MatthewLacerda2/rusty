@@ -1,5 +1,6 @@
 //! src/physics/shape/mod.rs — turning a `Collider` into a rapier shape: the
-//! builder (`build`), the triangle-mesh shape (`mesh`), a convex hull measured
+//! builder (`build`), the triangle-mesh shape (`mesh`), its convex
+//! decomposition on a dynamic body (`decompose`, chosen per body by `fit`), a convex hull measured
 //! by its face planes (`hull`) and the world-space triangle read-back
 //! (`triangles`).
 
@@ -8,6 +9,14 @@ pub(super) mod build;
 mod build_tests;
 #[cfg(test)]
 mod conformance;
+mod decompose;
+#[cfg(test)]
+mod decompose_body_tests;
+#[cfg(test)]
+mod decompose_refit_tests;
+#[cfg(test)]
+mod decompose_tests;
+pub(super) mod fit;
 #[cfg(test)]
 pub(super) mod fixture;
 pub(super) mod hull;
