@@ -106,17 +106,30 @@ first.
 - **From a script it logs its progress** (#1667), as Unity's batch-mode bake does: the
   verb blocks its caller until it returns, so a `play` scenario or a `session-mcp` call
   cannot poll, and instead the bake prints a line to **stderr** at each step and every
-  5 s within one, with an ETA from the step's own rate, then the total time:
-  `[Lighting] lightmaps 41% (612/1501 meshes, 3.1M/7.6M texels), ~38 min left`, then a
-  line per lightmap page encoded (`lightmap pages 50% (6/12 pages encoded), ~30 s left`),
+  5 s within one. `Lighting.Generate()` first names its steps (#1897):
+  `[Lighting] steps: lightmaps → lightmap pages → light probes → reflection probes → occlusion`.
+  Each line then starts with the time since the bake began (#1891), gives an ETA from
+  the step's rate over its last 2 minutes (#1890: a texel's cost varies with the lights
+  around it, so a rate since the step's start would drift) and, under `Generate()`,
+  the steps still to come:
+  `[Lighting] 26:02 lightmaps 41% (612/1501 meshes, 3.1M/7.6M texels), ~38 min left (then: lightmap pages, light probes, reflection probes, occlusion)`,
+  then a line per lightmap page encoded (`lightmap pages 50% (6/12 pages encoded), ~30 s left`),
   `light probes, bounce 2 of at most 5: …, ~1 min left in this bounce` and
-  `reflection probes 19% (3/16 probes), ~4 min left`, and `[Lighting] done in 1 h 4 min`.
+  `reflection probes 19% (3/16 probes), ~4 min left`. At the end (#1891) it prints what
+  each step took (`[Lighting] lightmaps took 1 h 4 min (7.6M texels)`, one line per
+  step and per light-probe bounce, plus the work between them: `writing lightmaps`,
+  `probe placement` and `saving`; every second is in one line, so they add up to the
+  total), the 15 lightmap
+  meshes whose texels cost the most worker time, summed over every thread
+  (`[Lighting]   Hall_Ceiling: 210.4k texels, 312.5 s, 673 texels/s`), and
+  `[Lighting] done in 1 h 9 min`.
   The lightmap step's first line and the total also go to the console (so `play`'s
   `console.log` and the MCP reply keep them), beside the probe step's own `Baking …`
-  lines; the lines in between go to stderr only. A probe step with no probes of its
-  kind prints nothing. `Lighting.Bake()`,
-  `Lighting.BakeLightmaps()`, `Probe.Bake()` and `Reflection.Bake()` log the same way. A
-  log never changes what is baked: the lightmaps are byte-identical with or without one.
+  lines; the lines in between, the step plan and the summary go to stderr only. A probe
+  step with no probes of its kind prints nothing. `Lighting.Bake()`,
+  `Lighting.BakeLightmaps()`, `Probe.Bake()` and `Reflection.Bake()` log the same way,
+  without the step plan. A log never changes what is baked: the lightmaps are
+  byte-identical with or without one.
 - **The probes bake from a snapshot and apply at the end** (Unity's shape, #1602): the
   light and reflection probes are copied when the probe step starts, and their SH and
   cubemaps are applied in one step when it finishes. Adding, removing or moving a probe

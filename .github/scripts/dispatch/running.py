@@ -29,10 +29,16 @@ its pull request is ready (`cloud-brief.md`). For each issue's newest
   who can push (`ghrest.can_push`) is newer than the fire. The orchestrator
   posts a re-brief, then launches, so a newer brief is a hand-back waiting for
   its relaunch, with no coder on it;
-- fired, no open pull request, the issue open and the fire [`FIRST_PUSH`] old
-  or more → ended, and said (`STALE`): a finished part of a multi-part issue
-  (#1714 between part 2 merging and part 3's launch), an issue kept open after
-  its PR merged, or a coder that stood down or stalled before its first push;
+- fired, no open pull request, the issue open, and a pull request for N
+  merged or closed after the fire → ended (#1913). A PR that says `Refs #N`
+  leaves its issue open: on 2026-11-08 #1684's PR #1903 merged at ≈05:40Z and
+  its coder still held a slot until 06:50Z, refusing two re-briefs with four
+  coders really running. A pull request closed *before* the fire is an earlier
+  round's, so it says nothing about this coder;
+- fired, no open pull request, none closed since the fire, the issue open and
+  the fire [`FIRST_PUSH`] old or more → ended, and said (`STALE`): a coder
+  that stood down or stalled before its first push, or one whose merged pull
+  request is past the one page of closed ones read ([`GitHub.closed`]);
 - fired, no open pull request, and the issue closed (merged) → ended.
 
 A stalled coder (draft, no newer brief) counts until the orchestrator deals
@@ -71,13 +77,16 @@ BRANCH = re.compile(r"^(\d+)-")
 
 @dataclass
 class GitHub:
-    """What placing a fired coder reads: the open pull requests, per issue its comments and
-    itself, and the time now (to age a fire against [`FIRST_PUSH`])."""
+    """What placing a fired coder reads: the open pull requests, per issue its comments,
+    itself and its closed pull requests, and the time now (to age a fire against
+    [`FIRST_PUSH`]). `closed` is read only for an issue with no open pull request; the
+    caller may answer it from one page of the newest closed pull requests (#1913)."""
 
     pulls: list[dict]
     comments: Callable[[int], list | None]
     issue: Callable[[int], dict | None]
     now: datetime
+    closed: Callable[[int], list | None]
 
 
 def issue(found: dict) -> int | None:
@@ -109,6 +118,12 @@ def pulls_for(number: int, pulls: list[dict]) -> list[dict]:
             and int(m.group(1)) == number]
 
 
+def closed_since(pulls: list[dict], since: datetime) -> dict | None:
+    """The newest of `pulls` closed (merged or not) after `since`, or `None`."""
+    after = [p for p in pulls if (at := when(p.get("closed_at"))) is not None and at > since]
+    return max(after, key=lambda p: when(p["closed_at"]), default=None)
+
+
 def rebriefed(comments: list[dict], since: datetime) -> bool:
     """Whether a `Brief` from someone who can push was posted after `since`."""
     trusted = [c for c in comments if ghrest.can_push(c)]
@@ -134,6 +149,11 @@ def state(found: dict, github: GitHub) -> tuple[str, str]:
             return "unknown", f"could not read #{number}"
         if got.get("state") != "open":
             return "ended", f"#{number} is closed"
+        shut = github.closed(number)
+        if shut is None:
+            return "unknown", f"could not read #{number}'s closed pull requests"
+        if (done := closed_since(shut, since)) is not None:
+            return "ended", "its pull request merged" if done.get("merged_at") else "its pull request closed"
         if github.now - since >= FIRST_PUSH:
             return "ended", STALE
     comments = github.comments(number)

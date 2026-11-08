@@ -33,8 +33,8 @@ fn the_worker_and_the_logged_run_bake_what_the_inline_bake_does() {
     assert_eq!(encode(logged.data.as_ref().unwrap()), inline);
     // A frozen clock: the step's first line, and no other step's.
     let lines: Vec<String> = lines.into_inner().into_iter().map(|l| l.text).collect();
-    assert_eq!(lines[0], "[Lighting] occlusion preparing", "{lines:?}");
-    assert!(lines.iter().all(|l| l.starts_with("[Lighting] occlusion")));
+    assert_eq!(lines[0], "[Lighting] 0:00 occlusion preparing", "{lines:?}");
+    assert!(lines.iter().all(|l| l.contains(" occlusion ")));
 }
 
 #[test]

@@ -25,10 +25,10 @@ fn every_encoded_page_gets_a_line_within_the_interval() {
     assert_eq!(
         texts,
         [
-            "[Lighting] lightmap pages 0% (0/3 pages encoded)",
-            "[Lighting] lightmap pages 33% (1/3 pages encoded), ~0 s left",
-            "[Lighting] lightmap pages 66% (2/3 pages encoded), ~0 s left",
-            "[Lighting] lightmap pages 100% (3/3 pages encoded)",
+            "[Lighting] 0:00 lightmap pages 0% (0/3 pages encoded)",
+            "[Lighting] 0:00 lightmap pages 33% (1/3 pages encoded), ~0 s left",
+            "[Lighting] 0:00 lightmap pages 66% (2/3 pages encoded), ~0 s left",
+            "[Lighting] 0:00 lightmap pages 100% (3/3 pages encoded)",
         ]
     );
 }
