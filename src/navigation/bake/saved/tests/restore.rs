@@ -99,3 +99,15 @@ fn start_tracked_restores_a_matching_file_and_bakes_a_stale_one() {
     assert_eq!(fresh.start_tracked(&mut scene), Start::Baked);
     assert_same_mesh(&fresh, &baked(&scene));
 }
+
+/// Zero: an empty scene's navmesh (no span, no link) saves and restores too.
+#[test]
+fn an_empty_scene_round_trips() {
+    let scene = crate::scene::Scene::new();
+    let (written, bytes) = saved(&scene);
+    assert!(written.spans.is_empty());
+    let mut g = NavigationGraph::new(0.0, 1.0, 0.0, 1.0, 1.0);
+    g.restore(&scene, &bytes).expect("an empty bake matches");
+    assert!(g.spans.is_empty());
+    assert_eq!((g.width, g.height), (written.width, written.height));
+}
