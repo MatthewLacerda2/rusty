@@ -21,6 +21,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::audio::AudioMaestro;
+use crate::components::MontageEvent;
 use crate::core::application::Application;
 use crate::core::input::InputState;
 use crate::core::storage::Storage;
@@ -109,9 +110,9 @@ pub struct Resources {
     /// entity referencing the same graph. Cleared on Play enter so per-session
     /// edits to the asset files are picked up.
     pub(super) animation_graphs: GraphCache,
-    /// The animation events (#459) `animate` found this tick, `(entity, name)` in
-    /// firing order, drained by `dispatch_animation_events`.
-    pub(super) animation_events: Vec<(u32, String)>,
+    /// The animation events (#459) `animate` found this tick, `(entity, name,
+    /// whose montage)` in firing order, drained by `dispatch_animation_events`.
+    pub(super) animation_events: Vec<(u32, String, Option<MontageEvent>)>,
     /// The schedule's observer (#433) — the dev layer's frame-stats timer. `None`
     /// unless installed via `GameWorld::set_probe`; it only watches the frame.
     pub(super) probe: Option<Box<dyn super::SystemProbe>>,

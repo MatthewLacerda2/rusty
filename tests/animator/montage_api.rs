@@ -14,7 +14,7 @@ use rusty::scripting::{ConsoleLogs, LogLevel};
 
 use super::{run, scene_with_animator};
 
-fn with_flinch() -> (Rc<RefCell<Scene>>, u32) {
+pub(super) fn with_flinch() -> (Rc<RefCell<Scene>>, u32) {
     let (scene, id) = scene_with_animator();
     let clip = AnimationClip {
         name: "Flinch".to_string(),

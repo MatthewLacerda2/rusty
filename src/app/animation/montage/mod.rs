@@ -11,19 +11,24 @@
 //!   section's end is no further away than its blend out (Unreal's default
 //!   blend-out trigger), so it is gone as the clip ends;
 //! - fires its markers crossed this step, with the same half-open rule as a
-//!   node's events, plus [`MONTAGE_BLEND_OUT`] and [`MONTAGE_END`] once each;
+//!   node's events, unless it was stopped or interrupted (a faded-out motion
+//!   is silent), plus [`MONTAGE_BLEND_OUT`] and [`MONTAGE_END`] once each,
+//!   each saying whose it is ([`MontageEvent`]);
 //! - adds its root motion over the travel when its slot's mask covers the root
 //!   bone, stacked like a layer's (`super::stack`).
 //!
 //! Its pose composes above every layer, slot by slot in the slot stack's order
 //! (a slot's blending-out montage under its active one), exactly as a layer's
-//! does (`layers::compose`). Pure functions of (skin, clips, montages, dt).
+//! does (`layers::compose`); its root motion stacks in that same order
+//! (`Montages::playing` is kept in it). Pure functions of (skin, clips,
+//! montages, dt).
 
 use crate::asset::anim_data::AnimationClip;
 use crate::asset::animation_graph::LayerBlending;
 use crate::asset::mesh_data::SkinData;
 use crate::components::{
-    ActiveMontage, AnimatorComponent, Bounds, Montages, RootMotion, MONTAGE_BLEND_OUT, MONTAGE_END,
+    ActiveMontage, AnimatorComponent, Bounds, MontageEvent, Montages, RootMotion,
+    MONTAGE_BLEND_OUT, MONTAGE_END,
 };
 
 use super::clip::{driven_slots, sampled_locals};
@@ -43,7 +48,7 @@ pub(super) fn compose(
     clips: &[AnimationClip],
     montages: &Montages,
 ) {
-    for m in in_slot_order(montages) {
+    for m in &montages.playing {
         let weight = m.weight();
         let Some(clip) = find(clips, &m.montage.clip).filter(|_| weight > 0.0) else {
             continue;
@@ -91,18 +96,20 @@ pub(super) fn step(
     let (montages, speed) = (&mut anim.montages, anim.speed);
     let mut events: Vec<Crossed> = std::mem::take(&mut montages.pending)
         .into_iter()
-        .map(|name| Crossed {
-            name,
+        .map(|info| Crossed {
+            name: MONTAGE_BLEND_OUT.to_string(),
             at: 0.0,
             layer: layer_base,
+            montage: Some(info),
         })
         .collect();
     for m in &mut montages.playing {
         let layer = layer_base + m.order;
-        let event = |name: &str, at: f32| Crossed {
+        let event = |name: &str, at: f32, montage: Option<MontageEvent>| Crossed {
             name: name.to_string(),
             at,
             layer,
+            montage,
         };
         m.elapsed += dt;
         if let Some(out) = &mut m.out {
@@ -111,17 +118,20 @@ pub(super) fn step(
         let rate = finite(m.rate * speed).max(0.0);
         let travel = finite(dt * rate);
         let segments = advance(m, travel);
-        for (name, at) in crossed(m, &segments, travel) {
-            events.push(event(name, at));
+        if m.fires_markers() {
+            for (name, at) in crossed(m, &segments, travel) {
+                events.push(event(name, at, None));
+            }
         }
-        if m.out.is_none() && ends_within_blend_out(m, rate) && m.blend_out(m.montage.blend_out) {
-            events.push(event(MONTAGE_BLEND_OUT, 1.0));
+        let ending = m.out.is_none() && ends_within_blend_out(m, rate);
+        if ending && m.blend_out(m.montage.blend_out, false) {
+            events.push(event(MONTAGE_BLEND_OUT, 1.0, Some(m.event())));
         }
         if let Some(r) = rooted {
             add_root(m, clips, r, &segments, root);
         }
         if m.out.is_some_and(|o| o.elapsed >= o.duration) {
-            events.push(event(MONTAGE_END, 1.0));
+            events.push(event(MONTAGE_END, 1.0, Some(m.event())));
         }
     }
     montages
@@ -232,13 +242,6 @@ fn add_root(
     *root = Some(super::stack(below, delta, m.slot.blending, weight));
 }
 
-/// The montages in slot-stack order, a slot's earlier starts first.
-fn in_slot_order(montages: &Montages) -> Vec<&ActiveMontage> {
-    let mut ordered: Vec<&ActiveMontage> = montages.playing.iter().collect();
-    ordered.sort_by_key(|m| m.order);
-    ordered
-}
-
 fn find<'c>(clips: &'c [AnimationClip], name: &str) -> Option<&'c AnimationClip> {
     clips.iter().find(|c| c.name == name)
 }
@@ -252,6 +255,8 @@ fn finite(x: f32) -> f32 {
     }
 }
 
+#[cfg(test)]
+mod marker_tests;
 #[cfg(test)]
 mod play_tests;
 #[cfg(test)]

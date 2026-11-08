@@ -5,8 +5,10 @@
 //! `SetNextSection`. A montage is resolved against the animator's graph asset
 //! (read from disk, as `PlayNode` does), else as a clip name on the mesh, and
 //! starts with a copy of what it plays (`components::ActiveMontage`), so the
-//! `animate` system plays it without the graph. Unknown names warn and return
-//! `false`, never a Lua error; a non-positive `rate` is one.
+//! `animate` system plays it without the graph. Unknown names, and a graph
+//! that fails to load, warn and return `false`, never a Lua error (a graph
+//! that exists but doesn't load never falls back to a clip of the same name);
+//! a non-positive `rate` is one.
 
 use std::path::Path;
 
@@ -33,7 +35,7 @@ pub(super) fn register(
     register_sections(lua, table, scene)
 }
 
-/// `PlayMontage(id, montage [, { rate, start_section, slot }])`.
+/// `PlayMontage(id, montage [, { rate, start_section, slot, blend_in, blend_out }])`.
 fn register_play(
     lua: &mlua::Lua,
     table: &Table,
@@ -52,7 +54,16 @@ fn register_play(
                 let Some(path) = scene.world.animator(id).map(|a| a.graph.clone()) else {
                     return Ok(false);
                 };
-                let graph = path.and_then(|p| animation_graph::load(Path::new(&p)).ok());
+                let warn = |why: String| {
+                    let msg = format!("Animator.PlayMontage: entity {id}: {why}");
+                    console.borrow_mut().repeated(msg, LogLevel::Warning, 1);
+                    Ok(false)
+                };
+                let graph = match path.map(|p| (animation_graph::load(Path::new(&p)), p)) {
+                    None => None,
+                    Some((Ok(graph), _)) => Some(graph),
+                    Some((Err(err), p)) => return warn(format!("graph '{p}': {err}")),
+                };
                 let settings = (opts.slot.as_deref(), opts.start.as_deref(), opts.rate);
                 let montage = {
                     let mesh = scene.world.mesh(id);
@@ -60,15 +71,8 @@ fn register_play(
                     ActiveMontage::resolve(graph.as_ref(), clips, &name, settings)
                 };
                 let montage = match montage {
-                    Ok(m) => m,
-                    Err(why) => {
-                        let msg = format!(
-                            "Animator.PlayMontage: entity {id}: {}",
-                            refused(&name, &why)
-                        );
-                        console.borrow_mut().repeated(msg, LogLevel::Warning, 1);
-                        return Ok(false);
-                    }
+                    Ok(m) => m.with_blends(opts.blend_in, opts.blend_out),
+                    Err(why) => return warn(refused(&name, &why)),
                 };
                 let Some(mut anim) = scene.world.animator_mut(id) else {
                     return Ok(false);
@@ -83,10 +87,13 @@ fn register_play(
 }
 
 /// `PlayMontage`'s options table.
+#[derive(Default)]
 struct Options {
     rate: f32,
     start: Option<String>,
     slot: Option<String>,
+    blend_in: Option<f32>,
+    blend_out: Option<f32>,
 }
 
 impl Options {
@@ -94,8 +101,7 @@ impl Options {
         let Some(t) = opts else {
             return Ok(Self {
                 rate: 1.0,
-                start: None,
-                slot: None,
+                ..Self::default()
             });
         };
         let rate = t.get::<Option<f32>>("rate")?.unwrap_or(1.0);
@@ -108,6 +114,8 @@ impl Options {
             rate,
             start: t.get("start_section")?,
             slot: t.get("slot")?,
+            blend_in: t.get("blend_in")?,
+            blend_out: t.get("blend_out")?,
         })
     }
 }

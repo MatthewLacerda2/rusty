@@ -10,12 +10,17 @@
 //! One montage per slot is *active*; an interrupted or stopped one blends out
 //! beside it from the weight it had (Unreal's `Montage_Play` and
 //! `Montage_Stop`). The two engine events, [`MONTAGE_BLEND_OUT`] and
-//! [`MONTAGE_END`], fire once each per montage, also when it is interrupted;
-//! what a script call starts is queued in `pending` and fires on the next step.
+//! [`MONTAGE_END`], fire once each per montage, also when it is interrupted,
+//! each carrying a [`MontageEvent`] that says whose it is; what a script call
+//! starts is queued in `pending` and fires on the next step. A stopped or
+//! interrupted montage's own markers fall silent as it fades (a faded-out
+//! motion is silent); one blending out at its own end still fires them.
 //! Advancing the playheads is `app::animation::montage`'s.
 
-use crate::asset::anim_data::AnimationClip;
-use crate::asset::animation_graph::{AnimationGraph, GraphSlot, Montage, MontageSection};
+use crate::asset::animation_graph::{GraphSlot, Montage, MontageSection};
+
+mod resolve;
+pub use resolve::MontageRefused;
 
 /// Fired when a montage starts blending out: it finished, or was stopped or
 /// interrupted (Unreal's `OnMontageBlendingOut`).
@@ -25,14 +30,26 @@ pub const MONTAGE_END: &str = "MontageEnd";
 /// The one section of a montage that declares none.
 const DEFAULT_SECTION: &str = "Default";
 
+/// Which montage an engine event belongs to (Unreal's
+/// `OnMontageEnded(Montage, bInterrupted)`): the third argument
+/// `OnAnimationEvent` gets for [`MONTAGE_BLEND_OUT`] and [`MONTAGE_END`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct MontageEvent {
+    pub montage: String,
+    pub slot: String,
+    /// It was stopped or interrupted, rather than played to its end.
+    pub interrupted: bool,
+}
+
 /// Every montage an animator plays, and the engine events a script call queued.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Montages {
-    /// In start order: a slot's blending-out montages before its active one.
+    /// In slot-stack order (`ActiveMontage::order`), and within a slot in
+    /// start order: its blending-out montages before its active one. The pose
+    /// and the root motion both stack in this order.
     pub playing: Vec<ActiveMontage>,
-    /// Engine events a call queued ([`MONTAGE_BLEND_OUT`]), fired on the next
-    /// step.
-    pub pending: Vec<String>,
+    /// [`MONTAGE_BLEND_OUT`]s a call queued, fired on the next step.
+    pub pending: Vec<MontageEvent>,
 }
 
 /// A montage starting to blend out: from `from` weight to 0 over `duration`.
@@ -41,6 +58,8 @@ pub struct BlendOut {
     pub from: f32,
     pub elapsed: f32,
     pub duration: f32,
+    /// Stopped or interrupted, not ending on its own: its markers are silent.
+    pub interrupted: bool,
 }
 
 /// One montage playing in a slot.
@@ -67,80 +86,7 @@ pub struct ActiveMontage {
     pub out: Option<BlendOut>,
 }
 
-/// Why a montage would not start.
-#[derive(Clone, Debug, PartialEq)]
-pub enum MontageRefused {
-    /// No montage of that name, and no clip either.
-    Unknown,
-    /// The montage's clip is not on the mesh.
-    NoClip(String),
-    NoSlot(String),
-    NoSection(String),
-}
-
 impl ActiveMontage {
-    /// Resolve `name` against `graph`'s montages, else as a clip name in
-    /// `clips` (played as a one-section montage), into a montage ready to
-    /// start in `slot` (the montage's own when `None`) from `start` (its first
-    /// section when `None`) at `rate`.
-    pub fn resolve(
-        graph: Option<&AnimationGraph>,
-        clips: &[AnimationClip],
-        name: &str,
-        (slot, start, rate): (Option<&str>, Option<&str>, f32),
-    ) -> Result<Self, MontageRefused> {
-        let clip = |n: &str| clips.iter().find(|c| c.name == n);
-        let mut montage = match graph.and_then(|g| g.montage(name)) {
-            Some(m) => m.clone(),
-            None if clip(name).is_some() => {
-                Montage::of_clip(name, crate::asset::animation_graph::DEFAULT_SLOT)
-            }
-            None => return Err(MontageRefused::Unknown),
-        };
-        if let Some(slot) = slot {
-            montage.slot = slot.to_string();
-        }
-        let length = clip(&montage.clip)
-            .ok_or_else(|| MontageRefused::NoClip(montage.clip.clone()))?
-            .duration;
-        let default = AnimationGraph::default();
-        let (order, slot) = graph
-            .unwrap_or(&default)
-            .slot(&montage.slot)
-            .ok_or_else(|| MontageRefused::NoSlot(montage.slot.clone()))?;
-        if montage.sections.is_empty() {
-            montage.sections.push(MontageSection {
-                name: DEFAULT_SECTION.to_string(),
-                time: 0.0,
-                next: None,
-            });
-        }
-        let section = match start {
-            None => 0,
-            Some(s) => find(&montage.sections, s)
-                .ok_or_else(|| MontageRefused::NoSection(s.to_string()))?,
-        };
-        let sections = &montage.sections;
-        let next = sections
-            .iter()
-            .map(|s| s.next.as_deref().and_then(|n| find(sections, n)))
-            .collect();
-        let mut active = Self {
-            time: 0.0,
-            montage,
-            slot,
-            order,
-            length,
-            rate,
-            section,
-            next,
-            elapsed: 0.0,
-            out: None,
-        };
-        active.time = active.start(section);
-        Ok(active)
-    }
-
     /// Section `index`'s start, within the clip.
     pub fn start(&self, index: usize) -> f32 {
         let at = self.montage.sections.get(index).map_or(0.0, |s| s.time);
@@ -185,9 +131,9 @@ impl ActiveMontage {
         }
     }
 
-    /// Start blending out over `duration` from the weight it shows now.
-    /// `false` when it already is.
-    pub fn blend_out(&mut self, duration: f32) -> bool {
+    /// Start blending out over `duration` from the weight it shows now,
+    /// `interrupted` when a call stopped it. `false` when it already is.
+    pub fn blend_out(&mut self, duration: f32, interrupted: bool) -> bool {
         if self.out.is_some() {
             return false;
         }
@@ -195,8 +141,24 @@ impl ActiveMontage {
             from: self.weight(),
             elapsed: 0.0,
             duration: duration.max(0.0),
+            interrupted,
         });
         true
+    }
+
+    /// Whether its authored markers fire: not once it was stopped or
+    /// interrupted.
+    pub fn fires_markers(&self) -> bool {
+        !self.out.is_some_and(|o| o.interrupted)
+    }
+
+    /// Whose an engine event of this montage is.
+    pub fn event(&self) -> MontageEvent {
+        MontageEvent {
+            montage: self.montage.name.clone(),
+            slot: self.slot.name.clone(),
+            interrupted: self.out.is_some_and(|o| o.interrupted),
+        }
     }
 }
 
@@ -219,12 +181,14 @@ impl Montages {
     }
 
     /// Start `montage`: whatever its slot plays blends out over the newcomer's
-    /// blend-in time (Unreal's interrupt), from the weight it had.
+    /// blend-in time (Unreal's interrupt), from the weight it had. It goes
+    /// last among its slot's, keeping `playing` in slot order.
     pub fn play(&mut self, montage: ActiveMontage) {
         let blend = montage.montage.blend_in;
         let slot = montage.slot.name.clone();
         self.stop(Some(&slot), Some(blend));
-        self.playing.push(montage);
+        let at = self.playing.partition_point(|m| m.order <= montage.order);
+        self.playing.insert(at, montage);
     }
 
     /// Blend out the active montage in `slot` (every slot's when `None`) over
@@ -236,8 +200,8 @@ impl Montages {
                 continue;
             }
             let duration = blend.unwrap_or(m.montage.blend_out);
-            if m.blend_out(duration) {
-                self.pending.push(MONTAGE_BLEND_OUT.to_string());
+            if m.blend_out(duration, true) {
+                self.pending.push(m.event());
                 stopped = true;
             }
         }

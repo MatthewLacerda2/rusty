@@ -1,6 +1,7 @@
 mod graph_api;
 mod layers_api;
 mod montage_api;
+mod montage_options;
 mod parameters;
 mod play_api;
 mod speed_api;

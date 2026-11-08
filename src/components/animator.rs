@@ -18,7 +18,9 @@ mod playback;
 mod playhead;
 mod root_motion;
 pub use ik::{IkChain, IkConstraint, IkTarget};
-pub use montage::{ActiveMontage, MontageRefused, Montages, MONTAGE_BLEND_OUT, MONTAGE_END};
+pub use montage::{
+    ActiveMontage, MontageEvent, MontageRefused, Montages, MONTAGE_BLEND_OUT, MONTAGE_END,
+};
 pub use parameters::{AnimatorParameter, AnimatorParameters};
 pub use playback::{Motion, Playback, Step};
 pub use playhead::{Bounds, Playhead};

@@ -63,3 +63,32 @@ fn two_runs_of_the_same_inputs_pose_identically() {
     let bits = |p: &[[f32; 3]]| p.iter().flatten().map(|f| f.to_bits()).collect::<Vec<_>>();
     assert_eq!(bits(&a), bits(&b));
 }
+
+#[test]
+fn root_motion_stacks_in_the_slot_order_the_pose_does() {
+    // `FullBody` (slot 0) sits under `DefaultSlot` (1), started the other way.
+    let m = mesh(vec![
+        slide("Idle", &[LEG], 0.0, 0.0, 1.0),
+        slide("Lunge", &[HIPS, SPINE], 0.0, 2.0, 1.0),
+        slide("Back", &[HIPS, SPINE], 0.0, -1.0, 1.0),
+    ]);
+    let g = with_montages(
+        r#"[{ "name": "FullBody" }]"#,
+        r#"[{ "name": "Lunge", "clip": "Lunge", "slot": "FullBody", "blend_in": 0, "blend_out": 0 },
+            { "name": "Back", "clip": "Back", "blend_in": 0, "blend_out": 0 }]"#,
+    );
+    let mut anim = animator(Motion::Clip("Idle"), None, 0.0);
+    start(&mut anim, &g, &m, "Back");
+    start(&mut anim, &g, &m, "Lunge");
+    let moved = (0..10).fold(RootMotion::ZERO, |acc, _| {
+        acc.then(
+            step(&mut anim, Some(&m), Some(&g), DT)
+                .root
+                .unwrap_or_default(),
+        )
+    });
+    let hips = sample_pose(&anim, &m, Some(&g)).unwrap().1[HIPS].unwrap();
+    // `Back` is on top in both: half a second of it, -0.5 m.
+    assert!((hips.translation.x + 0.5).abs() < 1e-3, "{hips:?}");
+    assert!((moved.position.x + 0.5).abs() < 1e-3, "{moved:?}");
+}
