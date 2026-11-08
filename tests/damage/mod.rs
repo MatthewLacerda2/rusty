@@ -1,12 +1,15 @@
 //! `Damage` and `OnTakeDamage` end to end (#1893): a shot bubbles from a hitbox
 //! to the character's script, a handler's return is what `Apply` answers, a
 //! barrel's blast chains to the next and a self-feeding loop stops at depth 16
-//! (`chain`), and the radial falloff, cover and grouping (`radial`).
+//! (`chain`), the radial falloff, cover and grouping (`radial`, `cover`), and a
+//! `RaycastThrough` crossing as a point hit (`through`).
 
 mod chain;
 #[cfg(feature = "dev")]
 mod content;
+mod cover;
 mod radial;
+mod through;
 
 use std::cell::RefCell;
 use std::rc::Rc;

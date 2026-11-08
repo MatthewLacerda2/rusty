@@ -2,44 +2,46 @@
 //! `ApplyRadialDamageWithFalloff` (#1893).
 //!
 //! 1. **Candidates**: every solid (non-trigger) collider overlapping the sphere of
-//!    radius `outer`, on `layer_mask`, grouped by who it belongs to: its damage
-//!    receiver ([`deliver::receiver`]), else its body, else itself. A character
-//!    with fifteen hitboxes is one group, damaged once.
-//! 2. **Distance**: the nearest of the group's colliders' closest points.
-//! 3. **Cover** (Unreal's `ComponentIsDamageableFrom`): a ray from the origin to
-//!    that point, or to that collider's bounds centre, must meet nothing on
-//!    `blocking_mask` first. The group itself and the `causer` never block.
+//!    radius `outer`, on `layer_mask`, outside the `causer`'s hierarchy (Unreal
+//!    passes the causer as an ignored actor), grouped by who it belongs to: its
+//!    damage receiver ([`deliver::receiver`]), else its body, else itself. A
+//!    character with fifteen hitboxes is one group, damaged once.
+//! 2. **Cover**, per collider (Unreal's `ComponentIsDamageableFrom`, [`cover`]):
+//!    a collider is reached when a ray to its closest point, or to its bounds
+//!    centre, meets no blocker first. A group is reached when any of its
+//!    colliders is: a bot crouched behind a crate with its head in view.
+//! 3. **Distance**: the nearest *reached* collider's closest point.
 //! 4. **Falloff**: full inside `inner`, `min` at `outer`, and between them
 //!    `min + (amount - min) · (1 - t)^falloff` with `t` the fraction of the way out.
 //!
 //! Groups are processed nearest first, ties by entity id, so two runs over one
-//! scene give the same list. Every dynamic body in a clear group is pushed by
-//! `impulse` scaled by the same falloff, away from the origin, damaged or not.
+//! scene give the same list; a receiver a nested blast deactivated is skipped.
+//! Every dynamic body in a reached group is pushed by `impulse` scaled by the same
+//! falloff, away from the origin (from its collider's bounds centre when the
+//! origin is on it), damaged or not.
 
 use std::cell::RefCell;
 
 use glam::Vec3;
 use mlua::{Lua, Table};
 
+use super::cover::{clear, solid_on, SKIN};
 use super::{deliver, enter, finite, push, vec_table, Common};
 use crate::api::ApiCell;
-use crate::physics::{is_hittable, PhysicsWorld};
-use crate::scene::{layer_in_mask, Scene};
+use crate::physics::PhysicsWorld;
+use crate::scene::Scene;
 use crate::ui::events::is_under;
 
-/// How short of its target a cover ray may stop and still count as clear (m).
-const SKIN: f32 = 1e-3;
-
 /// One `ApplyRadial` call's shape, read from its arguments.
-struct Blast {
-    origin: Vec3,
+pub(super) struct Blast {
+    pub(super) origin: Vec3,
     amount: f64,
     inner: f32,
     outer: f32,
     min: f64,
     falloff: f64,
     layer_mask: Option<u32>,
-    blocking_mask: Option<u32>,
+    pub(super) blocking_mask: Option<u32>,
 }
 
 impl Blast {
@@ -96,30 +98,31 @@ struct Row {
     point: Vec3,
 }
 
-/// One group the blast damages: its nearest row, and each body's nearest row.
+/// One group the blast reaches: its nearest reached row, and each body's
+/// nearest row with that row's collider (for the push).
 struct Group {
     nearest: Row,
-    bodies: Vec<(u32, Vec3)>,
+    bodies: Vec<(u32, Vec3, u32)>,
 }
 
-/// Whether `id`'s collider is a solid one on `mask` (`None`: every layer).
-fn solid_on(scene: &Scene, id: u32, mask: Option<u32>) -> bool {
+/// Every collider the sphere reaches outside the causer's hierarchy, as rows
+/// sorted by (owner, distance, id).
+fn rows(
+    lua: &Lua,
+    scene: &Scene,
+    physics: &PhysicsWorld,
+    blast: &Blast,
+    causer: Option<u32>,
+) -> Vec<Row> {
     let world = &scene.world;
-    let trigger =
-        world.collider(id).is_some_and(|c| c.is_trigger) && !world.has_character_controller(id);
-    is_hittable(scene, id) && !trigger && mask.is_none_or(|m| layer_in_mask(world.layer(id), m))
-}
-
-/// Every collider the sphere reaches, as rows sorted by (owner, distance, id).
-fn rows(lua: &Lua, scene: &Scene, physics: &PhysicsWorld, blast: &Blast) -> Vec<Row> {
     let ids = physics.overlap_sphere(blast.origin, blast.outer, |id| {
-        solid_on(scene, id, blast.layer_mask)
+        solid_on(scene, id, blast.layer_mask) && causer.is_none_or(|c| !is_under(world, id, c))
     });
     let mut rows: Vec<Row> = ids
         .into_iter()
         .filter_map(|id| {
             let point = physics.closest_point_on(id, blast.origin)?;
-            let body = scene.world.body_carrier(id).unwrap_or(id);
+            let body = world.body_carrier(id).unwrap_or(id);
             let receiver = deliver::receiver(lua, scene, id);
             Some(Row {
                 owner: receiver.unwrap_or(body),
@@ -139,32 +142,35 @@ fn rows(lua: &Lua, scene: &Scene, physics: &PhysicsWorld, blast: &Blast) -> Vec<
     rows
 }
 
-/// Whether a ray from the origin reaches `target` without meeting a blocker:
-/// a solid collider on `blocking_mask` that is not under `owner` or the causer.
-fn clear(
-    scene: &Scene,
-    physics: &PhysicsWorld,
-    (blast, causer): (&Blast, Option<u32>),
-    owner: u32,
-    target: Vec3,
-) -> bool {
-    let to = target - blast.origin;
-    let length = to.length();
-    if length <= SKIN {
-        return true;
-    }
-    let world = &scene.world;
-    let blocks = |id: u32| {
-        solid_on(scene, id, blast.blocking_mask)
-            && !is_under(world, id, owner)
-            && causer.is_none_or(|c| !is_under(world, id, c))
-    };
-    physics
-        .raycast_hit(blast.origin, to, length, blocks)
-        .is_none_or(|hit| hit.distance >= length - SKIN)
+/// Whether the blast reaches `row`'s collider: its closest point or its bounds
+/// centre is clear of cover.
+fn reached(scene: &Scene, physics: &PhysicsWorld, ctx: (&Blast, Option<u32>), row: &Row) -> bool {
+    let centre = scene
+        .world
+        .collider_bounds(row.id)
+        .map(|(lo, hi)| (lo + hi) * 0.5);
+    clear(scene, physics, ctx, row.owner, row.point)
+        || centre.is_some_and(|c| clear(scene, physics, ctx, row.owner, c))
 }
 
-/// The groups the blast damages, nearest first (ties by owner id).
+/// One owner's rows (nearest first) as a group, when any of them is reached.
+fn group(
+    scene: &Scene,
+    physics: &PhysicsWorld,
+    ctx: (&Blast, Option<u32>),
+    rows: Vec<Row>,
+) -> Option<Group> {
+    let mut bodies: Vec<(u32, Vec3, u32)> = Vec::new();
+    for r in &rows {
+        if !bodies.iter().any(|(b, _, _)| *b == r.body) {
+            bodies.push((r.body, r.point, r.id));
+        }
+    }
+    let nearest = rows.into_iter().find(|r| reached(scene, physics, ctx, r))?;
+    Some(Group { nearest, bodies })
+}
+
+/// The groups the blast reaches, nearest first (ties by owner id).
 fn groups(
     lua: &Lua,
     scene: &Scene,
@@ -172,36 +178,36 @@ fn groups(
     blast: &Blast,
     causer: Option<u32>,
 ) -> Vec<Group> {
-    let mut out: Vec<Group> = Vec::new();
-    for row in rows(lua, scene, physics, blast) {
-        match out.last_mut() {
-            Some(g) if g.nearest.owner == row.owner => {
-                if !g.bodies.iter().any(|(b, _)| *b == row.body) {
-                    g.bodies.push((row.body, row.point));
-                }
-            }
-            _ => out.push(Group {
-                bodies: vec![(row.body, row.point)],
-                nearest: row,
-            }),
+    let mut by_owner: Vec<Vec<Row>> = Vec::new();
+    for row in rows(lua, scene, physics, blast, causer) {
+        match by_owner.last_mut() {
+            Some(g) if g[0].owner == row.owner => g.push(row),
+            _ => by_owner.push(vec![row]),
         }
     }
-    out.retain(|g| {
-        let n = &g.nearest;
-        let centre = scene
-            .world
-            .collider_bounds(n.id)
-            .map(|(lo, hi)| (lo + hi) * 0.5);
-        let ctx = (blast, causer);
-        clear(scene, physics, ctx, n.owner, n.point)
-            || centre.is_some_and(|c| clear(scene, physics, ctx, n.owner, c))
-    });
+    let mut out: Vec<Group> = by_owner
+        .into_iter()
+        .filter_map(|rows| group(scene, physics, (blast, causer), rows))
+        .collect();
     out.sort_by(|a, b| {
         (a.nearest.distance, a.nearest.owner)
             .partial_cmp(&(b.nearest.distance, b.nearest.owner))
             .unwrap_or(std::cmp::Ordering::Equal)
     });
     out
+}
+
+/// The unit push direction for a body struck at `point` (on collider `id`):
+/// away from the origin, or from the collider's bounds centre when the origin
+/// lies on or in it.
+fn away(scene: &RefCell<Scene>, origin: Vec3, point: Vec3, id: u32) -> Vec3 {
+    if point.distance(origin) > SKIN {
+        return (point - origin).normalize_or_zero();
+    }
+    let bounds = scene.borrow().world.collider_bounds(id);
+    bounds.map_or(Vec3::ZERO, |(lo, hi)| {
+        ((lo + hi) * 0.5 - origin).normalize_or_zero()
+    })
 }
 
 /// `ApplyRadial(x, y, z, amount, opts)` — `{ {id, amount, distance}, … }`, one
@@ -225,7 +231,9 @@ pub(super) fn function(
             let Some(scale) = blast.scale(g.nearest.distance) else {
                 continue;
             };
-            if g.nearest.receives {
+            let owner = g.nearest.owner;
+            let active = scene.borrow().world.is_active_in_hierarchy(owner);
+            if g.nearest.receives && active {
                 let event = common.event(lua, "radial")?;
                 event.set("origin", vec_table(lua, origin)?)?;
                 event.set("distance", g.nearest.distance)?;
@@ -238,9 +246,9 @@ pub(super) fn function(
                 results.push(row)?;
             }
             let strength = common.impulse * scale as f32;
-            for (body, point) in g.bodies {
-                let away = (point - origin).normalize_or_zero();
-                push(lua, body, away * strength, point)?;
+            for (body, point, id) in g.bodies {
+                let dir = away(scene, origin, point, id);
+                push(lua, body, dir * strength, point)?;
             }
         }
         Ok(results)

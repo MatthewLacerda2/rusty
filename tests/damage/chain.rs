@@ -7,6 +7,8 @@ use rusty::scene::Scene;
 use super::{eval, play, static_box, RECORDER};
 
 /// A barrel: the first damage it takes blows it up, a 5 m blast from its centre.
+/// Its own blast leaves it alone (it is the causer); the guard is for the
+/// neighbour's blast, which would set it off again.
 const BARREL: &str = r#"
 local M = {}
 function M.OnTakeDamage(id, amount, event)

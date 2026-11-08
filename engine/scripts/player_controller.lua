@@ -101,7 +101,8 @@ local function shoot(self, entity_id)
         local cx, cy, cz = Camera.GetPosition()
         local fx, fy, fz = Camera.GetForward()
         -- The nearest hit that isn't the Player itself takes the shot.
-        for _, hit in ipairs(Physics.RaycastAll(cx, cy, cz, fx, fy, fz, SHOT_RANGE)) do
+        -- Triggers (pickups, zones) don't stop a bullet: query_triggers = false.
+        for _, hit in ipairs(Physics.RaycastAll(cx, cy, cz, fx, fy, fz, SHOT_RANGE, nil, false)) do
             if hit.root ~= entity_id then
                 Damage.ApplyPoint(hit, SHOT_DAMAGE, fx, fy, fz,
                     { type = "bullet", instigator = entity_id })

@@ -11,7 +11,7 @@ delivery, the hit information and the radial query.
 | Function | Signature | Returns |
 |---|---|---|
 | `Damage.Apply` | `(target, amount [, opts])` — plain damage to `target` (`event.kind = "any"`). A `nil` target is no entity. | the damage taken; `0` when nothing received it |
-| `Damage.ApplyPoint` | `(hit, amount, dx, dy, dz [, opts])` — a shot: `hit` is a [`Physics.RaycastAll` / `RaycastThrough`](Physics.md) entry, `dx, dy, dz` the shot's direction (`event.kind = "point"`). An error when `hit` has no `id`. | the damage taken; `0` when nothing received it |
+| `Damage.ApplyPoint` | `(hit, amount, dx, dy, dz [, opts])` — a shot: `hit` is a [`Physics.RaycastAll` / `RaycastThrough`](Physics.md) entry, `dx, dy, dz` the shot's direction (`event.kind = "point"`). A `RaycastThrough` crossing's `enter.point`, `enter.normal` and `enter.distance` stand in for the missing top-level ones. An error when `hit` has no `id`. | the damage taken; `0` when nothing received it |
 | `Damage.ApplyRadial` | `(x, y, z, amount, opts)` — a blast centred at `x, y, z` (`event.kind = "radial"`); see *Radial damage* below. `opts.outer` is required. | an array of `{ id, amount, distance }`, one per receiver, nearest first |
 
 A harness scenario's `Damage.*` runs in the gameplay VM, so it reaches the game
@@ -27,14 +27,16 @@ scripts' handlers too (`docs/testing.md`, *What a scenario can call*).
   `"explosion"`, `"fire"`, `"melee"`); `"generic"` when absent. Unreal's
   `DamageType` class, kept as data.
 - `instigator` — who caused it (the shooter), an entity id.
-- `causer` — what did it (the gun, the grenade), an entity id. A radial blast's
-  causer never shields anyone from it.
+- `causer` — what did it (the gun, the grenade), an entity id. A radial blast
+  ignores its causer and everything under it, as Unreal does: they are neither
+  damaged nor pushed by it, and never shield anyone from it.
 - `impulse` — N·s. `ApplyPoint` pushes the body the hit collider belongs to (its
   nearest `Rigidbody` up the hierarchy: a crate, a ragdolled bone) along the shot,
-  at `hit.point`, with [`Physics.AddImpulseAtPosition`](Physics.md) itself; a
+  at `hit.point` (a crossing's `enter.point`), with [`Physics.AddImpulseAtPosition`](Physics.md) itself; a
   kinematic or bodiless one doesn't move. `ApplyRadial` pushes every body in
-  reach and clear of cover away from the origin, scaled by the falloff, whether
-  or not it takes damage.
+  reach and clear of cover away from the origin (from its collider's bounds
+  centre when the origin is on it), scaled by the falloff, whether or not it
+  takes damage.
 
 ### Who receives it
 
@@ -68,9 +70,9 @@ propagates the same way.
 | `type` | the damage type (`opts.type`, `"generic"` by default) |
 | `instigator` | `opts.instigator`, or `nil` |
 | `causer` | `opts.causer`, or `nil` |
-| `hit` | `point` only: a copy of the hit table passed in (`id`, `point`, `normal`, `distance`, `bone`, `bone_name`, `root`, …) plus `direction = {x, y, z}`, the shot's unit direction |
+| `hit` | `point` only: a copy of the hit table passed in (`id`, `point`, `normal`, `distance`, `bone`, `bone_name`, `root`, …; for a `RaycastThrough` crossing also `thickness`, `enter`, `exit`, with `enter`'s `point`, `normal` and `distance` copied up) plus `direction = {x, y, z}`, the shot's unit direction |
 | `origin` | `radial` only: the blast centre, `{x, y, z}` |
-| `distance` | `radial` only: how far the receiver was from it (its nearest collider's closest point) |
+| `distance` | `radial` only: how far the receiver was from it (its nearest reached collider's closest point) |
 
 ```lua no-run
 -- bot.lua: health is the game's
@@ -105,20 +107,29 @@ barrels. Its `opts` take, beside the common fields:
 How it finds its victims:
 
 1. **Candidates.** Every solid (non-trigger) collider on `layer_mask` touching the
-   sphere of radius `outer` ([`Physics.OverlapSphere`](Physics.md)), grouped by who
-   receives it (the bubbling rule above), so a character with fifteen hitboxes is
-   damaged **once**. Colliders with no receiver group by their body, for the push.
-2. **Distance.** The nearest of the group's colliders' closest points
-   ([`Physics.ClosestPoint`](Physics.md)).
-3. **Cover.** A group is reached only when a ray from the origin to that point,
-   or to that collider's bounds centre, meets nothing on `blocking_mask` before
-   it (Unreal's `ComponentIsDamageableFrom`). The group's own colliders and the
-   `causer`'s never block. A grenade behind a wall does nothing to the room beyond.
+   sphere of radius `outer` ([`Physics.OverlapSphere`](Physics.md)), except the
+   `causer`'s, grouped by who receives it (the bubbling rule above), so a
+   character with fifteen hitboxes is damaged **once**. Colliders with no
+   receiver group by their body, for the push.
+2. **Cover**, per collider (Unreal's `ComponentIsDamageableFrom`). A collider is
+   reached when a ray from the origin to its closest point
+   ([`Physics.ClosestPoint`](Physics.md)), or to its bounds centre, meets nothing
+   on `blocking_mask` before it. A group is reached when **any** of its colliders
+   is: a bot crouched behind a crate with its head in view takes the blast. The
+   group's own colliders and the `causer`'s never block. A grenade behind a wall
+   does nothing to the room beyond. A blocker the origin lies on or inside (a
+   grenade at a raycast's `hit.point` on a wall) doesn't stop a ray leaving it,
+   nor any ray when the origin is buried in it; it still stops a ray from its
+   surface into it, so a blast on a wall's face doesn't reach through the wall.
+3. **Distance.** The nearest *reached* collider's closest point; the falloff and
+   `event.distance` use it.
 4. **Order.** Groups are processed nearest first, ties by entity id, so two runs
-   over one scene give the same list.
+   over one scene give the same list. A receiver that an earlier handler's blast
+   deactivated is skipped.
 
 ```lua no-run
 function Barrel.OnTakeDamage(id, amount, event)
+  -- its own blast leaves it alone; this is for a neighbouring barrel's
   if Barrel.exploded then return 0 end
   Barrel.exploded = true
   local x, y, z = Transform.GetPosition(id)

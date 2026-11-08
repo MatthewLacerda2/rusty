@@ -15,11 +15,13 @@
 //!   (`scripting::instances`, what `Scene.GetScript` reads). No queue. A handler
 //!   may apply damage itself; past [`MAX_DEPTH`] nested calls the next one is a
 //!   Lua error, and every call under it unwinds with it.
-//! - **Radial** (`radial`): an overlap, grouped by receiver, nearest point per
-//!   group, a cover ray, then the falloff — nearest first, ties by entity id.
+//! - **Radial** (`radial`): an overlap that ignores the causer, grouped by
+//!   receiver, a cover ray per collider (`cover`), the nearest reached point per
+//!   group, then the falloff — nearest first, ties by entity id.
 //! - **Impulse**: `opts.impulse` pushes the struck body through
 //!   `Physics.AddImpulseAtPosition` itself, the same code a script calls.
 
+mod cover;
 mod deliver;
 mod radial;
 
@@ -183,7 +185,7 @@ fn apply_point(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<mlua::Function>
         let common = Common::read("ApplyPoint", opts.as_ref())?;
         let Some(id) = hit.get::<Option<u32>>("id")? else {
             return Err(mlua::Error::RuntimeError(
-                "Damage.ApplyPoint: the hit has no `id` (pass a RaycastAll entry)".into(),
+                "Damage.ApplyPoint: the hit has no `id` (pass a RaycastAll or RaycastThrough entry)".into(),
             ));
         };
         let raw = Vec3::new(dx, dy, dz);
@@ -195,13 +197,21 @@ fn apply_point(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<mlua::Function>
             let (k, v) = pair?;
             copy.set(k, v)?;
         }
+        // A `RaycastThrough` crossing keeps where it landed under `enter`.
+        if copy.get::<Option<Table>>("point")?.is_none() {
+            if let Some(enter) = hit.get::<Option<Table>>("enter")? {
+                for key in ["point", "normal", "distance"] {
+                    copy.set(key, enter.get::<Value>(key)?)?;
+                }
+            }
+        }
         copy.set("direction", vec_table(lua, direction)?)?;
         let event = common.event(lua, "point")?;
-        event.set("hit", copy)?;
+        event.set("hit", copy.clone())?;
         let scene = &*scene.get(lua)?;
         let taken = deliver::to_receiver(lua, scene, id, amount, &event)?;
         // The push needs where the shot landed; a hit without a `point` gets none.
-        if let Some(p) = hit.get::<Option<Table>>("point")? {
+        if let Some(p) = copy.get::<Option<Table>>("point")? {
             let point = Vec3::new(p.get("x")?, p.get("y")?, p.get("z")?);
             let body = scene.borrow().world.body_carrier(id).unwrap_or(id);
             push(lua, body, direction * common.impulse, point)?;
