@@ -113,8 +113,10 @@ pub fn resolve_bounds(scene: &Scene, spacing: f32) -> NavBounds {
 }
 
 impl NavigationGraph {
-    /// A graph baked from `scene` — the one construction path the windowed game and the
-    /// headless harness share, so both navigate the same grid for the same scene.
+    /// A graph for `scene`, restored from its saved navmesh or baked
+    /// ([`Self::restore_or_bake`], #1887) — the one construction path the windowed
+    /// game, the player and the headless harness share, so all navigate the same grid
+    /// for the same scene.
     pub fn from_scene(scene: &Scene) -> Self {
         let b = NavBounds::EMPTY_SCENE;
         let mut graph = Self::new(
@@ -124,7 +126,7 @@ impl NavigationGraph {
             b.max_z,
             super::grid::DEFAULT_GRID_SPACING,
         );
-        graph.bake(scene);
+        graph.restore_or_bake(scene);
         graph
     }
 
@@ -206,8 +208,11 @@ impl NavigationGraph {
         if b == self.bounds() && spacing == self.grid_spacing {
             return;
         }
+        // A bake that re-shapes the grid during Play is still the play loop's navmesh.
         *self = Self {
             bake_generation: self.bake_generation,
+            tracked_scene: self.tracked_scene,
+            static_watch: self.static_watch.take(),
             ..Self::new(b.min_x, b.max_x, b.min_z, b.max_z, spacing)
         };
     }
@@ -219,7 +224,7 @@ impl NavigationGraph {
     }
 
     /// The bounds and spacing a bake of `scene` covers.
-    fn target_shape(&self, scene: &Scene) -> (NavBounds, f32) {
+    pub(super) fn target_shape(&self, scene: &Scene) -> (NavBounds, f32) {
         let spacing = scene.nav_settings.grid_spacing;
         let spacing = if spacing.is_finite() && spacing > 0.0 {
             spacing

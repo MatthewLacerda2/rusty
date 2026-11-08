@@ -97,6 +97,7 @@ impl Scene {
         self.pending_destroy.retain(|id| survivors.contains(id));
         self.land_persistent_decals(decals);
         self.renew_id();
+        crate::scene::nav_settings::load_navmesh(self, path);
         let loaded = crate::scene::lighting::io::load_lighting_sidecar(self, path);
         self.remap_occlusion(&moved);
         loaded

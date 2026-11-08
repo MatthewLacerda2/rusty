@@ -181,14 +181,16 @@ fn advance_frame(_world: &mut World, res: &mut Resources) {
 /// Keep the navmesh in step with the scene every tick (#456): advance the
 /// obstacles' carving bookkeeping, then rebake only the cells whose static
 /// colliders or carving obstacles changed; a tick no static entity changed in
-/// skips the static colliders altogether (#1707). Play frame 0 bakes in full, so a Play
-/// session starts from the same navmesh whatever edit mode left behind.
+/// skips the static colliders altogether (#1707). Play frame 0 starts afresh from the
+/// scene's saved navmesh, or bakes in full when it has none that matches (#1887), so a
+/// Play session starts from the same navmesh whatever edit mode left behind; a
+/// play-mode `Scene.Load` starts its scene the same way, in the load step.
 fn rebake_nav(world: &mut World, res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
     crate::navigation::tick_obstacles(&mut scene, res.frame_dt);
     let mut nav = res.nav.borrow_mut();
-    if res.play_frame == 0 {
-        nav.bake_tracked(&mut scene);
+    if res.play_frame == 0 || !nav.tracks(&scene) {
+        nav.start_tracked(&mut scene);
     } else {
         nav.sync_changes(&mut scene);
     }
@@ -223,6 +225,10 @@ mod standalone_tests;
 #[cfg(test)]
 #[path = "play_tests.rs"]
 mod play_tests;
+
+#[cfg(test)]
+#[path = "play_navmesh_tests.rs"]
+mod play_navmesh_tests;
 
 #[cfg(test)]
 #[path = "import_tests/mod.rs"]
