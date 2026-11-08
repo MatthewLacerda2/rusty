@@ -131,6 +131,8 @@ coder *changing* it must know.
   `tenancy.agent_pid_of`, #1658): keep that parser in step with the harness's wording.
   `make queue-status` and `make queue-events` read the same lock for liveness (`merging/view/status.py`).
 - **The log's wording is read by `make queue-events`** (`merging/view/events.py`, #1876): it passes a
-  line by `HANDED BACK`, `#N: merged`, `supervisor: … stopped.`, `watch: STOPPED:`, `HELD #N` and the
-  `watch: #N turned ready.` family of `watch.board.transitions`. A change to one of those lines
-  updates `events.KEEP` and its tests in the same pull request.
+  line by `HANDED BACK`, `#N: merged` (a single take's, and a train member's `#N: merged — landed with
+  the train <sha>.`, said as it lands), every `supervisor:` line but the ones that carry on
+  (`events.CARRIES_ON`), `watch: STOPPED:`, `HELD #N` and the `watch: #N turned ready.` family of
+  `watch.board.transitions`. A change to one of those lines updates `events.KEEP` and its tests
+  (`.github/scripts/tests/view/test_wording.py`, built from the watch's own functions) in the same pull request.

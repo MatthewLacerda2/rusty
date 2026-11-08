@@ -55,7 +55,10 @@ class Poll:
     """Each call: the lines for *Standing down* comments not said yet.
 
     `get(path)` is `gh api` (parsed JSON, or `None` on a failure);
-    `batch(number)` whether an issue is the batch's ([`in_batch`])."""
+    `batch(number)` whether an issue is the batch's ([`in_batch`]), `None` when
+    GitHub did not say. A comment is marked said only once that answer is
+    real: a failed page is asked again next poll, never read as "not ours"
+    (#1876's review)."""
 
     def __init__(self, get: Callable[[str], object], since: datetime, batch: Callable[[int], bool] | None = None):
         self.get, self.seen = get, set()
@@ -73,30 +76,44 @@ class Poll:
             number = issue_of(comment)
             if comment.get("id") in self.seen or number is None or not is_standing_down(comment):
                 continue
-            self.seen.add(comment.get("id"))
             try:
                 ours = self.batch(number)
             except SystemExit:
-                ours = False
+                ours = None
+            if ours is None:
+                continue
+            self.seen.add(comment.get("id"))
             if ours:
                 said.append(line(comment, number))
         return said
 
 
-def in_batch(get: Callable[[str], object], number: int) -> bool:
-    """Whether issue `number` carries a trusted `Brief`, or an open pull request closes it."""
-    comments = ghrest.pages(get, f"repos/{ghrest.slug()}/issues/{number}/comments") or []
+def in_batch(get: Callable[[str], object], number: int) -> bool | None:
+    """Whether issue `number` carries a trusted `Brief`, or an open pull request
+    closes it; `None` when a page GitHub was asked for did not come."""
+    comments = ghrest.pages(get, f"repos/{ghrest.slug()}/issues/{number}/comments")
+    if comments is None:
+        return None
     if any(brief.is_brief(c.get("body", "")) and ghrest.can_push(c) for c in comments):
         return True
-    pulls = ghrest.pages(get, f"repos/{ghrest.slug()}/pulls?state=open") or []
+    pulls = ghrest.pages(get, f"repos/{ghrest.slug()}/pulls?state=open")
+    if pulls is None:
+        return None
     return any(int(n) == number for p in pulls for n in ghrest.CLOSING.findall(p.get("body") or ""))
 
 
+# How long one `gh api` call may take. The poll runs in the stream's one
+# process, so a call that hangs would stop the log tail and the liveness check
+# with it (#1876's review); a timeout is a failed poll, asked again next time.
+GH_TIMEOUT_SECONDS = 30
+
+
 def gh_get(path: str) -> object:
-    """`gh api path`, parsed; `None` when it failed (the next poll tries again)."""
+    """`gh api path`, parsed; `None` when it failed or timed out (the next poll tries again)."""
     try:
-        done = subprocess.run(["gh", "api", path], capture_output=True, text=True, check=False)
-    except OSError:
+        done = subprocess.run(["gh", "api", path], capture_output=True, text=True, check=False,
+                              timeout=GH_TIMEOUT_SECONDS)
+    except (OSError, subprocess.TimeoutExpired):
         return None
     if done.returncode != 0:
         return None

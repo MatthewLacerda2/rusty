@@ -133,7 +133,11 @@ class Yard:
             return self.rebuild(train, dict(gone)), None
         results, landed, unknown = land.land(train, fx.look, fx.squash)
         for number, state, why in results:
-            if state == outcomes.REQUEUED:
+            if state == outcomes.MERGED:
+                # Said as it lands, not only in the closing summary: `make queue-events`
+                # passes it live (#1876's review), and drops the summary's repeat.
+                fx.say(outcomes.line(number, state, why))
+            elif state == outcomes.REQUEUED:
                 fx.say(f"watch: #{number} goes back in line: {why}")
         if not (landed or unknown):
             return results, None

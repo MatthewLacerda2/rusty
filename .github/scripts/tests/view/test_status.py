@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from merging.view import status
 from merging.watch import tenancy
@@ -64,6 +66,19 @@ class Identity(unittest.TestCase):
 
     def test_this_process_is_not_a_supervisor(self):
         self.assertFalse(status.is_supervisor(os.getpid()))
+
+    def test_an_exported_columns_does_not_cut_the_command_line(self):
+        tail = "queue-daemon.py"
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", "x" * 120 + tail])
+        try:
+            with mock.patch.dict(os.environ, {"COLUMNS": "20"}):
+                command, until = "", time.monotonic() + 10
+                while not command.endswith(tail) and time.monotonic() < until:  # a fork shows its parent's line until it execs
+                    command = status.identity(child.pid) or ""
+                self.assertTrue(command.endswith(tail), command)
+        finally:
+            child.kill()
+            child.wait()
 
 
 class LastLine(unittest.TestCase):

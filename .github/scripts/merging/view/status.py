@@ -44,9 +44,10 @@ def locks(listing: str) -> list[tuple[str, int]]:
 
 def identity(pid: int) -> str | None:
     """The command line of process `pid` (`ps`, on Linux and macOS alike), or
-    `None` when `ps` could not say."""
+    `None` when `ps` could not say. `-ww` keeps it whole: an exported `COLUMNS`
+    would otherwise cut `queue-daemon.py` off it (#1876's review)."""
     try:
-        done = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True, check=False)
+        done = subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(pid)], capture_output=True, text=True, check=False)
     except OSError:
         return None
     return done.stdout.strip() or None if done.returncode == 0 else None

@@ -223,7 +223,8 @@ The supervisor's own endings are status 7 (`supervisor: worktree <path> is gone;
 stopped.`) and 8 (`supervisor: crashed: <error>; stopped.`). **Watch it with `make queue-events`**, the one `Monitor` command (#1876), never a
 hand-typed `tail | grep`: it replays the log from 30 lines back (a re-arm from the
 end drops what the log said while no `Monitor` ran; two PRs sat ready and unread for
-an hour that way on 2026-10-31), passes hand-backs, merges (each once), stops, a held
+an hour that way on 2026-10-31), passes hand-backs, merges (each once, a train's members as they land), every
+supervisor line that ends its run, the watch's stops, a held
 Dependabot PR and every PR turning ready, opening ready, going back to draft or
 closing unmerged, plus coders' `STANDING DOWN #N` comments (a coder that stops says so
 on its issue, not on a PR), and **exits 1 when the supervisor is not running**, so a

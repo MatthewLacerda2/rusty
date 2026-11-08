@@ -77,13 +77,18 @@ def ordered(numbers: list[int]) -> list[int]:
     return [n for n in numbers if not (n in seen or seen.add(n))]
 
 
+def line(number: int, state: str, why: str) -> str:
+    """One result as the summary words it; a train's merge is said this way live too."""
+    return f"#{number}: {state} — {why}"
+
+
 def summary(results: list[tuple[int, str, str]]) -> list[str]:
     """The report — the only thing an unattended run leaves behind.
 
     A reason on every line, merges included, and the cleanup named rather than
     done (see the module doc).
     """
-    lines = [f"#{number}: {state} — {why}" for number, state, why in results]
+    lines = [line(number, state, why) for number, state, why in results]
     merged = [n for n, state, _ in results if state == MERGED]
     if merged:
         lines.append(

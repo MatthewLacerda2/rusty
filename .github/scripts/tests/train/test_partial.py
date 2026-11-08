@@ -85,6 +85,12 @@ class GitHubDown(unittest.TestCase):
 
 
 class Landing(unittest.TestCase):
+    def test_each_member_is_said_merged_as_it_lands(self):
+        fx = Fx(LINE)
+        go(fx)
+        live = [line for line in fx.said if ": merged — landed with the train " in line]
+        self.assertEqual([line.split(":")[0] for line in live], ["#1", "#2", "#3", "#4"])  # #1876's review
+
     def test_a_member_that_moved_is_found_before_the_first_squash(self):
         for moved in ({**pr(3), "body": "This would close #12 by accident."}, pr(3, head="h3b")):
             fx = Fx(LINE)

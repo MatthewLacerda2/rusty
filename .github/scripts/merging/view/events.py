@@ -6,13 +6,16 @@ hand-typed `tail -n 30 -F queue.log | grep` it replaced, and why:
 - **30 lines back, always** ([`BACK`]): a re-arm from the log's end drops what
   it said while no `Monitor` ran; on 2026-10-31 two PRs sat ready and unread for
   an hour that way, and on 2026-11-07 the `-n 0` form came back twice.
-- **Only what someone acts on** ([`keep`]): hand-backs, merges, stops, a held
+- **Only what someone acts on** ([`keep`]): hand-backs, merges (a train's
+  too), every line that ends the supervisor's run ([`CARRIES_ON`]), a held
   Dependabot PR, and a pull request turning ready, opening ready, going back
   to draft or closing unmerged (the watch's own `watch: #N …` lines,
   `watch.board.transitions`). PR #1870 sat ready for 90 minutes because the
   hand-typed grep let no ready flip through. A CI poll line is dropped.
-- **Each merge once**: the watch says `#N: merged.` as it lands, and again in
-  its closing summary; the second says nothing new.
+- **Each merge once**: the watch says a merge as it lands (`#N: merged.` for
+  a single take, `#N: merged — landed with the train <sha>.` for a train's
+  member, `watch.trains.Yard.land`), and again in its closing summary; the
+  second says nothing new.
 - **Every line flushed as written**, from one process: the combined command of
   2026-11-07 put the tail in the background of a PR poll, replayed old lines
   and delivered no live one, so `#1873: merged` went unreported for 20 minutes.
@@ -39,10 +42,22 @@ POLL_SECONDS = 120
 # How often the log is read for new lines.
 STEP_SECONDS = 1
 
+# The supervisor's lines that do not end its run (`watch.supervisor.run`).
+# Every other `supervisor:` line does (a give-up, a crash, a vanished worktree,
+# a requested stop, a refused update with its own wording), and is passed, so
+# the stream says why it stopped (#1876's review). A new wording that carries
+# on is noise here until it is listed, never a silent stop.
+CARRIES_ON = (
+    "starting the watch.",
+    "its own code changed on main; restarting itself.",
+    "the watch exited ",  # "…; starting it again in …"; its give-up ends "; stopped." and passes
+)
+
 # The lines to pass. `queue: ` prefixes the watch's own; the supervisor's are bare.
 KEEP = re.compile(
     r"HANDED BACK"
-    r"|supervisor:.*\bstopped\.?$"
+    r"|supervisor:.*; stopped\.$"
+    r"|supervisor: (?!" + "|".join(re.escape(line) for line in CARRIES_ON) + ")"
     r"|watch: STOPPED:"
     r"|HELD #\d+"
     r"|watch: #\d+ (?:turned ready|opened as ready|back to draft|closed, not merged)"
