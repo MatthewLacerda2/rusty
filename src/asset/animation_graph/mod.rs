@@ -228,6 +228,8 @@ mod montage_tests;
 #[cfg(test)]
 mod nested_tests;
 #[cfg(test)]
+mod sync_tests;
+#[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod v2_tests;

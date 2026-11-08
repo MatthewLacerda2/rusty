@@ -255,3 +255,14 @@ fn leaf_markers<'a>(tree: &'a BlendTree, clip: &str, depth: usize) -> Option<&'a
             None => (motion.clip == clip).then_some(&motion.sync_markers[..]),
         })
 }
+
+#[cfg(test)]
+mod events_tests;
+#[cfg(test)]
+mod fade_tests;
+#[cfg(test)]
+mod markers_tests;
+#[cfg(test)]
+mod rig;
+#[cfg(test)]
+mod tree_tests;

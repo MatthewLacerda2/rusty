@@ -87,7 +87,8 @@ parameters (`Animator.SetFloat(id, "speed", v)`); the weights follow each fixed
 step. The clips play **phase-synced**: one shared normalized time, each clip
 sampled at that fraction of its own length, so a walk and a run blended together
 keep their feet in step. The tree's cycle length is the weight-averaged length
-of its clips.
+of its clips. Clips whose feet land at different fractions are matched by
+**sync markers** instead (see *Sync groups and markers* below).
 
 | Kind | Reads | Weights |
 |---|---|---|
@@ -137,6 +138,8 @@ walk→run tree by `speed`:
   is skipped with its whole subtree.
 - **One phase for every clip**: the whole tree shares one normalized time, and
   its cycle length is the weight-averaged length of all its clips, at any depth.
+  When every leaf carries sync markers, the leaves are matched marker to marker
+  instead (*Sync groups and markers*).
 - **Loading checks every level**, naming the tree's path in the error
   (`blend tree 'Locomotion/children[0]' reads 'speed', which is not a declared
   Float parameter`): undeclared parameters, empty trees, duplicate points, a
@@ -263,6 +266,49 @@ what the handler did. Events crossed in the same step fire in the order the
 playheads crossed them, then by layer (base first), then in authored order; the
 whole dispatch is deterministic. Events are authored data only: there is no API
 to add them at runtime.
+
+### Sync groups and markers (#1896)
+
+Unreal's **sync groups** and **sync markers**, authored on the graph (no Lua API:
+it is data). They keep feet in phase in the two places a blend tree alone can't:
+across a transition between two nodes (Walk → Sprint, Stand → Crouch-walk), and
+between clips whose feet land at different fractions of their cycles.
+
+```json
+{ "name": "Walk", "clip": "Walk", "is_loop": true, "sync_group": "Locomotion",
+  "sync_markers": [ { "time": 0.02, "name": "FootL" }, { "time": 0.54, "name": "FootR" } ] }
+```
+
+- **Sync markers** name phase points on a clip, in its own seconds, beside its
+  `events`: on a clip node, or on a blend-tree child that plays a clip (a node
+  or child holding a tree carries none of its own). They fire nothing; they only
+  say where in its cycle the clip is. A clip's **phase** is the pair of markers
+  it is between and how far along (`FootL` → `FootR`, 40 %); another clip is put
+  at the same place between its own `FootL` and `FootR`. A clip without that
+  pair takes the normalized time instead (Unreal's length-based sync).
+- **A sync group** is a name on a node (`sync_group`). Entering a node of the
+  **same group, in the same layer**, as the node being left starts the incoming
+  motion at the outgoing one's phase instead of at 0 (a hard cut too). While the
+  crossfade blends, the **heavier** motion (the incoming one on a tie, so from
+  halfway) plays at its own rate and the lighter one **follows** its phase,
+  re-matched every step, so the two can't drift apart however long the fade.
+  A non-looping follower follows until its end, then holds. Nodes in different
+  groups, or in none, crossfade exactly as without groups: the incoming motion
+  from its start. Groups don't reach across layers.
+- **Inside a blend tree** whose every leaf carries markers, the dominant leaf
+  (the one whose events fire, *Which motion fires*) leads: every other leaf is
+  sampled at the leader's place between its own pair of markers. When the
+  dominant leaf changes, the new leader carries on from where it was being
+  sampled, so the pose doesn't jump. A tree with markers on some leaves and not
+  others syncs by normalized time, and loading it warns in the console.
+- **Events stay exact.** A following motion still crosses its own events once
+  each: placing it at the matched phase fires nothing, and when a re-match moves
+  it back over an event, the event doesn't fire again until it has played back
+  past where it was.
+- **Loading checks**, every problem named: a marker with an empty name or a
+  negative or non-finite time, two markers on one clip sharing a name *and* a
+  time, markers on a node or child holding a tree, and an empty `sync_group`.
+  Each marker list is sorted by time on load.
 
 ### Montages (#1894)
 

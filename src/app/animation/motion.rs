@@ -7,7 +7,8 @@
 //! blend tree samples every weighted leaf clip at the **same normalized phase**
 //! (`phase × clip length`), so cycles of different lengths stay in step, and
 //! blends them in TRS space like a crossfade does, through one reusable buffer
-//! rather than a pose per leaf.
+//! rather than a pose per leaf. A tree whose every leaf carries sync markers
+//! samples them marker to marker instead (#1896, `sync`).
 
 use crate::asset::anim_data::AnimationClip;
 use crate::asset::animation_graph::{GraphNode, StateMachine, SyncMarker};

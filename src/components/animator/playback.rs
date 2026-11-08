@@ -8,7 +8,8 @@
 //!
 //! A clip's playhead is in clip seconds. A blend tree's is **normalized** (0..1 is
 //! one cycle), because its children have different lengths and are sampled at the
-//! same phase — that is what keeps a walk and a run blended together in step.
+//! same phase — that is what keeps a walk and a run blended together in step
+//! (or, with sync markers, at the same place between them, #1896).
 
 use serde::{Deserialize, Serialize};
 
@@ -160,9 +161,8 @@ impl Playback {
 
     /// Enter graph `node`: crossfade into its motion over `blend` seconds, adopt
     /// its loop flag and per-node speed, and make it the active state. From a
-    /// node of the same sync group (#1896) the incoming motion is placed at the
-    /// outgoing one's phase on the next step, and follows it while the fade
-    /// blends ([`SyncState`]).
+    /// node of its sync group (#1896) the incoming motion starts at the
+    /// outgoing one's phase and follows it while they blend ([`SyncState`]).
     pub fn enter_node(&mut self, node: &GraphNode, blend: f32) {
         let motion = match node.blend_tree {
             Some(_) => Motion::Tree(&node.name),
@@ -194,7 +194,7 @@ impl Playback {
         (self.crossfade_elapsed / self.crossfade_duration).clamp(0.0, 1.0)
     }
 
-    /// True while a crossfade is blending.
+    /// While a crossfade blends.
     pub fn is_crossfading(&self) -> bool {
         (self.previous_clip.is_some() || self.previous_tree.is_some())
             && self.crossfade_duration > 0.0

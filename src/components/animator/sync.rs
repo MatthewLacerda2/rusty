@@ -109,7 +109,8 @@ impl SyncSource {
 impl Playback {
     /// Move the current playhead to `target`, a phase re-matched to the motion
     /// it follows (#1896), by the shortest way round a looping playhead. A
-    /// non-looping one that has ended holds there. `forward` is the leader's
+    /// non-looping one follows until its end, then holds: a leader wrapping
+    /// round its seam sends it on to its end, never back. `forward` is the leader's
     /// direction of play: travel against it fires no events and is owed back
     /// first ([`SyncState::rewind`]), so a re-match back and forth over an event
     /// fires it once.
@@ -119,6 +120,8 @@ impl Playback {
         let mut step = self.move_current(current, |from| match bounds {
             _ if held => from,
             Bounds::Wrap(w) => from + wrap_delta(target - from, w),
+            Bounds::Clamp(end) if forward && target < from => end,
+            Bounds::Clamp(_) if !forward && target > from => 0.0,
             _ => target,
         });
         let dir = if forward { 1.0 } else { -1.0 };
