@@ -37,6 +37,7 @@ mod delta;
 mod digest;
 mod files;
 mod format;
+mod forwards;
 mod index;
 mod read;
 mod record;
@@ -47,6 +48,7 @@ use std::path::Path;
 
 pub use calls::{journal_calls, plain_value};
 pub use files::{demos_in, Destination, DEMOS_DIR};
+pub use forwards::{Forward, FORWARDS};
 pub use index::{find_in, Event, EventKind, IndexLine, Query, CAMERA_EVERY};
 pub use read::{Demo, DemoTick, DemoTicks};
 pub use record::Recorder;
