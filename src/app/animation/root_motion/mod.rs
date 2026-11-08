@@ -23,7 +23,7 @@
 
 mod blend;
 
-pub use blend::Outgoing;
+pub use blend::Before;
 
 use std::f32::consts::{PI, TAU};
 

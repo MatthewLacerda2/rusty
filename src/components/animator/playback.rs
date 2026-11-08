@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use crate::asset::animation_graph::GraphNode;
 
 use super::playhead::{finite, Bounds, Playhead, Step};
-use super::sync::{SyncSource, SyncState};
+use super::sync::SyncState;
 
 /// What a playback plays: a clip by name, or the blend tree of the named graph
 /// node.
@@ -152,7 +152,7 @@ impl Playback {
         self.previous_tree = self.current_tree.take();
         self.previous_time = self.time;
         self.previous_loop = self.loop_clip;
-        self.sync = SyncState::default();
+        self.sync.begin_fade();
         self.set_current(motion);
         self.time = 0.0;
         self.crossfade_elapsed = 0.0;
@@ -168,21 +168,12 @@ impl Playback {
             Some(_) => Motion::Tree(&node.name),
             None => Motion::Clip(&node.clip),
         };
-        let synced = node.sync_group.is_some() && node.sync_group == self.sync.group;
-        let source = synced.then(|| SyncSource::of(self));
+        let source = self.sync_source(node);
         self.crossfade(motion, blend);
         self.loop_clip = node.is_loop;
         self.node_speed = node.speed.unwrap_or(1.0);
         let previous = self.current_node.replace(node.name.clone());
-        self.sync.group = node.sync_group.clone();
-        if let Some(source) = source {
-            self.sync.following = self.is_crossfading();
-            if self.sync.following {
-                self.sync.previous_node = previous;
-                self.sync.previous_leader = source.leader.clone();
-            }
-            self.sync.from = Some(source);
-        }
+        self.start_sync(node, previous, source);
     }
 
     /// The crossfade weight in `[0, 1]`: 0 fully on the outgoing motion, 1 fully

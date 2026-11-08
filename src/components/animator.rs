@@ -26,7 +26,7 @@ pub use parameters::{AnimatorParameter, AnimatorParameters};
 pub use playback::{Motion, Playback};
 pub use playhead::{wrap_delta, Bounds, Playhead, Step};
 pub use root_motion::{root_chain, RootMotion, RootMotionState};
-pub use sync::{SyncSource, SyncState};
+pub use sync::{follow_clamped, stored_leaf, LeafTime, SyncSource, SyncState};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AnimatorComponent {
@@ -191,5 +191,7 @@ impl AnimatorComponent {
 mod graph_state_tests;
 #[cfg(test)]
 mod parameters_tests;
+#[cfg(test)]
+mod sync_tests;
 #[cfg(test)]
 mod tests;

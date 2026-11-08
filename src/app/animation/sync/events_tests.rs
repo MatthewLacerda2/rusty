@@ -66,6 +66,26 @@ fn a_rematch_back_and_forth_over_an_event_fires_it_once() {
 }
 
 #[test]
+fn travel_owed_back_stays_silent_once_the_incoming_motion_leads() {
+    let graph = planted();
+    // A 0.6 s fade: Run leads from step 18, re-crossing Plant after that.
+    let mut anim = into_run(&graph, 0.0, 0.6);
+    let mut fired = plants(&graph, &mut anim, 12);
+    anim.base.previous_time -= 0.25; // Walk jumps back; Run is re-matched
+    fired += plants(&graph, &mut anim, 1);
+    assert!(anim.base.time < 0.2, "{}", anim.base.time);
+    let mut crossed_leading = false;
+    for _ in 0..24 {
+        let below = anim.base.time < 0.2;
+        fired += plants(&graph, &mut anim, 1);
+        let leads = anim.base.crossfade_weight() >= 0.5;
+        crossed_leading |= below && anim.base.time >= 0.2 && leads;
+    }
+    assert!(crossed_leading, "Run re-crossed Plant leading");
+    assert_eq!(fired, 1);
+}
+
+#[test]
 fn two_runs_give_bit_identical_poses() {
     let graph = planted();
     let mesh = rig_mesh();

@@ -19,13 +19,16 @@
 //!   crosses its own events once each (`Playback::follow`);
 //! - **a blend tree whose every leaf carries markers** samples each leaf at
 //!   the dominant leaf's place between markers ([`TreeSync`]), and carries
-//!   its phase across a change of dominant leaf ([`MotionContext::rebase`]).
+//!   its phase across a change of dominant leaf ([`MotionContext::rebase`]);
+//!   each follower leaf is kept on the occurrence of its markers nearest
+//!   where it was (`SyncState::leaves`, [`MotionContext::track_leaves`]), so a
+//!   leaf repeating the leader's pair never jumps a stride.
 //!
 //! Pure functions of (graph, clips, parameters, playheads): deterministic.
 
 use crate::asset::anim_data::AnimationClip;
-use crate::asset::animation_graph::{AnimationGraph, BlendTree, SyncMarker, MAX_TREE_DEPTH};
-use crate::components::{AnimatorComponent, Motion, Playback, Playhead};
+use crate::asset::animation_graph::{BlendTree, SyncMarker, MAX_TREE_DEPTH};
+use crate::components::{stored_leaf, LeafTime, Motion, Playhead};
 
 use super::blend_tree::dominant_leaf;
 use super::motion::MotionContext;
@@ -34,6 +37,9 @@ use markers::{place, position};
 
 mod fade;
 mod markers;
+mod place;
+
+pub(super) use place::place_pending;
 
 /// The clip a motion keeps step by, its markers, and whether its playhead is a
 /// tree's normalized phase (one unit is the clip's length) or clip seconds.
@@ -95,13 +101,24 @@ pub(super) struct TreeSync<'a> {
 impl TreeSync<'_> {
     /// Where leaf `clip` with `markers` is sampled at tree phase `phase`
     /// (bounded): the leader at `phase × length`, every other leaf at the
-    /// leader's place between its markers.
-    pub fn leaf_time(&self, clip: &AnimationClip, markers: &[SyncMarker], phase: f32) -> f32 {
+    /// leader's place between its markers, on the occurrence of that pair
+    /// nearest `near` (where the leaf was, [`SyncState::leaves`]; its
+    /// normalized time when it has no place yet).
+    ///
+    /// [`SyncState::leaves`]: crate::components::SyncState::leaves
+    pub fn leaf_time(
+        &self,
+        clip: &AnimationClip,
+        markers: &[SyncMarker],
+        phase: f32,
+        near: Option<f32>,
+    ) -> f32 {
         let natural = phase * clip.duration;
         if clip.name == self.leader {
             return natural;
         }
-        place(markers, clip.duration, self.pos, natural, self.looping)
+        let near = near.unwrap_or(natural);
+        place(markers, clip.duration, self.pos, near, self.looping)
     }
 }
 
@@ -185,9 +202,9 @@ impl MotionContext<'_> {
     pub(super) fn rebase(
         &self,
         motion: Motion<'_>,
-        time: &mut f32,
-        looping: bool,
+        (time, looping): (&mut f32, bool),
         stored: &mut Option<String>,
+        leaves: &[LeafTime],
     ) {
         let synced = matches!(motion, Motion::Tree(node) if self.marker_synced(node));
         let now = synced.then(|| self.lead(motion, None, None)).flatten();
@@ -203,54 +220,13 @@ impl MotionContext<'_> {
             .as_deref()
             .and_then(|l| self.lead(motion, None, Some(l)));
         if let Some(old) = old.filter(|o| stored.as_deref() == Some(o.clip.name.as_str())) {
-            *time = now.place(old.position(*time, looping), *time, looping);
+            // Where the new leader was sampled as a follower, in tree phase.
+            let duration = now.clip.duration;
+            let was = stored_leaf(leaves, &now.clip.name).filter(|_| duration > 0.0);
+            let near = was.map_or(*time, |t| t / duration);
+            *time = now.place(old.position(*time, looping), near, looping);
         }
         *stored = Some(now.clip.name.clone());
-    }
-
-    /// Place the incoming motion at the phase of the one a node of its group
-    /// was entered from, if that is still to do. Nothing travels, so nothing
-    /// fires.
-    pub(super) fn place_pending(&self, playback: &mut Playback) {
-        let Some(from) = playback.sync.from.take() else {
-            return;
-        };
-        let out = self.lead(from.motion(), from.node.as_deref(), from.leader.as_deref());
-        let node = playback.current_node.as_deref();
-        let Some(lead) = self.lead(playback.motion(), node, None) else {
-            return;
-        };
-        if let Some(out) = out {
-            let pos = out.position(from.time, from.looping);
-            playback.time = lead.place(pos, playback.time, playback.loop_clip);
-        }
-        if lead.tree && !lead.markers.is_empty() {
-            playback.sync.leader = Some(lead.clip.name.clone());
-        }
-    }
-}
-
-/// Make every layer's pending sync-group placement (#1896): paused or not, a
-/// node entered from one of its group starts at the outgoing phase.
-pub(super) fn place_pending(
-    anim: &mut AnimatorComponent,
-    clips: &[AnimationClip],
-    graph: Option<&AnimationGraph>,
-) {
-    let AnimatorComponent {
-        base,
-        layers,
-        parameters,
-        ..
-    } = anim;
-    let playbacks = std::iter::once(base).chain(layers.iter_mut().map(|l| &mut l.playback));
-    for (layer, playback) in playbacks.enumerate() {
-        let context = MotionContext {
-            clips,
-            machine: graph.and_then(|g| g.machine(layer)),
-            parameters,
-        };
-        context.place_pending(playback);
     }
 }
 
@@ -266,12 +242,20 @@ fn leaf_markers<'a>(tree: &'a BlendTree, clip: &str, depth: usize) -> Option<&'a
 }
 
 #[cfg(test)]
+mod entry_tests;
+#[cfg(test)]
 mod events_tests;
 #[cfg(test)]
 mod fade_tests;
 #[cfg(test)]
+mod hold_tests;
+#[cfg(test)]
 mod markers_tests;
 #[cfg(test)]
+mod repeat_tests;
+#[cfg(test)]
 mod rig;
+#[cfg(test)]
+mod root_tests;
 #[cfg(test)]
 mod tree_tests;

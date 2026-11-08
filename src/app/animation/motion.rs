@@ -13,7 +13,9 @@
 use crate::asset::anim_data::AnimationClip;
 use crate::asset::animation_graph::{GraphNode, StateMachine, SyncMarker};
 use crate::asset::mesh_data::{JointTransform, SkinData};
-use crate::components::{AnimatorParameters, Motion, Playback, Playhead, Step};
+use crate::components::{
+    stored_leaf, AnimatorParameters, LeafTime, Motion, Playback, Playhead, Step,
+};
 
 use super::blend_joint;
 use super::blend_poses;
@@ -55,12 +57,21 @@ impl MotionContext<'_> {
     /// an additive layer's reference pose. `None` when the current motion does not
     /// resolve.
     pub fn sample(&self, skin: &SkinData, playback: &Playback, at_start: bool) -> Option<Pose> {
-        let time = |t: f32| if at_start { 0.0 } else { t };
+        // An additive reference samples first frames: no leaf keeps a place.
+        let time = |t: f32, leaves| {
+            if at_start {
+                (0.0, &[][..])
+            } else {
+                (t, leaves)
+            }
+        };
         let current = (playback.motion(), playback.loop_clip);
-        let mut pose = self.sample_motion(skin, current, time(playback.time))?;
+        let at = time(playback.time, &playback.sync.leaves[..]);
+        let mut pose = self.sample_motion(skin, current, at)?;
         let outgoing = playback.previous_motion().and_then(|m| {
             let motion = (m, playback.previous_loop);
-            self.sample_motion(skin, motion, time(playback.previous_time))
+            let at = time(playback.previous_time, &playback.sync.previous_leaves[..]);
+            self.sample_motion(skin, motion, at)
         });
         if let Some(from) = outgoing {
             pose.locals = blend_poses(&from.locals, &pose.locals, playback.crossfade_weight());
@@ -80,12 +91,13 @@ impl MotionContext<'_> {
 
     /// One motion's pose at `time`, under its `loop_clip` flag: a tree's phase is
     /// bounded the way its playhead advances ([`Playhead::bounds`]), so the flag,
-    /// not the graph node's `is_loop`, decides both (#1362).
+    /// not the graph node's `is_loop`, decides both (#1362). A marker-synced
+    /// tree's followers are placed nearest where `leaves` last put them.
     fn sample_motion(
         &self,
         skin: &SkinData,
         (motion, looping): (Motion<'_>, bool),
-        time: f32,
+        (time, leaves): (f32, &[LeafTime]),
     ) -> Option<Sampled> {
         let joints = skin.local_bind.len();
         match motion {
@@ -104,9 +116,9 @@ impl MotionContext<'_> {
                 let mut total = 0.0;
                 self.for_each_leaf_clip(node, |clip, weight, markers| {
                     total += weight;
-                    let at = sync
-                        .as_ref()
-                        .map_or(phase * clip.duration, |s| s.leaf_time(clip, markers, phase));
+                    let at = sync.as_ref().map_or(phase * clip.duration, |s| {
+                        s.leaf_time(clip, markers, phase, stored_leaf(leaves, &clip.name))
+                    });
                     sample_into(skin, clip, at, &mut scratch);
                     let Some(acc) = &mut blended else {
                         // The first leaf is the pose as sampled; its buffer
@@ -171,8 +183,9 @@ impl MotionContext<'_> {
     /// and return the animation events (#459) the current motion crossed, tagged
     /// with `layer`, and the current playhead's [`Step`] (what root motion is
     /// measured over, #1745). A synced crossfade's lighter motion follows the
-    /// heavier one, and a marker-synced tree carries its phase across a change
-    /// of leader (#1896, `sync`).
+    /// heavier one, and a marker-synced tree's leaves are tracked where they
+    /// are sampled (#1896, `sync`). Call [`rebase_leaders`](Self::rebase_leaders)
+    /// first.
     pub fn advance(
         &self,
         playback: &mut Playback,
@@ -180,7 +193,6 @@ impl MotionContext<'_> {
         speed: f32,
         layer: usize,
     ) -> (Vec<Crossed>, Step) {
-        self.rebase_leaders(playback);
         let current = self.playhead(playback.motion());
         let previous = playback
             .previous_motion()
@@ -188,14 +200,26 @@ impl MotionContext<'_> {
         let step = if playback.sync.following && playback.is_crossfading() {
             self.advance_synced(playback, (dt, speed), current, previous)
         } else {
-            playback.advance(dt, speed, current, previous)
+            let forward = playback.scaled(dt, speed) >= 0.0;
+            let step = playback.advance(dt, speed, current, previous);
+            playback.repay(step, forward)
         };
+        let mut leaves = std::mem::take(&mut playback.sync.leaves);
+        let at = (playback.time, playback.loop_clip);
+        self.track_leaves(Some(playback.motion()), at, &mut leaves);
+        playback.sync.leaves = leaves;
+        let mut leaves = std::mem::take(&mut playback.sync.previous_leaves);
+        let at = (playback.previous_time, playback.previous_loop);
+        self.track_leaves(playback.previous_motion(), at, &mut leaves);
+        playback.sync.previous_leaves = leaves;
         (self.crossed(playback, current, step, layer), step)
     }
 
     /// [`rebase`](Self::rebase) the current tree and, while it fades out, the
-    /// previous one.
-    fn rebase_leaders(&self, playback: &mut Playback) {
+    /// previous one: a change of leader carries a marker-synced tree's phase
+    /// over (#1896). Before the step, and before root motion reads where the
+    /// motions start from.
+    pub(super) fn rebase_leaders(&self, playback: &mut Playback) {
         let Playback {
             current_clip,
             current_tree,
@@ -211,15 +235,11 @@ impl MotionContext<'_> {
             Some(node) => Motion::Tree(node),
             None => Motion::Clip(current_clip),
         };
-        self.rebase(motion, time, *loop_clip, &mut sync.leader);
+        self.rebase(motion, (time, *loop_clip), &mut sync.leader, &sync.leaves);
         if let (true, Some(node)) = (sync.following, previous_tree) {
-            let looping = *previous_loop;
-            self.rebase(
-                Motion::Tree(node),
-                previous_time,
-                looping,
-                &mut sync.previous_leader,
-            );
+            let at = (previous_time, *previous_loop);
+            let (leader, leaves) = (&mut sync.previous_leader, &sync.previous_leaves);
+            self.rebase(Motion::Tree(node), at, leader, leaves);
         }
     }
 }

@@ -26,10 +26,10 @@ pub mod transform;
 pub mod ui;
 
 pub use animator::{
-    root_chain, wrap_delta, ActiveMontage, AnimatorComponent, AnimatorParameter,
-    AnimatorParameters, Bounds, IkChain, IkConstraint, IkTarget, LayerState, MontageEvent,
-    MontageRefused, Montages, Motion, Playback, Playhead, RootMotion, RootMotionState, Step,
-    SyncSource, SyncState, MONTAGE_BLEND_OUT, MONTAGE_END,
+    follow_clamped, root_chain, stored_leaf, wrap_delta, ActiveMontage, AnimatorComponent,
+    AnimatorParameter, AnimatorParameters, Bounds, IkChain, IkConstraint, IkTarget, LayerState,
+    LeafTime, MontageEvent, MontageRefused, Montages, Motion, Playback, Playhead, RootMotion,
+    RootMotionState, Step, SyncSource, SyncState, MONTAGE_BLEND_OUT, MONTAGE_END,
 };
 pub use audio::reverb_zone::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 pub use audio::source::AudioSourceComponent;

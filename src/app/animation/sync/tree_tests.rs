@@ -38,8 +38,9 @@ fn leaf_times(graph: &AnimationGraph, anim: &AnimatorComponent) -> (f32, f32) {
     let sync = ctx.tree_sync("Loco", phase, true);
     let time = |clip: usize, marks: &[_]| {
         let clip = &mesh.clips[clip];
-        sync.as_ref()
-            .map_or(phase * clip.duration, |s| s.leaf_time(clip, marks, phase))
+        sync.as_ref().map_or(phase * clip.duration, |s| {
+            s.leaf_time(clip, marks, phase, None)
+        })
     };
     (time(0, &walk_marks()), time(1, &run_marks()))
 }

@@ -4,13 +4,16 @@
 //! groups, within a layer): the active node's group, a placement still to make
 //! (entering a node of the same group starts the incoming motion at the
 //! outgoing one's phase), whether the crossfade is a synced one (the lighter
-//! motion follows the heavier each step), which leaf leads each blend tree, and
-//! the travel a follower was re-matched back over. The phase arithmetic needs
+//! motion follows the heavier each step), which leaf leads each blend tree and
+//! where each of its leaves was, and the travel a follower was re-matched back
+//! over. The phase arithmetic needs
 //! the clips, so it lives in the runtime (`app::animation::sync`); this holds
 //! only the state, and [`Playback::follow`], the one way a follower's
 //! playhead moves.
 
 use serde::{Deserialize, Serialize};
+
+use crate::asset::animation_graph::GraphNode;
 
 use super::playback::{Motion, Playback};
 use super::playhead::{wrap_delta, Bounds, Playhead, Step};
@@ -46,6 +49,27 @@ pub struct SyncState {
     /// travelled that far forward again, so none fires twice.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub rewind: f32,
+    /// Where each leaf of a marker-synced current tree was last placed, so a
+    /// follower with a repeated pair of markers stays on the occurrence it is
+    /// on instead of jumping to the one nearest its normalized time.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub leaves: Vec<LeafTime>,
+    /// The same for the blend tree being faded out.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub previous_leaves: Vec<LeafTime>,
+}
+
+/// One leaf clip of a marker-synced blend tree and where it was last sampled,
+/// in clip seconds.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LeafTime {
+    pub clip: String,
+    pub time: f32,
+}
+
+/// `clip`'s time in `leaves`, if it is there.
+pub fn stored_leaf(leaves: &[LeafTime], clip: &str) -> Option<f32> {
+    leaves.iter().find(|l| l.clip == clip).map(|l| l.time)
 }
 
 fn is_zero(v: &f32) -> bool {
@@ -58,12 +82,23 @@ impl SyncState {
         *self == Self::default()
     }
 
-    /// The synced crossfade is over (or was dropped).
+    /// A new crossfade starts: nothing synced yet, and the motion fading out
+    /// keeps its tree's leader and where its leaves were.
+    pub(super) fn begin_fade(&mut self) {
+        *self = Self {
+            previous_leader: self.leader.take(),
+            previous_leaves: std::mem::take(&mut self.leaves),
+            ..Self::default()
+        };
+    }
+
+    /// The synced crossfade is over (or was dropped). Travel still owed
+    /// ([`rewind`](Self::rewind)) stays owed: the motion plays on.
     pub(super) fn end_fade(&mut self) {
         self.following = false;
         self.previous_node = None;
         self.previous_leader = None;
-        self.rewind = 0.0;
+        self.previous_leaves.clear();
     }
 }
 
@@ -108,32 +143,89 @@ impl SyncSource {
 
 impl Playback {
     /// Move the current playhead to `target`, a phase re-matched to the motion
-    /// it follows (#1896), by the shortest way round a looping playhead. A
-    /// non-looping one follows until its end, then holds: a leader wrapping
-    /// round its seam sends it on to its end, never back. `forward` is the leader's
+    /// it follows (#1896), by the shortest way round a looping playhead; a
+    /// non-looping one goes by [`follow_clamped`]. `forward` is the leader's
     /// direction of play: travel against it fires no events and is owed back
     /// first ([`SyncState::rewind`]), so a re-match back and forth over an event
     /// fires it once.
     pub fn follow(&mut self, current: Playhead, target: f32, forward: bool) -> Step {
         let bounds = current.bounds(self.loop_clip);
-        let held = self.ended && matches!(bounds, Bounds::Clamp(_));
         let mut step = self.move_current(current, |from| match bounds {
-            _ if held => from,
             Bounds::Wrap(w) => from + wrap_delta(target - from, w),
-            Bounds::Clamp(end) if forward && target < from => end,
-            Bounds::Clamp(_) if !forward && target > from => 0.0,
-            _ => target,
+            Bounds::Clamp(end) => follow_clamped(from, target, end, forward),
+            Bounds::Open => target,
         });
         let dir = if forward { 1.0 } else { -1.0 };
         let along = (step.events.1 - step.events.0) * dir;
         if along < 0.0 {
             self.sync.rewind -= along;
             step.events.1 = step.events.0;
-        } else {
+            return step;
+        }
+        self.repay(step, forward)
+    }
+
+    /// `step` with the part of its travel still owed to an earlier re-match
+    /// back ([`SyncState::rewind`]) silenced: whether the motion follows,
+    /// leads or plays on alone, an event it was moved back over fires once.
+    pub fn repay(&mut self, mut step: Step, forward: bool) -> Step {
+        let dir = if forward { 1.0 } else { -1.0 };
+        let along = (step.events.1 - step.events.0) * dir;
+        if along > 0.0 && self.sync.rewind > 0.0 {
             let owed = along.min(self.sync.rewind);
             self.sync.rewind -= owed;
             step.events.0 += owed * dir;
         }
         step
+    }
+
+    /// What entering `node` syncs to: the motion playing now when `node` is
+    /// another node of the active sync group, or the placement still pending
+    /// from an earlier entry this step (so a motion never placed is not taken
+    /// as the phase). Re-entering the current node restarts it, as ever.
+    pub(super) fn sync_source(&self, node: &GraphNode) -> Option<SyncSource> {
+        let synced = node.sync_group.is_some()
+            && node.sync_group == self.sync.group
+            && self.current_node.as_deref() != Some(node.name.as_str());
+        synced.then(|| {
+            self.sync
+                .from
+                .clone()
+                .unwrap_or_else(|| SyncSource::of(self))
+        })
+    }
+
+    /// Adopt `node`'s sync group after entering it from `previous`, syncing to
+    /// `source` when there is one.
+    pub(super) fn start_sync(
+        &mut self,
+        node: &GraphNode,
+        previous: Option<String>,
+        source: Option<SyncSource>,
+    ) {
+        self.sync.group = node.sync_group.clone();
+        let Some(source) = source else {
+            return;
+        };
+        self.sync.following = self.is_crossfading();
+        if self.sync.following {
+            self.sync.previous_node = previous;
+        }
+        self.sync.from = Some(source);
+    }
+}
+
+/// Where a non-looping follower of length `end` at `from` goes when its
+/// leader re-matches it to `target` (#1896): there, except that one resting
+/// on its end stays, and a jump against `forward` of over half its length is
+/// the leader wrapping round its seam, which sends it on to its end (back to
+/// its start, playing backwards), never back across itself.
+pub fn follow_clamped(from: f32, target: f32, end: f32, forward: bool) -> f32 {
+    let seam = (target - from).abs() > end * 0.5;
+    match () {
+        _ if forward && from >= end => from,
+        _ if forward && target < from && seam => end,
+        _ if !forward && target > from && seam => 0.0,
+        _ => target,
     }
 }

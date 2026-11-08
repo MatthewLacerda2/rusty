@@ -40,6 +40,16 @@ pub fn rig_mesh() -> MeshComponent {
     ])
 }
 
+/// Walk slides the hips 1 m a cycle; Run, the hips and the leg 1 m over its
+/// 0.6 s, so root motion reads both and the leg reads Run alone.
+pub fn hips_mesh() -> MeshComponent {
+    mesh(vec![
+        slide("Walk", &[HIPS], 0.0, 1.0, WALK),
+        slide("Run", &[HIPS, LEG], 0.0, 1.0, RUN),
+        slide("Idle", &[SPINE], 0.0, 1.0, 1.0),
+    ])
+}
+
 /// A looping node playing `clip` in `group` with `markers`.
 pub fn grouped(name: &str, group: Option<&str>, markers: Vec<SyncMarker>) -> GraphNode {
     GraphNode {

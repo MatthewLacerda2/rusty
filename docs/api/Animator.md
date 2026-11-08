@@ -292,19 +292,28 @@ between clips whose feet land at different fractions of their cycles.
   crossfade blends, the **heavier** motion (the incoming one on a tie, so from
   halfway) plays at its own rate and the lighter one **follows** its phase,
   re-matched every step, so the two can't drift apart however long the fade.
-  A non-looping follower follows until its end, then holds. Nodes in different
-  groups, or in none, crossfade exactly as without groups: the incoming motion
-  from its start. Groups don't reach across layers.
+  A non-looping follower, incoming or outgoing, follows until its end, then
+  holds: a looping leader wrapping round its seam never sends it back. Nodes
+  in different groups, or in none, crossfade exactly as without groups: the
+  incoming motion from its start. Re-entering the node already playing
+  restarts it, as without groups. Entering two nodes of the group before a
+  step syncs both to what was playing before the first. Groups don't reach
+  across layers.
 - **Inside a blend tree** whose every leaf carries markers, the dominant leaf
   (the one whose events fire, *Which motion fires*) leads: every other leaf is
-  sampled at the leader's place between its own pair of markers. When the
-  dominant leaf changes, the new leader carries on from where it was being
-  sampled, so the pose doesn't jump. A tree with markers on some leaves and not
+  sampled at the leader's place between its own pair of markers. A leaf whose
+  markers repeat the pair (a two-stride run under a one-stride walk) stays on
+  the occurrence it is on and plays on from there, one stride per stride of
+  the leader, never jumping to another; where each leaf was is runtime state
+  on the playback. When the dominant leaf changes, the new leader carries on
+  from where it was being sampled, so neither the pose nor the root motion
+  jumps. A tree with markers on some leaves and not
   others syncs by normalized time, and loading it warns in the console.
 - **Events stay exact.** A following motion still crosses its own events once
   each: placing it at the matched phase fires nothing, and when a re-match moves
   it back over an event, the event doesn't fire again until it has played back
-  past where it was.
+  past where it was, whether it still follows, leads by then, or plays on
+  alone after the fade.
 - **Loading checks**, every problem named: a marker with an empty name or a
   negative or non-finite time, two markers on one clip sharing a name *and* a
   time, markers on a node or child holding a tree, and an empty `sync_group`.
