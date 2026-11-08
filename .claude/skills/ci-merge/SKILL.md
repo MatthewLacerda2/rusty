@@ -565,19 +565,48 @@ want measured.
 
 | | on request | weekly |
 |---|---|---|
-| mutation | `make mutants-remote SCOPE=diff` (or path globs): `mutants-on-request.yml`, one runner, report and survivors' diffs printed in the terminal, and the report posted as one comment on the branch's open PR, or its merged one when the queue merged it first (#912); one run per branch, so a newer dispatch cancels the older, an unmerged close of the PR cancels what is left, and a merged PR's run finishes and reports (`mutants-cancel.yml`, #1530); on `main` every run stands alone, so re-asks after a merge never cancel each other | `mutants-sweep.yml`, Saturdays, full sim in as many shards as `mutants-plan` sizes from the mutant count (#1684), `mutants-report` summary + artifact; skipped when `main` has not moved since the last finished sweep |
+| mutation | a merged PR's `Mutation: diff` (or globs) line, dispatched by the queue after the merge (below, #1934); by hand, `make mutants-remote SCOPE=diff` (or path globs): `mutants-on-request.yml`, one runner, report and survivors' diffs printed in the terminal, and the report posted as one comment on the branch's open PR, or its merged one when the queue merged it first (#912); one run per branch, so a newer dispatch cancels the older, an unmerged close of the PR cancels what is left, and a merged PR's run finishes and reports (`mutants-cancel.yml`, #1530); on `main` every run stands alone, so re-asks after a merge never cancel each other | `mutants-sweep.yml`, Saturdays, full sim in as many shards as `mutants-plan` sizes from the mutant count (#1684), `mutants-report` summary + artifact; skipped when `main` has not moved since the last finished sweep |
 | coverage | `gh workflow run coverage.yml --ref <branch>` | `coverage.yml`, Mondays, ratchet table |
 
 **Ask for a scoped mutation run on a branch that adds mechanism** — arithmetic,
-a state machine, a boundary — and triage what it reports. Nothing runs it for you
-any more, so a branch nobody asked about is unmeasured, not clean. **Dispatch it
-and ready the branch in the same step; never hold a green branch in draft for it.**
-A scoped run takes 30 minutes or more on one runner (51 mutants for #771's diff on
-2026-10-04 were still running past the half hour), and a signal that keeps a
-finished branch out of the queue has become a gate. The report arrives after the
-branch is the queue's, so survivors go where *Once ready, the branch is the
-queue's* sends everything found late: a comment on the issue, and a follow-up
-pull request off `main` when one is worth fixing.
+a state machine, a boundary — and triage what it reports. Nothing runs it
+unasked, so a branch nobody asked about is unmeasured, not clean. **The ask is a
+line in the PR description, `Mutation: diff` or `Mutation: <globs>`; the merge
+queue dispatches it after the merge** (#1934, `merging/after/`), never the coder
+at ready: on 2026-11-08 six runs dispatched at ready held a third of the
+account's runners, and every gating `ci` run waited 20-40 minutes behind them
+with eight PRs in the queue. So a signal never keeps a green branch out of the
+queue, nor slows the CI the queue waits on:
+
+- **What runs:** `mutants-on-request.yml` on `main`, with the squash commit
+  checked out (input `commit`). `diff` is that commit's Rust change against its
+  parent (`mutants-scope.py --commit`): the branch's diff as it landed, the same
+  mutants. A `diff` ask whose commit changed no Rust is not dispatched. Globs are
+  passed as written. An unreadable line (a sentence, a shell character) asks for
+  nothing.
+- **The cap:** at most two at once (`merging/after/slots.CAP`). The rest wait in
+  `merge-queue/mutants.json` beside the hand-back memory, so a relaunched watch
+  keeps them; the watch dispatches the next as a slot frees, on each pass and
+  each poll of a take's CI wait. A watch that ended idle leaves them waiting for
+  the next watch (or the next `make queue PRS=N`, which asks for its own merges'
+  runs too).
+- **Where the report lands:** the merged PR, named by the run's `pr` input, as
+  one comment edited in place (#912). Lines starting `after:` in the queue's log
+  say each dispatch, each run's end and any refusal (a request GitHub refuses
+  three times is dropped, and said). A network failure is not a refusal: the
+  request keeps its place and its tries, and a merged PR whose description could
+  not be read is read again on the next pass. `make queue-events` passes the
+  lines that mean a request was lost (`dropped`, `could not …`, `never
+  appeared`), so a lost report is told from a slow one. A named take beside the
+  watch shares the file under its lock, and the cap with it.
+
+By hand, `make mutants-remote SCOPE=...` still dispatches on your branch and
+prints the report; keep that for a question you are waiting on, not for every
+branch. A scoped run takes 30 minutes or more on one runner (51 mutants for
+#771's diff on 2026-10-04 were still running past the half hour). The report
+arrives after the branch has merged, so survivors go where *Once ready, the
+branch is the queue's* sends everything found late: a comment on the issue, and
+a follow-up pull request off `main` when one is worth fixing.
 
 Three things about scope, all of which change how a clean report reads:
 

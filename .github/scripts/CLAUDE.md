@@ -18,7 +18,9 @@ coder *changing* it must know.
   and lands, and its `conflict/` resolves a conflict inside a `sorted` list and
   records every conflict met (#1723); `merging/train/` is the merge train (#1785:
   forming a group, its chain of squash commits, its `merge-train/*` branch, its wait,
-  landing it and checking `main`'s tree); `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how
+  landing it and checking `main`'s tree); `merging/after/` is what follows a merge (#1934:
+  the scoped mutation run a PR's `Mutation:` line asked for, dispatched on `main`, at most
+  `after.slots.CAP` at once, the waiting ones kept in `merge-queue/mutants.json`); `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how
   it ends, and the trains across passes, `watch/trains.py`). `merging/view/` is the orchestrator's read of it (#1876: `make queue-status`'s liveness from the
   supervisor's worktree lock, `make queue-events`'s filtered log and stand-down poll); the watch
   never imports it. `mergeable.py`, `merge-queue.py` and `queue-view.py` are only the command lines. A new
@@ -43,7 +45,7 @@ coder *changing* it must know.
 - **`make scripts` is a hard gate** (in `make gates` and `lint.yml`): `unittest` over
   `.github/scripts/tests/` (and `tools/launcher/tests/`). Tests are grouped there by area — `verdict/`, `queue/`,
   `watch/`, `reclaim/`, `board/`, `checks/`, `mutants/`, `dispatch/`, `health/`,
-  `resolved/`, `ruleset/`, `proved/` (#1784), `view/` (#1876) — each a package; a new area gets its own folder. A test never
+  `resolved/`, `ruleset/`, `proved/` (#1784), `view/` (#1876), `after/` (#1934) — each a package; a new area gets its own folder. A test never
   reaches GitHub or pushes: it fakes `gh` and `git` the way
   `.github/scripts/tests/watch/fakes.py` and the `fixtures.py` files do.
 - **The size gate measures `.py`** (#926): 300 lines of code, 150 for a file under a
