@@ -7,7 +7,7 @@
 //! game's Lua; the engine gives the delivery, the hit information and the
 //! radial query.
 //!
-//! - **Who receives it** ([`deliver`]): the nearest active ancestor-or-self of
+//! - **Who receives it** (`deliver`): the nearest active ancestor-or-self of
 //!   the entity named (or hit) whose live script defines `OnTakeDamage` — the
 //!   bubbling walk the UI pointer callbacks take (`ui::events::nearest`), so a
 //!   hitbox under a bone reaches the character's script.
@@ -15,7 +15,7 @@
 //!   (`scripting::instances`, what `Scene.GetScript` reads). No queue. A handler
 //!   may apply damage itself; past [`MAX_DEPTH`] nested calls the next one is a
 //!   Lua error, and every call under it unwinds with it.
-//! - **Radial** ([`radial`]): an overlap, grouped by receiver, nearest point per
+//! - **Radial** (`radial`): an overlap, grouped by receiver, nearest point per
 //!   group, a cover ray, then the falloff — nearest first, ties by entity id.
 //! - **Impulse**: `opts.impulse` pushes the struck body through
 //!   `Physics.AddImpulseAtPosition` itself, the same code a script calls.
