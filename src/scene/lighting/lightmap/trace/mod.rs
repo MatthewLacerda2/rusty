@@ -24,6 +24,9 @@ use std::f32::consts::{PI, TAU};
 
 use glam::{Vec2, Vec3, Vec4};
 
+#[cfg(test)]
+pub(super) mod bench;
+
 use super::input::{BakeLight, BakeRun, BakeScene, LightShape};
 use super::lights::area::{strata, stratified};
 use super::rays::{Hit, Rays};
@@ -71,7 +74,12 @@ pub(super) struct Tracer<'a> {
     pub rays: &'a Rays,
 }
 
-impl Tracer<'_> {
+impl<'a> Tracer<'a> {
+    /// The tracer over `scene`, its rays cast against `rays`.
+    pub(super) fn new(scene: &'a BakeScene, rays: &'a Rays) -> Self {
+        Self { scene, rays }
+    }
+
     /// The lightmap value at `position` facing `normal`, in its two parts: the bounce
     /// and sky over `samples` paths `bounces` deep, and the direct light of `Baked`
     /// lights. The bake filters the first and adds the second.
