@@ -116,7 +116,7 @@ pub(in crate::scene::lighting::lightmap) fn progressive_on(
     let steps = steps(settings.samples, settings.samples_per_pass, split);
     announce(scene, settings, progress, (&heads, &points), steps.len());
     let layouts = heads.iter().map(|_| Mutex::new(None)).collect();
-    let mut items = fresh(points, &heads, settings.seed);
+    let items = fresh(points, &heads, settings.seed);
     let run = Run {
         scene,
         settings,
@@ -127,48 +127,62 @@ pub(in crate::scene::lighting::lightmap) fn progressive_on(
         layouts,
         orphans: AtomicUsize::new(0),
     };
-    let mut done = Step { seen: 0, rest: 0 };
-    for (k, &step) in steps.iter().enumerate() {
-        let last = k + 1 == steps.len();
-        let mut work = Work {
-            tracer: &tracer,
-            settings,
-            done,
-            step,
-            last,
-            show: false,
-        };
-        let (mut going, maps) = run.pass(items, &work)?;
-        done = Step {
-            seen: done.seen + step.seen,
-            rest: done.rest + step.rest,
-        };
-        let pass = Pass {
-            done: k as u32 + 1,
-            passes: steps.len() as u32,
-            samples: done.rest.min(done.seen),
-            view: done.seen,
-            target: settings.samples,
-        };
-        progress.pass_done(pass);
-        if last {
-            note_buried(run.orphans.into_inner());
-            return Some(maps.into_iter().flatten().collect());
+    run.steps(items, &steps, &tracer, sink)
+}
+
+impl Run<'_> {
+    /// Every one of `steps` over `items`, `sink` hearing each but the last that
+    /// it wants: the finished lightmaps, or `None` when cancelled.
+    fn steps(
+        &self,
+        mut items: Charts,
+        steps: &[Step],
+        tracer: &Tracer,
+        sink: &mut dyn PassSink,
+    ) -> Option<Vec<Lightmap>> {
+        let mut done = Step { seen: 0, rest: 0 };
+        for (k, &step) in steps.iter().enumerate() {
+            let last = k + 1 == steps.len();
+            let mut work = Work {
+                tracer,
+                settings: self.settings,
+                done,
+                step,
+                last,
+                show: false,
+            };
+            let (mut going, maps) = self.pass(items, &work)?;
+            done = Step {
+                seen: done.seen + step.seen,
+                rest: done.rest + step.rest,
+            };
+            let pass = Pass {
+                done: k as u32 + 1,
+                passes: steps.len() as u32,
+                samples: done.rest.min(done.seen),
+                view: done.seen,
+                target: self.settings.samples,
+            };
+            self.progress.pass_done(pass);
+            if last {
+                note_buried(self.orphans.load(Ordering::Relaxed));
+                return Some(maps.into_iter().flatten().collect());
+            }
+            // Asked once the step is traced, so a sink that finished the last
+            // lightmaps meanwhile gets these: a display pass over the texels as they
+            // stand, tracing nothing.
+            if sink.wants() {
+                let still = Step { seen: 0, rest: 0 };
+                (work.done, work.step, work.show) = (done, still, true);
+                let (shown, maps) = self.pass(going, &work)?;
+                sink.pass(pass, maps.into_iter().flatten().collect());
+                going = shown;
+            }
+            items = going;
         }
-        // Asked once the step is traced, so a sink that finished the last
-        // lightmaps meanwhile gets these: a display pass over the texels as they
-        // stand, tracing nothing.
-        if sink.wants() {
-            let still = Step { seen: 0, rest: 0 };
-            (work.done, work.step, work.show) = (done, still, true);
-            let (shown, maps) = run.pass(going, &work)?;
-            sink.pass(pass, maps.into_iter().flatten().collect());
-            going = shown;
-        }
-        items = going;
+        // There is at least one step, so the last has returned.
+        None
     }
-    // There is at least one step, so the last has returned.
-    None
 }
 
 /// Tell `progress` the bake's size before its first texel: its texels over every
