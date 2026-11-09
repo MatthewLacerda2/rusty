@@ -65,3 +65,33 @@ pub(super) fn lazy_pipeline(
         make_pipeline(device, &shader, format, &layout, &spec)
     })
 }
+
+/// A compute pipeline of `module`'s `entry`, labelled `label`, built on its first
+/// dispatch: over `groups` in order, or with `None` the layout its entry declares
+/// (read back with `get_bind_group_layout`).
+pub(crate) fn lazy_compute(
+    device: &wgpu::Device,
+    module: &wgpu::ShaderModule,
+    (label, entry): (&'static str, &'static str),
+    groups: Option<&[&wgpu::BindGroupLayout]>,
+) -> LazyCompute {
+    let layout = groups.map(|groups| {
+        let groups: Vec<_> = groups.iter().map(|g| Some(*g)).collect();
+        device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some(label),
+            bind_group_layouts: &groups,
+            immediate_size: 0,
+        })
+    });
+    let module = module.clone();
+    LazyCompute::new(device, move |device| {
+        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some(label),
+            layout: layout.as_ref(),
+            module: &module,
+            entry_point: Some(entry),
+            compilation_options: Default::default(),
+            cache: None,
+        })
+    })
+}

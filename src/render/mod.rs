@@ -155,6 +155,8 @@ pub struct Renderer {
     /// What every solid draw binds as group 1 (#470): per-draw uniforms, palettes and
     /// instances per camera, and the object and material tables (#1706).
     draw_buffers: gpu::draw_buffers::DrawBuffers,
+    /// GPU occlusion culling's compute pipelines (#1963).
+    hiz: passes::hiz::HiZ,
     /// Each Light Probe Proxy Volume's last grid samples (#1672).
     proxy_volumes: draw::proxy_volume::ProxyVolumes,
     /// One group-2 material bind group per distinct set of resolved maps (#470).

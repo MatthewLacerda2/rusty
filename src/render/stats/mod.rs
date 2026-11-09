@@ -46,6 +46,13 @@ pub struct RenderCounters {
     /// sight of its cell by the scene's baked PVS (#1714), summed over the camera
     /// views. `0` with no bake, or for a camera with `use_occlusion_culling` off.
     pub occlusion_culled: u32,
+    /// Opaque draw instances tested against a camera's Hi-Z depth pyramid (#1963):
+    /// every one whose bounds are known, summed over the camera views.
+    pub hiz_tested: u32,
+    /// Opaque draw instances the depth pyramid found hidden (#1963), summed over
+    /// the camera views. Read back from the GPU without waiting, so it describes
+    /// a frame or so before this one, and `0` on the first.
+    pub hiz_culled: u32,
     /// Mesh entities hidden because their LODGroup showed another level (#472),
     /// summed over the camera stack.
     pub lod_hidden_entities: u32,
@@ -186,6 +193,8 @@ impl RenderCounters {
             ("culled_entities", self.culled_entities.into()),
             ("size_culled_entities", self.size_culled_entities.into()),
             ("occlusion_culled", self.occlusion_culled.into()),
+            ("hiz_tested", self.hiz_tested.into()),
+            ("hiz_culled", self.hiz_culled.into()),
             ("lod_hidden_entities", self.lod_hidden_entities.into()),
             ("lights", self.lights.into()),
             ("lights_dropped", self.lights_dropped.into()),

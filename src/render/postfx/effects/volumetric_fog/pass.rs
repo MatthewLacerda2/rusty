@@ -8,7 +8,7 @@ use crate::render::clusters::BakedLamps;
 use crate::render::gpu::layout_entries::{
     depth_entry, sampler_entry, storage_entry, texture_entry, uniform_entry,
 };
-use crate::render::gpu::pipelines::LazyCompute;
+use crate::render::gpu::pipelines::{lazy_compute, LazyCompute};
 use crate::render::gpu::shaders::ShaderRegistry;
 
 pub(crate) struct VolumetricFogPasses {
@@ -63,15 +63,15 @@ impl VolumetricFogPasses {
                 &[compute(texture_entry(0, D3)), grid_out(1)],
             ),
         ];
-        let scatter = lazy(
+        let scatter = lazy_compute(
             device,
             &module,
             ("Volumetric Scatter", "cs_scatter"),
-            &[&scatter_layout],
+            Some(&[&scatter_layout]),
         );
         let [uniforms, grids] = &integrate_layouts;
         let names = ("Volumetric Integrate", "cs_integrate");
-        let integrate = lazy(device, &module, names, &[uniforms, grids]);
+        let integrate = lazy_compute(device, &module, names, Some(&[uniforms, grids]));
         Self {
             scatter,
             integrate,
@@ -140,30 +140,4 @@ fn scatter_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
             compute(texture_entry(17, D3)),
         ],
     )
-}
-
-/// A compute pipeline of `module`'s entry point over `groups`, built on first use.
-fn lazy(
-    device: &wgpu::Device,
-    module: &wgpu::ShaderModule,
-    (label, entry): (&'static str, &'static str),
-    groups: &[&wgpu::BindGroupLayout],
-) -> LazyCompute {
-    let groups: Vec<_> = groups.iter().map(|g| Some(*g)).collect();
-    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some(label),
-        bind_group_layouts: &groups,
-        immediate_size: 0,
-    });
-    let module = module.clone();
-    LazyCompute::new(device, move |device| {
-        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some(label),
-            layout: Some(&layout),
-            module: &module,
-            entry_point: Some(entry),
-            compilation_options: Default::default(),
-            cache: None,
-        })
-    })
 }

@@ -2,8 +2,8 @@
 //! the upsample, ahead of the forward pass in the same encoder.
 
 use super::{SsaoFrame, SsaoTargets, Stage};
-use crate::render::draw::batch::DrawBatch;
 use crate::render::draw::pass::ScenePassFrame;
+use crate::render::draw::record::Solids;
 use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::postfx::effects::ssil;
 use crate::render::timing::GpuPass;
@@ -17,7 +17,7 @@ impl Renderer {
         view: &mut RenderView,
         encoder: &mut wgpu::CommandEncoder,
         frame: &SsaoFrame,
-        solids: &[DrawBatch],
+        solids: Solids,
     ) {
         let size = view.scene_size();
         let divisor = frame.plan.quality.resolution_divisor;
@@ -46,6 +46,7 @@ impl Renderer {
         let c = &mut self.frame_counters;
         c.add_draws(
             solids
+                .0
                 .iter()
                 .filter(|b| b.key.in_prepass())
                 .map(|b| (b.key.indices.len(), b.instances.len() as u32)),
@@ -61,7 +62,7 @@ impl Renderer {
         view: &mut RenderView,
         encoder: &mut wgpu::CommandEncoder,
         frame: &ScenePassFrame,
-        solids: &[DrawBatch],
+        solids: Solids,
     ) {
         if let Some(ssao) = &frame.ssao {
             self.record_ssao(view, encoder, ssao, solids);
@@ -96,11 +97,25 @@ impl Renderer {
         &self,
         encoder: &mut wgpu::CommandEncoder,
         depth: &wgpu::TextureView,
-        solids: &[DrawBatch],
+        solids: Solids,
+    ) {
+        let timed = self.gpu_timer.writes(GpuPass::SsaoPrepass);
+        self.record_depth(encoder, depth, solids, ("SSAO Depth Prepass", timed));
+    }
+
+    /// The prepass's draw of `solids` into `depth`, cleared first, labelled and
+    /// timed as given: the SSAO prepass, and GPU occlusion culling's phase one
+    /// (#1963), which draws last frame's visible instances through it.
+    pub(crate) fn record_depth(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        depth: &wgpu::TextureView,
+        solids: Solids,
+        (label, timestamp_writes): (&str, Option<wgpu::RenderPassTimestampWrites>),
     ) {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             multiview_mask: None,
-            label: Some("SSAO Depth Prepass"),
+            label: Some(label),
             color_attachments: &[],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: depth,
@@ -110,13 +125,13 @@ impl Renderer {
                 }),
                 stencil_ops: None,
             }),
-            timestamp_writes: self.gpu_timer.writes(GpuPass::SsaoPrepass),
+            timestamp_writes,
             occlusion_query_set: None,
         });
         pass.set_bind_group(0, &self.global_bind_group, &[]);
         // The prepass reads nothing from group 3; the no-AO group satisfies the layout.
         pass.set_bind_group(3, &self.shadow_bind_group, &[]);
-        self.draw_batches(
+        self.draw_solids(
             &mut pass,
             solids,
             SolidPass::Prepass(&self.prepass_pipeline),

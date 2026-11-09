@@ -546,6 +546,46 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
 - **Measure** with `Debug.Stats().occlusion_culled` (per frame, summed over the
   camera views) and `shadow_occlusion_culled` (over the shadow views).
 
+### GPU occlusion culling
+
+Unity 6's *GPU Occlusion Culling* (#1963): with no bake, wherever the camera stands
+(outside the baked cells, in the editor's Scene view far from the play area), a
+camera with `use_occlusion_culling` on leaves undrawn the opaque meshes that what it
+drew hides. The quality preset's `gpu_occlusion_culling` turns it on (every seeded
+preset; [`Graphics`](Graphics.md), *Quality*). It changes no pixel: a mesh it skips
+is wholly behind depth the camera drew this frame.
+
+- **How.** Two phases per camera, the standard way: the meshes it drew last frame
+  draw their depth first; that depth is reduced into a pyramid of farthest depths;
+  every opaque mesh's bounds are tested against it on the GPU, at the pyramid level
+  where its screen rect spans at most 2×2 texels; the camera's passes then draw the
+  ones that passed. A mesh that came out from behind a wall this frame is drawn this
+  frame. A mesh whose bounds cross the camera's near plane is always drawn.
+- **Beside the bake.** The baked PVS (*Occlusion culling*, above) still runs first
+  where it is usable, as Unity keeps Umbra next to the GPU Resident Drawer: what its
+  row hides is never tested. Where the bake is missing, older than the scene, or the
+  camera stands outside every cell, the GPU test alone culls.
+- **What takes part.** Opaque and Cutout meshes, static or not; a skinned mesh is
+  tested with its posed bounds. Only what the SSAO depth prepass draws hides
+  anything: lit solids, a Cutout texel clipped, a custom shader's own cut or moved
+  vertices. A Transparent mesh hides nothing and is always drawn, as are a mesh
+  whose bounds aren't known yet, a mesh particle, a selected mesh the editor's
+  outline rings, and a mesh whose custom shader cuts, scrolls or moves its
+  vertices (`vertex_waves` swells rise out of the mesh's own bounds, so a water
+  plane behind a low rim would vanish though its crests show; it still hides
+  what is behind it).
+- **Which cameras.** Each camera view, its own: the base camera, a stacked or
+  viewmodel camera, a render-texture camera, the editor's Scene view. Unlike the
+  bake, an orthographic camera and one whose near plane is far out cull too: the test
+  reads the depth the camera drew, so a wall its near plane clips away hides
+  nothing. Probe and reflection bakes, and a GPU without indirect first-instance
+  draws, cull nothing this way.
+- **Cost.** Per camera, a depth-only draw of last frame's set, a compute reduction
+  of the depth, and one compute test per opaque mesh; the draw calls stay the same
+  (indirect). The meshes still go through the CPU's frustum and size culls first.
+- **Measure** with `Debug.Stats().hiz_tested` and `hiz_culled` (read back a frame
+  or so late).
+
 ### Environment
 
 The scene's sky and ambient light (#1612), Unity's `RenderSettings.skybox`,

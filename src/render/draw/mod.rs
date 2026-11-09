@@ -9,6 +9,7 @@ pub(crate) mod materials;
 mod overlays;
 pub(crate) mod pass;
 pub(crate) mod proxy_volume;
+pub(crate) mod record;
 pub(crate) mod resources;
 mod solid_key;
 pub(crate) mod stack;

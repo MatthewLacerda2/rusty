@@ -20,6 +20,7 @@ fn stages_run_in_the_frames_order() {
             "clusters",
             "volumetric_fog",
             "solids",
+            "occlusion",
             "scene",
             "ssil_source",
             "ssr",
@@ -50,6 +51,9 @@ fn every_stage_reads_only_what_an_earlier_stage_wrote() {
     // The scene and transparent passes draw the solids batch.
     assert!(position("solids") < position("scene"));
     assert!(position("solids") < position("transparent"));
+    // GPU occlusion culling (#1963) tests the batched solids before any pass draws
+    // them, and writes the depth the scene pass then clears.
+    assert_eq!(position("occlusion"), position("solids") + 1);
     assert!(position("world_ui") < position("effects"));
     // SSIL keeps the opaque pass's light before SSR adds reflections to it (#1750),
     // and SSR reflects the opaque image the scene pass drew, before anything blends

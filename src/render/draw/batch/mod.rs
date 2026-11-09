@@ -16,10 +16,12 @@
 //! Pure CPU logic, no GPU state, so the grouping rules are unit-tested without an
 //! adapter.
 
+mod opaque;
 mod records;
 pub(crate) mod sort;
 mod traits;
 
+pub(crate) use opaque::OpaqueBatches;
 pub(crate) use traits::RecordTraits;
 
 use std::ops::Range;
@@ -129,7 +131,7 @@ pub(crate) struct DrawBatch {
 #[derive(Default)]
 pub(crate) struct FrameDraws {
     pub instances: Vec<InstanceData>,
-    pub opaque: Vec<DrawBatch>,
+    pub opaque: OpaqueBatches,
     pub transparent: Vec<DrawBatch>,
     pub outline: Vec<OutlineDraw>,
 }
@@ -155,7 +157,7 @@ impl FrameDraws {
             opaque = sort::front_to_back(opaque);
         }
         let mut out = Self::default();
-        out.opaque = out.push_runs(opaque, instancing, 0);
+        out.opaque = OpaqueBatches::new(out.push_runs(opaque, instancing, 0));
         let base = out.opaque.len() as u32;
         out.transparent = out.push_runs(transparent, instancing, base);
         out
