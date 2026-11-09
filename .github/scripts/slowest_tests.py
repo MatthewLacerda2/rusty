@@ -9,7 +9,8 @@ from the report it already writes, in the log, where an agent reads them.
 
 Usage: `slowest_tests.py <junit.xml> [count]`. A missing or unreadable report
 prints why and exits 0: this step informs, it never gates (the suite's own step
-does).
+does, and the workflow step is `continue-on-error` besides). A suite cut off by
+the job's timeout leaves no report, so the step has no timings to print then.
 """
 
 from __future__ import annotations
