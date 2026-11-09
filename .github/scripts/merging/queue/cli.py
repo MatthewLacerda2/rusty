@@ -88,7 +88,7 @@ def parse(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--no-check", action="store_true",
-        help="push an updated head without compile-checking it first (CI still judges it)",
+        help="push an updated head without compile-checking it first (CI still judges it; tools/lint still runs on it, #1956)",
     )
     parser.add_argument(
         "--target-dir", metavar="DIR",

@@ -15,7 +15,8 @@ coder *changing* it must know.
 - **`.github/scripts/merging/` is the merge path, one responsibility per module** (#926).
   `merging/verdict/` answers "may this pull request merge?" (`make mergeable`, and the
   queue before every merge); `merging/queue/` merges `main` in, checks, pushes, waits
-  and lands, and its `conflict/` resolves a conflict inside a `sorted` list and
+  and lands (its `lints.py` runs `tools/lint` on every merged tree, `--no-check` or not,
+  before the push, #1956), and its `conflict/` resolves a conflict inside a `sorted` list and
   records every conflict met (#1723); `merging/train/` is the merge train (#1785:
   forming a group, its chain of squash commits, its `merge-train/*` branch, its wait,
   landing it and checking `main`'s tree); `merging/after/` is what follows a merge (#1934:

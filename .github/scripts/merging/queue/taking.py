@@ -7,7 +7,7 @@ import functools
 import time
 
 from merging.queue.conflict import record
-from merging.queue import checks, dependabot, gitio, landing, outcomes, pulls, refusal, stamping, update, waiting
+from merging.queue import checks, dependabot, lints, gitio, landing, outcomes, pulls, refusal, stamping, update, waiting
 from merging.verdict import carried, closing, decide, github, protocol, reviewed
 from merging.watch import board, handbacks
 
@@ -78,8 +78,11 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
     else:
         outcomes.say(f"#{number} ({branch}): merging origin/main into {head[:7]}.")
         check = None
+        if checks.needs_lint(pull, opts):
+            # `--no-check` skips the compile, never `tools/lint` on the merged tree (#1956).
+            check = functools.partial(lints.shared(lints.target_dir(opts.root)).check, since=head, upto="origin/main")
         if checks.needs_check(pull, opts):
-            check = functools.partial(checks.verify, target=checks.target_dir(opts))
+            check = lints.both(functools.partial(checks.verify, target=checks.target_dir(opts)), check)
         # A dry run's conflicts are previews, not conflicts the queue met: unrecorded.
         log = None if opts.dry_run else functools.partial(record.note, record.path(opts.root), number, head)
         fresh, notes = update.advance(branch, head, opts.root, push=not opts.dry_run, check=check, log=log)
