@@ -70,6 +70,7 @@ TABLE: dict[str, tuple[str, ...]] = {
         ".github/scripts/queue-daemon.py",  # the queue's supervisor
         ".github/scripts/ghrest.py",  # how the verdict reads a pull request
         ".github/workflows/",
+        ".github/actions/",  # the workflows' shared steps (#1973)
     ),
 }
 

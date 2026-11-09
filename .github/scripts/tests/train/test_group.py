@@ -28,7 +28,7 @@ class Forming(unittest.TestCase):
         self.assertEqual(group.CAP, 4)
 
     def test_a_merge_path_or_manifest_change_goes_alone_first_and_waits_behind(self):
-        for path in (".github/scripts/merging/watch/loop.py", ".github/workflows/ci.yml", "Cargo.lock", "Makefile", "tools/lint/src/main.rs"):
+        for path in (".github/scripts/merging/watch/loop.py", ".github/workflows/ci.yml", ".github/actions/install-tool/action.yml", "Cargo.lock", "Makefile", "tools/lint/src/main.rs"):
             with self.subTest(path=path):
                 alone = pr(1, files=(path,))
                 self.assertEqual(formed(Fx([alone, pr(2)]), [alone, pr(2)])[:2], ([1], None))

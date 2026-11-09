@@ -51,6 +51,8 @@ class Edited(unittest.TestCase):
     def test_the_toolchain_file_and_workflows_are_the_pull_requests_own_setup(self):
         self.assertTrue(setup.edited(["src/x.rs", "rust-toolchain.toml"]))
         self.assertTrue(setup.edited([".github/workflows/ci.yml"]))
+        # The composite install step the workflows call (#1973).
+        self.assertTrue(setup.edited([".github/actions/install-tool/action.yml"]))
         self.assertFalse(setup.edited(["src/x.rs", ".github/scripts/x.py", "docs/rust-toolchain.toml"]))
         self.assertFalse(setup.edited([]))
 
