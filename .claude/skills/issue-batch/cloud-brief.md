@@ -63,6 +63,15 @@ nothing to wait for.
   `actions_run_trigger` does the same). It runs the gates and nothing else.
   Never dispatch `mutants-sweep.yml`: that is the full sweep, up to ten
   runners for a weekend the batch's gates need (#705).
+- **A run you cite is one you read finished.** Its id, its conclusion, and every
+  time or count you quote from it are copied from the completed run (`gh run view
+  <id> --json status,conclusion,jobs`, its log), never expected or extrapolated,
+  and the PR is readied only after. On 2026-11-09 PR #1977 cited a dispatched run
+  as "success, macOS 14 min" with a slowest-tests table, while that run's macOS
+  job had not finished and two of the quoted test names exist nowhere in the
+  tree. A reviewer caught it; a figure nobody can trace is worse than no figure.
+  If the run is still going when you would end, say so in the description and
+  leave the PR a draft naming the run.
 - **A branch that adds mechanism asks for a scoped mutation run** (#750) with
   a line of its own in the PR description: `Mutation: diff` (or path globs,
   `Mutation: src/physics/**`). **Never dispatch `mutants-on-request.yml`
