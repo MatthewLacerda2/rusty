@@ -12,7 +12,10 @@ fn inside(r: &CellRect) -> bool {
     r.x0 >= 8 && r.x1 <= 12 && r.z0 >= 3 && r.z1 <= 7
 }
 
-fn edits(table: u32, top: u32) -> [Box<dyn Fn(&mut Scene)>; 5] {
+/// One edit of the scene.
+type Edit = Box<dyn Fn(&mut Scene)>;
+
+fn edits(table: u32, top: u32) -> [Edit; 5] {
     [
         Box::new(move |s| set(s, table, not_walkable())),
         Box::new(move |s| s.world.nav_mesh_modifier_mut(table).unwrap().override_area = Some(3)),

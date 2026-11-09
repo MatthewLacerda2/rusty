@@ -161,29 +161,38 @@ impl World {
             particles: self.particles(id).map(|c| (*c).clone()),
             audio: self.audio(id).map(|c| (*c).clone()),
             reverb_zone: self.reverb_zone(id).map(|c| (*c).clone()),
-            canvas: self.canvas(id).map(|c| (*c).clone()),
-            rect_transform: self.rect_transform(id).map(|c| (*c).clone()),
-            image: self.image(id).map(|c| (*c).clone()),
-            canvas_group: self.canvas_group(id).map(|c| (*c).clone()),
-            rect_mask: self.rect_mask(id).map(|c| (*c).clone()),
-            mask: self.mask(id).map(|c| (*c).clone()),
-            backdrop_filter: self.backdrop_filter(id).map(|c| (*c).clone()),
-            text: self.text(id).map(|c| (*c).clone()),
-            selectable: self.selectable(id).map(|c| (*c).clone()),
-            layout_group: self.layout_group(id).map(|c| (*c).clone()),
-            layout_element: self.layout_element(id).map(|c| (*c).clone()),
             joint: self.joint(id).map(|c| (*c).clone()),
             character_controller: self.character_controller(id).map(|c| (*c).clone()),
             lod_group: self.lod_group(id).map(|c| (*c).clone()),
             light_probe_proxy_volume: self.light_probe_proxy_volume(id).map(|c| (*c).clone()),
             trail: self.trail(id).map(|c| (*c).clone()),
             line: self.line(id).map(|c| (*c).clone()),
-            shape: self.shape(id).map(|c| (*c).clone()),
             prefab_link: self.prefab_link(id).map(|c| (*c).clone()),
             parent_id: core.parent_id,
             parent_bone: Vec::new(), // document-only, as `bone_refs`: a save fills them
             bone_refs: BTreeMap::new(),
             children: core.children.clone(),
+            ..self.ui_document(id)
         })
+    }
+
+    /// An entity document holding only `id`'s UI components, the rest of
+    /// [`Self::document`]'s fields as a new entity's: split out to keep that one
+    /// under the function-length cap.
+    fn ui_document(&self, id: u32) -> Entity {
+        let mut e = Entity::new(id, String::new());
+        e.canvas = self.canvas(id).map(|c| (*c).clone());
+        e.rect_transform = self.rect_transform(id).map(|c| (*c).clone());
+        e.image = self.image(id).map(|c| (*c).clone());
+        e.canvas_group = self.canvas_group(id).map(|c| (*c).clone());
+        e.rect_mask = self.rect_mask(id).map(|c| (*c).clone());
+        e.mask = self.mask(id).map(|c| (*c).clone());
+        e.backdrop_filter = self.backdrop_filter(id).map(|c| (*c).clone());
+        e.text = self.text(id).map(|c| (*c).clone());
+        e.selectable = self.selectable(id).map(|c| (*c).clone());
+        e.layout_group = self.layout_group(id).map(|c| (*c).clone());
+        e.layout_element = self.layout_element(id).map(|c| (*c).clone());
+        e.shape = self.shape(id).map(|c| (*c).clone());
+        e
     }
 }
