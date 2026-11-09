@@ -3,6 +3,9 @@
 
 use std::path::Path;
 
+use super::encoder::Encoder;
+use super::preview::{lock, Previews};
+use super::preview_tests::preview_pages;
 use super::tests::{quick, scene, scene_path};
 use super::*;
 use crate::scene::lighting::lightmap::Lightmap;
@@ -67,20 +70,21 @@ fn pass_maps(value: f32) -> Vec<Lightmap> {
 
 #[test]
 fn the_preview_writer_keeps_only_the_shown_and_the_newest_pass_on_disk() {
-    use super::encoder::Encoder;
-    use super::preview::Previews;
-    use super::preview_tests::preview_pages;
     let path = scene_path("preview_writer");
     let progress = Arc::new(BakeProgress::default());
     let mut previews = Previews::new(&path);
     let taken = Default::default();
     let encoder = Encoder::start(&previews, 32, taken, progress.clone()).unwrap();
+    let latest = previews.latest.clone();
     let put = |k: u32| {
+        // Held, the writer's hand-over lock keeps the pass in flight for `busy`.
+        let held = lock(&latest);
         encoder.put(pass(k), pass_maps(k as f32 * 0.1));
         assert!(
             encoder.busy(),
             "a pass waiting is work: the bake builds none"
         );
+        drop(held);
         while encoder.busy() {
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
@@ -106,9 +110,6 @@ fn the_preview_writer_keeps_only_the_shown_and_the_newest_pass_on_disk() {
 
 #[test]
 fn a_dropped_bakes_writer_removes_only_its_own_pages() {
-    use super::encoder::Encoder;
-    use super::preview::Previews;
-    use super::preview_tests::preview_pages;
     let path = scene_path("preview_two_writers");
     // Write one pass of `value` as `p`'s bake, and wait until it is handed over.
     let write = |p: &Previews, progress: &Arc<BakeProgress>, value| {
