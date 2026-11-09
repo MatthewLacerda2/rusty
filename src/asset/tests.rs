@@ -249,17 +249,17 @@ fn sidecar_persists_mesh_collider_choice() {
     let mut settings = import_and_sync_sidecar(&path)
         .map(|a| sidecar::load(&path).unwrap().with_sub_objects(&a))
         .unwrap();
-    settings
-        .colliders
-        .insert("Quad".to_string(), MeshColliderKind::Convex);
+    settings.colliders.insert(
+        "Quad".to_string(),
+        SubObjectCollider::own(MeshColliderKind::Convex),
+    );
     sidecar::save(&path, &settings).unwrap();
 
     let loaded = sidecar::load(&path).unwrap();
     assert_eq!(
-        loaded.colliders.get("Quad"),
-        Some(&MeshColliderKind::Convex)
+        loaded.colliders.get("Quad").map(|c| c.kind),
+        Some(MeshColliderKind::Convex)
     );
-    assert!(loaded.colliders.get("Quad").unwrap().is_convex());
 }
 
 #[test]

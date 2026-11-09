@@ -89,9 +89,11 @@ pub struct ColliderComponent {
     /// that no longer loads falls back to the default material, never to them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub material_asset: Option<String>,
-    /// The mesh a `Mesh` shape builds from once its entity has no Mesh (#1657):
-    /// Unity's `MeshCollider.sharedMesh`. Set when the Mesh is removed, cleared when
-    /// one is added; the entity's own Mesh wins while it has one.
+    /// The mesh a `Mesh` shape builds from instead of its entity's Mesh: Unity's
+    /// `MeshCollider.sharedMesh`. A collision mesh its model's sidecar or a script
+    /// names (#1960, `scene::asset_instance::collision`), or the Mesh kept when it was
+    /// removed (#1657). Cleared when a Mesh is added; while set it wins over the
+    /// entity's Mesh.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shared_mesh: Option<SharedMesh>,
     /// The world-space bounds, derived from the shape and the entity's world pose

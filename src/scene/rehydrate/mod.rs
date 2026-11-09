@@ -145,21 +145,27 @@ fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
 /// are never stored on disk, only rebuilt here.
 /// A mesh collider's saved box is refit to the rebuilt mesh, so an import setting
 /// changed since the save (the Scale Factor, #1398) reaches it.
-/// A Mesh-shaped collider's shared mesh (#1657) is rebuilt the same way when the
-/// entity has no Mesh of its own; another shape's is left without geometry.
+/// A Mesh-shaped collider's shared mesh (#1657, #1960) is rebuilt the same way, and
+/// its box refit to that instead; another shape's is left without geometry.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
         hold_fields(entity.id, mesh);
         let rebuilt = rehydrate_one(mesh);
         install(mesh, rebuilt);
-        if let Some(collider) = &mut entity.collider {
-            refit_to(collider, mesh.vertices.iter().map(|v| v.position));
-        }
-        return;
     }
     let Some(collider) = &mut entity.collider else {
         return;
     };
+    if collider.shared_mesh.is_some() {
+        rehydrate_shared_mesh(entity.id, collider);
+    } else if let Some(mesh) = &entity.mesh {
+        refit_to(collider, mesh.vertices.iter().map(|v| v.position));
+    }
+}
+
+/// Rebuild a Mesh-shaped `collider`'s shared mesh from its reference and refit its
+/// box to it; another shape's, or a collider without one, is left as it is.
+pub(crate) fn rehydrate_shared_mesh(id: u32, collider: &mut ColliderComponent) {
     if !matches!(collider.shape, ColliderShape::Mesh { .. }) {
         return;
     }
@@ -167,7 +173,7 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
         return;
     };
     let mut mesh = shared.reference();
-    hold_fields(entity.id, &mut mesh);
+    hold_fields(id, &mut mesh);
     shared.subdivisions = mesh.subdivisions;
     let rebuilt = rehydrate_one(&mesh);
     install(&mut mesh, rebuilt);

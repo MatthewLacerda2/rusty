@@ -13,6 +13,7 @@ use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
 use crate::components::{CapsuleAxis, ColliderShape, CombineMode, PhysicsMaterial};
+use crate::scene::asset_instance::collision;
 use crate::scene::authoring::physics::collider as collider_ops;
 use crate::scene::Scene;
 
@@ -34,12 +35,19 @@ fn register_shape(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg 
         "GetColliderShape",
         lua.create_function(move |lua, id: EntityArg| {
             let scene = &*scene.get(lua)?;
-            let shape = scene
-                .borrow()
-                .world
-                .collider(id.read())
-                .map(|c| c.shape.clone());
-            shape.map(|s| shape_to_table(lua, &s)).transpose()
+            let shape = scene.borrow().world.collider(id.read()).map(|c| {
+                let mesh = c.shared_mesh.as_ref().and_then(|m| m.asset_ref.clone());
+                (c.shape.clone(), mesh)
+            });
+            let Some((shape, mesh)) = shape else {
+                return Ok(None);
+            };
+            let t = shape_to_table(lua, &shape)?;
+            // The collision mesh a Mesh shape builds from, when it is not the Mesh's.
+            if matches!(shape, ColliderShape::Mesh { .. }) {
+                t.set("mesh", mesh)?;
+            }
+            Ok(Some(t))
         }),
     )?;
     put(
@@ -48,6 +56,9 @@ fn register_shape(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg 
         lua.create_function(move |lua, (id, t): (EntityArg, Table)| {
             let scene = &*scene.get(lua)?;
             let id = id.live("Physics", "SetColliderShape")?;
+            if t.get::<String>("kind")? == "Mesh" {
+                return set_mesh_shape(&mut scene.borrow_mut(), id, &t);
+            }
             let shape = shape_from_table(&t)?;
             let mut scene = scene.borrow_mut();
             if let Some(mut c) = scene.world.collider_mut(id) {
@@ -92,6 +103,21 @@ fn shape_to_table(lua: &Lua, shape: &ColliderShape) -> mlua::Result<Table> {
         }
     }
     Ok(t)
+}
+
+/// `SetColliderShape(id, { kind = "Mesh", convex = false, mesh = nil })` (#1960): a
+/// mesh collider built from the collision mesh `mesh` names (`path::sub_object`, or
+/// a sub-object of the entity's own model), else from the entity's Mesh. A name the
+/// model lacks warns once and falls back; nothing to build from is an error. An
+/// entity without a collider is left alone, as for every other kind.
+fn set_mesh_shape(scene: &mut Scene, id: u32, t: &Table) -> mlua::Result<()> {
+    if !scene.world.has_collider(id) {
+        return Ok(());
+    }
+    let convex = t.get::<Option<bool>>("convex")?.unwrap_or(false);
+    let mesh = t.get::<Option<String>>("mesh")?;
+    collision::set_mesh_shape(scene, id, convex, mesh.as_deref())
+        .map_err(|e| err(format!("SetColliderShape: {e}")))
 }
 
 /// A strictly positive, finite extent named `key` of the shape table.
@@ -139,8 +165,8 @@ fn shape_from_table(t: &Table) -> mlua::Result<ColliderShape> {
         }
         _ => {
             return Err(err(format!(
-                "SetColliderShape: unknown kind {kind:?} (want Box, Sphere, Cylinder or \
-                 Capsule; a Mesh collider is baked from an imported mesh)"
+                "SetColliderShape: unknown kind {kind:?} (want Box, Sphere, Cylinder, \
+                 Capsule or Mesh)"
             )))
         }
     })

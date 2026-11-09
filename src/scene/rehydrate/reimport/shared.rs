@@ -1,6 +1,7 @@
 //! src/scene/rehydrate/reimport/shared.rs — a live re-import reaches a Mesh-shaped
 //! collider's shared mesh (#1657) too: a part whose Mesh was removed collides with,
-//! and feeds the navmesh, the model as it is now, not as it was at the last load.
+//! and feeds the navmesh, the model as it is now, not as it was at the last load,
+//! and so does a part whose collider builds from a collision mesh (#1960).
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -13,8 +14,8 @@ use crate::scene::prefab::diff::masked;
 use crate::scene::prefab::live::shift_baseline;
 use crate::scene::Scene;
 
-/// Rebuild every Mesh-shaped collider's shared mesh, on an entity without a Mesh,
-/// whose reference's file `names` accepts, from `imported` (each file imported
+/// Rebuild every Mesh-shaped collider's shared mesh (the copy kept of a removed
+/// Mesh, or a collision mesh named for it, #1960), whose reference's file `names` accepts, from `imported` (each file imported
 /// once, shared with the Meshes' walk), and refit its collider's box. A sub-object
 /// that now imports empty keeps the old geometry, as a Mesh does, so the part
 /// never drops out of physics.
@@ -24,9 +25,6 @@ pub(super) fn reimport_shared(
     imported: &mut BTreeMap<String, Option<Imported>>,
 ) {
     for id in scene.world.ids_with_collider() {
-        if scene.world.has_mesh(id) {
-            continue;
-        }
         let Some(reference) = scene.world.collider(id).and_then(|c| {
             if !matches!(c.shape, ColliderShape::Mesh { .. }) {
                 return None;

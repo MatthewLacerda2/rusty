@@ -126,7 +126,8 @@ fn reimport_where(
     rebuilt
 }
 
-/// Put `sub` on entity `id`'s mesh, and refit its mesh collider's box to it. A
+/// Put `sub` on entity `id`'s mesh, and refit its mesh collider's box to it (unless
+/// the collider builds from a shared mesh). A
 /// skinned mesh (before or after) takes the new rig, its bones re-bound, when `rig`
 /// says so, and is kept otherwise. `revision` is the import's `sub` came from.
 /// Returns whether the mesh was rebuilt.
@@ -153,8 +154,10 @@ fn reimport_entity_mesh(
     if let Some(hung) = hung {
         scene.restore_skeleton(id, hung);
     }
-    // The guard refreshes the world AABB.
-    if let Some(mut collider) = scene.world.collider_mut(id) {
+    // The guard refreshes the world AABB. A collider with a shared mesh builds
+    // from that (#1960), which `shared` refits.
+    let collider = scene.world.collider_mut(id);
+    if let Some(mut collider) = collider.filter(|c| c.shared_mesh.is_none()) {
         refit(&mut collider, bounds);
     }
     true

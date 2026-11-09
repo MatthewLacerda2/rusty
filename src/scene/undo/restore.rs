@@ -59,17 +59,20 @@ fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>
     for recorded in entities.into_values().flatten() {
         let Recorded { mut doc, seq } = recorded;
         let live = world.mesh_mut(doc.id);
-        match (&mut doc.mesh, live) {
+        let shared_too = match (&mut doc.mesh, live) {
             (Some(mesh), Some(mut live)) if mesh.same_source(&live) => {
                 mesh.adopt_geometry(&mut live);
+                true
             }
             (Some(_), _) => {
+                // Rebuilds the collider's shared mesh too.
                 crate::scene::rehydrate::rehydrate_entity_mesh(&mut doc);
                 rebuilt.push(doc.id);
+                false
             }
-            (None, _) => {}
-        }
-        if doc.mesh.is_none() {
+            (None, _) => true,
+        };
+        if shared_too {
             restore_shared_mesh(world, &mut doc);
         }
         world.restore_entity(doc, seq);
@@ -95,5 +98,7 @@ fn restore_shared_mesh(world: &mut World, doc: &mut Entity) {
             return;
         }
     }
-    crate::scene::rehydrate::rehydrate_entity_mesh(doc);
+    if let Some(collider) = doc.collider.as_mut() {
+        crate::scene::rehydrate::rehydrate_shared_mesh(doc.id, collider);
+    }
 }
