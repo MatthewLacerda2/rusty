@@ -19,6 +19,8 @@
 //!
 //! The engine's half of the instructions is not copied here: `session-mcp` serves it
 //! from the checkout as `rusty://game-guide.md`, so it never goes stale in a game.
+//!
+//! stored-format: the engine's entries in a project's `.mcp.json`
 
 use std::path::{Path, PathBuf};
 

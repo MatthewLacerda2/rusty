@@ -34,6 +34,8 @@
 //!   ([`DemoSettings`], #1581; default 20).
 //! * **`audio`** — the speed of sound doppler resolves with ([`AudioSettings`],
 //!   #1749), applied to the audio on entering Play.
+//!
+//! stored-format: `project.rusty`, the project file
 
 use std::path::Path;
 

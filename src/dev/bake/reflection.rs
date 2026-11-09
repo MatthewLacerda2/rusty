@@ -19,6 +19,8 @@
 //! Authoring-time only: a reflection bake is a dev action (its output is baked-asset
 //! files + path refs the runtime loads), so the whole path lives behind the `dev` feature
 //! with the rest of the agentic layer.
+//!
+//! stored-format: the reflection probes' KTX2 cubemaps in `<scene>.reflections/`
 
 use std::path::{Path, PathBuf};
 

@@ -22,6 +22,8 @@
 //! [`open`]: Storage::open
 //! [`flush`]: Storage::flush
 //! [`new`]: Storage::new
+//!
+//! stored-format: the PlayerPrefs save file
 
 use std::path::PathBuf;
 

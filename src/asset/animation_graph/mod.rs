@@ -17,6 +17,8 @@
 //! Purity: serde + std only — no wgpu/egui/mlua and no evaluation logic (the
 //! runtime evaluator is #316). Containers are ordered (`BTreeMap`/`Vec`) so the
 //! serialized JSON is stable and the fixed-step evaluator's walk is deterministic.
+//!
+//! stored-format: the `.animgraph` document
 
 use std::collections::BTreeMap;
 

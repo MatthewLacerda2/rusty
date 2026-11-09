@@ -45,6 +45,8 @@
 //!   name resolved across every effect the volume runs.
 //! - [`textures`] — the extra texture slots a surface block may sample (#400): a
 //!   material-named pattern such as a baked noise map.
+//!
+//! stored-format: the baked shaders under `assets/shaders/` and their params files
 
 // Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
 // or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.

@@ -57,6 +57,7 @@ fn document(position: usize, entry: &Value) -> Document {
 }
 
 fn read(path: &str) -> Result<Json, String> {
+    // lint: allow(stored-format) reads zimmer's patch and song documents, a format that crate owns
     let text = std::fs::read_to_string(path).map_err(|e| format!("cannot read: {e}"))?;
     serde_json::from_str(&text).map_err(|e| format!("invalid JSON: {e}"))
 }

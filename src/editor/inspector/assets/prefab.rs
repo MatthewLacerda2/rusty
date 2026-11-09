@@ -60,6 +60,7 @@ fn draw_metadata(ui: &mut egui::Ui, path: &str) {
 /// Read the prefab document and report its `(entity_count, material_count)`, or
 /// `None` if it cannot be read/parsed.
 fn counts(path: &str) -> Option<(usize, usize)> {
+    // lint: allow(stored-format) reads the prefab document, whose format `scene::prefab` owns
     let json = fs::read_to_string(path).ok()?;
     let prefab: crate::scene::PrefabData = serde_json::from_str(&json).ok()?;
     Some((prefab.entities.len(), prefab.materials.len()))

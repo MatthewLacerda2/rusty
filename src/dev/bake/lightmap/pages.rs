@@ -5,6 +5,8 @@
 //! its pages into the bake's `BakeProgress` and stopping between two levels when
 //! that is cancelled; then [`apply_encoded`] only writes the finished bytes and
 //! points the scene at them, on the caller's thread.
+//!
+//! stored-format: the lightmap pages a bake encodes into `<scene>.lightmaps/`
 
 use std::io::Cursor;
 use std::path::Path;
