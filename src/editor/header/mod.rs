@@ -15,9 +15,9 @@ use crate::editor::EditorUi;
 use crate::scene::Scene;
 use crate::scripting::ConsoleLogs;
 
-/// TOP BAR — a classic menu bar (File / Edit / GameObject / Config / About) over the
-/// toolbar row (scene name, centred Play / Stop). Always visible. Scene I/O, object
-/// creation and quality live in the menus; the toolbar row is just play-state.
+/// TOP BAR — one row (#1914): the menus (File / Edit / GameObject / Config / About) on
+/// the left, the transport (Play, Stop during Play) and the Developer Console button
+/// at the right end. Always visible. The scene's name is in the window title.
 pub fn draw(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
@@ -35,27 +35,25 @@ pub fn draw(
                 .stroke(egui::Stroke::new(1.0, t.border)),
         )
         .show(ui, |ui| {
-            draw_menu_bar(editor, ui, scene, console, *is_playing);
-            ui.add_space(2.0);
-            transport::draw(editor, ui, scene, is_playing);
+            draw_menu_bar(editor, ui, scene, console, is_playing);
         });
 
     draw_about_window(editor, ui.ctx());
 }
 
-/// File / Edit / GameObject / Config / About menus.
+/// File / Edit / GameObject / Config / About menus, then the transport right-aligned.
 fn draw_menu_bar(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
     scene: &mut Scene,
     console: &mut ConsoleLogs,
-    is_playing: bool,
+    is_playing: &mut bool,
 ) {
     // egui 0.27 menus stayed open until an item closed them or the user clicked
     // outside; keep that so the Config menu's toggles don't dismiss it.
     let config = MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside);
     egui::MenuBar::new().config(config).ui(ui, |ui| {
-        file_menu(editor, ui, scene, console, is_playing);
+        file_menu(editor, ui, scene, console, *is_playing);
         edit_menu::edit_menu(editor, ui, scene);
 
         // The GameObject menu — the Unity-style home for creating objects (#255).
@@ -69,6 +67,9 @@ fn draw_menu_bar(
                 ui.close();
             }
         });
+
+        let tail = egui::Layout::right_to_left(egui::Align::Center);
+        ui.with_layout(tail, |ui| transport::draw(editor, ui, scene, is_playing));
     });
 }
 

@@ -1,10 +1,11 @@
 //! src/api/snapshot/navigation.rs — the NavMeshObstacle (#456), OffMeshLink (#462)
-//! and NavMeshModifierVolume (#460) snapshots, apart from `components.rs` to keep it
+//! and NavMeshModifierVolume (#460) snapshots, and AIPerception's (#1900), apart from `components.rs` to keep it
 //! under the size cap.
 
 use serde_json::{json, Value};
 
 use super::vec3;
+use crate::components::AIPerceptionComponent;
 use crate::components::{
     NavMeshModifierVolumeComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
 };
@@ -46,5 +47,23 @@ pub(crate) fn nav_modifier_value(v: &NavMeshModifierVolumeComponent) -> Value {
         "center": vec3(v.center),
         "size": vec3(v.size),
         "area": v.area,
+    })
+}
+
+/// AIPerception: its settings, then what it knows (target ids) and sees now.
+pub(crate) fn ai_perception_value(p: &AIPerceptionComponent) -> Value {
+    json!({
+        "sight_range": p.sight_range,
+        "lose_sight_range": p.lose_sight_range,
+        "sight_angle": p.sight_angle,
+        "eye_height": p.eye_height,
+        "sight_mask": p.sight_mask,
+        "blocking_mask": p.blocking_mask,
+        "hearing_range": p.hearing_range,
+        "sight_max_age": p.sight_max_age,
+        "hearing_max_age": p.hearing_max_age,
+        "damage_max_age": p.damage_max_age,
+        "known": p.memory.known.keys().collect::<Vec<_>>(),
+        "in_sight": p.memory.in_sight.iter().collect::<Vec<_>>(),
     })
 }

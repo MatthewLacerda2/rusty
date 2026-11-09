@@ -12,6 +12,7 @@
 //! points (`set_parent` / `destroy_entity` / `save_to_file`); the structural API
 //! verbs call straight into those, so they are not duplicated here.
 
+pub mod ai;
 pub mod animator;
 pub mod audio;
 pub mod components;

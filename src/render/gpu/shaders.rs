@@ -121,7 +121,7 @@ mod tests {
     use crate::shadergen::compose;
     use crate::shadergen::validate::validate;
 
-    const SHIPPED: [&str; 15] = [
+    const SHIPPED: [&str; 16] = [
         "shader.wgsl",
         "outline/mask.wgsl",
         "outline/edge.wgsl",
@@ -137,6 +137,7 @@ mod tests {
         "postfx/depth_of_field.wgsl",
         "postfx/taa.wgsl",
         "ui.wgsl",
+        "gizmos/navmesh.wgsl",
     ];
 
     /// Every shipped shader must compose against the registered `common` module

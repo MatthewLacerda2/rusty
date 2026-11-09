@@ -160,7 +160,7 @@ impl EditorFrontend {
             &mut ui.selected_entity_id,
             &mut console,
         ) {
-            ui.is_dirty = true;
+            ui.is_dirty = false; // the scene is its file again
             self.scene_id = Some(scene.id());
         }
     }

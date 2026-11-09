@@ -3,6 +3,7 @@
 //! type that is neither (`ScriptComponent`, whose column is `Vec<ScriptComponent>`)
 //! does not compile, and a new marker is a column only by saying so.
 
+use crate::components::AIPerceptionComponent;
 use crate::components::{
     AnimatorComponent, AudioSourceComponent, BackdropFilterComponent, CameraComponent,
     CanvasComponent, CanvasGroupComponent, CharacterControllerComponent, ColliderComponent,
@@ -87,6 +88,7 @@ channels! { true:
     NavMeshObstacleComponent => "nav_obstacle",
     OffMeshLinkComponent => "offmesh_link",
     NavMeshModifierVolumeComponent => "nav_modifier",
+    AIPerceptionComponent => "ai_perception",
     CameraComponent => "camera",
     PostProcessingComponent => "post_processing",
     ParticleEmitterComponent => "particles",
