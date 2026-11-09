@@ -282,9 +282,10 @@ lighting settings (above), whose defaults are the ones listed here.
   the default 64 samples) to every texel, up to `samples`. After each pass but the last
   the live scene shows the lightmaps as they stand: the paths so far averaged, buried
   texels filled, the bounce cleaned by the denoiser, packed into pages. A writer
-  thread beside the bake stores them as `lightmap_preview_*` pages in the scene's
+  thread beside the bake stores them as `lightmap_preview_<bake>_*` pages in the scene's
   lightmap folder (uncompressed PNGs of one level, no BC encode, while the trace goes
-  on); a pass still unshown when the next is in is skipped and its pages removed,
+  on; a page a pass left unchanged is not written again); a pass still unshown when
+  the next is in is skipped and its pages removed,
   and while the writer is busy the bake builds no preview at all, so a pass that
   would only be dropped costs no denoise. The card and the log say
   the passes done, the samples so far and the time left at the pace since the first
@@ -294,8 +295,10 @@ lighting settings (above), whose defaults are the ones listed here.
   pass size never shows. Only a finished bake is written: a save during the bake
   writes the scene's previous lightmaps, never a preview, and **Cancel** puts them
   back and removes the preview pages. Edits during the bake reach those hidden
-  lightmaps: a deleted entity leaves them (and gets no lightmap from the finished
-  bake), and `Lighting.ClearLightmaps()` clears them and the preview. Each shown pass
+  lightmaps: a deleted entity leaves them and the preview, and
+  `Lighting.ClearLightmaps()` clears them and the preview. The finished bake still
+  keeps the deleted entity's new entry, so an Undo of the delete brings it back lit by
+  this bake; a save writes no entry for an entity the scene no longer holds. Each shown pass
   costs a display denoise and a preview write, so a smaller `samplesPerPass`
   refreshes more often and bakes a little longer. Until the first pass is done the
   card says `first pass`. The texels' state between passes
