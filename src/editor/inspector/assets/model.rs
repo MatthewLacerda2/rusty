@@ -188,21 +188,16 @@ fn sub_object_row(
                     ui.selectable_value(&mut convex, false, "Trimesh");
                     ui.selectable_value(&mut convex, true, "Convex");
                 });
-            egui::ComboBox::from_id_salt(format!("mesh_collider_mesh_{id}"))
-                .selected_text(mesh.as_deref().unwrap_or("Own mesh"))
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut mesh, None, "Own mesh");
-                    for other in ids.iter().filter(|o| *o != id) {
-                        ui.selectable_value(&mut mesh, Some(other.clone()), other);
-                    }
-                })
-                .response
-                .on_hover_text("The sub-object this collider builds from; a sub-object chosen here is no longer drawn");
-            if let Some(other) = &mesh {
-                ui.weak(format!("{other} is not drawn"));
-            }
         }
     });
+    // Its own line: the row above is already as wide as a narrow inspector.
+    if generate {
+        ui.horizontal_wrapped(|ui| {
+            ui.add_space(12.0);
+            ui.label("Collision mesh");
+            collision_mesh_combo(ui, &mut mesh, ids, id);
+        });
+    }
 
     let kind = if convex {
         MeshColliderKind::Convex
@@ -222,6 +217,26 @@ fn sub_object_row(
         }
     }
     true
+}
+
+/// The collision-mesh combo of `id`'s row (#1960): its own mesh, or another
+/// sub-object of the file, which a whole-model spawn then never draws.
+fn collision_mesh_combo(ui: &mut egui::Ui, mesh: &mut Option<String>, ids: &[String], id: &str) {
+    egui::ComboBox::from_id_salt(format!("mesh_collider_mesh_{id}"))
+        .selected_text(mesh.as_deref().unwrap_or("Own mesh"))
+        .show_ui(ui, |ui| {
+            ui.selectable_value(mesh, None, "Own mesh");
+            for other in ids.iter().filter(|o| *o != id) {
+                ui.selectable_value(mesh, Some(other.clone()), other);
+            }
+        })
+        .response
+        .on_hover_text(
+            "The sub-object this collider builds from: one chosen here is no longer drawn",
+        );
+    if let Some(other) = mesh {
+        ui.weak(format!("{other} is not drawn"));
+    }
 }
 
 /// Import the source file and instantiate it as Unity's model prefab (#1083): a

@@ -117,7 +117,7 @@ fn restore_collider_mesh(
     };
     if let Some(mut live) = world.collider_mut(doc.id) {
         if let Some(live) = which
-            .of(&mut *live)
+            .of(&mut live)
             .as_mut()
             .filter(|l| shared.same_source(l))
         {

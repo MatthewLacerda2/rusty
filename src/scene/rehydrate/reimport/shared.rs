@@ -70,10 +70,7 @@ fn reimport_one(
     if sub.is_none() && which == Which::Kept {
         return;
     }
-    let own = scene
-        .world
-        .mesh(id)
-        .and_then(|m| bounds_of(m.vertices.iter().map(|v| v.position)));
+    let own = scene.world.mesh(id).and_then(|m| mesh_bounds(&m));
     // A linked prefab entity's refit is the model's, never an override (#1527).
     let linked = scene.world.prefab_link(id).is_some();
     let before = linked.then(|| scene.world.reference_document(id)).flatten();
@@ -89,13 +86,7 @@ fn reimport_one(
             &mut mesh,
             RehydratedMesh::from_sub_mesh(sub, asset.revision),
         ),
-        None => warn_once_of(&format!("{file}::{}", reference.sub_object), || {
-            format!(
-                "collision mesh '{file}::{}' is gone: entity {id}'s collider builds from \
-                 its own mesh",
-                reference.sub_object
-            )
-        }),
+        None => warn_gone(id, &format!("{file}::{}", reference.sub_object)),
     }
     shared.take_geometry(&mesh);
     refit_collider(&mut collider, own);
@@ -103,4 +94,18 @@ fn reimport_one(
     if let Some(before) = before {
         shift_baseline(&mut scene.world, id, &masked(&before));
     }
+}
+
+/// The box around `mesh`'s rest-pose vertices.
+fn mesh_bounds(mesh: &crate::components::MeshComponent) -> Option<(glam::Vec3, glam::Vec3)> {
+    bounds_of(mesh.vertices.iter().map(|v| v.position))
+}
+
+/// Say once that the collision mesh `reference` is gone from its model.
+fn warn_gone(id: u32, reference: &str) {
+    warn_once_of(reference, || {
+        format!(
+            "collision mesh '{reference}' is gone: entity {id}'s collider builds from its own mesh"
+        )
+    });
 }
