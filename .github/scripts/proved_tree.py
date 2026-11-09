@@ -67,7 +67,7 @@ import ghrest
 BUILT: dict[str, dict[str, str | None]] = {
     "ci.yml": {
         "build-test": "Test (engine, default)",
-        "build-test-cross": "Test (engine, default)",
+        "build-test-cross": "Test (engine, dev features)",
         "blender": "Test (the .blend import, through Blender)",
         "deny": None,
     },

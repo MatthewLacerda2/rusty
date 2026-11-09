@@ -25,8 +25,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
 jobs:
-  # Same steps as ci.yml's `build-test-cross`; bash so Windows runs the same
-  # script.
+  # ci.yml's `build-test-cross` steps plus the default suite, which that job
+  # dropped (#1976): Windows is not yet proven by any other leg. Bash so Windows
+  # runs the same script.
   build-test-windows:
     runs-on: windows-latest
     env:

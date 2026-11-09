@@ -248,11 +248,12 @@ jobs:
         if: always() && needs.changes.outputs.code != 'false'
         run: df -h / && du -sh target 2>/dev/null || true
 
-  # Verify the wgpu cross-platform claim (issue #121): the same build + test on
-  # macOS (Metal), the other shipped platform, so the portability premise is
+  # Verify the wgpu cross-platform claim (issue #121): the build and the `dev`
+  # suite on macOS (Metal), the other shipped platform, so the portability premise is
   # checked, not assumed. Separate from `build-test` to avoid renaming that
   # required check. Windows is not a shipped platform yet, so its run is a signal
-  # in `windows.yml` (#741), outside this gate; keep the two jobs' steps in step.
+  # in `windows.yml` (#741), outside this gate; its steps follow this job's,
+  # plus the default suite this job no longer runs (#1976).
   # A one-entry matrix, so the check is named `build-test-cross (macos-26)`;
   # `mergeable` reads it by its base name.
   build-test-cross:
@@ -261,7 +262,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-26]
-    timeout-minutes: 30
+    # A guard against a hang, not a budget the suite must fit (#1976): the job
+    # took 23-29 min when it ran both suites and two green runs were cancelled
+    # at 30. With the one `dev` suite it took 18.4 (run 42611428872). It must
+    # stay below the merge queue's `DEADLINE_MINUTES` (45, in
+    # `merging/queue/cli.py`), so a hung job is a cancelled run the queue re-runs
+    # (#869), not a stall hand-back; `tests/queue/test_macos_timeout.py` holds it.
+    timeout-minutes: 35
     runs-on: ${{ matrix.os }}
     if: >-
       github.event_name == 'schedule' ||
@@ -290,15 +297,21 @@ jobs:
       - name: Install Open Image Denoise
         run: brew install open-image-denoise
       # macOS uses its native backend and needs no extra system libs; the apt
-      # step is Linux-only and lives on the `build-test` job above. Same runner
-      # and steps as build-test (#484); bash so `windows.yml` can run the same script.
-      - name: Test (engine, default)
-        shell: bash
-        run: |
-          rc=0
-          cargo nextest run --profile ci --locked || rc=$?
-          cp target/nextest/ci/junit.xml junit-default.xml || true
-          exit "$rc"
+      # step is Linux-only and lives on the `build-test` job above. Bash so
+      # `windows.yml` can run the same script.
+      #
+      # Only the `dev` suite runs here (#1976), where `build-test` runs both.
+      # What this leg proves is Metal and the platform, and the `dev` build
+      # compiles and tests a superset of the default one: on 2026-11-09 the
+      # default list held one test the `dev` list did not
+      # (`a_ship_build_has_no_speech_namespace`, a Lua check with no platform
+      # code); no `cfg` pairs `target_os` with `not(feature = "dev")`; and the
+      # runtime `cfg!(feature = "dev")` branches (`core::project::prepare`,
+      # `core/project/agent_tests.rs`) write files, with no platform code. So the
+      # default test targets and binaries now compile only on Linux: what only
+      # they hold is feature plumbing, which Linux proves, while the doctests
+      # below still build the default library on macOS. Running both cost the
+      # leg about 9 of its 23-29 minutes and tipped it past its timeout.
       - name: Test (engine, dev features)
         shell: bash
         run: |
@@ -306,6 +319,12 @@ jobs:
           cargo nextest run --profile ci --features dev --locked || rc=$?
           cp target/nextest/ci/junit.xml junit-dev.xml || true
           exit "$rc"
+      # The ten slowest tests, in the log where an agent reads them (#1976): the
+      # job summary is not served by the REST API a cloud session reads.
+      - name: Slowest tests
+        if: always()
+        continue-on-error: true
+        run: python3 .github/scripts/slowest_tests.py junit-dev.xml
       - name: Doctests (both feature sets)
         shell: bash
         run: |
