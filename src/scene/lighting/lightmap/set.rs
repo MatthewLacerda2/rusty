@@ -106,6 +106,15 @@ impl LightmapSet {
         }
     }
 
+    /// Keep only the entries of the entities `keep` accepts, under a preview
+    /// ([`Self::shown_over`]) too: a save drops those of entities no longer live.
+    pub fn retain(&mut self, keep: impl Fn(u32) -> bool + Copy) {
+        self.entries.retain(|&id, _| keep(id));
+        if let Some(own) = &mut self.shown_over {
+            own.retain(keep);
+        }
+    }
+
     /// Every entry, in entity order.
     pub fn entries(&self) -> impl Iterator<Item = &LightmapEntry> {
         self.entries.values()

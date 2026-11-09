@@ -64,18 +64,48 @@ fn lightmaps_cleared_during_a_bake_stay_cleared_on_save_and_cancel() {
     assert_eq!(preview_pages(&path), 0);
 }
 
+/// The wall's entry in the save of `scene`.
+fn saved(scene: &Scene, wall: u32) -> Option<crate::scene::lighting::lightmap::LightmapEntry> {
+    crate::scene::to_scene_data(scene)
+        .lightmaps
+        .get(wall)
+        .cloned()
+}
+
 #[test]
-fn a_bake_finished_after_a_delete_gives_the_deleted_entity_no_lightmap() {
-    let (mut scene, floor, _) = scene();
-    let path = scene_path("preview_delete_done");
+fn an_undone_delete_after_a_bake_brings_the_wall_back_with_the_new_entry() {
+    let (mut scene, wall, _) = scene();
+    let path = scene_path("preview_delete_undo");
+    bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
+    // The last bake's entry, marked so the new bake's cannot equal it.
+    let mut stale = scene.lightmaps.get(wall).cloned().unwrap();
+    stale.scale_offset = [9.0; 4];
+    scene.lightmaps.insert(stale.clone());
     let settings = BakeSettings {
         samples: 64,
         samples_per_pass: 1,
         ..quick()
     };
     let mut job = LightmapBakeJob::start(&mut scene, Some(&path), settings, None).unwrap();
-    scene.destroy_entity(floor);
+    scene.begin_edits();
+    scene.destroy_entity(wall);
+    scene.commit_edits(None);
     let (outcome, _) = run(&mut job, &mut scene);
-    assert!(matches!(outcome, BakeOutcome::Baked(_)), "{outcome:?}");
-    assert!(scene.lightmaps.get(floor).is_none());
+    // The ball has no lightmap UV: the floor alone was baked, and it is gone.
+    assert_eq!(outcome, BakeOutcome::Baked(0), "only live entities count");
+    let new = scene
+        .lightmaps
+        .get(wall)
+        .cloned()
+        .expect("the bake's entry");
+    assert_ne!(new, stale);
+    assert_eq!(saved(&scene, wall), None, "a save names no dead entity");
+    scene.undo();
+    assert!(scene.world.contains(wall));
+    assert_eq!(
+        scene.lightmaps.get(wall),
+        Some(&new),
+        "the new bake's entry"
+    );
+    assert_eq!(saved(&scene, wall), Some(new));
 }

@@ -43,7 +43,8 @@ type Encoded = Result<Option<EncodedPages>, String>;
 /// How a finished bake ended, once [`LightmapBakeJob::poll`] has applied it.
 #[derive(Debug, PartialEq)]
 pub enum BakeOutcome {
-    /// This many lightmaps were written and the scene now points at them.
+    /// The scene now points at the new pages, and this many live entities wear
+    /// a lightmap from them (one deleted during the bake is not counted).
     Baked(usize),
     /// Stopped by [`LightmapBakeJob::cancel`]; the scene was left untouched.
     Cancelled,
@@ -198,12 +199,17 @@ impl LightmapBakeJob {
         Some(match joined {
             // A cancel after the encode finished still applies nothing.
             Ok(Ok(Some(_))) if self.progress.is_cancelled() => BakeOutcome::Cancelled,
-            Ok(Ok(Some(mut pages))) => {
+            Ok(Ok(Some(pages))) => {
                 warn_missing_uvs(self.static_meshes, pages.maps);
-                // An entity deleted while the bake ran gets no lightmap.
-                pages.entries.retain(|e| scene.world.contains(e.entity));
+                // An entity deleted while the bake ran keeps its new entry, so an
+                // Undo of the delete brings it back lit by this bake, never by
+                // the stale entry its Undo record holds; a save leaves it out.
+                // Only the live ones are counted as applied.
+                let live = (pages.entries.iter())
+                    .filter(|e| scene.world.contains(e.entity))
+                    .count();
                 match apply_encoded(scene, &self.scene_path, &pages) {
-                    Ok(n) => BakeOutcome::Baked(n),
+                    Ok(_) => BakeOutcome::Baked(live),
                     Err(e) => BakeOutcome::Failed(e),
                 }
             }
