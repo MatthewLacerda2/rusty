@@ -156,7 +156,7 @@ impl Renderer {
         let counters = &mut self.frame_counters;
         counters.hiz_culled += cam.counter.culled;
         counters.cluster_tested += plan.tested;
-        counters.cluster_culled += cam.clusters.counter.culled;
+        counters.cluster_culled += cam.clusters.counter.while_active(!plan.runs.is_empty());
         ctx.solids.culled = Some(last);
     }
 

@@ -86,10 +86,19 @@ pub(super) fn cover(runs: &[Range<u32>], run: Range<u32>) -> Option<Range<u32>> 
     whole.then_some(lo as u32..hi as u32)
 }
 
+/// Whether an index buffer of `bytes` can be bound whole as storage under a
+/// device's `max_storage_buffer_binding_size` of `limit` (128 MiB by default,
+/// about 33.5M indices): past it, binding it is a validation panic.
+pub(super) fn binds(bytes: u64, limit: u64) -> bool {
+    bytes <= limit
+}
+
 impl crate::render::Renderer {
     /// Give the resident mesh `id` the table of `clusters` (its import's, still
     /// describing its geometry), or none. Clusters that don't end at its last
-    /// index are not its own, and are dropped.
+    /// index are not its own, and are dropped; so are those of a mesh whose index
+    /// buffer is past the device's storage binding limit ([`binds`]), which the
+    /// cluster passes could not bind, and which then draws whole as before.
     pub(crate) fn attach_clusters(
         &mut self,
         id: &crate::render::MeshId,
@@ -99,13 +108,34 @@ impl crate::render::Renderer {
         let Some(mesh) = self.gpu_meshes.get_mut(id) else {
             return;
         };
+        let limit = self.device.limits().max_storage_buffer_binding_size;
         let fits = |c: &&Clusters| {
-            c.list
-                .last()
-                .is_some_and(|l| l.indices.end == mesh.num_indices)
+            let own = c.list.last().map(|l| l.indices.end) == Some(mesh.num_indices);
+            own && binds(mesh.index_buffer.size(), limit)
         };
         mesh.clusters = clusters
             .filter(fits)
             .map(|c| GpuClusters::new(&self.device, layout, c, &mesh.index_buffer));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{binds, cover};
+
+    #[test]
+    fn a_mesh_past_the_storage_binding_limit_gets_no_cluster_table() {
+        let limit = 128 << 20;
+        assert!(binds(limit, limit), "exactly the limit binds");
+        assert!(!binds(limit + 4, limit), "34M indices do not");
+    }
+
+    #[test]
+    fn a_run_is_covered_only_when_it_starts_and_ends_on_cluster_edges() {
+        let runs = [0..30, 30..60, 60..96];
+        assert_eq!(cover(&runs, 30..96), Some(1..3));
+        assert_eq!(cover(&runs, 0..96), Some(0..3));
+        assert_eq!(cover(&runs, 3..60), None, "starts inside a cluster");
+        assert_eq!(cover(&runs, 30..63), None, "ends inside one");
     }
 }

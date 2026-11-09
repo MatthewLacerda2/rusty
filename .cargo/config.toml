@@ -8,3 +8,14 @@
 # get through the cloud sessions' proxy, and the system git can. Git is present
 # everywhere rusty builds (dev machines, CI runners, the cargo-deny-action image).
 git-fetch-with-cli = true
+
+[env]
+# Floating-point contraction off for the C++ dependencies `cc` builds (#1968).
+# meshoptimizer's clusterizer (the `meshopt` crate) picks triangles by float
+# comparisons, and Apple clang fuses a multiply and an add into one FMA by
+# default, so near-ties break differently on macOS than on Linux. The reordered
+# indices feed the occlusion, navmesh and hull fingerprints, so they must be the
+# same bytes everywhere: a bake made on Linux has to read as fresh on a Mac.
+# `asset::clusters::tests::the_reorder_is_the_same_bytes_everywhere` pins it.
+# Not forced: a CXXFLAGS already in the environment wins, and that test says so.
+CXXFLAGS = "-ffp-contract=off"

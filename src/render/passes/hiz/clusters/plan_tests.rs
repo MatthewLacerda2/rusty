@@ -73,3 +73,19 @@ fn a_batch_past_the_budget_is_drawn_whole() {
         "no batches, no jobs"
     );
 }
+
+#[test]
+fn a_batch_none_of_whose_instances_is_judged_keeps_one_instanced_draw() {
+    let batches = [
+        batch(0..2, 0..600, Facing::Ccw),
+        batch(2..4, 0..600, Facing::Ccw),
+    ];
+    let all = instances(4);
+    let plan = Plan::of(batches.iter(), (&all, &|i| i == 3), |_| Some(0..5));
+    assert_eq!(
+        plan.draws(2),
+        vec![None, Some(0..2)],
+        "particles stay instanced"
+    );
+    assert_eq!((plan.jobs.len(), plan.tested), (2, 5));
+}

@@ -20,7 +20,8 @@
 //!
 //! **Never culled.** A cluster crossing the near plane; the clusters of an
 //! instance the per-instance test does not judge (a moving material, a ringed
-//! object: `CameraSolids::tested`); a cone test on a batch that does not keep
+//! object: `CameraSolids::tested`), and a batch with no judged instance at all
+//! (mesh particles) is not drawn by cluster; a cone test on a batch that does not keep
 //! front faces only (`RenderFace::Both`, `Back`, a mirrored instance), or under a
 //! world matrix that isn't a rotation and uniform scale. A cluster never spans two
 //! draw runs (material slots), since the import splits each run on its own.

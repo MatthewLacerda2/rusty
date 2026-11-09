@@ -111,3 +111,40 @@ fn no_cluster_crosses_a_material_run() {
         assert!(c.indices.end <= half || c.indices.start >= half, "{c:?}");
     }
 }
+
+/// FNV-1a over `words`: a hash whose value is the same on every platform.
+fn fnv(words: impl Iterator<Item = u32>) -> u64 {
+    let mut h = 0xcbf2_9ce4_8422_2325_u64;
+    for b in words.flat_map(u32::to_le_bytes) {
+        h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+    }
+    h
+}
+
+/// The reorder feeds the occlusion, navmesh and hull fingerprints, so a bake made
+/// on Linux must read as fresh on a Mac: CI runs this on both. A change here means
+/// meshoptimizer now breaks near-ties differently (Apple clang's FMA, unless
+/// `.cargo/config.toml`'s `CXXFLAGS` keeps contraction off) or was upgraded.
+#[test]
+fn the_reorder_is_the_same_bytes_everywhere() {
+    let (mut positions, mut indices) = grid(48);
+    // A bumpy grid from integer arithmetic only, so its floats are exact.
+    for (k, p) in positions.iter_mut().enumerate() {
+        p[1] = ((k as u32).wrapping_mul(2_654_435_761) >> 22) as f32 / 1024.0;
+    }
+    let clusters = build(&positions, &mut indices, &[]).expect("4608 triangles");
+    let ends = clusters.list.iter().map(|c| c.indices.end);
+    let hash = fnv(indices.iter().copied().chain(ends));
+    assert_eq!(
+        hash,
+        0x1c20_15a1_5721_af93,
+        "reorder hash {hash:#x}, {} clusters",
+        clusters.list.len()
+    );
+}
+
+#[test]
+fn a_run_too_long_to_draw_by_cluster_is_not_split() {
+    let mut indices = vec![0; MAX_RUN_INDICES + 3];
+    assert_eq!(build(&[[0.0; 3]], &mut indices, &[]), None);
+}

@@ -101,14 +101,19 @@ fn gpu_a_wall_hides_half_a_panel_and_only_the_visible_half_is_drawn() {
     let cam = Camera::new(Vec3::new(0.0, 1.0, 8.0), -90.0, 0.0);
     let (_, half, same) = on_and_off(&mut r, &scene, &cam);
     assert!(same, "cluster culling moved pixels");
-    let drawn = half;
     assert!(
-        drawn > ALL / 4 && drawn < ALL * 3 / 4,
-        "about half: {drawn} of {ALL}"
+        half > ALL / 4 && half < ALL * 3 / 4,
+        "about half: {half} of {ALL}"
     );
+    // The count reads back a frame or so late; once culling stops it is 0.
     let mut view = offscreen(&r);
-    let (_, c) = shot(&mut r, &mut view, &scene, &cam);
-    assert!(c.cluster_tested > 0, "{c:?}");
+    let mut frame = || shot(&mut r, &mut view, &scene, &cam).1;
+    let c = (0..9).map(|_| frame()).last().expect("nine frames");
+    assert!(c.cluster_tested > 0 && c.cluster_culled > 0, "{c:?}");
+    r.quality.gpu_cluster_culling = false;
+    let c = shot(&mut r, &mut view, &scene, &cam).1;
+    assert_eq!(c.cluster_culled, 0, "stale once culling stopped: {c:?}");
+    r.quality.gpu_cluster_culling = true;
     // With nothing in front and all of it on screen, every cluster is drawn.
     let mut open = Scene::new();
     open.skybox_path = String::new();

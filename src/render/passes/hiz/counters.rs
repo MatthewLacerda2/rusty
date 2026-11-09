@@ -79,6 +79,16 @@ impl Counter {
         }
     }
 
+    /// The last read's count while the items it counts are still being tested
+    /// (`active`), else `0`, forgotten: a frame that tests none culls none, and a
+    /// read still in flight from before reports at most a frame or so late.
+    pub(crate) fn while_active(&mut self, active: bool) -> u32 {
+        if !active {
+            self.culled = 0;
+        }
+        self.culled
+    }
+
     /// Record a copy of `source`'s first `bytes` (a multiple of 4), when no read
     /// is in flight.
     pub(crate) fn copy(
@@ -138,6 +148,25 @@ mod tests {
         };
         counter.mapped.store(state, Ordering::Release);
         counter
+    }
+
+    #[test]
+    fn a_count_is_zero_and_forgotten_once_nothing_is_tested() {
+        let mut counter = Counter {
+            culled: 7,
+            ..Counter::default()
+        };
+        assert_eq!(counter.while_active(true), 7);
+        assert_eq!(
+            counter.while_active(false),
+            0,
+            "nothing tested, none culled"
+        );
+        assert_eq!(
+            counter.while_active(true),
+            0,
+            "the stale 7 does not come back"
+        );
     }
 
     #[test]

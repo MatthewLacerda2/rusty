@@ -591,8 +591,10 @@ is wholly behind depth the camera drew this frame.
   ones that pass are drawn: the half of a canopy or a building shell a wall hides
   is left out. A cluster crossing the near plane is always drawn; a two-sided or
   back-faced material, or a mirrored or non-uniformly scaled instance, takes no
-  facing test; a mesh whose custom shader moves its vertices, and a skinned mesh,
-  are never split or tested. It changes no pixel either, and the preset's
+  facing test; a skinned mesh is never split. A mesh whose custom shader moves
+  its vertices is split and reordered at import like any other, but the instance
+  test never judges it, so its clusters are never tested and it keeps one
+  instanced draw; mesh particles likewise. It changes no pixel either, and the preset's
   `gpu_cluster_culling` (on in every seeded preset) turns it off. A split mesh is
   drawn once per instance, not instanced, so many copies of one big mesh cost a
   draw each; past a per-camera budget (8M indices) a batch is tested whole.

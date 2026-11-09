@@ -274,7 +274,7 @@ impl RenderCounters {
 mod frame;
 
 #[cfg(test)]
-use frame::count_lights;
+use frame::{count_lights, draws_of};
 
 #[cfg(test)]
 #[path = "stats_tests.rs"]

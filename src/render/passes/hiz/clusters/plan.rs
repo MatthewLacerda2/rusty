@@ -10,8 +10,9 @@ use crate::render::scene::MeshHandle;
 use crate::render::InstanceData;
 
 /// The most output indices one camera's clustered draws may hold (32 MB): a
-/// batch that would pass it is drawn whole, by the per-instance test alone.
-pub(crate) const MAX_OUT_INDICES: u64 = 1 << 23;
+/// batch that would pass it is drawn whole, by the per-instance test alone. The
+/// import splits no run longer than it, since one could never fit.
+pub(crate) const MAX_OUT_INDICES: u64 = crate::asset::clusters::MAX_RUN_INDICES as u64;
 /// A dispatch dimension's limit, in workgroups: a batch with more instances or
 /// clusters than this, or more (instance, cluster) pairs than 64 times it (the
 /// test's threads), is drawn whole.
@@ -58,7 +59,8 @@ pub(crate) struct Plan {
 impl Plan {
     /// Plan `batches` over the camera's `instances`, `tested` saying which the
     /// per-instance test judges, `clusters_of` naming the cluster table range of a
-    /// batch whose mesh is split and whose run is whole clusters.
+    /// batch whose mesh is split and whose run is whole clusters. A batch with no
+    /// instance, or none the instance test judges, keeps its one instanced draw.
     pub(crate) fn of<'a>(
         batches: impl Iterator<Item = &'a DrawBatch>,
         (instances, tested): (&[InstanceData], &dyn Fn(usize) -> bool),
@@ -79,7 +81,11 @@ impl Plan {
                 && count <= u64::from(MAX_DIMENSION)
                 && n <= MAX_DIMENSION
                 && count * u64::from(n) <= 64 * u64::from(MAX_DIMENSION);
-            if !fits || count == 0 {
+            // A batch none of whose instances is judged (mesh particles, a
+            // vertex-moving material) would cull nothing by cluster but the
+            // frustum and cones, at a draw per instance: one instanced draw wins.
+            let judged = batch.instances.clone().any(|i| tested(i as usize));
+            if !fits || !judged {
                 continue;
             }
             let first = plan.jobs.len() as u32;

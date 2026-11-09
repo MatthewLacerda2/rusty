@@ -2,6 +2,7 @@
 //! render, each camera's solids and particles added, the frame's totals at its end.
 
 use super::RenderCounters;
+use crate::render::draw::batch::DrawBatch;
 use crate::render::draw::resources::SolidResources;
 use crate::render::gpu::textures::compressed::gpu_bytes;
 use crate::render::gpu::uniforms::MAX_DIRECTIONAL_LIGHTS;
@@ -26,8 +27,9 @@ impl Renderer {
     /// batches.
     pub(crate) fn count_camera(&mut self, solids: &SolidResources, particles: ParticleDraws) {
         let c = &mut self.frame_counters;
-        let batches = solids.draws.batches();
-        c.add_draws(batches.map(|b| (b.key.indices.len(), b.instances.len() as u32)));
+        let clustered = solids.culled.as_ref().and_then(|c| c.clusters.as_ref());
+        let clustered = clustered.map_or(&[][..], |c| &c.draws[..]);
+        c.add_draws(draws_of(solids.draws.batches(), clustered));
         c.visible_entities += solids.visible;
         c.cull_tested += solids.culls.tested;
         c.culled_entities += solids.culls.culled;
@@ -90,4 +92,19 @@ pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
     let dropped =
         per_type[1].saturating_sub(MAX_DIRECTIONAL_LIGHTS as u32) + per_type[3].saturating_sub(1);
     (per_type.iter().sum(), dropped)
+}
+
+/// The draws `batches` make, `(indices, instances)` each: one instanced draw per
+/// batch, but one draw per instance for the batch `i` that `clustered[i]` says is
+/// drawn by cluster (#1968), whose kept clusters each instance draws on its own.
+pub(super) fn draws_of<'a>(
+    batches: impl Iterator<Item = &'a DrawBatch> + 'a,
+    clustered: &'a [Option<std::ops::Range<u32>>],
+) -> impl Iterator<Item = (u32, u32)> + 'a {
+    batches.enumerate().flat_map(move |(i, b)| {
+        let n = b.instances.len() as u32;
+        let split = clustered.get(i).is_some_and(Option::is_some);
+        let (calls, per) = if split { (n, 1) } else { (1, n) };
+        std::iter::repeat_n((b.key.indices.len(), per), calls as usize)
+    })
 }

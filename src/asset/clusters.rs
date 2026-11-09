@@ -38,6 +38,10 @@ const CONE_WEIGHT: f32 = 0.25;
 /// The cutoff of a cluster whose triangles face too many ways for a cone: no
 /// direction's dot reaches it, so it is never culled by facing.
 pub const NO_CONE: f32 = 2.0;
+/// The longest run split: the renderer's per-camera room for clustered draws
+/// (`render::passes::hiz::clusters::plan::MAX_OUT_INDICES` is this), so a longer
+/// run could never be drawn by cluster and its clusters would be dead weight.
+pub const MAX_RUN_INDICES: usize = 1 << 23;
 
 /// One cluster: its index range in the reordered list, its local bounds, and the
 /// cone every triangle's normal falls in.
@@ -72,8 +76,9 @@ pub fn apply(sub: &mut SubMesh) {
 
 /// The clusters of `indices` over `positions`, each run of `runs` split on its
 /// own, with `indices` reordered to match. `None`, and `indices` untouched, for a
-/// mesh under [`MIN_TRIANGLES`], one whose runs don't cover its indices in order,
-/// one naming a vertex it doesn't have, or one with a position that isn't finite.
+/// mesh under [`MIN_TRIANGLES`], one with a run past [`MAX_RUN_INDICES`], one whose
+/// runs don't cover its indices in order, one naming a vertex it doesn't have, or
+/// one with a position that isn't finite.
 pub fn build(
     positions: &[[f32; 3]],
     indices: &mut [u32],
@@ -86,6 +91,7 @@ pub fn build(
     let fits = indices.len() / 3 >= MIN_TRIANGLES
         && indices.len().is_multiple_of(3)
         && covers(&runs, indices.len() as u32)
+        && runs.iter().all(|r| r.len() <= MAX_RUN_INDICES)
         && indices.iter().all(|&i| (i as usize) < positions.len())
         && positions.iter().flatten().all(|c| c.is_finite());
     if !fits {
