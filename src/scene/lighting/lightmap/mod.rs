@@ -108,17 +108,15 @@ mod pages_bc_tests;
 #[cfg(test)]
 mod pages_tests;
 #[cfg(test)]
+mod pass_tests;
+#[cfg(test)]
 mod pool_tests;
 #[cfg(test)]
 mod probe_direct_tests;
 #[cfg(test)]
 mod progress_tests;
 #[cfg(test)]
-mod progressive_pass_tests;
-#[cfg(test)]
 mod progressive_tests;
-#[cfg(test)]
-mod progressive_view_tests;
 #[cfg(test)]
 mod rays_tests;
 #[cfg(test)]
@@ -139,3 +137,5 @@ mod sliver_tests;
 mod tests;
 #[cfg(test)]
 mod validity_tests;
+#[cfg(test)]
+mod view_tests;

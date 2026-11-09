@@ -1,7 +1,7 @@
 //! The progressive bake (#1970): its last pass gives the one-shot bake's bytes
 //! whatever its pass size, view or thread count, and a cancel returns nothing.
-//! What each pass shows: `progressive_pass_tests`; Prioritize View:
-//! `progressive_view_tests`.
+//! What each pass shows: `pass_tests`; Prioritize View:
+//! `view_tests`.
 
 use glam::Vec3;
 
