@@ -97,6 +97,7 @@ pub(super) fn bake(scene: &mut Scene, name: &str) {
         denoiser: crate::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional: false,
+        backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
     };
     let maps = bake_scene_lightmaps(scene, Some(&path), &settings).expect("baked");
     assert!(maps > 0, "the floor is lightmapped");

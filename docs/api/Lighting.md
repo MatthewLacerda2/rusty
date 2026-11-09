@@ -21,8 +21,8 @@ first.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
@@ -30,11 +30,12 @@ first.
 ### Generate Lighting
 
 - **Settings live with the scene** (Unity's Lighting Settings): texels per unit, samples,
-  bounces, seed, Max Lightmap Size, the denoiser and the directional mode are saved in the scene file's
+  bounces, seed, Max Lightmap Size, the denoiser, Backface Tolerance and the directional mode are saved in the scene file's
   `lighting_settings` block, so a rebake never asks for them again.
   `Lighting.SetSettings{ samples = 256 }` changes only the fields it names (each clamped
   to the editor's range: `0.25`–`64` texels per unit, `1`–`4096` samples, `1`–`16`
-  bounces, Max Lightmap Size below; a NaN or infinite density takes the default `8`, and
+  bounces, `0`–`1` Backface Tolerance, Max Lightmap Size below; a NaN or infinite density takes
+  the default `8` (a NaN or infinite tolerance its default `0.9`), and
   a file's out-of-range value is held the same way when the scene loads); the editor's card edits the
   same fields under the button. The reflection probes' defaults sit beside them:
   `reflectionResolution` (default `512`, a power of two in 16–2048) and
@@ -305,8 +306,24 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   (*Denoising*, below); baked direct light never is, so a point, spot or directional light's shadows stay sharp; an Area
   light's (#1674) are soft, its rectangle integrated over `samples` or more jittered
   points per texel. A texel buried inside other geometry (floor
-  under a crate) is filled from its neighbours rather than baked black. No GPU is needed;
-  it runs headless.
+  under a crate) is filled from its neighbours rather than baked black (*Backface
+  Tolerance*, below). No GPU is needed; it runs headless.
+- **Backface Tolerance** (`backfaceTolerance`, #1949, Unity's setting of that name,
+  default `0.9`, `0`–`1`). Each texel shoots 32 probe rays of its own; it is
+  *valid* when at least that share of them reach a front face or escape. A texel
+  below it sits inside geometry (a floor texel under a crate, one inside a wall): its
+  light is dropped and it is filled from the valid texels of **its own chart** (the
+  UV island it lies on), never from a chart packed beside it in the map, so a texel
+  at a floor's edge never takes the dark underside next to it. The probes are a fixed,
+  seeded budget apart from `samples`, so a texel is valid or not the same way at 16
+  samples and at 4096. `0` keeps every texel; `1` drops any that sees a back face.
+  **One-sided geometry counts as inside:** a floor under a single quad roof sees
+  only the roof's back, so at `0.9` its texels are dropped and filled from the
+  floor's lit part beyond the roof. The bake has no *Double Sided GI* yet, so close
+  such geometry (a box, not a plane) or lower the tolerance for that scene. A
+  chart with no valid texel at all (a box's face resting on a floor or against a
+  neighbour, which is ordinary content) is filled from the charts beside it, as
+  before, and the bake log says how many in one info line, never a warning.
 - **Denoising** (#1884). Only the bounce (indirect light, and a directional bake's
   directions) is cleaned, chart by chart; the direct light stays as traced.
   - `"OIDN"`: Intel **Open Image Denoise 2**'s `RTLightmap` filter, a network trained

@@ -90,7 +90,13 @@ fn glass_is_lit_and_lets_light_through_to_the_floor() {
         bakes_direct: true,
         mask_channel: None,
     });
-    let maps = bake(&baked, &settings());
+    // The pane is one-sided: the floor under it sees only its back, which Unity's
+    // Backface Tolerance reads as inside geometry (#1949). Keep every texel.
+    let one_sided = BakeSettings {
+        backface_tolerance: 0.0,
+        ..settings()
+    };
+    let maps = bake(&baked, &one_sided);
     let map = |entity| maps.iter().find(|m| m.entity == entity).expect("baked");
 
     let (_, glass) = halves(map(pane));

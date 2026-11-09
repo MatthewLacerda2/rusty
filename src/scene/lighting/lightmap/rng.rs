@@ -14,6 +14,12 @@ impl Rng {
         rng
     }
 
+    /// The stream of texel `texel`'s validity probes (#1949): its own, apart from
+    /// [`Self::new`]'s, so how many paths the texel traces never moves them.
+    pub(in crate::scene::lighting) fn probes(seed: u64, mesh: u64, texel: u64) -> Self {
+        Self::new(seed ^ 0x6a09_e667_f3bc_c909, mesh, texel)
+    }
+
     /// The next value, uniform in `[0, 1)`.
     pub(in crate::scene::lighting) fn next_f32(&mut self) -> f32 {
         self.0 = self.0.wrapping_add(0x9e37_79b9_7f4a_7c15);
