@@ -7,14 +7,13 @@
 //! batches moves, never what a texel draws, so the bytes are the same with or
 //! without a view.
 
-use std::thread;
-
 use glam::{Mat4, Vec3};
 
+use super::super::progress::BakeProgress;
 use super::super::raster::TexelPoint;
 use super::super::rays::Rays;
 use super::super::trace::T_MIN;
-use super::pool::BATCH;
+use super::pool;
 
 /// The camera a progressive bake prioritizes: where it is and what it sees.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -49,28 +48,24 @@ impl BakeView {
         distance <= T_MIN || !rays.occluded(from, to / distance, T_MIN, distance)
     }
 
-    /// Per chart, per batch of [`BATCH`] texels, whether the camera sees any of
-    /// them, the charts split over `threads` workers.
+    /// Per chart, per batch of `pool::BATCH` texels, whether the camera sees any
+    /// of them: the charts' batches as the bake's pool cuts them, checked on it on
+    /// `threads` workers. `None` when `progress` is cancelled first.
     pub(super) fn seen(
         &self,
         rays: &Rays,
         charts: &[Vec<TexelPoint>],
         threads: usize,
-    ) -> Vec<Vec<bool>> {
-        let batch =
-            |points: &[TexelPoint]| points.iter().any(|p| self.sees(rays, p.position, p.normal));
-        let chart =
-            |points: &Vec<TexelPoint>| points.chunks(BATCH).map(batch).collect::<Vec<bool>>();
-        let per = charts.len().div_ceil(threads.max(1)).max(1);
-        thread::scope(|s| {
-            let parts: Vec<_> = charts
-                .chunks(per)
-                .map(|part| s.spawn(move || part.iter().map(chart).collect::<Vec<_>>()))
-                .collect();
-            parts
-                .into_iter()
-                .flat_map(|h| h.join().unwrap_or_else(|p| std::panic::resume_unwind(p)))
-                .collect()
-        })
+        progress: &BakeProgress,
+    ) -> Option<Vec<Vec<bool>>> {
+        let texels: usize = charts.iter().map(Vec::len).sum();
+        let charts = charts.iter().map(|c| c.iter().collect()).collect();
+        let batch = |_: usize, _: usize, points: &[&TexelPoint]| {
+            vec![points.iter().any(|p| self.sees(rays, p.position, p.normal))]
+        };
+        let seen = pool::run(charts, threads, progress, batch, |_, _, seen| seen);
+        // The pool counted the texels it looked at; none was traced yet.
+        progress.take_back(texels as u64);
+        seen
     }
 }

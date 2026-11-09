@@ -1,14 +1,14 @@
 //! The running bake's bar on the scene card (#808, #1602, #1714): the lightmaps'
-//! texels (a progressive bake's pass, samples and time left above it, #1970) or
+//! texels (a progressive bake's passes done, samples and time left above it,
+//! #1970, in the log's words: `job::pass_line`) or
 //! pages with a Cancel button, the probes' stage, the occlusion's cells.
 
 use egui_phosphor::regular as icon;
 
 use super::Step;
-use crate::dev::bake::lightmap::job::clock;
+use crate::dev::bake::lightmap::job::pass_line;
 use crate::dev::bake::steps::Stage;
 use crate::editor::EditorUi;
-use crate::scene::lighting::lightmap::Pass;
 
 /// The running bake's bar, and its Cancel button during the lightmaps.
 pub(super) fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
@@ -32,7 +32,7 @@ pub(super) fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
     };
     // A progressive bake's pass, its samples so far and the time left (#1970).
     if let Some(pass) = job.passes().filter(|_| job.pages().is_none()) {
-        ui.label(pass_label(pass, job.eta()));
+        ui.label(format!("Lightmaps {}", pass_line(pass, job.eta())));
     }
     ui.horizontal(|ui| {
         let bar = egui::ProgressBar::new(job.fraction()).text(text);
@@ -42,18 +42,6 @@ pub(super) fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
             job.cancel();
         }
     });
-}
-
-/// The line above a progressive bake's bar: the pass being traced, the samples
-/// per texel so far and, once a pass is in, the time left.
-fn pass_label(pass: Pass, eta: Option<std::time::Duration>) -> String {
-    let now = (pass.done + 1).min(pass.passes);
-    let left = eta.filter(|_| pass.done > 0).map(clock);
-    let left = left.map_or(String::new(), |t| format!(" · about {t} left"));
-    format!(
-        "Pass {now} of {} · {}/{} samples{left}",
-        pass.passes, pass.samples, pass.target
-    )
 }
 
 /// The probe step's bar: which pass or set on a line above, `i / n` in the bar, so

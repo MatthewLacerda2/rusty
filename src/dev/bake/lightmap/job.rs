@@ -2,10 +2,11 @@
 //! button: the window stays live while the CPU path tracer runs.
 //!
 //! The editor's bake is progressive (#1970, Unity's Progressive Lightmapper,
-//! `lightmap::bake_progressive`): after each pass the worker encodes the lightmaps
-//! as they stand, and [`LightmapBakeJob::show_preview`], called each frame, shows
-//! them on the live scene (`preview`), the batches the Scene view sees traced first
-//! when the settings' Prioritize View is on. The finished bake's bytes are the
+//! `lightmap::bake_progressive`): after each pass the worker hands the lightmaps
+//! as they stand to the preview writer beside it (`preview::Encoder`) and traces
+//! on, and [`LightmapBakeJob::show_preview`], called each frame, shows the newest
+//! written on the live scene, the batches the Scene view sees traced first when
+//! the settings' Prioritize View is on. The finished bake's bytes are the
 //! one-shot bake's, so only what is shown on the way differs from a script's bake.
 //!
 //! [`LightmapBakeJob::start`] gathers the owned `BakeScene` on the caller's thread
@@ -22,12 +23,13 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use super::preview::Previews;
+use super::preview::{Encoder, Previews};
 use super::UNSAVED;
 use super::{
     apply_encoded, encode_pages, gather_bake_input, lend_denoiser, lightmap_receivers,
     warn_missing_uvs, EncodedPages,
 };
+use crate::dev::bake::progress::{duration, eta, Progress, Step};
 use crate::scene::lighting::lightmap::{
     bake_progressive, BakeProgress, BakeSettings, BakeView, MaskChannels, Pass,
 };
@@ -55,9 +57,11 @@ pub struct LightmapBakeJob {
     scene_path: String,
     /// Static meshes asking for a lightmap, for the missing-lightmap-UV report (#831).
     static_meshes: usize,
-    /// The passes shown on the live scene so far, and the lightmaps they hide.
+    /// The passes shown on the live scene so far.
     previews: Previews,
-    started: Instant,
+    /// When the first pass was seen done, and the texels traced by then: the
+    /// time left is paced from there, past the first pass's validity probes.
+    paced_from: Option<(Instant, u64)>,
 }
 
 impl LightmapBakeJob {
@@ -77,16 +81,18 @@ impl LightmapBakeJob {
         let static_meshes = lightmap_receivers(&input);
         let progress = Arc::new(lend_denoiser(BakeProgress::default(), &settings).0);
         let previews = Previews::new(&scene_path);
-        let (watch, latest) = (Arc::clone(&progress), previews.latest());
+        let watch = Arc::clone(&progress);
         let view = view.filter(|_| settings.prioritize_view);
+        let (page, taken) = (settings.page(), (lights, shadowmask));
+        let encoder = Encoder::start(&previews, page, taken.clone(), Arc::clone(&progress))?;
         let worker = thread::Builder::new()
             .name("lightmap-bake".into())
             .spawn(move || {
-                let (page, taken) = (settings.page(), (lights, shadowmask));
-                let mut on_pass = |pass: Pass, maps: &[_]| {
-                    Previews::encode(&latest, (pass, maps), page, &taken, &watch)
-                };
-                match bake_progressive(&input, &settings, &watch, view, &mut on_pass) {
+                let mut on_pass = |pass: Pass, maps| encoder.put(pass, maps);
+                let baked = bake_progressive(&input, &settings, &watch, view, &mut on_pass);
+                // The last preview is written before the final pages are encoded.
+                drop(encoder);
+                match baked {
                     Some(maps) => encode_pages(&maps, page, &watch)
                         .map(|pages| pages.map(|p| labelled(p, &taken))),
                     None => Ok(None),
@@ -99,7 +105,7 @@ impl LightmapBakeJob {
             scene_path,
             static_meshes,
             previews,
-            started: Instant::now(),
+            paced_from: None,
         })
     }
 
@@ -107,9 +113,12 @@ impl LightmapBakeJob {
     /// it; the pass shown, or `None` when no new one came in. A preview that cannot
     /// be written is said and skipped: the bake goes on.
     pub fn show_preview(&mut self, scene: &mut Scene) -> Option<Pass> {
+        if self.paced_from.is_none() && self.passes().is_some_and(|p| p.done > 0) {
+            self.paced_from = Some((Instant::now(), self.progress.done()));
+        }
         match self.previews.show(scene) {
             Ok(Some(pass)) => {
-                log::info!("[LightmapBake] {}", pass_line(pass, self.eta()));
+                log::info!("[LightmapBake] lightmaps {}", pass_line(pass, self.eta()));
                 Some(pass)
             }
             Ok(None) => None,
@@ -131,14 +140,18 @@ impl LightmapBakeJob {
         self.progress.passes()
     }
 
-    /// How long the trace still needs, at the pace it has gone so far (from the
-    /// texels traced over every pass); `None` before the first texel.
+    /// How long the trace still needs, at the pace it has gone since the first
+    /// pass was done (`progress::eta`); `None` before then.
     pub fn eta(&self) -> Option<Duration> {
+        let (at, then) = self.paced_from?;
         let (done, total) = self.progress();
-        (done > 0 && total >= done).then(|| {
-            let left = (total - done) as f64 / done as f64;
-            self.started.elapsed().mul_f64(left)
-        })
+        let now = Progress {
+            step: Step::Lightmaps,
+            done,
+            total,
+            meshes: None,
+        };
+        eta((Duration::ZERO, then), at.elapsed(), &now)
     }
 
     /// Texels traced so far and the bake's total (0 until it has rasterized).
@@ -193,8 +206,10 @@ impl LightmapBakeJob {
         Some(match joined {
             // A cancel after the encode finished still applies nothing.
             Ok(Ok(Some(_))) if self.progress.is_cancelled() => BakeOutcome::Cancelled,
-            Ok(Ok(Some(pages))) => {
+            Ok(Ok(Some(mut pages))) => {
                 warn_missing_uvs(self.static_meshes, pages.maps);
+                // An entity deleted while the bake ran gets no lightmap.
+                pages.entries.retain(|e| scene.world.contains(e.entity));
                 match apply_encoded(scene, &self.scene_path, &pages) {
                     Ok(n) => BakeOutcome::Baked(n),
                     Err(e) => BakeOutcome::Failed(e),
@@ -236,22 +251,13 @@ pub(super) fn labelled(pages: EncodedPages, (lights, shadowmask): &Taken) -> Enc
     }
 }
 
-/// The log's and the card's line for a pass: which, the paths per texel so far,
-/// and the time left.
+/// The log's and the card's words for a pass: which, the paths per texel so far,
+/// and the time left, as the headless bake log says it (`progress::duration`):
+/// `pass 3/8 (24/64 samples), ~3 min 5 s left`.
 pub fn pass_line(pass: Pass, eta: Option<Duration>) -> String {
-    let left = eta.map_or(String::new(), |t| format!(", about {} left", clock(t)));
+    let left = eta.map_or(String::new(), |t| format!(", ~{} left", duration(t)));
     format!(
-        "lightmaps pass {}/{} ({}/{} samples){left}",
+        "pass {}/{} ({}/{} samples){left}",
         pass.done, pass.passes, pass.samples, pass.target
     )
-}
-
-/// `t` as `1h 02m`, `3m 05s` or `12s`.
-pub fn clock(t: Duration) -> String {
-    let s = t.as_secs();
-    match (s / 3600, s / 60 % 60, s % 60) {
-        (0, 0, s) => format!("{s}s"),
-        (0, m, s) => format!("{m}m {s:02}s"),
-        (h, m, _) => format!("{h}h {m:02}m"),
-    }
 }

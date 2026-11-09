@@ -13,9 +13,10 @@
 //! (`Rng::preview`), its denoise on the means so far, and the last pass resolves and
 //! cleans the full sums once. A cancelled bake returns `None`.
 //!
-//! **Memory:** per texel its point, stream, sums and shown direct light, about 110
-//! bytes, never per sample; a pass holds two copies of a chart's state until the
-//! chart finishes.
+//! **Memory:** per texel its point, stream, sums and shown direct light
+//! (`Texel`), never per sample, in one copy: the pool hands each batch to its
+//! worker to update in place (`pool::run_batched`). A pass adds, per chart until
+//! it finishes, its texels' light and points, and the lightmaps it hands on.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
@@ -43,24 +44,22 @@ pub struct Pass {
     pub target: u32,
 }
 
-/// One texel between passes: where it is, its stream, its sums, and once its
-/// first pass has run, what it shows (`None` then means it lies inside geometry,
-/// #1949, and is never traced).
-#[derive(Clone, Debug)]
+/// One texel between passes: where it is, its stream, its sums, whether it lies
+/// inside geometry (#1949, decided on its first pass and never traced then), and
+/// once a pass has shown it, what it shows.
+#[derive(Debug)]
 struct Texel {
     point: TexelPoint,
     rng: Rng,
     paths: Paths,
+    inside: bool,
     shown: Option<Shown>,
 }
 
-/// A texel after a pass: going on, or (the last pass) its light resolved.
-enum Traced {
-    Going(Texel),
-    Done(TexelLight),
-}
+/// Every chart's texels, cut into the pool's batches.
+type Charts = Vec<Vec<Vec<Texel>>>;
 
-/// Bake `scene` progressively on every core, telling `on_pass` each pass but the
+/// Bake `scene` progressively on every core, handing `on_pass` each pass but the
 /// last and its lightmaps, the batches `view` sees first in each pass. `None` when
 /// `progress` was cancelled; a bake that finishes is byte-identical to `bake`'s.
 pub fn bake_progressive(
@@ -68,7 +67,7 @@ pub fn bake_progressive(
     settings: &BakeSettings,
     progress: &BakeProgress,
     view: Option<BakeView>,
-    on_pass: &mut dyn FnMut(Pass, &[Lightmap]),
+    on_pass: &mut dyn FnMut(Pass, Vec<Lightmap>),
 ) -> Option<Vec<Lightmap>> {
     let threads = thread::available_parallelism().map_or(1, |n| n.get());
     progressive_on(scene, settings, progress, (view, threads), on_pass)
@@ -80,14 +79,17 @@ pub(in crate::scene::lighting::lightmap) fn progressive_on(
     settings: &BakeSettings,
     progress: &BakeProgress,
     (view, threads): (Option<BakeView>, usize),
-    on_pass: &mut dyn FnMut(Pass, &[Lightmap]),
+    on_pass: &mut dyn FnMut(Pass, Vec<Lightmap>),
 ) -> Option<Vec<Lightmap>> {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer::new(scene, &rays);
     let (heads, points) = receivers(scene, settings);
     let passes = settings.passes();
+    let seen = match view {
+        Some(v) => Some(v.seen(&rays, &points, threads, progress)?),
+        None => None,
+    };
     announce(scene, settings, progress, (&heads, &points));
-    let seen = view.map(|v| v.seen(&rays, &points, threads));
     let mut items = fresh(points, &heads, settings.seed);
     let run = Run {
         scene,
@@ -125,7 +127,7 @@ pub(in crate::scene::lighting::lightmap) fn progressive_on(
             samples: done,
             target: settings.samples,
         };
-        on_pass(pass, &maps);
+        on_pass(pass, maps);
         items = going;
     }
     // `passes` is at least 1, so the last pass has returned.
@@ -148,17 +150,19 @@ fn announce(
     progress.set_meshes(sizes.map(|((i, _), p)| (scene.meshes[*i].entity, p.len() as u64)));
 }
 
-/// Every chart's texels before the first pass, each with its own stream.
-fn fresh(points: Vec<Vec<TexelPoint>>, heads: &[(usize, u32)], seed: u64) -> Vec<Vec<Texel>> {
+/// Every chart's texels before the first pass, each with its own stream, in the
+/// pool's batches.
+fn fresh(points: Vec<Vec<TexelPoint>>, heads: &[(usize, u32)], seed: u64) -> Charts {
     let chart = |(c, chart): (usize, Vec<TexelPoint>)| {
         let mesh = heads[c].0 as u64;
-        let texel = |point: TexelPoint| Texel {
+        let texel = move |point: TexelPoint| Texel {
             rng: Rng::new(seed, mesh, point.index as u64),
             point,
             paths: Paths::default(),
+            inside: false,
             shown: None,
         };
-        chart.into_iter().map(texel).collect()
+        pool::batches(chart.into_iter().map(texel))
     };
     points.into_iter().enumerate().map(chart).collect()
 }
@@ -177,39 +181,41 @@ struct Run<'a> {
 }
 
 impl Run<'_> {
-    /// One pass over every chart's `items` on the pool, the seen batches first:
-    /// the texels the next pass goes on with, and each chart's lightmap as it now
-    /// stands (the finished one on the last pass). `None` when cancelled.
-    fn pass(
-        &self,
-        items: Vec<Vec<Texel>>,
-        step: &Step,
-    ) -> Option<(Vec<Vec<Texel>>, Vec<Lightmap>)> {
+    /// One pass over every chart's `items` on the pool, the seen batches first,
+    /// each texel updated in place: the texels the next pass goes on with (none
+    /// after the last), and each chart's lightmap as it now stands (the finished
+    /// one on the last pass). `None` when cancelled.
+    fn pass(&self, items: Charts, step: &Step) -> Option<(Charts, Vec<Lightmap>)> {
         let (heads, progress) = (self.heads, self.progress);
         let cleaner = Cleaner {
             denoiser: self.settings.denoiser,
             radius: self.settings.filter_radius,
             trained: progress.denoiser(),
         };
-        let first = |c: usize, b: usize| self.seen.is_some_and(|s| s[c][b]);
-        let trace = |c: usize, _: usize, batch: &[Texel]| {
+        // A chart with no texel has no batch in `seen` (#1970's review).
+        let first = |c: usize, b: usize| {
+            self.seen
+                .is_some_and(|s| s.get(c).and_then(|s| s.get(b)).copied().unwrap_or(false))
+        };
+        let trace = |c: usize, _: usize, batch: &mut [Texel]| {
             let mesh = heads[c].0 as u64;
             progress.batch_started(c);
-            let traced = batch.iter().map(|t| step.texel(mesh, t)).collect();
+            let light = batch.iter_mut().map(|t| step.texel(mesh, t)).collect();
             progress.batch_finished(c, batch.len());
-            traced
+            light
         };
-        let finish = |c: usize, before: Vec<Texel>, traced: Vec<Traced>| {
-            let points: Vec<TexelPoint> = before.iter().map(|t| t.point).collect();
-            let (light, going) = step.light(traced);
+        let finish = |c: usize, texels: Vec<Vec<Texel>>, light: Vec<TexelLight>| {
+            let points = texels.iter().flatten().map(|t| t.point).collect();
             let (map, lost) = lightmap(self.scene, heads[c], points, light, self.settings, cleaner);
-            if step.last {
-                self.orphans.fetch_add(lost, Ordering::Relaxed);
-                progress.mesh_done();
+            if !step.last {
+                return (texels, map);
             }
-            (going, map)
+            self.orphans.fetch_add(lost, Ordering::Relaxed);
+            progress.mesh_done();
+            // The last pass frees each chart's state as it finishes.
+            (Vec::new(), map)
         };
-        let out = pool::run_first(items, self.threads, progress, &first, trace, finish)?;
+        let out = pool::run_batched(items, self.threads, progress, &first, trace, finish)?;
         Some(out.into_iter().unzip())
     }
 }
@@ -225,54 +231,31 @@ struct Step<'a> {
 }
 
 impl Step<'_> {
-    /// Texel `t` of receiving mesh `mesh` after this pass. Its first pass decides
-    /// its validity as the one-shot bake does (`super::texel`) and takes what it
-    /// shows from its display stream.
-    fn texel(&self, mesh: u64, t: &Texel) -> Traced {
+    /// Texel `t` of receiving mesh `mesh` after this pass, updated in place, and
+    /// its light: what it shows so far, or on the last pass its finished light.
+    /// Its first pass decides its validity as the one-shot bake does
+    /// (`super::texel`); a pass that shows it takes its direct light once, from
+    /// its display stream, so a bake of one pass traces it only as one-shot does.
+    fn texel(&self, mesh: u64, t: &mut Texel) -> TexelLight {
         let (s, tracer) = (self.settings, self.tracer);
-        let mut t = t.clone();
-        let (p, index) = (&t.point, t.point.index as u64);
+        let (position, normal) = (t.point.position, t.point.normal);
+        let index = t.point.index as u64;
         if self.done == 0 {
             let mut probes = Rng::probes(s.seed, mesh, index);
-            if tracer.valid(p.position, p.normal, s.backface_tolerance, &mut probes) {
-                let mut shown = Rng::preview(s.seed, mesh, index);
-                t.shown = Some(tracer.shown(p.position, p.normal, s.samples, &mut shown));
-            }
+            t.inside = !tracer.valid(position, normal, s.backface_tolerance, &mut probes);
         }
-        if t.shown.is_none() {
-            return match self.last {
-                true => Traced::Done(TexelLight::INSIDE),
-                false => Traced::Going(t),
-            };
+        if t.inside {
+            return TexelLight::INSIDE;
         }
-        let (position, normal) = (p.position, p.normal);
         let work = (self.count, s.bounces);
         tracer.gather(position, normal, work, &mut t.rng, &mut t.paths);
-        match self.last {
-            true => Traced::Done(tracer.resolve(position, normal, s.samples, &t.paths, &mut t.rng)),
-            false => Traced::Going(t),
+        if self.last {
+            return tracer.resolve(position, normal, s.samples, &t.paths, &mut t.rng);
         }
-    }
-
-    /// A chart's traced texels as the light its lightmap is built from, and the
-    /// texels the next pass goes on with (none after the last).
-    fn light(&self, traced: Vec<Traced>) -> (Vec<TexelLight>, Vec<Texel>) {
-        let samples = self.done + self.count;
-        let mut going = Vec::with_capacity(if self.last { 0 } else { traced.len() });
-        let light = traced
-            .into_iter()
-            .map(|t| match t {
-                Traced::Done(light) => light,
-                Traced::Going(t) => {
-                    let light = match &t.shown {
-                        Some(shown) => t.paths.light(samples, shown),
-                        None => TexelLight::INSIDE,
-                    };
-                    going.push(t);
-                    light
-                }
-            })
-            .collect();
-        (light, going)
+        let shown = t.shown.get_or_insert_with(|| {
+            let mut display = Rng::preview(s.seed, mesh, index);
+            tracer.shown(position, normal, s.samples, &mut display)
+        });
+        t.paths.light(self.done + self.count, shown)
     }
 }

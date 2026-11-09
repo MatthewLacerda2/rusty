@@ -122,11 +122,11 @@ pub(super) fn bake_on(
 
 /// Every receiving mesh's (index, lightmap size) and its texels, rasterized
 /// before the first texel is traced so the total is known.
-type Receivers = (Vec<(usize, u32)>, Vec<Vec<TexelPoint>>);
+pub(super) type Receivers = (Vec<(usize, u32)>, Vec<Vec<TexelPoint>>);
 
 /// The meshes `scene` bakes a lightmap for at `settings` ([`bake`]'s rule), each
 /// with its texels.
-fn receivers(scene: &BakeScene, settings: &BakeSettings) -> Receivers {
+pub(super) fn receivers(scene: &BakeScene, settings: &BakeSettings) -> Receivers {
     // Every lightmap must fit a page with its ring around it.
     let max = max_map_edge(settings.page());
     scene

@@ -84,3 +84,36 @@ fn a_texel_behind_a_wall_is_not_seen() {
         "a wall stands between"
     );
 }
+
+#[test]
+fn a_chart_with_no_texel_is_never_seen_and_the_bake_still_finishes() {
+    // Lightmap UVs wholly outside [0, 1]: a lightmap with no texel (#1970's review).
+    let mut outside = quad(
+        3,
+        [
+            Vec3::new(-2.0, 3.0, -2.0),
+            Vec3::new(-2.0, 3.0, 2.0),
+            Vec3::new(0.0, 3.0, 2.0),
+            Vec3::new(0.0, 3.0, -2.0),
+        ],
+        Vec3::ONE,
+    );
+    outside.lightmap_uvs.iter_mut().for_each(|uv| *uv += 5.0);
+    let scene = BakeScene {
+        meshes: vec![floor(), outside, wall()],
+        ..Default::default()
+    };
+    let s = BakeSettings {
+        samples: 2,
+        samples_per_pass: 1,
+        ..settings()
+    };
+    let (heads, points) = bake::receivers(&scene, &s);
+    assert_eq!(heads.len(), 3, "the outside mesh still gets a lightmap");
+    assert!(points[1].is_empty(), "with no texel");
+    let view = camera(Vec3::new(-3.0, 2.0, 0.0), Vec3::new(2.0, 2.0, 0.0), 0.3);
+    let progress = BakeProgress::default();
+    let maps = progressive_on(&scene, &s, &progress, (Some(view), 2), &mut |_, _| {});
+    let one_shot = bake::bake_on(&scene, &s, &BakeProgress::default(), 2);
+    assert_eq!(maps.expect("finished"), one_shot.expect("finished"));
+}

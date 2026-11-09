@@ -69,7 +69,7 @@ pub(super) fn progressive(
     threads: usize,
 ) -> (Vec<Lightmap>, Vec<(Pass, usize)>) {
     let mut passes = Vec::new();
-    let mut heard = |pass: Pass, maps: &[Lightmap]| passes.push((pass, maps.len()));
+    let mut heard = |pass: Pass, maps: Vec<Lightmap>| passes.push((pass, maps.len()));
     let progress = BakeProgress::default();
     let maps = progressive_on(scene, s, &progress, (view, threads), &mut heard);
     (maps.expect("not cancelled"), passes)

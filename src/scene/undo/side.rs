@@ -30,7 +30,8 @@ impl Side {
     /// own.
     pub(super) fn of(scene: &Scene, ids: impl IntoIterator<Item = u32>) -> Self {
         let ids: BTreeSet<u32> = ids.into_iter().collect();
-        let entry = |id: &u32| Some((*id, scene.lightmaps.get(*id)?.clone()));
+        // The entries a save writes, never a progressive bake's preview (#1970).
+        let entry = |id: &u32| Some((*id, scene.lightmaps.saved().get(*id)?.clone()));
         let lightmaps = ids.iter().filter_map(entry).collect();
         let owned = |d: &&Decal| d.owner.is_some_and(|o| ids.contains(&o.entity));
         let decals = scene.decals.iter().filter(owned).cloned().collect();
@@ -64,7 +65,7 @@ impl Side {
         let missing: Vec<LightmapEntry> = self
             .lightmaps
             .into_iter()
-            .filter(|(id, _)| live(*id) && scene.lightmaps.get(*id).is_none())
+            .filter(|(id, _)| live(*id) && scene.lightmaps.saved().get(*id).is_none())
             .map(|(_, entry)| entry)
             .collect();
         let decals: Vec<Decal> = self

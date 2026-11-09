@@ -280,16 +280,22 @@ and one-shot, as does `Lighting.Generate()`.
   mesh: each pass adds `samplesPerPass` paths (default `8`, `1`–`4096`; eight passes at
   the default 64 samples) to every texel, up to `samples`. After each pass but the last
   the live scene shows the lightmaps as they stand: the paths so far averaged, buried
-  texels filled, the bounce cleaned by the denoiser, packed into pages. They are written
-  as `lightmap_preview_*` pages in the scene's lightmap folder. The card and the log say
-  the pass, the samples so far and the time left at the pace so far
-  (`[LightmapBake] lightmaps pass 3/8 (24/64 samples), about 3m 05s left`).
+  texels filled, the bounce cleaned by the denoiser, packed into pages. A writer
+  thread beside the bake stores them as `lightmap_preview_*` pages in the scene's
+  lightmap folder (uncompressed PNGs of one level, no BC encode, while the trace goes
+  on); a pass still unshown when the next is in is skipped. The card and the log say
+  the passes done, the samples so far and the time left at the pace since the first
+  pass (`[LightmapBake] lightmaps pass 3/8 (24/64 samples), ~3 min 5 s left`).
   **The finished bake's bytes are the one-shot bake's** at the same settings and seed:
   each texel keeps its own seeded stream and its running sums between passes, so the
   pass size never shows. Only a finished bake is written: a save during the bake
   writes the scene's previous lightmaps, never a preview, and **Cancel** puts them
-  back and removes the preview pages. Each shown pass costs one page encode, so a
-  smaller `samplesPerPass` refreshes more often and bakes a little longer.
+  back and removes the preview pages. Edits during the bake reach those hidden
+  lightmaps: a deleted entity leaves them (and gets no lightmap from the finished
+  bake), and `Lighting.ClearLightmaps()` clears them and the preview. Each shown pass
+  costs a display denoise and a preview write, so a smaller `samplesPerPass`
+  refreshes more often and bakes a little longer. The texels' state between passes
+  is held once, updated in place.
   Rebaking on edit (Unity's *Auto Generate*) is not built yet.
 - **Prioritize View** (`prioritizeView`, default `true`, Unity's setting of that name).
   Each pass traces the texels the **Scene view's** camera sees first: in its frustum,

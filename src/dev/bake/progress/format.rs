@@ -74,7 +74,11 @@ pub(super) fn clock(d: Duration) -> String {
 /// Time left at the step's rate since `from` (when, and how much was done then: the
 /// start of its window, `rate::Window::from`): `None` until some work was done
 /// since, or once it is all done.
-pub(super) fn eta(from: (Duration, u64), now: Duration, p: &Progress) -> Option<Duration> {
+pub(in crate::dev::bake) fn eta(
+    from: (Duration, u64),
+    now: Duration,
+    p: &Progress,
+) -> Option<Duration> {
     let (at, done_then) = from;
     let did = p.done.checked_sub(done_then).filter(|&d| d > 0)?;
     let left = p.total.checked_sub(p.done).filter(|&l| l > 0)?;
@@ -84,7 +88,7 @@ pub(super) fn eta(from: (Duration, u64), now: Duration, p: &Progress) -> Option<
 
 /// A duration as a person reads it: `45 s`, `38 min`, `1 h 4 min`. Under ten
 /// minutes the seconds stay.
-pub(super) fn duration(d: Duration) -> String {
+pub(in crate::dev::bake) fn duration(d: Duration) -> String {
     let secs = d.as_secs();
     let (h, m, s) = (secs / 3600, secs / 60 % 60, secs % 60);
     match (h, m) {

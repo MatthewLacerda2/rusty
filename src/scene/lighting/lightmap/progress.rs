@@ -209,4 +209,14 @@ impl BakeProgress {
     pub(super) fn advance(&self, texels: u64) {
         self.done.fetch_add(texels, Ordering::Relaxed);
     }
+
+    /// Take back `texels` the pool counted that were only looked at, never traced
+    /// (Prioritize View's visibility check, #1970).
+    /// A cancel mid-check counted fewer, so this stops at 0.
+    pub(super) fn take_back(&self, texels: u64) {
+        let less = |done: u64| Some(done.saturating_sub(texels));
+        let _ = self
+            .done
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, less);
+    }
 }

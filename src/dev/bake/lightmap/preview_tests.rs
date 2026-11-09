@@ -6,9 +6,10 @@ use std::time::Duration;
 
 use super::tests::{quick, scene, scene_path};
 use super::*;
+use crate::scene::lighting::lightmap::Pass;
 
 /// The `lightmap_preview_*` pages beside `path`.
-fn preview_pages(path: &str) -> usize {
+pub(super) fn preview_pages(path: &str) -> usize {
     let Ok(entries) = std::fs::read_dir(lightmap_dir(path)) else {
         return 0;
     };
@@ -20,7 +21,7 @@ fn preview_pages(path: &str) -> usize {
 
 /// Poll `job` (showing each pass, as the editor does each frame) until it ends,
 /// with how many passes it showed.
-fn run(job: &mut LightmapBakeJob, scene: &mut Scene) -> (BakeOutcome, usize) {
+pub(super) fn run(job: &mut LightmapBakeJob, scene: &mut Scene) -> (BakeOutcome, usize) {
     let mut shown = 0;
     for _ in 0..12_000 {
         shown += usize::from(job.show_preview(scene).is_some());
@@ -32,31 +33,41 @@ fn run(job: &mut LightmapBakeJob, scene: &mut Scene) -> (BakeOutcome, usize) {
     panic!("the bake never finished");
 }
 
+/// A bake of many one-path passes started on `scene`, still going once its first
+/// pass is shown, and that pass.
+pub(super) fn showing(scene: &mut Scene, path: &str) -> (LightmapBakeJob, Pass) {
+    let slow = BakeSettings {
+        samples: 4096,
+        samples_per_pass: 1,
+        ..quick()
+    };
+    let mut job = LightmapBakeJob::start(scene, Some(path), slow, None).unwrap();
+    for _ in 0..12_000 {
+        if let Some(pass) = job.show_preview(scene) {
+            return (job, pass);
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    panic!("no pass was shown");
+}
+
 #[test]
 fn a_preview_is_shown_but_never_saved_and_a_cancel_puts_the_lightmaps_back() {
     let (mut scene, floor, _) = scene();
     let path = scene_path("preview_cancel");
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
     let before = (*scene.lightmaps).clone();
-    // Many one-path passes, so the bake is still going when the first is shown.
-    let slow = BakeSettings {
-        samples: 4096,
-        samples_per_pass: 1,
-        ..quick()
-    };
-    let mut job = LightmapBakeJob::start(&mut scene, Some(&path), slow, None).unwrap();
-    let pass = loop {
-        if let Some(pass) = job.show_preview(&mut scene) {
-            break pass;
-        }
-        std::thread::sleep(Duration::from_millis(5));
-    };
+    let (mut job, pass) = showing(&mut scene, &path);
     assert!(pass.done >= 1 && pass.samples == pass.done && pass.target == 4096);
     assert!(
         preview_pages(&path) > 0,
         "the pass is written beside the scene"
     );
     assert_ne!(scene.lightmaps.pages, before.pages, "and shown");
+    assert!(
+        scene.lightmaps.pages[0].ends_with(".png"),
+        "uncompressed, one level"
+    );
     assert!(scene.lightmaps.get(floor).is_some());
     assert_eq!(*scene.lightmaps.saved(), before);
     let saved = crate::scene::to_scene_data(&scene).lightmaps;
@@ -95,18 +106,13 @@ fn a_finished_progressive_bake_writes_the_one_shot_pages() {
 
 #[test]
 fn a_pass_line_says_the_pass_its_samples_and_the_time_left() {
-    let pass = crate::scene::lighting::lightmap::Pass {
+    let pass = Pass {
         done: 3,
         passes: 8,
         samples: 24,
         target: 64,
     };
-    let left = Some(Duration::from_secs(185));
-    let line = job::pass_line(pass, left);
-    assert_eq!(
-        line,
-        "lightmaps pass 3/8 (24/64 samples), about 3m 05s left"
-    );
-    assert_eq!(job::clock(Duration::from_secs(3720)), "1h 02m");
-    assert_eq!(job::clock(Duration::from_secs(12)), "12s");
+    let line = job::pass_line(pass, Some(Duration::from_secs(185)));
+    assert_eq!(line, "pass 3/8 (24/64 samples), ~3 min 5 s left");
+    assert_eq!(job::pass_line(pass, None), "pass 3/8 (24/64 samples)");
 }

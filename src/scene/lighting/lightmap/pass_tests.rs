@@ -18,7 +18,7 @@ fn every_pass_shows_the_whole_scene_converging() {
         ..settings()
     };
     let mut shown: Vec<Vec<Lightmap>> = Vec::new();
-    let mut heard = |_: Pass, maps: &[Lightmap]| shown.push(maps.to_vec());
+    let mut heard = |_: Pass, maps: Vec<Lightmap>| shown.push(maps);
     let progress = BakeProgress::default();
     let last = progressive_on(&scene, &s, &progress, (None, 2), &mut heard).expect("finished");
     let ended = Pass {

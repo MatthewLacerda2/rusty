@@ -64,9 +64,13 @@ pub struct LightmapSet {
     /// until a bake gives it a channel.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub fell_back: BTreeSet<u32>,
-    /// While a progressive bake's preview is shown (#1970), the lightmaps the
-    /// scene had before the bake: what a save writes ([`Self::saved`]) and what
-    /// a cancel puts back. Never serialized.
+    /// While a progressive bake's preview is shown (#1970), the scene's own
+    /// lightmaps, which it hides: what a save writes ([`Self::saved`]) and what a
+    /// cancel puts back. Their one owner, so the set's edits reach them as they
+    /// reach the preview: a despawn's [`Self::remove`] takes the entity from both,
+    /// [`Self::clear`] forgets both, and [`Self::insert`] (an Undo putting an entry
+    /// back) gives it to them alone, the preview's pages being another layout.
+    /// Never serialized.
     #[serde(skip)]
     pub shown_over: Option<Box<LightmapSet>>,
 }
@@ -83,14 +87,23 @@ impl LightmapSet {
         self.entries.get(&entity)
     }
 
-    /// Give `entry.entity` this lightmap, replacing the one it had.
+    /// Give `entry.entity` this lightmap, replacing the one it had: in the
+    /// scene's own lightmaps, under a preview ([`Self::shown_over`]) too.
     pub fn insert(&mut self, entry: LightmapEntry) {
-        self.entries.insert(entry.entity, entry);
+        match &mut self.shown_over {
+            Some(own) => own.insert(entry),
+            None => drop(self.entries.insert(entry.entity, entry)),
+        }
     }
 
-    /// Take `entity`'s lightmap away (a despawn), returning it.
+    /// Take `entity`'s lightmap away (a despawn), returning the one a save would
+    /// have written; a preview shown loses it too.
     pub fn remove(&mut self, entity: u32) -> Option<LightmapEntry> {
-        self.entries.remove(&entity)
+        let shown = self.entries.remove(&entity);
+        match &mut self.shown_over {
+            Some(own) => own.remove(entity),
+            None => shown,
+        }
     }
 
     /// Every entry, in entity order.
@@ -134,7 +147,9 @@ impl LightmapSet {
     }
 
     /// Forget every lightmap: every mesh falls back to probe / ambient lighting.
+    /// A preview shown goes too, with the lightmaps it hid.
     pub fn clear(&mut self) {
+        self.shown_over = None;
         self.pages.clear();
         self.directions.clear();
         self.entries.clear();

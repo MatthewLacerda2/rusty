@@ -5,6 +5,7 @@
 //!
 //! stored-format: the lightmap pages a bake writes into `<scene>.lightmaps/`
 
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use crate::asset::lightmap_page::{self, Page};
@@ -37,16 +38,17 @@ pub fn apply_lightmaps(
 }
 
 /// Write `encoded` beside `scene_path` and point the scene at it, replacing the
-/// previous bake's pages. Returns how many lightmaps were written.
+/// previous bake's pages. Returns how many lightmaps were written. The old pages
+/// are removed only once the new ones are all written and shown, so a write that
+/// fails leaves the scene on its old pages, still on disk.
 pub fn apply_encoded(
     scene: &mut Scene,
     scene_path: &str,
     encoded: &EncodedPages,
 ) -> Result<usize, String> {
     let dir = lightmap_dir(scene_path);
-    clear_pages(&dir, FINAL)?;
-    scene.lightmaps.clear();
     if encoded.maps == 0 {
+        clear_pages(&dir, FINAL, &BTreeSet::new())?;
         // No lightmap, but the probes still mask by these channels (#1695).
         let mut set = LightmapSet::default();
         set.channels = encoded.shadowmask.channels.clone();
@@ -56,7 +58,22 @@ pub fn apply_encoded(
         return Ok(0);
     }
     let size = encoded.page_size;
-    let set = write_set(&dir, FINAL, encoded)?;
+    let set = match write_set(&dir, FINAL, encoded) {
+        Ok(set) => set,
+        Err(e) => {
+            // The pages written before the failure; what the scene shows stays.
+            let mut keep = stems(&scene.lightmaps);
+            keep.extend(
+                scene
+                    .lightmaps
+                    .shown_over
+                    .as_deref()
+                    .map_or_else(BTreeSet::new, stems),
+            );
+            warn_unremoved(clear_pages(&dir, FINAL, &keep));
+            return Err(e);
+        }
+    };
     warn_fell_back(&set);
     let mask_bytes = encoded.masks.len() * mask_gpu_bytes(size);
     let bytes: usize = (encoded.colour.iter())
@@ -77,8 +94,27 @@ pub fn apply_encoded(
         bytes as f64 / (1024.0 * 1024.0),
         dir.display()
     );
+    let keep = stems(&set);
     scene.lightmaps = set.into();
+    // A previous bake's pages and any preview's; a page the new bake made again
+    // byte for byte has its name, and stays.
+    warn_unremoved(clear_pages(&dir, FINAL, &keep));
     Ok(encoded.maps)
+}
+
+/// Say a leftover page could not be removed: the scene no longer points at it.
+fn warn_unremoved(cleared: Result<(), String>) {
+    if let Err(e) = cleared {
+        log::warn!("[LightmapBake] remove an old lightmap page: {e}");
+    }
+}
+
+/// The file stems (`lightmap_0_<tag>`) of every page `set` points at: a KTX2
+/// page's PNG beside it shares its stem.
+pub(super) fn stems(set: &LightmapSet) -> BTreeSet<String> {
+    let paths = set.pages.iter().chain(&set.directions).chain(&set.masks);
+    let stem = |p: &String| Some(Path::new(p).file_stem()?.to_string_lossy().into_owned());
+    paths.filter_map(stem).collect()
 }
 
 /// Write `encoded`'s pages into `dir` under names starting `prefix` ([`FINAL`]
@@ -130,7 +166,7 @@ fn write_page(
 }
 
 /// Write one shadowmask page as `<dir>/<prefix>_<k>_<tag>.png` and return its path.
-fn write_png(dir: &Path, prefix: &str, k: usize, png: &[u8]) -> Result<String, String> {
+pub(super) fn write_png(dir: &Path, prefix: &str, k: usize, png: &[u8]) -> Result<String, String> {
     let path = dir.join(format!("{prefix}_{k}_{:08x}.png", content_tag(png)));
     std::fs::write(&path, png).map_err(|e| format!("write {}: {e}", path.display()))?;
     crate::core::fs::written::note_written(&path.to_string_lossy());
@@ -158,19 +194,24 @@ pub(super) fn content_tag(bytes: &[u8]) -> u32 {
     (hash ^ (hash >> 32)) as u32
 }
 
-/// Remove the pages (`.ktx2` and `.png`) whose names start `<prefix>_` from `dir`:
-/// under [`FINAL`] every page a previous bake left, its previews included.
-pub(super) fn clear_pages(dir: &Path, prefix: &str) -> Result<(), String> {
+/// Remove the pages (`.ktx2` and `.png`) whose names start `<prefix>_` from `dir`,
+/// but those whose stem `keep` holds ([`stems`]): under [`FINAL`] every page a
+/// previous bake left, its previews included.
+pub(super) fn clear_pages(dir: &Path, prefix: &str, keep: &BTreeSet<String>) -> Result<(), String> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Ok(()); // never baked
     };
     for entry in entries.flatten() {
+        let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
         let page = name.ends_with(".png") || name.ends_with(".ktx2");
-        if name.starts_with(&format!("{prefix}_")) && page {
-            std::fs::remove_file(entry.path()).map_err(|e| format!("remove {name}: {e}"))?;
+        let kept = path
+            .file_stem()
+            .is_some_and(|s| keep.contains(&*s.to_string_lossy()));
+        if name.starts_with(&format!("{prefix}_")) && page && !kept {
+            std::fs::remove_file(&path).map_err(|e| format!("remove {name}: {e}"))?;
             // Noted like a write, so the renderer frees the arrays holding it.
-            crate::core::fs::written::note_written(&entry.path().to_string_lossy());
+            crate::core::fs::written::note_written(&path.to_string_lossy());
         }
     }
     Ok(())
