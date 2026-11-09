@@ -85,7 +85,8 @@ impl Renderer {
         let resident = |id: &MeshId| self.gpu_meshes.get(id).map(|g| g.revision);
         for (id, (revision, entity)) in stale_uploads(candidates, resident) {
             let mesh = scene.world.mesh(entity).expect("collected above");
-            self.update_gpu_mesh(id, revision, &mesh.vertices, &mesh.indices);
+            self.update_gpu_mesh(id.clone(), revision, &mesh.vertices, &mesh.indices);
+            self.attach_clusters(&id, mesh.clusters());
         }
     }
 
@@ -128,6 +129,7 @@ impl Renderer {
                 existing.local_aabb = local_aabb;
                 existing.skin_bounds = skin_bounds;
                 existing.revision = revision;
+                existing.clusters = None;
                 self.queue.write_buffer(&existing.vertex_buffer, 0, v_bytes);
                 self.queue.write_buffer(&existing.index_buffer, 0, i_bytes);
                 return;
@@ -147,7 +149,10 @@ impl Renderer {
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("Mesh Indices ({})", id.0)),
                 contents: i_bytes,
-                usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+                // STORAGE: the cluster cull copies a clustered mesh's runs (#1968).
+                usage: wgpu::BufferUsages::INDEX
+                    | wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_DST,
             });
 
         self.gpu_meshes.insert(
@@ -159,6 +164,7 @@ impl Renderer {
                 local_aabb,
                 skin_bounds,
                 revision,
+                clusters: None,
             },
         );
     }

@@ -46,17 +46,24 @@
 //! and the projected rect is exact for an orthographic projection. An adapter
 //! without `INDIRECT_FIRST_INSTANCE` culls nothing this way.
 //!
+//! **By cluster.** A batch of a mesh the import split into clusters is then
+//! culled cluster by cluster against the same pyramid and drawn per instance
+//! ([`clusters`], #1968); the quality preset's `gpu_cluster_culling` turns it off.
+//!
 //! **Seams.** The pyramid ([`pyramid::Pyramid`]) is built once per camera and
-//! read by mip level and texel, so a later per-cluster test (#1968) binds the same
-//! texture; a light's shadow views and the CPU frustum loop could feed `cs_test`
-//! the same way, from their own depth.
+//! read by mip level and texel through `hiz/hidden.wgsl`'s `hidden`, which the
+//! instance and cluster tests share; a light's shadow views and the CPU frustum
+//! loop could feed it the same way, from their own depth.
 
+pub(crate) mod clusters;
 mod counters;
 mod cull;
 mod kept;
 pub(crate) mod pyramid;
 mod upload;
 
+#[cfg(test)]
+mod cluster_gpu_tests;
 #[cfg(all(test, feature = "dev"))]
 mod dust2_gpu_tests;
 #[cfg(test)]
@@ -88,6 +95,8 @@ pub(crate) struct HiZ {
     pub(super) compact: LazyCompute,
     pub(super) reduce_depth: LazyCompute,
     pub(super) reduce: LazyCompute,
+    /// The per-cluster passes (#1968).
+    pub(crate) clusters: clusters::ClusterPipelines,
 }
 
 /// What one view keeps for it: the pyramid, and each stacked camera's buffers,
@@ -103,6 +112,7 @@ impl HiZ {
         let mut registry = ShaderRegistry::new(crate::shadergen::engine_shader_dir());
         let cull = registry.load(device, "hiz.wgsl", "Hi-Z Cull");
         let levels = registry.load(device, "hiz_pyramid.wgsl", "Hi-Z Pyramid");
+        let by_cluster = registry.load(device, "hiz_clusters.wgsl", "Hi-Z Clusters");
         let cull_layout = upload::layout(device);
         let groups: &[&wgpu::BindGroupLayout] = &[&cull_layout];
         let with = |entry| lazy_compute(device, &cull, (entry, entry), Some(groups));
@@ -114,20 +124,32 @@ impl HiZ {
             reduce_depth: lazy_compute(device, &levels, ("Hi-Z Depth", "cs_reduce_depth"), None),
             reduce: lazy_compute(device, &levels, ("Hi-Z Reduce", "cs_reduce"), None),
             cull_layout,
+            clusters: clusters::ClusterPipelines::new(device, &by_cluster),
         }
     }
 
     /// The pipelines, for warming (`Renderer::lazy_computes`).
-    pub(crate) fn lazy_computes(&self) -> [&LazyCompute; 5] {
+    pub(crate) fn lazy_computes(&self) -> [&LazyCompute; 8] {
         let Self {
             select,
             test,
             compact,
             reduce_depth,
             reduce,
+            clusters,
             ..
         } = self;
-        [select, test, compact, reduce_depth, reduce]
+        let c = clusters;
+        [
+            select,
+            test,
+            compact,
+            reduce_depth,
+            reduce,
+            &c.test,
+            &c.scan,
+            &c.copy,
+        ]
     }
 }
 
@@ -137,5 +159,11 @@ impl Renderer {
         let supported = self.device.features().contains(FEATURE);
         let on = self.quality.gpu_occlusion_culling && cam.use_occlusion_culling;
         supported && on && !self.capture.static_only
+    }
+
+    /// Whether a camera that culls by Hi-Z also culls its clustered meshes by
+    /// cluster (#1968): the preset's `gpu_cluster_culling`.
+    pub(crate) fn cluster_culls(&self) -> bool {
+        self.quality.gpu_cluster_culling
     }
 }

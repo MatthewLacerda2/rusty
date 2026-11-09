@@ -1,11 +1,10 @@
-//! How many instances a camera's GPU occlusion cull hid (#1963): its final args
-//! copied to a mapped buffer and read a frame or so later, never waited on, so
-//! `Debug.Stats`' `hiz_culled` trails the frame it describes.
+//! How many instances a camera's GPU occlusion cull hid (#1963), and how many
+//! clusters its cluster cull dropped (#1968): what the GPU drew copied to a mapped
+//! buffer and read a frame or so later, never waited on, so `Debug.Stats`'
+//! `hiz_culled` and `cluster_culled` trail the frame they describe.
 
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
-
-use super::cull::ARGS;
 
 /// A read whose map has not answered yet.
 const PENDING: u8 = 0;
@@ -18,21 +17,32 @@ const FAILED: u8 = 2;
 #[derive(Default)]
 pub(crate) struct Counter {
     staging: Option<wgpu::Buffer>,
-    /// The instances tested and batches copied of the read in flight.
-    in_flight: Option<(u32, u32)>,
+    /// The items tested and bytes copied of the read in flight.
+    in_flight: Option<(u32, u64)>,
     /// Set by the map callback: [`MAPPED`] once the copy is readable, [`FAILED`]
     /// when the map was refused; [`PENDING`] until then.
     mapped: Arc<AtomicU8>,
     /// Whether the copy was recorded this frame and waits for its submit.
     copied: bool,
-    /// Instances the last read found hidden.
+    /// Items the last read found hidden.
     pub(crate) culled: u32,
 }
 
 impl Counter {
-    /// Take a finished read's count, if one came back.
-    pub(super) fn collect(&mut self, device: &wgpu::Device) {
-        let Some((tested, batches)) = self.in_flight else {
+    /// How many instances final args (five words a batch) draw.
+    pub(crate) fn drawn_instances(words: &[u32]) -> u32 {
+        words.chunks_exact(5).map(|args| args[1]).sum()
+    }
+
+    /// The count in a buffer's first word.
+    pub(crate) fn first_word(words: &[u32]) -> u32 {
+        words.first().copied().unwrap_or(0)
+    }
+
+    /// Take a finished read's count, if one came back: `drawn` reads how many
+    /// tested items were drawn from the copied words.
+    pub(crate) fn collect(&mut self, device: &wgpu::Device, drawn: fn(&[u32]) -> u32) {
+        let Some((tested, bytes)) = self.in_flight else {
             return;
         };
         // Lets a pending map's callback run, without waiting for it.
@@ -44,13 +54,12 @@ impl Counter {
             .staging
             .as_ref()
             .expect("a read in flight has its buffer");
-        let bytes = (ARGS * u64::from(batches)).max(4);
-        let drawn = staging.slice(..bytes).get_mapped_range().map(|view| {
-            let words: &[u32] = bytemuck::cast_slice(&view);
-            words.chunks_exact(5).map(|args| args[1]).sum::<u32>()
-        });
+        let read = staging
+            .slice(..bytes)
+            .get_mapped_range()
+            .map(|view| drawn(bytemuck::cast_slice(&view)));
         staging.unmap();
-        if let Ok(drawn) = drawn {
+        if let Ok(drawn) = read {
             self.culled = tested.saturating_sub(drawn);
         }
         self.in_flight = None;
@@ -70,18 +79,19 @@ impl Counter {
         }
     }
 
-    /// Record a copy of `args`' first `batches` draws, when no read is in flight.
-    pub(super) fn copy(
+    /// Record a copy of `source`'s first `bytes` (a multiple of 4), when no read
+    /// is in flight.
+    pub(crate) fn copy(
         &mut self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
-        (args, batches): (&wgpu::Buffer, u32),
+        (source, bytes): (&wgpu::Buffer, u64),
     ) {
         self.copied = false;
         if self.in_flight.is_some() {
             return;
         }
-        let bytes = (ARGS * u64::from(batches)).max(4);
+        let bytes = bytes.max(4);
         if self.staging.as_ref().is_none_or(|s| s.size() < bytes) {
             self.staging = Some(device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("Hi-Z Counter Read Back"),
@@ -91,23 +101,23 @@ impl Counter {
             }));
         }
         let staging = self.staging.as_ref().expect("made above");
-        encoder.copy_buffer_to_buffer(args, 0, staging, 0, ARGS * u64::from(batches));
+        let copied = bytes.min(source.size());
+        encoder.copy_buffer_to_buffer(source, 0, staging, 0, copied);
         self.copied = true;
-        self.in_flight = Some((0, batches));
+        self.in_flight = Some((0, bytes));
     }
 
-    /// After the copy's submit: map it, for `tested` instances.
-    pub(super) fn request(&mut self, tested: u32) {
+    /// After the copy's submit: map it, for `tested` items.
+    pub(crate) fn request(&mut self, tested: u32) {
         if !std::mem::take(&mut self.copied) {
             return;
         }
-        let Some((_, batches)) = self.in_flight else {
+        let Some((_, bytes)) = self.in_flight else {
             return;
         };
-        self.in_flight = Some((tested, batches));
+        self.in_flight = Some((tested, bytes));
         let staging = self.staging.as_ref().expect("copied into it");
         let mapped = Arc::clone(&self.mapped);
-        let bytes = (ARGS * u64::from(batches)).max(4);
         staging
             .slice(..bytes)
             .map_async(wgpu::MapMode::Read, move |result| {
@@ -123,7 +133,7 @@ mod tests {
 
     fn reading(state: u8) -> Counter {
         let counter = Counter {
-            in_flight: Some((10, 1)),
+            in_flight: Some((10, 20)),
             ..Counter::default()
         };
         counter.mapped.store(state, Ordering::Release);
@@ -137,7 +147,7 @@ mod tests {
         assert_eq!(failed.in_flight, None, "the next copy may go");
         let mut pending = reading(PENDING);
         assert!(!pending.settle());
-        assert_eq!(pending.in_flight, Some((10, 1)), "still waiting");
+        assert_eq!(pending.in_flight, Some((10, 20)), "still waiting");
         let mut mapped = reading(MAPPED);
         assert!(mapped.settle());
         assert_eq!(mapped.mapped.load(Ordering::Acquire), PENDING);

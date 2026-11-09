@@ -1,6 +1,8 @@
 //! One camera's GPU occlusion cull (#1963, the [module docs](super)): its buffers,
 //! kept per view and stack place, and the stage that records the two phases.
 
+use super::clusters::plan::Plan;
+use super::clusters::{ClusterCull, ClusterDraws};
 use super::counters::Counter;
 use super::kept::{Kept, Tables};
 use super::pyramid::Pyramid;
@@ -16,6 +18,9 @@ use crate::render::{RenderView, Renderer};
 pub(crate) struct Culled {
     pub group: wgpu::BindGroup,
     pub args: wgpu::Buffer,
+    /// The draws standing for the clustered batches (#1968): the final draws'
+    /// only, and only when a batch is drawn by cluster.
+    pub clusters: Option<ClusterDraws>,
 }
 
 /// `DrawIndexedIndirectArgs`' size: five words.
@@ -34,6 +39,8 @@ pub(crate) struct CameraCull {
     pub(super) kept: [GrowBuffer; 2],
     pub(super) args: [GrowBuffer; 2],
     pub(super) counter: Counter,
+    /// Its per-cluster cull (#1968).
+    pub(crate) clusters: ClusterCull,
     /// The two `hiz.wgsl` groups (phase one's, then the test's and final), kept
     /// while the buffers and pyramid they bind are.
     pub(super) groups: Kept<CullKey, [wgpu::BindGroup; 2]>,
@@ -69,6 +76,7 @@ impl CameraCull {
             kept: [0, 1].map(|_| buffer("Hi-Z Kept Instances", U::empty())),
             args: [0, 1].map(|_| buffer("Hi-Z Indirect Args", indirect)),
             counter: Counter::default(),
+            clusters: ClusterCull::new(device),
             groups: Kept::default(),
             culled: Kept::default(),
             tables: Tables::default(),
@@ -119,7 +127,8 @@ impl Renderer {
         let n = last.instances.end;
         let idx = ctx.uniform.stack[0] as usize;
         self.hold_hiz(view, idx);
-        let [first, last] = self.prepare_cull(view, idx, (&ctx.solids, ctx.view_proj), n);
+        let ([first, mut last], plan) =
+            self.prepare_cull(view, idx, (&ctx.solids, ctx.view_proj), n);
         let (cam, pyramid) = (&mut view.hiz.cameras[idx], &mut view.hiz.pyramid);
         let pyramid = pyramid.as_mut().expect("held above");
         let groups = cam.groups.value().expect("bound by prepare_cull");
@@ -134,11 +143,20 @@ impl Renderer {
         pyramid.build(&self.device, &self.hiz, &mut encoder, &view.depth_view);
         self.dispatch(&mut encoder, (&self.hiz.test, &groups[1]), n);
         self.dispatch(&mut encoder, (&self.hiz.compact, &groups[1]), batches);
-        let args = (cam.args[1].buffer(), batches);
+        if !plan.runs.is_empty() {
+            let at = (&*pyramid, cam.visible.buffer(), ctx.view_proj);
+            let cull = (&mut cam.clusters, &plan);
+            last.clusters = Some(self.cull_clusters(&mut encoder, cull, at, batches as usize));
+        }
+        let args = (cam.args[1].buffer(), ARGS * u64::from(batches));
         cam.counter.copy(&self.device, &mut encoder, args);
         self.queue.submit(std::iter::once(encoder.finish()));
         cam.counter.request(n);
-        self.frame_counters.hiz_culled += cam.counter.culled;
+        cam.clusters.counter.request(plan.tested);
+        let counters = &mut self.frame_counters;
+        counters.hiz_culled += cam.counter.culled;
+        counters.cluster_tested += plan.tested;
+        counters.cluster_culled += cam.clusters.counter.culled;
         ctx.solids.culled = Some(last);
     }
 
@@ -156,24 +174,30 @@ impl Renderer {
     }
 
     /// Upload camera `idx`'s first `n` instances and their bounds, bind its
-    /// groups, count what it tests, and return the two phases' draws.
+    /// groups, count what it tests, and return the two phases' draws and the
+    /// batches it draws by cluster (#1968).
     fn prepare_cull(
         &mut self,
         view: &mut RenderView,
         idx: usize,
         (solids, view_proj): (&SolidResources, glam::Mat4),
         n: u32,
-    ) -> [Culled; 2] {
+    ) -> ([Culled; 2], Plan) {
         let cam = &mut view.hiz.cameras[idx];
         let pyramid = view.hiz.pyramid.as_ref().expect("held");
-        cam.counter.collect(&self.device);
+        cam.counter.collect(&self.device, Counter::drawn_instances);
+        cam.clusters
+            .counter
+            .collect(&self.device, Counter::first_word);
         let instances = &solids.draws.instances[..n as usize];
         let tested = pack_bounds(&mut cam.tables, instances, &solids.tested);
+        let plan = self.plan_clusters(&solids.draws, &cam.tables);
         let frame = Frame {
             view_proj,
             depth: pyramid.depth,
             levels: pyramid.levels(),
             batches: &solids.draws.opaque,
+            clustered: &plan.draws(solids.draws.opaque.len()),
             slots: cam.tables.slots.iter().max().map_or(1, |&s| s + 1),
         };
         self.upload_cull(cam, (&frame, &pyramid.view), n);
@@ -194,11 +218,12 @@ impl Renderer {
                 cam.kept[k].buffer(),
             ),
             args: cam.args[k].buffer().clone(),
+            clusters: None,
         };
         let mut culled = std::mem::take(&mut cam.culled);
         let draws = culled.get(key, || [make(0), make(1)]).clone();
         cam.culled = culled;
-        draws
+        (draws, plan)
     }
 
     /// One compute pass of `pipeline` over `group`, a thread per one of `count`.

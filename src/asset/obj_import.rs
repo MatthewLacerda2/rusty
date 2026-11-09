@@ -121,6 +121,7 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
         skin: None,
         clips: Vec::new(),
         node_name: None,
+        clusters: None,
     }
 }
 

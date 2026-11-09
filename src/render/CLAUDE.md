@@ -88,6 +88,16 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   instance (a particle, a ringed object) stays drawn unless it adds itself there.
   A material whose vertices move past the mesh's bounds (`RenderObject::moving`)
   is never listed (`scene/draw.rs`, `hiz_testable`).
+- **A big mesh is then culled by cluster** (#1968, `passes::hiz::clusters`): the
+  import splits a static mesh of at least `asset::clusters::MIN_TRIANGLES` into
+  clusters and reorders its indices to match (`MeshComponent::clusters`, valid
+  only at the revision it was built for, so an edit drops it), and its GPU mesh
+  carries a cluster table (`GpuMesh::clusters`). In phase two a batch of such a
+  mesh is drawn per instance from the camera's compacted cluster indices
+  (`Culled::clusters`, `ClusterDraws`): `Renderer::draw_solids` does that for
+  every opaque pass, so a new opaque pass gets it for free. Phase one still draws
+  whole meshes. A cluster test reads the same pyramid through
+  `hiz/hidden.wgsl`'s `hidden`, the module both cull shaders import.
 
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no

@@ -105,6 +105,15 @@ pub struct MeshComponent {
     /// `vertices` or `indices` change, so every renderer re-uploads them.
     #[serde(skip)]
     pub revision: MeshRevision,
+    /// The clusters its import built (#1968, `asset::clusters`), with the
+    /// revision they describe: any later edit takes a new revision, so stale
+    /// clusters are never read. Read through [`Self::clusters`]; rehydrated with the
+    /// geometry, never serialized.
+    #[serde(skip)]
+    pub clusters: Option<(
+        MeshRevision,
+        std::sync::Arc<crate::asset::clusters::Clusters>,
+    )>,
 }
 
 fn one() -> u32 {
@@ -159,7 +168,15 @@ impl MeshComponent {
             max_draw_distance: 0.0,
             min_screen_size: 0.0,
             revision: MeshRevision::next(),
+            clusters: None,
         }
+    }
+
+    /// Its import's clusters (#1968), when they still describe its geometry: none
+    /// once the vertices or indices were edited.
+    pub fn clusters(&self) -> Option<&crate::asset::clusters::Clusters> {
+        let (of, clusters) = self.clusters.as_ref()?;
+        (*of == self.revision).then_some(clusters)
     }
 
     /// This mesh with its rehydrated, never-saved fields (every `#[serde(skip)]` one:

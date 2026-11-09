@@ -1,6 +1,8 @@
 //! Writing one camera's GPU occlusion cull (#1963) into its buffers, and the bind
 //! groups `hiz.wgsl` reads them through.
 
+use std::ops::Range;
+
 use glam::{Mat4, Vec3};
 
 use super::cull::{CameraCull, ARGS};
@@ -22,12 +24,23 @@ pub(super) struct Params {
 }
 
 /// The batches' runs and draws, as `hiz.wgsl`'s `Batch`.
-fn pack_batches(batches: &OpaqueBatches) -> Vec<[u32; 4]> {
-    let run = |b: &DrawBatch| {
+/// `clustered` says, per batch, whether its final draws are by cluster (#1968).
+fn pack_batches(batches: &OpaqueBatches, clustered: &[Option<Range<u32>>]) -> Vec<[u32; 8]> {
+    let run = |(b, by_cluster): (&DrawBatch, &Option<Range<u32>>)| {
         let (first, count) = (b.instances.start, b.instances.len() as u32);
-        [first, count, b.key.indices.len(), b.key.indices.start]
+        let flag = u32::from(by_cluster.is_some());
+        [
+            first,
+            count,
+            b.key.indices.len(),
+            b.key.indices.start,
+            flag,
+            0,
+            0,
+            0,
+        ]
     };
-    batches.iter().map(run).collect()
+    batches.iter().zip(clustered).map(run).collect()
 }
 
 /// Fill `tables.bounds` with each of `instances`' bounds, as `hiz.wgsl`'s
@@ -84,7 +97,7 @@ impl Renderer {
         queue.write_buffer(&cam.params, 0, bytemuck::bytes_of(&params));
         let bounds = bytemuck::cast_slice(&cam.tables.bounds);
         cam.bounds.upload(device, queue, bounds);
-        let batches = pack_batches(frame.batches);
+        let batches = pack_batches(frame.batches, frame.clustered);
         cam.batches
             .upload(device, queue, bytemuck::cast_slice(&batches));
         cam.hold(device, queue, frame.slots);
@@ -150,6 +163,8 @@ pub(super) struct Frame<'a> {
     pub(super) depth: (u32, u32),
     pub(super) levels: u32,
     pub(super) batches: &'a OpaqueBatches,
+    /// Per batch, the cluster draws standing for it (#1968).
+    pub(super) clustered: &'a [Option<Range<u32>>],
     pub(super) slots: u32,
 }
 

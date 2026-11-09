@@ -53,6 +53,7 @@ pub(super) fn low() -> QualityValues {
         ui_blur_divisor: 4,
         shadowmask_mode: ShadowmaskMode::Shadowmask,
         gpu_occlusion_culling: true,
+        gpu_cluster_culling: true,
     }
 }
 
@@ -70,6 +71,7 @@ pub(super) fn medium() -> QualityValues {
         ui_blur_divisor: 2,
         shadowmask_mode: ShadowmaskMode::Shadowmask,
         gpu_occlusion_culling: true,
+        gpu_cluster_culling: true,
     }
 }
 
@@ -86,5 +88,6 @@ pub(super) fn high() -> QualityValues {
         ui_blur_divisor: 2,
         shadowmask_mode: ShadowmaskMode::DistanceShadowmask,
         gpu_occlusion_culling: true,
+        gpu_cluster_culling: true,
     }
 }

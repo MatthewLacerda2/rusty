@@ -53,6 +53,13 @@ pub struct RenderCounters {
     /// the camera views. Read back from the GPU without waiting, so it describes
     /// a frame or so before this one, and `0` on the first.
     pub hiz_culled: u32,
+    /// Clusters of big meshes tested one by one after the Hi-Z instance test
+    /// (#1968): every cluster of each instance it judged in a batch drawn by
+    /// cluster, summed over the camera views.
+    pub cluster_tested: u32,
+    /// Of those, the ones left undrawn (behind the pyramid, out of the frustum,
+    /// facing away, or of an instance found hidden). Read back like `hiz_culled`.
+    pub cluster_culled: u32,
     /// Mesh entities hidden because their LODGroup showed another level (#472),
     /// summed over the camera stack.
     pub lod_hidden_entities: u32,
@@ -195,6 +202,8 @@ impl RenderCounters {
             ("occlusion_culled", self.occlusion_culled.into()),
             ("hiz_tested", self.hiz_tested.into()),
             ("hiz_culled", self.hiz_culled.into()),
+            ("cluster_tested", self.cluster_tested.into()),
+            ("cluster_culled", self.cluster_culled.into()),
             ("lod_hidden_entities", self.lod_hidden_entities.into()),
             ("lights", self.lights.into()),
             ("lights_dropped", self.lights_dropped.into()),

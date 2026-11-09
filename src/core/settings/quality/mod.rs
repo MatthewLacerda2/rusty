@@ -131,6 +131,11 @@ pub struct QualityValues {
     /// the GPU's depth pyramid (#1963), Unity 6's *GPU Occlusion* toggle on the URP
     /// asset: on in every seeded preset. The baked PVS (#1714) does not read it.
     pub gpu_occlusion_culling: bool,
+    /// Whether that cull also tests a big mesh's clusters one by one (#1968), so
+    /// the part of a canopy or a building shell another wall hides is not drawn:
+    /// the culling half of UE5's Nanite. On in every seeded preset; it does
+    /// nothing with `gpu_occlusion_culling` off.
+    pub gpu_cluster_culling: bool,
 }
 
 crate::core::named_enum! {

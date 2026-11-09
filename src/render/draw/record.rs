@@ -1,6 +1,7 @@
 //! Recording a camera's solid batches into a pass (#470): one instanced draw per
 //! batch, or one indirect draw per batch over the instances GPU occlusion culling
-//! kept (#1963). The opaque batches are an [`OpaqueBatches`], drawn only by
+//! kept (#1963), a clustered batch one indirect draw per instance over the
+//! clusters it kept (#1968). The opaque batches are an [`OpaqueBatches`], drawn only by
 //! [`Renderer::draw_solids`]; [`Renderer::draw_batches`] takes the translucents'
 //! slices, so the compiler keeps an opaque pass off the uncull path.
 
@@ -76,9 +77,19 @@ impl Renderer {
                 .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
             render_pass.set_bind_group(1, group, &offsets);
             render_pass.set_bind_group(2, self.materials.group(batch.key.material), &[]);
-            match culled {
-                Some(c) => render_pass.draw_indexed_indirect(&c.args, ARGS * i as u64),
-                None => {
+            let by_cluster = culled
+                .and_then(|c| c.clusters.as_ref())
+                .and_then(|c| Some((c, c.draws.get(i)?.clone()?)));
+            match (culled, by_cluster) {
+                (_, Some((c, jobs))) => {
+                    // A clustered batch (#1968): each instance's kept clusters.
+                    render_pass.set_index_buffer(c.indices.slice(..), wgpu::IndexFormat::Uint32);
+                    for job in jobs {
+                        render_pass.draw_indexed_indirect(&c.args, ARGS * u64::from(job));
+                    }
+                }
+                (Some(c), None) => render_pass.draw_indexed_indirect(&c.args, ARGS * i as u64),
+                (None, None) => {
                     render_pass.draw_indexed(batch.key.indices.range(), 0, batch.instances.clone())
                 }
             }

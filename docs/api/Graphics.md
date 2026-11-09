@@ -1010,7 +1010,8 @@ without one, the middle preset):
     "ssil": { … }, "ssr": { … }, "bloom_resolution_divisor": { "low": 4, "medium": 4, "high": 2 },
     "depth_of_field_resolution_divisor": { … }, "motion_blur_samples": { … },
     "volumetric_fog": { "low": { "resolution": 64, "slices": 32 }, … },
-    "ui_blur_divisor": 4, "shadowmask_mode": "Shadowmask", "gpu_occlusion_culling": true }, … ] }
+    "ui_blur_divisor": 4, "shadowmask_mode": "Shadowmask", "gpu_occlusion_culling": true,
+    "gpu_cluster_culling": true }, … ] }
 ```
 
 A new project is seeded with `Low`, `Medium` and `High` (`Medium` first); the game may
@@ -1049,8 +1050,12 @@ not bound yet, when every caster does; the seeded `Low` and `Medium`) or
 Occlusion* toggle on the URP asset: whether a camera with `use_occlusion_culling`
 culls the opaque meshes its GPU depth pyramid finds hidden ([`Lighting`](Lighting.md),
 *GPU occlusion culling*); `Graphics.SetQualityPreset("Low", { gpu_occlusion_culling =
-false })` turns it off for that preset. The baked PVS does not read it. A project with
-no presets runs the seeded `Medium` preset's values.
+false })` turns it off for that preset. The baked PVS does not read it.
+`gpu_cluster_culling` (#1968, `true` in every seeded preset) has that cull also test a
+big static mesh's clusters one by one, so the part of it another wall hides is not
+drawn ([`Lighting`](Lighting.md), *GPU occlusion culling*, *Per cluster*); it does
+nothing with `gpu_occlusion_culling` off. A project with no presets runs the seeded
+`Medium` preset's values.
 
 ### Render scale
 

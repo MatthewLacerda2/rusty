@@ -9,7 +9,7 @@ use super::MeshComponent;
 
 impl MeshComponent {
     /// This mesh with every saved field and every light runtime one copied, and its
-    /// heavy rehydrated ones (vertices, indices, runs, palettes, skin, clips) left
+    /// heavy rehydrated ones (vertices, indices, runs, palettes, skin, clips, clusters) left
     /// empty. Every field is named, so a new one must be placed here.
     pub fn without_geometry(&self) -> Self {
         Self {
@@ -29,6 +29,7 @@ impl MeshComponent {
             max_draw_distance: self.max_draw_distance,
             min_screen_size: self.min_screen_size,
             revision: self.revision,
+            clusters: None,
         }
     }
 
@@ -52,5 +53,6 @@ impl MeshComponent {
         self.clips = std::mem::take(&mut from.clips);
         self.pose_palette = std::mem::take(&mut from.pose_palette);
         self.revision = from.revision;
+        self.clusters = from.clusters.take();
     }
 }
