@@ -1,4 +1,4 @@
-//! src/scene/asset_instance/collision.rs — the collision mesh a Mesh-shaped collider
+//! src/scene/asset_instance/collision/mod.rs — the collision mesh a Mesh-shaped collider
 //! builds from when it is not its entity's own (#1960): Unity's
 //! `MeshCollider.sharedMesh` set to a low-poly copy, Unreal's `UCX_` mesh.
 //!
@@ -135,11 +135,8 @@ fn named_mesh(model: Option<&str>, name: &str) -> SharedMesh {
 }
 
 #[cfg(test)]
-#[path = "collision_edge_tests.rs"]
 mod edge_tests;
 #[cfg(test)]
-#[path = "collision_fallback_tests.rs"]
 mod fallback_tests;
 #[cfg(test)]
-#[path = "collision_tests.rs"]
 pub(crate) mod tests;
