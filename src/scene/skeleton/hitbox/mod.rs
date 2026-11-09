@@ -125,6 +125,7 @@ impl Scene {
                 material,
                 material_asset,
                 shared_mesh: None,
+                collision_mesh: None,
                 aabb_min: Vec3::ZERO,
                 aabb_max: Vec3::ZERO,
             }),

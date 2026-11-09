@@ -4,71 +4,61 @@
 //!
 //! A model's sidecar names it per sub-object (`asset::SubObjectCollider::mesh`), and
 //! `Physics.SetColliderShape(id, { kind = "Mesh", mesh = .. })` names it in script.
-//! Either way the collider keeps it as its `shared_mesh`, which physics, the navmesh
-//! and the collider gizmo read ahead of the entity's Mesh
+//! Either way the collider keeps it as its `collision_mesh`, which physics, the
+//! navmesh and the collider gizmo read ahead of the entity's Mesh
 //! (`physics::shape::build::collider_inputs`); only its reference is saved, and the
-//! geometry is rebuilt from it on load (`scene::rehydrate`). A name the model lacks
-//! is said once in the console and the collider falls back to its entity's own mesh,
-//! as Unity's `MeshCollider` does with a missing mesh reference.
+//! geometry is rebuilt from it on load, re-import and undo (`scene::rehydrate`). A
+//! name the model lacks is said once in the console and kept with no geometry: the
+//! collider falls back to its entity's own mesh, as Unity's `MeshCollider` does with
+//! a missing mesh reference, and picks the name up once the model has it.
 
-use std::cell::RefCell;
-use std::collections::BTreeSet;
+use std::path::Path;
 
 use crate::asset::{self, AssetRef, ImportedAsset};
-use crate::components::{ColliderComponent, ColliderShape, SharedMesh};
+use crate::components::{ColliderShape, SharedMesh};
+use crate::scene::rehydrate::{bounds_of, refit_collider, warn_once_of};
 use crate::scene::Scene;
 
-thread_local! {
-    /// The `(owner, name)` pairs already warned of: a model spawned twenty times
-    /// says it once.
-    static WARNED: RefCell<BTreeSet<String>> = const { RefCell::new(BTreeSet::new()) };
-}
-
-/// The collision mesh `name` of the model at `path` (imported as `asset`), with its
-/// geometry, or `None`, warned of once per `owner`, when the model has no such
-/// sub-object or it holds no triangles.
-pub fn collision_mesh(
-    path: &str,
-    asset: &ImportedAsset,
-    name: &str,
-    owner: &str,
-) -> Option<SharedMesh> {
+/// The collision mesh `name` of the model at `path` (imported as `asset`): its
+/// reference, with its geometry when the model has such a sub-object with triangles,
+/// and without (warned once) when it has not.
+pub fn collision_mesh(path: &str, asset: &ImportedAsset, name: &str) -> SharedMesh {
+    let reference = format!("{path}{}{name}", asset::REF_SEPARATOR);
     let sub = asset.sub_mesh(name).filter(|s| !s.indices.is_empty());
-    let Some(sub) = sub.filter(|s| s.bounds().is_some()) else {
-        warn_once(
-            owner,
-            &format!("{path}::{name}"),
-            "the model has no such mesh",
-        );
-        return None;
-    };
-    Some(SharedMesh {
-        primitive_type: "Asset".to_string(),
-        asset_ref: Some(format!("{path}{}{name}", asset::REF_SEPARATOR)),
-        subdivisions: 1,
-        positions: sub.vertices.iter().map(|v| v.position).collect(),
-        indices: sub.indices.clone(),
-    })
+    let mut mesh = reference_only(reference.clone());
+    match sub.filter(|s| s.bounds().is_some()) {
+        Some(sub) => {
+            mesh.positions = sub.vertices.iter().map(|v| v.position).collect();
+            mesh.indices = sub.indices.clone();
+        }
+        None => warn_unused(&reference, "the model has no such mesh"),
+    }
+    mesh
 }
 
-/// Say once per `owner` and `reference` that the collider falls back to its own mesh.
-fn warn_once(owner: &str, reference: &str, why: &str) {
-    let key = format!("{owner} -> {reference}");
-    if WARNED.with(|w| w.borrow_mut().insert(key)) {
-        log::warn!(
-            "[Scene] {owner}'s collision mesh '{reference}' is not used ({why}): \
-             its collider builds from its own mesh"
-        );
+/// A collision mesh naming `reference`, its geometry not yet built.
+fn reference_only(reference: String) -> SharedMesh {
+    SharedMesh {
+        primitive_type: "Asset".to_string(),
+        asset_ref: Some(reference),
+        ..SharedMesh::default()
     }
 }
 
+/// Say once per `reference` that it builds no collider, and why.
+fn warn_unused(reference: &str, why: &str) {
+    warn_once_of(reference, || {
+        format!("collision mesh '{reference}' is not used ({why}): its collider builds from its own mesh")
+    });
+}
+
 /// Make entity `id`'s collider a Mesh shape (`convex`: one hull), built from the
-/// collision mesh `mesh` names, or from its own Mesh when `mesh` is `None` or names
-/// nothing the model has (warned once). `mesh` is a `path::sub_object` reference, or
-/// a bare sub-object of the model the entity's Mesh comes from. An entity without a
-/// Mesh keeps the shared mesh it has (the one kept when its Mesh was removed).
-/// The one write `Physics.SetColliderShape` makes for a `"Mesh"` shape. Errors when
-/// the entity has no collider or nothing to build the shape from.
+/// collision mesh `mesh` names, else from its own Mesh, else from the copy it kept
+/// when its Mesh was removed. `mesh` is a `path::sub_object` reference, or a bare
+/// sub-object of the model the entity's Mesh (or that kept copy) comes from; a name
+/// the model lacks is kept and warned of once, and the collider falls back. The one
+/// write `Physics.SetColliderShape` makes for a `"Mesh"` shape. Errors, changing
+/// nothing, when the entity has no collider or nothing to build the shape from.
 pub fn set_mesh_shape(
     scene: &mut Scene,
     id: u32,
@@ -76,52 +66,45 @@ pub fn set_mesh_shape(
     mesh: Option<&str>,
 ) -> Result<(), String> {
     let own = scene.world.mesh(id).map(|m| {
-        let positions: Vec<[f32; 3]> = m.vertices.iter().map(|v| v.position).collect();
-        (positions, m.asset_ref.clone())
+        let bounds = bounds_of(m.vertices.iter().map(|v| v.position));
+        (bounds, m.asset_ref.clone())
     });
-    let named = mesh.and_then(|name| named_mesh(scene, id, own.as_ref(), name));
     let Some(mut collider) = scene.world.collider_mut(id) else {
         return Err(format!("entity {id} has no Collider"));
     };
-    let shared = match (named, &own) {
-        (Some(shared), _) => Some(shared),
-        (None, Some(_)) => None,
-        (None, None) => collider.shared_mesh.clone(),
-    };
-    let positions = match (&shared, &own) {
-        (Some(s), _) => s.positions.clone(),
-        (None, Some((p, _))) => p.clone(),
-        (None, None) => Vec::new(),
-    };
-    let Some((min, max)) = bounds(&positions) else {
+    let (own_bounds, own_ref) = own.unwrap_or_default();
+    let kept = collider.shared_mesh.as_ref();
+    let model = own_ref.or_else(|| kept.and_then(|k| k.asset_ref.clone()));
+    let named = mesh.and_then(|name| named_mesh(model.as_deref(), name));
+    let builds = named.as_ref().is_some_and(|n| !n.indices.is_empty())
+        || own_bounds.is_some()
+        || kept.is_some_and(|k| !k.indices.is_empty());
+    if !builds {
         return Err(format!(
             "entity {id}: a Mesh collider needs a Mesh or a collision `mesh` to build from"
         ));
+    }
+    collider.shape = ColliderShape::Mesh {
+        convex,
+        local_min: glam::Vec3::ZERO,
+        local_max: glam::Vec3::ZERO,
     };
-    set_shape_and_mesh(&mut collider, convex, (min, max), shared);
+    collider.collision_mesh = named;
+    refit_collider(&mut collider, own_bounds);
     Ok(())
 }
 
-/// The collision mesh `name` resolves to for entity `id`, or `None` (warned once).
-fn named_mesh(
-    scene: &Scene,
-    id: u32,
-    own: Option<&(Vec<[f32; 3]>, Option<String>)>,
-    name: &str,
-) -> Option<SharedMesh> {
-    let owner = scene
-        .world
-        .name(id)
-        .map_or_else(|| format!("entity {id}"), |n| n.clone());
+/// The collision mesh `name` resolves to (a full reference, or a sub-object of the
+/// file `model`, a `path::sub_object` reference, names), or `None` (warned once)
+/// when it resolves to no file.
+fn named_mesh(model: Option<&str>, name: &str) -> Option<SharedMesh> {
     let reference = if name.contains(asset::REF_SEPARATOR) {
         name.to_string()
     } else {
-        let model = own.and_then(|(_, r)| AssetRef::parse(r.as_deref()?).ok());
-        let Some(model) = model else {
-            warn_once(
-                &owner,
+        let Some(model) = model.and_then(|r| AssetRef::parse(r).ok()) else {
+            warn_unused(
                 name,
-                "its Mesh comes from no model to look the name up in",
+                "the entity's mesh comes from no model to look it up in",
             );
             return None;
         };
@@ -130,48 +113,22 @@ fn named_mesh(
     let parsed = match AssetRef::parse(&reference) {
         Ok(r) => r,
         Err(e) => {
-            warn_once(&owner, &reference, &e.to_string());
+            warn_unused(&reference, &e.to_string());
             return None;
         }
     };
-    match asset::imported(std::path::Path::new(&parsed.path)) {
-        Ok(asset) => collision_mesh(&parsed.path, &asset, &parsed.sub_object, &owner),
+    match asset::imported(Path::new(&parsed.path)) {
+        Ok(asset) => Some(collision_mesh(&parsed.path, &asset, &parsed.sub_object)),
         Err(e) => {
-            warn_once(&owner, &reference, &e.to_string());
-            None
+            warn_unused(&reference, &e.to_string());
+            Some(reference_only(reference))
         }
     }
 }
 
-/// Put a Mesh shape over `(min, max)` and its shared mesh on `collider`.
-fn set_shape_and_mesh(
-    collider: &mut ColliderComponent,
-    convex: bool,
-    (local_min, local_max): (glam::Vec3, glam::Vec3),
-    shared: Option<SharedMesh>,
-) {
-    collider.shape = ColliderShape::Mesh {
-        convex,
-        local_min,
-        local_max,
-    };
-    collider.shared_mesh = shared;
-}
-
-/// The box around `positions`, or `None` for none.
-pub(super) fn bounds(positions: &[[f32; 3]]) -> Option<(glam::Vec3, glam::Vec3)> {
-    let mut points = positions.iter().copied().map(glam::Vec3::from_array);
-    let first = points.next()?;
-    Some(points.fold((first, first), |(lo, hi), p| (lo.min(p), hi.max(p))))
-}
-
-/// How many fallbacks `owner` was warned of: each is said once.
 #[cfg(test)]
-pub(super) fn warnings_for(owner: &str) -> usize {
-    let prefix = format!("{owner} -> ");
-    WARNED.with(|w| w.borrow().iter().filter(|k| k.starts_with(&prefix)).count())
-}
-
+#[path = "collision_fallback_tests.rs"]
+mod fallback_tests;
 #[cfg(test)]
 #[path = "collision_tests.rs"]
 pub(crate) mod tests;

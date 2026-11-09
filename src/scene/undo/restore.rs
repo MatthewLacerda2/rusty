@@ -13,6 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::components::{ColliderComponent, ColliderShape, Entity};
 use crate::ecs::{Recorded, World};
+use crate::scene::rehydrate::Which;
 use crate::scene::{Despawn, Scene};
 
 use super::{side::Side, Step};
@@ -59,21 +60,21 @@ fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>
     for recorded in entities.into_values().flatten() {
         let Recorded { mut doc, seq } = recorded;
         let live = world.mesh_mut(doc.id);
-        let shared_too = match (&mut doc.mesh, live) {
+        let rehydrated = match (&mut doc.mesh, live) {
             (Some(mesh), Some(mut live)) if mesh.same_source(&live) => {
                 mesh.adopt_geometry(&mut live);
-                true
-            }
-            (Some(_), _) => {
-                // Rebuilds the collider's shared mesh too.
-                crate::scene::rehydrate::rehydrate_entity_mesh(&mut doc);
-                rebuilt.push(doc.id);
                 false
             }
-            (None, _) => true,
+            (Some(_), _) => {
+                // Rebuilds the collider's meshes too.
+                crate::scene::rehydrate::rehydrate_entity_mesh(&mut doc);
+                rebuilt.push(doc.id);
+                true
+            }
+            (None, _) => false,
         };
-        if shared_too {
-            restore_shared_mesh(world, &mut doc);
+        if !rehydrated {
+            restore_collider_meshes(world, &mut doc);
         }
         world.restore_entity(doc, seq);
     }
@@ -83,22 +84,46 @@ fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>
     }
 }
 
-/// Give `doc`'s collider's shared mesh (recorded without geometry) the live one's
-/// when it comes from the same source, and rebuild it from its reference otherwise.
-/// Only a Mesh-shaped collider's: another shape never reads it.
-fn restore_shared_mesh(world: &mut World, doc: &mut Entity) {
+/// Put back `doc`'s collider's own meshes, recorded without geometry: the kept copy
+/// when it has no Mesh (#1657), and the collision mesh (#1960) whatever it has.
+fn restore_collider_meshes(world: &mut World, doc: &mut Entity) {
+    let own = doc
+        .mesh
+        .as_ref()
+        .map(|m| m.vertices.iter().map(|v| v.position));
+    let own = own.and_then(crate::scene::rehydrate::bounds_of);
+    if doc.mesh.is_none() {
+        restore_collider_mesh(world, doc, Which::Kept, own);
+    }
+    restore_collider_mesh(world, doc, Which::Collision, own);
+}
+
+/// Give `doc`'s collider's `which` mesh (recorded without geometry) the live one's
+/// when it comes from the same source, and rebuild it from its reference otherwise
+/// (its box refit to what it builds from, `own` the entity's Mesh bounds). Only a
+/// Mesh-shaped collider's: another shape never reads it.
+fn restore_collider_mesh(
+    world: &mut World,
+    doc: &mut Entity,
+    which: Which,
+    own: Option<(glam::Vec3, glam::Vec3)>,
+) {
     let mesh_shaped = |c: &&mut ColliderComponent| matches!(c.shape, ColliderShape::Mesh { .. });
-    let collider = doc.collider.as_mut().filter(mesh_shaped);
-    let Some(shared) = collider.and_then(|c| c.shared_mesh.as_mut()) else {
+    let Some(collider) = doc.collider.as_mut().filter(mesh_shaped) else {
+        return;
+    };
+    let Some(shared) = which.of(collider).as_mut() else {
         return;
     };
     if let Some(mut live) = world.collider_mut(doc.id) {
-        if let Some(live) = live.shared_mesh.as_mut().filter(|l| shared.same_source(l)) {
+        if let Some(live) = which
+            .of(&mut *live)
+            .as_mut()
+            .filter(|l| shared.same_source(l))
+        {
             shared.adopt_geometry(live);
             return;
         }
     }
-    if let Some(collider) = doc.collider.as_mut() {
-        crate::scene::rehydrate::rehydrate_shared_mesh(doc.id, collider);
-    }
+    crate::scene::rehydrate::rebuild_collider_mesh(doc.id, collider, which, own);
 }

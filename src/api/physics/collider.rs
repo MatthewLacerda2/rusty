@@ -36,7 +36,7 @@ fn register_shape(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg 
         lua.create_function(move |lua, id: EntityArg| {
             let scene = &*scene.get(lua)?;
             let shape = scene.borrow().world.collider(id.read()).map(|c| {
-                let mesh = c.shared_mesh.as_ref().and_then(|m| m.asset_ref.clone());
+                let mesh = c.collision_mesh.as_ref().and_then(|m| m.asset_ref.clone());
                 (c.shape.clone(), mesh)
             });
             let Some((shape, mesh)) = shape else {

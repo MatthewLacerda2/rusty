@@ -192,18 +192,15 @@ fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, 
     let Some(entry) = settings.colliders.get(sub) else {
         return false;
     };
-    let owner = format!("{path}{}{sub}", asset::REF_SEPARATOR);
-    let shared = (entry.mesh.as_deref())
-        .and_then(|name| collision::collision_mesh(path, asset, name, &owner));
-    let bounds = match &shared {
-        Some(shared) => collision::bounds(&shared.positions),
-        None => asset.sub_mesh(sub).and_then(|s| s.bounds()),
-    };
-    let Some((min, max)) = bounds else {
+    let mut collider =
+        ColliderComponent::from_mesh_bounds(entry.kind.is_convex(), Vec3::ZERO, Vec3::ZERO);
+    collider.collision_mesh =
+        (entry.mesh.as_deref()).map(|name| collision::collision_mesh(path, asset, name));
+    let own = asset.sub_mesh(sub).and_then(|s| s.bounds());
+    if own.is_none() && collider.built_collision_mesh().is_none() {
         return false;
-    };
-    let mut collider = ColliderComponent::from_mesh_bounds(entry.kind.is_convex(), min, max);
-    collider.shared_mesh = shared;
+    }
+    rehydrate::refit_collider(&mut collider, own);
     scene.world.set_collider(id, Some(collider))
 }
 

@@ -78,8 +78,8 @@ pub fn reimport_written(scene: &mut Scene, stale: &Stale, skip: &BTreeSet<u32>) 
 }
 
 /// Re-import every mesh outside `skip` whose reference's file `names` accepts,
-/// importing each such file once, and every Mesh-shaped collider's shared mesh
-/// (#1657) the same way when `rig` rebuilds: a setting that keeps rigs (Generate
+/// importing each such file once, and every Mesh-shaped collider's shared and
+/// collision meshes (#1657, #1960) the same way when `rig` rebuilds: a setting that keeps rigs (Generate
 /// Lightmap UVs) never moves a vertex, and a shared mesh holds only positions and
 /// triangles. Returns the ids of the entities whose Mesh was rebuilt; a shared mesh
 /// is not counted.
@@ -121,13 +121,13 @@ fn reimport_where(
         }
     }
     if rig == Rig::Rebuild {
-        shared::reimport_shared(scene, &mut names, &mut imported);
+        shared::reimport_shared(scene, skip, &mut names, &mut imported);
     }
     rebuilt
 }
 
-/// Put `sub` on entity `id`'s mesh, and refit its mesh collider's box to it (unless
-/// the collider builds from a shared mesh). A
+/// Put `sub` on entity `id`'s mesh, and refit its mesh collider's box to what it
+/// builds from (`rehydrate::refit_collider`). A
 /// skinned mesh (before or after) takes the new rig, its bones re-bound, when `rig`
 /// says so, and is kept otherwise. `revision` is the import's `sub` came from.
 /// Returns whether the mesh was rebuilt.
@@ -154,11 +154,10 @@ fn reimport_entity_mesh(
     if let Some(hung) = hung {
         scene.restore_skeleton(id, hung);
     }
-    // The guard refreshes the world AABB. A collider with a shared mesh builds
-    // from that (#1960), which `shared` refits.
-    let collider = scene.world.collider_mut(id);
-    if let Some(mut collider) = collider.filter(|c| c.shared_mesh.is_none()) {
-        refit(&mut collider, bounds);
+    // The guard refreshes the world AABB. A collision mesh, while it has
+    // triangles, still sizes the box (#1960).
+    if let Some(mut collider) = scene.world.collider_mut(id) {
+        super::refit_collider(&mut collider, Some(bounds));
     }
     true
 }

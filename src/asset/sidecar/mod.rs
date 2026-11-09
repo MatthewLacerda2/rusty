@@ -49,7 +49,7 @@ pub struct ImportSettings {
     /// Per-sub-object mesh-collider choice (#77), keyed by sub-object id: its kind,
     /// and the sub-object whose geometry builds it (#1960, `collider`). A missing
     /// key means "no collider"; `BTreeMap` keeps the sidecar JSON stably ordered.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "collider::read_map")]
     pub colliders: BTreeMap<String, SubObjectCollider>,
     /// Generate Lightmap UVs (#831): whether the importer unwraps a lightmap UV, and
     /// how. Off by default, as in Unity.

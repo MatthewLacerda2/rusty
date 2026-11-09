@@ -86,9 +86,8 @@ fn keep_collider_mesh(world: &mut World, id: u32) {
     let Some(shared) = world.mesh(id).map(|m| SharedMesh::of(&m)) else {
         return;
     };
-    // A collision mesh named for the collider (#1960) is kept: it was never the Mesh.
     if let Some(mut collider) = world.collider_mut(id) {
-        if matches!(collider.shape, ColliderShape::Mesh { .. }) && collider.shared_mesh.is_none() {
+        if matches!(collider.shape, ColliderShape::Mesh { .. }) {
             collider.shared_mesh = Some(shared);
         }
     }

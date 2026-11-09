@@ -12,7 +12,8 @@
 //! `Assets.GetLightmapUVSettings` / `SetLightmapUVSettings` (#831) read and write a
 //! model's Generate Lightmap UVs import setting, the model inspector's checkbox.
 //! `Assets.GetModelImportSettings` / `SetModelImportSettings` (#1398) read and write
-//! a model's Scale Factor, the inspector's drag.
+//! a model's Scale Factor, the inspector's drag, and its sub-objects' mesh colliders
+//! and collision meshes (#1960, `colliders`), the inspector's sub-object rows.
 //! `Assets.GetTextureImportSettings` / `SetTextureImportSettings` (#1323) read and
 //! write an image's wrap, filter, mipmap, texture type, compression and max-size
 //! settings (#1574), the image inspector's card.
@@ -25,6 +26,7 @@ use mlua::{Lua, Table};
 
 use super::{global_table, put, Reg};
 
+mod colliders;
 mod humanoid;
 use crate::api::ApiCell;
 use crate::asset::audio::{refresh, Refresh};
@@ -103,7 +105,7 @@ pub fn register(lua: &Lua) -> Reg {
 /// t)` writes the keys `t` names (the rest keep their value) through the verb the
 /// model inspector uses, re-importing the model's meshes in the scene, and returns
 /// how many it re-imported. `SetModelImportSettings(path, t)` does the same for the
-/// Scale Factor.
+/// Scale Factor, after writing the `colliders` entries `t` names to the sidecar.
 pub fn register_reimport(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = global_table(lua, "Assets")?;
     put(
@@ -126,8 +128,13 @@ pub fn register_reimport(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         "SetModelImportSettings",
         lua.create_function(move |lua, (path, t): (String, Table)| {
             let scene = &*scene.get(lua)?;
-            let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
+            let mut stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
             let scale = t.get::<Option<f32>>("scaleFactor")?.unwrap_or(stored.scale);
+            if let Some(given) = t.get::<Option<Table>>("colliders")? {
+                if colliders::merge(&mut stored.colliders, &given)? {
+                    sidecar::save(Path::new(&path), &stored).map_err(runtime)?;
+                }
+            }
             let mut scene = scene.borrow_mut();
             crate::scene::asset_instance::set_model_scale_factor(&mut scene, &path, scale)
                 .map_err(mlua::Error::RuntimeError)
@@ -145,11 +152,12 @@ fn lightmap_uv_table(lua: &Lua, s: &LightmapUvSettings) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// `{ scaleFactor }`: the model at `path`'s import settings.
+/// `{ scaleFactor, colliders }`: the model at `path`'s import settings.
 fn model_import_table(lua: &Lua, path: &str) -> mlua::Result<Table> {
     let stored = sidecar::load(Path::new(path)).map_err(runtime)?;
     let t = lua.create_table()?;
     t.raw_set("scaleFactor", stored.scale)?;
+    t.raw_set("colliders", colliders::table(lua, &stored.colliders)?)?;
     Ok(t)
 }
 

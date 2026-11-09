@@ -65,6 +65,7 @@ pub fn default_collider() -> ColliderComponent {
         material: Default::default(),
         material_asset: None,
         shared_mesh: None,
+        collision_mesh: None,
         aabb_min: Vec3::ZERO,
         aabb_max: Vec3::ZERO,
     }

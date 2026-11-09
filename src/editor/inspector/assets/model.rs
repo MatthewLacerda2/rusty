@@ -195,7 +195,12 @@ fn sub_object_row(
                     for other in ids.iter().filter(|o| *o != id) {
                         ui.selectable_value(&mut mesh, Some(other.clone()), other);
                     }
-                });
+                })
+                .response
+                .on_hover_text("The sub-object this collider builds from; a sub-object chosen here is no longer drawn");
+            if let Some(other) = &mesh {
+                ui.weak(format!("{other} is not drawn"));
+            }
         }
     });
 

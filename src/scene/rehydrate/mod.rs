@@ -5,8 +5,11 @@
 //! stamp and propagation. Split out of `serialize` (#453) to keep it under the size
 //! cap. GPU buffers are never stored on disk, only rebuilt here.
 
+mod collider;
 pub mod model_writes;
 mod reimport;
+
+pub(crate) use collider::{rebuild_collider_mesh, refit_collider, Which};
 
 pub use reimport::{
     reimport_model, reimport_model_except, reimport_model_ids, reimport_written, Rig,
@@ -16,7 +19,7 @@ use glam::{Mat4, Vec3};
 
 use crate::asset::{self, MeshRevision, MeshVertex, SubMesh};
 use crate::components::mesh::Vertex;
-use crate::components::{ColliderComponent, ColliderShape, Entity};
+use crate::components::Entity;
 use crate::scene::authoring::{subdivided_geometry, Primitive};
 
 /// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
@@ -118,10 +121,23 @@ thread_local! {
 /// Say why `reference`'s mesh comes back empty, once per reference, rather than
 /// leaving an invisible entity with no explanation.
 fn warn_once(reference: &str, error: &asset::ImportError) {
-    let first = WARNED.with(|warned| warned.borrow_mut().insert(reference.to_string()));
-    if first {
-        log::warn!("[Scene] mesh '{reference}' loads empty: {error}");
+    warn_once_of(reference, || {
+        format!("mesh '{reference}' loads empty: {error}")
+    });
+}
+
+/// Say `message` once per `key` in the console, out of the set every failed
+/// rehydrate shares: a scene reloads often, and once is enough.
+pub(crate) fn warn_once_of(key: &str, message: impl FnOnce() -> String) {
+    if WARNED.with(|warned| warned.borrow_mut().insert(key.to_string())) {
+        log::warn!("[Scene] {}", message());
     }
+}
+
+/// Whether `key` was already warned of ([`warn_once_of`]).
+#[cfg(test)]
+pub(crate) fn warned_of(key: &str) -> bool {
+    WARNED.with(|warned| warned.borrow().contains(key))
 }
 
 /// Rebuild one mesh's vertex/index data + rig from its on-disk REFERENCE: a
@@ -143,10 +159,10 @@ fn rehydrate_one(mesh: &crate::scene::MeshComponent) -> RehydratedMesh {
 /// Rebuild one entity's mesh (if any) from its on-disk reference. Shared by scene
 /// load and prefab instantiate (#215) so both rehydrate identically; GPU buffers
 /// are never stored on disk, only rebuilt here.
-/// A mesh collider's saved box is refit to the rebuilt mesh, so an import setting
-/// changed since the save (the Scale Factor, #1398) reaches it.
-/// A Mesh-shaped collider's shared mesh (#1657, #1960) is rebuilt the same way, and
-/// its box refit to that instead; another shape's is left without geometry.
+/// A Mesh-shaped collider's shared mesh (#1657, when the entity has no Mesh) and
+/// collision mesh (#1960) are rebuilt the same way, and its saved box is refit to
+/// what it builds from (`collider::refit_collider`), so an import setting changed
+/// since the save (the Scale Factor, #1398) reaches it.
 pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     if let Some(mesh) = &mut entity.mesh {
         hold_fields(entity.id, mesh);
@@ -156,31 +172,15 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
     let Some(collider) = &mut entity.collider else {
         return;
     };
-    if collider.shared_mesh.is_some() {
-        rehydrate_shared_mesh(entity.id, collider);
-    } else if let Some(mesh) = &entity.mesh {
-        refit_to(collider, mesh.vertices.iter().map(|v| v.position));
+    if entity.mesh.is_none() {
+        collider::rebuild(entity.id, collider, collider::Which::Kept);
     }
-}
-
-/// Rebuild a Mesh-shaped `collider`'s shared mesh from its reference and refit its
-/// box to it; another shape's, or a collider without one, is left as it is.
-pub(crate) fn rehydrate_shared_mesh(id: u32, collider: &mut ColliderComponent) {
-    if !matches!(collider.shape, ColliderShape::Mesh { .. }) {
-        return;
-    }
-    let Some(shared) = &mut collider.shared_mesh else {
-        return;
-    };
-    let mut mesh = shared.reference();
-    hold_fields(id, &mut mesh);
-    shared.subdivisions = mesh.subdivisions;
-    let rebuilt = rehydrate_one(&mesh);
-    install(&mut mesh, rebuilt);
-    shared.take_geometry(&mesh);
-    if let Some(bounds) = bounds_of(shared.positions.iter().copied()) {
-        reimport::refit(collider, bounds);
-    }
+    collider::rebuild(entity.id, collider, collider::Which::Collision);
+    let own = entity.mesh.as_ref();
+    refit_collider(
+        collider,
+        own.and_then(|m| bounds_of(m.vertices.iter().map(|v| v.position))),
+    );
 }
 
 /// Hold the Mesh fields the field table leaves `unheld!`: clamp `mesh`'s
@@ -197,19 +197,8 @@ fn hold_fields(id: u32, mesh: &mut crate::scene::MeshComponent) {
     }
 }
 
-/// Size a mesh collider's box to the box around `positions` (none: left as it is),
-/// as Unity's `MeshCollider` follows its mesh. Any other shape is left as authored.
-pub(crate) fn refit_to(
-    collider: &mut ColliderComponent,
-    positions: impl Iterator<Item = [f32; 3]>,
-) {
-    if let Some(bounds) = bounds_of(positions) {
-        reimport::refit(collider, bounds);
-    }
-}
-
 /// The box around `positions`, or `None` for none.
-fn bounds_of(positions: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
+pub(crate) fn bounds_of(positions: impl Iterator<Item = [f32; 3]>) -> Option<(Vec3, Vec3)> {
     positions.map(Vec3::from_array).fold(None, |b, p| {
         Some(b.map_or((p, p), |(lo, hi): (Vec3, Vec3)| (lo.min(p), hi.max(p))))
     })

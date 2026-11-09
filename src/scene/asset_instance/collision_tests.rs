@@ -2,7 +2,6 @@
 //! the low-poly sibling builds it, is never drawn, survives a save and load, and a
 //! name the model lacks falls back to the own mesh with one warning.
 
-use super::warnings_for;
 use crate::asset::{sidecar, MeshColliderKind, SubObjectCollider};
 use crate::physics::collider_world_triangles;
 use crate::scene::model_instance::instantiate_model;
@@ -43,7 +42,7 @@ pub(crate) fn chair(file: &str, n: u32, mesh: Option<&str>) -> String {
 }
 
 /// The model at `path` spawned whole, and its child entities' names and ids.
-fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
+pub(crate) fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
     let asset = crate::asset::import_and_sync_sidecar(std::path::Path::new(path)).unwrap();
     let mut scene = Scene::new();
     let root = instantiate_model(&mut scene, path, &asset, glam::Vec3::ZERO);
@@ -54,7 +53,7 @@ fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
     (scene, named)
 }
 
-fn triangles(scene: &Scene, id: u32) -> usize {
+pub(crate) fn triangles(scene: &Scene, id: u32) -> usize {
     collider_world_triangles(scene, id).map_or(0, |t| t.triangles.len())
 }
 
@@ -72,7 +71,7 @@ fn the_low_poly_sibling_builds_the_collider_and_is_not_drawn() {
         "physics collides with the sibling"
     );
     let c = scene.world.collider(id).unwrap();
-    let shared = c.shared_mesh.as_ref().expect("the collision mesh");
+    let shared = c.collision_mesh.as_ref().expect("the collision mesh");
     assert!(shared
         .asset_ref
         .as_deref()
@@ -108,13 +107,19 @@ fn an_undone_edit_keeps_the_collision_mesh() {
 }
 
 #[test]
-fn removing_the_mesh_keeps_the_collision_mesh() {
-    use crate::scene::authoring::{remove_component, ComponentKind};
+fn removing_and_adding_the_mesh_keeps_the_collision_mesh() {
+    use crate::scene::authoring::{add_component, remove_component, ComponentKind};
     let path = chair("rusty_1960_chair_remove.obj", 4, Some("Chair_col"));
     let (mut scene, kids) = spawn(&path);
     let id = kids[0].1;
     assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
     assert_eq!(triangles(&scene, id), 2, "still the sibling, not the Chair");
+    assert!(add_component(&mut scene, id, ComponentKind::Mesh));
+    let c = scene.world.collider(id).unwrap();
+    assert!(c.collision_mesh.is_some(), "Unity keeps sharedMesh");
+    assert_eq!(c.shared_mesh, None, "the kept copy goes");
+    assert_eq!(triangles(&scene, id), 2);
+    assert_eq!(scene.world.collider(id).unwrap().aabb_max.y, 0.5);
 }
 
 #[test]
@@ -123,23 +128,14 @@ fn a_missing_name_falls_back_to_the_own_mesh_with_one_warning() {
     let (scene, kids) = spawn(&path);
     let (_, again) = spawn(&path);
     let id = kids.iter().find(|(n, _)| n == "Chair").unwrap().1;
-    assert_eq!(scene.world.collider(id).unwrap().shared_mesh, None);
+    let kept = scene.world.collider(id).unwrap().collision_mesh.clone();
+    let kept = kept.expect("the name is kept, to pick up once the model has it");
+    assert!(kept.indices.is_empty());
     assert_eq!(triangles(&scene, id), 3 * 3 * 2, "the own mesh");
     assert_eq!(
         again.len(),
         2,
         "named by no one, Chair_col is a plain object"
     );
-    assert_eq!(warnings_for(&format!("{path}::Chair")), 1, "said once");
-}
-
-#[test]
-fn a_scale_factor_change_reaches_the_collision_mesh() {
-    let path = chair("rusty_1960_chair_scale.obj", 4, Some("Chair_col"));
-    let (mut scene, _) = spawn(&path);
-    crate::scene::asset_instance::set_model_scale_factor(&mut scene, &path, 2.0).unwrap();
-    let chair = scene.world.ids_with_collider().into_iter().next().unwrap();
-    assert_eq!(triangles(&scene, chair), 2);
-    let top = scene.world.collider(chair).unwrap().aabb_max.y;
-    assert!((top - 1.0).abs() < 1e-5, "the sibling scaled too: {top}");
+    assert!(crate::scene::rehydrate::warned_of(&format!("{path}::Nope")));
 }

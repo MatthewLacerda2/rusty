@@ -1,5 +1,5 @@
 //! src/components/physics/collider/shared_mesh.rs — the mesh a Mesh-shaped collider
-//! keeps of its own (#1657, #1960). Unity: `MeshCollider.sharedMesh`.
+//! keeps of its own (#1657). Unity: `MeshCollider.sharedMesh`.
 //!
 //! A Mesh-shaped collider builds from its entity's Mesh. When that Mesh is removed
 //! (`Scene.RemoveComponent(id, "Mesh")`: a blockout box kept as an invisible
@@ -7,9 +7,11 @@
 //! physics and the navmesh still read it. Like a Mesh, only the reference is saved;
 //! the geometry is rebuilt from it on load (`scene::rehydrate`), on a live re-import
 //! of its model, and on an undo, whose record leaves it out as it leaves out a
-//! Mesh's ([`SharedMesh::without_geometry`]). It is also how a collider builds from
-//! a collision mesh other than the one drawn (#1960): a set shared mesh wins over
-//! the entity's own Mesh.
+//! Mesh's ([`SharedMesh::without_geometry`]). The entity's own Mesh, when it has
+//! one, wins.
+//!
+//! The same type carries a collider's authored collision mesh
+//! (`ColliderComponent::collision_mesh`, #1960), rebuilt the same ways.
 
 use serde::{Deserialize, Serialize};
 

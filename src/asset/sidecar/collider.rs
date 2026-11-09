@@ -10,6 +10,8 @@
 //! the render sub-object's local space, so it shares that object's origin, as a
 //! Blender duplicate with a Decimate modifier does.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 /// How a sub-object's baked mesh collider is shaped (#77). `TriMesh` is an exact
@@ -42,6 +44,28 @@ impl SubObjectCollider {
     pub fn own(kind: MeshColliderKind) -> Self {
         Self { kind, mesh: None }
     }
+
+    /// This entry as the sub-object `owner` reads it: a `mesh` naming `owner` itself
+    /// means its own mesh, so it never names a collision sub-object that is hidden.
+    pub fn for_owner(self, owner: &str) -> Self {
+        Self {
+            mesh: self.mesh.filter(|m| m != owner),
+            ..self
+        }
+    }
+}
+
+/// Read a sidecar's `colliders` map, each entry [`SubObjectCollider::for_owner`] its
+/// key: `"Chair": {"kind": "TriMesh", "mesh": "Chair"}` is `"Chair": "TriMesh"`.
+pub(super) fn read_map<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<BTreeMap<String, SubObjectCollider>, D::Error> {
+    let map = BTreeMap::<String, SubObjectCollider>::deserialize(d)?;
+    let owned = map.into_iter().map(|(k, c)| {
+        let c = c.for_owner(&k);
+        (k, c)
+    });
+    Ok(owned.collect())
 }
 
 /// The two ways an entry is written: the bare kind, or the kind with its mesh.
@@ -81,7 +105,6 @@ impl From<SubObjectCollider> for Written {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
 
     fn parse(json: &str) -> BTreeMap<String, SubObjectCollider> {
         serde_json::from_str(json).unwrap()
@@ -105,6 +128,14 @@ mod tests {
         let map = parse(r#"{"A": {"kind": "TriMesh"}, "B": {"kind": "TriMesh", "mesh": ""}}"#);
         assert_eq!(map["A"].mesh, None);
         assert_eq!(map["B"].mesh, None, "an empty name is none");
+    }
+
+    #[test]
+    fn a_mesh_naming_its_own_sub_object_is_its_own() {
+        let json = r#"{"colliders": {"Chair": {"kind": "TriMesh", "mesh": "Chair"}}}"#;
+        let settings: super::super::ImportSettings = serde_json::from_str(json).unwrap();
+        let own = SubObjectCollider::own(MeshColliderKind::TriMesh);
+        assert_eq!(settings.colliders["Chair"], own);
     }
 
     #[test]

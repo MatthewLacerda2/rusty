@@ -1,7 +1,7 @@
 //! src/components/physics/collider/mod.rs — Collider component
 //!
 //! box/sphere/cylinder/capsule/mesh shapes, the inline physics material
-//! (`physics_material`) or the path of a shared one, the mesh it keeps once its Mesh is gone (`shared_mesh`),
+//! (`physics_material`) or the path of a shared one, the mesh it keeps once its Mesh is gone (`shared_mesh`), the collision mesh it builds from instead (`collision_mesh`),
 //! the shape under a world scale (`scaled`), and the
 //! cached world AABB. Unity: Collider.
 
@@ -89,13 +89,19 @@ pub struct ColliderComponent {
     /// that no longer loads falls back to the default material, never to them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub material_asset: Option<String>,
-    /// The mesh a `Mesh` shape builds from instead of its entity's Mesh: Unity's
-    /// `MeshCollider.sharedMesh`. A collision mesh its model's sidecar or a script
-    /// names (#1960, `scene::asset_instance::collision`), or the Mesh kept when it was
-    /// removed (#1657). Cleared when a Mesh is added; while set it wins over the
-    /// entity's Mesh.
+    /// The mesh a `Mesh` shape builds from once its entity has no Mesh (#1657):
+    /// the copy kept when the Mesh was removed. Set when the Mesh is removed,
+    /// cleared when one is added; the entity's own Mesh wins while it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shared_mesh: Option<SharedMesh>,
+    /// The collision mesh a `Mesh` shape builds from instead of whatever Mesh its
+    /// entity has (#1960, `scene::asset_instance::collision`): Unity's
+    /// `MeshCollider.sharedMesh` pointed at a low-poly copy, named by its model's
+    /// sidecar or a script. Adding or removing a Mesh never touches it. While its
+    /// geometry is empty (the sub-object failed to load) the collider falls back to
+    /// the entity's Mesh, then to `shared_mesh`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collision_mesh: Option<SharedMesh>,
     /// The world-space bounds, derived from the shape and the entity's world pose
     /// (`ecs::world_space::bounds`): never saved, and recomputed on every load.
     #[serde(skip)]
@@ -105,7 +111,7 @@ pub struct ColliderComponent {
 }
 
 impl ColliderComponent {
-    /// This collider with its shared mesh's geometry left out
+    /// This collider with its shared and collision meshes' geometry left out
     /// ([`SharedMesh::without_geometry`]): what an undo record and a prefab diff copy.
     /// Every field is named, so a new one must be placed here.
     pub fn without_geometry(&self) -> Self {
@@ -116,9 +122,20 @@ impl ColliderComponent {
             material: self.material,
             material_asset: self.material_asset.clone(),
             shared_mesh: self.shared_mesh.as_ref().map(SharedMesh::without_geometry),
+            collision_mesh: self
+                .collision_mesh
+                .as_ref()
+                .map(SharedMesh::without_geometry),
             aabb_min: self.aabb_min,
             aabb_max: self.aabb_max,
         }
+    }
+
+    /// The collision mesh a Mesh shape builds from (#1960), when it has triangles: an
+    /// empty one (its sub-object failed to load) is not built from.
+    pub fn built_collision_mesh(&self) -> Option<&SharedMesh> {
+        let mesh = self.collision_mesh.as_ref();
+        mesh.filter(|m| !m.indices.is_empty() && matches!(self.shape, ColliderShape::Mesh { .. }))
     }
 
     /// Build a mesh collider baked from an imported mesh's rest-pose bounds (#77).
@@ -136,6 +153,7 @@ impl ColliderComponent {
             material: PhysicsMaterial::default(),
             material_asset: None,
             shared_mesh: None,
+            collision_mesh: None,
             aabb_min: Vec3::ZERO,
             aabb_max: Vec3::ZERO,
         }
