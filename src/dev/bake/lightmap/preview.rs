@@ -90,11 +90,14 @@ impl Previews {
     }
 }
 
+/// A pass's lightmaps, handed to the encoder.
+type Handed = (Pass, Vec<Lightmap>);
+
 /// The pass waiting for the encoder (a newer one replaces it), and whether the
 /// bake is over.
 #[derive(Default)]
 struct Queue {
-    next: Mutex<(Option<(Pass, Vec<Lightmap>)>, bool)>,
+    next: Mutex<(Option<Handed>, bool)>,
     woken: Condvar,
 }
 
@@ -160,7 +163,7 @@ impl Drop for Encoder {
 
 impl Queue {
     /// The next pass to write, waiting for one; `None` once the bake is over.
-    fn take(&self) -> Option<(Pass, Vec<Lightmap>)> {
+    fn take(&self) -> Option<Handed> {
         let mut next = lock(&self.next);
         loop {
             if let Some(pass) = next.0.take() {
