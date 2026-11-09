@@ -94,8 +94,7 @@ class MergedOverTheCap(unittest.TestCase):
         head = self.grow("b", top=0, bottom=3, subject="on b")  # 8 lines on the branch
         fresh, notes = self.advance(head)
         self.assertIsNone(fresh)
-        self.assertEqual(notes[0], "the merged tree fails tools/lint; not pushed.")
-        self.assertIn("FILE_TOO_LONG src/play.rs 11/9", notes)
+        self.assertEqual(notes[0], "the merged tree fails tools/lint: FILE_TOO_LONG src/play.rs 11/9; not pushed.")
         self.assertIn("src/play.rs was also changed by #12, merged since this branch's base.", notes)
         self.assertEqual(notes[-1], lints.HANDED_BACK)
         self.assertEqual(self.repo.on_origin("b"), head)  # nothing pushed

@@ -168,10 +168,14 @@ otherwise, and always for named pull requests, it is one pull request:
    CI's `lint` job runs (size, `--rules`, `--layers`, `--determinism`,
    `--direction`, `--components`, `--parity`; `merging/queue/lints.py`, #1956):
    `tools/lint` is built once per `tools/lint` tree into the queue's
-   `target/merge-queue-lint`, and a violation hands the head back unpushed with
-   the report's first lines and the merged pull requests that touched the file,
-   re-admitted by a push. A tool that cannot build or crashes is said once and
-   the tree is left to CI, as before.
+   `target/merge-queue-lint` (a relaunch reuses the kept copy), and a violation
+   hands the head back unpushed: its first line names the pass, the rule and
+   the file (what `make queue-events` shows), then the report's first lines and
+   the pull requests merged since the branch's base that touched the file,
+   re-admitted by a push. A tool that cannot build, crashes or cannot start is
+   said once per `tools/lint` tree and the tree is left to CI, as before; a
+   failure the machine caused (out of disk or memory, a killed process) is said
+   and tried again on the next take.
 3. Push it as a fast-forward leased on the head the take began from
    (`--force-with-lease=refs/heads/<branch>:<head>`, a compare-and-swap: the
    queue's own push is the one deliberate lease in the normal flow) — both
@@ -303,9 +307,10 @@ take counts as one pass for those behind it in the aging count, none for its mem
 The train's tip is pushed to `merge-train/<main>-<a>-<b>…` (never forced: one left
 behind is deleted first) and `ci.yml` and `lint.yml` are dispatched on it
 (`workflow_dispatch` runs every gating job; `lint.yml` first, so a dispatch that
-fails halfway leaves only the cheap run going); without `--no-check` the tip is
-compile-checked first, as step 2 (under it, `tools/lint` alone runs on it, and a
-violation is a red train, split the same way, #1956), and a checkout that fails stops the watch as a
+fails halfway leaves only the cheap run going); the tip is checked first, as
+step 2: compiled unless `--no-check`, and given `tools/lint`'s passes either way,
+whose violation splits the train like a red one and hands no member back (#1956);
+a checkout that fails stops the watch as a
 machine failure, not a red train. Its runs are read by the same rules as a pull
 request's (the grace, the runner re-run, the lagging jobs; a runner outage is
 stalled, never red). The branch is deleted once they settle. Then:

@@ -59,7 +59,7 @@ def compiles(sha: str, opts: argparse.Namespace) -> list[str]:
         try:
             lint = lints.shared(lints.target_dir(opts.root))
             broken = [] if opts.no_check else checks.verify(work, target=checks.target_dir(opts))
-            return broken or lint.check(work, since="origin/main", upto=sha)
+            return broken or lint.check(work, last=lints.SPLIT)
         finally:
             gitio.git("worktree", "remove", "--force", work, cwd=opts.root)
 

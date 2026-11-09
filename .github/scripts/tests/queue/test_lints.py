@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -86,11 +87,17 @@ class Reading(unittest.TestCase):
                 out.write("lint: FAILED\nFILE_TOO_LONG src/app/play.rs 309/300\n\n")
             self.assertEqual(lints.report(work), ["FILE_TOO_LONG src/app/play.rs 309/300"])
 
-    def test_every_lint_job_pass_runs_and_dead_pub_does_not(self):
+    def test_the_passes_are_exactly_the_lint_jobs_steps(self):
         with open(os.path.join(os.path.dirname(__file__), "..", "..", "..", "workflows", "lint.yml")) as text:
             workflow = text.read()
-        for flags in lints.PASSES:
-            self.assertIn(" ".join(("tools/lint/Cargo.toml", *(("--", *flags) if flags else ()))), workflow)
+        runs = re.findall(r"^\s*run: cargo run [^\n]*--manifest-path tools/lint/Cargo\.toml(.*)$", workflow, re.M)
+        steps = set()
+        for rest in runs:
+            flag = re.fullmatch(r"\s*(?:-- (--[\w-]+))?\s*", rest)
+            self.assertIsNotNone(flag, f"a tools/lint step the mirror cannot read: {rest!r}")
+            steps.add((flag.group(1),) if flag.group(1) else ())
+        self.assertIn((), steps)  # the size pass: no flag at all
+        self.assertEqual(steps, set(lints.PASSES))  # both ways: a step added to either side fails here
         self.assertNotIn(("--dead-pub",), lints.PASSES)
 
 

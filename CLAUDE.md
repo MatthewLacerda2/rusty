@@ -204,13 +204,14 @@ is wrong.
   measurement. The `issue-batch` skill says how to launch one.
 - **The lightest batch keeps only the merge queue local.** With the coding in cloud
   sessions, `make queue ARGS=--no-check` skips the local compile check of each updated
-  head and lets CI judge it, so merging costs this machine `git` and GitHub calls, not a
-  build. Prefer it whenever the machine has other work. The price is that an update broken
-  by a merge ahead (rare: a few in 126 PRs) is caught by CI a round later, not before
-  the push. Under it a merge train's tree is not compiled either, and CI judges it; but
-  every merged tree, a train's included, gets `tools/lint`'s build-free passes
-  (size, `dir-size`, layers and the rest) before the push, so a file two PRs push over
-  its cap together is a hand-back, not a CI round (#1956).
+  head and lets CI judge it, so merging costs this machine `git` and GitHub calls and a
+  small lint build per `tools/lint` tree, never the engine. Prefer it whenever the machine
+  has other work. The price is that an update broken by a merge ahead (rare: a few in 126
+  PRs) is caught by CI a round later, not before the push. Under it a merge train's tree is
+  not compiled either, and CI judges it; but every merged tree, a train's included, gets
+  `tools/lint`'s build-free passes (size, `dir-size`, layers and the rest) before the push,
+  so a file two PRs push over its cap together costs no CI round: an updated head is
+  handed back, and a train is split, each half tested alone (#1956).
 - **Dependencies (not batches).** Once an issue is written, record how it relates to the
   others using GitHub's native issue **relationships** — set `Blocked by` / `Blocks`
   directly on the issue, and use GitHub **sub-issues** when one issue is literal

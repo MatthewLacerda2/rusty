@@ -16,23 +16,29 @@ builds in seconds and runs every pass CI's `lint` job runs ([`PASSES`]) in a few
 So the queue runs it on the tree it is about to push: after `main` is merged into
 a head ([`update.advance`]'s `check`), and on a merge train's tree before its
 branch is pushed (`train.world.compiles`). A violation hands the head back with
-the report's first lines and the merged pull requests that touched the file
-([`blame`]), with no push and no CI round; a train is split, as a red one is.
-Re-admission is by a push, like a conflict's.
+the report's first lines and the pull requests merged since its base that touched
+the file ([`blame`]), with no push and no CI round; re-admission is by a push,
+like a conflict's. A train's violation hands nothing back: its members are
+requeued and the train split, as a red one is ([`SPLIT`]), with no blame lines.
 
 ## Built once per `tools/lint` tree
 
 The binary is built from the merged tree's own `tools/lint` (what CI would run),
 into a target directory inside the queue's worktree (`target/merge-queue-lint`,
 never a shared `CARGO_TARGET_DIR`), and copied aside under that tree's hash, so
-a later take with the same `tools/lint` runs it without asking cargo anything.
+a later take with the same `tools/lint` runs it without asking cargo anything;
+a relaunched watch finds that copy on disk and does not rebuild either.
 A pull request that changes `tools/lint` gets a build of its own.
 
 ## A broken local tool never stops the queue
 
-No cargo, a build that fails, a pass that crashes (any exit but 0 or 1): the
-queue says so once per `tools/lint` tree and carries on as before #1956, leaving
-the tree to CI. Only a pass that ran and found something hands a head back.
+No cargo, a build that fails, a pass that crashes or cannot start (any exit but
+0 or 1): the queue says so once per `tools/lint` tree, remembers it (`failed`,
+`crashed`) and carries on as before #1956, leaving the tree to CI. A failure the
+machine caused ([`machines`]: out of disk or memory, a killed process) is said
+but never remembered, so the next take tries again: remembered, it would turn the
+lint off for that tree until the watch relaunched (#1956's review). Only a pass
+that ran and found something hands a head back.
 """
 
 from __future__ import annotations
@@ -43,7 +49,7 @@ import re
 import shutil
 import subprocess
 
-from merging.queue import gitio, outcomes
+from merging.queue import checks, gitio, outcomes
 
 
 # Every pass CI's `lint` job runs (`.github/workflows/lint.yml`), in its order.
@@ -69,9 +75,15 @@ TRAIN_CAR = re.compile(r"^merge train: #(\d+) ")
 # A path in a report line: something with a slash and a dot-extension.
 PATH = re.compile(r"(?<![\w/.-])((?:[\w.-]+/)+[\w.-]+\.\w+)")
 
-HANDED_BACK = (
-    "Handed back unpushed: each side passed alone, and the merge does not (#1956)."
-    " Fix it on the branch (a push re-admits it), naming the pull request above in the re-brief."
+# The last line of an update's hand-back. It claims only what the queue checked:
+# the merged tree fails, not that either side passed alone (#1956's review).
+HANDED_BACK = "Handed back unpushed: the merged tree fails tools/lint (#1956). Fix it on the branch; a push re-admits it."
+
+# The last line when a merge train's tree fails: nothing is handed back, the
+# members are requeued and the train split, as a red one is (#1956's review).
+SPLIT = (
+    "The train's combined tree fails tools/lint (#1956): the train is split and each half tested alone;"
+    " no member is handed back for it."
 )
 
 
@@ -88,62 +100,99 @@ def binary_name() -> str:
     return "lint.exe" if os.name == "nt" else "lint"
 
 
+def output(done) -> list[str]:
+    """A finished process's stdout then stderr, as non-empty lines."""
+    return [line for line in f"{done.stdout or ''}\n{done.stderr or ''}".splitlines() if line.strip()]
+
+
+def machines(text: str, returncode: int = 0) -> bool:
+    """Whether a failure is the machine's (#580's [`checks.ENVIRONMENT`]: out of
+    disk or memory, a killed process), not the tool's: never remembered, so the
+    next take tries again (#1956's review)."""
+    return returncode < 0 or bool(checks.ENVIRONMENT.search(text))
+
+
 class Linter:
     """`tools/lint`, built per `tools/lint` tree into `target` and run on a merged tree.
 
     `runner` is `subprocess.run`'s shape and `say` [`outcomes.say`]'s, injected
     so the tests need no toolchain. One per watch ([`shared`]): its memory of
-    built and failed trees is what makes a pass cost the run, not a build.
+    built, failed and crashed trees is what makes a pass cost the run, not a
+    build, and a broken tool said once, not on every take.
     """
 
     def __init__(self, target: str, runner=subprocess.run, say=outcomes.say):
         self.target, self.runner, self.say = target, runner, say
         self.built: dict[str, str] = {}  # tools/lint tree hash -> the binary built from it
         self.failed: set[str] = set()  # tools/lint tree hashes whose build failed, said once
+        self.crashed: set[str] = set()  # tools/lint tree hashes a pass crashed or could not start in, said once
 
     def tool_tree(self, work: str) -> str:
         """The hash of `work`'s `tools/lint` tree, `""` when it has none."""
         done = gitio.git("rev-parse", "--verify", "--quiet", "HEAD:tools/lint", cwd=work)
         return done.stdout.strip() if done.returncode == 0 else ""
 
-    def binary(self, work: str) -> str | None:
-        """The binary for `work`'s `tools/lint`, built if it is new; `None` when it
-        cannot be (said once per tree: the queue then carries on without it)."""
-        tree = self.tool_tree(work)
-        if not tree:
-            return None
+    def binary(self, work: str, tree: str) -> str | None:
+        """The binary for `work`'s `tools/lint` (tree hash `tree`), built if it is
+        new; `None` when it cannot be (said once per tree, unless the machine
+        failed: the queue then carries on without it)."""
+        kept = os.path.join(self.target, "by-tree", tree[:16], binary_name())
         if tree in self.built and os.path.exists(self.built[tree]):
             return self.built[tree]
         if tree in self.failed:
             return None
+        if os.path.exists(kept):  # built by an earlier watch: a relaunch does not rebuild
+            self.built[tree] = kept
+            return kept
         env = {**os.environ, "CARGO_TARGET_DIR": self.target}
         argv = ["cargo", "build", "--quiet", "--release", "--locked", "--manifest-path", "tools/lint/Cargo.toml"]
+        machine = False
         try:
             done = self.runner(argv, cwd=work, env=env, capture_output=True, text=True, check=False)
-            why = "" if done.returncode == 0 else (f"{done.stdout or ''}\n{done.stderr or ''}".strip().splitlines() or ["(no output)"])[-1]
-        except OSError as error:  # no cargo on the PATH
-            why = str(error)
-        kept = os.path.join(self.target, "by-tree", tree[:16], binary_name())
+            said = output(done)
+            why = "" if done.returncode == 0 else (said or ["(no output)"])[-1]
+            machine = done.returncode != 0 and machines("\n".join(said), done.returncode)
+        except OSError as error:  # no cargo on the PATH, or no memory to start it
+            why, machine = str(error), machines(str(error))
         if not why:
             try:
                 os.makedirs(os.path.dirname(kept), exist_ok=True)
                 shutil.copy2(os.path.join(self.target, "release", binary_name()), kept)
             except OSError as error:
-                why = f"could not keep the built binary: {error}"
+                why, machine = f"could not keep the built binary: {error}", machines(str(error))
         if why:
-            self.failed.add(tree)
-            self.say(f"could not build tools/lint ({why}); the merged tree is left to CI's lint job, as before #1956.")
+            if machine:
+                self.say(f"could not build tools/lint ({why}): the machine's failure; this tree is left to CI, and the next take tries again.")
+            else:
+                self.failed.add(tree)
+                self.say(f"could not build tools/lint ({why}); the merged tree is left to CI's lint job, as before #1956.")
             return None
         self.built[tree] = kept
         return kept
 
-    def check(self, work: str, since: str, upto: str) -> list[str]:
+    def unrun(self, tree: str, why: str, machine: bool) -> list[str]:
+        """A pass that crashed or could not start: the tree is left to CI. Said
+        once per `tools/lint` tree, unless it was the machine's failure."""
+        if machine:
+            self.say(f"{why}: the machine's failure; this tree is left to CI, and the next take tries again.")
+        else:
+            self.crashed.add(tree)
+            self.say(f"{why}; this tools/lint is left to CI from now on.")
+        return []
+
+    def check(self, work: str, since: str | None = None, upto: str | None = None, last: str = HANDED_BACK) -> list[str]:
         """Why the merged tree `work` must not be pushed, or `[]`.
 
-        `since..upto` are the commits the merge brought in, for [`blame`]: an
-        update's `head..origin/main`, a train's `origin/main..<tip>`.
+        The first line names the pass and its first violation (rule and file),
+        since `make queue-events` shows only that one; `last` ends it
+        ([`HANDED_BACK`] for an update, [`SPLIT`] for a train). `since..upto`
+        are the commits the merge brought in, for [`blame`]: an update's
+        `head..origin/main`. A train gives none: no line is blamed there.
         """
-        exe = self.binary(work)
+        tree = self.tool_tree(work)
+        if not tree or tree in self.crashed:
+            return []
+        exe = self.binary(work, tree)
         if exe is None:
             return []
         for flags in PASSES:
@@ -151,21 +200,17 @@ class Linter:
             try:
                 done = self.runner([exe, *flags], cwd=work, capture_output=True, text=True, check=False)
             except OSError as error:
-                self.say(f"could not run {name} ({error}); the merged tree is left to CI.")
-                return []
+                return self.unrun(tree, f"could not run {name} ({error})", machines(str(error)))
             if done.returncode == 0:
                 continue
             if done.returncode != 1:
-                tail = (f"{done.stdout or ''}\n{done.stderr or ''}".strip().splitlines() or ["(no output)"])[-1]
-                self.say(f"{name} crashed (exit {done.returncode}: {tail}); the merged tree is left to CI.")
-                return []
-            said = report(work) or (f"{done.stdout or ''}\n{done.stderr or ''}".strip().splitlines())
-            return [
-                f"the merged tree fails {name}; not pushed.",
-                *said[:REPORT_HEAD],
-                *blame(work, said, since, upto),
-                HANDED_BACK,
-            ]
+                text = output(done)
+                why = f"{name} crashed (exit {done.returncode}: {(text or ['(no output)'])[-1]})"
+                return self.unrun(tree, why, machines("\n".join(text), done.returncode))
+            said = report(work) or output(done)
+            first = f"the merged tree fails {name}: {said[0]}; not pushed." if said else f"the merged tree fails {name}; not pushed."
+            blamed = blame(work, said, since, upto) if since and upto else []
+            return [first, *said[1:REPORT_HEAD], *blamed, last]
         return []
 
 
