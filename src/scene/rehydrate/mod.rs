@@ -9,7 +9,7 @@ mod collider;
 pub mod model_writes;
 mod reimport;
 
-pub(crate) use collider::{rebuild_collider_mesh, refit_collider, Which};
+pub(crate) use collider::{rebuild as rebuild_collider_mesh, refit_collider, Which};
 
 pub use reimport::{
     reimport_model, reimport_model_except, reimport_model_ids, reimport_written, Rig,

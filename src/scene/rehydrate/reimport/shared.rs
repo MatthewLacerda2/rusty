@@ -45,11 +45,13 @@ fn reimport_one(
     names: &mut impl FnMut(&str) -> bool,
     imported: &mut BTreeMap<String, Option<Imported>>,
 ) {
-    let Some(reference) = scene.world.collider_mut(id).and_then(|mut c| {
+    // Read-only: `collider_mut` would deep-copy the collider, and this runs twice per
+    // collider on every re-import.
+    let Some(reference) = scene.world.collider(id).and_then(|c| {
         if !matches!(c.shape, ColliderShape::Mesh { .. }) {
             return None;
         }
-        let shared = which.of(&mut c).as_ref()?;
+        let shared = which.get(&c).as_ref()?;
         AssetRef::parse(shared.asset_ref.as_deref()?).ok()
     }) else {
         return;

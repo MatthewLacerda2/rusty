@@ -23,6 +23,14 @@ pub(crate) enum Which {
 }
 
 impl Which {
+    /// The field this names on `collider`, read-only.
+    pub(crate) fn get(self, collider: &ColliderComponent) -> &Option<SharedMesh> {
+        match self {
+            Which::Kept => &collider.shared_mesh,
+            Which::Collision => &collider.collision_mesh,
+        }
+    }
+
     /// The field this names on `collider`.
     pub(crate) fn of(self, collider: &mut ColliderComponent) -> &mut Option<SharedMesh> {
         match self {
@@ -36,7 +44,8 @@ impl Which {
 /// shape's, or a collider without one, is left as it is. A reference that no longer
 /// loads comes back empty, warned once (`rehydrate::warn_once_of`): an empty
 /// collision mesh is not built from, so the collider falls back to its entity's Mesh.
-pub(super) fn rebuild(id: u32, collider: &mut ColliderComponent, which: Which) {
+/// The box is left as it is: refit it ([`refit_collider`]) once every mesh is back.
+pub(crate) fn rebuild(id: u32, collider: &mut ColliderComponent, which: Which) {
     if !matches!(collider.shape, ColliderShape::Mesh { .. }) {
         return;
     }
@@ -49,18 +58,6 @@ pub(super) fn rebuild(id: u32, collider: &mut ColliderComponent, which: Which) {
     let rebuilt = rehydrate_one(&mesh);
     install(&mut mesh, rebuilt);
     shared.take_geometry(&mesh);
-}
-
-/// [`rebuild`] `which`, then [`refit_collider`] with `own`, the entity's Mesh
-/// bounds: what an undo does for a collider whose recorded mesh is not the live one.
-pub(crate) fn rebuild_collider_mesh(
-    id: u32,
-    collider: &mut ColliderComponent,
-    which: Which,
-    own: Option<(Vec3, Vec3)>,
-) {
-    rebuild(id, collider, which);
-    refit_collider(collider, own);
 }
 
 /// Size a Mesh-shaped collider's box to the geometry it builds from, as Unity's

@@ -45,9 +45,15 @@ fn reference_only(reference: String) -> SharedMesh {
     }
 }
 
+/// The warn-once key of a collision mesh `reference` that builds no collider: its
+/// own, so a "loads empty" said earlier of the same reference does not swallow it.
+pub(crate) fn warn_key(reference: &str) -> String {
+    format!("collision mesh {reference}")
+}
+
 /// Say once per `reference` that it builds no collider, and why.
 fn warn_unused(reference: &str, why: &str) {
-    warn_once_of(reference, || {
+    warn_once_of(&warn_key(reference), || {
         format!("collision mesh '{reference}' is not used ({why}): its collider builds from its own mesh")
     });
 }
@@ -56,9 +62,10 @@ fn warn_unused(reference: &str, why: &str) {
 /// collision mesh `mesh` names, else from its own Mesh, else from the copy it kept
 /// when its Mesh was removed. `mesh` is a `path::sub_object` reference, or a bare
 /// sub-object of the model the entity's Mesh (or that kept copy) comes from; a name
-/// the model lacks is kept and warned of once, and the collider falls back. The one
-/// write `Physics.SetColliderShape` makes for a `"Mesh"` shape. Errors, changing
-/// nothing, when the entity has no collider or nothing to build the shape from.
+/// the model lacks (or one that resolves to no model) is kept and warned of once,
+/// and the collider falls back. The one write `Physics.SetColliderShape` makes for a
+/// `"Mesh"` shape. An entity without a collider is left alone, as for every other
+/// shape; one with nothing to build the shape from is an error, changing nothing.
 pub fn set_mesh_shape(
     scene: &mut Scene,
     id: u32,
@@ -70,12 +77,12 @@ pub fn set_mesh_shape(
         (bounds, m.asset_ref.clone())
     });
     let Some(mut collider) = scene.world.collider_mut(id) else {
-        return Err(format!("entity {id} has no Collider"));
+        return Ok(());
     };
     let (own_bounds, own_ref) = own.unwrap_or_default();
     let kept = collider.shared_mesh.as_ref();
     let model = own_ref.or_else(|| kept.and_then(|k| k.asset_ref.clone()));
-    let named = mesh.and_then(|name| named_mesh(model.as_deref(), name));
+    let named = mesh.map(|name| named_mesh(model.as_deref(), name));
     let builds = named.as_ref().is_some_and(|n| !n.indices.is_empty())
         || own_bounds.is_some()
         || kept.is_some_and(|k| !k.indices.is_empty());
@@ -94,10 +101,11 @@ pub fn set_mesh_shape(
     Ok(())
 }
 
-/// The collision mesh `name` resolves to (a full reference, or a sub-object of the
-/// file `model`, a `path::sub_object` reference, names), or `None` (warned once)
-/// when it resolves to no file.
-fn named_mesh(model: Option<&str>, name: &str) -> Option<SharedMesh> {
+/// The collision mesh `name` resolves to: a full reference, or a sub-object of the
+/// file `model` (a `path::sub_object` reference) names. One that resolves to no file
+/// or no sub-object is kept as written with no geometry, warned once, so the
+/// collider falls back and the name is saved.
+fn named_mesh(model: Option<&str>, name: &str) -> SharedMesh {
     let reference = if name.contains(asset::REF_SEPARATOR) {
         name.to_string()
     } else {
@@ -106,7 +114,7 @@ fn named_mesh(model: Option<&str>, name: &str) -> Option<SharedMesh> {
                 name,
                 "the entity's mesh comes from no model to look it up in",
             );
-            return None;
+            return reference_only(name.to_string());
         };
         format!("{}{}{name}", model.path, asset::REF_SEPARATOR)
     };
@@ -114,18 +122,21 @@ fn named_mesh(model: Option<&str>, name: &str) -> Option<SharedMesh> {
         Ok(r) => r,
         Err(e) => {
             warn_unused(&reference, &e.to_string());
-            return None;
+            return reference_only(reference);
         }
     };
     match asset::imported(Path::new(&parsed.path)) {
-        Ok(asset) => Some(collision_mesh(&parsed.path, &asset, &parsed.sub_object)),
+        Ok(asset) => collision_mesh(&parsed.path, &asset, &parsed.sub_object),
         Err(e) => {
             warn_unused(&reference, &e.to_string());
-            Some(reference_only(reference))
+            reference_only(reference)
         }
     }
 }
 
+#[cfg(test)]
+#[path = "collision_edge_tests.rs"]
+mod edge_tests;
 #[cfg(test)]
 #[path = "collision_fallback_tests.rs"]
 mod fallback_tests;

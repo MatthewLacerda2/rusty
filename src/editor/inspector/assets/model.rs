@@ -195,7 +195,7 @@ fn sub_object_row(
         ui.horizontal_wrapped(|ui| {
             ui.add_space(12.0);
             ui.label("Collision mesh");
-            collision_mesh_combo(ui, &mut mesh, ids, id);
+            collision_mesh_combo(ui, &mut mesh, colliders, ids, id);
         });
     }
 
@@ -220,13 +220,22 @@ fn sub_object_row(
 }
 
 /// The collision-mesh combo of `id`'s row (#1960): its own mesh, or another
-/// sub-object of the file, which a whole-model spawn then never draws.
-fn collision_mesh_combo(ui: &mut egui::Ui, mesh: &mut Option<String>, ids: &[String], id: &str) {
+/// sub-object of the file, which a whole-model spawn then never draws. A sub-object
+/// whose own collision mesh leads back to `id` is not offered: the two would name
+/// each other and neither be drawn (`sidecar::closes_loop`).
+fn collision_mesh_combo(
+    ui: &mut egui::Ui,
+    mesh: &mut Option<String>,
+    colliders: &std::collections::BTreeMap<String, SubObjectCollider>,
+    ids: &[String],
+    id: &str,
+) {
+    let offered = |o: &&String| *o != id && !crate::asset::sidecar::closes_loop(colliders, id, o);
     egui::ComboBox::from_id_salt(format!("mesh_collider_mesh_{id}"))
         .selected_text(mesh.as_deref().unwrap_or("Own mesh"))
         .show_ui(ui, |ui| {
             ui.selectable_value(mesh, None, "Own mesh");
-            for other in ids.iter().filter(|o| *o != id) {
+            for other in ids.iter().filter(offered) {
                 ui.selectable_value(mesh, Some(other.clone()), other);
             }
         })

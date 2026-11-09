@@ -111,9 +111,6 @@ fn shape_to_table(lua: &Lua, shape: &ColliderShape) -> mlua::Result<Table> {
 /// model lacks warns once and falls back; nothing to build from is an error. An
 /// entity without a collider is left alone, as for every other kind.
 fn set_mesh_shape(scene: &mut Scene, id: u32, t: &Table) -> mlua::Result<()> {
-    if !scene.world.has_collider(id) {
-        return Ok(());
-    }
     let convex = t.get::<Option<bool>>("convex")?.unwrap_or(false);
     let mesh = t.get::<Option<String>>("mesh")?;
     collision::set_mesh_shape(scene, id, convex, mesh.as_deref())

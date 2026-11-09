@@ -75,3 +75,46 @@ fn the_assets_api_writes_a_sub_objects_collider() {
     let bad = format!("Assets.SetModelImportSettings({path:?}, {{ colliders = {{ Chair = {{ kind = 'Box' }} }} }})");
     assert!(m.exec(&bad).is_err());
 }
+
+#[test]
+fn a_name_on_a_mesh_from_no_model_is_kept() {
+    use crate::scene::authoring::{add_component, ComponentKind};
+    let (m, scene, id) = manager_with_collider();
+    assert!(add_component(
+        &mut scene.borrow_mut(),
+        id,
+        ComponentKind::Mesh
+    ));
+    let set = format!("Physics.SetColliderShape({id}, {{kind='Mesh', mesh='Chair_col'}})");
+    m.eval(&set).unwrap();
+    let read = format!("return Physics.GetColliderShape({id}).mesh");
+    assert_eq!(
+        m.eval(&read).unwrap().trim(),
+        "Chair_col",
+        "kept, as Physics.md says"
+    );
+    let s = scene.borrow();
+    assert_eq!(
+        collider_world_triangles(&s, id).map_or(0, |t| t.triangles.len()),
+        12
+    );
+}
+
+#[test]
+fn collision_meshes_naming_each_other_are_refused_and_nothing_is_written() {
+    let (m, _, _) = manager_with_collider();
+    let path = chair("rusty_1960_lua_loop.obj", 2, Some("Chair_col"));
+    let meta = crate::asset::sidecar::meta_path(std::path::Path::new(&path));
+    let before = std::fs::read_to_string(&meta).unwrap();
+    let looped = format!(
+        "Assets.SetModelImportSettings({path:?}, {{ scaleFactor = 2, colliders = {{
+             Chair_col = {{ kind = 'TriMesh', mesh = 'Chair' }} }} }})"
+    );
+    let err = m.exec(&looped).unwrap_err().to_string();
+    assert!(err.contains("name each other"), "{err}");
+    assert_eq!(
+        std::fs::read_to_string(&meta).unwrap(),
+        before,
+        "nothing on disk"
+    );
+}

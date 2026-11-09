@@ -25,11 +25,27 @@ pub(super) fn table(
 
 /// `stored` with `t`'s keys: each `[subObject] = { kind, mesh? }` sets that
 /// sub-object's collider (no `mesh`: its own), and `[subObject] = false` removes it.
-/// Sub-objects `t` doesn't name keep theirs. Returns whether anything changed.
+/// Sub-objects `t` doesn't name keep theirs. Returns whether anything changed; on an
+/// error `stored` is left as it was. Collision meshes that would name each other
+/// (`sidecar::looped`) are an error, as a loop would leave none of them drawn.
 pub(super) fn merge(
     stored: &mut BTreeMap<String, SubObjectCollider>,
     t: &Table,
 ) -> mlua::Result<bool> {
+    let mut merged = stored.clone();
+    let changed = merge_into(&mut merged, t)?;
+    let looped = crate::asset::sidecar::looped(&merged);
+    if !looped.is_empty() {
+        return Err(bad(format!(
+            "colliders: the collision meshes of {} would name each other",
+            looped.join(", ")
+        )));
+    }
+    *stored = merged;
+    Ok(changed)
+}
+
+fn merge_into(stored: &mut BTreeMap<String, SubObjectCollider>, t: &Table) -> mlua::Result<bool> {
     let mut changed = false;
     for pair in t.pairs::<String, Value>() {
         let (sub, value) = pair?;

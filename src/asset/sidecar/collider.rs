@@ -68,6 +68,62 @@ pub(super) fn read_map<'de, D: serde::Deserializer<'de>>(
     Ok(owned.collect())
 }
 
+/// Whether naming `mesh` as `owner`'s collision mesh closes a loop: following each
+/// entry's `mesh` from `mesh` leads back to `owner` (`"A": {mesh: "B"}, "B": {mesh:
+/// "A"}`). Every sub-object of a loop names another as its collision mesh, so a
+/// whole-model spawn would draw none of them.
+pub fn closes_loop(map: &BTreeMap<String, SubObjectCollider>, owner: &str, mesh: &str) -> bool {
+    let mut at = mesh;
+    for _ in 0..=map.len() {
+        if at == owner {
+            return true;
+        }
+        match map.get(at).and_then(|c| c.mesh.as_deref()) {
+            Some(next) => at = next,
+            None => return false,
+        }
+    }
+    false
+}
+
+/// The sub-objects of `map` whose collision mesh closes a loop ([`closes_loop`]).
+pub fn looped(map: &BTreeMap<String, SubObjectCollider>) -> Vec<String> {
+    let looping = |(k, c): (&String, &SubObjectCollider)| {
+        let mesh = c.mesh.as_deref()?;
+        closes_loop(map, k, mesh).then(|| k.clone())
+    };
+    map.iter().filter_map(looping).collect()
+}
+
+/// Read every entry of a loop as its own mesh, so the loop hides nothing; returns
+/// the sub-objects it changed. What a hand-edited sidecar's loop reads as
+/// (`sidecar::load`, warned once).
+pub(super) fn break_loops(map: &mut BTreeMap<String, SubObjectCollider>) -> Vec<String> {
+    let looped = looped(map);
+    for k in &looped {
+        if let Some(c) = map.get_mut(k) {
+            c.mesh = None;
+        }
+    }
+    looped
+}
+
+/// Files whose collision-mesh loop has been warned of.
+static WARNED: std::sync::Mutex<std::collections::BTreeSet<std::path::PathBuf>> =
+    std::sync::Mutex::new(std::collections::BTreeSet::new());
+
+/// Say once per file that its sidecar's collision meshes loop through `looped`.
+pub(super) fn warn_loop(source: &std::path::Path, looped: &[String]) {
+    let mut warned = WARNED.lock().unwrap_or_else(|e| e.into_inner());
+    if warned.insert(source.to_path_buf()) {
+        log::warn!(
+            "[Import] {}: the collision meshes of {} name each other; each builds from its own mesh",
+            super::meta_path(source).display(),
+            looped.join(", ")
+        );
+    }
+}
+
 /// The two ways an entry is written: the bare kind, or the kind with its mesh.
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
@@ -136,6 +192,22 @@ mod tests {
         let settings: super::super::ImportSettings = serde_json::from_str(json).unwrap();
         let own = SubObjectCollider::own(MeshColliderKind::TriMesh);
         assert_eq!(settings.colliders["Chair"], own);
+    }
+
+    #[test]
+    fn a_loop_of_collision_meshes_is_found_and_broken() {
+        let mut map = parse(
+            r#"{"A": {"kind": "TriMesh", "mesh": "B"}, "B": {"kind": "TriMesh", "mesh": "A"},
+                "C": {"kind": "TriMesh", "mesh": "D"}, "D": "TriMesh"}"#,
+        );
+        assert!(closes_loop(&map, "D", "C"), "D naming C closes C's link");
+        assert!(!closes_loop(&map, "C", "D"));
+        assert_eq!(break_loops(&mut map), ["A", "B"]);
+        assert_eq!(
+            (map["A"].mesh.as_ref(), map["B"].mesh.as_ref()),
+            (None, None)
+        );
+        assert_eq!(map["C"].mesh.as_deref(), Some("D"), "a chain is no loop");
     }
 
     #[test]

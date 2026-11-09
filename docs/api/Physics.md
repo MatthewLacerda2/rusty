@@ -340,7 +340,8 @@ entity whose `Mesh` was removed builds from the copy its collider kept
 nothing. A model gives it per sub-object in its `.meta` sidecar, where an entry of
 `colliders` is either the bare kind (`"Chair": "TriMesh"`, its own mesh) or the
 kind with its mesh (`"Chair": { "kind": "TriMesh", "mesh": "Chair_col" }`; a
-`mesh` naming the entry's own sub-object means its own mesh). The model
+`mesh` naming the entry's own sub-object means its own mesh, and entries that
+name each other are read as their own, warned once). The model
 inspector's sub-object row and `Assets.SetModelImportSettings`' `colliders`
 (`Assets.md`) write it. The collision sub-object is imported for its geometry and
 never drawn: spawning the whole model makes no entity for it. Its vertices are
@@ -348,8 +349,9 @@ read in the collider's own local space, so it shares its render object's origin.
 Physics, the navmesh bake and the collider gizmo all read the collision mesh, and
 a concave one on a dynamic body is split as above. Adding or removing the entity's
 `Mesh` leaves it in place, as Unity's `sharedMesh` stays when the MeshFilter
-changes. A name the model lacks (or a sub-object that stops loading, on a scene
-load or a re-import) is said once in the console and kept with no triangles: the
+changes. A name the model lacks (or one given for a `Mesh` that comes from no
+model, or a sub-object that stops loading, on a scene load or a re-import) is
+said once in the console and kept with no triangles: the
 collider builds from its entity's `Mesh` meanwhile, and from the collision mesh
 again once the model has it. `GetColliderShape`'s `mesh` is that reference, `nil`
 when there is none.

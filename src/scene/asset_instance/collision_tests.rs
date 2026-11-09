@@ -137,5 +137,6 @@ fn a_missing_name_falls_back_to_the_own_mesh_with_one_warning() {
         2,
         "named by no one, Chair_col is a plain object"
     );
-    assert!(crate::scene::rehydrate::warned_of(&format!("{path}::Nope")));
+    let key = super::warn_key(&format!("{path}::Nope"));
+    assert!(crate::scene::rehydrate::warned_of(&key));
 }
