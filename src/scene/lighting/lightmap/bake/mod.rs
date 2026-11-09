@@ -5,15 +5,17 @@
 //! machine's cores (`pool`, #1656), and a [`BakeProgress`] can watch them go by or
 //! stop the bake (#808) without changing a completed bake's bytes.
 
-use std::ops::RangeInclusive;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 
 use glam::{Vec3, Vec4};
 
-use super::atlas::{max_map_edge, page_edge, MAX_PAGE, MIN_PAGE};
+use super::atlas::max_map_edge;
 use super::input::BakeScene;
 use super::progress::BakeProgress;
-use super::raster::{lightmap_size, rasterize, world_per_uv, TexelPoint};
+use super::raster::{
+    chart_of_triangles, lightmap_size, rasterize, texel_charts, world_per_uv, TexelPoint,
+};
 use super::rays::{Rays, Tri};
 use super::rng::Rng;
 use super::trace::{TexelLight, Tracer};
@@ -22,104 +24,12 @@ mod assemble;
 mod denoise;
 pub(super) mod direction;
 pub(in crate::scene::lighting) mod pool;
+mod settings;
 
 use assemble::assemble;
 use denoise::{Chart, Cleaner};
 pub use denoise::{Denoiser, LightmapDenoiser};
-
-/// The bake's knobs, Unity's Lightmapping settings in miniature. The scene stores
-/// them in its lighting settings (#832); a field a scene file omits takes its default.
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(default)]
-pub struct BakeSettings {
-    /// Lightmap texels per world unit (Unity's "Lightmap Resolution").
-    pub texels_per_unit: f32,
-    /// Paths traced per texel; more is smoother and slower.
-    pub samples: u32,
-    /// Surfaces a path bounces off before it stops.
-    pub bounces: u32,
-    /// The seed every texel's sample stream derives from.
-    pub seed: u64,
-    /// Unity's *Max Lightmap Size* (#1704): the atlas page's edge, in texels, a
-    /// power of two in [`Self::MAX_LIGHTMAP_SIZE`]. A mesh's lightmap follows its
-    /// area × `texels_per_unit` up to the largest map such a page holds
-    /// ([`max_map_edge`]); the packer picks the smallest page that holds the bake,
-    /// up to this edge, then adds pages. Read through [`Self::page`].
-    pub max_lightmap_size: u32,
-    /// What cleans the baked bounce (#1884, Unity's *Denoiser* and *Filter*): OIDN
-    /// then the Gaussian below, the Gaussian alone, or nothing. Baked direct light
-    /// is never cleaned.
-    pub denoiser: Denoiser,
-    /// Radius, in texels, of the Gaussian that smooths the baked bounce (Unity's
-    /// indirect filter): alone under [`Denoiser::Filter`] or where OIDN cannot run,
-    /// after OIDN under `Oidn`; 0 leaves it as traced or as OIDN gave it.
-    pub filter_radius: u32,
-    /// Also bake each texel's dominant incoming light direction and its `Baked`
-    /// lamps' share (#810, Unity's *Directional* mode; #1695), so normal maps
-    /// reshape baked light and `Baked` lamps give a lightmapped surface one
-    /// specular highlight. Off saves the direction pages' memory; the colour
-    /// lightmaps are the same either way.
-    pub directional: bool,
-}
-
-impl Default for BakeSettings {
-    fn default() -> Self {
-        Self {
-            texels_per_unit: 8.0,
-            samples: Self::DEFAULT_SAMPLES,
-            bounces: 3,
-            seed: 0,
-            max_lightmap_size: 1024,
-            denoiser: Denoiser::Oidn,
-            filter_radius: 3,
-            directional: true,
-        }
-    }
-}
-
-impl BakeSettings {
-    /// The default paths per texel: the fewest at which an OIDN bake (OIDN, then
-    /// the Gaussian) is as close to a converged one as the Gaussian alone was at
-    /// its old default of 128, within a point of mean relative error, in about 60%
-    /// of the time (#1884, `dev::bake::denoise::quality_tests`; 32 missed by 1.3 to
-    /// 1.7 points). A bake that falls back to the Gaussian alone is blurrier and
-    /// blotchier at this count.
-    pub const DEFAULT_SAMPLES: u32 = 64;
-    /// The texel densities a bake takes (Unity's Lightmap Resolution, in miniature).
-    pub const TEXELS_PER_UNIT: RangeInclusive<f32> = 0.25..=64.0;
-    /// The samples per texel a bake takes.
-    pub const SAMPLES: RangeInclusive<u32> = 1..=4096;
-    /// The bounces a bake takes.
-    pub const BOUNCES: RangeInclusive<u32> = 1..=16;
-    /// The page edges a bake takes (Unity's 32–4096), each a power of two.
-    pub const MAX_LIGHTMAP_SIZE: RangeInclusive<u32> = MIN_PAGE..=MAX_PAGE;
-
-    /// The atlas page edge this bake packs into: [`Self::max_lightmap_size`] held
-    /// to a power of two in [`Self::MAX_LIGHTMAP_SIZE`] (a hand-edited file may
-    /// hold anything).
-    pub fn page(&self) -> u32 {
-        page_edge(self.max_lightmap_size)
-    }
-
-    /// These settings with each authored knob clamped into its range: the one place
-    /// those limits live, applied by `Lighting.SetSettings` / `BakeLightmaps` and
-    /// spanned by the editor's fields (#993). A non-finite density takes the default.
-    pub fn sanitized(self) -> Self {
-        let texels = match self.texels_per_unit.is_finite() {
-            true => self.texels_per_unit,
-            false => Self::default().texels_per_unit,
-        };
-        let clamp = |v: u32, r: RangeInclusive<u32>| v.clamp(*r.start(), *r.end());
-        Self {
-            texels_per_unit: texels
-                .clamp(*Self::TEXELS_PER_UNIT.start(), *Self::TEXELS_PER_UNIT.end()),
-            samples: clamp(self.samples, Self::SAMPLES),
-            bounces: clamp(self.bounces, Self::BOUNCES),
-            max_lightmap_size: self.page(),
-            ..self
-        }
-    }
-}
+pub use settings::BakeSettings;
 
 /// One mesh's baked lightmap: `size`² linear texels, row-major, each the `E / π`
 /// value the forward shader multiplies by albedo (see `trace`).
@@ -197,11 +107,7 @@ pub(super) fn bake_on(
     progress.set_meshes(sizes.map(|((i, _), p)| (scene.meshes[*i].entity, p.len() as u64)));
     let trace = |c: usize, _: usize, batch: &[TexelPoint]| {
         let mesh = heads[c].0 as u64;
-        let one = |p: &TexelPoint| {
-            let mut rng = Rng::new(settings.seed, mesh, p.index as u64);
-            let s = settings;
-            tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng)
-        };
+        let one = |p: &TexelPoint| texel(&tracer, settings, mesh, p);
         // An observed bake (#1891) says each batch's mesh; it never touches a texel.
         progress.batch_started(c);
         let traced = batch.iter().map(one).collect();
@@ -214,16 +120,55 @@ pub(super) fn bake_on(
         radius: settings.filter_radius,
         trained: progress.denoiser(),
     };
+    let orphans = AtomicUsize::new(0);
     let finish = |c: usize, points: Vec<TexelPoint>, light: Vec<TexelLight>| {
         let (index, size) = heads[c];
-        let map = lightmap(scene, (index, size), points, light, settings, cleaner);
+        let (map, lost) = lightmap(scene, (index, size), points, light, settings, cleaner);
+        orphans.fetch_add(lost, Ordering::Relaxed);
         progress.mesh_done();
         map
     };
-    pool::run(points, threads, progress, trace, finish)
+    let maps = pool::run(points, threads, progress, trace, finish)?;
+    note_buried(orphans.into_inner());
+    Some(maps)
 }
 
-/// One mesh's lightmap from its traced texels.
+/// Texel `p` of receiving mesh `mesh` traced: its validity first, from a stream of
+/// its own the sample count never moves (#1949), then, for a valid texel only, its
+/// light from its own seeded stream. The two streams are apart, so skipping an
+/// invalid texel's paths never changes a valid one's bytes. The bench
+/// (`trace::bench`) traces through this too.
+pub(in crate::scene::lighting::lightmap) fn texel(
+    tracer: &Tracer,
+    s: &BakeSettings,
+    mesh: u64,
+    p: &TexelPoint,
+) -> TexelLight {
+    let index = p.index as u64;
+    let mut probes = Rng::probes(s.seed, mesh, index);
+    if !tracer.valid(p.position, p.normal, s.backface_tolerance, &mut probes) {
+        return TexelLight::INSIDE;
+    }
+    let mut rng = Rng::new(s.seed, mesh, index);
+    tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng)
+}
+
+/// The bake log's one line for UV islands with no valid texel (#1949): a box's face
+/// resting on a floor or against a neighbour is buried, which is ordinary content,
+/// so it is information, not a warning. Those islands keep the light of the
+/// islands beside them, as before.
+fn note_buried(islands: usize) {
+    if islands > 0 {
+        log::info!(
+            "[Lighting] lightmap bake: {islands} lightmap UV island(s) are fully covered by \
+             other geometry (a face resting on a floor or against a neighbour) and take the \
+             light of the islands beside them"
+        );
+    }
+}
+
+/// One mesh's lightmap from its traced texels, and how many of its charts had no
+/// valid texel (`assemble::ChartMaps::orphans`).
 fn lightmap(
     scene: &BakeScene,
     (index, size): (usize, u32),
@@ -231,9 +176,11 @@ fn lightmap(
     light: Vec<TexelLight>,
     settings: &BakeSettings,
     cleaner: Cleaner,
-) -> Lightmap {
+) -> (Lightmap, usize) {
     let mesh = &scene.meshes[index];
-    // Texels inside other geometry are dropped here and filled by dilation below.
+    let labels = texel_charts(&points, &chart_of_triangles(&mesh.surface()), size);
+    // Texels inside other geometry are dropped here and filled from their own
+    // chart's valid texels in `assemble` (#1949).
     let (points, light): (Vec<TexelPoint>, Vec<TexelLight>) = points
         .into_iter()
         .zip(light)
@@ -246,14 +193,15 @@ fn lightmap(
         size,
         texel_world,
     };
-    let maps = assemble(chart, &light, settings, cleaner, masked);
-    Lightmap {
+    let maps = assemble(chart, &labels, &light, settings, cleaner, masked);
+    let map = Lightmap {
         entity: mesh.entity,
         size,
         texels: maps.texels,
         directions: maps.directions,
         masks: maps.masks,
-    }
+    };
+    (map, maps.orphans)
 }
 
 /// Every mesh's occluding triangles, for the BVH: a Transparent run lets light

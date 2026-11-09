@@ -876,6 +876,7 @@ scene.fog.start: f32
 scene.layers.names: seq
 scene.layers.names[]: string
 scene.lighting_settings.diffuse_model: enum Lambert|HalfLambert
+scene.lighting_settings.lightmaps.backface_tolerance: f32
 scene.lighting_settings.lightmaps.bounces: u32
 scene.lighting_settings.lightmaps.denoiser: enum Oidn|Filter|None
 scene.lighting_settings.lightmaps.directional: bool
