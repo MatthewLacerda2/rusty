@@ -27,7 +27,9 @@ impl Renderer {
     /// [`LazyCompute`] goes in this list, as a render one goes in
     /// [`Self::lazy_pipelines`].
     pub(crate) fn lazy_computes(&self) -> Vec<&LazyCompute> {
-        self.post_passes.lazy_computes()
+        let mut all = self.post_passes.lazy_computes();
+        all.extend(self.hiz.lazy_computes());
+        all
     }
 
     /// Every pipeline built on first draw. A new [`LazyPipeline`] goes in this list,

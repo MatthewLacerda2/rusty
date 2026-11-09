@@ -1,6 +1,6 @@
 //! src/render/gpu/draw_buffers/pack.rs — the byte layouts the packed per-frame arrays
 //! take (#470): per-draw uniforms at their dynamic-offset stride, and the joint array
-//! with its shared identity at element 0.
+//! with its shared identity at element 0, and the group-1 bind group over them.
 
 use super::{IDENTITY_JOINT, UNIFORM_STRIDE};
 use crate::render::DrawUniform;
@@ -63,4 +63,52 @@ mod tests {
         assert_eq!(joints.len(), 103);
         assert_eq!(joints[99][12], 99.0, "joint 99 is posed, not identity");
     }
+}
+
+/// A group-1 bind group over `[uniform, bones, instances, materials, proxies,
+/// objects]`. The uniform binds one element's width, so a dynamic offset can slide
+/// across the packed array; the other arrays bind whole, and the shader indexes them.
+pub(crate) fn group1(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    label: &str,
+    [uniform, bones, instances, materials, proxies, objects]: [&wgpu::Buffer; 6],
+) -> wgpu::BindGroup {
+    let sized = |buffer, size: usize| {
+        wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+            buffer,
+            offset: 0,
+            size: wgpu::BufferSize::new(size as u64),
+        })
+    };
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some(label),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: sized(uniform, std::mem::size_of::<DrawUniform>()),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: bones.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: instances.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: materials.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 5,
+                resource: proxies.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 6,
+                resource: objects.as_entire_binding(),
+            },
+        ],
+    })
 }

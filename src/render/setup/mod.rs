@@ -59,9 +59,8 @@ impl Renderer {
         // 3. Create Device & Queue
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                // BC compression where the GPU has it (#1574).
-                required_features: adapter.features()
-                    & crate::render::gpu::textures::compressed::FEATURE,
+                // What the GPU has of `limits::OPTIONAL`.
+                required_features: adapter.features() & limits::OPTIONAL,
                 required_limits: limits::device_limits(),
                 label: None,
                 ..Default::default()
@@ -185,6 +184,7 @@ impl Renderer {
         );
         // Depth priming follows the adapter's backend (#1499): never on Metal.
         let backend = device.adapter_info().backend;
+        let hiz = crate::render::passes::hiz::HiZ::new(&device);
         Self {
             device,
             queue,
@@ -224,6 +224,7 @@ impl Renderer {
             lightmaps: global.lightmaps,
             fog_volume: global.fog_volume,
             draw_buffers,
+            hiz,
             proxy_volumes: Default::default(),
             materials: crate::render::gpu::material_cache::MaterialCache::new(textures.zero_params),
             surface_shaders,

@@ -35,7 +35,7 @@ use wgpu::util::DeviceExt;
 mod objects;
 mod pack;
 
-pub(crate) use pack::{joint_array_bytes, push_palette, uniform_array_bytes, JointMatrix};
+pub(crate) use pack::{group1, joint_array_bytes, push_palette, uniform_array_bytes, JointMatrix};
 
 use super::grow_buffer::GrowBuffer;
 use super::uniforms::ObjectData;
@@ -180,19 +180,8 @@ impl DrawBuffers {
 
     /// Rebuild the bind group over the buffers as they are now (one grew).
     fn rebind(&mut self, device: &wgpu::Device, layout: &wgpu::BindGroupLayout) {
-        self.bind_group = group1(
-            device,
-            layout,
-            "Frame Draw Bind Group",
-            [
-                self.uniforms.buffer(),
-                self.bones.buffer(),
-                self.instances.buffer(),
-                self.materials.buffer(),
-                self.proxies.buffer(),
-                self.objects.buffer(),
-            ],
-        );
+        let instances = self.instances.buffer();
+        self.bind_group = self.group_over(device, layout, ("Frame Draw Bind Group", instances));
     }
 
     /// The bytes written since the last call.
@@ -208,6 +197,40 @@ impl DrawBuffers {
     /// The dynamic offset selecting uniform `slot`.
     pub(crate) fn offsets(slot: u32) -> [u32; 1] {
         [slot * UNIFORM_STRIDE as u32]
+    }
+
+    /// The camera's packed instances, which GPU occlusion culling reads (#1963).
+    pub(crate) fn instances(&self) -> &wgpu::Buffer {
+        self.instances.buffer()
+    }
+
+    /// A group 1 over these buffers with `instances` in place of the camera's own:
+    /// the instances GPU occlusion culling kept (#1963), at their batches' runs.
+    pub(crate) fn group_with_instances(
+        &self,
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        instances: &wgpu::Buffer,
+    ) -> wgpu::BindGroup {
+        self.group_over(device, layout, ("Culled Draw Bind Group", instances))
+    }
+
+    /// The group 1 over these buffers and `instances`, labelled.
+    fn group_over(
+        &self,
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        (label, instances): (&str, &wgpu::Buffer),
+    ) -> wgpu::BindGroup {
+        let buffers = [
+            self.uniforms.buffer(),
+            self.bones.buffer(),
+            instances,
+            self.materials.buffer(),
+            self.proxies.buffer(),
+            self.objects.buffer(),
+        ];
+        group1(device, layout, label, buffers)
     }
 
     pub(crate) fn default_bones(&self) -> &wgpu::Buffer {
@@ -228,52 +251,4 @@ impl DrawBuffers {
     pub(crate) fn objects(&self) -> &wgpu::Buffer {
         self.objects.buffer()
     }
-}
-
-/// A group-1 bind group over `[uniform, bones, instances, materials, proxies,
-/// objects]`. The uniform binds one element's width, so a dynamic offset can slide
-/// across the packed array; the other arrays bind whole, and the shader indexes them.
-pub(crate) fn group1(
-    device: &wgpu::Device,
-    layout: &wgpu::BindGroupLayout,
-    label: &str,
-    [uniform, bones, instances, materials, proxies, objects]: [&wgpu::Buffer; 6],
-) -> wgpu::BindGroup {
-    let sized = |buffer, size: usize| {
-        wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-            buffer,
-            offset: 0,
-            size: wgpu::BufferSize::new(size as u64),
-        })
-    };
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some(label),
-        layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: sized(uniform, std::mem::size_of::<DrawUniform>()),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: bones.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: instances.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 4,
-                resource: materials.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 5,
-                resource: proxies.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 6,
-                resource: objects.as_entire_binding(),
-            },
-        ],
-    })
 }

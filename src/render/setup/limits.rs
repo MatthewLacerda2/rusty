@@ -10,6 +10,12 @@
 //! validation limit, not an allocation) and fails the device loudly on an adapter
 //! that cannot draw the forward pass, rather than the pipeline later.
 
+/// The features a device takes where its adapter has them: BC texture
+/// compression (#1574) and GPU occlusion culling's indirect draws (#1963). Each
+/// has a path without it.
+pub(crate) const OPTIONAL: wgpu::Features =
+    crate::render::gpu::textures::compressed::FEATURE.union(crate::render::passes::hiz::FEATURE);
+
 /// The most sampled textures one stage binds: the forward fragment stage's.
 pub(crate) const SAMPLED_TEXTURES_PER_STAGE: u32 = 18;
 

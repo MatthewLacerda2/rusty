@@ -1010,7 +1010,7 @@ without one, the middle preset):
     "ssil": { … }, "ssr": { … }, "bloom_resolution_divisor": { "low": 4, "medium": 4, "high": 2 },
     "depth_of_field_resolution_divisor": { … }, "motion_blur_samples": { … },
     "volumetric_fog": { "low": { "resolution": 64, "slices": 32 }, … },
-    "ui_blur_divisor": 4, "shadowmask_mode": "Shadowmask" }, … ] }
+    "ui_blur_divisor": 4, "shadowmask_mode": "Shadowmask", "gpu_occlusion_culling": true }, … ] }
 ```
 
 A new project is seeded with `Low`, `Medium` and `High` (`Medium` first); the game may
@@ -1044,8 +1044,13 @@ level, read only in a scene whose Mixed Lighting Mode is `"Shadowmask"`
 `Mixed` light's realtime shadow, unless volumetric fog is on or the mask pages are
 not bound yet, when every caster does; the seeded `Low` and `Medium`) or
 `"DistanceShadowmask"` (every caster, within the shadow distance; the seeded `High`).
-`Graphics.SetQualityPreset("High", { shadowmask_mode = "Shadowmask" })` sets it. A project with no presets runs the
-seeded `Medium` preset's values.
+`Graphics.SetQualityPreset("High", { shadowmask_mode = "Shadowmask" })` sets it.
+`gpu_occlusion_culling` (#1963, `true` in every seeded preset) is Unity 6's *GPU
+Occlusion* toggle on the URP asset: whether a camera with `use_occlusion_culling`
+culls the opaque meshes its GPU depth pyramid finds hidden ([`Lighting`](Lighting.md),
+*GPU occlusion culling*); `Graphics.SetQualityPreset("Low", { gpu_occlusion_culling =
+false })` turns it off for that preset. The baked PVS does not read it. A project with
+no presets runs the seeded `Medium` preset's values.
 
 ### Render scale
 

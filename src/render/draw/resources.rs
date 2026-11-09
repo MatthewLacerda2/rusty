@@ -34,6 +34,10 @@ pub(crate) struct SolidResources {
     /// Where the solids the selection outline rings sit in world space (#1175);
     /// `None` when it rings none.
     pub outline_bounds: Option<OutlineBounds>,
+    /// The objects GPU occlusion culling may test, by slot, with their world bounds
+    /// (#1963), and, once its stage ran, the opaque draws it decided.
+    pub tested: Vec<(u32, (Vec3, Vec3))>,
+    pub culled: Option<crate::render::passes::hiz::Culled>,
 }
 // Each overlay keeps only what it owns (any vertex buffer) and its slot of the pass's
 // one overlay group 1 ([`OverlayBindings`], #1616): its uniform there places it and
@@ -137,6 +141,7 @@ impl Renderer {
     ) -> SolidResources {
         let eye = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
+        let mut tested = Vec::new();
         let limits = self.device.limits();
         let binding = limits.max_storage_buffer_binding_size;
         let mut proxies = self
@@ -159,6 +164,7 @@ impl Renderer {
             transparent: &mut transparent,
             joints: &mut joints,
             proxies: &mut proxies,
+            tested: &mut tested,
         };
         let (culls, visible) = self.camera_solids(scene, (&view, eye, &ringed), out, history);
         let mesh_particles = self.push_mesh_particles(scene, cam, (&mut opaque, &mut transparent));
@@ -169,6 +175,8 @@ impl Renderer {
             visible,
             mesh_particles,
             outline_bounds,
+            tested,
+            culled: None,
         }
     }
 

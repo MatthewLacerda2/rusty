@@ -47,6 +47,7 @@ pub(crate) const CAMERA_PASSES: &[(&str, CameraPass)] = &[
     ("clusters", bin_clusters),
     ("volumetric_fog", volumetric_fog),
     ("solids", batch_solids),
+    ("occlusion", occlusion),
     ("scene", scene_pass),
     ("ssil_source", ssil_source),
     ("ssr", ssr),
