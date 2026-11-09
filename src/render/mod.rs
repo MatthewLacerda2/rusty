@@ -78,6 +78,9 @@ pub struct GpuMesh {
     /// The geometry revision these buffers hold (#1540): a mesh carrying a newer
     /// one is re-uploaded.
     pub revision: MeshRevision,
+    /// Its clusters' table (#1968), when its import split it
+    /// (`passes::hiz::clusters`).
+    pub(crate) clusters: Option<crate::render::passes::hiz::clusters::GpuClusters>,
 }
 
 impl GpuMesh {

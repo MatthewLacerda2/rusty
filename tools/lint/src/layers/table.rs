@@ -57,13 +57,14 @@ pub const LAYERS: &[Layer] = &[
     // Decoding is the asset pipeline's: models, clips through symphonia (#545; only
     // `audio` plays them) and colour lookups through `image` (#1441); textures are
     // block-compressed at import (#1574), and baked lightmap pages
-    // are stored as KTX2 (#1694).
+    // are stored as KTX2 (#1694); big meshes are split into clusters (#1968).
     sim("asset", &["core"]).uses(&[
         "bevy_mikktspace",
         "block_compression",
         "gltf",
         "image",
         "ktx2",
+        "meshopt",
         "symphonia",
         "tobj",
         "ufbx",

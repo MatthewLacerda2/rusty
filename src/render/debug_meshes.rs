@@ -7,6 +7,12 @@ use super::{GpuMesh, MeshId, Renderer, SkinBounds};
 use crate::components::mesh::{MeshRevision, Vertex};
 use crate::scene::Scene;
 
+/// A mesh index buffer's usage: STORAGE too, since the cluster cull copies a
+/// clustered mesh's runs from it (#1968).
+const INDEX_USAGE: wgpu::BufferUsages = wgpu::BufferUsages::INDEX
+    .union(wgpu::BufferUsages::STORAGE)
+    .union(wgpu::BufferUsages::COPY_DST);
+
 /// The local-space AABB `(min, max)` over a mesh's vertices. Callers upload only
 /// non-empty geometry, so the fold always sees at least one vertex; an empty slice
 /// degenerates to a zero-extent box at the origin (never rendered).
@@ -85,7 +91,8 @@ impl Renderer {
         let resident = |id: &MeshId| self.gpu_meshes.get(id).map(|g| g.revision);
         for (id, (revision, entity)) in stale_uploads(candidates, resident) {
             let mesh = scene.world.mesh(entity).expect("collected above");
-            self.update_gpu_mesh(id, revision, &mesh.vertices, &mesh.indices);
+            self.update_gpu_mesh(id.clone(), revision, &mesh.vertices, &mesh.indices);
+            self.attach_clusters(&id, mesh.clusters());
         }
     }
 
@@ -128,6 +135,7 @@ impl Renderer {
                 existing.local_aabb = local_aabb;
                 existing.skin_bounds = skin_bounds;
                 existing.revision = revision;
+                existing.clusters = None;
                 self.queue.write_buffer(&existing.vertex_buffer, 0, v_bytes);
                 self.queue.write_buffer(&existing.index_buffer, 0, i_bytes);
                 return;
@@ -147,7 +155,7 @@ impl Renderer {
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("Mesh Indices ({})", id.0)),
                 contents: i_bytes,
-                usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+                usage: INDEX_USAGE,
             });
 
         self.gpu_meshes.insert(
@@ -159,6 +167,7 @@ impl Renderer {
                 local_aabb,
                 skin_bounds,
                 revision,
+                clusters: None,
             },
         );
     }

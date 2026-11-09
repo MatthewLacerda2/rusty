@@ -65,11 +65,9 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
 
 fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
     let mesh = model.mesh;
-    let id = if model.name.is_empty() {
-        format!("mesh_{index}")
-    } else {
-        model.name
-    };
+    let id = Some(model.name)
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| format!("mesh_{index}"));
 
     let vertex_count = mesh.positions.len() / 3;
     let has_normals = mesh.normals.len() == mesh.positions.len();
@@ -121,6 +119,7 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
         skin: None,
         clips: Vec::new(),
         node_name: None,
+        clusters: None,
     }
 }
 

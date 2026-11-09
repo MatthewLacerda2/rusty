@@ -59,6 +59,7 @@ pub fn soldier() -> MeshComponent {
         max_draw_distance: 0.0,
         min_screen_size: 0.0,
         revision: Default::default(),
+        clusters: None,
     }
 }
 

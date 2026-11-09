@@ -140,6 +140,9 @@ pub struct SubMesh {
     /// Blender *object* name, where `id` is the mesh-data name. The `_LOD<n>` import
     /// convention reads it (`asset::lod`, #472). `None` for `.obj`.
     pub node_name: Option<String>,
+    /// Its clusters (#1968), built at import for a big static mesh, whose
+    /// `indices` they reordered; `None` for the rest (`asset::clusters`).
+    pub clusters: Option<std::sync::Arc<super::clusters::Clusters>>,
 }
 
 impl SubMesh {
