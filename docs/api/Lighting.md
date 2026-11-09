@@ -321,8 +321,9 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   only the roof's back, so at `0.9` its texels are dropped and filled from the
   floor's lit part beyond the roof. The bake has no *Double Sided GI* yet, so close
   such geometry (a box, not a plane) or lower the tolerance for that scene. A
-  chart with no valid texel at all (one wholly buried) is filled from the charts beside
-  it, as before, and the bake warns once naming how many.
+  chart with no valid texel at all (a box's face resting on a floor or against a
+  neighbour, which is ordinary content) is filled from the charts beside it, as
+  before, and the bake log says how many in one info line, never a warning.
 - **Denoising** (#1884). Only the bounce (indirect light, and a directional bake's
   directions) is cleaned, chart by chart; the direct light stays as traced.
   - `"OIDN"`: Intel **Open Image Denoise 2**'s `RTLightmap` filter, a network trained

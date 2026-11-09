@@ -90,6 +90,17 @@ impl BakeSettings {
         page_edge(self.max_lightmap_size)
     }
 
+    /// `tolerance` held to [`Self::BACKFACE_TOLERANCE`], a non-finite one taking
+    /// [`Self::DEFAULT_BACKFACE_TOLERANCE`]: the one range rule both
+    /// [`Self::sanitized`] and the bake's validity test (`trace::validity`) apply.
+    pub fn backface_tolerance_of(tolerance: f32) -> f32 {
+        let (low, high) = Self::BACKFACE_TOLERANCE.into_inner();
+        match tolerance.is_finite() {
+            true => tolerance.clamp(low, high),
+            false => Self::DEFAULT_BACKFACE_TOLERANCE,
+        }
+    }
+
     /// These settings with each authored knob clamped into its range: the one place
     /// those limits live, applied by `Lighting.SetSettings` / `BakeLightmaps` and
     /// spanned by the editor's fields (#993). A non-finite density or backface
@@ -100,18 +111,13 @@ impl BakeSettings {
             false => Self::default().texels_per_unit,
         };
         let clamp = |v: u32, r: RangeInclusive<u32>| v.clamp(*r.start(), *r.end());
-        let tolerance = match self.backface_tolerance.is_finite() {
-            true => self.backface_tolerance,
-            false => Self::DEFAULT_BACKFACE_TOLERANCE,
-        };
-        let (low, high) = Self::BACKFACE_TOLERANCE.into_inner();
         Self {
             texels_per_unit: texels
                 .clamp(*Self::TEXELS_PER_UNIT.start(), *Self::TEXELS_PER_UNIT.end()),
             samples: clamp(self.samples, Self::SAMPLES),
             bounces: clamp(self.bounces, Self::BOUNCES),
             max_lightmap_size: self.page(),
-            backface_tolerance: tolerance.clamp(low, high),
+            backface_tolerance: Self::backface_tolerance_of(self.backface_tolerance),
             ..self
         }
     }

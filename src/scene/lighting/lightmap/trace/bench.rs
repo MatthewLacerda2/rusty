@@ -6,11 +6,10 @@
 use std::thread;
 
 use super::super::atlas::max_map_edge;
-use super::super::bake::{triangles, BakeSettings};
+use super::super::bake::{texel, triangles, BakeSettings};
 use super::super::input::BakeScene;
 use super::super::raster::{lightmap_size, rasterize, TexelPoint};
 use super::super::rays::Rays;
-use super::super::rng::Rng;
 use super::Tracer;
 
 /// Trace about `count` texels of `scene` spread evenly over its receiving meshes,
@@ -49,17 +48,7 @@ pub fn trace_texels(
             let tracer = &tracer;
             s.spawn(move || {
                 for (mesh, p) in part {
-                    let mut rng = Rng::new(settings.seed, *mesh, p.index as u64);
-                    let (n, b) = (settings.samples, settings.bounces);
-                    std::hint::black_box(tracer.texel(p.position, p.normal, n, b, &mut rng));
-                    let mut probes = Rng::probes(settings.seed, *mesh, p.index as u64);
-                    let tolerance = settings.backface_tolerance;
-                    std::hint::black_box(tracer.valid(
-                        p.position,
-                        p.normal,
-                        tolerance,
-                        &mut probes,
-                    ));
+                    std::hint::black_box(texel(tracer, settings, *mesh, p));
                 }
             });
         }

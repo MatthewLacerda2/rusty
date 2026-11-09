@@ -129,27 +129,40 @@ pub(super) fn bake_on(
         map
     };
     let maps = pool::run(points, threads, progress, trace, finish)?;
-    warn_orphans(orphans.into_inner());
+    note_buried(orphans.into_inner());
     Some(maps)
 }
 
-/// Texel `p` of receiving mesh `mesh` traced: its light from its own seeded stream,
-/// and its validity from a stream of its own the sample count never moves (#1949).
-fn texel(tracer: &Tracer, s: &BakeSettings, mesh: u64, p: &TexelPoint) -> TexelLight {
+/// Texel `p` of receiving mesh `mesh` traced: its validity first, from a stream of
+/// its own the sample count never moves (#1949), then, for a valid texel only, its
+/// light from its own seeded stream. The two streams are apart, so skipping an
+/// invalid texel's paths never changes a valid one's bytes. The bench
+/// (`trace::bench`) traces through this too.
+pub(in crate::scene::lighting::lightmap) fn texel(
+    tracer: &Tracer,
+    s: &BakeSettings,
+    mesh: u64,
+    p: &TexelPoint,
+) -> TexelLight {
     let index = p.index as u64;
-    let mut rng = Rng::new(s.seed, mesh, index);
-    let mut light = tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng);
     let mut probes = Rng::probes(s.seed, mesh, index);
-    light.valid = tracer.valid(p.position, p.normal, s.backface_tolerance, &mut probes);
-    light
+    if !tracer.valid(p.position, p.normal, s.backface_tolerance, &mut probes) {
+        return TexelLight::INSIDE;
+    }
+    let mut rng = Rng::new(s.seed, mesh, index);
+    tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng)
 }
 
-/// The bake's one warning for UV islands with no valid texel (#1949).
-fn warn_orphans(orphans: usize) {
-    if orphans > 0 {
-        log::warn!(
-            "[Lighting] lightmap bake: {orphans} lightmap UV island(s) lie wholly inside \
-             geometry; their texels were filled from the islands beside them"
+/// The bake log's one line for UV islands with no valid texel (#1949): a box's face
+/// resting on a floor or against a neighbour is buried, which is ordinary content,
+/// so it is information, not a warning. Those islands keep the light of the
+/// islands beside them, as before.
+fn note_buried(islands: usize) {
+    if islands > 0 {
+        log::info!(
+            "[Lighting] lightmap bake: {islands} lightmap UV island(s) are fully covered by \
+             other geometry (a face resting on a floor or against a neighbour) and take the \
+             light of the islands beside them"
         );
     }
 }

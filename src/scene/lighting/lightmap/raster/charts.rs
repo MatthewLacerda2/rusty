@@ -91,42 +91,61 @@ pub(in crate::scene::lighting::lightmap) fn fill_within<T: Texel>(
             }
         }
     }
-    let size = size as i32;
-    let mut pending: Vec<usize> = (0..filled.len())
+    let pending: Vec<usize> = (0..filled.len())
         .filter(|&i| labels[i] != NO_CHART && !filled[i])
         .collect();
-    // Each ring reads only texels filled before it, so the order within one never
-    // shows; the work is the invalid texels' alone, not the map's.
-    loop {
-        let ring: Vec<(usize, T)> = pending
+    let size = size as i32;
+    let near = |i: usize| {
+        let (x, y) = (i as i32 % size, i as i32 / size);
+        NEIGHBOURS.into_iter().filter_map(move |(dx, dy)| {
+            let (nx, ny) = (x + dx, y + dy);
+            let inside = nx >= 0 && ny >= 0 && nx < size && ny < size;
+            inside.then_some((ny * size + nx) as usize)
+        })
+    };
+    // Ring by ring, as a frontier: a ring is the unfilled texels beside the one
+    // before it, so each texel is visited a bounded number of times and the work
+    // is linear in the invalid texels, however many rings a buried region takes.
+    // Each ring reads only texels filled before it, and sums its neighbours in
+    // `NEIGHBOURS` order, so neither the order within a ring nor the queue shows.
+    let mut queued = vec![false; filled.len()];
+    let mut ring: Vec<usize> = Vec::new();
+    for &i in &pending {
+        if near(i).any(|j| filled[j] && labels[j] == labels[i]) {
+            queued[i] = true;
+            ring.push(i);
+        }
+    }
+    while !ring.is_empty() {
+        let values: Vec<T> = ring
             .iter()
-            .filter_map(|&i| {
-                let (x, y) = (i as i32 % size, i as i32 / size);
+            .map(|&i| {
                 let (mut sum, mut n) = (T::default(), 0.0);
-                for (dx, dy) in NEIGHBOURS {
-                    let (nx, ny) = (x + dx, y + dy);
-                    let j = (ny * size + nx) as usize;
-                    let inside = nx >= 0 && ny >= 0 && nx < size && ny < size;
-                    if inside && filled[j] && labels[j] == labels[i] {
-                        sum = sum + texels[j];
-                        n += 1.0;
-                    }
+                for j in near(i).filter(|&j| filled[j] && labels[j] == labels[i]) {
+                    sum = sum + texels[j];
+                    n += 1.0;
                 }
-                (n > 0.0).then(|| (i, sum / n))
+                sum / n
             })
             .collect();
-        if ring.is_empty() {
-            break;
-        }
-        for (i, value) in ring {
+        for (&i, value) in ring.iter().zip(values) {
             texels[i] = value;
             filled[i] = true;
         }
-        pending.retain(|&i| !filled[i]);
+        let mut next = Vec::new();
+        for &i in &ring {
+            for j in near(i) {
+                if labels[j] == labels[i] && !filled[j] && !queued[j] {
+                    queued[j] = true;
+                    next.push(j);
+                }
+            }
+        }
+        ring = next;
     }
     for i in pending {
         let (sum, n) = means[&labels[i]];
-        if n > 0.0 {
+        if !filled[i] && n > 0.0 {
             texels[i] = sum / n;
             filled[i] = true;
         }

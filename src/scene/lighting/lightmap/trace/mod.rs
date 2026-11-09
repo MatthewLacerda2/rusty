@@ -87,9 +87,23 @@ pub(super) struct TexelLight {
     pub mask: Vec4,
     /// False when the texel sits inside other geometry (a floor texel under a
     /// crate): its light is meaningless, and the bake fills it from its own chart
-    /// instead (#1949). [`Tracer::texel`] leaves it true; the bake sets it from
-    /// [`Tracer::valid`], a test of its own that the sample count never moves.
+    /// instead (#1949). [`Tracer::texel`] leaves it true; the bake asks
+    /// [`Tracer::valid`] first, a test of its own that the sample count never
+    /// moves, and gives an invalid texel [`TexelLight::INSIDE`] untraced.
     pub valid: bool,
+}
+
+impl TexelLight {
+    /// A texel inside geometry, its paths never traced: the bake drops it and fills
+    /// it from its own chart (#1949).
+    pub const INSIDE: Self = Self {
+        indirect: Vec3::ZERO,
+        direct: Vec3::ZERO,
+        indirect_dir: Vec3::ZERO,
+        direct_dir: Vec3::ZERO,
+        mask: Vec4::ONE,
+        valid: false,
+    };
 }
 
 /// The static scene ready to trace.

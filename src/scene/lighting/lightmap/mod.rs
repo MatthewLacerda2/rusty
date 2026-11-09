@@ -81,6 +81,8 @@ mod area_reach_tests;
 #[cfg(test)]
 mod area_tests;
 #[cfg(test)]
+mod buried_tests;
+#[cfg(test)]
 mod casting_tests;
 #[cfg(test)]
 mod coverage_tests;

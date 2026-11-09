@@ -9,6 +9,7 @@
 
 use glam::Vec3;
 
+use super::super::bake::BakeSettings;
 use super::super::rng::Rng;
 use super::{cosine_sample, Tracer, SURFACE_OFFSET, T_MIN};
 
@@ -22,7 +23,9 @@ impl Tracer<'_> {
     /// `tolerance` of its [`PROBES`] cosine-weighted rays reach a front face or
     /// escape (Unity counts a texel valid by the share of its rays that see front
     /// faces; a ray that meets nothing sees no back face either). `tolerance` is
-    /// clamped to `[0, 1]`: 0 keeps every texel, 1 drops one that sees any back face.
+    /// held as [`BakeSettings::backface_tolerance_of`] holds it (NaN or ∞ take
+    /// 0.9): 1 drops a texel that sees any back face, and 0 keeps every texel
+    /// without casting a probe.
     pub(in crate::scene::lighting::lightmap) fn valid(
         &self,
         position: Vec3,
@@ -30,6 +33,10 @@ impl Tracer<'_> {
         tolerance: f32,
         rng: &mut Rng,
     ) -> bool {
+        let tolerance = BakeSettings::backface_tolerance_of(tolerance);
+        if tolerance <= 0.0 {
+            return true;
+        }
         let origin = position + normal * SURFACE_OFFSET;
         let back = (0..PROBES)
             .filter(|_| {
@@ -38,11 +45,6 @@ impl Tracer<'_> {
                 hit.is_some_and(|h| self.rays.tris[h.tri].normal().dot(dir) >= 0.0)
             })
             .count() as f32;
-        let tolerance = if tolerance.is_nan() {
-            0.0
-        } else {
-            tolerance.clamp(0.0, 1.0)
-        };
         PROBES as f32 - back >= tolerance * PROBES as f32
     }
 }
