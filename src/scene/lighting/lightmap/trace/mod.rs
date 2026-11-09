@@ -46,6 +46,7 @@ mod mis_tests;
 #[cfg(test)]
 mod pick_tests;
 mod sources;
+mod validity;
 
 pub(super) use direct::arrival;
 
@@ -67,9 +68,6 @@ pub(super) const T_MIN: f32 = 1e-4;
 /// brighter than the rest; a path that happens to hit there would add a speckle
 /// the bake's filter only smears. The texel's own direct light is never clamped.
 pub(super) const INDIRECT_CLAMP: f32 = 10.0;
-/// The share of a texel's rays that may start out on back faces before the texel is
-/// judged to be inside geometry (Unity's backface tolerance, inverted).
-const BACKFACE_TOLERANCE: f32 = 0.5;
 /// The bounds a path's survival odds are held to under Russian roulette (#1883):
 /// never below the low one, so a dim path is never reweighted into a firefly, and
 /// never above the high one, so even a bright path's depth costs a little less.
@@ -87,11 +85,25 @@ pub(super) struct TexelLight {
     /// Per shadowmask channel (#1695), how much of its `Mixed` light reaches the
     /// texel past static occluders: 1 lit (or out of its reach), 0 shadowed.
     pub mask: Vec4,
-    /// False when most of the texel's rays start out hitting back faces: it sits
-    /// inside other geometry (a floor texel under a crate), so its light is
-    /// meaningless and the bake fills it from its neighbours instead (Unity's
-    /// backface tolerance).
+    /// False when the texel sits inside other geometry (a floor texel under a
+    /// crate): its light is meaningless, and the bake fills it from its own chart
+    /// instead (#1949). [`Tracer::texel`] leaves it true; the bake asks
+    /// [`Tracer::valid`] first, a test of its own that the sample count never
+    /// moves, and gives an invalid texel [`TexelLight::INSIDE`] untraced.
     pub valid: bool,
+}
+
+impl TexelLight {
+    /// A texel inside geometry, its paths never traced: the bake drops it and fills
+    /// it from its own chart (#1949).
+    pub const INSIDE: Self = Self {
+        indirect: Vec3::ZERO,
+        direct: Vec3::ZERO,
+        indirect_dir: Vec3::ZERO,
+        direct_dir: Vec3::ZERO,
+        mask: Vec4::ONE,
+        valid: false,
+    };
 }
 
 /// The static scene ready to trace.
@@ -125,13 +137,12 @@ impl<'a> Tracer<'a> {
         rng: &mut Rng,
     ) -> TexelLight {
         let origin = position + normal * SURFACE_OFFSET;
-        let (mut sum, mut dir_sum, mut inside) = (Vec3::ZERO, Vec3::ZERO, 0);
+        let (mut sum, mut dir_sum) = (Vec3::ZERO, Vec3::ZERO);
         let mut picks = Picks::default();
         for _ in 0..samples {
-            let (radiance, dir, backface) = self.path(origin, normal, bounces, rng, &mut picks);
+            let (radiance, dir) = self.path(origin, normal, bounces, rng, &mut picks);
             sum += radiance;
             dir_sum += dir;
-            inside += u32::from(backface);
         }
         let n = samples.max(1) as f32;
         let (direct, direct_dir) = self.direct(origin, normal, samples, rng);
@@ -141,12 +152,12 @@ impl<'a> Tracer<'a> {
             indirect_dir: dir_sum / n,
             direct_dir: direct_dir / PI,
             mask: self.mask(origin),
-            valid: (inside as f32) < samples as f32 * BACKFACE_TOLERANCE,
+            valid: true,
         }
     }
 
-    /// The radiance one path from `origin` brings back, its luminance-weighted
-    /// direction (#810), and whether its first ray hit a back face. The texel's
+    /// The radiance one path from `origin` brings back and its luminance-weighted
+    /// direction (#810). The texel's
     /// own view of the emitters is one next-event sample; then a cosine-weighted
     /// ray, and at each front face it lands on, `albedo / π` times one next-event
     /// sample of the lamps (and the emitters, where another bounce follows),
@@ -164,11 +175,11 @@ impl<'a> Tracer<'a> {
         bounces: u32,
         rng: &mut Rng,
         picks: &mut Picks,
-    ) -> (Vec3, Vec3, bool) {
+    ) -> (Vec3, Vec3) {
         let bounces = bounces.max(1);
         let (own, own_dir) = self.next_event(origin, normal, (false, true), rng, picks);
         let (mut radiance, mut throughput) = (Vec3::ZERO, Vec3::ONE);
-        let (mut first, mut backface) = (Vec3::ZERO, false);
+        let mut first = Vec3::ZERO;
         for depth in 0..bounces {
             if depth >= 2 {
                 let p = throughput.max_element().clamp(ROULETTE.0, ROULETTE.1);
@@ -187,7 +198,6 @@ impl<'a> Tracer<'a> {
             };
             let Some((point, hit_normal, m)) = self.surface(&hit, dir) else {
                 // A back face: nothing comes through.
-                backface = depth == 0;
                 break;
             };
             radiance += throughput * self.glow(&hit, origin, normal, dir, picks);
@@ -203,7 +213,7 @@ impl<'a> Tracer<'a> {
         let clamped = clamp_indirect(total);
         let scale = luminance(clamped) / luminance(total).max(f32::MIN_POSITIVE);
         let dir = (own_dir / PI + first * luminance(radiance)) * scale.min(1.0);
-        (clamped, dir, backface)
+        (clamped, dir)
     }
 
     /// The glow a bounce ray from `origin` (facing `normal`) along `dir` finds at
