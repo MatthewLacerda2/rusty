@@ -7,6 +7,9 @@
 //! bends the result, hitboxes follow the IK'd pose, and the skin palette is built
 //! from it in `Render`. A bone carried by a dynamic `Rigidbody` (a ragdoll, #466)
 //! belongs to physics, so a constraint touching one is skipped: physics wins.
+//! A bone blended between physics and animation (a hit reaction, #1895) is the
+//! exception: it is put back on its animated pose, IK solves as usual, and the
+//! blend is redone over the result, so the aim holds through the reaction.
 //!
 //! Aim chains solve before limbs (Unity's order: look-at and body, then hands
 //! and feet), so a support hand reaching for a foregrip on a gun held by the
@@ -41,6 +44,12 @@ pub struct BonePose {
 impl Scene {
     /// Solve every active animator's IK constraints, in id order (deterministic).
     pub fn solve_ik(&mut self) {
+        let blended = self.unblend_ragdolls();
+        self.solve_constraints();
+        self.reblend_ragdolls(blended);
+    }
+
+    fn solve_constraints(&mut self) {
         for owner in self.world.ids_with_animator() {
             if !self.world.is_active_in_hierarchy(owner) {
                 continue;
@@ -143,11 +152,15 @@ impl Scene {
         }
     }
 
-    /// A bone driven by a dynamic body (a ragdolled limb) is physics' to pose.
+    /// A bone driven by a dynamic body (a ragdolled limb) is physics' to pose,
+    /// unless it is drawn blended with its animation (a hit reaction, #1895):
+    /// then IK bends the animated side, and the blend is redone after.
     fn is_simulated(&self, bone: u32) -> bool {
-        self.world
+        let dynamic = self
+            .world
             .rigidbody(bone)
-            .is_some_and(|rb| rb.active && !rb.is_kinematic)
+            .is_some_and(|rb| rb.active && !rb.is_kinematic);
+        dynamic && self.ragdolls.weight(bone) >= 1.0
     }
 
     fn bone_pose(&self, bone: u32) -> BonePose {

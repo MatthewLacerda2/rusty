@@ -6,7 +6,7 @@
 //! when new, when its shape (kind, bodies, anchors, axes, limits, collision flag)
 //! changed, or when either body was rebuilt (rapier drops a removed body's
 //! joints), and drops one while either body is disabled (#1775). Break
-//! thresholds are read live.
+//! thresholds and the drive are read live (the drive's motors: [`drive`], #1895).
 //!
 //! **Frames.** The joint's frame sits at `anchor` (this entity's local space,
 //! scaled like its geometry) with its X axis along `axis` and its Y axis along
@@ -49,6 +49,7 @@ use frame::{joint_basis, joint_builder, local_frame};
 
 #[cfg(test)]
 mod disabled_tests;
+pub(super) mod drive;
 mod frame;
 #[cfg(test)]
 mod frame_tests;
@@ -100,12 +101,14 @@ pub(super) struct BuiltJoint {
 /// Joint entity id → its live joint.
 pub(super) type JointMap = BTreeMap<u32, BuiltJoint>;
 
-/// `j` with the live-read fields (break thresholds) cleared: the part of a joint
-/// that decides how it is built.
+/// `j` with the live-read fields (break thresholds, the drive) cleared: the part
+/// of a joint that decides how it is built.
 fn shape_of(j: &JointComponent) -> JointComponent {
     JointComponent {
         break_force: 0.0,
         break_torque: 0.0,
+        drive_strength: 0.0,
+        drive_damping: 0.0,
         ..j.clone()
     }
 }

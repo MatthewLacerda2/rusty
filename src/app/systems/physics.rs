@@ -50,9 +50,15 @@ pub(in crate::app) fn follow_bones(world: &mut World, res: &mut Resources) {
 }
 
 /// Override the Animator on every bone a dynamic body carries — a ragdoll's —
-/// with the pose this tick's step solved (#466, see `physics::joints::ragdoll`).
+/// with the pose this tick's step solved, blended toward the animation by its
+/// weight (#466, #1895, see `physics::joints::ragdoll`). The hit reactions age by
+/// this tick's `dt` first, and the bones they let go of return to the Animator
+/// after, so a reaction's last tick is drawn at weight 0.
 pub(in crate::app) fn pose_ragdolls(world: &mut World, res: &mut Resources) {
+    let mut scene = world.scene.borrow_mut();
+    scene.advance_reactions(res.frame_dt);
     if let Some(physics) = res.physics.borrow().as_ref() {
-        physics.pose_bones(&mut world.scene.borrow_mut());
+        physics.pose_bones(&mut scene);
     }
+    scene.end_reactions();
 }

@@ -76,6 +76,8 @@ pub struct PhysicsWorld {
     pub(super) joints: JointMap,
     /// The fixed body world-anchored joints attach to, made on first use.
     pub(super) world_body: Option<RigidBodyHandle>,
+    /// The joints whose motors the last step drove (#1895, `joints::drive`).
+    pub(super) driven: std::collections::BTreeMap<u32, super::joints::drive::Driven>,
     /// What the sync before each step needs to sync only what changed (#1707).
     pub(super) tracked: Tracked,
     /// What the world remembers about its own steps (#1795, #1797, see `recover`).
@@ -108,6 +110,7 @@ impl PhysicsWorld {
             prev_collisions: Vec::new(),
             joints: JointMap::new(),
             world_body: None,
+            driven: Default::default(),
             tracked: Tracked::default(),
             recovery: Recovery::default(),
         };
@@ -180,6 +183,7 @@ impl PhysicsWorld {
         if self.dormant(dt) {
             return self.dormant_step(scene, &synced);
         }
+        self.drive_joints(scene);
         let awake_before = self.awake_owners();
         let pre_solve = self.snapshot_velocities();
 

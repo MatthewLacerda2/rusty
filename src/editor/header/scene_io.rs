@@ -21,6 +21,17 @@ impl EditorUi {
         f(self.scene_path.borrow().as_deref())
     }
 
+    /// The open scene's file stem, or "Untitled" for a scene never saved: the window
+    /// title's scene name (#1914).
+    pub fn scene_name(&self) -> String {
+        self.with_current_scene_path(|path| {
+            path.and_then(|p| Path::new(p).file_stem()).map_or_else(
+                || "Untitled".to_string(),
+                |s| s.to_string_lossy().into_owned(),
+            )
+        })
+    }
+
     /// Make `path` the scene file the editor (and `Scene.Save()`) writes back to.
     pub fn set_current_scene_path(&mut self, path: Option<String>) {
         *self.scene_path.borrow_mut() = path;
@@ -59,7 +70,7 @@ impl EditorUi {
         self.set_current_scene_path(Some(path.to_string()));
         self.selected_entity_id = None;
         self.selected_asset_path = None;
-        self.is_dirty = true;
+        self.is_dirty = false;
         true
     }
 
@@ -68,6 +79,7 @@ impl EditorUi {
         match scene.save_to_file(path) {
             Ok(_) => {
                 self.set_current_scene_path(Some(path.to_string()));
+                self.is_dirty = false;
                 console.info(format!("Scene saved to {path}"));
             }
             Err(err) => console.error(format!("Failed to save scene: {err}")),
@@ -133,7 +145,7 @@ pub(super) fn new_scene(
     editor.set_current_scene_path(None);
     editor.selected_entity_id = None;
     editor.selected_asset_path = None;
-    editor.is_dirty = true;
+    editor.is_dirty = false;
     console.info("New empty scene".to_string());
 }
 
@@ -153,7 +165,7 @@ pub(super) fn reset_scene(
     editor.set_current_scene_path(Some(path));
     editor.selected_entity_id = None;
     editor.selected_asset_path = None;
-    editor.is_dirty = true;
+    editor.is_dirty = false;
     console.info("Scene reset to default".to_string());
 }
 

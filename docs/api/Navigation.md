@@ -59,6 +59,10 @@ the file only when the scene holds bytes it lacks: a Dust2-sized navmesh is tens
 The **Bake Navigation** button is live on the open scene's card only, as Generate
 Lighting's is, so it never writes the open scene's navmesh beside another scene.
 
+To see the baked navmesh, turn on the Scene view's **NavMesh** gizmo (or
+`Editor.SetGizmo("NavMesh", true)`, [`Editor.md`](Editor.md)): translucent cyan over every
+walkable span, as Unity draws it (#1910).
+
 | Function | Signature | Returns / Effect |
 |---|---|---|
 | `Navigation.Bake` | `()` | bakes the navmesh in full now; in a dev build in edit mode also saves it beside the scene, returning `true` when `<scene>.navmesh` was written (`false`: an unsaved scene, whose first save writes it, Play, or a ship build) |

@@ -1,7 +1,8 @@
 //! src/api/joint.rs — `Joint` namespace (#449).
 //!
 //! Get/Set over an entity's `JointComponent`: its kind, the connected body, the
-//! anchors and axes, the limits, the break thresholds and the collision flag.
+//! anchors and axes, the limits, the break thresholds, the collision flag and the
+//! drive (#1895).
 //! Every setter routes through the shared `scene::authoring::physics::joint` ops the
 //! inspector card uses. Getters return a neutral default without a Joint; setters
 //! are then no-ops. The kind travels as its name (`"Fixed"`, `"Hinge"`, `"Ball"`,
@@ -152,7 +153,8 @@ fn register_shape(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
 }
 
 /// `Get/SetUseLimits`, `Get/SetLimits` (min, max degrees), `Get/SetSwingLimit`,
-/// `Get/SetSwing2Limit`, `Get/SetBreakForce`, `Get/SetBreakTorque`.
+/// `Get/SetSwing2Limit`, `Get/SetBreakForce`, `Get/SetBreakTorque`,
+/// `Get/SetDriveStrength`, `Get/SetDriveDamping`.
 fn register_limits(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     bool_pair(
         lua,
@@ -179,5 +181,9 @@ fn register_limits(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let force: Field<f32> = (|j| j.break_force, ops::set_break_force);
     f32_pair(lua, t, scene, "BreakForce", force)?;
     let torque: Field<f32> = (|j| j.break_torque, ops::set_break_torque);
-    f32_pair(lua, t, scene, "BreakTorque", torque)
+    f32_pair(lua, t, scene, "BreakTorque", torque)?;
+    let strength: Field<f32> = (|j| j.drive_strength, ops::set_drive_strength);
+    f32_pair(lua, t, scene, "DriveStrength", strength)?;
+    let damping: Field<f32> = (|j| j.drive_damping, ops::set_drive_damping);
+    f32_pair(lua, t, scene, "DriveDamping", damping)
 }
