@@ -45,19 +45,27 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
         "Share of a texel's rays that must see front faces; below it the texel is \
          inside geometry and its own chart fills it",
     );
-    let per_pass = egui::DragValue::new(&mut s.samples_per_pass).ranged(BakeSettings::SAMPLES);
-    row(
-        ui,
-        per_pass,
-        "Samples per pass",
-        "Paths each pass adds to every texel; the scene shows the lightmaps after each pass",
-    );
     changed |= draw_max_lightmap_size(ui, &mut s.max_lightmap_size);
     changed |= draw_denoiser(ui, &mut s.denoiser);
     changed |= ui
         .checkbox(&mut s.directional, "Directional lightmaps")
         .on_hover_text("Bake light directions too, so normal maps show under baked light (#810)")
         .changed();
+    changed | draw_progressive(ui, s)
+}
+
+/// The progressive bake's knobs (#1970); returns whether either changed.
+fn draw_progressive(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
+    let per_pass = egui::DragValue::new(&mut s.samples_per_pass).ranged(BakeSettings::SAMPLES);
+    let mut changed = ui
+        .horizontal(|ui| {
+            let hover = "Paths each pass adds to every texel; the scene shows the lightmaps \
+                         after each pass";
+            let changed = ui.add(per_pass).on_hover_text(hover).changed();
+            ui.label("Samples per pass");
+            changed
+        })
+        .inner;
     changed |= ui
         .checkbox(&mut s.prioritize_view, "Prioritize view")
         .on_hover_text("Each pass traces what the Scene view's camera sees first")
