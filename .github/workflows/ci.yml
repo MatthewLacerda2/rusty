@@ -261,8 +261,8 @@ jobs:
         os: [macos-26]
     # A guard against a hang, not a budget the suite must fit (#1976): the job
     # took 23-29 min when it ran both suites and two green runs were cancelled
-    # at 30. With the one `dev` suite it takes about 15, so 45 leaves room for a
-    # cold cache and a slow runner while still killing a hang well inside the hour.
+    # at 30. With the one `dev` suite it took 18.4 (run 42611428872), so 45 leaves
+    # room for a slow runner and a growing suite while still killing a hang.
     timeout-minutes: 45
     runs-on: ${{ matrix.os }}
     if: >-
