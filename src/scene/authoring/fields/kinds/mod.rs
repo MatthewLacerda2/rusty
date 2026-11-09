@@ -4,6 +4,7 @@
 //! fields) plus the mandatory `Transform`; the field tables live beside, grouped
 //! by area.
 
+mod ai;
 mod fx;
 mod graphic;
 mod nav;
@@ -41,6 +42,7 @@ pub const KINDS: &[Kind] = &[
         Some(K::NavMeshModifierVolume),
         "nav_modifier",
     ),
+    kind::<AIPerceptionComponent>("AIPerception", Some(K::AIPerception), "ai_perception"),
     kind::<CameraComponent>("Camera", Some(K::Camera), "camera"),
     kind::<ParticleEmitterComponent>("Particles", Some(K::Particles), "particles"),
     kind::<PostProcessingComponent>("PostProcessing", Some(K::PostProcessing), "post_processing"),

@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::ShapeComponent;
+use super::{AIPerceptionComponent, ReverbZoneComponent, TrailComponent};
 use super::{
     AnimatorComponent, AudioSourceComponent, CameraComponent, CanvasComponent,
     CanvasGroupComponent, ColliderComponent, ImageComponent, LayoutElementComponent,
@@ -26,7 +27,6 @@ use super::{
 };
 use super::{CharacterControllerComponent, JointComponent, LineComponent, LodGroupComponent};
 use super::{LightProbeProxyVolumeComponent, NavMeshModifierVolumeComponent};
-use super::{ReverbZoneComponent, TrailComponent};
 
 mod override_refs;
 mod prefab_link;
@@ -79,6 +79,9 @@ pub struct Entity {
     /// A navigation-area modifier volume (#460).
     #[serde(default)]
     pub nav_modifier: Option<NavMeshModifierVolumeComponent>,
+    /// What the agent can sense: sight, hearing and damage (#1900).
+    #[serde(default)]
+    pub ai_perception: Option<AIPerceptionComponent>,
     pub camera: Option<CameraComponent>,
     pub post_processing: Option<PostProcessingComponent>,
     #[serde(default)]
@@ -188,6 +191,7 @@ impl Entity {
             nav_obstacle: None,
             offmesh_link: None,
             nav_modifier: None,
+            ai_perception: None,
             camera: None,
             post_processing: None,
             particles: None,

@@ -14,7 +14,9 @@ tree: `cargo check --locked --all-targets` with `dev` and with
 target, against ten for the CI round it saves. A failure hands the branch
 back unpushed: a head known to be broken is never pushed to find out again.
 Skipped for a Markdown-only branch (nothing compiles differently), an update
-that moved nothing, Dependabot, and `--no-check`.
+that moved nothing, Dependabot, and `--no-check`. Every merged tree, under
+`--no-check` too, then gets all of `tools/lint`'s passes ([`needs_lint`],
+`queue.lints`, #1956), where [`LOCAL_CHECKS`] runs only the size pass.
 
 Those builds land in **one target directory owned by the queue**
 (`target/merge-queue` under `--root` by default), never a worktree's own.
@@ -168,3 +170,10 @@ def target_dir(opts: argparse.Namespace) -> str:
 def needs_check(pull: dict, opts: argparse.Namespace) -> bool:
     """Whether [`verify`] runs for this pull request's update."""
     return not (opts.no_check or opts.dry_run or changes.markdown_only(github.paths(pull)))
+
+
+def needs_lint(pull: dict, opts: argparse.Namespace) -> bool:
+    """Whether `tools/lint`'s passes run on this pull request's update
+    ([`lints.Linter.check`], #1956): `--no-check` or not, never in a dry run or
+    for a Markdown-only branch."""
+    return not (opts.dry_run or changes.markdown_only(github.paths(pull)))

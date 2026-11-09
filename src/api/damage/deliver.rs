@@ -5,11 +5,18 @@
 //! pointer callbacks bubble along). Each of its scripts that defines the callback
 //! is called in slot order; a handler's number return is what it took, and the
 //! next handler is called with that amount (an armour script before a health one).
+//!
+//! Every hit is also the damage sense's stimulus (#1900, [`sense`]): the struck
+//! entity's perceiver (`ai::perception::report_damage`) senses it whether or not
+//! anything receives the damage, so a bot with no health script still turns to
+//! the shot.
 
 use std::cell::RefCell;
 
+use glam::Vec3;
 use mlua::{Lua, Table, Value};
 
+use crate::ai::perception;
 use crate::scene::Scene;
 use crate::scripting::callbacks::ON_TAKE_DAMAGE;
 use crate::scripting::instances;
@@ -38,6 +45,7 @@ pub(super) fn to_receiver(
     amount: f64,
     event: &Table,
 ) -> mlua::Result<f64> {
+    sense_event(scene, id, amount, event)?;
     let found = receiver(lua, &scene.borrow(), id);
     match found {
         Some(r) => call(lua, r, amount, event),
@@ -64,4 +72,37 @@ pub(super) fn call(lua: &Lua, receiver: u32, amount: f64, event: &Table) -> mlua
         };
     }
     Ok(taken)
+}
+
+/// The damage sense for a hit on `struck` described by `event`: placed at the
+/// instigator, else the hit's point, else the struck entity.
+fn sense_event(
+    scene: &RefCell<Scene>,
+    struck: u32,
+    amount: f64,
+    event: &Table,
+) -> mlua::Result<()> {
+    let point = match event.get::<Option<Table>>("hit")? {
+        Some(hit) => hit.get::<Option<Table>>("point")?,
+        None => None,
+    };
+    let at = match point {
+        Some(p) => Vec3::new(p.get("x")?, p.get("y")?, p.get("z")?),
+        None => scene.borrow().world.world_position(struck),
+    };
+    let instigator: Option<u32> = event.get("instigator")?;
+    let kind: String = event.get("type")?;
+    sense(scene, struck, instigator, at, (amount, &kind));
+    Ok(())
+}
+
+/// Report a hit on `struck` to its perceiver, if it has one (`report_damage`).
+pub(super) fn sense(
+    scene: &RefCell<Scene>,
+    struck: u32,
+    instigator: Option<u32>,
+    at: Vec3,
+    hit: (f64, &str),
+) {
+    perception::report_damage(&mut scene.borrow_mut(), struck, instigator, at, hit);
 }

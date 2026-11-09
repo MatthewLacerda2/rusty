@@ -151,6 +151,7 @@ Component menu offers.
 | `OnStateEnter` | `OnStateEnter(id, info)` | The step the entity's `Animator` enters a graph state (#1901), Unity's `StateMachineBehaviour.OnStateEnter`: as a transition into it **starts**, or on a hard cut (`PlayNode`, binding the entry node), in every layer. `info` is the state's `{ layer, layer_name, state, tag, time, normalized_time, length }`. Rules and order: [`Animator`](Animator.md), *State callbacks*. |
 | `OnStateUpdate` | `OnStateUpdate(id, info)` | Every step a graph state stays active (#1901), from the step after its enter to the step before its exit — both states of a crossfade, each step it blends. Only scripts that define it are called. |
 | `OnStateExit` | `OnStateExit(id, info)` | The step a graph state stops being active (#1901): as a crossfade out of it **ends**, or at once on a hard cut away. `info` is as the state's last step left it. |
+| `OnPerceptionUpdated` | `OnPerceptionUpdated(id, target, info)` | Once per update the entity's [`AIPerception`](AIPerception.md) raised (#1900): a target gained (first sensed, or sensed again), lost from sight (`info.sensed == false`, still known at its last-known position) or forgotten (`info.forgotten == true`), and every noise or hit it sensed. `target` is `nil` for a noise or hit with no instigator. After the perception step, before `LateUpdate`. Rules: [`AIPerception`](AIPerception.md), *Updates*. |
 | `OnTakeDamage` | `OnTakeDamage(id, amount, event)` | Synchronously, inside a [`Damage`](Damage.md) call (#1893) — not by the tick. It bubbles: the nearest active entity from the one struck upward whose script defines it receives it. `event` carries the kind, type, instigator, causer and the hit or blast; a number return is the damage taken. Rules: [`Damage`](Damage.md). |
 | `OnEnable` | `OnEnable(id)` | When the owning entity becomes `active`: on its **first** activation — between `Awake` and `Start`, so the first-tick order is `Awake → OnEnable → Start` — and again on every later inactive→active transition (e.g. a script's `Scene.SetActive(id, true)` re-enabling a pooled object). Detected by diffing whether the entity is active in the hierarchy against the previous tick (so a parent's `SetActive` fires its children's edges too), so it fires **exactly once** per rising edge. |
 | `OnDisable` | `OnDisable(id)` | When the owning entity becomes inactive: once on each `active`→inactive transition (e.g. `Scene.Deactivate`), and once more — immediately **before** `OnDestroy` — when an *active* entity is destroyed. Fires **exactly once** per falling edge. While disabled, the entity receives no other gameplay callback (no `Update`/`LateUpdate`/`OnTrigger`/`OnCollision*`). |
@@ -244,6 +245,9 @@ headless replays stay byte-identical):
 - `OnAnimationEvent`s fire after the tick's animation step and before
   `LateUpdate`: by entity id ascending, each entity's events in the order its
   playheads crossed them, then layer, then authored order.
+- `OnPerceptionUpdated`s fire right after the `OnAnimationEvent`s (and the
+  root-motion hits), once the perception step has run, before `LateUpdate`: by
+  perceiver id ascending, each perceiver's updates in the order they were raised.
 - `OnControllerColliderHit` is not a phase of the tick: it fires inside the
   `CharacterController.Move` that touched the colliders, each collider once,
   in sweep order. The moves root motion made this tick dispatch theirs right
@@ -350,6 +354,7 @@ where it reads best. -->
 - [`OffMeshLink`](OffMeshLink.md)
 - [`NavMeshModifierVolume`](NavMeshModifierVolume.md)
 - [`EnvironmentQuery`](EnvironmentQuery.md)
+- [`AIPerception`](AIPerception.md)
 - [`Physics`](Physics.md)
 - [`Joint`](Joint.md)
 - [`Ragdoll`](Ragdoll.md)

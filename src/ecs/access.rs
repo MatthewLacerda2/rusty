@@ -20,6 +20,7 @@
 
 use std::ops::{Deref, DerefMut};
 
+use crate::components::AIPerceptionComponent;
 use crate::components::NavMeshModifierVolumeComponent;
 use crate::components::ReverbZoneComponent;
 use crate::components::ShapeComponent;
@@ -136,6 +137,7 @@ optional_component_accessors! {
     NavMeshObstacleComponent => nav_obstacle, nav_obstacle_mut, has_nav_obstacle, set_nav_obstacle, take_nav_obstacle, ids_with_nav_obstacle;
     OffMeshLinkComponent => offmesh_link, offmesh_link_mut, has_offmesh_link, set_offmesh_link, take_offmesh_link, ids_with_offmesh_link;
     NavMeshModifierVolumeComponent => nav_modifier, nav_modifier_mut, has_nav_modifier, set_nav_modifier, take_nav_modifier, ids_with_nav_modifier;
+    AIPerceptionComponent => ai_perception, ai_perception_mut, has_ai_perception, set_ai_perception, take_ai_perception, ids_with_ai_perception;
     CameraComponent => camera, camera_mut, has_camera, set_camera, take_camera, ids_with_camera;
     PostProcessingComponent => post_processing, post_processing_mut, has_post_processing, set_post_processing, take_post_processing, ids_with_post_processing;
     ParticleEmitterComponent => particles, particles_mut, has_particles, set_particles, take_particles, ids_with_particles;

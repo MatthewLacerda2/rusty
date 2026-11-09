@@ -22,28 +22,15 @@ pub struct Anchor {
 }
 
 impl Anchor {
-    /// Entity `id` as a context: where it **stands** (its feet, not its
+    /// Entity `id` as a context: where it **stands** ([`stand::feet`], not its
     /// Transform, which for a character is its middle) and its world forward
-    /// (+Z). The feet are a `NavMeshAgent`'s, else the bottom of a
-    /// `CharacterController`'s capsule, else the bottom of its collider, else its
-    /// Transform. So a trace's eye height and a distance read the same for every
-    /// kind of body.
+    /// (+Z).
+    ///
+    /// [`stand::feet`]: crate::ai::stand::feet
     pub fn of_entity(scene: &crate::scene::Scene, id: u32) -> Self {
-        let w = &scene.world;
-        let at = w.world_position(id);
-        let feet_y = if let Some(agent) = w.nav_agent(id) {
-            agent.feet(at).y
-        } else if let (Some(cc), Some(pose)) = (w.character_controller(id), w.world_pose(id)) {
-            let center = pose.pos + pose.rot * (cc.center * pose.scale);
-            center.y - 0.5 * cc.height.max(2.0 * cc.radius) * pose.scale.y.abs()
-        } else if let Some((min, _)) = w.collider_bounds(id) {
-            min.y
-        } else {
-            at.y
-        };
         Self {
-            position: at.with_y(feet_y),
-            facing: Some(w.world_rotation(id) * Vec3::Z),
+            position: crate::ai::stand::feet(scene, id),
+            facing: Some(scene.world.world_rotation(id) * Vec3::Z),
             entity: Some(id),
         }
     }

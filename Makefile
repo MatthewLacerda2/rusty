@@ -240,7 +240,8 @@ ruleset: ## Does main's live ruleset match .github/rulesets/main.json? ARGS=--ap
 # The same question in a loop, with the update from main and the waiting done for you.
 # Serialized: one branch at a time, in the order given. Merges origin/main into
 # each (never a rebase, so never a force-push, #1568) and compile-checks the
-# updated head before pushing it (#571; ARGS=--no-check skips). Never resolves
+# updated head before pushing it (#571; ARGS=--no-check skips the compile, never
+# tools/lint's build-free passes on the merged tree, #1956). Never resolves
 # a conflict or touches a worktree of yours; it names what to clean up.
 # ARGS passes flags through, e.g. ARGS=--dry-run (reads only, writes nothing).
 queue: ## Merge main in, wait for CI, squash-merge each in turn. make queue PRS="524 526", or ARGS=--watch

@@ -52,6 +52,7 @@ mod navigation_layered;
 mod navmesh_settings;
 mod parity_authoring_ops;
 mod particles;
+mod perception;
 mod physics;
 mod plane_subdivisions;
 mod prefab_api;

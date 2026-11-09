@@ -23,7 +23,7 @@ use super::game::GameWorld;
 use super::registry::App;
 use super::resources::Resources;
 use super::stage::Stage;
-use super::systems::physics;
+use super::systems::{perception, physics};
 use super::world::World;
 
 /// Play-enter helpers, split out of `GameWorld::enter_play` so each phase stays
@@ -109,7 +109,10 @@ impl GameWorld {
 /// runs in `Render`, after every stage that may move a bone. The post-animation
 /// writers, in order: `animate` writes the clip pose; `pose_ragdolls` (#466) puts each simulated
 /// ragdoll bone back where physics left it; the state callbacks (#1901) and
-/// `OnAnimationEvent` (#459) then fire for the states and events of this tick's step; `LateUpdate` scripts set this tick's
+/// `OnAnimationEvent` (#459) then fire for the states and events of this tick's step;
+/// `perceive` (#1900) then steps every `AIPerception`'s sight against this tick's
+/// colliders and settled pose, and `OnPerceptionUpdated` fires for what it and
+/// this tick's noises and hits raised; `LateUpdate` scripts set this tick's
 /// targets; `solve_ik` (#461) post-processes the final pose, skipping any bone a
 /// dynamic body carries (physics wins over IK); `follow_bones` (#464) then moves
 /// the hitbox query poses to the pose that renders; `carry_local_particles` (#1529)
@@ -126,6 +129,8 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::systems::animate::animate)
         .add_system(Stage::FixedUpdate, physics::pose_ragdolls)
         .add_system(Stage::FixedUpdate, dispatch_animation_events)
+        .add_system(Stage::FixedUpdate, perception::perceive)
+        .add_system(Stage::FixedUpdate, perception::dispatch_perception_updates)
         .add_system(
             Stage::FixedUpdate,
             super::systems::particles::tick_particles,
@@ -142,7 +147,8 @@ pub(super) fn register(app: &mut App) {
         .add_system(Stage::FixedUpdate, super::systems::decals::tick_decals)
         .add_system(Stage::FixedUpdate, super::scene_load::apply_scene_load)
         .add_system(Stage::FixedUpdate, advance_frame)
-        .add_system(Stage::Render, build_skin_palettes);
+        .add_system(Stage::Render, build_skin_palettes)
+        .add_system(Stage::Startup, perception::reset_sight_rays);
 }
 
 /// The tick's head: the `Debug.Draw*` lines (#1882) lose a tick before any script
