@@ -143,8 +143,9 @@ pub struct CameraComponent {
     #[serde(default)]
     pub projection: Projection,
     /// Occlusion Culling (#1714, Unity's `Camera.useOcclusionCulling`): skip the
-    /// static meshes the scene's baked PVS says this camera's cell cannot see. On by
-    /// default, as Unity's camera is; a scene with no bake culls nothing by it.
+    /// static meshes the scene's baked PVS says this camera's cell cannot see, and,
+    /// under a quality preset with `gpu_occlusion_culling`, the opaque meshes its own
+    /// depth hides (#1963, no bake needed). On by default, as Unity's camera is.
     #[serde(default = "default_use_occlusion_culling")]
     pub use_occlusion_culling: bool,
     /// Draw into a named render texture instead of the screen (#430): the camera

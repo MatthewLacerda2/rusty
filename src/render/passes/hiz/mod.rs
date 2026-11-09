@@ -48,10 +48,16 @@ mod cull;
 pub(crate) mod pyramid;
 mod upload;
 
+#[cfg(all(test, feature = "dev"))]
+mod dust2_gpu_tests;
 #[cfg(test)]
 mod gpu_tests;
 #[cfg(test)]
 mod moving_gpu_tests;
+#[cfg(test)]
+mod projection_gpu_tests;
+#[cfg(test)]
+mod scale_gpu_tests;
 
 use crate::render::gpu::pipelines::LazyCompute;
 use crate::render::gpu::shaders::ShaderRegistry;
