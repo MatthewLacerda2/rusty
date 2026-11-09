@@ -12,7 +12,14 @@
 //! 3. **Headroom (#278).** A span with less than `agent_height` of open space is
 //!    dropped: nobody crawls under a low overhang.
 //!
-//! Sorting uses a total order on `(cell, min, max, walkable)`, so the result is a
+//! The merged top carries the area of the walkable solid that gives it its flag.
+//! **Past Recast:** when the solid that reaches the merged top carries a
+//! `NavMeshModifier`'s override (#1959), its flag and area decide alone and the
+//! flag merge is skipped. A 0.45 m sofa overridden to `NotWalkable` sits within
+//! `max_step` of the floor, so Recast's merge would hand it the floor's walkable
+//! flag; the developer placed the override to say the seat is not floor.
+//!
+//! Sorting uses a total order on `(cell, min, max, walkable, area, overridden)`, so the result is a
 //! pure function of the geometry, whatever order the colliders were visited in.
 
 use super::super::{NavSpan, NavigationGraph};
@@ -34,6 +41,8 @@ impl NavigationGraph {
                 .then(a.min.total_cmp(&b.min))
                 .then(a.max.total_cmp(&b.max))
                 .then(a.walkable.cmp(&b.walkable))
+                .then(a.area.cmp(&b.area))
+                .then(a.overridden.cmp(&b.overridden))
                 .then(Plane::order(a.plane, b.plane))
                 .then(a.floor.total_cmp(&b.floor))
         });
@@ -60,7 +69,7 @@ fn open_spans(column: &[Solid], agent_height: f32) -> impl Iterator<Item = NavSp
         (s.walkable && ceiling - s.max >= agent_height).then_some(NavSpan {
             y: s.max,
             ceiling,
-            area: super::super::WALKABLE_AREA,
+            area: s.area,
             surface: Plane::surface(s.plane, s.max, s.floor),
         })
     })
@@ -75,12 +84,43 @@ fn merge_column(solids: &[Solid], flag_merge: f32, out: &mut Vec<Solid>) {
                 let top = last.max.max(s.max);
                 last.plane = top_plane((last.max, last.plane), (s.max, s.plane));
                 last.floor = last.floor.max(s.floor).max(lower_floor(last, &s));
-                last.walkable = (last.walkable && last.max >= top - flag_merge)
-                    || (s.walkable && s.max >= top - flag_merge);
+                let authored = (authors(last, top), authors(&s, top));
+                let (keeps, takes) = match authored {
+                    (false, false) => (
+                        last.walkable && last.max >= top - flag_merge,
+                        s.walkable && s.max >= top - flag_merge,
+                    ),
+                    (a, b) => (a && last.walkable, b && s.walkable),
+                };
+                last.area = match authored {
+                    (false, true) if !takes => s.area,
+                    _ => merged_area((last, keeps), (&s, takes)),
+                };
+                last.overridden = authored.0 || authored.1;
+                last.walkable = keeps || takes;
                 last.max = top;
             }
             _ => out.push(s),
         }
+    }
+}
+
+/// Whether `s` is an overridden solid reaching the merged `top`: then the flag
+/// merge is skipped and its own flag and area decide.
+fn authors(s: &Solid, top: f32) -> bool {
+    s.overridden && s.max >= top - TOP_EPS
+}
+
+/// The area of two merging solids' top: that of the walkable one reaching it, the
+/// higher one's when both do (the higher id when level, so the visit order never
+/// decides).
+fn merged_area((a, a_walks): (&Solid, bool), (b, b_walks): (&Solid, bool)) -> u8 {
+    match (a_walks, b_walks) {
+        (true, true) if a.max > b.max + TOP_EPS => a.area,
+        (true, true) if b.max > a.max + TOP_EPS => b.area,
+        (true, true) => a.area.max(b.area),
+        (false, true) => b.area,
+        _ => a.area,
     }
 }
 
@@ -107,6 +147,8 @@ mod tests {
             walkable,
             plane: None,
             floor: f32::NEG_INFINITY,
+            area: 0,
+            overridden: false,
         }
     }
 
@@ -159,5 +201,29 @@ mod tests {
             &mut out,
         );
         assert_eq!(out.len(), 2);
+    }
+
+    #[test]
+    fn an_overridden_top_skips_the_flag_merge() {
+        let mut out = Vec::new();
+        let seat = |area| Solid {
+            area,
+            overridden: true,
+            ..solid(0.0, 0.45, area != 1)
+        };
+        merge_column(&[solid(-0.1, 0.0, true), seat(1)], 0.5, &mut out);
+        assert!(!out[0].walkable, "a NotWalkable seat stays unwalkable");
+        assert_eq!((out[0].area, out[0].max), (1, 0.45));
+        merge_column(&[solid(-0.1, 0.0, true), seat(4)], 0.5, &mut out);
+        assert!(
+            out[0].walkable && out[0].area == 4,
+            "another area keeps its id"
+        );
+        let rug = Solid {
+            overridden: true,
+            ..solid(-0.1, -0.05, false)
+        };
+        merge_column(&[rug, solid(-0.1, 0.0, true)], 0.5, &mut out);
+        assert!(out[0].walkable, "an override below the top decides nothing");
     }
 }

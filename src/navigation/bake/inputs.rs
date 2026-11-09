@@ -1,6 +1,7 @@
 //! src/navigation/bake/inputs.rs — what the last bake read, to find what changed (#456).
 //!
-//! The bake's inputs are the static colliders (shape + world pose), the carving
+//! The bake's inputs are the static colliders (shape + world pose + the area a
+//! `NavMeshModifier` gives them, #1959), the carving
 //! obstacles (their [`ObstacleVolume`]), the area modifier volumes (#460) and the
 //! scene's `nav_settings`. The bake
 //! keeps a record of each input with the cells it covered. Diffing that record
@@ -19,6 +20,7 @@
 use glam::Mat4;
 
 use super::super::bounds::static_collider_ids;
+use super::super::object_modifier::bake_as;
 use super::super::obstacle::{carving_volumes, ObstacleVolume};
 use super::super::offmesh::AuthoredKey;
 use super::super::NavMeshSettings;
@@ -35,11 +37,14 @@ pub(super) struct Source<K> {
     pub rect: Option<CellRect>,
 }
 
-/// A static collider's identity for the bake: its shape at its world pose.
+/// A static collider's identity for the bake: its shape at its world pose, and the
+/// area a `NavMeshModifier` bakes it as (#1959), so a changed modifier dirties
+/// exactly the collider's cells.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct ColliderKey {
     shape: ColliderShape,
     pose: Mat4,
+    pub area: Option<u8>,
 }
 
 /// Everything the last bake read.
@@ -87,7 +92,8 @@ pub(super) fn collider_keys(scene: &Scene) -> Vec<(u32, ColliderKey)> {
         .filter_map(|id| {
             let shape = scene.world.collider(id)?.shape.clone();
             let pose = scene.world.local_to_world(id);
-            Some((id, ColliderKey { shape, pose }))
+            let area = bake_as(&scene.world, id).area;
+            Some((id, ColliderKey { shape, pose, area }))
         })
         .collect();
     out.sort_by_key(|&(id, _)| id);

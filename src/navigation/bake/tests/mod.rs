@@ -13,6 +13,8 @@ mod erosion;
 mod headroom;
 mod incremental;
 mod layers;
+mod object_modifier;
+mod object_modifier_sync;
 mod settings;
 mod slope;
 mod surface;

@@ -144,6 +144,7 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
         (World::has_nav_obstacle, "NavMeshObstacle"),
         (World::has_offmesh_link, "OffMeshLink"),
         (World::has_nav_modifier, "NavMeshModifierVolume"),
+        (World::has_nav_mesh_modifier, "NavMeshModifier"),
         (World::has_ai_perception, "AIPerception"),
         (World::has_particles, "ParticleEmitter"),
         (World::has_animator, "Animator"),

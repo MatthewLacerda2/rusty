@@ -15,7 +15,7 @@ every field added later, with nothing new to bind.
 **`name`** is any component name [`Scene.AddComponent`](Scene.md) takes (in any
 case, aliases too), plus `Transform`. Each answers to one name first:
 `Transform`, `Mesh`, `Light`, `Animator`, `Collider`, `RigidBody`, `Material`,
-`NavMeshAgent`, `NavMeshObstacle`, `OffMeshLink`, `NavMeshModifierVolume`,
+`NavMeshAgent`, `NavMeshObstacle`, `OffMeshLink`, `NavMeshModifierVolume`, `NavMeshModifier`,
 `AIPerception`, `Camera`, `Particles`, `PostProcessing`, `AudioSource`, `AudioReverbZone`,
 `Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
 `BackdropFilter`, `Text`, `Selectable`, `LayoutGroup`, `LayoutElement`, `Joint`,

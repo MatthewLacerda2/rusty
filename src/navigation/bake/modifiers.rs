@@ -5,7 +5,9 @@
 //! active volume takes that volume's area; a span inside a `NotWalkable` volume is
 //! removed, so erosion then pulls the surface back from it as from a wall. Where
 //! volumes overlap, `NotWalkable` wins, then the highest area id (Unity's rule), so
-//! the result never depends on the order volumes are visited in.
+//! the result never depends on the order volumes are visited in. A volume's area
+//! replaces the one a `NavMeshModifier` gave the surface (#1959); a span outside
+//! every volume keeps its own.
 //!
 //! Like carving, this is per column, so a moved, resized or retargeted volume
 //! dirties only the cells its old and new boxes cover (`inputs`), and an
@@ -13,7 +15,10 @@
 
 use glam::{Mat4, Vec3};
 
-use super::super::{NavSpan, NavigationGraph, NOT_WALKABLE_AREA, WALKABLE_AREA};
+use super::super::areas::clamp_area;
+#[cfg(test)]
+use super::super::WALKABLE_AREA;
+use super::super::{NavSpan, NavigationGraph, NOT_WALKABLE_AREA};
 use super::columns::Columns;
 use super::raster;
 use super::region::CellRect;
@@ -73,7 +78,7 @@ pub(super) fn modifier_keys(scene: &Scene) -> Vec<(u32, ModifierVolume)> {
                 ModifierVolume {
                     center: m.center,
                     size: m.size,
-                    area: m.area,
+                    area: clamp_area(m.area),
                     pose,
                 },
             ))
@@ -129,10 +134,7 @@ pub(super) fn apply(
             let column = cols.column(local).iter().filter_map(|s| match assign(s) {
                 Some(s) if s.area == NOT_WALKABLE_AREA => None,
                 Some(s) => Some(s),
-                None => Some(NavSpan {
-                    area: WALKABLE_AREA,
-                    ..*s
-                }),
+                None => Some(*s),
             });
             out.push_column(column.collect::<Vec<_>>());
             local += 1;

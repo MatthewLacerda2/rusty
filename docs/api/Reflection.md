@@ -145,6 +145,6 @@ needs a GPU or software adapter (e.g. lavapipe); with none it skips gracefully a
 returns `false` rather than erroring. It **errors** when the scene has probes and is
 unsaved (there is nowhere to write the cubemaps), when a cubemap file cannot be written
 or a stale one removed, and while the
-editor's Generate Lighting runs (see `Lighting.md`). It logs its progress, probe by probe, to stderr as it goes (#1667). It is **dev-only** (an authoring action driving a headless
+editor's Generate Lighting or Bake Occlusion runs (see `Lighting.md`). It logs its progress, probe by probe, to stderr as it goes (#1667). It is **dev-only** (an authoring action driving a headless
 renderer), so it is absent from ship builds. Save the scene afterward to persist each
 probe's `cubemap_path` and its stored `irradiance` into the `.scene` document.

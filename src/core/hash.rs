@@ -17,6 +17,21 @@ pub fn content(bytes: &[u8]) -> u64 {
     xxhash_rust::xxh3::xxh3_64(bytes)
 }
 
+/// [`content`] fed in pieces: the same digest as `content` of the pieces joined,
+/// with no buffer to join them in.
+#[derive(Default)]
+pub struct Content(xxhash_rust::xxh3::Xxh3);
+
+impl Content {
+    pub fn write(&mut self, bytes: &[u8]) {
+        self.0.update(bytes);
+    }
+
+    pub fn finish(&self) -> u64 {
+        self.0.digest()
+    }
+}
+
 /// FNV-1a, 64-bit. Only for digests already stored (the `.seeded` manifest,
 /// `fingerprints.txt`); new uses take [`content`].
 pub fn fnv1a64(bytes: &[u8]) -> u64 {
@@ -32,6 +47,14 @@ mod tests {
         // XXH3_64bits("") from the xxHash reference implementation.
         assert_eq!(super::content(b""), 0x2d06_8005_38d3_94c2);
         assert_ne!(super::content(b"a"), super::content(b"b"));
+    }
+
+    #[test]
+    fn content_in_pieces_is_content_of_them_joined() {
+        let mut pieces = super::Content::default();
+        pieces.write(b"occlu");
+        pieces.write(b"sion");
+        assert_eq!(pieces.finish(), super::content(b"occlusion"));
     }
 
     #[test]
