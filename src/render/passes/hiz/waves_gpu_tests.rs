@@ -4,7 +4,7 @@
 
 use glam::Vec3;
 
-use super::gpu_tests::{offscreen, shot, H, W};
+use super::gpu_tests::{drawn, offscreen, shot, H, W};
 use crate::scene::authoring::rendering::mesh::set_subdivisions;
 use crate::scene::authoring::{create_entity, material, Primitive};
 use crate::scene::lighting::occlusion::test_level::block;
@@ -23,19 +23,19 @@ impl Drop for Baked {
     }
 }
 
-/// A rim 0.3 m tall at z = 0 and, 4 m behind it, a water plane at y = 0 whose
-/// swells (metre-high when `waves`) rise over the rim; the plane is left out when
-/// `water` is `None`.
+/// A rim 2 m tall at z = 0 and, 4 m behind it, a 2 m water plane at y = 0 drawn
+/// with `water` (its swells rise metres over the rim), or none when `None`. The
+/// plane is narrow, so its flat box is tested at a fine pyramid level, all rim.
 fn pool(water: Option<&str>) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let rim = (Vec3::new(-8.0, -2.0, -0.2), Vec3::new(8.0, 0.3, 0.2));
+    let rim = (Vec3::new(-8.0, -2.0, -0.2), Vec3::new(8.0, 2.0, 0.2));
     block(&mut scene, "Rim", rim.0, rim.1);
     if let Some(shader) = water {
         let id = create_entity(&mut scene, "Water", Some(Primitive::Plane));
-        set_subdivisions(&mut scene.world.mesh_mut(id).unwrap(), 48).unwrap();
+        set_subdivisions(&mut scene.world.mesh_mut(id).unwrap(), 32).unwrap();
         let mut t = scene.world.transform_mut(id).unwrap();
-        (t.position, t.scale) = (Vec3::new(0.0, 0.0, -4.0), Vec3::new(16.0, 1.0, 6.0));
+        (t.position, t.scale) = (Vec3::new(0.0, 0.0, -4.0), Vec3::new(0.2, 1.0, 0.2)); // a 10 m Plane, made 2 m
         drop(t);
         let key = material::ensure_material_key(&mut scene, id).unwrap();
         material::set_shader(&mut scene.materials, &key, shader.to_string());
@@ -47,7 +47,7 @@ fn pool(water: Option<&str>) -> Scene {
 fn gpu_a_waved_plane_behind_a_rim_still_draws_its_crests() {
     let name = format!("test_hiz_waves_{}", std::process::id());
     let _baked = Baked(name.clone());
-    let params = [("amplitude".to_string(), ParamValue::Scalar(1.0))];
+    let params = [("amplitude".to_string(), ParamValue::Scalar(6.0))];
     let recipe = ShaderRecipe {
         pass: PassKind::Surface,
         name: name.clone(),
@@ -60,8 +60,8 @@ fn gpu_a_waved_plane_behind_a_rim_still_draws_its_crests() {
     let Some(mut r) = crate::render::test_gpu::headless_or_skip(W, H) else {
         return;
     };
-    // Low, just under the rim's top: the flat box behind it is hidden.
-    let cam = Camera::new(Vec3::new(0.0, 0.2, 6.0), -90.0, 0.0);
+    // Low, well under the rim's top: the flat box behind it is hidden.
+    let cam = Camera::new(Vec3::new(0.0, 0.5, 6.0), -90.0, 0.0);
     let (water, dry) = (pool(Some(&name)), pool(None));
     let mut view = offscreen(&r);
     let (empty, _) = shot(&mut r, &mut view, &dry, &cam);
@@ -70,6 +70,12 @@ fn gpu_a_waved_plane_behind_a_rim_still_draws_its_crests() {
         (on, _) = shot(&mut r, &mut view, &water, &cam);
     }
     assert!(on != empty, "the crests show over the rim");
+    // The same plane drawn flat is hidden: the scene does test the cull.
+    let flat = pool(Some(""));
+    for _ in 0..2 {
+        shot(&mut r, &mut view, &flat, &cam);
+    }
+    assert_eq!(drawn(&r, &view).iter().sum::<u32>(), 1, "the rim alone");
     r.quality.gpu_occlusion_culling = false;
     let mut fresh = offscreen(&r);
     let (off, _) = shot(&mut r, &mut fresh, &water, &cam);
