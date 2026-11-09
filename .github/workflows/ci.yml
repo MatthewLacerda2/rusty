@@ -262,7 +262,8 @@ jobs:
         os: [macos-26]
     # A guard against a hang, not a budget the suite must fit (#1976): the job
     # took 23-29 min when it ran both suites and two green runs were cancelled
-    # at 30. It must stay below the merge queue's `DEADLINE_MINUTES` (45, in
+    # at 30. With the one `dev` suite it took 18.4 (run 42611428872). It must
+    # stay below the merge queue's `DEADLINE_MINUTES` (45, in
     # `merging/queue/cli.py`), so a hung job is a cancelled run the queue re-runs
     # (#869), not a stall hand-back; `tests/queue/test_macos_timeout.py` holds it.
     timeout-minutes: 35
