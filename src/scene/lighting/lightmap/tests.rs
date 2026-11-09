@@ -65,6 +65,7 @@ pub(super) fn settings() -> BakeSettings {
         denoiser: Denoiser::Filter,
         filter_radius: 0,
         directional: true,
+        backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
     }
 }
 

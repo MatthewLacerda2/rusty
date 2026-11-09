@@ -95,6 +95,7 @@ fn probe_and_bake(scene: &mut Scene, name: &str, normalised: bool) {
         denoiser: rusty::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional: false,
+        backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
     };
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     bake_scene_lightmaps(scene, Some(&path), &settings).unwrap();

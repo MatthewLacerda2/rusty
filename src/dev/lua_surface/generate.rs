@@ -5,7 +5,8 @@
 //! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, its
 //! Max Lightmap Size included, #1704, and the
 //! reflection probes' default resolution, memory budget and probe ceiling, #1584,
-//! and the scene's diffuse model, #1698, and the lightmaps' denoiser, #1884).
+//! and the scene's diffuse model, #1698, and the lightmaps' denoiser, #1884, and
+//! Backface Tolerance, #1949).
 
 use std::cell::RefCell;
 
@@ -34,6 +35,8 @@ pub(super) struct Overrides {
     pub max_lightmap_size: Option<u32>,
     /// What cleans the bounce (#1884).
     pub denoiser: Option<Denoiser>,
+    /// Backface Tolerance (#1949).
+    pub backface_tolerance: Option<f32>,
 }
 
 impl Overrides {
@@ -48,6 +51,7 @@ impl Overrides {
             directional: self.directional.unwrap_or(base.directional),
             max_lightmap_size: self.max_lightmap_size.unwrap_or(base.max_lightmap_size),
             denoiser: self.denoiser.unwrap_or(base.denoiser),
+            backface_tolerance: self.backface_tolerance.unwrap_or(base.backface_tolerance),
             ..base
         }
         .sanitized()
@@ -62,6 +66,7 @@ impl Overrides {
             directional: t.get("directional")?,
             max_lightmap_size: t.get("maxLightmapSize")?,
             denoiser: denoiser(t)?,
+            backface_tolerance: t.get("backfaceTolerance")?,
         })
     }
 }
@@ -156,6 +161,7 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
             out.set("directional", s.directional)?;
             out.set("maxLightmapSize", s.max_lightmap_size)?;
             out.set("denoiser", s.denoiser.name())?;
+            out.set("backfaceTolerance", s.backface_tolerance)?;
             out.set("diffuseModel", settings.diffuse_model.name())?;
             out.set("mixedLightingMode", settings.mixed_lighting_mode.name())?;
             put_reflections(&out, &r)?;

@@ -81,6 +81,8 @@ mod area_reach_tests;
 #[cfg(test)]
 mod area_tests;
 #[cfg(test)]
+mod buried_tests;
+#[cfg(test)]
 mod casting_tests;
 #[cfg(test)]
 mod coverage_tests;
@@ -124,3 +126,5 @@ mod skybox_tests;
 mod sliver_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod validity_tests;

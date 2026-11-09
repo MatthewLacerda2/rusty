@@ -46,6 +46,7 @@ pub(super) fn bake_with(scene: &mut Scene, name: &str, directional: bool) -> usi
         denoiser: crate::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional,
+        backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
     };
     bake_scene_lightmaps(scene, Some(&path), &settings).expect("baked")
 }
