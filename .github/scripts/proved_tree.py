@@ -23,7 +23,8 @@ every `Cargo.toml` / `Cargo.lock`, `.cargo/config` and the job's `CARGO*`/`RUST*
 env, and saves only on `main` (#482), only when that key has no cache yet. A
 push that changes any [`CACHE_KEYED`] file since the previous tip, or the
 workflow file itself, runs everything, so the new key's cache is written by
-`main` and a dependency bump is proven on `main`. Any other push leaves the key,
+`main` and a dependency bump is proven on `main`. So does one under
+`.github/actions/`: `install-tool` pins the CI tools and keys their cache (#1973). Any other push leaves the key,
 and so the saved cache, as it was.
 
 **A superseded push skips** (#1785). A merge train lands its members as one
@@ -75,7 +76,8 @@ BUILT: dict[str, dict[str, str | None]] = {
 
 #: What `Swatinem/rust-cache` hashes into its key, by path or file name.
 CACHE_KEYED = ("Cargo.toml", "Cargo.lock", "rust-toolchain", "rust-toolchain.toml")
-CACHE_KEYED_DIRS = (".cargo/",)
+# `.github/actions/install-tool` pins the tools and keys their cache (#1973).
+CACHE_KEYED_DIRS = (".cargo/", ".github/actions/")
 
 #: How many pages of successful runs to search; the proving run of a merge is
 #: the pull request's last, minutes old.

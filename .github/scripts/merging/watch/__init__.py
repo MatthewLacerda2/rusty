@@ -93,7 +93,8 @@ to merge or close ([`board.lock_waits`], #969). Dependabot goes after every one 
 conflicts, and its conflicts count against nobody: it rebases itself. A pull
 request whose base is not `main` is never taken: the queue merges `main` in.
 
-**A Dependabot pull request that edits `.github/workflows/` is never taken**
+**A Dependabot pull request that edits `.github/workflows/` or `.github/actions/`
+(the composite actions the workflows call, #1973) is never taken**
 ([`board.held`], #825). The actions entry in `dependabot.yml` only ever proposes
 majors (the workflows pin `@v4`, which floats the rest), and those bumps edit
 workflows a pull-request run never executes (the sweep, coverage, Windows,

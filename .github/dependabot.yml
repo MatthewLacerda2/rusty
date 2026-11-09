@@ -8,7 +8,8 @@ updates:
   # they edit workflows no pull-request run executes: the merge queue's watch
   # holds the PR for the orchestrator to dispatch them first (#825).
   - package-ecosystem: "github-actions"
-    directory: "/"
+    # The workflows, and the composite actions they call (#1973).
+    directories: ["/", "/.github/actions/*"]
     schedule:
       interval: "monthly"
     groups:

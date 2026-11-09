@@ -25,8 +25,8 @@ set -u
 cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}" || exit 0
 
 # cargo-deny must be 0.20+: older releases cannot parse the advisory database's
-# CVSS 4.0 entries. CI installs the latest nextest; this pin only has to be new
-# enough for `.config/nextest.toml`.
+# CVSS 4.0 entries. CI pins nextest in `.github/actions/install-tool/action.yml`
+# (#1973); this pin only has to be new enough for `.config/nextest.toml`.
 NEXTEST=0.9.146
 DENY=0.20.2
 

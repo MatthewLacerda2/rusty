@@ -43,7 +43,7 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: ./.github/actions/install-tool
         with:
           tool: cargo-nextest
       - name: Test (engine, default)

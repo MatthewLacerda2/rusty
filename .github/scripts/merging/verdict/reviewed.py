@@ -52,7 +52,8 @@ REVIEWED = re.compile(r"^[#*_\s]*Independent review[*_]*[ \t]*(?:$|[(:—–-])"
 WAIVED = re.compile(r"^[#*_\s]*No review(?:\*\*|__)?:[*_]*[ \t]*(.*?)\s*$", re.IGNORECASE)
 
 # Dependabot's cargo branches, beside its author ([`exempt`]). Its GitHub Actions
-# bumps (`dependabot/github_actions/…`) edit `.github/workflows/`, which
+# bumps (`dependabot/github_actions/…`) edit `.github/workflows/` or
+# `.github/actions/`, which
 # `independent-review` reviews whoever wrote it, so they are not exempt.
 BOT_BRANCH = "dependabot/cargo/"
 
