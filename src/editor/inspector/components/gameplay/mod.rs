@@ -3,7 +3,7 @@
 //! live apart to stay under the size cap: the Collider card in `collider`, the
 //! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`, the NavMesh
 //! Obstacle card in `nav_obstacle`, the Off-Mesh Link card in `offmesh_link`, the
-//! NavMesh Modifier Volume card in `nav_modifier`, the Joint card in `joint`, the
+//! NavMesh Modifier Volume and Modifier cards in `nav`, the Joint card in `joint`, the
 //! CharacterController card in `character_controller`, the AI Perception card in
 //! `ai_perception`.
 
@@ -24,7 +24,7 @@ pub use ai_perception::draw_ai_perception;
 pub use character_controller::draw_character_controller;
 pub use collider::{commit_abandoned as commit_abandoned_collider, draw_collider};
 pub use joint::draw_joint;
-pub use nav::{draw_nav_agent, draw_nav_modifier, draw_nav_obstacle};
+pub use nav::{draw_nav_agent, draw_nav_mesh_modifier, draw_nav_modifier, draw_nav_obstacle};
 pub use offmesh_link::draw_offmesh_link;
 pub use physics::draw_rigidbody;
 
@@ -40,7 +40,7 @@ pub fn draw_bodies(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is
 }
 
 /// The navigation cards, in inspector order: NavMesh Agent, NavMesh Obstacle,
-/// Off-Mesh Link, NavMesh Modifier Volume, then the AI card: AI Perception.
+/// Off-Mesh Link, NavMesh Modifier Volume, NavMesh Modifier, then the AI card: AI Perception.
 pub fn draw_navigation(
     ui: &mut egui::Ui,
     world: &mut crate::ecs::World,
@@ -51,6 +51,7 @@ pub fn draw_navigation(
     draw_nav_obstacle(ui, world, id, is_dirty);
     draw_offmesh_link(ui, world, id, is_dirty);
     draw_nav_modifier(ui, world, id, is_dirty);
+    draw_nav_mesh_modifier(ui, world, id, is_dirty);
     draw_ai_perception(ui, world, id, is_dirty);
 }
 

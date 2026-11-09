@@ -3,11 +3,11 @@
 use super::super::table::{inspect, op, ro, with};
 use super::super::value::Mask;
 use crate::components::{
-    NavMeshAgentComponent, NavMeshModifierVolumeComponent, NavMeshObstacleComponent,
-    OffMeshLinkComponent,
+    NavMeshAgentComponent, NavMeshModifierComponent, NavMeshModifierVolumeComponent,
+    NavMeshObstacleComponent, OffMeshLinkComponent,
 };
 use crate::scene::authoring::nav::offmesh_link as link;
-use crate::scene::authoring::nav::{agent, modifier, obstacle};
+use crate::scene::authoring::nav::{agent, modifier, object_modifier as object, obstacle};
 
 inspect! {
     NavMeshAgentComponent => nav_agent, nav_agent_mut, &[
@@ -52,5 +52,11 @@ inspect! {
         op!("center", modifier::set_center),
         op!("size", modifier::set_size),
         op!("area", modifier::set_area),
+    ];
+    NavMeshModifierComponent => nav_mesh_modifier, nav_mesh_modifier_mut, &[
+        op!("active", object::set_active),
+        op!("override_area", object::set_override_area),
+        op!("ignore_from_build", object::set_ignore_from_build),
+        op!("apply_to_children", object::set_apply_to_children),
     ];
 }

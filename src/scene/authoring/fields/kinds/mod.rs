@@ -42,6 +42,11 @@ pub const KINDS: &[Kind] = &[
         Some(K::NavMeshModifierVolume),
         "nav_modifier",
     ),
+    kind::<NavMeshModifierComponent>(
+        "NavMeshModifier",
+        Some(K::NavMeshModifier),
+        "nav_mesh_modifier",
+    ),
     kind::<AIPerceptionComponent>("AIPerception", Some(K::AIPerception), "ai_perception"),
     kind::<CameraComponent>("Camera", Some(K::Camera), "camera"),
     kind::<ParticleEmitterComponent>("Particles", Some(K::Particles), "particles"),

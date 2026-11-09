@@ -14,7 +14,7 @@ use super::components::{
     nav_agent_value, particle_value, rigidbody_value,
 };
 use super::components::{joint_value, line_value, lod_group_value, trail_value};
-use super::navigation::{ai_perception_value, nav_modifier_value};
+use super::navigation::{ai_perception_value, nav_mesh_modifier_value, nav_modifier_value};
 use super::navigation::{nav_obstacle_value, offmesh_link_value};
 use super::ui::{backdrop_filter_value, mask_value};
 use super::ui::{
@@ -35,7 +35,7 @@ pub(super) fn component_fields(scene: &Scene, id: u32) -> impl Iterator<Item = F
 }
 
 /// Rendering, physics, navigation, animation and audio.
-fn world_fields(scene: &Scene, id: u32) -> [Field; 15] {
+fn world_fields(scene: &Scene, id: u32) -> [Field; 16] {
     let w = &scene.world;
     [
         ("mesh", w.mesh(id).map(|m| mesh_value(&m))),
@@ -56,6 +56,10 @@ fn world_fields(scene: &Scene, id: u32) -> [Field; 15] {
         (
             "nav_modifier",
             w.nav_modifier(id).map(|v| nav_modifier_value(&v)),
+        ),
+        (
+            "nav_mesh_modifier",
+            w.nav_mesh_modifier(id).map(|m| nav_mesh_modifier_value(&m)),
         ),
         (
             "ai_perception",

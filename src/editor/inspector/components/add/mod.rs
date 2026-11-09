@@ -74,6 +74,11 @@ const ENTRIES: &[(ComponentKind, &str, &str)] = &[
         icon::SELECTION,
         "NavMesh Modifier Volume",
     ),
+    (
+        ComponentKind::NavMeshModifier,
+        icon::FUNNEL,
+        "NavMesh Modifier",
+    ),
     // AI (#1900): what an agent senses.
     (ComponentKind::AIPerception, icon::EYE, "AI Perception"),
     (ComponentKind::Joint, icon::LINK, "Joint"),
