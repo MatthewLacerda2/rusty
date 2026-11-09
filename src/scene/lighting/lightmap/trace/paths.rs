@@ -30,7 +30,9 @@ pub(in crate::scene::lighting::lightmap) struct Paths {
 pub(in crate::scene::lighting::lightmap) struct Shown {
     pub direct: Vec3,
     pub direct_dir: Vec3,
-    pub mask: Vec4,
+    /// A `Vec4`'s floats, unaligned: a progressive bake holds one per texel
+    /// between passes, so it stays 40 bytes, not 48.
+    pub mask: [f32; 4],
 }
 
 impl Paths {
@@ -43,7 +45,7 @@ impl Paths {
             direct: shown.direct,
             indirect_dir: self.dir / n,
             direct_dir: shown.direct_dir,
-            mask: shown.mask,
+            mask: Vec4::from_array(shown.mask),
             valid: true,
         }
     }
@@ -113,7 +115,7 @@ impl Tracer<'_> {
         Shown {
             direct: direct / PI,
             direct_dir: direct_dir / PI,
-            mask: self.mask(origin),
+            mask: self.mask(origin).to_array(),
         }
     }
 }

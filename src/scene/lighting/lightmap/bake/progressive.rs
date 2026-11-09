@@ -14,7 +14,7 @@
 //! cleans the full sums once. A cancelled bake returns `None`.
 //!
 //! **Memory:** per texel its point, stream, sums and shown direct light
-//! (`Texel`), never per sample, in one copy: the pool hands each batch to its
+//! (`Texel`, about 110 bytes), never per sample, in one copy: the pool hands each batch to its
 //! worker to update in place (`pool::run_batched`). A pass adds, per chart until
 //! it finishes, its texels' light and points, and the lightmaps it hands on.
 
