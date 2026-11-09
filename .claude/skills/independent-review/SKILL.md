@@ -33,7 +33,8 @@ does **work the engine does itself**:
 - **a stored format or determinism**: the scene, prefab or save format, an asset
   cache or sidecar, anything a sim module reads that could carry a clock, an
   unseeded RNG or iteration order;
-- **the development machinery**: `.github/workflows/`, the `Makefile` gate
+- **the development machinery**: `.github/workflows/` and the composite
+  actions they call (`.github/actions/`), the `Makefile` gate
   verbs, the hooks, the merge path (`.github/scripts/merge-queue.py`,
   `merging/`, `mergeable.py`), or how a `tools/lint` gate decides;
 - **a refactor**: code moved or reshaped across modules, whatever its size.

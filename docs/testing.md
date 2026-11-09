@@ -306,7 +306,8 @@ its check and its command changed to match).
 ## The test runner: cargo-nextest
 `make test` and CI run the suite with [cargo-nextest](https://nexte.st) (#484),
 configured in `.config/nextest.toml`. Install it once: `cargo install --locked
-cargo-nextest` (CI uses `taiki-e/install-action`). What it buys over `cargo test`:
+cargo-nextest` (CI installs a pinned version through `.github/actions/install-tool`,
+which caches it, #1973). What it buys over `cargo test`:
 
 - **Each test is its own process**, so one test's panic, leaked global or stuck
   thread cannot take its neighbours with it.

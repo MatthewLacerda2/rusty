@@ -11,8 +11,9 @@ from datetime import datetime
 # The go-ahead (#925): the watch takes a ready pull request only with this label.
 QUEUE_LABEL = "queue"
 
-# A bot pull request touching anything under here waits for the orchestrator.
-WORKFLOWS = ".github/workflows/"
+# A bot pull request touching anything under here waits for the orchestrator:
+# the workflows, and the composite actions they call (#1973).
+WORKFLOWS = (".github/actions/", ".github/workflows/")
 
 # How the line saying so begins ([`held`]): not a hand-back, nothing to wake for.
 HELD_LINE = "HELD"
