@@ -5,7 +5,7 @@
 //! ([`set_default`]) and detach raw ([`clear_one`]). The compiler holds them
 //! exhaustive, so a new kind cannot be added without its three arms.
 
-use crate::components::{BackdropFilterComponent, MaskComponent};
+use crate::components::{AIPerceptionComponent, BackdropFilterComponent, MaskComponent};
 use crate::components::{
     CanvasComponent, CanvasGroupComponent, ImageComponent, RectMaskComponent,
     RectTransformComponent, SelectableComponent, TextComponent,
@@ -38,6 +38,7 @@ pub fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::NavMeshObstacle => world.has_nav_obstacle(id),
         ComponentKind::OffMeshLink => world.has_offmesh_link(id),
         ComponentKind::NavMeshModifierVolume => world.has_nav_modifier(id),
+        ComponentKind::AIPerception => world.has_ai_perception(id),
         ComponentKind::Camera => world.has_camera(id),
         ComponentKind::Particles => world.has_particles(id),
         ComponentKind::PostProcessing => world.has_post_processing(id),
@@ -75,14 +76,11 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         ComponentKind::Collider => world.set_collider(id, Some(default_collider())),
         ComponentKind::RigidBody => world.set_rigidbody(id, Some(default_rigidbody())),
         ComponentKind::Texture => attach_default_material_world(world, id),
-        ComponentKind::NavMeshAgent => world.set_nav_agent(id, Some(default_nav_agent())),
-        ComponentKind::NavMeshObstacle => {
-            world.set_nav_obstacle(id, Some(NavMeshObstacleComponent::default()))
-        }
-        ComponentKind::OffMeshLink => world.set_offmesh_link(id, Some(Default::default())),
-        ComponentKind::NavMeshModifierVolume => {
-            world.set_nav_modifier(id, Some(Default::default()))
-        }
+        agent @ (ComponentKind::NavMeshAgent
+        | ComponentKind::NavMeshObstacle
+        | ComponentKind::OffMeshLink
+        | ComponentKind::NavMeshModifierVolume
+        | ComponentKind::AIPerception) => set_default_agent(world, id, agent),
         ComponentKind::Camera => world.set_camera(id, Some(default_camera())),
         ComponentKind::Particles => {
             world.set_particles(id, Some(ParticleEmitterComponent::default()))
@@ -116,6 +114,25 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         }
         ComponentKind::Trail => world.set_trail(id, Some(TrailComponent::default())),
         ComponentKind::Line => world.set_line(id, Some(LineComponent::default())),
+    }
+}
+
+/// [`set_default`] for the navigation and AI kinds, split out like
+/// [`set_default_ui`]. Any other kind attaches nothing and returns `false`.
+fn set_default_agent(world: &mut World, id: u32, kind: ComponentKind) -> bool {
+    match kind {
+        ComponentKind::NavMeshAgent => world.set_nav_agent(id, Some(default_nav_agent())),
+        ComponentKind::NavMeshObstacle => {
+            world.set_nav_obstacle(id, Some(NavMeshObstacleComponent::default()))
+        }
+        ComponentKind::OffMeshLink => world.set_offmesh_link(id, Some(Default::default())),
+        ComponentKind::NavMeshModifierVolume => {
+            world.set_nav_modifier(id, Some(Default::default()))
+        }
+        ComponentKind::AIPerception => {
+            world.set_ai_perception(id, Some(AIPerceptionComponent::default()))
+        }
+        _ => false,
     }
 }
 
@@ -186,6 +203,7 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::NavMeshObstacle => world.set_nav_obstacle(id, None),
         ComponentKind::OffMeshLink => world.set_offmesh_link(id, None),
         ComponentKind::NavMeshModifierVolume => world.set_nav_modifier(id, None),
+        ComponentKind::AIPerception => world.set_ai_perception(id, None),
         ComponentKind::Camera => world.set_camera(id, None),
         ComponentKind::Particles => world.set_particles(id, None),
         ComponentKind::PostProcessing => world.set_post_processing(id, None),

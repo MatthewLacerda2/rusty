@@ -11,6 +11,7 @@
 // or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
+pub mod ai;
 pub mod animator;
 pub mod audio;
 pub mod entity;
@@ -25,6 +26,8 @@ pub mod script;
 pub mod transform;
 pub mod ui;
 
+pub use ai::memory::{Known, Memory, Sense, Update as PerceptionUpdate};
+pub use ai::perception::AIPerceptionComponent;
 pub use animator::{
     follow_clamped, root_chain, stored_leaf, wrap_delta, ActiveMontage, AnimatorComponent,
     AnimatorParameter, AnimatorParameters, Bounds, IkChain, IkConstraint, IkTarget, LayerState,

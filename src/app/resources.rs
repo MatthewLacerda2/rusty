@@ -116,6 +116,8 @@ pub struct Resources {
     /// What each CharacterController moved by root motion touched this tick
     /// (#1879), in move order, drained with `animation_events`.
     pub(super) controller_hits: Vec<(u32, Vec<crate::physics::ControllerHit>)>,
+    /// The sight-ray budget and its round-robin (#1900), stepped by `perceive`.
+    pub(super) sight_rays: crate::ai::perception::SightRays,
     /// The schedule's observer (#433) — the dev layer's frame-stats timer. `None`
     /// unless installed via `GameWorld::set_probe`; it only watches the frame.
     pub(super) probe: Option<Box<dyn super::SystemProbe>>,
@@ -124,6 +126,22 @@ pub struct Resources {
     pub(super) tap: Option<Box<dyn super::TickTap>>,
     /// How far the edit scene's meshes follow the write log (#1242).
     pub(super) model_writes: crate::scene::model_writes::ModelWrites,
+}
+
+/// The audio maestro, shared with the script runtime so the `Audio` namespace
+/// drives the same one. It starts with a no-op backend (the harness path); the
+/// windowed app injects the real `KiraBackend` after construction. Its occluder
+/// traces through the runtime's physics cell.
+fn audio_cell(
+    scene: Rc<RefCell<Scene>>,
+    physics: &Rc<RefCell<Option<PhysicsWorld>>>,
+    script_manager: &mut ScriptManager,
+) -> Rc<RefCell<AudioMaestro>> {
+    let audio = Rc::new(RefCell::new(AudioMaestro::default()));
+    let occluder = super::audio::occluder(scene, Rc::clone(physics));
+    audio.borrow_mut().set_occluder(occluder);
+    script_manager.set_audio_cell(Rc::clone(&audio));
+    audio
 }
 
 impl Resources {
@@ -148,17 +166,11 @@ impl Resources {
         // The runtime's own physics cell, so it holds the world Play builds from
         // construction on, not only from its first `init_runtime` (#1384).
         let physics = script_manager.physics_cell();
-        let occluder = super::audio::occluder(scene, Rc::clone(&physics));
         // One store shared by the script runtime and the app. Pathless until the
         // platform layer binds it to a file at startup.
         let storage = Rc::new(RefCell::new(Storage::new()));
         script_manager.set_storage(Rc::clone(&storage));
-        // The audio maestro starts with a no-op backend (the harness path); the
-        // windowed app injects the real `KiraBackend` after construction. Shared
-        // with the script runtime so the `Audio` namespace drives the same maestro.
-        let audio = Rc::new(RefCell::new(AudioMaestro::default()));
-        audio.borrow_mut().set_occluder(occluder);
-        script_manager.set_audio_cell(Rc::clone(&audio));
+        let audio = audio_cell(scene, &physics, &mut script_manager);
         let screen = Rc::new(RefCell::new(ScreenSize::default()));
         script_manager.set_screen_cell(Rc::clone(&screen));
         let event_system = script_manager.event_system_cell();
@@ -190,6 +202,7 @@ impl Resources {
             animation_graphs: GraphCache::default(),
             animation_events: AnimationQueue::default(),
             controller_hits: Vec::new(),
+            sight_rays: Default::default(),
             probe: None,
             tap: None,
             model_writes: Default::default(),
