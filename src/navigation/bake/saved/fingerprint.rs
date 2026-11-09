@@ -2,7 +2,8 @@
 //! (`scene::lighting::occlusion::gather::fingerprint`) is what its PVS was: one hash
 //! of everything the bake reads and nothing time- or path-dependent. The static
 //! colliders' world triangles (the very ones `raster` clips, so a mesh collider's
-//! vertices count, not only its bounds), the carving obstacles, the modifier volumes,
+//! vertices count, not only its bounds) and the area a `NavMeshModifier` gives each
+//! (#1959; an ignored one is not read at all), the carving obstacles, the modifier volumes,
 //! the authored links (each with its entity id), the bake settings without the area
 //! costs (read at search time, `NavMeshSettings::bakes_like`), the grid, and the
 //! file's format.
@@ -71,6 +72,11 @@ fn colliders(
     let mut out = Vec::new();
     for (id, key) in collider_keys(scene) {
         bytes.extend(id.to_le_bytes());
+        // A `NavMeshModifier`'s override (#1959), tagged so no id reads as none.
+        match key.area {
+            None => bytes.push(0),
+            Some(a) => bytes.extend([1, a]),
+        }
         let Some(m) = collider_world_triangles(scene, id) else {
             bytes.push(2);
             out.push(Source {

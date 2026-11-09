@@ -468,6 +468,12 @@ scene.entities[].nav_agent.update_rotation: bool
 scene.entities[].nav_agent.velocity: tuple(3)
 scene.entities[].nav_agent.velocity[]: f32
 scene.entities[].nav_agent: option
+scene.entities[].nav_mesh_modifier.active: bool
+scene.entities[].nav_mesh_modifier.apply_to_children: bool
+scene.entities[].nav_mesh_modifier.ignore_from_build: bool
+scene.entities[].nav_mesh_modifier.override_area: option
+scene.entities[].nav_mesh_modifier.override_area: u8
+scene.entities[].nav_mesh_modifier: option
 scene.entities[].nav_modifier.active: bool
 scene.entities[].nav_modifier.area: u8
 scene.entities[].nav_modifier.center: tuple(3)
