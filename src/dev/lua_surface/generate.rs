@@ -1,6 +1,7 @@
 //! `Lighting.Generate()` and the scene's lighting settings (#832): the one verb
 //! behind the editor's Generate Lighting button (lightmaps, probes and, #1714, the
-//! occlusion culling's PVS), and `Lighting.GetSettings()` /
+//! occlusion culling's PVS), `Lighting.BakeOcclusion()` behind its Bake Occlusion
+//! button (#1958: the PVS alone), and `Lighting.GetSettings()` /
 //! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, its
 //! Max Lightmap Size included, #1704, and the
 //! reflection probes' default resolution, memory budget and probe ceiling, #1584,
@@ -8,7 +9,7 @@
 
 use mlua::{Lua, Table};
 
-use super::super::bake::generate_lighting::generate_lighting;
+use super::super::bake::generate_lighting::{bake_occlusion_only, generate_lighting};
 use super::super::bake::progress::BakeLog;
 use crate::api::{global_table, put, ApiCell, ApiCtx, Reg};
 use crate::scene::lighting::lightmap::{BakeSettings, Denoiser};
@@ -60,7 +61,8 @@ impl Overrides {
     }
 }
 
-/// Add `Generate`, `GetSettings` and `SetSettings` to the `Lighting` table.
+/// Add `Generate`, `BakeOcclusion`, `GetSettings` and `SetSettings` to the
+/// `Lighting` table.
 pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let (scene, scene_path, nav, console) = (ctx.scene, ctx.scene_path, ctx.nav, ctx.console);
     let table = global_table(lua, "Lighting")?;
@@ -89,7 +91,35 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
             Ok(out)
         }),
     )?;
+    register_bake_occlusion(lua, &table, ctx)?;
     register_settings(lua, &table, scene)
+}
+
+/// `BakeOcclusion()` (#1958): only the occlusion step of `Generate`, written
+/// beside the scene, as Unity bakes occlusion from its own window.
+fn register_bake_occlusion(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
+    let (scene, scene_path, console) = (ctx.scene, ctx.scene_path, ctx.console);
+    put(
+        table,
+        "BakeOcclusion",
+        lua.create_function(move |lua, ()| {
+            let (scene, scene_path) = (scene.get(lua)?, scene_path.get(lua)?);
+            let console = console.get(lua)?;
+            let path = scene_path.borrow();
+            let mut log = BakeLog::to_console(&console);
+            let report = bake_occlusion_only(&mut scene.borrow_mut(), path.as_deref(), &mut log)
+                .map_err(mlua::Error::external)?;
+            console.borrow_mut().info(report.summary());
+            let (o, out) = (report.occlusion, lua.create_table()?);
+            out.set("cells", o.cells)?;
+            out.set("objects", o.objects)?;
+            out.set("occluders", o.occluders)?;
+            out.set("neverCulled", o.never_culled)?;
+            out.set("bytes", o.bytes)?;
+            out.set("tooLarge", o.too_large)?;
+            Ok(out)
+        }),
+    )
 }
 
 /// `GetSettings` / `SetSettings`: the bake settings `Generate` uses.

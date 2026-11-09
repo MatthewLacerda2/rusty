@@ -9,7 +9,7 @@
 use std::time::Duration;
 
 use super::Step;
-use crate::dev::bake::generate_lighting::{finish, start_probes, write_lighting};
+use crate::dev::bake::generate_lighting::{apply_occlusion, finish, start_probes, write_lighting};
 use crate::dev::bake::lightmap::BakeOutcome;
 use crate::dev::bake::occlusion::OcclusionBakeJob;
 use crate::dev::bake::steps::PROBES_CHANGED;
@@ -90,6 +90,7 @@ fn advance(
         Step::Lightmaps(job) => job,
         Step::Probes { .. } => return advance_probes(step, scene, log),
         Step::Occlusion { .. } => return advance_occlusion(step, scene, log),
+        Step::OcclusionOnly { .. } => return advance_occlusion_only(step, scene, log),
     };
     if !job.is_finished() {
         return None;
@@ -206,6 +207,26 @@ fn advance_occlusion(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) 
     }
 }
 
+/// Bake Occlusion (#1958): once its worker finished, apply the PVS and write it
+/// beside the scene. Nothing else was touched, so no outcome needs a full save.
+fn advance_occlusion_only(
+    step: &mut Step,
+    scene: &mut Scene,
+    log: &mut ConsoleLogs,
+) -> Option<bool> {
+    let Step::OcclusionOnly { job, path } = step else {
+        return None;
+    };
+    let applied = job
+        .poll()?
+        .and_then(|baked| scene.unrecorded(|scene| apply_occlusion(scene, path, baked)));
+    match applied {
+        Ok(report) => log.info(report.summary()),
+        Err(e) => log.error(format!("Bake Occlusion failed: {e}")),
+    }
+    Some(false)
+}
+
 /// Say the bake failed; `needs_save` when what it applied was never written.
 fn fail(log: &mut ConsoleLogs, e: String, needs_save: bool) -> Option<bool> {
     log.error(format!("Generate Lighting failed: {e}"));
@@ -222,5 +243,8 @@ fn dropped(step: &Step, why: &str) -> String {
         Step::Occlusion { .. } => format!(
             "Generate Lighting dropped: {why}; the lightmaps and probes were applied and written, the occlusion culling kept its old bake"
         ),
+        Step::OcclusionOnly { .. } => {
+            format!("Bake Occlusion dropped: {why}; the occlusion culling kept its old bake")
+        }
     }
 }

@@ -21,6 +21,10 @@
 //! (#1602 kept it out of scope). The
 //! settings under the button (#810's directional mode among them) are the scene's,
 //! as `Lighting.SetSettings{…}` edits them.
+//!
+//! **Bake Occlusion** beside it (#1958, Unity's Occlusion window) runs only the
+//! last step, the PVS on its worker, and writes it beside the scene: the same
+//! `generate_lighting::apply_occlusion` as `Lighting.BakeOcclusion()`.
 
 use std::path::Path;
 
@@ -70,6 +74,8 @@ enum Step {
         saved: crate::scene::LightingSave,
         path: String,
     },
+    /// Bake Occlusion (#1958): the PVS alone, on its worker, written to `path`.
+    OcclusionOnly { job: OcclusionBakeJob, path: String },
 }
 
 impl ActiveBake {
@@ -77,7 +83,9 @@ impl ActiveBake {
     pub fn scene_path(&self) -> &str {
         match &self.step {
             Step::Lightmaps(job) => job.scene_path(),
-            Step::Probes { path, .. } | Step::Occlusion { path, .. } => path,
+            Step::Probes { path, .. }
+            | Step::Occlusion { path, .. }
+            | Step::OcclusionOnly { path, .. } => path,
         }
     }
 }
@@ -97,14 +105,28 @@ pub fn draw(
     // It writes the scene file, so Play greys it out as it does Save (#1340): the
     // inspector is gated on the *requested* play state, so it can still be drawn on
     // the frame Play starts or stops.
-    let generate = ui
-        .add_enabled(idle && open && !scene.is_playing(), button)
-        .on_hover_text("Bake lightmaps, then light & reflection probes, and save the result")
-        .on_disabled_hover_text(if open {
-            "Stop Play first, or wait for the bake"
-        } else {
-            NOT_OPEN
-        });
+    let live = idle && open && !scene.is_playing();
+    let why = if open {
+        "Stop Play first, or wait for the bake"
+    } else {
+        NOT_OPEN
+    };
+    let (generate, occlusion) = ui
+        .horizontal(|ui| {
+            let generate = ui
+                .add_enabled(live, button)
+                .on_hover_text(
+                    "Bake lightmaps, then light & reflection probes, and save the result",
+                )
+                .on_disabled_hover_text(why);
+            let occlusion = egui::Button::new(format!("{}  Bake Occlusion", icon::EYE_SLASH));
+            let occlusion = ui
+                .add_enabled(live, occlusion)
+                .on_hover_text("Bake only the occlusion culling, and save it beside the scene")
+                .on_disabled_hover_text(why);
+            (generate, occlusion)
+        })
+        .inner;
     // The diffuse model is greyed out with the knobs: lightmaps and probes bake one
     // after the other, and a change between them would save two models as one.
     let settings = &mut scene.lighting_settings;
@@ -118,6 +140,9 @@ pub fn draw(
     editor.is_dirty |= changed;
     if generate.clicked() {
         start(editor, scene, console);
+    }
+    if occlusion.clicked() {
+        start_occlusion(editor, scene, console);
     }
     draw_progress(ui, editor);
 }
@@ -164,6 +189,29 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     }
 }
 
+/// Start Bake Occlusion (#1958) of the live scene on a worker: only Generate
+/// Lighting's last step, written beside the open scene's file.
+fn start_occlusion(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
+    let Some(path) = editor.current_scene_path() else {
+        return console.error("Bake Occlusion failed: save the scene first".into());
+    };
+    match OcclusionBakeJob::start(scene) {
+        Ok(job) => {
+            console.info("Baking occlusion culling in the background…".into());
+            editor.dev.lightmap_bake = Some(ActiveBake {
+                step: Step::OcclusionOnly {
+                    job,
+                    path: path.clone(),
+                },
+                scene: scene.id(),
+                path: Some(path),
+            });
+            scene.lighting_bake_running = true;
+        }
+        Err(e) => console.error(format!("Bake Occlusion failed: {e}")),
+    }
+}
+
 /// The running bake's bar, and its Cancel button during the lightmaps.
 fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
     let Some(active) = &editor.dev.lightmap_bake else {
@@ -172,7 +220,9 @@ fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
     let job = match &active.step {
         Step::Lightmaps(job) => job,
         Step::Probes { job, .. } => return draw_probe_progress(ui, job.stage()),
-        Step::Occlusion { job, .. } => return draw_occlusion_progress(ui, job.cells()),
+        Step::Occlusion { job, .. } | Step::OcclusionOnly { job, .. } => {
+            return draw_occlusion_progress(ui, job.cells())
+        }
     };
     let (done, total) = job.progress();
     let text = match (job.is_cancelled(), job.pages(), total) {
@@ -225,5 +275,7 @@ fn draw_occlusion_progress(ui: &mut egui::Ui, (done, total): (usize, usize)) {
 mod drop_tests;
 #[cfg(test)]
 mod occlusion_drop_tests;
+#[cfg(test)]
+mod occlusion_only_tests;
 #[cfg(test)]
 mod tests;

@@ -168,6 +168,62 @@ pub fn finish(
     })
 }
 
+/// Bake Occlusion (#1958): only Generate Lighting's last step, as Unity bakes
+/// occlusion from its own window. Bakes the open scene's PVS in line, applies it
+/// and writes it beside the scene at `scene_path`, touching no lightmap or probe.
+/// Refused as Generate Lighting is: during Play, while the editor's bake runs, and
+/// for a scene never saved.
+pub fn bake_occlusion_only(
+    scene: &mut Scene,
+    scene_path: Option<&str>,
+    log: &mut BakeLog,
+) -> Result<OcclusionOnlyReport, String> {
+    refuse_in_play(scene)?;
+    refuse_while_baking(scene)?;
+    let path = scene_path.ok_or(UNSAVED)?;
+    log.plan(&[Step::Occlusion]);
+    let baked = bake_occlusion_logged(scene, log)?;
+    let report = scene.unrecorded(|scene| apply_occlusion(scene, path, baked))?;
+    log.finish();
+    Ok(report)
+}
+
+/// What one Bake Occlusion did: the bake's report and its wall-clock milliseconds.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OcclusionOnlyReport {
+    pub occlusion: OcclusionBakeReport,
+    pub ms: u64,
+}
+
+impl OcclusionOnlyReport {
+    /// One line for the console.
+    pub fn summary(&self) -> String {
+        match occlusion_summary(&self.occlusion, self.ms) {
+            line if line.is_empty() => "Baked occlusion: nothing occludes, so nothing is \
+                 occlusion-culled"
+                .to_string(),
+            line => format!("Baked occlusion{line}; saved"),
+        }
+    }
+}
+
+/// Apply a finished occlusion bake to `scene` and write it beside the scene file
+/// at `path`: Bake Occlusion's last step, the script's and the editor's worker's.
+pub fn apply_occlusion(
+    scene: &mut Scene,
+    path: &str,
+    baked: BakedOcclusion,
+) -> Result<OcclusionOnlyReport, String> {
+    refuse_in_play(scene)?;
+    *scene.occlusion = baked.data.map(std::sync::Arc::new);
+    scene.occlusion_unread = false;
+    crate::scene::lighting::occlusion::save_sidecar(scene, path)?;
+    Ok(OcclusionOnlyReport {
+        occlusion: baked.report,
+        ms: baked.ms,
+    })
+}
+
 /// Why a script's bake is refused while the editor's runs: the two would bake the same
 /// probes and write the same files.
 pub const BAKE_RUNNING: &str =
@@ -189,6 +245,9 @@ fn refuse_in_play(scene: &Scene) -> Result<(), String> {
     }
 }
 
+#[cfg(test)]
+#[path = "pvs_only_tests.rs"]
+mod pvs_only_tests;
 #[cfg(test)]
 #[path = "generate_lighting_tests.rs"]
 mod tests;

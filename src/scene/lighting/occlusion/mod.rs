@@ -35,12 +35,15 @@
 //! visible. The sampling is a pure function of the scene and the seed, and each cell
 //! is baked alone, so the bytes are the same at any worker count.
 //!
-//! **What is baked against** (`gather`): each object's [`fingerprint`] (its mesh and
-//! a hash of its vertex positions and indices, so a re-export that moved a doorway
-//! with the same counts differs, its world matrix, layer, cast mode, its `LODGroup`
-//! membership, and its slots' materials as an occluder reads them). At runtime the renderer culls only an object whose fingerprint is still
+//! **What is baked against** (`gather`): each object's [`fingerprint`], a hash of
+//! what the bake reads of it and nothing else (#1958): its triangles corner by
+//! corner (so a re-export that moved a doorway with the same counts differs, while
+//! one that welds the same corners differently does not), its world matrix, layer,
+//! cast mode, its `LODGroup`
+//! membership, and each drawn slot's material as an occluder reads it (opaque or
+//! not, and its Render Face; never its name). At runtime the renderer culls only an object whose fingerprint is still
 //! what was baked, and uses the PVS at all only while every baked occluder still
-//! matches: an object moved, added or re-materialled since the bake is drawn, and an
+//! matches: an object moved, added or given a material that occludes differently since the bake is drawn, and an
 //! occluder moved or removed turns the bake off until it is re-baked. Never stale
 //! pixels.
 //!

@@ -21,6 +21,7 @@ first.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
+| `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the fields `0` when nothing occludes |
 | `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
 | `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
@@ -465,6 +466,12 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   only many faces together hide what is past them.
   At runtime a camera costs one cell lookup, and each static mesh
   a map lookup and a bit test; a static mesh moved or edited re-checks that mesh alone.
+- **Baked alone** by `Lighting.BakeOcclusion()` or the scene inspector's **"Bake
+  Occlusion"** button beside Generate Lighting (#1958; Unity bakes occlusion from its
+  own window): the same step on the open scene, written beside it, with no lightmap
+  or probe touched and the scene file left as it is. Refused as Generate Lighting is:
+  in Play, while the editor's bake runs, and for a scene never saved. A level whose
+  full Generate takes most of an hour re-bakes its PVS in seconds.
 - **Runs** as Generate Lighting's last step, after the lightmaps and probes are
   written into the scene, so a bake dropped or failed during it (the scene closed or
   reloaded, another opened) loses none of the lighting: in the editor on a worker
@@ -477,11 +484,15 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   occlusion-culled. One that is there but cannot be read (a permission) also culls
   nothing, with a warning, and the next save leaves it in place.
 - **A bake older than the scene** never hides what is there: a static mesh moved,
-  re-materialled, re-imported with other vertices (the bake hashes each mesh's
-  positions and indices), added to or taken out of a `LODGroup`, or made dynamic
-  since is drawn, a mesh added since is drawn, and if an occluder changed so, or was
-  removed or deactivated, nothing is occlusion-culled until the next Generate
-  Lighting. The console says so once, and again if an occluder changes after it
+  re-shaped (the bake hashes each mesh's triangles, corner by corner), given a
+  material that occludes or faces differently (opaque or not, a surface shader, its
+  Render Face), added to or taken out of a `LODGroup`, or made dynamic since is
+  drawn, a mesh added since is drawn, and if an occluder changed so, or was removed
+  or deactivated, nothing is occlusion-culled until the next Generate Lighting or
+  Bake Occlusion. Only what the bake reads counts (#1958): a material renamed, or
+  defined by a script and missing from the scene file, that occludes the same way,
+  and a re-export that stores the same triangles in another vertex order, keep the
+  bake. The console says so once, and again if an occluder changes after it
   said only meshes did. A runtime `Scene.Load` that moves the level's
   ids out of a `DontDestroyOnLoad` entity's way moves the bake's with them.
 - **Per camera.** Each perspective camera reads its own position's cell: the base
