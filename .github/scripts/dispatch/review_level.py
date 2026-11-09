@@ -27,6 +27,7 @@ PR that brings a new format reads `high` too. Only what a marker cannot express
 from __future__ import annotations
 
 import subprocess
+import sys
 
 #: Why a path calls for `high`, then the paths. A miss there is a broken save,
 #: a desynced harness, an escape from the sandbox, or a queue that merges the
@@ -74,6 +75,8 @@ TABLE: dict[str, tuple[str, ...]] = {
 
 HIGH, MEDIUM = "high", "medium"
 MARKER = "//! stored-format:"
+#: `git grep -E` for a marker line, indented or not.
+PATTERN = r"^[[:space:]]*//! stored-format:"
 
 
 def covering(path: str, marked: dict[str, str]) -> str | None:
@@ -98,11 +101,15 @@ def parse_marker(line: str) -> str | None:
 
 def tree_markers(rev: str | None = "origin/main", cwd=None) -> dict[str, str]:
     """`path -> text` for every marker under `src/` at `rev` (the working tree when
-    `None`, or when `rev` cannot be read)."""
+    `None`, or when `rev` cannot be read). A marker may be indented, as the lint's
+    `marker()` and [`parse_marker`] read it. Says on stderr when it falls back or
+    finds nothing, since either makes every marked path read `medium`."""
     tree = [rev] if rev else []
-    done = subprocess.run(["git", "grep", "-I", "--full-name", "-e", "^//! stored-format:", *tree, "--", "src"],
+    done = subprocess.run(["git", "grep", "-I", "-E", "--full-name", "-e", PATTERN, *tree, "--", "src"],
                           capture_output=True, text=True, check=False, cwd=cwd)
     if done.returncode not in (0, 1):
+        print(f"review-level: cannot read {rev or 'the working tree'}'s markers"
+              + ("; reading the working tree" if rev else ""), file=sys.stderr)
         return tree_markers(None, cwd) if rev else {}
     marked = {}
     for hit in done.stdout.splitlines():
@@ -111,6 +118,8 @@ def tree_markers(rev: str | None = "origin/main", cwd=None) -> dict[str, str]:
         path, _, text = hit.partition(":")
         if (why := parse_marker(text)) is not None:
             marked[path] = why
+    if not marked:
+        print(f"review-level: no stored-format marker in {rev or 'the working tree'}", file=sys.stderr)
     return marked
 
 

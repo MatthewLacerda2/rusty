@@ -54,7 +54,7 @@ agent can read exactly what failed.
 | Sim determinism | clippy `disallowed_methods`/`disallowed_types` + `tools/lint -- --determinism` | **hard gate**: clock reads, OS/unseeded RNG and `std`'s randomly seeded hash maps are banned crate-wide in `clippy.toml`; only a platform row's `mod.rs` may opt out, and the ban list must stay whole (#757, #764) |
 | Sim panic-freedom | clippy `unwrap_used` + `tools/lint -- --rules` (`unwrap-deny`) | **hard gate**: every sim row of the layer table carries `#![deny(clippy::unwrap_used)]` at its `mod.rs`, and no sim file lifts it; bare `.unwrap()` banned in production (test code exempt via `allow-unwrap-in-tests`, which `--determinism` keeps set); no `allow`/`expect` of `unwrap_used` anywhere (`ESCAPE`, #961) (#195, #962) |
 | Skipped tests | `tools/lint -- --rules` (`skip`) | **hard gate**: `#[ignore]` / `#[cfg_attr(…, ignore)]` needs `// lint: allow(skip) <why>` (#935) |
-| Stored formats declare themselves | `tools/lint -- --rules` (`stored-format`) | **hard gate**: a non-test file of `src/` that reads or writes a file (`fs::write`/`read`/`read_to_string`, `File::open`/`create`, `OpenOptions`, `write_atomic`), names `serde_json` or `serde::`, and sits in a directory whose code derives `Serialize`/`Deserialize` is covered by a `//! stored-format: <the file>` marker (its own, or a `mod.rs`/`<dir>.rs` above it), which `make review-level` reads to review the change at `high`; a file that touches disk for another reason takes `// lint: allow(stored-format) <why>` (#1966) |
+| Stored formats declare themselves | `tools/lint -- --rules` (`stored-format`) | **hard gate**: a non-test file of `src/` that reads or writes a file (`fs::write`/`read`/`read_to_string`, `File::open`/`create`, `OpenOptions`, `write_atomic`, `written::write`) and either calls `serde_json::to_*`/`from_*` (wherever the type is derived) or names `serde_json`/`serde::` in a directory whose code derives `Serialize`/`Deserialize` is covered by a `//! stored-format: <the file>` marker (its own, or a `mod.rs`/`<dir>.rs` above it), which `make review-level` reads to review the change at `high`; each IO line of a file that touches disk for another reason takes `// lint: allow(stored-format) <why>` (#1966) |
 | Style | rustfmt (`rustfmt.toml`) | `cargo fmt --check` |
 | Supply chain | cargo-deny (`make deny`) | **hard gate**: advisories, bans, sources and licenses (`deny.toml`) |
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
@@ -498,10 +498,16 @@ new flag, gate, CI step or baseline.
   So the module that keeps a file declares it in its top doc comment,
   `//! stored-format: <the file>`: in `mod.rs` it covers the directory and all under
   it, in `x.rs` that file and `x/`. `.github/scripts/dispatch/review_level.py` reads
-  the markers from `origin/main` and from the PR's own patches. The rule flags a
-  serde document written to disk with no marker covering it (the IO, the
-  `serde_json`/`serde::` codec and a serde derive in the same directory), on the
-  file's first read or write. A format coded by hand (a binary `.occlusion` or
+  the markers from `origin/main` and from the PR's own patches; a marker may be
+  indented, and both readers share their coverage cases through
+  `tools/lint/src/rules/stored_format_cover.tsv`. The rule flags a serde document
+  kept on disk with no marker covering it: a file's IO (`written::write`, the one
+  engine asset write, included) beside a `serde_json::to_*`/`from_*` call, wherever
+  the type is derived (`.physmat` derives its type in `components/`), or beside a
+  mention of `serde_json`/`serde::` in a directory that derives one. Every IO line
+  is reported, so an allow on an unrelated read excuses that read and nothing after
+  it. A file that only peeks at a format another module owns (an inspector, the
+  widget prefab seeding) takes the inline allow and names the owner. A format coded by hand (a binary `.occlusion` or
   `.navmesh`, a KTX2 cubemap) never trips it: mark its module by hand. A marker with
   nothing after the colon is a finding.
 - **`subprocess`** (#975) — a shipped game runs on what it carries. A code line of

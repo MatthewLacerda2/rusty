@@ -15,15 +15,19 @@
 //! `x.rs` covers that file and `x/`. `review_level.py` reads the markers.
 //!
 //! This rule keeps the marker from being forgotten. A non-test file of `src/` is a
-//! finding, on its first file read or write, when it
+//! finding, on every file read or write, when it
 //! * reads or writes a file (`fs::write`, `fs::read`, `fs::read_to_string`,
-//!   `File::open`, `File::create`, `OpenOptions`, `write_atomic`),
-//! * names the serde codec (`serde_json` or `serde::`), and
-//! * sits in a directory whose non-test code derives `Serialize` or `Deserialize`,
+//!   `File::open`, `File::create`, `OpenOptions`, `write_atomic`, and
+//!   `written::write`, which every engine asset write goes through), and
+//! * either encodes or decodes with a serde format crate (`serde_json::to_*` or
+//!   `serde_json::from_*`), wherever the type is derived, or names serde
+//!   (`serde_json`, `serde::`) in a directory whose non-test code derives
+//!   `Serialize` or `Deserialize`,
 //!
-//! and no marker covers it. A file that names serde and touches disk for another
-//! reason (it reads a script, not a document) says so with
-//! `// lint: allow(stored-format) <why>` on that line. A format coded by hand (the
+//! and no marker covers it. Every IO line is reported, so an allow on one never
+//! excuses another. A file that uses serde and touches disk for another reason
+//! (it reads a script, not a document) says so with
+//! `// lint: allow(stored-format) <why>` on each such line. A format coded by hand (the
 //! binary `.occlusion` and `.navmesh` files, a KTX2 cubemap) never trips the rule:
 //! its module is marked by hand. A marker with no text after the colon is a finding.
 
@@ -44,7 +48,12 @@ const IO: &[&str] = &[
     "File::create",
     "OpenOptions",
     "write_atomic",
+    "written::write",
 ];
+
+/// A serde format crate's encode or decode call: the type it moves may be
+/// derived anywhere, so these say "a document" on their own.
+const CODEC: &[&str] = &["serde_json::to_", "serde_json::from_"];
 
 /// One scanned source: its path, its text, and which lines are test code.
 pub struct Source<'a> {
@@ -71,8 +80,22 @@ fn live<'a>(s: &'a Source) -> Vec<(usize, std::borrow::Cow<'a, str>)> {
         .collect()
 }
 
+/// The code lines joined back into one text, so a construct may span lines.
+fn joined(code: &[(usize, std::borrow::Cow<str>)]) -> String {
+    code.iter()
+        .map(|(_, c)| c.as_ref())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Whether any `derive(...)` in `code` names `Serialize` or `Deserialize`, also
+/// when rustfmt wraps the list over several lines.
 fn derives_serde(code: &str) -> bool {
-    code.contains("derive(") && (code.contains("Serialize") || code.contains("Deserialize"))
+    code.match_indices("derive(").any(|(at, open)| {
+        let rest = &code[at + open.len()..];
+        let list = &rest[..rest.find(')').unwrap_or(rest.len())];
+        list.contains("Serialize") || list.contains("Deserialize")
+    })
 }
 
 /// The text of the file's marker, if it has one (empty when it says nothing).
@@ -124,21 +147,22 @@ pub fn check(sources: &[Source]) -> Vec<Finding> {
         .collect();
     let serde_dirs: Vec<&str> = lives
         .iter()
-        .filter(|(_, code)| code.iter().any(|(_, c)| derives_serde(c)))
+        .filter(|(_, code)| derives_serde(&joined(code)))
         .filter_map(|(s, _)| s.path.rsplit_once('/').map(|(d, _)| d))
         .collect();
     for (s, code) in &lives {
         let dir = s.path.rsplit_once('/').map_or("", |(d, _)| d);
-        let codec = code
-            .iter()
-            .any(|(_, c)| c.contains("serde_json") || c.contains("serde::"));
-        if !codec || !serde_dirs.contains(&dir) || covered(s.path, &marked) {
+        let any = |p: &dyn Fn(&str) -> bool| code.iter().any(|(_, c)| p(c));
+        let calls = any(&|c| CODEC.iter().any(|t| c.contains(t)));
+        let names = any(&|c| c.contains("serde_json") || c.contains("serde::"));
+        let kept = calls || (names && serde_dirs.contains(&dir));
+        if !kept || covered(s.path, &marked) {
             continue;
         }
-        if let Some((line, _)) = code
+        let io = code
             .iter()
-            .find(|(_, c)| IO.iter().any(|t| ends_word(c, t)))
-        {
+            .filter(|(_, c)| IO.iter().any(|t| ends_word(c, t)));
+        for (line, _) in io {
             let why =
                 "a serde type kept in a file: mark its module `//! stored-format: <the file>` \
                        so `make review-level` reads it as a stored format";

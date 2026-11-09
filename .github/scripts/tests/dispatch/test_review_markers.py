@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import subprocess
 import unittest
 from unittest import mock
 
@@ -23,23 +24,77 @@ PR_1962 = ["docs/api/Lighting.md", "src/dev/bake/generate_lighting.rs", "src/dev
            "src/scene/lighting/occlusion/print_tests.rs"]
 
 
+#: What `git grep` prints for PR #1962's case on `origin/main`: the `.occlusion`
+#: marker (indented, as the lint allows), one elsewhere, and a line that is no marker.
+GREP_1962 = ("origin/main:src/scene/lighting/occlusion/mod.rs://! stored-format: the `<scene>.occlusion` file\n"
+             "origin/main:src/scene/io/mod.rs:  //! stored-format: the scene file\n"
+             "origin/main:src/x.rs://! no marker\n")
+
+
+def fake_git(*answers: subprocess.CompletedProcess):
+    """`subprocess.run` answering each call with the next of `answers`, recording argv."""
+    calls = []
+
+    def run(argv, **_):
+        calls.append(argv)
+        return answers[len(calls) - 1]
+    return run, calls
+
+
+def grep(code: int, out: str = "") -> subprocess.CompletedProcess:
+    return subprocess.CompletedProcess([], code, out, "")
+
+
 class Markers(unittest.TestCase):
+    def tree(self, *answers) -> tuple[dict[str, str], list, str]:
+        run, calls = fake_git(*answers)
+        err = io.StringIO()
+        with mock.patch.object(review_level.subprocess, "run", run), contextlib.redirect_stderr(err):
+            return review_level.tree_markers(), calls, err.getvalue()
+
     def test_the_occlusion_marker_makes_pr_1962_high(self):
-        marked = review_level.tree_markers(None, cwd=ROOT)
+        marked, calls, err = self.tree(grep(0, GREP_1962))
+        self.assertIn("origin/main", calls[0])
+        self.assertEqual(err, "")
+        self.assertEqual(marked, {"src/scene/lighting/occlusion/mod.rs": "the `<scene>.occlusion` file",
+                                  "src/scene/io/mod.rs": "the scene file"})
         level, decided = review_level.level(PR_1962, marked)
         self.assertEqual(level, "high")
         self.assertIn("src/scene/lighting/occlusion/gather.rs", [path for _, path in decided])
         self.assertTrue(all(".occlusion" in why for why, _ in decided), decided)
 
-    def test_the_tree_marks_the_formats_the_table_used_to_list(self):
-        marked = review_level.tree_markers(None, cwd=ROOT)
-        for path in ["src/scene/serialize.rs", "src/scene/io/mod.rs", "src/scene/prefab/apply.rs",
-                     "src/core/storage.rs", "src/asset/sidecar/mod.rs", "src/asset/convert/glb/mod.rs",
-                     "src/asset/import_cache/hulls/file.rs", "src/asset/animation_graph/io.rs",
-                     "src/shadergen/params.rs", "src/dev/demo/read.rs", "src/scene/lighting/io.rs",
-                     "src/navigation/bake/saved/file.rs"]:
-            with self.subTest(path):
-                self.assertIsNotNone(review_level.covering(path, marked))
+    def test_an_unreadable_main_falls_back_to_the_tree_and_says_so(self):
+        marked, calls, err = self.tree(grep(128), grep(0, "src/a/mod.rs://! stored-format: a\n"))
+        self.assertEqual(marked, {"src/a/mod.rs": "a"})
+        self.assertNotIn("origin/main", calls[1])
+        self.assertIn("reading the working tree", err)
+
+    def test_finding_no_marker_says_so(self):
+        marked, _, err = self.tree(grep(1))
+        self.assertEqual(marked, {})
+        self.assertIn("no stored-format marker", err)
+
+    def test_the_tree_still_marks_the_formats_the_table_used_to_list(self):
+        # Hand-coded formats (`.occlusion`, `.navmesh`) no lint rule can see: their
+        # markers are held here, read straight from the files.
+        for owner in ["src/scene/lighting/occlusion/mod.rs", "src/navigation/bake/saved/mod.rs",
+                      "src/scene/serialize.rs", "src/scene/io/mod.rs", "src/scene/prefab/mod.rs",
+                      "src/core/storage.rs", "src/asset/sidecar/mod.rs", "src/asset/convert/mod.rs",
+                      "src/asset/import_cache/mod.rs", "src/asset/animation_graph/mod.rs",
+                      "src/shadergen/mod.rs", "src/dev/demo/mod.rs", "src/scene/lighting/io.rs"]:
+            with self.subTest(owner):
+                lines = (ROOT / owner).read_text().splitlines()
+                self.assertTrue(any(review_level.parse_marker(line) for line in lines))
+
+    def test_coverage_reads_the_shared_table_as_the_lint_rule_does(self):
+        table = ROOT / "tools/lint/src/rules/stored_format_cover.tsv"
+        rows = [r for r in table.read_text().splitlines() if r and not r.startswith("# ")]
+        self.assertGreater(len(rows), 5)
+        for row in rows:
+            path, marked, want = row.split("\t")
+            with self.subTest(row):
+                got = review_level.covering(path, dict.fromkeys(marked.split(","), "x"))
+                self.assertEqual(got is not None, want == "yes")
 
     def test_a_marker_covers_its_directory_or_its_file(self):
         marked = {"src/a/mod.rs": "a", "src/b.rs": "b", "src/c/d.rs": "d"}

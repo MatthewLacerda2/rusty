@@ -47,8 +47,6 @@
 //! opening the project read
 //! ([`Opened::settings`](crate::core::project::Opened::settings)) into an unbound instance,
 //! so a shipped game can never rewrite its own build settings.
-//!
-//! stored-format: the build settings kept in `project.rusty`
 
 use std::path::PathBuf;
 
@@ -165,6 +163,7 @@ impl Application {
         let path = path.into();
         // Read once and parse that text, so the text kept for `reread` is the one
         // the budgets and presets came from.
+        // lint: allow(stored-format) `project.rusty`'s format is `core::project::file`'s
         let read = match std::fs::read_to_string(&path) {
             Ok(text) => Ok(Some(text)),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),

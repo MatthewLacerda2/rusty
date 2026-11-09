@@ -5,6 +5,8 @@
 //! project root the way an `image` node names its file. Reading follows nested
 //! instances, each file once; [`crate::procgen::graph::expand`] then refuses a
 //! cycle or a nesting too deep, naming the chain.
+//!
+//! stored-format: the `<name>.graph.json` texture-recipe graph
 
 use std::path::Path;
 

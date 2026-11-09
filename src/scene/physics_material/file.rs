@@ -2,6 +2,8 @@
 //! JSON of `PhysicsMaterial`'s four fields, as the scene document stores the
 //! inline one. A missing field reads as its default; a value out of range is
 //! clamped, as `Physics.SetPhysicsMaterial` clamps it.
+//!
+//! stored-format: the `.physmat` physics material asset
 
 use std::path::Path;
 

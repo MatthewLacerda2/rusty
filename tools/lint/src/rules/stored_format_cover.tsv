@@ -1,0 +1,15 @@
+# The cases both readers of a stored-format marker answer alike (#1966):
+# tools/lint's `stored_format::covered` and review_level.py's `covering`.
+# Columns: the path, the marked files (comma-separated), whether it is covered.
+src/a/b/c.rs	src/a/mod.rs	yes
+src/a/b/c.rs	src/a/b.rs	yes
+src/a/b/c.rs	src/a/b/c.rs	yes
+src/a/b/c.rs	src/a/b/d.rs	no
+src/a/bc/c.rs	src/a/b.rs	no
+src/a/b.rs	src/a/b.rs	yes
+src/a/b/c.rs	src/a/b/mod.rs	yes
+src/a/mod.rs	src/a/mod.rs	yes
+src/a/x.rs	src/a/b/mod.rs	no
+src/b/y.rs	src/c/d.rs,src/b.rs	yes
+src/bb/y.rs	src/b.rs	no
+src/a/b/c.rs	src/a/b/c/mod.rs	no
