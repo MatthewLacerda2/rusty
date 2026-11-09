@@ -31,7 +31,8 @@ install fails the test.
 ## A pull request that edits its own setup is judged on it
 
 The toolchain, the install steps and `Set up job` itself run what the pull
-request's own `rust-toolchain.toml` and `.github/workflows/` say. A bad channel
+request's own `rust-toolchain.toml`, `.github/workflows/` and the composite
+actions under `.github/actions/` they call (#1973) say. A bad channel
 or action version there fails a setup step every time, so read as the runners'
 it would be re-run once and handed back as `runners unavailable`, never as the
 code's. [`edited`] is that case: such a failure is the code's, and for a train

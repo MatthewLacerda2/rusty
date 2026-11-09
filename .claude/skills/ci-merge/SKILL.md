@@ -222,7 +222,7 @@ compiled and nothing failed, so the queue re-runs those runs once
 come back that way again, as `runners unavailable …`; both lines name each job
 cancelled or the setup step it failed in. A train red only this way is
 re-run, not split. A pull request that edits what its setup runs
-(`rust-toolchain.toml`, `.github/workflows/`; for a train, any member) is judged
+(`rust-toolchain.toml`, `.github/workflows/`, `.github/actions/`; for a train, any member) is judged
 on its setup failures: they are its code's, handed back at once. That hand-back needs no
 push: once GitHub's runners are back, re-run the run and the watch retakes it.
 
@@ -247,7 +247,7 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   itself. The queue comments `@dependabot rebase` when one is behind, waits for a
   head on `main`'s tip, and judges that, all inside one `--deadline` (#825).
 - **The watch never takes a Dependabot pull request that edits
-  `.github/workflows/`** (#825). The actions entry only proposes majors, and
+  `.github/workflows/` or `.github/actions/`** (#825, #1973). The actions entry only proposes majors, and
   they edit workflows a pull-request run never executes (`mutants-sweep.yml`,
   `coverage.yml`, `windows.yml`, `main-health.yml`), so its green run proves
   nothing about them. The watch prints `queue: HELD #N: Dependabot edits …`
@@ -298,7 +298,7 @@ and keeps its place (`watch: #N waits …`); it is never updated for the train. 
 conflicts with `main`, even in a `sorted` list the take resolves; its own CI is not
 green; Dependabot), a Markdown-only pull request as CI's `code` filter counts it
 (the Markdown code reads ride; alone it merges in about a minute), a pull request touching `.github/scripts/merging/`,
-`.github/workflows/`, `tools/lint/` (its code: the layer table and the component
+`.github/workflows/`, `.github/actions/`, `tools/lint/` (its code: the layer table and the component
 waivers ride, `train.group.RIDES`), `Makefile`, `merge-queue.py`, `queue-daemon.py`,
 `Cargo.toml` or `Cargo.lock` (`watch: #N goes alone: it changes …`), one whose head
 was in a red train, and a train that found nobody to ride with its first. A train's

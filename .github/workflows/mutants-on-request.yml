@@ -143,6 +143,11 @@ jobs:
       # failed baseline instead of that silence.
       - name: Software Vulkan driver (lavapipe)
         run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+      # The tree is `inputs.commit`, which may predate a step this job calls
+      # (`install-tool`, #1973): take `.github/actions` from the workflow's own
+      # commit, so a request queued before a change to them still runs.
+      - name: Shared steps from the workflow's commit
+        run: git checkout "$GITHUB_SHA" -- .github/actions
       # nextest too: mutants run under it (`--test-tool nextest`, below).
       - name: Install cargo-mutants and cargo-nextest
         uses: ./.github/actions/install-tool

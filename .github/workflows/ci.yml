@@ -102,7 +102,9 @@ jobs:
               - 'docs/game-agent.md'
               - 'src/core/project/game_claude.md'
       # Only a push asks, and only when it changes code: a Markdown-only merge
-      # already skips. The nightly and a dispatch always build. A lookup that
+      # already skips. A push that changes a cache key's inputs (`Cargo.lock`,
+      # the toolchain, `.github/actions/`, which pins the CI tools, #1973) runs
+      # in full. The nightly and a dispatch always build. A lookup that
       # breaks (no `gh`, a hung call) must not fail `changes` and turn `main`
       # red: the step may fail or time out, and its empty output means a full run.
       - name: Was this tree already proved?
