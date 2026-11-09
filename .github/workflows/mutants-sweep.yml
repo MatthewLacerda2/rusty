@@ -143,7 +143,7 @@ jobs:
         run: rustup show
       - name: Install cargo-mutants
         if: steps.plan.outputs.sweep == 'true'
-        uses: taiki-e/install-action@v2
+        uses: ./.github/actions/install-tool
         with:
           tool: cargo-mutants
       # The newest earlier sweep's report, for what a mutant cost (#1684). Only
@@ -266,7 +266,7 @@ jobs:
         run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
       # nextest too: mutants run under it (`--test-tool nextest`, below).
       - name: Install cargo-mutants and cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: ./.github/actions/install-tool
         with:
           tool: cargo-mutants,cargo-nextest
       - name: Mutation test (one shard of the full deterministic sim, report-only)

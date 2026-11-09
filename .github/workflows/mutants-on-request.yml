@@ -145,7 +145,7 @@ jobs:
         run: sudo apt-get install -y mesa-vulkan-drivers libvulkan1
       # nextest too: mutants run under it (`--test-tool nextest`, below).
       - name: Install cargo-mutants and cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: ./.github/actions/install-tool
         with:
           tool: cargo-mutants,cargo-nextest
 

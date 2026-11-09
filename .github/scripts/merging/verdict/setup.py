@@ -63,7 +63,8 @@ SETUP: tuple[str, ...] = (
 
 # What a job's setup steps run is written in these: a pull request changing one
 # is judged on its own setup ([`edited`]).
-OWN_SETUP: tuple[str, ...] = (".github/workflows/", "rust-toolchain.toml")
+# `.github/actions/` holds the composite install step the workflows call (#1973).
+OWN_SETUP: tuple[str, ...] = (".github/actions/", ".github/workflows/", "rust-toolchain.toml")
 
 
 def edited(paths: list[str]) -> bool:

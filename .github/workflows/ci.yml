@@ -203,7 +203,7 @@ jobs:
           mkdir -p "$RUSTY_OIDN" && tar -xzf "$RUNNER_TEMP/oidn.tgz" -C "$RUSTY_OIDN" --strip-components=1
       - name: Install cargo-nextest
         if: needs.changes.outputs.code != 'false'
-        uses: taiki-e/install-action@v2
+        uses: ./.github/actions/install-tool
         with:
           tool: cargo-nextest
       # No separate `cargo build` steps (#482): the test run already compiles every
@@ -281,7 +281,7 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: ./.github/actions/install-tool
         with:
           tool: cargo-nextest
       # The lightmap denoiser (#1884), opened at run time from Homebrew's lib.
@@ -349,7 +349,7 @@ jobs:
       - name: System libs for winit/wgpu builds
         run: sudo apt-get update && sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libudev-dev libasound2-dev
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: ./.github/actions/install-tool
         with:
           tool: cargo-nextest
       - name: Cache Blender
