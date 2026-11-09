@@ -134,8 +134,7 @@ fn a_prefab_of_a_character_keeps_its_bone_attachment() {
 #[test]
 fn a_linked_prefab_instance_keeps_its_bone_overrides_through_propagation() {
     let (source, hero) = armed_hero("linked");
-    let path = crate::test_temp::dir().join("rusty_453_linked.prefab");
-    let path = path.to_string_lossy().replace('\\', "/");
+    let path = crate::test_temp::lua_path("rusty_453_linked.prefab");
     crate::scene::save_prefab(&source, hero, &path).unwrap();
 
     let mut scene = Scene::new();
