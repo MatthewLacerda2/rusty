@@ -40,6 +40,7 @@ use crate::dev::bake::progress::{BakeLog, MeshCost, MeshTime, Step};
 use crate::scene::lighting::lightmap::{BakeProgress, BakeScene, BakeSettings};
 use crate::scene::Scene;
 
+mod encoder;
 pub mod job;
 pub(in crate::dev::bake) mod logged;
 mod pages;

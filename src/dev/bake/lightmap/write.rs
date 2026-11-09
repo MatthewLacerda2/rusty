@@ -48,13 +48,14 @@ pub fn apply_encoded(
 ) -> Result<usize, String> {
     let dir = lightmap_dir(scene_path);
     if encoded.maps == 0 {
-        clear_pages(&dir, FINAL, &BTreeSet::new())?;
         // No lightmap, but the probes still mask by these channels (#1695).
         let mut set = LightmapSet::default();
         set.channels = encoded.shadowmask.channels.clone();
         set.fell_back = encoded.shadowmask.fell_back.clone();
         warn_fell_back(&set);
+        // The scene points away from the old pages before they go, as below.
         scene.lightmaps = set.into();
+        warn_unremoved(clear_pages(&dir, FINAL, &BTreeSet::new()));
         return Ok(0);
     }
     let size = encoded.page_size;
@@ -165,7 +166,8 @@ fn write_page(
     Ok(crate::core::paths::to_slash(&ktx2_path))
 }
 
-/// Write one shadowmask page as `<dir>/<prefix>_<k>_<tag>.png` and return its path.
+/// Write one page as `<dir>/<prefix>_<k>_<tag>.png` and return its path: a
+/// shadowmask page, or any page of a progressive bake's preview (#1970).
 pub(super) fn write_png(dir: &Path, prefix: &str, k: usize, png: &[u8]) -> Result<String, String> {
     let path = dir.join(format!("{prefix}_{k}_{:08x}.png", content_tag(png)));
     std::fs::write(&path, png).map_err(|e| format!("write {}: {e}", path.display()))?;
@@ -192,6 +194,22 @@ fn warn_fell_back(set: &LightmapSet) {
 pub(super) fn content_tag(bytes: &[u8]) -> u32 {
     let hash = crate::core::hash::content(bytes);
     (hash ^ (hash >> 32)) as u32
+}
+
+/// Remove the `.png` pages whose stems `gone` holds from `dir` ([`stems`]: a
+/// preview's pages are PNGs only); one already gone is no error.
+pub(super) fn remove_stems(dir: &Path, gone: &BTreeSet<String>) -> Result<(), String> {
+    for stem in gone {
+        let path = dir.join(format!("{stem}.png"));
+        match std::fs::remove_file(&path) {
+            Ok(()) => {
+                crate::core::fs::written::note_written(&path.to_string_lossy());
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("remove {}: {e}", path.display())),
+        }
+    }
+    Ok(())
 }
 
 /// Remove the pages (`.ktx2` and `.png`) whose names start `<prefix>_` from `dir`,

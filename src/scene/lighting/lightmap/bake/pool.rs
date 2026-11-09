@@ -91,7 +91,8 @@ where
     T: Send,
 {
     let charts = charts.into_iter().map(batches).collect();
-    let trace = |c: usize, b: usize, items: &mut [P]| trace(c, b * BATCH, items);
+    let trace =
+        |c: usize, b: usize, items: &mut [P]| (trace(c, b * BATCH, items), items.len() as u64);
     let finish = |c: usize, items: Vec<Vec<P>>, out: Vec<L>| {
         finish(c, items.into_iter().flatten().collect(), out)
     };
@@ -99,7 +100,9 @@ where
 }
 
 /// [`run`] over charts already cut into batches ([`batches`]), each traced as
-/// `trace(chart, batch, &mut items)` so it may update its items in place, and
+/// `trace(chart, batch, &mut items)` so it may update its items in place, which
+/// gives its results and the items it counts as traced (a progressive step passes
+/// over some batches without tracing them), and
 /// the batches `first(chart, batch)` picks queued ahead of the rest, each group
 /// in chart order (#1970's Prioritize View). Only the order the batches are
 /// taken in moves: results still come back in item order.
@@ -108,7 +111,7 @@ pub(in crate::scene::lighting) fn run_batched<P, L, T>(
     threads: usize,
     progress: &BakeProgress,
     first: &(dyn Fn(usize, usize) -> bool + Sync),
-    trace: impl Fn(usize, usize, &mut [P]) -> Vec<L> + Sync,
+    trace: impl Fn(usize, usize, &mut [P]) -> (Vec<L>, u64) + Sync,
     finish: impl Fn(usize, Vec<Vec<P>>, Vec<L>) -> T + Sync,
 ) -> Option<Vec<T>>
 where
@@ -130,11 +133,8 @@ where
             return;
         };
         let slot = &slots[c];
-        let (out, traced) = {
-            let mut items = lock(&slot.batches[b]);
-            (trace(c, b, &mut items), items.len())
-        };
-        progress.advance(traced as u64);
+        let (out, traced) = trace(c, b, &mut lock(&slot.batches[b]));
+        progress.advance(traced);
         lock(&slot.parts).push((b, out));
         // The worker that hands in a chart's last batch finishes it.
         if slot.left.fetch_sub(1, Ordering::AcqRel) == 1 {

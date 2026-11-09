@@ -3,10 +3,10 @@
 //!
 //! The editor's bake is progressive (#1970, Unity's Progressive Lightmapper,
 //! `lightmap::bake_progressive`): after each pass the worker hands the lightmaps
-//! as they stand to the preview writer beside it (`preview::Encoder`) and traces
+//! as they stand to the preview writer beside it (`encoder::Encoder`) and traces
 //! on, and [`LightmapBakeJob::show_preview`], called each frame, shows the newest
-//! written on the live scene, the batches the Scene view sees traced first when
-//! the settings' Prioritize View is on. The finished bake's bytes are the
+//! written on the live scene, what the Scene view sees converging first when the
+//! settings' Prioritize View is on. The finished bake's bytes are the
 //! one-shot bake's, so only what is shown on the way differs from a script's bake.
 //!
 //! [`LightmapBakeJob::start`] gathers the owned `BakeScene` on the caller's thread
@@ -23,7 +23,8 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use super::preview::{Encoder, Previews};
+use super::encoder::Encoder;
+use super::preview::Previews;
 use super::UNSAVED;
 use super::{
     apply_encoded, encode_pages, gather_bake_input, lend_denoiser, lightmap_receivers,
@@ -65,8 +66,8 @@ pub struct LightmapBakeJob {
 }
 
 impl LightmapBakeJob {
-    /// Gather `scene` and start baking it progressively on a worker, the batches
-    /// `view` sees first in each pass (#1970). Errors, without starting, when the
+    /// Gather `scene` and start baking it progressively on a worker, what `view`
+    /// sees converging first (#1970). Errors, without starting, when the
     /// scene was never saved (there is nowhere to write the pages).
     pub fn start(
         scene: &mut Scene,
@@ -84,12 +85,11 @@ impl LightmapBakeJob {
         let watch = Arc::clone(&progress);
         let view = view.filter(|_| settings.prioritize_view);
         let (page, taken) = (settings.page(), (lights, shadowmask));
-        let encoder = Encoder::start(&previews, page, taken.clone(), Arc::clone(&progress))?;
+        let mut encoder = Encoder::start(&previews, page, taken.clone(), Arc::clone(&progress))?;
         let worker = thread::Builder::new()
             .name("lightmap-bake".into())
             .spawn(move || {
-                let mut on_pass = |pass: Pass, maps| encoder.put(pass, maps);
-                let baked = bake_progressive(&input, &settings, &watch, view, &mut on_pass);
+                let baked = bake_progressive(&input, &settings, &watch, view, &mut encoder);
                 // The last preview is written before the final pages are encoded.
                 drop(encoder);
                 match baked {
@@ -111,22 +111,14 @@ impl LightmapBakeJob {
 
     /// Show the newest finished pass on `scene` (#1970), once per pass, logging
     /// it; the pass shown, or `None` when no new one came in. A preview that cannot
-    /// be written is said and skipped: the bake goes on.
+    /// be written is said by the writer and skipped: the bake goes on.
     pub fn show_preview(&mut self, scene: &mut Scene) -> Option<Pass> {
         if self.paced_from.is_none() && self.passes().is_some_and(|p| p.done > 0) {
             self.paced_from = Some((Instant::now(), self.progress.done()));
         }
-        match self.previews.show(scene) {
-            Ok(Some(pass)) => {
-                log::info!("[LightmapBake] lightmaps {}", pass_line(pass, self.eta()));
-                Some(pass)
-            }
-            Ok(None) => None,
-            Err(e) => {
-                log::warn!("[LightmapBake] show a preview pass: {e}");
-                None
-            }
-        }
+        let pass = self.previews.show(scene)?;
+        log::info!("[LightmapBake] lightmaps {}", pass_line(pass, self.eta()));
+        Some(pass)
     }
 
     /// Put back the lightmaps a preview is shown over (a bake dropped while its
@@ -251,13 +243,22 @@ pub(super) fn labelled(pages: EncodedPages, (lights, shadowmask): &Taken) -> Enc
     }
 }
 
-/// The log's and the card's words for a pass: which, the paths per texel so far,
-/// and the time left, as the headless bake log says it (`progress::duration`):
-/// `pass 3/8 (24/64 samples), ~3 min 5 s left`.
+/// The log's and the card's words for a pass: which, the paths per texel so far
+/// (the view's too while it runs ahead), and the time left, as the headless bake
+/// log says it (`progress::duration`): `pass 3/8 (24/64 samples), ~3 min 5 s
+/// left`, or `pass 3/15 (8/64 samples, 24 in view)`. Before the first pass is
+/// done, `first pass`.
 pub fn pass_line(pass: Pass, eta: Option<Duration>) -> String {
+    if pass.done == 0 {
+        return "first pass".into();
+    }
     let left = eta.map_or(String::new(), |t| format!(", ~{} left", duration(t)));
+    let view = match pass.view > pass.samples {
+        true => format!(", {} in view", pass.view),
+        false => String::new(),
+    };
     format!(
-        "pass {}/{} ({}/{} samples){left}",
+        "pass {}/{} ({}/{} samples{view}){left}",
         pass.done, pass.passes, pass.samples, pass.target
     )
 }

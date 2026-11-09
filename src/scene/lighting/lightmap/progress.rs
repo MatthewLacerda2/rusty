@@ -72,6 +72,7 @@ pub struct BakeProgress {
     passes_done: AtomicU64,
     passes_total: AtomicU64,
     samples_done: AtomicU64,
+    view_done: AtomicU64,
     samples_total: AtomicU64,
     cancelled: AtomicBool,
     observer: Observer,
@@ -138,20 +139,25 @@ impl BakeProgress {
             done: load(&self.passes_done),
             passes,
             samples: load(&self.samples_done),
+            view: load(&self.view_done),
             target: load(&self.samples_total),
         })
     }
 
-    /// A progressive bake makes `total` passes, `samples` paths per texel in all.
+    /// A progressive bake makes `total` steps, `samples` paths per texel in all.
     pub(super) fn set_passes(&self, total: u64, samples: u64) {
         self.samples_total.store(samples, Ordering::Relaxed);
         self.passes_total.store(total, Ordering::Relaxed);
     }
 
-    /// A pass is finished: `done` of them, `samples` paths per texel traced so far.
-    pub(super) fn pass_done(&self, done: u64, samples: u64) {
-        self.samples_done.store(samples, Ordering::Relaxed);
-        self.passes_done.store(done, Ordering::Relaxed);
+    /// A step is finished: `pass` says which, and the paths per texel so far.
+    pub(super) fn pass_done(&self, pass: Pass) {
+        self.samples_done
+            .store(u64::from(pass.samples), Ordering::Relaxed);
+        self.view_done
+            .store(u64::from(pass.view), Ordering::Relaxed);
+        self.passes_done
+            .store(u64::from(pass.done), Ordering::Relaxed);
     }
 
     /// The encode has begun: it makes `total` pages (colour and direction alike).

@@ -273,7 +273,8 @@ every pass) and then the pages it encodes ("Encoding page k of n"), and **Cancel
 the bake, during the trace or the encode, and keeps the previous lightmaps. The result
 is applied when the bake finishes, byte-identical to the script verb's; a bake whose
 scene was swapped out meanwhile is dropped. The script verb itself stays synchronous
-and one-shot, as does `Lighting.Generate()`.
+and one-shot, as does `Lighting.Generate()`. An argument left out takes the scene's
+lighting settings (above), whose defaults are the ones listed here.
 
 - **Progressive bake** (#1970, Unity's Progressive Lightmapper; the editor's Generate
   Lighting). The trace runs in passes over **every texel of the scene**, not mesh by
@@ -283,7 +284,9 @@ and one-shot, as does `Lighting.Generate()`.
   texels filled, the bounce cleaned by the denoiser, packed into pages. A writer
   thread beside the bake stores them as `lightmap_preview_*` pages in the scene's
   lightmap folder (uncompressed PNGs of one level, no BC encode, while the trace goes
-  on); a pass still unshown when the next is in is skipped. The card and the log say
+  on); a pass still unshown when the next is in is skipped and its pages removed,
+  and while the writer is busy the bake builds no preview at all, so a pass that
+  would only be dropped costs no denoise. The card and the log say
   the passes done, the samples so far and the time left at the pace since the first
   pass (`[LightmapBake] lightmaps pass 3/8 (24/64 samples), ~3 min 5 s left`).
   **The finished bake's bytes are the one-shot bake's** at the same settings and seed:
@@ -294,14 +297,20 @@ and one-shot, as does `Lighting.Generate()`.
   lightmaps: a deleted entity leaves them (and gets no lightmap from the finished
   bake), and `Lighting.ClearLightmaps()` clears them and the preview. Each shown pass
   costs a display denoise and a preview write, so a smaller `samplesPerPass`
-  refreshes more often and bakes a little longer. The texels' state between passes
+  refreshes more often and bakes a little longer. Until the first pass is done the
+  card says `first pass`. The texels' state between passes
   is held once, updated in place.
   Rebaking on edit (Unity's *Auto Generate*) is not built yet.
 - **Prioritize View** (`prioritizeView`, default `true`, Unity's setting of that name).
-  Each pass traces the texels the **Scene view's** camera sees first: in its frustum,
-  facing it, with nothing static in between (one ray per texel, before the first
-  pass). Only the order changes, never the bytes; off, the meshes go in scene order. An argument left out takes the
-scene's lighting settings (above), whose defaults are the ones listed here.
+  The texels the **Scene view's** camera sees converge first: in its frustum, facing
+  it (for an orthographic view, its view direction), with nothing static the camera
+  draws in between (one ray per texel, before the first pass; a `"ShadowsOnly"` mesh
+  hides nothing). The whole scene gets its first pass, so it shows at once; then the
+  seen texels get all their other passes, each shown, then the rest get theirs. So a
+  bake whose view sees part of the scene makes more steps than passes (`pass 3/15
+  (8/64 samples, 24 in view)`), and the same paths in all. Only when each texel is
+  traced changes, never the bytes; off, or with a view that sees all or none of the
+  scene, every pass covers every texel.
 
 - **Who gets one.** Every active, **static**, opaque mesh with a **second UV map** (the
   lightmap UV: glTF `TEXCOORD_1`, or one generated at import by the model's **Generate

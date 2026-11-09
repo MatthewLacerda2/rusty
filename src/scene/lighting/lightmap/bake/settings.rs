@@ -48,8 +48,9 @@ pub struct BakeSettings {
     /// result, and the next pass adds as many again, up to [`Self::samples`].
     /// Never changes the bytes, only how often the preview refreshes.
     pub samples_per_pass: u32,
-    /// Unity's *Prioritize View* (#1970): a progressive bake traces the texels the
-    /// Scene view's camera sees first in each pass. Order only, so never the bytes.
+    /// Unity's *Prioritize View* (#1970): after a progressive bake's first pass,
+    /// the texels the Scene view's camera sees get all their passes before the
+    /// rest. Only when each is traced moves, so never the bytes.
     pub prioritize_view: bool,
 }
 

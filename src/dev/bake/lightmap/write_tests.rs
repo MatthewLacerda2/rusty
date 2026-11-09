@@ -5,6 +5,7 @@ use std::path::Path;
 
 use super::tests::{quick, scene, scene_path};
 use super::*;
+use crate::scene::lighting::lightmap::Lightmap;
 
 #[test]
 fn a_failed_write_leaves_the_old_pages_and_the_scene_on_them() {
@@ -37,4 +38,64 @@ fn a_failed_write_leaves_the_old_pages_and_the_scene_on_them() {
         "now replaced"
     );
     assert!(scene.lightmaps.pages.iter().all(|p| Path::new(p).exists()));
+}
+
+/// One 4² lightmap of `value`, as a pass hands it to the preview writer.
+fn pass_maps(value: f32) -> Vec<Lightmap> {
+    let texels = vec![glam::Vec3::splat(value); 16];
+    let (directions, masks) = (Vec::new(), Vec::new());
+    vec![Lightmap {
+        entity: 1,
+        size: 4,
+        texels,
+        directions,
+        masks,
+    }]
+}
+
+#[test]
+fn the_preview_writer_keeps_only_the_shown_and_the_newest_pass_on_disk() {
+    use super::encoder::Encoder;
+    use super::preview::Previews;
+    use super::preview_tests::preview_pages;
+    use crate::scene::lighting::lightmap::Pass;
+    let path = scene_path("preview_writer");
+    let progress = Arc::new(BakeProgress::default());
+    let mut previews = Previews::new(&path);
+    let taken = Default::default();
+    let encoder = Encoder::start(&previews, 32, taken, progress.clone()).unwrap();
+    let put = |k: u32| {
+        let pass = Pass {
+            done: k,
+            passes: 9,
+            samples: k,
+            view: k,
+            target: 9,
+        };
+        encoder.put(pass, pass_maps(k as f32 * 0.1));
+        assert!(
+            encoder.busy(),
+            "a pass waiting is work: the bake builds none"
+        );
+        while encoder.busy() {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    };
+    // Three passes no frame showed: each replaced one's page is removed.
+    (1..=3).for_each(put);
+    assert_eq!(preview_pages(&path), 1);
+    let mut scene = Scene::new();
+    assert_eq!(previews.show(&mut scene).map(|p| p.done), Some(3));
+    put(4);
+    assert_eq!(preview_pages(&path), 2, "the shown pass and the newest");
+    progress.cancel();
+    put(5);
+    assert_eq!(
+        preview_pages(&path),
+        2,
+        "a pass written after a cancel goes"
+    );
+    drop(encoder);
+    previews.restore(&mut scene);
+    assert_eq!(preview_pages(&path), 0);
 }

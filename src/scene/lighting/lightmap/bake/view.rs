@@ -1,11 +1,12 @@
 //! Unity's *Prioritize View* for a progressive bake (#1970): which batches of
-//! texels the Scene view's camera sees, so each pass traces them first.
+//! texels the Scene view's camera sees, so they converge first.
 //!
-//! A texel is seen when it lies in the camera's frustum, faces the camera and
-//! nothing static stands between them (one ray per texel, cast once before the
-//! first pass). A batch is seen when any of its texels is. Only the order of the
-//! batches moves, never what a texel draws, so the bytes are the same with or
-//! without a view.
+//! A texel is seen when it lies in the camera's frustum, faces the camera (its
+//! eye, or for an orthographic view its view direction) and nothing static the
+//! camera draws stands between them (one ray per texel, cast once before the
+//! first pass). A batch is seen when any of its texels is. Only when the
+//! batches are traced moves (`progressive::schedule`), never what a texel draws,
+//! so the bytes are the same with or without a view.
 
 use glam::{Mat4, Vec3};
 
@@ -28,7 +29,8 @@ pub struct BakeView {
 const LIFT: f32 = 1e-3;
 
 impl BakeView {
-    /// Whether the camera sees the texel at `p` facing `normal` past `rays`.
+    /// Whether the camera sees the texel at `p` facing `normal` past `rays`. Only
+    /// what the camera draws hides it: a `ShadowsOnly` mesh does not (#1571).
     pub(in crate::scene::lighting::lightmap) fn sees(
         &self,
         rays: &Rays,
@@ -39,13 +41,32 @@ impl BakeView {
         let w = clip.w;
         let inside =
             w > 0.0 && clip.x.abs() <= w && clip.y.abs() <= w && (0.0..=w).contains(&clip.z);
-        if !inside || normal.dot(self.eye - p) <= 0.0 {
+        let Some((to, distance)) = inside.then(|| self.toward(p, clip.z)).flatten() else {
+            return false;
+        };
+        if normal.dot(to) <= 0.0 {
             return false;
         }
         let from = p + normal * LIFT;
-        let to = self.eye - from;
-        let distance = to.length();
-        distance <= T_MIN || !rays.occluded(from, to / distance, T_MIN, distance)
+        let drawn = |i: usize| rays.tris[i].seen;
+        distance <= T_MIN || !rays.occluded_by(from, to, (T_MIN, distance), drawn)
+    }
+
+    /// The way from `p` (at clip depth `depth`) back to the camera, and how far:
+    /// to the eye for a perspective view, along the view direction to the near
+    /// plane for an orthographic one (its projection leaves `w` at 1).
+    fn toward(&self, p: Vec3, depth: f32) -> Option<(Vec3, f32)> {
+        if self.view_proj.row(3) != glam::Vec4::W {
+            let to = self.eye - p;
+            let distance = to.length();
+            return Some((to / distance.max(f32::MIN_POSITIVE), distance));
+        }
+        // Clip depth grows away from the camera by `rate` per unit along `back`'s
+        // opposite: walk back until it is 0.
+        let ahead = (self.view_proj.inverse() * glam::Vec4::Z).truncate();
+        let back = -ahead.try_normalize()?;
+        let rate = (self.view_proj * (-back).extend(0.0)).z;
+        (rate > 0.0).then(|| (back, depth / rate))
     }
 
     /// Per chart, per batch of `pool::BATCH` texels, whether the camera sees any

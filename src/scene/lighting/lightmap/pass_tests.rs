@@ -25,6 +25,7 @@ fn every_pass_shows_the_whole_scene_converging() {
         done: 4,
         passes: 4,
         samples: 64,
+        view: 64,
         target: 64,
     };
     assert_eq!(progress.passes(), Some(ended));

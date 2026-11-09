@@ -110,9 +110,17 @@ fn a_pass_line_says_the_pass_its_samples_and_the_time_left() {
         done: 3,
         passes: 8,
         samples: 24,
+        view: 24,
         target: 64,
     };
     let line = job::pass_line(pass, Some(Duration::from_secs(185)));
     assert_eq!(line, "pass 3/8 (24/64 samples), ~3 min 5 s left");
     assert_eq!(job::pass_line(pass, None), "pass 3/8 (24/64 samples)");
+    let ahead = Pass { view: 40, ..pass };
+    assert_eq!(
+        job::pass_line(ahead, None),
+        "pass 3/8 (24/64 samples, 40 in view)"
+    );
+    let first = Pass { done: 0, ..pass };
+    assert_eq!(job::pass_line(first, None), "first pass", "never pass 0/8");
 }
