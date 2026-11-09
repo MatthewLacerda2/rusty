@@ -57,3 +57,27 @@ fn add_draws_counts_calls_and_triangles() {
     assert_eq!((c.draw_calls, c.triangles), (3, 1214));
     assert_eq!(c.pairs()[0], ("draw_calls", 3));
 }
+
+#[test]
+fn a_batch_drawn_by_cluster_counts_a_draw_per_instance() {
+    use crate::render::draw::batch::{BatchKey, DrawBatch, RecordTraits};
+    let batch = |instances| DrawBatch {
+        key: BatchKey {
+            pipeline: 0,
+            facing: crate::render::gpu::pipelines::winding::Facing::Ccw,
+            mesh: crate::render::scene::MeshHandle(0),
+            indices: (0..600).into(),
+            material: 0,
+            record: 0,
+            traits: RecordTraits::of(&crate::render::MaterialData::flat([1.0; 4])),
+            bone_base: 0,
+        },
+        uniform_slot: 0,
+        instances,
+    };
+    let batches = [batch(0..3), batch(3..7), batch(7..9)];
+    let mut c = RenderCounters::default();
+    c.add_draws(draws_of(batches.iter(), &[None, Some(0..4)]));
+    // 1 instanced draw, 4 clustered ones, 1 past the opaque list (a translucent).
+    assert_eq!((c.draw_calls, c.triangles), (6, 9 * 200));
+}

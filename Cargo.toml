@@ -136,6 +136,10 @@ gltf = { version = "1.4.1", default-features = false, features = ["import", "uti
 # Godot and Bevy's FBX loader read FBX with. An `.fbx` is converted to a cached glTF
 # at import (`asset::convert`), so nothing past the importer reads FBX.
 ufbx = "0.11.5"
+# Meshlets (#1968): meshoptimizer's official bindings (MIT/Apache-2.0) split a big mesh into
+# clusters at import, each with its bounds and normal cone, which the GPU occlusion
+# cull tests one by one. Built from C++ by `cc`, as ufbx is from C.
+meshopt = "0.7.0"
 bytemuck = { version = "1.16.1", features = ["derive"] }
 # No default features: RUST_LOG filtering stays, colour and timestamps (anstream, jiff) go.
 env_logger = { version = "0.11.3", default-features = false }

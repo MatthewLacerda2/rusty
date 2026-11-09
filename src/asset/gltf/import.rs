@@ -114,6 +114,7 @@ fn sub_mesh_from_gltf(
         skin,
         clips,
         node_name: None,
+        clusters: None,
     }
 }
 

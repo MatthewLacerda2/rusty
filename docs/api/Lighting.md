@@ -626,8 +626,23 @@ is wholly behind depth the camera drew this frame.
 - **Cost.** Per camera, a depth-only draw of last frame's set, a compute reduction
   of the depth, and one compute test per opaque mesh; the draw calls stay the same
   (indirect). The meshes still go through the CPU's frustum and size culls first.
+- **Per cluster** (#1968), the culling half of UE5's Nanite: a static mesh of at
+  least 4096 triangles is split at import into clusters of up to 124 triangles,
+  each with its bounds and normal cone, kept with the model. After its whole mesh
+  passed the test above, each cluster is tested on its own, by the frustum, by
+  whether every triangle in it faces away, and by the same pyramid, and only the
+  ones that pass are drawn: the half of a canopy or a building shell a wall hides
+  is left out. A cluster crossing the near plane is always drawn; a two-sided or
+  back-faced material, or a mirrored or non-uniformly scaled instance, takes no
+  facing test; a skinned mesh is never split. A mesh whose custom shader moves
+  its vertices is split and reordered at import like any other, but the instance
+  test never judges it, so its clusters are never tested and it keeps one
+  instanced draw; mesh particles likewise. It changes no pixel either, and the preset's
+  `gpu_cluster_culling` (on in every seeded preset) turns it off. A split mesh is
+  drawn once per instance, not instanced, so many copies of one big mesh cost a
+  draw each; past a per-camera budget (8M indices) a batch is tested whole.
 - **Measure** with `Debug.Stats().hiz_tested` and `hiz_culled` (read back a frame
-  or so late).
+  or so late), and `cluster_tested` / `cluster_culled` for the clusters.
 
 ### Environment
 

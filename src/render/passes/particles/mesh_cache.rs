@@ -91,6 +91,8 @@ impl Renderer {
                 // primitive); a stale spec replaces that upload with the new file.
                 if cached == Some(CachedMesh::Stale) || !self.gpu_meshes.contains_key(&id) {
                     self.update_gpu_mesh(id.clone(), mesh.revision, &mesh.vertices, &mesh.indices);
+                    // Kept for the scene meshes drawing the same model (#1968).
+                    self.attach_clusters(&id, mesh.clusters());
                 }
                 let loaded = !mesh.indices.is_empty() && self.gpu_meshes.contains_key(&id);
                 let entry = match loaded {
