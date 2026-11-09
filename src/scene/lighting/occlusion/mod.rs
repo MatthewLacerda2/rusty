@@ -78,6 +78,8 @@ mod file_tests;
 #[cfg(test)]
 mod grid_tests;
 #[cfg(test)]
+mod print_tests;
+#[cfg(test)]
 mod sampling_tests;
 #[cfg(test)]
 pub(crate) mod test_gap;
