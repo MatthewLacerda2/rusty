@@ -12,6 +12,8 @@
 //!
 //! A refused file (unreadable, stale, another grid) changes nothing: the caller
 //! bakes in full, as with no file. Never a half-loaded navmesh.
+//!
+//! stored-format: the `<scene>.navmesh` bytes and their fingerprint
 
 mod file;
 mod fingerprint;

@@ -10,27 +10,29 @@ cannot see a stored format changed through a component's serde fields, say.
 [`TABLE`] is the rule. An entry ending in `/` is a directory and covers what is
 under it; any other entry is one file. Add a row when a new module takes on one
 of these responsibilities, in the same PR.
+
+**A stored format declares itself where it lives** (#1966). The table missed a
+new on-disk format three times in one batch (#1946's hull sidecars, #1942's
+`.animgraph`, PR #1962's `.occlusion`): each was a module it had not heard of.
+So a module that keeps a file says `//! stored-format: <the file>` in its top
+doc comment, `tools/lint`'s `stored-format` rule fails a serde type written to
+disk without one, and [`covering`] reads the markers: one in `mod.rs` covers its
+directory and everything under it, one in `x.rs` covers that file and `x/`. The
+markers come from `origin/main` (`git grep`, one local call, [`tree_markers`])
+plus any marker line a PR's own patches add or remove ([`patch_markers`]), so a
+PR that brings a new format reads `high` too. Only what a marker cannot express
+(a fingerprint file, WGSL bindings, a path outside `src/`) stays a hand row.
 """
 
 from __future__ import annotations
+
+import subprocess
 
 #: Why a path calls for `high`, then the paths. A miss there is a broken save,
 #: a desynced harness, an escape from the sandbox, or a queue that merges the
 #: wrong thing for every PR behind it.
 TABLE: dict[str, tuple[str, ...]] = {
     "stored format": (
-        "src/scene/serialize.rs",  # World <-> SceneData, the scene document
-        "src/scene/io/",  # save / load, the on-disk text, the default scene's seeding
-        "src/scene/prefab/",  # PrefabData, instances and overrides
-        "src/core/storage.rs",  # Storage, the PlayerPrefs save file
-        "src/asset/sidecar/",  # an asset's import settings beside it
-        "src/asset/convert/",  # the import cache and its fingerprints
-        # files the import cache writes beside a model (#1946's hull sidecars read
-        # `medium`)
-        "src/asset/import_cache/",
-        # the `.animgraph` document (#1942 added a saved node field and read
-        # `medium`)
-        "src/asset/animation_graph/",
         # every serde change to the scene/prefab document moves it, wherever the
         # field lives (a component's own module): #1587 changed the format from
         # `src/components/mesh/` and read `medium`
@@ -38,9 +40,6 @@ TABLE: dict[str, tuple[str, ...]] = {
         # surface-shader variants baked to `assets/shaders/` import these symbols by
         # name, so a rename strands every baked file (#1638; #1628 read `medium`)
         "engine/shaders/forward/bindings.wgsl",
-        "src/shadergen/",
-        # the `.demo` file a recorded playtest is saved as (#1581)
-        "src/dev/demo/",
     ),
     "determinism": (
         "src/core/random.rs",  # the seeded Random resource
@@ -74,17 +73,70 @@ TABLE: dict[str, tuple[str, ...]] = {
 }
 
 HIGH, MEDIUM = "high", "medium"
+MARKER = "//! stored-format:"
 
 
-def reasons_for(path: str) -> list[str]:
-    """Each responsibility of [`TABLE`] that `path` falls under."""
-    return [why for why, entries in TABLE.items()
-            if any(path == entry or (entry.endswith("/") and path.startswith(entry)) for entry in entries)]
+def covering(path: str, marked: dict[str, str]) -> str | None:
+    """The text of the nearest marker covering `path`: the file's own, then each
+    enclosing directory's `mod.rs` or `<dir>.rs`, as `tools/lint`'s rule reads them."""
+    if path in marked:
+        return marked[path]
+    parent = path
+    while "/" in parent:
+        parent = parent.rsplit("/", 1)[0]
+        for owner in (f"{parent}/mod.rs", f"{parent}.rs"):
+            if owner in marked:
+                return marked[owner]
+    return None
 
 
-def level(paths: list[str]) -> tuple[str, list[tuple[str, str]]]:
+def parse_marker(line: str) -> str | None:
+    """The text of a marker line, `None` for any other line."""
+    line = line.strip()
+    return line[len(MARKER):].strip() if line.startswith(MARKER) else None
+
+
+def tree_markers(rev: str | None = "origin/main", cwd=None) -> dict[str, str]:
+    """`path -> text` for every marker under `src/` at `rev` (the working tree when
+    `None`, or when `rev` cannot be read)."""
+    tree = [rev] if rev else []
+    done = subprocess.run(["git", "grep", "-I", "--full-name", "-e", "^//! stored-format:", *tree, "--", "src"],
+                          capture_output=True, text=True, check=False, cwd=cwd)
+    if done.returncode not in (0, 1):
+        return tree_markers(None, cwd) if rev else {}
+    marked = {}
+    for hit in done.stdout.splitlines():
+        if rev and hit.startswith(f"{rev}:"):
+            hit = hit[len(rev) + 1:]
+        path, _, text = hit.partition(":")
+        if (why := parse_marker(text)) is not None:
+            marked[path] = why
+    return marked
+
+
+def patch_markers(files: list[dict]) -> dict[str, str]:
+    """`path -> text` for every marker line a PR's patch adds or removes."""
+    marked = {}
+    for entry in files:
+        for line in (entry.get("patch") or "").splitlines():
+            if line[:1] in "+-" and (why := parse_marker(line[1:])) is not None:
+                marked[entry.get("filename", "")] = why
+    return marked
+
+
+def reasons_for(path: str, marked: dict[str, str] | None = None) -> list[str]:
+    """Each responsibility of [`TABLE`] that `path` falls under, then the stored
+    format a marker covering it names."""
+    reasons = [why for why, entries in TABLE.items()
+               if any(path == entry or (entry.endswith("/") and path.startswith(entry)) for entry in entries)]
+    if (text := covering(path, marked or {})) is not None:
+        reasons.append(f"stored format ({text})")
+    return reasons
+
+
+def level(paths: list[str], marked: dict[str, str] | None = None) -> tuple[str, list[tuple[str, str]]]:
     """The level, and every `(reason, path)` that decided it (empty for medium)."""
-    decided = [(why, path) for path in sorted(set(paths)) for why in reasons_for(path)]
+    decided = [(why, path) for path in sorted(set(paths)) for why in reasons_for(path, marked)]
     return (HIGH if decided else MEDIUM), decided
 
 

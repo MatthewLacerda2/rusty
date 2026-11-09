@@ -47,6 +47,8 @@
 //! opening the project read
 //! ([`Opened::settings`](crate::core::project::Opened::settings)) into an unbound instance,
 //! so a shipped game can never rewrite its own build settings.
+//!
+//! stored-format: the build settings kept in `project.rusty`
 
 use std::path::PathBuf;
 

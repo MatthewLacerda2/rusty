@@ -6,6 +6,8 @@
 //! the mistake scorsese made and had to fix (scorsese#237), where one overnight run
 //! crossed a per-shot ceiling dozens of times over. The ceiling arithmetic itself is
 //! scorsese's [`Budget`]; only the file is rusty's.
+//!
+//! stored-format: `provider_budget.json`, the project's budget and spend
 
 use std::path::{Path, PathBuf};
 

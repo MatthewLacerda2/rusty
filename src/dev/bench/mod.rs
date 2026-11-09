@@ -25,6 +25,8 @@
 //! CI runner's software GPU makes them meaningless. Only the counts are portable.
 //! The scene is deterministic (fixed dt, seeded scripts, no RNG in placement), so
 //! two runs on one machine measure the same frames.
+//!
+//! stored-format: `bench.json`, the last run's report the next one compares against
 
 mod clock;
 mod lua;

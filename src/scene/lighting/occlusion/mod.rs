@@ -48,6 +48,8 @@
 //! the lighting save writes and the scene load reads; absent, the scene culls
 //! nothing by occlusion. A runtime level load that moves incoming ids out of a
 //! carried entity's way renames the baked objects with them ([`OcclusionData::remap`]).
+//!
+//! stored-format: the `<scene>.occlusion` file, the baked PVS and its fingerprint
 
 mod bake;
 mod file;

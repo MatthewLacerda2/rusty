@@ -15,6 +15,8 @@
 //!   - Seeded into the project's `assets/scenes/` on boot with the bundled scripts
 //!     (`seed`, through the seed `manifest` so unedited files follow engine fixes,
 //!     #746; the seeds are embedded in the binary, `bundled`, #829).
+//!
+//! stored-format: the scene file on disk, its text and the default scene's seeding
 
 pub mod bundled;
 mod disk_text;
