@@ -5,6 +5,8 @@
 //! each time it opens one ([`record`]), with or without the picker, as Unity's editor
 //! does. Times are Unix seconds handed in by the caller, so this module never reads a
 //! clock and its tests pin "now".
+//!
+//! stored-format: the recent-projects list in the user's config directory
 
 use std::path::{Path, PathBuf};
 

@@ -45,6 +45,7 @@
 //! One cache per thread, like the resolved texture references
 //! (`asset::convert::texture_ref::resolved`): a bake or preview thread keeps its
 //! own, and nothing takes a lock across a parse.
+//! stored-format: the files the import cache writes beside a model (the hull sidecars)
 
 pub mod hulls;
 mod reads;

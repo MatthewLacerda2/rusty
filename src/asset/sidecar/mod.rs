@@ -8,12 +8,17 @@
 //! it is regenerated from the file on demand and is never the source of truth.
 //!
 //! Format is JSON for diffability, matching the scene document's choice.
+//!
+//! stored-format: the `<file>.meta` import-settings sidecar
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+mod collider;
 mod texture;
+
+pub use collider::{closes_loop, looped, MeshColliderKind, SubObjectCollider};
 
 pub use texture::{
     fit_data_slot, fit_normal_slot, parse_max_size, set_texture, texture, Compression, FilterMode,
@@ -30,22 +35,6 @@ use crate::core::fs;
 /// `crates.glb` → `crates.glb.meta`.
 const META_EXTENSION: &str = "meta";
 
-/// How a sub-object's baked mesh collider is shaped (#77). `TriMesh` is an exact
-/// triangle mesh (static geometry); `Convex` is a convex hull (cheaper, usable on
-/// dynamic bodies). A sub-object absent from the sidecar map gets no collider.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MeshColliderKind {
-    TriMesh,
-    Convex,
-}
-
-impl MeshColliderKind {
-    /// `true` when this kind bakes a convex hull rather than a triangle mesh.
-    pub fn is_convex(self) -> bool {
-        matches!(self, MeshColliderKind::Convex)
-    }
-}
-
 /// Per-file import settings + a cached sub-object listing. Settings here are the
 /// only authoritative thing in the sidecar; the sub-object map is a convenience
 /// cache. `#[serde(default)]` throughout so a sparse, hand-written sidecar loads.
@@ -59,10 +48,11 @@ pub struct ImportSettings {
     /// Cached, human-readable list of the addressable sub-object ids in the file.
     #[serde(default)]
     pub sub_objects: Vec<String>,
-    /// Per-sub-object mesh-collider choice (#77), keyed by sub-object id. A missing
+    /// Per-sub-object mesh-collider choice (#77), keyed by sub-object id: its kind,
+    /// and the sub-object whose geometry builds it (#1960, `collider`). A missing
     /// key means "no collider"; `BTreeMap` keeps the sidecar JSON stably ordered.
-    #[serde(default)]
-    pub colliders: BTreeMap<String, MeshColliderKind>,
+    #[serde(default, deserialize_with = "collider::read_map")]
+    pub colliders: BTreeMap<String, SubObjectCollider>,
     /// Generate Lightmap UVs (#831): whether the importer unwraps a lightmap UV, and
     /// how. Off by default, as in Unity.
     #[serde(default)]
@@ -130,12 +120,21 @@ pub fn meta_path(source: &Path) -> PathBuf {
     source.with_file_name(name)
 }
 
-/// Load a source file's sidecar, or `Default` if none exists yet.
+/// Load a source file's sidecar, or `Default` if none exists yet. Collision meshes
+/// that name each other (a hand edit) read as their own, warned once per file.
 pub fn load(source: &Path) -> Result<ImportSettings, ImportError> {
     let path = meta_path(source);
     // Windows can briefly deny the open while a concurrent save replaces the file.
     match fs::retry_transient(|| std::fs::read_to_string(&path)) {
-        Ok(text) => serde_json::from_str(&text).map_err(|e| ImportError::Sidecar(e.to_string())),
+        Ok(text) => {
+            let mut settings: ImportSettings =
+                serde_json::from_str(&text).map_err(|e| ImportError::Sidecar(e.to_string()))?;
+            let looped = collider::break_loops(&mut settings.colliders);
+            if !looped.is_empty() {
+                collider::warn_loop(source, &looped);
+            }
+            Ok(settings)
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(ImportSettings::default()),
         Err(e) => Err(ImportError::Sidecar(e.to_string())),
     }

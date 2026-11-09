@@ -9,6 +9,8 @@
 //! costs only a full bake). A save never bakes: `Navigation.Bake()` and the editor's
 //! *Bake Navigation* button do. Nor does it rewrite bytes the file already holds: a
 //! Dust2-sized navmesh is tens of MB, and most saves leave it as it was loaded.
+//!
+//! stored-format: the `<scene>.navmesh` file beside the scene
 
 use std::cell::RefCell;
 use std::path::PathBuf;

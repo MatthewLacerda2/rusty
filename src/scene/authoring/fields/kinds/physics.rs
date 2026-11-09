@@ -28,6 +28,7 @@ inspect! {
         op!("material", collider::set_material),
         with!("material_asset", |c, v: Option<String>| collider::set_material_asset(c, v)?),
         ro!("shared_mesh", "kept from the Mesh removed off a Mesh-shaped collider"),
+        ro!("collision_mesh", "the collision mesh a Mesh-shaped collider builds from instead of its entity's Mesh"),
     ];
     JointComponent => joint, joint_mut, &[
         op!("kind", joint::set_kind),

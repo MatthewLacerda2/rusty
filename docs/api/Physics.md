@@ -289,7 +289,7 @@ A collider's **shape** is a table with a `kind` and that kind's extents — what
 | `"Sphere"` | `radius` |
 | `"Cylinder"` | `radius, height` (along local Y) |
 | `"Capsule"` | `radius, height, axis` — `axis` is `"X"`, `"Y"` (default) or `"Z"`, case-insensitive |
-| `"Mesh"` | `convex` — read-only: baked from an imported mesh, never set from script. It builds from the entity's `Mesh`, or, once that is removed, from the copy the collider kept (`Scene.RemoveComponent`, Unity's `MeshCollider.sharedMesh`) |
+| `"Mesh"` | `convex` (default `false`), `mesh` — the collision mesh it builds from (below), `nil` for the entity's own `Mesh` |
 
 **Capsule** (Unity: `CapsuleCollider`) is the character and limb shape: a
 cylinder capped by two hemispheres. As in Unity, `height` is the **full**
@@ -326,6 +326,35 @@ another engine's splitter (a physics library upgrade) is ignored and rewritten. 
 flat or too degenerate to split stays a triangle mesh, with one console warning
 naming the entity.
 `RaycastThrough` reads the pieces as one solid.
+
+**Collision mesh** (#1960, Unity's `MeshCollider.sharedMesh`, Unreal's `UCX_`
+meshes): a Mesh collider can build from another mesh than the one drawn, usually
+a low-poly copy (a Decimate modifier in Blender), so a 15k-triangle chair
+collides as a 500-triangle one. Set it from script with
+`Physics.SetColliderShape(id, { kind = "Mesh", convex = false, mesh = "Chair_col" })`:
+`mesh` is a `path::sub_object` reference, or a bare sub-object of the model the
+entity's `Mesh` comes from (or, with the `Mesh` removed, the model of the copy its
+collider kept). Without `mesh` the shape builds from the entity's `Mesh`; an
+entity whose `Mesh` was removed builds from the copy its collider kept
+(`Scene.RemoveComponent`), and with neither the call is an error and changes
+nothing. A model gives it per sub-object in its `.meta` sidecar, where an entry of
+`colliders` is either the bare kind (`"Chair": "TriMesh"`, its own mesh) or the
+kind with its mesh (`"Chair": { "kind": "TriMesh", "mesh": "Chair_col" }`; a
+`mesh` naming the entry's own sub-object means its own mesh, and entries that
+name each other are read as their own, warned once). The model
+inspector's sub-object row and `Assets.SetModelImportSettings`' `colliders`
+(`Assets.md`) write it. The collision sub-object is imported for its geometry and
+never drawn: spawning the whole model makes no entity for it. Its vertices are
+read in the collider's own local space, so it shares its render object's origin.
+Physics, the navmesh bake and the collider gizmo all read the collision mesh, and
+a concave one on a dynamic body is split as above. Adding or removing the entity's
+`Mesh` leaves it in place, as Unity's `sharedMesh` stays when the MeshFilter
+changes. A name the model lacks (or one given for a `Mesh` that comes from no
+model, or a sub-object that stops loading, on a scene load or a re-import) is
+said once in the console and kept with no triangles: the
+collider builds from its entity's `Mesh` meanwhile, and from the collision mesh
+again once the model has it. `GetColliderShape`'s `mesh` is that reference, `nil`
+when there is none.
 
 The **physics material** (Unity: `PhysicMaterial`) sets how a collider grips
 and bounces:

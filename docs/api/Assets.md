@@ -27,8 +27,8 @@ one by its source path still works.
 | `Assets.Refresh` | `()` | `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... }, compressed, failed = { path, ... } }` — imports what arrived (below); images wait for Stop |
 | `Assets.GetLightmapUVSettings` | `(path)` | `{ generate, hardAngle, packMargin }` — a model's Generate Lightmap UVs setting (below) |
 | `Assets.SetLightmapUVSettings` | `(path, { generate?, hardAngle?, packMargin? })` | how many of the scene's meshes it re-imported |
-| `Assets.GetModelImportSettings` | `(path)` | `{ scaleFactor }` — a model's Scale Factor (below) |
-| `Assets.SetModelImportSettings` | `(path, { scaleFactor? })` | how many of the scene's meshes it re-imported |
+| `Assets.GetModelImportSettings` | `(path)` | `{ scaleFactor, colliders }` — a model's Scale Factor and its sub-objects' mesh colliders (below) |
+| `Assets.SetModelImportSettings` | `(path, { scaleFactor?, colliders? })` | how many of the scene's meshes it re-imported |
 | `Assets.GetHumanoid` | `(path)` | `{ bones = { Hips = name, ... }, clipsFrom = { path, ... }, problems = { text, ... } }` — a model's humanoid map, resolved (below) |
 | `Assets.SetHumanoid` | `(path, { bones?, clipsFrom? })` | how many of the scene's meshes took new clips |
 | `Assets.GetTextureImportSettings` | `(path)` | `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize }` — an image's import settings (below) |
@@ -116,6 +116,20 @@ linked instance of the model (#1637), so it is rebuilt from the scaled import: i
 offsets scale with the meshes, in the open scene at once and in every other scene when it
 loads, and a part moved by hand keeps its own place (an override). A changed source file
 reaches it the same way.
+
+`colliders` (#1960) is the model inspector's sub-object rows: `{ [subObject] = { kind,
+mesh } }`, `kind` `"TriMesh"` (the default) or `"Convex"`, and `mesh` the sub-object of
+the same file whose geometry builds the collider, `nil` for its own (`Physics.md`,
+*Collision mesh*). A sub-object with no entry gets no collider. `SetModelImportSettings`
+changes only the sub-objects it names (`[subObject] = false` removes one's collider) and
+writes the sidecar once every key it was given has validated, so a failing call writes
+nothing. Like the inspector's rows, `colliders` takes effect at the next spawn of the
+model, not on what the scene already holds, except that a call that also changes
+`scaleFactor` rebuilds the scene's whole-model instances at once, with the new
+colliders. A `mesh` naming its own sub-object means its own mesh; an unknown `kind` is
+an error, and so are collision meshes that would name each other (`"A"` built from `B`
+and `B` from `A`), since neither would be drawn. A hand-edited sidecar holding such a
+loop reads each of them as its own mesh, with one console warning.
 
 ```lua no-run
 Assets.SetModelImportSettings("project/models/crate_cm.glb", { scaleFactor = 0.01 })

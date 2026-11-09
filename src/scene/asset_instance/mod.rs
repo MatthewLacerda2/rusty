@@ -3,7 +3,8 @@
 //! The "drag a glTF from Unity's Project window into the scene" verb, given an API
 //! equivalent: spawn ONE entity from a path-based asset reference
 //! (`path::sub_object`), carrying the importer-built mesh, its resolved material
-//! (or the engine default), and a synced collider when the sidecar asks for one.
+//! (or the engine default), and a synced collider when the sidecar asks for one,
+//! built from the collision mesh it names when it names one (`collision`, #1960).
 //!
 //! Both callers route through here so editor and API can never drift: the editor's
 //! model inspector ("Instantiate into Scene") and the `Scene.Instantiate` asset
@@ -182,26 +183,36 @@ fn import_material(
 }
 
 /// Attach a mesh collider to `id` when the file's sidecar records one for `sub`,
-/// sized from the sub-mesh bounds (consistent with the editor's import path).
-/// Returns `true` if a collider was added (so the caller refreshes world AABBs).
+/// sized from the geometry it builds from: the collision mesh the entry names
+/// (#1960, `collision`), else the sub-mesh itself (consistent with the editor's
+/// import path). Returns `true` if a collider was added (so the caller refreshes
+/// world AABBs).
 fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, sub: &str) -> bool {
     let settings = asset::sidecar::load(std::path::Path::new(path)).unwrap_or_default();
-    let Some(kind) = settings.colliders.get(sub).copied() else {
+    let Some(entry) = settings.colliders.get(sub) else {
         return false;
     };
-    let Some((min, max)) = asset.sub_mesh(sub).and_then(|s| s.bounds()) else {
+    let mut collider =
+        ColliderComponent::from_mesh_bounds(entry.kind.is_convex(), Vec3::ZERO, Vec3::ZERO);
+    collider.collision_mesh =
+        (entry.mesh.as_deref()).map(|name| collision::collision_mesh(path, asset, name));
+    let own = asset.sub_mesh(sub).and_then(|s| s.bounds());
+    if own.is_none() && collider.built_collision_mesh().is_none() {
         return false;
-    };
-    scene.world.set_collider(
-        id,
-        Some(ColliderComponent::from_mesh_bounds(
-            kind.is_convex(),
-            min,
-            max,
-        )),
-    )
+    }
+    rehydrate::refit_collider(&mut collider, own);
+    scene.world.set_collider(id, Some(collider))
 }
 
+/// The sub-objects `path`'s sidecar names as another's collision mesh (#1960):
+/// imported for their geometry, never spawned by a whole-model instance.
+pub fn collision_sub_objects(path: &str) -> std::collections::BTreeSet<String> {
+    let settings = asset::sidecar::load(std::path::Path::new(path)).unwrap_or_default();
+    let named = settings.colliders.into_values().filter_map(|c| c.mesh);
+    named.collect()
+}
+
+pub mod collision;
 mod humanoid;
 
 pub use humanoid::set_humanoid;

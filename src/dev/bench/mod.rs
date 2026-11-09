@@ -32,8 +32,6 @@ mod report;
 mod rig;
 pub mod stress;
 
-use std::path::Path;
-
 pub use lua::register;
 pub(crate) use lua::spec_from_lua;
 pub use report::{Report, Samples, Summary};
@@ -42,6 +40,7 @@ use super::capture::RenderedFrame;
 use super::harness::Harness;
 use crate::core::frame_stats::FrameStats;
 use crate::render::{ClockProbe, GpuPass};
+use report::{read, write};
 
 /// The render counters a bench row reports, in order.
 const COUNTERS: [&str; 8] = [
@@ -170,21 +169,6 @@ pub fn run(harness: &mut Harness, ticks: u32) -> Report {
     }
     harness.log(format!("bench: {} frames measured", report.frames));
     report
-}
-
-/// The last run's report, if `out_dir` holds a readable one.
-fn read(out_dir: &Path) -> Option<Report> {
-    let json = std::fs::read_to_string(out_dir.join("bench.json")).ok()?;
-    serde_json::from_str(&json).ok()
-}
-
-fn write(out_dir: &Path, report: &Report, text: &str) -> std::io::Result<()> {
-    std::fs::create_dir_all(out_dir)?;
-    let json = serde_json::to_string_pretty(report).map_err(std::io::Error::other)?;
-    // lint: allow(asset-write) a bench report, not read by a path-keyed cache
-    std::fs::write(out_dir.join("bench.json"), json)?;
-    // lint: allow(asset-write) a bench report, not read by a path-keyed cache
-    std::fs::write(out_dir.join("bench.txt"), text)
 }
 
 #[cfg(test)]

@@ -21,7 +21,7 @@ use crate::scene::authoring::defaults::{
     default_nav_agent, default_post_processing, default_rigidbody,
 };
 use crate::scene::authoring::{primitive_mesh_component, Primitive};
-use crate::scene::rehydrate::refit_to;
+use crate::scene::rehydrate::{bounds_of, refit_collider};
 use crate::scene::{AudioSourceComponent, MaterialComponent, ParticleEmitterComponent};
 
 /// Does entity `id` carry a component of `kind`? The dependency machinery's presence
@@ -173,20 +173,17 @@ fn set_default_ui(world: &mut World, id: u32, kind: ComponentKind) -> bool {
 /// Unity's empty Mesh Filter draws nothing; rusty's Mesh is the Filter and Renderer
 /// in one, so it arrives as the menu's default Box. A Mesh-shaped collider follows
 /// the entity's Mesh again: its shared mesh goes (#1657) and its box is refit to
-/// the Box, as a re-import refits it.
+/// the Box, as a re-import refits it. An authored collision mesh (#1960) stays, as
+/// Unity's `sharedMesh` does when the MeshFilter changes, and keeps sizing the box.
 fn add_box_mesh(world: &mut World, id: u32) -> bool {
     let mesh = primitive_mesh_component(Primitive::Box);
-    let positions: Vec<[f32; 3]> = mesh
-        .iter()
-        .flat_map(|m| &m.vertices)
-        .map(|v| v.position)
-        .collect();
+    let bounds = bounds_of(mesh.iter().flat_map(|m| &m.vertices).map(|v| v.position));
     if !world.set_mesh(id, mesh) {
         return false;
     }
     if let Some(mut collider) = world.collider_mut(id) {
         collider.shared_mesh = None;
-        refit_to(&mut collider, positions.into_iter());
+        refit_collider(&mut collider, bounds);
     }
     true
 }

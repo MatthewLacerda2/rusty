@@ -226,6 +226,7 @@ fn draw_metadata(ui: &mut egui::Ui, path: &str) {
     // Attempt to inspect JSON content
     let mut entity_count = 0;
     let mut skybox_str = "None".to_string();
+    // lint: allow(stored-format) peeks the scene document, whose format `scene::io` owns
     if let Ok(content) = fs::read_to_string(path) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
             if let Some(arr) = val.get("entities").and_then(|e| e.as_array()) {
