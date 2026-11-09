@@ -6,8 +6,8 @@
 //! With a [`BakeView`] the camera's texels converge first: after the whole
 //! scene's first pass they get all their other passes, then the rest get theirs
 //! (`schedule`), so a bake that splits that way makes more steps than passes.
-//! A [`PassSink`] that is still busy with the last lightmaps it took gets none
-//! built for the next step.
+//! Once a step is traced, a display pass builds its lightmaps from the texels as
+//! they stand, unless the [`PassSink`] is still busy with the last ones it took.
 //!
 //! **The final bytes are the one-shot bake's** ([`bake`](super::bake)) at the same
 //! settings and seed: a texel keeps its one seeded stream and its sums between
@@ -61,11 +61,11 @@ pub struct Pass {
     pub target: u32,
 }
 
-/// Who hears a progressive bake's steps: whether it wants the next step's
-/// lightmaps (built only then, #1970's review), and each it wanted.
+/// Who hears a progressive bake's steps: whether it wants the lightmaps of the
+/// step just traced (built only then, #1970's review), and each it wanted.
 pub trait PassSink {
-    /// Whether to build the next step's lightmaps; a sink still busy with the
-    /// last ones says no, and the step only traces.
+    /// Whether to build the lightmaps of the step just traced; a sink still busy
+    /// with the last ones says no, and the bake traces on.
     fn wants(&self) -> bool {
         true
     }
@@ -130,15 +130,15 @@ pub(in crate::scene::lighting::lightmap) fn progressive_on(
     let mut done = Step { seen: 0, rest: 0 };
     for (k, &step) in steps.iter().enumerate() {
         let last = k + 1 == steps.len();
-        let work = Work {
+        let mut work = Work {
             tracer: &tracer,
             settings,
             done,
             step,
             last,
-            show: !last && sink.wants(),
+            show: false,
         };
-        let (going, maps) = run.pass(items, &work)?;
+        let (mut going, maps) = run.pass(items, &work)?;
         done = Step {
             seen: done.seen + step.seen,
             rest: done.rest + step.rest,
@@ -155,8 +155,15 @@ pub(in crate::scene::lighting::lightmap) fn progressive_on(
             note_buried(run.orphans.into_inner());
             return Some(maps.into_iter().flatten().collect());
         }
-        if work.show {
+        // Asked once the step is traced, so a sink that finished the last
+        // lightmaps meanwhile gets these: a display pass over the texels as they
+        // stand, tracing nothing.
+        if sink.wants() {
+            let still = Step { seen: 0, rest: 0 };
+            (work.done, work.step, work.show) = (done, still, true);
+            let (shown, maps) = run.pass(going, &work)?;
             sink.pass(pass, maps.into_iter().flatten().collect());
+            going = shown;
         }
         items = going;
     }
