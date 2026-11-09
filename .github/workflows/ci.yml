@@ -259,7 +259,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-26]
-    timeout-minutes: 30
+    # A guard against a hang, not a budget the suite must fit (#1976): the job
+    # took 23-29 min when it ran both suites and two green runs were cancelled
+    # at 30. With the one `dev` suite it takes about 15, so 45 leaves room for a
+    # cold cache and a slow runner while still killing a hang well inside the hour.
+    timeout-minutes: 45
     runs-on: ${{ matrix.os }}
     if: >-
       github.event_name == 'schedule' ||
@@ -290,13 +294,15 @@ jobs:
       # macOS uses its native backend and needs no extra system libs; the apt
       # step is Linux-only and lives on the `build-test` job above. Same runner
       # and steps as build-test (#484); bash so `windows.yml` can run the same script.
-      - name: Test (engine, default)
-        shell: bash
-        run: |
-          rc=0
-          cargo nextest run --profile ci --locked || rc=$?
-          cp target/nextest/ci/junit.xml junit-default.xml || true
-          exit "$rc"
+      #
+      # Only the `dev` suite runs here (#1976). What this leg proves is Metal and
+      # the platform, and the `dev` build compiles and tests a superset of the
+      # default one: on 2026-11-09 the default list held one test the `dev` list
+      # did not (`a_ship_build_has_no_speech_namespace`, a Lua check with no
+      # platform code), and no `cfg` pairs `target_os` with `not(feature = "dev")`.
+      # The default suite still runs on Linux (`build-test`), and the doctests
+      # below still build the default library on macOS. Running both cost the
+      # leg about 9 of its 23-29 minutes and tipped it past its timeout.
       - name: Test (engine, dev features)
         shell: bash
         run: |
@@ -304,6 +310,11 @@ jobs:
           cargo nextest run --profile ci --features dev --locked || rc=$?
           cp target/nextest/ci/junit.xml junit-dev.xml || true
           exit "$rc"
+      # The ten slowest tests, in the log where an agent reads them (#1976): the
+      # job summary is not served by the REST API a cloud session reads.
+      - name: Slowest tests
+        if: always()
+        run: python3 .github/scripts/slowest_tests.py junit-dev.xml
       - name: Doctests (both feature sets)
         shell: bash
         run: |
