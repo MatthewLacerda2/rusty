@@ -13,7 +13,8 @@
 //!
 //! The rules that keep it from ever hiding what a camera sees:
 //! - only an object whose fingerprint is what was baked is culled: one moved,
-//!   re-materialled, re-imported, regrouped, made dynamic or spawned since is drawn;
+//!   re-shaped, given a material that occludes differently, regrouped, made
+//!   dynamic or spawned since is drawn;
 //! - the bake is used only while every baked occluder still matches: one moved,
 //!   removed or deactivated may have uncovered anything, so nothing is culled until
 //!   it is re-baked (said once in the log);
@@ -164,7 +165,7 @@ impl OcclusionBinding {
         self.reported = Some((revision, broken > 0));
         log::warn!(
             "[Occlusion] the bake is older than the scene's statics: {moved} baked mesh(es) \
-             changed since; {}. Generate Lighting re-bakes it.",
+             changed since; {}. Generate Lighting or Bake Occlusion re-bakes it.",
             match broken {
                 0 => "they are always drawn".to_string(),
                 n => format!("{n} were occluders, so nothing is occlusion-culled"),

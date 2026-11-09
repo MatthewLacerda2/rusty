@@ -31,6 +31,9 @@ use crate::scene::{save_lighting, LightingSave, Scene, LIGHTING_IN_PLAY};
 /// Why Generate Lighting cannot start: the bakes write beside the scene file.
 pub const UNSAVED: &str = "save the scene before generating lighting";
 
+/// Why Bake Occlusion cannot start: the PVS is written beside the scene file.
+pub const UNSAVED_OCCLUSION: &str = "save the scene before baking occlusion";
+
 /// What one Generate Lighting did.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GenerateReport {
@@ -154,24 +157,115 @@ pub fn finish(
     occlusion: BakedOcclusion,
 ) -> Result<GenerateReport, String> {
     refuse_in_play(scene)?;
-    *scene.occlusion = occlusion.data.map(std::sync::Arc::new);
-    scene.occlusion_unread = false;
-    if saved == LightingSave::Written {
-        crate::scene::lighting::occlusion::save_sidecar(scene, path)?;
-    }
+    let (report, ms) = match saved {
+        LightingSave::Written => {
+            let o = apply_occlusion(scene, path, occlusion)?;
+            (o.occlusion, o.ms)
+        }
+        LightingSave::NeedsSceneSave => {
+            let (report, ms) = (occlusion.report, occlusion.ms);
+            put_occlusion(scene, occlusion);
+            (report, ms)
+        }
+    };
     Ok(GenerateReport {
         lightmaps,
         probes,
-        occlusion: occlusion.report,
-        occlusion_ms: occlusion.ms,
+        occlusion: report,
+        occlusion_ms: ms,
         saved,
     })
 }
 
+/// Bake Occlusion (#1958): only Generate Lighting's last step, as Unity bakes
+/// occlusion from its own window. Bakes the open scene's PVS in line, applies it
+/// and writes it beside the scene at `scene_path`, touching no lightmap or probe.
+/// Refused as Generate Lighting is: during Play, while the editor's bake runs, and
+/// for a scene never saved.
+pub fn bake_occlusion_only(
+    scene: &mut Scene,
+    scene_path: Option<&str>,
+    log: &mut BakeLog,
+) -> Result<OcclusionOnlyReport, String> {
+    refuse_in_play(scene)?;
+    refuse_while_baking(scene)?;
+    let path = scene_path.ok_or(UNSAVED_OCCLUSION)?;
+    log.plan(&[Step::Occlusion]);
+    let baked = bake_occlusion_logged(scene, log)?;
+    let report = scene.unrecorded(|scene| apply_occlusion(scene, path, baked))?;
+    log.finish();
+    Ok(report)
+}
+
+/// What one Bake Occlusion did: the bake's report and its wall-clock milliseconds.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OcclusionOnlyReport {
+    pub occlusion: OcclusionBakeReport,
+    pub ms: u64,
+}
+
+impl OcclusionOnlyReport {
+    /// One line for the console.
+    pub fn summary(&self) -> String {
+        match occlusion_summary(&self.occlusion, self.ms) {
+            line if line.is_empty() => "Baked occlusion: nothing occludes, so nothing is \
+                 occlusion-culled"
+                .to_string(),
+            // No PVS was kept, so there is nothing saved to speak of.
+            line if self.occlusion.too_large => format!("Baked occlusion{line}"),
+            line => format!("Baked occlusion{line}; saved"),
+        }
+    }
+}
+
+/// Apply a finished occlusion bake to `scene` and write it beside the scene file
+/// at `path`: Bake Occlusion's last step, the script's and the editor's worker's.
+pub fn apply_occlusion(
+    scene: &mut Scene,
+    path: &str,
+    baked: BakedOcclusion,
+) -> Result<OcclusionOnlyReport, String> {
+    refuse_in_play(scene)?;
+    let report = OcclusionOnlyReport {
+        occlusion: baked.report,
+        ms: baked.ms,
+    };
+    put_occlusion(scene, baked);
+    crate::scene::lighting::occlusion::save_sidecar(scene, path)?;
+    Ok(report)
+}
+
+/// Put a finished bake's PVS on `scene`, as read: the next save writes it.
+fn put_occlusion(scene: &mut Scene, baked: BakedOcclusion) {
+    *scene.occlusion = baked.data.map(std::sync::Arc::new);
+    scene.occlusion_unread = false;
+}
+
+/// The warning a bake gives when the scene file at `path` lacks, or holds
+/// otherwise, a material the baked meshes draw (#1958,
+/// [`unsaved_materials`](crate::scene::lighting::occlusion::unsaved_materials)):
+/// the PVS fingerprints the live library, so the next load of the file would read
+/// it as stale. `None` when the file agrees, or cannot be read.
+pub fn unsaved_materials_warning(scene: &Scene, path: &str) -> Option<String> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let saved = crate::scene::parse_scene_text(&text, path).ok()?.materials;
+    let keys = crate::scene::lighting::occlusion::unsaved_materials(scene, &saved);
+    if keys.is_empty() {
+        return None;
+    }
+    let keys: Vec<_> = keys.iter().map(|k| format!("{k:?}")).collect();
+    Some(format!(
+        "[Occlusion] material(s) {} are defined in memory but not as the scene file holds \
+         them: save the scene so its materials are written, or the bake won't match the \
+         next load",
+        keys.join(", ")
+    ))
+}
+
 /// Why a script's bake is refused while the editor's runs: the two would bake the same
-/// probes and write the same files.
+/// probes and write the same files. The editor's bake is either of its buttons.
 pub const BAKE_RUNNING: &str =
-    "Generate Lighting is already running in the editor; wait for it to finish";
+    "the editor's Generate Lighting or Bake Occlusion is already running; wait for it to finish";
 
 /// A bake run in one call is refused while the editor's stepped one runs (#1602).
 pub fn refuse_while_baking(scene: &Scene) -> Result<(), String> {
@@ -189,6 +283,9 @@ fn refuse_in_play(scene: &Scene) -> Result<(), String> {
     }
 }
 
+#[cfg(test)]
+#[path = "pvs_only_tests.rs"]
+mod pvs_only_tests;
 #[cfg(test)]
 #[path = "generate_lighting_tests.rs"]
 mod tests;
