@@ -222,15 +222,23 @@ impl DrawBuffers {
         layout: &wgpu::BindGroupLayout,
         (label, instances): (&str, &wgpu::Buffer),
     ) -> wgpu::BindGroup {
-        let buffers = [
+        group1(device, layout, label, self.group1_buffers(instances))
+    }
+
+    /// The buffers a group 1 over `instances` binds, in [`group1`]'s order: what a
+    /// kept group compares to know it still names them (#1963).
+    pub(crate) fn group1_buffers<'a>(
+        &'a self,
+        instances: &'a wgpu::Buffer,
+    ) -> [&'a wgpu::Buffer; 6] {
+        [
             self.uniforms.buffer(),
             self.bones.buffer(),
             instances,
             self.materials.buffer(),
             self.proxies.buffer(),
             self.objects.buffer(),
-        ];
-        group1(device, layout, label, buffers)
+        ]
     }
 
     pub(crate) fn default_bones(&self) -> &wgpu::Buffer {

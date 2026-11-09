@@ -4,9 +4,10 @@
 use glam::{Mat4, Vec3};
 
 use super::cull::{CameraCull, ARGS};
-use crate::render::draw::batch::DrawBatch;
+use super::kept::Tables;
+use crate::render::draw::batch::{DrawBatch, OpaqueBatches};
 use crate::render::gpu::layout_entries::{storage_entry, uniform_entry};
-use crate::render::Renderer;
+use crate::render::{InstanceData, Renderer};
 
 /// `hiz.wgsl`'s `Params`.
 #[repr(C)]
@@ -21,7 +22,7 @@ pub(super) struct Params {
 }
 
 /// The batches' runs and draws, as `hiz.wgsl`'s `Batch`.
-fn pack_batches(batches: &[DrawBatch]) -> Vec<[u32; 4]> {
+fn pack_batches(batches: &OpaqueBatches) -> Vec<[u32; 4]> {
     let run = |b: &DrawBatch| {
         let (first, count) = (b.instances.start, b.instances.len() as u32);
         [first, count, b.key.indices.len(), b.key.indices.start]
@@ -29,31 +30,48 @@ fn pack_batches(batches: &[DrawBatch]) -> Vec<[u32; 4]> {
     batches.iter().map(run).collect()
 }
 
-/// Each instance's bounds, as `hiz.wgsl`'s `Bounds`: tested (`min.w` 1) when its
-/// object is among `tested`, by slot.
-pub(super) fn pack_bounds(slots: &[u32], tested: &[(u32, (Vec3, Vec3))]) -> Vec<[f32; 8]> {
-    let mut by_slot = vec![None; slots.iter().max().map_or(0, |&s| s as usize + 1)];
-    for &(slot, bounds) in tested {
+/// Fill `tables.bounds` with each of `instances`' bounds, as `hiz.wgsl`'s
+/// `Bounds`: tested (`min.w` 1) when its object is among `tested`, by slot, and
+/// `tables.slots` with their object slots. Returns how many are tested. Reuses
+/// the tables' room, so a frame allocates nothing once they fit the scene.
+pub(super) fn pack_bounds(
+    tables: &mut Tables,
+    instances: &[InstanceData],
+    tested: &[(u32, (Vec3, Vec3))],
+) -> u32 {
+    let Tables {
+        slots,
+        by_slot,
+        bounds,
+    } = tables;
+    slots.clear();
+    slots.extend(instances.iter().map(|i| i.object));
+    by_slot.clear();
+    by_slot.resize(slots.iter().max().map_or(0, |&s| s as usize + 1), None);
+    for &(slot, b) in tested {
         if let Some(at) = by_slot.get_mut(slot as usize) {
-            *at = Some(bounds);
+            *at = Some(b);
         }
     }
     let one = |&slot: &u32| match by_slot[slot as usize] {
         Some((lo, hi)) => [lo.x, lo.y, lo.z, 1.0, hi.x, hi.y, hi.z, 0.0],
         None => [0.0; 8],
     };
-    slots.iter().map(one).collect()
+    bounds.clear();
+    bounds.extend(slots.iter().map(one));
+    bounds.iter().filter(|b| b[3] > 0.5).count() as u32
 }
 
 impl Renderer {
-    /// Write `frame` into `cam`'s buffers and bind them: the phase-one group, then
-    /// the test and final group.
+    /// Write `frame` and `cam`'s packed bounds into its buffers, and bind them
+    /// (`cam.groups`: the phase-one group, then the test and final group), rebuilt
+    /// only when one of those buffers or the pyramid was replaced.
     pub(super) fn upload_cull(
         &self,
         cam: &mut CameraCull,
         (frame, pyramid): (&Frame, &wgpu::TextureView),
         n: u32,
-    ) -> [wgpu::BindGroup; 2] {
+    ) {
         let (device, queue) = (&self.device, &self.queue);
         let params = Params {
             view_proj: frame.view_proj.to_cols_array(),
@@ -64,8 +82,8 @@ impl Renderer {
             _pad: [0; 3],
         };
         queue.write_buffer(&cam.params, 0, bytemuck::bytes_of(&params));
-        cam.bounds
-            .upload(device, queue, bytemuck::cast_slice(frame.bounds));
+        let bounds = bytemuck::cast_slice(&cam.tables.bounds);
+        cam.bounds.upload(device, queue, bounds);
         let batches = pack_batches(frame.batches);
         cam.batches
             .upload(device, queue, bytemuck::cast_slice(&batches));
@@ -76,7 +94,26 @@ impl Renderer {
             cam.kept[k].reserve(device, 16 * u64::from(n));
             cam.args[k].reserve(device, args);
         }
-        [0, 1].map(|k| self.cull_group(cam, k, pyramid))
+        let key = [0, 1].map(|k| self.cull_buffers(cam, k).map(Clone::clone));
+        let mut groups = std::mem::take(&mut cam.groups);
+        groups.get((key, pyramid.clone()), || {
+            [0, 1].map(|k| self.cull_group(cam, k, pyramid))
+        });
+        cam.groups = groups;
+    }
+
+    /// The buffers `hiz.wgsl`'s group 0 binds for phase `k`, by binding.
+    fn cull_buffers<'a>(&'a self, cam: &'a CameraCull, k: usize) -> [&'a wgpu::Buffer; 8] {
+        [
+            &cam.params,
+            cam.bounds.buffer(),
+            cam.batches.buffer(),
+            self.draw_buffers.instances(),
+            cam.history.buffer(),
+            cam.visible.buffer(),
+            cam.kept[k].buffer(),
+            cam.args[k].buffer(),
+        ]
     }
 
     /// `hiz.wgsl`'s group 0 over `cam`'s buffers, writing phase `k`'s kept
@@ -87,16 +124,7 @@ impl Renderer {
         k: usize,
         pyramid: &wgpu::TextureView,
     ) -> wgpu::BindGroup {
-        let buffers = [
-            &cam.params,
-            cam.bounds.buffer(),
-            cam.batches.buffer(),
-            self.draw_buffers.instances(),
-            cam.history.buffer(),
-            cam.visible.buffer(),
-            cam.kept[k].buffer(),
-            cam.args[k].buffer(),
-        ];
+        let buffers = self.cull_buffers(cam, k);
         let mut entries: Vec<_> = (0..)
             .zip(buffers)
             .map(|(binding, buffer)| wgpu::BindGroupEntry {
@@ -121,8 +149,7 @@ pub(super) struct Frame<'a> {
     pub(super) view_proj: Mat4,
     pub(super) depth: (u32, u32),
     pub(super) levels: u32,
-    pub(super) batches: &'a [DrawBatch],
-    pub(super) bounds: &'a [[f32; 8]],
+    pub(super) batches: &'a OpaqueBatches,
     pub(super) slots: u32,
 }
 

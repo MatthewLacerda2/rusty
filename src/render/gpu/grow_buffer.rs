@@ -6,7 +6,8 @@
 //! instead of one per entity. Growth reallocates, which invalidates any bind group that
 //! names the old buffer — `upload` says so, and the owner rebuilds. The object table
 //! (#1706) is kept instead: [`GrowBuffer::reserve`] grows it, and
-//! [`GrowBuffer::write_at`] writes only the slots that changed.
+//! [`GrowBuffer::write_at`] writes only the slots that changed; and
+//! [`GrowBuffer::reserve_kept`] grows one whose contents the GPU wrote (#1963).
 
 /// Smallest allocation, so a near-empty scene does not reallocate on its first props.
 const MIN_BYTES: u64 = 4096;
@@ -66,6 +67,30 @@ impl GrowBuffer {
             self.buffer = allocate(device, self.label, self.usage, size);
         }
         grown
+    }
+
+    /// Make room for `bytes`, keeping what the buffer holds: on growth its old
+    /// contents are copied into the new one's start (a submit of their own), and
+    /// the old size is returned, so the caller writes only past it and rebuilds its
+    /// bind groups. Needs `COPY_SRC` among the usages.
+    pub(crate) fn reserve_kept(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        bytes: u64,
+    ) -> Option<u64> {
+        let old = self.buffer.size();
+        if bytes <= old {
+            return None;
+        }
+        debug_assert!(self.usage.contains(wgpu::BufferUsages::COPY_SRC));
+        let size = bytes.next_power_of_two().max(MIN_BYTES);
+        let grown = allocate(device, self.label, self.usage, size);
+        let mut encoder = device.create_command_encoder(&Default::default());
+        encoder.copy_buffer_to_buffer(&self.buffer, 0, &grown, 0, old);
+        queue.submit(std::iter::once(encoder.finish()));
+        self.buffer = grown;
+        Some(old)
     }
 
     /// Write `bytes` at `offset`, which [`Self::reserve`] made room for.

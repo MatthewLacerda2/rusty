@@ -80,11 +80,14 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   `SolidResources::culled`: the kept instances and one indirect draw per opaque
   batch. Every pass that draws the opaque batches goes through
   `Renderer::draw_solids` with it (the SSAO/SSIL prepass, the forward and velocity
-  pass), never `draw_batches`, or it draws what the cull hid; a transparent batch
-  is never culled. `Renderer::hiz_culls` says which camera culls (the preset's
+  pass); the batches are an `OpaqueBatches`, which hands out no slice, so the
+  compiler refuses them to `draw_batches` (the translucents' path), which would draw
+  what the cull hid. A transparent batch is never culled. `Renderer::hiz_culls` says which camera culls (the preset's
   `gpu_occlusion_culling`, the camera's flag, no capture); an object is tested
   only when `camera_solids` lists it in `CameraSolids::tested`, so a new kind of
   instance (a particle, a ringed object) stays drawn unless it adds itself there.
+  A material whose vertices move past the mesh's bounds (`RenderObject::moving`)
+  is never listed (`scene/draw.rs`, `hiz_testable`).
 
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no

@@ -569,8 +569,11 @@ is wholly behind depth the camera drew this frame.
   tested with its posed bounds. Only what the SSAO depth prepass draws hides
   anything: lit solids, a Cutout texel clipped, a custom shader's own cut or moved
   vertices. A Transparent mesh hides nothing and is always drawn, as are a mesh
-  whose bounds aren't known yet, a mesh particle, and a selected mesh the editor's
-  outline rings.
+  whose bounds aren't known yet, a mesh particle, a selected mesh the editor's
+  outline rings, and a mesh whose custom shader cuts, scrolls or moves its
+  vertices (`vertex_waves` swells rise out of the mesh's own bounds, so a water
+  plane behind a low rim would vanish though its crests show; it still hides
+  what is behind it).
 - **Which cameras.** Each camera view, its own: the base camera, a stacked or
   viewmodel camera, a render-texture camera, the editor's Scene view. Unlike the
   bake, an orthographic camera and one whose near plane is far out cull too: the test

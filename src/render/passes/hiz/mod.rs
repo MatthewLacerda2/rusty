@@ -28,7 +28,15 @@
 //! so only what the prepass writes (lit solids, cutouts clipped, a surface variant's
 //! own cut or moved vertices) is ever an occluder. A skinned object is tested with
 //! its posed bounds, an object whose bounds are unknown, one the selection outline
-//! rings, and a mesh particle are always drawn.
+//! rings, a mesh particle, and one a surface variant whose cut moves draws
+//! (`RenderObject::moving`: a `vertex_waves` swell leaves its undisplaced bounds)
+//! are always drawn. The opaque batches are an `OpaqueBatches`, which only
+//! `Renderer::draw_solids` draws, so no opaque pass can skip the verdict.
+//!
+//! **What it keeps.** Its bind groups (the cull's, the pyramid's levels, the
+//! kept instances' group 1) are rebuilt only when a buffer they bind grew or the
+//! depth was resized ([`kept::Kept`]), and its CPU tables are reused. Grown
+//! history keeps its verdicts: only new object slots read "drawn".
 //!
 //! **Who culls.** [`Renderer::hiz_culls`]: the quality preset's
 //! `gpu_occlusion_culling` (on in every seeded preset), the camera's
@@ -45,6 +53,7 @@
 
 mod counters;
 mod cull;
+mod kept;
 pub(crate) mod pyramid;
 mod upload;
 
@@ -58,8 +67,10 @@ mod moving_gpu_tests;
 mod projection_gpu_tests;
 #[cfg(test)]
 mod scale_gpu_tests;
+#[cfg(test)]
+mod waves_gpu_tests;
 
-use crate::render::gpu::pipelines::LazyCompute;
+use crate::render::gpu::pipelines::{lazy_compute, LazyCompute};
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::Renderer;
 
@@ -93,14 +104,15 @@ impl HiZ {
         let cull = registry.load(device, "hiz.wgsl", "Hi-Z Cull");
         let levels = registry.load(device, "hiz_pyramid.wgsl", "Hi-Z Pyramid");
         let cull_layout = upload::layout(device);
-        let with = |entry| lazy(device, &cull, entry, Some(&cull_layout));
+        let groups: &[&wgpu::BindGroupLayout] = &[&cull_layout];
+        let with = |entry| lazy_compute(device, &cull, (entry, entry), Some(groups));
         let (select, test, compact) = (with("cs_select"), with("cs_test"), with("cs_compact"));
         Self {
             select,
             test,
             compact,
-            reduce_depth: lazy(device, &levels, "cs_reduce_depth", None),
-            reduce: lazy(device, &levels, "cs_reduce", None),
+            reduce_depth: lazy_compute(device, &levels, ("Hi-Z Depth", "cs_reduce_depth"), None),
+            reduce: lazy_compute(device, &levels, ("Hi-Z Reduce", "cs_reduce"), None),
             cull_layout,
         }
     }
@@ -126,32 +138,4 @@ impl Renderer {
         let on = self.quality.gpu_occlusion_culling && cam.use_occlusion_culling;
         supported && on && !self.capture.static_only
     }
-}
-
-/// A compute pipeline of `module`'s `entry`, over `layout` (or the one its entry
-/// declares), built on first use.
-fn lazy(
-    device: &wgpu::Device,
-    module: &wgpu::ShaderModule,
-    entry: &'static str,
-    layout: Option<&wgpu::BindGroupLayout>,
-) -> LazyCompute {
-    let layout = layout.map(|group| {
-        device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some(entry),
-            bind_group_layouts: &[Some(group)],
-            immediate_size: 0,
-        })
-    });
-    let module = module.clone();
-    LazyCompute::new(device, move |device| {
-        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some(entry),
-            layout: layout.as_ref(),
-            module: &module,
-            entry_point: Some(entry),
-            compilation_options: Default::default(),
-            cache: None,
-        })
-    })
 }

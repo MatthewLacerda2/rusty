@@ -54,22 +54,26 @@ pub(super) fn offscreen(r: &Renderer) -> RenderView {
 
 /// The instances the base camera's last frame drew through the cull, per batch.
 pub(super) fn drawn(r: &Renderer, view: &RenderView) -> Vec<u32> {
-    let args = view.hiz.cameras[0].final_args();
+    let words = words(r, view.hiz.cameras[0].final_args());
+    let batches = view.hiz.cameras[0].drawn_batches as usize;
+    words.chunks_exact(5).take(batches).map(|a| a[1]).collect()
+}
+
+/// `buffer`'s words, read back (it must allow `COPY_SRC`).
+pub(super) fn words(r: &Renderer, buffer: &wgpu::Buffer) -> Vec<u32> {
     let staging = r.device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
-        size: args.size(),
+        size: buffer.size(),
         usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
     let mut encoder = r.device.create_command_encoder(&Default::default());
-    encoder.copy_buffer_to_buffer(args, 0, &staging, 0, args.size());
+    encoder.copy_buffer_to_buffer(buffer, 0, &staging, 0, buffer.size());
     r.queue.submit(std::iter::once(encoder.finish()));
     staging.slice(..).map_async(wgpu::MapMode::Read, |_| ());
     r.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
-    let batches = view.hiz.cameras[0].drawn_batches as usize;
     let mapped = staging.slice(..).get_mapped_range().unwrap();
-    let words: &[u32] = bytemuck::cast_slice(&mapped);
-    words.chunks_exact(5).take(batches).map(|a| a[1]).collect()
+    bytemuck::cast_slice(&mapped).to_vec()
 }
 
 #[test]

@@ -4,6 +4,7 @@
 //! pixels `t << (l + 1)` up to the next texel's; texels past the depth's edge
 //! repeat it. Kept per view and made again when the depth's size changes.
 
+use super::kept::Kept;
 use super::HiZ;
 
 /// The pyramid's format: one float, written by a compute pass.
@@ -17,6 +18,8 @@ pub(crate) struct Pyramid {
     pub(crate) view: wgpu::TextureView,
     /// One view per level, each reduced from the one below.
     levels: Vec<wgpu::TextureView>,
+    /// Each level's reduction group, kept while the depth it reads is.
+    groups: Kept<wgpu::TextureView, Vec<wgpu::BindGroup>>,
 }
 
 /// Half of `n`, rounded up, never below one.
@@ -69,6 +72,7 @@ impl Pyramid {
             view: texture.create_view(&Default::default()),
             texture,
             levels,
+            groups: Kept::default(),
         }
     }
 
@@ -78,42 +82,66 @@ impl Pyramid {
 
     /// Record the reduction of `depth` into every level.
     pub(crate) fn build(
-        &self,
+        &mut self,
         device: &wgpu::Device,
         hiz: &HiZ,
         encoder: &mut wgpu::CommandEncoder,
         depth: &wgpu::TextureView,
     ) {
+        let levels = &self.levels;
+        let groups = self.groups.get(depth.clone(), || {
+            (0..levels.len())
+                .map(|level| level_group(device, hiz, (depth, levels), level))
+                .collect()
+        });
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Hi-Z Pyramid"),
             timestamp_writes: None,
         });
         let mut size = base(self.depth.0, self.depth.1);
-        for (level, out) in self.levels.iter().enumerate() {
-            let (pipeline, input) = match level {
-                0 => (hiz.reduce_depth.get(), depth),
-                _ => (hiz.reduce.get(), &self.levels[level - 1]),
-            };
-            let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Hi-Z Level"),
-                layout: &pipeline.get_bind_group_layout(0),
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: if level == 0 { 0 } else { 1 },
-                        resource: wgpu::BindingResource::TextureView(input),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(out),
-                    },
-                ],
-            });
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, &group, &[]);
+        for (level, group) in groups.iter().enumerate() {
+            pass.set_pipeline(level_pipeline(hiz, level));
+            pass.set_bind_group(0, group, &[]);
             pass.dispatch_workgroups(size.0.div_ceil(8), size.1.div_ceil(8), 1);
             size = (half(size.0), half(size.1));
         }
     }
+}
+
+/// The reduction that writes `level`: from the depth, or from the level below.
+fn level_pipeline(hiz: &HiZ, level: usize) -> &wgpu::ComputePipeline {
+    match level {
+        0 => hiz.reduce_depth.get(),
+        _ => hiz.reduce.get(),
+    }
+}
+
+/// The group that reduces into `level`: `depth` or the level below in, the
+/// level out.
+fn level_group(
+    device: &wgpu::Device,
+    hiz: &HiZ,
+    (depth, levels): (&wgpu::TextureView, &[wgpu::TextureView]),
+    level: usize,
+) -> wgpu::BindGroup {
+    let (binding, input) = match level {
+        0 => (0, depth),
+        _ => (1, &levels[level - 1]),
+    };
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Hi-Z Level"),
+        layout: &level_pipeline(hiz, level).get_bind_group_layout(0),
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding,
+                resource: wgpu::BindingResource::TextureView(input),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::TextureView(&levels[level]),
+            },
+        ],
+    })
 }
 
 #[cfg(test)]

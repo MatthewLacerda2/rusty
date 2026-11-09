@@ -2,10 +2,17 @@
 //! copied to a mapped buffer and read a frame or so later, never waited on, so
 //! `Debug.Stats`' `hiz_culled` trails the frame it describes.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
 use super::cull::ARGS;
+
+/// A read whose map has not answered yet.
+const PENDING: u8 = 0;
+/// A read whose copy is mapped and readable.
+const MAPPED: u8 = 1;
+/// A read whose map failed: nothing to read, and the next copy may go.
+const FAILED: u8 = 2;
 
 /// One camera's read back, at most one in flight.
 #[derive(Default)]
@@ -13,8 +20,9 @@ pub(crate) struct Counter {
     staging: Option<wgpu::Buffer>,
     /// The instances tested and batches copied of the read in flight.
     in_flight: Option<(u32, u32)>,
-    /// Set by the map callback once the copy is readable.
-    mapped: Arc<AtomicBool>,
+    /// Set by the map callback: [`MAPPED`] once the copy is readable, [`FAILED`]
+    /// when the map was refused; [`PENDING`] until then.
+    mapped: Arc<AtomicU8>,
     /// Whether the copy was recorded this frame and waits for its submit.
     copied: bool,
     /// Instances the last read found hidden.
@@ -29,7 +37,7 @@ impl Counter {
         };
         // Lets a pending map's callback run, without waiting for it.
         let _ = device.poll(wgpu::PollType::Poll);
-        if !self.mapped.swap(false, Ordering::AcqRel) {
+        if !self.settle() {
             return;
         }
         let staging = self
@@ -46,6 +54,20 @@ impl Counter {
             self.culled = tested.saturating_sub(drawn);
         }
         self.in_flight = None;
+    }
+
+    /// Whether the read in flight is mapped and readable now. A refused map
+    /// leaves nothing to read: the read is dropped, so the next frame copies
+    /// afresh rather than waiting on it for ever and `culled` keeps moving.
+    fn settle(&mut self) -> bool {
+        match self.mapped.swap(PENDING, Ordering::AcqRel) {
+            MAPPED => true,
+            FAILED => {
+                self.in_flight = None;
+                false
+            }
+            _ => false,
+        }
     }
 
     /// Record a copy of `args`' first `batches` draws, when no read is in flight.
@@ -89,7 +111,35 @@ impl Counter {
         staging
             .slice(..bytes)
             .map_async(wgpu::MapMode::Read, move |result| {
-                mapped.store(result.is_ok(), Ordering::Release);
+                let state = if result.is_ok() { MAPPED } else { FAILED };
+                mapped.store(state, Ordering::Release);
             });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reading(state: u8) -> Counter {
+        let counter = Counter {
+            in_flight: Some((10, 1)),
+            ..Counter::default()
+        };
+        counter.mapped.store(state, Ordering::Release);
+        counter
+    }
+
+    #[test]
+    fn a_failed_map_frees_the_read_and_a_pending_one_waits() {
+        let mut failed = reading(FAILED);
+        assert!(!failed.settle());
+        assert_eq!(failed.in_flight, None, "the next copy may go");
+        let mut pending = reading(PENDING);
+        assert!(!pending.settle());
+        assert_eq!(pending.in_flight, Some((10, 1)), "still waiting");
+        let mut mapped = reading(MAPPED);
+        assert!(mapped.settle());
+        assert_eq!(mapped.mapped.load(Ordering::Acquire), PENDING);
     }
 }

@@ -1,7 +1,7 @@
 //! Shadow depth passes, dynamic global bind-group update, and the main scene
 //! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
-use crate::render::draw::batch::DrawBatch;
+use crate::render::draw::batch::OpaqueBatches;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::gpu::pipelines::PrimedPipelines;
@@ -117,7 +117,7 @@ impl Renderer {
         &mut self,
         view: &mut RenderView,
         frame: ScenePassFrame,
-        solid_batches: &[DrawBatch],
+        solid_batches: &OpaqueBatches,
     ) {
         let mut encoder = self
             .device
@@ -149,7 +149,7 @@ impl Renderer {
         view: &RenderView,
         encoder: &mut wgpu::CommandEncoder,
         frame: &ScenePassFrame,
-        solid_batches: &[DrawBatch],
+        solid_batches: &OpaqueBatches,
     ) {
         let clear = frame.clear;
         let velocity = view.post_fx.motion.target_view();

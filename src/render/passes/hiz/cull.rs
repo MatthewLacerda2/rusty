@@ -2,6 +2,7 @@
 //! kept per view and stack place, and the stage that records the two phases.
 
 use super::counters::Counter;
+use super::kept::{Kept, Tables};
 use super::pyramid::Pyramid;
 use super::upload::{pack_bounds, Frame, Params};
 use crate::render::draw::camera::CameraCtx;
@@ -33,11 +34,20 @@ pub(crate) struct CameraCull {
     pub(super) kept: [GrowBuffer; 2],
     pub(super) args: [GrowBuffer; 2],
     pub(super) counter: Counter,
-    /// This frame's two `hiz.wgsl` groups: phase one's, then the test's and final.
-    groups: Vec<wgpu::BindGroup>,
+    /// The two `hiz.wgsl` groups (phase one's, then the test's and final), kept
+    /// while the buffers and pyramid they bind are.
+    pub(super) groups: Kept<CullKey, [wgpu::BindGroup; 2]>,
+    /// The two phases' draws, kept while the group-1 buffers they bind are.
+    culled: Kept<[[wgpu::Buffer; 6]; 2], [Culled; 2]>,
+    /// The CPU tables it fills each frame.
+    pub(super) tables: Tables,
     /// The batches its last cull drew.
+    #[cfg(test)]
     pub(crate) drawn_batches: u32,
 }
+
+/// What the cull groups bind: per phase, its buffers by binding, and the pyramid.
+pub(super) type CullKey = ([[wgpu::Buffer; 8]; 2], wgpu::TextureView);
 
 impl CameraCull {
     pub(crate) fn new(device: &wgpu::Device) -> Self {
@@ -53,13 +63,16 @@ impl CameraCull {
             }),
             bounds: buffer("Hi-Z Bounds", U::empty()),
             batches: buffer("Hi-Z Batches", U::empty()),
-            history: buffer("Hi-Z History", U::empty()),
+            history: buffer("Hi-Z History", U::COPY_SRC),
             slots: 0,
             visible: buffer("Hi-Z Visible", U::empty()),
             kept: [0, 1].map(|_| buffer("Hi-Z Kept Instances", U::empty())),
             args: [0, 1].map(|_| buffer("Hi-Z Indirect Args", indirect)),
             counter: Counter::default(),
-            groups: Vec::new(),
+            groups: Kept::default(),
+            culled: Kept::default(),
+            tables: Tables::default(),
+            #[cfg(test)]
             drawn_batches: 0,
         }
     }
@@ -70,16 +83,27 @@ impl CameraCull {
         self.args[1].buffer()
     }
 
-    /// Make room for `slots` object slots of history; new ones read "drawn".
+    /// Make room for `slots` object slots of history. The verdicts it holds are
+    /// kept; only the new slots, `[old, slots)`, read "drawn", so a growth past a
+    /// power of two (a spawn, a stream-in) costs phase one just the new objects.
     pub(super) fn hold(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, slots: u32) {
         if slots <= self.slots {
             return;
         }
         let slots = slots.next_power_of_two();
-        let drawn = vec![1u32; slots as usize];
         self.history
-            .upload(device, queue, bytemuck::cast_slice(&drawn));
+            .reserve_kept(device, queue, 4 * u64::from(slots));
+        let drawn = vec![1u32; (slots - self.slots) as usize];
+        let at = 4 * u64::from(self.slots);
+        self.history
+            .write_at(queue, at, bytemuck::cast_slice(&drawn));
         self.slots = slots;
+    }
+
+    /// How many object slots its history holds.
+    #[cfg(test)]
+    pub(crate) fn slots(&self) -> u32 {
+        self.slots
     }
 }
 
@@ -96,19 +120,20 @@ impl Renderer {
         let idx = ctx.uniform.stack[0] as usize;
         self.hold_hiz(view, idx);
         let [first, last] = self.prepare_cull(view, idx, (&ctx.solids, ctx.view_proj), n);
-        let cam = &mut view.hiz.cameras[idx];
-        let pyramid = view.hiz.pyramid.as_ref().expect("held above");
+        let (cam, pyramid) = (&mut view.hiz.cameras[idx], &mut view.hiz.pyramid);
+        let pyramid = pyramid.as_mut().expect("held above");
+        let groups = cam.groups.value().expect("bound by prepare_cull");
         let opaque = &ctx.solids.draws.opaque;
         let batches = opaque.len() as u32;
         let mut encoder = self.device.create_command_encoder(&Default::default());
-        self.dispatch(&mut encoder, (&self.hiz.select, &cam.groups[0]), batches);
+        self.dispatch(&mut encoder, (&self.hiz.select, &groups[0]), batches);
         self.update_global_bind_group();
         let phase_one = ("Hi-Z Phase One", None);
-        let solids = (opaque.as_slice(), Some(&first));
+        let solids = (opaque, Some(&first));
         self.record_depth(&mut encoder, &view.depth_view, solids, phase_one);
         pyramid.build(&self.device, &self.hiz, &mut encoder, &view.depth_view);
-        self.dispatch(&mut encoder, (&self.hiz.test, &cam.groups[1]), n);
-        self.dispatch(&mut encoder, (&self.hiz.compact, &cam.groups[1]), batches);
+        self.dispatch(&mut encoder, (&self.hiz.test, &groups[1]), n);
+        self.dispatch(&mut encoder, (&self.hiz.compact, &groups[1]), batches);
         let args = (cam.args[1].buffer(), batches);
         cam.counter.copy(&self.device, &mut encoder, args);
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -143,28 +168,37 @@ impl Renderer {
         let pyramid = view.hiz.pyramid.as_ref().expect("held");
         cam.counter.collect(&self.device);
         let instances = &solids.draws.instances[..n as usize];
-        let slots: Vec<u32> = instances.iter().map(|i| i.object).collect();
-        let bounds = pack_bounds(&slots, &solids.tested);
+        let tested = pack_bounds(&mut cam.tables, instances, &solids.tested);
         let frame = Frame {
             view_proj,
             depth: pyramid.depth,
             levels: pyramid.levels(),
             batches: &solids.draws.opaque,
-            bounds: &bounds,
-            slots: slots.iter().max().map_or(1, |&s| s + 1),
+            slots: cam.tables.slots.iter().max().map_or(1, |&s| s + 1),
         };
-        cam.groups = self.upload_cull(cam, (&frame, &pyramid.view), n).to_vec();
-        cam.drawn_batches = solids.draws.opaque.len() as u32;
-        let tested = bounds.iter().filter(|b| b[3] > 0.5).count() as u32;
+        self.upload_cull(cam, (&frame, &pyramid.view), n);
+        #[cfg(test)]
+        {
+            cam.drawn_batches = solids.draws.opaque.len() as u32;
+        }
         self.frame_counters.hiz_tested += tested;
-        [0, 1].map(|k| Culled {
+        let buffers = |k: usize| {
+            let kept = cam.kept[k].buffer();
+            self.draw_buffers.group1_buffers(kept).map(Clone::clone)
+        };
+        let key = [buffers(0), buffers(1)];
+        let make = |k: usize| Culled {
             group: self.draw_buffers.group_with_instances(
                 &self.device,
                 &self.entity_bones_layout,
                 cam.kept[k].buffer(),
             ),
             args: cam.args[k].buffer().clone(),
-        })
+        };
+        let mut culled = std::mem::take(&mut cam.culled);
+        let draws = culled.get(key, || [make(0), make(1)]).clone();
+        cam.culled = culled;
+        draws
     }
 
     /// One compute pass of `pipeline` over `group`, a thread per one of `count`.
