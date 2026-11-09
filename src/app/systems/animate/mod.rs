@@ -91,15 +91,25 @@ pub(in crate::app) fn animate(world: &mut World, res: &mut Resources) {
         queue.states.extend(states.into_iter().map(|c| (id, c)));
         let events = crossed.into_iter().map(|e| (id, e.name, e.montage));
         queue.events.extend(events);
-        for (bone, local) in writes.unwrap_or_default() {
-            if let Some(mut t) = s.world.transform_mut(bone) {
-                *t = local;
-            }
-        }
+        write_pose(&mut s, writes.unwrap_or_default());
         if let Some((motion, model)) = applied {
             let hits = apply_root_motion(&mut s, res, id, motion, model, dt);
             let touched = (!hits.is_empty()).then_some((id, hits));
             res.controller_hits.extend(touched);
+        }
+    }
+}
+
+/// Write the sampled pose onto its bones, noting each one a partial ragdoll
+/// simulates: its animated pose is its drive's target and blend side (#1895).
+fn write_pose(s: &mut Scene, writes: Vec<(u32, crate::components::TransformComponent)>) {
+    for (bone, local) in writes {
+        if !s.ragdolls.is_idle() {
+            s.ragdolls
+                .note_animated(bone, (local.position, local.rotation));
+        }
+        if let Some(mut t) = s.world.transform_mut(bone) {
+            *t = local;
         }
     }
 }

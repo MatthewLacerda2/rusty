@@ -19,7 +19,7 @@ mod body;
 mod cast;
 mod collider;
 mod hitbox;
-mod impulse;
+pub(in crate::api) mod impulse;
 mod material;
 mod matrix;
 mod point;

@@ -2,7 +2,7 @@
 //!
 //! Unity's editor behaviour: Esc releases a locked cursor and still reaches the game,
 //! so a game's own Esc pause menu can be play-tested in the editor; stopping Play is
-//! Ctrl/Cmd+P or the toolbar. The release is the editor's override, not the game's
+//! Ctrl/Cmd+P or the menu bar's Stop button. The release is the editor's override, not the game's
 //! request: the game still reads its lock as it set it, and a click inside the Game
 //! view takes the cursor back, the way Unity re-captures it. The standalone player
 //! has no such override — Esc is just a key there.

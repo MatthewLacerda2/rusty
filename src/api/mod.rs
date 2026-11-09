@@ -16,6 +16,7 @@
 
 // lint: allow(dir-size) a flat registry: one file per Lua namespace, so the list is the surface's index
 // sorted: namespace modules and their helpers; no module reads another's declaration order
+pub mod ai_perception;
 pub mod animator;
 pub mod application;
 pub mod assets;
@@ -99,9 +100,11 @@ use crate::scene::Scene;
 pub type Reg = Result<(), String>;
 
 /// The navigation namespaces: `Navigation` + `NavMeshAgent`, `NavMeshObstacle`,
-/// `NavMeshModifierVolume` (#460) and `OffMeshLink`.
+/// `NavMeshModifierVolume` (#460) and `OffMeshLink`, and the agents' senses,
+/// `AIPerception` (#1900).
 fn register_navigation(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // sorted: each registrar makes its own global table
+    ai_perception::register(lua, ctx.scene)?;
     nav::register(lua, ctx.scene, ctx.nav)?;
     nav_modifier::register(lua, ctx.scene)?;
     nav_obstacle::register(lua, ctx.scene)?;

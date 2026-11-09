@@ -3,7 +3,8 @@
 //! A THIN client (#287): widgets read a snapshot and route every write through the
 //! shared `authoring::physics::joint` ops the `Joint.*` Lua setters call. Rows that do not
 //! apply to the chosen kind (the axis and limits of a Fixed joint, the swing of a
-//! Hinge) are hidden, not cleared, so switching kinds back loses nothing.
+//! Hinge, the drive of a Fixed joint) are hidden, not cleared, so switching kinds
+//! back loses nothing.
 
 use crate::editor::inspector::components::card::remove_component;
 use crate::editor::widgets::DragRange;
@@ -39,6 +40,7 @@ pub fn draw_joint(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32, is_
         draw_bodies(ui, world, id, &j, is_dirty);
         if j.kind != JointKind::Fixed {
             draw_limits(ui, world, id, &j, is_dirty);
+            draw_drive(ui, world, id, &j, is_dirty);
         }
         draw_breaking(ui, world, id, &j, is_dirty);
     });
@@ -184,6 +186,35 @@ fn draw_swing(
     if row(ui, "Swing 2 Limit (deg):", &mut swing2) {
         write(world, id, is_dirty, |c| {
             joint_ops::set_swing2_limit(c, swing2)
+        });
+    }
+}
+
+/// The drive's strength (0 = no motor) and damping (#1895).
+fn draw_drive(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    j: &JointComponent,
+    is_dirty: &mut bool,
+) {
+    let (mut strength, mut damping) = (j.drive_strength, j.drive_damping);
+    let row = |ui: &mut egui::Ui, label: &str, v: &mut f32| {
+        ui.horizontal(|ui| {
+            ui.label(label);
+            let drag = egui::DragValue::new(v).speed(1.0).ranged(0.0..=f32::MAX);
+            ui.add(drag).changed()
+        })
+        .inner
+    };
+    if row(ui, "Drive Strength (0 = none):", &mut strength) {
+        write(world, id, is_dirty, |c| {
+            joint_ops::set_drive_strength(c, strength)
+        });
+    }
+    if row(ui, "Drive Damping:", &mut damping) {
+        write(world, id, is_dirty, |c| {
+            joint_ops::set_drive_damping(c, damping)
         });
     }
 }

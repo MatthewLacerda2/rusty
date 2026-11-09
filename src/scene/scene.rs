@@ -144,6 +144,8 @@ pub struct Scene {
     pub lighting_bake_running: bool,
     /// Per-entity runtime shader-param overrides (#670). Runtime-only, never serialized.
     pub shader_overrides: crate::scene::shader_overrides::ShaderOverrides,
+    /// Partial ragdolls' runtime state (#1895): reactions, weights. Never serialized.
+    pub ragdolls: crate::scene::skeleton::RagdollRuntime,
     /// The write-log generation (`core::fs::written`) when the meshes were last read
     /// from a document: every note up to it is in them (#1242). Never serialized.
     pub meshes_read_at: u64,
@@ -194,6 +196,7 @@ impl Default for Scene {
             #[cfg(feature = "dev")]
             lighting_bake_running: false,
             shader_overrides: Default::default(),
+            ragdolls: Default::default(),
             meshes_read_at: 0,
             meshes_reimported: BTreeMap::new(),
             disk_text: Default::default(),
@@ -205,25 +208,6 @@ impl Default for Scene {
 impl Scene {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// This scene's runtime identity (#355) — stable for the life of the object,
-    /// distinct from every other live scene's.
-    pub fn id(&self) -> SceneId {
-        self.id
-    }
-
-    /// Mint a fresh runtime identity (#355): the World now holds a different scene
-    /// (a load replaced it), so GPU caches keyed by the old identity must not apply.
-    pub fn renew_id(&mut self) {
-        self.id = SceneId::next();
-    }
-
-    /// Take back `id`, an identity this World held before (Stop's restore after a
-    /// play-mode `Scene.Load`, #1374): the restored World is that scene again, so a
-    /// Generate Lighting waiting for Stop still recognises it.
-    pub(crate) fn restore_id(&mut self, id: SceneId) {
-        self.id = id;
     }
 
     pub fn add_entity(&mut self, name: String) -> u32 {

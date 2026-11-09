@@ -33,7 +33,9 @@ impl Scene {
     /// Enter or leave Play. Only `GameWorld`'s transition (`enter_play` /
     /// `exit_play`) calls this outside tests, so every reader sees the state
     /// change at the same moment.
-    /// Entering Play forgets the Undo history: Stop restores Play's changes.
+    /// Entering Play forgets the Undo history: Stop restores Play's changes. It
+    /// also empties every `AIPerception`'s memory (#1900), before any `Start`
+    /// can report a noise or a hit, so an agent starts Play knowing nothing.
     /// Leaving it drops what Play asked for and never got (a load or destroy a
     /// paused Play left queued, #1298), every `DontDestroyOnLoad` mark and every
     /// `Debug.Draw*` line still held (#1882): the
@@ -41,14 +43,33 @@ impl Scene {
     pub(crate) fn set_playing(&mut self, playing: bool) {
         if playing && !self.playing {
             self.clear_undo();
+            self.forget_perception();
         }
         if !playing && self.playing {
             self.pending_load = None;
             self.pending_destroy.clear(); // the next Play must not destroy edit entities
             self.persistent.clear();
+            self.ragdolls = Default::default();
             self.debug_lines = Default::default();
         }
         self.playing = playing;
+    }
+
+    /// Empty every `AIPerception`'s memory: known targets, sight and pending
+    /// updates. A perceiver that knows nothing is not written (no stamp).
+    fn forget_perception(&mut self) {
+        for id in self.world.ids_with_ai_perception() {
+            if self
+                .world
+                .ai_perception(id)
+                .is_none_or(|c| c.memory.is_empty())
+            {
+                continue;
+            }
+            if let Some(mut c) = self.world.ai_perception_mut(id) {
+                c.memory = Default::default();
+            }
+        }
     }
 
     /// Replace this scene with an empty one in place, keeping its play state and
@@ -80,7 +101,7 @@ impl Scene {
 
     /// Despawn every entity of `ids` together, then drop the scene's own references
     /// to them (#1264): the selection, `DontDestroyOnLoad`, a queued destroy, their
-    /// lightmap entries, the decals they own and their shader overrides. The World's references go in
+    /// lightmap entries, the decals they own, their shader overrides and ragdoll state. The World's references go in
     /// `World::despawn_all`, one pass for the batch. Every despawn in the scene runs
     /// through here, saying `why` it may skip script teardown.
     pub(crate) fn despawn_batch(&mut self, ids: &BTreeSet<u32>, why: Despawn) {
@@ -95,6 +116,7 @@ impl Scene {
         for &id in ids {
             self.shader_overrides.clear(id, None);
         }
+        self.ragdolls.retain(|id| !ids.contains(&id));
         if self.selected_entity_id.is_some_and(|s| ids.contains(&s)) {
             self.selected_entity_id = None;
         }

@@ -12,6 +12,17 @@ scene.collision_matrix.rows: tuple(32)
 scene.collision_matrix.rows[]: u32
 scene.entities: seq
 scene.entities[].active: bool
+scene.entities[].ai_perception.blocking_mask: u32
+scene.entities[].ai_perception.damage_max_age: f32
+scene.entities[].ai_perception.eye_height: f32
+scene.entities[].ai_perception.hearing_max_age: f32
+scene.entities[].ai_perception.hearing_range: f32
+scene.entities[].ai_perception.lose_sight_range: f32
+scene.entities[].ai_perception.sight_angle: f32
+scene.entities[].ai_perception.sight_mask: u32
+scene.entities[].ai_perception.sight_max_age: f32
+scene.entities[].ai_perception.sight_range: f32
+scene.entities[].ai_perception: option
 scene.entities[].animator.crossfade_duration: f32
 scene.entities[].animator.crossfade_elapsed: f32
 scene.entities[].animator.current_clip: string
@@ -279,6 +290,8 @@ scene.entities[].joint.connected_anchor: tuple(3)
 scene.entities[].joint.connected_anchor[]: f32
 scene.entities[].joint.connected_body: option
 scene.entities[].joint.connected_body: u32
+scene.entities[].joint.drive_damping: f32
+scene.entities[].joint.drive_strength: f32
 scene.entities[].joint.enable_collision: bool
 scene.entities[].joint.kind: enum Fixed|Hinge|Ball
 scene.entities[].joint.limits: tuple(2)
@@ -404,6 +417,8 @@ scene.entities[].mesh.skeleton.bodies{}.joint.connected_anchor: tuple(3)
 scene.entities[].mesh.skeleton.bodies{}.joint.connected_anchor[]: f32
 scene.entities[].mesh.skeleton.bodies{}.joint.connected_body: option
 scene.entities[].mesh.skeleton.bodies{}.joint.connected_body: u32
+scene.entities[].mesh.skeleton.bodies{}.joint.drive_damping: f32
+scene.entities[].mesh.skeleton.bodies{}.joint.drive_strength: f32
 scene.entities[].mesh.skeleton.bodies{}.joint.enable_collision: bool
 scene.entities[].mesh.skeleton.bodies{}.joint.kind: enum Fixed|Hinge|Ball
 scene.entities[].mesh.skeleton.bodies{}.joint.limits: tuple(2)

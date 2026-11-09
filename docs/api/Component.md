@@ -16,7 +16,7 @@ every field added later, with nothing new to bind.
 case, aliases too), plus `Transform`. Each answers to one name first:
 `Transform`, `Mesh`, `Light`, `Animator`, `Collider`, `RigidBody`, `Material`,
 `NavMeshAgent`, `NavMeshObstacle`, `OffMeshLink`, `NavMeshModifierVolume`,
-`Camera`, `Particles`, `PostProcessing`, `AudioSource`, `AudioReverbZone`,
+`AIPerception`, `Camera`, `Particles`, `PostProcessing`, `AudioSource`, `AudioReverbZone`,
 `Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
 `BackdropFilter`, `Text`, `Selectable`, `LayoutGroup`, `LayoutElement`, `Joint`,
 `CharacterController`, `LODGroup`, `LightProbeProxyVolume`, `Trail`, `Line`, `Shape`. Scripts are not a

@@ -85,7 +85,7 @@ only its mandatory `Transform` — the menu's **Create Empty**.
 case-insensitive: `Mesh` (aliases `MeshFilter`, `MeshRenderer`), `Light`, `Animator`, `Collider`, `RigidBody`,
 `Texture` (alias `Material`), `NavMeshAgent` (alias `NavAgent`), `NavMeshObstacle` (alias
 `NavObstacle`), `OffMeshLink` (alias `NavMeshLink`), `NavMeshModifierVolume` (alias
-`NavModifier`), `Camera`, `Particles` (alias `ParticleSystem`),
+`NavModifier`), `AIPerception` (alias `Perception`), `Camera`, `Particles` (alias `ParticleSystem`),
 `PostProcessing`, `Audio` (alias `AudioSource`), `AudioReverbZone` (alias
 `ReverbZone`), `Canvas`, `RectTransform`,
 `Image`, `CanvasGroup`, `RectMask` (alias `RectMask2D`), `Mask`,

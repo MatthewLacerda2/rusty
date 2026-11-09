@@ -52,7 +52,10 @@ pub use hang::Hung;
 pub use hitbox::{HitboxFit, HitboxOptions, HITBOX_NAME};
 pub use ik::{AimSettings, BonePose};
 pub use persist::{strip_bones, take_bone_parents};
-pub use ragdoll::{RagdollOptions, RAGDOLL_LAYER};
+pub use ragdoll::{
+    critical_damping, Drive, HitReact, RagdollOptions, RagdollRuntime, RAGDOLL_LAYER,
+    REACT_DURATION, REACT_STRENGTH,
+};
 
 use crate::scene::Scene;
 
