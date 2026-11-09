@@ -27,6 +27,7 @@
 pub mod anim_data;
 pub mod animation_graph;
 pub mod audio;
+pub mod clusters;
 pub mod convert;
 pub mod flat_normals;
 pub mod gltf;
@@ -182,6 +183,10 @@ fn import_own(
         for sub in &mut asset.sub_meshes {
             lightmap_uv::apply(sub, &settings.lightmap_uvs);
         }
+    }
+    // Last: the clusters reorder the indices every step above settled.
+    for sub in &mut asset.sub_meshes {
+        clusters::apply(sub);
     }
     Ok(asset)
 }

@@ -51,6 +51,8 @@ struct RehydratedMesh {
     /// The revision of the import it came from (#857): every instance of one
     /// import shares it. `None` (a primitive, a failed import) takes a fresh one.
     revision: Option<MeshRevision>,
+    /// The import's clusters (#1968), which describe `revision`'s geometry.
+    clusters: Option<std::sync::Arc<crate::asset::clusters::Clusters>>,
 }
 
 impl RehydratedMesh {
@@ -79,6 +81,7 @@ impl RehydratedMesh {
             skin: sub.skin.clone(),
             clips: sub.clips.clone(),
             revision: Some(revision),
+            clusters: sub.clusters.clone(),
         }
     }
 }
@@ -217,6 +220,7 @@ fn install(mesh: &mut crate::scene::MeshComponent, rebuilt: RehydratedMesh) {
     mesh.pose_palette = Vec::new();
     mesh.skeleton.bones.clear();
     mesh.revision = rebuilt.revision.unwrap_or_else(MeshRevision::next);
+    mesh.clusters = rebuilt.clusters.map(|c| (mesh.revision, c));
 }
 
 /// Build an `"Asset"` mesh component from a path-based reference, importing its

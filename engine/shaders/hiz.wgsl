@@ -7,10 +7,14 @@
 //   4. `cs_test`: each instance's world bounds against the pyramid, into
 //      `visible` and next frame's `history`;
 //   5. `cs_compact`: each batch keeps its visible instances, in order, and writes
-//      the indirect args every opaque pass then draws with.
+//      the indirect args every opaque pass then draws with. A batch whose mesh is
+//      split into clusters (#1968) keeps every instance at its own place instead:
+//      `hiz_clusters.wgsl` then draws each instance's visible clusters on its own.
 // The depth is ordinary Z (cleared to 1, compared `Less`), so the pyramid keeps the
 // farthest depth under each texel, and an instance is hidden only when its nearest
 // point is behind it.
+
+#import hiz::hidden::{hidden, Eye}
 
 struct Params {
     view_proj: mat4x4<f32>,
@@ -32,12 +36,17 @@ struct Bounds {
     max: vec4<f32>,
 };
 
-// One opaque batch: its instance run and the indexed draw it makes.
+// One opaque batch: its instance run and the indexed draw it makes, and 1 in
+// `clustered` when its final draws are per instance, by cluster (#1968).
 struct Batch {
     first: u32,
     count: u32,
     index_count: u32,
     first_index: u32,
+    clustered: u32,
+    _pad0: u32,
+    _pad1: u32,
+    _pad2: u32,
 };
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -55,9 +64,12 @@ struct Batch {
 @group(0) @binding(7) var<storage, read_write> args: array<u32>;
 @group(0) @binding(8) var pyramid: texture_2d<f32>;
 
-// Keep batch `b`'s instances `keep` admits, in order, and write its draw.
+// Keep batch `b`'s instances `keep` admits, in order, and write its draw. A
+// clustered batch's final pass keeps every instance at its own place (its draws
+// are per instance), counting the visible ones.
 fn compact(b: u32, phase_one: bool) {
     let batch = batches[b];
+    let in_place = !phase_one && batch.clustered != 0u;
     var n = 0u;
     for (var k = 0u; k < batch.count; k++) {
         let i = batch.first + k;
@@ -68,8 +80,12 @@ fn compact(b: u32, phase_one: bool) {
         } else {
             keep = visible[i] != 0u;
         }
-        if keep {
+        if in_place {
+            kept[i] = instance;
+        } else if keep {
             kept[batch.first + n] = instance;
+        }
+        if keep {
             n++;
         }
     }
@@ -95,75 +111,6 @@ fn cs_compact(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 }
 
-// Whether the box `lo..hi` is behind the pyramid everywhere it covers.
-fn hidden(lo: vec3<f32>, hi: vec3<f32>) -> bool {
-    var rect_min = vec2<f32>(1e30);
-    var rect_max = vec2<f32>(-1e30);
-    var nearest = 1.0;
-    for (var c = 0u; c < 8u; c++) {
-        let corner = vec3<f32>(
-            select(lo.x, hi.x, (c & 1u) != 0u),
-            select(lo.y, hi.y, (c & 2u) != 0u),
-            select(lo.z, hi.z, (c & 4u) != 0u),
-        );
-        let clip = params.view_proj * vec4<f32>(corner, 1.0);
-        // A corner on or behind the near plane: never culled.
-        if clip.w <= 1e-5 || clip.z < 0.0 {
-            return false;
-        }
-        let ndc = clip.xyz / clip.w;
-        let px = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * params.size;
-        rect_min = min(rect_min, px);
-        rect_max = max(rect_max, px);
-        nearest = min(nearest, ndc.z);
-    }
-    let last = params.size - vec2<f32>(1.0);
-    // Wholly off screen: the frustum cull's call, not this one's.
-    if any(rect_max < vec2<f32>(0.0)) || any(rect_min > last + vec2<f32>(1.0)) {
-        return false;
-    }
-    let p0 = vec2<u32>(clamp(floor(rect_min), vec2<f32>(0.0), last));
-    let p1 = vec2<u32>(clamp(floor(rect_max), vec2<f32>(0.0), last));
-    // The level where the rect spans at most 2x2 texels: level `l` texel `t` covers
-    // pixels `t << (l + 1)` up to the next texel's.
-    var level = 0u;
-    loop {
-        let t0 = p0 >> vec2<u32>(level + 1u);
-        let t1 = p1 >> vec2<u32>(level + 1u);
-        if all(t1 - t0 <= vec2<u32>(1u)) || level + 1u >= params.levels {
-            break;
-        }
-        level++;
-    }
-    // The level's size from level 0's, and its texels read in a loop over every
-    // level: `textureDimensions` and `textureLoad` at a level that differs per
-    // thread answered another thread's on lavapipe, so each call's level is the
-    // loop's, the same in every thread.
-    let base = textureDimensions(pyramid, 0u);
-    var farthest = 0.0;
-    for (var l = 0u; l < params.levels; l++) {
-        if l != level {
-            continue;
-        }
-        let dims = max(base >> vec2<u32>(l), vec2<u32>(1u)) - vec2<u32>(1u);
-        let t0 = min(p0 >> vec2<u32>(l + 1u), dims);
-        let t1 = min(p1 >> vec2<u32>(l + 1u), dims);
-        for (var y = t0.y; y <= t1.y; y++) {
-            for (var x = t0.x; x <= t1.x; x++) {
-                farthest = max(farthest, textureLoad(pyramid, vec2<u32>(x, y), l).r);
-            }
-        }
-    }
-    // A face on the box's own near plane rasterizes to its corners' depth give or
-    // take rounding: hidden only past a margin of float steps (64, about 4e-6 near
-    // 1, a centimetre and a half at 20 m from a 0.1 m near plane), never by it.
-    return bitcast<u32>(nearest) > bitcast<u32>(farthest) + MARGIN;
-}
-
-// The depth margin, in float steps (`hidden`); depths are in `0..1`, so their
-// bits order as they do.
-const MARGIN: u32 = 64u;
-
 @compute @workgroup_size(64)
 fn cs_test(@builtin(global_invocation_id) id: vec3<u32>) {
     let i = id.x;
@@ -173,7 +120,8 @@ fn cs_test(@builtin(global_invocation_id) id: vec3<u32>) {
     let b = bounds[i];
     var drawn = true;
     if b.min.w > 0.5 {
-        drawn = !hidden(b.min.xyz, b.max.xyz);
+        let eye = Eye(params.view_proj, params.size, params.levels);
+        drawn = !hidden(eye, pyramid, b.min.xyz, b.max.xyz);
     }
     visible[i] = u32(drawn);
     history[instances[i].x] = u32(drawn);

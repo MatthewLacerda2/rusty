@@ -99,6 +99,7 @@ mod tests {
             skin: None,
             clips: Vec::new(),
             node_name: node.map(str::to_string),
+            clusters: None,
         }
     }
 

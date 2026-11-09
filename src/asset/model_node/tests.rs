@@ -16,6 +16,7 @@ fn tri(id: &str) -> SubMesh {
         skin: None,
         clips: Vec::new(),
         node_name: None,
+        clusters: None,
     }
 }
 
