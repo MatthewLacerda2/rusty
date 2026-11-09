@@ -1,5 +1,5 @@
 //! src/api/snapshot/navigation.rs — the NavMeshObstacle (#456), OffMeshLink (#462)
-//! and NavMeshModifierVolume (#460) snapshots, and AIPerception's (#1900), apart from `components.rs` to keep it
+//! NavMeshModifierVolume (#460) and NavMeshModifier (#1959) snapshots, and AIPerception's (#1900), apart from `components.rs` to keep it
 //! under the size cap.
 
 use serde_json::{json, Value};
@@ -7,7 +7,8 @@ use serde_json::{json, Value};
 use super::vec3;
 use crate::components::AIPerceptionComponent;
 use crate::components::{
-    NavMeshModifierVolumeComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
+    NavMeshModifierComponent, NavMeshModifierVolumeComponent, NavMeshObstacleComponent,
+    OffMeshLinkComponent,
 };
 
 /// NavMeshObstacle: its shape, its carving options, and whether it carves now.
@@ -47,6 +48,16 @@ pub(crate) fn nav_modifier_value(v: &NavMeshModifierVolumeComponent) -> Value {
         "center": vec3(v.center),
         "size": vec3(v.size),
         "area": v.area,
+    })
+}
+
+/// NavMeshModifier: how the bake reads the object's colliders.
+pub(crate) fn nav_mesh_modifier_value(m: &NavMeshModifierComponent) -> Value {
+    json!({
+        "active": m.active,
+        "override_area": m.override_area,
+        "ignore_from_build": m.ignore_from_build,
+        "apply_to_children": m.apply_to_children,
     })
 }
 

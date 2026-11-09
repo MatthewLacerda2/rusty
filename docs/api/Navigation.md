@@ -13,15 +13,16 @@ cell, so a `NavMeshAgent` on a ramp stands on the slope under its feet and climb
 smoothly, not in one-cell steps (#781). **Where there is no collider there is no navmesh**: no
 implicit ground past the level's edge, and an empty scene bakes nothing (as in Unity).
 Carving `NavMeshObstacle`s cut their footprint out of it (see `NavMeshObstacle`),
-`NavMeshModifierVolume`s give parts of it a navigation area with its own cost (below), and
+`NavMeshModifierVolume`s give parts of it a navigation area with its own cost (below), a
+`NavMeshModifier` changes how one object's colliders bake (below), and
 off-mesh links join what walking can't (below).
 
 ### Keeping the navmesh current (#456)
 
 In Play the navmesh follows the scene **every tick**, rebaking **only what changed**. Each
 tick compares the static colliders (shape and world pose; added, removed, moved, resized,
-toggled static or active), the carving obstacles, the area modifier volumes and the
-authored off-mesh links against
+toggled static or active, and the area a `NavMeshModifier` bakes them as), the carving
+obstacles, the area modifier volumes and the authored off-mesh links against
 what the last bake read; a link change re-snaps the links without rebaking any floor. A
 change dirties the cells its old and new footprints cover; only those cells, plus the
 agent-radius erosion's reach around them, are rebaked. The result is exactly the navmesh
@@ -163,8 +164,39 @@ agent's **area mask** (`NavMeshAgent.SetAreaMask`, and the optional `areaMask` o
 queries above; bit `i` = area `i`, `-1` = every area) says which areas it may enter at
 all. Two areas are built in: **`Walkable`** (`0`, every floor's area by default) and
 **`NotWalkable`** (`1`, which removes the floor a modifier volume covers). Areas are
-assigned by `NavMeshModifierVolume` boxes at bake time, and by `OffMeshLink.SetArea`
-(generated links are `Walkable`).
+assigned by `NavMeshModifier`s on objects and `NavMeshModifierVolume` boxes at bake time
+(a volume's area wins over an object's), and by `OffMeshLink.SetArea` (generated links
+are `Walkable`).
+
+#### Per-object modifiers: `NavMeshModifier` (#1959)
+
+Unity's `NavMeshModifier`: a component on an object that changes how the bake reads its
+colliders (and, by default, its children's), following their own geometry, so there is
+no box to size and it moves with the object. Its fields, set through the
+[`NavMeshModifier`](NavMeshModifier.md) namespace or
+[`Component.Set`](Component.md) and shown in the inspector (Add Component › NavMesh
+Modifier):
+
+| Field | Default | Effect |
+|---|---|---|
+| `active` | `true` | an inactive modifier changes nothing, and shields nothing below it |
+| `override_area` | `nil` | the area id the object's floors bake as; `1` (`NotWalkable`) gives it no floor at all |
+| `ignore_from_build` | `false` | the object's colliders are left out of the bake entirely |
+| `apply_to_children` | `true` | the modifier covers the object's descendants too |
+
+- **Furniture wants `override_area = 1`.** A table, a sofa or a bar counter then has no
+  walkable top, but it stays solid geometry: the floor under it still lacks the agent's
+  headroom, and agents walk around it.
+- **`ignore_from_build` removes the object**, as in Unity: it neither has a floor nor
+  blocks one, so the floor under a table is walkable. Use it for clutter agents walk
+  through (a hanging lamp, a decal), not for an obstacle.
+- The modifier that covers a collider is the **nearest** active one, on its own object or,
+  with `apply_to_children`, on an ancestor: a child's own modifier wins over its parent's.
+- Adding, removing or changing one rebakes only the cells of the colliders it covers.
+
+```lua with=table:NavMeshModifier
+Component.Set(table, "NavMeshModifier", { override_area = 1 })  -- no walking on the table
+```
 
 - Costs are at least `1` (lower values clamp up), so the search stays optimal.
 - A step between floors of two areas pays the mean of their costs; a diagonal step pays at

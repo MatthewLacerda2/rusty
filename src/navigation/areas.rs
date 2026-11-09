@@ -10,8 +10,10 @@
 //! one only when no cheaper way exists. An agent's **area mask** (bit `i` = area
 //! `i`) says which areas it may enter at all.
 //!
-//! * `Walkable` (0) is every span's area unless a `NavMeshModifierVolume` says
-//!   otherwise; `NotWalkable` (1) removes the spans a volume covers.
+//! * `Walkable` (0) is every span's area unless a `NavMeshModifier` on its object
+//!   (#1959) or a `NavMeshModifierVolume` around it says otherwise (the volume wins);
+//!   `NotWalkable` (1) removes the spans a volume covers, and leaves an object's tops
+//!   unwalkable while it still blocks what is under it.
 //! * Costs are clamped to at least 1, so the octile heuristic (one unit per cell)
 //!   stays admissible and A\* stays optimal.
 //! * Areas are assigned at bake time, but a cost is read at search time: changing a

@@ -19,6 +19,7 @@
 //! every cell by a fraction). Pure AABB math — no RNG/clock — so the determinism guard
 //! for `navigation` holds.
 
+use super::object_modifier::bake_as;
 use super::NavigationGraph;
 use crate::scene::lighting::placement::{FloorCell, FloorGrid};
 pub use crate::scene::nav_settings::NavBounds;
@@ -54,8 +55,9 @@ impl NavBounds {
 }
 
 /// Every collider the bake reads: entity active, static, collider active and not a
-/// trigger (Unity leaves triggers out of the navmesh). The one definition of "static
-/// geometry" shared by the rasteriser and the bounds.
+/// trigger (Unity leaves triggers out of the navmesh), and not ignored by a
+/// `NavMeshModifier` (#1959). The one definition of "static geometry" shared by the
+/// rasteriser and the bounds.
 pub(super) fn static_collider_ids(scene: &Scene) -> impl Iterator<Item = u32> + '_ {
     scene
         .world
@@ -68,6 +70,7 @@ pub(super) fn static_collider_ids(scene: &Scene) -> impl Iterator<Item = u32> + 
                     .world
                     .collider(id)
                     .is_some_and(|c| c.active && !c.is_trigger)
+                && !bake_as(&scene.world, id).ignored
         })
 }
 

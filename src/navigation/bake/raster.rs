@@ -15,6 +15,9 @@
 //! reach a convex solid's column maximum. A non-convex mesh rasterises triangle by
 //! triangle and trusts the winding (front faces point out), as Recast does.
 //!
+//! A collider a `NavMeshModifier` overrides (#1959) tags its solids with that
+//! area; `NotWalkable` leaves its tops unwalkable, so the object stays an obstacle.
+//!
 //! A cell's column is its square around the centre, shrunk by [`EDGE_EPS`] so a
 //! collider that only touches a cell's edge does not claim it.
 //!
@@ -24,7 +27,8 @@
 
 use glam::{Vec2, Vec3};
 
-use super::super::NavigationGraph;
+use super::super::object_modifier::bake_as;
+use super::super::{NavigationGraph, NOT_WALKABLE_AREA, WALKABLE_AREA};
 use super::plane::{top_plane, Plane, TOP_EPS};
 use super::region::CellRect;
 use crate::physics::collider_world_triangles;
@@ -45,6 +49,9 @@ pub(super) struct Solid {
     pub plane: Option<Plane>,
     /// The highest lower walkable top merged under this one (`-∞` with none).
     pub floor: f32,
+    /// The area a walkable top bakes as: `Walkable`, or a `NavMeshModifier`'s
+    /// override (#1959).
+    pub area: u8,
 }
 
 /// A clipped polygon: at most 7 vertices (a triangle cut by four planes).
@@ -67,12 +74,18 @@ pub(super) fn rasterize(
             continue;
         };
         rects.push(footprint(g, &mesh.vertices));
-        let walkable = |tri| faces_up(tri, g.max_slope, mesh.convex);
+        // An object overridden to `NotWalkable` stays solid: it still blocks the
+        // floor beneath through clearance, but carries no surface of its own.
+        let area = bake_as(&scene.world, id).area.unwrap_or(WALKABLE_AREA);
+        let surface = area != NOT_WALKABLE_AREA;
+        let walkable = |tri| surface && faces_up(tri, g.max_slope, mesh.convex);
         let tris = mesh
             .triangles
             .iter()
             .map(|t| t.map(|i| mesh.vertices[i as usize]));
+        let start = out.len();
         rasterize_mesh(g, region, tris, mesh.convex, walkable, &mut out);
+        out[start..].iter_mut().for_each(|s| s.area = area);
     }
     (out, rects)
 }
@@ -105,6 +118,7 @@ pub(super) fn rasterize_mesh(
                 walkable,
                 plane: walkable.then(|| Plane::of(tri, centre)).flatten(),
                 floor: f32::NEG_INFINITY,
+                area: WALKABLE_AREA,
             })
         });
     }

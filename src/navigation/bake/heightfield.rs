@@ -12,7 +12,10 @@
 //! 3. **Headroom (#278).** A span with less than `agent_height` of open space is
 //!    dropped: nobody crawls under a low overhang.
 //!
-//! Sorting uses a total order on `(cell, min, max, walkable)`, so the result is a
+//! The merged top carries the area of the walkable solid that gives it its flag
+//! (a `NavMeshModifier`'s override, #1959).
+//!
+//! Sorting uses a total order on `(cell, min, max, walkable, area)`, so the result is a
 //! pure function of the geometry, whatever order the colliders were visited in.
 
 use super::super::{NavSpan, NavigationGraph};
@@ -34,6 +37,7 @@ impl NavigationGraph {
                 .then(a.min.total_cmp(&b.min))
                 .then(a.max.total_cmp(&b.max))
                 .then(a.walkable.cmp(&b.walkable))
+                .then(a.area.cmp(&b.area))
                 .then(Plane::order(a.plane, b.plane))
                 .then(a.floor.total_cmp(&b.floor))
         });
@@ -60,7 +64,7 @@ fn open_spans(column: &[Solid], agent_height: f32) -> impl Iterator<Item = NavSp
         (s.walkable && ceiling - s.max >= agent_height).then_some(NavSpan {
             y: s.max,
             ceiling,
-            area: super::super::WALKABLE_AREA,
+            area: s.area,
             surface: Plane::surface(s.plane, s.max, s.floor),
         })
     })
@@ -75,12 +79,27 @@ fn merge_column(solids: &[Solid], flag_merge: f32, out: &mut Vec<Solid>) {
                 let top = last.max.max(s.max);
                 last.plane = top_plane((last.max, last.plane), (s.max, s.plane));
                 last.floor = last.floor.max(s.floor).max(lower_floor(last, &s));
-                last.walkable = (last.walkable && last.max >= top - flag_merge)
-                    || (s.walkable && s.max >= top - flag_merge);
+                let keeps = last.walkable && last.max >= top - flag_merge;
+                let takes = s.walkable && s.max >= top - flag_merge;
+                last.area = merged_area((last, keeps), (&s, takes));
+                last.walkable = keeps || takes;
                 last.max = top;
             }
             _ => out.push(s),
         }
+    }
+}
+
+/// The area of two merging solids' top: that of the walkable one reaching it, the
+/// higher one's when both do (the higher id when level, so the visit order never
+/// decides).
+fn merged_area((a, a_walks): (&Solid, bool), (b, b_walks): (&Solid, bool)) -> u8 {
+    match (a_walks, b_walks) {
+        (true, true) if a.max > b.max + TOP_EPS => a.area,
+        (true, true) if b.max > a.max + TOP_EPS => b.area,
+        (true, true) => a.area.max(b.area),
+        (false, true) => b.area,
+        _ => a.area,
     }
 }
 
@@ -107,6 +126,7 @@ mod tests {
             walkable,
             plane: None,
             floor: f32::NEG_INFINITY,
+            area: 0,
         }
     }
 

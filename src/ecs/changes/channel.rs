@@ -9,11 +9,11 @@ use crate::components::{
     CanvasComponent, CanvasGroupComponent, CharacterControllerComponent, ColliderComponent,
     ImageComponent, JointComponent, LayoutElementComponent, LayoutGroupComponent, LightComponent,
     LightProbeProxyVolumeComponent, LineComponent, LodGroupComponent, MaskComponent, MaterialAsset,
-    MaterialComponent, MeshComponent, NavMeshAgentComponent, NavMeshModifierVolumeComponent,
-    NavMeshObstacleComponent, OffMeshLinkComponent, ParticleEmitterComponent,
-    PostProcessingComponent, PrefabLink, RectMaskComponent, RectTransformComponent,
-    ReverbZoneComponent, RigidBodyComponent, ScriptComponent, SelectableComponent, ShapeComponent,
-    TextComponent, TrailComponent, TransformComponent,
+    MaterialComponent, MeshComponent, NavMeshAgentComponent, NavMeshModifierComponent,
+    NavMeshModifierVolumeComponent, NavMeshObstacleComponent, OffMeshLinkComponent,
+    ParticleEmitterComponent, PostProcessingComponent, PrefabLink, RectMaskComponent,
+    RectTransformComponent, ReverbZoneComponent, RigidBodyComponent, ScriptComponent,
+    SelectableComponent, ShapeComponent, TextComponent, TrailComponent, TransformComponent,
 };
 
 use super::super::bundle::Core;
@@ -88,6 +88,7 @@ channels! { true:
     NavMeshObstacleComponent => "nav_obstacle",
     OffMeshLinkComponent => "offmesh_link",
     NavMeshModifierVolumeComponent => "nav_modifier",
+    NavMeshModifierComponent => "nav_mesh_modifier",
     AIPerceptionComponent => "ai_perception",
     CameraComponent => "camera",
     PostProcessingComponent => "post_processing",

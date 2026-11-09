@@ -353,6 +353,7 @@ where it reads best. -->
 - [`NavMeshObstacle`](NavMeshObstacle.md)
 - [`OffMeshLink`](OffMeshLink.md)
 - [`NavMeshModifierVolume`](NavMeshModifierVolume.md)
+- [`NavMeshModifier`](NavMeshModifier.md)
 - [`EnvironmentQuery`](EnvironmentQuery.md)
 - [`AIPerception`](AIPerception.md)
 - [`Physics`](Physics.md)

@@ -48,6 +48,7 @@ pub mod mask;
 pub mod material;
 pub mod mesh;
 pub mod nav;
+pub mod nav_mesh_modifier;
 pub mod nav_modifier;
 pub mod nav_obstacle;
 pub mod offmesh_link;
@@ -100,12 +101,13 @@ use crate::scene::Scene;
 pub type Reg = Result<(), String>;
 
 /// The navigation namespaces: `Navigation` + `NavMeshAgent`, `NavMeshObstacle`,
-/// `NavMeshModifierVolume` (#460) and `OffMeshLink`, and the agents' senses,
+/// `NavMeshModifierVolume` (#460), `NavMeshModifier` (#1959) and `OffMeshLink`, and the agents' senses,
 /// `AIPerception` (#1900).
 fn register_navigation(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // sorted: each registrar makes its own global table
     ai_perception::register(lua, ctx.scene)?;
     nav::register(lua, ctx.scene, ctx.nav)?;
+    nav_mesh_modifier::register(lua, ctx.scene)?;
     nav_modifier::register(lua, ctx.scene)?;
     nav_obstacle::register(lua, ctx.scene)?;
     offmesh_link::register(lua, ctx.scene, ctx.nav)
