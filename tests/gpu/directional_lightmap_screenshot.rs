@@ -84,6 +84,7 @@ fn shot(directional: bool) -> Option<image::RgbImage> {
         denoiser: rusty::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional,
+        backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
     };
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     assert_eq!(

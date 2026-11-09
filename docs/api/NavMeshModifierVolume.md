@@ -22,7 +22,7 @@ full bake gives (see `Navigation`, *Keeping the navmesh current*). Changing an a
 
 Getters return a neutral default (`false`, zeros) without a volume; setters are then
 no-ops. Add one with `Scene.AddComponent(id, "NavMeshModifierVolume")` (alias
-`NavModifier`). `Debug.Snapshot` reports it as `nav_modifier`.
+`NavModifierVolume`). `Debug.Snapshot` reports it as `nav_modifier`.
 
 | Function | Signature | Returns |
 |---|---|---|

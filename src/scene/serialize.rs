@@ -11,6 +11,8 @@
 //! primitive meshes from `primitive_type`, and the collider world AABBs (which
 //! `#[serde(skip)]` keeps out of the file) — so the file stays human-readable,
 //! diffable and small, and never holds a box gone stale.
+//!
+//! stored-format: the scene document (`SceneData`), World <-> serde
 
 use std::collections::BTreeMap;
 

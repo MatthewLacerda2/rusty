@@ -102,6 +102,7 @@ pub fn store<B: Brief + ?Sized>(
     if let Some(dir) = file.parent() {
         std::fs::create_dir_all(dir)?;
     }
+    // lint: allow(stored-format) the provider's own bytes (audio); the sidecar's format is `sidecar.rs`'s
     crate::core::fs::written::write(&file, bytes)?;
     let sidecar = Sidecar {
         kind: brief.kind().to_owned(),

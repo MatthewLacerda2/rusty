@@ -28,6 +28,7 @@ mod bounds_tests;
 mod flood;
 mod grid;
 mod links;
+mod object_modifier;
 mod obstacle;
 mod offmesh;
 mod path;

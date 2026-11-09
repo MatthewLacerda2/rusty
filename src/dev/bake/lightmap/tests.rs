@@ -40,6 +40,7 @@ pub(super) fn quick() -> BakeSettings {
         denoiser: crate::scene::lighting::lightmap::Denoiser::Filter,
         filter_radius: 1,
         directional: true,
+        backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
     }
 }
 

@@ -21,8 +21,9 @@ first.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the counts `0` when nothing occludes, and `tooLarge` (a boolean) `true`, with `cells` and `bytes` `0` and no PVS kept, when the level is too large to cull |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
@@ -30,11 +31,12 @@ first.
 ### Generate Lighting
 
 - **Settings live with the scene** (Unity's Lighting Settings): texels per unit, samples,
-  bounces, seed, Max Lightmap Size, the denoiser and the directional mode are saved in the scene file's
+  bounces, seed, Max Lightmap Size, the denoiser, Backface Tolerance and the directional mode are saved in the scene file's
   `lighting_settings` block, so a rebake never asks for them again.
   `Lighting.SetSettings{ samples = 256 }` changes only the fields it names (each clamped
   to the editor's range: `0.25`–`64` texels per unit, `1`–`4096` samples, `1`–`16`
-  bounces, Max Lightmap Size below; a NaN or infinite density takes the default `8`, and
+  bounces, `0`–`1` Backface Tolerance, Max Lightmap Size below; a NaN or infinite density takes
+  the default `8` (a NaN or infinite tolerance its default `0.9`), and
   a file's out-of-range value is held the same way when the scene loads); the editor's card edits the
   same fields under the button. The reflection probes' defaults sit beside them:
   `reflectionResolution` (default `512`, a power of two in 16–2048) and
@@ -143,9 +145,10 @@ first.
   fails for another reason (a cubemap that cannot be written) marks it unsaved too.
   Saving this one elsewhere drops it the same way; opening another scene drops it with
   nothing applied to the new one.
-- **One bake at a time:** `Lighting.Generate()`, `Lighting.Bake()`,
-  `Lighting.BakeLightmaps()`, `Probe.Bake()` and `Reflection.Bake()` error while the
-  editor's Generate Lighting is running.
+- **One bake at a time:** `Lighting.Generate()`, `Lighting.BakeOcclusion()`,
+  `Lighting.Bake()`, `Lighting.BakeLightmaps()`, `Probe.Bake()` and
+  `Reflection.Bake()` error while the editor's Generate Lighting or Bake Occlusion
+  is running.
 
 ### Light and reflection probes
 
@@ -305,8 +308,24 @@ scene's lighting settings (above), whose defaults are the ones listed here.
   (*Denoising*, below); baked direct light never is, so a point, spot or directional light's shadows stay sharp; an Area
   light's (#1674) are soft, its rectangle integrated over `samples` or more jittered
   points per texel. A texel buried inside other geometry (floor
-  under a crate) is filled from its neighbours rather than baked black. No GPU is needed;
-  it runs headless.
+  under a crate) is filled from its neighbours rather than baked black (*Backface
+  Tolerance*, below). No GPU is needed; it runs headless.
+- **Backface Tolerance** (`backfaceTolerance`, #1949, Unity's setting of that name,
+  default `0.9`, `0`–`1`). Each texel shoots 32 probe rays of its own; it is
+  *valid* when at least that share of them reach a front face or escape. A texel
+  below it sits inside geometry (a floor texel under a crate, one inside a wall): its
+  light is dropped and it is filled from the valid texels of **its own chart** (the
+  UV island it lies on), never from a chart packed beside it in the map, so a texel
+  at a floor's edge never takes the dark underside next to it. The probes are a fixed,
+  seeded budget apart from `samples`, so a texel is valid or not the same way at 16
+  samples and at 4096. `0` keeps every texel; `1` drops any that sees a back face.
+  **One-sided geometry counts as inside:** a floor under a single quad roof sees
+  only the roof's back, so at `0.9` its texels are dropped and filled from the
+  floor's lit part beyond the roof. The bake has no *Double Sided GI* yet, so close
+  such geometry (a box, not a plane) or lower the tolerance for that scene. A
+  chart with no valid texel at all (a box's face resting on a floor or against a
+  neighbour, which is ordinary content) is filled from the charts beside it, as
+  before, and the bake log says how many in one info line, never a warning.
 - **Denoising** (#1884). Only the bounce (indirect light, and a directional bake's
   directions) is cleaned, chart by chart; the direct light stays as traced.
   - `"OIDN"`: Intel **Open Image Denoise 2**'s `RTLightmap` filter, a network trained
@@ -465,6 +484,12 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   only many faces together hide what is past them.
   At runtime a camera costs one cell lookup, and each static mesh
   a map lookup and a bit test; a static mesh moved or edited re-checks that mesh alone.
+- **Baked alone** by `Lighting.BakeOcclusion()` or the scene inspector's **"Bake
+  Occlusion"** button beside Generate Lighting (#1958; Unity bakes occlusion from its
+  own window): the same step on the open scene, written beside it, with no lightmap
+  or probe touched and the scene file left as it is. Refused as Generate Lighting is:
+  in Play, while the editor's bake runs, and for a scene never saved. A level whose
+  full Generate takes most of an hour re-bakes its PVS in seconds.
 - **Runs** as Generate Lighting's last step, after the lightmaps and probes are
   written into the scene, so a bake dropped or failed during it (the scene closed or
   reloaded, another opened) loses none of the lighting: in the editor on a worker
@@ -477,12 +502,21 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   occlusion-culled. One that is there but cannot be read (a permission) also culls
   nothing, with a warning, and the next save leaves it in place.
 - **A bake older than the scene** never hides what is there: a static mesh moved,
-  re-materialled, re-imported with other vertices (the bake hashes each mesh's
-  positions and indices), added to or taken out of a `LODGroup`, or made dynamic
-  since is drawn, a mesh added since is drawn, and if an occluder changed so, or was
-  removed or deactivated, nothing is occlusion-culled until the next Generate
-  Lighting. The console says so once, and again if an occluder changes after it
-  said only meshes did. A runtime `Scene.Load` that moves the level's
+  re-shaped (the bake hashes each mesh's triangles, corner by corner), given a
+  material that occludes or faces differently (opaque or not, a surface shader, its
+  Render Face), added to or taken out of a `LODGroup`, or made dynamic since is
+  drawn, a mesh added since is drawn, and if an occluder changed so, or was removed
+  or deactivated, nothing is occlusion-culled until the next Generate Lighting or
+  Bake Occlusion. The console says so once, and again if an occluder changes after
+  it said only meshes did. Only what the bake reads counts (#1958): a material
+  renamed, and a re-export that stores the same triangles in another vertex order,
+  keep the bake. The bake reads the live material library and the next load reads
+  the file's, so a material a script defined in memory that the scene file lacks
+  keeps the bake only when it reads as the default does (opaque, front faces); one
+  that is two-sided, Cutout, transparent or has a surface shader does not. So
+  `Lighting.Generate()`, `Lighting.BakeOcclusion()` and the editor's two buttons
+  warn once, naming the keys, when the file lacks, or holds otherwise, a material
+  the baked meshes draw: save the scene so its materials are written. A runtime `Scene.Load` that moves the level's
   ids out of a `DontDestroyOnLoad` entity's way moves the bake's with them.
 - **Per camera.** Each perspective camera reads its own position's cell: the base
   camera, a stacked or viewmodel camera, a render-texture camera. An orthographic

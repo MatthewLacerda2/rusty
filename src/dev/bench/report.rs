@@ -1,9 +1,12 @@
 //! The bench report: per-frame samples summarised as average and 95th percentile,
 //! printed as a short table with each row's change against the previous run.
-//! Pure — the I/O (reading and writing `bench.json`) is the caller's.
+//! The summaries are pure; [`read`] and [`write`] keep the report in the out dir.
+//!
+//! stored-format: `bench.json`, the last run's report the next one compares against
 
 use std::collections::BTreeMap;
 use std::fmt::Write;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
@@ -141,6 +144,21 @@ fn change(before: f64, after: f64) -> String {
         format!(" ({:+.1}%)", d / before * 100.0)
     };
     format!("{d:+.3}{pct}")
+}
+
+/// The last run's report, if `out_dir` holds a readable one.
+pub(super) fn read(out_dir: &Path) -> Option<Report> {
+    let json = std::fs::read_to_string(out_dir.join("bench.json")).ok()?;
+    serde_json::from_str(&json).ok()
+}
+
+pub(super) fn write(out_dir: &Path, report: &Report, text: &str) -> std::io::Result<()> {
+    std::fs::create_dir_all(out_dir)?;
+    let json = serde_json::to_string_pretty(report).map_err(std::io::Error::other)?;
+    // lint: allow(asset-write) a bench report, not read by a path-keyed cache
+    std::fs::write(out_dir.join("bench.json"), json)?;
+    // lint: allow(asset-write) a bench report, not read by a path-keyed cache
+    std::fs::write(out_dir.join("bench.txt"), text)
 }
 
 #[cfg(test)]

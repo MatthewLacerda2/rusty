@@ -3,7 +3,7 @@
 
 use glam::{Vec3, Vec4};
 
-use super::super::raster::{dilate, fill_rest};
+use super::super::raster::{dilate, fill_rest, fill_within};
 use super::super::trace::TexelLight;
 use super::denoise::{Chart, Cleaner};
 use super::direction::direction_texel;
@@ -17,16 +17,22 @@ pub(super) struct ChartMaps {
     pub texels: Vec<Vec3>,
     pub directions: Vec<Vec4>,
     pub masks: Vec<Vec4>,
+    /// How many of the chart's UV islands had no valid texel to fill the others
+    /// from (#1949): their invalid texels were filled by the map's dilation.
+    pub orphans: usize,
 }
 
 /// One chart's traced texels as its `chart.size`² lightmap and, for a directional bake,
 /// its direction map, and with `masked` lights its shadowmask (#1695, raw: a
 /// shadow is a direct-light term, never filtered): the bounce (and its directions)
 /// cleaned by `cleaner` (#1884: OIDN, the Gaussian or nothing), the direct light
-/// added, then each dilated past the chart's edge and the rest of the map filled
-/// from its nearest chart (`raster::fill_rest`, for the mips, #1694).
+/// added, an invalid texel (one `labels` gives a chart but `chart.points` leaves
+/// out) filled from its own chart's valid texels (#1949, `raster::fill_within`),
+/// then each dilated past the chart's edge and the rest of the map filled from its
+/// nearest chart (`raster::fill_rest`, for the mips, #1694).
 pub(super) fn assemble(
     chart: Chart,
+    labels: &[u32],
     light: &[TexelLight],
     settings: &BakeSettings,
     cleaner: Cleaner,
@@ -57,17 +63,20 @@ pub(super) fn assemble(
     ] {
         if keep {
             let mut ring = filled.clone();
+            fill_within(map, &mut ring, labels, size);
             dilate(map, &mut ring, size, DILATE_PASSES);
             fill_rest(map, &ring, size);
         } else {
             map.clear();
         }
     }
+    let orphans = fill_within(&mut texels, &mut filled, labels, size);
     dilate(&mut texels, &mut filled, size, DILATE_PASSES);
     fill_rest(&mut texels, &filled, size);
     ChartMaps {
         texels,
         directions,
         masks,
+        orphans,
     }
 }

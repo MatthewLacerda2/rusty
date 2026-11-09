@@ -31,6 +31,8 @@
 //!
 //! The file format is in `format`; the per-tick reader a replay steps through is
 //! [`Demo::ticks`], the index's is [`Demo::index`].
+//!
+//! stored-format: the `.demo` file a recorded playtest is saved as
 
 mod calls;
 mod delta;

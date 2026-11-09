@@ -11,6 +11,8 @@
 //! ONLY when probes carry baked SH; load merges it back onto the in-memory probes by
 //! index. A missing sidecar is not an error — the probes simply load with zero SH
 //! (e.g. positions placed but never baked).
+//!
+//! stored-format: the `<scene>.lighting.json` SH sidecar
 
 use std::path::{Path, PathBuf};
 

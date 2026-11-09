@@ -5,6 +5,8 @@
 //! the brief can be read back to regenerate or adjust it. It records the brief, the
 //! date and the estimated cost, never the key or the account: it travels with a copy
 //! of the project, and the money does not.
+//!
+//! stored-format: the `<file>.json` sidecar beside a generated file
 
 use std::path::Path;
 

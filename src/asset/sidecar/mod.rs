@@ -8,6 +8,8 @@
 //! it is regenerated from the file on demand and is never the source of truth.
 //!
 //! Format is JSON for diffability, matching the scene document's choice.
+//!
+//! stored-format: the `<file>.meta` import-settings sidecar
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

@@ -90,13 +90,17 @@ the diff:
 **`make review-level PR=<n>` applies it** (#1569): it prints `high` or `medium`
 on its first line, then the paths that decided it, read from the PR's own files
 on GitHub (what the PR really touches, not what its brief meant it to) against
-the table in `.github/scripts/dispatch/review_level.py`. Pass both into the
-prompt. A path table cannot see everything (a stored format changed through a
+the table in `.github/scripts/dispatch/review_level.py` and the
+`//! stored-format:` markers modules carry (#1966: one in `mod.rs` covers its
+directory; `tools/lint`'s `stored-format` rule fails a serde file format without
+one). Pass both into the prompt. A path table cannot see everything (a stored format changed through a
 component's serde fields, say), so the reviewer may raise `medium` to `high`,
 and says why; it never lowers it. The reviewer names the level it ran at, and
 why, at the top of its answer. Called without one, `code-review` reuses whatever
 level was typed last in the session, so a level is always passed. A path that
-should call for `high` and does not is a row missing from the table: add it.
+should call for `high` and does not is a missing marker (a stored format: add
+`//! stored-format: <the file>` to its module) or a row missing from the table:
+add it.
 
 ### Prompt template
 

@@ -3,7 +3,8 @@
 
 `make review-level PR=N` is this. It prints `high` or `medium` on the first
 line, then the paths that decided it, read from the PR's files on GitHub
-against the table in `dispatch/review_level.py`. The dispatcher passes the
+against the table in `dispatch/review_level.py` and the `stored-format` markers
+of `origin/main`'s tree plus any the PR's patches add (#1966). The dispatcher passes the
 level into `independent-review`'s prompt; before this, the reviewer chose it by
 reading the diff against a rule that is mostly about paths.
 
@@ -32,11 +33,11 @@ def gh_json(path: str) -> object:
 
 def report(level: str, decided: list[tuple[str, str]], count: int) -> str:
     if not decided:
-        return f"{level}\n  no path of the table among the {count} changed"
+        return f"{level}\n  no path of the table or a stored-format marker among the {count} changed"
     return "\n".join([level, *(f"  {why}: {path}" for why, path in decided)])
 
 
-def main(argv: list[str], gh=gh_json) -> int:
+def main(argv: list[str], gh=gh_json, markers=review_level.tree_markers) -> int:
     if len(argv) != 1 or not argv[0].lstrip("#").isdigit():
         print(USAGE, file=sys.stderr)
         return 2
@@ -46,7 +47,8 @@ def main(argv: list[str], gh=gh_json) -> int:
         print(f"review-level: could not read the files of PR #{number}", file=sys.stderr)
         return 2
     paths = review_level.changed_paths(files)
-    level, decided = review_level.level(paths)
+    marked = {**markers(), **review_level.patch_markers(files)}
+    level, decided = review_level.level(paths, marked)
     print(report(level, decided, len(paths)))
     return 0
 

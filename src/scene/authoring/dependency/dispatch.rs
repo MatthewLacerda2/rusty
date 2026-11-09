@@ -38,6 +38,7 @@ pub fn has_kind(world: &World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::NavMeshObstacle => world.has_nav_obstacle(id),
         ComponentKind::OffMeshLink => world.has_offmesh_link(id),
         ComponentKind::NavMeshModifierVolume => world.has_nav_modifier(id),
+        ComponentKind::NavMeshModifier => world.has_nav_mesh_modifier(id),
         ComponentKind::AIPerception => world.has_ai_perception(id),
         ComponentKind::Camera => world.has_camera(id),
         ComponentKind::Particles => world.has_particles(id),
@@ -80,6 +81,7 @@ pub(crate) fn set_default(world: &mut World, id: u32, kind: ComponentKind) -> bo
         | ComponentKind::NavMeshObstacle
         | ComponentKind::OffMeshLink
         | ComponentKind::NavMeshModifierVolume
+        | ComponentKind::NavMeshModifier
         | ComponentKind::AIPerception) => set_default_agent(world, id, agent),
         ComponentKind::Camera => world.set_camera(id, Some(default_camera())),
         ComponentKind::Particles => {
@@ -129,6 +131,7 @@ fn set_default_agent(world: &mut World, id: u32, kind: ComponentKind) -> bool {
         ComponentKind::NavMeshModifierVolume => {
             world.set_nav_modifier(id, Some(Default::default()))
         }
+        ComponentKind::NavMeshModifier => world.set_nav_mesh_modifier(id, Some(Default::default())),
         ComponentKind::AIPerception => {
             world.set_ai_perception(id, Some(AIPerceptionComponent::default()))
         }
@@ -200,6 +203,7 @@ pub(crate) fn clear_one(world: &mut World, id: u32, kind: ComponentKind) -> bool
         ComponentKind::NavMeshObstacle => world.set_nav_obstacle(id, None),
         ComponentKind::OffMeshLink => world.set_offmesh_link(id, None),
         ComponentKind::NavMeshModifierVolume => world.set_nav_modifier(id, None),
+        ComponentKind::NavMeshModifier => world.set_nav_mesh_modifier(id, None),
         ComponentKind::AIPerception => world.set_ai_perception(id, None),
         ComponentKind::Camera => world.set_camera(id, None),
         ComponentKind::Particles => world.set_particles(id, None),

@@ -60,6 +60,8 @@
 //!
 //! **Adding a converter** is one row in [`CONVERTERS`]: an extension and a
 //! function that writes a glTF where its [`Staging`] says.
+//!
+//! stored-format: the import cache's converted `.glb` files and their fingerprints
 
 mod blend;
 mod converter;

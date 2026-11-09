@@ -1,20 +1,27 @@
 //! `Lighting.Generate()` and the scene's lighting settings (#832): the one verb
 //! behind the editor's Generate Lighting button (lightmaps, probes and, #1714, the
-//! occlusion culling's PVS), and `Lighting.GetSettings()` /
+//! occlusion culling's PVS), `Lighting.BakeOcclusion()` behind its Bake Occlusion
+//! button (#1958: the PVS alone), and `Lighting.GetSettings()` /
 //! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, its
 //! Max Lightmap Size included, #1704, and the
 //! reflection probes' default resolution, memory budget and probe ceiling, #1584,
-//! and the scene's diffuse model, #1698, and the lightmaps' denoiser, #1884).
+//! and the scene's diffuse model, #1698, and the lightmaps' denoiser, #1884, and
+//! Backface Tolerance, #1949).
+
+use std::cell::RefCell;
 
 use mlua::{Lua, Table};
 
-use super::super::bake::generate_lighting::generate_lighting;
+use super::super::bake::generate_lighting::{
+    bake_occlusion_only, generate_lighting, unsaved_materials_warning,
+};
 use super::super::bake::progress::BakeLog;
 use crate::api::{global_table, put, ApiCell, ApiCtx, Reg};
 use crate::scene::lighting::lightmap::{BakeSettings, Denoiser};
 use crate::scene::lighting::settings::ReflectionSettings;
 use crate::scene::lighting::{DiffuseModel, MixedLightingMode};
 use crate::scene::Scene;
+use crate::scripting::ConsoleLogs;
 
 /// The knobs a script may override, each optional; `None` keeps `base`'s.
 #[derive(Default)]
@@ -28,6 +35,8 @@ pub(super) struct Overrides {
     pub max_lightmap_size: Option<u32>,
     /// What cleans the bounce (#1884).
     pub denoiser: Option<Denoiser>,
+    /// Backface Tolerance (#1949).
+    pub backface_tolerance: Option<f32>,
 }
 
 impl Overrides {
@@ -42,6 +51,7 @@ impl Overrides {
             directional: self.directional.unwrap_or(base.directional),
             max_lightmap_size: self.max_lightmap_size.unwrap_or(base.max_lightmap_size),
             denoiser: self.denoiser.unwrap_or(base.denoiser),
+            backface_tolerance: self.backface_tolerance.unwrap_or(base.backface_tolerance),
             ..base
         }
         .sanitized()
@@ -56,11 +66,13 @@ impl Overrides {
             directional: t.get("directional")?,
             max_lightmap_size: t.get("maxLightmapSize")?,
             denoiser: denoiser(t)?,
+            backface_tolerance: t.get("backfaceTolerance")?,
         })
     }
 }
 
-/// Add `Generate`, `GetSettings` and `SetSettings` to the `Lighting` table.
+/// Add `Generate`, `BakeOcclusion`, `GetSettings` and `SetSettings` to the
+/// `Lighting` table.
 pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let (scene, scene_path, nav, console) = (ctx.scene, ctx.scene_path, ctx.nav, ctx.console);
     let table = global_table(lua, "Lighting")?;
@@ -77,6 +89,7 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
             let (path, nav) = (path.as_deref(), Some(&*nav));
             let report = generate_lighting(&mut scene, path, nav, &mut say, &mut log)
                 .map_err(mlua::Error::external)?;
+            warn_unsaved(&console, &scene, path);
             let out = lua.create_table()?;
             out.set("lightmaps", report.lightmaps)?;
             out.set("lightProbes", report.probes.light_probes)?;
@@ -89,7 +102,47 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
             Ok(out)
         }),
     )?;
+    register_bake_occlusion(lua, &table, ctx)?;
     register_settings(lua, &table, scene)
+}
+
+/// `BakeOcclusion()` (#1958): only the occlusion step of `Generate`, written
+/// beside the scene, as Unity bakes occlusion from its own window.
+fn register_bake_occlusion(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
+    let (scene, scene_path, console) = (ctx.scene, ctx.scene_path, ctx.console);
+    put(
+        table,
+        "BakeOcclusion",
+        lua.create_function(move |lua, ()| {
+            let (scene, scene_path) = (scene.get(lua)?, scene_path.get(lua)?);
+            let console = console.get(lua)?;
+            let path = scene_path.borrow();
+            let mut log = BakeLog::to_console(&console);
+            let mut scene = scene.borrow_mut();
+            let report = bake_occlusion_only(&mut scene, path.as_deref(), &mut log)
+                .map_err(mlua::Error::external)?;
+            console.borrow_mut().info(report.summary());
+            warn_unsaved(&console, &scene, path.as_deref());
+            let (o, out) = (report.occlusion, lua.create_table()?);
+            out.set("cells", o.cells)?;
+            out.set("objects", o.objects)?;
+            out.set("occluders", o.occluders)?;
+            out.set("neverCulled", o.never_culled)?;
+            out.set("bytes", o.bytes)?;
+            out.set("tooLarge", o.too_large)?;
+            Ok(out)
+        }),
+    )
+}
+
+/// Say once, after a bake, when the scene file lacks a material the bake read
+/// (`unsaved_materials_warning`, #1958): to stderr, as the bake's own lines go,
+/// and to the console.
+fn warn_unsaved(console: &RefCell<ConsoleLogs>, scene: &Scene, path: Option<&str>) {
+    if let Some(line) = path.and_then(|p| unsaved_materials_warning(scene, p)) {
+        eprintln!("{line}");
+        console.borrow_mut().warn(line);
+    }
 }
 
 /// `GetSettings` / `SetSettings`: the bake settings `Generate` uses.
@@ -108,6 +161,7 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
             out.set("directional", s.directional)?;
             out.set("maxLightmapSize", s.max_lightmap_size)?;
             out.set("denoiser", s.denoiser.name())?;
+            out.set("backfaceTolerance", s.backface_tolerance)?;
             out.set("diffuseModel", settings.diffuse_model.name())?;
             out.set("mixedLightingMode", settings.mixed_lighting_mode.name())?;
             put_reflections(&out, &r)?;

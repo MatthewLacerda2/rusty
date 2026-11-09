@@ -17,15 +17,13 @@ cli = load("review-level.py")
 class Level(unittest.TestCase):
     def test_each_responsibility_calls_for_high(self):
         cases = {
-            "stored format": "src/scene/prefab/apply.rs",
+            "stored format": "engine/shaders/forward/bindings.wgsl",
             "determinism": "clippy.toml",
             "scripting sandbox": "src/scripting/sandbox/files.rs",
             "merge path": ".github/workflows/ci.yml",
         }
         cases_by_path = {
             "tests/scene_format/scene.fingerprint": "stored format",
-            "src/asset/import_cache/hulls/file.rs": "stored format",
-            "src/asset/animation_graph/mod.rs": "stored format",
         }
         for path, why in cases_by_path.items():
             with self.subTest(path):
@@ -41,8 +39,8 @@ class Level(unittest.TestCase):
         self.assertEqual(review_level.level(paths), ("medium", []))
 
     def test_a_file_entry_matches_only_itself(self):
-        self.assertEqual(review_level.reasons_for("src/scene/serialize.rs"), ["stored format"])
-        self.assertEqual(review_level.reasons_for("src/scene/serialize_tests.rs"), [])
+        self.assertEqual(review_level.reasons_for("clippy.toml"), ["determinism"])
+        self.assertEqual(review_level.reasons_for("clippy.toml.bak"), [])
 
     def test_a_rename_counts_its_old_name(self):
         files = [{"filename": "src/scene/moved.rs", "previous_filename": "src/scene/serialize.rs"},
@@ -66,7 +64,7 @@ class CommandLine(unittest.TestCase):
         gh = lambda path: files if "page=1" in path else []  # noqa: E731
         with mock.patch.object(cli.ghrest, "slug", return_value="o/r"), \
                 contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-            code = cli.main(["12"], gh=gh if files is not None else (lambda path: None))
+            code = cli.main(["12"], gh=gh if files is not None else (lambda path: None), markers=dict)
         return code, out.getvalue()
 
     def test_prints_the_level_then_why(self):

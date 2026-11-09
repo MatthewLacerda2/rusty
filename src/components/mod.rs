@@ -49,6 +49,7 @@ pub use material::{
 pub use mesh::{MeshComponent, MeshRevision, ShadowCasting};
 pub use nav::agent::{NavMeshAgentComponent, NavPathStatus, MAX_AVOIDANCE_PRIORITY};
 pub use nav::modifier::NavMeshModifierVolumeComponent;
+pub use nav::object_modifier::NavMeshModifierComponent;
 pub use nav::obstacle::{NavMeshObstacleComponent, ObstacleShape};
 pub use nav::offmesh_link::{
     OffMeshLinkComponent, OffMeshLinkData, OffMeshLinkKind, LINK_SNAP_DISTANCE,

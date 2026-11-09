@@ -34,6 +34,7 @@ mod self_path;
 mod skip;
 mod slash_join;
 mod sorted;
+mod stored_format;
 mod subprocess;
 mod temp_dir;
 mod test_shape;
@@ -89,6 +90,7 @@ const RULES: &[(Rule, Allow)] = &[
     (skip::run, Allow::Inline),
     (slash_join::run, Allow::Inline),
     (sorted::run, Allow::Inline),
+    (stored_format::run, Allow::Inline),
     (subprocess::run, Allow::Inline),
     (temp_dir::run, Allow::Inline),
     (test_shape::run, Allow::Inline),

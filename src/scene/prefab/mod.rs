@@ -15,6 +15,8 @@
 //! scene ids (no wall-clock / RNG). The canonical verbs (`extract_prefab` /
 //! `instantiate_prefab`) are re-exported through `scene::authoring` so editor and API
 //! can never drift. Apply/link/overrides for linked instances live in submodules.
+//!
+//! stored-format: the `.prefab` asset (`PrefabData`, instances and overrides)
 
 pub mod apply;
 pub mod diff;

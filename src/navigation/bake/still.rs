@@ -6,6 +6,8 @@
 //! its world pose. Each of those facts has a channel: a pose on `WorldPose`, the
 //! Collider on `ColliderComponent`, `activeInHierarchy` on `Activity`, and static
 //! membership on `StaticSet`, which also names a static entity that was removed.
+//! A `NavMeshModifier` (#1959) changes how they bake from anywhere above them, so
+//! any write on its channel counts as a change.
 //! When no id on the first three is static now and `StaticSet` named nothing, the
 //! collider diff, the bounds' geometry extent and the reshape check would all find
 //! what they found last tick, so [`NavigationGraph::sync_changes`] skips them. A
@@ -13,7 +15,7 @@
 
 use super::super::NavigationGraph;
 use super::sync::Rebake;
-use crate::components::ColliderComponent;
+use crate::components::{ColliderComponent, NavMeshModifierComponent};
 use crate::ecs::{Activity, Changes, Channel, Cursor, StaticSet, World, WorldPose};
 use crate::scene::Scene;
 
@@ -23,6 +25,7 @@ pub(in crate::navigation) struct StaticWatch {
     collider: Cursor<ColliderComponent>,
     activity: Cursor<Activity>,
     statics: Cursor<StaticSet>,
+    modifiers: Cursor<NavMeshModifierComponent>,
 }
 
 /// Whether `cursor` named no static entity (`false` on `Rebuild`).
@@ -40,20 +43,24 @@ impl StaticWatch {
             collider: w.change_cursor(),
             activity: w.change_cursor(),
             statics: w.change_cursor(),
+            modifiers: w.change_cursor(),
         }
     }
 
     /// Whether the static geometry is as it was at the last read. Reads every
     /// cursor, so each has read everything after this.
     pub(in crate::navigation) fn still(&mut self, w: &mut World) -> bool {
-        let membership =
-            matches!(w.changes(&mut self.statics), Changes::Ids(ids) if ids.is_empty());
+        let unchanged = |c: Changes| matches!(c, Changes::Ids(ids) if ids.is_empty());
+        let membership = unchanged(w.changes(&mut self.statics));
+        // Any `NavMeshModifier` write counts: one on a non-static parent changes
+        // how its static children bake (#1959). They are rare.
+        let modifiers = unchanged(w.changes(&mut self.modifiers));
         let reads = [
             none_static(w, &mut self.pose),
             none_static(w, &mut self.collider),
             none_static(w, &mut self.activity),
         ];
-        membership && !reads.contains(&false)
+        membership && modifiers && !reads.contains(&false)
     }
 }
 

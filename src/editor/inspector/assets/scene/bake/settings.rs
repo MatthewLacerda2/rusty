@@ -35,6 +35,16 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
         "Bounces",
         "Surfaces a path bounces off before it stops",
     );
+    let tolerance = egui::DragValue::new(&mut s.backface_tolerance)
+        .ranged(BakeSettings::BACKFACE_TOLERANCE)
+        .speed(0.01);
+    row(
+        ui,
+        tolerance,
+        "Backface tolerance",
+        "Share of a texel's rays that must see front faces; below it the texel is \
+         inside geometry and its own chart fills it",
+    );
     changed |= draw_max_lightmap_size(ui, &mut s.max_lightmap_size);
     changed |= draw_denoiser(ui, &mut s.denoiser);
     changed |= ui
