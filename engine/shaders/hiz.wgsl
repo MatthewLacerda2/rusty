@@ -135,17 +135,34 @@ fn hidden(lo: vec3<f32>, hi: vec3<f32>) -> bool {
         }
         level++;
     }
-    let dims = textureDimensions(pyramid, level) - vec2<u32>(1u);
-    let t0 = min(p0 >> vec2<u32>(level + 1u), dims);
-    let t1 = min(p1 >> vec2<u32>(level + 1u), dims);
+    // The level's size from level 0's, and its texels read in a loop over every
+    // level: `textureDimensions` and `textureLoad` at a level that differs per
+    // thread answered another thread's on lavapipe, so each call's level is the
+    // loop's, the same in every thread.
+    let base = textureDimensions(pyramid, 0u);
     var farthest = 0.0;
-    for (var y = t0.y; y <= t1.y; y++) {
-        for (var x = t0.x; x <= t1.x; x++) {
-            farthest = max(farthest, textureLoad(pyramid, vec2<u32>(x, y), level).r);
+    for (var l = 0u; l < params.levels; l++) {
+        if l != level {
+            continue;
+        }
+        let dims = max(base >> vec2<u32>(l), vec2<u32>(1u)) - vec2<u32>(1u);
+        let t0 = min(p0 >> vec2<u32>(l + 1u), dims);
+        let t1 = min(p1 >> vec2<u32>(l + 1u), dims);
+        for (var y = t0.y; y <= t1.y; y++) {
+            for (var x = t0.x; x <= t1.x; x++) {
+                farthest = max(farthest, textureLoad(pyramid, vec2<u32>(x, y), l).r);
+            }
         }
     }
-    return nearest > farthest;
+    // A face on the box's own near plane rasterizes to its corners' depth give or
+    // take rounding: hidden only past a margin of float steps (64, about 4e-6 near
+    // 1, a centimetre and a half at 20 m from a 0.1 m near plane), never by it.
+    return bitcast<u32>(nearest) > bitcast<u32>(farthest) + MARGIN;
 }
+
+// The depth margin, in float steps (`hidden`); depths are in `0..1`, so their
+// bits order as they do.
+const MARGIN: u32 = 64u;
 
 @compute @workgroup_size(64)
 fn cs_test(@builtin(global_invocation_id) id: vec3<u32>) {

@@ -33,7 +33,7 @@ pub(crate) struct CameraCull {
     pub(super) args: [GrowBuffer; 2],
     pub(super) counter: Counter,
     /// The batches its last cull drew.
-    pub(crate) batches: u32,
+    pub(crate) drawn_batches: u32,
 }
 
 impl CameraCull {
@@ -56,7 +56,7 @@ impl CameraCull {
             kept: [0, 1].map(|_| buffer("Hi-Z Kept Instances", U::empty())),
             args: [0, 1].map(|_| buffer("Hi-Z Indirect Args", indirect)),
             counter: Counter::default(),
-            batches: 0,
+            drawn_batches: 0,
         }
     }
 
@@ -126,7 +126,7 @@ impl Renderer {
         let (first, last) = (culled(0), culled(1));
         let mut encoder = self.device.create_command_encoder(&Default::default());
         let batches = opaque.len() as u32;
-        cam.batches = batches;
+        cam.drawn_batches = batches;
         self.dispatch(&mut encoder, (&self.hiz.select, &groups[0]), batches);
         self.update_global_bind_group();
         let phase_one = ("Hi-Z Phase One", None);

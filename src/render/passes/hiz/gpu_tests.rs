@@ -66,9 +66,9 @@ pub(super) fn drawn(r: &Renderer, view: &RenderView) -> Vec<u32> {
     r.queue.submit(std::iter::once(encoder.finish()));
     staging.slice(..).map_async(wgpu::MapMode::Read, |_| ());
     r.device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
-    let view = staging.slice(..).get_mapped_range().unwrap();
-    let words: &[u32] = bytemuck::cast_slice(&view);
-    let batches = view.hiz.cameras[0].batches as usize;
+    let batches = view.hiz.cameras[0].drawn_batches as usize;
+    let mapped = staging.slice(..).get_mapped_range().unwrap();
+    let words: &[u32] = bytemuck::cast_slice(&mapped);
     words.chunks_exact(5).take(batches).map(|a| a[1]).collect()
 }
 
@@ -137,6 +137,7 @@ fn gpu_where_nothing_is_hidden_a_frame_is_the_same_on_and_off() {
         "a second frame, from last frame's set, differs"
     );
     r.quality.gpu_occlusion_culling = false;
-    let (off, _) = shot(&mut r, &mut offscreen(&r), &scene, &cam);
+    let mut fresh = offscreen(&r);
+    let (off, _) = shot(&mut r, &mut fresh, &scene, &cam);
     assert!(on == off, "Hi-Z moved pixels where nothing is hidden");
 }
