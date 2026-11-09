@@ -52,11 +52,7 @@ fn gpu_hiz_dust2_counts() {
         r.quality.gpu_occlusion_culling = false;
         let mut fresh = offscreen(&r);
         let (off, _) = shot(&mut r, &mut fresh, &scene, &cam);
-        let same = if on == off {
-            "same pixels"
-        } else {
-            "PIXELS DIFFER"
-        };
+        let same = ["PIXELS DIFFER", "same pixels"][usize::from(on == off)];
         println!(
             "{name}: {} meshes drawn by the CPU's culls, {} instances tested, {kept} drawn with Hi-Z, {same}",
             c.visible_entities, c.hiz_tested

@@ -41,30 +41,6 @@ pub(crate) fn push_palette(joints: &mut Vec<JointMatrix>, palette: &[glam::Mat4]
     base
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use glam::{Mat4, Vec3};
-
-    #[test]
-    fn every_joint_of_a_large_skin_is_kept_past_64() {
-        let rig: Vec<Mat4> = (0..100)
-            .map(|j| Mat4::from_translation(Vec3::X * j as f32))
-            .collect();
-        let mut joints = Vec::new();
-        assert_eq!(push_palette(&mut joints, &[]), 0, "non-skinned: identity");
-        assert!(joints.is_empty(), "non-skinned draws allocate no palette");
-        assert_eq!(push_palette(&mut joints, &rig), 1);
-        assert_eq!(
-            push_palette(&mut joints, &rig[..3]),
-            101,
-            "packed back to back"
-        );
-        assert_eq!(joints.len(), 103);
-        assert_eq!(joints[99][12], 99.0, "joint 99 is posed, not identity");
-    }
-}
-
 /// A group-1 bind group over `[uniform, bones, instances, materials, proxies,
 /// objects]`. The uniform binds one element's width, so a dynamic offset can slide
 /// across the packed array; the other arrays bind whole, and the shader indexes them.
@@ -111,4 +87,28 @@ pub(crate) fn group1(
             },
         ],
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::{Mat4, Vec3};
+
+    #[test]
+    fn every_joint_of_a_large_skin_is_kept_past_64() {
+        let rig: Vec<Mat4> = (0..100)
+            .map(|j| Mat4::from_translation(Vec3::X * j as f32))
+            .collect();
+        let mut joints = Vec::new();
+        assert_eq!(push_palette(&mut joints, &[]), 0, "non-skinned: identity");
+        assert!(joints.is_empty(), "non-skinned draws allocate no palette");
+        assert_eq!(push_palette(&mut joints, &rig), 1);
+        assert_eq!(
+            push_palette(&mut joints, &rig[..3]),
+            101,
+            "packed back to back"
+        );
+        assert_eq!(joints.len(), 103);
+        assert_eq!(joints[99][12], 99.0, "joint 99 is posed, not identity");
+    }
 }
