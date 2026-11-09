@@ -58,6 +58,7 @@ mod gather;
 mod grid;
 mod progress;
 mod sample;
+mod unsaved;
 
 pub use bake::{
     bake_occlusion, gather_occlusion, OcclusionBakeReport, OcclusionInput, OCCLUSION_SEED,
@@ -67,6 +68,7 @@ pub use gather::{fingerprint, Fingerprints};
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
 pub use progress::OcclusionProgress;
 pub use sample::{MAX_TARGETS, TARGET_SPACING, VOXEL};
+pub use unsaved::unsaved_materials;
 
 #[cfg(test)]
 mod bake_tests;
@@ -90,6 +92,8 @@ pub(crate) mod test_gap;
 pub(crate) mod test_level;
 #[cfg(test)]
 mod unread_tests;
+#[cfg(test)]
+mod unsaved_tests;
 #[cfg(test)]
 mod window_tests;
 

@@ -7,15 +7,20 @@
 //! reflection probes' default resolution, memory budget and probe ceiling, #1584,
 //! and the scene's diffuse model, #1698, and the lightmaps' denoiser, #1884).
 
+use std::cell::RefCell;
+
 use mlua::{Lua, Table};
 
-use super::super::bake::generate_lighting::{bake_occlusion_only, generate_lighting};
+use super::super::bake::generate_lighting::{
+    bake_occlusion_only, generate_lighting, unsaved_materials_warning,
+};
 use super::super::bake::progress::BakeLog;
 use crate::api::{global_table, put, ApiCell, ApiCtx, Reg};
 use crate::scene::lighting::lightmap::{BakeSettings, Denoiser};
 use crate::scene::lighting::settings::ReflectionSettings;
 use crate::scene::lighting::{DiffuseModel, MixedLightingMode};
 use crate::scene::Scene;
+use crate::scripting::ConsoleLogs;
 
 /// The knobs a script may override, each optional; `None` keeps `base`'s.
 #[derive(Default)]
@@ -79,6 +84,7 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
             let (path, nav) = (path.as_deref(), Some(&*nav));
             let report = generate_lighting(&mut scene, path, nav, &mut say, &mut log)
                 .map_err(mlua::Error::external)?;
+            warn_unsaved(&console, &scene, path);
             let out = lua.create_table()?;
             out.set("lightmaps", report.lightmaps)?;
             out.set("lightProbes", report.probes.light_probes)?;
@@ -107,9 +113,11 @@ fn register_bake_occlusion(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
             let console = console.get(lua)?;
             let path = scene_path.borrow();
             let mut log = BakeLog::to_console(&console);
-            let report = bake_occlusion_only(&mut scene.borrow_mut(), path.as_deref(), &mut log)
+            let mut scene = scene.borrow_mut();
+            let report = bake_occlusion_only(&mut scene, path.as_deref(), &mut log)
                 .map_err(mlua::Error::external)?;
             console.borrow_mut().info(report.summary());
+            warn_unsaved(&console, &scene, path.as_deref());
             let (o, out) = (report.occlusion, lua.create_table()?);
             out.set("cells", o.cells)?;
             out.set("objects", o.objects)?;
@@ -120,6 +128,16 @@ fn register_bake_occlusion(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
             Ok(out)
         }),
     )
+}
+
+/// Say once, after a bake, when the scene file lacks a material the bake read
+/// (`unsaved_materials_warning`, #1958): to stderr, as the bake's own lines go,
+/// and to the console.
+fn warn_unsaved(console: &RefCell<ConsoleLogs>, scene: &Scene, path: Option<&str>) {
+    if let Some(line) = path.and_then(|p| unsaved_materials_warning(scene, p)) {
+        eprintln!("{line}");
+        console.borrow_mut().warn(line);
+    }
 }
 
 /// `GetSettings` / `SetSettings`: the bake settings `Generate` uses.

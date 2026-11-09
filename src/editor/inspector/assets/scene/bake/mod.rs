@@ -30,6 +30,7 @@ use std::path::Path;
 
 use egui_phosphor::regular as icon;
 
+use crate::dev::bake::generate_lighting::unsaved_materials_warning;
 use crate::dev::bake::lighting::LightingBakeReport;
 use crate::dev::bake::lightmap::LightmapBakeJob;
 use crate::dev::bake::occlusion::OcclusionBakeJob;
@@ -178,6 +179,7 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     match LightmapBakeJob::start(scene, Some(&path), settings) {
         Ok(job) => {
             console.info("Generating lighting in the background…".into());
+            warn_unsaved(scene, &path, console);
             editor.dev.lightmap_bake = Some(ActiveBake {
                 step: Step::Lightmaps(job),
                 scene: scene.id(),
@@ -198,6 +200,7 @@ fn start_occlusion(editor: &mut EditorUi, scene: &mut Scene, console: &mut Conso
     match OcclusionBakeJob::start(scene) {
         Ok(job) => {
             console.info("Baking occlusion culling in the background…".into());
+            warn_unsaved(scene, &path, console);
             editor.dev.lightmap_bake = Some(ActiveBake {
                 step: Step::OcclusionOnly {
                     job,
@@ -209,6 +212,14 @@ fn start_occlusion(editor: &mut EditorUi, scene: &mut Scene, console: &mut Conso
             scene.lighting_bake_running = true;
         }
         Err(e) => console.error(format!("Bake Occlusion failed: {e}")),
+    }
+}
+
+/// Say when the scene file lacks a material the PVS will read (#1958): the next
+/// load of the file would read the bake as stale until the scene is saved.
+fn warn_unsaved(scene: &Scene, path: &str, console: &mut ConsoleLogs) {
+    if let Some(line) = unsaved_materials_warning(scene, path) {
+        console.warn(line);
     }
 }
 

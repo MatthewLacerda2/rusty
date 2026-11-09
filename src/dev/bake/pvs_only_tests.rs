@@ -1,11 +1,13 @@
 //! Bake Occlusion (#1958): Generate Lighting's occlusion step alone, from a
 //! script, written beside the scene and touching nothing else.
 
-use super::{bake_occlusion_only, UNSAVED};
+use super::{bake_occlusion_only, OcclusionOnlyReport, UNSAVED_OCCLUSION};
 use crate::dev::bake::progress::BakeLog;
 use crate::dev::session::Session;
+use crate::scene::lighting::occlusion::OcclusionBakeReport;
 use crate::scene::lighting::occlusion::{fingerprint, occlusion_path, test_level::corridors};
-use crate::scene::Scene;
+use crate::scene::{MaterialComponent, Scene};
+use crate::scripting::LogLevel;
 
 /// The corridors level saved at a fresh path.
 fn saved(tag: &str) -> String {
@@ -50,7 +52,7 @@ fn it_writes_only_the_pvs_and_a_fresh_load_matches_it() {
 fn it_is_refused_unsaved_and_while_the_editor_bakes() {
     let mut scene = corridors();
     let unsaved = bake_occlusion_only(&mut scene, None, &mut BakeLog::off());
-    assert_eq!(unsaved.unwrap_err(), UNSAVED);
+    assert_eq!(unsaved.unwrap_err(), UNSAVED_OCCLUSION);
     scene.lighting_bake_running = true;
     let path = saved("refused");
     let busy = bake_occlusion_only(&mut scene, Some(&path), &mut BakeLog::off());
@@ -71,4 +73,39 @@ fn the_script_verb_bakes_the_open_scene() {
         .iter()
         .any(|(m, _)| m.starts_with("Baked occlusion"));
     assert!(said, "the summary reached the console");
+}
+
+#[test]
+fn a_level_too_large_to_cull_claims_nothing_saved() {
+    let occlusion = OcclusionBakeReport {
+        objects: 3,
+        occluders: 2,
+        too_large: true,
+        ..OcclusionBakeReport::default()
+    };
+    let line = OcclusionOnlyReport { occlusion, ms: 5 }.summary();
+    assert!(line.contains("no occlusion culling"), "{line}");
+    assert!(!line.ends_with("; saved"), "{line}");
+}
+
+/// The script's material, two-sided, is not in the file: the bake says so once.
+#[test]
+fn the_script_verb_warns_of_a_material_the_file_lacks() {
+    let path = saved("warns");
+    let mut level = Scene::new();
+    level.load_from_file(&path).unwrap();
+    for id in level.world.ids_with_mesh() {
+        let glass = Some(MaterialComponent::new("glass"));
+        level.world.set_material(id, glass);
+    }
+    level.save_to_file(&path).unwrap();
+    let s = Session::new(&path).unwrap();
+    s.eval(r#"Material.DefineAsset("glass", { render_face = "Both" })"#)
+        .unwrap();
+    s.eval("Lighting.BakeOcclusion()").unwrap();
+    let console = s.world().console().borrow();
+    let warned = console.messages.iter().filter(|(m, level)| {
+        *level == LogLevel::Warning && m.starts_with(r#"[Occlusion] material(s) "glass""#)
+    });
+    assert_eq!(warned.count(), 1, "{:?}", console.messages);
 }
