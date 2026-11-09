@@ -72,8 +72,11 @@ fn colliders(
     let mut out = Vec::new();
     for (id, key) in collider_keys(scene) {
         bytes.extend(id.to_le_bytes());
-        // A `NavMeshModifier`'s override (#1959): `0xff` for none, past every id.
-        bytes.push(key.area.unwrap_or(u8::MAX));
+        // A `NavMeshModifier`'s override (#1959), tagged so no id reads as none.
+        match key.area {
+            None => bytes.push(0),
+            Some(a) => bytes.extend([1, a]),
+        }
         let Some(m) = collider_world_triangles(scene, id) else {
             bytes.push(2);
             out.push(Source {

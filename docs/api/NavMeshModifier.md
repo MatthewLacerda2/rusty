@@ -8,7 +8,9 @@ geometry, so there is no box to size and it moves with the object; a
 - **`OverrideArea`**: the object's floors bake as that area id. **`1` (`NotWalkable`)**
   is what furniture wants: a table, a sofa or a bar counter then has no walkable top, but
   stays solid geometry, so the floor under it still lacks the agent's headroom and agents
-  walk around it. `nil` keeps the bake's own area. Where a `NavMeshModifierVolume` covers
+  walk around it, even a seat lower than `max_step` that the bake would otherwise
+  merge into the floor it rests on. `nil` keeps the bake's own area; an id past the
+  area table's limit read from a file bakes as the last id. Where a `NavMeshModifierVolume` covers
   the same floor, the volume's area wins.
 - **`IgnoreFromBuild`** leaves the colliders out of the bake entirely, as in Unity: the
   object neither has a floor nor blocks one, so the floor under a table is walkable. Use

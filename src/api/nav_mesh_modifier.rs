@@ -39,10 +39,18 @@ fn get(scene: &RefCell<Scene>, id: u32) -> Option<Modifier> {
         .map(|m| m.clone())
 }
 
-/// Apply a shared op to `id`'s modifier, if it has one.
+/// Apply a shared op to `id`'s modifier, if it has one. A write that changes
+/// nothing (a script repeating a value every tick) never borrows the component
+/// mutably, so it stamps no change and Play's navmesh check stays skipped.
 fn write(scene: &RefCell<Scene>, id: u32, op: impl FnOnce(&mut Modifier)) {
+    let Some(old) = get(scene, id) else { return };
+    let mut new = old.clone();
+    op(&mut new);
+    if new == old {
+        return;
+    }
     if let Some(mut m) = scene.borrow_mut().world.nav_mesh_modifier_mut(id) {
-        op(&mut m);
+        *m = new;
     }
 }
 

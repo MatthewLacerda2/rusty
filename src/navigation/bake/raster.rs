@@ -52,6 +52,9 @@ pub(super) struct Solid {
     /// The area a walkable top bakes as: `Walkable`, or a `NavMeshModifier`'s
     /// override (#1959).
     pub area: u8,
+    /// A `NavMeshModifier` set `area`: the top's flag and area survive the flag
+    /// merge (`heightfield`).
+    pub overridden: bool,
 }
 
 /// A clipped polygon: at most 7 vertices (a triangle cut by four planes).
@@ -76,7 +79,8 @@ pub(super) fn rasterize(
         rects.push(footprint(g, &mesh.vertices));
         // An object overridden to `NotWalkable` stays solid: it still blocks the
         // floor beneath through clearance, but carries no surface of its own.
-        let area = bake_as(&scene.world, id).area.unwrap_or(WALKABLE_AREA);
+        let authored = bake_as(&scene.world, id).area;
+        let area = authored.unwrap_or(WALKABLE_AREA);
         let surface = area != NOT_WALKABLE_AREA;
         let walkable = |tri| surface && faces_up(tri, g.max_slope, mesh.convex);
         let tris = mesh
@@ -85,7 +89,10 @@ pub(super) fn rasterize(
             .map(|t| t.map(|i| mesh.vertices[i as usize]));
         let start = out.len();
         rasterize_mesh(g, region, tris, mesh.convex, walkable, &mut out);
-        out[start..].iter_mut().for_each(|s| s.area = area);
+        out[start..].iter_mut().for_each(|s| {
+            s.area = area;
+            s.overridden = authored.is_some();
+        });
     }
     (out, rects)
 }
@@ -119,6 +126,7 @@ pub(super) fn rasterize_mesh(
                 plane: walkable.then(|| Plane::of(tri, centre)).flatten(),
                 floor: f32::NEG_INFINITY,
                 area: WALKABLE_AREA,
+                overridden: false,
             })
         });
     }

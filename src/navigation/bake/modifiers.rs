@@ -15,6 +15,7 @@
 
 use glam::{Mat4, Vec3};
 
+use super::super::areas::clamp_area;
 #[cfg(test)]
 use super::super::WALKABLE_AREA;
 use super::super::{NavSpan, NavigationGraph, NOT_WALKABLE_AREA};
@@ -77,7 +78,7 @@ pub(super) fn modifier_keys(scene: &Scene) -> Vec<(u32, ModifierVolume)> {
                 ModifierVolume {
                     center: m.center,
                     size: m.size,
-                    area: m.area,
+                    area: clamp_area(m.area),
                     pose,
                 },
             ))

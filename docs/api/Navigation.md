@@ -186,7 +186,9 @@ Modifier):
 
 - **Furniture wants `override_area = 1`.** A table, a sofa or a bar counter then has no
   walkable top, but it stays solid geometry: the floor under it still lacks the agent's
-  headroom, and agents walk around it.
+  headroom, and agents walk around it. This holds for a low sofa seat too: an
+  overridden top keeps its own area even within `max_step` of the floor it rests on,
+  where the bake would otherwise merge the two into one walkable surface.
 - **`ignore_from_build` removes the object**, as in Unity: it neither has a floor nor
   blocks one, so the floor under a table is walkable. Use it for clutter agents walk
   through (a hanging lamp, a decal), not for an obstacle.

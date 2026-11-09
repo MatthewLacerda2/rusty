@@ -32,6 +32,12 @@ pub fn clamp_cost(cost: f32) -> Option<f32> {
     cost.is_finite().then(|| cost.max(MIN_AREA_COST))
 }
 
+/// An authored area id as the bake reads it: one past the table's limit (a
+/// hand-edited scene file) is clamped to the last id, so it never indexes past it.
+pub(super) fn clamp_area(area: u8) -> u8 {
+    area.min((MAX_AREAS - 1) as u8)
+}
+
 /// The cost of every area id, from a table: rows past the table (and a non-finite
 /// cost) read as [`MIN_AREA_COST`].
 pub fn cost_table(areas: &[NavArea]) -> [f32; MAX_AREAS] {

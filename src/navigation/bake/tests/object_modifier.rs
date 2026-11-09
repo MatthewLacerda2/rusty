@@ -116,3 +116,20 @@ fn a_child_inherits_its_parents_modifier_unless_it_has_its_own() {
         "not applied to children"
     );
 }
+
+#[test]
+fn a_low_not_walkable_seat_on_the_floor_stays_off_the_navmesh() {
+    let (mut scene, _, _) = room();
+    let sofa = add_box(
+        &mut scene,
+        Vec3::new(2.6, 0.0, 2.6),
+        Vec3::new(4.4, 0.45, 4.4),
+    );
+    set(&mut scene, sofa, not_walkable());
+    let g = baked(&scene);
+    assert!(
+        !g.is_walkable(3, 3),
+        "within max_step, yet the seat is not floor"
+    );
+    assert!(g.is_walkable(1, 3) && g.is_walkable(5, 3) && g.is_walkable(3, 6));
+}

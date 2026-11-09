@@ -59,3 +59,23 @@ fn setters_write_through_the_shared_ops_and_getters_read_back() {
         "never attached"
     );
 }
+
+#[test]
+fn a_setter_repeating_the_value_stamps_no_change() {
+    let mut scene = Scene::new();
+    let id = scene.add_entity("table".to_string());
+    let m = NavMeshModifierComponent::default();
+    scene.world.set_nav_mesh_modifier(id, Some(m));
+    let mut cursor = scene.world.change_cursor::<NavMeshModifierComponent>();
+    let scene = Rc::new(RefCell::new(scene));
+    let lua = Lua::new();
+    crate::api::attempt(|| {
+        register(&lua, bind(&lua, &scene)).unwrap();
+        lua.globals().set("id", id)?;
+        lua.load("NavMeshModifier.SetActive(id, true) NavMeshModifier.SetOverrideArea(id, nil)")
+            .exec()
+    })
+    .unwrap();
+    let changes = scene.borrow().world.changes(&mut cursor);
+    assert_eq!(changes, crate::ecs::Changes::Ids(vec![]));
+}

@@ -6,6 +6,7 @@
 //! modifier wins over its parent's, whole). An inactive modifier covers nothing and
 //! does not shield what is below it from one further up.
 
+use super::areas::clamp_area;
 use crate::components::NavMeshModifierComponent;
 use crate::ecs::World;
 
@@ -34,7 +35,7 @@ pub(super) fn bake_as(world: &World, id: u32) -> BakeAs {
 fn of(m: &NavMeshModifierComponent) -> BakeAs {
     BakeAs {
         ignored: m.ignore_from_build,
-        area: m.override_area,
+        area: m.override_area.map(clamp_area),
     }
 }
 
@@ -69,6 +70,12 @@ mod tests {
             bake_as(&w, leaf).area,
             Some(5),
             "an inactive one shields nothing"
+        );
+        w.set_nav_mesh_modifier(leaf, Some(modifier(Some(255), true)));
+        assert_eq!(
+            bake_as(&w, leaf).area,
+            Some((crate::navigation::MAX_AREAS - 1) as u8),
+            "a loaded id past the table"
         );
     }
 }
