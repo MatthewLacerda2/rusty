@@ -94,24 +94,35 @@ pub(in crate::scene::lighting::lightmap) fn fill_within<T: Texel>(
     let pending: Vec<usize> = (0..filled.len())
         .filter(|&i| labels[i] != NO_CHART && !filled[i])
         .collect();
-    let size = size as i32;
-    let near = |i: usize| {
-        let (x, y) = (i as i32 % size, i as i32 / size);
-        NEIGHBOURS.into_iter().filter_map(move |(dx, dy)| {
-            let (nx, ny) = (x + dx, y + dy);
-            let inside = nx >= 0 && ny >= 0 && nx < size && ny < size;
-            inside.then_some((ny * size + nx) as usize)
-        })
-    };
-    // Ring by ring, as a frontier: a ring is the unfilled texels beside the one
-    // before it, so each texel is visited a bounded number of times and the work
-    // is linear in the invalid texels, however many rings a buried region takes.
-    // Each ring reads only texels filled before it, and sums its neighbours in
-    // `NEIGHBOURS` order, so neither the order within a ring nor the queue shows.
+    fill_rings(texels, filled, labels, size, &pending);
+    for i in pending {
+        let (sum, n) = means[&labels[i]];
+        if !filled[i] && n > 0.0 {
+            texels[i] = sum / n;
+            filled[i] = true;
+        }
+    }
+    means.values().filter(|(_, n)| *n == 0.0).count()
+}
+
+/// [`fill_within`]'s rings, as a frontier: a ring is the unfilled texels of a
+/// chart beside the ring before it, so each texel is visited a bounded number of
+/// times and the work is linear in `pending` (the invalid texels), however many
+/// rings a buried region takes. Each ring reads only texels filled before it, and
+/// sums its neighbours in `NEIGHBOURS` order, so neither the order within a ring
+/// nor the queue shows in the bytes.
+fn fill_rings<T: Texel>(
+    texels: &mut [T],
+    filled: &mut [bool],
+    labels: &[u32],
+    size: u32,
+    pending: &[usize],
+) {
+    let same = |i: usize| move |&j: &usize| labels[j] == labels[i];
     let mut queued = vec![false; filled.len()];
     let mut ring: Vec<usize> = Vec::new();
-    for &i in &pending {
-        if near(i).any(|j| filled[j] && labels[j] == labels[i]) {
+    for &i in pending {
+        if near(i, size).filter(same(i)).any(|j| filled[j]) {
             queued[i] = true;
             ring.push(i);
         }
@@ -121,7 +132,7 @@ pub(in crate::scene::lighting::lightmap) fn fill_within<T: Texel>(
             .iter()
             .map(|&i| {
                 let (mut sum, mut n) = (T::default(), 0.0);
-                for j in near(i).filter(|&j| filled[j] && labels[j] == labels[i]) {
+                for j in near(i, size).filter(same(i)).filter(|&j| filled[j]) {
                     sum = sum + texels[j];
                     n += 1.0;
                 }
@@ -134,8 +145,8 @@ pub(in crate::scene::lighting::lightmap) fn fill_within<T: Texel>(
         }
         let mut next = Vec::new();
         for &i in &ring {
-            for j in near(i) {
-                if labels[j] == labels[i] && !filled[j] && !queued[j] {
+            for j in near(i, size).filter(same(i)) {
+                if !filled[j] && !queued[j] {
                     queued[j] = true;
                     next.push(j);
                 }
@@ -143,12 +154,16 @@ pub(in crate::scene::lighting::lightmap) fn fill_within<T: Texel>(
         }
         ring = next;
     }
-    for i in pending {
-        let (sum, n) = means[&labels[i]];
-        if !filled[i] && n > 0.0 {
-            texels[i] = sum / n;
-            filled[i] = true;
-        }
-    }
-    means.values().filter(|(_, n)| *n == 0.0).count()
+}
+
+/// The indices of texel `i`'s eight neighbours inside a `size`² map, in
+/// `NEIGHBOURS` order.
+fn near(i: usize, size: u32) -> impl Iterator<Item = usize> {
+    let size = size as i32;
+    let (x, y) = (i as i32 % size, i as i32 / size);
+    NEIGHBOURS.into_iter().filter_map(move |(dx, dy)| {
+        let (nx, ny) = (x + dx, y + dy);
+        let inside = nx >= 0 && ny >= 0 && nx < size && ny < size;
+        inside.then_some((ny * size + nx) as usize)
+    })
 }
