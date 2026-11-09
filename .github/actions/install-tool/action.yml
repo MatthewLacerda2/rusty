@@ -76,7 +76,9 @@ runs:
     - name: Wait before the retry
       if: steps.cache.outputs.cache-hit != 'true' && steps.first.outcome == 'failure'
       shell: bash
-      run: echo "install-tool: the download failed; one more attempt in 60 s" && sleep 60
+      run: |
+        echo "install-tool: the download failed; one more attempt in 60 s"
+        sleep 60
     - name: Download (retry)
       if: steps.cache.outputs.cache-hit != 'true' && steps.first.outcome == 'failure'
       uses: taiki-e/install-action@v2
