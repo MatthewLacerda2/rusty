@@ -23,6 +23,11 @@ fn an_entity_deleted_during_a_bake_is_gone_from_the_save_and_the_cancel() {
         scene.lightmaps.saved().get(floor).is_none(),
         "and from what it hides"
     );
+    // The next pass, handed over before or after the delete, leaves it out too.
+    while job.show_preview(&mut scene).is_none() {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(scene.lightmaps.get(floor).is_none(), "the next pass too");
     let saved = crate::scene::to_scene_data(&scene).lightmaps;
     assert!(
         saved.get(floor).is_none(),

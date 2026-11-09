@@ -40,6 +40,18 @@ fn a_failed_write_leaves_the_old_pages_and_the_scene_on_them() {
     assert!(scene.lightmaps.pages.iter().all(|p| Path::new(p).exists()));
 }
 
+/// Pass `k` of 9, as the bake hands it to the preview writer.
+fn pass(k: u32) -> crate::scene::lighting::lightmap::Pass {
+    let (done, samples, view, passes, target) = (k, k, k, 9, 9);
+    crate::scene::lighting::lightmap::Pass {
+        done,
+        passes,
+        samples,
+        view,
+        target,
+    }
+}
+
 /// One 4² lightmap of `value`, as a pass hands it to the preview writer.
 fn pass_maps(value: f32) -> Vec<Lightmap> {
     let texels = vec![glam::Vec3::splat(value); 16];
@@ -58,21 +70,13 @@ fn the_preview_writer_keeps_only_the_shown_and_the_newest_pass_on_disk() {
     use super::encoder::Encoder;
     use super::preview::Previews;
     use super::preview_tests::preview_pages;
-    use crate::scene::lighting::lightmap::Pass;
     let path = scene_path("preview_writer");
     let progress = Arc::new(BakeProgress::default());
     let mut previews = Previews::new(&path);
     let taken = Default::default();
     let encoder = Encoder::start(&previews, 32, taken, progress.clone()).unwrap();
     let put = |k: u32| {
-        let pass = Pass {
-            done: k,
-            passes: 9,
-            samples: k,
-            view: k,
-            target: 9,
-        };
-        encoder.put(pass, pass_maps(k as f32 * 0.1));
+        encoder.put(pass(k), pass_maps(k as f32 * 0.1));
         assert!(
             encoder.busy(),
             "a pass waiting is work: the bake builds none"
@@ -98,4 +102,48 @@ fn the_preview_writer_keeps_only_the_shown_and_the_newest_pass_on_disk() {
     drop(encoder);
     previews.restore(&mut scene);
     assert_eq!(preview_pages(&path), 0);
+}
+
+#[test]
+fn a_dropped_bakes_writer_removes_only_its_own_pages() {
+    use super::encoder::Encoder;
+    use super::preview::Previews;
+    use super::preview_tests::preview_pages;
+    let path = scene_path("preview_two_writers");
+    // Write one pass of `value` as `p`'s bake, and wait until it is handed over.
+    let write = |p: &Previews, progress: &Arc<BakeProgress>, value| {
+        let e = Encoder::start(p, 32, Default::default(), progress.clone()).unwrap();
+        e.put(pass(1), pass_maps(value));
+        while e.busy() {
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    };
+    let (old, new) = (Previews::new(&path), Previews::new(&path));
+    let (gone, going) = (Arc::new(BakeProgress::default()), Arc::default());
+    write(&new, &going, 0.5);
+    assert_eq!(preview_pages(&path), 1, "the new bake's pass");
+    gone.cancel();
+    write(&old, &gone, 0.25);
+    assert_eq!(
+        preview_pages(&path),
+        1,
+        "the dropped bake's pass went alone"
+    );
+    new.clear();
+}
+
+#[test]
+fn a_page_already_written_is_left_as_it_is() {
+    let dir = lightmap_dir(&scene_path("write_unchanged"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let png = b"same bytes";
+    let page = write::write_png(&dir, "lightmap_mask", 0, png).unwrap();
+    std::fs::write(&page, b"planted!!!").unwrap();
+    let again = write::write_png(&dir, "lightmap_mask", 0, png).unwrap();
+    assert_eq!(again, page);
+    assert_eq!(
+        std::fs::read(&page).unwrap(),
+        b"planted!!!",
+        "not rewritten"
+    );
 }

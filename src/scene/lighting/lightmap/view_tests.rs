@@ -116,4 +116,14 @@ fn a_chart_with_no_texel_is_never_seen_and_the_bake_still_finishes() {
     let maps = progressive_on(&scene, &s, &progress, (Some(view), 2), &mut |_, _| {});
     let one_shot = bake::bake_on(&scene, &s, &BakeProgress::default(), 2);
     assert_eq!(maps.expect("finished"), one_shot.expect("finished"));
+    // A view that sees every real texel is no partial view: no extra steps.
+    let (outside, wall) = (scene.meshes[1].clone(), wall());
+    let scene = BakeScene {
+        meshes: vec![outside, wall],
+        ..Default::default()
+    };
+    let whole = camera(Vec3::new(-3.0, 2.0, 0.0), Vec3::new(2.0, 2.0, 0.0), 1.5);
+    let progress = BakeProgress::default();
+    progressive_on(&scene, &s, &progress, (Some(whole), 2), &mut |_, _| {}).expect("finished");
+    assert_eq!(progress.passes().map(|p| p.passes), Some(s.passes()));
 }

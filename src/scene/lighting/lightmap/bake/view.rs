@@ -70,8 +70,8 @@ impl BakeView {
     }
 
     /// Per chart, per batch of `pool::BATCH` texels, whether the camera sees any
-    /// of them: the charts' batches as the bake's pool cuts them, checked on it on
-    /// `threads` workers. `None` when `progress` is cancelled first.
+    /// of them (none for a chart with no texel): the charts' batches as the
+    /// bake's pool cuts them, checked on it on `threads` workers. `None` when `progress` is cancelled first.
     pub(super) fn seen(
         &self,
         rays: &Rays,
@@ -81,8 +81,11 @@ impl BakeView {
     ) -> Option<Vec<Vec<bool>>> {
         let texels: usize = charts.iter().map(Vec::len).sum();
         let charts = charts.iter().map(|c| c.iter().collect()).collect();
-        let batch = |_: usize, _: usize, points: &[&TexelPoint]| {
-            vec![points.iter().any(|p| self.sees(rays, p.position, p.normal))]
+        // A chart with no texel gets the pool's one empty batch: it says nothing,
+        // so a view that sees every real texel is no partial view (#1970's review).
+        let batch = |_: usize, _: usize, points: &[&TexelPoint]| match points.is_empty() {
+            true => Vec::new(),
+            false => vec![points.iter().any(|p| self.sees(rays, p.position, p.normal))],
         };
         let seen = pool::run(charts, threads, progress, batch, |_, _, seen| seen);
         // The pool counted the texels it looked at; none was traced yet.

@@ -68,7 +68,10 @@ fn draw_progressive(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
         .inner;
     changed |= ui
         .checkbox(&mut s.prioritize_view, "Prioritize view")
-        .on_hover_text("Each pass traces what the Scene view's camera sees first")
+        .on_hover_text(
+            "After the whole scene's first pass, what the Scene view's camera sees gets \
+             all its passes first, then the rest gets theirs",
+        )
         .changed();
     changed
 }

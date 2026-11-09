@@ -163,8 +163,8 @@ impl Run<'_> {
                 view: done.seen,
                 target: self.settings.samples,
             };
-            self.progress.pass_done(pass);
             if last {
+                self.progress.pass_done(pass);
                 note_buried(self.orphans.load(Ordering::Relaxed));
                 return Some(maps.into_iter().flatten().collect());
             }
@@ -178,6 +178,9 @@ impl Run<'_> {
                 sink.pass(pass, maps.into_iter().flatten().collect());
                 going = shown;
             }
+            // Said once its lightmaps are handed on, so the editor's card never
+            // reads a pass ahead of what the viewport can show.
+            self.progress.pass_done(pass);
             items = going;
         }
         // There is at least one step, so the last has returned.

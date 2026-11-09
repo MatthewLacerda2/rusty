@@ -1,7 +1,8 @@
 //! A progressive bake's preview on the live scene (#1970, Unity's Progressive
 //! Lightmapper). After each pass the bake's worker hands the lightmaps as they
 //! stand to an encoder thread of its own (`encoder::Encoder`), so the trace goes on at
-//! once; the encoder writes them beside the scene as `lightmap_preview_*` pages,
+//! once; the encoder writes them beside the scene as `lightmap_preview_<bake>_*`
+//! pages,
 //! cheaply (uncompressed PNGs of one level, which the renderer loads as it loads
 //! any `.png` page), and the editor's next frame points the scene at them
 //! ([`Previews::show`]). A pass not yet shown when the next one is in is skipped,
@@ -17,6 +18,7 @@
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, TryLockError};
 
 use super::lightmap_dir;
@@ -39,14 +41,23 @@ pub(super) type Latest = Arc<Mutex<Shared>>;
 pub(super) struct Previews {
     pub(super) latest: Latest,
     pub(super) dir: PathBuf,
+    /// What this bake's preview pages are named from, `lightmap_preview_<n>`, `n`
+    /// this bake's own: a writer still finishing for a bake dropped (a restart, a
+    /// scene switch) removes its own pages, never another bake's.
+    pub(super) prefix: String,
 }
+
+/// The bakes started in this process, numbering their preview pages.
+static BAKES: AtomicU32 = AtomicU32::new(0);
 
 impl Previews {
     /// Previews written beside `scene_path`.
     pub fn new(scene_path: &str) -> Self {
+        let n = BAKES.fetch_add(1, Ordering::Relaxed);
         Self {
             latest: Latest::default(),
             dir: lightmap_dir(scene_path),
+            prefix: format!("{PREVIEW}_{n}"),
         }
     }
 
@@ -62,6 +73,8 @@ impl Previews {
             Err(TryLockError::WouldBlock) => return None,
         };
         let (pass, mut set) = shared.latest.take()?;
+        // An entity deleted since the pass was handed over stays gone.
+        set.retain(|id| scene.world.contains(id));
         let shown = &mut scene.lightmaps;
         let own = shown.shown_over.take();
         set.shown_over = Some(own.unwrap_or_else(|| Box::new((**shown).clone())));
@@ -85,12 +98,12 @@ impl Previews {
         self.clear();
     }
 
-    /// Remove the preview pages; the folder may hold none. Once the bake is
-    /// cancelled, a pass the writer is still writing is removed by the writer.
+    /// Remove this bake's preview pages; the folder may hold none. Once the bake
+    /// is cancelled, a pass the writer is still writing is removed by the writer.
     pub fn clear(&self) {
         let mut shared = lock(&self.latest);
         *shared = Shared::default();
-        if let Err(e) = clear_pages(&self.dir, PREVIEW, &BTreeSet::new()) {
+        if let Err(e) = clear_pages(&self.dir, &self.prefix, &BTreeSet::new()) {
             log::warn!("[LightmapBake] remove the preview lightmaps: {e}");
         }
     }

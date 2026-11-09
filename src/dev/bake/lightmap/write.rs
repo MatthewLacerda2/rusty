@@ -167,11 +167,17 @@ fn write_page(
 }
 
 /// Write one page as `<dir>/<prefix>_<k>_<tag>.png` and return its path: a
-/// shadowmask page, or any page of a progressive bake's preview (#1970).
+/// shadowmask page, or any page of a progressive bake's preview (#1970). A page
+/// already there under that name and size (its content tag) is left as it is,
+/// so a page a pass did not change (a shadowmask, once its texels are in) is
+/// neither rewritten nor reloaded.
 pub(super) fn write_png(dir: &Path, prefix: &str, k: usize, png: &[u8]) -> Result<String, String> {
     let path = dir.join(format!("{prefix}_{k}_{:08x}.png", content_tag(png)));
-    std::fs::write(&path, png).map_err(|e| format!("write {}: {e}", path.display()))?;
-    crate::core::fs::written::note_written(&path.to_string_lossy());
+    let there = std::fs::metadata(&path).is_ok_and(|m| m.is_file() && m.len() == png.len() as u64);
+    if !there {
+        std::fs::write(&path, png).map_err(|e| format!("write {}: {e}", path.display()))?;
+        crate::core::fs::written::note_written(&path.to_string_lossy());
+    }
     Ok(crate::core::paths::to_slash(&path))
 }
 

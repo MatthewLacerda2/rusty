@@ -3,7 +3,7 @@
 //! takes it only to hand the pass over and remove the pages nobody will show.
 
 use std::collections::BTreeSet;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::thread::{self, JoinHandle};
 
@@ -12,7 +12,7 @@ use image::{ExtendedColorType, ImageEncoder};
 
 use super::job::Taken;
 use super::preview::{lock, Previews, Shared};
-use super::write::{clear_pages, stems, write_png, PREVIEW};
+use super::write::{clear_pages, stems, write_png};
 use crate::scene::lighting::lightmap::{
     check_page_count, encode_directions, encode_masks, encode_texels, pack, BakeProgress, Lightmap,
     LightmapEntry, LightmapSet, Pass, PassSink, MAX_PAGES,
@@ -53,15 +53,16 @@ impl Encoder {
         progress: Arc<BakeProgress>,
     ) -> Result<Self, String> {
         let queue = Arc::new(Queue::default());
-        let (from, shared, dir) = (queue.clone(), previews.latest.clone(), previews.dir.clone());
+        let (from, shared) = (queue.clone(), previews.latest.clone());
+        let at = (previews.dir.clone(), previews.prefix.clone());
         let thread = thread::Builder::new()
             .name("lightmap-preview".into())
             .spawn(move || {
                 while let Some((pass, maps)) = from.take() {
                     // Written without the lock, so the UI never waits on a write.
-                    let written = write_preview(&dir, &maps, page, &taken);
+                    let written = write_preview(&at, &maps, page, &taken);
                     drop(maps);
-                    let over = hand_over(&dir, &shared, (pass, written), &progress);
+                    let over = hand_over(&at, &shared, (pass, written), &progress);
                     from.written();
                     if over {
                         return;
@@ -103,9 +104,10 @@ impl PassSink for Encoder {
 /// Under the lock, make `written` the newest pass (unless the bake was
 /// cancelled) and remove every preview page neither shown nor newest: the pass it
 /// replaced before it was shown, a failed write's pages, or after a cancel its
-/// own. Whether the bake is over.
+/// own. Only this bake's pages (named from `prefix`): a writer finishing after
+/// its bake was dropped never touches the next bake's. Whether the bake is over.
 fn hand_over(
-    dir: &Path,
+    (dir, prefix): &(PathBuf, String),
     shared: &Mutex<Shared>,
     (pass, written): (Pass, Result<LightmapSet, String>),
     progress: &BakeProgress,
@@ -124,7 +126,7 @@ fn hand_over(
             .as_ref()
             .map_or_else(BTreeSet::new, |(_, s)| stems(s)),
     );
-    if let Err(e) = clear_pages(dir, PREVIEW, &keep) {
+    if let Err(e) = clear_pages(dir, prefix, &keep) {
         log::warn!("[LightmapBake] remove a preview page never shown: {e}");
     }
     cancelled
@@ -170,10 +172,10 @@ impl Queue {
 }
 
 /// `maps` packed into pages of at most `page` texels and written into `dir` as
-/// preview pages, each an uncompressed PNG of one level (no BC encode, no mips),
-/// and the set that points at them.
+/// preview pages named from `prefix`, each an uncompressed PNG of one level (no
+/// BC encode, no mips), and the set that points at them.
 fn write_preview(
-    dir: &Path,
+    (dir, prefix): &(PathBuf, String),
     maps: &[Lightmap],
     page: u32,
     (lights, shadowmask): &Taken,
@@ -186,15 +188,15 @@ fn write_preview(
     let write =
         |kind: &str, k: usize, rgba: Vec<u8>| write_png(dir, kind, k, &raw_png(size, &rgba)?);
     for (k, texels) in atlas.pages.iter().enumerate() {
-        set.pages.push(write(PREVIEW, k, encode_texels(texels))?);
+        set.pages.push(write(prefix, k, encode_texels(texels))?);
     }
     for (k, dirs) in atlas.directions.iter().enumerate() {
-        let kind = format!("{PREVIEW}_dir");
+        let kind = format!("{prefix}_dir");
         set.directions
             .push(write(&kind, k, encode_directions(dirs))?);
     }
     for (k, mask) in atlas.masks.iter().enumerate() {
-        let kind = format!("{PREVIEW}_mask");
+        let kind = format!("{prefix}_mask");
         set.masks.push(write(&kind, k, encode_masks(mask))?);
     }
     let entry = |&(entity, page, scale_offset): &(u32, u32, [f32; 4])| LightmapEntry {
