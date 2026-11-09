@@ -43,6 +43,14 @@ pub struct BakeSettings {
     /// that must reach a front face (or escape) for its light to count. A texel
     /// below it sits inside geometry, and its own chart's valid texels fill it.
     pub backface_tolerance: f32,
+    /// Paths a progressive bake traces per texel per pass (#1970, the editor's
+    /// Generate Lighting): every texel gets this many, the live scene shows the
+    /// result, and the next pass adds as many again, up to [`Self::samples`].
+    /// Never changes the bytes, only how often the preview refreshes.
+    pub samples_per_pass: u32,
+    /// Unity's *Prioritize View* (#1970): a progressive bake traces the texels the
+    /// Scene view's camera sees first in each pass. Order only, so never the bytes.
+    pub prioritize_view: bool,
 }
 
 impl Default for BakeSettings {
@@ -57,6 +65,8 @@ impl Default for BakeSettings {
             filter_radius: 3,
             directional: true,
             backface_tolerance: Self::DEFAULT_BACKFACE_TOLERANCE,
+            samples_per_pass: Self::DEFAULT_SAMPLES_PER_PASS,
+            prioritize_view: true,
         }
     }
 }
@@ -69,6 +79,10 @@ impl BakeSettings {
     /// 1.7 points). A bake that falls back to the Gaussian alone is blurrier and
     /// blotchier at this count.
     pub const DEFAULT_SAMPLES: u32 = 64;
+    /// The default paths per texel per pass of a progressive bake (#1970): eight
+    /// passes at the default [`Self::DEFAULT_SAMPLES`], so the first preview shows
+    /// after an eighth of the trace and each pass costs one page encode.
+    pub const DEFAULT_SAMPLES_PER_PASS: u32 = 8;
     /// Unity's default *Backface Tolerance*: a texel is valid when nine in ten of
     /// its probes see front faces (#1949).
     pub const DEFAULT_BACKFACE_TOLERANCE: f32 = 0.9;
@@ -78,6 +92,12 @@ impl BakeSettings {
     pub const TEXELS_PER_UNIT: RangeInclusive<f32> = 0.25..=64.0;
     /// The samples per texel a bake takes.
     pub const SAMPLES: RangeInclusive<u32> = 1..=4096;
+    /// How many passes a progressive bake makes: [`Self::samples`] in steps of
+    /// [`Self::samples_per_pass`] (0 held to 1), the last pass taking the rest.
+    pub fn passes(&self) -> u32 {
+        self.samples.max(1).div_ceil(self.samples_per_pass.max(1))
+    }
+
     /// The bounces a bake takes.
     pub const BOUNCES: RangeInclusive<u32> = 1..=16;
     /// The page edges a bake takes (Unity's 32–4096), each a power of two.
@@ -115,6 +135,7 @@ impl BakeSettings {
             texels_per_unit: texels
                 .clamp(*Self::TEXELS_PER_UNIT.start(), *Self::TEXELS_PER_UNIT.end()),
             samples: clamp(self.samples, Self::SAMPLES),
+            samples_per_pass: clamp(self.samples_per_pass, Self::SAMPLES),
             bounces: clamp(self.bounces, Self::BOUNCES),
             max_lightmap_size: self.page(),
             backface_tolerance: Self::backface_tolerance_of(self.backface_tolerance),

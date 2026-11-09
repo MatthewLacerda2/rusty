@@ -134,7 +134,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         materials: (*scene.materials).clone(),
         probes: scene.probes.clone(),
         reflection_probes: scene.reflection_probes.clone(),
-        lightmaps: (*scene.lightmaps).clone(),
+        lightmaps: scene.lightmaps.saved().clone(),
         lighting_settings: scene.lighting_settings,
     }
 }

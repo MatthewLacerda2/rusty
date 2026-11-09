@@ -64,9 +64,20 @@ pub struct LightmapSet {
     /// until a bake gives it a channel.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub fell_back: BTreeSet<u32>,
+    /// While a progressive bake's preview is shown (#1970), the lightmaps the
+    /// scene had before the bake: what a save writes ([`Self::saved`]) and what
+    /// a cancel puts back. Never serialized.
+    #[serde(skip)]
+    pub shown_over: Option<Box<LightmapSet>>,
 }
 
 impl LightmapSet {
+    /// The lightmaps a save writes: these, or while a preview is shown the ones it
+    /// is shown over ([`Self::shown_over`]), so a preview's pages never reach a file.
+    pub fn saved(&self) -> &LightmapSet {
+        self.shown_over.as_deref().unwrap_or(self)
+    }
+
     /// Where `entity`'s lightmap is, if it has one.
     pub fn get(&self, entity: u32) -> Option<&LightmapEntry> {
         self.entries.get(&entity)

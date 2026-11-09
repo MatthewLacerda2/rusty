@@ -112,6 +112,7 @@ pub(super) fn bake(scene: &mut Scene, name: &str, directional: bool) -> String {
         filter_radius: 1,
         directional,
         backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
+        ..Default::default()
     };
     assert!(bake_scene_lightmaps(scene, Some(&path), &settings).is_ok_and(|n| n > 0));
     path

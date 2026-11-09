@@ -2,7 +2,9 @@
 //! from `(seed, mesh, texel)`. Every texel draws from its own stream, so the result
 //! is a pure function of the inputs however the texels are spread across threads.
 
-/// SplitMix64 state. Not shared: one per texel.
+/// SplitMix64 state. Not shared: one per texel. A progressive bake keeps each
+/// texel's between its passes (#1970), so it is `Clone`.
+#[derive(Clone, Debug)]
 pub(in crate::scene::lighting) struct Rng(u64);
 
 impl Rng {
@@ -18,6 +20,13 @@ impl Rng {
     /// [`Self::new`]'s, so how many paths the texel traces never moves them.
     pub(in crate::scene::lighting) fn probes(seed: u64, mesh: u64, texel: u64) -> Self {
         Self::new(seed ^ 0x6a09_e667_f3bc_c909, mesh, texel)
+    }
+
+    /// The stream a progressive bake draws texel `texel`'s displayed direct light
+    /// from (#1970): its own, so what is shown between passes never moves the
+    /// stream the finished texel is drawn from.
+    pub(in crate::scene::lighting) fn preview(seed: u64, mesh: u64, texel: u64) -> Self {
+        Self::new(seed ^ 0xbb67_ae85_84ca_a73b, mesh, texel)
     }
 
     /// The next value, uniform in `[0, 1)`.

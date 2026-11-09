@@ -67,12 +67,33 @@ where
     L: Send,
     T: Send,
 {
+    run_first(charts, threads, progress, &|_, _| false, trace, finish)
+}
+
+/// [`run`], the batches `first(chart, batch)` picks (`batch` its index in its
+/// chart) queued ahead of the rest, each group in chart order (#1970's Prioritize
+/// View). Only the order the batches are taken in moves: results still come back
+/// in item order.
+pub(in crate::scene::lighting) fn run_first<P, L, T>(
+    charts: Vec<Vec<P>>,
+    threads: usize,
+    progress: &BakeProgress,
+    first: &(dyn Fn(usize, usize) -> bool + Sync),
+    trace: impl Fn(usize, usize, &[P]) -> Vec<L> + Sync,
+    finish: impl Fn(usize, Vec<P>, Vec<L>) -> T + Sync,
+) -> Option<Vec<T>>
+where
+    P: Send + Sync,
+    L: Send,
+    T: Send,
+{
     // An empty chart still gets one (empty) batch, so it is finished like the rest.
-    let batches: Vec<(usize, usize)> = charts
+    let mut batches: Vec<(usize, usize)> = charts
         .iter()
         .enumerate()
         .flat_map(|(c, items)| (0..items.len().max(1)).step_by(BATCH).map(move |s| (c, s)))
         .collect();
+    batches.sort_by_key(|&(c, s)| !first(c, s / BATCH));
     let slots: Vec<Slot<P, L, T>> = charts.into_iter().map(Slot::new).collect();
     let next = AtomicUsize::new(0);
     let work = || loop {

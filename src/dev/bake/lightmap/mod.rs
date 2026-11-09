@@ -42,10 +42,13 @@ use crate::scene::Scene;
 pub mod job;
 pub(in crate::dev::bake) mod logged;
 mod pages;
+mod preview;
+mod write;
 pub use job::{BakeOutcome, LightmapBakeJob};
+pub use pages::{encode_pages, EncodedPages};
 #[cfg(test)]
-use pages::content_tag;
-pub use pages::{apply_encoded, apply_lightmaps, encode_pages, EncodedPages};
+use write::content_tag;
+pub use write::{apply_encoded, apply_lightmaps};
 
 /// The lightmap folder for a scene: `foo.scene` → `foo.scene.lightmaps/`. What
 /// lies in it is a baked page, which the texture importer leaves alone

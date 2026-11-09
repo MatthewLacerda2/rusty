@@ -18,7 +18,7 @@ use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use super::bake::LightmapDenoiser;
+use super::bake::{LightmapDenoiser, Pass};
 
 /// Who hears a lightmap bake's batches (#1891): the platform, which times them. Every
 /// call returns nothing, so an observer can watch the bake but never steer it. A
@@ -58,7 +58,8 @@ impl fmt::Debug for Trained {
 }
 
 /// Texels traced so far out of the bake's total, the meshes finished out of theirs
-/// (#1667), the pages encoded out of theirs (#1694), plus a cancel request, and for an
+/// (#1667), the pages encoded out of theirs (#1694), a progressive bake's passes
+/// and the paths per texel they have traced (#1970), plus a cancel request, and for an
 /// observed one the [`BakeObserver`] its batches are reported to (#1891).
 #[derive(Debug, Default)]
 pub struct BakeProgress {
@@ -68,6 +69,10 @@ pub struct BakeProgress {
     meshes_total: AtomicU64,
     pages_done: AtomicU64,
     pages_total: AtomicU64,
+    passes_done: AtomicU64,
+    passes_total: AtomicU64,
+    samples_done: AtomicU64,
+    samples_total: AtomicU64,
     cancelled: AtomicBool,
     observer: Observer,
     denoiser: Trained,
@@ -123,6 +128,30 @@ impl BakeProgress {
     pub fn pages(&self) -> Option<(u64, u64)> {
         let total = self.pages_total.load(Ordering::Relaxed);
         (total > 0).then(|| (self.pages_done.load(Ordering::Relaxed), total))
+    }
+
+    /// A progressive bake's passes so far (#1970); `None` for a one-shot bake.
+    pub fn passes(&self) -> Option<Pass> {
+        let load = |n: &AtomicU64| n.load(Ordering::Relaxed) as u32;
+        let passes = load(&self.passes_total);
+        (passes > 0).then(|| Pass {
+            done: load(&self.passes_done),
+            passes,
+            samples: load(&self.samples_done),
+            target: load(&self.samples_total),
+        })
+    }
+
+    /// A progressive bake makes `total` passes, `samples` paths per texel in all.
+    pub(super) fn set_passes(&self, total: u64, samples: u64) {
+        self.samples_total.store(samples, Ordering::Relaxed);
+        self.passes_total.store(total, Ordering::Relaxed);
+    }
+
+    /// A pass is finished: `done` of them, `samples` paths per texel traced so far.
+    pub(super) fn pass_done(&self, done: u64, samples: u64) {
+        self.samples_done.store(samples, Ordering::Relaxed);
+        self.passes_done.store(done, Ordering::Relaxed);
     }
 
     /// The encode has begun: it makes `total` pages (colour and direction alike).
