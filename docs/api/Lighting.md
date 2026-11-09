@@ -22,8 +22,8 @@ first.
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
 | `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the counts `0` when nothing occludes, and `tooLarge` (a boolean) `true`, with `cells` and `bytes` `0` and no PVS kept, when the level is too large to cull |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, samplesPerPass, prioritizeView, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, samplesPerPass?, prioritizeView?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
@@ -31,7 +31,8 @@ first.
 ### Generate Lighting
 
 - **Settings live with the scene** (Unity's Lighting Settings): texels per unit, samples,
-  bounces, seed, Max Lightmap Size, the denoiser, Backface Tolerance and the directional mode are saved in the scene file's
+  bounces, seed, Max Lightmap Size, the denoiser, Backface Tolerance, the directional mode and
+  the progressive bake's samples per pass and Prioritize View are saved in the scene file's
   `lighting_settings` block, so a rebake never asks for them again.
   `Lighting.SetSettings{ samples = 256 }` changes only the fields it names (each clamped
   to the editor's range: `0.25`–`64` texels per unit, `1`–`4096` samples, `1`–`16`
@@ -102,7 +103,9 @@ first.
   probe step needs a GPU/software adapter and skips gracefully without one, as
   `Lighting.Bake` does.
 - **In the editor** the lightmap step runs in the background (#808) with a progress
-  bar and **Cancel**; a cancelled run writes nothing and keeps the old lighting. When
+  bar and **Cancel**, and **progressively** (#1970, *Progressive bake*, below): the
+  whole scene sharpens in place pass by pass. A cancelled run writes nothing and keeps
+  the old lighting. When
   the lightmaps land they are applied (the probes are captured under them), then the
   probe step runs a step a frame and the console logs one summary line at the end.
   The probe step's placement is planned whole in the frame it starts: about 0.75 s
@@ -264,12 +267,34 @@ afterward to persist the baked SH (`<scene>.lighting.json`) and the cubemap path
 `Lighting.BakeLightmaps()` (#438) bakes per-texel lighting for **static geometry**: bounce
 light, the sky, emissive surfaces, and the direct light of `Baked` lights (see the light
 **Mode** in [`Light`](Light.md)). It is the lightmap half of Generate Lighting; the
-editor's button runs this exact path as its first step, in the background (#808): the
-window stays live, a progress bar counts texels done and then the pages it encodes
-("Encoding page k of n"), and **Cancel** stops the bake, during the trace or the encode,
-and keeps the previous lightmaps. The result is applied when the bake finishes,
-byte-identical to the script verb's; a bake whose scene was swapped out meanwhile is
-dropped. The script verb itself stays synchronous. An argument left out takes the
+editor's button runs the same bake as its first step, in the background (#808) and
+progressively (#1970): the window stays live, a progress bar counts texels done (over
+every pass) and then the pages it encodes ("Encoding page k of n"), and **Cancel** stops
+the bake, during the trace or the encode, and keeps the previous lightmaps. The result
+is applied when the bake finishes, byte-identical to the script verb's; a bake whose
+scene was swapped out meanwhile is dropped. The script verb itself stays synchronous
+and one-shot, as does `Lighting.Generate()`.
+
+- **Progressive bake** (#1970, Unity's Progressive Lightmapper; the editor's Generate
+  Lighting). The trace runs in passes over **every texel of the scene**, not mesh by
+  mesh: each pass adds `samplesPerPass` paths (default `8`, `1`–`4096`; eight passes at
+  the default 64 samples) to every texel, up to `samples`. After each pass but the last
+  the live scene shows the lightmaps as they stand: the paths so far averaged, buried
+  texels filled, the bounce cleaned by the denoiser, packed into pages. They are written
+  as `lightmap_preview_*` pages in the scene's lightmap folder. The card and the log say
+  the pass, the samples so far and the time left at the pace so far
+  (`[LightmapBake] lightmaps pass 3/8 (24/64 samples), about 3m 05s left`).
+  **The finished bake's bytes are the one-shot bake's** at the same settings and seed:
+  each texel keeps its own seeded stream and its running sums between passes, so the
+  pass size never shows. Only a finished bake is written: a save during the bake
+  writes the scene's previous lightmaps, never a preview, and **Cancel** puts them
+  back and removes the preview pages. Each shown pass costs one page encode, so a
+  smaller `samplesPerPass` refreshes more often and bakes a little longer.
+  Rebaking on edit (Unity's *Auto Generate*) is not built yet.
+- **Prioritize View** (`prioritizeView`, default `true`, Unity's setting of that name).
+  Each pass traces the texels the **Scene view's** camera sees first: in its frustum,
+  facing it, with nothing static in between (one ray per texel, before the first
+  pass). Only the order changes, never the bytes; off, the meshes go in scene order. An argument left out takes the
 scene's lighting settings (above), whose defaults are the ones listed here.
 
 - **Who gets one.** Every active, **static**, opaque mesh with a **second UV map** (the

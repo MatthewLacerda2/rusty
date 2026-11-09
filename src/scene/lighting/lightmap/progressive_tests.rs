@@ -125,3 +125,19 @@ fn a_cancelled_progressive_bake_returns_nothing() {
     let out = progressive_on(&lit(), &s, &progress, (None, 2), &mut |_, _| heard += 1);
     assert!(out.is_none() && heard == 0);
 }
+
+#[test]
+fn passes_cover_the_samples_the_last_taking_the_rest() {
+    let passes = |samples, samples_per_pass| {
+        let s = BakeSettings {
+            samples,
+            samples_per_pass,
+            ..settings()
+        };
+        s.sanitized().passes()
+    };
+    assert_eq!(
+        (passes(64, 8), passes(10, 4), passes(4, 64), passes(5, 0)),
+        (8, 3, 1, 5)
+    );
+}

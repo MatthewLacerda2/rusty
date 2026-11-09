@@ -6,7 +6,8 @@
 //! Max Lightmap Size included, #1704, and the
 //! reflection probes' default resolution, memory budget and probe ceiling, #1584,
 //! and the scene's diffuse model, #1698, and the lightmaps' denoiser, #1884, and
-//! Backface Tolerance, #1949).
+//! Backface Tolerance, #1949, and the progressive bake's samples per pass and
+//! Prioritize View, #1970).
 
 use std::cell::RefCell;
 
@@ -37,6 +38,9 @@ pub(super) struct Overrides {
     pub denoiser: Option<Denoiser>,
     /// Backface Tolerance (#1949).
     pub backface_tolerance: Option<f32>,
+    /// A progressive bake's paths per texel per pass, and Prioritize View (#1970).
+    pub samples_per_pass: Option<u32>,
+    pub prioritize_view: Option<bool>,
 }
 
 impl Overrides {
@@ -52,6 +56,8 @@ impl Overrides {
             max_lightmap_size: self.max_lightmap_size.unwrap_or(base.max_lightmap_size),
             denoiser: self.denoiser.unwrap_or(base.denoiser),
             backface_tolerance: self.backface_tolerance.unwrap_or(base.backface_tolerance),
+            samples_per_pass: self.samples_per_pass.unwrap_or(base.samples_per_pass),
+            prioritize_view: self.prioritize_view.unwrap_or(base.prioritize_view),
             ..base
         }
         .sanitized()
@@ -67,6 +73,8 @@ impl Overrides {
             max_lightmap_size: t.get("maxLightmapSize")?,
             denoiser: denoiser(t)?,
             backface_tolerance: t.get("backfaceTolerance")?,
+            samples_per_pass: t.get("samplesPerPass")?,
+            prioritize_view: t.get("prioritizeView")?,
         })
     }
 }
@@ -162,6 +170,8 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
             out.set("maxLightmapSize", s.max_lightmap_size)?;
             out.set("denoiser", s.denoiser.name())?;
             out.set("backfaceTolerance", s.backface_tolerance)?;
+            out.set("samplesPerPass", s.samples_per_pass)?;
+            out.set("prioritizeView", s.prioritize_view)?;
             out.set("diffuseModel", settings.diffuse_model.name())?;
             out.set("mixedLightingMode", settings.mixed_lighting_mode.name())?;
             put_reflections(&out, &r)?;

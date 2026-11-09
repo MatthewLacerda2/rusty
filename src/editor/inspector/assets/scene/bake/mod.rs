@@ -7,7 +7,10 @@
 //!
 //! The lightmap step runs in the background (#808): the button starts a
 //! [`LightmapBakeJob`], the card shows its progress with a Cancel button, and
-//! [`poll`] applies the result on the UI thread when the worker finishes. The probe
+//! [`poll`] applies the result on the UI thread when the worker finishes. The bake
+//! is progressive (#1970): [`poll`] shows each finished pass on the live scene, the
+//! card says the pass, the samples so far and the time left, and the Scene view's
+//! camera is the bake's Prioritize View. The probe
 //! step then runs one step a frame (#1602, Unity's `BakeAsync`): the probes capture
 //! through the GPU, so they stay on the UI thread, but no frame waits on more than a
 //! reflection probe or a few light probes, and the editor and the MCP keep answering.

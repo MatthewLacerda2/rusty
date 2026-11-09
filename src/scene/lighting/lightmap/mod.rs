@@ -19,7 +19,9 @@
 //! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
 //!   `progress` ([`BakeProgress`], #808); its `pool` is the one work pool every
 //!   mesh's texels share, in fixed-size batches (#1656), and the mesh-map baker
-//!   runs its texels on too (`run_pool`, #1849);
+//!   runs its texels on too (`run_pool`, #1849); its `progressive` bake
+//!   ([`bake_progressive`], #1970) runs the trace in passes over every texel, each
+//!   pass shown, the camera's texels first (`view`, [`BakeView`]), to the same bytes;
 //! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
 //!   a cell its BC blocks and first [`MIP_LEVELS`] mips never leave (#1694);
 //! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, the RGBA8 direction
