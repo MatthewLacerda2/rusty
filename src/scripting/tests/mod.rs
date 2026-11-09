@@ -8,6 +8,7 @@ mod cells_attach;
 mod class_revisions;
 mod classes;
 mod collider;
+mod collision_mesh;
 mod collisions;
 mod console;
 mod coroutines;

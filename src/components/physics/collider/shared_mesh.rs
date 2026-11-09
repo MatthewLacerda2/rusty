@@ -9,12 +9,15 @@
 //! of its model, and on an undo, whose record leaves it out as it leaves out a
 //! Mesh's ([`SharedMesh::without_geometry`]). The entity's own Mesh, when it has
 //! one, wins.
+//!
+//! The same type carries a collider's authored collision mesh
+//! (`ColliderComponent::collision_mesh`, #1960), rebuilt the same ways.
 
 use serde::{Deserialize, Serialize};
 
 use crate::components::mesh::MeshComponent;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SharedMesh {
     /// The removed Mesh's `primitive_type`: a primitive's name, or `"Asset"`.
     pub primitive_type: String,
@@ -34,6 +37,20 @@ pub struct SharedMesh {
 
 fn one() -> u32 {
     1
+}
+
+/// Subdivisions start at 1, as the serde default and [`MeshComponent`] do: a 0 is
+/// held back to 1 with a warning on every rebuild (#1960's review).
+impl Default for SharedMesh {
+    fn default() -> Self {
+        Self {
+            primitive_type: String::new(),
+            asset_ref: None,
+            subdivisions: one(),
+            positions: Vec::new(),
+            indices: Vec::new(),
+        }
+    }
 }
 
 fn is_one(n: &u32) -> bool {

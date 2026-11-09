@@ -219,6 +219,11 @@ scene.entities[].character_controller: option
 scene.entities[].children: seq
 scene.entities[].children[]: u32
 scene.entities[].collider.active: bool
+scene.entities[].collider.collision_mesh.asset_ref: option
+scene.entities[].collider.collision_mesh.asset_ref: string
+scene.entities[].collider.collision_mesh.primitive_type: string
+scene.entities[].collider.collision_mesh.subdivisions: u32
+scene.entities[].collider.collision_mesh: option
 scene.entities[].collider.is_trigger: bool
 scene.entities[].collider.material.bounce_combine: enum Average|Minimum|Multiply|Maximum
 scene.entities[].collider.material.bounciness: f32

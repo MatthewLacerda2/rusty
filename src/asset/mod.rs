@@ -60,7 +60,7 @@ pub use material_range::MaterialRange;
 pub use mesh_data::{ImportedAsset, JointTransform, MaterialData, MeshVertex, SkinData, SubMesh};
 pub use model_node::{ModelNode, NodeBone};
 pub use reference::{AssetRef, REF_SEPARATOR};
-pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind};
+pub use sidecar::{import_and_sync_sidecar, ImportSettings, MeshColliderKind, SubObjectCollider};
 
 use crate::core::paths;
 use std::path::Path;

@@ -12,6 +12,10 @@
 //! The `_LOD<n>` nodes under one parent sharing a base (and Blender's `.001`
 //! duplicate suffix) become one LODGroup where the first of them sits (`lod`).
 //!
+//! A node placing a mesh the sidecar names as another's collision mesh (#1960,
+//! `scene::asset_instance::collision`) is not spawned: it is a collider, never drawn.
+//! One that other nodes hang from is spawned empty, so they keep their parent.
+//!
 //! The spawn is a **linked prefab instance of the model** (#1637, Unity's model
 //! prefab): [`model_prefab`] builds the tree in a scratch scene and extracts it as
 //! a [`PrefabData`], and [`instantiate_model`] stamps that with a link to the file
@@ -23,11 +27,13 @@
 
 mod lod;
 
+use std::borrow::Cow;
+
 use glam::{Mat4, Vec3};
 
 use crate::asset::{Imported, ModelNode};
 use crate::components::TransformComponent;
-use crate::scene::asset_instance::instantiate_imported;
+use crate::scene::asset_instance::{collision_sub_objects, instantiate_imported};
 use crate::scene::prefab::instantiate_prefab_linked;
 use crate::scene::prefab::PrefabData;
 use crate::scene::{extract_prefab, Scene};
@@ -93,9 +99,23 @@ fn spawn_tree(scene: &mut Scene, path: &str, asset: &Imported) -> u32 {
     let nodes = asset.node_tree();
     let mut lods = lod::Lods::default();
     let mut spawned: Vec<u32> = Vec::with_capacity(nodes.len());
-    for node in nodes.iter() {
+    let collision = collision_sub_objects(path);
+    for (index, node) in nodes.iter().enumerate() {
         let parent = node.parent.and_then(|p| spawned.get(p).copied());
         let (holder, held) = holder(scene, node, parent.unwrap_or(root));
+        // A collision mesh is another node's collider, never drawn (#1960): no
+        // entity, or an empty one when nodes hang from it.
+        let node = &match node.mesh.as_ref().filter(|m| collision.contains(*m)) {
+            None => Cow::Borrowed(node),
+            Some(_) if !nodes.iter().any(|n| n.parent == Some(index)) => {
+                spawned.push(holder);
+                continue;
+            }
+            Some(_) => Cow::Owned(ModelNode {
+                mesh: None,
+                ..node.clone()
+            }),
+        };
         let id = match lods.group_for(scene, node, holder, held) {
             Some((group, at)) => {
                 let id = spawn_node(scene, path, asset, node, group);

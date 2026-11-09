@@ -1,3 +1,4 @@
+use crate::asset::{MeshColliderKind, SubObjectCollider};
 use crate::editor::widgets::DragRange;
 use crate::editor::EditorUi;
 use crate::scene::Scene;
@@ -124,8 +125,8 @@ fn draw_lightmap_uvs(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
 }
 
 /// List the addressable sub-objects the source file exposes (`path::<id>`) and,
-/// per sub-object, a "Mesh Collider" toggle whose trimesh/convex choice persists in
-/// the `.meta` sidecar (#77). Reads the sidecar's cached map when present, else
+/// per sub-object, a "Mesh Collider" toggle whose trimesh/convex choice and collision
+/// mesh persist in the `.meta` sidecar (#77, #1960). Reads the sidecar's cached map when present, else
 /// imports the file once and writes the sidecar.
 fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
     let mut settings = match crate::asset::sidecar::load(Path::new(path)) {
@@ -147,7 +148,7 @@ fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
     } else {
         let mut changed = false;
         for id in &ids {
-            changed |= sub_object_row(ui, path, &mut settings.colliders, id);
+            changed |= sub_object_row(ui, path, &mut settings.colliders, &ids, id);
         }
         if changed {
             let _ = crate::asset::sidecar::save(Path::new(path), &settings);
@@ -158,17 +159,20 @@ fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
     ui.add_space(5.0);
 }
 
-/// One sub-object row: its `file::id` label plus the mesh-collider toggle and
-/// trimesh/convex selector. Returns `true` if the collider choice changed.
+/// One sub-object row: its `file::id` label plus the mesh-collider toggle, the
+/// trimesh/convex selector and the collision mesh it builds from (#1960: its own,
+/// or another sub-object of the file). Returns `true` if the collider choice changed.
 fn sub_object_row(
     ui: &mut egui::Ui,
     path: &str,
-    colliders: &mut std::collections::BTreeMap<String, crate::asset::MeshColliderKind>,
+    colliders: &mut std::collections::BTreeMap<String, SubObjectCollider>,
+    ids: &[String],
     id: &str,
 ) -> bool {
-    use crate::asset::MeshColliderKind;
-    let mut generate = colliders.contains_key(id);
-    let mut convex = colliders.get(id).map(|k| k.is_convex()).unwrap_or(false);
+    let stored = colliders.get(id).cloned();
+    let mut generate = stored.is_some();
+    let mut convex = stored.as_ref().is_some_and(|c| c.kind.is_convex());
+    let mut mesh = stored.as_ref().and_then(|c| c.mesh.clone());
 
     ui.horizontal(|ui| {
         let file = std::path::Path::new(path)
@@ -186,24 +190,62 @@ fn sub_object_row(
                 });
         }
     });
+    // Its own line: the row above is already as wide as a narrow inspector.
+    if generate {
+        ui.horizontal_wrapped(|ui| {
+            ui.add_space(12.0);
+            ui.label("Collision mesh");
+            collision_mesh_combo(ui, &mut mesh, colliders, ids, id);
+        });
+    }
 
-    let new = generate.then_some(if convex {
+    let kind = if convex {
         MeshColliderKind::Convex
     } else {
         MeshColliderKind::TriMesh
-    });
-    if colliders.get(id).copied() == new {
+    };
+    let new = generate.then_some(SubObjectCollider { kind, mesh });
+    if stored == new {
         return false;
     }
     match new {
-        Some(kind) => {
-            colliders.insert(id.to_string(), kind);
+        Some(entry) => {
+            colliders.insert(id.to_string(), entry);
         }
         None => {
             colliders.remove(id);
         }
     }
     true
+}
+
+/// The collision-mesh combo of `id`'s row (#1960): its own mesh, or another
+/// sub-object of the file, which a whole-model spawn then never draws. A sub-object
+/// whose own collision mesh leads back to `id` is not offered: the two would name
+/// each other and neither be drawn (`sidecar::closes_loop`).
+fn collision_mesh_combo(
+    ui: &mut egui::Ui,
+    mesh: &mut Option<String>,
+    colliders: &std::collections::BTreeMap<String, SubObjectCollider>,
+    ids: &[String],
+    id: &str,
+) {
+    let offered = |o: &&String| *o != id && !crate::asset::sidecar::closes_loop(colliders, id, o);
+    egui::ComboBox::from_id_salt(format!("mesh_collider_mesh_{id}"))
+        .selected_text(mesh.as_deref().unwrap_or("Own mesh"))
+        .show_ui(ui, |ui| {
+            ui.selectable_value(mesh, None, "Own mesh");
+            for other in ids.iter().filter(offered) {
+                ui.selectable_value(mesh, Some(other.clone()), other);
+            }
+        })
+        .response
+        .on_hover_text(
+            "The sub-object this collider builds from: one chosen here is no longer drawn",
+        );
+    if let Some(other) = mesh {
+        ui.weak(format!("{other} is not drawn"));
+    }
 }
 
 /// Import the source file and instantiate it as Unity's model prefab (#1083): a

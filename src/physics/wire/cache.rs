@@ -2,7 +2,8 @@
 //! physics builds the shape from changes.
 //!
 //! **What moves a wire.** The inputs `shape::build::collider_inputs` reads: the
-//! Collider (shape, `active`, `is_trigger`, its shared mesh), the entity's Mesh, a
+//! Collider (shape, `active`, `is_trigger`, its kept shared mesh and its collision
+//! mesh, #1960), the entity's Mesh, a
 //! CharacterController, the world scale (within a relative 1e-5, so a turning
 //! parent's float noise is no change) and whether its body is dynamic (a concave
 //! mesh is decomposed on one, #1886). The three columns are read off the World's

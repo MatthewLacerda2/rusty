@@ -103,6 +103,7 @@ pub(crate) fn collider_value(c: &ColliderComponent) -> Value {
             "bounce_combine": m.bounce_combine.name(),
         },
         "material_asset": c.material_asset,
+        "collision_mesh": c.collision_mesh.as_ref().and_then(|m| m.asset_ref.as_deref()),
     })
 }
 
