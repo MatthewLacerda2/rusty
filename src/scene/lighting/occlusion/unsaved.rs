@@ -9,7 +9,7 @@ use crate::components::MaterialAsset;
 use crate::scene::Scene;
 
 /// The material keys the baked meshes draw that a fresh load of a scene file
-/// whose library is `saved` reads otherwise as an occluder ([`as_occluder`]; a key
+/// whose library is `saved` reads otherwise as an occluder (`as_occluder`; a key
 /// `saved` lacks reads as the engine's default). The bake fingerprints the live
 /// library, so those meshes will not match it on that load (#1958): a material a
 /// script defined in memory and the file never got.

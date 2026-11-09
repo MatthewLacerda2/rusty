@@ -63,7 +63,7 @@ pub(super) struct Object {
 
 /// The scene-wide facts a fingerprint reads, gathered once: the renderers every
 /// `LODGroup` holds (which never occlude: the drawn level moves with the camera),
-/// and each geometry's [`corners_hash`], kept by its revision so a re-check of an
+/// and each geometry's `corners_hash`, kept by its revision so a re-check of an
 /// unchanged level hashes no vertex.
 #[derive(Default)]
 pub struct Fingerprints {
@@ -118,7 +118,7 @@ impl Fingerprints {
     }
 
     /// Entity `id`'s fingerprint and whether it occludes, `None` when it takes no
-    /// part in the bake ([`takes_part`]) or draws no triangle.
+    /// part in the bake (`takes_part`) or draws no triangle.
     pub fn of(&self, scene: &Scene, id: u32) -> Option<(u64, bool)> {
         let mesh = scene.world.mesh(id)?;
         let read = self.read(scene, id, &mesh)?;
