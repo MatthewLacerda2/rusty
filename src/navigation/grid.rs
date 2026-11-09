@@ -12,7 +12,8 @@ pub struct NavSpan {
     /// World `y` of the underside of the next solid above, or `f32::INFINITY`.
     pub ceiling: f32,
     /// The navigation area the span belongs to (#460): `WALKABLE_AREA` unless a
-    /// `NavMeshModifierVolume` assigned another at bake time.
+    /// `NavMeshModifier` (#1959) or a `NavMeshModifierVolume` assigned another at
+    /// bake time.
     pub area: u8,
     /// The floor's shape across the cell (#781): where an agent on it stands. `y`
     /// stays the cell's highest point, which connectivity compares.

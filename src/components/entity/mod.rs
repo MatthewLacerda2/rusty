@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::NavMeshModifierComponent;
 use super::ShapeComponent;
 use super::{AIPerceptionComponent, ReverbZoneComponent, TrailComponent};
 use super::{
@@ -79,6 +80,9 @@ pub struct Entity {
     /// A navigation-area modifier volume (#460).
     #[serde(default)]
     pub nav_modifier: Option<NavMeshModifierVolumeComponent>,
+    /// How the navmesh bake reads this object's colliders (#1959).
+    #[serde(default)]
+    pub nav_mesh_modifier: Option<NavMeshModifierComponent>,
     /// What the agent can sense: sight, hearing and damage (#1900).
     #[serde(default)]
     pub ai_perception: Option<AIPerceptionComponent>,
@@ -191,6 +195,7 @@ impl Entity {
             nav_obstacle: None,
             offmesh_link: None,
             nav_modifier: None,
+            nav_mesh_modifier: None,
             ai_perception: None,
             camera: None,
             post_processing: None,
