@@ -79,13 +79,12 @@ pub fn build(
     indices: &mut [u32],
     runs: &[MaterialRange],
 ) -> Option<Clusters> {
-    let whole = [0..indices.len() as u32];
     let runs: Vec<Range<u32>> = match runs.is_empty() {
-        true => whole.to_vec(),
+        true => std::iter::once(0..indices.len() as u32).collect(),
         false => runs.iter().map(|r| r.indices.clone()).collect(),
     };
     let fits = indices.len() / 3 >= MIN_TRIANGLES
-        && indices.len() % 3 == 0
+        && indices.len().is_multiple_of(3)
         && covers(&runs, indices.len() as u32)
         && indices.iter().all(|&i| (i as usize) < positions.len())
         && positions.iter().flatten().all(|c| c.is_finite());
@@ -115,7 +114,7 @@ pub fn build(
 fn covers(runs: &[Range<u32>], count: u32) -> bool {
     let mut at = 0;
     for run in runs {
-        if run.start != at || run.end < run.start || (run.end - run.start) % 3 != 0 {
+        if run.start != at || run.end < run.start || !(run.end - run.start).is_multiple_of(3) {
             return false;
         }
         at = run.end;

@@ -7,6 +7,12 @@ use super::{GpuMesh, MeshId, Renderer, SkinBounds};
 use crate::components::mesh::{MeshRevision, Vertex};
 use crate::scene::Scene;
 
+/// A mesh index buffer's usage: STORAGE too, since the cluster cull copies a
+/// clustered mesh's runs from it (#1968).
+const INDEX_USAGE: wgpu::BufferUsages = wgpu::BufferUsages::INDEX
+    .union(wgpu::BufferUsages::STORAGE)
+    .union(wgpu::BufferUsages::COPY_DST);
+
 /// The local-space AABB `(min, max)` over a mesh's vertices. Callers upload only
 /// non-empty geometry, so the fold always sees at least one vertex; an empty slice
 /// degenerates to a zero-extent box at the origin (never rendered).
@@ -149,10 +155,7 @@ impl Renderer {
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                 label: Some(&format!("Mesh Indices ({})", id.0)),
                 contents: i_bytes,
-                // STORAGE: the cluster cull copies a clustered mesh's runs (#1968).
-                usage: wgpu::BufferUsages::INDEX
-                    | wgpu::BufferUsages::STORAGE
-                    | wgpu::BufferUsages::COPY_DST,
+                usage: INDEX_USAGE,
             });
 
         self.gpu_meshes.insert(

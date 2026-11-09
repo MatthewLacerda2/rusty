@@ -104,6 +104,43 @@ impl Renderer {
         batches: usize,
     ) -> ClusterDraws {
         self.upload_clusters(cull, plan, (pyramid, view_proj));
+        self.bind_clusters(cull, (pyramid, visible));
+        let group = cull.group.value().expect("made above");
+        encoder.clear_buffer(cull.state.buffer(), 0, Some(4));
+        #[cfg(test)]
+        {
+            cull.ran = plan.jobs.len() as u32;
+        }
+        let pipes = &self.hiz.clusters;
+        for (r, run) in plan.runs.iter().enumerate() {
+            let mesh = self.gpu_mesh_of(run.mesh).and_then(|m| m.clusters.as_ref());
+            let mesh = &mesh
+                .expect("planned this frame from a resident clustered mesh")
+                .group;
+            let offset = [r as u32 * RUN_STRIDE as u32];
+            let jobs = run.jobs.len() as u32;
+            let mut pass = encoder.begin_compute_pass(&Default::default());
+            pass.set_bind_group(0, group, &offset);
+            pass.set_bind_group(1, mesh, &[]);
+            pass.set_pipeline(pipes.test.get());
+            pass.dispatch_workgroups((jobs * run.clusters).div_ceil(64), 1, 1);
+            pass.set_pipeline(pipes.scan.get());
+            pass.dispatch_workgroups(jobs.div_ceil(64), 1, 1);
+            pass.set_pipeline(pipes.copy.get());
+            pass.dispatch_workgroups(run.clusters, jobs, 1);
+        }
+        cull.counter
+            .copy(&self.device, encoder, (cull.state.buffer(), 4));
+        ClusterDraws {
+            indices: cull.out_indices.buffer().clone(),
+            args: cull.out_args.buffer().clone(),
+            draws: Arc::new(plan.draws(batches)),
+        }
+    }
+
+    /// Bind `cull`'s group 0, rebuilt only when a buffer or the pyramid it
+    /// names was replaced.
+    fn bind_clusters(&self, cull: &mut ClusterCull, (pyramid, visible): (&Pyramid, &wgpu::Buffer)) {
         let key = (
             [
                 cull.params.clone(),
@@ -125,37 +162,6 @@ impl Renderer {
             super::layout::cull_group(device, layout, &buffers, &pyramid.view)
         });
         cull.group = kept;
-        let group = cull.group.value().expect("made above");
-        encoder.clear_buffer(cull.state.buffer(), 0, Some(4));
-        #[cfg(test)]
-        {
-            cull.ran = plan.jobs.len() as u32;
-        }
-        let pipes = &self.hiz.clusters;
-        for (r, run) in plan.runs.iter().enumerate() {
-            let mesh = self.gpu_mesh_of(run.mesh).and_then(|m| m.clusters.as_ref());
-            let Some(mesh) = mesh.map(|c| &c.group) else {
-                continue;
-            };
-            let offset = [r as u32 * RUN_STRIDE as u32];
-            let jobs = run.jobs.len() as u32;
-            let mut pass = encoder.begin_compute_pass(&Default::default());
-            pass.set_bind_group(0, group, &offset);
-            pass.set_bind_group(1, mesh, &[]);
-            pass.set_pipeline(pipes.test.get());
-            pass.dispatch_workgroups((jobs * run.clusters).div_ceil(64), 1, 1);
-            pass.set_pipeline(pipes.scan.get());
-            pass.dispatch_workgroups(jobs.div_ceil(64), 1, 1);
-            pass.set_pipeline(pipes.copy.get());
-            pass.dispatch_workgroups(run.clusters, jobs, 1);
-        }
-        cull.counter
-            .copy(&self.device, encoder, (cull.state.buffer(), 4));
-        ClusterDraws {
-            indices: cull.out_indices.buffer().clone(),
-            args: cull.out_args.buffer().clone(),
-            draws: Arc::new(plan.draws(batches)),
-        }
     }
 
     /// Write `plan`'s jobs, runs and the camera's params into `cull`'s buffers.

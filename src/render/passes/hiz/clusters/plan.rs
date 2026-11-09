@@ -12,8 +12,9 @@ use crate::render::InstanceData;
 /// The most output indices one camera's clustered draws may hold (32 MB): a
 /// batch that would pass it is drawn whole, by the per-instance test alone.
 pub(crate) const MAX_OUT_INDICES: u64 = 1 << 23;
-/// A dispatch dimension's limit: a batch with more instances or clusters than
-/// this is drawn whole.
+/// A dispatch dimension's limit, in workgroups: a batch with more instances or
+/// clusters than this, or more (instance, cluster) pairs than 64 times it (the
+/// test's threads), is drawn whole.
 const MAX_DIMENSION: u32 = 65535;
 
 /// `hiz_clusters.wgsl`'s `Job`.
@@ -76,7 +77,8 @@ impl Plan {
             let n = clusters.len() as u32;
             let fits = u64::from(plan.out_indices) + room <= MAX_OUT_INDICES
                 && count <= u64::from(MAX_DIMENSION)
-                && n <= MAX_DIMENSION;
+                && n <= MAX_DIMENSION
+                && count * u64::from(n) <= 64 * u64::from(MAX_DIMENSION);
             if !fits || count == 0 {
                 continue;
             }
