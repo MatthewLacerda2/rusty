@@ -18,12 +18,26 @@ use crate::scene::Scene;
 type Bounds = Option<(Vec3, Vec3)>;
 
 /// What one camera collects: its opaque items, its transparent items with their
-/// view depth, and the joint palettes and proxy volumes they index.
+/// view depth, the joint palettes and proxy volumes they index, and, when the camera
+/// culls by Hi-Z, the objects GPU occlusion culling may test, by slot, with their
+/// world bounds (#1963).
 pub(crate) struct CameraSolids<'a> {
     pub opaque: &'a mut Vec<DrawItem>,
     pub transparent: &'a mut Vec<(DrawItem, f32)>,
     pub joints: &'a mut Vec<JointMatrix>,
     pub proxies: &'a mut proxy_volume::Frame,
+    pub tested: Option<&'a mut Vec<(u32, (Vec3, Vec3))>>,
+}
+
+/// Whether GPU occlusion culling may test `object` by its bounds (#1963). Not
+/// when the selection outline rings it (drawn whatever hides it, as the PVS
+/// leaves it), nor when a surface variant whose cut moves draws one of its slots
+/// (`RenderObject::moving`): a `vertex_waves` swell rises out of the undisplaced
+/// bounds (a water plane's box is zero metres tall), so behind a rim the box is
+/// hidden while its crests show. Dissolving and scrolling variants are left out
+/// with it, since the pipeline cannot tell a move from a cut; they are only drawn.
+fn hiz_testable(object: &RenderObject, outline: bool) -> bool {
+    !outline && !object.moving
 }
 
 impl Renderer {
@@ -61,6 +75,10 @@ impl Renderer {
             visible += 1;
             let at = (id, object, bounds);
             let outline = ringed.contains(&id);
+            let testable = bounds.filter(|_| hiz_testable(object, outline));
+            if let (Some(tested), Some(bounds)) = (out.tested.as_mut(), testable) {
+                tested.push((object.slot, bounds));
+            }
             self.object_items(scene, at, (eye, outline), &mut history, &mut out);
         }
         self.keep_scene(scene.id(), retained);

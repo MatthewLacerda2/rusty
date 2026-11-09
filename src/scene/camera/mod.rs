@@ -48,8 +48,9 @@ pub struct Camera {
     /// Perspective (through `fov`) or orthographic (#430).
     pub projection: Projection,
     /// Cull static meshes the scene's baked PVS says this camera's cell cannot see
-    /// (#1714, Unity's `Camera.useOcclusionCulling`). On by default; it culls nothing
-    /// in a scene with no bake.
+    /// (#1714, Unity's `Camera.useOcclusionCulling`), and the opaque meshes its own
+    /// depth hides on the GPU (#1963, under the preset's `gpu_occlusion_culling`).
+    /// On by default.
     pub use_occlusion_culling: bool,
     /// The view's up vector: +Y for every camera a person or script drives, which
     /// aims by yaw and pitch. A cube-capture face sets its own (#1615), so a face

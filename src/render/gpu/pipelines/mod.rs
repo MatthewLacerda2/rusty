@@ -12,7 +12,7 @@ pub(crate) mod winding;
 
 pub(crate) use depth_postpass::DepthPostpassPipelines;
 use lazy::lazy_pipeline;
-pub(crate) use lazy::{LazyCompute, LazyPipeline};
+pub(crate) use lazy::{lazy_compute, LazyCompute, LazyPipeline};
 pub(crate) use transparent::{TransparentBlend, TransparentPipelines};
 pub(crate) use winding::{FacedPipeline, Facing};
 

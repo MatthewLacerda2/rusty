@@ -4,8 +4,8 @@
 use super::pass::{Stage, StageInputs};
 use super::targets::{History, SsilTargets};
 use super::{Previous, SsilFrame};
-use crate::render::draw::batch::DrawBatch;
 use crate::render::draw::camera::CameraCtx;
+use crate::render::draw::record::Solids;
 use crate::render::gpu::bind_layouts::create_shadow_bind_group;
 use crate::render::passes::ssao::SsaoTargets;
 use crate::render::passes::transparent::OpaqueViews;
@@ -22,7 +22,7 @@ impl Renderer {
         view: &mut RenderView,
         encoder: &mut wgpu::CommandEncoder,
         frame: &SsilFrame,
-        solids: &[DrawBatch],
+        solids: Solids,
         prepassed: bool,
     ) {
         let size = view.scene_size();
@@ -45,7 +45,7 @@ impl Renderer {
             .write_buffer(&t.uniform, 0, bytemuck::bytes_of(&uniform));
         if !prepassed {
             self.record_prepass(encoder, &view.depth_view, solids);
-            let prepass = solids.iter().filter(|b| b.key.in_prepass());
+            let prepass = solids.0.iter().filter(|b| b.key.in_prepass());
             let draws = prepass.map(|b| (b.key.indices.len(), b.instances.len() as u32));
             self.frame_counters.add_draws(draws);
         }

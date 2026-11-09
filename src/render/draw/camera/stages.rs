@@ -38,6 +38,12 @@ pub(super) fn batch_solids(r: &mut Renderer, view: &mut RenderView, ctx: &mut Ca
         r.precreate_solid_resources(scene, cam, &ctx.frustum, &ctx.lod, (outline, history));
 }
 
+/// GPU occlusion culling (#1963): this camera's opaque instances against the
+/// depth pyramid of what it drew last frame, before anything draws them.
+pub(super) fn occlusion(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
+    r.cull_by_hiz(view, ctx);
+}
+
 /// A light-probe capture's clear (#1668): black, and no sky, so a direction that
 /// escapes the scene carries only the ambient its bake adds.
 const OPEN_CLEAR: PassClear = PassClear {
@@ -56,6 +62,7 @@ pub(super) fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut Came
             .map(|plan| SsaoFrame::for_camera(plan, ctx.view_proj, ctx.cam)),
         base: ctx.is_first,
         ssil: ctx.ssil,
+        culled: ctx.solids.culled.clone(),
     };
     r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque);
 }

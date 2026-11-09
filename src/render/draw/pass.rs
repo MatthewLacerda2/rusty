@@ -1,13 +1,13 @@
 //! Shadow depth passes, dynamic global bind-group update, and the main scene
 //! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
-use crate::render::draw::batch::DrawBatch;
-use crate::render::gpu::draw_buffers::DrawBuffers;
+use crate::render::draw::batch::OpaqueBatches;
 use crate::render::gpu::global_group::GlobalGroup;
 use crate::render::gpu::pipelines::surface::SolidPass;
 use crate::render::gpu::pipelines::PrimedPipelines;
 use crate::render::ibl::skybox::SkyTargets;
 use crate::render::motion;
+use crate::render::passes::hiz::Culled;
 use crate::render::passes::ssao::SsaoFrame;
 use crate::render::postfx::effects::ssr;
 use crate::render::timing::GpuPass;
@@ -61,6 +61,9 @@ pub(crate) struct ScenePassFrame {
     /// wrote and runs before any overlay draws (#1526), so an overlay binds no SSR
     /// surface target and draws with the plain velocity pipelines.
     pub base: bool,
+    /// The opaque draws GPU occlusion culling decided (#1963); `None` draws every
+    /// batched instance.
+    pub culled: Option<Culled>,
 }
 
 impl ScenePassFrame {
@@ -114,7 +117,7 @@ impl Renderer {
         &mut self,
         view: &mut RenderView,
         frame: ScenePassFrame,
-        solid_batches: &[DrawBatch],
+        solid_batches: &OpaqueBatches,
     ) {
         let mut encoder = self
             .device
@@ -126,7 +129,8 @@ impl Renderer {
         // Bind active skybox view & sampler into the global group for reflections.
         self.update_global_bind_group();
         // A. SSAO (#436) and SSIL (#1750): what the scene pass samples.
-        self.record_screen_space(view, &mut encoder, &frame, solid_batches);
+        let solids = (solid_batches, frame.culled.as_ref());
+        self.record_screen_space(view, &mut encoder, &frame, solids);
         // B. Main scene pass. The editor's gizmos draw after post-FX (`draw_handles`).
         self.record_scene_pass(view, &mut encoder, &frame, solid_batches);
         let velocity = view.post_fx.motion.target_view().is_some();
@@ -145,7 +149,7 @@ impl Renderer {
         view: &RenderView,
         encoder: &mut wgpu::CommandEncoder,
         frame: &ScenePassFrame,
-        solid_batches: &[DrawBatch],
+        solid_batches: &OpaqueBatches,
     ) {
         let clear = frame.clear;
         let velocity = view.post_fx.motion.target_view();
@@ -182,7 +186,8 @@ impl Renderer {
         render_pass.set_bind_group(0, &self.global_bind_group, &[]);
         render_pass.set_bind_group(3, self.scene_group3(view, frame), &[]);
         // Solid entities (each batch binds its shader's pipeline).
-        self.draw_batches(&mut render_pass, solid_batches, solid_pass);
+        let solids = (solid_batches, frame.culled.as_ref());
+        self.draw_solids(&mut render_pass, solids, solid_pass);
 
         // Render Skybox last (optimization). Only a Skybox camera paints it — a
         // DepthOnly/SolidColor overlay must not overwrite the world below it. With a
@@ -226,7 +231,7 @@ impl Renderer {
     /// Rebuild the group-0 bind group only when something it names changed (the list:
     /// `GlobalGroup`'s module doc); its buffers otherwise persist (#210). When only the
     /// procedural sky slot changed, that slot's kept group is swapped in (#1620).
-    fn update_global_bind_group(&mut self) {
+    pub(crate) fn update_global_bind_group(&mut self) {
         let switched = self.spare_global_group.switched;
         if !self.global_bind_group_dirty && !switched {
             return;
@@ -254,46 +259,5 @@ impl Renderer {
         let group = &mut self.global_bind_group;
         self.spare_global_group
             .replace(group, (slot, only_sky), build);
-    }
-
-    /// Record `batches` into `pass`: per batch, its pipeline when it differs from the
-    /// last one (see [`SolidPass`]), the mesh buffers, the frame's group-1 bind group
-    /// at the batch's uniform offset, the shared material group, and one instanced
-    /// draw over its instance range (#470). Shared by the prepass, opaque and
-    /// transparent passes.
-    pub(crate) fn draw_batches<'a>(
-        &'a self,
-        render_pass: &mut wgpu::RenderPass<'a>,
-        batches: &'a [DrawBatch],
-        solid_pass: SolidPass<'a>,
-    ) {
-        let mut bound = None;
-        for batch in batches {
-            let Some(gpu_mesh) = self.gpu_mesh_of(batch.key.mesh) else {
-                continue;
-            };
-            let in_prepass = batch.key.in_prepass();
-            if solid_pass.is_prepass() && !in_prepass {
-                continue;
-            }
-            let primed = solid_pass.primed() && in_prepass;
-            let blend = batch.key.traits.blend;
-            let facing = batch.key.facing;
-            let pipeline = (batch.key.pipeline, primed, blend, facing);
-            if bound != Some(pipeline) {
-                let pick = self
-                    .surface_shaders
-                    .pick(solid_pass, pipeline.0, primed, blend, facing);
-                render_pass.set_pipeline(pick);
-                bound = Some(pipeline);
-            }
-            let offsets = DrawBuffers::offsets(batch.uniform_slot);
-            render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
-            render_pass
-                .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            render_pass.set_bind_group(1, self.draw_buffers.bind_group(), &offsets);
-            render_pass.set_bind_group(2, self.materials.group(batch.key.material), &[]);
-            render_pass.draw_indexed(batch.key.indices.range(), 0, batch.instances.clone());
-        }
     }
 }

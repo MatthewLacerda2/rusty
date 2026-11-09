@@ -67,6 +67,9 @@ pub struct RenderView {
     /// their own size and divisor, and their bind groups read this view's depth, so
     /// `resize` drops them with it.
     pub(crate) ssao: Option<crate::render::passes::ssao::SsaoTargets>,
+    /// GPU occlusion culling's pyramid and per-camera buffers (#1963), made on the
+    /// first frame that culls; the pyramid follows the depth's size itself.
+    pub(crate) hiz: crate::render::passes::hiz::HiZView,
     /// The offscreen colour target this view renders into (editor viewport / Inspector
     /// preview), `RENDER_ATTACHMENT | TEXTURE_BINDING` so egui samples it. `None` for a
     /// targetless view whose caller supplies the output and reads it back itself.
@@ -184,6 +187,7 @@ impl RenderView {
             post_fx,
             scene_depth_bind_group: None,
             ssao: None,
+            hiz: Default::default(),
             color_target,
             forward_override: None,
             ui_format,

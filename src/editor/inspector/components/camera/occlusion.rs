@@ -1,5 +1,6 @@
 //! The Camera card's Occlusion Culling toggle (#1714, Unity's camera has the same
-//! box): whether the camera skips what the scene's baked PVS hides from its cell.
+//! box): whether the camera skips what the scene's baked PVS hides from its cell,
+//! and what its GPU depth pyramid hides (#1963).
 //! Writes through the shared op, so this and `Camera.SetUseOcclusionCulling` are
 //! one path.
 
@@ -16,7 +17,8 @@ pub(super) fn draw_occlusion_culling(
     let mut on = cam.use_occlusion_culling;
     let toggle = ui.checkbox(&mut on, "Occlusion Culling");
     let toggle = toggle.on_hover_text(
-        "Skip static meshes the baked occlusion (Generate Lighting) hides from this camera",
+        "Skip meshes hidden from this camera: by the baked occlusion (Generate Lighting), \
+         and by the GPU's depth test (the quality preset's GPU occlusion culling)",
     );
     if toggle.changed() {
         if let Some(mut c) = world.camera_mut(id) {

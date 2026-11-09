@@ -127,6 +127,10 @@ pub struct QualityValues {
     /// `QualitySettings.shadowmaskMode`: one value per preset, as Unity keeps it
     /// per quality level.
     pub shadowmask_mode: ShadowmaskMode,
+    /// Whether a camera with `use_occlusion_culling` culls its opaque instances by
+    /// the GPU's depth pyramid (#1963), Unity 6's *GPU Occlusion* toggle on the URP
+    /// asset: on in every seeded preset. The baked PVS (#1714) does not read it.
+    pub gpu_occlusion_culling: bool,
 }
 
 crate::core::named_enum! {
