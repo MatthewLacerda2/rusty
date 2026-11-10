@@ -30,3 +30,18 @@ fn voronoi_counts_its_cells_per_axis() {
     // Between two centres down, half a cell from each.
     assert!((v(0.5 / 3.0, 1.0 / 6.0)[0] - 0.5).abs() < 1e-5);
 }
+
+#[test]
+fn gray_cells_are_one_value_per_cell() {
+    use crate::procgen::recipe::Voronoi;
+    let mut p: Voronoi =
+        serde_json::from_value(serde_json::json!({ "scale": 4, "output": "cells" })).unwrap();
+    let colour = super::voronoi(&p, Field::Const(1.0), 3);
+    p.grayscale = true;
+    let gray = super::voronoi(&p, Field::Const(1.0), 3);
+    for (u, v) in [(0.1, 0.2), (0.6, 0.9), (0.33, 0.71)] {
+        let (c, g) = (colour(u, v), gray(u, v));
+        assert_eq!(g, [c[0], c[0], c[0], 1.0]);
+        assert_ne!(c[0], c[1], "the colour cells are not gray");
+    }
+}

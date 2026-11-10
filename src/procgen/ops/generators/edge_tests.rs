@@ -47,6 +47,7 @@ fn a_huge_or_malformed_count_is_capped_not_a_panic() {
             metric: VoronoiMetric::Euclidean,
             randomness: 1.0.into(),
             smoothness: 1.0,
+            grayscale: false,
             seed: 0,
         };
         let samplers = [

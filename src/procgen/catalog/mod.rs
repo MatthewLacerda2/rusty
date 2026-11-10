@@ -117,8 +117,8 @@ catalog! {
     Checker(generators::checker::Checker),
     Clamp(math::clamp::Clamp),
     ColorRamp(color::color_ramp::ColorRamp),
-    /// Combine up to three single-channel inputs into one RGB image (alpha 1); a
-    /// channel without an input reads 0.
+    /// Combine up to four single-channel inputs into R, G, B and alpha; a colour
+    /// channel without an input reads 0, alpha without one reads 1.
     CombineRgb = vector::combine_rgb::CombineRgb,
     Constant(generators::constant::Constant),
     /// Each pixel centre's position in the tile: `u` in red, `v` in green.

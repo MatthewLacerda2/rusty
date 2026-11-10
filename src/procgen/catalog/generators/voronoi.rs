@@ -29,6 +29,10 @@ pub struct Voronoi {
     pub randomness: Param,
     #[serde(default = "one_f32")]
     pub smoothness: f32,
+    /// `cells` as one gray value per cell, not a random colour (#2002): what a
+    /// mask or a height reads. The other outputs are gray already.
+    #[serde(default)]
+    pub grayscale: bool,
     #[serde(default)]
     pub seed: u32,
 }
@@ -51,6 +55,7 @@ impl Row for Voronoi {
             },
             socket(opt("randomness", "number", Lit::Number(1.0))),
             opt("smoothness", "number", Lit::Number(1.0)),
+            opt("grayscale", "bool", Lit::Bool(false)),
             SEED,
         ],
     );

@@ -63,6 +63,7 @@ fn organic_ops_bake_byte_identically_per_seed() {
             metric: VoronoiMetric::Euclidean,
             randomness: 0.7.into(),
             smoothness: 1.0,
+            grayscale: false,
             seed: 0,
         });
         vec![node("v", op, &[])]

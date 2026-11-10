@@ -78,6 +78,7 @@ fn lattice_ops() -> Vec<OpKind> {
                     metric,
                     randomness: (s / 8.0).into(),
                     smoothness: 1.0,
+                    grayscale: false,
                     seed: 0,
                 }));
             }

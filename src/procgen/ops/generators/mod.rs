@@ -28,7 +28,9 @@ pub use image::image;
 
 use super::super::hash;
 use super::super::image_buf::{Rgba, Size};
-use super::super::recipe::{Brick, Checker, Constant, GradientKind, Noise, Shape, Voronoi, Wave};
+use super::super::recipe::{
+    Brick, Checker, Constant, GradientKind, Noise, Shape, Voronoi, VoronoiOutput, Wave,
+};
 use super::field::Field;
 
 /// A generator's per-point function over the unit domain, borrowing for `'a` the
@@ -98,7 +100,12 @@ pub fn noise<'a>(p: &Noise, gain: Field<'a>, seed: u64) -> Sampler<'a> {
 pub fn voronoi<'a>(p: &Voronoi, randomness: Field<'a>, seed: u64) -> Sampler<'a> {
     let modes = (p.output, p.metric);
     let scale = per_axis(p.scale, p.aspect);
-    voronoi::sampler(scale, modes, randomness, p.smoothness, seed)
+    let sampler = voronoi::sampler(scale, modes, randomness, p.smoothness, seed);
+    if !(p.grayscale && p.output == VoronoiOutput::Cells) {
+        return sampler;
+    }
+    // A cell's red is its own uniform draw, so gray `cells` is that alone.
+    Box::new(move |u, v| gray(sampler(u, v)[0]))
 }
 
 /// The running-bond brick pattern.

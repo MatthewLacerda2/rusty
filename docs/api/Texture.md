@@ -372,8 +372,8 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   as Blender's ColorRamp: `constant` holds each stop's colour from its position up to
   the next stop — hard bands for toon, stylized and posterized looks — and `ease` is
   a smoothstep between stops, soft into and out of each colour.
-- `combine_rgb` (*vector*, 1 to 3 inputs): grayscale inputs → R, G, B; a channel
-  without an input reads 0.
+- `combine_rgb` (*vector*, 1 to 4 inputs): grayscale inputs → R, G, B and alpha (each
+  input's red); a colour channel without an input reads 0, alpha without one reads 1.
 - `constant {color}` (*generator*).
 - `coordinates` (*generator*): each pixel centre's position in the tile, `u` in red
   and `v` in green (blue 0, alpha 1), Blender's *Texture Coordinate*. Shape it with
@@ -589,7 +589,10 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   `value_jitter` is ignored, an out-of-range one clamped. Rivets are `shape circle`
   → `tile`.
 - `voronoi {scale, aspect={1,1}, output="distance"|"cells"|"f2"|"edges"|"smooth_f1",
-  metric="euclidean"|"manhattan"|"chebyshev", randomness=1, smoothness=1, seed=0}` (*generator*):
+  metric="euclidean"|"manhattan"|"chebyshev", randomness=1, smoothness=1,
+  grayscale=false, seed=0}` (*generator*): `cells` is a random **colour** per cell
+  unless `grayscale` makes it one gray value (a mask, a height, a per-stone tint
+  amount): fed straight to albedo, colour cells speckle it;
   `f2` is the distance to the second-nearest point, `edges` is F2 − F1 — ~0 on cell
   borders: cracks, dried mud, cobble outlines; `metric` is how distance is measured:
   `euclidean` gives round cells, `manhattan` (`|dx| + |dy|`) diamond-cut ones,
@@ -613,7 +616,7 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   no `warp` chain. It costs about 0.85 s of one core at 2048² with `detail = 2`; 0 costs
   nothing.
   Capped at ±1000; a NaN reads 0.
-- `white_noise {seed=0}` (*generator*).
+- `white_noise {seed=0}` (*generator*): one uniform gray value per pixel (R = G = B).
 
 ### Linked params — a node drives a value
 
