@@ -209,8 +209,8 @@ whether it is drawn live:
     come from one side (an open sky over a dark ground, a `Mixed` spot's bounce off
     the floor onto a glossy ceiling): the environment reflection reflects them. A
     `Mixed` light gives its highlight live, and its baked bounce none. A lamp
-    supplying under about 6% of a texel's light gives none either: the compressed
-    page can't tell so little from none.
+    supplying under a quarter of a texel's light (the fringe of its range, where a
+    bounce outshines it) has its highlight faded with its share, to none at none.
   - **One highlight per texel.** Two lamps lighting one texel give one highlight
     between them, pulled toward both and weakened (two lamps at 45° either side of
     a floor's normal keep about 0.7 of their light in it), where live lights give
@@ -226,8 +226,13 @@ whether it is drawn live:
     about 62%; a sun 2° up, about 35%).
   - **A two-sided surface's back face** shows its front's baked light (the bake
     lights the front only) and no highlight.
-  - **Its sharpness is the lightmap's.** A glossy highlight smaller than a lightmap
-    texel is spread over one; raise the bake's texels per unit where it matters.
+  - **Its sharpness is the live one's.** The direction page is stored uncompressed
+    (RGBA8), so between texels a lamp's direction is rebuilt to well under a degree,
+    and a polished surface's highlight is as round and as sharp baked as live, at 8
+    texels per unit as at 32 (#1996). What a texel cannot hold is light that changes
+    inside it: a shadow's or a cone's edge across a texel is blurred over it, in the
+    highlight as in the diffuse light; raise the bake's texels per unit where that
+    matters.
   - **A level needs a directional bake** to have it; a non-directional lightmap, a
     surface with no lightmap and a probe-lit dynamic object get none. No probe or
     reflection bake sees it, since it depends on the viewer.

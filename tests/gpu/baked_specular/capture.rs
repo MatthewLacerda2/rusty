@@ -36,7 +36,12 @@ fn a_reflection_bake_never_sees_the_lobe() {
             .add(Vec3::new(-1.0, 0.5, 0.0), Vec3::splat(3.0));
         scene.reflection_probes.edit(probe, |p| p.manual = true);
         scene.lighting_settings.reflections.resolution = 16;
-        let path = bake(&mut scene, &format!("probe_{directional}"), directional);
+        let path = bake(
+            &mut scene,
+            &format!("probe_{directional}"),
+            directional,
+            super::DENSITY,
+        );
         let mut log = BakeLog::off();
         let ran = bake_scene_reflections(&mut scene, Some(&path), &mut log);
         ran.unwrap().then(|| {

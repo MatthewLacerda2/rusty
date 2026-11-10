@@ -1,6 +1,6 @@
 //! A lightmap page round trip (#1694): BC6H holds linear HDR within 5%
-//! with no RGBM range cap, BC7 a direction page within a few steps, the KTX2 file
-//! reads back exactly what was written in the spec's level layout, and a malformed file is refused.
+//! with no RGBM range cap, the KTX2 file reads back exactly what was written in
+//! the spec's level layout, and a malformed file is refused.
 
 use glam::Vec3;
 
@@ -33,7 +33,6 @@ fn a_stopped_encode_makes_no_page() {
     };
     assert_eq!(encode_bc6h(8, &[light(8), light(4)], 1, &stop_second), None);
     assert_eq!(asked.get(), 2, "asked before each level");
-    assert_eq!(encode_bc7(4, &[vec![[0; 4]; 16]], 1, &|| true), None);
 }
 
 #[test]
@@ -69,16 +68,8 @@ fn the_same_page_encodes_the_same_on_any_thread_count() {
 }
 
 #[test]
-fn bc7_holds_a_direction_page_and_ktx2_round_trips() {
-    let dirs: Vec<[u8; 4]> = (0..64u32)
-        .map(|i| [(i * 4) as u8, 128, (255 - i * 4) as u8, (i * 3) as u8])
-        .collect();
-    let half: Vec<[u8; 4]> = dirs.iter().step_by(2).take(16).copied().collect();
-    let page = encode_bc7(8, &[dirs.clone(), half], 2, &|| false).expect("never stopped");
-    for (a, b) in dirs.iter().zip(decode_bc7(&page, 0)) {
-        let err = a.iter().zip(b).map(|(x, y)| x.abs_diff(y)).max().unwrap();
-        assert!(err <= 12, "{a:?} -> {b:?}");
-    }
+fn a_ktx2_page_round_trips_in_the_specs_layout() {
+    let page = bc6h(8, &[light(8), light(4)], 2);
     let file = write(&page);
     // The spec's layout: the index largest first, the images smallest first,
     // each 16-byte aligned.
@@ -100,11 +91,31 @@ fn a_malformed_file_is_refused_naming_why() {
     assert!(read(&file[..40]).is_err(), "header only");
     assert!(read(b"not a ktx2").is_err());
     let mut other = file.clone();
-    other[12..16].copy_from_slice(&37u32.to_le_bytes()); // R8G8B8A8_UNORM
+    other[12..16].copy_from_slice(&145u32.to_le_bytes()); // BC7_UNORM
     assert!(read(&other).unwrap_err().contains("format"));
     let mut wide = file;
     wide[20..24].copy_from_slice(&16u32.to_le_bytes());
     assert!(read(&wide).is_err(), "not square, levels the wrong length");
+}
+
+/// A direction page (#1996): RGBA8 levels round trip as they are, and a level of
+/// the wrong length is refused.
+#[test]
+fn an_rgba8_page_round_trips_and_its_lengths_are_checked() {
+    let level = |edge: u32| (0..edge * edge * 4).map(|i| (i * 7) as u8).collect();
+    let page = Page {
+        format: PageFormat::Rgba8,
+        edge: 8,
+        levels: vec![level(8), level(4)],
+    };
+    assert_eq!(page.gpu_bytes(), 8 * 8 * 4 + 4 * 4 * 4);
+    let file = write(&page);
+    assert_eq!(read(&file), Ok(page.clone()));
+    let short = Page {
+        levels: vec![level(8), vec![0; 15]],
+        ..page
+    };
+    assert!(read(&write(&short)).unwrap_err().contains("level 1"));
 }
 
 #[test]

@@ -51,7 +51,7 @@ fn scene(name: &str) -> Scene {
 fn from_behind(directional: bool) -> Option<Vec<f32>> {
     let name = format!("behind_{directional}");
     let mut scene = scene(&name);
-    bake(&mut scene, &name, directional);
+    bake(&mut scene, &name, directional, super::DENSITY);
     shot(
         &scene,
         &Camera::new(Vec3::new(0.0, -2.0, 0.0), 0.0, 89.9),

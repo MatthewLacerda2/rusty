@@ -69,7 +69,7 @@ fn room(floor: MaterialAsset, ceiling: MaterialAsset) -> Scene {
 
 /// `scene` baked (`directional` or not) under `name`, then shot from `camera`.
 fn baked(mut scene: Scene, camera: &Camera, name: &str, directional: bool) -> Option<Vec<f32>> {
-    bake(&mut scene, name, directional);
+    bake(&mut scene, name, directional, super::DENSITY);
     shot(&scene, camera, name)
 }
 
