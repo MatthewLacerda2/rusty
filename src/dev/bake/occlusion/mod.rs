@@ -122,3 +122,10 @@ fn read(progress: &OcclusionProgress) -> Progress {
 fn threads() -> usize {
     thread::available_parallelism().map_or(1, |n| n.get())
 }
+
+#[cfg(test)]
+mod cost_tests;
+#[cfg(test)]
+mod tests;
+#[cfg(test)]
+mod town_cost_tests;

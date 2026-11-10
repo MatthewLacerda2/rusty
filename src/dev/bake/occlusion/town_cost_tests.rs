@@ -6,11 +6,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
-use super::bench_level::rooms;
-use super::bench_town::{town, Make};
-use super::gather_occlusion;
-use super::sample::Baking;
-use super::Grid;
+use crate::scene::lighting::occlusion::bench_level::rooms;
+use crate::scene::lighting::occlusion::bench_town::{town, Make};
+use crate::scene::lighting::occlusion::gather_occlusion;
 use crate::scene::Scene;
 
 #[test]
@@ -46,13 +44,11 @@ fn occlusion_town_scaling() {
 /// Bake `level`'s cells on 4 threads, timing each, and print the rate, the
 /// spread and a hash of what every cell sees.
 fn measure(name: &str, level: &Scene) {
-    let input = gather_occlusion(&level);
+    let input = gather_occlusion(level);
     let t = Instant::now();
-    let scene = Baking::of(input.objects());
+    let scene = input.sampler().expect("a grid");
     let build = t.elapsed().as_secs_f64();
-    let (min, max) = scene.bounds.expect("bounds");
-    let grid = Grid::over(min, max).expect("a grid");
-    let count = grid.cell_count();
+    let count = scene.grid.cell_count();
     let (next, times) = (
         AtomicUsize::new(0),
         Mutex::new(vec![(0f64, Vec::new()); count]),
@@ -66,7 +62,7 @@ fn measure(name: &str, level: &Scene) {
                     break;
                 }
                 let c = Instant::now();
-                let bits = scene.cell(&grid, cell);
+                let bits = scene.cell(cell);
                 times.lock().unwrap()[cell] = (c.elapsed().as_secs_f64(), bits);
             });
         }
@@ -83,10 +79,10 @@ fn measure(name: &str, level: &Scene) {
     let top: f64 = times[count - count / 100..].iter().sum();
     let rays = scene.rays_cast();
     println!(
-        "{name}: {} objects, {count} cells, build {build:.2} s, \
+        "{name}: {} meshes, {count} cells, build {build:.2} s, \
          bake {secs:.1} s = {:.0} cells/s, {:.0} rays/cell, median {:.1} ms, \
          p99 {:.1} ms, max {:.0} ms, slowest 1% = {:.0}% of the time, bits {hash:016x}",
-        input.objects().len(),
+        level.world.ids_with_mesh().len(),
         count as f64 / secs,
         rays as f64 / count as f64,
         times[count / 2] * 1e3,

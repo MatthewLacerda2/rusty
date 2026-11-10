@@ -77,7 +77,7 @@ mod bake_tests;
 #[cfg(all(test, feature = "dev"))]
 pub(crate) mod bench_level;
 #[cfg(all(test, feature = "dev"))]
-mod bench_town;
+pub(crate) mod bench_town;
 #[cfg(test)]
 mod carry_tests;
 #[cfg(test)]
@@ -96,8 +96,6 @@ mod tessellated_tests;
 pub(crate) mod test_gap;
 #[cfg(test)]
 pub(crate) mod test_level;
-#[cfg(all(test, feature = "dev"))]
-mod town_cost_tests;
 #[cfg(test)]
 mod unread_tests;
 #[cfg(test)]

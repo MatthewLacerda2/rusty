@@ -16,25 +16,58 @@ use std::collections::BTreeMap;
 
 use glam::{UVec2, Vec2, Vec3};
 
-/// Set, in the grid `(origin, texel, dims)`, every texel the union of the convex
-/// `polys` (on the plane, `corners` the same points in 3D) holds whole, its
-/// edges missing a texel by up to `tol`.
+/// A sheet's texel grid: origin, texel edge, size.
+type TexelGrid = (Vec2, f32, UVec2);
+/// An edge's corners' bits, ordered: the same edge whichever way it runs.
+type EdgeKey = ([u32; 3], [u32; 3]);
+
+/// Set, in `grid`, every texel the union of the convex `polys` (on the plane,
+/// `corners` the same points in 3D) holds whole, its edges missing a texel by up
+/// to `tol`.
 pub(super) fn union_fill(
     set: &mut [bool],
     (polys, corners): (&[Vec<Vec2>], &[&[Vec3]]),
-    (origin, texel, dims): (Vec2, f32, UVec2),
+    grid: TexelGrid,
     tol: f32,
 ) {
-    let bits = |p: Vec3| p.to_array().map(f32::to_bits);
-    // Per undirected edge (its corners' bits, ordered), its 2D ends and how many
-    // members run it one way less the other.
-    let mut edges: BTreeMap<([u32; 3], [u32; 3]), (Vec2, Vec2, i32)> = BTreeMap::new();
     // A face with no area holds nothing, so it may not cancel an edge either.
-    let solid = |poly: &&Vec<Vec2>| {
+    let solid = |poly: &Vec<Vec2>| {
         let long = (0..poly.len()).map(|i| poly[i].distance(poly[(i + 1) % poly.len()]));
         super::area(poly).abs() > tol * long.fold(0.0, f32::max)
     };
-    for (poly, at) in polys.iter().zip(corners).filter(|(p, _)| solid(p)) {
+    let faces = polys.iter().zip(corners).filter(|(p, _)| solid(p));
+    let cut = cut(set.len(), boundary(faces), grid, tol);
+    for poly in polys.iter().filter(|p| solid(p)) {
+        let turn = super::area(poly).signum();
+        let k = poly.len();
+        let holds = |p: Vec2| {
+            (0..k).all(|i| {
+                let (a, b) = (poly[i], poly[(i + 1) % k]);
+                turn * (b - a).perp_dot(p - a) >= -tol * (b - a).length()
+            })
+        };
+        let (min, max) = poly.iter().fold((Vec2::MAX, Vec2::MIN), |(lo, hi), &p| {
+            (lo.min(p), hi.max(p))
+        });
+        let (first, last) = span(min, max, grid);
+        for y in first.y..last.y {
+            for x in first.x..last.x {
+                let at = (y * grid.2.x + x) as usize;
+                let (lo, hi) = cell(grid, x, y);
+                if !cut[at] && holds((lo + hi) * 0.5) {
+                    set[at] = true;
+                }
+            }
+        }
+    }
+}
+
+/// The union's boundary: each edge (its 2D ends) that `faces` do not run as
+/// often one way as the other.
+fn boundary<'a>(faces: impl Iterator<Item = (&'a Vec<Vec2>, &'a &'a [Vec3])>) -> Vec<(Vec2, Vec2)> {
+    let bits = |p: Vec3| p.to_array().map(f32::to_bits);
+    let mut edges: BTreeMap<EdgeKey, (Vec2, Vec2, i32)> = BTreeMap::new();
+    for (poly, at) in faces {
         let k = poly.len();
         let turn = if super::area(poly) < 0.0 { -1 } else { 1 };
         for i in 0..k {
@@ -48,50 +81,40 @@ pub(super) fn union_fill(
             e.2 += way;
         }
     }
-    let cell = |x: u32, y: u32| {
-        let lo = origin + UVec2::new(x, y).as_vec2() * texel;
-        (lo, lo + Vec2::splat(texel))
-    };
-    let mut cut = vec![false; set.len()];
-    for &(a, b, _) in edges.values().filter(|e| e.2 != 0) {
-        let (first, last) = span(a.min(b), a.max(b), (origin, texel, dims));
+    edges
+        .into_values()
+        .filter(|e| e.2 != 0)
+        .map(|e| (e.0, e.1))
+        .collect()
+}
+
+/// Per texel of `grid` (`count` of them), whether a `boundary` edge reaches its
+/// square shrunk by `tol`.
+fn cut(count: usize, boundary: Vec<(Vec2, Vec2)>, grid: TexelGrid, tol: f32) -> Vec<bool> {
+    let mut cut = vec![false; count];
+    for (a, b) in boundary {
+        let (first, last) = span(a.min(b), a.max(b), grid);
         for y in first.y..last.y {
             for x in first.x..last.x {
-                let (lo, hi) = cell(x, y);
+                let (lo, hi) = cell(grid, x, y);
                 if crosses(a, b, lo + Vec2::splat(tol), hi - Vec2::splat(tol)) {
-                    cut[(y * dims.x + x) as usize] = true;
+                    cut[(y * grid.2.x + x) as usize] = true;
                 }
             }
         }
     }
-    for poly in polys.iter().filter(solid) {
-        let turn = super::area(poly).signum();
-        let k = poly.len();
-        let holds = |p: Vec2| {
-            (0..k).all(|i| {
-                let (a, b) = (poly[i], poly[(i + 1) % k]);
-                turn * (b - a).perp_dot(p - a) >= -tol * (b - a).length()
-            })
-        };
-        let (min, max) = poly.iter().fold((Vec2::MAX, Vec2::MIN), |(lo, hi), &p| {
-            (lo.min(p), hi.max(p))
-        });
-        let (first, last) = span(min, max, (origin, texel, dims));
-        for y in first.y..last.y {
-            for x in first.x..last.x {
-                let at = (y * dims.x + x) as usize;
-                let (lo, hi) = cell(x, y);
-                if !cut[at] && holds((lo + hi) * 0.5) {
-                    set[at] = true;
-                }
-            }
-        }
-    }
+    cut
+}
+
+/// Texel `(x, y)`'s square.
+fn cell((origin, texel, _): TexelGrid, x: u32, y: u32) -> (Vec2, Vec2) {
+    let lo = origin + UVec2::new(x, y).as_vec2() * texel;
+    (lo, lo + Vec2::splat(texel))
 }
 
 /// The texels `[first, last)` the rectangle `(min, max)` reaches, a texel more
 /// each way.
-fn span(min: Vec2, max: Vec2, (origin, texel, dims): (Vec2, f32, UVec2)) -> (UVec2, UVec2) {
+fn span(min: Vec2, max: Vec2, (origin, texel, dims): TexelGrid) -> (UVec2, UVec2) {
     let first = ((min - origin) / texel).floor() - Vec2::ONE;
     let last = ((max - origin) / texel).ceil() + Vec2::ONE;
     let first = first.max(Vec2::ZERO).as_uvec2().min(dims);

@@ -71,10 +71,14 @@ pub fn bake_occlusion(
 }
 
 impl OcclusionInput {
-    /// The gathered objects, for a measurement that drives the sampling itself.
+    /// The scene ready to sample and its grid, for a measurement that times or
+    /// counts cells one by one; `None` when no grid is laid.
     #[cfg(all(test, feature = "dev"))]
-    pub(super) fn objects(&self) -> &[Object] {
-        &self.objects
+    pub(crate) fn sampler(&self) -> Option<Sampler> {
+        let baking = Baking::of(&self.objects);
+        let (min, max) = baking.bounds?;
+        let grid = Grid::over(min, max)?;
+        Some(Sampler { baking, grid })
     }
 
     /// Bake `count` cells spread over the grid on this thread, for a measurement
@@ -140,6 +144,26 @@ impl OcclusionInput {
             ..report
         };
         Some((Some(data), report))
+    }
+}
+
+/// One bake's sampling, a cell at a time ([`OcclusionInput::sampler`]).
+#[cfg(all(test, feature = "dev"))]
+pub(crate) struct Sampler {
+    baking: Baking,
+    pub grid: Grid,
+}
+
+#[cfg(all(test, feature = "dev"))]
+impl Sampler {
+    /// What cell `index` sees on its own, as the bake samples it.
+    pub fn cell(&self, index: usize) -> Vec<u64> {
+        self.baking.cell(&self.grid, index)
+    }
+
+    /// Rays cast so far, either kind.
+    pub fn rays_cast(&self) -> u64 {
+        self.baking.rays_cast()
     }
 }
 
