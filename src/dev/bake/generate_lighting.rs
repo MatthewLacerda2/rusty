@@ -156,7 +156,7 @@ pub fn finish(
     scene: &mut Scene,
     path: &str,
     (lightmaps, probes, saved): (usize, LightingBakeReport, LightingSave),
-    mut occlusion: BakedOcclusion,
+    occlusion: BakedOcclusion,
 ) -> Result<GenerateReport, String> {
     refuse_in_play(scene)?;
     let (report, ms) = match saved {
@@ -166,10 +166,11 @@ pub fn finish(
         }
         LightingSave::NeedsSceneSave => {
             let (report, ms) = (occlusion.report, occlusion.ms);
-            let cells = std::mem::take(&mut occlusion.cells);
-            put_occlusion(scene, occlusion);
-            // Nothing is written until the scene saves; the bake is reported now.
-            super::report::occlusion::keep(scene, path, (&report, ms, &cells), None);
+            // The next save writes it ([`Scene::put_baked_occlusion`]); the bake is
+            // reported now.
+            scene.put_baked_occlusion(occlusion.data);
+            let measured = (&report, ms, &occlusion.cells[..]);
+            super::report::occlusion::keep(scene, path, measured, None);
             (report, ms)
         }
     };
@@ -228,27 +229,20 @@ impl OcclusionOnlyReport {
 pub fn apply_occlusion(
     scene: &mut Scene,
     path: &str,
-    mut baked: BakedOcclusion,
+    baked: BakedOcclusion,
 ) -> Result<OcclusionOnlyReport, String> {
     refuse_in_play(scene)?;
     let report = OcclusionOnlyReport {
         occlusion: baked.report,
         ms: baked.ms,
     };
-    let cells = std::mem::take(&mut baked.cells);
-    put_occlusion(scene, baked);
+    scene.put_baked_occlusion(baked.data);
     let saving = std::time::Instant::now();
     crate::scene::lighting::occlusion::save_sidecar(scene, path)?;
     let saved = Some(saving.elapsed());
-    let measured = (&report.occlusion, report.ms, &cells[..]);
+    let measured = (&report.occlusion, report.ms, &baked.cells[..]);
     super::report::occlusion::keep(scene, path, measured, saved);
     Ok(report)
-}
-
-/// Put a finished bake's PVS on `scene`: the next save writes it
-/// ([`Scene::put_baked_occlusion`]).
-fn put_occlusion(scene: &mut Scene, baked: BakedOcclusion) {
-    scene.put_baked_occlusion(baked.data);
 }
 
 /// The warning a bake gives when the scene file at `path` lacks, or holds
