@@ -50,19 +50,7 @@ pub fn register(
         }),
     )?;
 
-    // File ▸ New's scene half: an attached editor follows the new identity as it
-    // follows a scripted `Load` (selection and dirty mark drop), and the path cell
-    // is the editor's own (#1366).
-    put(
-        table,
-        "New",
-        lua.create_function(move |lua, ()| {
-            let scene = &*scene.get(lua)?;
-            let path = &*scene_path.get(lua)?;
-            let done = crate::scene::new_scene(&mut scene.borrow_mut(), &mut path.borrow_mut());
-            done.map_err(|why| runtime(format!("Scene.New: {why}")))
-        }),
-    )?;
+    register_new(lua, table, scene, scene_path)?;
 
     put(
         table,
@@ -84,6 +72,27 @@ pub fn register(
                 }
                 Ok(scene.borrow_mut().dont_destroy_on_load(id))
             })
+        }),
+    )
+}
+
+/// `New()`: File ▸ New's scene half. An attached editor follows the new identity
+/// as it follows a scripted `Load` (selection and dirty mark drop), and the path
+/// cell is the editor's own (#1366).
+fn register_new(
+    lua: &mlua::Lua,
+    table: &mlua::Table,
+    scene: ApiCell<Scene>,
+    scene_path: ApiCell<Option<String>>,
+) -> Reg {
+    put(
+        table,
+        "New",
+        lua.create_function(move |lua, ()| {
+            let scene = &*scene.get(lua)?;
+            let path = &*scene_path.get(lua)?;
+            let done = crate::scene::new_scene(&mut scene.borrow_mut(), &mut path.borrow_mut());
+            done.map_err(|why| runtime(format!("Scene.New: {why}")))
         }),
     )
 }
