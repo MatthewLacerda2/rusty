@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::time::Duration;
 
-use super::occlusion::{bake_occlusion_logged, OcclusionBakeJob};
+use super::{bake_occlusion_logged, OcclusionBakeJob};
 use crate::dev::bake::progress::{BakeLog, Line};
 use crate::scene::lighting::occlusion::test_level::corridors;
 use crate::scene::lighting::occlusion::{

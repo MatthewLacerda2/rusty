@@ -9,7 +9,7 @@ use super::Oidn;
 use crate::scene::lighting::lightmap::{
     bake_with_progress, BakeLight, BakeProgress, BakeScene, BakeSettings, LightShape,
 };
-use crate::scene::lighting::occlusion::bench_level::rooms;
+use crate::scene::lighting::occlusion::bench::level::rooms;
 
 #[test]
 fn a_whole_oidn_bake_repeats_its_bytes_whichever_worker_finishes_first() {

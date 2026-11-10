@@ -13,6 +13,8 @@ mod sight;
 mod targets;
 
 pub(super) use baking::Baking;
+#[cfg(all(test, feature = "dev"))]
+pub(super) use sheets::without_union;
 #[cfg(test)]
 pub(super) use targets::target_points;
 pub use targets::{MAX_TARGETS, TARGET_SPACING, VOXEL};
@@ -44,3 +46,5 @@ fn opposite(normal: Vec3, (lo, hi): (f32, f32), from: (Vec3, Vec3), to: (Vec3, V
 
 #[cfg(test)]
 mod sheets_tests;
+#[cfg(test)]
+mod union_tests;

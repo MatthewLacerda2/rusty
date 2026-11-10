@@ -117,3 +117,10 @@ fn read(progress: &OcclusionProgress) -> Progress {
         meshes: None,
     }
 }
+
+#[cfg(test)]
+mod cost_tests;
+#[cfg(test)]
+mod tests;
+#[cfg(test)]
+mod town_cost_tests;

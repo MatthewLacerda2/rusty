@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use glam::Vec3;
 
-use crate::scene::lighting::occlusion::bench_level::rooms;
+use crate::scene::lighting::occlusion::bench::level::rooms;
 use crate::scene::lighting::occlusion::test_level::block;
 use crate::scene::lighting::occlusion::{bake_occlusion, gather_occlusion};
 use crate::scene::Scene;
