@@ -126,7 +126,7 @@ off every wall. A path is a table:
 | `Navigation.CalculatePath` | `(fx, fy, fz, tx, ty, tz [, areaMask])` | a path table (above); with `areaMask`, the path enters only those areas (see *Areas and costs*) |
 | `Navigation.GetPathLength` | `(path)` | the length along a path table's `corners` (the same number as its `length`) |
 | `Navigation.SamplePosition` | `(x, y, z, maxDistance [, areaMask])` | `found, x, y, z` — the walkable point nearest the given one (3D distance) within `maxDistance`, on a floor whose area `areaMask` allows; `false, 0, 0, 0` when there is none |
-| `Navigation.Raycast` | `(fx, fy, fz, tx, ty, tz [, areaMask])` | `hit, x, y, z` — walks the navmesh straight from the start toward the end; `hit` is `true` when a wall, ledge, eroded edge, too-steep step or a floor outside `areaMask` stops it, and `x, y, z` is where it stopped (the end point when clear), on the floor it reached |
+| `Navigation.Raycast` | `(fx, fy, fz, tx, ty, tz [, areaMask])` | `hit, x, y, z` — walks the navmesh straight from the start toward the end; `hit` is `true` when a wall, ledge, eroded edge, a step taller than `MaxStep` or a floor outside `areaMask` stops it, and `x, y, z` is where it stopped (the end point when clear), on the floor it reached |
 
 `Raycast` follows ramps and stairs, so a clear walk can end on another floor; the
 returned `y` says which. Its start must stand on the navmesh: from off it the walk is
@@ -269,8 +269,10 @@ low-headroom spans** at bake time (#278, the radius's vertical companion): a spa
 open space up to the next solid above is below the height is not walkable, so the agent
 can't path under a low overhang or through a crawlspace, and a move between two spans
 needs that height in the gap they share. The floor *above* an overhang stays walkable.
-`MaxSlope` also decides which surfaces are walkable at all: a triangle steeper than it is
-not a floor.
+`MaxSlope` decides which surfaces are walkable at all: a triangle steeper than it is
+not a floor. It is not held between neighbouring cells: a step between two floors is
+limited by `MaxStep` alone (Recast's climb height), so a stair or a curb joins the same way
+at every `GridSpacing` (#2001).
 
 | Function | Signature | Returns / Effect |
 |---|---|---|
@@ -280,7 +282,7 @@ not a floor.
 | `Navigation.SetAgentHeight` | `(height)` | writes `nav_settings.agent_height` + re-bakes (drops spans with less open space above than the height) |
 | `Navigation.GetMaxSlope` | `()` | max walkable grade (rise per unit travelled) |
 | `Navigation.SetMaxSlope` | `(slope)` | writes `nav_settings.max_slope` + re-bakes |
-| `Navigation.GetMaxStep` | `()` | max step height between spans in adjacent cells |
+| `Navigation.GetMaxStep` | `()` | max step height between spans in adjacent cells; `0.3` by default (#2001), the default `CharacterController` step offset, so a default bot is never routed over a ledge its controller can't climb |
 | `Navigation.SetMaxStep` | `(step)` | writes `nav_settings.max_step` + re-bakes |
 | `Navigation.GetGridSpacing` | `()` | grid cell size (world units); `0.25` by default (#1887), half the default agent radius |
 | `Navigation.SetGridSpacing` | `(spacing)` | writes `nav_settings.grid_spacing` + re-bakes (re-shapes the grid) |

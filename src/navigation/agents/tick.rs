@@ -181,7 +181,7 @@ impl NavigationGraph {
 
     /// Return the slide-constrained position after one step of `agent.velocity`.
     /// Each axis moves only onto a span linked to the agent's current one (walkable,
-    /// within the step/slope limits, enough headroom), so agents climb ramps and
+    /// within the step limit, enough headroom), so agents climb ramps and
     /// stairs but never slide up a wall face (#130). The agent then stands on the
     /// span it reached — the floor it walked onto, not whichever floor of that
     /// column is highest (#454) — at that floor's height under its XZ, so it follows

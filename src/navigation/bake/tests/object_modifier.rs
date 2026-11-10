@@ -120,6 +120,7 @@ fn a_child_inherits_its_parents_modifier_unless_it_has_its_own() {
 #[test]
 fn a_low_not_walkable_seat_on_the_floor_stays_off_the_navmesh() {
     let (mut scene, _, _) = room();
+    scene.nav_settings.max_step = 0.5; // the 0.45 m seat sits within it
     let sofa = add_box(
         &mut scene,
         Vec3::new(2.6, 0.0, 2.6),

@@ -19,6 +19,7 @@ use crate::scene::Scene;
 fn platform() -> Scene {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
+    scene.nav_settings.max_step = 0.5; // the ramp climbs 0.375 a 1 m cell
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 20.0, 0.0, 20.0));
     scene.nav_settings.drop_height = 4.0;
     scene.nav_settings.jump_height = 1.2;

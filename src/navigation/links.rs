@@ -5,12 +5,18 @@
 //! short scan, and nothing has to be rebuilt when the bake changes a cell. A
 //! move from span `a` to span `b` is allowed when
 //!
-//! * the floor delta clears both `max_step` (an absolute curb height) and
-//!   `max_slope` (rise per unit of horizontal travel, so a diagonal tolerates a
-//!   slightly larger rise than a cardinal move), and
+//! * the floor delta clears `max_step`, an absolute curb height (Recast's
+//!   `walkableClimb`), and
 //! * the open gap the two columns share, from the higher floor to the lower
 //!   ceiling, still fits `agent_height` (Recast's `walkableHeight` rule), so an
 //!   agent can't squeeze under a low lintel between two otherwise open spans.
+//!
+//! `max_slope` is not part of the rule. It decides which triangles are walkable at
+//! rasterisation (`bake::raster`), as Recast's `walkableSlopeAngle` does; a ramp too
+//! steep to walk bakes no spans to link. Held between neighbouring cell tops, a grade
+//! would refuse any step taller than `max_slope × grid_spacing`, so a 0.15 m riser
+//! joined at a 0.15 m grid and split at 0.1 (#2001): a finer grid disconnected what
+//! a coarser one joined.
 //!
 //! When several spans of the target column qualify (rare: they'd need to sit
 //! within a step of each other with a full agent height between them), the one
@@ -21,17 +27,17 @@ use super::{NavigationGraph, SpanRef};
 impl NavigationGraph {
     /// The span in cell `(gx, gz)` an agent on `from` reaches by walking there in a
     /// straight line, or `None` when no span of that column is within a step.
-    /// `(gx, gz)` may be any cell; the horizontal run is the centre-to-centre distance.
+    /// `(gx, gz)` may be any cell; only the floor delta and the shared headroom count,
+    /// not the horizontal run between the cells.
     pub fn link_to(&self, from: SpanRef, gx: i32, gz: i32) -> Option<SpanRef> {
         if (gx, gz) == (from.gx, from.gz) {
             return Some(from);
         }
         let a = self.spans[from.index as usize];
-        let run = self.run_between(from, gx, gz);
         let mut best: Option<(f32, usize)> = None;
         for i in self.span_range(gx, gz) {
             let b = self.spans[i];
-            if !self.steps(a, b, run) {
+            if !self.steps(a, b) {
                 continue;
             }
             let dh = (b.y - a.y).abs();
@@ -46,13 +52,13 @@ impl NavigationGraph {
         })
     }
 
-    /// Whether an agent can walk between spans `a` and `b` whose cells lie `run`
-    /// metres apart: the floor delta clears `max_step` and `max_slope`, and the
-    /// gap they share fits `agent_height`. Symmetric in `a` and `b`.
-    pub(super) fn steps(&self, a: super::NavSpan, b: super::NavSpan, run: f32) -> bool {
+    /// Whether an agent can walk between spans `a` and `b` of neighbouring cells: the
+    /// floor delta clears `max_step`, and the gap they share fits `agent_height`.
+    /// Symmetric in `a` and `b`.
+    pub(super) fn steps(&self, a: super::NavSpan, b: super::NavSpan) -> bool {
         let dh = (b.y - a.y).abs();
         let gap = a.ceiling.min(b.ceiling) - a.y.max(b.y);
-        dh <= self.max_step && dh <= self.max_slope * run && gap >= self.agent_height
+        dh <= self.max_step && gap >= self.agent_height
     }
 
     /// Centre-to-centre metres from `from`'s cell to cell `(gx, gz)`.
@@ -117,19 +123,17 @@ mod tests {
     }
 
     #[test]
-    fn step_and_slope_limits_both_apply() {
-        let mut g = NavigationGraph::new(0.0, 1.0, 0.0, 0.0, 1.0);
-        g.spans[1].y = 0.5;
+    fn only_max_step_limits_a_step() {
+        // A 0.15 m step on a 0.1 m grid is a 1.5 grade between cell centres: the
+        // slope limit is the rasteriser's, so the step still links (#2001).
+        let mut g = NavigationGraph::new(0.0, 0.1, 0.0, 0.0, 0.1);
+        g.spans[1].y = 0.15;
         let from = at(0, 0);
-        assert!(g.link_to(from, 1, 0).is_some(), "0.5 is exactly max_step");
-        g.max_slope = 0.4;
-        assert!(
-            g.link_to(from, 1, 0).is_none(),
-            "0.5 rise over 1.0 run > 0.4"
-        );
-        g.max_slope = 1.0;
-        g.max_step = 0.4;
-        assert!(g.link_to(from, 1, 0).is_none(), "0.5 step > max_step 0.4");
+        assert!(g.link_to(from, 1, 0).is_some(), "0.15 is within max_step");
+        g.spans[1].y = g.max_step;
+        assert!(g.link_to(from, 1, 0).is_some(), "exactly max_step");
+        g.spans[1].y = g.max_step + 0.01;
+        assert!(g.link_to(from, 1, 0).is_none(), "past max_step");
     }
 
     #[test]
