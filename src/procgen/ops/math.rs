@@ -135,9 +135,11 @@ mod tests {
         use std::f32::consts::{FRAC_PI_2, PI};
         assert!((apply(MathOp::Sin, FRAC_PI_2, 9.0) - 1.0).abs() < 1e-6);
         assert!((apply(MathOp::Cos, PI, 9.0) + 1.0).abs() < 1e-6);
-        assert_eq!(apply(MathOp::Atan2, 1.0, 0.0), FRAC_PI_2);
-        assert_eq!(apply(MathOp::Atan2, 0.0, -1.0), PI);
-        assert_eq!(apply(MathOp::Atan2, -1.0, 0.0), -FRAC_PI_2);
+        // Within an ulp: macOS's libm gives atan2(0, -1) one ulp under PI.
+        let near = |got: f32, want: f32| (got - want).abs() < 1e-6;
+        assert!(near(apply(MathOp::Atan2, 1.0, 0.0), FRAC_PI_2));
+        assert!(near(apply(MathOp::Atan2, 0.0, -1.0), PI));
+        assert!(near(apply(MathOp::Atan2, -1.0, 0.0), -FRAC_PI_2));
     }
 
     #[test]
