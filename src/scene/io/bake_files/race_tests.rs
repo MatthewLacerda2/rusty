@@ -1,7 +1,7 @@
 //! The issue's repro (#1982) for every bake sidecar the keep-newer rule covers: a world
 //! that only loaded a bake never writes it back over a newer one another `Scene`
 //! (another process) baked, a world that baked since does, Save As carries it, and
-//! a cleared bake removes only the file this world saw.
+//! a world holding none it did not bake removes only the file it saw.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -117,7 +117,7 @@ fn save_as_writes_the_loaded_bake_to_the_new_path() {
 }
 
 #[test]
-fn a_cleared_bake_removes_only_the_file_this_world_saw() {
+fn holding_none_unbaked_removes_only_the_file_this_world_saw() {
     let path = level("cleared");
     let mut editor = opened(&path);
     KINDS.iter().for_each(|k| (k.bake)(&mut editor, 0));

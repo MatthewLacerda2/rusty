@@ -1,6 +1,7 @@
 //! The bake files' rule (#1982) on raw bytes: a save writes only what this world
 //! baked, never writes back what it only loaded over a newer file, restores a file
-//! removed outside, and removes a newer file never.
+//! removed outside, and removes a newer file only for a bake that kept none (the
+//! last write wins).
 
 use std::path::{Path, PathBuf};
 
@@ -72,7 +73,7 @@ fn save_as_writes_the_new_path() {
 }
 
 #[test]
-fn a_cleared_bake_removes_only_the_file_this_world_saw_unchanged() {
+fn holding_none_unbaked_removes_only_the_file_this_world_saw_unchanged() {
     let path = file("cleared.occlusion", b"old");
     let files = loaded(&path);
     assert_eq!(

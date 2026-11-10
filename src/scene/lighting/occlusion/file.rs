@@ -110,7 +110,7 @@ pub fn save_sidecar(scene: &Scene, scene_path: &str) -> Result<Saved, String> {
 
 /// Load the PVS beside `scene_path` onto `scene`: none when there is no file, and
 /// none, with a warning, when the file is refused (the next save then rewrites or
-/// removes it). A file that is there but cannot be read (a permission, a transient
+/// removes it, while it is still that file). A file that is there but cannot be read (a permission, a transient
 /// failure) also loads none, with a warning, and the next save keeps it.
 pub fn load_sidecar(scene: &mut Scene, scene_path: &str) {
     let path = occlusion_path(scene_path);

@@ -114,11 +114,17 @@ pub fn apply_lighting(scene: &mut Scene, data: &LightingData) {
 
 /// Write the baked PVS beside `scene_path` (`occlusion::save_sidecar`, #1714), by
 /// the bake files' rule (`scene::io::BakeFiles`, #1982), and the lighting sidecar
-/// next to it, with the document: written when any probe is baked, removed when
-/// none is, so stale data can't linger. Errors are returned as strings, matching
-/// scene I/O.
+/// next to it ([`save_sh_sidecar`]): a whole scene save. Errors are returned as
+/// strings, matching scene I/O.
 pub fn save_lighting_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
     super::occlusion::save_sidecar(scene, scene_path)?;
+    save_sh_sidecar(scene, scene_path)
+}
+
+/// Write the lighting sidecar beside `scene_path`, with the document: written when
+/// any probe is baked, removed when none is, so stale data can't linger. Generate
+/// Lighting's lighting save writes only this one; its PVS is written once baked.
+pub fn save_sh_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
     let path = sidecar_path(scene_path);
     let has_baked = (scene.probes.probes().iter())
         .any(|p| p.sh != Sh9::zero() || p.occlusion != glam::Vec4::ONE);

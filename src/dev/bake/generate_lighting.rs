@@ -139,14 +139,11 @@ pub fn start_probes(
 
 /// Write the applied lightmaps and the committed probes ([`LightingBake::commit`])
 /// into the file at `path`, before the PVS bakes: what Generate Lighting baked is
-/// on disk however its last step ends.
+/// on disk however its last step ends. The PVS file is not touched: [`finish`]
+/// writes it once the PVS is baked, so a PVS step that never ends leaves the file
+/// as it was, a newer one another process baked included (#1982).
 pub fn write_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> {
     refuse_in_play(scene)?;
-    // The PVS bakes next and `finish` writes it: this save writes the one held now
-    // rather than warn that it keeps a newer file the bake replaces anyway (#1982).
-    scene
-        .bake_files
-        .baked(crate::scene::lighting::occlusion::OCCLUSION_SUFFIX);
     save_lighting(scene, path)
 }
 
@@ -291,6 +288,9 @@ fn refuse_in_play(scene: &Scene) -> Result<(), String> {
 #[cfg(test)]
 #[path = "pvs_only_tests.rs"]
 mod pvs_only_tests;
+#[cfg(test)]
+#[path = "pvs_write_tests.rs"]
+mod pvs_write_tests;
 #[cfg(test)]
 #[path = "generate_lighting_tests.rs"]
 mod tests;

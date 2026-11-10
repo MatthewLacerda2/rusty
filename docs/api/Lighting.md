@@ -160,12 +160,16 @@ process (a headless `session-mcp`, a second editor) re-bakes a scene while it is
 saving the open one keeps the newer file, and the console says so once (`changed on disk
 since this scene read it … the save keeps that newer bake, and the next load uses it`). A
 scene that baked since still writes its own (the last write wins, and the warning says it
-overwrote the newer file). A cleared bake removes the file unless it changed on disk
-since. A file removed outside the engine is written back when the scene holds a bake
-(the console says so). A file refused on load (corrupt, truncated) is rewritten or
-removed by the next save; one that could not be read at all is left until the scene
-bakes. "Changed" is the file's length and content hash, so a same-length rewrite counts.
-Writes are atomic: a crash leaves the old file or the new one.
+overwrote the newer file), and a bake that kept no PVS removes the file, newer or not
+(the last write wins). A file removed outside the engine is written back when the scene
+holds a bake (the console says so). A file refused on load (corrupt, truncated) is
+rewritten or removed by the next save while it is still that file; a valid one another
+process baked there since is kept, as after a load. One that could not be read at all is
+left until the scene bakes. Generate Lighting writes the PVS file only once its PVS is
+baked: a bake that stops before (an error, the editor closing) leaves the file as it was.
+"Changed" is the file's length and content hash, so a same-length rewrite counts. Writes
+are atomic and synced to the disk: a crash or a power cut leaves the old file or the new
+one.
 
 The keep-newer rule protects only a file written after this scene's own load of that
 path. A save to a path the scene has no record for (File ▸ New or Reset Scene then a

@@ -58,8 +58,9 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
     std::fs::write(path, &json).map_err(|e| format!("Failed to write scene file: {}", e))?;
     scene.disk_text.record(path, json);
     // Heavy baked SH lives beside the scene in `<scene>.lighting.json`, not inline in
-    // the human-diffable scene doc (#240). Written only when the probes hold a bake
-    // this world did not last read or write there (`BakeFiles`, #1982).
+    // the human-diffable scene doc (#240): written with the document on every save
+    // (removed when no probe is baked). The PVS beside it follows the bake files'
+    // rule (`BakeFiles`, #1982).
     crate::scene::lighting::io::save_lighting_sidecar(scene, path)?;
     // The saved navmesh (#1887), when the scene baked one since it last read or
     // wrote the file (`BakeFiles`, #1982): a save never bakes it.

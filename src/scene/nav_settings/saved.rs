@@ -4,12 +4,15 @@
 //! The scene only carries the file's bytes ([`SavedNavmesh`]): what they mean, and
 //! whether they still match the scene, is `navigation`'s (the arrow is navigation →
 //! scene). A save writes the bytes the scene holds to its own path, so *Save As*
-//! carries the navmesh to the new path as it carries the baked PVS; a scene that holds
-//! none removes only a file it read or wrote itself (the file is checked on use, so
-//! a stale one costs only a full bake). A save never bakes: `Navigation.Bake()` and the
+//! carries the navmesh to the new path as it carries the baked PVS. A scene that holds
+//! none removes a file it read or wrote itself only while that file is unchanged, and
+//! a save to a path it has no record for (a new scene saved over a baked one) replaces
+//! whatever navmesh is there (the file is checked on use, so a stale one costs only
+//! a full bake). A save never bakes: `Navigation.Bake()` and the
 //! editor's *Bake Navigation* button do. Nor does it rewrite bytes it only loaded
 //! (`scene::io::BakeFiles`, #1982): a Dust2-sized navmesh is tens of MB, most saves
-//! leave it as it was loaded, and a newer one another process baked is kept.
+//! leave it as it was loaded (the held buffer is not hashed again), and a newer one
+//! another process baked is kept.
 //!
 //! stored-format: the `<scene>.navmesh` file beside the scene
 
@@ -42,13 +45,13 @@ pub fn navmesh_path(scene_path: &str) -> PathBuf {
 }
 
 /// Bring the navmesh file beside `scene_path` to what `scene` holds, by the bake
-/// files' rule (`scene::io::BakeFiles`, #1982): written only when this world holds
-/// bytes it did not last read or write there, and never over a newer file with
+/// files' rule (`scene::io::BakeFiles`, #1982): written only when this world baked
+/// since or holds bytes it did not last read or write there, and never over a newer file with
 /// bytes it only loaded.
 pub fn save_navmesh(scene: &Scene, scene_path: &str) -> Result<Saved, String> {
     let path = navmesh_path(scene_path);
-    let want = scene.navmesh.bytes.as_deref();
-    scene.bake_files.store(&path, want, "Navigation")
+    let want = scene.navmesh.bytes.as_ref();
+    scene.bake_files.store_shared(&path, want, "Navigation")
 }
 
 /// Read the navmesh beside `scene_path` onto `scene`: none when there is no file,
@@ -69,9 +72,7 @@ pub fn load_navmesh(scene: &mut Scene, scene_path: &str) {
             return;
         }
     };
-    scene
-        .bake_files
-        .loaded(&path, bytes.as_deref(), bytes.as_deref());
+    scene.bake_files.loaded_shared(&path, bytes.as_ref());
     scene.navmesh = SavedNavmesh { bytes };
 }
 
