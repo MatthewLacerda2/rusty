@@ -458,9 +458,11 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   seam fuses where it falls on the quarter-metre grid of world units, as a modular
   level's do; a slit between two faces is seen through however thin, down to float
   noise, and faces fuse only at one depth (to float noise), never a millimetre
-  apart. Fusion takes faces merged into convex quads (a mesh's consecutive
-  triangles are paired), so a wall triangulated as a fan or an n-gon fuses little:
-  it bakes slower, never wrong, and the times below are on primitive boxes. Each cube tries first the faces that last stopped one of its rays.
+  apart. The faces' triangles fuse whatever their order or triangulation (#1981):
+  edges two faces share corner for corner join them, so an imported wall
+  tessellated into triangles hides what a box does; an edge welded only to float
+  noise, or a T-junction, is left a seam, which fuses less and is never wrong.
+  Each cube tries first the faces that last stopped one of its rays.
   These proofs are exact, so they change how fast a cell bakes, not what it keeps.
   Every cell
   then also takes its 26 neighbours' sets, and cells that see the same set share one
@@ -482,6 +484,12 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   (part 2 took some 8 hours on that level). Fewer cores take longer in proportion.
   What costs is the cells under the ground floor and across a storey's slab, where
   only many faces together hide what is past them.
+  A level of imported meshes costs what one of boxes does: a 6 × 6 town of
+  tessellated one-mesh buildings on bumpy ground (5120 cells of 2 m) bakes at
+  about 700 cells a second, its box-built twin at about 550 (#1981; it was 78
+  before tessellated faces fused). A cell's cost grows with the meshes the level
+  holds, slowly where they crowd (5.6 times the meshes, about half the rate) and
+  about in proportion to the level's floor area.
   At runtime a camera costs one cell lookup, and each static mesh
   a map lookup and a bit test; a static mesh moved or edited re-checks that mesh alone.
 - **Baked alone** by `Lighting.BakeOcclusion()` or the scene inspector's **"Bake
@@ -489,7 +497,8 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   own window): the same step on the open scene, written beside it, with no lightmap
   or probe touched and the scene file left as it is. Refused as Generate Lighting is:
   in Play, while the editor's bake runs, and for a scene never saved. A level whose
-  full Generate takes most of an hour re-bakes its PVS in seconds.
+  full Generate takes most of an hour re-bakes its PVS in what *Cost* above says:
+  seconds for a Kolvik-sized interior, minutes for a Dust2-sized level.
 - **Runs** as Generate Lighting's last step, after the lightmaps and probes are
   written into the scene, so a bake dropped or failed during it (the scene closed or
   reloaded, another opened) loses none of the lighting: in the editor on a worker

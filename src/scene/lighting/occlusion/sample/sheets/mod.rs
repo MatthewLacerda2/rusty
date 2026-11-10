@@ -4,7 +4,8 @@
 //! what none of their faces hides alone.
 //!
 //! A sheet is a grid of square texels on its plane, one bit each: set when the
-//! texel lies wholly inside one member face. Every segment from one box to
+//! texel lies wholly inside one member face, or inside their union (`cover`:
+//! a tessellated wall's triangles, whatever their order). Every segment from one box to
 //! another that clear the plane on opposite sides crosses it inside the
 //! rectangle round the crossings of their corners' segments (`shaft` says why),
 //! so when every texel that rectangle touches is set, every segment crosses a
@@ -24,10 +25,8 @@
 //!
 //! A texel is held by a face whose edge misses its corner by noise and no more,
 //! so a slit between two faces is seen through however thin, down to float noise.
-//! Fusion needs faces merged into convex quads (`shaft`'s `Polygon::merge` pairs
-//! a mesh's consecutive triangles): a wall triangulated as a fan or an n-gon
-//! leaves triangles no texel lies wholly inside, so it fuses little, which is
-//! slower and never wrong.
+//! Faces join across an edge only where they share its corners bit for bit
+//! (`cover`), so two faces a slit apart never do.
 
 use glam::{UVec2, Vec2, Vec3};
 
@@ -35,6 +34,7 @@ use super::{corners, opposite, CLEAR};
 pub(super) use group::sheets;
 use group::tolerance;
 
+mod cover;
 mod group;
 use crate::scene::lighting::occlusion::gather::Face;
 
@@ -102,6 +102,8 @@ impl Sheet {
         for poly in &polys {
             fill(&mut set, poly, (origin, texel, dims), tol);
         }
+        let corners: Vec<&[Vec3]> = members.clone().map(|m| m.corners).collect();
+        cover::union_fill(&mut set, (&polys, &corners), (origin, texel, dims), tol);
         let mut members: Vec<u32> = members.map(|m| m.mesh).collect();
         members.sort_unstable();
         members.dedup();

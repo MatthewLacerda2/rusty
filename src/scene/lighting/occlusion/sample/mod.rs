@@ -44,3 +44,5 @@ fn opposite(normal: Vec3, (lo, hi): (f32, f32), from: (Vec3, Vec3), to: (Vec3, V
 
 #[cfg(test)]
 mod sheets_tests;
+#[cfg(test)]
+mod union_tests;

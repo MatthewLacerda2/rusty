@@ -60,6 +60,12 @@ impl Baking {
         self.polygons.sheet_bytes()
     }
 
+    /// How many rays it has cast, for a cost measurement.
+    #[cfg(all(test, feature = "dev"))]
+    pub fn rays_cast(&self) -> u64 {
+        self.rays.cast.load(Ordering::Relaxed)
+    }
+
     pub fn of(objects: &[Object]) -> Self {
         let (mut tris, mut faces) = (Vec::new(), Vec::new());
         let mut bounds: Option<(Vec3, Vec3)> = None;

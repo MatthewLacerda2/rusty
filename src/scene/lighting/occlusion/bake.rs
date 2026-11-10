@@ -71,6 +71,12 @@ pub fn bake_occlusion(
 }
 
 impl OcclusionInput {
+    /// The gathered objects, for a measurement that drives the sampling itself.
+    #[cfg(all(test, feature = "dev"))]
+    pub(super) fn objects(&self) -> &[Object] {
+        &self.objects
+    }
+
     /// Bake `count` cells spread over the grid on this thread, for a measurement
     /// of a level too large to bake whole in a test: the grid's cell count and
     /// edge, and the sheets the occluders fused into (count, bytes). `None` when
