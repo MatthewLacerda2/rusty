@@ -66,25 +66,29 @@ fn draw_field(
                 .add(crate::editor::widgets::slider(&mut n, range.clone()))
                 .changed()
                 .then_some(SurfaceValue::Number(n)),
-            (SurfaceKind::Color, SurfaceValue::Color(mut rgb)) => ui
+            (SurfaceKind::Color(range), SurfaceValue::Color(mut rgb)) if *range.end() <= 1.0 => ui
                 .color_edit_button_rgb(&mut rgb)
                 .changed()
                 .then_some(SurfaceValue::Color(rgb)),
+            // A tint that can pass 1 (#1998) is three numbers: a picker stops at white.
+            (SurfaceKind::Color(range), SurfaceValue::Color(mut rgb)) => {
+                drags(ui, &mut rgb, range).then_some(SurfaceValue::Color(rgb))
+            }
             (SurfaceKind::Vec2(range), SurfaceValue::Vec2(mut v)) => {
-                let x = ui.add(
-                    egui::DragValue::new(&mut v[0])
-                        .speed(0.01)
-                        .ranged(range.clone()),
-                );
-                let y = ui.add(
-                    egui::DragValue::new(&mut v[1])
-                        .speed(0.01)
-                        .ranged(range.clone()),
-                );
-                (x.changed() || y.changed()).then_some(SurfaceValue::Vec2(v))
+                drags(ui, &mut v, range).then_some(SurfaceValue::Vec2(v))
             }
             _ => None,
         }
     })
     .inner
+}
+
+/// One drag per value, each held in `range`; whether any changed.
+fn drags(ui: &mut egui::Ui, values: &mut [f32], range: &std::ops::RangeInclusive<f32>) -> bool {
+    let mut changed = false;
+    for v in values {
+        let drag = egui::DragValue::new(v).speed(0.01).ranged(range.clone());
+        changed |= ui.add(drag).changed();
+    }
+    changed
 }

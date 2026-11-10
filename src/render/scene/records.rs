@@ -242,6 +242,8 @@ fn record_free(m: &MaterialAsset) -> MaterialAsset {
         receive_shadows: d.receive_shadows,
         refraction_model: d.refraction_model,
         ior: d.ior,
+        specular: d.specular,
+        specular_color: d.specular_color,
         thickness: d.thickness,
         transmittance_color: d.transmittance_color,
         absorption_distance: d.absorption_distance,

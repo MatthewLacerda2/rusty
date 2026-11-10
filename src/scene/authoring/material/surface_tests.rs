@@ -24,7 +24,7 @@ fn every_row_reads_back_what_it_wrote() {
                 SurfaceValue::Bool(true)
             )),
             SurfaceKind::Number(ref r) => SurfaceValue::Number(*r.end()),
-            SurfaceKind::Color => SurfaceValue::Color([0.25, 0.5, 0.75]),
+            SurfaceKind::Color(_) => SurfaceValue::Color([0.25, 0.5, 0.75]),
             SurfaceKind::Vec2(ref r) => SurfaceValue::Vec2([*r.start(), 2.5]),
         };
         set_surface(&mut materials, "k", f, value.clone()).unwrap();
@@ -121,4 +121,21 @@ fn tiling_and_offset_hints_follow_the_mapping() {
         .unwrap()
         .contains("down the surface"));
     assert_eq!(hint("blend_mode", UvMapping::Uv0), None);
+}
+
+#[test]
+fn an_import_lands_in_the_rows_ranges_and_ior_zero_is_a_mirror() {
+    use super::super::import_reflectance;
+    let import = |ior, specular, color| {
+        let mut m = MaterialAsset::default();
+        import_reflectance(&mut m, ior, specular, color);
+        m
+    };
+    let wild = import(4.0, f32::NAN, [100.0, -1.0, 0.5]);
+    assert_eq!((wild.ior, wild.specular), (2.5, 0.0));
+    assert_eq!(wild.specular_color, [25.0, 0.0, 0.5]);
+    // `KHR_materials_ior`'s 0 is an infinite ior: F0 = min(colour, 1) × specular.
+    let mirror = import(0.0, 1.0, [1.0, 0.5, 0.0]);
+    assert_eq!(mirror.ior, 1.5, "refraction stays defined");
+    assert_eq!(mirror.dielectric_f0(), [1.0, 0.5, 0.0]);
 }

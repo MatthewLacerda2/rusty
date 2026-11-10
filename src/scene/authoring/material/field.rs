@@ -10,7 +10,7 @@
 
 use std::ops::RangeInclusive;
 
-use super::super::sanitize::{finite_array_or, saturated, unit};
+use super::super::sanitize::{finite_array_or, saturated};
 use super::MaterialLibrary;
 use crate::components::MaterialAsset;
 
@@ -33,8 +33,9 @@ pub enum SurfaceKind {
     Toggle,
     /// A number the write clamps into this range.
     Number(RangeInclusive<f32>),
-    /// An RGB colour, each channel clamped to `[0, 1]`.
-    Color,
+    /// An RGB colour, each channel clamped into this range: `[0, 1]` for a colour,
+    /// past 1 for a tint that can also raise (`specular_color`, #1998).
+    Color(RangeInclusive<f32>),
     /// A pair of numbers, each clamped into this range (tiling, offset).
     Vec2(RangeInclusive<f32>),
 }
@@ -75,9 +76,9 @@ impl SurfaceField {
             (SurfaceKind::Number(r), SurfaceValue::Number(n)) => {
                 Ok(SurfaceValue::Number(saturated(n, *r.start(), *r.end())))
             }
-            (SurfaceKind::Color, SurfaceValue::Color(c)) => {
-                Ok(SurfaceValue::Color(finite_array_or(c, [1.0; 3]).map(unit)))
-            }
+            (SurfaceKind::Color(r), SurfaceValue::Color(c)) => Ok(SurfaceValue::Color(
+                finite_array_or(c, [1.0; 3]).map(|n| saturated(n, *r.start(), *r.end())),
+            )),
             (SurfaceKind::Vec2(r), SurfaceValue::Vec2(v)) => Ok(SurfaceValue::Vec2(
                 v.map(|n| saturated(n, *r.start(), *r.end())),
             )),
@@ -103,7 +104,11 @@ impl SurfaceKind {
             Self::Choice(names) => format!("one of {}", names().join(", ")),
             Self::Toggle => "a boolean".into(),
             Self::Number(r) => format!("a number in [{}, {}]", r.start(), r.end()),
-            Self::Color => "an {r, g, b} colour".into(),
+            Self::Color(r) => format!(
+                "an {{r, g, b}} colour, each in [{}, {}]",
+                r.start(),
+                r.end()
+            ),
             Self::Vec2(r) => format!("an {{x, y}} pair, each in [{}, {}]", r.start(), r.end()),
         }
     }

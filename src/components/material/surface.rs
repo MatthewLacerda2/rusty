@@ -101,7 +101,54 @@ pub(super) fn white() -> [f32; 3] {
     [1.0; 3]
 }
 
+/// A dielectric's reflectance head-on, F0, by glTF's `KHR_materials_ior` and
+/// `KHR_materials_specular` (#1998): `min(((ior - 1) / (ior + 1))² × color, 1) ×
+/// specular`, per channel. The one place F0 is computed: every reader in the
+/// forward shader (the lamps, the lightmap's lobe, the environment BRDF and so a
+/// transparent surface's opacity) takes it from the record, mixed toward a metal's
+/// albedo by `metallic` there. Worked in `f64`, so glass's default 1.5 is exactly
+/// `0.04_f32`, the constant this replaced, and every material that sets neither
+/// field renders as before. A hand-written scene skips the field table's clamps,
+/// so each input is clamped here: an `ior` below 1 or NaN reads as 1 (an infinite
+/// one is a mirror), a `specular` as its nearest bound in `[0, 1]` (NaN as 0), and
+/// a colour channel below 0 or NaN as 0.
+pub fn dielectric_f0(ior: f32, specular: f32, color: [f32; 3]) -> [f32; 3] {
+    let n = within(ior, 1.0, f64::MAX);
+    let reflectance = ((n - 1.0) / (n + 1.0)).powi(2);
+    let strength = within(specular, 0.0, 1.0);
+    color.map(|c| ((reflectance * within(c, 0.0, f64::MAX)).min(1.0) * strength) as f32)
+}
+
+/// A dielectric's reflectance at grazing angles, F90, by `KHR_materials_specular`
+/// (#1998): its `specular`, clamped as [`dielectric_f0`] clamps it. 1 by default, so
+/// a material that sets no `specular` keeps Schlick's full rim; 0 takes a
+/// dielectric's reflections away at every angle. A metal's F90 is 1, mixed in by
+/// `metallic` in the shader.
+pub fn dielectric_f90(specular: f32) -> f32 {
+    within(specular, 0.0, 1.0) as f32
+}
+
+/// `v` in `[lo, hi]`, a NaN at `lo`.
+fn within(v: f32, lo: f64, hi: f64) -> f64 {
+    if v.is_nan() {
+        lo
+    } else {
+        f64::from(v).clamp(lo, hi)
+    }
+}
+
 impl super::MaterialAsset {
+    /// This material's dielectric F0 (`surface::dielectric_f0` of its `ior`, `specular`
+    /// and `specular_color`).
+    pub fn dielectric_f0(&self) -> [f32; 3] {
+        dielectric_f0(self.ior, self.specular, self.specular_color)
+    }
+
+    /// This material's dielectric F90 (`surface::dielectric_f90` of its `specular`).
+    pub fn dielectric_f90(&self) -> f32 {
+        dielectric_f90(self.specular)
+    }
+
     /// Whether this material's surface reads the opaque copy (#1523): a
     /// `Transparent` one that refracts or absorbs, under `Alpha` or `Premultiply`
     /// (an `Additive` or `Multiply` surface adds to or tints what is behind it, so it
@@ -113,3 +160,7 @@ impl super::MaterialAsset {
         self.is_transparent() && blends_over && (refracts || absorbs)
     }
 }
+
+#[cfg(test)]
+#[path = "f0_tests.rs"]
+mod f0_tests;

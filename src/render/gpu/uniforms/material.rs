@@ -86,6 +86,11 @@ pub(crate) struct MaterialData {
     // What a BC5 normal map's mips lost (#1702, Toksvig): its `VarianceTable`, four
     // levels a word, low byte first; read when `use_normal_map == 2`.
     pub normal_variance: [u32; 4],
+    // A dielectric's reflectance (#1998): head-on in rgb, the material's
+    // `dielectric_f0` from its `ior` and `KHR_materials_specular`, and at grazing
+    // angles in `w`, its `dielectric_f90` (`specular`). The shader mixes both toward
+    // a metal's (albedo, 1) by `metallic`.
+    pub dielectric_reflectance: [f32; 4],
 }
 
 // The stride is a dynamic-offset alignment, not a cap the record has to fit; a storage

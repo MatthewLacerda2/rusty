@@ -94,6 +94,14 @@ pub struct MaterialData {
     /// glTF `doubleSided` (#1615): both faces draw. `false` by default, as in glTF,
     /// and always for a `.blend`'s conversion (`gltf::material`, Unity's way).
     pub double_sided: bool,
+    /// glTF `KHR_materials_ior`'s `ior` (#1998), 1.5 when absent, as the extension
+    /// defaults it.
+    pub ior: f32,
+    /// `KHR_materials_specular`'s `specularFactor` (#1998), 1 when absent. Its
+    /// textures are not read: the engine's material has no specular map slots.
+    pub specular: f32,
+    /// `KHR_materials_specular`'s `specularColorFactor` (#1998), white when absent.
+    pub specular_color: [f32; 3],
 }
 
 impl Default for MaterialData {
@@ -110,6 +118,9 @@ impl Default for MaterialData {
             emissive_map: None,
             emissive: [0.0, 0.0, 0.0],
             double_sided: false,
+            ior: 1.5,
+            specular: 1.0,
+            specular_color: [1.0; 3],
         }
     }
 }

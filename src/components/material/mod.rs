@@ -134,10 +134,23 @@ pub struct MaterialAsset {
     /// normal map included.
     #[serde(default)]
     pub refraction_model: RefractionModel,
-    /// The index of refraction, HDRP's *Index of Refraction* (water 1.33, glass
-    /// 1.5, the default).
+    /// The index of refraction (water 1.33, glass 1.5, the default): HDRP's *Index
+    /// of Refraction* for a refracting surface's bend, and glTF's
+    /// `KHR_materials_ior` for every dielectric's reflectance (#1998,
+    /// [`MaterialAsset::dielectric_f0`]).
     #[serde(default = "default_ior")]
     pub ior: f32,
+    /// glTF's `KHR_materials_specular` strength in `[0, 1]` (#1998): scales a
+    /// dielectric's reflectance head-on and at grazing angles (its F90,
+    /// [`MaterialAsset::dielectric_f90`]); 1 (the default) keeps the one `ior`
+    /// gives, 0 reflects nothing at any angle.
+    #[serde(default = "default_one")]
+    pub specular: f32,
+    /// glTF's `KHR_materials_specular` colour (#1998): tints a dielectric's
+    /// reflectance, and above 1 raises it (a single-quad pane standing for two
+    /// surfaces at 2). White by default.
+    #[serde(default = "white")]
+    pub specular_color: [f32; 3],
     /// How thick a `Planar` refraction's slab is, in metres (default 1).
     #[serde(default = "default_one")]
     pub thickness: f32,

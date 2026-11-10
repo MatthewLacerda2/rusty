@@ -722,6 +722,12 @@
       "receive_shadows": true,
       "refraction_model": "None",
       "ior": 1.5,
+      "specular": 1.0,
+      "specular_color": [
+        1.0,
+        1.0,
+        1.0
+      ],
       "thickness": 1.0,
       "transmittance_color": [
         1.0,

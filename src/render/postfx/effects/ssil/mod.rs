@@ -12,8 +12,9 @@
 //!   pass never reads, so the stage binds no texture more than
 //!   `render::setup::limits` allows) while the
 //!   camera uniform's `ssil.x` says it runs; adds it to the ambient irradiance
-//!   (`forward::lighting::indirect_bounce`) through the same `albedo × 0.96 ×
-//!   (1 − metallic)` response and the same `ao` (SSAO's contact occlusion is
+//!   (`forward::lighting::indirect_bounce`) through the same `albedo × (1 −
+//!   reflectivity) × (1 − metallic)` response (the dielectric F0's strongest
+//!   channel, 0.04 by default, #1998) and the same `ao` (SSAO's contact occlusion is
 //!   visibility the half-resolution gather misses), so a metal takes none.
 //! - **After the base camera's opaque pass** (the `ssil_source` stage, before SSR):
 //!   its HDR colour, scene-linear before bloom, the grade, the tonemap, the UI, the

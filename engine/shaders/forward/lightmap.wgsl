@@ -69,14 +69,14 @@ struct LightmapLight {
 // The direction is mirrored with them, so the back face shows the front's light
 // reshaped as the front reshapes it, and it gets no lobe: no lamp the bake saw is on
 // that side.
-fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, behind: bool, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, roughness: f32) -> LightmapLight {
+fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, behind: bool, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, F90: f32, roughness: f32) -> LightmapLight {
     var out = LightmapLight(textureSampleLevel(t_lightmaps, s_lightmaps, uv, layer, lod).rgb, vec3<f32>(0.0));
     if (directional) {
         var dir = decode_lightmap_direction(textureSampleLevel(t_lightmap_dirs, s_lightmaps, uv, layer, lod));
         if (behind) {
             dir = vec4<f32>(reflect(dir.xyz, Ng), 0.0);
         }
-        out.specular = baked_specular(out.irradiance, dir, N, Ng, V, F0, roughness);
+        out.specular = baked_specular(out.irradiance, dir, N, Ng, V, F0, F90, roughness);
         out.irradiance *= lightmap_direction_rebalance(dir.xyz, N, Ng);
     }
     return out;
@@ -106,7 +106,7 @@ const MIN_DIRECTIONALITY: f32 = 0.02;
 // `N` the shading normal, `roughness` already widened by specular AA. Zero in a bake
 // capture, where no lamp lights the texel, and where its light has no direction;
 // faded by the ramp below `LAMP_RAMP`, where the direction is not all the lamps'.
-fn baked_specular(texel: vec3<f32>, dir: vec4<f32>, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
+fn baked_specular(texel: vec3<f32>, dir: vec4<f32>, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, F90: f32, roughness: f32) -> vec3<f32> {
     let aimed = saturate(dir.w / LAMP_RAMP);
     let share = dir.w * aimed * lighting.baked_specular;
     let directionality = length(dir.xyz);
@@ -115,5 +115,5 @@ fn baked_specular(texel: vec3<f32>, dir: vec4<f32>, N: vec3<f32>, Ng: vec3<f32>,
     }
     let L = dir.xyz / directionality;
     let radiance = texel * PI * share / max(diffuse_response(dot(Ng, L)), GRAZING_FLOOR);
-    return specular_response(N, V, L, radiance, F0, roughness);
+    return specular_response(N, V, L, radiance, F0, F90, roughness);
 }

@@ -1,13 +1,38 @@
 // engine/shaders/forward/reflection.wgsl — the forward pass's environment reflection
 // (#244, #1015, #1697): up to two reflection probes and the sky (or the scene's
 // fallback probe), each probe normalised by the pixel's baked diffuse, and the
-// specular occlusion that weighs the whole term. `fs_main` in `shader.wgsl` adds it.
+// environment BRDF and the specular occlusion that weigh the whole term. `fs_main`
+// in `shader.wgsl` adds it.
 
 #define_import_path forward::reflection
 
 #import lighting::sh::sh_basis
 #import lighting::reflection_probe::{ReflectionProbe, parallax_correct}
 #import forward::bindings::{lighting, s_refl_cube, s_skybox, t_refl_cube, t_skybox}
+
+// How much of the environment a surface reflects toward `V`: Unity URP's analytic
+// environment BRDF (#1543; `BRDF.hlsl` `EnvironmentBRDFSpecular`,
+// `GlobalIllumination.hlsl`). Roughness only picks the prefiltered mip, and URP's
+// `surfaceReduction`, `1 / (alpha^2 + 1)` with `alpha = roughness^2` (so perceptual
+// roughness to the 4th), is the energy a rough lobe loses, so a rough metal reads
+// blurry, not black. `roughness` is perceptual, URP's `perceptualRoughness`; a
+// surface reflects its `F0` head-on and rises toward URP's grazing term at the rim,
+// scaled by `F90` (#1998: a dielectric's `KHR_materials_specular` strength, so one at
+// `specular` 0 has no rim either). `dielectric_reflectivity` is the dielectric F0's
+// strongest channel, URP's reflectivity before `metallic` raises it. The angle is
+// `|N.V|`: a normal map or a vertex normal can still lean away from the camera on a
+// face turned toward it, which would otherwise take the grazing Fresnel.
+// `fs_main` passes the authored roughness, not the widened one: a far floor's spread
+// of normals (up to 0.08 of α², `specular_aa`) would take `grazing` from 0.96 to 0.51
+// and a pane's opacity with it (#1702's review). URP has no specular AA; HDRP filters
+// its smoothness through a preintegrated FGD rusty has not got.
+fn environment_brdf(F0: vec3<f32>, F90: f32, dielectric_reflectivity: f32, metallic: f32, roughness: f32, N: vec3<f32>, V: vec3<f32>) -> vec3<f32> {
+    let reflectivity = dielectric_reflectivity + (1.0 - dielectric_reflectivity) * metallic; // URP's
+    let grazing = saturate(1.0 - roughness + reflectivity) * F90;
+    let alpha = roughness * roughness;
+    let fresnel = pow(1.0 - saturate(abs(dot(N, V))), 4.0);
+    return mix(F0, vec3<f32>(grazing), fresnel) / (alpha * alpha + 1.0);
+}
 
 // The environment a surface reflects along the mirror direction `R` (#244, #718). An
 // object blends up to two reflection probes (#1584, Unity's Blend Probes, picked per

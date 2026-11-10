@@ -105,7 +105,7 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
     // Unity's model importer marks a bump map a material names as a Normal map,
     // and its packed metallic/roughness map linear (#1574), so each compresses
     // as what it holds.
-    let asset = MaterialAsset {
+    let mut asset = MaterialAsset {
         base_color: [data.base_color[0], data.base_color[1], data.base_color[2]],
         base_color_map: data.base_color_map.clone(),
         metallic: data.metallic,
@@ -126,6 +126,8 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
         // import via the inspector or the `Material` API.
         ..MaterialAsset::default()
     };
+    // `KHR_materials_ior` and `KHR_materials_specular` (#1998), clamped by their rows.
+    super::material::import_reflectance(&mut asset, data.ior, data.specular, data.specular_color);
     super::material::fit_map_slots(&asset);
     asset
 }
@@ -221,6 +223,9 @@ mod tests {
             emissive_map: Some("e.png".into()),
             emissive: [0.1, 0.2, 0.3],
             double_sided: false,
+            ior: 1.33,
+            specular: 0.5,
+            specular_color: [2.0, 1.0, 0.5],
         };
         let mat = material_asset_from_import(&data);
         assert_eq!(mat.render_face, crate::components::RenderFace::Front);
@@ -246,6 +251,8 @@ mod tests {
         assert_eq!(mat.normal_map, Some("n.png".into()));
         assert_eq!(mat.emissive, [0.1, 0.2, 0.3]);
         assert_eq!(mat.emissive_map, Some("e.png".into()));
+        assert_eq!((mat.ior, mat.specular), (1.33, 0.5));
+        assert_eq!(mat.specular_color, [2.0, 1.0, 0.5]);
     }
 
     #[test]

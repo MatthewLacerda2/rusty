@@ -123,7 +123,7 @@ fn surface_value(field: &SurfaceField, v: &serde_json::Value) -> Result<SurfaceV
         SurfaceKind::Choice(_) => v.as_str().map(|s| SurfaceValue::Text(s.to_owned())),
         SurfaceKind::Toggle => v.as_bool().map(SurfaceValue::Bool),
         SurfaceKind::Number(_) => v.as_f64().map(|n| SurfaceValue::Number(n as f32)),
-        SurfaceKind::Color => serde_json::from_value::<[f32; 3]>(v.clone())
+        SurfaceKind::Color(_) => serde_json::from_value::<[f32; 3]>(v.clone())
             .ok()
             .map(SurfaceValue::Color),
         SurfaceKind::Vec2(_) => pair(v).map(SurfaceValue::Vec2),

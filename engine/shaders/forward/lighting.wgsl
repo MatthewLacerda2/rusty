@@ -62,8 +62,8 @@ var<private> ssil_realtime: vec3<f32>;
 // translucent surface (`transmission.w`, #1523) what it transmits under `back`
 // (the light reaching the back face). SSIL (#1750) gathers it unless the lightmap
 // bake took the lamp in (`bounce_baked`).
-fn lamp(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, front: vec3<f32>, back: vec3<f32>, F0: vec3<f32>, metallic: f32, roughness: f32, albedo: vec3<f32>, transmission: vec4<f32>, bounce_baked: f32) -> vec3<f32> {
-    var c = calculate_pbr(N, V, L, front, F0, metallic, roughness, albedo);
+fn lamp(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, front: vec3<f32>, back: vec3<f32>, F0: vec3<f32>, F90: f32, metallic: f32, roughness: f32, albedo: vec3<f32>, transmission: vec4<f32>, bounce_baked: f32) -> vec3<f32> {
+    var c = calculate_pbr(N, V, L, front, F0, F90, metallic, roughness, albedo);
     if (transmission.w > 0.0) {
         c += transparent::transmitted(N, L, back, albedo, transmission.rgb);
     }
@@ -158,8 +158,11 @@ fn GeometrySmith(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, roughness: f32) -> f3
     return ggx2 * ggx1;
 }
 
-fn FresnelSchlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+// Schlick's Fresnel from the head-on reflectance `F0` to the grazing one `F90`: 1
+// for a metal and a default dielectric, `KHR_materials_specular`'s `specular` for a
+// dielectric (#1998), so a dielectric at `specular` 0 reflects nothing at any angle.
+fn FresnelSchlick(cosTheta: f32, F0: vec3<f32>, F90: f32) -> vec3<f32> {
+    return F0 + (F90 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
 // The GGX specular BRDF (Cook-Torrance: D * G * F / (4 N·V N·L)) for light from `L`
@@ -178,9 +181,9 @@ fn ggx_specular(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, H: vec3<f32>, F: vec3<
 
 // What a light of `radiance` arriving from `L` reflects specularly toward `V`: the
 // GGX lobe times N·L, with no diffuse term.
-fn specular_response(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, radiance: vec3<f32>, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
+fn specular_response(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, radiance: vec3<f32>, F0: vec3<f32>, F90: f32, roughness: f32) -> vec3<f32> {
     let H = normalize(L + V);
-    let F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+    let F = FresnelSchlick(max(dot(H, V), 0.0), F0, F90);
     return ggx_specular(N, V, L, H, F, roughness) * radiance * max(dot(N, L), 0.0);
 }
 
@@ -198,6 +201,7 @@ fn calculate_pbr(
     L: vec3<f32>, 
     radiance: vec3<f32>, 
     F0: vec3<f32>, 
+    F90: f32, 
     metallic: f32, 
     roughness: f32, 
     albedo: vec3<f32>
@@ -206,7 +210,7 @@ fn calculate_pbr(
     let NdotL = max(dot(N, L), 0.0);
     // Diffuse follows the scene's model (`diffuse_response`); specular is always the
     // physical N·L.
-    let F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+    let F = FresnelSchlick(max(dot(H, V), 0.0), F0, F90);
 
     let kS = F;
     var kD = vec3<f32>(1.0) - kS;
