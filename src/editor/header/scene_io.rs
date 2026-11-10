@@ -131,7 +131,8 @@ fn refuse_in_play(console: &mut ConsoleLogs, is_playing: bool, what: &str) -> bo
 /// Start a fresh, empty scene — a blank slate (no entities, default ambient/sky/
 /// layers), discarding the in-memory scene. Distinct from Reset Scene, which
 /// rebuilds the *engine's default* (its ground, lights, etc.). The new scene is
-/// unsaved, so its path is cleared until the next Save.
+/// unsaved, so its path is cleared until the next Save. The scene half is
+/// `scene::new_scene`, the one `Scene.New()` runs too (#2000).
 pub(super) fn new_scene(
     editor: &mut EditorUi,
     scene: &mut Scene,
@@ -141,8 +142,10 @@ pub(super) fn new_scene(
     if refuse_in_play(console, is_playing, "New Scene") {
         return;
     }
-    scene.clear();
-    editor.set_current_scene_path(None);
+    if let Err(why) = crate::scene::new_scene(scene, &mut editor.scene_path.borrow_mut()) {
+        console.warn(why.to_string());
+        return;
+    }
     editor.selected_entity_id = None;
     editor.selected_asset_path = None;
     editor.is_dirty = false;

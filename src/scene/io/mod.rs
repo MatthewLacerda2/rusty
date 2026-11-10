@@ -74,6 +74,24 @@ pub const SAVE_IN_PLAY: &str = "a scene cannot be saved during Play: stop Play f
 /// Why Generate Lighting refused: it writes the scene file, as a save does (#1340).
 pub const LIGHTING_IN_PLAY: &str = "lighting cannot be generated during Play: stop Play first";
 
+/// File ▸ New and `Scene.New()`, one path (#2000): replace `scene` with an empty
+/// one (no entities, default ambient/sky/layers, a new identity) and clear
+/// `current`, the current scene file, so nothing writes back over the old file.
+/// Refused during Play, as Unity greys File ▸ New out: the swap would skip every
+/// script's `OnDisable`/`OnDestroy` (#1305). An unsaved scene is discarded, as a
+/// load discards it.
+pub fn new_scene(scene: &mut Scene, current: &mut Option<String>) -> Result<(), &'static str> {
+    if scene.is_playing() {
+        return Err(NEW_IN_PLAY);
+    }
+    scene.clear();
+    *current = None;
+    Ok(())
+}
+
+/// Why [`new_scene`] refused: the World holds the play state, and Play owns it.
+pub const NEW_IN_PLAY: &str = "a new scene cannot be started during Play: stop Play first";
+
 /// The scene document exactly as [`save_to_file`] writes it, so a seeded default and
 /// a saved one compare byte for byte. A script attached by absolute path inside the
 /// workspace (the working directory) is written relative to it, `/`-separated, so
