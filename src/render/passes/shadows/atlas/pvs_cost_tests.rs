@@ -14,7 +14,7 @@ use glam::Vec3;
 use super::static_tests::RES;
 use crate::render::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use crate::scene::authoring::{create_entity, Primitive};
-use crate::scene::lighting::occlusion::{bake_occlusion, bench_level::rooms};
+use crate::scene::lighting::occlusion::{bake_occlusion, bench::level::rooms};
 use crate::scene::{Camera, Scene};
 
 /// The bench level, `n × n` rooms, with three shadowed lamps of `range` in each

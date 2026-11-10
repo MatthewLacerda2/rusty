@@ -12,7 +12,7 @@ use super::cluster_gpu_tests::cluster_indices;
 use super::gpu_tests::{drawn, offscreen, shot, words, H, W};
 use crate::components::mesh::{primitives, MeshRevision};
 use crate::render::{RenderView, Renderer};
-use crate::scene::lighting::occlusion::bench_level::rooms;
+use crate::scene::lighting::occlusion::bench::level::rooms;
 use crate::scene::Camera;
 use crate::scene::Scene;
 

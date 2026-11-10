@@ -6,8 +6,8 @@
 
 use glam::Vec3;
 
-use super::test_level::block;
 use crate::components::mesh::{primitives, MeshRevision};
+use crate::scene::lighting::occlusion::test_level::block;
 use crate::scene::Scene;
 
 const ROOM: f32 = 10.0;

@@ -67,7 +67,7 @@ impl Baking {
     }
 
     pub fn of(objects: &[Object]) -> Self {
-        let (mut tris, mut faces) = (Vec::new(), Vec::new());
+        let (mut tris, mut exact, mut faces) = (Vec::new(), Vec::new(), Vec::new());
         let mut bounds: Option<(Vec3, Vec3)> = None;
         let mut targets = Vec::with_capacity(objects.len());
         for (i, object) in objects.iter().enumerate() {
@@ -78,6 +78,7 @@ impl Baking {
                 .filter(|t| t.0.iter().all(|p| p.is_finite()));
             for &([a, b, c], face) in finite {
                 tris.push(Tri::new(a, b, c, i as u32, 0));
+                exact.push([a, b, c]);
                 faces.push(face);
             }
             let corners = object.drawn.iter().flat_map(|(t, _)| t);
@@ -91,7 +92,7 @@ impl Baking {
             }
             targets.push((min, max, points));
         }
-        let polygons = Polygons::of(&tris, &faces);
+        let polygons = Polygons::of(&tris, &exact, &faces);
         Self {
             clusters: clusters(&targets),
             rays: Rays::build(tris),

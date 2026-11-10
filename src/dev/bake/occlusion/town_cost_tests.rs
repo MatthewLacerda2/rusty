@@ -6,8 +6,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
-use crate::scene::lighting::occlusion::bench_level::rooms;
-use crate::scene::lighting::occlusion::bench_town::{town, Make};
+use crate::scene::lighting::occlusion::bench::level::rooms;
+use glam::Vec3;
+
+use crate::scene::lighting::occlusion::bench::shift;
+use crate::scene::lighting::occlusion::bench::town::{town, Make};
 use crate::scene::lighting::occlusion::gather_occlusion;
 use crate::scene::Scene;
 
@@ -16,7 +19,7 @@ use crate::scene::Scene;
 #[ignore = "a release-build measurement, run by hand"]
 fn occlusion_town_cost() {
     let n = 6;
-    measure("bench_level rooms(5)", &rooms(5));
+    measure("bench::level rooms(5)", &rooms(5));
     let configs = [
         (Make::Boxes, 0.0, 2),
         (Make::Boxes, 0.5, 2),
@@ -38,6 +41,17 @@ fn occlusion_town_scaling() {
     for (n, props) in [(4, 2), (6, 2), (8, 2), (6, 8), (6, 24), (8, 24)] {
         let name = format!("Authored town {n} x {n}, open 0.25, props {props}");
         measure(&name, &town(n, 0.25, props, Make::Authored));
+    }
+}
+
+#[test]
+// lint: allow(skip) a timing measurement in a release build, run by hand, never a gate
+#[ignore = "a release-build measurement, run by hand"]
+fn occlusion_town_shifted() {
+    for make in [Make::Boxes, Make::Authored] {
+        let mut level = town(6, 0.25, 2, make);
+        shift(&mut level, Vec3::new(0.137, 0.053, -0.211), 1.07);
+        measure(&format!("{make:?} town, open 0.25, shifted"), &level);
     }
 }
 

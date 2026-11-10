@@ -3,18 +3,21 @@
 //! all the same, so its rays are proved stopped instead of cast. Counted in
 //! rays, not timed (#1883), so it holds on any machine.
 
-use super::bench_town::{town, Make};
+use glam::Vec3;
+
+use super::bench::shift;
+use super::bench::town::{town, Make};
 use super::gather_occlusion;
 
-/// Rays cast baking `cells` cells spread over `make`'s town, per cell.
+/// Rays cast baking `cells` cells spread over `make`'s town, per cell. The
+/// town is moved and scaled off round coordinates, as an imported level's
+/// corners are, so faces join only where they share a corner bit for bit.
 fn rays_per_cell(make: Make, cells: u64) -> u64 {
-    let input = gather_occlusion(&town(3, 0.25, 2, make));
+    let mut level = town(3, 0.25, 2, make);
+    shift(&mut level, Vec3::new(0.137, 0.053, -0.211), 1.07);
+    let input = gather_occlusion(&level);
     let sampler = input.sampler().expect("a grid");
-    let count = sampler.grid.cell_count() as u64;
-    for k in 0..cells {
-        let cell = k.wrapping_mul(0x9E37_79B9_7F4A_7C15) % count;
-        std::hint::black_box(sampler.cell(cell as usize));
-    }
+    sampler.spread(cells);
     sampler.rays_cast() / cells
 }
 

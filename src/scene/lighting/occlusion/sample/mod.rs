@@ -13,6 +13,8 @@ mod sight;
 mod targets;
 
 pub(super) use baking::Baking;
+#[cfg(all(test, feature = "dev"))]
+pub(super) use sheets::without_union;
 #[cfg(test)]
 pub(super) use targets::target_points;
 pub use targets::{MAX_TARGETS, TARGET_SPACING, VOXEL};

@@ -72,7 +72,7 @@ fn cuts(lo: f32, hi: f32) -> usize {
 
 /// A static entity at the origin whose mesh is `quads`: every quad's first
 /// triangle, then every quad's second.
-fn entity(scene: &mut Scene, name: &str, quads: &[[Vec3; 4]]) -> u32 {
+pub fn entity(scene: &mut Scene, name: &str, quads: &[[Vec3; 4]]) -> u32 {
     let mut vertices = Vec::with_capacity(quads.len() * 4);
     for q in quads {
         let n = (q[1] - q[0]).cross(q[2] - q[0]).normalize_or_zero();

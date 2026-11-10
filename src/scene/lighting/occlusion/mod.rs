@@ -75,9 +75,7 @@ pub use unsaved::unsaved_materials;
 #[cfg(test)]
 mod bake_tests;
 #[cfg(all(test, feature = "dev"))]
-pub(crate) mod bench_level;
-#[cfg(all(test, feature = "dev"))]
-pub(crate) mod bench_town;
+pub(crate) mod bench;
 #[cfg(test)]
 mod carry_tests;
 #[cfg(test)]
@@ -86,6 +84,8 @@ mod dense_tests;
 mod file_tests;
 #[cfg(test)]
 mod grid_tests;
+#[cfg(all(test, feature = "dev"))]
+mod opening_tests;
 #[cfg(test)]
 mod print_tests;
 #[cfg(test)]

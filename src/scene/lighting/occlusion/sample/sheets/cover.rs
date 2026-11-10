@@ -1,17 +1,23 @@
 //! The texels a sheet's faces hold together though none holds alone (#1981): a
 //! wall an exporter tessellated into triangles leaves every texel its diagonals
 //! cross outside each one, so it fused nothing and the bake cast every ray
-//! past it (a Kolvik-sized level baked 60 times slower than a box-built one).
+//! past it. A primitive town of such walls baked 7 to 8 times slower than its
+//! box-built twin; Kolvik baked 60 times slower than cozy-coffee, a cause this
+//! fits but no one has confirmed on Kolvik itself.
 //!
 //! The members' union is bounded by the edges no other member shares from the
 //! other side: one used as often in each direction (faces wound one way, so a
 //! shared edge runs backward in its neighbour) has faces on both sides, and
 //! lies inside. A texel that no boundary edge reaches (its square shrunk by the
-//! noise `tol`) and whose centre a member holds lies wholly in the union, since
-//! a path out of it would cross the boundary. Edges match only on corners that
+//! noise `tol`) and whose centre a member holds, with no slack, lies wholly in
+//! the union, since a path out of it would cross the boundary. (Slack there
+//! would reach past a thin face's tip, far beyond `tol`, into an opening.) A
+//! centre on an edge two members share is held by one side or the other. Edges match only on corners that
 //! are bit for bit the same, as a mesh's shared vertices are: a T-junction or a
 //! seam welded to noise stays boundary, which fuses less and is never wrong.
 
+#[cfg(all(test, feature = "dev"))]
+use std::cell::Cell;
 use std::collections::BTreeMap;
 
 use glam::{UVec2, Vec2, Vec3};
@@ -36,14 +42,18 @@ pub(super) fn union_fill(
         super::area(poly).abs() > tol * long.fold(0.0, f32::max)
     };
     let faces = polys.iter().zip(corners).filter(|(p, _)| solid(p));
-    let cut = cut(set.len(), boundary(faces), grid, tol);
+    // With no edge cancelled the union is the members apart, which `fill` set.
+    let Some(boundary) = boundary(faces).filter(|_| on()) else {
+        return;
+    };
+    let cut = cut(set.len(), boundary, grid, tol);
     for poly in polys.iter().filter(|p| solid(p)) {
         let turn = super::area(poly).signum();
         let k = poly.len();
         let holds = |p: Vec2| {
             (0..k).all(|i| {
                 let (a, b) = (poly[i], poly[(i + 1) % k]);
-                turn * (b - a).perp_dot(p - a) >= -tol * (b - a).length()
+                turn * (b - a).perp_dot(p - a) >= 0.0
             })
         };
         let (min, max) = poly.iter().fold((Vec2::MAX, Vec2::MIN), |(lo, hi), &p| {
@@ -62,9 +72,35 @@ pub(super) fn union_fill(
     }
 }
 
+#[cfg(all(test, feature = "dev"))]
+thread_local! {
+    static OFF: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Whether faces fuse by their union: always, outside [`without_union`].
+fn on() -> bool {
+    #[cfg(all(test, feature = "dev"))]
+    if OFF.with(Cell::get) {
+        return false;
+    }
+    true
+}
+
+/// `make()` with sheets made as before #1981, each face filling alone, on this
+/// thread: a test's baseline for what the union may never change.
+#[cfg(all(test, feature = "dev"))]
+pub(in crate::scene::lighting::occlusion) fn without_union<T>(make: impl FnOnce() -> T) -> T {
+    OFF.with(|off| off.set(true));
+    let out = make();
+    OFF.with(|off| off.set(false));
+    out
+}
+
 /// The union's boundary: each edge (its 2D ends) that `faces` do not run as
-/// often one way as the other.
-fn boundary<'a>(faces: impl Iterator<Item = (&'a Vec<Vec2>, &'a &'a [Vec3])>) -> Vec<(Vec2, Vec2)> {
+/// often one way as the other; `None` when every edge is, as no edge cancels.
+fn boundary<'a>(
+    faces: impl Iterator<Item = (&'a Vec<Vec2>, &'a &'a [Vec3])>,
+) -> Option<Vec<(Vec2, Vec2)>> {
     let bits = |p: Vec3| p.to_array().map(f32::to_bits);
     let mut edges: BTreeMap<EdgeKey, (Vec2, Vec2, i32)> = BTreeMap::new();
     for (poly, at) in faces {
@@ -81,11 +117,12 @@ fn boundary<'a>(faces: impl Iterator<Item = (&'a Vec<Vec2>, &'a &'a [Vec3])>) ->
             e.2 += way;
         }
     }
-    edges
-        .into_values()
+    let all = edges.len();
+    let open: Vec<_> = (edges.into_values())
         .filter(|e| e.2 != 0)
         .map(|e| (e.0, e.1))
-        .collect()
+        .collect();
+    (open.len() < all).then_some(open)
 }
 
 /// Per texel of `grid` (`count` of them), whether a `boundary` edge reaches its

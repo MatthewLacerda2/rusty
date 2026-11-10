@@ -20,7 +20,7 @@ use crate::scene::lighting::lightmap::{
     bake_with_progress, AreaShape, BakeLight, BakeProgress, BakeScene, BakeSettings, Denoiser,
     LightShape, Lightmap,
 };
-use crate::scene::lighting::occlusion::bench_level::rooms;
+use crate::scene::lighting::occlusion::bench::level::rooms;
 use crate::scene::AmbientRadiance;
 
 /// Paths per texel of the converged bake every row is measured against.
