@@ -202,7 +202,8 @@ pub fn write_prefab_file(prefab: &PrefabData, path: &str) -> Result<(), String> 
     let json = serde_json::to_string_pretty(prefab)
         .map_err(|e| format!("Failed to serialize prefab: {e}"))?;
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
-    std::fs::write(path, json).map_err(|e| format!("Failed to write prefab file: {e}"))
+    crate::core::fs::write_atomic(std::path::Path::new(path), json.as_bytes())
+        .map_err(|e| format!("Failed to write prefab file: {e}"))
 }
 
 /// Read and deserialize a `.prefab` document from `path`, its values held through
