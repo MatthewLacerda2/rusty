@@ -1,7 +1,7 @@
 ## `LightProbeProxyVolume`
 
 Lights a dynamic object from a **grid of light-probe samples over its bounds**,
-interpolated per pixel, instead of from one sample at its origin: Unity's
+interpolated per pixel, instead of from one sample at its bounds' centre: Unity's
 `LightProbeProxyVolume` (#1672). A 2 m locker under a wall lamp, a bunk bed, a grunt
 walking under a light: without a volume the whole mesh takes one colour, so the
 locker's foot is as bright as its top; with one, the top is lit and the foot dark.
