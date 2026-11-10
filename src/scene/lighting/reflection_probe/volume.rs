@@ -44,9 +44,9 @@ impl ProbeFrame {
 
     /// The distance over which the projection fades back to infinite projection
     /// past the influence volume (#1995): the volume's half-diagonal (the sphere's
-    /// radius), floored at [`MIN_RADIUS`]. A projection tracks a room only while
-    /// the fragment is near it: from one room-size away the whole volume sits in a
-    /// cone of under 60 degrees from the fragment, so every reflection would map to
+    /// radius), floored at 0.01 m (the least radius). A projection tracks a room
+    /// only while the fragment is near it: from a room-size away the whole volume
+    /// sits in a narrowing cone from the fragment, so every reflection would map to
     /// one patch of the cube, whatever its direction. Fading over the volume's own
     /// size keeps the change as gradual as the parallax itself (scale-free: a 2 m
     /// box and a 40 m hall fade alike) and leaves a far fragment of a large mesh
@@ -186,7 +186,7 @@ impl ReflectionProbe {
 
     /// The share of the world-aligned box `lo`..`hi` inside this probe's volume
     /// (#1995), 0 to 1: exact for a world-aligned box, else sampled at
-    /// [`SHARE_SAMPLES`]³ cell centres. An empty box reads 0.
+    /// 16³ cell centres (`SHARE_SAMPLES`). An empty box reads 0.
     pub fn share_of(&self, lo: Vec3, hi: Vec3) -> f32 {
         let volume = |a: Vec3, b: Vec3| (b - a).max(Vec3::ZERO).element_product();
         let own = volume(lo, hi);
