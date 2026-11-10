@@ -19,8 +19,10 @@ pub struct Ssr {
     pub quality: EffectQuality,
     /// `Custom`: how many steps the ray takes, `1..=256`.
     pub steps: u32,
-    /// `Custom`: each step's length in world units, `0.05..=2`. The reach is
-    /// `steps × step_length`.
+    /// `Custom`: each step's longest length in world units, `0.05..=2`. A step
+    /// is also held to `max(1/64, 1/steps)` of the screen's shorter side (#2004),
+    /// so the reach is at most `steps × step_length`, less where the ray crosses
+    /// the screen fast, and always enough to cross the screen's height.
     pub step_length: f32,
     /// HDRP's *Minimum Smoothness*, `0..=1`: a surface less smooth than this
     /// (smoothness is `1 − roughness`) gets no SSR and keeps its probe or sky

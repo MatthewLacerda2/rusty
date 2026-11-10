@@ -30,6 +30,13 @@
 // tight highlight toward its centre, not a panel-shaped one). So the lobe's radiance is `texel * share`, and its direction
 // the lamps' (the page's RGB, once the share passes a quarter).
 //
+// Its aim. The page is RGBA8, never block-compressed (#1996): between texels
+// bilinear filtering rebuilds a lamp's direction to well under a degree, so a
+// polished surface's baked highlight is as round and as sharp as its live one, and
+// the lobe takes the surface's own roughness, unwidened. BC7, which the page was,
+// put a texel up to 5° off, which a lobe that narrow drew as a sawtooth edge and a
+// dot a texel.
+//
 // No AO: the lobe stands in for direct light, which AO doesn't touch here, and the
 // static occluders' shadows are already in the bake. It is off in every bake capture
 // (`lighting.baked_specular`), so no view-dependent highlight is frozen into a probe.
@@ -82,14 +89,6 @@ fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, behind
 // behind the surface a normal map has turned toward.
 const GRAZING_FLOOR: f32 = 0.1;
 
-// The least lamp share that is a lamp, rescaled from there to 1: BC7 lends a
-// lamp-free texel up to 9/255 of share from its block where a lamp's edge (a hard
-// shadow, its range) crosses it, which a glossy metal turns into a blocky highlight
-// (`lightmap::share_tests` holds BC7 under it and this line to its value). A lamp
-// under about 6% of a texel's light gives no highlight; the ramp below has faded
-// such a lamp's to a quarter already.
-const SHARE_FLOOR: f32 = 16.0 / 255.0;
-
 // The lamp share over which the bake turns the page's direction from the mean of
 // all the texel's light to the lamps' own (`bake::direction::LAMP_RAMP`, which
 // `lightmap::share_tests` holds this line to). Below it the lobe aims partly away
@@ -109,7 +108,7 @@ const MIN_DIRECTIONALITY: f32 = 0.02;
 // faded by the ramp below `LAMP_RAMP`, where the direction is not all the lamps'.
 fn baked_specular(texel: vec3<f32>, dir: vec4<f32>, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
     let aimed = saturate(dir.w / LAMP_RAMP);
-    let share = saturate((dir.w - SHARE_FLOOR) / (1.0 - SHARE_FLOOR)) * aimed * lighting.baked_specular;
+    let share = dir.w * aimed * lighting.baked_specular;
     let directionality = length(dir.xyz);
     if (share <= 0.0 || directionality < MIN_DIRECTIONALITY) {
         return vec3<f32>(0.0);

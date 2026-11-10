@@ -1,5 +1,6 @@
 //! `Reflection.SetFallback` / `GetFallback` (#1697): one fallback probe a scene
-//! names, as Unity's default reflection probe.
+//! names, as Unity's default reflection probe; and the volume's `Set` fields (#1995),
+//! kept here for the size cap of `reflection_tests.rs`.
 
 use crate::api::bind;
 use std::cell::RefCell;
@@ -69,4 +70,32 @@ fn repointing_a_probe_drops_its_irradiance_and_the_fallback_stays_manual() {
     assert!(!normalised(), "Set with a cubemap");
     run("Reflection.SetFallback(0); Reflection.Set(0, { manual = false })");
     assert!(scene.borrow().reflection_probes.probes[0].manual);
+}
+
+#[test]
+fn set_and_get_the_volume_shape_and_rotation() {
+    let scene = Rc::new(RefCell::new(Scene::default()));
+    let lua = Lua::new();
+    register(&lua, bind(&lua, &scene)).unwrap();
+    lua.load(
+        "Reflection.Add(0,0,0, 1,1,1) Reflection.Set(0, Reflection.Get(0))
+        Reflection.Add(0,0,0, 1,1,1)
+        Reflection.Set(1, { shape = 'Sphere', radius = 3, rotation = { x = 0, y = 90, z = 0 } })",
+    )
+    .exec()
+    .unwrap();
+    let r: (String, f32, f32) = lua
+        .load("local p = Reflection.Get(1) return p.shape, p.radius, p.rotation.y")
+        .eval()
+        .unwrap();
+    assert_eq!((r.0.as_str(), r.1), ("Sphere", 3.0));
+    assert!((r.2 - 90.0).abs() < 1e-3, "{r:?}");
+    assert_eq!(
+        scene.borrow().reflection_probes.probes[0].rotation,
+        glam::Quat::IDENTITY
+    );
+    assert!(lua
+        .load("Reflection.Set(0, { shape = 'Cone' })")
+        .exec()
+        .is_err());
 }

@@ -165,11 +165,14 @@ pub struct MaterialAsset {
     /// How reactive the surface is under TAA (#1845): `Auto` by default.
     #[serde(default)]
     pub reactive: TaaReactive,
-    /// HDRP's *Receive SSR Transparent* (#1570): a `Transparent` surface traces
-    /// screen-space reflections of the opaque scene where the view runs SSR, over its
-    /// probe reflection. Off by default; an opaque surface always takes SSR.
-    #[serde(default)]
-    pub receive_ssr: bool,
+    /// HDRP's *Receive SSR* and *Receive SSR Transparent* (#1570, #2004): whether
+    /// the surface takes screen-space reflections where the view runs SSR. An opaque
+    /// or cutout surface with it off keeps its probe reflection; a `Transparent` one
+    /// with it on traces its own over its probe. `None` (unset) is HDRP's default
+    /// for the render mode: on for opaque and cutout, off for transparent
+    /// ([`MaterialAsset::receives_ssr`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receive_ssr: Option<bool>,
     /// The colour thin translucency lets through (#1523), HDRP's *Transmission
     /// Tint*; white by default.
     #[serde(default = "white")]
@@ -220,6 +223,13 @@ impl MaterialAsset {
     /// pass; only `Transparent` defers to the sorted pass.
     pub fn is_transparent(&self) -> bool {
         self.render_mode == RenderMode::Transparent
+    }
+
+    /// Whether the surface takes SSR: its `receive_ssr`, or unset, HDRP's default
+    /// for its render mode (on unless `Transparent`, where a trace costs a march per
+    /// pixel).
+    pub fn receives_ssr(&self) -> bool {
+        self.receive_ssr.unwrap_or(!self.is_transparent())
     }
 }
 

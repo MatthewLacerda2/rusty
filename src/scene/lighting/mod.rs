@@ -2,6 +2,8 @@
 //! probe volumes, the irradiance probe grid and its analytic fill, reflection
 //! probes, the baked occlusion culling (`occlusion`, #1714), the scene's bake settings, and the spherical-harmonics basis they all share.
 
+#[cfg(feature = "dev")]
+pub mod bake_status;
 pub mod io;
 pub mod lightmap;
 pub mod mesh_maps;

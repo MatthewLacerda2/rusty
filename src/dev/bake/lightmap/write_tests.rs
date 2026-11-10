@@ -29,10 +29,13 @@ fn a_failed_write_leaves_the_old_pages_and_the_scene_on_them() {
     std::fs::create_dir_all(&blocker).unwrap();
     assert!(apply_encoded(&mut scene, &path, &encoded).is_err());
     assert_eq!(*scene.lightmaps, before, "the scene stays on its pages");
-    let on_disk = before.pages.iter().chain(&before.directions);
-    for page in on_disk {
+    for page in before.pages.iter().chain(&before.directions) {
         assert!(Path::new(page).exists(), "{page} was removed");
-        assert!(Path::new(page).with_extension("png").exists());
+        let png = Path::new(page).with_extension("png");
+        assert!(
+            png.exists() || before.directions.contains(page),
+            "{page}'s PNG"
+        );
     }
     std::fs::remove_dir(&blocker).unwrap();
     apply_encoded(&mut scene, &path, &encoded).unwrap();

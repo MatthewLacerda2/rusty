@@ -84,3 +84,16 @@ fn one_lamp_sh_ringing_does_not_saturate_the_scale() {
         "never above 1"
     );
 }
+
+/// The fallback is never box-projected (#1995), and the shape row carries the
+/// projection's fade: the blend distance, then the volume's half-diagonal.
+#[test]
+fn the_fallback_is_never_box_projected_and_the_fade_is_packed() {
+    let mut probe = ReflectionProbe::new(Vec3::ZERO, Vec3::new(3.0, 4.0, 0.0));
+    probe.blend_distance = 2.0;
+    let room = ReflectionProbeUniform::of(&probe, 0, 1, 0);
+    assert_eq!(room.params[1], 1.0);
+    assert_eq!(room.shape[2..], [2.0, 5.0]);
+    probe.fallback = true;
+    assert_eq!(ReflectionProbeUniform::of(&probe, 0, 1, 0).params[1], 0.0);
+}

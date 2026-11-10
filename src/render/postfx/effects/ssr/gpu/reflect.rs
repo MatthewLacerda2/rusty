@@ -1,6 +1,8 @@
 //! SSR on lavapipe (#1526, #1542): a mirror reflects and a rough floor does not, an
 //! overlay camera's viewmodel is untouched while the world under it still reflects
-//! (and the overlay draws with the plain pipelines), and with no skybox the sky an SSR hit replaces is the procedural one.
+//! (and the overlay draws with the plain pipelines), with no skybox the sky an SSR
+//! hit replaces is the procedural one, and an opaque floor with `receive_ssr` off is
+//! drawn as with SSR off (#2004).
 
 use glam::Vec3;
 
@@ -115,5 +117,22 @@ fn gpu_without_a_skybox_a_hit_replaces_the_procedural_sky() {
     assert!(
         lost[1] > lost[0].max(lost[2]),
         "what it replaced was green, not violet"
+    );
+}
+
+#[test]
+fn gpu_an_opaque_mirror_with_receive_ssr_off_is_drawn_as_with_ssr_off() {
+    let Some(mut r) = renderer() else { return };
+    let opted = |on| {
+        let (mut s, _) = scene(on, MIRROR, RED);
+        s.materials.get_mut("floor").unwrap().receive_ssr = Some(false);
+        s
+    };
+    let (on, off) = (frame(&mut r, &opted(true)), frame(&mut r, &opted(false)));
+    assert!(on == off, "the floor keeps its probe reflection");
+    let taking = frame(&mut r, &scene(true, MIRROR, RED).0);
+    assert!(
+        taking != off,
+        "the same floor left at its default reflects the cube"
     );
 }

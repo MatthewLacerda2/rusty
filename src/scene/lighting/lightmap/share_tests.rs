@@ -1,7 +1,8 @@
 //! The direction page's lamp share (#1695): only `Baked` lamps' direct light makes a
 //! texel's specular lobe. An even sky over a dark ground and a `Mixed` light's bounce
 //! leave a texel directional but lamp-free; a lamp alone gives a share of 1 toward
-//! itself; and two opposed lamps weaken it. BC7's share: `share_bc7_tests`.
+//! itself; and two opposed lamps weaken it. The shader reads it with the bake's
+//! own ramp.
 
 use glam::{Vec3, Vec4};
 
@@ -97,4 +98,14 @@ fn two_opposed_lamps_weaken_the_share() {
         mean.truncate().normalize().dot(Vec3::Y) > 0.99,
         "between them: {mean}"
     );
+}
+
+#[test]
+fn the_shaders_ramp_is_the_bakes() {
+    let shader = include_str!("../../../../engine/shaders/forward/lightmap.wgsl");
+    let ramp = format!(
+        "const LAMP_RAMP: f32 = {:?};",
+        super::bake::direction::LAMP_RAMP
+    );
+    assert!(shader.contains(&ramp), "the shader's ramp is the bake's");
 }

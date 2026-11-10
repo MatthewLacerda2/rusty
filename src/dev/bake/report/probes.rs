@@ -33,7 +33,12 @@ pub struct Timeline {
 impl Timeline {
     /// The bake is at `stage` now: the time since the last note was the last stage's.
     pub fn note(&mut self, stage: Stage) {
-        let now = Instant::now();
+        self.note_at(stage, Instant::now());
+    }
+
+    /// [`Self::note`] at the instant `now`, which must not be before the last
+    /// note's: a test drives fixed instants through it (#2011).
+    pub fn note_at(&mut self, stage: Stage, now: Instant) {
         let Some((was, at)) = self.last.replace((stage, now)) else {
             return;
         };
@@ -45,7 +50,7 @@ impl Timeline {
         if list.len() <= i {
             list.resize(i + 1, Duration::ZERO);
         }
-        list[i] += now - at;
+        list[i] += now.saturating_duration_since(at);
     }
 
     /// The bounces' and the reflection probes' stages, in order.

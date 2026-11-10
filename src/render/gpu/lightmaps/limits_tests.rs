@@ -4,7 +4,7 @@
 
 use super::finish;
 use super::load::Loaded;
-use super::upload::fits;
+use super::upload::{fits, MAX_ARRAY_BYTES};
 use crate::render::test_gpu::headless_or_skip;
 use crate::scene::lighting::lightmap::{MAX_PAGE, MAX_PAGES};
 
@@ -22,14 +22,22 @@ fn fits_refuses_more_layers_or_a_larger_edge_than_the_limits() {
         max_texture_dimension_2d: 64,
         ..wgpu::Limits::default()
     };
-    assert_eq!(fits(&small, 64, 4), Ok(()));
-    let layers = fits(&small, 64, 5).unwrap_err();
+    assert_eq!(fits(&small, 64, 4, 0), Ok(()));
+    let layers = fits(&small, 64, 5, 0).unwrap_err();
     assert!(
         layers.contains("5 pages") && layers.contains("the 4 layers"),
         "{layers}"
     );
-    let edge = fits(&small, 128, 1).unwrap_err();
+    let edge = fits(&small, 128, 1, 0).unwrap_err();
     assert!(edge.contains("128²") && edge.contains("64²"), "{edge}");
+}
+
+#[test]
+fn fits_refuses_an_array_past_the_byte_budget() {
+    let limits = wgpu::Limits::default();
+    assert_eq!(fits(&limits, 1024, 8, MAX_ARRAY_BYTES), Ok(()));
+    let err = fits(&limits, 1024, 8, MAX_ARRAY_BYTES + 1).unwrap_err();
+    assert!(err.contains("1024 MiB") && err.contains("8 pages"), "{err}");
 }
 
 #[test]

@@ -14,7 +14,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::sync::mpsc::{self, Sender};
 use std::thread;
 
-use super::Command;
+use super::{progress_line, Command, Reply};
 
 /// A bound listener's identity: the human-readable address to log, plus (on unix)
 /// the socket path the channel removes on drop. The `path` field is unix-only — TCP
@@ -120,7 +120,8 @@ impl Stream for std::net::TcpStream {
 }
 
 /// Per-connection handler: spawn a thread that reads lines, forwards each to the
-/// main loop, blocks for the framed reply, and writes it back. Generic over the
+/// main loop, blocks for the framed reply, and writes it back (after the progress
+/// lines a bake told while the line ran). Generic over the
 /// stream type so the unix and windows branches share one body.
 ///
 /// A blank line is skipped (parity with the session). A clone/read/write error or
@@ -145,19 +146,33 @@ fn spawn_handler<S: Stream>(stream: S, tx: Sender<Command>) {
             }
             // Hand the line to the main loop and block for its framed reply. The
             // main loop owns the world; we never touch it from this thread.
-            let (reply_tx, reply_rx) = mpsc::channel::<String>();
+            let (reply_tx, reply_rx) = mpsc::channel::<Reply>();
             if tx.send((line, reply_tx)).is_err() {
                 break; // main loop gone (engine shutting down).
             }
             // The editor may be asleep outside Play (#1721): only a frame drains it.
             crate::core::wake::frame();
-            let response = match reply_rx.recv() {
-                Ok(r) => r,
-                Err(_) => break,
-            };
-            if writeln!(writer, "{}", response).is_err() || writer.flush().is_err() {
-                break; // client disconnected.
+            if !write_replies(&mut writer, &reply_rx) {
+                break; // main loop gone, or the client disconnected.
             }
         }
     });
+}
+
+/// Write a command's progress lines as they come (#1999), then its reply. `false`
+/// when the main loop dropped the command or the client went away.
+pub(super) fn write_replies(writer: &mut impl Write, replies: &mpsc::Receiver<Reply>) -> bool {
+    loop {
+        let (line, last) = match replies.recv() {
+            Ok(Reply::Progress(text)) => (progress_line(&text), false),
+            Ok(Reply::Done(line)) => (line, true),
+            Err(_) => return false,
+        };
+        if writeln!(writer, "{line}").is_err() || writer.flush().is_err() {
+            return false;
+        }
+        if last {
+            return true;
+        }
+    }
 }

@@ -29,21 +29,30 @@
 //! One Lua command per line in; one framed JSON response per command out, in lockstep
 //! and **byte-identical** to the headless session (`crate::dev::session::response_line`):
 //! `{"ok":true,"result":"…"}` / `{"ok":false,"error":"…"}`. Blank lines are skipped.
+//! A command that asks (its line starts with `progress::ASK`, #1999) also gets its
+//! bake's progress lines (`dev::bake::progress`) first, one `{"progress":"…"}`
+//! line each: a line with no `ok` key is progress, and the reply is the line that
+//! has one. A command that doesn't ask gets only its reply, as before.
 //! A malformed line comes back as `{"ok":false,…}` and tears down neither the
 //! connection nor the engine; EOF / read error ends only that connection's handler.
 
 pub mod client;
+mod progress;
 mod transport;
 
 use std::cell::RefCell;
 use std::sync::mpsc::{self, Receiver, Sender};
 
+use super::bake::progress::listen::listening;
 use super::{console, session};
 use crate::scripting::{ConsoleLogs, ScriptManager};
+pub(super) use progress::Reply;
+pub use progress::{asks, parse_progress, progress_line, ASK};
 
 /// One queued command: the input line plus the reply channel its handler thread
-/// blocks on. The main loop evaluates the line and sends the framed JSON back.
-pub(super) type Command = (String, Sender<String>);
+/// blocks on. The main loop evaluates the line and sends the framed JSON back,
+/// after any progress lines a bake told while it ran.
+pub(super) type Command = (String, Sender<Reply>);
 
 /// The main-loop side of the windowed command channel. Holds the receiver the
 /// listener thread feeds; [`drain`](CommandChannel::drain) is polled once per frame
@@ -105,9 +114,22 @@ impl CommandChannel {
     pub fn drain(&self, scripts: &ScriptManager, console: &RefCell<ConsoleLogs>) -> usize {
         let mut ran = 0;
         while let Ok((line, reply_tx)) = self.rx.try_recv() {
-            let outcome = console::evaluate_line(scripts, console, &line);
+            // A bake's progress lines go to a client that asked while the line
+            // runs (#1999); one that didn't gets only the reply.
+            let (asked, line) = asks(&line);
+            let evaluate = || console::evaluate_line(scripts, console, line);
+            let outcome = match asked {
+                true => {
+                    let progress = reply_tx.clone();
+                    let tell = move |text: &str| {
+                        let _ = progress.send(Reply::Progress(text.to_string()));
+                    };
+                    listening(tell, evaluate)
+                }
+                false => evaluate(),
+            };
             let warnings = crate::logging::forward(console);
-            let _ = reply_tx.send(session::response_line(&outcome, &warnings));
+            let _ = reply_tx.send(Reply::Done(session::response_line(&outcome, &warnings)));
             ran += 1;
         }
         ran
@@ -123,151 +145,4 @@ impl Drop for CommandChannel {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::dev::session::Session;
-
-    fn session() -> Session {
-        Session::new("").expect("session boots in edit mode")
-    }
-
-    /// Build a channel whose listener side is unused: we drive the receiver directly
-    /// by feeding `(line, reply_tx)` pairs, exercising the core `drain` logic against
-    /// a live world without a real socket. Returns the sender + the channel.
-    fn local_channel() -> (Sender<Command>, CommandChannel) {
-        let (tx, rx) = mpsc::channel::<Command>();
-        let channel = CommandChannel {
-            rx,
-            #[cfg(unix)]
-            socket_path: std::path::PathBuf::from("/tmp/rusty-test-unused.sock"),
-        };
-        (tx, channel)
-    }
-
-    /// Send one line through the channel, drain it against the live world, and return
-    /// the single framed reply the handler would have written back.
-    fn round_trip(s: &Session, tx: &Sender<Command>, ch: &CommandChannel, line: &str) -> String {
-        let (reply_tx, reply_rx) = mpsc::channel::<String>();
-        tx.send((line.to_string(), reply_tx))
-            .expect("queue command");
-        let ran = ch.drain(s.world().script_manager(), s.world().console());
-        assert_eq!(ran, 1, "drain counts the one line it ran");
-        reply_rx.recv().expect("drain replies once")
-    }
-
-    #[test]
-    fn drain_frames_a_successful_command() {
-        let s = session();
-        let (tx, ch) = local_channel();
-        let reply = round_trip(&s, &tx, &ch, "1 + 1");
-        assert!(reply.contains("\"ok\":true") && reply.contains("\"result\":\"2\""));
-    }
-
-    #[test]
-    fn drain_round_trips_a_setter_and_getter_against_the_live_world() {
-        let s = session();
-        s.world()
-            .scene()
-            .borrow_mut()
-            .add_entity("Probe".to_string());
-        let (tx, ch) = local_channel();
-
-        let id_reply = round_trip(&s, &tx, &ch, "Scene.FindEntityByName(\"Probe\")");
-        // Pull the rendered id out of the framed reply for the follow-up commands.
-        let id: serde_json::Value = serde_json::from_str(&id_reply).unwrap();
-        let id = id["result"].as_str().unwrap().to_string();
-        assert_ne!(id, "0", "the live scene must resolve the authored entity");
-
-        round_trip(
-            &s,
-            &tx,
-            &ch,
-            &format!("Transform.SetPosition({}, 1, 2, 3)", id),
-        );
-        let pos = round_trip(&s, &tx, &ch, &format!("Transform.GetPosition({})", id));
-        assert!(
-            pos.contains("\"ok\":true") && pos.contains("\"result\":\"1, 2, 3\""),
-            "the setter must persist on the live world: {pos}"
-        );
-    }
-
-    #[test]
-    fn malformed_line_frames_an_error_and_channel_survives() {
-        let s = session();
-        let (tx, ch) = local_channel();
-
-        let bad = round_trip(&s, &tx, &ch, "this is not lua %%%");
-        assert!(
-            bad.contains("\"ok\":false") && bad.contains("\"error\""),
-            "a malformed line must frame an error: {bad}"
-        );
-
-        // A subsequent good command still works: bad input never breaks the channel.
-        let good = round_trip(&s, &tx, &ch, "1 + 1");
-        assert!(good.contains("\"ok\":true") && good.contains("\"result\":\"2\""));
-    }
-
-    #[test]
-    fn drain_replies_once_per_queued_command_in_order() {
-        let s = session();
-        let (tx, ch) = local_channel();
-        let (a_tx, a_rx) = mpsc::channel::<String>();
-        let (b_tx, b_rx) = mpsc::channel::<String>();
-        tx.send(("1 + 1".to_string(), a_tx)).unwrap();
-        tx.send(("2 + 2".to_string(), b_tx)).unwrap();
-
-        // One drain call clears the whole queue — both replies are ready after it.
-        ch.drain(s.world().script_manager(), s.world().console());
-        assert!(a_rx.recv().unwrap().contains("\"result\":\"2\""));
-        assert!(b_rx.recv().unwrap().contains("\"result\":\"4\""));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn start_binds_a_unix_socket_then_drops_cleanly() {
-        // Point the channel at an isolated path so the test never collides with a
-        // running engine or another test.
-        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
-        let dir = std::env::temp_dir();
-        let path = dir.join(format!("rusty-cmd-test-{}.sock", std::process::id()));
-        // The path goes to the bind directly: setting `RUSTY_CMD_SOCK` would leak
-        // into every other test in this process (#977).
-
-        let console = RefCell::new(ConsoleLogs::new());
-        let channel =
-            CommandChannel::listen(&console, |tx| transport::bind_and_listen(tx, path.clone()))
-                .expect("bind the unix socket");
-        assert!(path.exists(), "start() must create the socket file");
-
-        drop(channel);
-        assert!(!path.exists(), "drop must remove the socket file");
-    }
-
-    /// The editor sleeps outside Play (#1721): a command must wake it, or its client
-    /// waits for a frame that nothing asks for.
-    #[cfg(unix)]
-    #[test]
-    fn a_command_wakes_a_sleeping_window() {
-        use std::io::Write;
-        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
-        let dir = std::env::temp_dir();
-        let path = dir.join(format!("rusty-cmd-wake-{}.sock", std::process::id()));
-        let console = RefCell::new(ConsoleLogs::new());
-        let channel =
-            CommandChannel::listen(&console, |tx| transport::bind_and_listen(tx, path.clone()))
-                .expect("bind the unix socket");
-        let before = crate::core::wake::rings();
-        let mut client = std::os::unix::net::UnixStream::connect(&path).expect("connect");
-        writeln!(client, "return 1").expect("send a command");
-        let (line, _reply) = channel.rx.recv().expect("the handler forwards it");
-        assert_eq!(line, "return 1");
-        // The ring comes right after the hand-off, on the handler's thread.
-        for _ in 0..200 {
-            if crate::core::wake::rings() > before {
-                return;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        panic!("the command never woke the window");
-    }
-}
+mod tests;

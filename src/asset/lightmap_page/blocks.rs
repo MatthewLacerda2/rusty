@@ -4,10 +4,10 @@
 //! blocks are the same whichever thread wrote them, so a bake's pages never
 //! depend on the machine.
 
-use block_compression::decode::{decompress_blocks_as_rgba16f, decompress_blocks_as_rgba8};
-use block_compression::encode::{compress_rgba16, compress_rgba8};
+use block_compression::decode::decompress_blocks_as_rgba16f;
+use block_compression::encode::compress_rgba16;
 use block_compression::half::f16;
-use block_compression::{BC6HSettings, BC7Settings, CompressionVariant};
+use block_compression::{BC6HSettings, CompressionVariant};
 use glam::Vec3;
 
 use super::{Page, PageFormat};
@@ -17,12 +17,6 @@ use crate::asset::texture_import::banded;
 /// 5% (`tests`); a 2048² page with its mips took 1.9 s on four cores of the 2026
 /// cloud container, against 4.8 s at `basic`, which held them no closer.
 const BC6H: CompressionVariant = CompressionVariant::BC6H(BC6HSettings::very_fast());
-/// BC7's profile for a direction page (its alpha is the lamp share, #1695): the one
-/// the texture importer uses (`texture_import::encode`), 4.4 s a 2048² page there.
-/// Not ultra-fast (1.4 s): like BC1 it flattens a block of two contrasting colours,
-/// which a direction page has at every crease.
-const BC7: CompressionVariant = CompressionVariant::BC7(BC7Settings::alpha_very_fast());
-
 /// The largest value a BC6H unsigned-float texel holds (half float's).
 pub const BC6H_MAX: f32 = 65504.0;
 
@@ -77,33 +71,6 @@ pub fn bc6h_level(edge: u32, texels: &[Vec3], threads: usize) -> Vec<u8> {
     })
 }
 
-/// A BC7 page of RGBA8 `levels` (level `l` is `(edge >> l)`² texels, row-major).
-/// `None` when `stop` answers true before a level.
-pub fn encode_bc7(
-    edge: u32,
-    levels: &[Vec<[u8; 4]>],
-    threads: usize,
-    stop: &dyn Fn() -> bool,
-) -> Option<Page> {
-    let mut encoded = Vec::with_capacity(levels.len());
-    for (l, texels) in levels.iter().enumerate() {
-        if stop() {
-            return None;
-        }
-        let bytes: &[u8] = bytemuck_flat(texels);
-        let w = edge >> l;
-        encoded.push(banded(w, w, 16, threads, |out, rows, row0| {
-            let start = (row0 * w * 4) as usize;
-            compress_rgba8(BC7, &bytes[start..], out, w, rows, w * 4);
-        }));
-    }
-    Some(Page {
-        format: PageFormat::Bc7,
-        edge,
-        levels: encoded,
-    })
-}
-
 /// Level `level` of a BC6H `page` decoded back to linear HDR: what a GPU samples.
 pub fn decode_bc6h(page: &Page, level: usize) -> Vec<Vec3> {
     bc6h_texels(page.edge >> level, &page.levels[level])
@@ -136,16 +103,6 @@ pub fn bc6h_texels(edge: u32, blocks: &[u8]) -> Vec<Vec3> {
     texels
 }
 
-/// Level `level` of a BC7 `page` decoded back to RGBA8.
-pub fn decode_bc7(page: &Page, level: usize) -> Vec<[u8; 4]> {
-    let edge = page.edge >> level;
-    let mut out = vec![0u8; (edge * edge * 4) as usize];
-    decompress_blocks_as_rgba8(BC7, edge, edge, &page.levels[level], &mut out);
-    out.chunks_exact(4)
-        .map(|t| [t[0], t[1], t[2], t[3]])
-        .collect()
-}
-
 /// Linear HDR texels as `Rgba16Float` bytes (alpha 1): the upload of a page on a
 /// GPU without BC compression.
 pub fn to_rgba16f(texels: &[Vec3]) -> Vec<u8> {
@@ -166,9 +123,4 @@ fn clean(v: f32) -> f32 {
     } else {
         v.clamp(0.0, BC6H_MAX)
     }
-}
-
-/// RGBA8 texels as their bytes.
-fn bytemuck_flat(texels: &[[u8; 4]]) -> &[u8] {
-    block_compression::bytemuck::cast_slice(texels)
 }

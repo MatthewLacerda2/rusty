@@ -26,7 +26,8 @@ class Fake:
     """GitHub and the routines API, answering from tables and noting the calls."""
 
     def __init__(self, issue: dict | None = None, comments: list | None = None, create=(200, None),
-                 routines: dict | None = None, pulls: list | None = None):
+                 routines: dict | None = None, pulls: list | None = None, threads: dict | None = None):
+        self.threads = threads or {}  # a pull request's conversation, by number (#2017)
         self.pulls = [] if pulls is None else pulls
         self.routines = ROUTINES if routines is None else routines
         self.issue = {"number": 9, "title": "Do it", "state": "open", "labels": []} if issue is None else issue
@@ -38,7 +39,8 @@ class Fake:
         if "/pulls" in path:
             return self.pulls if "page=1" in path else []
         if "/comments" in path:
-            return self.comments if "page=1" in path else []
+            number = int(path.split("/issues/")[1].split("/")[0])
+            return self.threads.get(number, self.comments) if "page=1" in path else []
         return self.issue
 
     def call(self, arguments: dict):
@@ -115,9 +117,16 @@ class Limit(unittest.TestCase):
     def test_four_running_leaves_room_for_a_fifth(self):
         self.assertEqual(Fake(routines=busy(1, 2, 3, 4), pulls=drafts(1, 2, 3, 4)).run("9")[0], 0)
 
-    def test_a_ready_pull_request_frees_its_coder(self):
-        pulls = drafts(1, 2, 3, 4) + [{"draft": False, "head": {"ref": "5-x"}}]
-        self.assertEqual(Fake(routines=busy(1, 2, 3, 4, 5), pulls=pulls).run("9")[0], 0)
+    def test_a_reviewed_ready_pull_request_frees_its_coder(self):
+        pulls = drafts(1, 2, 3, 4) + [{"number": 105, "draft": False, "head": {"ref": "5-x"}}]
+        record = {105: [{**BRIEF, "body": "No review: data only"}]}
+        self.assertEqual(Fake(routines=busy(1, 2, 3, 4, 5), pulls=pulls, threads=record).run("9")[0], 0)
+
+    def test_a_ready_pull_request_in_review_holds_its_slot_and_is_named(self):
+        pulls = drafts(1, 2, 3, 4) + [{"number": 105, "draft": False, "head": {"ref": "5-x"}}]
+        code, _, err = Fake(routines=busy(1, 2, 3, 4, 5), pulls=pulls, threads={105: [CHAT]}).run("9")
+        self.assertEqual(code, 1)
+        self.assertIn("rusty #5 x (fired 2026-10-29T13:00Z, in review)", err)
 
     def test_a_fire_with_no_pull_request_past_two_hours_is_said_and_not_counted(self):
         listed = busy(1, 2, 3, 4)

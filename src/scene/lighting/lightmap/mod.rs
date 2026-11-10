@@ -27,8 +27,9 @@
 //! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, the RGBA8 direction
 //!   page a directional bake adds (#810) and the RGBA8 shadowmask page a
 //!   `Shadowmask` bake adds (#1695);
-//! * `pages` — a packed page's mip chain, as BC6H irradiance and a BC7 direction
-//!   page (#1694), with the RGBM PNG beside it as the fallback;
+//! * `pages` — a packed page's mip chain, as BC6H irradiance (#1694) with the RGBM
+//!   PNG beside it as the fallback, and the RGBA8 levels of a direction page (never
+//!   block-compressed, #1996) and a shadowmask;
 //! * `set` — the scene's pages and each entity's place in them ([`LightmapSet`]);
 //! * `probe_direct` — the direct light of `Baked` lights at light probes, which the
 //!   probe bake adds analytically ([`baked_direct_sh`], #809), and the probes'
@@ -127,8 +128,6 @@ mod run_bake_tests;
 mod run_tests;
 #[cfg(test)]
 mod scale_tests;
-#[cfg(test)]
-mod share_bc7_tests;
 #[cfg(test)]
 mod share_tests;
 #[cfg(test)]

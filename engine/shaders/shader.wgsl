@@ -519,6 +519,10 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // distance fog's and the volumetric fog's together (#1703).
     let surface_fog = transparent::surface_fog(in.world_position);
     ssr_texels = ssr_surface::encode(N, roughness, reflection, reflection_weight, surface_fog);
+    // An opaque material with `receive_ssr` off keeps its probe (#2004): no weight.
+    if (material().receive_ssr == 0u) {
+        ssr_texels = ssr_surface::scale(ssr_texels, vec3<f32>(0.0));
+    }
 
     // 6. Emissive (#222 factor, #207 map): self-illumination added on top of the lit
     // colour, independent of any light. The factor is modulated by the emissive map's

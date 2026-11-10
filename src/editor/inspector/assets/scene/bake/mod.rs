@@ -25,6 +25,10 @@
 //! settings under the button (#810's directional mode among them) are the scene's,
 //! as `Lighting.SetSettings{…}` edits them.
 //!
+//! A script's `Lighting.GenerateAsync()` (#1999, Unity's `Lightmapping.BakeAsync`)
+//! presses the button: it sets `Scene::lighting_bake_requested`, and [`poll`] starts
+//! the same job on the next frame.
+//!
 //! **Bake Occlusion** beside it (#1958, Unity's Occlusion window) runs only the
 //! last step, the PVS on its worker, and writes it beside the scene: the same
 //! `generate_lighting::apply_occlusion` as `Lighting.BakeOcclusion()`.
@@ -39,10 +43,12 @@ use crate::dev::bake::lightmap::LightmapBakeJob;
 use crate::dev::bake::occlusion::OcclusionBakeJob;
 use crate::dev::bake::steps::LightingBake;
 use crate::editor::EditorUi;
+use crate::scene::lighting::bake_status::BakeStatus;
 use crate::scene::lighting::lightmap::BakeView;
 use crate::scene::{Scene, SceneId};
 use crate::scripting::ConsoleLogs;
 
+mod outcome;
 mod poll;
 mod progress;
 mod settings;
@@ -179,7 +185,11 @@ pub(super) fn is_open_scene(editor: &EditorUi, card: &str) -> bool {
 /// open scene's file, never to whichever scene asset the card shows.
 fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     let Some(path) = editor.current_scene_path() else {
-        return console.error("Generate Lighting failed: save the scene first".into());
+        return not_started(
+            scene,
+            console,
+            "Generate Lighting failed: save the scene first".into(),
+        );
     };
     let settings = scene.lighting_settings.lightmaps;
     match LightmapBakeJob::start(scene, Some(&path), settings, Some(scene_view(editor))) {
@@ -192,9 +202,34 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
                 path: Some(path),
             });
             scene.lighting_bake_running = true; // a script's bake waits from now on
+            scene.lighting_bake_status = BakeStatus::Running;
         }
-        Err(e) => console.error(format!("Generate Lighting failed: {e}")),
+        Err(e) => not_started(scene, console, format!("Generate Lighting failed: {e}")),
     }
+}
+
+/// Say a bake never started because `line`, in the console and as the scene's
+/// status (`Lighting.GetBakeStatus`, #1999).
+fn not_started(scene: &mut Scene, console: &mut ConsoleLogs, line: String) {
+    console.error(line.clone());
+    scene.lighting_bake_status = BakeStatus::Refused(line);
+}
+
+/// A script's `Lighting.GenerateAsync()` (#1999): press the button for it, once.
+/// The verb refused what the button refuses when it was called, and asking for
+/// Play, Stop, File ▸ New and a load drop the request (`Scene::drop_bake_request`,
+/// `shell::editor::sync` before the draw); a button pressed
+/// since refuses it here.
+fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
+    if !std::mem::take(&mut scene.lighting_bake_requested) {
+        return;
+    }
+    if editor.dev.lightmap_bake.is_none() {
+        return start(editor, scene, console);
+    }
+    let line = "Lighting.GenerateAsync: a bake was already running".to_string();
+    console.error(line.clone());
+    scene.lighting_bake_status = BakeStatus::Refused(line);
 }
 
 /// What the Scene view's camera sees, for the bake's Prioritize View (#1970). The
@@ -212,7 +247,11 @@ fn scene_view(editor: &EditorUi) -> BakeView {
 /// Lighting's last step, written beside the open scene's file.
 fn start_occlusion(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     let Some(path) = editor.current_scene_path() else {
-        return console.error("Bake Occlusion failed: save the scene first".into());
+        return not_started(
+            scene,
+            console,
+            "Bake Occlusion failed: save the scene first".into(),
+        );
     };
     match OcclusionBakeJob::start(scene) {
         Ok(job) => {
@@ -227,8 +266,9 @@ fn start_occlusion(editor: &mut EditorUi, scene: &mut Scene, console: &mut Conso
                 path: Some(path),
             });
             scene.lighting_bake_running = true;
+            scene.lighting_bake_status = BakeStatus::Running;
         }
-        Err(e) => console.error(format!("Bake Occlusion failed: {e}")),
+        Err(e) => not_started(scene, console, format!("Bake Occlusion failed: {e}")),
     }
 }
 
@@ -240,6 +280,8 @@ fn warn_unsaved(scene: &Scene, path: &str, console: &mut ConsoleLogs) {
     }
 }
 
+#[cfg(test)]
+mod async_tests;
 #[cfg(test)]
 mod drop_tests;
 #[cfg(test)]

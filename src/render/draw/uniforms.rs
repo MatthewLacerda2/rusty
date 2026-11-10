@@ -113,6 +113,7 @@ pub(crate) fn surface_uniform(lit: bool, material: Option<&MaterialAsset>) -> Su
     let Some(m) = material else {
         return SurfaceUniform {
             receive_shadows: 1,
+            receive_ssr: u32::from(lit),
             ..SurfaceUniform::default()
         };
     };
@@ -135,7 +136,15 @@ pub(crate) fn surface_uniform(lit: bool, material: Option<&MaterialAsset>) -> Su
         depth_postpass: u32::from(glass && m.depth_postpass),
         transmission: transmission(m.transmission_color, m.transmission),
         absorption: absorption(m.transmittance_color, m.absorption_distance, m.thickness),
-        receive_ssr: u32::from(lit && glass && ssr::transparent::traces(m)),
+        // A translucent's lane says it traces (#1570); an opaque one's that its
+        // pixels keep the SSR record, else take the probe only (#2004).
+        receive_ssr: u32::from(
+            lit && if glass {
+                ssr::transparent::traces(m)
+            } else {
+                m.receives_ssr()
+            },
+        ),
         reactive: if glass { m.reactive.gpu() } else { 0.0 },
         writes_motion: u32::from(glass && m.writes_motion),
         _pad: 0,
