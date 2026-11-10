@@ -475,7 +475,20 @@ confidence (the screen's edge, wider the blurrier it is, and the march's last fi
 reach) and a miss keeps the sky or probe reflection, so a weak hit falls back to it
 without a seam. A ray a normal map tilts below the surface's own geometry (a rough,
 bumpy floor seen at a grazing angle) keeps the probe reflection too, rather than
-reflecting the floor it leaves. It runs on the base camera's opaque image, right after its opaque
+reflecting the floor it leaves. The march (#2004) takes steps of at most `step_length`
+and at most 1/64 of the screen's shorter side, so it sees anything on screen wider than
+that (a bottle, a pole) and spends its reach where the ray crosses the screen fast;
+where a step goes behind the scene, or comes back out, it halves the step four times to
+find where, so a reflected silhouette is drawn to the texel, not in stairs of a step.
+A point counts as a hit only on a surface or up to 0.15 m behind it (or 2% of its depth,
+for a floor seen near grazing): the depth holds only front faces, so a ray that meets
+an object's unseen back is taken to hit it, and one that passes further behind it
+marches on rather than smearing it. A hit whose blur on screen is wide (its cone's
+radius past 4% of the screen's shorter side, gone by 12%: a long ray from a rough
+surface) fades to the probe reflection, since the blur softens the hit's colour but
+not where the rays stop hitting, which would show as a hard-edged block; a contact
+reflection (a short ray) keeps it. A material with `receive_ssr` off keeps its probe
+reflection (see `Material.SetReceiveSsr`). It runs on the base camera's opaque image, right after its opaque
 pass (HDRP's order): translucent surfaces, particles, ribbons and world canvases blend
 over the reflection (a `Transparent` material with `receive_ssr` traces its own in
 its pass, against that opaque image, sharp and so never below a smoothness of 0.7; see `Material.SetReceiveSsr`), depth of field and motion blur blur it, and a `DepthOnly` overlay
@@ -487,9 +500,9 @@ its blocks run, so any block restyles its reflection with the rest of its colour
 `Debug.Stats().gpu_passes.ssr` times it. Where SSR is off the forward shader reflects
 the sky or a reflection probe. Its **quality** sets the march (see *Quality presets*):
 the seeded `Medium` preset marches 16, 32 or 64 steps at its `Low`, `Medium` and
-`High` levels, reaching 8, 12 or 16 m (the `Low` preset 16, 16 and 32; the `High`
-preset 32, 64 and 128, reaching 25.6 m), and `Custom` marches `steps` steps of
-`step_length` world units. No preset turns it off. The player's `ssr` option gates
+`High` levels, reaching at most 8, 12 or 16 m (the `Low` preset 16, 16 and 32; the
+`High` preset 32, 64 and 128, reaching 25.6 m; less where the ray crosses the screen
+fast), and `Custom` marches `steps` steps of at most `step_length` world units. No preset turns it off. The player's `ssr` option gates
 it. A new volume starts with SSR on at the `Medium` quality.
 Tween paths: `Graphics.ssr.step_length`, `Graphics.ssr.min_smoothness` (a count, as
 `steps`, does not tween).
