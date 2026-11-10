@@ -60,18 +60,20 @@ fn register_navigation(lua: &Lua, ctx: &ApiCtx) -> Reg {
 /// `Probe.Bake()`: capture each probe's static surroundings to a cubemap and project
 /// the bounce into SH (#241).
 fn register_probe(lua: &Lua, ctx: &ApiCtx) -> Reg {
-    let (scene, console) = (ctx.scene, ctx.console);
+    let (scene, scene_path, console) = (ctx.scene, ctx.scene_path, ctx.console);
     put(
         &global_table(lua, "Probe")?,
         "Bake",
         lua.create_function(move |lua, ()| {
             let scene = &*scene.get(lua)?;
+            let path = scene_path.get(lua)?.borrow().clone();
             let mut scene = scene.borrow_mut();
             refuse_while_baking(&scene).map_err(mlua::Error::external)?;
             let console = &*console.get(lua)?;
             shadowmask_note(&scene, console, false);
             let mut log = BakeLog::to_console(console);
-            probe_bake::bake_scene_probes(&mut scene, &mut log).map_err(mlua::Error::external)
+            probe_bake::bake_scene_probes_at(&mut scene, path.as_deref(), &mut log)
+                .map_err(mlua::Error::external)
         }),
     )
 }

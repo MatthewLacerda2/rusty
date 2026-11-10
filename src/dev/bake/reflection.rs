@@ -20,11 +20,15 @@
 //! files + path refs the runtime loads), so the whole path lives behind the `dev` feature
 //! with the rest of the agentic layer.
 //!
+//! A bake that ran writes its report beside the scene (`report::reflections`,
+//! #1980).
+//!
 //! stored-format: the reflection probes' KTX2 cubemaps in `<scene>.reflections/`
 
 use std::path::{Path, PathBuf};
 
 use super::progress::{stage_progress, BakeLog};
+use super::report::{self, probes::Timeline};
 use super::steps::Stage;
 use crate::render::ibl::reflection_bake::CUBE_PREFIX;
 use crate::render::Renderer;
@@ -105,13 +109,23 @@ pub fn bake_scene_reflections(
         }
     };
     let out_dir = out_dir(scene_path)?;
+    let mut times = Timeline::default();
     let baked = renderer.bake_reflections_observed(scene, &out_dir, &mut |done, total| {
+        times.note(Stage::Reflection { done, total });
         if let Some(p) = stage_progress(Stage::Reflection { done, total }) {
             log.observe(p);
         }
     })?;
+    times.note(Stage::Done);
     prune_stale(&out_dir, baked)?;
     log.finish();
+    if let Some(path) = scene_path {
+        let (stages, times) = (times.stages().1, &times.reflections);
+        report::keep(
+            path,
+            report::reflections::report(scene, &stages, times, &out_dir),
+        );
+    }
     Ok(true)
 }
 

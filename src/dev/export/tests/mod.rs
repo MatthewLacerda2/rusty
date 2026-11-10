@@ -18,6 +18,10 @@ fn project(root: &Path) {
         ("cache/thumb.png", "machine-local".into()),
         ("saved/slot1.json", "this machine's save".into()),
         ("assets/scenes/main.scene", "scene".into()),
+        (
+            "assets/scenes/main.scene.bake/navmesh.json",
+            "a bake report".into(),
+        ),
         ("assets/scripts/b.lua", "b".into()),
         ("assets/scripts/a.lua", "a".into()),
         ("assets/models/soldier.fbx", "source".into()),
@@ -96,6 +100,7 @@ fn the_runtime_files_are_copied_in_order_and_the_sources_left_behind() {
         &orphan,
         &hulls,
         "assets/generated/theme.mp3",
+        "assets/scenes/main.scene.bake",
     ] {
         assert!(!out.join(gone).exists(), "{gone} is not exported");
     }

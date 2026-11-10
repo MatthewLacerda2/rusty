@@ -105,8 +105,9 @@ impl NavigationGraph {
     }
 
     /// Each span's walking area (joined by grid steps alone, which go both ways),
-    /// numbered in scan order, and each area's span count.
-    fn walk_areas(&self) -> (Vec<u32>, Vec<usize>) {
+    /// numbered in scan order, and each area's span count: the islands a bake
+    /// report lists (#1980).
+    pub fn walk_areas(&self) -> (Vec<u32>, Vec<usize>) {
         let mut area = vec![u32::MAX; self.spans.len()];
         let mut sizes = Vec::new();
         let mut queue = VecDeque::new();

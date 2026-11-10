@@ -9,22 +9,33 @@
 //! the same [`apply_encoded`] the synchronous `Lighting.BakeLightmaps()` uses. A
 //! cancelled bake applies nothing, so the scene keeps its previous lightmaps: a
 //! cancel lands during the trace, between two levels of the encode, or after it,
-//! up to the `poll` that would have applied it.
+//! up to the `poll` that would have applied it. A bake applied writes its report
+//! (`report::lightmaps`, #1980), with each mesh's worker time.
 
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
+use std::time::{Duration, Instant};
+
+use super::logged::timed;
 use super::UNSAVED;
 use super::{
-    apply_encoded, encode_pages, gather_bake_input, lend_denoiser, lightmap_receivers,
+    apply_encoded, gather_bake_input, keep_report, lend_denoiser, lightmap_receivers,
     warn_missing_uvs, EncodedPages,
 };
-use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeSettings};
+use crate::dev::bake::denoise::Oidn;
+use crate::dev::bake::progress::MeshClocks;
+use crate::dev::bake::report::{lightmaps::Measured, Stages};
+use crate::scene::lighting::lightmap::{BakeProgress, BakeScene, BakeSettings};
 use crate::scene::Scene;
 
-/// What the worker hands back: the encoded pages, `None` when cancelled, or why
-/// encoding failed.
-type Encoded = Result<Option<EncodedPages>, String>;
+/// What the worker hands back: the encoded pages with the trace's and the
+/// encode's time, `None` when cancelled, or why encoding failed; and the input it
+/// baked, for the report (#1980).
+type Encoded = (
+    Result<Option<(EncodedPages, Duration, Duration)>, String>,
+    BakeScene,
+);
 
 /// How a finished bake ended, once [`LightmapBakeJob::poll`] has applied it.
 #[derive(Debug, PartialEq)]
@@ -44,6 +55,12 @@ pub struct LightmapBakeJob {
     scene_path: String,
     /// Static meshes asking for a lightmap, for the missing-lightmap-UV report (#831).
     static_meshes: usize,
+    /// What the report reads besides the pages: the settings, the gather's time,
+    /// each mesh's worker time and OIDN's (#1980).
+    settings: BakeSettings,
+    gathered: Duration,
+    clocks: Arc<MeshClocks>,
+    oidn: Option<Arc<Oidn>>,
 }
 
 impl LightmapBakeJob {
@@ -55,32 +72,42 @@ impl LightmapBakeJob {
         settings: BakeSettings,
     ) -> Result<Self, String> {
         let scene_path = scene_path.ok_or(UNSAVED)?.to_string();
+        let started = Instant::now();
         let input = gather_bake_input(scene);
+        let gathered = started.elapsed();
         let lights = crate::scene::lighting::lightmap::taken_lights(scene);
         let shadowmask = input.shadowmask.clone();
         let static_meshes = lightmap_receivers(&input);
-        let progress = Arc::new(lend_denoiser(BakeProgress::default(), &settings).0);
+        let clocks = Arc::new(MeshClocks::default());
+        let (progress, oidn) = lend_denoiser(BakeProgress::observed(clocks.clone()), &settings);
+        let progress = Arc::new(progress);
         let watch = Arc::clone(&progress);
-        let worker = thread::Builder::new()
+        let work = move || {
+            let pages = timed(&input, &settings, &watch);
+            let with = |(p, trace, encode)| {
+                let (lights, shadowmask) = (lights, shadowmask);
+                let pages = EncodedPages {
+                    lights,
+                    shadowmask,
+                    ..p
+                };
+                (pages, trace, encode)
+            };
+            (pages.map(|p| p.map(with)), input)
+        };
+        let worker = (thread::Builder::new()
             .name("lightmap-bake".into())
-            .spawn(
-                move || match bake_with_progress(&input, &settings, &watch) {
-                    Some(maps) => encode_pages(&maps, settings.page(), &watch).map(|pages| {
-                        pages.map(|p| EncodedPages {
-                            lights,
-                            shadowmask,
-                            ..p
-                        })
-                    }),
-                    None => Ok(None),
-                },
-            )
-            .map_err(|e| format!("start the bake: {e}"))?;
+            .spawn(work))
+        .map_err(|e| format!("start the bake: {e}"))?;
         Ok(Self {
             progress,
             worker: Some(worker),
             scene_path,
             static_meshes,
+            settings,
+            gathered,
+            clocks,
+            oidn,
         })
     }
 
@@ -135,18 +162,39 @@ impl LightmapBakeJob {
         let joined = self.worker.take()?.join();
         Some(match joined {
             // A cancel after the encode finished still applies nothing.
-            Ok(Ok(Some(_))) if self.progress.is_cancelled() => BakeOutcome::Cancelled,
-            Ok(Ok(Some(pages))) => {
-                warn_missing_uvs(self.static_meshes, pages.maps);
-                match apply_encoded(scene, &self.scene_path, &pages) {
-                    Ok(n) => BakeOutcome::Baked(n),
-                    Err(e) => BakeOutcome::Failed(e),
-                }
-            }
-            Ok(Ok(None)) => BakeOutcome::Cancelled,
-            Ok(Err(e)) => BakeOutcome::Failed(e),
+            Ok((Ok(Some(_)), _)) if self.progress.is_cancelled() => BakeOutcome::Cancelled,
+            Ok((Ok(Some(baked)), input)) => self.apply(scene, &input, baked),
+            Ok((Ok(None), _)) => BakeOutcome::Cancelled,
+            Ok((Err(e), _)) => BakeOutcome::Failed(e),
             Err(_) => BakeOutcome::Failed("the bake worker panicked".into()),
         })
+    }
+
+    /// Write the finished pages and point `scene` at them, then the report.
+    fn apply(
+        &self,
+        scene: &mut Scene,
+        input: &BakeScene,
+        (pages, trace, encode): (EncodedPages, Duration, Duration),
+    ) -> BakeOutcome {
+        warn_missing_uvs(self.static_meshes, pages.maps);
+        let writing = Instant::now();
+        let n = match apply_encoded(scene, &self.scene_path, &pages) {
+            Ok(n) => n,
+            Err(e) => return BakeOutcome::Failed(e),
+        };
+        let mut stages = Stages::start();
+        stages.push("gather", self.gathered);
+        stages.push("trace", trace);
+        stages.push("encode", encode);
+        stages.push("write", writing.elapsed());
+        let measured = Measured {
+            times: self.clocks.times(),
+            denoised: self.oidn.as_ref().map(|o| o.spent()),
+        };
+        let read = (input, &self.settings);
+        keep_report(scene, &self.scene_path, read, (&pages, &measured), &stages);
+        BakeOutcome::Baked(n)
     }
 }
 

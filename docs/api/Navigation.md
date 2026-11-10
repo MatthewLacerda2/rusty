@@ -67,6 +67,23 @@ walkable span, as Unity draws it (#1910).
 | Function | Signature | Returns / Effect |
 |---|---|---|
 | `Navigation.Bake` | `()` | bakes the navmesh in full now; in a dev build in edit mode also saves it beside the scene, returning `true` when `<scene>.navmesh` was written (`false`: an unsaved scene, whose first save writes it, Play, or a ship build) |
+| `Navigation.GetBakeReport` *(dev-only)* | `()` | the report the last `Navigation.Bake()` that wrote `<scene>.navmesh` wrote beside it, as a table (below); `nil` when the scene is unsaved or never baked |
+
+A bake that writes `<scene>.navmesh` also writes **`<scene>.bake/navmesh.json`** (#1980):
+the common fields every bake report opens with ([`Lighting.md`](Lighting.md), *Bake
+reports*), then `grid` (`{ min, max, cellSize, width, height }`, `min`/`max` as
+`[x, z]`), `spans`, `areas` (`{ area, name, spans, squareMetres }` per nav area with any
+span), `islands`, `offMeshLinks` (`{ generated = { drop, jump }, authored }`) and
+`colliders` (`{ count, triangles, heaviest }`: the colliders the bake read, heaviest
+first, at most 20, each `{ entity, name, triangles }`). An **island** is a walking area,
+spans joined by grid steps alone; `islands` is `{ count, unreachable, list }`, the list
+largest first (at most 256), each `{ spans, squareMetres, min, max, centre, reachable }`.
+One is reachable when an actor can get to it: the main floor, wherever an agent or
+character controller starts, and what an off-mesh link leads to (the light-probe
+placement's floor, *Light and reflection probes* in `Lighting.md`). A wall top is an
+unreachable island too; a small unreachable floor is usually a bug. There is no polygon
+mesh to count (the navmesh is a layered span grid), and the bake's own stages run in the
+sim, which reads no clock: `stages` holds `bake` and `write`.
 
 Every query resolves the start and the target to spans with one rule: **the nearest
 span below the point, favouring the floor under a character's feet** — the highest floor

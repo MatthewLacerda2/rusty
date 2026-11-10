@@ -54,6 +54,14 @@ impl NavBounds {
     }
 }
 
+/// The colliders a bake of `scene` reads (see `static_collider_ids`), by ascending
+/// id: what the bake report weighs (#1980).
+pub fn bake_collider_ids(scene: &Scene) -> Vec<u32> {
+    let mut ids: Vec<u32> = static_collider_ids(scene).collect();
+    ids.sort_unstable();
+    ids
+}
+
 /// Every collider the bake reads: entity active, static, collider active and not a
 /// trigger (Unity leaves triggers out of the navmesh), and not ignored by a
 /// `NavMeshModifier` (#1959). The one definition of "static geometry" shared by the

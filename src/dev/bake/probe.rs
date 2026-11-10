@@ -12,6 +12,7 @@
 //! behind the `dev` feature with the rest of the agentic layer.
 
 use super::progress::{stage_progress, BakeLog};
+use super::report::{self, probes::Timeline};
 use super::steps::Stage;
 use crate::render::{Renderer, DEFAULT_BAKE_RESOLUTION};
 use crate::scene::Scene;
@@ -22,6 +23,16 @@ use crate::scene::Scene;
 /// screenshot path). With no probes the bake is a successful no-op. Where each bounce
 /// is goes to `log` (#1667).
 pub fn bake_scene_probes(scene: &mut Scene, log: &mut BakeLog) -> Result<bool, String> {
+    bake_scene_probes_at(scene, None, log)
+}
+
+/// [`bake_scene_probes`] of the scene saved at `scene_path`: a bake that ran writes
+/// its report beside it (`report::probes`, #1980; `Probe.Bake()`).
+pub fn bake_scene_probes_at(
+    scene: &mut Scene,
+    scene_path: Option<&str>,
+    log: &mut BakeLog,
+) -> Result<bool, String> {
     if scene.probes.is_empty() {
         return Ok(true);
     }
@@ -33,15 +44,22 @@ pub fn bake_scene_probes(scene: &mut Scene, log: &mut BakeLog) -> Result<bool, S
             return Ok(false);
         }
     };
+    let mut times = Timeline::default();
     renderer.bake_probes_observed(scene, res, &mut |bounce, done, total| {
-        if let Some(p) = stage_progress(Stage::Light {
+        let stage = Stage::Light {
             bounce,
             done,
             total,
-        }) {
+        };
+        times.note(stage);
+        if let Some(p) = stage_progress(stage) {
             log.observe(p);
         }
     });
+    times.note(Stage::Done);
     log.finish();
+    if let Some(path) = scene_path {
+        report::keep(path, report::probes::report(scene, &times.stages().0));
+    }
     Ok(true)
 }
