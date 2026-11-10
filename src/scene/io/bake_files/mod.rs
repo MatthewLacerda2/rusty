@@ -170,7 +170,7 @@ impl BakeFiles {
         match (change(path, seen.disk), want) {
             (Change::Same, _) if as_held => Ok(kept(None)),
             (Change::Same, _) => self.bring(path, want, None),
-            (Change::Newer, Some(_)) if !as_held => {
+            (Change::Newer, _) if seen.dirty || (want.is_some() && !as_held) => {
                 let warning = format!(
                     "[{tag}] {} had changed on disk since this scene read it (another \
                      process baked it?): this scene's own bake overwrote it, the last write wins",
@@ -280,5 +280,10 @@ fn change(path: &Path, disk: Disk) -> Change {
 }
 
 #[cfg(test)]
-#[path = "bake_files_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod race_tests;
+
+#[cfg(test)]
+mod replace_tests;

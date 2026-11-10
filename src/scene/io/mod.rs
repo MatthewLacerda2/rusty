@@ -139,11 +139,3 @@ pub fn parse_scene_text(json: &str, path: &str) -> Result<SceneData, String> {
 #[cfg(test)]
 #[path = "save_tests.rs"]
 mod save_tests;
-
-#[cfg(test)]
-#[path = "bake_race_tests.rs"]
-mod bake_race_tests;
-
-#[cfg(test)]
-#[path = "bake_replace_tests.rs"]
-mod bake_replace_tests;

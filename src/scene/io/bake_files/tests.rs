@@ -126,3 +126,14 @@ fn a_file_removed_outside_is_written_back_when_a_bake_is_held() {
     let saved = files.store(&path, None, "T").unwrap();
     assert_eq!((saved.action, saved.warning), (Action::Kept, None));
 }
+
+#[test]
+fn a_bake_that_kept_nothing_replaces_a_newer_file_too() {
+    let path = file("none.occlusion", b"old");
+    let files = loaded(&path);
+    std::fs::write(&path, b"theirs").unwrap();
+    files.baked(".occlusion");
+    let saved = files.store(&path, None, "T").unwrap();
+    assert_eq!(saved.action, Action::Removed);
+    assert!(saved.warning.is_some_and(|w| w.contains("overwrote")));
+}
