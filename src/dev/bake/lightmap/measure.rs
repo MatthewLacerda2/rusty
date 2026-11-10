@@ -28,7 +28,7 @@ impl Measure {
         let clocks = Arc::new(MeshClocks::default());
         let (progress, oidn) = lend_denoiser(BakeProgress::observed(clocks.clone()), settings);
         let measure = Self {
-            settings: settings.clone(),
+            settings: *settings,
             gathered,
             clocks,
             oidn,
