@@ -14,7 +14,8 @@ It refuses, and starts nothing, when the issue is closed, is labelled
 `planning` or `human`, has no brief, or has a brief from someone who cannot push
 (`dispatch/brief.py`), and when [`running.LIMIT`] coders on other issues are
 already waiting to fire or running (#1856; a fired one is placed from its pull
-request and briefs on GitHub, #1866, `dispatch/running.py` says why): a re-brief of an issue is never counted against
+request and briefs on GitHub, #1866, `dispatch/running.py` says why; a ready pull
+request with no review record yet still holds its slot, named `in review`, #2017): a re-brief of an issue is never counted against
 itself, and `--over-limit` launches anyway.
 
 The operator asked on 2026-10-29 for a script that starts the coder for an
@@ -105,12 +106,12 @@ def check_limit(listed: list[dict], number: int, over: bool, reader: running.Git
             else f"{name}: {why}; not counted")
     if len(counted) < running.LIMIT:
         return
-    names = "; ".join(running.describe(found) for found in counted)
+    names = "; ".join(running.describe(found, why) for found, why in counted)
     if over:
         say(f"--over-limit: launching past {len(counted)} running coders ({names})")
         return
     raise brief.Refused(f"{len(counted)} cloud coders already waiting or running, the limit is {running.LIMIT} "
-                        f"(CLAUDE.md): {names}. Launch when one is ready, or pass --over-limit")
+                        f"(CLAUDE.md): {names}. Launch when one is ready and reviewed, or pass --over-limit")
 
 
 def trigger_id(answer: object) -> str | None:
