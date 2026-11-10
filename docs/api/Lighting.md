@@ -176,8 +176,8 @@ are atomic and synced to the disk: a crash or a power cut leaves the old file or
 one.
 
 The keep-newer rule protects only a file written after this scene's own load of that
-path. A save to a path the scene has no record for (File ▸ New or Reset Scene then a
-save over a baked scene, a *Save As* over another scene) replaces that path's bake
+path. A save to a path the scene has no record for (File ▸ New, `Scene.New()` or Reset
+Scene then a save over a baked scene, a *Save As* over another scene) replaces that path's bake
 files with what the scene holds, and removes the ones it does not hold, as Unity drops a
 replaced scene's lighting data.
 
