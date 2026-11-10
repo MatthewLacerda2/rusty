@@ -19,6 +19,7 @@
 //! (stochastic ops draw from [`super::hash`]), so the same recipe always yields the
 //! same buffer — the foundation of the byte-identical-bake guarantee.
 
+mod held;
 mod plan;
 pub mod preview;
 pub mod stats;
@@ -29,6 +30,7 @@ use super::ops::eval_linked;
 use super::ops::field::Links;
 use super::recipe::{Fault, NodeError, TextureRecipe};
 use super::source::Sources;
+use held::{Held, Resident};
 use plan::{plan, Plan, Scope};
 
 /// Why a recipe could not be evaluated.
@@ -86,7 +88,7 @@ pub fn evaluate_many(
 ) -> Result<Vec<Image>, RunError> {
     let plan = plan(recipe, targets, Scope::Needed)?;
     check_sources(recipe, sources)?;
-    Ok(run(recipe, sources, &plan, &mut |_, _| {}).images)
+    Ok(run(recipe, sources, &plan, &mut |_, _| {})?.images)
 }
 
 /// Evaluate every node of `recipe`, calling `on_node(index, image)` as each one
@@ -100,7 +102,7 @@ pub fn evaluate_each(
 ) -> Result<(), RunError> {
     let plan = plan(recipe, &[], Scope::Every)?;
     check_sources(recipe, sources)?;
-    run(recipe, sources, &plan, &mut on_node);
+    run(recipe, sources, &plan, &mut on_node)?;
     Ok(())
 }
 
@@ -117,7 +119,7 @@ fn check_sources(recipe: &TextureRecipe, sources: &Sources) -> Result<(), RunErr
     match recipe
         .image_paths()
         .into_iter()
-        .find(|&(_, path)| sources.get(path).is_none())
+        .find(|&(_, path)| !sources.has(path))
     {
         Some((node, path)) => Err(RunError::Node(NodeError {
             node: node.into(),
@@ -139,22 +141,31 @@ struct Run {
 }
 
 /// Evaluate `plan`'s nodes in order, handing each image to `on_node` as it is made
-/// and dropping it once its last consumer has run, unless it is a target.
+/// and dropping it once its last consumer has run, unless it is a target. A waiting
+/// image is held as one channel when it is grayscale, and a lazily loaded file only
+/// while an `image` node still to run reads it ([`held`], #2002); a file the loader
+/// can't read is the one error a run can still meet.
 fn run(
     recipe: &TextureRecipe,
     sources: &Sources,
     plan: &Plan,
     on_node: &mut dyn FnMut(usize, &Image),
-) -> Run {
-    let mut slots: Vec<Option<Image>> = recipe.nodes.iter().map(|_| None).collect();
+) -> Result<Run, RunError> {
+    let mut slots: Vec<Option<Held>> = recipe.nodes.iter().map(|_| None).collect();
+    let mut resident = Resident::new(recipe, &plan.order, sources);
     let mut uses = plan.uses.clone();
     let (mut live, mut peak_live) = (0, 0);
     for &i in &plan.order {
-        let edges: Vec<&Image> = plan.inputs[i]
-            .iter()
-            .map(|&j| slots[j].as_ref().expect("plan orders inputs first"))
-            .collect();
         let node = &recipe.nodes[i];
+        let files = resident
+            .for_node(recipe, i, sources)
+            .map_err(RunError::Node)?;
+        // A grayscale input is rebuilt for this node alone, and freed with its views.
+        let views: Vec<_> = plan.inputs[i]
+            .iter()
+            .map(|&j| slots[j].as_ref().expect("plan orders inputs first").view())
+            .collect();
+        let edges: Vec<&Image> = views.iter().map(|v| v.as_ref()).collect();
         let (inputs, linked) = edges.split_at(node.inputs.len());
         let ids = plan.inputs[i][node.inputs.len()..].iter();
         let links = Links::new(
@@ -163,9 +174,10 @@ fn run(
                 .collect(),
         );
         let seed = node_seed(recipe.seed, node.op.seed());
-        let out = eval_linked(&node.op, inputs, &links, recipe.extent(), seed, sources);
+        let out = eval_linked(&node.op, inputs, &links, recipe.extent(), seed, files);
+        resident.done(recipe, i);
         on_node(i, &out);
-        slots[i] = Some(out);
+        slots[i] = Some(Held::pack(out));
         live += 1;
         peak_live = peak_live.max(live);
         for &j in &plan.inputs[i] {
@@ -179,24 +191,26 @@ fn run(
             }
         }
     }
-    // A target named twice is cloned for all but its last request.
+    // A target named twice is rebuilt for all but its last request.
     let images = plan
         .targets
         .iter()
         .enumerate()
         .map(|(k, &i)| {
-            let image = if plan.targets[k + 1..].contains(&i) {
-                slots[i].clone()
+            let held = if plan.targets[k + 1..].contains(&i) {
+                slots[i].as_ref().map(|h| h.view().into_owned())
             } else {
-                slots[i].take()
+                slots[i].take().map(Held::into_image)
             };
-            image.expect("every target was evaluated")
+            held.expect("every target was evaluated")
         })
         .collect();
-    Run { images, peak_live }
+    Ok(Run { images, peak_live })
 }
 
 #[cfg(test)]
 mod each_tests;
+#[cfg(test)]
+mod held_tests;
 #[cfg(test)]
 mod tests;

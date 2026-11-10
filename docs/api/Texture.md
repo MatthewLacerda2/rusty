@@ -210,6 +210,9 @@ everywhere in a recipe — on the recipe itself, on a node, on a ramp stop: `{ o
 "noise", scael = 8 }` is refused with a message naming `scael` and the params `noise`
 takes, rather than baking with the default scale. The runner evaluates the DAG
 in dependency order in linear `[f32]` RGBA, then the bake encodes/packs per `slot`.
+It runs only the nodes the requested outputs need, frees each image after its last
+reader, and holds a grayscale image waiting for its readers as one channel, a
+quarter of its RGBA size; none of that changes a baked byte.
 A node `id` holds no `/` or `.`: those name a graph's inner nodes and outputs. A
 recipe may also declare `params` and `inputs`, which make it a graph another recipe
 instances as one node (*Graphs* below).
@@ -705,9 +708,14 @@ imported model, a provider-generated image, an earlier bake, a hand-made mask or
   source stays seamless through the graph.
 - Any format the importer reads: png, jpeg, tga.
 - A file that can't be read or decoded is an **error** naming the node and the path,
-  never a black canvas. Every verb reads the files when it runs (`Texture.Bake`,
+  never a black canvas: a missing one before anything runs, one that doesn't decode
+  when its node runs. Every verb reads the files when it runs (`Texture.Bake`,
   `BakeSet`, `Stats`, `Preview`, and a material's maps via `Material.DefineAsset` /
   `Material.Rebake`), so a rebake picks up an edited source.
+- A file is decoded **only when a node that reads it runs**, which an output the verb
+  asked for must need, and freed after the last such node: a decoded file is RGBA
+  f32, about 512 MiB at 8192 × 4096, so a graph with many large sources holds one
+  at a time, not all of them.
 
 ```lua no-run
 Texture.Bake({ resolution = 512, nodes = {

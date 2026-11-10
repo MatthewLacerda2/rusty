@@ -44,7 +44,7 @@ fn evaluate_each_holds_a_constant_number_of_images() {
     let recipe = chain(64);
     let plan = plan(&recipe, &[], Scope::Every).unwrap();
     let mut count = 0;
-    let run = run(&recipe, &Sources::new(), &plan, &mut |_, _| count += 1);
+    let run = run(&recipe, &Sources::new(), &plan, &mut |_, _| count += 1).unwrap();
     assert_eq!(count, 65);
     assert_eq!(
         run.peak_live, 2,
@@ -75,7 +75,7 @@ fn leaves_listed_first_still_run_beside_their_consumer() {
     let recipe = leaves_first();
     for (scope, targets) in [(Scope::Needed, &["m9"][..]), (Scope::Every, &[][..])] {
         let plan = plan(&recipe, targets, scope).unwrap();
-        let run = run(&recipe, &Sources::new(), &plan, &mut |_, _| {});
+        let run = run(&recipe, &Sources::new(), &plan, &mut |_, _| {}).unwrap();
         assert_eq!(
             run.peak_live, 3,
             "two inputs and their mix, not every leaf at once"

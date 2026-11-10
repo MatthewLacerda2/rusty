@@ -95,4 +95,4 @@ mod link_tests;
 #[cfg(test)]
 mod seed_tests;
 #[cfg(test)]
-mod test_graph;
+pub(crate) mod test_graph;
