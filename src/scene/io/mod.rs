@@ -55,7 +55,8 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
     }
     let json = scene_json(scene)?;
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
-    std::fs::write(path, &json).map_err(|e| format!("Failed to write scene file: {}", e))?;
+    crate::core::fs::write_atomic(std::path::Path::new(path), json.as_bytes())
+        .map_err(|e| format!("Failed to write scene file: {}", e))?;
     scene.disk_text.record(path, json);
     // Heavy baked SH lives beside the scene in `<scene>.lighting.json`, not inline in
     // the human-diffable scene doc (#240): written with the document on every save
