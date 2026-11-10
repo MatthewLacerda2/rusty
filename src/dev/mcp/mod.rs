@@ -31,12 +31,15 @@
 pub mod attach;
 pub mod bench;
 pub mod embed;
+pub mod progress;
 pub mod protocol;
 pub mod resources;
 pub mod tools;
 
+use std::cell::RefCell;
 use std::io::{BufRead, Write};
 use std::path::Path;
+use std::rc::Rc;
 
 use serde_json::{json, Value};
 
@@ -84,19 +87,25 @@ impl EvalBackend for Session {
 
 /// Run the MCP stdio server: read newline-delimited JSON-RPC messages from `input`,
 /// dispatch each against the live `session`, and write one response line per request
-/// to `output` (notifications produce nothing). Blank lines are skipped. The loop
-/// ends at EOF; an I/O error on the channel itself is fatal and propagates.
-pub fn run<R: BufRead, W: Write>(
+/// to `output` (notifications produce nothing). A request carrying a progress token
+/// also gets its bake's progress as notifications while it runs ([`progress`],
+/// #1999). Blank lines are skipped. The loop ends at EOF; an I/O error on the
+/// channel itself is fatal and propagates.
+pub fn run<R: BufRead, W: Write + 'static>(
     backend: &dyn EvalBackend,
     input: R,
-    mut output: W,
+    output: W,
 ) -> std::io::Result<()> {
+    let output = Rc::new(RefCell::new(output));
     for line in input.lines() {
         let line = line?;
         if line.trim().is_empty() {
             continue;
         }
-        if let Some(response) = handle_line(backend, &line) {
+        let token = progress::token(&line);
+        if let Some(response) = progress::reporting(token, &output, || handle_line(backend, &line))
+        {
+            let mut output = output.borrow_mut();
             writeln!(output, "{response}")?;
             output.flush()?;
         }
@@ -242,10 +251,13 @@ mod tests {
             "\n",
         )
         .as_bytes();
-        let mut out = Vec::new();
-        run(&s, input, &mut out).expect("runs to EOF");
-        let text = String::from_utf8(out).unwrap();
+        let out = progress::Captured::default();
+        run(&s, input, out.clone()).expect("runs to EOF");
+        let text = out.text();
         // Two requests -> two lines; the notification writes nothing.
         assert_eq!(text.lines().count(), 2);
     }
 }
+
+#[cfg(test)]
+mod progress_tests;

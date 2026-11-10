@@ -1,7 +1,7 @@
 //! src/dev/lua_surface/mod.rs — the dev-only part of the Lua surface (#737).
 //!
 //! `Debug.*`, the GPU bake verbs (`Lighting.Bake`, `Reflection.Bake`, `Probe.Bake`,
-//! `Lighting.Generate`) with their reports (`GetBakeReport`, #1980) and the provider verbs `Speech.Generate` (#386) and
+//! `Lighting.Generate`, `Lighting.GenerateAsync`) with their reports (`GetBakeReport`, #1980) and the provider verbs `Speech.Generate` (#386) and
 //! `Sfx.Generate` (#388), the play switch `Editor.*` (#1360) and the audio capture
 //! `Audio.StartCapture` (#1579) belong to the one API surface, but they render, spend or
 //! record, so
@@ -23,6 +23,7 @@ mod capture;
 mod debug;
 mod editor;
 mod generate;
+mod generate_async;
 mod sfx;
 mod speech;
 mod voices;
@@ -50,6 +51,7 @@ fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     debug::register(lua, ctx)?;
     editor::register(lua, ctx)?;
     generate::register(lua, ctx)?;
+    generate_async::register(lua, ctx)?;
     sfx::register(lua, ctx)?;
     speech::register(lua, ctx)?;
     voices::register(lua, ctx)

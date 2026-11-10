@@ -145,6 +145,9 @@ pub struct Application {
     play_request: Option<bool>,
     /// A standalone run (the player, the harness, #431): no edit mode to return to.
     standalone: bool,
+    /// Whether the host steps a background bake each frame (the editor window,
+    /// #1999): what `Lighting.GenerateAsync()` needs.
+    bake_host: bool,
     /// The editor's demo timeline mailbox (#1598).
     demo: demo::DemoDesk,
     /// The Scene view's gizmo mailbox (#1909).

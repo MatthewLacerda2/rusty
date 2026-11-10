@@ -29,21 +29,29 @@
 //! One Lua command per line in; one framed JSON response per command out, in lockstep
 //! and **byte-identical** to the headless session (`crate::dev::session::response_line`):
 //! `{"ok":true,"result":"…"}` / `{"ok":false,"error":"…"}`. Blank lines are skipped.
+//! While a command bakes, its bake's progress lines (`dev::bake::progress`) come
+//! first, one `{"progress":"…"}` line each (#1999): a line with no `ok` key is
+//! progress, and the reply is the line that has one.
 //! A malformed line comes back as `{"ok":false,…}` and tears down neither the
 //! connection nor the engine; EOF / read error ends only that connection's handler.
 
 pub mod client;
+mod progress;
 mod transport;
 
 use std::cell::RefCell;
 use std::sync::mpsc::{self, Receiver, Sender};
 
+use super::bake::progress::listen::listening;
 use super::{console, session};
 use crate::scripting::{ConsoleLogs, ScriptManager};
+pub(super) use progress::Reply;
+pub use progress::{parse_progress, progress_line};
 
 /// One queued command: the input line plus the reply channel its handler thread
-/// blocks on. The main loop evaluates the line and sends the framed JSON back.
-pub(super) type Command = (String, Sender<String>);
+/// blocks on. The main loop evaluates the line and sends the framed JSON back,
+/// after any progress lines a bake told while it ran.
+pub(super) type Command = (String, Sender<Reply>);
 
 /// The main-loop side of the windowed command channel. Holds the receiver the
 /// listener thread feeds; [`drain`](CommandChannel::drain) is polled once per frame
@@ -105,9 +113,14 @@ impl CommandChannel {
     pub fn drain(&self, scripts: &ScriptManager, console: &RefCell<ConsoleLogs>) -> usize {
         let mut ran = 0;
         while let Ok((line, reply_tx)) = self.rx.try_recv() {
-            let outcome = console::evaluate_line(scripts, console, &line);
+            // A bake's progress lines go to the client while the line runs (#1999).
+            let progress = reply_tx.clone();
+            let tell = move |text: &str| {
+                let _ = progress.send(Reply::Progress(text.to_string()));
+            };
+            let outcome = listening(tell, || console::evaluate_line(scripts, console, &line));
             let warnings = crate::logging::forward(console);
-            let _ = reply_tx.send(session::response_line(&outcome, &warnings));
+            let _ = reply_tx.send(Reply::Done(session::response_line(&outcome, &warnings)));
             ran += 1;
         }
         ran
@@ -131,6 +144,14 @@ mod tests {
         Session::new("").expect("session boots in edit mode")
     }
 
+    /// The framed reply a plain command sends: no progress line comes first.
+    fn done(reply: Reply) -> String {
+        match reply {
+            Reply::Done(line) => line,
+            Reply::Progress(line) => panic!("no bake ran, yet it told {line:?}"),
+        }
+    }
+
     /// Build a channel whose listener side is unused: we drive the receiver directly
     /// by feeding `(line, reply_tx)` pairs, exercising the core `drain` logic against
     /// a live world without a real socket. Returns the sender + the channel.
@@ -147,12 +168,12 @@ mod tests {
     /// Send one line through the channel, drain it against the live world, and return
     /// the single framed reply the handler would have written back.
     fn round_trip(s: &Session, tx: &Sender<Command>, ch: &CommandChannel, line: &str) -> String {
-        let (reply_tx, reply_rx) = mpsc::channel::<String>();
+        let (reply_tx, reply_rx) = mpsc::channel::<Reply>();
         tx.send((line.to_string(), reply_tx))
             .expect("queue command");
         let ran = ch.drain(s.world().script_manager(), s.world().console());
         assert_eq!(ran, 1, "drain counts the one line it ran");
-        reply_rx.recv().expect("drain replies once")
+        done(reply_rx.recv().expect("drain replies once"))
     }
 
     #[test]
@@ -211,15 +232,15 @@ mod tests {
     fn drain_replies_once_per_queued_command_in_order() {
         let s = session();
         let (tx, ch) = local_channel();
-        let (a_tx, a_rx) = mpsc::channel::<String>();
-        let (b_tx, b_rx) = mpsc::channel::<String>();
+        let (a_tx, a_rx) = mpsc::channel::<Reply>();
+        let (b_tx, b_rx) = mpsc::channel::<Reply>();
         tx.send(("1 + 1".to_string(), a_tx)).unwrap();
         tx.send(("2 + 2".to_string(), b_tx)).unwrap();
 
         // One drain call clears the whole queue — both replies are ready after it.
         ch.drain(s.world().script_manager(), s.world().console());
-        assert!(a_rx.recv().unwrap().contains("\"result\":\"2\""));
-        assert!(b_rx.recv().unwrap().contains("\"result\":\"4\""));
+        assert!(done(a_rx.recv().unwrap()).contains("\"result\":\"2\""));
+        assert!(done(b_rx.recv().unwrap()).contains("\"result\":\"4\""));
     }
 
     #[cfg(unix)]

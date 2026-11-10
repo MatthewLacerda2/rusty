@@ -32,6 +32,31 @@ fn multiple_calls_each_reconnect_and_succeed() {
     assert_eq!(out[1]["result"]["content"][0]["text"], "b");
 }
 
+/// The window's bake progress crosses the socket and reaches the client as MCP
+/// progress for a call that asked (#1999); one that didn't ask gets only its reply.
+#[test]
+fn a_windows_bake_progress_reaches_a_call_with_a_progress_token() {
+    let call = |meta: &str| {
+        format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"eval","arguments":{{"line":"Lighting.Generate()"}},"_meta":{meta}}}}}"#
+        )
+    };
+    let out = drive(fake_engine(), &[&call(r#"{"progressToken":"t"}"#)]);
+    assert_eq!(out[0]["method"], "notifications/progress", "{out:?}");
+    assert_eq!(out[0]["params"]["progressToken"], "t");
+    assert_eq!(out[0]["params"]["message"], "[Lighting] 0:05 lightmaps 40%");
+    assert_eq!(
+        out[1]["result"]["content"][0]["text"],
+        "Lighting.Generate()"
+    );
+    let quiet = drive(fake_engine(), &[&call("{}")]);
+    assert_eq!(quiet.len(), 1, "{quiet:?}");
+    assert_eq!(
+        quiet[0]["result"]["content"][0]["text"],
+        "Lighting.Generate()"
+    );
+}
+
 #[test]
 fn resources_read_works_without_any_engine() {
     // The scripting-API resource is embedded, so attach mode serves it even with no

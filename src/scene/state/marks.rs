@@ -144,6 +144,7 @@ pub const MARKS: &[Mark] = marks! {
 pub const DEV_MARKS: &[Mark] = marks! {
     "screen_exposure" => |s, _| s.screen_exposure = Some(7.5), s.screen_exposure == Some(7.5);
     "lighting_bake_running" => |s, _| s.lighting_bake_running = true, s.lighting_bake_running;
+    "lighting_bake_requested" => |s, _| s.lighting_bake_requested = true, s.lighting_bake_requested;
 };
 
 /// Every mark in this build.

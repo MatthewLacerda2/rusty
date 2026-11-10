@@ -141,6 +141,7 @@ authored_fields!(scene_state {
     dev {
         screen_exposure: Frame, No;
         lighting_bake_running: Frame, No;
+        lighting_bake_requested: Frame, No;
     }
 });
 

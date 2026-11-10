@@ -50,6 +50,9 @@ impl EditorFrontend {
     fn sync_gizmos(&mut self, game: &GameWorld) {
         let mut app = game.resources.application.borrow_mut();
         app.mark_gizmo_viewer();
+        // Its inspector steps Generate Lighting's job, so `Lighting.GenerateAsync()`
+        // is welcome here (#1999).
+        app.mark_bake_host();
         app.sync_gizmos(&mut self.editor_ui.gizmos);
     }
 }

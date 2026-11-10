@@ -271,9 +271,10 @@ pub fn unsaved_materials_warning(scene: &Scene, path: &str) -> Option<String> {
 pub const BAKE_RUNNING: &str =
     "the editor's Generate Lighting or Bake Occlusion is already running; wait for it to finish";
 
-/// A bake run in one call is refused while the editor's stepped one runs (#1602).
+/// A bake run in one call is refused while the editor's stepped one runs (#1602),
+/// or a script's `Lighting.GenerateAsync()` waits to start it (#1999).
 pub fn refuse_while_baking(scene: &Scene) -> Result<(), String> {
-    match scene.lighting_bake_running {
+    match scene.lighting_bake_running || scene.lighting_bake_requested {
         true => Err(BAKE_RUNNING.to_string()),
         false => Ok(()),
     }

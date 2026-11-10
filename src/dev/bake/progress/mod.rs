@@ -41,6 +41,7 @@ use std::time::{Duration, Instant};
 use crate::scripting::ConsoleLogs;
 
 mod format;
+pub mod listen;
 mod mesh_clock;
 #[cfg(test)]
 mod pages_tests;
@@ -117,14 +118,15 @@ impl<'a> BakeLog<'a> {
         }
     }
 
-    /// The log a script verb uses: the wall clock, every line to stderr and the
-    /// milestones to `console` too.
+    /// The log a script verb uses: the wall clock, every line to stderr and to this
+    /// thread's [`listen`]er (#1999), and the milestones to `console` too.
     pub fn to_console(console: &'a RefCell<ConsoleLogs>) -> Self {
         let start = Instant::now();
         Self::new(
             move || start.elapsed(),
             move |line: Line| {
                 eprintln!("{}", line.text);
+                listen::tell(&line.text); // an MCP call waiting on the verb (#1999)
                 if line.milestone {
                     console.borrow_mut().info(line.text);
                 }

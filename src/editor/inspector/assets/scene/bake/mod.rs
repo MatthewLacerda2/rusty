@@ -25,6 +25,10 @@
 //! settings under the button (#810's directional mode among them) are the scene's,
 //! as `Lighting.SetSettings{…}` edits them.
 //!
+//! A script's `Lighting.GenerateAsync()` (#1999, Unity's `Lightmapping.BakeAsync`)
+//! presses the button: it sets `Scene::lighting_bake_requested`, and [`poll`] starts
+//! the same job on the next frame.
+//!
 //! **Bake Occlusion** beside it (#1958, Unity's Occlusion window) runs only the
 //! last step, the PVS on its worker, and writes it beside the scene: the same
 //! `generate_lighting::apply_occlusion` as `Lighting.BakeOcclusion()`.
@@ -197,6 +201,20 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     }
 }
 
+/// A script's `Lighting.GenerateAsync()` (#1999): press the button for it, once.
+/// The verb refused what the button refuses when it was called; what changed
+/// since (Play started, the button pressed) refuses it here, in the console.
+fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
+    if !std::mem::take(&mut scene.lighting_bake_requested) {
+        return;
+    }
+    match (editor.dev.lightmap_bake.is_some(), scene.is_playing()) {
+        (false, false) => start(editor, scene, console),
+        (true, _) => console.error("Lighting.GenerateAsync: a bake was already running".into()),
+        (_, true) => console.error(crate::scene::LIGHTING_IN_PLAY.into()),
+    }
+}
+
 /// What the Scene view's camera sees, for the bake's Prioritize View (#1970). The
 /// lens at a 16:9 aspect: a little wider or narrower than the panel only moves
 /// which texels go first.
@@ -240,6 +258,8 @@ fn warn_unsaved(scene: &Scene, path: &str, console: &mut ConsoleLogs) {
     }
 }
 
+#[cfg(test)]
+mod async_tests;
 #[cfg(test)]
 mod drop_tests;
 #[cfg(test)]

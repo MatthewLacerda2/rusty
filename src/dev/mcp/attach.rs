@@ -61,7 +61,9 @@ impl EvalBackend for SocketClient {
         // restart is picked up transparently on the next call.
         let mut client =
             Client::connect(self.explicit.as_deref()).map_err(|e| self.no_engine(&e))?;
-        let framed = client.request(line).map_err(|e| self.no_engine(&e))?;
+        // The window's bake progress, passed on to whoever listens here (#1999).
+        let mut tell = |text: &str| crate::dev::bake::progress::listen::tell(text);
+        let framed = (client.request(line, &mut tell)).map_err(|e| self.no_engine(&e))?;
         let (outcome, warnings) = parse_framed(&framed);
         *self.warnings.borrow_mut() = warnings;
         outcome
