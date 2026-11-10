@@ -99,6 +99,7 @@ mod tests {
                 op: OpKind::Noise(Noise {
                     kind: recipe::NoiseKind::Fbm,
                     scale: 8.0,
+                    aspect: [1.0, 1.0],
                     octaves: 4,
                     lacunarity: 2.0,
                     gain: 0.5.into(),

@@ -498,8 +498,9 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   min — the way to combine height fields (rivets over a panel, stones over mortar),
   where `add` overshoots; `divide` is `a / b`, and a channel of `b` at (near) 0 leaves
   `a`.
-- `noise {kind="perlin"|"fbm"|"ridged"|"turbulence", scale, octaves=1, lacunarity=2,
-  gain=0.5, distortion=0, seed=0}` (*generator*): `ridged` is `1 − |n|` squared — rock
+- `noise {kind="perlin"|"fbm"|"ridged"|"turbulence", scale, aspect={1,1}, octaves=1,
+  lacunarity=2, gain=0.5, distortion=0, seed=0}` (*generator*): `aspect` multiplies
+  `scale` across and down, each rounded on its own (*Non-square bakes*); `ridged` is `1 − |n|` squared — rock
   veins, scratches; `turbulence` is `|n|` — smoke, grime; the fBM family stacks
   `octaves`, each `lacunarity`× the frequency and `gain`× the amplitude of the last;
   `perlin` is one octave. `distortion` is Blender's Noise Texture *Distortion*: a
@@ -587,7 +588,7 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   thin; output alpha is left as `max` leaves it. A NaN `probability` or
   `value_jitter` is ignored, an out-of-range one clamped. Rivets are `shape circle`
   → `tile`.
-- `voronoi {scale, output="distance"|"cells"|"f2"|"edges"|"smooth_f1",
+- `voronoi {scale, aspect={1,1}, output="distance"|"cells"|"f2"|"edges"|"smooth_f1",
   metric="euclidean"|"manhattan"|"chebyshev", randomness=1, smoothness=1, seed=0}` (*generator*):
   `f2` is the distance to the second-nearest point, `edges` is F2 − F1 — ~0 on cell
   borders: cracks, dried mud, cobble outlines; `metric` is how distance is measured:
@@ -714,8 +715,8 @@ imported model, a provider-generated image, an earlier bake, a hand-made mask or
   `Material.Rebake`), so a rebake picks up an edited source.
 - A file is decoded **only when a node that reads it runs**, which an output the verb
   asked for must need, and freed after the last such node: a decoded file is RGBA
-  f32, about 512 MiB at 8192 × 4096, so a graph with many large sources holds one
-  at a time, not all of them.
+  f32, about 512 MiB at 8192 × 4096, so a graph with many large sources holds each
+  only from its first reader to its last, not all of them for the whole bake.
 
 ```lua no-run
 Texture.Bake({ resolution = 512, nodes = {
@@ -819,7 +820,7 @@ field stays a number, so `4.5` is accepted — it bakes as `5`), and capped at 2
 
 | Op | Param | Rounds to |
 |---|---|---|
-| noise, voronoi | `scale` | nearest whole number ≥ 1 |
+| noise, voronoi | `scale × aspect`, per axis | nearest whole number ≥ 1, across and down on their own |
 | noise (fBM family) | each octave's `scale × lacunarity^octave` | nearest whole number ≥ 1 (so a fractional `lacunarity` still tiles) |
 | wave | `frequency` | nearest whole number ≥ 1 |
 | anisotropic_noise | `scale`, and `scale ÷ anisotropy` along the fibres | nearest whole number ≥ 1, at most 4096, per lattice direction (at least 2 along on an axis) |
@@ -893,7 +894,11 @@ pattern **stretches**. Every param keeps its meaning (a `blur.radius` of 0.01 is
 of each side, a `distance.radius` is in tiles of each axis), and every periodic
 count stays a whole number per tile, so the map still tiles on both axes. To get
 square features back, scale the counts by the aspect: on a 4:1 strip, `cols = 4 ×
-rows` gives square bricks, and `scale = {4, 1}` on a `mapping` squares up its input.
+rows` gives square bricks, `aspect = {4, 1}` on a `noise` or `voronoi` gives
+square cells (`scale` of them down, four times that across), and `scale = {4, 1}` on
+a `mapping` squares up its input. `aspect` grows the pattern itself, so a 1 × 2 m
+tile at `{1, 2}` has twice the cells down with no repeat, where tiling a square map
+twice would repeat it.
 
 ```lua no-run
 Texture.Bake({ size = {2048, 512}, seed = 1, nodes = {

@@ -69,6 +69,12 @@ pub fn count(x: f32) -> f32 {
     }
 }
 
+/// A generator's `scale` across and down: times its `aspect` per axis (#2002).
+#[inline]
+fn per_axis(scale: f32, aspect: [f32; 2]) -> [f32; 2] {
+    aspect.map(|a| scale * a)
+}
+
 /// A flat color fill.
 pub fn constant(p: &Constant) -> Sampler<'static> {
     let color = p.color;
@@ -79,13 +85,20 @@ pub fn constant(p: &Constant) -> Sampler<'static> {
 /// op's `gain`, read at each pixel.
 pub fn noise<'a>(p: &Noise, gain: Field<'a>, seed: u64) -> Sampler<'a> {
     let octaves = (p.octaves, p.lacunarity, gain);
-    noise::sampler(p.kind, p.scale, octaves, p.distortion, seed)
+    noise::sampler(
+        p.kind,
+        per_axis(p.scale, p.aspect),
+        octaves,
+        p.distortion,
+        seed,
+    )
 }
 
 /// The Voronoi / Worley cellular pattern. `randomness` is the op's, read per cell.
 pub fn voronoi<'a>(p: &Voronoi, randomness: Field<'a>, seed: u64) -> Sampler<'a> {
     let modes = (p.output, p.metric);
-    voronoi::sampler(p.scale, modes, randomness, p.smoothness, seed)
+    let scale = per_axis(p.scale, p.aspect);
+    voronoi::sampler(scale, modes, randomness, p.smoothness, seed)
 }
 
 /// The running-bond brick pattern.
@@ -149,5 +162,7 @@ pub fn wave(p: &Wave, seed: u64) -> Sampler<'static> {
     wave::sampler(p.kind, p.frequency, shape, seed)
 }
 
+#[cfg(test)]
+mod axis_tests;
 #[cfg(test)]
 mod tests;

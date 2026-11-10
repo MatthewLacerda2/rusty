@@ -55,6 +55,7 @@ fn lattice_ops() -> Vec<OpKind> {
             ops.push(OpKind::Noise(Noise {
                 kind,
                 scale: s,
+                aspect: [1.0, 1.0],
                 octaves: 3,
                 lacunarity: s,
                 gain: 0.6.into(),
@@ -72,6 +73,7 @@ fn lattice_ops() -> Vec<OpKind> {
             for metric in [Euclidean, Manhattan, Chebyshev] {
                 ops.push(OpKind::Voronoi(Voronoi {
                     scale: s,
+                    aspect: [1.0, 1.0],
                     output,
                     metric,
                     randomness: (s / 8.0).into(),
@@ -186,7 +188,7 @@ fn linear_tiling_gradient_is_a_triangle() {
 }
 
 fn grid_voronoi(output: VoronoiOutput) -> Sampler<'static> {
-    voronoi::sampler(4.0, (output, Euclidean), Field::Const(0.0), 1.0, 5)
+    voronoi::sampler([4.0; 2], (output, Euclidean), Field::Const(0.0), 1.0, 5)
 }
 
 #[test]
@@ -214,6 +216,7 @@ fn ridged_and_turbulence_span_the_unit_range() {
         let op = OpKind::Noise(Noise {
             kind,
             scale: 4.0,
+            aspect: [1.0, 1.0],
             octaves: 4,
             lacunarity: 2.0,
             gain: 0.5.into(),

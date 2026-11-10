@@ -14,6 +14,7 @@ fn noise(id: &str, kind: NoiseKind, scale: f32) -> Node {
     let op = OpKind::Noise(Noise {
         kind,
         scale,
+        aspect: [1.0, 1.0],
         octaves: 3,
         lacunarity: 2.0,
         gain: 0.5.into(),
@@ -57,6 +58,7 @@ fn organic_ops_bake_byte_identically_per_seed() {
     let voronoi = |output| {
         let op = OpKind::Voronoi(Voronoi {
             scale: 6.0,
+            aspect: [1.0, 1.0],
             output,
             metric: VoronoiMetric::Euclidean,
             randomness: 0.7.into(),
