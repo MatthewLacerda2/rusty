@@ -66,6 +66,7 @@ pub(super) fn settings() -> BakeSettings {
         filter_radius: 0,
         directional: true,
         backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
+        ..Default::default()
     }
 }
 

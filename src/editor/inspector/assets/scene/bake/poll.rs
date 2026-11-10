@@ -64,6 +64,10 @@ fn drive(
             false => dropped(&active.step, "the scene was saved elsewhere"),
         };
         log.warn(line);
+        if let (Step::Lightmaps(job), true) = (&mut active.step, active.scene == scene.id()) {
+            // Still the scene in front of the user: put its lightmaps back (#1970).
+            scene.unrecorded(|scene| job.restore(scene));
+        }
         editor.dev.lightmap_bake = None;
         return;
     }
@@ -93,6 +97,8 @@ fn advance(
         Step::OcclusionOnly { .. } => return advance_occlusion_only(step, scene, log),
     };
     if !job.is_finished() {
+        // A progressive bake's newest pass on the live scene (#1970): no edit.
+        scene.unrecorded(|scene| job.show_preview(scene));
         return None;
     }
     // A bake is no edit (#1631): what it writes never joins an Undo step.

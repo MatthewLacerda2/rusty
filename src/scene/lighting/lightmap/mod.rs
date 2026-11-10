@@ -19,7 +19,9 @@
 //! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
 //!   `progress` ([`BakeProgress`], #808); its `pool` is the one work pool every
 //!   mesh's texels share, in fixed-size batches (#1656), and the mesh-map baker
-//!   runs its texels on too (`run_pool`, #1849);
+//!   runs its texels on too (`run_pool`, #1849); its `progressive` bake
+//!   ([`bake_progressive`], #1970) runs the trace in passes over every texel, each
+//!   pass shown, the camera's texels first (`view`, [`BakeView`]), to the same bytes;
 //! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
 //!   a cell its BC blocks and first [`MIP_LEVELS`] mips never leave (#1694);
 //! * `encode` — RGBM, how a page's fallback is stored as an 8-bit PNG, the RGBA8 direction
@@ -55,7 +57,10 @@ pub use atlas::{
     MAX_PAGES, MIN_PAGE, MIP_LEVELS, PAD,
 };
 pub(in crate::scene::lighting) use bake::pool::run as run_pool;
-pub use bake::{bake, bake_with_progress, BakeSettings, Denoiser, Lightmap, LightmapDenoiser};
+pub use bake::{
+    bake, bake_progressive, bake_with_progress, BakeSettings, BakeView, Denoiser, Lightmap,
+    LightmapDenoiser, Pass, PassSink,
+};
 pub use encode::{
     decode_direction, decode_mask, decode_rgbm, encode_directions, encode_masks, encode_texels,
 };
@@ -103,11 +108,17 @@ mod pages_bc_tests;
 #[cfg(test)]
 mod pages_tests;
 #[cfg(test)]
+mod pass_tests;
+#[cfg(test)]
 mod pool_tests;
+#[cfg(test)]
+mod prioritize_tests;
 #[cfg(test)]
 mod probe_direct_tests;
 #[cfg(test)]
 mod progress_tests;
+#[cfg(test)]
+mod progressive_tests;
 #[cfg(test)]
 mod rays_tests;
 #[cfg(test)]
@@ -128,3 +139,5 @@ mod sliver_tests;
 mod tests;
 #[cfg(test)]
 mod validity_tests;
+#[cfg(test)]
+mod view_tests;

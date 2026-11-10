@@ -58,6 +58,7 @@ mod summary_tests;
 #[cfg(test)]
 mod tests;
 
+pub(in crate::dev::bake) use format::{duration, eta};
 pub use mesh_clock::{MeshClocks, MeshTime};
 pub use step::{stage_progress, Step};
 pub use summary::MeshCost;
