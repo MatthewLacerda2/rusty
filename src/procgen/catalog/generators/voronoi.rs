@@ -17,6 +17,10 @@ use crate::procgen::recipe::{
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Voronoi {
     pub scale: f32,
+    /// `scale`'s multiplier across and down (#2002): `{1, 2}` packs twice the cells
+    /// down as across, for a map twice as tall as it is wide.
+    #[serde(default = "square")]
+    pub aspect: [f32; 2],
     #[serde(default)]
     pub output: VoronoiOutput,
     #[serde(default)]
@@ -25,6 +29,10 @@ pub struct Voronoi {
     pub randomness: Param,
     #[serde(default = "one_f32")]
     pub smoothness: f32,
+    /// `cells` as one gray value per cell, not a random colour (#2002): what a
+    /// mask or a height reads. The other outputs are gray already.
+    #[serde(default)]
+    pub grayscale: bool,
     #[serde(default)]
     pub seed: u32,
 }
@@ -36,6 +44,7 @@ impl Row for Voronoi {
         SOURCE,
         &[
             req("scale", "number"),
+            opt("aspect", "vec2", Lit::Vec2([1.0, 1.0])),
             OpParam {
                 default: Some(Lit::Text("distance")),
                 ..choice("output", &["distance", "cells", "f2", "edges", "smooth_f1"])
@@ -46,6 +55,7 @@ impl Row for Voronoi {
             },
             socket(opt("randomness", "number", Lit::Number(1.0))),
             opt("smoothness", "number", Lit::Number(1.0)),
+            opt("grayscale", "bool", Lit::Bool(false)),
             SEED,
         ],
     );
@@ -75,4 +85,8 @@ fn one() -> Param {
 
 fn one_f32() -> f32 {
     1.0
+}
+
+fn square() -> [f32; 2] {
+    [1.0, 1.0]
 }

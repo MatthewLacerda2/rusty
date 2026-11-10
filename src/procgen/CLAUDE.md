@@ -84,11 +84,13 @@ and fails past 12; an allow for a folder under the cap is itself refused
 - `filter/relief/`: `ambient_occlusion` (#1743, landed), beside `cavity` and
   `curvature`. A filter's tests share `filter/test_probe.rs` (run one op on one
   image, roll it to show the op wraps).
-- `generators/` (11): `anisotropic_noise` (#1740, landed); the rest of #1740 was
-  params on existing generators. A generator's op enum that is new (`WaveProfile`,
+- `generators/` (12, full): `anisotropic_noise` (#1740, landed), `coordinates`
+  (#2002, landed); the rest of #1740 was params on existing generators. The next
+  generator clusters the folder first. A generator's op enum that is new (`WaveProfile`,
   `ShapeProfile`) lives in its op file, as the rule above says.
-- `vector/` (8): `directional_warp` (#1739, landed), beside `warp`; #1742 is params and
-  inputs on `tile`.
+- `vector/` (9): `directional_warp` (#1739, landed), beside `warp`; `sample_at`
+  (#2002, landed), its mip chain in `ops/sample.rs`; #1742 is params and inputs on
+  `tile`.
 
 A two-input op with an optional mask and an output mode is `dummy`'s shape:
 `arity(2, 3)`, `cx.input(0)` and `cx.input(1)` read directly, `cx.optional(2)` for

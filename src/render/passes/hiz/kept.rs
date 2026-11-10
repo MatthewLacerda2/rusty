@@ -5,7 +5,9 @@ use glam::Vec3;
 
 /// A value built from some resources, kept until one of them is replaced: the
 /// key is the resources themselves (wgpu compares them by identity), so a grown
-/// buffer or a resized texture rebuilds it and nothing else does.
+/// buffer or a resized texture rebuilds it and nothing else does. So every
+/// resource the value holds must be in the key: one left out is drawn from
+/// after it was replaced (#2021, a cached indirect draw over outgrown args).
 pub(crate) struct Kept<K, V> {
     held: Option<(K, V)>,
 }

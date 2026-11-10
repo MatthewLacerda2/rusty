@@ -15,6 +15,7 @@ fn fbm(scale: f32, distortion: f32) -> Noise {
     Noise {
         kind,
         scale,
+        aspect: [1.0, 1.0],
         octaves,
         lacunarity,
         gain,
@@ -41,10 +42,12 @@ fn a_huge_or_malformed_count_is_capped_not_a_panic() {
         };
         let vor = Voronoi {
             scale: x,
+            aspect: [1.0, 1.0],
             output: VoronoiOutput::Distance,
             metric: VoronoiMetric::Euclidean,
             randomness: 1.0.into(),
             smoothness: 1.0,
+            grayscale: false,
             seed: 0,
         };
         let samplers = [

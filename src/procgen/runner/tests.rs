@@ -108,7 +108,7 @@ fn a_long_chain_holds_a_constant_number_of_images() {
     let peak = |len| {
         let target = format!("n{len}");
         let plan = plan(&chain(len), &[&target], Scope::Needed).unwrap();
-        run(&chain(len), &Sources::new(), &plan, &mut |_, _| {})
+        run(&chain(len), &Sources::new(), &plan, &mut |_, _| {}).unwrap()
     };
     let (short, long) = (peak(4), peak(64));
     assert_eq!(short.peak_live, 2, "an input and its consumer");

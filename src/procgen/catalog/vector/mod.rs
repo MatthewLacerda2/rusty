@@ -8,6 +8,7 @@ pub mod combine_rgb;
 pub mod directional_warp;
 pub mod mapping;
 pub mod normal_blend;
+pub mod sample_at;
 pub mod separate_rgb;
 pub mod tile;
 pub mod warp;

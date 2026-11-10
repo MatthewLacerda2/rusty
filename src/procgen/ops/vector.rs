@@ -131,12 +131,13 @@ fn rnm(base: Vec3, detail: Vec3) -> Vec3 {
     r.try_normalize().unwrap_or(Vec3::Z)
 }
 
-/// Combine up to three single-channel inputs into one RGB image (alpha 1). Each input
-/// contributes its red channel to one output channel; missing inputs contribute 0.
+/// Combine up to four single-channel inputs into one RGBA image. Each input
+/// contributes its red channel to one output channel, R, G, B then alpha (#2002); a
+/// missing colour input contributes 0, a missing alpha 1.
 pub fn combine_rgb(inputs: &[&Image], size: Size) -> Image {
     let mut out = Image::filled(size, [0.0, 0.0, 0.0, 1.0]);
     out.for_each_row(|y, row| {
-        for (c, src) in inputs.iter().take(3).enumerate() {
+        for (c, src) in inputs.iter().take(4).enumerate() {
             for (p, s) in row.iter_mut().zip(src.row(y)) {
                 p[c] = s[0];
             }
@@ -176,6 +177,16 @@ mod tests {
         for (p, q) in a.pixels().iter().zip(b.pixels()) {
             assert!((0..4).all(|c| (p[c] - q[c]).abs() < 1e-5), "{p:?} vs {q:?}");
         }
+    }
+
+    #[test]
+    fn a_fourth_input_is_alpha_and_alpha_is_1_without_it() {
+        let gray = |v| Image::filled(2, [v, 0.9, 0.9, 0.3]);
+        let (r, g, b, a) = (gray(0.1), gray(0.2), gray(0.3), gray(0.4));
+        let out = combine_rgb(&[&r, &g, &b, &a], 2.into());
+        assert_eq!(out.pixels()[3], [0.1, 0.2, 0.3, 0.4]);
+        let out = combine_rgb(&[&r, &g], 2.into());
+        assert_eq!(out.pixels()[0], [0.1, 0.2, 0.0, 1.0]);
     }
 
     #[test]

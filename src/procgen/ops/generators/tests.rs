@@ -42,26 +42,35 @@ fn close(a: Rgba, b: Rgba) -> bool {
     (0..4).all(|c| (a[c] - b[c]).abs() < 2e-3)
 }
 
-/// Every generator whose pattern is a whole-tile lattice, over fractional params.
-fn lattice_ops() -> Vec<OpKind> {
-    let mut ops = vec![OpKind::WhiteNoise(WhiteNoise::default())];
-    for s in [0.4, 1.0, 2.5, 4.5, 5.5, 7.3] {
-        for kind in [
-            NoiseKind::Perlin,
-            NoiseKind::Fbm,
-            NoiseKind::Ridged,
-            NoiseKind::Turbulence,
-        ] {
-            ops.push(OpKind::Noise(Noise {
+/// The noise family at `s`, its lacunarity and aspect fractional too.
+fn noise_ops(s: f32) -> Vec<OpKind> {
+    let kinds = [
+        NoiseKind::Perlin,
+        NoiseKind::Fbm,
+        NoiseKind::Ridged,
+        NoiseKind::Turbulence,
+    ];
+    kinds
+        .map(|kind| {
+            OpKind::Noise(Noise {
                 kind,
                 scale: s,
+                aspect: [1.0, 1.5],
                 octaves: 3,
                 lacunarity: s,
                 gain: 0.6.into(),
                 distortion: 0.0,
                 seed: 0,
-            }));
-        }
+            })
+        })
+        .to_vec()
+}
+
+/// Every generator whose pattern is a whole-tile lattice, over fractional params.
+fn lattice_ops() -> Vec<OpKind> {
+    let mut ops = vec![OpKind::WhiteNoise(WhiteNoise::default())];
+    for s in [0.4, 1.0, 2.5, 4.5, 5.5, 7.3] {
+        ops.extend(noise_ops(s));
         for output in [
             VoronoiOutput::Distance,
             VoronoiOutput::Cells,
@@ -72,10 +81,12 @@ fn lattice_ops() -> Vec<OpKind> {
             for metric in [Euclidean, Manhattan, Chebyshev] {
                 ops.push(OpKind::Voronoi(Voronoi {
                     scale: s,
+                    aspect: [1.0, 2.0],
                     output,
                     metric,
                     randomness: (s / 8.0).into(),
                     smoothness: 1.0,
+                    grayscale: false,
                     seed: 0,
                 }));
             }
@@ -186,7 +197,7 @@ fn linear_tiling_gradient_is_a_triangle() {
 }
 
 fn grid_voronoi(output: VoronoiOutput) -> Sampler<'static> {
-    voronoi::sampler(4.0, (output, Euclidean), Field::Const(0.0), 1.0, 5)
+    voronoi::sampler([4.0; 2], (output, Euclidean), Field::Const(0.0), 1.0, 5)
 }
 
 #[test]
@@ -214,6 +225,7 @@ fn ridged_and_turbulence_span_the_unit_range() {
         let op = OpKind::Noise(Noise {
             kind,
             scale: 4.0,
+            aspect: [1.0, 1.0],
             octaves: 4,
             lacunarity: 2.0,
             gain: 0.5.into(),
