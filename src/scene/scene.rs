@@ -143,8 +143,8 @@ pub struct Scene {
     #[cfg(feature = "dev")]
     pub lighting_bake_running: bool,
     /// A script's `Lighting.GenerateAsync()` (#1999) waiting for the editor's next
-    /// frame to start the Generate Lighting button's job. Dropped by Play, Stop and
-    /// any load (`Scene::drop_bake_request`). Never serialized.
+    /// frame to start the Generate Lighting button's job. Dropped by Play (from its
+    /// request), Stop, File ▸ New and any load (`Scene::drop_bake_request`).
     #[cfg(feature = "dev")]
     pub lighting_bake_requested: bool,
     /// What became of the editor's last background bake (`Lighting.GetBakeStatus`).

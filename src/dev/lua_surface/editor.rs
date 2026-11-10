@@ -35,7 +35,18 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     put(
         &table,
         "EnterPlay",
-        lua.create_function(move |lua, ()| Ok(request(&*app.get(lua)?, &*console.get(lua)?, true))),
+        lua.create_function(move |lua, ()| {
+            let asked = request(&*app.get(lua)?, &*console.get(lua)?, true);
+            // A pending `Lighting.GenerateAsync()` was made of edit mode (#1999): the
+            // window's draw after this line would otherwise start it into Play.
+            if asked {
+                scene
+                    .get(lua)?
+                    .borrow_mut()
+                    .drop_bake_request("Play was requested");
+            }
+            Ok(asked)
+        }),
     )?;
     put(
         &table,

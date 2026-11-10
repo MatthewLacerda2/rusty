@@ -90,3 +90,33 @@ fn a_load_drops_a_request_and_the_status_says_why() {
     let why = s.eval("return Lighting.GetBakeStatus().message").unwrap();
     assert!(why.contains("another scene was loaded"), "{why}");
 }
+
+/// Play asked for but not yet taken refuses, as Play does (#1999's review): the
+/// script's own `EnterPlay` earlier in the line, and the host's pending Play.
+#[test]
+fn play_requested_but_not_taken_is_refused() {
+    let s = hosted("play_heading", true);
+    let err = s
+        .eval("Editor.EnterPlay(); Lighting.GenerateAsync()")
+        .unwrap_err();
+    assert!(err.contains(crate::scene::LIGHTING_IN_PLAY), "{err}");
+    let host = hosted("host_play", true);
+    let app = &host.world().resources.application;
+    app.borrow_mut().set_host_play(true);
+    let err = host.eval("Lighting.GenerateAsync()").unwrap_err();
+    assert!(err.contains(crate::scene::LIGHTING_IN_PLAY), "{err}");
+}
+
+/// `Scene.New()` (File ▸ New's path) drops a request and says why, as a load does.
+#[test]
+fn a_new_scene_drops_a_request_and_the_status_says_why() {
+    let s = hosted("new_drops", true);
+    s.eval("Lighting.GenerateAsync(); Scene.New()").unwrap();
+    assert_eq!(s.eval("Lighting.IsRunning()").unwrap(), "false");
+    let line = "local st = Lighting.GetBakeStatus(); return st.state .. ' ' .. st.message";
+    let st = s.eval(line).unwrap();
+    assert!(
+        st.starts_with("refused") && st.contains("a new scene"),
+        "{st}"
+    );
+}

@@ -212,12 +212,13 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
 /// status (`Lighting.GetBakeStatus`, #1999).
 fn not_started(scene: &mut Scene, console: &mut ConsoleLogs, line: String) {
     console.error(line.clone());
-    scene.lighting_bake_status = BakeStatus::Failed(line);
+    scene.lighting_bake_status = BakeStatus::Refused(line);
 }
 
 /// A script's `Lighting.GenerateAsync()` (#1999): press the button for it, once.
-/// The verb refused what the button refuses when it was called, and Play, Stop
-/// and a load drop the request (`Scene::drop_bake_request`); a button pressed
+/// The verb refused what the button refuses when it was called, and asking for
+/// Play, Stop, File ▸ New and a load drop the request (`Scene::drop_bake_request`,
+/// `shell::editor::sync` before the draw); a button pressed
 /// since refuses it here.
 fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     if !std::mem::take(&mut scene.lighting_bake_requested) {

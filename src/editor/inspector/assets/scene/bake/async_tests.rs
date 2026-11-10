@@ -92,7 +92,7 @@ fn play_and_stop_drop_a_request_and_the_status_says_so() {
     assert!(editor.dev.lightmap_bake.is_none(), "Stop baked it unasked");
     let st = status(&s);
     assert!(
-        st.starts_with("refused") && st.contains("Play started"),
+        st.starts_with("refused") && st.contains("Play was requested"),
         "{st}"
     );
 }
@@ -112,4 +112,26 @@ fn gpu_a_failed_bake_reads_failed_with_its_reason() {
     run_out(&mut editor, &scene, &mut console);
     let st = status(&s);
     assert!(st.starts_with("failed Generate Lighting failed"), "{st}");
+}
+
+/// `GenerateAsync(); EnterPlay()` in one line, in the window's order: the line is
+/// drained (Play only requested), then the editor draws, which is where a request
+/// is taken. Nothing starts, and the status says Play was asked for (#1999's
+/// second review: the draw took it into Play).
+#[test]
+fn play_requested_in_the_same_line_drops_the_request() {
+    let (s, mut editor) = open_editor_in("generate_async_same_line");
+    s.eval("Lighting.GenerateAsync(); Editor.EnterPlay()")
+        .unwrap();
+    let app = &s.world().resources.application;
+    assert!(app.borrow().play_heading(), "requested, not yet taken");
+    let mut console = ConsoleLogs::new();
+    let scene = s.world().scene().clone();
+    frame(&mut editor, &mut scene.borrow_mut(), &mut console);
+    assert!(editor.dev.lightmap_bake.is_none(), "taken into Play");
+    let st = status(&s);
+    assert!(
+        st.starts_with("refused") && st.contains("Play was requested"),
+        "{st}"
+    );
 }

@@ -56,3 +56,40 @@ impl EditorFrontend {
         app.sync_gizmos(&mut self.editor_ui.gizmos);
     }
 }
+
+/// The frame that would start a script's `Lighting.GenerateAsync()` refuses it
+/// while Play is asked for but not yet taken (#1999, Unity's
+/// `isPlayingOrWillChangePlaymode`): the request was made of edit mode. Runs before
+/// the editor draws, where the inspector takes requests.
+pub(super) fn refuse_bake_request_on_play(game: &GameWorld) {
+    #[cfg(feature = "dev")]
+    if game.resources.application.borrow().play_heading() {
+        game.world
+            .scene
+            .borrow_mut()
+            .drop_bake_request("Play was requested");
+    }
+    #[cfg(not(feature = "dev"))]
+    let _ = game;
+}
+
+#[cfg(all(test, feature = "dev"))]
+mod tests {
+    /// The host's own pending Play (the transport) refuses a request at the draw.
+    #[test]
+    fn a_pending_host_play_refuses_a_request_before_the_draw() {
+        let s = crate::dev::session::Session::new("").expect("an empty session boots");
+        let game = s.world();
+        game.world.scene.borrow_mut().lighting_bake_requested = true;
+        super::refuse_bake_request_on_play(game);
+        assert!(
+            game.world.scene.borrow().lighting_bake_requested,
+            "no Play asked"
+        );
+        game.resources.application.borrow_mut().set_host_play(true);
+        super::refuse_bake_request_on_play(game);
+        let scene = game.world.scene.borrow();
+        assert!(!scene.lighting_bake_requested);
+        assert_eq!(scene.lighting_bake_status.state(), "refused");
+    }
+}

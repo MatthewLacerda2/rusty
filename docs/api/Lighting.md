@@ -17,13 +17,15 @@ level bakes for longer). Poll **`Lighting.IsRunning()`** (Unity's
 `Lightmapping.isRunning`) until it reads `false`, then **`Lighting.GetBakeStatus()`**
 says how it ended (`done` with its summary, `failed` or `cancelled` with why, or
 `refused` when it never started), and `Lighting.GetBakeReport(kind)` reads what it
-wrote. It is refused, with an error, where the button is greyed out: during Play,
+wrote. It is refused, with an error, where the button is greyed out: during Play
+(and once Play is asked for, `Editor.EnterPlay()` earlier in the line included),
 while a bake runs (the button's, or a `GenerateAsync` not yet started), and on a
 scene never saved. Only the editor window steps the job, so a host without one (the
 headless `session` and `session-mcp` without `--attach`, the player, `play`) refuses
 it with an error naming `Lighting.Generate()`, which bakes in the one call there.
 The call only asks: the window's next frame starts the job. The request belongs to
-the scene and mode it was made in, so Play, Stop or a load before that frame drops it
+the scene and mode it was made in, so asking for Play (`Editor.EnterPlay()` later in
+the same line too), Stop, `Scene.New()` / File ▸ New or a load before that frame drops it
 and the status reads `refused` with why; it never bakes a scene you didn't ask about. It has no cancel; the card's Cancel button
 stops the lightmap step.
 The two individual verbs stay for a script that wants only one of them. On a
@@ -38,7 +40,7 @@ first.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
-| `Lighting.GenerateAsync` *(dev-only)* | `()` | `true` once the editor's Generate Lighting job is asked for; returns at once (*Generate Lighting*, above). Errors during Play, while a bake runs, on an unsaved scene, and in a host with no editor window to step the job |
+| `Lighting.GenerateAsync` *(dev-only)* | `()` | `true` once the editor's Generate Lighting job is asked for; returns at once (*Generate Lighting*, above). Errors during Play or once it is asked for, while a bake runs, on an unsaved scene, and in a host with no editor window to step the job |
 | `Lighting.IsRunning` *(dev-only)* | `()` | `true` while the editor's Generate Lighting or Bake Occlusion runs, or a `GenerateAsync` waits to start it |
 | `Lighting.GetBakeStatus` *(dev-only)* | `()` | `{ state, message }`: the editor's last background bake (the button's or `GenerateAsync`'s). `state` is `idle`, `requested`, `running`, `done`, `cancelled`, `failed` or `refused`; `message` is its summary or why, `nil` until it ended |
 | `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the counts `0` when nothing occludes, and `tooLarge` (a boolean) `true`, with `cells` and `bytes` `0` and no PVS kept, when the level is too large to cull |

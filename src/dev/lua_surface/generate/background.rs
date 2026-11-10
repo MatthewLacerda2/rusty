@@ -13,8 +13,10 @@
 //! button's job, so nothing a script starts differs from what the button starts.
 //! It is refused where the button is (Play, a bake already running, an unsaved
 //! scene) and in a host with no frame loop to step the job (a headless session),
-//! which names `Lighting.Generate()` instead. A request belongs to the scene and
-//! mode it was made in: Play, Stop and a load drop it (`Scene::drop_bake_request`).
+//! which names `Lighting.Generate()` instead. Play counts from the moment it is
+//! requested (`Application::play_heading`). A request belongs to the scene and
+//! mode it was made in: asking for Play, Play, Stop, File ▸ New and a load drop it
+//! (`Scene::drop_bake_request`).
 
 use mlua::Lua;
 
@@ -37,12 +39,15 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         "GenerateAsync",
         lua.create_function(move |lua, ()| {
             let refuse = |why: &str| Err(mlua::Error::runtime(why.to_string()));
-            if !app.get(lua)?.borrow().bake_host() {
+            let app = app.get(lua)?;
+            if !app.borrow().bake_host() {
                 return refuse(NO_BAKE_HOST);
             }
             let scene = scene.get(lua)?;
             let mut scene = scene.borrow_mut();
-            if scene.is_playing() {
+            // Play asked for but not yet taken counts, as it does for the button
+            // (Unity's `isPlayingOrWillChangePlaymode`).
+            if scene.is_playing() || app.borrow().play_heading() {
                 return refuse(LIGHTING_IN_PLAY);
             }
             refuse_while_baking(&scene).map_err(mlua::Error::runtime)?;

@@ -85,10 +85,20 @@ impl Scene {
     /// its decal budgets (File ▸ New, Reset Scene): the scene is new, the session
     /// (and the project's budgets it applied) is not.
     pub fn clear(&mut self) {
+        // A pending `Lighting.GenerateAsync()` asked about the old scene (#1999);
+        // the status is the editor's, so it says why the request went.
+        #[cfg(feature = "dev")]
+        self.drop_bake_request("a new scene was started");
+        #[cfg(feature = "dev")]
+        let status = std::mem::take(&mut self.lighting_bake_status);
         let (playing, limits) = (self.playing, self.decals.limits());
         *self = Scene::new();
         self.playing = playing;
         self.decals.set_limits(limits);
+        #[cfg(feature = "dev")]
+        {
+            self.lighting_bake_status = status;
+        }
     }
 
     /// Remove entity `id` and everything under it ([`Scene::destroy_set`]), as

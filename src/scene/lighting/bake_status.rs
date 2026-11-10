@@ -58,8 +58,8 @@ impl Scene {
         self.lighting_bake_running || self.lighting_bake_requested
     }
 
-    /// Drop a pending `Lighting.GenerateAsync()` because `why` (Play, Stop, a
-    /// load): a request belongs to the scene and the mode it was made in, so it
+    /// Drop a pending `Lighting.GenerateAsync()` because `why` (Play asked for,
+    /// Stop, File ▸ New, a load): a request belongs to the scene and the mode it was made in, so it
     /// never bakes a scene the agent did not ask about. The status says so.
     pub fn drop_bake_request(&mut self, why: &str) {
         if std::mem::take(&mut self.lighting_bake_requested) {

@@ -129,6 +129,7 @@ impl EditorFrontend {
     /// Returns the viewport panel's pointer interaction for picking/dragging (#183).
     fn draw_dashboard(&mut self, shell: &mut Shell, game: &mut GameWorld) -> ViewportInteraction {
         self.follow_scene_swap(game);
+        sync::refuse_bake_request_on_play(game);
         // The transport asks through `set_playing`, like every other host (#1302).
         let mut playing = game.play_requested();
         let interaction = {
