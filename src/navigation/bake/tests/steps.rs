@@ -22,14 +22,21 @@ fn bake(scene: &mut Scene, radius: f32, grid: f32) -> NavigationGraph {
     NavigationGraph::from_scene(scene)
 }
 
-/// Whether a walk from `from` to `to` arrives at every radius and grid.
+/// The `(radius, grid)` pairs at which a walk from `from` to `to` does not arrive;
+/// empty when it arrives at every one. Both probe points must have a span under
+/// them at every bake, so a vanished floor fails instead of counting as refused.
 fn joins(scene: &mut Scene, from: Vec3, to: Vec3) -> Vec<(f32, f32)> {
     let mut refused = Vec::new();
     for r in RADII {
         for grid in GRIDS {
             let g = bake(scene, r, grid);
-            let (a, b) = (g.span_under(from), g.span_under(to));
-            if !a.zip(b).is_some_and(|(a, b)| arrives(&g, a, b)) {
+            let a = g
+                .span_under(from)
+                .unwrap_or_else(|| panic!("no span at {from} ({r}, {grid})"));
+            let b = g
+                .span_under(to)
+                .unwrap_or_else(|| panic!("no span at {to} ({r}, {grid})"));
+            if !arrives(&g, a, b) {
                 refused.push((r, grid));
             }
         }
@@ -123,4 +130,5 @@ fn a_curved_stair_joins_top_to_bottom_at_every_grid() {
     let (mut scene, top) = curved_stair();
     let bottom = Vec3::new(3.0, 0.0, -0.6);
     assert_eq!(joins(&mut scene, top, bottom), [], "top -> bottom");
+    assert_eq!(joins(&mut scene, bottom, top), [], "bottom -> top");
 }

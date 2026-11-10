@@ -27,7 +27,8 @@ use super::{NavigationGraph, SpanRef};
 impl NavigationGraph {
     /// The span in cell `(gx, gz)` an agent on `from` reaches by walking there in a
     /// straight line, or `None` when no span of that column is within a step.
-    /// `(gx, gz)` may be any cell; the horizontal run is the centre-to-centre distance.
+    /// `(gx, gz)` may be any cell; only the floor delta and the shared headroom count,
+    /// not the horizontal run between the cells.
     pub fn link_to(&self, from: SpanRef, gx: i32, gz: i32) -> Option<SpanRef> {
         if (gx, gz) == (from.gx, from.gz) {
             return Some(from);
@@ -51,8 +52,9 @@ impl NavigationGraph {
         })
     }
 
-    /// Whether an agent can walk between spans `a` and `b` of neighbouring cells: the floor delta clears `max_step`, and the gap they share
-    /// fits `agent_height`. Symmetric in `a` and `b`.
+    /// Whether an agent can walk between spans `a` and `b` of neighbouring cells: the
+    /// floor delta clears `max_step`, and the gap they share fits `agent_height`.
+    /// Symmetric in `a` and `b`.
     pub(super) fn steps(&self, a: super::NavSpan, b: super::NavSpan) -> bool {
         let dh = (b.y - a.y).abs();
         let gap = a.ceiling.min(b.ceiling) - a.y.max(b.y);

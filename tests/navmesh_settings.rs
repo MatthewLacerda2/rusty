@@ -12,8 +12,9 @@ use rusty::scene::Scene;
 fn fresh_scene_uses_default_nav_settings() {
     let scene = Scene::new();
     assert_eq!(scene.nav_settings, NavMeshSettings::default());
-    // The defaults equal the historical bake constants, bar the cell (#1887).
-    assert_eq!(scene.nav_settings.max_step, 0.5);
+    // The defaults equal the historical bake constants, bar the cell (#1887) and the
+    // step, now the default controller's step offset (#2001).
+    assert_eq!(scene.nav_settings.max_step, 0.3);
     assert_eq!(scene.nav_settings.max_slope, 1.0);
     assert_eq!(scene.nav_settings.grid_spacing, 0.25);
     assert_eq!(scene.nav_settings.agent_radius, 0.5);
@@ -44,7 +45,7 @@ fn nav_settings_survive_round_trip() {
         agent_radius: 0.8,
         agent_height: 1.8,
         max_slope: 0.6,
-        max_step: 0.3,
+        max_step: 0.4,
         grid_spacing: 1.5,
         bounds: Some(NavBounds {
             min_x: -80.0,
@@ -73,7 +74,7 @@ fn nav_settings_survive_round_trip() {
     assert_eq!(loaded.nav_settings.agent_radius, 0.8);
     assert_eq!(loaded.nav_settings.agent_height, 1.8);
     assert_eq!(loaded.nav_settings.max_slope, 0.6);
-    assert_eq!(loaded.nav_settings.max_step, 0.3);
+    assert_eq!(loaded.nav_settings.max_step, 0.4);
     assert_eq!(loaded.nav_settings.grid_spacing, 1.5);
     assert_eq!(loaded.nav_settings.bounds, scene.nav_settings.bounds);
 }

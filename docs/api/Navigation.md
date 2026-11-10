@@ -282,7 +282,7 @@ at every `GridSpacing` (#2001).
 | `Navigation.SetAgentHeight` | `(height)` | writes `nav_settings.agent_height` + re-bakes (drops spans with less open space above than the height) |
 | `Navigation.GetMaxSlope` | `()` | max walkable grade (rise per unit travelled) |
 | `Navigation.SetMaxSlope` | `(slope)` | writes `nav_settings.max_slope` + re-bakes |
-| `Navigation.GetMaxStep` | `()` | max step height between spans in adjacent cells |
+| `Navigation.GetMaxStep` | `()` | max step height between spans in adjacent cells; `0.3` by default (#2001), the default `CharacterController` step offset, so a default bot is never routed over a ledge its controller can't climb |
 | `Navigation.SetMaxStep` | `(step)` | writes `nav_settings.max_step` + re-bakes |
 | `Navigation.GetGridSpacing` | `()` | grid cell size (world units); `0.25` by default (#1887), half the default agent radius |
 | `Navigation.SetGridSpacing` | `(spacing)` | writes `nav_settings.grid_spacing` + re-bakes (re-shapes the grid) |

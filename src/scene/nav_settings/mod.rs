@@ -27,8 +27,11 @@ pub use bounds::{NavBounds, EMPTY_SCENE_HALF_EXTENT};
 pub use saved::{load_navmesh, navmesh_path, save_navmesh, SavedNavmesh};
 
 /// Default maximum height an agent can step up/down between two adjacent cells
-/// while still treating them as connected (stairs, curbs). World units.
-pub const DEFAULT_MAX_STEP: f32 = 0.5;
+/// while still treating them as connected (stairs, curbs). World units. It is the
+/// default `CharacterController::step_offset` (0.3), so the default navmesh never
+/// routes a default walker over a ledge its controller can't climb (#2001). Unity's
+/// agent default is 0.4, but Unity's agent moves without a controller.
+pub const DEFAULT_MAX_STEP: f32 = 0.3;
 /// Default maximum walkable slope, expressed as a height delta per cell of
 /// horizontal travel (i.e. `rise / grid_spacing`). A ramp steeper than this is
 /// not traversable. `1.0` ≈ 45° at unit spacing.
