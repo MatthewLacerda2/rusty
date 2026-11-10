@@ -44,6 +44,14 @@ impl Held {
         }
     }
 
+    /// The bytes it holds.
+    pub fn bytes(&self) -> usize {
+        match self {
+            Held::Rgba(img) => super::slots::image_bytes(img),
+            Held::Gray(_, red) => std::mem::size_of_val(red.as_slice()),
+        }
+    }
+
     /// The image, rebuilt when held as one channel.
     pub fn into_image(self) -> Image {
         match self {

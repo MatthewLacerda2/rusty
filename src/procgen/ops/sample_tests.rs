@@ -78,19 +78,16 @@ fn each_mip_level_is_the_box_mean_of_the_last() {
     let src = Image::fill_uv(Size::new(8, 2), |u, v| [u, v, 0.0, 1.0]);
     let chain = mips(&src);
     let sizes: Vec<Size> = chain.iter().map(Image::size).collect();
-    assert_eq!(
-        sizes,
-        [
-            Size::new(8, 2),
-            Size::new(4, 1),
-            Size::new(2, 1),
-            Size::new(1, 1)
-        ]
-    );
+    assert_eq!(sizes, [Size::new(4, 1), Size::new(2, 1), Size::new(1, 1)]);
     let mean = |x: i64| (src.get_wrapped(2 * x, 0)[0] + src.get_wrapped(2 * x + 1, 0)[0]) / 2.0;
     for x in 0..4 {
-        assert!((chain[1].get_wrapped(x, 0)[0] - mean(x)).abs() < 1e-6);
-        assert!((chain[1].get_wrapped(x, 0)[1] - 0.5).abs() < 1e-6);
+        assert!((chain[0].get_wrapped(x, 0)[0] - mean(x)).abs() < 1e-6);
+        assert!((chain[0].get_wrapped(x, 0)[1] - 0.5).abs() < 1e-6);
     }
-    assert!((chain[3].pixels()[0][0] - 0.5).abs() < 1e-6);
+    assert!((chain[2].pixels()[0][0] - 0.5).abs() < 1e-6);
+    // Level 0 is the source itself, never copied: the chain is under a third of it.
+    let bytes = |c: &[Image]| c.iter().map(|l| l.pixels().len()).sum::<usize>();
+    let big = mips(&Image::new(64));
+    assert!(3 * bytes(&big) <= 64 * 64, "{}", bytes(&big));
+    assert!(mips(&Image::new(1)).is_empty());
 }

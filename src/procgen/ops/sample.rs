@@ -57,7 +57,7 @@ pub fn sample_at(src: &Image, coords: Coords) -> Image {
             let (dux, dvx) = step(coords.at(x - 1, y), (u, v), coords.at(x + 1, y));
             let (duy, dvy) = step(coords.at(x, y - 1), (u, v), coords.at(x, y + 1));
             let texels = (dux.max(duy) * sw).max(dvx.max(dvy) * sh);
-            *p = trilinear(&chain, u, v, lod(texels));
+            *p = trilinear(src, &chain, u, v, lod(texels));
         }
     });
     out
@@ -74,26 +74,31 @@ fn lod(texels: f32) -> f32 {
     }
 }
 
-/// `chain` read at `(u, v)` and level `lod`, blended between the two levels around
-/// it; past the last level it reads the last.
-fn trilinear(chain: &[Image], u: f32, v: f32, lod: f32) -> Rgba {
-    let last = chain.len() - 1;
+/// The mip chain read at `(u, v)` and level `lod`, blended between the two levels
+/// around it; past the last level it reads the last. Level 0 is `src` itself,
+/// borrowed, and `below` the levels under it.
+fn trilinear(src: &Image, below: &[Image], u: f32, v: f32, lod: f32) -> Rgba {
+    let level = |l: usize| if l == 0 { src } else { &below[l - 1] };
+    let last = below.len();
     let lo = (lod.floor() as usize).min(last);
-    let a = chain[lo].sample_bilinear_wrapped(u, v);
+    let a = level(lo).sample_bilinear_wrapped(u, v);
     let t = lod - lo as f32;
     if lo == last || t <= 0.0 {
         return a;
     }
-    let b = chain[lo + 1].sample_bilinear_wrapped(u, v);
+    let b = level(lo + 1).sample_bilinear_wrapped(u, v);
     std::array::from_fn(|c| a[c] + (b[c] - a[c]) * t)
 }
 
-/// `img` and each half-size reduction of it down to one texel. A level's texel is
-/// the mean of the four bilinear taps at the texel centres of the 2 × 2 it covers:
-/// exactly their box mean on an even side, and a wrapped blend on an odd one.
+/// Each half-size reduction of `img` down to one texel, `img` itself left out (the
+/// caller reads it as level 0), so the chain costs a third of `img` more. A level's
+/// texel is the mean of the four bilinear taps at the texel centres of the 2 × 2 it
+/// covers: exactly their box mean on an even side, and a wrapped blend on an odd one.
 pub fn mips(img: &Image) -> Vec<Image> {
-    let mut chain = vec![img.clone()];
-    while let Some(prev) = chain.last().filter(|p| p.width() > 1 || p.height() > 1) {
+    let mut chain: Vec<Image> = Vec::new();
+    while let Some(prev) =
+        Some(chain.last().unwrap_or(img)).filter(|p| p.width() > 1 || p.height() > 1)
+    {
         let (pw, ph) = (prev.width(), prev.height());
         let next = super::super::image_buf::Size::new(pw.div_ceil(2), ph.div_ceil(2));
         let (ox, oy) = (0.5 / pw as f32, 0.5 / ph as f32);
