@@ -128,10 +128,12 @@ coder *changing* it must know.
   and `main`'s tree is not the one it proved; never relaunched, #1785), and a last line
   `watch: resume: <command>`. The skills and the orchestrator read them, so a change
   to one updates `ci-merge` in the same pull request.
-- **The supervisor** (`queue-daemon.py`, #908) adds two statuses of its own, 7 (its
-  worktree is gone) and 8 (it crashed), each one `supervisor: … stopped.` line, never
-  a traceback (#1450). It holds `git worktree lock` on its worktree for its life
-  (`merging/watch/tenancy.py`), which `reclaim.py` reads back: keep the reason's
+- **The supervisor** (`queue-daemon.py`, #908) adds statuses of its own: 7 (its
+  worktree is gone), 8 (it crashed) and 11 (it could not lock its worktree, #1983),
+  each one `supervisor: … stopped.` line, never a traceback (#1450); and 10, a
+  `queue-daemon:` line printed before it forks, when started from the main working
+  tree (`tenancy.main_tree`, #1983). It holds `git worktree lock` on its worktree for its life
+  (`merging/watch/tenancy.py`) and stops without it, since `reclaim.py` and `make queue-status` read it back: keep the reason's
   format (`merge-queue supervisor pid <pid>`) and `tenancy.pid_of` in step. It also reads the
   harness's own lock on agent worktrees (`claude agent agent-<id> (pid <pid> start <ticks>)`,
   `tenancy.agent_pid_of`, #1658): keep that parser in step with the harness's wording.
