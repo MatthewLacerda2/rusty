@@ -28,6 +28,7 @@ it behaves identically to the editor and uses the same default values.
 | `Scene.FindChild` | `(id, path)` | the descendant at name path `path` (`"Viewport/Content"`), or `nil` (also for a `nil` id) |
 | `Scene.GetScript` | `(id, name)` | the entity's live script instance named `name`, or `nil` (also for a `nil` id) — see below |
 | `Scene.Save` | `([path])` | the written path |
+| `Scene.New` | `()` | `nil` — the editor's File ▸ New: the World becomes an empty scene (no entities, default ambient, sky and layers) with no current scene file, so `GetActivePath()` reads `nil` and a bare `Save()` errors until `Save(path)` names one. An unsaved scene is discarded without asking, as `Load` discards it; an open editor drops its entity selection and its unsaved mark. Edit mode only: errors during Play |
 | `Scene.Load` | `(path)` | `nil`, or in edit mode a warning string when the scene loaded but its lighting sidecar did not (errors, naming `path`, if there is no file there) |
 | `Scene.GetActivePath` | `()` | the current scene file, or `nil` |
 | `Scene.DontDestroyOnLoad` | `(id)` | `true` if an entity existed at `id` (errors outside play) |

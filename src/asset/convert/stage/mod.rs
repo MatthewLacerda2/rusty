@@ -117,6 +117,7 @@ fn swap(to: &Staging, dir: &Path, record: &str) -> Result<(), ImportError> {
         return Err(write_error(&to.out, &e));
     }
     at(Step::GlbIn);
+    // lint: allow(asset-write) the conversion stamp, read by the next freshness check; `note` notes the `.glb` and source after the swap
     fs::write_atomic(&stamp_path, record.as_bytes()).map_err(|e| write_error(&stamp_path, &e))
 }
 

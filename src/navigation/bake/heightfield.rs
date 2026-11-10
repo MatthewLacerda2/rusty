@@ -15,9 +15,10 @@
 //! The merged top carries the area of the walkable solid that gives it its flag.
 //! **Past Recast:** when the solid that reaches the merged top carries a
 //! `NavMeshModifier`'s override (#1959), its flag and area decide alone and the
-//! flag merge is skipped. A 0.45 m sofa overridden to `NotWalkable` sits within
-//! `max_step` of the floor, so Recast's merge would hand it the floor's walkable
-//! flag; the developer placed the override to say the seat is not floor.
+//! flag merge is skipped. A sofa overridden to `NotWalkable` whose seat sits within
+//! `max_step` of the floor (a 0.45 m seat at a 0.5 `max_step`) would get the floor's
+//! walkable flag from Recast's merge; the developer placed the override to say the
+//! seat is not floor.
 //!
 //! Sorting uses a total order on `(cell, min, max, walkable, area, overridden)`, so the result is a
 //! pure function of the geometry, whatever order the colliders were visited in.

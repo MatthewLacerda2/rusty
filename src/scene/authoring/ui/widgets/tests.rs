@@ -96,3 +96,18 @@ fn labels_parse_loosely_and_prefabs_exist_for_all_but_canvas() {
         Some("assets/prefabs/ui/Dropdown.prefab")
     );
 }
+
+#[test]
+fn a_changed_widget_script_is_noted_and_an_unchanged_one_is_not() {
+    use crate::core::fs::written::written_since;
+    let dir = crate::test_temp::dir().join("rusty_widget_note");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("w.lua");
+    let key = path.to_string_lossy().into_owned();
+    let (seen, _) = written_since(u64::MAX);
+    write_if_changed(&path, b"-- v1");
+    let (now, written) = written_since(seen);
+    assert!(written.contains(&key));
+    write_if_changed(&path, b"-- v1");
+    assert!(!written_since(now).1.contains(&key));
+}

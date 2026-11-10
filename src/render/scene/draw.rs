@@ -149,8 +149,7 @@ impl Renderer {
     ) {
         let mesh = object.palette.then(|| scene.world.mesh(id)).flatten();
         let palette: &[Mat4] = mesh.as_ref().map_or(&[], |m| m.active_palette());
-        let origin = object.origin();
-        let centre = bounds.map_or(origin, |(min, max)| (min + max) * 0.5);
+        let centre = object.centre(bounds);
         let mut instance = InstanceData::of(object.slot);
         instance.reflection_probe = self.reflection_probes.probe_for(centre);
         // A capture draws static geometry for a bake: its probes are in flux.
@@ -176,9 +175,7 @@ impl Renderer {
                 outline,
             };
             match slot.transparent {
-                true => out
-                    .transparent
-                    .push((item, view_depth(origin, eye.0, eye.1))),
+                true => out.transparent.push((item, depth)),
                 false => out.opaque.push(item),
             }
         }

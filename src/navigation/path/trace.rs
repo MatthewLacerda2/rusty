@@ -3,7 +3,7 @@
 //!
 //! The segment is stepped cell by cell in XZ (a grid DDA over the cell squares, whose
 //! edges sit half a cell from each centre). Every cell crossed must link to the span
-//! the walk is on (`links.rs`: step, slope and headroom), so the walk follows a ramp
+//! the walk is on (`links.rs`: step and headroom), so the walk follows a ramp
 //! or a stair onto the next floor and stops at a wall, a ledge or an eroded edge.
 //! Where the segment passes exactly through a cell corner it is a diagonal move, and
 //! both cells beside the corner must be reachable too (no corner-cutting).

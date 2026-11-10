@@ -150,6 +150,9 @@ pub struct Scene {
     /// What became of the editor's last background bake (`Lighting.GetBakeStatus`).
     #[cfg(feature = "dev")]
     pub lighting_bake_status: crate::scene::lighting::bake_status::BakeStatus,
+    /// Each camera's history cuts (#2003, `Camera.ResetHistory`): part of its view's
+    /// render history key. Never serialized.
+    pub history_cuts: crate::scene::camera::HistoryCuts,
     /// Per-entity runtime shader-param overrides (#670). Runtime-only, never serialized.
     pub shader_overrides: crate::scene::shader_overrides::ShaderOverrides,
     /// Partial ragdolls' runtime state (#1895): reactions, weights. Never serialized.
@@ -207,6 +210,7 @@ impl Default for Scene {
             lighting_bake_requested: false,
             #[cfg(feature = "dev")]
             lighting_bake_status: Default::default(),
+            history_cuts: Default::default(),
             shader_overrides: Default::default(),
             ragdolls: Default::default(),
             meshes_read_at: 0,

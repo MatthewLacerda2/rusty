@@ -128,6 +128,9 @@ authored_fields!(scene_state {
         // Partial ragdolls (#1895): every document applied clears them, a Play
         // load keeps the survivors' (`swap_in`).
         ragdolls: Runtime, Dropped;
+        // A camera's cuts (#2003): a despawn and a Play load drop a camera's
+        // count; a stale one only cuts a view once more.
+        history_cuts: Frame, Dropped;
         shader_time: Frame, No;
         ui_time: Frame, No;
         meshes_read_at: Follow, No;

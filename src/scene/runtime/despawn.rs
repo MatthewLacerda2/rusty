@@ -126,6 +126,7 @@ impl Scene {
             self.shader_overrides.clear(id, None);
         }
         self.ragdolls.retain(|id| !ids.contains(&id));
+        self.history_cuts.retain(|id| !ids.contains(&id));
         if self.selected_entity_id.is_some_and(|s| ids.contains(&s)) {
             self.selected_entity_id = None;
         }

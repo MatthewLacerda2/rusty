@@ -122,6 +122,7 @@ pub const MARKS: &[Mark] = marks! {
     "ragdolls" => |s, b| s.ragdolls.track(b, Default::default()), s.ragdolls.animated(b).is_some();
     "debug_lines" => |s, _| s.debug_lines.push(Vec3::ZERO, Vec3::X, [1.0; 4], 7),
         s.debug_lines.lines().len() == 1;
+    "history_cuts" => |s, b| s.history_cuts.cut(Some(b)), s.history_cuts.of(Some(b)) == 1;
     "shader_time" => |s, _| s.shader_time = 7.5, s.shader_time == 7.5;
     "ui_time" => |s, _| s.ui_time = 7.5, s.ui_time == 7.5;
     "meshes_read_at" => |s, _| s.meshes_read_at = u64::MAX - 1, s.meshes_read_at == u64::MAX - 1;

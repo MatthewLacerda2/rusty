@@ -136,6 +136,7 @@ pub fn save_sh_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
     }
     let json = serde_json::to_string_pretty(&extract_lighting(scene))
         .map_err(|e| format!("Failed to serialize lighting sidecar: {}", e))?;
+    // lint: allow(asset-write) the SH sidecar is half of the scene document, read whole on load
     crate::core::fs::write_atomic(&path, json.as_bytes())
         .map_err(|e| format!("Failed to write lighting sidecar: {}", e))
 }

@@ -51,6 +51,7 @@ pub fn add_floor(scene: &mut Scene, x0: f32, x1: f32, z0: f32, z1: f32) -> u32 {
 pub fn bake_pinned(scene: &mut Scene) -> NavigationGraph {
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     scene.nav_settings.grid_spacing = 1.0;
+    scene.nav_settings.max_step = 0.5; // the fixtures' 0.5 m steps (#2001 lowered the default)
     let mut g = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
     g.bake(scene);
     g

@@ -23,8 +23,8 @@
 pub(crate) struct ObjectData {
     pub model_matrix: [f32; 16],
     // When `use_sh == 1`, the shader reconstructs ambient irradiance from these 9 L2
-    // SH coefficients — the probe field interpolated at this object's position on the
-    // CPU — instead of the flat hemispherical ambient term. Each coefficient is an RGB
+    // SH coefficients — the probe field interpolated at this object's world bounds'
+    // centre on the CPU — instead of the flat hemispherical ambient term. Each coefficient is an RGB
     // triple in `xyz` (4th lane unused) so the array stays `vec4`-aligned.
     pub use_sh: u32,
     // The baked lightmap (#438): its atlas page plus one (0 for none) and the
