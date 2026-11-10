@@ -1,5 +1,6 @@
-//! The transparent-surface fields of a material (#1523): URP Lit's blending and
-//! shadow toggles and HDRP Lit's refraction, absorption, depth postpass, motion vectors,
+//! The surface fields of a material (#1523): URP Lit's blending and shadow toggles,
+//! glTF's `KHR_materials_ior` and `KHR_materials_specular` reflectance (#1998), and
+//! HDRP Lit's refraction, absorption, depth postpass, motion vectors,
 //! SSR (opaque and transparent, #2004) and thin translucency, and TAA's reactivity (#1845), as rows of the material field table (`field.rs`).
 //!
 //! Pure.
@@ -44,9 +45,8 @@ fn color(value: SurfaceValue) -> [f32; 3] {
     }
 }
 
-fn refracts(m: &MaterialAsset) -> bool {
-    m.is_transparent() && m.refraction_model != RefractionModel::None
-}
+/// A colour's channel range.
+const UNIT: std::ops::RangeInclusive<f32> = 0.0..=1.0;
 
 /// Every transparent-surface field, in Inspector order.
 pub static SURFACE_FIELDS: &[SurfaceField] = &[
@@ -95,10 +95,34 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         api: "IndexOfRefraction",
         label: "Index of Refraction",
         kind: SurfaceKind::Number(1.0..=2.5),
-        shown: refracts,
+        // It bends a refracting surface and sets every dielectric's reflectance
+        // (#1998, `MaterialAsset::dielectric_f0`).
+        shown: always,
         get: |m| SurfaceValue::Number(m.ior),
         hint: no_hint,
         put: |m, v| m.ior = number(v),
+    },
+    SurfaceField {
+        key: "specular",
+        api: "Specular",
+        label: "Specular",
+        kind: SurfaceKind::Number(0.0..=1.0),
+        shown: always,
+        get: |m| SurfaceValue::Number(m.specular),
+        hint: no_hint,
+        put: |m, v| m.specular = number(v),
+    },
+    SurfaceField {
+        key: "specular_color",
+        api: "SpecularColor",
+        label: "Specular Color",
+        // Above 1 raises a dielectric's reflectance, as glTF's extension allows; 25
+        // takes glass (0.04) to a mirror.
+        kind: SurfaceKind::Color(0.0..=25.0),
+        shown: always,
+        get: |m| SurfaceValue::Color(m.specular_color),
+        hint: no_hint,
+        put: |m, v| m.specular_color = color(v),
     },
     SurfaceField {
         key: "thickness",
@@ -120,7 +144,7 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         key: "transmittance_color",
         api: "TransmittanceColor",
         label: "Transmittance Color",
-        kind: SurfaceKind::Color,
+        kind: SurfaceKind::Color(UNIT),
         shown: transparent,
         get: |m| SurfaceValue::Color(m.transmittance_color),
         hint: no_hint,
@@ -190,7 +214,7 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         key: "transmission_color",
         api: "TransmissionColor",
         label: "Transmission Color",
-        kind: SurfaceKind::Color,
+        kind: SurfaceKind::Color(UNIT),
         shown: |m| m.transmission > 0.0,
         get: |m| SurfaceValue::Color(m.transmission_color),
         hint: no_hint,

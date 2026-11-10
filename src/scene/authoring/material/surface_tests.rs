@@ -24,7 +24,7 @@ fn every_row_reads_back_what_it_wrote() {
                 SurfaceValue::Bool(true)
             )),
             SurfaceKind::Number(ref r) => SurfaceValue::Number(*r.end()),
-            SurfaceKind::Color => SurfaceValue::Color([0.25, 0.5, 0.75]),
+            SurfaceKind::Color(_) => SurfaceValue::Color([0.25, 0.5, 0.75]),
             SurfaceKind::Vec2(ref r) => SurfaceValue::Vec2([*r.start(), 2.5]),
         };
         set_surface(&mut materials, "k", f, value.clone()).unwrap();

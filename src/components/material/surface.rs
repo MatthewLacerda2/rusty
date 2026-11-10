@@ -101,7 +101,37 @@ pub(super) fn white() -> [f32; 3] {
     [1.0; 3]
 }
 
+/// A dielectric's reflectance head-on, F0, by glTF's `KHR_materials_ior` and
+/// `KHR_materials_specular` (#1998): `min(((ior - 1) / (ior + 1))² × color, 1) ×
+/// specular`, per channel. The one place F0 is computed: every reader in the
+/// forward shader (the lamps, the lightmap's lobe, the environment BRDF and so a
+/// transparent surface's opacity) takes it from the record, mixed toward a metal's
+/// albedo by `metallic` there. Worked in `f64`, so glass's default 1.5 is exactly
+/// `0.04_f32`, the constant this replaced, and every material that sets neither
+/// field renders as before. An `ior` below 1 or not a number reads as 1, a
+/// `specular` outside `[0, 1]` or not a number as its nearest bound, and a colour
+/// channel below 0 or not a number as 0 (an infinite one as the largest finite): a hand-written scene skips the field
+/// table's clamps.
+pub fn dielectric_f0(ior: f32, specular: f32, color: [f32; 3]) -> [f32; 3] {
+    let n = f64::from(ior).max(1.0);
+    let reflectance = ((n - 1.0) / (n + 1.0)).powi(2);
+    let strength = f64::from(specular).max(0.0).min(1.0);
+    // An infinite ior gives NaN here (∞ / ∞): every glass past ~1e18 is a mirror.
+    let reflectance = if reflectance.is_nan() {
+        1.0
+    } else {
+        reflectance
+    };
+    color.map(|c| ((reflectance * f64::from(c).max(0.0).min(f64::MAX)).min(1.0) * strength) as f32)
+}
+
 impl super::MaterialAsset {
+    /// This material's dielectric F0 ([`dielectric_f0`] of its `ior`, `specular`
+    /// and `specular_color`).
+    pub fn dielectric_f0(&self) -> [f32; 3] {
+        dielectric_f0(self.ior, self.specular, self.specular_color)
+    }
+
     /// Whether this material's surface reads the opaque copy (#1523): a
     /// `Transparent` one that refracts or absorbs, under `Alpha` or `Premultiply`
     /// (an `Additive` or `Multiply` surface adds to or tints what is behind it, so it
@@ -113,3 +143,7 @@ impl super::MaterialAsset {
         self.is_transparent() && blends_over && (refracts || absorbs)
     }
 }
+
+#[cfg(test)]
+#[path = "f0_tests.rs"]
+mod f0_tests;

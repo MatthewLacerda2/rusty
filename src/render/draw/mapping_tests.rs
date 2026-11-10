@@ -1,8 +1,9 @@
 //! Tiling and Offset pack to what Unity's mean (#1851), without a GPU: the shader's
 //! `tile_with` is `uv * uv_st.xy + uv_st.zw`, so a packed record is checked by
-//! running that sum on the CPU against Unity's `TRANSFORM_TEX`.
+//! running that sum on the CPU against Unity's `TRANSFORM_TEX`. And a record's
+//! dielectric F0 (#1998), which the shader reads where it held 0.04.
 
-use super::mapping_uniform;
+use super::{mapping_uniform, material_data};
 use crate::components::{MaterialAsset, UvMapping};
 
 fn mapped(uv_mapping: UvMapping, tiling: [f32; 2], offset: [f32; 2]) -> [f32; 4] {
@@ -56,4 +57,16 @@ fn defaults_and_world_mappings_pack_as_set() {
             [2.0, 3.0, 0.25, 0.1]
         );
     }
+}
+
+#[test]
+fn a_record_carries_its_dielectric_f0_and_none_is_the_default_glass() {
+    let f0 = |m: Option<&MaterialAsset>| material_data(true, m).dielectric_f0;
+    assert_eq!(f0(None), [0.04, 0.04, 0.04, 0.0]);
+    assert_eq!(f0(Some(&MaterialAsset::default())), [0.04, 0.04, 0.04, 0.0]);
+    let pane = MaterialAsset {
+        specular_color: [2.0; 3],
+        ..MaterialAsset::default()
+    };
+    assert_eq!(f0(Some(&pane)), [0.08, 0.08, 0.08, 0.0]);
 }

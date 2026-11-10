@@ -25,10 +25,7 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
     let is_lit = u32::from(lit);
     let color_tint = material_color_tint(material);
 
-    let (metallic, roughness) = match material {
-        Some(mat) => (mat.metallic, mat.roughness),
-        None => (0.0, 0.5),
-    };
+    let (metallic, roughness) = material.map_or((0.0, 0.5), |m| (m.metallic, m.roughness));
 
     let use_texture = u32::from(material.is_some_and(|m| m.base_color_map.is_some()));
     let use_metallic_map = u32::from(material.is_some_and(|m| m.metallic_map.is_some()));
@@ -46,11 +43,15 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
         u32::from(lit && material.is_none_or(|m| m.receive_decals && !m.is_transparent()));
 
     // Flat emissive factor (#222), 4th lane unused. Defaults to black with no material.
-    let emissive = match material {
-        Some(mat) => [mat.emissive[0], mat.emissive[1], mat.emissive[2], 0.0],
-        None => [0.0, 0.0, 0.0, 0.0],
-    };
+    let emissive = material.map_or([0.0; 4], |m| {
+        [m.emissive[0], m.emissive[1], m.emissive[2], 0.0]
+    });
 
+    // A draw with no material reflects as the default one (#1998).
+    let f0 = material.map_or_else(
+        || MaterialAsset::default().dielectric_f0(),
+        |m| m.dielectric_f0(),
+    );
     MaterialData {
         color_tint,
         use_texture,
@@ -69,6 +70,7 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
         surface: surface_uniform(lit, material),
         mapping: material.map_or_else(MappingUniform::default, mapping_uniform),
         normal_variance: [0; 4],
+        dielectric_f0: [f0[0], f0[1], f0[2], 0.0],
     }
 }
 

@@ -392,14 +392,21 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // grazing reflection, its opacity or its SSR away.
     let roughness = specular_aa::widen(surface.roughness, specular_kernel);
 
-    let F0 = mix(vec3<f32>(0.04), albedo, metallic);
+    // F0 (#1998): a dielectric's comes from its ior and `KHR_materials_specular`,
+    // computed once on the CPU (`MaterialAsset::dielectric_f0`; 0.04 for the default
+    // glass ior 1.5), a metal's is its albedo. `reflectivity` is its strongest
+    // channel, URP's specular-workflow `ReflectivitySpecular`: what the environment
+    // takes from the diffuse (`0.96` at 0.04) and the grazing weight starts from.
+    let dielectric = m.dielectric_f0.rgb;
+    let F0 = mix(dielectric, albedo, metallic);
+    let dielectric_reflectivity = max(dielectric.r, max(dielectric.g, dielectric.b));
 
     // 1. Ambient lighting term. A lightmapped static mesh reads its lightmap (#438).
     // Non-static objects that a light probe covers
     // (`use_sh == 1`, #240) reconstruct DIRECTIONAL irradiance from their interpolated
     // SH probe; everything else falls back to the flat Hemispherical Sky-Ground
-    // gradient. All three are E / pi, so they feed the same albedo * 0.96 * (1 - metallic)
-    // Lambert response (the 4% is the dielectric's reflection, step 5).
+    // gradient. All three are E / pi, so they feed the same albedo * (1 - reflectivity)
+    // * (1 - metallic) Lambert response (the reflectivity is the dielectric's, step 5).
     var ambient_irradiance: vec3<f32>;
     // A directional lightmap's one specular lobe: the `Baked` lamps' highlight (#1695).
     var lightmap_specular = vec3<f32>(0.0);
@@ -422,9 +429,10 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // here, and the env reflection below through its specular occlusion (#1697).
     let ao = ambient_occlusion(in.clip_position.xy) * surface.occlusion;
     // The diffuse share is URP's `albedo * oneMinusReflectivity`: what the
-    // environment reflection (step 5) takes, a dielectric's 4%, is not diffused too.
+    // environment reflection (step 5) takes, a dielectric's reflectivity, is not
+    // diffused too.
     // SSIL's bounce (#1750) is indirect diffuse too: the same response, the same AO.
-    var lighting_color = (ambient_irradiance + indirect_bounce(in.clip_position.xy)) * diffuse_albedo * (0.96 * (1.0 - metallic)) * ao;
+    var lighting_color = (ambient_irradiance + indirect_bounce(in.clip_position.xy)) * diffuse_albedo * ((1.0 - dielectric_reflectivity) * (1.0 - metallic)) * ao;
     // The lobe is `Baked` lamps' light, so it stays out of `ssil_realtime`, as the
     // lightmap's own light does.
     lighting_color += lightmap_specular;
@@ -495,7 +503,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // prefiltered mip, and URP's `surfaceReduction`, `1 / (alpha^2 + 1)` with
     // `alpha = roughness^2` (so perceptual roughness to the 4th), is the energy a rough
     // lobe loses, so a rough metal reads blurry, not black. `roughness` is perceptual,
-    // URP's `perceptualRoughness`; a dielectric reflects F0 = 0.04 head-on. The angle is
+    // URP's `perceptualRoughness`; a dielectric reflects its F0 head-on. The angle is
     // `|N.V|`: a normal map or a vertex normal can still lean away from the camera on a
     // face turned toward it, which would otherwise take the grazing Fresnel.
     // The AO weighs it as specular occlusion (#1697, Frostbite's, as HDRP has it), and
@@ -506,7 +514,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // specular AA; HDRP filters its smoothness through a preintegrated FGD rusty
     // has not got.
     let R = reflect(-V, N);
-    let grazing = saturate(1.0 - surface.roughness + (0.04 + 0.96 * metallic)); // URP's reflectivity
+    let reflectivity = dielectric_reflectivity + (1.0 - dielectric_reflectivity) * metallic; // URP's
+    let grazing = saturate(1.0 - surface.roughness + reflectivity);
     let alpha = surface.roughness * surface.roughness;
     let fresnel = pow(1.0 - saturate(abs(dot(N, V))), 4.0);
     let env_brdf = mix(F0, vec3<f32>(grazing), fresnel) / (alpha * alpha + 1.0);

@@ -121,6 +121,10 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
             true => RenderFace::Both,
             false => RenderFace::Front,
         },
+        // `KHR_materials_ior` and `KHR_materials_specular` (#1998).
+        ior: data.ior,
+        specular: data.specular,
+        specular_color: data.specular_color,
         // Imported glTF/OBJ materials default to Opaque (#242): the importer does not
         // yet read glTF `alphaMode`/`alphaCutoff`, so transparency is authored after
         // import via the inspector or the `Material` API.
@@ -221,6 +225,9 @@ mod tests {
             emissive_map: Some("e.png".into()),
             emissive: [0.1, 0.2, 0.3],
             double_sided: false,
+            ior: 1.33,
+            specular: 0.5,
+            specular_color: [2.0, 1.0, 0.5],
         };
         let mat = material_asset_from_import(&data);
         assert_eq!(mat.render_face, crate::components::RenderFace::Front);
@@ -246,6 +253,8 @@ mod tests {
         assert_eq!(mat.normal_map, Some("n.png".into()));
         assert_eq!(mat.emissive, [0.1, 0.2, 0.3]);
         assert_eq!(mat.emissive_map, Some("e.png".into()));
+        assert_eq!((mat.ior, mat.specular), (1.33, 0.5));
+        assert_eq!(mat.specular_color, [2.0, 1.0, 0.5]);
     }
 
     #[test]

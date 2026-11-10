@@ -68,7 +68,7 @@ pub(super) fn from_lua(field: &SurfaceField, value: &Value) -> Result<SurfaceVal
         }
         (SurfaceKind::Toggle, Value::Boolean(b)) => Ok(SurfaceValue::Bool(*b)),
         (SurfaceKind::Number(_), v) => number(v).map(SurfaceValue::Number).ok_or_else(wrong),
-        (SurfaceKind::Color, Value::Table(t)) => {
+        (SurfaceKind::Color(_), Value::Table(t)) => {
             let channel = |i| t.get::<Value>(i).ok().as_ref().and_then(number);
             match (channel(1), channel(2), channel(3)) {
                 (Some(r), Some(g), Some(b)) => Ok(SurfaceValue::Color([r, g, b])),

@@ -34,6 +34,8 @@ impl Default for MaterialAsset {
             receive_shadows: true,
             refraction_model: RefractionModel::None,
             ior: default_ior(),
+            specular: default_one(),
+            specular_color: white(),
             thickness: default_one(),
             transmittance_color: white(),
             absorption_distance: default_one(),

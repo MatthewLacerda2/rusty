@@ -18,6 +18,7 @@ pub(super) fn material_data(
     source: Option<&str>,
 ) -> MaterialData {
     let pbr = material.pbr_metallic_roughness();
+    let specular = material.specular();
     MaterialData {
         name: material.name().unwrap_or("").to_string(),
         base_color: pbr.base_color_factor(),
@@ -41,6 +42,11 @@ pub(super) fn material_data(
             .map(MapRef::from),
         emissive: material.emissive_factor(),
         double_sided: material.double_sided() && !from_blend(source),
+        // `KHR_materials_ior` / `KHR_materials_specular` (#1998): the factors; the
+        // engine's material has no slot for `specularTexture`/`specularColorTexture`.
+        ior: material.ior().unwrap_or(1.5),
+        specular: specular.as_ref().map_or(1.0, |s| s.specular_factor()),
+        specular_color: specular.map_or([1.0; 3], |s| s.specular_color_factor()),
     }
 }
 
