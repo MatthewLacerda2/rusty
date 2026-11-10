@@ -27,7 +27,8 @@ pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
         "Preview",
         lua.create_function(|lua, (recipe, path, size): (Value, String, Option<u32>)| {
             let recipe = parse_recipe(&recipe).map_err(mlua::Error::RuntimeError)?;
-            preview_table(lua, &recipe, &path, size)
+            let root = crate::core::project::root();
+            preview_table(lua, &recipe, &path, size, &root)
         }),
     )
 }
@@ -76,15 +77,19 @@ fn node_table(lua: &Lua, s: &NodeStats) -> mlua::Result<Table> {
 }
 
 /// Write the contact sheet and return `{ path, columns, order = { node ids } }`.
+/// The missing folders above `path` are made first when they lie inside `root`, as
+/// `Texture.Bake` makes them (#1850, #2002).
 pub fn preview_table(
     lua: &Lua,
     recipe: &TextureRecipe,
     path: &str,
     size: Option<u32>,
+    root: &std::path::Path,
 ) -> mlua::Result<Table> {
     let size = size.unwrap_or(PREVIEW_SIZE.min(recipe.extent().longer()));
     let loaded = super::load(recipe)?;
-    let columns = write_preview(&loaded.recipe, &loaded.sources, path, size)
+    let columns = super::folder::make_parents(path, root)
+        .and_then(|()| write_preview(&loaded.recipe, &loaded.sources, path, size))
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Preview: {e}")))?;
     let t = lua.create_table()?;
     t.set("path", path)?;

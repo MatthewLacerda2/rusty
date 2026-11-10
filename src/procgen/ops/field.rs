@@ -105,7 +105,7 @@ impl Field<'_> {
 /// is the closure. [`PerCell::for_pixels`] tables by the image instead, for a value
 /// costly to work out and read many times per cell.
 pub struct PerCell<T, F> {
-    per: i64,
+    per: (i64, i64),
     table: Option<Vec<T>>,
     value: F,
 }
@@ -113,10 +113,19 @@ pub struct PerCell<T, F> {
 impl<T: Copy, F: Fn((i64, i64)) -> T> PerCell<T, F> {
     /// The grid's `value` per (wrapped) cell, tabled when one of `fields` links.
     pub fn new(per: i64, fields: &[Field], value: F) -> Self {
+        Self::grid((per, per), fields, value)
+    }
+
+    /// [`Self::new`] on a wrapped `per.0`×`per.1` grid: a count per axis (#2002).
+    pub fn grid(per: (i64, i64), fields: &[Field], value: F) -> Self {
         let pixels = fields.iter().map(Field::pixels).max().unwrap_or(0);
-        let fits = per.checked_mul(per).is_some_and(|c| c as usize <= pixels);
+        let fits = per
+            .0
+            .checked_mul(per.1)
+            .is_some_and(|c| c as usize <= pixels);
         let tabled = fields.iter().any(Field::linked) && fits;
-        let table = tabled.then(|| (0..per * per).map(|i| value((i % per, i / per))).collect());
+        let (w, n) = (per.0, per.0 * per.1);
+        let table = tabled.then(|| (0..n).map(|i| value((i % w, i / w))).collect());
         Self { per, table, value }
     }
 
@@ -131,14 +140,18 @@ impl<T: Copy, F: Fn((i64, i64)) -> T> PerCell<T, F> {
             .and_then(|c| c.checked_mul(4))
             .is_some_and(|c| c as usize <= pixels);
         let table = fits.then(|| (0..per * per).map(|i| value((i % per, i / per))).collect());
-        Self { per, table, value }
+        Self {
+            per: (per, per),
+            table,
+            value,
+        }
     }
 
-    /// The value of the wrapped cell `cell` (each coordinate in `0..per`).
+    /// The value of the wrapped cell `cell` (each coordinate in `0..` its axis' count).
     #[inline]
     pub fn get(&self, cell: (i64, i64)) -> T {
         match &self.table {
-            Some(t) => t[(cell.1 * self.per + cell.0) as usize],
+            Some(t) => t[(cell.1 * self.per.0 + cell.0) as usize],
             None => (self.value)(cell),
         }
     }

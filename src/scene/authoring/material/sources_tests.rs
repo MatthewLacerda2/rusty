@@ -30,9 +30,8 @@ fn a_path_is_read_from_the_root() {
     let sources = load_recipe(&image_recipe("textures/red.png"), &root)
         .unwrap()
         .sources;
-    let source = sources
-        .get("textures/red.png")
-        .expect("loaded under its path");
+    assert!(sources.get("textures/red.png").is_none(), "decoded lazily");
+    let source = sources.load("textures/red.png").expect("found").unwrap();
     assert_eq!(source.texels()[0], [1.0, 0.0, 0.0, 1.0]);
     assert!(outside_root(&root.join("textures").join("red.png"), &root).is_none());
 }
@@ -44,6 +43,20 @@ fn a_missing_file_is_an_error_naming_the_node_and_the_path() {
     let err = load_recipe(&image_recipe("textures/nope.png"), &root).unwrap_err();
     assert!(
         err.contains("'photo'") && err.contains("textures/nope.png"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_file_that_does_not_decode_fails_the_bake_naming_the_node() {
+    let root = crate::test_temp::dir().join("rusty_sources_corrupt_2002");
+    std::fs::create_dir_all(root.join("textures")).unwrap();
+    std::fs::write(root.join("textures").join("cut.png"), b"\x89PNG trunc").unwrap();
+    let loaded = load_recipe(&image_recipe("textures/cut.png"), &root).unwrap();
+    let err = crate::procgen::evaluate_with(&loaded.recipe, &loaded.sources).unwrap_err();
+    let err = err.to_string();
+    assert!(
+        err.contains("\"photo\"") && err.contains("textures/cut.png"),
         "{err}"
     );
 }

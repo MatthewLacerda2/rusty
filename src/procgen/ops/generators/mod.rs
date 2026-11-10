@@ -10,7 +10,8 @@
 //! itself at the wrap (#407), or joins its neighbours' copies (`polygon`, `star`);
 //! `anisotropic_noise` runs along a whole-step lattice direction, and every
 //! distortion is itself a tiling noise (#1740). Two generators are the documented exceptions:
-//! `gradient linear` is a one-way ramp (use `linear_tiling` for a seamless one), and
+//! `gradient linear` is a one-way ramp (use `linear_tiling` for a seamless one, and
+//! the catalog's `coordinates` is that ramp per axis, for `sample_at`), and
 //! the radial shapes (`gradient radial`, `wave rings`) meet the edge
 //! mirror-symmetrically — continuous across the seam, not periodic beyond it.
 //! `image` is no sampler: it resamples a decoded file, whose tiling is the file's own
@@ -28,7 +29,9 @@ pub use image::image;
 
 use super::super::hash;
 use super::super::image_buf::{Rgba, Size};
-use super::super::recipe::{Brick, Checker, Constant, GradientKind, Noise, Shape, Voronoi, Wave};
+use super::super::recipe::{
+    Brick, Checker, Constant, GradientKind, Noise, Shape, Voronoi, VoronoiOutput, Wave,
+};
 use super::field::Field;
 
 /// A generator's per-point function over the unit domain, borrowing for `'a` the
@@ -69,6 +72,12 @@ pub fn count(x: f32) -> f32 {
     }
 }
 
+/// A generator's `scale` across and down: times its `aspect` per axis (#2002).
+#[inline]
+fn per_axis(scale: f32, aspect: [f32; 2]) -> [f32; 2] {
+    aspect.map(|a| scale * a)
+}
+
 /// A flat color fill.
 pub fn constant(p: &Constant) -> Sampler<'static> {
     let color = p.color;
@@ -79,13 +88,25 @@ pub fn constant(p: &Constant) -> Sampler<'static> {
 /// op's `gain`, read at each pixel.
 pub fn noise<'a>(p: &Noise, gain: Field<'a>, seed: u64) -> Sampler<'a> {
     let octaves = (p.octaves, p.lacunarity, gain);
-    noise::sampler(p.kind, p.scale, octaves, p.distortion, seed)
+    noise::sampler(
+        p.kind,
+        per_axis(p.scale, p.aspect),
+        octaves,
+        p.distortion,
+        seed,
+    )
 }
 
 /// The Voronoi / Worley cellular pattern. `randomness` is the op's, read per cell.
 pub fn voronoi<'a>(p: &Voronoi, randomness: Field<'a>, seed: u64) -> Sampler<'a> {
     let modes = (p.output, p.metric);
-    voronoi::sampler(p.scale, modes, randomness, p.smoothness, seed)
+    let scale = per_axis(p.scale, p.aspect);
+    let sampler = voronoi::sampler(scale, modes, randomness, p.smoothness, seed);
+    if !(p.grayscale && p.output == VoronoiOutput::Cells) {
+        return sampler;
+    }
+    // A cell's red is its own uniform draw, so gray `cells` is that alone.
+    Box::new(move |u, v| gray(sampler(u, v)[0]))
 }
 
 /// The running-bond brick pattern.
@@ -149,5 +170,7 @@ pub fn wave(p: &Wave, seed: u64) -> Sampler<'static> {
     wave::sampler(p.kind, p.frequency, shape, seed)
 }
 
+#[cfg(test)]
+mod axis_tests;
 #[cfg(test)]
 mod tests;

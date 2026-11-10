@@ -8,7 +8,8 @@ use crate::procgen::ops::math;
 use crate::procgen::recipe::{arity, choice, op, opt, Arity, Lit, MathOp, OpInfo, ONE};
 
 const FUNCS: &[&str] = &[
-    "add", "subtract", "multiply", "divide", "power", "min", "max", "abs", "fract", "sqrt",
+    "add", "subtract", "multiply", "divide", "power", "min", "max", "abs", "fract", "sqrt", "sin",
+    "cos", "atan2",
 ];
 
 /// Per-channel math. The right-hand side is the constant `value`, or, when a second
@@ -39,7 +40,7 @@ impl Op for Math {
         math::math(cx.own(), cx.optional(1), self.func, self.value)
     }
 
-    /// A unary func (`abs`, `fract`, `sqrt`) has no right-hand side to read a
+    /// A unary func (`abs`, `fract`, `sqrt`, `sin`, `cos`) has no right-hand side to read a
     /// second input into.
     fn arity(&self) -> Option<Arity> {
         self.func.is_unary().then_some(ONE)

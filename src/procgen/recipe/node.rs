@@ -82,6 +82,9 @@ pub enum Fault {
     Cycle,
     /// An `image` node whose file was not handed in (#1491).
     MissingSource(String),
+    /// An `image` node whose file the caller's loader could not read or decode when
+    /// the node ran (#2002).
+    Unreadable { path: String, error: String },
     /// A graph instance (#1744) left in the recipe the runner was handed: its
     /// caller skipped [`crate::procgen::graph::expand`].
     Unexpanded(String),
@@ -109,6 +112,7 @@ impl std::fmt::Display for NodeError {
             }
             Fault::Cycle => f.write_str("is on a cycle"),
             Fault::MissingSource(path) => write!(f, "has no image loaded for {path:?}"),
+            Fault::Unreadable { path, error } => write!(f, "can't read {path:?}: {error}"),
             Fault::Unexpanded(path) => write!(
                 f,
                 "instances {path:?} but was never expanded; the Texture and Material \

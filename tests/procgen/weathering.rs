@@ -116,6 +116,7 @@ fn weathering_bakes_byte_identically_per_seed() {
     let noise = OpKind::Noise(Noise {
         kind: NoiseKind::Fbm,
         scale: 4.0,
+        aspect: [1.0, 1.0],
         octaves: 3,
         lacunarity: 2.0,
         gain: 0.5.into(),

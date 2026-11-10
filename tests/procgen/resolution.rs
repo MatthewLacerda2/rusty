@@ -60,6 +60,7 @@ fn perlin(scale: f32) -> Node {
         OpKind::Noise(Noise {
             kind: NoiseKind::Perlin,
             scale,
+            aspect: [1.0, 1.0],
             octaves: 1,
             lacunarity: 2.0,
             gain: 0.5.into(),

@@ -95,6 +95,7 @@ fn mapping_keeps_a_seamless_input_seamless() {
         let src = OpKind::Noise(Noise {
             kind: NoiseKind::Perlin,
             scale: 3.0,
+            aspect: [1.0, 1.0],
             octaves: 1,
             lacunarity: 2.0,
             gain: 0.5.into(),

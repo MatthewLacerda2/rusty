@@ -18,7 +18,8 @@ use super::source::Sources;
 /// slot name → written path.
 ///
 /// Everything is checked before any file is written: an empty `outputs`, an unknown
-/// slot, two keys naming the same slot (`albedo` and `base_color`), or an unknown
+/// slot, two keys naming the same slot (`albedo` and `base_color`, or `normal` and
+/// `normal16`), or an unknown
 /// node id is an error and the disk is untouched.
 pub fn bake_set(
     recipe: &TextureRecipe,
@@ -56,12 +57,14 @@ fn set_slots(recipe: &TextureRecipe) -> Result<BTreeMap<&'static str, (Slot, &st
     let mut slots: BTreeMap<&str, (Slot, &str)> = BTreeMap::new();
     for (key, node) in &recipe.outputs {
         let slot = Slot::parse(key)?;
-        if let Some((_, other)) = slots.insert(slot.name(), (slot, node.as_str())) {
+        let twin = slots.values().find(|(s, _)| s.kind() == slot.kind());
+        if let Some((_, other)) = twin {
             return Err(format!(
                 "outputs name the {} slot twice (node {other:?} and {node:?})",
-                slot.name()
+                slot.kind().name()
             ));
         }
+        slots.insert(slot.name(), (slot, node.as_str()));
     }
     Ok(slots)
 }
