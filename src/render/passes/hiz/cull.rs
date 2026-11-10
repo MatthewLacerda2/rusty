@@ -217,8 +217,9 @@ impl Renderer {
             let group1 = self.draw_buffers.group1_buffers(kept).map(Clone::clone);
             (group1, cam.args[k].buffer().clone())
         });
-        // Built from the key alone, so a buffer it captures is one the key names
-        // (#2021: the args grow on their own, by batch, not by instance).
+        // Its instances and args come from the key (#2021: the args grow on their
+        // own, by batch, not by instance); the other group-1 buffers are read from
+        // `draw_buffers` again, the same ones the key was built from just above.
         let make = |(group1, args): &CulledKey| Culled {
             group: self.draw_buffers.group_with_instances(
                 &self.device,

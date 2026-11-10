@@ -46,11 +46,15 @@ fn gpu_more_batches_in_the_same_instance_room_draw_from_the_grown_args() {
     let mut view = offscreen(&r);
     shot(&mut r, &mut view, &scene, &cam);
     assert_eq!(view.hiz.cameras[0].drawn_batches, 200, "frame 1's batches");
+    let args = view.hiz.cameras[0].final_args().size();
+    assert_eq!(args, 4096, "frame 1's args at the minimum");
     // The same scene and tables: 250 batches outgrow 4096 bytes of args, while
     // 400 instances stay in the 8192 bytes of kept instances 300 took.
     cam.culling_mask = u32::MAX;
     let (_, c) = shot(&mut r, &mut view, &scene, &cam);
     assert_eq!(view.hiz.cameras[0].drawn_batches, 250, "frame 2's batches");
+    let args = view.hiz.cameras[0].final_args().size();
+    assert_eq!(args, 8192, "the args grew, the case this test is for");
     assert_eq!(c.hiz_tested, 400, "{c:?}");
     assert_eq!(drawn(&r, &view).iter().sum::<u32>(), 400, "nothing hidden");
 }
