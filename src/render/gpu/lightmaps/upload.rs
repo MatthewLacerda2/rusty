@@ -13,13 +13,34 @@ pub(crate) struct LightmapArray {
     pub sampler: wgpu::Sampler,
 }
 
-/// Whether `limits` take a page list of `layers` pages `edge` texels a side as one
-/// array (#1704). A file baked past the bake's [`MAX_PAGES`] refusal (a hand edit,
-/// another engine version) would panic `create_texture` in wgpu's default error
-/// handler on every load; `Err` instead leaves the scene unlit by lightmaps.
+/// The most bytes one lightmap page array may take on the GPU, every level of
+/// every page (#1996). wgpu's limits name no texture-memory bound, so this is a
+/// constant: 1 GiB, which a Dust2-sized level's direction pages stay under at 8
+/// texels a unit (47–74 MiB) and reach at 32 (0.75–1.2 GiB).
+pub(crate) const MAX_ARRAY_BYTES: u64 = 1 << 30;
+
+/// Whether `limits` take a page list of `layers` pages `edge` texels a side,
+/// `bytes` in all, as one array (#1704). A file baked past the bake's
+/// [`MAX_PAGES`] refusal (a hand edit, another engine version) would panic
+/// `create_texture` in wgpu's default error handler on every load, and an array
+/// past [`MAX_ARRAY_BYTES`] (a dense directional bake) can exhaust the device's
+/// memory; `Err` instead leaves the scene unlit by lightmaps.
 ///
 /// [`MAX_PAGES`]: crate::scene::lighting::lightmap::MAX_PAGES
-pub(crate) fn fits(limits: &wgpu::Limits, edge: u32, layers: usize) -> Result<(), String> {
+pub(crate) fn fits(
+    limits: &wgpu::Limits,
+    edge: u32,
+    layers: usize,
+    bytes: u64,
+) -> Result<(), String> {
+    if bytes > MAX_ARRAY_BYTES {
+        return Err(format!(
+            "{layers} pages taking {} MiB, more than the {} MiB a lightmap array may; \
+             rebake with fewer texels a unit",
+            bytes >> 20,
+            MAX_ARRAY_BYTES >> 20
+        ));
+    }
     if layers > limits.max_texture_array_layers as usize {
         return Err(format!(
             "{layers} pages, more than the {} layers a texture array holds on this GPU; \
@@ -78,8 +99,10 @@ pub(crate) fn upload(device: &wgpu::Device, queue: &wgpu::Queue, loaded: &Loaded
             );
         }
     }
-    let bytes = loaded.layers.iter().flatten().map(|l| l.len() as u64).sum();
-    LightmapArray { bytes, ..array }
+    LightmapArray {
+        bytes: loaded.bytes(),
+        ..array
+    }
 }
 
 /// A zeroed `edge`² array of `layers` pages and `levels` mips in `format`, its

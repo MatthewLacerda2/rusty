@@ -174,8 +174,8 @@ fn write_page(
 fn write_ktx2(dir: &Path, prefix: &str, k: usize, page: &Page) -> Result<String, String> {
     let ktx2 = lightmap_page::write(page);
     let path = dir.join(format!("{prefix}_{k}_{:08x}.ktx2", content_tag(&ktx2)));
-    std::fs::write(&path, &ktx2).map_err(|e| format!("write {}: {e}", path.display()))?;
-    crate::core::fs::written::note_written(&path.to_string_lossy());
+    crate::core::fs::written::write(&path, &ktx2)
+        .map_err(|e| format!("write {}: {e}", path.display()))?;
     Ok(crate::core::paths::to_slash(&path))
 }
 

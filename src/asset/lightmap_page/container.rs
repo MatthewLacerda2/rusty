@@ -1,6 +1,7 @@
 //! A lightmap page's container (#1694): KTX2, one 2D texture (BC6H or, for a
-//! direction page, RGBA8: #1996) with its mip chain, no supercompression. As the spec lays it out, the level index
-//! runs largest first and the level images smallest first, each 16-byte aligned,
+//! direction page, RGBA8: #1996) with its mip chain, no supercompression. As the
+//! spec lays it out, the level index runs largest first and the level images
+//! smallest first, each aligned to its block (16 bytes for BC6H, 4 for RGBA8),
 //! so other KTX2 tools open a page. Written by hand (the
 //! `ktx2` crate only reads) over the layout its `Reader` validates, and read back
 //! through that reader. A file that does not parse, names another format or size,
@@ -16,8 +17,14 @@ const MAGIC: [u8; 12] = [
 ];
 const HEADER_LEN: usize = 80;
 const LEVEL_ENTRY_LEN: usize = 24;
-/// Where a level image may start: lcm(a 16-byte block, 4).
-const LEVEL_ALIGN: usize = 16;
+/// Where a level image of `format` starts (KTX 2.0 §3.9, `mipPadding`):
+/// lcm(its texel block's bytes, 4), so 16 for a BC6H block and 4 for an RGBA8 texel.
+fn level_align(format: PageFormat) -> usize {
+    match format {
+        PageFormat::Bc6h => 16,
+        PageFormat::Rgba8 => 4,
+    }
+}
 
 /// The KTX2 bytes of `page`.
 pub fn write(page: &Page) -> Vec<u8> {
@@ -49,7 +56,7 @@ pub fn write(page: &Page) -> Vec<u8> {
     // The level images run smallest first, each at a multiple of the block size
     // (KTX 2.0 §3.9, `mipPadding`); the index stays largest first.
     for (i, level) in page.levels.iter().enumerate().rev() {
-        out.resize(out.len().next_multiple_of(LEVEL_ALIGN), 0);
+        out.resize(out.len().next_multiple_of(level_align(page.format)), 0);
         let at = HEADER_LEN + i * LEVEL_ENTRY_LEN;
         let (offset, len) = (out.len() as u64, level.len() as u64);
         put(&mut out, at, &offset.to_le_bytes());

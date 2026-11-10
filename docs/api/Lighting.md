@@ -490,7 +490,14 @@ lighting settings (above), whose defaults are the ones listed here.
   BC6H and its PNG: a 2048² page pair about 3.3 s on four cores (2.9 s without its
   direction page), a 4096² pair about 14 s (11 s); a level whose biggest meshes reach
   the default 1016 cap fills about three 4096² pairs, so about 40 s (#1704). A 4096²
-  page pair takes about 105 MiB of GPU memory (21 MiB without its direction page), but filling many of them takes a density whose trace stops a bake long before memory does; the editor's Generate Lighting
+  page pair takes about 105 MiB of GPU memory (21 MiB without its direction page), and
+  direction pages take four times what BC7 did, so a dense directional bake can reach
+  memory: a Dust2-sized level's direction pages take about 47–74 MiB at 8 texels a unit
+  but 0.75–1.2 GiB at 32. Each page array (colour, direction, shadowmask) may take at
+  most **1 GiB** on the GPU, every level of every page (`MAX_ARRAY_BYTES`: wgpu names no
+  texture-memory limit, so it is a constant); past it the load is refused with a
+  warning naming the pages and the scene is left unlit by lightmaps, so rebake with fewer
+  texels a unit. 8 texels a unit already keeps the baked highlight sharp. The editor's Generate Lighting
   encodes the pages and compresses their PNGs on its worker and only writes the finished
   files on the frame, so the window stays live. The scene stores the page list and, per entity, its page and
   scale/offset (Unity's lightmap index + scale/offset), and the lights the bake took

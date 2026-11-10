@@ -1,6 +1,6 @@
 //! What a direction page loads as (#1996): its RGBA8 KTX2 levels exactly as the
-//! bake stored them, with or without BC compression; a preview's PNG with mips
-//! made here; a page of another format, or a truncated one, refused naming it.
+//! bake stored them, with or without BC compression; a preview's PNG its one
+//! level as written; a page of another format, or a truncated one, refused naming it.
 
 use glam::{Vec3, Vec4};
 
@@ -39,15 +39,18 @@ fn a_direction_ktx2_uploads_its_stored_levels_as_they_are() {
 }
 
 #[test]
-fn a_preview_direction_png_gets_the_same_mips() {
-    let texels = directions(16);
-    let png = image::RgbaImage::from_raw(16, 16, encode_directions(&texels)).unwrap();
+fn a_preview_direction_png_uploads_its_one_level_as_written() {
+    let written = encode_directions(&directions(16));
+    let png = image::RgbaImage::from_raw(16, 16, written.clone()).unwrap();
     let path = crate::test_temp::dir().join("rusty_1996_preview_dir.png");
     png.save(&path).unwrap();
     let loaded = load(&[path.to_string_lossy().into()], Kind::Direction, true).unwrap();
-    let stored = direction_page(&texels, 16).levels;
-    assert_eq!(loaded.layers[0].len(), stored.len(), "mips made on load");
-    assert_eq!(loaded.layers[0][0], stored[0], "the base as written");
+    assert_eq!(loaded.format, wgpu::TextureFormat::Rgba8Unorm);
+    assert_eq!(
+        (loaded.edge, &loaded.layers[0]),
+        (16, &vec![written]),
+        "no mips"
+    );
 }
 
 #[test]
