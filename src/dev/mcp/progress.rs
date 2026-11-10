@@ -2,8 +2,10 @@
 //! `params._meta.progressToken` (the MCP spec's progress utility) hears its bake's
 //! progress lines as `notifications/progress`, sent while the request runs. A
 //! client such as Claude Code aborts a tool call that has sent nothing for 30
-//! minutes, and `Lighting.Generate()` on a Dust2-sized scene bakes for longer; each
-//! notification restarts that clock. A request without a token sends none.
+//! minutes, and `Lighting.Generate()` on a Dust2-sized scene bakes for longer;
+//! whether a notification restarts that clock is the client's choice (the MCP
+//! TypeScript SDK does only when its caller opts in), so `Lighting.GenerateAsync()`
+//! is the reliable path there. A request without a token sends none.
 //!
 //! The lines come from [`listen`](crate::dev::bake::progress::listen): an embedded
 //! session's bake tells them on this thread, and the attach backend tells the

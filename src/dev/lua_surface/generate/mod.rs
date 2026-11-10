@@ -1,4 +1,5 @@
-//! `Lighting.Generate()` (and, in `background`, `GenerateAsync` / `IsRunning`, #1999)
+//! `Lighting.Generate()` (and, in `background`, `GenerateAsync` / `IsRunning` /
+//! `GetBakeStatus`, #1999)
 //! and the scene's lighting settings (#832): the one verb
 //! behind the editor's Generate Lighting button (lightmaps, probes and, #1714, the
 //! occlusion culling's PVS), `Lighting.BakeOcclusion()` behind its Bake Occlusion
