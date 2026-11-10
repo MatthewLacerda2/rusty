@@ -34,9 +34,10 @@
 //! `Renderer::draw_solids` draws, so no opaque pass can skip the verdict.
 //!
 //! **What it keeps.** Its bind groups (the cull's, the pyramid's levels, the
-//! kept instances' group 1) are rebuilt only when a buffer they bind grew or the
-//! depth was resized ([`kept::Kept`]), and its CPU tables are reused. Grown
-//! history keeps its verdicts: only new object slots read "drawn".
+//! kept instances' group 1) and the draws holding them are rebuilt only when a
+//! buffer they bind or draw from grew or the depth was resized ([`kept::Kept`]):
+//! a `Kept`'s key names every resource its value holds (#2021). Its CPU tables are
+//! reused. Grown history keeps its verdicts: only new object slots read "drawn".
 //!
 //! **Who culls.** [`Renderer::hiz_culls`]: the quality preset's
 //! `gpu_occlusion_culling` (on in every seeded preset), the camera's
@@ -62,6 +63,8 @@ mod kept;
 pub(crate) mod pyramid;
 mod upload;
 
+#[cfg(test)]
+mod args_gpu_tests;
 #[cfg(test)]
 mod cluster_gpu_tests;
 #[cfg(all(test, feature = "dev"))]
