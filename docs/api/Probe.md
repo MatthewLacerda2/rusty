@@ -5,8 +5,9 @@ captures the bounced/ambient light arriving at a point as an L2 spherical-harmon
 (SH) irradiance signal. Dynamic (non-`is_static`) objects sample the interpolated
 probe field in the shader instead of the flat ambient term (the scene's `Color`
 hemisphere or `Gradient`, `Lighting.md`), so they
-pick up directional bounced light. An object takes **one** sample, at its origin, for
-its whole mesh; one carrying a [`LightProbeProxyVolume`](LightProbeProxyVolume.md)
+pick up directional bounced light. An object takes **one** sample, at the centre of its world bounds (Unity's
+`Renderer.bounds.center`, so a mesh modelled in world coordinates is lit where it stands,
+not at its origin), for its whole mesh; one carrying a [`LightProbeProxyVolume`](LightProbeProxyVolume.md)
 samples a grid over its bounds instead and is lit per pixel from it, so a tall
 object goes from a lit top to a dark foot. Probe POSITIONS save into the `.scene` document;
 their baked SH saves into a `<scene>.lighting.json` sidecar (heavy, regenerable data

@@ -92,9 +92,19 @@ impl RenderObject {
         })
     }
 
-    /// Its origin: where the transparent sort anchors it.
-    pub(crate) fn origin(&self) -> Vec3 {
-        self.world.w_axis.truncate()
+    /// Its world bounds' centre, Unity's `Renderer.bounds.center` (#1993, #1994):
+    /// where both sorts, the reflection-probe pick and the light-probe sample place
+    /// it, so a mesh modelled in world coordinates (its origin far from its geometry)
+    /// is placed where it stands. `bounds` is its world bounds now (a skinned one's
+    /// posed bound); without them, its local bounds' centre under its world matrix,
+    /// which is its origin while its mesh is not resident.
+    pub(crate) fn centre(&self, bounds: Option<(Vec3, Vec3)>) -> Vec3 {
+        let (min, max) = bounds.unwrap_or_else(|| {
+            let (min, max) = self.local_aabb;
+            let at = self.world.transform_point3((min + max) * 0.5);
+            (at, at)
+        });
+        (min + max) * 0.5
     }
 }
 
@@ -201,7 +211,7 @@ impl Renderer {
     }
 
     /// Re-place `object` (entity `id`) under its world matrix now: its bounds, its
-    /// record in the object table (the probe SH it samples where it stands, its
+    /// record in the object table (the probe SH it samples at its bounds' centre, its
     /// lightmap) and each slot's facing. All a move changes; what else it changes is
     /// a full extract's.
     pub(crate) fn pose_object(&mut self, scene: &Scene, id: u32, object: &mut RenderObject) {
@@ -210,7 +220,8 @@ impl Renderer {
         let (min, max) = object.local_aabb;
         let posed = object.resident && !object.palette;
         object.bounds = posed.then(|| transform_aabb(min, max, model));
-        let data = solid_object(scene, id, model, &self.capture, &self.lightmaps);
+        let at = (model, object.centre(object.bounds));
+        let data = solid_object(scene, id, at, &self.capture, &self.lightmaps);
         self.retained.objects.write(object.slot, data);
         for slot in &mut object.slots {
             slot.key.facing = Facing::of(model, slot.face);

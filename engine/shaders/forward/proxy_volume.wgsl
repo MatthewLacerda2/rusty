@@ -1,7 +1,7 @@
 // engine/shaders/forward/proxy_volume.wgsl — Light Probe Proxy Volumes (#1672,
 // Unity's `LightProbeProxyVolume`): a dynamic object's probe light interpolated per
 // pixel over a grid of probe samples spanning its bounds, instead of the one sample
-// at its origin (`eval_sh`).
+// at its world bounds' centre (`eval_sh`).
 //
 // An instance's `proxy_volume` is 0 for none, else the first vec4 of its volume in
 // `proxy_volumes` plus one (`render::draw::proxy_volume::pack`). A volume is:
