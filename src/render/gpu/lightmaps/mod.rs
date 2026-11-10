@@ -4,12 +4,13 @@
 //! lightmapped copies of a prop still draw as one instanced call (Unity's lightmap
 //! index + scale/offset).
 //!
-//! **What is uploaded** (`load`): a `.ktx2` page as stored, BC6H irradiance and a
-//! BC7 direction page with their mips, when the GPU has BC compression; else the
-//! RGBM PNG beside it, decoded on the CPU to linear `Rgba16Float` with the same
-//! mips. A `.png` page of a scene baked before #1694 uploads its one level: its
-//! layout bleeds under mips. Either way the shader reads linear light and picks
-//! its level from the UV's screen derivatives.
+//! **What is uploaded** (`load`): an irradiance `.ktx2` page as stored, BC6H with
+//! its mips, when the GPU has BC compression; else the RGBM PNG beside it, decoded
+//! on the CPU to linear `Rgba16Float` with the same mips. An irradiance `.png`
+//! page alone (a progressive bake's preview, or a scene baked before #1694)
+//! uploads its one level. Either way the shader reads linear light and picks its
+//! level from the UV's screen derivatives. A direction page is an RGBA8 PNG alone,
+//! uploaded as `Rgba8Unorm` with mips made on load (#1996).
 //!
 //! **Where it loads.** A page list is read on a worker thread in a windowed
 //! renderer, so a scene load never stalls a frame on disk; the frames before it

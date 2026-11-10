@@ -30,6 +30,13 @@
 // tight highlight toward its centre, not a panel-shaped one). So the lobe's radiance is `texel * share`, and its direction
 // the lamps' (the page's RGB, once the share passes a quarter).
 //
+// Its aim. The page is RGBA8, never block-compressed (#1996): between texels
+// bilinear filtering rebuilds a lamp's direction to well under a degree, so a
+// polished surface's baked highlight is as round and as sharp as its live one, and
+// the lobe takes the surface's own roughness, unwidened. BC7, which the page was,
+// put a texel up to 5° off, which a lobe that narrow drew as a sawtooth edge and a
+// dot a texel.
+//
 // No AO: the lobe stands in for direct light, which AO doesn't touch here, and the
 // static occluders' shadows are already in the bake. It is off in every bake capture
 // (`lighting.baked_specular`), so no view-dependent highlight is frozen into a probe.
@@ -82,12 +89,11 @@ fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, behind
 // behind the surface a normal map has turned toward.
 const GRAZING_FLOOR: f32 = 0.1;
 
-// The least lamp share that is a lamp, rescaled from there to 1: BC7 lends a
-// lamp-free texel up to 9/255 of share from its block where a lamp's edge (a hard
-// shadow, its range) crosses it, which a glossy metal turns into a blocky highlight
-// (`lightmap::share_tests` holds BC7 under it and this line to its value). A lamp
-// under about 6% of a texel's light gives no highlight; the ramp below has faded
-// such a lamp's to a quarter already.
+// The least lamp share that is a lamp, rescaled from there to 1: a lamp under
+// about 6% of a texel's light (the fringe of its range, where a bounce outshines
+// it) gives no highlight; the ramp below has faded such a lamp's to a quarter
+// already. It once also hid BC7's lending a lamp-free texel share from its block
+// (#1695), before direction pages were stored uncompressed (#1996).
 const SHARE_FLOOR: f32 = 16.0 / 255.0;
 
 // The lamp share over which the bake turns the page's direction from the mean of

@@ -1,6 +1,6 @@
 //! A lightmap page round trip (#1694): BC6H holds linear HDR within 5%
-//! with no RGBM range cap, BC7 a direction page within a few steps, the KTX2 file
-//! reads back exactly what was written in the spec's level layout, and a malformed file is refused.
+//! with no RGBM range cap, the KTX2 file reads back exactly what was written in
+//! the spec's level layout, and a malformed file is refused.
 
 use glam::Vec3;
 
@@ -33,7 +33,6 @@ fn a_stopped_encode_makes_no_page() {
     };
     assert_eq!(encode_bc6h(8, &[light(8), light(4)], 1, &stop_second), None);
     assert_eq!(asked.get(), 2, "asked before each level");
-    assert_eq!(encode_bc7(4, &[vec![[0; 4]; 16]], 1, &|| true), None);
 }
 
 #[test]
@@ -69,16 +68,8 @@ fn the_same_page_encodes_the_same_on_any_thread_count() {
 }
 
 #[test]
-fn bc7_holds_a_direction_page_and_ktx2_round_trips() {
-    let dirs: Vec<[u8; 4]> = (0..64u32)
-        .map(|i| [(i * 4) as u8, 128, (255 - i * 4) as u8, (i * 3) as u8])
-        .collect();
-    let half: Vec<[u8; 4]> = dirs.iter().step_by(2).take(16).copied().collect();
-    let page = encode_bc7(8, &[dirs.clone(), half], 2, &|| false).expect("never stopped");
-    for (a, b) in dirs.iter().zip(decode_bc7(&page, 0)) {
-        let err = a.iter().zip(b).map(|(x, y)| x.abs_diff(y)).max().unwrap();
-        assert!(err <= 12, "{a:?} -> {b:?}");
-    }
+fn a_ktx2_page_round_trips_in_the_specs_layout() {
+    let page = bc6h(8, &[light(8), light(4)], 2);
     let file = write(&page);
     // The spec's layout: the index largest first, the images smallest first,
     // each 16-byte aligned.

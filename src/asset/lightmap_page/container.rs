@@ -96,12 +96,10 @@ fn dfd(format: PageFormat) -> Vec<u8> {
     const BLOCK: u32 = 24 + 16;
     let model = match format {
         PageFormat::Bc6h => 133u32, // KHR_DF_MODEL_BC6H
-        PageFormat::Bc7 => 134,     // KHR_DF_MODEL_BC7
     };
     // The sample: bit offset 0, bit length 127 (+1), channel 0; BC6H's is float.
     let qualifiers: u32 = match format {
         PageFormat::Bc6h => 0x80, // KHR_DF_SAMPLE_DATATYPE_FLOAT
-        PageFormat::Bc7 => 0,
     };
     let words = [
         4 + BLOCK,                      // dfdTotalSize

@@ -129,20 +129,13 @@ fn a_directional_bake_writes_a_direction_page_per_colour_page() {
     let set = scene.lightmaps.clone();
     assert_eq!(set.directions.len(), set.pages.len());
     let name = set.directions[0].rsplit('/').next().unwrap();
-    assert!(name.starts_with("lightmap_dir_0_"), "{name}");
-    let read = |p: &str| crate::asset::lightmap_page::read(&std::fs::read(p).unwrap()).unwrap();
-    let (dir, colour) = (read(&set.directions[0]), read(&set.pages[0]));
-    assert_eq!(dir.edge, colour.edge);
-    let png = |p: &str| {
-        image::open(Path::new(p).with_extension("png"))
-            .unwrap()
-            .width()
-    };
-    assert_eq!(
-        png(&set.directions[0]),
-        colour.edge,
-        "the PNG fallback beside it"
+    assert!(
+        name.starts_with("lightmap_dir_0_") && name.ends_with(".png"),
+        "an RGBA8 PNG, never block-compressed (#1996): {name}"
     );
+    let colour = crate::asset::lightmap_page::read(&std::fs::read(&set.pages[0]).unwrap());
+    let dir = image::open(&set.directions[0]).unwrap();
+    assert_eq!(dir.width(), colour.unwrap().edge, "the colour page's size");
     let flat = BakeSettings {
         directional: false,
         ..quick()

@@ -12,11 +12,11 @@
 //! `128 + 127·x` so 0 is exact; A is its **lamp share** (#1695): the part of the
 //! texel's light that `Baked` lamps' direct light brings from one way,
 //! `|direct_dir| / luminance(direct + indirect)` (`bake::direction_texel`), 0 where no
-//! lamp reaches. Both are linear in the stored bytes, so bilinear filtering, the box
-//! mips and BC7 average them as the vectors and shares they are (a packed bit field
-//! would not survive), though BC7 lends a lamp-free texel a few steps of its block's
-//! share, which the shader's `SHARE_FLOOR` ignores (`share_tests`). The shader's
-//! direction read mirrors [`decode_direction`].
+//! lamp reaches. Both are linear in the stored bytes, so bilinear filtering and the
+//! box mips average them as the vectors and shares they are (a packed bit field
+//! would not survive). The page is stored as these bytes, never block-compressed
+//! (#1996): BC7 put a lamp's direction up to 5° off a texel. The shader's direction
+//! read mirrors [`decode_direction`].
 
 use glam::{Vec3, Vec4};
 

@@ -1,14 +1,18 @@
 //! Reading a page list from disk into upload-ready levels (#1694), on whatever
 //! thread asks: no GPU here, so the windowed renderer runs it on a worker.
 //!
-//! A `.ktx2` page is read as it is stored (BC6H irradiance, a BC7 direction page,
-//! every mip) when the GPU has BC compression. Without it, or for a `.png` page (a
-//! scene baked before #1694), the PNG is decoded on the CPU: RGBM to linear
-//! `Rgba16Float` for irradiance, RGBA8 for directions, its mips made by the same
-//! `lightmap::levels` the bake made the KTX2's with. A `.png` page that stands
-//! alone (a scene baked before #1694) uploads its one level: its layout (a
-//! 1-texel ring, an unfilled background) cannot carry mips without bleeding. The
-//! shader then reads linear light either way, filtered linearly.
+//! An irradiance `.ktx2` page is read as it is stored (BC6H, every mip) when the
+//! GPU has BC compression. Without it, the RGBM PNG beside it is decoded on the
+//! CPU to linear `Rgba16Float`, its mips made by the same `lightmap::levels` the
+//! bake made the KTX2's with. A `.png` irradiance page that stands alone (a
+//! progressive bake's preview, #1970, or a scene baked before #1694) uploads its
+//! one level. The shader then reads linear light either way, filtered linearly.
+//!
+//! Direction (#810) and shadowmask (#1695) pages are RGBA8 PNGs alone, their mips
+//! made here by the bake's own box filter (`lightmap::direction_levels`,
+//! `lightmap::mask_levels`), uploaded as `Rgba8Unorm`. A direction page is never
+//! block-compressed: BC7 turned a lamp's direction up to 5° off a texel, which a
+//! glossy surface's baked highlight showed as a sawtooth (#1996).
 
 use std::path::Path;
 
@@ -22,7 +26,8 @@ use crate::scene::lighting::lightmap::{
 pub(crate) enum Kind {
     /// Irradiance (`LightmapSet::pages`).
     Colour,
-    /// Directions (#810, `LightmapSet::directions`).
+    /// Directions (#810, `LightmapSet::directions`): an RGBA8 PNG alone, whose
+    /// mips are made here.
     Direction,
     /// Shadowmasks (#1695, `LightmapSet::masks`): an RGBA8 PNG alone, whose mips
     /// are made here.
@@ -71,8 +76,10 @@ fn page(
     kind: Kind,
     bc: bool,
 ) -> Result<(wgpu::TextureFormat, u32, Vec<Vec<u8>>), String> {
-    if kind == Kind::Mask {
-        return mask_page(path);
+    match kind {
+        Kind::Direction => return rgba8_page(path, decode_direction, direction_levels),
+        Kind::Mask => return rgba8_page(path, decode_mask, mask_levels),
+        Kind::Colour => {}
     }
     let is_ktx2 = Path::new(path)
         .extension()
@@ -80,12 +87,13 @@ fn page(
     if is_ktx2 && bc {
         let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
         let page = lightmap_page::read(&bytes)?;
-        let format = match (page.format, kind) {
-            (PageFormat::Bc6h, Kind::Colour) => wgpu::TextureFormat::Bc6hRgbUfloat,
-            (PageFormat::Bc7, Kind::Direction) => wgpu::TextureFormat::Bc7RgbaUnorm,
-            (f, _) => return Err(format!("a {f:?} page where a {kind:?} page belongs")),
-        };
-        return Ok((format, page.edge, page.levels));
+        if page.format != PageFormat::Bc6h {
+            return Err(format!(
+                "a {:?} page where a {kind:?} page belongs",
+                page.format
+            ));
+        }
+        return Ok((wgpu::TextureFormat::Bc6hRgbUfloat, page.edge, page.levels));
     }
     // The PNG beside a KTX2 page, or the page itself.
     let png = match is_ktx2 {
@@ -97,45 +105,33 @@ fn page(
     if image.height() != edge || edge == 0 {
         return Err("not a square page".into());
     }
-    let texels = image.pixels().map(|p| p.0);
-    // A `.png` page is a scene baked before #1694: a 1-texel ring and no filled
-    // background, a layout whose mips would bleed, so it keeps its one level.
-    let mips = is_ktx2;
-    Ok(match kind {
-        Kind::Colour => {
-            let light: Vec<_> = texels.map(decode_rgbm).collect();
-            let chain = match mips {
-                true => levels(&light, edge),
-                false => vec![light],
-            };
-            let bytes = chain.iter().map(|l| lightmap_page::to_rgba16f(l)).collect();
-            (wgpu::TextureFormat::Rgba16Float, edge, bytes)
-        }
-        Kind::Mask => unreachable!("a mask page is read by `mask_page`"),
-        Kind::Direction => {
-            let bytes = match mips {
-                true => {
-                    let dirs: Vec<_> = texels.map(decode_direction).collect();
-                    let chain = direction_levels(&dirs, edge);
-                    chain.into_iter().map(|l| l.concat()).collect()
-                }
-                false => vec![image.as_raw().clone()],
-            };
-            (wgpu::TextureFormat::Rgba8Unorm, edge, bytes)
-        }
-    })
+    let light: Vec<_> = image.pixels().map(|p| decode_rgbm(p.0)).collect();
+    // A `.png` page alone keeps its one level (above).
+    let chain = match is_ktx2 {
+        true => levels(&light, edge),
+        false => vec![light],
+    };
+    let bytes = chain.iter().map(|l| lightmap_page::to_rgba16f(l)).collect();
+    Ok((wgpu::TextureFormat::Rgba16Float, edge, bytes))
 }
 
-/// One shadowmask page (#1695): its PNG's occlusions with the mips the colour
-/// pages carry (`lightmap::mask_levels`, the same box filter), as RGBA8.
-fn mask_page(path: &str) -> Result<(wgpu::TextureFormat, u32, Vec<Vec<u8>>), String> {
+/// One RGBA8 page (a direction page, #810, or a shadowmask, #1695): its PNG's
+/// texels, `decode`d, with the mips the colour pages carry (`levels`, the bake's
+/// box filter), as RGBA8.
+fn rgba8_page<T>(
+    path: &str,
+    decode: fn([u8; 4]) -> T,
+    levels: fn(&[T], u32) -> Vec<Vec<[u8; 4]>>,
+) -> Result<(wgpu::TextureFormat, u32, Vec<Vec<u8>>), String> {
     let image = image::open(path).map_err(|e| e.to_string())?.to_rgba8();
     let edge = image.width();
     if image.height() != edge || edge == 0 {
         return Err("not a square page".into());
     }
-    let masks: Vec<_> = image.pixels().map(|p| decode_mask(p.0)).collect();
-    let chain = mask_levels(&masks, edge);
-    let bytes = chain.into_iter().map(|l| l.concat()).collect();
+    let texels: Vec<T> = image.pixels().map(|p| decode(p.0)).collect();
+    let bytes = levels(&texels, edge)
+        .into_iter()
+        .map(|l| l.concat())
+        .collect();
     Ok((wgpu::TextureFormat::Rgba8Unorm, edge, bytes))
 }

@@ -10,7 +10,9 @@
 //! **What a page is** ([`Page`]): one square level chain, block-compressed, in a
 //! KTX2 file (`container`). Irradiance is BC6H unsigned float ([`PageFormat::Bc6h`], a
 //! byte a texel, HDR stored as is: no RGBM, so bilinear filtering is linear in the
-//! light); a directional bake's direction page is BC7 ([`PageFormat::Bc7`]). The
+//! light). A directional bake's direction page is not one of these: it is an RGBA8
+//! PNG alone, never block-compressed (#1996; `render::gpu::lightmaps` makes its
+//! mips on load). The
 //! bake (`scene::lighting::lightmap`) makes the levels; this module only encodes,
 //! decodes and stores them (`blocks`), as Unity, Godot 4 and Unreal store theirs.
 //! Baked reflection cubes share the BC6H level encoder ([`bc6h_level`], #1885).
@@ -22,9 +24,7 @@ mod container;
 
 use std::path::Path;
 
-pub use blocks::{
-    bc6h_level, bc6h_texels, decode_bc6h, decode_bc7, encode_bc6h, encode_bc7, to_rgba16f,
-};
+pub use blocks::{bc6h_level, bc6h_texels, decode_bc6h, encode_bc6h, to_rgba16f};
 pub use container::{read, write};
 
 /// The suffix of the folder beside a scene file that holds its baked lightmap
@@ -47,18 +47,15 @@ pub fn is_baked(path: &Path) -> bool {
 pub enum PageFormat {
     /// Unsigned-float HDR RGB: irradiance.
     Bc6h,
-    /// RGBA8 unorm: a direction page.
-    Bc7,
 }
 
 impl PageFormat {
-    pub const ALL: [Self; 2] = [Self::Bc6h, Self::Bc7];
+    pub const ALL: [Self; 1] = [Self::Bc6h];
 
     /// Its `VkFormat`, what a KTX2 header names.
     pub fn vk_format(self) -> u32 {
         match self {
             Self::Bc6h => 143, // VK_FORMAT_BC6H_UFLOAT_BLOCK
-            Self::Bc7 => 145,  // VK_FORMAT_BC7_UNORM_BLOCK
         }
     }
 
