@@ -37,8 +37,9 @@ impl fmt::Debug for Observer {
 }
 
 /// How far an occlusion bake has got (cells baked of the grid's), and the switch
-/// that stops it. Plain atomics, read from another thread; neither touches what a
-/// cell samples, so a bake run to the end is the same bytes with or without one,
+/// that stops it: plain atomics read from another thread, and the observer, if one
+/// was lent, told where each cell starts and ends. None of them touches what a cell
+/// samples, so a bake run to the end is the same bytes with or without one,
 /// observed or not.
 #[derive(Debug, Default)]
 pub struct OcclusionProgress {

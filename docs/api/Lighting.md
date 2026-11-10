@@ -726,7 +726,8 @@ Then each kind's own:
   the grid, `centre` its middle, `seconds` its time to the microsecond and `visible` the
   objects its PVS row sees. A cell runs on one worker, so its time is that worker's, read on
   the platform's clock: the sampling itself never reads one, and a timed bake writes the
-  same PVS as an untimed one. Both are `nil` when no PVS was kept.
+  same PVS as an untimed one. Both are `nil` when no PVS was kept, or when the bake was
+  not timed cell by cell.
 
 A stage baked in the editor a step a frame (the probes) counts the frames between its
 steps too. Lists of "heaviest first" keep the top 20; the counts hold them all.

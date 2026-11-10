@@ -4,7 +4,7 @@
 //! cell sees, and the time each cell took with the slowest cells (#1987). The
 //! times come from the cell clocks the bake was lent (`dev::bake::occlusion::
 //! CellClocks`), the rest from the bake's report and its PVS, outside the bake.
-//! So `neverCulled` is a count with no names: the objects too large or not finite
+//! Being read outside, `neverCulled` is a count with no names: the objects too large or not finite
 //! to sample are only known inside the bake. Every cell sees them, so they are among
 //! `alwaysVisibleNames`, not told apart from the objects every cell sees anyway.
 
