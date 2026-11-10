@@ -61,7 +61,14 @@ impl EvalBackend for SocketClient {
         // restart is picked up transparently on the next call.
         let mut client =
             Client::connect(self.explicit.as_deref()).map_err(|e| self.no_engine(&e))?;
-        let framed = client.request(line).map_err(|e| self.no_engine(&e))?;
+        // The window's bake progress, asked for only when someone listens here: a
+        // request with a progress token (#1999).
+        use crate::dev::bake::progress::listen;
+        let framed = match listen::is_listening() {
+            true => client.request_progress(line, &mut |text| listen::tell(text)),
+            false => client.request(line),
+        };
+        let framed = framed.map_err(|e| self.no_engine(&e))?;
         let (outcome, warnings) = parse_framed(&framed);
         *self.warnings.borrow_mut() = warnings;
         outcome

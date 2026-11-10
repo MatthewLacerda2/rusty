@@ -109,7 +109,8 @@ fn draw_rotation(ui: &mut egui::Ui, trans: &mut crate::components::TransformComp
 }
 
 /// A single degree drag field clamped to [-180, 180]. Returns whether it changed.
-fn drag_angle(ui: &mut egui::Ui, value: &mut f32) -> bool {
+/// The reflection probe card's *Rotation* uses it too (#1995).
+pub(crate) fn drag_angle(ui: &mut egui::Ui, value: &mut f32) -> bool {
     // The Euler decomposition yields -0.0, which egui 0.36 prints as "-0". This is
     // the field's own copy, written back only when the user drags it.
     if *value == 0.0 {

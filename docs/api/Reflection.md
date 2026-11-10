@@ -1,22 +1,35 @@
 ## `Reflection`
 
 Place **reflection probes** — the *specular* sibling of light probes. Each probe is a
-capture position, a **box volume** for parallax correction and blending, Unity's
-Reflection Probe settings (Baked mode), and a path to its baked **cubemap** (a KTX2
-file).
+capture position, a **volume** for parallax correction and blending (a box, which may
+be turned, or a sphere: HDRP's two shapes), Unity's Reflection Probe settings (Baked
+mode), and a path to its baked **cubemap** (a KTX2 file).
+
+**The volume (#1995).** A box probe's box is `boxMin`..`boxMax` turned by its
+`rotation` about its `position` (HDRP's oriented box; there is no scale, the corners
+carry the size); a sphere probe's is the sphere of `radius` about its `position`.
+The volume is both what the reflection is projected against and where the probe
+applies (its influence is the volume grown by `blendDistance`).
 
 **Blending (Unity's *Blend Probes*).** Probes are picked **per object**, at the centre
-of its world bounds. A probe's *influence* there is 1 inside its box and falls
+of its world bounds. A probe's *influence* there is 1 inside its volume and falls
 linearly to 0 at `blendDistance` past it. Of the probes that reach the object, ranked
 by `importance`, then influence, then the nearer capture point, then the lower index,
 the top two share its reflection: equal importance splits it by influence (so walking
 through a doorway fades from one room's probe to the next), a lower-importance second
 fills only what the first leaves (a small important box is drawn over the room around
 it), and the sky takes whatever the probes don't cover. Every fragment of the object
-box-projects against each probe's box when that probe's `boxProjection` is on (the
-standard Lagarde technique, so the reflection tracks the room as the camera moves); a
-fragment outside the box, or a probe with it off, reflects the cubemap as if
-infinitely far away. An object no baked probe reaches reflects the global skybox, or
+projects against each probe's volume when that probe's `boxProjection` is on (the
+standard Lagarde technique, so the reflection tracks the room as the camera moves),
+a fragment outside the volume too: its ray's distance to where it leaves each slab of
+the box (or the sphere) is taken as a magnitude, so the reflection is continuous
+across every face, and a large object reaching past one of its two probes, a floor
+under a row of turned boxes in a round room, shows no straight step where a box ends.
+That projection is bounded: past the probe's influence volume (its volume grown by
+`blendDistance`) it fades smoothly back to infinite projection over the volume's own
+size (a box's half-diagonal, a sphere's radius), so the far end of a large floor keeps
+a reflection that follows its direction instead of one blurry patch of the cube.
+Only a probe with `boxProjection` off reflects the cubemap as if infinitely far away. An object no baked probe reaches reflects the global skybox, or
 the scene's **fallback probe** when it names one (below).
 
 **Normalised by the baked light (#1697).** A probe's cube shows its room as lit at the
@@ -55,7 +68,9 @@ probe a scene names takes the share the sky took: everything an object's probes 
 all of it for an object outside every box. It stays resident wherever the camera is
 (it is taken first, whatever the budget, and so is the nearest probe after it, so a
 large fallback never evicts the camera's own room's probe) and is always slot 0 of
-the resident probes.
+the resident probes. It is **never box-projected**, whatever its `boxProjection` says,
+as Unity's default reflection probe isn't: it reflects as if infinitely far away,
+since what reads it lies outside the room it captured.
 With none named, or the named one not baked, that share is the sky's. Naming a probe
 makes it manual, and it stays manual through any edit (`Set{ manual = false }`, the
 Inspector's *Manual*), so Generate Lighting keeps it; removing it, `Clear`, or loading a
@@ -67,10 +82,13 @@ scene that names none leaves the scene without one. A file naming two keeps the 
 | Field | Default | Meaning |
 |---|---|---|
 | `position` | — | `{ x, y, z }` capture point |
-| `boxMin`, `boxMax` | — | `{ x, y, z }` box corners (normalized so min ≤ max) |
+| `boxMin`, `boxMax` | — | `{ x, y, z }` box corners (normalized so min ≤ max), before `rotation` turns the box about `position` |
+| `rotation` | `{ 0, 0, 0 }` | `{ x, y, z }` Euler degrees, as `Transform`'s: the box's orientation about `position`; a `Set` of the angles `Get` returned leaves it as it was |
+| `shape` | `"Box"` | `"Box"` or `"Sphere"` (any other name is an error) |
+| `radius` | `5` | the sphere's radius in metres (at least 0.01; read only by a sphere) |
 | `cubemap` | `""` | the baked KTX2 file (empty until baked) |
-| `boxProjection` | `true` | parallax-correct against the box |
-| `blendDistance` | `1` | metres past the box the probe still reaches, fading out (0 = hard edge) |
+| `boxProjection` | `true` | parallax-correct against the volume |
+| `blendDistance` | `1` | metres past the volume the probe still reaches, fading out (0 = hard edge) |
 | `importance` | `1` | a higher one is drawn over a lower one where they overlap |
 | `resolution` | `nil` | face size, a power of two in 16–2048 (others round to the nearest); `nil` bakes at the scene default, and `Set` takes `0` to go back to it |
 | `nearClip`, `farClip` | `0.05`, `1000` | the capture cameras' clip planes (far is kept past twice the near) |
@@ -83,8 +101,8 @@ scene that names none leaves the scene without one. A file naming two keeps the 
 **Scene defaults** live in the lighting settings (`Lighting.GetSettings()` /
 `SetSettings{ reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }`): the resolution a probe
 without its own bakes at (**512**), the **memory budget** of resident cubes
-(**256 MB**) and the most probes `Lighting.Generate()` places (**512**). Each frame keeps the baked probes whose boxes are nearest the camera (a
-box the camera stands in counts as distance zero; ties go to the lower index), at most
+(**256 MB**) and the most probes `Lighting.Generate()` places (**512**). Each frame keeps the baked probes whose volumes are nearest the camera (a
+volume the camera stands in counts as distance zero; ties go to the lower index), at most
 32, while the cubes stay within the budget: a cube that would pass it is skipped and
 farther ones that fit are still taken; the nearest is always kept, and so is the
 fallback probe (above). They share one
@@ -118,7 +136,7 @@ path and the runtime falls back to the skybox. `Move`/`SetBox`/`SetCubemap`/`Set
 | `Reflection.SetFallback` | `(index \| nil)` | `true`, or `false` for an index past the set (nothing changes) — name the fallback probe, or none with `nil`; any other loses the flag |
 | `Reflection.GetFallback` | `()` | the fallback probe's `index`, or `nil` |
 | `Reflection.SetCubemap` | `(index, path)` | — (point the probe at a baked cubemap KTX2 file) |
-| `Reflection.Set` | `(index, { position?, boxMin?, boxMax?, cubemap?, boxProjection?, blendDistance?, importance?, resolution?, nearClip?, farClip?, shadows?, intensity?, manual? })` | — (changes only the fields it names, each clamped to its range) |
+| `Reflection.Set` | `(index, { position?, boxMin?, boxMax?, rotation?, shape?, radius?, cubemap?, boxProjection?, blendDistance?, importance?, resolution?, nearClip?, farClip?, shadows?, intensity?, manual? })` | — (changes only the fields it names, each clamped to its range) |
 | `Reflection.Get` | `(index)` | every field above as a table, or `nil` |
 | `Reflection.Bake` *(dev-only)* | `()` | `true` if the bake ran, `false` if no GPU/software adapter was available (skipped, nothing written or removed) — the real prefiltered cubemap bake. With **no probes it is not a no-op**: it deletes every cube in the scene's `<scene file>.reflections/` folder and returns `true` |
 | `Reflection.Remove` | `(index)` | — |

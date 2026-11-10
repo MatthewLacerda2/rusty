@@ -9,8 +9,9 @@
 //!   * Light probes — a small 3-axis cross marker at each probe position, TINTED by the
 //!     probe's baked SH irradiance (sampled toward world-up), so dead/dark or
 //!     mis-bounced probes read at a glance.
-//!   * Reflection probes — a wireframe of the parallax box (`box_min`..`box_max`, via
-//!     the shared `aabb_wireframe` helper). The capture position is not a line: it is
+//!   * Reflection probes — a wireframe of the parallax volume: the box
+//!     (`box_min`..`box_max`, via the shared `aabb_wireframe` helper) turned by the
+//!     probe's rotation, or three great circles of a sphere probe (#1995). The capture position is not a line: it is
 //!     a mirror ball showing the probe's cube, or grey when the cube is not resident
 //!     (`probe_ball`, #1911), drawn before these lines through its own pipeline.
 //!
@@ -20,7 +21,7 @@
 //! gizmo set has it on (`Gizmo::LightProbes`, `Gizmo::ReflectionProbes`, #1909);
 //! Area lights are not probes and always draw.
 
-use glam::{Mat4, Vec3};
+use glam::{Mat4, Quat, Vec3};
 use wgpu::util::DeviceExt;
 
 use super::{aabb_wireframe, OverlayBindings, OverlayDraws};
@@ -29,7 +30,7 @@ use crate::core::application::{Gizmo, SceneGizmos};
 use crate::render::draw::resources::ProbeResource;
 use crate::render::Renderer;
 use crate::scene::lighting::sh::Sh9;
-use crate::scene::Scene;
+use crate::scene::{ProbeShape, ReflectionProbe, Scene};
 
 /// Half-length of a probe cross marker's arms, in world units.
 const MARKER_HALF: f32 = 0.15;
@@ -62,8 +63,8 @@ impl Renderer {
         // ball (`probe_ball`, #1911).
         if gizmos.on(Gizmo::ReflectionProbes) {
             for probe in &scene.reflection_probes.probes {
-                let box_verts = aabb_wireframe(probe.box_min, probe.box_max);
-                resources.push(self.build_probe_resource(draws, &box_verts, REFLECTION_TINT));
+                let verts = reflection_volume_verts(probe);
+                resources.push(self.build_probe_resource(draws, &verts, REFLECTION_TINT));
             }
         }
         // Area lights (#1674), baked only, ride the same line path.
@@ -137,6 +138,35 @@ pub(crate) fn probe_marker_verts(center: Vec3, half: f32) -> Vec<Vertex> {
     verts
 }
 
+/// Line-list vertices of a reflection probe's volume (#1995): its box's 12 edges
+/// turned by its rotation about its capture point, or a sphere's three great circles.
+pub(crate) fn reflection_volume_verts(probe: &ReflectionProbe) -> Vec<Vertex> {
+    const SEGMENTS: usize = 32;
+    if probe.shape == ProbeShape::Box {
+        let mut verts = aabb_wireframe(probe.box_min, probe.box_max);
+        if probe.rotation != Quat::IDENTITY {
+            let c = probe.position;
+            for v in &mut verts {
+                v.position = (c + probe.rotation * (Vec3::from(v.position) - c)).to_array();
+            }
+        }
+        return verts;
+    }
+    let mut verts = Vec::with_capacity(3 * SEGMENTS * 2);
+    let at = |a: Vec3, b: Vec3, k: usize| {
+        let t = k as f32 / SEGMENTS as f32 * std::f32::consts::TAU;
+        let p = probe.position + (a * t.cos() + b * t.sin()) * probe.radius;
+        Vertex::new(p, Vec3::Y, [0.0, 0.0])
+    };
+    for (a, b) in [(Vec3::X, Vec3::Y), (Vec3::Y, Vec3::Z), (Vec3::Z, Vec3::X)] {
+        for k in 0..SEGMENTS {
+            verts.push(at(a, b, k));
+            verts.push(at(a, b, k + 1));
+        }
+    }
+    verts
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,6 +217,23 @@ mod tests {
             tint[0] > tint[1] && tint[1] > tint[2],
             "warm hue not preserved: {tint:?}"
         );
+    }
+
+    /// A turned box's wireframe ends at its turned corners; a sphere's sits on it.
+    #[test]
+    fn a_reflection_volume_wireframe_follows_its_rotation_and_shape() {
+        let mut p = ReflectionProbe::new(Vec3::new(2.0, 0.0, 0.0), Vec3::ONE);
+        p.rotation = Quat::from_rotation_y(0.5);
+        let corners = p.corners();
+        for v in reflection_volume_verts(&p) {
+            let near = |c: &Vec3| c.distance(Vec3::from(v.position)) < 1e-5;
+            assert!(corners.iter().any(near), "{:?}", v.position);
+        }
+        (p.shape, p.radius) = (ProbeShape::Sphere, 3.0);
+        for v in reflection_volume_verts(&p) {
+            let r = Vec3::from(v.position).distance(p.position);
+            assert!((r - 3.0).abs() < 1e-4, "{r}");
+        }
     }
 
     /// The cross marker is three segments (6 vertices) centred on the point, each arm

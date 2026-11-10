@@ -143,6 +143,10 @@ fn lighting_uniform_matches_wgsl_layout() {
         ("sky_sh", offset_of!(AmbientLightUniform, sky_sh)),
     ];
     assert_layout("AmbientLight", &ambient, size_of::<AmbientLightUniform>());
+}
+
+#[test]
+fn reflection_probe_matches_wgsl_layout() {
     let probe = [
         ("mip_base", offset_of!(ReflectionProbeUniform, mip_base)),
         ("box_min", offset_of!(ReflectionProbeUniform, box_min)),
@@ -150,6 +154,9 @@ fn lighting_uniform_matches_wgsl_layout() {
         ("box_max", offset_of!(ReflectionProbeUniform, box_max)),
         ("layer", offset_of!(ReflectionProbeUniform, layer)),
         ("params", offset_of!(ReflectionProbeUniform, params)),
+        ("irradiance", offset_of!(ReflectionProbeUniform, irradiance)),
+        ("rotation", offset_of!(ReflectionProbeUniform, rotation)),
+        ("shape", offset_of!(ReflectionProbeUniform, shape)),
     ];
     assert_layout(
         "ReflectionProbe",

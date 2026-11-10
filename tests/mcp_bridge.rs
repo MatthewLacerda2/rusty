@@ -14,10 +14,9 @@ use rusty::dev::session::Session;
 fn drive(lines: &[&str]) -> Vec<Value> {
     let sess = Session::new("").expect("session boots in edit mode");
     let input = lines.join("\n").into_bytes();
-    let mut out = Vec::new();
-    mcp::run(&sess, &input[..], &mut out).expect("runs to EOF");
-    String::from_utf8(out)
-        .unwrap()
+    let out = mcp::progress::Captured::default();
+    mcp::run(&sess, &input[..], out.clone()).expect("runs to EOF");
+    out.text()
         .lines()
         .map(|l| serde_json::from_str(l).expect("each response line is JSON"))
         .collect()

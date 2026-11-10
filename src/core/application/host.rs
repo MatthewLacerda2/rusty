@@ -1,5 +1,5 @@
-//! What the host asks of the run, and the run of its host: quit, Play and
-//! standalone (split out of the module root for size).
+//! What the host asks of the run, and the run of its host: quit, Play,
+//! standalone and whether it steps a background bake (split out of the module root for size).
 
 use super::Application;
 
@@ -54,5 +54,17 @@ impl Application {
     /// Mark the run standalone, once, at boot (`GameWorld::boot_standalone`).
     pub fn mark_standalone(&mut self) {
         self.standalone = true;
+    }
+
+    /// Mark the host as one whose frame loop steps the editor's background bake
+    /// (the editor window, each frame, #1999).
+    pub fn mark_bake_host(&mut self) {
+        self.bake_host = true;
+    }
+
+    /// Whether a background bake started now would be stepped: only the editor
+    /// window runs Generate Lighting's job (`Lighting.GenerateAsync()`).
+    pub fn bake_host(&self) -> bool {
+        self.bake_host
     }
 }

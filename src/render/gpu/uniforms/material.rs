@@ -153,10 +153,12 @@ pub(crate) struct SurfaceUniform {
     /// Thin translucency: rgb the transmission colour times its amount, `w` the
     /// amount (0: none).
     pub transmission: [f32; 4],
-    /// 1 when the surface traces screen-space reflections (#1570): a lit
-    /// `Transparent` material with `receive_ssr` that can be smooth enough to
-    /// reflect (`postfx::effects::ssr::transparent::traces`); it traces only where
-    /// the camera's `ssr.x` gives a march.
+    /// 1 when the surface takes screen-space reflections. On a lit `Transparent`
+    /// material (#1570): it traces its own, having `receive_ssr` and able to be
+    /// smooth enough to reflect (`postfx::effects::ssr::transparent::traces`), only
+    /// where the camera's `ssr.x` gives a march. On a lit opaque or cutout one
+    /// (#2004): its pixels keep the SSR record the SSR pass reads; 0 zeroes it, so
+    /// the surface keeps its probe reflection.
     pub receive_ssr: u32,
     /// TAA's reactivity (#1845): below zero `Auto`, else the fixed value
     /// (`TaaReactive::gpu`); 0 on an opaque surface, which writes none.

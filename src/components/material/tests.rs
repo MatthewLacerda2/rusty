@@ -82,3 +82,18 @@ fn map_coordinates_round_trip_and_default_when_absent() {
         ([1.0, 1.0], UvMapping::Uv0)
     );
 }
+
+#[test]
+fn receive_ssr_unset_follows_the_render_mode_and_a_set_value_stays() {
+    let mut m = MaterialAsset::default();
+    assert!(m.receives_ssr(), "opaque takes SSR by default");
+    m.render_mode = RenderMode::Cutout;
+    assert!(m.receives_ssr());
+    m.render_mode = RenderMode::Transparent;
+    assert!(!m.receives_ssr(), "a translucent traces only when asked");
+    m.receive_ssr = Some(false);
+    m.render_mode = RenderMode::Opaque;
+    assert!(!m.receives_ssr(), "a set value survives a mode change");
+    let unset = serde_json::to_string(&MaterialAsset::default()).unwrap();
+    assert!(!unset.contains("receive_ssr"), "unset is not written");
+}

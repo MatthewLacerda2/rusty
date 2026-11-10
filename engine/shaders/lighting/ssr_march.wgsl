@@ -83,53 +83,160 @@ fn footprint(f: Frame, p: vec3<f32>, r: vec3<f32>, t: f32, cone: f32, uv: vec2<f
     return 2.0 * length((rim_uv - uv) * dim);
 }
 
-// March the reflected ray `r` from `origin` in `steps` steps of `step` world units,
-// against `t_depth`'s depths as `f` measures them. Returns the colour of `t_color`
-// it hits and, in `.w`, how much the hit counts (0: a miss): faded at the screen's
-// edge, wider by the blur's radius, and over the reach's last `REACH_FADE`.
+// The longest a march step may move on screen, as a fraction of the screen's
+// shorter side (#2004): a step that would move further is shortened to it. A fixed
+// world step near the camera jumps tens of texels between depth taps and steps past
+// a thin object (a bottle, a pole) or a grazing floor, drawing its reflection as
+// stair-steps and dashes; a step held to this sees anything wider than it. The
+// reach so spent is the march's, not the world step's: `trace` fades by the steps.
+// A march of fewer than 64 steps is capped at `1 / steps` of that side instead
+// (`step_cap`), so any step count can still cross the screen's height: the cap
+// never cuts a quality level's reach to a fraction of the screen, it only spends
+// more of a long count's steps where the ray moves fast.
+const SCREEN_STEP: f32 = 1.0 / 64.0;
+
+// The cap in texels of `dim` for a march of `steps` steps: `SCREEN_STEP` or
+// `1 / steps` of the shorter side, whichever is longer.
+fn step_cap(steps: i32, dim: vec2<f32>) -> f32 {
+    return max(SCREEN_STEP, 1.0 / f32(max(steps, 1))) * min(dim.x, dim.y);
+}
+
+// How far behind the scene's depth a refined hit may lie and still count (#2004):
+// a ray that crosses a surface refines to within a texel of it, one that passes
+// behind an object refines onto the object's edge, still behind it by however far
+// it passed. The depth target holds only front faces, so a ray that meets an
+// object's unseen back is behind its front by the object's own depth: `THICKNESS`
+// is how deep an object is taken to be (a bottle, a pole, a crate's edge), and a ray
+// further behind passes it. `DEPTH_SLACK`, a fraction of the depth, is a texel's
+// own depth on a surface seen near grazing: 2% holds a floor down to a few degrees
+// at 1080p (a texel's depth there is about `depth × 0.001 / tan(angle)`).
+const THICKNESS: f32 = 0.15;
+const DEPTH_SLACK: f32 = 0.02;
+
+// Where a hit's blur, the cone's on-screen radius as a fraction of the screen's
+// shorter side, stops being able to hide what the march cannot blur (#2004): the
+// pyramid softens the hit's colour, but where a ray stops hitting (a reflected
+// silhouette) is decided per pixel, so a wide blur drawn inside a hard edge reads
+// as a block. From `BLUR_FADE_START` the hit fades out to the probe it replaces,
+// gone at `BLUR_FADE_END`. A contact reflection (a short ray) keeps a narrow blur
+// and stays; a long ray from a rough surface takes the probe.
+const BLUR_FADE_START: f32 = 0.04;
+const BLUR_FADE_END: f32 = 0.12;
+
+// Where `p` lands on screen (`uv`) and whether in front of the camera: `probe`
+// without the depth tap.
+fn project(f: Frame, p: vec3<f32>) -> vec3<f32> {
+    let clip = f.view_proj * vec4<f32>(p, 1.0);
+    let s = clip.xy / max(clip.w, 1e-6);
+    return vec3<f32>(s.x * 0.5 + 0.5, 0.5 - s.y * 0.5, clip.w);
+}
+
+// How far behind the scene at `p` a point may lie and still be on it.
+fn slack(f: Frame, p: vec3<f32>) -> f32 {
+    return max(THICKNESS, depth_of(f, p) * DEPTH_SLACK);
+}
+
+// Where a march point stands against the scene: in front of it (or over the sky),
+// on it (behind by at most `slack`: a hit), or beyond it.
+const FRONT: i32 = 0;
+const ON: i32 = 1;
+const BEYOND: i32 = 2;
+
+fn state(f: Frame, here: Probe, p: vec3<f32>) -> i32 {
+    if (!here.valid || here.behind <= 0.0) {
+        return FRONT;
+    }
+    return select(BEYOND, ON, here.behind <= slack(f, p));
+}
+
+// Where between `a` (of state `start`) and `b` the ray first changes state: the
+// point on `b`'s side of the boundary after `REFINE` halvings. From in front, the
+// boundary is where it goes behind the scene; from beyond, where it comes back
+// within `slack` (or in front).
+fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start: i32) -> vec3<f32> {
+    var keep = a;
+    var go = b;
+    for (var j = 0; j < REFINE; j = j + 1) {
+        let mid = (keep + go) * 0.5;
+        let s = state(f, probe(f, t_depth, mid), mid);
+        if (s == start) {
+            keep = mid;
+        } else {
+            go = mid;
+        }
+    }
+    return go;
+}
+
+// March the reflected ray `r` from `origin` in `steps` steps of at most `step`
+// world units (and at most `step_cap` on screen), against `t_depth`'s
+// depths as `f` measures them. Each point is in front of the scene, on it (behind
+// by at most `slack`: an object `THICKNESS` deep) or beyond it. A step that
+// leaves the front, or comes back from beyond, is refined by bisection to where it
+// changed (`refine`), and hits only if that point is on the scene: one that went
+// behind a thin object's edge, or came out beside it, marches on. Returns the
+// colour of `t_color` it hits and, in `.w`, how much the hit counts (0: a miss):
+// faded at the screen's edge, wider by the blur's radius, over the march's last
+// `REACH_FADE` of its steps, and out where the blur is too wide to hide a hard
+// edge (`BLUR_FADE_START`).
 //
 // `cone` is the tangent of the half-angle of the surface's GGX lobe (0: a mirror,
 // #1736): the hit is read at the mip of `t_color` whose texels are the cone's
 // on-screen width there, so a rough surface reflects a blur of what it sees (cone
 // tracing, as Frostbite and UE do). A `t_color` with one level reads sharp.
 fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32) -> vec4<f32> {
-    let thickness = step * 1.5;
+    let depth_dim = vec2<f32>(textureDimensions(t_depth));
+    let cap = step_cap(steps, depth_dim);
     var prev = origin;
+    var prev_uv = project(f, origin).xy;
+    var was = FRONT;
     for (var i = 0; i < steps; i = i + 1) {
-        let p = origin + r * (step * f32(i + 1));
+        var len = step;
+        let ahead = project(f, prev + r * step);
+        let moved = length((ahead.xy - prev_uv) * depth_dim);
+        if (ahead.z > 0.0 && moved > cap) {
+            len = step * cap / moved;
+        }
+        let p = prev + r * len;
         let here = probe(f, t_depth, p);
         if (!here.on_screen) {
             break;
         }
-        if (here.valid && here.behind > 0.0 && here.behind < thickness) {
-            // Bisect between the last point in front and this one behind.
-            var front = prev;
-            var back = p;
-            for (var j = 0; j < REFINE; j = j + 1) {
-                let mid = (front + back) * 0.5;
-                let m = probe(f, t_depth, mid);
-                if (m.valid && m.behind > 0.0) {
-                    back = mid;
-                } else {
-                    front = mid;
-                }
+        let now = state(f, here, p);
+        if (now != was) {
+            var back = refine(f, t_depth, prev, p, was);
+            var hit = probe(f, t_depth, back);
+            // The halving can settle on another boundary than the one the step
+            // crossed (two edges between its ends): a step that landed on the scene
+            // still hits there.
+            if (state(f, hit, back) != ON && now == ON) {
+                back = p;
+                hit = here;
             }
-            let hit = probe(f, t_depth, back);
-            let dim = vec2<f32>(textureDimensions(t_color));
-            let t = distance(origin, back);
-            let width = footprint(f, back, r, t, cone, hit.uv, dim);
-            let top = f32(textureNumLevels(t_color) - 1u);
-            let lod = clamp(log2(max(width, 1.0)), 0.0, top);
-            let edge = min(min(hit.uv.x, 1.0 - hit.uv.x), min(hit.uv.y, 1.0 - hit.uv.y));
-            let blur = 0.5 * width / min(dim.x, dim.y);
-            let reach = f32(steps) * step;
-            let far = clamp((reach - t) / (reach * REACH_FADE), 0.0, 1.0);
-            // Explicit-LOD sample: a gradient instruction inside this break-bounded
-            // (varying-iteration) loop fails to compile under D3D12/FXC.
-            let colour = textureSampleLevel(t_color, s_color, hit.uv, lod).rgb;
-            return vec4<f32>(colour, clamp(edge / (SCREEN_FADE + blur), 0.0, 1.0) * far);
+            if (state(f, hit, back) == ON) {
+                let dim = vec2<f32>(textureDimensions(t_color));
+                let t = distance(origin, back);
+                let width = footprint(f, back, r, t, cone, hit.uv, dim);
+                let top = f32(textureNumLevels(t_color) - 1u);
+                let lod = clamp(log2(max(width, 1.0)), 0.0, top);
+                let edge = min(min(hit.uv.x, 1.0 - hit.uv.x), min(hit.uv.y, 1.0 - hit.uv.y));
+                let blur = 0.5 * width / min(dim.x, dim.y);
+                let done = f32(i) + distance(prev, back) / len;
+                let far = clamp((f32(steps) - done) / (f32(steps) * REACH_FADE), 0.0, 1.0);
+                let wide = clamp((BLUR_FADE_END - blur) / (BLUR_FADE_END - BLUR_FADE_START), 0.0, 1.0);
+                // Explicit-LOD sample: a gradient instruction inside this break-bounded
+                // (varying-iteration) loop fails to compile under D3D12/FXC.
+                // At the centre of the depth texel the hit was tested against: a
+                // refined hit lies on that texel's edge, and a filtered read there
+                // would take half its colour from the surface beside it.
+                let centre = (floor(clamp(hit.uv, vec2<f32>(0.0), vec2<f32>(0.999999)) * depth_dim) + 0.5) / depth_dim;
+                let colour = textureSampleLevel(t_color, s_color, centre, lod).rgb;
+                return vec4<f32>(colour, clamp(edge / (SCREEN_FADE + blur), 0.0, 1.0) * far * wide);
+            }
         }
         prev = p;
+        prev_uv = here.uv;
+        was = now;
     }
     return vec4<f32>(0.0);
 }

@@ -24,12 +24,16 @@ DISABLED = {"name": "rusty #6 f", "enabled": False, "ended_reason": ""}
 SOON = datetime(2026, 11, 7, 4, 1, 42, tzinfo=timezone.utc)
 
 
-def pr(number: int, draft: bool) -> dict:
-    return {"number": 100 + number, "draft": draft, "head": {"ref": f"{number}-slug"}}
-
-
 def note(body: str, at: str, who: str = "OWNER") -> dict:
     return {"body": body, "created_at": at, "author_association": who}
+
+
+#: A review record on `pr(2, …)` and `pr(3, …)`'s conversations (#2017).
+REVIEWED = {n: [note("Independent review (high)", "2026-11-07T05:00:00Z")] for n in (102, 103)}
+
+
+def pr(number: int, draft: bool) -> dict:
+    return {"number": 100 + number, "draft": draft, "head": {"ref": f"{number}-slug"}}
 
 
 def hub(pulls=(), comments=None, closed=(), now=SOON, shut=()) -> running.GitHub:
@@ -53,8 +57,8 @@ class State(unittest.TestCase):
             with self.subTest(found["last_run"]["status"]):
                 self.assertEqual(placed(found, hub([pr(2, True)])), "running")
 
-    def test_a_ready_pull_request_has_ended(self):
-        self.assertEqual(placed(FIRED, hub([pr(2, False)])), "ended")
+    def test_a_ready_pull_request_has_ended_once_reviewed(self):
+        self.assertEqual(placed(FIRED, hub([pr(2, False)], REVIEWED)), "ended")
 
     def test_a_merged_coder_has_ended_though_its_session_is_active(self):
         self.assertEqual(placed(WAITS, hub([], closed={2})), "ended")
@@ -107,20 +111,20 @@ class Coders(unittest.TestCase):
         ready = {**FIRED, "name": "rusty #3 c"}
         stale = {**FIRED, "name": "rusty #4 d", "last_run": {"fired_at": "2026-11-07T01:00:00Z"}}
         counted, noted = running.coders([WAITING, FIRED, ready, stale, NO_TIME, {"name": "scorsese #2 b"}], 99,
-                                        hub([pr(2, True), pr(3, False)]))
-        self.assertEqual([c["name"] for c in counted], ["rusty #1 a", "rusty #2 b"])
+                                        hub([pr(2, True), pr(3, False)], REVIEWED))
+        self.assertEqual([c["name"] for c, _ in counted], ["rusty #1 a", "rusty #2 b"])
         self.assertEqual([(found["name"], placed) for found, placed, _ in noted],
                          [("rusty #4 d", "ended"), ("rusty #5 e", "unknown")])
 
     def test_only_the_newest_routine_of_an_issue_is_placed(self):
         old = {**WAITS, "created_at": "2026-11-06T00:00:00Z"}
         new = {**WAITING, "name": "rusty #2 b", "created_at": "2026-11-07T00:00:00Z"}
-        counted, _ = running.coders([new, old], 99, hub([pr(2, False)]))
-        self.assertEqual(counted, [new])
+        counted, _ = running.coders([new, old], 99, hub([pr(2, False)], REVIEWED))
+        self.assertEqual(counted, [(new, "not fired")])
 
     def test_the_issue_being_launched_is_never_counted(self):
         counted, _ = running.coders([WAITING, FIRED], 2, hub([pr(2, True)]))
-        self.assertEqual(counted, [WAITING])
+        self.assertEqual(counted, [(WAITING, "not fired")])
 
     def test_only_rusty_routines_count(self):
         self.assertEqual(running.issue({"name": "scorsese #2 b"}), None)

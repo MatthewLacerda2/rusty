@@ -74,15 +74,15 @@ pub use camera::{
 };
 pub use identity::SceneId;
 pub use io::{
-    build_default_scene, bundled, load_from_file, load_parsed, parse_scene_text, print_refresh,
-    read_scene_file, save_lighting, save_to_file, seed_default_scene, seed_default_scripts,
-    seed_project, seed_workspace, LightingSave, LoadError, DEFAULT_SCENE_PATH,
-    DEFAULT_SCRIPTS_DEST_DIR, LIGHTING_IN_PLAY, SCENE_EXTENSION,
+    build_default_scene, bundled, load_from_file, load_parsed, new_scene, parse_scene_text,
+    print_refresh, read_scene_file, save_lighting, save_to_file, seed_default_scene,
+    seed_default_scripts, seed_project, seed_workspace, LightingSave, LoadError,
+    DEFAULT_SCENE_PATH, DEFAULT_SCRIPTS_DEST_DIR, LIGHTING_IN_PLAY, NEW_IN_PLAY, SCENE_EXTENSION,
 };
 pub use lighting::io::{sidecar_path, LightingData};
 pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
 pub use lighting::probe_fill::analytic_fill;
-pub use lighting::reflection_probe::{ReflectionProbe, ReflectionProbeSet};
+pub use lighting::reflection_probe::{ProbeShape, ReflectionProbe, ReflectionProbeSet};
 pub use lighting::sh::Sh9;
 pub use prefab::link::{list_instance_overrides, reimport_instance, revert_instance_overrides};
 pub use prefab::{

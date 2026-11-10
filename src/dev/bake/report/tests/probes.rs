@@ -63,19 +63,23 @@ fn the_timeline_gives_each_stage_its_own_time() {
         total: 4,
     };
     let reflection = |done| Stage::Reflection { done, total: 2 };
-    for stage in [
+    // Fixed instants, never a real sleep: a scheduler's overshoot is no
+    // property of the timeline (#2011).
+    let start = std::time::Instant::now();
+    let ms = std::time::Duration::from_millis;
+    let stages = [
         light(1),
         light(1),
         light(2),
         reflection(0),
         reflection(1),
         Stage::Done,
-    ] {
-        t.note(stage);
-        std::thread::sleep(std::time::Duration::from_millis(2));
+    ];
+    for (at, stage) in [0, 2, 5, 9, 14, 20].into_iter().zip(stages) {
+        t.note_at(stage, start + ms(at));
     }
-    assert_eq!((t.bounces.len(), t.reflections.len()), (2, 2));
-    assert!(t.bounces[0] > t.bounces[1], "bounce 1 had two steps");
+    assert_eq!(t.bounces, [ms(5), ms(4)], "bounce 1 had two steps");
+    assert_eq!(t.reflections, [ms(5), ms(6)]);
     let (light, reflection) = t.stages();
     let names: Vec<_> = light
         .to_json()
