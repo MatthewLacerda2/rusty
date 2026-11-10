@@ -191,21 +191,26 @@ fn run(
             }
         }
     }
-    // A target named twice is rebuilt for all but its last request.
-    let images = plan
-        .targets
-        .iter()
-        .enumerate()
-        .map(|(k, &i)| {
-            let held = if plan.targets[k + 1..].contains(&i) {
-                slots[i].as_ref().map(|h| h.view().into_owned())
-            } else {
-                slots[i].take().map(Held::into_image)
-            };
-            held.expect("every target was evaluated")
-        })
-        .collect();
+    let images = take_targets(&plan.targets, &mut slots);
     Ok(Run { images, peak_live })
+}
+
+/// The targets' images in request order, each rebuilt whole; one named twice is
+/// copied for all but its last request.
+fn take_targets(targets: &[usize], slots: &mut [Option<Held>]) -> Vec<Image> {
+    let take = |k: usize, i: usize, slots: &mut [Option<Held>]| {
+        let held = if targets[k + 1..].contains(&i) {
+            slots[i].as_ref().map(|h| h.view().into_owned())
+        } else {
+            slots[i].take().map(Held::into_image)
+        };
+        held.expect("every target was evaluated")
+    };
+    let mut images = Vec::with_capacity(targets.len());
+    for (k, &i) in targets.iter().enumerate() {
+        images.push(take(k, i, slots));
+    }
+    images
 }
 
 #[cfg(test)]
