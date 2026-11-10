@@ -3,7 +3,7 @@
 //!
 //! Unity's `LightProbeProxyVolume`: a mesh entity that carries one is lit from the
 //! light probes sampled on a small 3D grid over its bounds, interpolated per pixel,
-//! instead of from one sample at its origin. A 2 m locker under a wall lamp then
+//! instead of from one sample at its world bounds' centre. A 2 m locker under a wall lamp then
 //! goes from a lit top to a dark foot; without the component it stays one colour.
 //!
 //! Pure authoring data, values only: the box (the mesh's own local bounds, or a
