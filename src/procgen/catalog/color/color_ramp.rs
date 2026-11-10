@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::procgen::catalog::{Cx, Op, Row};
 use crate::procgen::image_buf::Image;
-use crate::procgen::ops::color;
+use crate::procgen::ops::ramp;
 use crate::procgen::recipe::{
     choice, op, req, Lit, OpInfo, OpParam, RampInterpolation, RampStop, ONE,
 };
@@ -35,6 +35,6 @@ impl Row for ColorRamp {
 
 impl Op for ColorRamp {
     fn run(&self, cx: &Cx) -> Image {
-        color::color_ramp(cx.own(), &self.stops, self.interpolation)
+        ramp::color_ramp(cx.own(), &self.stops, self.interpolation)
     }
 }

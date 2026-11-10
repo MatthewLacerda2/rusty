@@ -371,7 +371,8 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
 - `color_ramp {stops, interpolation="linear"|"constant"|"ease"}` (*color*, 1 input):
   as Blender's ColorRamp: `constant` holds each stop's colour from its position up to
   the next stop — hard bands for toon, stylized and posterized looks — and `ease` is
-  a smoothstep between stops, soft into and out of each colour.
+  a smoothstep between stops, soft into and out of each colour. Each pixel finds its
+  stops by binary search, so a lookup ramp of thousands of stops stays cheap.
 - `combine_rgb` (*vector*, 1 to 4 inputs): grayscale inputs → R, G, B and alpha (each
   input's red); a colour channel without an input reads 0, alpha without one reads 1.
 - `constant {color}` (*generator*).
