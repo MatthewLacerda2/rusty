@@ -38,14 +38,16 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 | `base_color` / `albedo` | **sRGB** | — |
 | `emissive` | **sRGB** | — |
 | `normal` | linear | tangent-space (use a `bump_to_normal` op) |
+| `normal16` | linear, **16-bit** | as `normal`, for relief subtler than one 8-bit step |
 | `roughness` | linear | — |
 | `metallic` | linear | — |
 | `metallic_roughness` / `orm` | linear | reads **metallic from the input's R, roughness from its G** (input B is ignored), and writes them as glTF's packed map: **metallic → B, roughness → G**, R = 0 |
 | `data` | linear, **16-bit** | — (height/masks/anything raw; the explicit way to get unencoded output) |
 
-Every slot bakes 8 bits per channel except `data`, which bakes a **16-bit** PNG
-(#1491): a height field used as displacement or a terrain heightmap keeps 65536
-levels instead of terracing into 256 steps. The 16 bits are the file's: the renderer
+Every slot bakes 8 bits per channel except `data` and `normal16`, which bake a
+**16-bit** PNG (#1491, #2002): a height field used as displacement or a terrain
+heightmap keeps 65536 levels instead of terracing into 256 steps, and a normal map
+keeps slopes under about 0.004 that 8 bits round flat (a mirror-polished stone). The 16 bits are the file's: the renderer
 loads it as a material map like any other PNG, but uploads every map at 8 bits per
 channel at most today (and block-compressed below that once the import cache has
 made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the extra precision serves what reads the file itself (an
@@ -95,6 +97,7 @@ and the file name use the canonical name: `albedo` → `base_color`, `orm` →
 | `base_color` | `base_color_map` |
 | `emissive` | `emissive_map` |
 | `normal` | `normal_map` |
+| `normal16` | `normal_map` (a set names `normal` or `normal16`, not both) |
 | `roughness` | `roughness_map` |
 | `metallic` | `metallic_map` |
 | `metallic_roughness` | `metallic_map` **and** `roughness_map` (the same PNG) |

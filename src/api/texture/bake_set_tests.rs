@@ -81,6 +81,8 @@ fn a_bad_outputs_table_is_refused_before_writing() {
     assert!(err.contains("unknown slot \"basecolour\""), "{err}");
     let err = refused(&lua, "{ albedo = 'albedo', base_color = 'b' }");
     assert!(err.contains("base_color slot twice"), "{err}");
+    let err = refused(&lua, "{ normal = 'nrm', normal16 = 'nrm' }");
+    assert!(err.contains("normal slot twice"), "{err}");
     let err = refused(&lua, "{ normal = 'nrm', base_color = 'ghost' }");
     assert!(err.contains("'ghost' not found"), "{err}");
     let written = std::fs::read_dir(&dir).unwrap().count();
