@@ -69,3 +69,24 @@ fn a_request_reads_as_running_and_holds_off_another_bake() {
     let blocking = s.eval("Lighting.Generate()").unwrap_err();
     assert!(blocking.contains("already running"), "{blocking}");
 }
+
+/// A load replaces the scene the request asked about: it is dropped, and the
+/// status says so in band (#1999's review: it baked the loaded scene).
+#[test]
+fn a_load_drops_a_request_and_the_status_says_why() {
+    let s = hosted("load_drops", true);
+    s.eval("Lighting.GenerateAsync()").unwrap();
+    let other = crate::test_temp::dir().join("generate_async_other.scene");
+    let other = other.to_string_lossy().into_owned();
+    crate::scene::Scene::new().save_to_file(&other).unwrap();
+    s.world()
+        .scene()
+        .borrow_mut()
+        .load_from_file(&other)
+        .unwrap();
+    assert_eq!(s.eval("Lighting.IsRunning()").unwrap(), "false");
+    let state = s.eval("return Lighting.GetBakeStatus().state").unwrap();
+    assert!(state.contains("refused"), "{state}");
+    let why = s.eval("return Lighting.GetBakeStatus().message").unwrap();
+    assert!(why.contains("another scene was loaded"), "{why}");
+}

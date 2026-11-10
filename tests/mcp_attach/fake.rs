@@ -27,7 +27,8 @@ impl Dup for std::net::TcpStream {
 
 /// Per-connection: read each command line and reply with a framed JSON line that
 /// echoes the received line back as the `result`, so a test can assert the exact line
-/// crossed the socket. A `Lighting.Generate` line streams one progress line first.
+/// crossed the socket. A line that asks for progress (`ASK`, #1999) streams one
+/// progress line first and has the ask taken off.
 fn serve<S: Dup>(stream: S) {
     let mut writer = match stream.dup() {
         Ok(w) => w,
@@ -38,8 +39,10 @@ fn serve<S: Dup>(stream: S) {
         if line.trim().is_empty() {
             continue;
         }
-        // A line naming a bake tells a progress line first, as a window's does.
-        if line.contains("Lighting.Generate") {
+        // A line that asks hears a progress line first, as a window's bake tells.
+        let (asked, line) = rusty::dev::command_channel::asks(&line);
+        let line = line.to_string();
+        if asked {
             let _ = writeln!(writer, r#"{{"progress":"[Lighting] 0:05 lightmaps 40%"}}"#);
         }
         let reply = format!(r#"{{"ok":true,"result":{}}}"#, Value::String(line));

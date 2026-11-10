@@ -1,21 +1,26 @@
-//! `Lighting.GenerateAsync()` and `Lighting.IsRunning()` (#1999), Unity's
-//! `Lightmapping.BakeAsync` and `Lightmapping.isRunning`: the editor's Generate
+//! `Lighting.GenerateAsync()`, `Lighting.IsRunning()` and `Lighting.GetBakeStatus()`
+//! (#1999), Unity's `Lightmapping.BakeAsync` and `Lightmapping.isRunning`: the editor's Generate
 //! Lighting button from a script. `Lighting.Generate()` blocks its caller for the
 //! whole bake, and an MCP client gives up on a tool call that has said nothing for
 //! 30 minutes; this starts the button's own job and returns at once, so an agent
 //! polls `IsRunning()` and reads `Lighting.GetBakeReport(kind)` when it is done.
+//! `GetBakeStatus()` says how the last one ended (done, cancelled, failed or
+//! refused, with its line), in band: a failure in the editor's job reaches only
+//! the window's console otherwise, and `IsRunning()` alone reads `false` either way.
 //!
 //! The call only *requests* the bake (`Scene::lighting_bake_requested`): the
 //! editor's inspector takes it on its next frame (`bake::poll`) and runs the
 //! button's job, so nothing a script starts differs from what the button starts.
 //! It is refused where the button is (Play, a bake already running, an unsaved
 //! scene) and in a host with no frame loop to step the job (a headless session),
-//! which names `Lighting.Generate()` instead.
+//! which names `Lighting.Generate()` instead. A request belongs to the scene and
+//! mode it was made in: Play, Stop and a load drop it (`Scene::drop_bake_request`).
 
 use mlua::Lua;
 
 use crate::api::{global_table, put, ApiCtx, Reg};
 use crate::dev::bake::generate_lighting::refuse_while_baking;
+use crate::scene::lighting::bake_status::BakeStatus;
 use crate::scene::LIGHTING_IN_PLAY;
 
 /// Why a host that steps no background bake refuses `GenerateAsync`.
@@ -23,7 +28,7 @@ pub const NO_BAKE_HOST: &str = "Lighting.GenerateAsync: no editor frame loop her
 run the bake in the background (a headless session or a standalone run); call \
 Lighting.Generate() instead, which bakes in the one call";
 
-/// Add `GenerateAsync` and `IsRunning` to the `Lighting` table.
+/// Add `GenerateAsync`, `IsRunning` and `GetBakeStatus` to the `Lighting` table.
 pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let (scene, scene_path, app) = (ctx.scene, ctx.scene_path, ctx.application);
     let table = global_table(lua, "Lighting")?;
@@ -45,6 +50,7 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
                 return refuse("Lighting.GenerateAsync: save the scene first");
             }
             scene.lighting_bake_requested = true;
+            scene.lighting_bake_status = BakeStatus::Requested;
             // The editor sleeps outside Play (#1721): a frame takes the request.
             crate::core::wake::frame();
             Ok(true)
@@ -53,10 +59,17 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     put(
         &table,
         "IsRunning",
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().bake_busy())),
+    )?;
+    put(
+        &table,
+        "GetBakeStatus",
         lua.create_function(move |lua, ()| {
-            let scene = scene.get(lua)?;
-            let scene = scene.borrow();
-            Ok(scene.lighting_bake_running || scene.lighting_bake_requested)
+            let status = scene.get(lua)?.borrow().lighting_bake_status.clone();
+            let out = lua.create_table()?;
+            out.set("state", status.state())?;
+            out.set("message", status.message())?;
+            Ok(out)
         }),
     )
 }

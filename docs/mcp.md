@@ -83,12 +83,16 @@ as text), per MCP convention — the agent sees it and recovers, the server stay
 a `notifications/progress` for that token for each progress line a bake prints while
 the call runs (`Lighting.Generate()`, `Lighting.Bake()`, `Probe.Bake()`, …: every 5 s
 within a step, `docs/api/Lighting.md`), `progress` counting the lines and `message`
-the line itself, then its response as always. Attached to a window, the window
-streams the lines over its socket. A request without a token gets none. A client
-such as Claude Code aborts a tool call that has sent nothing for 30 minutes; each
-notification restarts that clock. For a bake that may run longer, attached to the
-editor, `Lighting.GenerateAsync()` returns at once and `Lighting.IsRunning()` says
-when it is done.
+the line itself, then its response as always. Attached to a window, the server asks
+the window for the lines over its socket only for such a request. A request without
+a token gets none. Whether the notifications keep a call alive is the client's
+choice: a client such as Claude Code aborts a tool call that has sent nothing for
+30 minutes, and the MCP TypeScript SDK resets that clock on progress only when its
+caller opts in (`resetTimeoutOnProgress`); whether Claude Code sends a token at all
+is unverified. **The reliable path for a long bake** is attached to the editor:
+`Lighting.GenerateAsync()` returns at once, `Lighting.IsRunning()` reads `false`
+once it ended, and `Lighting.GetBakeStatus()` says how (done, failed with why,
+refused), each a short call of its own.
 
 **Engine warnings come back in-band.** When the engine warned or errored while a
 call ran (an asset it skipped, a mesh collider it dropped), the `eval` or `snapshot`

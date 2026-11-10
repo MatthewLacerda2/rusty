@@ -1,5 +1,23 @@
-//! The command channel's progress lines (#1999): while a command bakes, the
-//! handler writes each of its bake's progress lines before the reply.
+//! The command channel's progress lines (#1999): while a command that asked for
+//! them bakes, the handler writes each of its bake's progress lines before the
+//! reply.
+//!
+//! Opt-in per command, as MCP's `progressToken` is per request: a client asks by
+//! starting the line with [`ASK`], a Lua comment, so a window from before this
+//! protocol evaluates the line as it is and replies once. A line without it gets
+//! exactly one reply line, the old protocol, byte for byte.
+
+/// The prefix a command line carries to ask for its bake's progress lines: a Lua
+/// block comment, which an older window evaluates as nothing.
+pub const ASK: &str = "--[[progress]] ";
+
+/// `line` with the client's [`ASK`] taken off, and whether it asked.
+pub fn asks(line: &str) -> (bool, &str) {
+    match line.strip_prefix(ASK) {
+        Some(rest) => (true, rest),
+        None => (false, line),
+    }
+}
 
 /// What the main loop sends a handler: a bake's progress line while the command
 /// runs (#1999), then the command's one framed reply.
@@ -37,6 +55,16 @@ mod tests {
         assert_eq!(parse_progress(r#"{"ok":true,"result":"x"}"#), None);
         assert_eq!(parse_progress(r#"{"ok":false,"error":"progress"}"#), None);
         assert_eq!(parse_progress("not json"), None);
+    }
+
+    #[test]
+    fn only_a_line_carrying_the_prefix_asks() {
+        assert_eq!(
+            asks("--[[progress]] Lighting.Generate()"),
+            (true, "Lighting.Generate()")
+        );
+        assert_eq!(asks("Lighting.Generate()"), (false, "Lighting.Generate()"));
+        assert_eq!(asks(" --[[progress]] x"), (false, " --[[progress]] x"));
     }
 
     /// A handler writes each progress line as it comes, then the reply, and stops.

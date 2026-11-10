@@ -143,9 +143,13 @@ pub struct Scene {
     #[cfg(feature = "dev")]
     pub lighting_bake_running: bool,
     /// A script's `Lighting.GenerateAsync()` (#1999) waiting for the editor's next
-    /// frame to start the Generate Lighting button's job. Never serialized.
+    /// frame to start the Generate Lighting button's job. Dropped by Play, Stop and
+    /// any load (`Scene::drop_bake_request`). Never serialized.
     #[cfg(feature = "dev")]
     pub lighting_bake_requested: bool,
+    /// What became of the editor's last background bake (`Lighting.GetBakeStatus`).
+    #[cfg(feature = "dev")]
+    pub lighting_bake_status: crate::scene::lighting::bake_status::BakeStatus,
     /// Per-entity runtime shader-param overrides (#670). Runtime-only, never serialized.
     pub shader_overrides: crate::scene::shader_overrides::ShaderOverrides,
     /// Partial ragdolls' runtime state (#1895): reactions, weights. Never serialized.
@@ -201,6 +205,8 @@ impl Default for Scene {
             lighting_bake_running: false,
             #[cfg(feature = "dev")]
             lighting_bake_requested: false,
+            #[cfg(feature = "dev")]
+            lighting_bake_status: Default::default(),
             shader_overrides: Default::default(),
             ragdolls: Default::default(),
             meshes_read_at: 0,

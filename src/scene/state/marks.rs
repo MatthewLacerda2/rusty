@@ -13,6 +13,8 @@ use glam::Vec3;
 use super::Class;
 use crate::scene::authoring::{create_entity, Primitive};
 use crate::scene::decal::DecalSpec;
+#[cfg(feature = "dev")]
+use crate::scene::lighting::bake_status::BakeStatus;
 use crate::scene::lighting::lightmap::LightmapEntry;
 use crate::scene::lighting::reflection_probe::ReflectionProbe;
 use crate::scene::{Scene, SceneId};
@@ -145,6 +147,8 @@ pub const DEV_MARKS: &[Mark] = marks! {
     "screen_exposure" => |s, _| s.screen_exposure = Some(7.5), s.screen_exposure == Some(7.5);
     "lighting_bake_running" => |s, _| s.lighting_bake_running = true, s.lighting_bake_running;
     "lighting_bake_requested" => |s, _| s.lighting_bake_requested = true, s.lighting_bake_requested;
+    "lighting_bake_status" => |s, _| s.lighting_bake_status = BakeStatus::Done("x".into()),
+        s.lighting_bake_status == BakeStatus::Done("x".into());
 };
 
 /// Every mark in this build.

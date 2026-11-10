@@ -36,6 +36,10 @@ pub enum Class {
     Follow,
     /// Edit mode's Undo history: never saved, cleared by Play and by a load.
     History,
+    /// A request edit mode makes of the host's next frame (a script's
+    /// `Lighting.GenerateAsync()`, #1999): never saved, and dropped by Play, Stop
+    /// and any load, so it never acts on another scene or mode than it was made in.
+    Request,
 }
 
 /// A lifecycle that copies, puts back or clears scene state.
@@ -111,6 +115,7 @@ impl Class {
             (Self::History, Save | Stop | Load | PlayLoad) => Gone,
             // Undo works the history itself.
             (Self::History, Undo) => Free,
+            (Self::Request, Save | Stop) => Gone,
             (_, Undo) => Left,
             (_, Load | PlayLoad) => Gone,
         }

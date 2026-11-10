@@ -41,6 +41,15 @@ impl Scene {
     /// `Debug.Draw*` line still held (#1882): the
     /// scene state inventory's runtime class (`scene::state`, #1649).
     pub(crate) fn set_playing(&mut self, playing: bool) {
+        // A script's pending `Lighting.GenerateAsync()` was made in the other mode.
+        #[cfg(feature = "dev")]
+        if playing != self.playing {
+            self.drop_bake_request(if playing {
+                "Play started"
+            } else {
+                "Play stopped"
+            });
+        }
         if playing && !self.playing {
             self.clear_undo();
             self.forget_perception();

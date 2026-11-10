@@ -25,7 +25,8 @@ pub fn tools_list() -> Value {
                     (Editor.EnterPlay), step the sim, etc. See the \
                     scripting-api resource for the available namespaces and functions. \
                     A bake that may outlast the tool timeout: attached to the editor, \
-                    Lighting.GenerateAsync() returns at once; poll Lighting.IsRunning().",
+                    Lighting.GenerateAsync() returns at once; poll Lighting.IsRunning(), \
+                    then Lighting.GetBakeStatus().",
                 "inputSchema": {
                     "type": "object",
                     "properties": {

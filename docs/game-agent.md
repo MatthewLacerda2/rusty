@@ -169,9 +169,10 @@ The tools describe themselves; what they don't say:
 - a long bake (a Dust2-sized `Lighting.Generate()` takes over 30 minutes, past the
   client's tool timeout): attached to the editor, start it with
   `Lighting.GenerateAsync()`, which returns at once, poll `Lighting.IsRunning()`
-  every few minutes, then read `Lighting.GetBakeReport(kind)`
-  (`docs/api/Lighting.md`). Headless, `Lighting.Generate()` is the only way, and it
-  sends progress to a client that asks for it (a progress token) while it runs;
+  every few minutes, then read `Lighting.GetBakeStatus()` (`done`, or `failed` /
+  `refused` with why) and `Lighting.GetBakeReport(kind)` (`docs/api/Lighting.md`).
+  Headless, `Lighting.Generate()` is the only way; it sends progress to a client
+  that asks for it (a progress token), which may or may not keep the call alive;
 - when the engine warned during a call, the result carries a second text block
   starting `engine warnings:`. Read it: a skipped asset or a dropped collider shows
   up there first;

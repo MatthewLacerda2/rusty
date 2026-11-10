@@ -118,9 +118,10 @@ The chosen address/path is logged to the engine console on boot (`[cmd] command
 channel listening on …`). Connect, then send one Lua command per line and read one
 JSON response per command, exactly as with the headless session. Commands are
 evaluated on the engine's main loop (once per frame), so they never race the sim.
-While a command bakes, the window sends its bake's progress lines first (#1999), one
-`{"progress":"<line>"}` per line: a line with no `ok` key is progress, and the
-response is the line that has one. A
+A command that asks, by starting its line with the Lua comment `--[[progress]] `
+(#1999), also gets its bake's progress lines first, one `{"progress":"<line>"}` per
+line: a line with no `ok` key is progress, and the response is the line that has
+one. A command that doesn't ask gets exactly one line, its response. A
 bind failure is non-fatal — the window simply runs without the channel. The channel
 is **dev-only** and absent from ship builds.
 

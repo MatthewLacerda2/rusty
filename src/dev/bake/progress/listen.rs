@@ -34,6 +34,12 @@ pub fn listening<R>(listener: impl FnMut(&str) + 'static, body: impl FnOnce() ->
     body()
 }
 
+/// Whether a listener hears this thread's progress lines: the attach backend
+/// asks the window for them only then.
+pub fn is_listening() -> bool {
+    LISTENER.with(|l| l.try_borrow().map_or(true, |l| l.is_some()))
+}
+
 /// Pass one progress line to this thread's listener, if any. A listener that
 /// tells (it would re-enter itself) is not heard twice: the inner line is dropped.
 pub fn tell(line: &str) {
@@ -62,6 +68,8 @@ mod tests {
         );
         tell("after");
         assert_eq!(*heard.borrow(), ["during"]);
+        assert!(!is_listening());
+        assert!(listening(|_| {}, is_listening));
     }
 
     #[test]

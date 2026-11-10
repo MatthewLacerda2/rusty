@@ -43,10 +43,24 @@ impl Client {
     }
 
     /// Send one command line and block for its single framed reply line, returned
-    /// trimmed of its trailing newline. The progress lines a bake tells first
-    /// (#1999) go to `progress`, as they arrive. EOF before a reply (the engine
-    /// closed the connection) is an `UnexpectedEof` error.
-    pub fn request(&mut self, line: &str, progress: &mut dyn FnMut(&str)) -> io::Result<String> {
+    /// trimmed of its trailing newline. EOF before a reply (the engine closed the
+    /// connection) is an `UnexpectedEof` error.
+    pub fn request(&mut self, line: &str) -> io::Result<String> {
+        self.exchange(line, &mut |_| {})
+    }
+
+    /// [`request`](Self::request), asking for the command's bake progress lines
+    /// (#1999): each goes to `progress` as it arrives, before the reply. A window
+    /// from before the protocol ignores the ask and only replies.
+    pub fn request_progress(
+        &mut self,
+        line: &str,
+        progress: &mut dyn FnMut(&str),
+    ) -> io::Result<String> {
+        self.exchange(&format!("{}{line}", super::ASK), progress)
+    }
+
+    fn exchange(&mut self, line: &str, progress: &mut dyn FnMut(&str)) -> io::Result<String> {
         writeln!(self.writer, "{line}")?;
         self.writer.flush()?;
         loop {
