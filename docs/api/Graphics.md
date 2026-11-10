@@ -476,8 +476,9 @@ reach) and a miss keeps the sky or probe reflection, so a weak hit falls back to
 without a seam. A ray a normal map tilts below the surface's own geometry (a rough,
 bumpy floor seen at a grazing angle) keeps the probe reflection too, rather than
 reflecting the floor it leaves. The march (#2004) takes steps of at most `step_length`
-and at most 1/64 of the screen's shorter side, so it sees anything on screen wider than
-that (a bottle, a pole) and spends its reach where the ray crosses the screen fast;
+and at most 1/64 of the screen's shorter side (1/`steps` of it for fewer than 64 steps,
+so any count can still cross the screen's height), so it sees anything on screen wider
+than that (a bottle, a pole) and spends its reach where the ray crosses the screen fast;
 where a step goes behind the scene, or comes back out, it halves the step four times to
 find where, so a reflected silhouette is drawn to the texel, not in stairs of a step.
 A point counts as a hit only on a surface or up to 0.15 m behind it (or 2% of its depth,

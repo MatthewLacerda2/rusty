@@ -89,7 +89,17 @@ fn footprint(f: Frame, p: vec3<f32>, r: vec3<f32>, t: f32, cone: f32, uv: vec2<f
 // a thin object (a bottle, a pole) or a grazing floor, drawing its reflection as
 // stair-steps and dashes; a step held to this sees anything wider than it. The
 // reach so spent is the march's, not the world step's: `trace` fades by the steps.
+// A march of fewer than 64 steps is capped at `1 / steps` of that side instead
+// (`step_cap`), so any step count can still cross the screen's height: the cap
+// never cuts a quality level's reach to a fraction of the screen, it only spends
+// more of a long count's steps where the ray moves fast.
 const SCREEN_STEP: f32 = 1.0 / 64.0;
+
+// The cap in texels of `dim` for a march of `steps` steps: `SCREEN_STEP` or
+// `1 / steps` of the shorter side, whichever is longer.
+fn step_cap(steps: i32, dim: vec2<f32>) -> f32 {
+    return max(SCREEN_STEP, 1.0 / f32(max(steps, 1))) * min(dim.x, dim.y);
+}
 
 // How far behind the scene's depth a refined hit may lie and still count (#2004):
 // a ray that crosses a surface refines to within a texel of it, one that passes
@@ -159,7 +169,7 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
 }
 
 // March the reflected ray `r` from `origin` in `steps` steps of at most `step`
-// world units (and at most `SCREEN_STEP` of the screen), against `t_depth`'s
+// world units (and at most `step_cap` on screen), against `t_depth`'s
 // depths as `f` measures them. Each point is in front of the scene, on it (behind
 // by at most `slack`: an object `THICKNESS` deep) or beyond it. A step that
 // leaves the front, or comes back from beyond, is refined by bisection to where it
@@ -176,7 +186,7 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
 // tracing, as Frostbite and UE do). A `t_color` with one level reads sharp.
 fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32) -> vec4<f32> {
     let depth_dim = vec2<f32>(textureDimensions(t_depth));
-    let cap = SCREEN_STEP * min(depth_dim.x, depth_dim.y);
+    let cap = step_cap(steps, depth_dim);
     var prev = origin;
     var prev_uv = project(f, origin).xy;
     var was = FRONT;

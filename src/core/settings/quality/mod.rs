@@ -82,8 +82,10 @@ pub struct SsilQuality {
     pub resolution_divisor: u32,
 }
 
-/// The SSR ray march (#1521): how many steps, how long each in world units. Its
-/// reach is their product.
+/// The SSR ray march (#1521): how many steps, how long each at most in world
+/// units. Its reach is at most their product: a step is also held to
+/// `max(1/64, 1/steps)` of the screen's shorter side (#2004), so a ray that
+/// crosses the screen fast reaches less, but any count can cross the screen.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SsrQuality {
     pub steps: u32,
