@@ -6,7 +6,7 @@
 
 use std::ops::RangeInclusive;
 
-use glam::Mat4;
+use glam::{Mat4, Vec3};
 
 use crate::components::{MaterialAsset, RefractionModel, RenderFace, RenderMode, UvMapping};
 use crate::render::gpu::lightmaps::Lightmaps;
@@ -167,7 +167,8 @@ pub(crate) fn preserves_specular(m: &MaterialAsset) -> bool {
 }
 
 /// One solid's object record (#1706): its world matrix, the SH its ambient term reads when a light
-/// probe covers it (see [`entity_probe_sh`]), and its baked lightmap when it has one
+/// probe covers it (see [`entity_probe_sh`]) and its probe shadowmask occlusion, both
+/// sampled at `centre`, its world bounds' centre (#1994), and its baked lightmap when it has one
 /// and `lightmaps` has its pages bound (#438), directional when their direction
 /// pages are bound too (#810). `capture` is the renderer's [`CaptureMode`]: a bake
 /// capture's static surfaces read probes only on a probe bounce.
@@ -176,11 +177,11 @@ pub(crate) fn preserves_specular(m: &MaterialAsset) -> bool {
 pub(crate) fn solid_object(
     scene: &Scene,
     id: u32,
-    model_matrix: Mat4,
+    (model_matrix, centre): (Mat4, Vec3),
     capture: &crate::render::ibl::cubemap_capture::CaptureMode,
     lightmaps: &Lightmaps,
 ) -> ObjectData {
-    let (use_sh, sh) = entity_probe_sh(scene, id, model_matrix, capture);
+    let (use_sh, sh) = entity_probe_sh(scene, id, centre, capture);
     let lightmap = scene.lightmaps.get(id).filter(|_| lightmaps.resident());
     ObjectData {
         model_matrix: model_matrix.to_cols_array(),
@@ -190,7 +191,7 @@ pub(crate) fn solid_object(
         lightmap_st: lightmap.map_or([0.0; 4], |l| l.scale_offset),
         in_bake: u32::from(scene.lightmaps.holds_bake() && BakeScene::takes_mesh(scene, id)),
         sh,
-        occlusion: probe_occlusion_at(scene, model_matrix.w_axis.truncate()),
+        occlusion: probe_occlusion_at(scene, centre),
     }
 }
 
@@ -207,7 +208,9 @@ fn material_color_tint(material: Option<&MaterialAsset>) -> [f32; 4] {
 }
 
 /// Resolve the light-probe SH for one entity (#240): the scene's probe field sampled
-/// (trilinear) at the entity's world position, flattened to the `vec4`-padded GPU
+/// (trilinear) at `centre`, its world bounds' centre (Unity's `Renderer.bounds.center`,
+/// #1994; never its origin, which a mesh modelled in world coordinates leaves in
+/// another room), flattened to the `vec4`-padded GPU
 /// layout. Only NON-STATIC objects opt in — static geometry keeps the flat ambient
 /// term (and is the bake's target, not its consumer) — and a static mesh at *Scale
 /// In Lightmap* 0 (#1704), which the lightmap bake skips: as in Unity, it reads
@@ -223,7 +226,7 @@ fn material_color_tint(material: Option<&MaterialAsset>) -> [f32; 4] {
 fn entity_probe_sh(
     scene: &Scene,
     id: u32,
-    model_matrix: Mat4,
+    centre: Vec3,
     capture: &crate::render::ibl::cubemap_capture::CaptureMode,
 ) -> (u32, [[f32; 4]; 9]) {
     let probe_lit =
@@ -231,7 +234,7 @@ fn entity_probe_sh(
     if scene.world.is_static(id) && !capture.probe_bounce && !probe_lit() {
         return (0, [[0.0; 4]; 9]);
     }
-    probe_sh_at(scene, model_matrix.w_axis.truncate())
+    probe_sh_at(scene, centre)
 }
 
 /// The light-probe SH at `position` in the GPU layout, `(use_sh, coeffs)` — zeroed
