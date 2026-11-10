@@ -70,8 +70,9 @@ pub struct NavMeshSettings {
     /// in their shared gap. A span with nothing above has infinite headroom.
     #[serde(default = "default_agent_height")]
     pub agent_height: f32,
-    /// Max walkable grade (rise per unit of horizontal travel). A ramp steeper than
-    /// this is not traversable; `1.0` ≈ 45° at unit spacing. Sourced into
+    /// Max walkable grade (rise per unit of horizontal travel). A triangle steeper
+    /// than this bakes no walkable surface, so such a ramp is not traversable; `1.0`
+    /// is 45°. Steps between cells are `max_step`'s alone (#2001). Sourced into
     /// `NavigationGraph::max_slope` at bake time.
     #[serde(default = "default_max_slope")]
     pub max_slope: f32,
