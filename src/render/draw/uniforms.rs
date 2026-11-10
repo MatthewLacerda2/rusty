@@ -70,7 +70,7 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
         surface: surface_uniform(lit, material),
         mapping: material.map_or_else(MappingUniform::default, mapping_uniform),
         normal_variance: [0; 4],
-        dielectric_f0: [f0[0], f0[1], f0[2], 0.0],
+        dielectric_reflectance: [f0[0], f0[1], f0[2], 0.0],
     }
 }
 

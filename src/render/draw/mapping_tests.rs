@@ -61,7 +61,7 @@ fn defaults_and_world_mappings_pack_as_set() {
 
 #[test]
 fn a_record_carries_its_dielectric_f0_and_none_is_the_default_glass() {
-    let f0 = |m: Option<&MaterialAsset>| material_data(true, m).dielectric_f0;
+    let f0 = |m: Option<&MaterialAsset>| material_data(true, m).dielectric_reflectance;
     assert_eq!(f0(None), [0.04, 0.04, 0.04, 0.0]);
     assert_eq!(f0(Some(&MaterialAsset::default())), [0.04, 0.04, 0.04, 0.0]);
     let pane = MaterialAsset {

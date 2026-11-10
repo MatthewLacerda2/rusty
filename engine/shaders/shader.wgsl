@@ -397,7 +397,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // glass ior 1.5), a metal's is its albedo. `reflectivity` is its strongest
     // channel, URP's specular-workflow `ReflectivitySpecular`: what the environment
     // takes from the diffuse (`0.96` at 0.04) and the grazing weight starts from.
-    let dielectric = m.dielectric_f0.rgb;
+    let dielectric = m.dielectric_reflectance.rgb;
     let F0 = mix(dielectric, albedo, metallic);
     let dielectric_reflectivity = max(dielectric.r, max(dielectric.g, dielectric.b));
 

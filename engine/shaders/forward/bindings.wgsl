@@ -91,7 +91,7 @@ struct MaterialData {
     normal_variance: vec4<u32>,
     // A dielectric's F0 (#1998, `MaterialAsset::dielectric_f0`: its ior and
     // `KHR_materials_specular`), rgb; mixed toward albedo by metallic in `fs_main`.
-    dielectric_f0: vec4<f32>,
+    dielectric_reflectance: vec4<f32>,
 };
 
 // One object a kept scene draws (#1706), at its slot of `objects`: what the object

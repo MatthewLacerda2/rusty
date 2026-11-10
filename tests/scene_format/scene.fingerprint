@@ -994,6 +994,9 @@ scene.materials{}.shader_params{}[]: f32
 scene.materials{}.shader_textures: map
 scene.materials{}.shader_textures{key}: string
 scene.materials{}.shader_textures{}: string
+scene.materials{}.specular: f32
+scene.materials{}.specular_color: tuple(3)
+scene.materials{}.specular_color[]: f32
 scene.materials{}.thickness: f32
 scene.materials{}.tiling: tuple(2)
 scene.materials{}.tiling[]: f32
