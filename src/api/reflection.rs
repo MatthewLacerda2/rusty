@@ -19,7 +19,8 @@ use mlua::{Lua, Table};
 
 use super::{put, Reg};
 use crate::api::ApiCell;
-use crate::scene::{ReflectionProbe, Scene};
+use crate::components::transform::{euler_degrees, from_euler_degrees};
+use crate::scene::{ProbeShape, ReflectionProbe, Scene};
 
 /// Register the `Reflection` namespace onto `lua`. `scene_path` is the saved scene file
 /// (if any) — the dev-only `Reflection.Bake()` (installed by `dev`, #737) writes its
@@ -223,6 +224,9 @@ fn read_fields(lua: &Lua, p: &ReflectionProbe) -> mlua::Result<Table> {
     t.set("position", vec_table(lua, p.position)?)?;
     t.set("boxMin", vec_table(lua, p.box_min)?)?;
     t.set("boxMax", vec_table(lua, p.box_max)?)?;
+    t.set("rotation", vec_table(lua, euler_degrees(p.rotation))?)?;
+    t.set("shape", format!("{:?}", p.shape))?;
+    t.set("radius", p.radius)?;
     t.set("cubemap", p.cubemap_path.as_str())?;
     t.set("boxProjection", p.box_projection)?;
     t.set("blendDistance", p.blend_distance)?;
@@ -250,6 +254,15 @@ fn write_fields(p: &mut ReflectionProbe, t: &Table) -> mlua::Result<()> {
     if let Some(v) = vec_field(t, "boxMax")? {
         p.box_max = v;
     }
+    // A round trip of `Get`'s Euler angles leaves the stored rotation as it was.
+    if let Some(v) = vec_field(t, "rotation")?.filter(|&v| v != euler_degrees(p.rotation)) {
+        p.rotation = from_euler_degrees(v);
+    }
+    if let Some(v) = t.get::<Option<String>>("shape")? {
+        let bad = || mlua::Error::runtime(format!("shape {v:?}: \"Box\" or \"Sphere\""));
+        p.shape = ProbeShape::named(&v).ok_or_else(bad)?;
+    }
+    set(t, "radius", &mut p.radius)?;
     if let Some(v) = t.get::<Option<String>>("cubemap")? {
         // A new cube drops the old one's stored irradiance (#1697).
         if v != p.cubemap_path {

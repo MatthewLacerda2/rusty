@@ -15,10 +15,17 @@ use rusty::scene::{Camera, Scene};
 /// A one-mip `size`² BC6H KTX2 cubemap (what the bake writes, #1885), every face
 /// the solid linear `rgb`. `size` is a multiple of 4.
 pub(crate) fn solid_cube_ktx2(size: u32, rgb: [f32; 3]) -> Vec<u8> {
+    let texels = vec![Vec3::from(rgb); (size * size) as usize];
+    cube_ktx2(size, |_| texels.clone())
+}
+
+/// A one-mip `size`² BC6H KTX2 cubemap whose face `f` (+X, -X, +Y, -Y, +Z, -Z)
+/// holds the row-major linear texels `face(f)`. `size` is a multiple of 4.
+pub(crate) fn cube_ktx2(size: u32, face: impl Fn(usize) -> Vec<Vec3>) -> Vec<u8> {
     const MAGIC: [u8; 12] = [
         0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
     ];
-    let face = bc6h_level(size, &vec![Vec3::from(rgb); (size * size) as usize], 1);
+    let faces: Vec<Vec<u8>> = (0..6).map(|f| bc6h_level(size, &face(f), 1)).collect();
     let (header, index, dfd) = (80usize, 24usize, 4usize);
     let level = header + index + dfd;
     let mut buf = vec![0u8; level];
@@ -30,12 +37,12 @@ pub(crate) fn solid_cube_ktx2(size: u32, rgb: [f32; 3]) -> Vec<u8> {
     }
     put(&mut buf, 48, (header + index) as u32);
     put(&mut buf, 52, dfd as u32);
-    let len = (face.len() * 6) as u64;
+    let len = (faces[0].len() * 6) as u64;
     for (k, v) in [level as u64, len, len].into_iter().enumerate() {
         buf[header + 8 * k..header + 8 * k + 8].copy_from_slice(&v.to_le_bytes());
     }
-    for _ in 0..6 {
-        buf.extend_from_slice(&face);
+    for f in &faces {
+        buf.extend_from_slice(f);
     }
     buf
 }

@@ -308,7 +308,7 @@ box) or **placed** by this bake. A hand edit makes a probe manual: `Probe.Move`,
 and unticking *Manual*, which say otherwise), so a tuned box survives the next bake.
 Each bake **replaces the placed probes and keeps every manual one as it is** (position,
 box, settings), and plans around them: a placed reflection probe whose box a manual
-probe's box covers by at least half is left out (that room is the manual probe's), and
+probe's volume (its turned box or sphere, not its bounds) covers by at least half is left out (that room is the manual probe's), and
 no placed light probe lands within half a step of a manual one. A manual `FillGrid`
 keeps its trilinear grid through any number of bakes. So a level can mix the two and still be regenerated after its static
 geometry moves. A saved probe without the flag loads as placed. `Probe.Clear()` /
@@ -768,9 +768,12 @@ Then each kind's own:
   (`{ count, list }`: the active dynamic drawn objects whose centre (as the renderer takes
   it: the mesh's local bounds under its world matrix, halved) is over
   8 m from the nearest probe, farthest first, each `{ entity, name, centre, nearest }`).
-- **`reflections`:** `count`, `probes` (`{ index, position, boxMin, boxMax, resolution,
-  importance, manual, bytes, seconds, overlaps }`, `resolution` the face size the bake
-  rendered at, `overlaps` the probes whose box this one's overlaps) and `picks`: **which
+- **`reflections`:** `count`, `probes` (`{ index, position, shape, boxMin, boxMax,
+  rotation, radius, resolution, importance, manual, bytes, seconds, overlaps }`, `shape`
+  `"Box"` or `"Sphere"`, a box carrying `boxMin`, `boxMax` and `rotation` (a quaternion,
+  `[x, y, z, w]`) and a sphere `radius`, `resolution` the face size the bake rendered at,
+  `overlaps` the probes whose volume (the turned box or the sphere) this one's overlaps)
+  and `picks`: **which
   probe each active drawn object reflects**, at its bounds' centre as the renderer takes
   it (the mesh's local bounds under its world matrix) (`{ entity, name, centre, probe, weight,
   second, secondWeight }`, `probe` `nil` for the sky). The picks rank the scene's whole

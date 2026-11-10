@@ -1054,9 +1054,13 @@ scene.reflection_probes.probes[].manual: bool
 scene.reflection_probes.probes[].near_clip: f32
 scene.reflection_probes.probes[].position: tuple(3)
 scene.reflection_probes.probes[].position[]: f32
+scene.reflection_probes.probes[].radius: f32
 scene.reflection_probes.probes[].resolution: option
 scene.reflection_probes.probes[].resolution: u32
+scene.reflection_probes.probes[].rotation: tuple(4)
+scene.reflection_probes.probes[].rotation[]: f32
 scene.reflection_probes.probes[].shadows: bool
+scene.reflection_probes.probes[].shape: enum Box|Sphere
 scene.selected_entity_id: option
 scene.selected_entity_id: u32
 scene.sky.cloud_coverage: f32
