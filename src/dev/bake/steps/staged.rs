@@ -96,6 +96,7 @@ impl StagedCubemaps {
         let mut staged = target.clone().into_os_string();
         staged.push(".baking");
         let staged = PathBuf::from(staged);
+        // lint: allow(asset-write) a `.baking` staging file no cache reads; `commit` notes the cube it moves into place
         std::fs::write(&staged, bytes).map_err(|e| {
             format!(
                 "Failed to write reflection cubemap {}: {e}",

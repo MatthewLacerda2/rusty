@@ -42,3 +42,19 @@ fn set_humanoid_finds_a_borrower_by_another_spelling_of_its_source() {
     let set = crate::scene::asset_instance::set_humanoid(&mut scene, &spelled, settings);
     assert_eq!(set, Ok(1));
 }
+
+#[test]
+fn set_humanoid_notes_the_sources_sidecar() {
+    use crate::core::fs::written::written_since;
+    let dir = crate::test_temp::dir().join("rusty_humanoid_note");
+    let a = model(&dir, "a.gltf", "Wave", &[]);
+    let mut settings = crate::asset::sidecar::load(&a).unwrap().humanoid;
+    settings.bones.insert("Hips".into(), String::new());
+    let (seen, _) = written_since(u64::MAX);
+    let mut scene = Scene::new();
+    crate::scene::asset_instance::set_humanoid(&mut scene, &a.to_string_lossy(), settings).unwrap();
+    let meta = crate::asset::sidecar::meta_path(&a);
+    assert!(written_since(seen)
+        .1
+        .contains(&meta.to_string_lossy().into_owned()));
+}

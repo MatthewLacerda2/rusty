@@ -22,7 +22,7 @@ fn the_area_table_is_not_a_bake_input() {
     let mut a = NavMeshSettings::default();
     a.areas[0].cost = 5.0;
     assert!(a.bakes_like(&NavMeshSettings::default()));
-    a.max_step = 0.3;
+    a.max_step = 0.4;
     assert!(!a.bakes_like(&NavMeshSettings::default()));
 }
 
@@ -62,7 +62,7 @@ fn round_trips_through_json() {
 /// same field names, same order, same serde defaults, so every scene file on disk
 /// loads and re-saves unchanged.
 const SAVED_DEFAULT: &str = concat!(
-    r#"{"agent_radius":0.5,"agent_height":2.0,"max_slope":1.0,"max_step":0.5,"#,
+    r#"{"agent_radius":0.5,"agent_height":2.0,"max_slope":1.0,"max_step":0.3,"#,
     r#""grid_spacing":0.25,"bounds":null,"drop_height":0.0,"jump_distance":0.0,"#,
     r#""jump_height":0.0,"link_spacing":2.0,"areas":[{"name":"Walkable","cost":1.0},"#,
     r#"{"name":"NotWalkable","cost":1.0}]}"#
@@ -82,4 +82,12 @@ fn a_saved_bounds_override_keeps_its_shape() {
     let b = NavBounds::new(-60.0, 80.0, -5.0, 5.0);
     assert_eq!(serde_json::to_string(&b).expect("serialize"), json);
     assert_eq!(serde_json::from_str::<NavBounds>(json).expect("loads"), b);
+}
+
+/// The default navmesh never routes over what the default walker can't climb
+/// (#2001): a step it links is one the default controller steps up.
+#[test]
+fn the_default_step_is_one_the_default_controller_climbs() {
+    let cc = crate::components::CharacterControllerComponent::default();
+    assert!(DEFAULT_MAX_STEP <= cc.step_offset);
 }

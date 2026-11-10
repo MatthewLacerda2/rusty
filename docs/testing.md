@@ -284,6 +284,13 @@ its check and its command changed to match).
   are left out while TAA upscales the view (a render scale below 1 with TAA on;
   the console says so once). The editor's Game view captures the same with
   `make editor-capture ARGS="--game --gizmo GameGizmos=on"`.
+- **A shot after a camera jump needs a cut** (#2003): with TAA on, each shot blends
+  into the history the shots before it left, and `Harness.Step` renders nothing, so
+  a shot from a new spot ghosts the last one in. Call `Camera.ResetHistory()` after
+  the jump, and add `{ settle = n }` (whole frames, 0 to 1024, default 0) for a
+  converged image: the shot first draws `n` frames with no sim step, as `n`
+  `Harness.Render()` calls would. It goes beside `width`, `height` and `gizmos`;
+  `docs/api/Graphics.md`, *TAA*.
 - **The test-fixture project** is `tests/fixtures/project/` (#829): the committed
   scenarios, the bot-player script and its `project.rusty`, opened like any other
   project — `cargo run --bin play --features dev -- --project tests/fixtures/project

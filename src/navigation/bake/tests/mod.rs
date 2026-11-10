@@ -17,5 +17,6 @@ mod object_modifier;
 mod object_modifier_sync;
 mod settings;
 mod slope;
+mod steps;
 mod surface;
 mod tracked;

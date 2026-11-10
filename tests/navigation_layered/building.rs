@@ -12,6 +12,7 @@ use super::{add_box, bake, heights};
 pub fn building() -> (Scene, NavigationGraph) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
+    scene.nav_settings.max_step = 0.5; // built for a 0.5 m step (#2001 lowered the default)
     add_box(
         &mut scene,
         Vec3::new(0.0, -0.2, 0.0),

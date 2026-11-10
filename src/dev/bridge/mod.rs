@@ -159,21 +159,25 @@ fn register_harness_stats(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaRe
 
 /// Screenshot / AttachPlayerBot — side-effecting harness actions.
 fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> LuaResult<()> {
-    // Screenshot(path [, { width =, height =, gizmos = }]) -> bool. Renders the
-    // current scene/camera offscreen to a PNG, at the run's size or the one given
-    // (#1583), with the colliders and Debug.Draw lines over it when `gizmos` (#1882).
-    // Returns false (no error) when no GPU/software adapter is available.
+    // Screenshot(path [, { width =, height =, gizmos =, settle = }]) -> bool. Renders
+    // the current scene/camera offscreen to a PNG, at the run's size or the one given
+    // (#1583), with the colliders and Debug.Draw lines over it when `gizmos` (#1882),
+    // after `settle` frames drawn with no sim step (#2003, default 0) so TAA
+    // converges. Returns false (no error) when no GPU/software adapter is available.
     let h = Rc::clone(harness);
     t.set(
         "Screenshot",
         lua.create_function(move |_, (path, opts): (String, Option<mlua::Table>)| {
             let mut h = h.borrow_mut();
-            let (size, gizmos) = match opts {
+            let shot = match opts {
                 Some(opts) => shot_options(&opts)?,
-                None => (None, false),
+                None => ShotOptions::default(),
             };
-            let size = size.unwrap_or_else(|| h.size());
-            Ok(h.screenshot_with(path, size, gizmos))
+            let size = shot.size.unwrap_or_else(|| h.size());
+            if !h.settle(size, shot.settle) {
+                return Ok(false);
+            }
+            Ok(h.screenshot_with(path, size, shot.gizmos))
         })?,
     )?;
 
@@ -200,9 +204,23 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
     )
 }
 
-/// A `Screenshot`'s options: its size (both of `width` and `height`, or neither)
-/// and `gizmos` (a boolean, default false).
-fn shot_options(opts: &mlua::Table) -> LuaResult<(Option<(u32, u32)>, bool)> {
+/// The most frames a `Screenshot` may settle: TAA's still-pixel history has
+/// kept about 0.1% of an old view by 64 (0.9^64), so 1024 only catches a typo.
+const MAX_SETTLE: u32 = 1024;
+
+/// A `Screenshot`'s options (all optional).
+#[derive(Default)]
+struct ShotOptions {
+    /// Its size: both of `width` and `height`, or neither (the run's).
+    size: Option<(u32, u32)>,
+    /// Draw the gizmos over the frame (default false).
+    gizmos: bool,
+    /// Frames drawn before the shot, with no sim step (default 0).
+    settle: u32,
+}
+
+/// Read a `Screenshot`'s options table.
+fn shot_options(opts: &mlua::Table) -> LuaResult<ShotOptions> {
     let gizmos = match opts.get::<mlua::Value>("gizmos")? {
         mlua::Value::Nil => false,
         mlua::Value::Boolean(on) => on,
@@ -213,7 +231,20 @@ fn shot_options(opts: &mlua::Table) -> LuaResult<(Option<(u32, u32)>, bool)> {
     };
     let sized = opts.contains_key("width")? || opts.contains_key("height")?;
     let size = if sized { Some(shot_size(opts)?) } else { None };
-    Ok((size, gizmos))
+    let settle: Option<i64> = opts.get("settle")?;
+    let settle = match settle.map(|n| u32::try_from(n).ok().filter(|n| *n <= MAX_SETTLE)) {
+        None => 0,
+        Some(Some(n)) => n,
+        Some(None) => {
+            let msg = format!("Harness.Screenshot: settle must be a whole 0..={MAX_SETTLE}");
+            return Err(mlua::Error::RuntimeError(msg));
+        }
+    };
+    Ok(ShotOptions {
+        size,
+        gizmos,
+        settle,
+    })
 }
 
 /// A `Screenshot`'s `{ width =, height = }`: both whole pixels, 1 to

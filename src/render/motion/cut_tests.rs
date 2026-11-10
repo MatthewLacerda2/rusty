@@ -89,8 +89,8 @@ fn reset_is_a_cut_under_the_same_key() {
 }
 
 /// `cut()`, what TAA forgets its history on (#1702): the view's first frame, a
-/// changed key (another scene, Play or Stop, another base camera) and a reset (a
-/// resize), and nothing else.
+/// changed key (another scene, Play or Stop, another base camera, a camera's
+/// `Camera.ResetHistory`) and a reset (a resize), and nothing else.
 #[test]
 fn cut_names_every_frame_with_no_last_frame() {
     let (scene, mut h) = (Scene::new(), MotionHistory::default());
@@ -114,6 +114,14 @@ fn cut_names_every_frame_with_no_last_frame() {
         ..other
     };
     assert!(cut(&mut h, play), "Play");
+    let mut cuts = crate::scene::camera::HistoryCuts::default();
+    cuts.cut(Some(2));
+    let reset = HistoryKey {
+        cuts: cuts.of(Some(2)),
+        ..play
+    };
+    assert!(cut(&mut h, reset), "Camera.ResetHistory (#2003)");
+    assert!(!cut(&mut h, reset));
     h.clear();
     assert!(cut(&mut h, play), "a reset (a resize)");
     assert!(!cut(&mut h, play));

@@ -33,7 +33,7 @@ Unity's `Debug.DrawLine` / `Debug.DrawRay`: a line seen, never collided with. It
 draws in the editor's Scene view always, and over the game when its gizmos are on:
 the Game view's **Gizmos** toggle (`Editor.SetGizmo("GameGizmos", true)`), or
 `Harness.Screenshot(path, { gizmos = true })`
-(`docs/testing.md`), with every collider's shape beside it. A plain game frame
+(`docs/testing.md`, which also has its `settle` option), with every collider's shape beside it. A plain game frame
 never shows one.
 
 - Vectors and the colour cross flat, as everywhere in the API: six numbers, then
