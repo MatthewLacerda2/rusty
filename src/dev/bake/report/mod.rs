@@ -45,38 +45,16 @@ pub const DIR_SUFFIX: &str = ".bake";
 /// How many entries a "heaviest first" list keeps.
 pub const TOP: usize = 20;
 
-/// The bakes that write a report.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind {
-    Lightmaps,
-    Probes,
-    Reflections,
-    Occlusion,
-    Navmesh,
-}
-
-impl Kind {
-    pub const ALL: [Kind; 5] = [
-        Kind::Lightmaps,
-        Kind::Probes,
-        Kind::Reflections,
-        Kind::Occlusion,
-        Kind::Navmesh,
-    ];
-
-    /// The report's file stem and the name `Lighting.GetBakeReport` takes.
-    pub fn name(self) -> &'static str {
-        match self {
-            Kind::Lightmaps => "lightmaps",
-            Kind::Probes => "probes",
-            Kind::Reflections => "reflections",
-            Kind::Occlusion => "occlusion",
-            Kind::Navmesh => "navmesh",
-        }
-    }
-
-    pub fn parse(name: &str) -> Option<Kind> {
-        Kind::ALL.into_iter().find(|k| k.name() == name)
+crate::core::named_enum! {
+    /// The bakes that write a report; a name is the report's file stem and what
+    /// `Lighting.GetBakeReport` takes.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum Kind {
+        Lightmaps = "lightmaps",
+        Probes = "probes",
+        Reflections = "reflections",
+        Occlusion = "occlusion",
+        Navmesh = "navmesh",
     }
 }
 
@@ -143,6 +121,7 @@ impl Report {
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let path = report_path(scene_path, self.kind);
         let text = serde_json::to_string_pretty(&self.fields).map_err(|e| e.to_string())?;
+        // lint: allow(asset-write) a dev-only bake report, never read by a cache or at runtime
         std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(path)
     }

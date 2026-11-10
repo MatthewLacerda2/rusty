@@ -36,6 +36,39 @@ pub fn report(
     output_bytes: u64,
 ) -> Report {
     let fingerprint = fingerprint(input, settings);
+    let (meshes, texels_lit) = mesh_rows(scene, (input, settings), (pages, measured));
+    let zero: Vec<String> = (input.meshes.iter())
+        .filter(|m| m.scale_in_lightmap <= 0.0)
+        .map(|m| entity_name(scene, m.entity))
+        .collect();
+    let lights = input
+        .lights
+        .iter()
+        .zip(&texels_lit)
+        .enumerate()
+        .map(|(i, (l, &t))| light(i, l, t));
+    let denoise = measured
+        .denoised
+        .map(|(charts, busy)| json!({ "charts": charts, "seconds": secs(busy) }));
+    Report::new(Kind::Lightmaps, stages, settings, fingerprint, output_bytes).with(json!({
+        "maps": pages.maps,
+        "pageSize": pages.page_size,
+        "pages": occupancy(pages),
+        "meshes": meshes,
+        "zeroScaleInLightmap": zero,
+        "denoise": denoise,
+        "lights": lights.collect::<Vec<_>>(),
+        "invalidTexels": Value::Null,
+    }))
+}
+
+/// One row per lightmapped mesh, slowest first, and per light the texels in its
+/// reach.
+fn mesh_rows(
+    scene: &Scene,
+    (input, settings): (&BakeScene, &BakeSettings),
+    (pages, measured): (&EncodedPages, &Measured),
+) -> (Vec<Value>, Vec<u64>) {
     let page = pages.page_size as f32;
     let reach: Vec<Vec<usize>> = input
         .meshes
@@ -76,30 +109,8 @@ pub fn report(
         ));
     }
     // Slowest first; untimed ones after, in entity order.
-    meshes.sort_by(|a, b| b.0.cmp(&a.0));
-    let zero: Vec<String> = (input.meshes.iter())
-        .filter(|m| m.scale_in_lightmap <= 0.0)
-        .map(|m| entity_name(scene, m.entity))
-        .collect();
-    let lights = input
-        .lights
-        .iter()
-        .zip(&texels_lit)
-        .enumerate()
-        .map(|(i, (l, &t))| light(i, l, t));
-    let denoise = measured
-        .denoised
-        .map(|(charts, busy)| json!({ "charts": charts, "seconds": secs(busy) }));
-    Report::new(Kind::Lightmaps, stages, settings, fingerprint, output_bytes).with(json!({
-        "maps": pages.maps,
-        "pageSize": pages.page_size,
-        "pages": occupancy(pages),
-        "meshes": meshes.into_iter().map(|m| m.1).collect::<Vec<_>>(),
-        "zeroScaleInLightmap": zero,
-        "denoise": denoise,
-        "lights": lights.collect::<Vec<_>>(),
-        "invalidTexels": Value::Null,
-    }))
+    meshes.sort_by_key(|m| std::cmp::Reverse(m.0));
+    (meshes.into_iter().map(|m| m.1).collect(), texels_lit)
 }
 
 /// Per page: its maps and the share of its texels they cover.
