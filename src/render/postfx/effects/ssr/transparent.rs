@@ -52,5 +52,5 @@ pub(crate) const SHARP_SMOOTHNESS: f32 = 0.7;
 /// out on a curved, distant pixel.
 pub(crate) fn traces(m: &MaterialAsset) -> bool {
     let smooth = 1.0 - m.roughness.max(0.04) - SHARP_SMOOTHNESS > 0.0;
-    m.receive_ssr && (smooth || m.roughness_map.is_some())
+    m.receives_ssr() && (smooth || m.roughness_map.is_some())
 }

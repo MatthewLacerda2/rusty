@@ -1,6 +1,6 @@
 //! The transparent-surface fields of a material (#1523): URP Lit's blending and
 //! shadow toggles and HDRP Lit's refraction, absorption, depth postpass, motion vectors,
-//! transparent SSR and thin translucency, and TAA's reactivity (#1845), as rows of the material field table (`field.rs`).
+//! SSR (opaque and transparent, #2004) and thin translucency, and TAA's reactivity (#1845), as rows of the material field table (`field.rs`).
 //!
 //! Pure.
 
@@ -171,10 +171,10 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         api: "ReceiveSsr",
         label: "Receive SSR",
         kind: SurfaceKind::Toggle,
-        shown: transparent,
-        get: |m| SurfaceValue::Bool(m.receive_ssr),
+        shown: always,
+        get: |m| SurfaceValue::Bool(m.receives_ssr()),
         hint: no_hint,
-        put: |m, v| m.receive_ssr = boolean(v),
+        put: |m, v| m.receive_ssr = Some(boolean(v)),
     },
     SurfaceField {
         key: "transmission",

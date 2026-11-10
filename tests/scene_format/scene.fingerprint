@@ -978,6 +978,7 @@ scene.materials{}.reactive: enum Auto|Off|Full
 scene.materials{}.receive_decals: bool
 scene.materials{}.receive_shadows: bool
 scene.materials{}.receive_ssr: bool
+scene.materials{}.receive_ssr: option
 scene.materials{}.refraction_model: enum None|Planar|Thin
 scene.materials{}.render_face: enum Front|Back|Both
 scene.materials{}.render_mode: enum Opaque|Cutout|Transparent
