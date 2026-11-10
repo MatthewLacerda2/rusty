@@ -95,7 +95,9 @@ re-brief launch: a new routine whose prompt names the new `Brief`.
   by someone who cannot push, and a sixth coder (CLAUDE.md's limit, #1856): it
   counts each issue's newest `rusty #…` routine not yet fired, or fired with its
   PR still a draft (or no PR yet, the issue open, within 2 hours of the fire) and
-  no newer `Brief`, and names them; a coder whose PR merged or closed after the
+  no newer `Brief`, or fired with its PR ready but no review record on it yet (no
+  `Independent review` or `No review:` comment by someone who can push: its re-brief
+  needs the slot, #2017), and names them, the last ones `in review`; a coder whose PR merged or closed after the
   fire has ended though a `Refs` PR leaves the issue open (#1913); a fire with no
   PR past 2 hours is said and not counted (a coder that stood down or stalled). The API cannot tell a working coder from a finished one (a coder waiting
   on a background command reads `SUCCEEDED`, #1866), so a fired one is placed from

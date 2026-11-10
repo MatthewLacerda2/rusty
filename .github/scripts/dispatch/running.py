@@ -22,7 +22,15 @@ its pull request is ready (`cloud-brief.md`). For each issue's newest
 - not fired yet → running;
 - fired, and its fire time cannot be read → *unknown*: named, not counted;
 - fired, and an open pull request for N (its branch `N-…`, CLAUDE.md *Branch
-  naming*) is ready → ended;
+  naming*) is ready → running, *in review* ([`REVIEWING`]), until a comment on
+  it records the review decision (`merging/verdict/reviewed.py`'s test: first
+  line `Independent review…` or `No review: <why>`, by someone who can push),
+  then ended, whatever the record's outcomes say (#2017). On 2026-11-10 the slot
+  freed at ready went to a new issue twice (#2009, #2015), and the review then
+  sent each PR back with no slot for its re-brief; most reviews send a PR back
+  (48 of 57 re-briefs that batch), and a re-brief finishes something nearly
+  done. The re-brief takes exactly the held slot, since the issue being
+  launched is never counted;
 - fired, and N's pull request is a draft, **or** N has no open pull request,
   the issue is still open and the fire is under [`FIRST_PUSH`] old (a coder
   that has not opened its PR yet) → running, unless a `Brief` on N from someone
@@ -60,6 +68,7 @@ from typing import Callable
 
 import ghrest
 from dispatch import brief, routine
+from merging.verdict import reviewed
 
 #: The most cloud coders at once (the operator, 2026-11-05).
 LIMIT = 5
@@ -70,6 +79,8 @@ LIMIT = 5
 #: stalled, and counting it would hold a slot forever (#1866's review).
 FIRST_PUSH = timedelta(hours=2)
 STALE = "no PR in 2 h: ended or stalled"
+#: Why a ready pull request with no review record still counts (#2017).
+REVIEWING = "in review"
 
 ISSUE = re.compile(re.escape(routine.NAME_PREFIX) + r"(\d+)\b")
 BRANCH = re.compile(r"^(\d+)-")
@@ -142,7 +153,7 @@ def state(found: dict, github: GitHub) -> tuple[str, str]:
     number = issue(found)
     mine = pulls_for(number, github.pulls)
     if mine and not any(p.get("draft") for p in mine):
-        return "ended", "its pull request is ready"
+        return in_review(mine, github)
     if not mine:
         got = github.issue(number)
         if got is None:
@@ -164,6 +175,18 @@ def state(found: dict, github: GitHub) -> tuple[str, str]:
     return "running", "draft pull request" if mine else "no pull request yet"
 
 
+def in_review(ready: list[dict], github: GitHub) -> tuple[str, str]:
+    """A fired coder whose pull requests are all ready: running while one has no review record
+    (`reviewed.decided`), since the review most often sends it back to its coder (#2017)."""
+    for pull in ready:
+        comments = github.comments(pull.get("number"))
+        if comments is None:
+            return "unknown", f"could not read #{pull.get('number')}'s comments"
+        if not reviewed.decided(comments):
+            return "running", REVIEWING
+    return "ended", "its pull request is ready and reviewed"
+
+
 def newest(routines: list[dict], launching: int) -> list[dict]:
     """Each issue's newest coder routine, leaving out `launching` (a re-brief)."""
     latest: dict[int, dict] = {}
@@ -177,20 +200,25 @@ def newest(routines: list[dict], launching: int) -> list[dict]:
 
 
 def coders(routines: list[dict], launching: int,
-           github: GitHub) -> tuple[list[dict], list[tuple[dict, str, str]]]:
-    """The coder routines that count, and the uncounted ones worth saying, as (routine,
-    placement, why): those that cannot be placed, and those [`STALE`] past [`FIRST_PUSH`]."""
+           github: GitHub) -> tuple[list[tuple[dict, str]], list[tuple[dict, str, str]]]:
+    """The coder routines that count, as (routine, why), and the uncounted ones worth saying,
+    as (routine, placement, why): those that cannot be placed, and those [`STALE`] past
+    [`FIRST_PUSH`]."""
     counted, noted = [], []
     for found in newest(routines, launching):
         placed, why = state(found, github)
         if placed == "running":
-            counted.append(found)
+            counted.append((found, why))
         elif placed == "unknown" or why == STALE:
             noted.append((found, placed, why))
     return counted, noted
 
 
-def describe(found: dict) -> str:
+def describe(found: dict, why: str = "") -> str:
+    """One counted coder for the refusal: its name, when it fired or fires, and `in review`
+    for a ready pull request still waiting on its review record ([`REVIEWING`])."""
     since = fired_at(found)
     told = f"fired {since:%Y-%m-%dT%H:%M}Z" if since and fired(found) else f"fires {found.get('run_once_at', '?')}"
+    if why == REVIEWING:
+        told += f", {REVIEWING}"
     return f"{found.get('name', '?')} ({told})"
