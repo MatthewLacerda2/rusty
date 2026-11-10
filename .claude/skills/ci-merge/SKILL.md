@@ -269,10 +269,13 @@ worktree (~2.5–4.5 GB of `target/` each) and its branch once nobody is standin
   is gone; stopped.`), **8** when something unexpected was raised (`supervisor:
   crashed: <error>; stopped.`) and **11** when it could not lock its worktree
   (`supervisor: could not lock …; stopped.`, or `… is already locked (…), not by a
-  supervisor`; #1983): `make queue-status` and `make reclaim` read that lock, so it
-  never runs without it. Started from the main working tree, `make queue-daemon`
+  supervisor; `git worktree unlock <path>` clears it …`; #1983): `make queue-status`
+  and `make reclaim` read that lock, so it never runs without it. A lock with no
+  reason is replaced, with a line saying so: a power loss can empty the
+  supervisor's own lock file. Started from the main working tree, `make queue-daemon`
   refuses before forking with **10** and one `queue-daemon:` line giving the command
-  to run from `.claude/worktrees/merge-queue` (or how to make that worktree). `make queue-daemon` exits non-zero, printing the
+  to run from `.claude/worktrees/merge-queue` (or how to make that worktree, pruning a
+  registered one whose directory is gone). `make queue-daemon` exits non-zero, printing the
   log's tail, when the supervisor it started exits in its first few seconds; one
   still running but never seen holding its lock is reported as *unconfirmed*
   (exit 0): ask `make queue-status` (the supervisor's lock PID, checked alive, the

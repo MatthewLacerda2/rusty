@@ -82,7 +82,11 @@ def current(root: str) -> str | None:
 def main_tree(root: str) -> bool:
     """Whether `root` stands in the repository's main working tree, where git
     keeps its own directory (`--git-dir` is `--git-common-dir`), not a linked one.
-    A `root` git cannot read is not called main: what runs next meets it."""
+    A `root` git cannot read is not called main: what runs next meets it, and
+    a `root` that is gone ends as one (`supervisor.vanished`), never a traceback
+    from running git in it (review of PR #1984)."""
+    if not os.path.isdir(root):
+        return False
     own = gitio.git("rev-parse", "--git-dir", cwd=root)
     common = gitio.git("rev-parse", "--git-common-dir", cwd=root)
     if own.returncode or common.returncode or not own.stdout.strip():
@@ -90,34 +94,62 @@ def main_tree(root: str) -> bool:
     return Path(root, own.stdout.strip()).resolve() == Path(root, common.stdout.strip()).resolve()
 
 
+def registered(top: str, tree: Path) -> dict[str, str] | None:
+    """`git worktree list`'s fields for `tree` in the checkout at `top`, or
+    `None` when git does not know it, even if a plain directory stands there."""
+    listing = gitio.git("worktree", "list", "--porcelain", cwd=top).stdout
+    for block in listing.strip().split("\n\n"):
+        fields = dict(line.partition(" ")[::2] for line in block.splitlines() if line)
+        if fields.get("worktree") and Path(fields["worktree"]).resolve() == tree.resolve():
+            return fields
+    return None
+
+
 def refusal(root: str, forwarded: list[str]) -> str:
     """The one line refusing to supervise from the main working tree at `root`:
-    the exact command when [`WORKTREE`] exists, else how to make it."""
+    the exact command when [`WORKTREE`] is a live worktree, else how to make it.
+    It reads `git worktree list`, not the directory (review of PR #1984): a
+    leftover plain directory is not offered as the worktree, and a registered
+    one whose directory is gone is pruned before `git worktree add`."""
     top = gitio.git("rev-parse", "--show-toplevel", cwd=root).stdout.strip() or root
     tree = Path(top, WORKTREE)
     again = "make queue-daemon" + (f" ARGS={shlex.quote(shlex.join(forwarded))}" if forwarded else "")
-    if tree.is_dir():
+    known, git = registered(top, tree), f"git -C {shlex.quote(top)} worktree"
+    if known is not None and tree.is_dir():
         how = f"run `cd {shlex.quote(str(tree))} && {again}`"
     else:
-        made = f"git -C {shlex.quote(top)} worktree add --detach {shlex.quote(str(tree))} origin/main"
+        made = f"{git} add --detach {shlex.quote(str(tree))} origin/main"
+        if known is not None:  # registered, its directory gone: a lock keeps `prune` off it
+            unlock = f"{git} unlock {shlex.quote(str(tree))} && " if "locked" in known else ""
+            made = f"{unlock}{git} prune && {made}"
+        elif tree.exists():  # not a worktree git knows; `add` refuses a non-empty directory
+            made = f"mv {shlex.quote(str(tree))} {shlex.quote(str(tree))}.old && {made}"
         how = f"make one and run it there: `{made} && cd {shlex.quote(str(tree))} && {again}`"
     return (f"queue-daemon: {top} is the main working tree, which the supervisor would detach onto"
             f" origin/main and cannot lock; {how}.")
 
 
-def claim(root: str, pid: int) -> str | None:
+def claim(root: str, pid: int, say=lambda line: None) -> str | None:
     """Lock `root`'s worktree for supervisor `pid`; why not, when it could not.
 
     Called holding the supervisor's flock, so a lock another supervisor left is
     a dead one's (or this PID's own, after it re-executed itself) and is
-    replaced. Any other lock is left as it is: it protects the worktree too,
-    but names no supervisor, so the caller stops as for a failed lock (#1983).
+    replaced. So is a lock with no reason (review of PR #1984): git writes the
+    lock file without an fsync, and after a power loss the supervisor's own can
+    come back empty; stopping on it would stop every later start until someone
+    unlocked it by hand. The replacement is `say`d. Any other lock is left as
+    it is: it protects the worktree too, but names no supervisor, so the caller
+    stops as for a failed lock (#1983), and the line names how to clear it.
     """
     held = current(root)
-    if pid_of(held) is not None:
+    if held == "":
+        say(f"supervisor: {root} was locked with no reason given (a supervisor's lock emptied by a"
+            " power loss, say); replacing it.")
+    if held == "" or pid_of(held) is not None:
         gitio.git("worktree", "unlock", root, cwd=root)
     elif held is not None:
-        return f"{root} is already locked ({held or 'no reason given'}), not by a supervisor"
+        return (f"{root} is already locked ({held}), not by a supervisor;"
+                f" `git worktree unlock {shlex.quote(root)}` clears it if nothing else needs it")
     done = gitio.git("worktree", "lock", "--reason", reason(pid), root, cwd=root)
     if done.returncode != 0:
         return f"could not lock {root} against `make reclaim`: {done.stderr.strip()}"

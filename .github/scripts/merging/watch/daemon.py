@@ -134,7 +134,7 @@ def supervised(root: str, forwarded: list[str], argv: list[str], restarted: bool
         stale = None if restarted else detach.clear_stale_stop(common)
         if stale:
             say(stale)
-        refused = tenancy.claim(root, os.getpid())
+        refused = tenancy.claim(root, os.getpid(), say)
         if refused:  # running unlocked is what #1983 was: stop instead
             return supervisor.unlocked(refused, say)
         return effects(root, forwarded, argv)
