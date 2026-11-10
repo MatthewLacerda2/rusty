@@ -47,11 +47,9 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
         [m.emissive[0], m.emissive[1], m.emissive[2], 0.0]
     });
 
-    // A draw with no material reflects as the default one (#1998).
-    let f0 = material.map_or_else(
-        || MaterialAsset::default().dielectric_f0(),
-        |m| m.dielectric_f0(),
-    );
+    // A draw with no material reflects as the default one (#1998): F0 in rgb, F90 in w.
+    let reflects = |m: &MaterialAsset| (m.dielectric_f0(), m.dielectric_f90());
+    let (f0, f90) = material.map_or_else(|| reflects(&MaterialAsset::default()), reflects);
     MaterialData {
         color_tint,
         use_texture,
@@ -70,7 +68,7 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
         surface: surface_uniform(lit, material),
         mapping: material.map_or_else(MappingUniform::default, mapping_uniform),
         normal_variance: [0; 4],
-        dielectric_reflectance: [f0[0], f0[1], f0[2], 0.0],
+        dielectric_reflectance: [f0[0], f0[1], f0[2], f90],
     }
 }
 
@@ -132,7 +130,8 @@ pub(crate) fn surface_uniform(lit: bool, material: Option<&MaterialAsset>) -> Su
         premultiply_diffuse: u32::from(lit && glass && preserves_specular(m)),
         receive_shadows: u32::from(m.receive_shadows),
         refraction_model: if reads_opaque { refraction_model } else { 0 },
-        ior: m.ior,
+        // Never below 1 (a NaN reads as 1): the shader refracts by `1 / ior` (#1998).
+        ior: m.ior.max(1.0),
         thickness,
         uses_opaque: u32::from(reads_opaque),
         depth_postpass: u32::from(glass && m.depth_postpass),

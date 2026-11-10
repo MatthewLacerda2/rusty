@@ -105,7 +105,7 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
     // Unity's model importer marks a bump map a material names as a Normal map,
     // and its packed metallic/roughness map linear (#1574), so each compresses
     // as what it holds.
-    let asset = MaterialAsset {
+    let mut asset = MaterialAsset {
         base_color: [data.base_color[0], data.base_color[1], data.base_color[2]],
         base_color_map: data.base_color_map.clone(),
         metallic: data.metallic,
@@ -121,15 +121,13 @@ pub fn material_asset_from_import(data: &crate::asset::MaterialData) -> Material
             true => RenderFace::Both,
             false => RenderFace::Front,
         },
-        // `KHR_materials_ior` and `KHR_materials_specular` (#1998).
-        ior: data.ior,
-        specular: data.specular,
-        specular_color: data.specular_color,
         // Imported glTF/OBJ materials default to Opaque (#242): the importer does not
         // yet read glTF `alphaMode`/`alphaCutoff`, so transparency is authored after
         // import via the inspector or the `Material` API.
         ..MaterialAsset::default()
     };
+    // `KHR_materials_ior` and `KHR_materials_specular` (#1998), clamped by their rows.
+    super::material::import_reflectance(&mut asset, data.ior, data.specular, data.specular_color);
     super::material::fit_map_slots(&asset);
     asset
 }

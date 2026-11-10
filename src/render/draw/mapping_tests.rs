@@ -60,13 +60,19 @@ fn defaults_and_world_mappings_pack_as_set() {
 }
 
 #[test]
-fn a_record_carries_its_dielectric_f0_and_none_is_the_default_glass() {
+fn a_record_carries_its_dielectric_f0_and_f90_and_none_is_the_default_glass() {
     let f0 = |m: Option<&MaterialAsset>| material_data(true, m).dielectric_reflectance;
-    assert_eq!(f0(None), [0.04, 0.04, 0.04, 0.0]);
-    assert_eq!(f0(Some(&MaterialAsset::default())), [0.04, 0.04, 0.04, 0.0]);
+    assert_eq!(f0(None), [0.04, 0.04, 0.04, 1.0]);
+    assert_eq!(f0(Some(&MaterialAsset::default())), [0.04, 0.04, 0.04, 1.0]);
     let pane = MaterialAsset {
         specular_color: [2.0; 3],
         ..MaterialAsset::default()
     };
-    assert_eq!(f0(Some(&pane)), [0.08, 0.08, 0.08, 0.0]);
+    assert_eq!(f0(Some(&pane)), [0.08, 0.08, 0.08, 1.0]);
+    // `specular` scales F0 and is the grazing reflectance (#1998).
+    let half = MaterialAsset {
+        specular: 0.5,
+        ..MaterialAsset::default()
+    };
+    assert_eq!(f0(Some(&half)), [0.02, 0.02, 0.02, 0.5]);
 }

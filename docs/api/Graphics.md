@@ -329,8 +329,9 @@ A depth-aware blur, a temporal accumulate (90% history, rejected where a surface
 distance from the eye moved or its normal turned by more than about 25°, clamped to
 the frame's own neighbourhood, so a light switched off is gone within two frames; no
 TAA needed) and a depth-aware upsample follow. The forward pass adds the result to
-the **indirect diffuse** only, through the same `albedo × 0.96 × (1 − metallic)`
-response and SSAO as the ambient term: a metal takes none, and a transparent surface
+the **indirect diffuse** only, through the same `albedo × (1 − reflectivity) ×
+(1 − metallic)` response (`reflectivity` the dielectric reflectance `Material.md`'s
+`ior` and `specular` set, so 0.96 for the default 4 %) and SSAO as the ambient term: a metal takes none, and a transparent surface
 or an overlay camera (a viewmodel) reads none.
 
 **It never gathers light a bake already bounced.** What the gather reads of each pixel

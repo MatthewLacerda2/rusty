@@ -8,7 +8,7 @@
 #import lighting::ssr_surface
 #import forward::transparent
 #import forward::mapping
-#import forward::reflection::{baked_diffuse, environment_reflection, specular_occlusion}
+#import forward::reflection::{baked_diffuse, environment_brdf, environment_reflection, specular_occlusion}
 #import forward::lighting::{ambient_occlusion, sun_shadow_parts, flat_ambient, fold_decals, indirect_bounce, lamp, lightmap_level, probe_irradiance, ssil_realtime, with_ssil_share}
 #import forward::shadowmask::{baked_occlusion, directional_shadows, local_shadows}
 #import forward::facing::{facing_normal, facing_tangent, seen_from_behind}
@@ -394,11 +394,17 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
 
     // F0 (#1998): a dielectric's comes from its ior and `KHR_materials_specular`,
     // computed once on the CPU (`MaterialAsset::dielectric_f0`; 0.04 for the default
-    // glass ior 1.5), a metal's is its albedo. `reflectivity` is its strongest
-    // channel, URP's specular-workflow `ReflectivitySpecular`: what the environment
-    // takes from the diffuse (`0.96` at 0.04) and the grazing weight starts from.
+    // glass ior 1.5), a metal's is its albedo. F90, the grazing reflectance, is the
+    // extension's too: a dielectric's `specular` (`MaterialAsset::dielectric_f90`, 1
+    // by default), a metal's 1, mixed by `metallic`. `reflectivity` is the
+    // dielectric F0's strongest channel, URP's specular-workflow
+    // `ReflectivitySpecular`: what the environment takes from the diffuse (`0.96` at
+    // 0.04) and the grazing weight starts from.
     let dielectric = m.dielectric_reflectance.rgb;
     let F0 = mix(dielectric, albedo, metallic);
+    // Written as `reflectivity` is below, not `mix`: at the default F90 of 1 it is
+    // exactly 1 for any `metallic`, so a default material renders as before.
+    let F90 = m.dielectric_reflectance.w + (1.0 - m.dielectric_reflectance.w) * metallic;
     let dielectric_reflectivity = max(dielectric.r, max(dielectric.g, dielectric.b));
 
     // 1. Ambient lighting term. A lightmapped static mesh reads its lightmap (#438).
@@ -413,7 +419,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     let lightmap_page = objects[in.instance.x].lightmap_page;
     if (lightmap_page > 0u) {
         // Baked lightmap (#438, `forward::lightmap`), at the level taken above.
-        let baked = lightmap_light(in.lightmap_uv, lightmap_page - 1u, lightmap_lod, objects[in.instance.x].lightmap_directional == 1u, behind, N, geometric, V, F0, roughness);
+        let baked = lightmap_light(in.lightmap_uv, lightmap_page - 1u, lightmap_lod, objects[in.instance.x].lightmap_directional == 1u, behind, N, geometric, V, F0, F90, roughness);
         ambient_irradiance = baked.irradiance;
         lightmap_specular = baked.specular;
     } else if (objects[in.instance.x].use_sh == 1u) {
@@ -469,7 +475,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         let L = normalize(-sun.direction);
         let radiance = sun.color * sun.intensity;
         let shadowed = directional_shadows(i, shadow, back_shadow, sun.mask_channel, baked_shadow);
-        lighting_color += lamp(N, V, L, radiance * shadowed.x, radiance * shadowed.y, F0, metallic, roughness, diffuse_albedo, m.transmission, sun.bounce_baked);
+        lighting_color += lamp(N, V, L, radiance * shadowed.x, radiance * shadowed.y, F0, F90, metallic, roughness, diffuse_albedo, m.transmission, sun.bounce_baked);
     }
 
     // 3. Point and spot lights, only those binned into this fragment's cluster (#434),
@@ -488,7 +494,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         // translucent surface.
         let lit = local_shadows(light, in.world_position, N, m.receive_shadows == 1u, translucent, baked_shadow);
         let L = normalize(light.position - in.world_position);
-        lighting_color += lamp(N, V, L, radiance * lit.x, radiance * lit.y, F0, metallic, roughness, diffuse_albedo, m.transmission, light.bounce_baked);
+        lighting_color += lamp(N, V, L, radiance * lit.x, radiance * lit.y, F0, F90, metallic, roughness, diffuse_albedo, m.transmission, light.bounce_baked);
     }
 
     // 5. Environment reflections (#244), always on (#718) but in a light-probe capture
@@ -498,27 +504,12 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // (postfx), so the record below stores what was added and under what weight.
     // A metal has no diffuse term, so without this it renders black. See
     // `environment_reflection`.
-    // Its weight is Unity URP's analytic environment BRDF (#1543; `BRDF.hlsl`
-    // `EnvironmentBRDFSpecular`, `GlobalIllumination.hlsl`): roughness only picks the
-    // prefiltered mip, and URP's `surfaceReduction`, `1 / (alpha^2 + 1)` with
-    // `alpha = roughness^2` (so perceptual roughness to the 4th), is the energy a rough
-    // lobe loses, so a rough metal reads blurry, not black. `roughness` is perceptual,
-    // URP's `perceptualRoughness`; a dielectric reflects its F0 head-on. The angle is
-    // `|N.V|`: a normal map or a vertex normal can still lean away from the camera on a
-    // face turned toward it, which would otherwise take the grazing Fresnel.
-    // The AO weighs it as specular occlusion (#1697, Frostbite's, as HDRP has it), and
-    // each probe is normalised by this pixel's baked diffuse (`baked_diffuse`).
-    // The weight reads the authored roughness, not the widened one: a far floor's
-    // spread of normals (up to 0.08 of α², `specular_aa`) would take `grazing` from
-    // 0.96 to 0.51 and a pane's opacity with it (#1702's review). URP has no
-    // specular AA; HDRP filters its smoothness through a preintegrated FGD rusty
-    // has not got.
+    // Its weight is URP's analytic environment BRDF (`environment_brdf`), at the
+    // authored roughness. The AO weighs it as specular occlusion (#1697, Frostbite's,
+    // as HDRP has it), and each probe is normalised by this pixel's baked diffuse
+    // (`baked_diffuse`).
     let R = reflect(-V, N);
-    let reflectivity = dielectric_reflectivity + (1.0 - dielectric_reflectivity) * metallic; // URP's
-    let grazing = saturate(1.0 - surface.roughness + reflectivity);
-    let alpha = surface.roughness * surface.roughness;
-    let fresnel = pow(1.0 - saturate(abs(dot(N, V))), 4.0);
-    let env_brdf = mix(F0, vec3<f32>(grazing), fresnel) / (alpha * alpha + 1.0);
+    let env_brdf = environment_brdf(F0, F90, dielectric_reflectivity, metallic, surface.roughness, N, V);
     let reflection_weight = env_brdf * specular_occlusion(saturate(abs(dot(N, V))), ao, roughness);
     // A transparent surface with `receive_ssr` traces SSR over it here (#1570), faded
     // by its authored smoothness.

@@ -141,7 +141,9 @@ pub struct MaterialAsset {
     #[serde(default = "default_ior")]
     pub ior: f32,
     /// glTF's `KHR_materials_specular` strength in `[0, 1]` (#1998): scales a
-    /// dielectric's reflectance; 1 (the default) keeps the one `ior` gives.
+    /// dielectric's reflectance head-on and at grazing angles (its F90,
+    /// [`MaterialAsset::dielectric_f90`]); 1 (the default) keeps the one `ior`
+    /// gives, 0 reflects nothing at any angle.
     #[serde(default = "default_one")]
     pub specular: f32,
     /// glTF's `KHR_materials_specular` colour (#1998): tints a dielectric's

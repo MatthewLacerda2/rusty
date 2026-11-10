@@ -45,10 +45,12 @@ fn color(value: SurfaceValue) -> [f32; 3] {
     }
 }
 
-/// A colour's channel range.
+/// The channel range of a colour that can only tint (`transmittance_color`,
+/// `transmission_color`); `specular_color` can also raise, up to 25.
 const UNIT: std::ops::RangeInclusive<f32> = 0.0..=1.0;
 
-/// Every transparent-surface field, in Inspector order.
+/// Every surface field (blending, reflectance, refraction, absorption, SSR,
+/// translucency, reactivity), in Inspector order.
 pub static SURFACE_FIELDS: &[SurfaceField] = &[
     SurfaceField {
         key: "blend_mode",
@@ -221,6 +223,37 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         put: |m, v| m.transmission_color = color(v),
     },
 ];
+
+/// What an imported `KHR_materials_ior` `ior` of 0 becomes (#1998): the extension's
+/// infinite ior, whose dielectric F0 is `min(specular_color, 1) × specular`, a ior the
+/// table's range cannot hold. So it imports as glass's ior with its `specular_color`
+/// raised by this factor, `1 / 0.04`: the same F0 (`MaterialAsset::dielectric_f0`),
+/// and a refraction that stays defined.
+const INFINITE_IOR_TINT: f32 = 25.0;
+
+/// Write an imported glTF's `ior`, `specular` and `specular_color` (#1998) into `m`
+/// through their rows, so an import lands in the ranges the Inspector and
+/// `Material.Get*` report, as an authored value does: a NaN or out-of-range value is
+/// clamped, and an `ior` of 0 is mapped first ([`INFINITE_IOR_TINT`]).
+pub fn import_reflectance(m: &mut MaterialAsset, ior: f32, specular: f32, color: [f32; 3]) {
+    let (ior, color) = if ior == 0.0 {
+        (1.5, color.map(|c| c * INFINITE_IOR_TINT))
+    } else {
+        (ior, color)
+    };
+    for (key, value) in [
+        ("ior", SurfaceValue::Number(ior)),
+        ("specular", SurfaceValue::Number(specular)),
+        ("specular_color", SurfaceValue::Color(color)),
+    ] {
+        let Some(field) = SURFACE_FIELDS.iter().find(|f| f.key == key) else {
+            continue;
+        };
+        if let Ok(value) = field.check(value) {
+            (field.put)(m, value);
+        }
+    }
+}
 
 #[cfg(test)]
 #[path = "surface_tests.rs"]

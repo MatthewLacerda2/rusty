@@ -113,18 +113,28 @@ pub(super) fn white() -> [f32; 3] {
 /// one is a mirror), a `specular` as its nearest bound in `[0, 1]` (NaN as 0), and
 /// a colour channel below 0 or NaN as 0.
 pub fn dielectric_f0(ior: f32, specular: f32, color: [f32; 3]) -> [f32; 3] {
-    // `v` in `[lo, hi]`, a NaN at `lo`.
-    let within = |v: f32, lo: f64, hi: f64| {
-        if v.is_nan() {
-            lo
-        } else {
-            f64::from(v).clamp(lo, hi)
-        }
-    };
     let n = within(ior, 1.0, f64::MAX);
     let reflectance = ((n - 1.0) / (n + 1.0)).powi(2);
     let strength = within(specular, 0.0, 1.0);
     color.map(|c| ((reflectance * within(c, 0.0, f64::MAX)).min(1.0) * strength) as f32)
+}
+
+/// A dielectric's reflectance at grazing angles, F90, by `KHR_materials_specular`
+/// (#1998): its `specular`, clamped as [`dielectric_f0`] clamps it. 1 by default, so
+/// a material that sets no `specular` keeps Schlick's full rim; 0 takes a
+/// dielectric's reflections away at every angle. A metal's F90 is 1, mixed in by
+/// `metallic` in the shader.
+pub fn dielectric_f90(specular: f32) -> f32 {
+    within(specular, 0.0, 1.0) as f32
+}
+
+/// `v` in `[lo, hi]`, a NaN at `lo`.
+fn within(v: f32, lo: f64, hi: f64) -> f64 {
+    if v.is_nan() {
+        lo
+    } else {
+        f64::from(v).clamp(lo, hi)
+    }
 }
 
 impl super::MaterialAsset {
@@ -132,6 +142,11 @@ impl super::MaterialAsset {
     /// and `specular_color`).
     pub fn dielectric_f0(&self) -> [f32; 3] {
         dielectric_f0(self.ior, self.specular, self.specular_color)
+    }
+
+    /// This material's dielectric F90 (`surface::dielectric_f90` of its `specular`).
+    pub fn dielectric_f90(&self) -> f32 {
+        dielectric_f90(self.specular)
     }
 
     /// Whether this material's surface reads the opaque copy (#1523): a

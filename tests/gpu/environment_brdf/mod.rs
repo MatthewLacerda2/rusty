@@ -10,6 +10,7 @@
 //! Without an adapter the capture returns `Ok(false)` and the tests skip.
 
 mod back_face_screenshot;
+mod grazing_screenshot;
 mod sphere_screenshot;
 
 use std::path::PathBuf;

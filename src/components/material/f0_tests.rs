@@ -1,6 +1,6 @@
 //! A dielectric's F0 from `ior` and `KHR_materials_specular` (#1998).
 
-use super::dielectric_f0;
+use super::{dielectric_f0, dielectric_f90};
 use crate::components::MaterialAsset;
 
 #[test]
@@ -36,4 +36,13 @@ fn a_malformed_material_still_gives_a_reflectance_in_range() {
     let odd = dielectric_f0(1.0, 1.0, [f32::INFINITY, f32::NAN, -1.0]);
     assert_eq!(odd, [0.0; 3], "no ior, no reflection, whatever the colour");
     assert_eq!(dielectric_f0(1.5, 1.0, [f32::INFINITY; 3]), [1.0; 3]);
+}
+
+#[test]
+fn the_grazing_reflectance_is_the_specular_strength_clamped() {
+    assert_eq!(MaterialAsset::default().dielectric_f90(), 1.0);
+    assert_eq!(dielectric_f90(0.5), 0.5);
+    assert_eq!(dielectric_f90(0.0), 0.0, "no rim at specular 0");
+    assert_eq!((dielectric_f90(7.0), dielectric_f90(-1.0)), (1.0, 0.0));
+    assert_eq!(dielectric_f90(f32::NAN), 0.0, "as dielectric_f0 reads it");
 }

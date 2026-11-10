@@ -53,7 +53,7 @@ pub use shader_params::{
 };
 pub use slots::{keys, set_slot, slot_count};
 pub use sources::{load_recipe, Loaded};
-pub use surface::SURFACE_FIELDS;
+pub use surface::{import_reflectance, SURFACE_FIELDS};
 
 use super::sanitize::{finite_array_or, non_negative, unit};
 use crate::asset::MapRef;
