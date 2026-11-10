@@ -36,6 +36,17 @@ fn bake_set_and_a_relative_path_make_missing_nested_folders() {
 }
 
 #[test]
+fn preview_makes_a_missing_nested_folder_inside_the_project() {
+    let root = crate::test_temp::dir();
+    let path = root.join("previews").join("new").join("sheet.png");
+    let p = path.to_str().unwrap();
+    let lua = Lua::new();
+    let t = super::super::inspect::preview_table(&lua, &recipe(), p, Some(8), &root).unwrap();
+    assert_eq!(t.get::<String>("path").unwrap(), p);
+    assert!(path.is_file());
+}
+
+#[test]
 fn a_folder_outside_the_project_is_not_made() {
     let root = crate::test_temp::dir().join("project");
     std::fs::create_dir_all(&root).unwrap();

@@ -55,8 +55,8 @@ made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the ex
 occlusion-roughness-metallic map: rusty's material has no occlusion map, so nothing
 is written to R.
 
-**The target folder.** `Bake` and `BakeSet` make the missing folders above `path`
-(or above `prefix`) when they lie inside the project, so a new set can bake to
+**The target folder.** `Bake`, `BakeSet` and `Preview` make the missing folders
+above `path` (or above `prefix`) when they lie inside the project, so a new set can bake to
 `assets/textures/<new set>/brick` at once (#1850). A target outside the project is
 written only into a folder that already exists. A write that still fails names the
 verb and the path: `Texture.BakeSet: cannot write <path>: <os error>`.
@@ -265,7 +265,8 @@ transform: a 0.5 mask shows as 188, not 128. Alpha is not shown.
 `size` defaults to 128, or the recipe's longer side when that is smaller; a `size`
 above that side is an error, since a tile larger than the image adds nothing.
 Both verbs refuse a recipe whose `output` or `outputs` names a missing node, as the
-bakes do.
+bakes do. `Preview` makes the missing folders above `path` as `Bake` does (*The
+target folder*).
 
 ```lua no-run
 local p = Texture.Preview(recipe, "out/preview.png", 96)
