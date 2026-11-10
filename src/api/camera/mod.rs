@@ -6,6 +6,7 @@
 //! main camera entity's Transform and the fov its lens when the scene has one, else
 //! the free view camera's (`scene::camera::view`, #1619); the per-entity functions (`component`) tune a camera *entity's*
 //! projection and render-texture target (#430), lens and stacking (`lens`, #1341).
+//! `ResetHistory` cuts a camera's view (#2003, `scene::camera::HistoryCuts`).
 
 pub mod component;
 mod lens;
@@ -17,7 +18,7 @@ use mlua::Lua;
 
 use super::{put, ApiCtx, Reg};
 use crate::api::entity_arg::EntityArg;
-use crate::scene::camera::{set_view_fov, set_view_orientation, set_view_position};
+use crate::scene::camera::{main_camera, set_view_fov, set_view_orientation, set_view_position};
 use crate::scene::{game_camera_from_scene, Camera, Scene};
 
 /// Register the `Camera` namespace onto `lua`.
@@ -27,6 +28,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     register_orientation(lua, &table, ctx)?;
     register_fov(lua, &table, ctx)?;
     register_projection(lua, &table, ctx)?;
+    register_reset_history(lua, &table, ctx)?;
     component::register(lua, &table, ctx.scene)?;
 
     lua.globals()
@@ -189,6 +191,28 @@ fn register_projection(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Re
             let (o, d) =
                 view(&*camera.get(lua)?, &*scene.get(lua)?).screen_ray(Vec2::new(x, y), px(lua)?);
             Ok((o.x, o.y, o.z, d.x, d.y, d.z))
+        }),
+    )
+}
+
+/// `ResetHistory([id])`: the next frame of camera `id`'s view (the screen's base
+/// camera, `Camera.main`, when omitted or `nil`) starts every history over, URP's
+/// `resetHistory`. A dead id or an entity with no camera does nothing.
+fn register_reset_history(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
+    let scene = ctx.scene;
+    put(
+        table,
+        "ResetHistory",
+        lua.create_function(move |lua, id: EntityArg| {
+            let scene = scene.get(lua)?;
+            let mut scene = scene.borrow_mut();
+            let camera = match id.get() {
+                None => main_camera(&scene),
+                Some(id) if scene.world.camera(id).is_some() => Some(id),
+                Some(_) => return Ok(()),
+            };
+            scene.history_cuts.cut(camera);
+            Ok(())
         }),
     )
 }

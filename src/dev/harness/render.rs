@@ -1,5 +1,6 @@
-//! The harness's rendering verbs: `Screenshot` (a frame to a PNG) and `Render`
-//! (a frame drawn only for what it costs, #835). Both draw through the run's one
+//! The harness's rendering verbs: `Screenshot` (a frame to a PNG, after `settle`
+//! frames drawn first, #2003) and `Render` (a frame drawn only for what it costs,
+//! #835). Both draw through the run's one
 //! [`CaptureHost`](crate::dev::capture::CaptureHost) and fold the frame's cost —
 //! render counters, `renderer_ms`, GPU time where the adapter measures it — into
 //! the run's frame stats.
@@ -118,7 +119,19 @@ impl Harness {
     /// software adapter is available (a skip, as for a screenshot) or on an error,
     /// which is logged.
     pub fn render_frame(&mut self) -> Option<RenderedFrame> {
-        let (width, height) = self.size();
+        self.render_frame_at(self.size())
+    }
+
+    /// Render `frames` frames at `size` with no sim step between them, writing
+    /// nothing (#2003): a screenshot's `settle`, so temporal effects (TAA above all)
+    /// converge on the view before the shot. Each frame's cost lands in the stats,
+    /// as `Render`'s does. `false` when one did not draw (no adapter, an error).
+    pub fn settle(&mut self, size: (u32, u32), frames: u32) -> bool {
+        (0..frames).all(|_| self.render_frame_at(size).is_some())
+    }
+
+    /// [`render_frame`](Self::render_frame) at `size`.
+    fn render_frame_at(&mut self, (width, height): (u32, u32)) -> Option<RenderedFrame> {
         let result = {
             let world = self.world.borrow();
             crate::dev::screenshot::share_world(&mut self.capture, &world, width, height);
