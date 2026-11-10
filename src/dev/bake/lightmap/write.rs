@@ -19,10 +19,18 @@ pub(super) const FINAL: &str = "lightmap";
 /// The file names a progressive bake's preview pages start with (#1970).
 pub(super) const PREVIEW: &str = "lightmap_preview";
 
-/// What one `size`² shadowmask page takes on the GPU: RGBA8 with its mips.
-fn rgba8_gpu_bytes(size: u32) -> usize {
+/// What `encoded`'s pages take on the GPU, every mip: its colour and direction
+/// pages as stored, and each shadowmask page as RGBA8 with the mips made on load.
+fn gpu_bytes(encoded: &EncodedPages) -> usize {
+    let size = encoded.page_size;
     let levels = crate::scene::lighting::lightmap::level_count(size);
-    (0..levels).map(|l| ((size >> l) as usize).pow(2) * 4).sum()
+    let mask: usize = (0..levels).map(|l| ((size >> l) as usize).pow(2) * 4).sum();
+    let stored = encoded
+        .colour
+        .iter()
+        .map(|(p, _)| p)
+        .chain(&encoded.directions);
+    stored.map(Page::gpu_bytes).sum::<usize>() + encoded.masks.len() * mask
 }
 
 /// [`encode_pages`] then [`apply_encoded`]: write `maps` beside `scene_path`, on
@@ -76,13 +84,7 @@ pub fn apply_encoded(
         }
     };
     warn_fell_back(&set);
-    let pages = encoded
-        .colour
-        .iter()
-        .map(|(p, _)| p)
-        .chain(&encoded.directions);
-    let bytes: usize =
-        pages.map(Page::gpu_bytes).sum::<usize>() + encoded.masks.len() * rgba8_gpu_bytes(size);
+    let bytes = gpu_bytes(encoded);
     log::info!(
         "[LightmapBake] {} lightmaps in {} page(s) of {size}²{}, {:.1} MiB on the GPU, in {}",
         encoded.maps,

@@ -90,28 +90,30 @@ pub fn read(bytes: &[u8]) -> Result<Page, String> {
     })
 }
 
+/// One DFD sample: its bit offset, bit length less one, channel and qualifiers,
+/// and upper bound.
+type Sample = (u32, u32, u32, u32);
+
 /// A Basic Data Format Descriptor for `format`, linear transfer (lightmaps hold
 /// linear light and raw directions): BC6H's one 128-bit float sample over a 4×4
 /// block, or RGBA8's four 8-bit samples over one texel.
 fn dfd(format: PageFormat) -> Vec<u8> {
-    // Per sample: (bit offset, bit length less one, channel and qualifiers, upper).
-    let (model, block_dims, plane0, samples): (u32, u32, u32, &[(u32, u32, u32, u32)]) =
-        match format {
-            // KHR_DF_MODEL_BC6H; channel 0 with KHR_DF_SAMPLE_DATATYPE_FLOAT.
-            PageFormat::Bc6h => (133, 3 | (3 << 8), 16, &[(0, 127, 0x80, u32::MAX)]),
-            // KHR_DF_MODEL_RGBSDA; channels R, G, B and A (15), each a byte.
-            PageFormat::Rgba8 => (
-                1,
-                0,
-                4,
-                &[
-                    (0, 7, 0, 255),
-                    (8, 7, 1, 255),
-                    (16, 7, 2, 255),
-                    (24, 7, 15, 255),
-                ],
-            ),
-        };
+    let (model, block_dims, plane0, samples): (u32, u32, u32, &[Sample]) = match format {
+        // KHR_DF_MODEL_BC6H; channel 0 with KHR_DF_SAMPLE_DATATYPE_FLOAT.
+        PageFormat::Bc6h => (133, 3 | (3 << 8), 16, &[(0, 127, 0x80, u32::MAX)]),
+        // KHR_DF_MODEL_RGBSDA; channels R, G, B and A (15), each a byte.
+        PageFormat::Rgba8 => (
+            1,
+            0,
+            4,
+            &[
+                (0, 7, 0, 255),
+                (8, 7, 1, 255),
+                (16, 7, 2, 255),
+                (24, 7, 15, 255),
+            ],
+        ),
+    };
     let block = 24 + 16 * samples.len() as u32;
     let mut words = vec![
         4 + block,                    // dfdTotalSize
