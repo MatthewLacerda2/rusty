@@ -74,5 +74,6 @@ fn write(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
+    // lint: allow(asset-write) the hulls it adds are already in `core::hulls`; the sidecar is read only when a model is parsed
     crate::core::fs::write_atomic(path, bytes)
 }

@@ -221,6 +221,7 @@ impl BakeFiles {
     ) -> Result<Saved, String> {
         let action = match want {
             Some(w) => {
+                // lint: allow(asset-write) `.occlusion` / `.navmesh` bake files, read whole by the scene load (`BakeFiles`), no path-keyed cache
                 crate::core::fs::write_atomic(path, w.bytes())
                     .map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
                 Action::Written

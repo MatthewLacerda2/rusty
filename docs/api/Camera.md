@@ -11,6 +11,7 @@
 | `Camera.GetFov` / `SetFov` | `()` / `(fov)` | degrees (clamped 1–179); the main camera entity's field of view when there is one (same as `SetFieldOfView` on it), else the free view camera's |
 | `Camera.WorldToScreen` | `(x, y, z [, canvas])` | `sx, sy, depth, onScreen` — see below |
 | `Camera.ScreenToWorldRay` | `(x, y)` | `ox, oy, oz, dx, dy, dz` — the ray's origin (on the near plane) and unit direction |
+| `Camera.ResetHistory` | `([id])` | — the next frame of camera `id`'s view (the main camera when omitted or `nil`) starts every history over; see *Teleports* |
 
 **Which pose these move (#1619).** Following Unity, where `Camera.main` is a
 GameObject: when the scene has a **main camera** — the active screen camera entity
@@ -31,6 +32,20 @@ included) changes the main camera entity itself, and that change is **saved with
 the scene**, as moving `Camera.main` in a Unity editor script would be. During Play,
 Stop restores the authored pose as usual. To frame a debug shot without touching
 the scene, enter Play first or move a camera you then delete.
+
+**Teleports: `ResetHistory` (#2003).** A view remembers its last frame: motion
+vectors, TAA's history, SSIL, volumetric fog and the automatic exposure all read it.
+The engine starts them over by itself on a scene load, Play or Stop, a camera switch
+and a resize, but it never guesses a teleport from distance (Unity doesn't either:
+a fast camera in a real game is no cut). So after jumping the camera (a respawn, a
+level transition, a cutscene cut, a review shot from a new spot) call
+`Camera.ResetHistory()`, URP's `resetHistory` (HDRP's `HDCamera.Reset`): the next
+frame that camera's view draws is a new view's first, with no ghost of the old one
+and the exposure snapped. Pass a camera entity's id to cut a render-texture camera's
+view; the screen's view keys on its base camera, so cutting an overlay camera of the
+stack does nothing. A dead id or an entity with no camera is a no-op. It works in edit
+mode, in Play and in the harness; for a converged TAA image of the new view in a shot,
+add `settle` (`Harness.Screenshot(path, { settle = 32 })`, `docs/testing.md`).
 
 **World ↔ screen (#429).** Screen points are **UI screen pixels** — bottom-left
 origin, y-up, the frame of `UI.GetRect(id).screen` and the UI pointer (Unity's

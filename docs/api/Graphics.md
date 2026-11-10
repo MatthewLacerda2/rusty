@@ -850,8 +850,11 @@ The mask costs 2 bytes a pixel at the scene's size (4 MB at 1920×1080), the
 translucent passes one more blended target.
 
 The first frame after a cut (a
-scene load, Play or Stop, a camera switch, a resize) is the current frame alone, so
-nothing of the last shot ghosts in. The editor's Scene view never runs TAA (it keeps
+scene load, Play or Stop, a camera switch, a resize, `Camera.ResetHistory()`) is the
+current frame alone, so nothing of the last shot ghosts in. **A teleport is no cut by
+itself** (no distance heuristic, as in Unity): after jumping the camera, call
+`Camera.ResetHistory()` (`Camera.md`, *Teleports*), or the old view ghosts into the
+new one wherever the history survives the clamp. The editor's Scene view never runs TAA (it keeps
 FXAA); the Game view, the player and a render-texture camera with `taa_active` and
 `post_fx` on do, each with its own history. The player's `taa` option can turn it
 off.
@@ -886,7 +889,13 @@ Upscaling (a render scale below 1), it is that frame's 3×3 reconstruction at th
 output's size: as soft as a bilinear upscale, and shifted too. Each later shot
 blends 0.1 of its own frame into the history of the shots before it (upscaling,
 0.1 times how near its nearest sample landed to the pixel), however many sim steps
-apart they were, so two shots of an unchanged scene can differ. To compare shots pixel for pixel, or to judge a scene's edges, turn TAA off
+apart they were, so two shots of an unchanged scene can differ. `Harness.Step` renders nothing, so
+steps never settle it. A shot after a camera jump ghosts the last shot's view in
+unless the jump is cut (`Camera.ResetHistory()`); `Harness.Screenshot(path, { settle
+= n })` draws `n` frames with no sim step before the shot, so the history converges
+(a still pixel keeps 0.9ⁿ of the old view: about 3% at 32, 0.1% at 64). A cut and a
+settle give a player's settled image of the new view; a cut alone, the new view's
+first frame. To compare shots pixel for pixel, or to judge a scene's edges, turn TAA off
 for the capture (`Graphics.SetTaaActive(false)`: FXAA then runs, if it is on).
 
 **Camera TAA settings** (#1847, URP's `taaSettings`). The resolve's strength is on
