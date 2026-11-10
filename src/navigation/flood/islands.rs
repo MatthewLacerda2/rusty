@@ -117,9 +117,8 @@ fn predecessors(
     }
     for &(dx, dz, _) in &DIRS {
         let (gx, gz) = (s.gx + dx, s.gz + dz);
-        let run = nav.run_between(s, gx, gz);
         for i in nav.span_range(gx, gz) {
-            if nav.steps(a, nav.spans[i], run) {
+            if nav.steps(a, nav.spans[i]) {
                 two_way.push(SpanRef {
                     gx,
                     gz,

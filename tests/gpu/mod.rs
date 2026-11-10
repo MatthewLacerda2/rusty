@@ -37,6 +37,7 @@ pub fn black_sky(scene: &mut rusty::scene::Scene) {
 
 mod baked_specular;
 mod bloom_screenshot;
+mod bounds_centre;
 mod cascaded_shadows_screenshot;
 mod custom_postfx_screenshot;
 mod diffuse_model_screenshot;
@@ -82,6 +83,7 @@ mod skinning_joint_cap;
 mod sky_reflection_screenshot;
 mod specular_aa_screenshot;
 mod ssao_screenshot;
+mod taa_cut_screenshot;
 mod toksvig;
 mod transparent_sorting_screenshot;
 mod transparent_surfaces;
