@@ -3,8 +3,10 @@
 //! result on the scene and writes `<scene>.navmesh` beside a saved one. A save writes
 //! it when the file lacks it (`scene::nav_settings::save_navmesh`), so a scene baked
 //! unsaved, or saved under another name, carries its navmesh to its file. Independent
-//! of Generate Lighting, as in Unity.
+//! of Generate Lighting, as in Unity. A bake that writes the file writes its report
+//! beside it too (`report::navmesh`, #1980).
 
+use super::report::{self, Stages};
 use crate::navigation::NavigationGraph;
 use crate::scene::nav_settings::{navmesh_path, save_navmesh};
 use crate::scene::Scene;
@@ -22,10 +24,20 @@ pub fn bake_navmesh(
         nav.bake(scene);
         return Ok(None);
     }
-    scene.navmesh.bytes = Some(nav.bake_to_bytes(scene).into());
+    let mut stages = Stages::start();
+    let bytes: std::sync::Arc<[u8]> = nav.bake_to_bytes(scene).into();
+    stages.lap("bake");
+    scene.navmesh.bytes = Some(bytes.clone());
     let Some(path) = path else {
         return Ok(None);
     };
     save_navmesh(scene, path)?;
-    Ok(Some(navmesh_path(path).to_string_lossy().into_owned()))
+    stages.lap("write");
+    let file = navmesh_path(path);
+    let written = report::bytes_under(&file);
+    report::keep(
+        path,
+        report::navmesh::report(scene, nav, &stages, &bytes, written),
+    );
+    Ok(Some(file.to_string_lossy().into_owned()))
 }

@@ -24,7 +24,8 @@
 //! ([`job`], #808): [`gather_bake_input`] borrows the scene, `bake` needs only
 //! the owned [`BakeScene`], and [`apply_lightmaps`] writes the result back. A script's
 //! bake runs the middle on a worker too, so its caller can log progress (`logged`,
-//! #1667).
+//! #1667). Either way the bake writes its report beside the scene
+//! (`report::lightmaps`, #1980).
 //!
 //! Allowed deps: scene (the bake and its data), asset (the KTX2 page), image (PNG
 //! I/O).
@@ -37,12 +38,14 @@ use glam::Vec3;
 use crate::asset::MapRef;
 use crate::dev::bake::denoise::{self, Oidn};
 use crate::dev::bake::progress::{BakeLog, MeshCost, MeshTime, Step};
+use crate::dev::bake::report::{self, lightmaps::Measured, Stages};
 use crate::scene::lighting::lightmap::{BakeProgress, BakeScene, BakeSettings};
 use crate::scene::Scene;
 
 mod encoder;
 pub mod job;
 pub(in crate::dev::bake) mod logged;
+mod measure;
 mod pages;
 mod preview;
 mod write;
@@ -82,14 +85,38 @@ pub fn bake_scene_lightmaps_logged(
     log: &mut BakeLog,
 ) -> Result<usize, String> {
     let scene_path = scene_path.ok_or(UNSAVED)?;
+    let mut stages = Stages::start();
     let input = gather_bake_input(scene);
-    let (mut encoded, times) = logged::bake_logged(&input, settings, log)?;
+    stages.lap("gather");
+    let run = logged::bake_logged(&input, settings, log)?;
+    stages.push("trace", run.trace);
+    stages.push("encode", run.encode);
     log.enter(Step::WritingLightmaps);
+    let times = &run.measured.times;
     log.mesh_costs(times.iter().map(|t| mesh_cost(scene, t)).collect());
+    let mut encoded = run.pages;
     encoded.lights = crate::scene::lighting::lightmap::taken_lights(scene);
     encoded.shadowmask = input.shadowmask.clone();
     warn_missing_uvs(lightmap_receivers(&input), encoded.maps);
-    apply_encoded(scene, scene_path, &encoded)
+    let written = apply_encoded(scene, scene_path, &encoded)?;
+    stages.lap("write");
+    let baked = (&encoded, &run.measured);
+    keep_report(scene, scene_path, (&input, settings), baked, &stages);
+    Ok(written)
+}
+
+/// Write the report of a bake of `scene` (#1980): it read `input` with its
+/// settings, ran `stages`, and made `pages`, now written beside `scene_path`.
+fn keep_report(
+    scene: &Scene,
+    scene_path: &str,
+    read: (&BakeScene, &BakeSettings),
+    baked: (&EncodedPages, &Measured),
+    stages: &Stages,
+) {
+    let written = report::bytes_under(&lightmap_dir(scene_path));
+    let report = report::lightmaps::report(scene, read, baked, stages, written);
+    report::keep(scene_path, report);
 }
 
 /// `progress` lending the bake OIDN when `settings` pick it and it opens (#1884,
@@ -179,6 +206,8 @@ mod logged_tests;
 mod preview_edit_tests;
 #[cfg(test)]
 mod preview_tests;
+#[cfg(test)]
+mod report_tests;
 #[cfg(test)]
 mod shadowmask_tests;
 #[cfg(test)]

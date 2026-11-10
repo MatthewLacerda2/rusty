@@ -178,7 +178,7 @@ fn survey(scene: &Scene, nav: Option<&NavigationGraph>, floor_cell: f32) -> Opti
 }
 
 /// Where actors start: every active agent and character controller.
-fn actor_starts(scene: &Scene) -> Vec<Vec3> {
+pub(in crate::dev::bake) fn actor_starts(scene: &Scene) -> Vec<Vec3> {
     let world = &scene.world;
     (world.ids_with_nav_agent().into_iter())
         .chain(world.ids_with_character_controller())

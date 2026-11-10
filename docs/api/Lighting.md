@@ -27,6 +27,7 @@ first.
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
+| `Lighting.GetBakeReport` *(dev-only)* | `(kind)` | the last report the `kind` bake (`"lightmaps"`, `"probes"`, `"reflections"` or `"occlusion"`) wrote beside the open scene, as a table (*Bake reports*, below); `nil` when the scene is unsaved or that bake never wrote one; an unknown kind errors |
 
 ### Generate Lighting
 
@@ -643,6 +644,70 @@ is wholly behind depth the camera drew this frame.
   draw each; past a per-camera budget (8M indices) a batch is tested whole.
 - **Measure** with `Debug.Stats().hiz_tested` and `hiz_culled` (read back a frame
   or so late), and `cluster_tested` / `cluster_culled` for the clusters.
+
+### Bake reports
+
+Every bake writes what it measured and what it found **beside the scene** (#1980), one
+JSON file per kind: `<scene>.bake/lightmaps.json`, `probes.json`, `reflections.json`,
+`occlusion.json` and `navmesh.json` ([`Navigation.md`](Navigation.md)). The next bake of
+that kind overwrites it, so two bakes compare by copying the file between them;
+Generate Lighting writes the ones for the steps it ran. Only a bake writes one, never a
+scene save; nothing reads them at runtime, and an export leaves the `.bake` folder
+behind. A report that cannot be written is a console warning, never a failed bake. A bake
+of an unsaved scene (`Lighting.Bake()` before the first save) writes none.
+`Lighting.GetBakeReport(kind)` returns the file as a table, so a scenario can assert on a
+bake: `assert(Lighting.GetBakeReport("occlusion").visibility.culledFraction >= 0.4)`.
+A value the bake could not measure is `null` in the file and `nil` in the table.
+
+Every report opens with the same fields:
+
+| Field | What it holds |
+|---|---|
+| `kind` | the report's kind |
+| `engine` | the engine commit that baked it (the one the project file records) |
+| `timestamp` | when it was written, Unix seconds |
+| `threads` | what the bake ran on: the CPU workers it used for `lightmaps` and `occlusion` (every core), `1` for `navmesh` (one thread), `"gpu"` for `probes` and `reflections` (a GPU capture) |
+| `stages` | `{ name, seconds }` per stage, in order; `wallSeconds` is their total |
+| `settings` | the settings the bake used |
+| `inputFingerprint` | a hash of every input the bake read, hex: the same scene and settings give the same one, and a change to anything the bake reads (for the probes and reflections: the static geometry, its materials' colours, emission and textures, the lights, ambient, sky, skybox, fog, the lightmaps and the lighting settings) gives another |
+| `outputBytes` | the bytes it wrote (for the light probes, the SH they carry: their sidecar is written with the scene's lighting) |
+
+Then each kind's own:
+
+- **`lightmaps`:** `maps`, `pageSize`, `pages` (`{ page, maps, occupancy }`, the share of
+  the page's texels its maps cover), `meshes`, slowest first (`{ entity, name, page, size,
+  texels, charts, seconds, texelsPerSecond, lightsInReach, requestedDensity,
+  actualDensity }`: `seconds` is worker time over every thread, the densities are texels
+  per metre asked for (texels per unit × Scale In Lightmap) and got), `zeroScaleInLightmap`
+  (the meshes left out at Scale In Lightmap 0), `denoise` (`{ charts, seconds }`, `nil`
+  without OIDN) and `lights` (`{ index, kind, position, range, bakesDirect, texelsInReach }`).
+  A light is in reach of a mesh when the mesh's bounds meet the sphere of its range (a
+  directional light reaches every mesh): a spot light's cone is not read.
+  `invalidTexels` (the backface texels the bake filled) is `nil`: only the tracer knows it.
+- **`probes`:** `count`, `manual`, `bounds` (`{ min, max }`), `bounces` (the wall time of
+  each bounce pass), `sampling` (`"grid"`, trilinear, or `"nearest"`, the four nearest
+  blended: there is no tetrahedral mesh, so no tetrahedra to count) and `farObjects`
+  (`{ count, list }`: the active dynamic drawn objects whose centre (as the renderer takes
+  it: the mesh's local bounds under its world matrix, halved) is over
+  8 m from the nearest probe, farthest first, each `{ entity, name, centre, nearest }`).
+- **`reflections`:** `count`, `probes` (`{ index, position, boxMin, boxMax, resolution,
+  importance, manual, bytes, seconds, overlaps }`, `resolution` the face size the bake
+  rendered at, `overlaps` the probes whose box this one's overlaps) and `picks`: **which
+  probe each active drawn object reflects**, at its bounds' centre as the renderer takes
+  it (the mesh's local bounds under its world matrix) (`{ entity, name, centre, probe, weight,
+  second, secondWeight }`, `probe` `nil` for the sky). The picks rank the scene's whole
+  set: a probe the memory budget leaves out at runtime is not skipped here.
+- **`occlusion`:** `cells`, `cellSize`, `tooLarge`, `rows`, `dataBytes`, `objects`,
+  `occluders`, `neverCulled`, `occluderTriangles`, `biggestOccluders` (`{ entity, name,
+  triangles }`, at most 20) and `visibility`: `meanVisible` and `maxVisible` (objects a
+  cell sees), `culledFraction` (the share of the objects a cell culls, on average),
+  `alwaysVisible` (how many objects every cell sees; the never culled are among them) and
+  `alwaysVisibleNames` (at most 20). `neverCulled` is a count with no names of its own:
+  which objects the bake could not sample is known only inside it. `slowestCells` is `nil`: the time per cell needs
+  hooks inside the bake (#1987).
+
+A stage baked in the editor a step a frame (the probes) counts the frames between its
+steps too. Lists of "heaviest first" keep the top 20; the counts hold them all.
 
 ### Environment
 

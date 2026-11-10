@@ -27,6 +27,7 @@
 
 use super::lighting::{LightingBakeReport, PlannedProbes};
 use super::reflection::{out_dir, prune_stale, reflection_dir, UNSAVED};
+use super::report::probes::Timeline;
 use crate::render::ibl::probe::solve::BounceSolve;
 pub use crate::render::ibl::probe::solve::PROBES_CHANGED;
 use crate::render::{Renderer, DEFAULT_BAKE_RESOLUTION};
@@ -75,6 +76,8 @@ pub struct LightingBake {
     staged: StagedCubemaps,
     was: Baseline,
     report: LightingBakeReport,
+    /// Each stage's wall time, for the reports the commit writes (#1980).
+    times: Timeline,
 }
 
 /// The scene's probe sets when a bake started: an edit to them midway drops it.
@@ -152,6 +155,7 @@ impl LightingBake {
             staged: StagedCubemaps::default(),
             was: Baseline::take(scene),
             report,
+            times: Timeline::default(),
         })
     }
 
@@ -160,6 +164,7 @@ impl LightingBake {
     /// could not be written, or the scene's probes changed since the start ([`PROBES_CHANGED`]).
     pub fn step(&mut self, scene: &mut Scene, say: &mut dyn FnMut(String)) -> Result<bool, String> {
         self.refuse_changed(scene)?;
+        self.times.note(self.stage());
         if !self.light_done {
             self.step_light(scene, say);
             return Ok(false);
@@ -215,6 +220,10 @@ impl LightingBake {
         }
         scene.probes = light.clone();
         scene.reflection_probes = reflections;
+        self.times.note(Stage::Done);
+        if let Some(path) = self.scene_path.as_deref() {
+            super::report::probes::keep_both(scene, path, &self.times);
+        }
         Ok(())
     }
 

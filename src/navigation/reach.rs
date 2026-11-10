@@ -46,8 +46,18 @@ impl NavigationGraph {
     /// the module docs. All `false` when nothing is walkable.
     pub fn reachable_spans(&self, starts: &[Vec3]) -> Vec<bool> {
         let (area, sizes) = self.walk_areas();
+        self.reachable_spans_in((&area, &sizes), starts)
+    }
+
+    /// [`Self::reachable_spans`] over the walking areas [`Self::walk_areas`]
+    /// already gave, for a caller that reads them too (a bake report, #1980).
+    pub fn reachable_spans_in(
+        &self,
+        (area, sizes): (&[u32], &[usize]),
+        starts: &[Vec3],
+    ) -> Vec<bool> {
         let mut seed = vec![false; sizes.len()];
-        if let Some(main) = self.main_floor(&area, &sizes) {
+        if let Some(main) = self.main_floor(area, sizes) {
             seed[main] = true;
         }
         for s in starts.iter().filter_map(|&p| self.snap(p)) {
@@ -105,8 +115,9 @@ impl NavigationGraph {
     }
 
     /// Each span's walking area (joined by grid steps alone, which go both ways),
-    /// numbered in scan order, and each area's span count.
-    fn walk_areas(&self) -> (Vec<u32>, Vec<usize>) {
+    /// numbered in scan order, and each area's span count: the islands a bake
+    /// report lists (#1980).
+    pub fn walk_areas(&self) -> (Vec<u32>, Vec<usize>) {
         let mut area = vec![u32::MAX; self.spans.len()];
         let mut sizes = Vec::new();
         let mut queue = VecDeque::new();

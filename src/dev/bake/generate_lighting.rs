@@ -165,6 +165,8 @@ pub fn finish(
         LightingSave::NeedsSceneSave => {
             let (report, ms) = (occlusion.report, occlusion.ms);
             put_occlusion(scene, occlusion);
+            // Nothing is written until the scene saves; the bake is reported now.
+            super::report::occlusion::keep(scene, path, (&report, ms), None);
             (report, ms)
         }
     };
@@ -231,7 +233,10 @@ pub fn apply_occlusion(
         ms: baked.ms,
     };
     put_occlusion(scene, baked);
+    let saving = std::time::Instant::now();
     crate::scene::lighting::occlusion::save_sidecar(scene, path)?;
+    let saved = Some(saving.elapsed());
+    super::report::occlusion::keep(scene, path, (&report.occlusion, report.ms), saved);
     Ok(report)
 }
 
