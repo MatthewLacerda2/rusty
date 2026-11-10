@@ -61,7 +61,7 @@ the file only when the scene baked since it last read or wrote it (or the path i
 scene follows ([`Lighting`](Lighting.md#bake-files-and-the-scene-save)): a save never
 writes back a navmesh it only loaded over a newer one another process baked, restores
 one removed outside the engine, and replaces the navmesh of a scene it saves over without
-having loaded it (File ▸ New, then a save over a baked scene).
+having loaded it (File ▸ New or `Scene.New()`, then a save over a baked scene).
 The **Bake Navigation** button is live on the open scene's card only, as Generate
 Lighting's is, so it never writes the open scene's navmesh beside another scene.
 

@@ -166,14 +166,15 @@ pub fn seed() {
 
 /// Write `bytes` to `path` unless it already holds them — through a temp file and a
 /// rename, so a concurrent reader (another test process seeding the same
-/// workspace) never sees a half-written script.
+/// workspace) never sees a half-written script — and note the write, so the
+/// script class cache drops a widget script it read before (`core::fs::written`).
 fn write_if_changed(path: &Path, bytes: &[u8]) {
     // lint: allow(stored-format) seeds scripts and `.prefab`s; the prefab format is `scene::prefab`'s
     if std::fs::read(path).is_ok_and(|old| old == bytes) {
         return;
     }
     // lint: allow(stored-format) seeds scripts and `.prefab`s; the prefab format is `scene::prefab`'s
-    crate::core::fs::write_atomic(path, bytes).ok();
+    crate::core::fs::written::write(path, bytes).ok();
 }
 
 #[cfg(test)]

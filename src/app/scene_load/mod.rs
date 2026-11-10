@@ -120,6 +120,9 @@ mod fixture;
 #[path = "api_tests.rs"]
 mod scene_load_api_tests;
 #[cfg(test)]
+#[path = "new_tests.rs"]
+mod scene_load_new_tests;
+#[cfg(test)]
 #[path = "play_state_tests.rs"]
 mod scene_load_play_state_tests;
 #[cfg(test)]

@@ -98,6 +98,7 @@ impl Scene {
             self.materials.entry(name).or_insert(material);
         }
         self.persistent.retain(|id| survivors.contains(id));
+        self.history_cuts.retain(|id| survivors.contains(&id));
         self.pending_destroy.retain(|id| survivors.contains(id));
         self.land_persistent_decals(decals);
         self.renew_id();

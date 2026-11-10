@@ -107,9 +107,7 @@ pub fn set_texture(source: &Path, settings: TextureSettings) -> Result<(), Impor
         return Ok(());
     }
     stored.texture = settings;
-    save(source, &stored)?;
-    crate::core::fs::written::note_written(&meta_path(source).to_string_lossy());
-    Ok(())
+    save(source, &stored)
 }
 
 /// The image at `source`, just assigned to a material's normal slot, set to

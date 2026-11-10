@@ -14,7 +14,7 @@
 //!   - `SetParent(id, parent)` / `ClearParent(id)` — parenting (`parent_id`).
 //!   - `Save([path])` — persist the live world (write-back to the current scene
 //!     path when no path is given).
-//!   - `Load` / `GetActivePath` / `DontDestroyOnLoad` — scene loading (#432), in
+//!   - `New` / `Load` / `GetActivePath` / `DontDestroyOnLoad` — scene loading (#432), in
 //!     `api::scene_load`.
 //!
 //! These verbs deliberately do not touch the `ConsoleLogs` cell: when the REPL /
