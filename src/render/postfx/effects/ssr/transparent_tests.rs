@@ -62,36 +62,39 @@ fn a_translucent_reflects_sharp_so_never_below_the_sharp_floor() {
 }
 
 #[test]
-fn only_a_lit_transparent_with_receive_ssr_traces() {
+fn receive_ssr_defaults_by_render_mode_and_an_explicit_value_wins() {
     let water = MaterialAsset {
         render_mode: RenderMode::Transparent,
-        receive_ssr: true,
+        receive_ssr: Some(true),
         roughness: 0.04,
         ..MaterialAsset::default()
     };
-    assert_eq!(surface_uniform(true, Some(&water)).receive_ssr, 1);
+    let lane = |m: &MaterialAsset| surface_uniform(true, Some(m)).receive_ssr;
+    assert_eq!(lane(&water), 1);
     assert_eq!(surface_uniform(false, Some(&water)).receive_ssr, 0, "unlit");
-    let opaque = MaterialAsset {
-        render_mode: RenderMode::Opaque,
+    let unset = MaterialAsset {
+        receive_ssr: None,
         ..water.clone()
     };
-    assert_eq!(
-        surface_uniform(true, Some(&opaque)).receive_ssr,
-        0,
-        "opaque"
-    );
-    let off = MaterialAsset {
-        receive_ssr: false,
-        ..water
+    assert_eq!(lane(&unset), 0, "a translucent traces only when asked");
+    let opaque = MaterialAsset {
+        render_mode: RenderMode::Opaque,
+        ..unset
     };
-    assert_eq!(surface_uniform(true, Some(&off)).receive_ssr, 0);
+    assert_eq!(lane(&opaque), 1, "an opaque surface takes SSR by default");
+    let opted_out = MaterialAsset {
+        receive_ssr: Some(false),
+        ..opaque
+    };
+    assert_eq!(lane(&opted_out), 0, "#2004: an opaque surface may opt out");
+    assert_eq!(surface_uniform(true, None).receive_ssr, 1, "no material");
 }
 
 #[test]
 fn a_material_too_rough_to_ever_reflect_traces_nothing() {
     let glass = |roughness| MaterialAsset {
         render_mode: RenderMode::Transparent,
-        receive_ssr: true,
+        receive_ssr: Some(true),
         roughness,
         ..MaterialAsset::default()
     };

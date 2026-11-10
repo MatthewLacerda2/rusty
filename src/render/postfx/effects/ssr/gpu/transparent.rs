@@ -12,7 +12,8 @@ use crate::scene::Scene;
 fn pool(on: bool, receive: bool, dz: f32) -> Scene {
     let (mut scene, _) = tuned(on, MIRROR, RED, |_| {});
     let floor = scene.materials.get_mut("floor").unwrap();
-    (floor.render_mode, floor.alpha, floor.receive_ssr) = (RenderMode::Transparent, 0.5, receive);
+    (floor.render_mode, floor.alpha, floor.receive_ssr) =
+        (RenderMode::Transparent, 0.5, Some(receive));
     let cube = scene.find_entity_by_name("Cube").unwrap();
     scene.world.transform_mut(cube).unwrap().position.z += dz;
     scene

@@ -3,9 +3,12 @@
 
 mod blur;
 mod cover;
+mod edge;
 mod energy;
 mod fixture;
 mod glossy;
 mod packing;
+mod reach;
 mod reflect;
+mod silhouette;
 mod transparent;
