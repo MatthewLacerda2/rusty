@@ -10,7 +10,8 @@
 //! itself at the wrap (#407), or joins its neighbours' copies (`polygon`, `star`);
 //! `anisotropic_noise` runs along a whole-step lattice direction, and every
 //! distortion is itself a tiling noise (#1740). Two generators are the documented exceptions:
-//! `gradient linear` is a one-way ramp (use `linear_tiling` for a seamless one), and
+//! `gradient linear` is a one-way ramp (use `linear_tiling` for a seamless one, and
+//! the catalog's `coordinates` is that ramp per axis, for `sample_at`), and
 //! the radial shapes (`gradient radial`, `wave rings`) meet the edge
 //! mirror-symmetrically — continuous across the seam, not periodic beyond it.
 //! `image` is no sampler: it resamples a decoded file, whose tiling is the file's own

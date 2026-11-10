@@ -841,9 +841,11 @@ field stays a number, so `4.5` is accepted — it bakes as `5`), and capped at 2
 | mapping (`tiling = true`) | `rotation` | nearest quarter turn |
 
 `mapping { tiling = false }` honours free scale and rotation — for decals and one-off
-maps that are never tiled; it opens a seam. `gradient linear` (0→1 left to right) is
-the one generator that does **not** tile — it has a hard edge at the wrap; use it under
-a mask, or use `linear_tiling` (0→1→0) for a seamless ramp. `gradient radial` and
+maps that are never tiled; it opens a seam. `gradient linear` (0→1 left to right) and
+`coordinates` (the same ramp on each axis) are the generators that do **not** tile —
+each has a hard edge at the wrap; use one under a mask, or use `linear_tiling` (0→1→0)
+for a seamless ramp. `coordinates` is meant for `sample_at`, whose output tiles when
+the function of the coordinates does (`sin` and `cos` of `2π u` do). `gradient radial` and
 `wave rings` meet the edge mirror-symmetrically: continuous across the seam, and so
 does `shape` (a shape larger than the tile is clipped at the edge, symmetrically;
 a `polygon` or `star`, which an odd count leaves lopsided top to bottom, is instead
