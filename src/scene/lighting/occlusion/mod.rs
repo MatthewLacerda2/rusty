@@ -68,6 +68,7 @@ pub use bake::{
 pub use file::{decode, encode, load_sidecar, occlusion_path, save_sidecar};
 pub use gather::{fingerprint, Fingerprints};
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
+pub use progress::OcclusionObserver;
 pub use progress::OcclusionProgress;
 pub use sample::{MAX_TARGETS, TARGET_SPACING, VOXEL};
 pub use unsaved::unsaved_materials;

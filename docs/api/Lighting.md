@@ -720,8 +720,13 @@ Then each kind's own:
   cell sees), `culledFraction` (the share of the objects a cell culls, on average),
   `alwaysVisible` (how many objects every cell sees; the never culled are among them) and
   `alwaysVisibleNames` (at most 20). `neverCulled` is a count with no names of its own:
-  which objects the bake could not sample is known only inside it. `slowestCells` is `nil`: the time per cell needs
-  hooks inside the bake (#1987).
+  which objects the bake could not sample is known only inside it. `cellSeconds` (`{ mean,
+  max }`) is the time a cell took to sample, and `slowestCells` the 20 slowest, slowest
+  first (ties to the lower cell): `{ cell, centre, seconds, visible }`, `cell` its index in
+  the grid, `centre` its middle, `seconds` its time to the microsecond and `visible` the
+  objects its PVS row sees. A cell runs on one worker, so its time is that worker's, read on
+  the platform's clock: the sampling itself never reads one, and a timed bake writes the
+  same PVS as an untimed one. Both are `nil` when no PVS was kept.
 
 A stage baked in the editor a step a frame (the probes) counts the frames between its
 steps too. Lists of "heaviest first" keep the top 20; the counts hold them all.

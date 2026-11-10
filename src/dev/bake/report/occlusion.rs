@@ -1,26 +1,28 @@
 //! The occlusion bake's report (#1980): the grid, the objects baked with their
 //! triangles (the biggest occluders first), and how well the finished PVS culls:
-//! the mean and most objects a cell sees, the share culled, and the objects every
-//! cell sees. All of it is read from the bake's report and its PVS, outside the
-//! bake: the time per cell and the slowest cells need hooks inside it, and stay
-//! `null` until they have them (`slowestCells`, #1987). For the same reason
-//! `neverCulled` is a count with no names: the objects too large or not finite to
-//! sample are only known inside the bake. Every cell sees them, so they are among
+//! the mean and most objects a cell sees, the share culled, the objects every
+//! cell sees, and the time each cell took with the slowest cells (#1987). The
+//! times come from the cell clocks the bake was lent (`dev::bake::occlusion::
+//! CellClocks`), the rest from the bake's report and its PVS, outside the bake.
+//! So `neverCulled` is a count with no names: the objects too large or not finite
+//! to sample are only known inside the bake. Every cell sees them, so they are among
 //! `alwaysVisibleNames`, not told apart from the objects every cell sees anyway.
+
+use std::time::Duration;
 
 use serde_json::{json, Value};
 
-use super::{entity_name, Kind, Report, Stages, TOP};
+use super::{entity_name, point, Kind, Report, Stages, TOP};
 use crate::scene::lighting::occlusion::{
     OcclusionBakeReport, OcclusionData, CELL_SIZE, MAX_CELL, OCCLUSION_SEED,
 };
 use crate::scene::Scene;
 
-/// The report of a bake of `scene` that reported `r`, baked `data` and wrote
-/// `output_bytes`.
+/// The report of a bake of `scene` that reported `r`, baked `data`, took `cells`
+/// per cell (by cell index; empty when it was not timed) and wrote `output_bytes`.
 pub fn report(
     scene: &Scene,
-    (r, data): (&OcclusionBakeReport, Option<&OcclusionData>),
+    (r, data, cells): (&OcclusionBakeReport, Option<&OcclusionData>, &[Duration]),
     stages: &Stages,
     output_bytes: u64,
 ) -> Report {
@@ -43,17 +45,18 @@ pub fn report(
         "occluderTriangles": triangles,
         "biggestOccluders": biggest,
         "visibility": data.map_or(Value::Null, |d| visibility(scene, d)),
-        "slowestCells": Value::Null,
+        "cellSeconds": data.map_or(Value::Null, |d| cell_seconds(d, cells)),
+        "slowestCells": data.map_or(Value::Null, |d| slowest_cells(d, cells)),
     }))
 }
 
-/// Write the report of an occlusion bake now on `scene` (#1980): it reported `r`
-/// and took `ms`, and writing its file beside `path` took `saved` (`None` when
-/// the file waits for a scene save, so nothing is written yet).
+/// Write the report of an occlusion bake now on `scene` (#1980): it reported `r`,
+/// took `ms` and `cells` per cell, and writing its file beside `path` took `saved`
+/// (`None` when the file waits for a scene save, so nothing is written yet).
 pub fn keep(
     scene: &Scene,
     path: &str,
-    (r, ms): (&OcclusionBakeReport, u64),
+    (r, ms, cells): (&OcclusionBakeReport, u64, &[Duration]),
     saved: Option<std::time::Duration>,
 ) {
     let mut stages = Stages::start();
@@ -64,7 +67,7 @@ pub fn keep(
         written = super::bytes_under(&crate::scene::lighting::occlusion::occlusion_path(path));
     }
     let data = scene.occlusion.as_deref();
-    let report = report(scene, (r, data), &stages, written);
+    let report = report(scene, (r, data, cells), &stages, written);
     super::keep(path, report);
 }
 
@@ -143,4 +146,55 @@ pub(super) fn visibility(scene: &Scene, data: &OcclusionData) -> Value {
         "alwaysVisible": every.len(),
         "alwaysVisibleNames": named.collect::<Vec<_>>(),
     })
+}
+
+/// A cell's time in seconds, to the microsecond: most cells take less than the
+/// millisecond the stages round to.
+fn cell_secs(d: Duration) -> f64 {
+    (d.as_secs_f64() * 1e6).round() / 1e6
+}
+
+/// The times of `data`'s cells, `None` when they were not timed (or not for this
+/// grid).
+fn timed<'a>(data: &OcclusionData, cells: &'a [Duration]) -> Option<&'a [Duration]> {
+    (!cells.is_empty() && cells.len() == data.grid.cell_count()).then_some(cells)
+}
+
+/// The mean and the most time a cell took.
+fn cell_seconds(data: &OcclusionData, cells: &[Duration]) -> Value {
+    let Some(cells) = timed(data, cells) else {
+        return Value::Null;
+    };
+    let total: Duration = cells.iter().sum();
+    let max = cells.iter().max().copied().unwrap_or_default();
+    json!({
+        "mean": cell_secs(total / cells.len() as u32),
+        "max": cell_secs(max),
+    })
+}
+
+/// The [`TOP`] slowest cells, slowest first (ties to the lower index): each its
+/// index, centre, time and how many objects its PVS row sees.
+fn slowest_cells(data: &OcclusionData, cells: &[Duration]) -> Value {
+    let Some(cells) = timed(data, cells) else {
+        return Value::Null;
+    };
+    let mut order: Vec<usize> = (0..cells.len()).collect();
+    order.sort_by_key(|&i| (std::cmp::Reverse(cells[i]), i));
+    let (rows, rows_of) = data.parts();
+    let words = data.objects.len().div_ceil(64);
+    let visible = |cell: usize| -> u32 {
+        let row = rows_of[cell] as usize * words;
+        rows[row..row + words].iter().map(|w| w.count_ones()).sum()
+    };
+    let entry = |&cell: &usize| {
+        let (min, max) = data.grid.bounds(cell);
+        json!({
+            "cell": cell,
+            "centre": point((min + max) * 0.5),
+            "seconds": cell_secs(cells[cell]),
+            "visible": visible(cell),
+        })
+    };
+    Value::Array(order.iter().take(TOP).map(entry).collect())
 }
