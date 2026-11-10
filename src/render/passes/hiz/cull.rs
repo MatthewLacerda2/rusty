@@ -9,6 +9,7 @@ use super::pyramid::Pyramid;
 use super::upload::{pack_bounds, Frame, Params};
 use crate::render::draw::camera::CameraCtx;
 use crate::render::draw::resources::SolidResources;
+use crate::render::gpu::draw_buffers::GROUP1_INSTANCES;
 use crate::render::gpu::grow_buffer::GrowBuffer;
 use crate::render::{RenderView, Renderer};
 
@@ -44,14 +45,19 @@ pub(crate) struct CameraCull {
     /// The two `hiz.wgsl` groups (phase one's, then the test's and final), kept
     /// while the buffers and pyramid they bind are.
     pub(super) groups: Kept<CullKey, [wgpu::BindGroup; 2]>,
-    /// The two phases' draws, kept while the group-1 buffers they bind are.
-    culled: Kept<[[wgpu::Buffer; 6]; 2], [Culled; 2]>,
+    /// The two phases' draws, kept while the group-1 buffers they bind and the
+    /// args they draw from are.
+    culled: Kept<[CulledKey; 2], [Culled; 2]>,
     /// The CPU tables it fills each frame.
     pub(super) tables: Tables,
     /// The batches its last cull drew.
     #[cfg(test)]
     pub(crate) drawn_batches: u32,
 }
+
+/// What a phase's [`Culled`] names: its group 1's buffers, by binding, and its
+/// indirect args.
+type CulledKey = ([wgpu::Buffer; 6], wgpu::Buffer);
 
 /// What the cull groups bind: per phase, its buffers by binding, and the pyramid.
 pub(super) type CullKey = ([[wgpu::Buffer; 8]; 2], wgpu::TextureView);
@@ -206,22 +212,25 @@ impl Renderer {
             cam.drawn_batches = solids.draws.opaque.len() as u32;
         }
         self.frame_counters.hiz_tested += tested;
-        let buffers = |k: usize| {
+        let key = [0, 1].map(|k| {
             let kept = cam.kept[k].buffer();
-            self.draw_buffers.group1_buffers(kept).map(Clone::clone)
-        };
-        let key = [buffers(0), buffers(1)];
-        let make = |k: usize| Culled {
+            let group1 = self.draw_buffers.group1_buffers(kept).map(Clone::clone);
+            (group1, cam.args[k].buffer().clone())
+        });
+        // Its instances and args come from the key (#2021: the args grow on their
+        // own, by batch, not by instance); the other group-1 buffers are read from
+        // `draw_buffers` again, the same ones the key was built from just above.
+        let make = |(group1, args): &CulledKey| Culled {
             group: self.draw_buffers.group_with_instances(
                 &self.device,
                 &self.entity_bones_layout,
-                cam.kept[k].buffer(),
+                &group1[GROUP1_INSTANCES],
             ),
-            args: cam.args[k].buffer().clone(),
+            args: args.clone(),
             clusters: None,
         };
         let mut culled = std::mem::take(&mut cam.culled);
-        let draws = culled.get(key, || [make(0), make(1)]).clone();
+        let draws = culled.get(key.clone(), || key.each_ref().map(make)).clone();
         cam.culled = culled;
         (draws, plan)
     }

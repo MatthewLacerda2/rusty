@@ -47,6 +47,9 @@ use crate::render::{DrawUniform, InstanceData, MaterialData};
 pub(crate) const UNIFORM_STRIDE: usize = 256;
 const _: () = assert!(std::mem::size_of::<DrawUniform>() <= UNIFORM_STRIDE);
 
+/// Where [`DrawBuffers::group1_buffers`] puts the instances it was given.
+pub(crate) const GROUP1_INSTANCES: usize = 2;
+
 /// The shared identity joint: element 0 of the frame's joint array, and the whole of
 /// the array overlays bind.
 const IDENTITY_JOINT: [f32; 16] = glam::Mat4::IDENTITY.to_cols_array();
@@ -226,19 +229,22 @@ impl DrawBuffers {
     }
 
     /// The buffers a group 1 over `instances` binds, in [`group1`]'s order: what a
-    /// kept group compares to know it still names them (#1963).
+    /// kept group compares to know it still names them (#1963). `instances` is at
+    /// [`GROUP1_INSTANCES`].
     pub(crate) fn group1_buffers<'a>(
         &'a self,
         instances: &'a wgpu::Buffer,
     ) -> [&'a wgpu::Buffer; 6] {
-        [
+        let buffers = [
             self.uniforms.buffer(),
             self.bones.buffer(),
             instances,
             self.materials.buffer(),
             self.proxies.buffer(),
             self.objects.buffer(),
-        ]
+        ];
+        debug_assert!(std::ptr::eq(buffers[GROUP1_INSTANCES], instances));
+        buffers
     }
 
     pub(crate) fn default_bones(&self) -> &wgpu::Buffer {
