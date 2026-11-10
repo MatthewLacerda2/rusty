@@ -41,7 +41,7 @@ fn ledge_reachable(nav: &Rc<RefCell<NavigationGraph>>) -> bool {
 
 /// `SetMaxStep` round-trips into `scene.nav_settings` AND is consumed by the re-bake:
 /// a 1.0-high ledge cell is reachable from ground when max_step ≥ 1.0 but not below it,
-/// proving the bake sources `scene.nav_settings`, not the historical constant (0.5).
+/// proving the bake sources `scene.nav_settings`, not the default constant (0.3).
 #[test]
 fn set_max_step_round_trips_and_rebakes() {
     // A box [3.6,4.4]² to y=1.0 covers exactly cell (4,4); ground is y=0 around it.
@@ -49,10 +49,10 @@ fn set_max_step_round_trips_and_rebakes() {
     let lua = Lua::new();
     register(&lua, bind(&lua, &scene), bind(&lua, &nav)).unwrap();
 
-    // Default max_step (0.5): a 1.0 ledge is NOT reachable from a neighbour.
+    // Default max_step (0.3, #2001): a 1.0 ledge is NOT reachable from a neighbour.
     let before: f32 = lua.load("return Navigation.GetMaxStep()").eval().unwrap();
-    assert_eq!(before, 0.5, "starts at the historical default");
-    assert!(!ledge_reachable(&nav), "1.0 ledge blocked at step 0.5");
+    assert_eq!(before, 0.3, "starts at the default");
+    assert!(!ledge_reachable(&nav), "1.0 ledge blocked at step 0.3");
 
     // Raise max_step past the ledge: the setter re-bakes, so it becomes reachable.
     lua.load("Navigation.SetMaxStep(1.5)").exec().unwrap();

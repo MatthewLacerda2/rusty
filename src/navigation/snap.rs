@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn a_point_slightly_below_a_floor_still_resolves_to_it() {
         let g = tower();
-        assert_eq!(picked(&g, 3.6), 1, "within max_step under the second floor");
+        assert_eq!(picked(&g, 3.8), 1, "within max_step under the second floor");
         assert_eq!(picked(&g, -5.0), 0, "under the level: the lowest floor");
     }
 

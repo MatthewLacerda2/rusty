@@ -41,7 +41,7 @@ pub struct SpanRef {
 ///
 /// # Traversal
 /// A move between spans in adjacent cells is a connectivity rule, not a stored edge
-/// (`links.rs`): the floor delta must clear `max_step` and `max_slope`, and the open
+/// (`links.rs`): the floor delta must clear `max_step`, and the open
 /// gap the two spans share must fit `agent_height`. A wall top is a span too, but
 /// no neighbour is within a step of it, so A\* never reaches it.
 pub struct NavigationGraph {
@@ -58,7 +58,8 @@ pub struct NavigationGraph {
     pub spans: Vec<NavSpan>,
     /// Max absolute step height between adjacent spans for a move to be allowed.
     pub max_step: f32,
-    /// Max walkable grade (rise per unit of horizontal travel).
+    /// Max walkable grade (rise per unit of horizontal travel) of a triangle the
+    /// bake rasterises; not part of the step rule (`links.rs`, #2001).
     pub max_slope: f32,
     /// Minimum open height a span (and a move between two spans) must offer.
     pub agent_height: f32,
