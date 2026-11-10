@@ -234,7 +234,7 @@ const INFINITE_IOR_TINT: f32 = 25.0;
 /// Write an imported glTF's `ior`, `specular` and `specular_color` (#1998) into `m`
 /// through their rows, so an import lands in the ranges the Inspector and
 /// `Material.Get*` report, as an authored value does: a NaN or out-of-range value is
-/// clamped, and an `ior` of 0 is mapped first ([`INFINITE_IOR_TINT`]).
+/// clamped, and an `ior` of 0 is mapped first (to 1.5, its colour times 25).
 pub fn import_reflectance(m: &mut MaterialAsset, ior: f32, specular: f32, color: [f32; 3]) {
     let (ior, color) = if ior == 0.0 {
         (1.5, color.map(|c| c * INFINITE_IOR_TINT))
