@@ -167,7 +167,8 @@ impl ProjectFile {
             return Ok(());
         }
         // lint: allow(asset-write) project settings, not read by a path-keyed cache
-        std::fs::write(path, text).map_err(|e| format!("Failed to write {}: {e}", path.display()))
+        crate::core::fs::write_atomic(path, text.as_bytes())
+            .map_err(|e| format!("Failed to write {}: {e}", path.display()))
     }
 }
 

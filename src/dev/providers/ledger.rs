@@ -66,7 +66,7 @@ impl Ledger {
         }
         let json = serde_json::to_string_pretty(self).map_err(|e| fail(&e))?;
         // lint: allow(asset-write) the provider ledger, not read by a path-keyed cache
-        std::fs::write(path, json + "\n").map_err(|e| fail(&e))
+        crate::core::fs::write_atomic(path, (json + "\n").as_bytes()).map_err(|e| fail(&e))
     }
 
     /// Whether `estimate_cents` more fits under the budget. `path` only names the
