@@ -88,6 +88,9 @@ def main(argv: list[str] | None = None) -> int:
         path.touch()
         print(f"queue-daemon: asked the watch to stop ({path}); it stops between pull requests.")
         return 0
+    if tenancy.main_tree(root):  # before the fork, so the line reaches whoever started it (#1983)
+        print(tenancy.refusal(root, forwarded), file=sys.stderr)
+        return supervisor.MAIN_TREE_STATUS
     if opts.detach:
         log = common_dir(root) / supervisor.LOG
         log.parent.mkdir(parents=True, exist_ok=True)
@@ -127,10 +130,13 @@ def supervised(root: str, forwarded: list[str], argv: list[str], restarted: bool
         say(f"queue-daemon: another supervisor runs (PID {holder}); one at a time.")
         return lock.LOCKED_STATUS
 
-    def begin() -> argparse.Namespace:
-        for note in (None if restarted else detach.clear_stale_stop(common), tenancy.claim(root, os.getpid())):
-            if note:
-                say(note)
+    def begin() -> argparse.Namespace | int:
+        stale = None if restarted else detach.clear_stale_stop(common)
+        if stale:
+            say(stale)
+        refused = tenancy.claim(root, os.getpid(), say)
+        if refused:  # running unlocked is what #1983 was: stop instead
+            return supervisor.unlocked(refused, say)
         return effects(root, forwarded, argv)
     previous = signal.signal(signal.SIGTERM, _terminated)
     with held:
