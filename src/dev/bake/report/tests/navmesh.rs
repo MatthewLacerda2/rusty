@@ -59,6 +59,11 @@ fn a_navmesh_bake_reports_the_unreachable_island() {
         (ledge_y - 5.0).abs() < 0.1,
         "the ledge's island is up on it: {ledge}"
     );
+    // Its box runs along the cells' outer edges: whole cells wide, never zero.
+    let cell = report["grid"]["cellSize"].as_f64().unwrap();
+    let wide = (ledge["max"][0].as_f64().unwrap() - ledge["min"][0].as_f64().unwrap()) / cell;
+    assert!(wide >= 1.0 && (wide - wide.round()).abs() < 0.02, "{ledge}");
+    assert_eq!(report["threads"], 1, "the navmesh bakes on one thread");
     assert!(
         floor["squareMetres"].as_f64() > ledge["squareMetres"].as_f64(),
         "largest first"

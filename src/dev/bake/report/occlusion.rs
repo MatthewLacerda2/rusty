@@ -3,7 +3,10 @@
 //! the mean and most objects a cell sees, the share culled, and the objects every
 //! cell sees. All of it is read from the bake's report and its PVS, outside the
 //! bake: the time per cell and the slowest cells need hooks inside it, and stay
-//! `null` until they have them (`slowestCells`, #1987).
+//! `null` until they have them (`slowestCells`, #1987). For the same reason
+//! `neverCulled` is a count with no names: the objects too large or not finite to
+//! sample are only known inside the bake. Every cell sees them, so they are among
+//! `alwaysVisibleNames`, not told apart from the objects every cell sees anyway.
 
 use serde_json::{json, Value};
 
@@ -27,6 +30,7 @@ pub fn report(
         "maxCell": MAX_CELL,
     });
     let fingerprint = data.map_or(0, fingerprint);
+    let (triangles, biggest) = data.map_or((0, json!([])), |d| occluder_triangles(scene, d));
     Report::new(Kind::Occlusion, stages, settings, fingerprint, output_bytes).with(json!({
         "cells": r.cells,
         "cellSize": r.cell_size,
@@ -36,8 +40,8 @@ pub fn report(
         "objects": r.objects,
         "occluders": r.occluders,
         "neverCulled": r.never_culled,
-        "occluderTriangles": data.map_or(0, |d| occluder_triangles(scene, d).0),
-        "biggestOccluders": data.map_or(json!([]), |d| occluder_triangles(scene, d).1),
+        "occluderTriangles": triangles,
+        "biggestOccluders": biggest,
         "visibility": data.map_or(Value::Null, |d| visibility(scene, d)),
         "slowestCells": Value::Null,
     }))

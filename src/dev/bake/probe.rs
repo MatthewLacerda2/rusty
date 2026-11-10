@@ -59,7 +59,11 @@ pub fn bake_scene_probes_at(
     times.note(Stage::Done);
     log.finish();
     if let Some(path) = scene_path {
-        report::keep(path, report::probes::report(scene, &times.stages().0));
+        let print = report::probes::scene_fingerprint(scene);
+        report::keep(
+            path,
+            report::probes::report(scene, &times.stages().0, print),
+        );
     }
     Ok(true)
 }

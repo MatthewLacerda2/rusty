@@ -38,11 +38,48 @@ fn each_object_reports_the_probe_it_picks() {
     assert!(probe("Outside").is_null(), "outside every box: the sky");
 }
 
+/// An L-shaped floor turned 45° about Y between two probes whose boxes meet at
+/// `x = 2.3`: its vertices' world box is centred at `x ≈ 1.77`, but the renderer
+/// takes the centre of its local box under the turn, `x ≈ 2.83`.
+#[test]
+fn a_turned_l_picks_the_probe_the_renderer_does() {
+    use crate::components::{mesh::Vertex, MeshComponent};
+    let mut scene = Scene::new();
+    let corners = [
+        (0.0, 0.0),
+        (4.0, 0.0),
+        (4.0, 1.0),
+        (1.0, 1.0),
+        (1.0, 4.0),
+        (0.0, 4.0),
+    ];
+    let vertices = corners.map(|(x, z)| Vertex::new(Vec3::new(x, 0.0, z), Vec3::Y, [0.0; 2]));
+    let indices = vec![0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5];
+    let floor = scene.add_entity("Floor".to_string());
+    let mesh = MeshComponent::new("L", vertices.to_vec(), indices);
+    scene.world.set_mesh(floor, Some(mesh));
+    let turn = glam::Quat::from_rotation_y(45f32.to_radians());
+    scene.world.transform_mut(floor).expect("new").rotation = turn;
+    let set = &mut scene.reflection_probes;
+    let west = set.add(Vec3::new(0.0, 1.0, 0.0), Vec3::splat(2.0));
+    let east = set.add(Vec3::new(4.0, 1.0, 0.0), Vec3::splat(2.0));
+    set.set_box(west, Vec3::new(-5.0, -1.0, -5.0), Vec3::new(2.3, 3.0, 5.0));
+    set.set_box(east, Vec3::new(2.3, -1.0, -5.0), Vec3::new(9.0, 3.0, 5.0));
+    let centre = crate::dev::bake::report::drawn_centre(&scene, floor).unwrap();
+    assert!((centre.x - 2.83).abs() < 0.01, "{centre}");
+    let picks = reflections::picks(&scene, &scene.reflection_probes);
+    assert_eq!(
+        picks[0]["probe"], 1,
+        "the renderer's centre is east: {picks}"
+    );
+    assert_eq!(picks[0]["centre"][0], 2.83);
+}
+
 #[test]
 fn the_report_lists_each_probe_with_its_overlaps() {
     let scene = rooms();
     let dir = std::path::PathBuf::from(scene_path("overlaps")).with_extension("reflections");
-    let report = reflections::report(&scene, &Stages::start(), &[], &dir).to_json();
+    let report = reflections::report(&scene, (&Stages::start(), &[]), &dir, 0).to_json();
     assert_common(&report, Kind::Reflections);
     assert_eq!(report["count"], 2);
     assert_eq!(report["probes"][0]["overlaps"], serde_json::json!([1]));

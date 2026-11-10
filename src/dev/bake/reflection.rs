@@ -121,10 +121,9 @@ pub fn bake_scene_reflections(
     log.finish();
     if let Some(path) = scene_path {
         let (stages, times) = (times.stages().1, &times.reflections);
-        report::keep(
-            path,
-            report::reflections::report(scene, &stages, times, &out_dir),
-        );
+        let print = report::probes::scene_fingerprint(scene);
+        let report = report::reflections::report(scene, (&stages, times), &out_dir, print);
+        report::keep(path, report);
     }
     Ok(true)
 }

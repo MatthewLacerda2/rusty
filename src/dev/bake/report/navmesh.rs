@@ -62,7 +62,8 @@ fn areas(scene: &Scene, nav: &NavigationGraph) -> Value {
     Value::Array(used.map(area).collect())
 }
 
-/// One island: its spans, area, bounds and centre, and whether it is reachable.
+/// One island: its spans, area, bounds (of its spans' cell centres, widened to
+/// the cells' edges when listed) and centre, and whether it is reachable.
 struct Island {
     spans: usize,
     min: glam::Vec3,
@@ -74,7 +75,8 @@ struct Island {
 /// The islands, largest first (ties to scan order), at most [`ISLANDS`] listed.
 pub(super) fn islands(scene: &Scene, nav: &NavigationGraph) -> Value {
     let (area, sizes) = nav.walk_areas();
-    let reach = nav.reachable_spans(&crate::dev::bake::lighting::actor_starts(scene));
+    let starts = crate::dev::bake::lighting::actor_starts(scene);
+    let reach = nav.reachable_spans_in((&area, &sizes), &starts);
     let empty = |&spans: &usize| Island {
         spans,
         min: glam::Vec3::INFINITY,
@@ -93,13 +95,15 @@ pub(super) fn islands(scene: &Scene, nav: &NavigationGraph) -> Value {
     let mut order: Vec<usize> = (0..all.len()).collect();
     order.sort_by_key(|&i| std::cmp::Reverse(all[i].spans));
     let cell = nav.grid_spacing * nav.grid_spacing;
+    // A span stands at its cell's centre: the box spans the cells' outer edges.
+    let half = glam::Vec3::new(nav.grid_spacing, 0.0, nav.grid_spacing) * 0.5;
     let listed = order.iter().take(ISLANDS).map(|&i| {
         let island = &all[i];
         json!({
             "spans": island.spans,
             "squareMetres": island.spans as f32 * cell,
-            "min": point(island.min),
-            "max": point(island.max),
+            "min": point(island.min - half),
+            "max": point(island.max + half),
             "centre": point(island.sum / island.spans.max(1) as f32),
             "reachable": island.reachable,
         })

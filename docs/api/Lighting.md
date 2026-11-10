@@ -666,10 +666,10 @@ Every report opens with the same fields:
 | `kind` | the report's kind |
 | `engine` | the engine commit that baked it (the one the project file records) |
 | `timestamp` | when it was written, Unix seconds |
-| `threads` | the workers a bake on this machine uses |
+| `threads` | what the bake ran on: the CPU workers it used for `lightmaps` and `occlusion` (every core), `1` for `navmesh` (one thread), `"gpu"` for `probes` and `reflections` (a GPU capture) |
 | `stages` | `{ name, seconds }` per stage, in order; `wallSeconds` is their total |
 | `settings` | the settings the bake used |
-| `inputFingerprint` | a hash of what the bake read, hex: the same scene and settings give the same one |
+| `inputFingerprint` | a hash of every input the bake read, hex: the same scene and settings give the same one, and a change to anything the bake reads (for the probes and reflections: the static geometry, its materials' colours, emission and textures, the lights, ambient, sky, skybox, fog, the lightmaps and the lighting settings) gives another |
 | `outputBytes` | the bytes it wrote (for the light probes, the SH they carry: their sidecar is written with the scene's lighting) |
 
 Then each kind's own:
@@ -687,12 +687,14 @@ Then each kind's own:
 - **`probes`:** `count`, `manual`, `bounds` (`{ min, max }`), `bounces` (the wall time of
   each bounce pass), `sampling` (`"grid"`, trilinear, or `"nearest"`, the four nearest
   blended: there is no tetrahedral mesh, so no tetrahedra to count) and `farObjects`
-  (`{ count, list }`: the active dynamic drawn objects whose world-bounds centre is over
+  (`{ count, list }`: the active dynamic drawn objects whose centre (as the renderer takes
+  it: the mesh's local bounds under its world matrix, halved) is over
   8 m from the nearest probe, farthest first, each `{ entity, name, centre, nearest }`).
 - **`reflections`:** `count`, `probes` (`{ index, position, boxMin, boxMax, resolution,
-  importance, manual, bytes, seconds, overlaps }`, `overlaps` the probes whose box this
-  one's overlaps) and `picks`: **which probe each active drawn object reflects**, at its
-  world-bounds centre as the renderer asks (`{ entity, name, centre, probe, weight,
+  importance, manual, bytes, seconds, overlaps }`, `resolution` the face size the bake
+  rendered at, `overlaps` the probes whose box this one's overlaps) and `picks`: **which
+  probe each active drawn object reflects**, at its bounds' centre as the renderer takes
+  it (the mesh's local bounds under its world matrix) (`{ entity, name, centre, probe, weight,
   second, secondWeight }`, `probe` `nil` for the sky). The picks rank the scene's whole
   set: a probe the memory budget leaves out at runtime is not skipped here.
 - **`occlusion`:** `cells`, `cellSize`, `tooLarge`, `rows`, `dataBytes`, `objects`,
@@ -700,7 +702,8 @@ Then each kind's own:
   triangles }`, at most 20) and `visibility`: `meanVisible` and `maxVisible` (objects a
   cell sees), `culledFraction` (the share of the objects a cell culls, on average),
   `alwaysVisible` (how many objects every cell sees; the never culled are among them) and
-  `alwaysVisibleNames` (at most 20). `slowestCells` is `nil`: the time per cell needs
+  `alwaysVisibleNames` (at most 20). `neverCulled` is a count with no names of its own:
+  which objects the bake could not sample is known only inside it. `slowestCells` is `nil`: the time per cell needs
   hooks inside the bake (#1987).
 
 A stage baked in the editor a step a frame (the probes) counts the frames between its

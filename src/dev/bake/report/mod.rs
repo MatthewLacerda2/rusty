@@ -7,7 +7,7 @@
 //!
 //! Every report opens with the same block ([`Report::new`]): the engine commit
 //! (as the project's engine check reads it, `core::project::engine_commit`), the
-//! Unix time it was written, the bake's worker count, the wall time per stage and
+//! Unix time it was written, what the bake ran on ([`workers`]), the wall time per stage and
 //! their total, the settings the bake used, a fingerprint of what it read, and the
 //! bytes it wrote. Then each kind adds its own findings (`lightmaps`, `probes`,
 //! `reflections`, `occlusion`, `navmesh`): the heaviest meshes, colliders and
@@ -89,7 +89,7 @@ impl Report {
             "kind": kind.name(),
             "engine": crate::core::project::engine_commit(),
             "timestamp": unix_seconds(),
-            "threads": threads(),
+            "threads": workers(kind),
             "wallSeconds": stages.total().as_secs_f64(),
             "stages": stages.to_json(),
             "settings": serde_json::to_value(settings).unwrap_or(Value::Null),
@@ -159,9 +159,34 @@ pub fn bytes_under(path: &std::path::Path) -> u64 {
     entries.flatten().map(|e| bytes_under(&e.path())).sum()
 }
 
-/// The workers a bake uses: every core.
+/// The CPU workers a threaded bake runs on: every core. The one definition the
+/// occlusion bake starts with and the reports say.
 pub fn threads() -> usize {
     std::thread::available_parallelism().map_or(1, |n| n.get())
+}
+
+/// What a `kind` bake runs on, as its report's `threads` says it: the lightmap
+/// tracer and the occlusion bake run on [`threads`] workers, the navmesh bake on
+/// the calling thread (1), and the probe and reflection captures on the GPU
+/// (`"gpu"`).
+pub fn workers(kind: Kind) -> Value {
+    match kind {
+        Kind::Lightmaps | Kind::Occlusion => json!(threads()),
+        Kind::Navmesh => json!(1),
+        Kind::Probes | Kind::Reflections => json!("gpu"),
+    }
+}
+
+/// Entity `id`'s centre as the renderer picks its reflection probe there: its
+/// mesh's local bounds under its world matrix (`render::transform_aabb`, what
+/// the renderer's world bounds are), halved. A rotated asymmetric mesh's centre
+/// differs from the middle of its vertices' world box. A skinned mesh is taken
+/// at rest. `None` without a mesh or with no vertex.
+pub fn drawn_centre(scene: &crate::scene::Scene, id: u32) -> Option<glam::Vec3> {
+    let world = &scene.world;
+    let (min, max) = world.mesh(id)?.world_aabb(glam::Mat4::IDENTITY)?;
+    let (min, max) = crate::render::transform_aabb(min, max, world.local_to_world(id));
+    Some((min + max) * 0.5)
 }
 
 /// Seconds since the Unix epoch, 0 on a clock before it.

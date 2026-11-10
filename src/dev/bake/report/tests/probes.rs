@@ -4,7 +4,7 @@
 use glam::Vec3;
 
 use super::assert_common;
-use crate::dev::bake::report::probes::{report, Timeline, FAR};
+use crate::dev::bake::report::probes::{report, scene_fingerprint, Timeline, FAR};
 use crate::dev::bake::report::Kind;
 use crate::dev::bake::steps::Stage;
 use crate::scene::authoring::{create_entity, Primitive};
@@ -24,8 +24,9 @@ fn a_dynamic_object_far_from_every_probe_is_listed() {
         scene.world.transform_mut(id).expect("new").position = Vec3::new(x, 0.0, 0.0);
         scene.world.set_static(id, is_static);
     }
-    let report = report(&scene, &crate::dev::bake::report::Stages::start()).to_json();
+    let report = report(&scene, &crate::dev::bake::report::Stages::start(), 0).to_json();
     assert_common(&report, Kind::Probes);
+    assert_eq!(report["threads"], "gpu", "a GPU capture says so");
     assert_eq!(report["count"], 2);
     assert_eq!(report["bounds"]["max"], serde_json::json!([2.0, 0.0, 0.0]));
     let far = &report["farObjects"];
@@ -45,7 +46,7 @@ fn a_dynamic_object_far_from_every_probe_is_listed() {
 fn a_probe_set_with_no_probes_reports_nothing_near() {
     let mut scene = Scene::new();
     create_entity(&mut scene, "Crate", Some(Primitive::Box));
-    let report = report(&scene, &crate::dev::bake::report::Stages::start()).to_json();
+    let report = report(&scene, &crate::dev::bake::report::Stages::start(), 0).to_json();
     assert!(report["bounds"]["min"].is_null());
     assert!(
         report["farObjects"]["list"][0]["nearest"].is_null(),
@@ -85,4 +86,44 @@ fn the_timeline_gives_each_stage_its_own_time() {
         .collect();
     assert_eq!(names, ["bounce 1", "bounce 2"]);
     assert_eq!(reflection.total(), t.reflections.iter().sum());
+}
+
+#[test]
+fn the_fingerprint_moves_with_a_colour_the_capture_reads() {
+    use crate::components::{MaterialAsset, MaterialComponent};
+    let mut scene = Scene::new();
+    let wall = create_entity(&mut scene, "Wall", Some(Primitive::Box));
+    scene.world.set_static(wall, true);
+    scene
+        .materials
+        .insert("paint".into(), MaterialAsset::default());
+    let paint = Some(MaterialComponent {
+        materials: vec!["paint".into()],
+    });
+    scene.world.set_material(wall, paint);
+    let before = scene_fingerprint(&scene);
+    assert_eq!(
+        scene_fingerprint(&scene),
+        before,
+        "the same scene, the same print"
+    );
+    let paint = scene.materials.get_mut("paint").expect("in the library");
+    paint.base_color = [1.0, 0.0, 0.0];
+    let red = scene_fingerprint(&scene);
+    assert_ne!(red, before, "an albedo change rebakes");
+    scene
+        .materials
+        .get_mut("paint")
+        .expect("in the library")
+        .emissive = [2.0; 3];
+    let glowing = scene_fingerprint(&scene);
+    assert_ne!(glowing, red, "so does an emission change");
+    scene.ambient_intensity += 0.5;
+    assert_ne!(scene_fingerprint(&scene), glowing, "and the ambient");
+    scene.lighting_settings.reflections.resolution = 16;
+    assert_ne!(
+        scene_fingerprint(&scene),
+        glowing,
+        "and the lighting settings"
+    );
 }

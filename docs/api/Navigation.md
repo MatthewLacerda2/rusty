@@ -77,7 +77,8 @@ span), `islands`, `offMeshLinks` (`{ generated = { drop, jump }, authored }`) an
 `colliders` (`{ count, triangles, heaviest }`: the colliders the bake read, heaviest
 first, at most 20, each `{ entity, name, triangles }`). An **island** is a walking area,
 spans joined by grid steps alone; `islands` is `{ count, unreachable, list }`, the list
-largest first (at most 256), each `{ spans, squareMetres, min, max, centre, reachable }`.
+largest first (at most 256), each `{ spans, squareMetres, min, max, centre, reachable }`
+(`min`/`max` the box over its cells' outer edges, `centre` the mean of its spans).
 One is reachable when an actor can get to it: the main floor, wherever an agent or
 character controller starts, and what an off-mesh link leads to (the light-probe
 placement's floor, *Light and reflection probes* in `Lighting.md`). A wall top is an

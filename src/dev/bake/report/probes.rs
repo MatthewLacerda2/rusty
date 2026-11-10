@@ -63,21 +63,23 @@ impl Timeline {
 /// `timeline` timed it (#1980).
 pub fn keep_both(scene: &Scene, path: &str, timeline: &Timeline) {
     let (light, reflection) = timeline.stages();
-    super::keep(path, report(scene, &light));
+    let print = scene_fingerprint(scene);
+    super::keep(path, report(scene, &light, print));
     let dir = crate::dev::bake::reflection::reflection_dir(path);
     let times = &timeline.reflections;
     super::keep(
         path,
-        super::reflections::report(scene, &reflection, times, &dir),
+        super::reflections::report(scene, (&reflection, times), &dir, print),
     );
 }
 
-/// The report of a light-probe bake of `scene` that ran `stages` (one a bounce).
-pub fn report(scene: &Scene, stages: &Stages) -> Report {
+/// The report of a light-probe bake of `scene` that ran `stages` (one a bounce)
+/// and read the scene `scene_print` ([`scene_fingerprint`]).
+pub fn report(scene: &Scene, stages: &Stages, scene_print: u64) -> Report {
     let volume = &scene.probes;
     let probes = volume.probes();
     let keys: String = probes.iter().map(|p| format!("{:?}", p.position)).collect();
-    let fingerprint = scene_fingerprint(scene, &keys);
+    let fingerprint = keyed(scene_print, &keys);
     // The baked SH and shadowmask occlusion each probe carries.
     let per_probe = std::mem::size_of::<crate::scene::lighting::sh::Sh9>() + 16;
     let output = (probes.len() * per_probe) as u64;
@@ -102,7 +104,7 @@ fn bounds(volume: &ProbeVolume) -> (Option<glam::Vec3>, Option<glam::Vec3>) {
     )
 }
 
-/// The active dynamic drawn objects whose world-bounds centre is over [`FAR`] from
+/// The active dynamic drawn objects whose centre ([`super::drawn_centre`]) is over [`FAR`] from
 /// the nearest probe, farthest first (at most [`TOP`] listed), and their count.
 pub(super) fn far_objects(scene: &Scene, volume: &ProbeVolume) -> Value {
     let world = &scene.world;
@@ -112,8 +114,7 @@ pub(super) fn far_objects(scene: &Scene, volume: &ProbeVolume) -> Value {
     let dynamic =
         (ids.into_iter()).filter(|&id| !world.is_static(id) && world.is_active_in_hierarchy(id));
     let distance = |id: u32| {
-        let (min, max) = world.mesh(id)?.world_aabb(world.local_to_world(id))?;
-        let centre = (min + max) * 0.5;
+        let centre = super::drawn_centre(scene, id)?;
         let nearest = probes
             .iter()
             .map(|p| p.position.distance(centre))
@@ -129,19 +130,33 @@ pub(super) fn far_objects(scene: &Scene, volume: &ProbeVolume) -> Value {
     json!({ "count": far.len(), "list": listed.collect::<Vec<_>>() })
 }
 
-/// A fingerprint of what a probe bake reads: `keys` (the probes as it reads
-/// them), every active static mesh as the occlusion bake fingerprints it (its
-/// triangles, world matrix and materials' occlusion), and every light.
-pub fn scene_fingerprint(scene: &Scene, keys: &str) -> u64 {
+/// A fingerprint of what a probe or reflection capture reads of `scene`,
+/// hashed once per bake and shared by both its reports ([`keyed`] adds each
+/// report's own probes): every active static mesh (its geometry and world matrix
+/// as the occlusion bake prints them, through one `Fingerprints` for the whole
+/// sweep, its raw corners when it takes no part there, and every material it
+/// draws with in full: albedo, emission, textures, render mode), every light,
+/// the ambient, sky, skybox and fog, the lightmaps static surfaces wear, where
+/// the light probes stand (never the SH a bake writes into them), and the
+/// lighting settings.
+pub fn scene_fingerprint(scene: &Scene) -> u64 {
     let mut hash = crate::core::hash::Content::default();
-    hash.write(keys.as_bytes());
     let world = &scene.world;
+    let prints = crate::scene::lighting::occlusion::Fingerprints::of_scene(scene);
     let mut ids = world.ids_with_mesh();
     ids.sort_unstable();
-    for id in ids.into_iter().filter(|&id| world.is_static(id)) {
-        let print = crate::scene::lighting::occlusion::fingerprint(scene, id).unwrap_or(0);
+    let drawn = |&id: &u32| world.is_static(id) && world.is_active_in_hierarchy(id);
+    for id in ids.into_iter().filter(drawn) {
         hash.write(&id.to_le_bytes());
-        hash.write(&print.to_le_bytes());
+        match prints.of(scene, id) {
+            Some((print, _)) => hash.write(&print.to_le_bytes()),
+            None => raw_geometry(scene, id, &mut hash),
+        }
+        let slots = world.material(id).map_or(1, |m| m.materials.len().max(1));
+        for slot in 0..slots {
+            let material = scene.material_entry_at(id, slot).map(|(_, m)| m);
+            hash.write(format!("{material:?}").as_bytes());
+        }
     }
     let mut lights = world.ids_with_light();
     lights.sort_unstable();
@@ -152,5 +167,40 @@ pub fn scene_fingerprint(scene: &Scene, keys: &str) -> u64 {
             .unwrap_or_default();
         hash.write(format!("{id}{light}{:?}", world.local_to_world(id)).as_bytes());
     }
+    let environment = (
+        (
+            &scene.skybox_path,
+            scene.ambient_color,
+            scene.ambient_intensity,
+        ),
+        (&scene.ambient, &scene.sky, &scene.fog),
+        (&*scene.lightmaps, &scene.lighting_settings),
+    );
+    // Where the light probes stand, never the SH this bake writes into them.
+    let probes = scene.probes.probes().iter().map(|p| (p.position, p.manual));
+    hash.write(format!("{:?}", probes.collect::<Vec<_>>()).as_bytes());
+    hash.write(format!("{environment:?}").as_bytes());
+    hash.finish()
+}
+
+/// A static mesh the occlusion print skips (it casts no shadow, say), still
+/// drawn by a capture: its world matrix, corners and triangles.
+fn raw_geometry(scene: &Scene, id: u32, hash: &mut crate::core::hash::Content) {
+    let matrix = scene.world.local_to_world(id).to_cols_array();
+    hash.write(bytemuck::cast_slice(&matrix));
+    if let Some(mesh) = scene.world.mesh(id) {
+        mesh.vertices
+            .iter()
+            .for_each(|v| hash.write(bytemuck::cast_slice(&v.position)));
+        hash.write(bytemuck::cast_slice(&mesh.indices));
+    }
+}
+
+/// A report's input fingerprint: the bake's [`scene_fingerprint`] and `keys`,
+/// the report's probes as the bake reads them.
+pub fn keyed(scene_print: u64, keys: &str) -> u64 {
+    let mut hash = crate::core::hash::Content::default();
+    hash.write(&scene_print.to_le_bytes());
+    hash.write(keys.as_bytes());
     hash.finish()
 }

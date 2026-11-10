@@ -41,7 +41,7 @@ use std::rc::Rc;
 
 pub use camera::{build_camera_stack, texture_cameras, ScreenStack, TextureCamera};
 pub use draw::{NavMeshPatch, NavMeshRevision, NavMeshSource};
-pub use frustum::{Frustum, SkinBounds};
+pub use frustum::{transform_aabb, Frustum, SkinBounds};
 pub(crate) use frustum::{SmallLimits, SmallObjectCull};
 pub use gpu::mesh::MeshId;
 pub use gpu::textures::GpuTexture;
