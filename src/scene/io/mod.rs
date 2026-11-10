@@ -18,6 +18,7 @@
 //!
 //! stored-format: the scene file on disk, its text and the default scene's seeding
 
+mod bake_files;
 pub mod bundled;
 mod disk_text;
 mod lighting_block;
@@ -25,6 +26,7 @@ mod load_error;
 mod manifest;
 mod seed;
 
+pub use bake_files::{Action, BakeFiles, Saved};
 pub use disk_text::DiskText;
 pub use lighting_block::{save_lighting, LightingSave};
 pub use load_error::LoadError;
@@ -56,10 +58,11 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
     std::fs::write(path, &json).map_err(|e| format!("Failed to write scene file: {}", e))?;
     scene.disk_text.record(path, json);
     // Heavy baked SH lives beside the scene in `<scene>.lighting.json`, not inline in
-    // the human-diffable scene doc (#240). Written only when probes are baked.
+    // the human-diffable scene doc (#240). Written only when the probes hold a bake
+    // this world did not last read or write there (`BakeFiles`, #1982).
     crate::scene::lighting::io::save_lighting_sidecar(scene, path)?;
-    // The saved navmesh (#1887), when the scene holds one the file lacks: a save
-    // never bakes it.
+    // The saved navmesh (#1887), when the scene baked one since it last read or
+    // wrote the file (`BakeFiles`, #1982): a save never bakes it.
     crate::scene::nav_settings::save_navmesh(scene, path).map(|_| ())
 }
 
@@ -110,6 +113,8 @@ pub fn load_parsed(
     // withholding the record would buy no retry, only a reload that discards
     // unsaved edits on the next Generate Lighting, `touch` or rescan (#1374).
     scene.disk_text.record(path, json);
+    // A new scene: what the old one saw at its bake files is no record of this one.
+    scene.bake_files = Default::default();
     crate::scene::nav_settings::load_navmesh(scene, path);
     // Merge the baked SH back onto the just-loaded probe positions (#240). A missing
     // sidecar is fine — probes load with zero SH (positions placed, never baked).
@@ -134,3 +139,7 @@ pub fn parse_scene_text(json: &str, path: &str) -> Result<SceneData, String> {
 #[cfg(test)]
 #[path = "save_tests.rs"]
 mod save_tests;
+
+#[cfg(test)]
+#[path = "bake_race_tests.rs"]
+mod bake_race_tests;

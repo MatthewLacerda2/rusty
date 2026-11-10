@@ -5,48 +5,34 @@
 //! whether they still match the scene, is `navigation`'s (the arrow is navigation →
 //! scene). A save writes the bytes the scene holds to its own path, so *Save As*
 //! carries the navmesh to the new path as it carries the baked PVS; a scene that holds
-//! none leaves any file at its path alone (the file is checked on use, so a stale one
-//! costs only a full bake). A save never bakes: `Navigation.Bake()` and the editor's
-//! *Bake Navigation* button do. Nor does it rewrite bytes the file already holds: a
-//! Dust2-sized navmesh is tens of MB, and most saves leave it as it was loaded.
+//! none removes only a file it read or wrote itself (the file is checked on use, so
+//! a stale one costs only a full bake). A save never bakes: `Navigation.Bake()` and the
+//! editor's *Bake Navigation* button do. Nor does it rewrite bytes it only loaded
+//! (`scene::io::BakeFiles`, #1982): a Dust2-sized navmesh is tens of MB, most saves
+//! leave it as it was loaded, and a newer one another process baked is kept.
 //!
 //! stored-format: the `<scene>.navmesh` file beside the scene
 
-use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::scene::io::Saved;
 use crate::scene::Scene;
 
 const SUFFIX: &str = ".navmesh";
 
-/// The scene's saved navmesh: its bytes, and what the engine last read or wrote at
-/// which path, so a save skips a file that already holds them.
+/// The scene's saved navmesh: its bytes. What the engine last read or wrote at
+/// which path is the scene's [`BakeFiles`](crate::scene::io::BakeFiles) record.
 #[derive(Clone, Default)]
 pub struct SavedNavmesh {
     /// The `<scene>.navmesh` bytes, checked on use (`navigation`); `None` for none.
     pub bytes: Option<Arc<[u8]>>,
-    /// Interior mutability because a save takes `&Scene`, as `DiskText` does.
-    on_disk: RefCell<Option<(PathBuf, Arc<[u8]>)>>,
 }
 
 impl SavedNavmesh {
     /// Hold `bytes`.
     pub fn new(bytes: Option<Arc<[u8]>>) -> Self {
-        Self {
-            bytes,
-            on_disk: RefCell::default(),
-        }
-    }
-
-    /// Whether the file at `path` holds `bytes`, as last read or written there.
-    fn on_disk(&self, path: &PathBuf, bytes: &Arc<[u8]>) -> bool {
-        let last = self.on_disk.borrow();
-        let same = last
-            .as_ref()
-            .is_some_and(|(p, b)| p == path && (Arc::ptr_eq(b, bytes) || **b == **bytes));
-        // A file deleted or resized outside the engine since is written again.
-        same && std::fs::metadata(path).is_ok_and(|m| m.len() == bytes.len() as u64)
+        Self { bytes }
     }
 }
 
@@ -55,21 +41,14 @@ pub fn navmesh_path(scene_path: &str) -> PathBuf {
     PathBuf::from(format!("{scene_path}{SUFFIX}"))
 }
 
-/// Write the navmesh `scene` holds beside `scene_path`: nothing when it holds none,
-/// or when the file already holds those bytes. Returns whether it wrote.
-pub fn save_navmesh(scene: &Scene, scene_path: &str) -> Result<bool, String> {
-    let saved = &scene.navmesh;
-    let Some(bytes) = saved.bytes.as_ref() else {
-        return Ok(false);
-    };
+/// Bring the navmesh file beside `scene_path` to what `scene` holds, by the bake
+/// files' rule (`scene::io::BakeFiles`, #1982): written only when this world holds
+/// bytes it did not last read or write there, and never over a newer file with
+/// bytes it only loaded.
+pub fn save_navmesh(scene: &Scene, scene_path: &str) -> Result<Saved, String> {
     let path = navmesh_path(scene_path);
-    if saved.on_disk(&path, bytes) {
-        return Ok(false);
-    }
-    // lint: allow(asset-write) the saved navmesh, a bake document read whole on load
-    std::fs::write(&path, bytes).map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
-    *saved.on_disk.borrow_mut() = Some((path, bytes.clone()));
-    Ok(true)
+    let want = scene.navmesh.bytes.as_deref();
+    scene.bake_files.store(&path, want, "Navigation")
 }
 
 /// Read the navmesh beside `scene_path` onto `scene`: none when there is no file,
@@ -85,14 +64,15 @@ pub fn load_navmesh(scene: &mut Scene, scene_path: &str) {
                 "[Navigation] could not read {} ({e}): Play bakes the navmesh in full",
                 path.display()
             );
-            None
+            scene.bake_files.forget(&path);
+            scene.navmesh = SavedNavmesh::default();
+            return;
         }
     };
-    let on_disk = bytes.clone().map(|b| (path, b));
-    scene.navmesh = SavedNavmesh {
-        bytes,
-        on_disk: RefCell::new(on_disk),
-    };
+    scene
+        .bake_files
+        .loaded(&path, bytes.as_deref(), bytes.as_deref());
+    scene.navmesh = SavedNavmesh { bytes };
 }
 
 #[cfg(test)]

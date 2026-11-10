@@ -128,6 +128,8 @@ pub const MARKS: &[Mark] = marks! {
         s.meshes_reimported.contains_key("marked.glb");
     "disk_text" => |s, _| s.disk_text.record("marked.scene", "marked".into()),
         s.is_disk_text("marked.scene", "marked");
+    "bake_files" => |s, _| s.bake_files.loaded(std::path::Path::new("marked.occlusion"), None, None),
+        s.bake_files.has(std::path::Path::new("marked.occlusion"));
     "history" => |s, b| {
             s.begin_edits();
             if let Some(mut t) = s.world.transform_mut(b) {

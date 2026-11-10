@@ -8,13 +8,14 @@
 //! storing GPU buffers in the scene.
 //!
 //! Save writes the sidecar next to the scene (`foo.scene` → `foo.scene.lighting.json`)
-//! ONLY when probes carry baked SH; load merges it back onto the in-memory probes by
+//! ONLY when probes carry baked SH this world did not last read or write there
+//! (`scene::io::BakeFiles`, #1982); load merges it back onto the in-memory probes by
 //! index. A missing sidecar is not an error — the probes simply load with zero SH
 //! (e.g. positions placed but never baked).
 //!
 //! stored-format: the `<scene>.lighting.json` SH sidecar
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -80,43 +81,59 @@ pub fn apply_lighting(scene: &mut Scene, data: &LightingData) {
     }
 }
 
-/// Write the baked PVS beside `scene_path` (`occlusion::save_sidecar`, #1714), and
-/// the lighting sidecar next to it, but only if at least one probe carries non-zero
-/// SH or a shadowmask occlusion below one (#1695). When no probe is baked the sidecar
-/// is removed (if present) so
-/// stale data can't linger. Errors are returned as strings, matching scene I/O.
-pub fn save_lighting_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
-    super::occlusion::save_sidecar(scene, scene_path)?;
-    let path = sidecar_path(scene_path);
+/// The sidecar as a save writes it: `None` when no probe carries non-zero SH or a
+/// shadowmask occlusion below one (#1695).
+fn sidecar_json(scene: &Scene) -> Result<Option<String>, String> {
     let has_baked = (scene.probes.probes().iter())
         .any(|p| p.sh != Sh9::zero() || p.occlusion != glam::Vec4::ONE);
     if !has_baked {
-        if path.exists() {
-            std::fs::remove_file(&path).map_err(|e| format!("Failed to remove sidecar: {}", e))?;
-        }
-        return Ok(());
+        return Ok(None);
     }
-    let data = extract_lighting(scene);
-    let json = serde_json::to_string_pretty(&data)
-        .map_err(|e| format!("Failed to serialize lighting sidecar: {}", e))?;
-    // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
-    std::fs::write(&path, json).map_err(|e| format!("Failed to write lighting sidecar: {}", e))
+    serde_json::to_string_pretty(&extract_lighting(scene))
+        .map(Some)
+        .map_err(|e| format!("Failed to serialize lighting sidecar: {}", e))
+}
+
+/// Write the baked PVS beside `scene_path` (`occlusion::save_sidecar`, #1714), and
+/// the lighting sidecar next to it, both by the bake files' rule
+/// (`scene::io::BakeFiles`, #1982): a sidecar is written only when this world holds
+/// a bake it did not last read or write there, and never over a newer file with one
+/// it only loaded. When no probe is baked the sidecar this world read or wrote is
+/// removed, so stale data can't linger. Errors are returned as strings, matching
+/// scene I/O.
+pub fn save_lighting_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
+    super::occlusion::save_sidecar(scene, scene_path)?;
+    let json = sidecar_json(scene)?;
+    let want = json.as_deref().map(str::as_bytes);
+    let path = sidecar_path(scene_path);
+    scene.bake_files.store(&path, want, "Lighting").map(|_| ())
 }
 
 /// Load the lighting sidecar for `scene_path` onto the scene's probes, if it exists,
-/// and the baked PVS beside it (`occlusion::load_sidecar`, #1714). A missing sidecar is a no-op (probes keep zero SH). Returns an error only on a
-/// present-but-corrupt sidecar.
+/// and the baked PVS beside it (`occlusion::load_sidecar`, #1714). A missing sidecar
+/// is a no-op (probes keep zero SH). Returns an error only on a present-but-corrupt
+/// sidecar, which a save then never removes.
 pub fn load_lighting_sidecar(scene: &mut Scene, scene_path: &str) -> Result<(), String> {
     super::occlusion::load_sidecar(scene, scene_path);
     let path = sidecar_path(scene_path);
-    if !Path::new(&path).exists() {
-        return Ok(());
-    }
-    let json = std::fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read lighting sidecar: {}", e))?;
+    scene.bake_files.forget(&path);
+    let json = match std::fs::read_to_string(&path) {
+        Ok(json) => json,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            let held = sidecar_json(scene)?;
+            scene
+                .bake_files
+                .loaded(&path, None, held.as_deref().map(str::as_bytes));
+            return Ok(());
+        }
+        Err(e) => return Err(format!("Failed to read lighting sidecar: {}", e)),
+    };
     let data: LightingData = serde_json::from_str(&json)
         .map_err(|e| format!("Failed to deserialize lighting sidecar: {}", e))?;
     apply_lighting(scene, &data);
+    let held = sidecar_json(scene)?;
+    let held = held.as_deref().map(str::as_bytes);
+    scene.bake_files.loaded(&path, Some(json.as_bytes()), held);
     Ok(())
 }
 

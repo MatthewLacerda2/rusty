@@ -13,6 +13,7 @@ use std::sync::Arc;
 use glam::{UVec3, Vec3};
 
 use super::{BakedObject, Grid, OcclusionData, MAX_CELLS};
+use crate::scene::io::Saved;
 use crate::scene::Scene;
 
 const MAGIC: &[u8; 4] = b"RPVS";
@@ -95,20 +96,15 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
         .ok_or_else(|| "rows disagree with the grid".into())
 }
 
-/// Write `scene`'s PVS beside `scene_path`, or remove a stale one when it has none
-/// (and kept none it could not read: that file stays, [`load_sidecar`]).
-pub fn save_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
+/// Bring the PVS file beside `scene_path` to what `scene` holds, by the bake
+/// files' rule (`scene::io::BakeFiles`, #1982): written only when this world baked
+/// since it last read or wrote the file, removed only when its bake was cleared and
+/// it read or wrote the file being removed, and never over a newer file with bytes
+/// it only loaded. A file it could not read stays ([`load_sidecar`]).
+pub fn save_sidecar(scene: &Scene, scene_path: &str) -> Result<Saved, String> {
     let path = occlusion_path(scene_path);
-    let Some(data) = scene.occlusion.as_deref() else {
-        if path.exists() && !scene.occlusion_unread {
-            std::fs::remove_file(&path)
-                .map_err(|e| format!("Failed to remove {}: {e}", path.display()))?;
-        }
-        return Ok(());
-    };
-    // lint: allow(asset-write) the baked PVS, a lighting document read whole on load
-    std::fs::write(&path, encode(data))
-        .map_err(|e| format!("Failed to write {}: {e}", path.display()))
+    let want = scene.occlusion.as_deref().map(encode);
+    scene.bake_files.store(&path, want.as_deref(), "Occlusion")
 }
 
 /// Load the PVS beside `scene_path` onto `scene`: none when there is no file, and
@@ -118,15 +114,8 @@ pub fn save_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
 pub fn load_sidecar(scene: &mut Scene, scene_path: &str) {
     let path = occlusion_path(scene_path);
     scene.occlusion_unread = false;
-    let data = match std::fs::read(&path) {
-        Ok(bytes) => decode(&bytes)
-            .map_err(|e| {
-                log::warn!(
-                    "[Occlusion] {} refused ({e}): nothing is occlusion-culled",
-                    path.display()
-                )
-            })
-            .ok(),
+    let bytes = match std::fs::read(&path) {
+        Ok(bytes) => Some(bytes),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => {
             log::warn!(
@@ -135,9 +124,27 @@ pub fn load_sidecar(scene: &mut Scene, scene_path: &str) {
                 path.display()
             );
             scene.occlusion_unread = true;
-            None
+            scene.bake_files.forget(&path);
+            *scene.occlusion = None;
+            return;
         }
     };
+    let data = bytes.as_deref().and_then(|b| {
+        decode(b)
+            .map_err(|e| {
+                log::warn!(
+                    "[Occlusion] {} refused ({e}): nothing is occlusion-culled",
+                    path.display()
+                )
+            })
+            .ok()
+    });
+    // What a save would write, encoded afresh: a file that does not round-trip
+    // byte for byte never reads as a bake since.
+    let held = data.as_ref().map(encode);
+    scene
+        .bake_files
+        .loaded(&path, bytes.as_deref(), held.as_deref());
     *scene.occlusion = data.map(Arc::new);
 }
 

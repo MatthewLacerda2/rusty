@@ -136,6 +136,9 @@ authored_fields!(scene_state {
         meshes_read_at: Follow, No;
         meshes_reimported: Follow, No;
         disk_text: DiskRecord, No;
+        // What this world last read or wrote at each bake sidecar (#1982), keyed by
+        // path: an edit load starts afresh, a Play load adds its own path's.
+        bake_files: DiskRecord, No;
         history: History, No;
     }
     dev {

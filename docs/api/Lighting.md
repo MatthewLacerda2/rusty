@@ -150,6 +150,23 @@ first.
   `Reflection.Bake()` error while the editor's Generate Lighting or Bake Occlusion
   is running.
 
+### Bake files and the scene save
+
+A scene's bakes sit beside it in files of their own: `<scene>.occlusion`,
+`<scene>.lighting.json` and `<scene>.navmesh` ([`Navigation`](Navigation.md)). As
+Unity's lighting data is an asset a scene save never rewrites, `Scene.Save()` writes one
+only when this scene holds a bake other than the one it last read or wrote at that path:
+it baked since, its bake was cleared, or the save is a *Save As* to a new path. So when
+another process (a headless `session-mcp`, a second editor) re-bakes a scene while it is
+open, saving the open one keeps the newer file, and the console says so once
+(`changed on disk since this scene read it … the save keeps that newer bake, and the
+next load uses it`). A scene that baked since still writes its own (the last write wins,
+and the warning says it overwrote the newer file). A cleared bake removes only the file
+this scene read or wrote, unchanged since; a file it never saw, or could not read, is
+left. "Changed" is the file's length and content hash, so a same-length rewrite counts.
+The lightmap pages and reflection cubemaps are written by their bakes only, never by a
+save.
+
 ### Light and reflection probes
 
 `Lighting.Bake()` (#246) auto-places light probes and reflection probes from the static
@@ -497,7 +514,8 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   `Lighting.Generate()` bakes it in line and logs `[Lighting] occlusion 62%
   (2260/3645 cells)` lines like the other steps.
 - **Stored** beside the scene as `<scene>.occlusion` (a small binary file, written
-  with the lighting and on every save; removed when the scene has none). A file that
+  by the bake, and by a save only by the rule in
+  [*Bake files and the scene save*](#bake-files-and-the-scene-save)). A file that
   is truncated or out of range is refused on load with a warning, and nothing is
   occlusion-culled. One that is there but cannot be read (a permission) also culls
   nothing, with a warning, and the next save leaves it in place.
