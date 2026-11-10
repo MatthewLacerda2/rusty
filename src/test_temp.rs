@@ -23,6 +23,15 @@ pub(crate) fn dir() -> PathBuf {
     dir
 }
 
+/// `name` inside [`dir`] with `/` separators, safe inside a Lua string literal: a
+/// Windows temp path (`C:\Users\…`) trips Lua's escape parser at `\U` (#1937). It is
+/// the stored form a script passes (`core::paths::to_slash`), and Windows accepts
+/// `/` for file I/O, so the same string serves the test's own reads and assertions.
+/// The integration suite's twin is `tests/temp.rs`'s `lua_path`.
+pub(crate) fn lua_path(name: &str) -> String {
+    crate::core::paths::to_slash(&dir().join(name))
+}
+
 /// The running test's name as one path component (`a::b` → `a-b`).
 fn test_name() -> String {
     let thread = std::thread::current();

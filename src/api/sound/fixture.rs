@@ -5,16 +5,8 @@ use mlua::Lua;
 
 use super::register;
 
-/// A temp path with forward slashes: a Windows path (`C:\Users\…`) interpolated
-/// into a Lua string literal trips Lua's escape parser (`\U`), and Windows accepts
-/// `/` for file I/O, so the round-trip matches on every platform.
-pub(super) fn tmp(name: &str) -> String {
-    crate::test_temp::dir()
-        .join(name)
-        .to_str()
-        .expect("utf-8 temp path")
-        .replace('\\', "/")
-}
+/// A temp path a Lua literal can carry: [`crate::test_temp::lua_path`].
+pub(super) use crate::test_temp::lua_path as tmp;
 
 /// A percussive noise patch — the shape every impact / footstep SFX takes.
 pub(super) const IMPACT_PATCH: &str = r#"{
