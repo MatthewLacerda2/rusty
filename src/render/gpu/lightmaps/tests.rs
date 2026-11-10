@@ -52,7 +52,15 @@ fn gpu_lightmaps_rebind_on_colour_pages_and_match_direction_shapes() {
         page: 0,
         scale_offset: [1.0, 1.0, 0.0, 0.0],
     });
-    let instance = |id| solid_object(&scene, id, Mat4::IDENTITY, &Default::default(), &maps);
+    let instance = |id| {
+        solid_object(
+            &scene,
+            id,
+            (Mat4::IDENTITY, glam::Vec3::ZERO),
+            &Default::default(),
+            &maps,
+        )
+    };
     assert_eq!(instance(1).lightmap_directional, 1, "lightmapped");
     assert_eq!(
         instance(2).lightmap_directional,

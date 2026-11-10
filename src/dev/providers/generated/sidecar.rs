@@ -46,7 +46,7 @@ impl Sidecar {
     pub fn save(&self, file: &Path) -> std::io::Result<()> {
         let json = serde_json::to_string_pretty(self).map_err(std::io::Error::other)?;
         // lint: allow(asset-write) a generated file's sidecar json, not an asset a cache reads
-        std::fs::write(Self::path_for(file), json + "\n")
+        crate::core::fs::write_atomic(&Self::path_for(file), (json + "\n").as_bytes())
     }
 }
 

@@ -1,7 +1,7 @@
 //! Which entities read light probes (#240, #1704): dynamic ones, and a static mesh
 //! only at Scale In Lightmap 0, which the lightmap bake leaves to the probes.
 
-use glam::{Mat4, Vec3};
+use glam::Vec3;
 
 use super::entity_probe_sh;
 use crate::render::ibl::cubemap_capture::CaptureMode;
@@ -17,7 +17,7 @@ fn a_static_mesh_reads_probes_only_at_scale_in_lightmap_zero() {
         .world
         .set_mesh(id, primitive_mesh_component(Primitive::Box));
     let runtime = CaptureMode::default();
-    let use_sh = |scene: &Scene| entity_probe_sh(scene, id, Mat4::IDENTITY, &runtime).0;
+    let use_sh = |scene: &Scene| entity_probe_sh(scene, id, Vec3::ZERO, &runtime).0;
     assert_eq!(use_sh(&scene), 1, "a dynamic mesh reads them");
     scene.world.set_static(id, true);
     assert_eq!(use_sh(&scene), 0, "a lightmapped static one doesn't");
@@ -27,7 +27,7 @@ fn a_static_mesh_reads_probes_only_at_scale_in_lightmap_zero() {
         static_only: true,
         ..runtime
     };
-    let in_bake = entity_probe_sh(&scene, id, Mat4::IDENTITY, &bake).0;
+    let in_bake = entity_probe_sh(&scene, id, Vec3::ZERO, &bake).0;
     assert_eq!(
         in_bake, 0,
         "a bounce-1 bake capture never reads its own probes"

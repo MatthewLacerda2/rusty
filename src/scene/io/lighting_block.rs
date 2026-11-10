@@ -45,7 +45,8 @@ pub fn save_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> 
     copy_lighting(scene, &mut data);
     let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
-    std::fs::write(path, &json).map_err(|e| format!("Failed to write scene file: {e}"))?;
+    crate::core::fs::write_atomic(std::path::Path::new(path), json.as_bytes())
+        .map_err(|e| format!("Failed to write scene file: {e}"))?;
     // Only when the file held the engine's own text: an outside edit the follow has
     // not applied yet stays unrecorded, so the follow reloads it (edit + lighting)
     // instead of the next Save writing over it (#1374). The old record takes the

@@ -62,7 +62,8 @@ impl RecentProjects {
         }
         let text = serde_json::to_string_pretty(self).unwrap_or_default();
         // lint: allow(asset-write) project settings, not read by a path-keyed cache
-        std::fs::write(path, text + "\n").map_err(|e| format!("{}: {e}", path.display()))
+        crate::core::fs::write_atomic(path, (text + "\n").as_bytes())
+            .map_err(|e| format!("{}: {e}", path.display()))
     }
 
     /// Put `root` at the top, opened at `now`, dropping its older entry and anything

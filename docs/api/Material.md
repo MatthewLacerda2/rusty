@@ -321,7 +321,8 @@ visible fallback.
 >   card shadows its leaf, not its quad.
 > - **Transparent** — alpha-blended (glass, holograms, fades): the surface blends over
 >   what is behind it using `alpha` (× the texture's alpha) as the opacity. Drawn in a
->   separate pass after the opaque geometry, sorted back-to-front per object, with depth
+>   separate pass after the opaque geometry, sorted back-to-front per object by its world bounds' centre (as
+>   Unity sorts renderers; never its origin), with depth
 >   testing on but depth writes off — so overlapping translucent surfaces all blend
 >   correctly regardless of draw order. (Per-object sort only; intersecting translucent
 >   surfaces within one mesh are a known limitation, as in Unity's default.)
