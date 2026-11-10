@@ -217,7 +217,7 @@ pub fn clamp_resolution(size: u32) -> u32 {
 /// A new probe's sphere radius: Unity's new probe's 10 m box, as a sphere.
 pub const DEFAULT_RADIUS: f32 = 5.0;
 /// The smallest sphere radius a write accepts.
-const MIN_RADIUS: f32 = 0.01;
+pub(super) const MIN_RADIUS: f32 = 0.01;
 
 fn is_identity(q: &Quat) -> bool {
     *q == Quat::IDENTITY
@@ -246,6 +246,9 @@ pub const PARALLEL_EPSILON: f32 = 1e-6;
 /// the same value.
 pub const NO_HIT: f32 = 1e30;
 
+#[cfg(test)]
+#[path = "projection_far_tests.rs"]
+mod projection_far_tests;
 #[cfg(test)]
 #[path = "projection_tests.rs"]
 mod projection_tests;

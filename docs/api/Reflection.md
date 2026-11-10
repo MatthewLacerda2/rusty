@@ -25,6 +25,10 @@ a fragment outside the volume too: its ray's distance to where it leaves each sl
 the box (or the sphere) is taken as a magnitude, so the reflection is continuous
 across every face, and a large object reaching past one of its two probes, a floor
 under a row of turned boxes in a round room, shows no straight step where a box ends.
+That projection is bounded: past the probe's influence volume (its volume grown by
+`blendDistance`) it fades smoothly back to infinite projection over the volume's own
+size (a box's half-diagonal, a sphere's radius), so the far end of a large floor keeps
+a reflection that follows its direction instead of one blurry patch of the cube.
 Only a probe with `boxProjection` off reflects the cubemap as if infinitely far away. An object no baked probe reaches reflects the global skybox, or
 the scene's **fallback probe** when it names one (below).
 
@@ -64,7 +68,9 @@ probe a scene names takes the share the sky took: everything an object's probes 
 all of it for an object outside every box. It stays resident wherever the camera is
 (it is taken first, whatever the budget, and so is the nearest probe after it, so a
 large fallback never evicts the camera's own room's probe) and is always slot 0 of
-the resident probes.
+the resident probes. It is **never box-projected**, whatever its `boxProjection` says,
+as Unity's default reflection probe isn't: it reflects as if infinitely far away,
+since what reads it lies outside the room it captured.
 With none named, or the named one not baked, that share is the sky's. Naming a probe
 makes it manual, and it stays manual through any edit (`Set{ manual = false }`, the
 Inspector's *Manual*), so Generate Lighting keeps it; removing it, `Clear`, or loading a

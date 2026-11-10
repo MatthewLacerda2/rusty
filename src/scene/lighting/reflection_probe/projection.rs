@@ -14,6 +14,16 @@
 //! parallel to the face: tilted one way it hit at the fragment, the other way at the
 //! far wall, a hard line down a curved floor under an oriented box. As a magnitude,
 //! both sides run to infinity there and the closest other face takes over.
+//!
+//! **Projection past a volume is bounded** (#1995). Far outside, every ray's exit
+//! lies on the volume, which a far fragment sees in a narrow cone, so projected
+//! directions would collapse toward `p - centre`: one blurry patch of the cube that
+//! ignores the reflection's direction. Past the influence volume (the volume grown by
+//! the blend distance) the result fades back to infinite projection, smoothly over
+//! [`ProbeFrame::fade_span`], and is infinite past that. The fade depends only on
+//! the fragment's position, so it keeps both continuities above. HDRP never
+//! projects there because its weight is 0; rusty picks probes per object, so a
+//! large mesh's far fragments still read a probe, and this is the bound for them.
 
 use glam::Vec3;
 
@@ -36,6 +46,27 @@ impl ReflectionProbe {
 /// against `frame`'s volume.
 fn project(frame: &ProbeFrame, world_pos: Vec3, dir: Vec3) -> Vec3 {
     let p = frame.to_frame(world_pos);
+    let fade = past_influence(frame, p);
+    if fade >= 1.0 {
+        return dir;
+    }
+    let projected = project_in_volume(frame, p, dir);
+    if fade <= 0.0 {
+        return projected;
+    }
+    projected.lerp(dir, fade).normalize_or(dir)
+}
+
+/// How far `p` (in the frame) has faded toward infinite projection: 0 within the
+/// influence volume, 1 a [`ProbeFrame::fade`] past it, smoothstepped between.
+fn past_influence(frame: &ProbeFrame, p: Vec3) -> f32 {
+    let x = ((frame.outside(p) - frame.influence) / frame.fade).clamp(0.0, 1.0);
+    x * x * (3.0 - 2.0 * x)
+}
+
+/// The world direction from the capture point to where the ray from `p` (in the
+/// frame) along `dir` (world) leaves the volume.
+pub(super) fn project_in_volume(frame: &ProbeFrame, p: Vec3, dir: Vec3) -> Vec3 {
     let d = frame.to_frame(dir);
     let t = match frame.sphere {
         None => box_exit(frame, p, d),

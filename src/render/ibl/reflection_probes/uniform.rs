@@ -23,7 +23,8 @@ pub(crate) struct ReflectionProbeUniform {
     pub box_max: [f32; 3],
     /// The array layer (cube) its cube was copied into.
     pub layer: u32,
-    /// `x` intensity, `y` 1 when box projection is on, `z` 1 for the scene's
+    /// `x` intensity, `y` 1 when box projection is on (never for the fallback,
+    /// #1995), `z` 1 for the scene's
     /// fallback probe (only ever slot 0, #1697), `w` 1 when `irradiance` holds a
     /// stored irradiance the reflection is normalised by.
     pub params: [f32; 4],
@@ -34,7 +35,9 @@ pub(crate) struct ReflectionProbeUniform {
     /// The quaternion (`x, y, z, w`) that turns a world vector into the volume's
     /// frame (#1995): identity for a world-aligned box.
     pub rotation: [f32; 4],
-    /// `x` 1 for a sphere, `y` its radius (#1995); `zw` unused.
+    /// `x` 1 for a sphere, `y` its radius, `z` the blend distance past which the
+    /// projection fades back to infinite projection, over `w` (`ProbeFrame`'s
+    /// `influence` and `fade`, #1995).
     pub shape: [f32; 4],
 }
 
@@ -53,7 +56,9 @@ impl ReflectionProbeUniform {
             layer,
             params: [
                 probe.intensity,
-                flag(probe.box_projection),
+                // The fallback is never box-projected (#1995), as Unity's default
+                // reflection probe isn't: it is what far-off objects reflect.
+                flag(probe.box_projection && !probe.fallback),
                 flag(probe.fallback),
                 flag(probe.irradiance.is_some()),
             ],
@@ -62,8 +67,8 @@ impl ReflectionProbeUniform {
             shape: [
                 flag(frame.sphere.is_some()),
                 frame.sphere.unwrap_or(0.0),
-                0.0,
-                0.0,
+                frame.influence,
+                frame.fade,
             ],
         }
     }

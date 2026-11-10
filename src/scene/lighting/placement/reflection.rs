@@ -47,8 +47,8 @@ impl Default for ReflectionPlacement {
 /// box fits its room's walls, floor and ceiling (an open room reaches the top of
 /// the static geometry), and it captures from eye height over the room's middle;
 /// a room open to the sky gets one probe without box projection (#1737); see
-/// `room_probes.rs`. A planned probe whose box a `manual` probe's box covers by at
-/// least half is left out: that room is the manual probe's. Empty with nothing
+/// `room_probes.rs`. A planned probe whose box a `manual` probe's volume covers by
+/// at least half is left out: that room is the manual probe's. Empty with nothing
 /// to stand on.
 ///
 /// Bounded: `region` is held to at least [`MIN_REGION`], and a level that would
@@ -113,17 +113,14 @@ pub fn plan_reflection_probes(
     plans
 }
 
-/// Whether manual probe `m` takes `plan`'s place: its box covers at least half of
-/// the plan's box (#1737). A small manual probe in a corner of a room leaves the
-/// room its own probe. An oriented box or a sphere (#1995) is judged by its
-/// world-aligned bounds.
+/// Whether manual probe `m` takes `plan`'s place: its volume covers at least half
+/// of the plan's box (#1737). A small manual probe in a corner of a room leaves the
+/// room its own probe. An oriented box or a sphere is measured by what it really
+/// covers (#1995, `ReflectionProbe::share_of`), not its world-aligned bounds, so a
+/// turned corridor probe never takes a room it only crosses.
 fn covers(m: &ReflectionProbe, plan: &ReflectionPlan) -> bool {
-    let volume = |lo: Vec3, hi: Vec3| (hi - lo).max(Vec3::ZERO).element_product();
-    let own = volume(plan.box_min, plan.box_max);
-    let (lo, hi) = m.world_bounds();
-    let shared = volume(lo.max(plan.box_min), hi.min(plan.box_max));
-    match own > 0.0 {
-        true => shared >= own * 0.5,
+    match (plan.box_max - plan.box_min).cmpgt(Vec3::ZERO).all() {
+        true => m.share_of(plan.box_min, plan.box_max) >= 0.5,
         false => m.contains(plan.position),
     }
 }

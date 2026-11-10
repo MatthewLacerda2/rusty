@@ -83,3 +83,33 @@ fn a_world_aligned_box_probe_writes_no_new_keys_and_a_sphere_round_trips() {
     assert!(json.contains("\"Sphere\""), "{json}");
     assert_eq!(serde_json::from_str::<ReflectionProbe>(&json).unwrap(), p);
 }
+
+#[test]
+fn coverage_and_overlap_use_the_real_volume() {
+    // The review's case: a 2 x 20 m corridor probe turned 45 degrees and a 10 x 10 m
+    // room about it: its bounds cover the room, the turned box 26.3% of it (the
+    // sampled share is within 0.04 of that).
+    let corridor = ReflectionProbe {
+        rotation: Quat::from_rotation_y(45f32.to_radians()),
+        ..ReflectionProbe::new(Vec3::ZERO, Vec3::new(1.0, 2.0, 10.0))
+    };
+    let room = (Vec3::new(-5.0, -2.0, -5.0), Vec3::new(5.0, 2.0, 5.0));
+    let share = corridor.share_of(room.0, room.1);
+    assert!((share - 0.263).abs() < 0.04, "{share}");
+    // A world-aligned box is exact; an empty box is covered by nothing.
+    let flat = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(5.0));
+    assert_eq!(flat.share_of(Vec3::ZERO, Vec3::splat(10.0)), 0.125);
+    assert_eq!(flat.share_of(Vec3::ZERO, Vec3::ZERO), 0.0);
+    // Overlap: a turned box clear of a box its bounds reach, a sphere by distance.
+    let near = ReflectionProbe::new(Vec3::new(5.8, 0.0, 0.0), Vec3::ONE);
+    let (lo, hi) = corridor.world_bounds();
+    assert!(lo.x < 4.8 && hi.x > 4.8, "its bounds reach the box");
+    assert!(!corridor.overlaps(&near) && !near.overlaps(&corridor));
+    assert!(flat.overlaps(&near) && near.overlaps(&flat));
+    let ball = ReflectionProbe {
+        shape: ProbeShape::Sphere,
+        radius: 1.0,
+        ..ReflectionProbe::new(Vec3::new(7.5, 0.0, 0.0), Vec3::ONE)
+    };
+    assert!(ball.overlaps(&near) && !ball.overlaps(&flat) && !flat.overlaps(&ball));
+}

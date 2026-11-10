@@ -1,19 +1,20 @@
 //! Unity's *Blend Probes* (#1584): the two probes an object between rooms reflects,
 //! and how much of each.
 //!
-//! A probe's **influence** at a point is 1 inside its box and falls linearly to 0
+//! A probe's **influence** at a point is 1 inside its volume (a turned box or a
+//! sphere, #1995) and falls linearly to 0
 //! at `blend_distance` past it (a zero distance is a hard edge). The candidates are
 //! the probes with any influence, ranked by importance, then influence, then the
 //! nearer capture point, then the lower index. The two at the top share the
 //! reflection:
 //!   * **equal importance** — they split it in proportion to their influence, and
 //!     together cover as much as the stronger one, so walking through a doorway
-//!     from one box into the next fades across the blend distances;
+//!     from one volume into the next fades across the blend distances;
 //!   * **lower importance second** — the first is drawn over it: it takes its own
 //!     influence, and the second fills what is left, so leaving a small important
-//!     box fades into the room around it (Unity's "higher importance wins");
+//!     volume fades into the room around it (Unity's "higher importance wins");
 //!   * whatever the probes don't cover reflects the sky, so an object leaving the
-//!     last box fades into the sky rather than popping.
+//!     last volume fades into the sky rather than popping.
 //!
 //! Per object, on the CPU, at its world-bounds centre, as Unity does; the shader
 //! takes two probe indices and their weights. Pure and deterministic.
@@ -33,7 +34,7 @@ pub struct ProbeBlend {
 }
 
 impl ReflectionProbe {
-    /// How strongly this probe applies at `point`: 1 in its box, falling linearly to
+    /// How strongly this probe applies at `point`: 1 in its volume, falling linearly to
     /// 0 at [`Self::blend_distance`] past it.
     pub fn influence(&self, point: Vec3) -> f32 {
         let outside = self.volume_distance_sq(point);

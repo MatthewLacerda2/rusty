@@ -8,6 +8,7 @@
 use egui_phosphor::regular as icon;
 
 use crate::components::transform::{euler_degrees, from_euler_degrees};
+use crate::editor::inspector::components::transform::drag_angle;
 use crate::editor::widgets::DragRange;
 use crate::editor::EditorUi;
 use crate::scene::lighting::settings::ReflectionSettings;
@@ -168,7 +169,7 @@ fn volume_rows(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe) -> bool {
             // Written back only when edited, so a round trip through Euler
             // angles never nudges a stored rotation.
             let mut euler = euler_degrees(p.rotation);
-            if vec_row(ui, "Rotation", &mut euler) {
+            if angle_row(ui, &mut euler) {
                 p.rotation = from_euler_degrees(euler);
                 changed = true;
             }
@@ -208,6 +209,20 @@ fn vec_row(ui: &mut egui::Ui, label: &str, v: &mut glam::Vec3) -> bool {
             changed |= ui.add(egui::DragValue::new(axis).speed(0.05)).changed();
         }
         ui.label(label);
+        changed
+    })
+    .inner
+}
+
+/// The *Rotation* row in degrees, with the Transform card's angle fields (speed 1,
+/// held to [-180, 180], no "-0"); returns whether one changed.
+fn angle_row(ui: &mut egui::Ui, euler: &mut glam::Vec3) -> bool {
+    ui.horizontal(|ui| {
+        let mut changed = false;
+        for axis in [&mut euler.x, &mut euler.y, &mut euler.z] {
+            changed |= drag_angle(ui, axis);
+        }
+        ui.label("Rotation");
         changed
     })
     .inner
