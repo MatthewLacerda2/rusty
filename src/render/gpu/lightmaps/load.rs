@@ -115,13 +115,16 @@ fn page(
     Ok((wgpu::TextureFormat::Rgba16Float, edge, bytes))
 }
 
+/// The bake's mip chain of an RGBA8 page's decoded texels, as bytes.
+type Rgba8Levels<T> = fn(&[T], u32) -> Vec<Vec<[u8; 4]>>;
+
 /// One RGBA8 page (a direction page, #810, or a shadowmask, #1695): its PNG's
 /// texels, `decode`d, with the mips the colour pages carry (`levels`, the bake's
 /// box filter), as RGBA8.
 fn rgba8_page<T>(
     path: &str,
     decode: fn([u8; 4]) -> T,
-    levels: fn(&[T], u32) -> Vec<Vec<[u8; 4]>>,
+    levels: Rgba8Levels<T>,
 ) -> Result<(wgpu::TextureFormat, u32, Vec<Vec<u8>>), String> {
     let image = image::open(path).map_err(|e| e.to_string())?.to_rgba8();
     let edge = image.width();
