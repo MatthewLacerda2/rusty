@@ -41,6 +41,15 @@ impl Scene {
     /// `Debug.Draw*` line still held (#1882): the
     /// scene state inventory's runtime class (`scene::state`, #1649).
     pub(crate) fn set_playing(&mut self, playing: bool) {
+        // A script's pending `Lighting.GenerateAsync()` was made in the other mode.
+        #[cfg(feature = "dev")]
+        if playing != self.playing {
+            self.drop_bake_request(if playing {
+                "Play started"
+            } else {
+                "Play stopped"
+            });
+        }
         if playing && !self.playing {
             self.clear_undo();
             self.forget_perception();
@@ -76,10 +85,20 @@ impl Scene {
     /// its decal budgets (File ▸ New, Reset Scene): the scene is new, the session
     /// (and the project's budgets it applied) is not.
     pub fn clear(&mut self) {
+        // A pending `Lighting.GenerateAsync()` asked about the old scene (#1999);
+        // the status is the editor's, so it says why the request went.
+        #[cfg(feature = "dev")]
+        self.drop_bake_request("a new scene was started");
+        #[cfg(feature = "dev")]
+        let status = std::mem::take(&mut self.lighting_bake_status);
         let (playing, limits) = (self.playing, self.decals.limits());
         *self = Scene::new();
         self.playing = playing;
         self.decals.set_limits(limits);
+        #[cfg(feature = "dev")]
+        {
+            self.lighting_bake_status = status;
+        }
     }
 
     /// Remove entity `id` and everything under it ([`Scene::destroy_set`]), as

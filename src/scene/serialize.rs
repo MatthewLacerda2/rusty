@@ -202,6 +202,9 @@ fn drop_old_world(scene: &mut Scene) {
     // destroys everything of the old scene (#1649). A Play load took the
     // persistent ones out first (`swap_in`), and Stop's snapshot puts its own back.
     scene.clear_decals(false);
+    // A pending `Lighting.GenerateAsync()` asked about the replaced scene (#1999).
+    #[cfg(feature = "dev")]
+    scene.drop_bake_request("another scene was loaded");
     // An edit-mode load drops the `Debug.Draw*` lines drawn over the old World
     // (#1882), as Stop does; a Play load leaves them to age out, as it leaves
     // Play's other runtime state (`scene::state`).

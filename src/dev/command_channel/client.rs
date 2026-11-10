@@ -46,16 +46,37 @@ impl Client {
     /// trimmed of its trailing newline. EOF before a reply (the engine closed the
     /// connection) is an `UnexpectedEof` error.
     pub fn request(&mut self, line: &str) -> io::Result<String> {
+        self.exchange(line, &mut |_| {})
+    }
+
+    /// [`request`](Self::request), asking for the command's bake progress lines
+    /// (#1999): each goes to `progress` as it arrives, before the reply. A window
+    /// from before the protocol ignores the ask and only replies.
+    pub fn request_progress(
+        &mut self,
+        line: &str,
+        progress: &mut dyn FnMut(&str),
+    ) -> io::Result<String> {
+        self.exchange(&format!("{}{line}", super::ASK), progress)
+    }
+
+    fn exchange(&mut self, line: &str, progress: &mut dyn FnMut(&str)) -> io::Result<String> {
         writeln!(self.writer, "{line}")?;
         self.writer.flush()?;
-        let mut reply = String::new();
-        if self.reader.read_line(&mut reply)? == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "engine closed the connection before replying",
-            ));
+        loop {
+            let mut reply = String::new();
+            if self.reader.read_line(&mut reply)? == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "engine closed the connection before replying",
+                ));
+            }
+            let reply = reply.trim_end();
+            match super::parse_progress(reply) {
+                Some(text) => progress(&text),
+                None => return Ok(reply.to_string()),
+            }
         }
-        Ok(reply.trim_end().to_string())
     }
 }
 
