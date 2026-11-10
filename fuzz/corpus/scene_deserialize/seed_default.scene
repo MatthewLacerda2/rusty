@@ -732,7 +732,6 @@
       "depth_postpass": false,
       "writes_motion": false,
       "reactive": "Auto",
-      "receive_ssr": false,
       "transmission_color": [
         1.0,
         1.0,

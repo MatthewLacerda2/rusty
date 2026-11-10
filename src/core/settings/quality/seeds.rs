@@ -28,8 +28,10 @@ const fn ssil(samples: u32, resolution_divisor: u32) -> SsilQuality {
 
 /// The march HDRP's quality levels name: its *Max Ray Steps* (Low 16, Medium 32,
 /// High 64), each step shorter as the count grows, so each also reaches further
-/// (8, 12, 16 m); 128 steps reach 25.6 m. HDRP traces a depth pyramid in screen
-/// space, so its reach is the screen; this march steps in world space.
+/// (at most 8, 12, 16 m); 128 steps at most 25.6 m. HDRP traces a depth pyramid in
+/// screen space, so its reach is the screen; this march steps in world space, each
+/// step also held to `max(1/64, 1/steps)` of the screen's shorter side (#2004), so
+/// its reach is the lesser of the world distance and about the screen's height.
 const fn march(steps: u32, step_length: f32) -> SsrQuality {
     SsrQuality { steps, step_length }
 }

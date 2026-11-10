@@ -16,9 +16,10 @@
 //! ones behind and a failed write leaves the old ones. `<tag>` hashes the page,
 //! so a rebake that changes a page changes its path and the renderer, which caches
 //! pages by path, loads the new one. A directional bake (#810) writes each page's
-//! direction page beside it as `lightmap_dir_<page>_<tag>` (BC7, and RGBA8 PNG), and
-//! a `Shadowmask` bake (#1695) its shadowmask page as `lightmap_mask_<page>_<tag>.png`
-//! (RGBA8, one channel per masked light; the loader makes its mips).
+//! direction page beside it as `lightmap_dir_<page>_<tag>.ktx2` (RGBA8 with the
+//! bake's mips, never block-compressed, #1996), and a `Shadowmask` bake (#1695)
+//! its shadowmask page as `lightmap_mask_<page>_<tag>.png` (RGBA8, one channel
+//! per masked light; the loader makes its mips).
 //!
 //! The bake splits in three so the editor can run the middle on a worker thread
 //! ([`job`], #808): [`gather_bake_input`] borrows the scene, `bake` needs only

@@ -40,7 +40,7 @@ impl Default for MaterialAsset {
             depth_postpass: false,
             writes_motion: false,
             reactive: TaaReactive::Auto,
-            receive_ssr: false,
+            receive_ssr: None,
             transmission_color: white(),
             transmission: 0.0,
             shader: None,

@@ -1,5 +1,8 @@
 //! A packed atlas page as the GPU stores it (#1694): its mip chain, then BC6H for
-//! irradiance and BC7 for directions (`asset::lightmap_page`). The levels are made
+//! irradiance (`asset::lightmap_page`); a direction page's levels stay RGBA8
+//! ([`direction_page`]), never block-compressed: BC7 turned a lamp's direction up
+//! to 5° off a texel, which a glossy surface's baked highlight showed as a
+//! sawtooth (#1996). A shadowmask's are RGBA8 too ([`mask_levels`]). The levels are made
 //! here, after the bake's chart dilation and fill (`raster::fill_rest`), so a mip
 //! averages a chart's light and its own edge, never the empty background, and
 //! the atlas's cells (`atlas`) keep every level of [`MIP_LEVELS`] inside one map.
@@ -18,7 +21,7 @@ use glam::{Vec3, Vec4};
 use super::atlas::MIP_LEVELS;
 use super::encode::{encode_direction, encode_mask};
 use super::raster::Texel;
-use crate::asset::lightmap_page::{self, encode_bc6h, encode_bc7, Page};
+use crate::asset::lightmap_page::{self, encode_bc6h, Page};
 
 /// How many levels an `edge`² page is stored with: [`MIP_LEVELS`], fewer when a
 /// level would not be whole blocks.
@@ -52,18 +55,22 @@ pub fn colour_page(
     encode_bc6h(edge, &levels(page, edge), threads, stop)
 }
 
-/// A direction page, every level, as BC7; `None` when `stop` answers true before
-/// a level.
-pub fn direction_page(
-    page: &[Vec4],
-    edge: u32,
-    threads: usize,
-    stop: &dyn Fn() -> bool,
-) -> Option<Page> {
-    encode_bc7(edge, &direction_levels(page, edge), threads, stop)
+/// A direction page, every level, as uncompressed RGBA8 (#1996): its mips made
+/// from the float directions, so the loader uploads them as they are.
+pub fn direction_page(page: &[Vec4], edge: u32) -> Page {
+    Page {
+        format: lightmap_page::PageFormat::Rgba8,
+        edge,
+        levels: direction_levels(page, edge)
+            .into_iter()
+            .map(|l| l.concat())
+            .collect(),
+    }
 }
 
-/// A direction page's levels as their RGBA8 texels (`encode::encode_direction`).
+/// A direction page's levels as their RGBA8 texels (`encode::encode_direction`):
+/// what [`direction_page`] stores, and what the loader makes of a progressive
+/// preview's direction PNG (`render::gpu::lightmaps`).
 pub fn direction_levels(page: &[Vec4], edge: u32) -> Vec<Vec<[u8; 4]>> {
     chain(page, edge)
         .iter()

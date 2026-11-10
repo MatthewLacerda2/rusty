@@ -1,7 +1,7 @@
 //! The reflection probes the forward pass shades with (#1206): the baked cubes of
-//! the probes whose boxes are nearest the camera (#1238), copied into one cube-array
-//! texture at group-0 binding 4, and the probes themselves in
-//! `LightingUniforms.refl_probes`.
+//! the probes whose volumes (a turned box or a sphere, #1995) are nearest the
+//! camera (#1238), copied into one cube-array texture at group-0 binding 4, and the
+//! probes themselves in `LightingUniforms.refl_probes`.
 //!
 //! Like Unity's *Blend Probes*, probes are picked per drawn object, not per camera
 //! or per pixel (#1584): the draw's instance carries the two resident probes its
@@ -9,11 +9,11 @@
 //! [`pack_blend`]), and every fragment of it samples both, box-projected when the
 //! probe asks for it, and the sky for what they leave. Only probes with a loaded
 //! cube are resident. A layer holds one cube *path*: probes that share a cube share
-//! its layer, each keeping its own box and centre.
+//! its layer, each keeping its own volume and centre.
 //!
 //! **Per-frame cost.** Ordering the scene's probes by the camera's distance to their
-//! boxes is O(P log P) over P probes, then each draw tests at most
-//! [`MAX_REFLECTION_PROBES`] boxes. GPU work happens only when the set of nearest
+//! volumes is O(P log P) over P probes, then each draw tests at most
+//! [`MAX_REFLECTION_PROBES`] volumes. GPU work happens only when the set of nearest
 //! cubes changes: one texture-to-texture copy per newly resident cube, or a rebuild
 //! of the array when it cannot hold them. A scene with no baked probe (the Inspector
 //! preview, rendered every frame beside the viewport) leaves the resident cubes
@@ -26,7 +26,7 @@
 //! copied into its slot, and its own texture dropped, so the scene's byte budget
 //! (`LightingSettings::reflections`, counted at the array's face in the array's
 //! format: BC6H, a byte a texel, where the adapter has BC, #1885) bounds all the
-//! probe memory there is. The frame fills it nearest box first, judging each cube by
+//! probe memory there is. The frame fills it nearest volume first, judging each cube by
 //! its KTX2 header before reading the rest of it, and leaves room in it for
 //! [`SPARE_SLOTS`] cubes that just left range (`frame.rs`, `slots.rs`). A cube
 //! whose size is not a power of two up to [`MAX_FACE`] is left out with a warning,

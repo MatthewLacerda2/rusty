@@ -16,8 +16,8 @@
 // or the scene's fallback probe when it names one (#1697, Unity's default reflection
 // probe). Each probe is normalised by the pixel's baked diffuse (`baked`, #1697); the
 // sky is not.
-// A probe's direction is parallax-corrected against its box when its box projection
-// is on, and its baked, prefiltered cube is sampled (roughness selects the mip within
+// A probe's direction is parallax-corrected against its volume (a turned box or a
+// sphere, #1995) when its box projection is on, and its baked, prefiltered cube is sampled (roughness selects the mip within
 // its chain, #245), scaled by its intensity and its normalisation. The sky is its cube (#1553), prefiltered
 // the same way, so a rough metal reflects a blurred sky: the panorama, or the
 // procedural sky's terms tinted with the ambient colour the sky pass draws it with

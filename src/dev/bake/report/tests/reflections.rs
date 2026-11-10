@@ -86,6 +86,16 @@ fn the_report_lists_each_probe_with_its_overlaps() {
     assert_eq!(report["probes"][1]["overlaps"], serde_json::json!([0]));
     assert!(report["probes"][0]["seconds"].is_null(), "not timed");
     assert_eq!(report["picks"].as_array().unwrap().len(), 3);
+    // #1995: turning a probe or making it a sphere is a new input, and a sphere
+    // reports its radius, not a box.
+    let mut turned = rooms();
+    turned
+        .reflection_probes
+        .edit(1, |p| p.shape = crate::scene::ProbeShape::Sphere);
+    let sphere = reflections::report(&turned, (&Stages::start(), &[]), &dir, 0).to_json();
+    assert_ne!(sphere["inputFingerprint"], report["inputFingerprint"]);
+    assert_eq!(sphere["probes"][1]["radius"], 5.0);
+    assert!(sphere["probes"][1]["boxMin"].is_null());
 }
 
 #[test]

@@ -15,32 +15,57 @@
 //!   * light probes (`probe.rs`) carry baked L2 SH irradiance for DIFFUSE ambient;
 //!   * reflection probes (here) carry a prefiltered cubemap for SPECULAR reflection.
 //!
-//! Storage split (mirrors `skybox_path`): each probe stores a world POSITION, a box
-//! VOLUME (`box_min`/`box_max`, the parallax-correction and influence bounds), its
-//! settings, and a PATH to its baked cubemap sidecar (a KTX2 file). No GPU data lives
+//! Storage split (mirrors `skybox_path`): each probe stores a world POSITION, a
+//! VOLUME (the parallax-correction and influence bounds, #1995: a box `box_min`/
+//! `box_max` turned by `rotation` about the position, or a sphere of `radius` about
+//! it; `volume.rs`), its settings, and a PATH to its baked cubemap sidecar (a KTX2
+//! file). No GPU data lives
 //! in the scene document. `Probe.Bake()` writes those cubemaps (#245); until a probe
 //! is baked it may reference a file that doesn't exist yet, and the objects it would
 //! cover reflect the skybox.
 //!
-//! The box-projected parallax correction (the standard Lagarde technique) is a pure
-//! function here so it is unit-testable without a GPU; `parallax_correct` in
-//! `engine/shaders/lighting/reflection_probe.wgsl` runs the same steps with the same
-//! guards (no division by a zero component, no hit at or past [`NO_HIT`]), since WGSL
-//! may assume no inf or NaN.
+//! The box-projected parallax correction (the standard Lagarde technique, HDRP's
+//! oriented proxy) is a pure function (`projection.rs`) so it is unit-testable without
+//! a GPU; `parallax_correct` in `engine/shaders/lighting/reflection_probe.wgsl` runs
+//! the same steps with the same guards (no division by a zero component, no hit at or
+//! past [`NO_HIT`]), since WGSL may assume no inf or NaN.
 //!
 //! This module is pure data + math — deterministic, no RNG/clock.
 
 mod blend;
+mod projection;
 mod set;
+mod volume;
 
 use std::ops::RangeInclusive;
 
-use glam::Vec3;
+use glam::{Quat, Vec3};
 use serde::{Deserialize, Serialize};
 
 use super::sh::Sh9;
 pub use blend::ProbeBlend;
 pub use set::ReflectionProbeSet;
+pub use volume::ProbeFrame;
+
+/// The shape of a probe's volume (#1995, HDRP's and Unreal's two): what its
+/// reflection is projected against and where it applies.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProbeShape {
+    /// The box `box_min`..`box_max`, turned by the probe's `rotation`.
+    #[default]
+    Box,
+    /// A sphere of the probe's `radius` about its capture point.
+    Sphere,
+}
+
+impl ProbeShape {
+    /// The shape `Reflection.Set` names: `"Box"` or `"Sphere"`.
+    pub fn named(name: &str) -> Option<Self> {
+        [Self::Box, Self::Sphere]
+            .into_iter()
+            .find(|s| format!("{s:?}") == name)
+    }
+}
 
 /// A single reflection probe: a capture position, the box volume used for parallax
 /// correction and blending, Unity's per-probe settings, and the path to its baked
@@ -51,18 +76,33 @@ pub use set::ReflectionProbeSet;
 pub struct ReflectionProbe {
     /// World-space capture point — the cubemap's origin and the parallax pivot.
     pub position: Vec3,
-    /// Min corner of the parallax-correction box (world space).
+    /// Min corner of the parallax-correction box: world space before
+    /// [`Self::rotation`] turns the box about [`Self::position`].
     pub box_min: Vec3,
-    /// Max corner of the parallax-correction box (world space).
+    /// Max corner of the parallax-correction box, as [`Self::box_min`].
     pub box_max: Vec3,
+    /// The box's orientation (#1995, HDRP's oriented box): it turns about the
+    /// capture point, for projection and influence alike. Identity is the
+    /// world-aligned box. Probes are scene data, not entities, so there is no scale:
+    /// the box's corners carry its size.
+    #[serde(skip_serializing_if = "is_identity")]
+    pub rotation: Quat,
+    /// The volume's shape (#1995): the box, or a sphere of [`Self::radius`].
+    #[serde(skip_serializing_if = "is_box")]
+    pub shape: ProbeShape,
+    /// The sphere's radius, world units (only read with [`ProbeShape::Sphere`]).
+    #[serde(skip_serializing_if = "is_default_radius")]
+    pub radius: f32,
     /// Path to the baked cubemap (a KTX2 file). May be empty / point at a not-yet-baked
     /// file (#245); the runtime then falls back to the global skybox.
     pub cubemap_path: String,
-    /// Unity's *Box Projection*: reflections are parallax-corrected against the box,
-    /// so they track the room. Off reflects the cube as if infinitely far away.
+    /// Unity's *Box Projection*: reflections are parallax-corrected against the
+    /// volume, so they track the room, also for a fragment outside it (#1995). Off
+    /// reflects the cube as if infinitely far away.
     pub box_projection: bool,
-    /// Unity's *Blend Distance*, world units: how far past its box the probe still
-    /// reaches, fading to nothing, so an object between two probes blends them.
+    /// Unity's *Blend Distance*, world units: how far past its volume the probe
+    /// still reaches, fading to nothing, so an object between two probes blends
+    /// them. Influence is the volume grown by it; projection is the volume itself.
     pub blend_distance: f32,
     /// Unity's *Importance*: where boxes overlap, a higher one is drawn over a lower
     /// one; equal ones blend by how deep the object sits in each.
@@ -123,6 +163,9 @@ impl ReflectionProbe {
             position,
             box_min: position - he,
             box_max: position + he,
+            rotation: Quat::IDENTITY,
+            shape: ProbeShape::Box,
+            radius: DEFAULT_RADIUS,
             cubemap_path: String::new(),
             box_projection: true,
             blend_distance: 1.0,
@@ -147,61 +190,11 @@ impl ReflectionProbe {
         self.far_clip = finite_or(self.far_clip, 1000.0).max(self.near_clip * 2.0);
         let (lo, hi) = (*Self::INTENSITY.start(), *Self::INTENSITY.end());
         self.intensity = finite_or(self.intensity, 1.0).clamp(lo, hi);
-    }
-
-    /// True when `point` lies inside this probe's parallax box (inclusive).
-    pub fn contains(&self, point: Vec3) -> bool {
-        point.cmpge(self.box_min).all() && point.cmple(self.box_max).all()
-    }
-
-    /// Squared distance from `point` to the nearest point of the probe's box, zero
-    /// inside it: how the renderer ranks probes for its resident budget (#1238), so a
-    /// big room whose capture point is far away still counts as near when the camera
-    /// stands in it.
-    pub fn box_distance_sq(&self, point: Vec3) -> f32 {
-        point
-            .clamp(self.box_min, self.box_max)
-            .distance_squared(point)
-    }
-
-    /// Squared distance from `point` to the probe's capture position — the
-    /// blend's tiebreak metric.
-    fn distance_sq(&self, point: Vec3) -> f32 {
-        self.position.distance_squared(point)
-    }
-
-    /// Box-projected parallax correction (Lagarde): given a fragment world position and
-    /// a raw reflection direction, intersect the ray against this probe's box and return
-    /// the direction from the probe centre to that hit point. This is what makes the
-    /// reflection track the room as the camera moves, instead of behaving like an
-    /// infinitely-distant skybox. A fragment outside the box, or a ray with no forward
-    /// hit, keeps the plain normalized direction. The shader's `parallax_correct` runs
-    /// these same steps; with [`Self::box_projection`] off the shader skips it.
-    /// Test seam for `tests/reflection_probes.rs`.
-    pub fn parallax_correct(&self, world_pos: Vec3, reflection: Vec3) -> Vec3 {
-        let dir = reflection.normalize_or_zero();
-        if !self.contains(world_pos) {
-            return dir;
-        }
-        // Per-axis ray/box-plane intersection; the forward exit per axis, then the
-        // closest of the three. An axis the ray runs parallel to never exits through
-        // its planes, so it is set to `NO_HIT` instead of dividing by zero.
-        let mut t = NO_HIT;
-        for axis in 0..3 {
-            if dir[axis].abs() > PARALLEL_EPSILON {
-                let first = (self.box_max[axis] - world_pos[axis]) / dir[axis];
-                let second = (self.box_min[axis] - world_pos[axis]) / dir[axis];
-                t = t.min(first.max(second));
-            }
-        }
-        if t <= 0.0 || t >= NO_HIT {
-            return dir;
-        }
-        let to_hit = world_pos + dir * t - self.position;
-        if to_hit.length_squared() <= 0.0 {
-            return dir;
-        }
-        to_hit.normalize()
+        self.radius = finite_or(self.radius, DEFAULT_RADIUS).max(MIN_RADIUS);
+        self.rotation = match self.rotation.is_finite() && self.rotation.length() > 1e-6 {
+            true => self.rotation.normalize(),
+            false => Quat::IDENTITY,
+        };
     }
 }
 
@@ -221,6 +214,23 @@ pub fn clamp_resolution(size: u32) -> u32 {
     }
 }
 
+/// A new probe's sphere radius: Unity's new probe's 10 m box, as a sphere.
+pub const DEFAULT_RADIUS: f32 = 5.0;
+/// The smallest sphere radius a write accepts.
+pub(super) const MIN_RADIUS: f32 = 0.01;
+
+fn is_identity(q: &Quat) -> bool {
+    *q == Quat::IDENTITY
+}
+
+fn is_box(shape: &ProbeShape) -> bool {
+    *shape == ProbeShape::Box
+}
+
+fn is_default_radius(r: &f32) -> bool {
+    *r == DEFAULT_RADIUS
+}
+
 fn finite_or(value: f32, fallback: f32) -> f32 {
     if value.is_finite() {
         value
@@ -237,4 +247,13 @@ pub const PARALLEL_EPSILON: f32 = 1e-6;
 pub const NO_HIT: f32 = 1e30;
 
 #[cfg(test)]
+#[path = "projection_far_tests.rs"]
+mod projection_far_tests;
+#[cfg(test)]
+#[path = "projection_tests.rs"]
+mod projection_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+#[path = "volume_tests.rs"]
+mod volume_tests;

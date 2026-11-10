@@ -1,6 +1,7 @@
 //! Choosing each frame's resident reflection probes (#1206): the baked probes whose
-//! boxes are nearest the primary camera (#1238), as many as the scene's byte budget
-//! holds (#1584), each judged by its cube's header before the cube is read.
+//! volumes (a turned box or a sphere, #1995) are nearest the primary camera
+//! (#1238), as many as the scene's byte budget holds (#1584), each judged by its
+//! cube's header before the cube is read.
 
 use glam::Vec3;
 
@@ -10,7 +11,7 @@ use crate::render::Renderer;
 use crate::scene::{ReflectionProbe, Scene};
 
 impl Renderer {
-    /// Make the baked probes whose boxes are nearest `camera_pos` this frame's
+    /// Make the baked probes whose volumes are nearest `camera_pos` this frame's
     /// resident probes (#1206, #1238), and mark group 0 for a rebind when the array
     /// texture was replaced. They are taken nearest first while the array, with its
     /// [`SPARE_SLOTS`], stays within the scene's budget
@@ -22,7 +23,7 @@ impl Renderer {
     /// and none is read at all once the array is full; only the cubes the array must
     /// copy in are read whole, and dropped once copied. Cubes that don't fit the
     /// array are passed over and never uploaded (#1245). Which probes are resident
-    /// depends on the camera's distance to each box; only ties are broken by scene
+    /// depends on the camera's distance to each volume; only ties are broken by scene
     /// index, and the residents are handed over in scene order, so two runs from one
     /// camera agree. The scene's fallback probe (#1697) is ranked first, so it is
     /// resident wherever the camera is, and handed over first, so it is slot 0. A cube that fails to load is refused until it is re-written, and
@@ -142,14 +143,14 @@ fn push_new<'a>(mut paths: Vec<&'a str>, path: &'a str) -> Vec<&'a str> {
 
 /// The indices of the baked probes, the fallback first (#1697: it and the nearest
 /// after it are taken whatever the budget, so it stays resident wherever the camera
-/// is), then nearest box to
+/// is), then nearest volume (`ReflectionProbe::volume_distance_sq`) to
 /// `camera_pos` first (zero inside it), ties to the lower scene index, so the order
 /// is the same every run.
 pub(super) fn ranked(probes: &[ReflectionProbe], camera_pos: Vec3) -> Vec<usize> {
     let mut order: Vec<usize> = (0..probes.len())
         .filter(|&i| !probes[i].cubemap_path.is_empty())
         .collect();
-    let distance = |i: usize| probes[i].box_distance_sq(camera_pos);
+    let distance = |i: usize| probes[i].volume_distance_sq(camera_pos);
     order.sort_by(|&a, &b| {
         (!probes[a].fallback)
             .cmp(&!probes[b].fallback)

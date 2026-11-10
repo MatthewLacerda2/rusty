@@ -27,7 +27,8 @@ impl Dup for std::net::TcpStream {
 
 /// Per-connection: read each command line and reply with a framed JSON line that
 /// echoes the received line back as the `result`, so a test can assert the exact line
-/// crossed the socket.
+/// crossed the socket. A line that asks for progress (`ASK`, #1999) streams one
+/// progress line first and has the ask taken off.
 fn serve<S: Dup>(stream: S) {
     let mut writer = match stream.dup() {
         Ok(w) => w,
@@ -37,6 +38,12 @@ fn serve<S: Dup>(stream: S) {
     for line in reader.lines().map_while(Result::ok) {
         if line.trim().is_empty() {
             continue;
+        }
+        // A line that asks hears a progress line first, as a window's bake tells.
+        let (asked, line) = rusty::dev::command_channel::asks(&line);
+        let line = line.to_string();
+        if asked {
+            let _ = writeln!(writer, r#"{{"progress":"[Lighting] 0:05 lightmaps 40%"}}"#);
         }
         let reply = format!(r#"{{"ok":true,"result":{}}}"#, Value::String(line));
         if writeln!(writer, "{reply}").is_err() {
@@ -87,10 +94,9 @@ pub(super) fn fake_engine() -> String {
 pub(super) fn drive(addr: String, lines: &[&str]) -> Vec<Value> {
     let backend = SocketClient::new(Some(addr));
     let input = lines.join("\n").into_bytes();
-    let mut out = Vec::new();
-    mcp::run(&backend, &input[..], &mut out).expect("runs to EOF");
-    String::from_utf8(out)
-        .unwrap()
+    let out = mcp::progress::Captured::default();
+    mcp::run(&backend, &input[..], out.clone()).expect("runs to EOF");
+    out.text()
         .lines()
         .map(|l| serde_json::from_str(l).expect("each response line is JSON"))
         .collect()

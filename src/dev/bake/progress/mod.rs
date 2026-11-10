@@ -32,8 +32,9 @@
 //! bakes step on the caller's thread. Each [`Line`] says whether it is a milestone
 //! (the lightmap step's start or the total; a probe step's start is already in the
 //! console as the job's own `Baking …` line), which the script verbs keep in the
-//! console as well; every line goes to stderr, the one stream a `play` run or an MCP
-//! client shows while the call blocks (`session-mcp`'s stdout carries only JSON-RPC).
+//! console as well; every line goes to stderr, the one stream a `play` run shows
+//! while the call blocks (`session-mcp`'s stdout carries only JSON-RPC), and to
+//! the thread's [`listen`]er, which turns it into MCP progress (#1999).
 
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
@@ -41,6 +42,7 @@ use std::time::{Duration, Instant};
 use crate::scripting::ConsoleLogs;
 
 mod format;
+pub mod listen;
 mod mesh_clock;
 #[cfg(test)]
 mod pages_tests;
@@ -117,14 +119,15 @@ impl<'a> BakeLog<'a> {
         }
     }
 
-    /// The log a script verb uses: the wall clock, every line to stderr and the
-    /// milestones to `console` too.
+    /// The log a script verb uses: the wall clock, every line to stderr and to this
+    /// thread's [`listen`]er (#1999), and the milestones to `console` too.
     pub fn to_console(console: &'a RefCell<ConsoleLogs>) -> Self {
         let start = Instant::now();
         Self::new(
             move || start.elapsed(),
             move |line: Line| {
                 eprintln!("{}", line.text);
+                listen::tell(&line.text); // an MCP call waiting on the verb (#1999)
                 if line.milestone {
                     console.borrow_mut().info(line.text);
                 }

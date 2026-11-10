@@ -60,7 +60,7 @@ fn a_sky_lit_metal_wall_shows_no_lobe() {
     let shoot = |directional: bool| {
         let mut scene = wall_under_sky();
         let name = format!("sky_wall_{directional}");
-        bake(&mut scene, &name, directional);
+        bake(&mut scene, &name, directional, super::DENSITY);
         shot(&scene, &camera, &name)
     };
     let Some(lobed) = shoot(true) else {

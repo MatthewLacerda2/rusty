@@ -9,6 +9,25 @@ path. The call returns when the bake is done (Unity's `Lightmapping.Bake`); the 
 bakes the same probes a step a frame — one reflection probe or a few light probes —
 so the editor and the MCP keep answering (Unity's `BakeAsync`, #1602). Both say each
 bounce pass and reflection probe in the console (`Baking reflection probe 3 of 12`).
+**`Lighting.GenerateAsync()`** (#1999, Unity's `Lightmapping.BakeAsync`) presses that
+button from a script: it starts the button's own job and returns at once, so prefer
+it for a bake that may outlast the caller's patience, above all an MCP tool call
+(Claude Code aborts a call that has sent nothing for 30 minutes, and a Dust2-sized
+level bakes for longer). Poll **`Lighting.IsRunning()`** (Unity's
+`Lightmapping.isRunning`) until it reads `false`, then **`Lighting.GetBakeStatus()`**
+says how it ended (`done` with its summary, `failed` or `cancelled` with why, or
+`refused` when it never started), and `Lighting.GetBakeReport(kind)` reads what it
+wrote. It is refused, with an error, where the button is greyed out: during Play
+(and once Play is asked for, `Editor.EnterPlay()` earlier in the line included),
+while a bake runs (the button's, or a `GenerateAsync` not yet started), and on a
+scene never saved. Only the editor window steps the job, so a host without one (the
+headless `session` and `session-mcp` without `--attach`, the player, `play`) refuses
+it with an error naming `Lighting.Generate()`, which bakes in the one call there.
+The call only asks: the window's next frame starts the job. The request belongs to
+the scene and mode it was made in, so asking for Play (`Editor.EnterPlay()` later in
+the same line too), Stop, `Scene.New()` / File ▸ New or a load before that frame drops it
+and the status reads `refused` with why; it never bakes a scene you didn't ask about. It has no cancel; the card's Cancel button
+stops the lightmap step.
 The two individual verbs stay for a script that wants only one of them. On a
 `Shadowmask` scene (#1695) the lightmap bake records each masked light's channel and
 only a probe bake writes the probes' occlusion on it, reading those channels from the
@@ -21,6 +40,9 @@ first.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
+| `Lighting.GenerateAsync` *(dev-only)* | `()` | `true` once the editor's Generate Lighting job is asked for; returns at once (*Generate Lighting*, above). Errors during Play or once it is asked for, while a bake runs, on an unsaved scene, and in a host with no editor window to step the job |
+| `Lighting.IsRunning` *(dev-only)* | `()` | `true` while the editor's Generate Lighting or Bake Occlusion runs, or a `GenerateAsync` waits to start it |
+| `Lighting.GetBakeStatus` *(dev-only)* | `()` | `{ state, message }`: the editor's last background bake (the button's or `GenerateAsync`'s). `state` is `idle`, `requested`, `running`, `done`, `cancelled`, `failed` or `refused`; `message` is its summary or why, `nil` until it ended |
 | `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the counts `0` when nothing occludes, and `tooLarge` (a boolean) `true`, with `cells` and `bytes` `0` and no PVS kept, when the level is too large to cull |
 | `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, samplesPerPass, prioritizeView, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
 | `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, samplesPerPass?, prioritizeView?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
@@ -116,7 +138,9 @@ first.
 - **From a script it logs its progress** (#1667), as Unity's batch-mode bake does: the
   verb blocks its caller until it returns, so a `play` scenario or a `session-mcp` call
   cannot poll, and instead the bake prints a line to **stderr** at each step and every
-  5 s within one. `Lighting.Generate()` first names its steps (#1897):
+  5 s within one. An MCP tool call that carries a progress token hears the same
+  lines as `notifications/progress` (#1999, `docs/mcp.md`); whether that keeps
+  the client's call alive is the client's choice, so prefer `GenerateAsync` there. `Lighting.Generate()` first names its steps (#1897):
   `[Lighting] steps: lightmaps → lightmap pages → light probes → reflection probes → occlusion`.
   Each line then starts with the time since the bake began (#1891), gives an ETA from
   the step's rate over its last 2 minutes (#1890: a texel's cost varies with the lights
@@ -284,7 +308,7 @@ box) or **placed** by this bake. A hand edit makes a probe manual: `Probe.Move`,
 and unticking *Manual*, which say otherwise), so a tuned box survives the next bake.
 Each bake **replaces the placed probes and keeps every manual one as it is** (position,
 box, settings), and plans around them: a placed reflection probe whose box a manual
-probe's box covers by at least half is left out (that room is the manual probe's), and
+probe's volume (its turned box or sphere, not its bounds) covers by at least half is left out (that room is the manual probe's), and
 no placed light probe lands within half a step of a manual one. A manual `FillGrid`
 keeps its trilinear grid through any number of bakes. So a level can mix the two and still be regenerated after its static
 geometry moves. A saved probe without the flag loads as placed. `Probe.Clear()` /
@@ -479,13 +503,25 @@ lighting settings (above), whose defaults are the ones listed here.
   aligned to 16 texels, so no compressed block and no texel of any of the three levels
   ever mixes two lightmaps. An RGBM-encoded PNG of the same
   name sits beside it: what a GPU without BC compression loads, and a picture an agent
-  can open. A directional bake writes a `lightmap_dir_<page>_<tag>.ktx2` (BC7) and
-  `.png` beside each page, packed exactly like its colour page: RGB the direction
-  scaled by its directionality, each component `x` stored as the byte `128 + 127·x`
-  (so 0 is exact), and A the lamp share (0–1). The texture importer leaves that folder alone
-  (`Assets.md`). Encoding takes time, about 2 s per million texels on four cores, after
-  the trace: a 2048² page pair about 8 s, a 4096² pair about 30 s; a level whose biggest
-  meshes reach the default 1016 cap, about 90 s (#1704); a 4096² page pair takes about 43 MiB of GPU memory, but filling many of them takes a density whose trace stops a bake long before memory does; the editor's Generate Lighting
+  can open. A directional bake writes a `lightmap_dir_<page>_<tag>.ktx2` beside each
+  page, packed exactly like its colour page: RGB the direction scaled by its
+  directionality, each component `x` stored as the byte `128 + 127·x` (so 0 is
+  exact), and A the lamp share (0–1). It is plain RGBA8 (`R8G8B8A8_UNORM`, four bytes
+  a texel) with the bake's two mips, uploaded as it is stored, never block-compressed:
+  BC7 put a lamp's direction up to 5° off a texel, which a polished surface's baked
+  highlight showed as a sawtooth edge (#1996). The texture importer leaves that folder alone
+  (`Assets.md`). Encoding takes time after the trace, most of it the irradiance page's
+  BC6H and its PNG: a 2048² page pair about 3.3 s on four cores (2.9 s without its
+  direction page), a 4096² pair about 14 s (11 s); a level whose biggest meshes reach
+  the default 1016 cap fills about three 4096² pairs, so about 40 s (#1704). A 4096²
+  page pair takes about 105 MiB of GPU memory (21 MiB without its direction page), and
+  direction pages take four times what BC7 did, so a dense directional bake can reach
+  memory: a Dust2-sized level's direction pages take about 47–74 MiB at 8 texels a unit
+  but 0.75–1.2 GiB at 32. Each page array (colour, direction, shadowmask) may take at
+  most **1 GiB** on the GPU, every level of every page (`MAX_ARRAY_BYTES`: wgpu names no
+  texture-memory limit, so it is a constant); past it the load is refused with a
+  warning naming the pages and the scene is left unlit by lightmaps, so rebake with fewer
+  texels a unit. 8 texels a unit already keeps the baked highlight sharp. The editor's Generate Lighting
   encodes the pages and compresses their PNGs on its worker and only writes the finished
   files on the frame, so the window stays live. The scene stores the page list and, per entity, its page and
   scale/offset (Unity's lightmap index + scale/offset), and the lights the bake took
@@ -744,9 +780,12 @@ Then each kind's own:
   (`{ count, list }`: the active dynamic drawn objects whose centre (as the renderer takes
   it: the mesh's local bounds under its world matrix, halved) is over
   8 m from the nearest probe, farthest first, each `{ entity, name, centre, nearest }`).
-- **`reflections`:** `count`, `probes` (`{ index, position, boxMin, boxMax, resolution,
-  importance, manual, bytes, seconds, overlaps }`, `resolution` the face size the bake
-  rendered at, `overlaps` the probes whose box this one's overlaps) and `picks`: **which
+- **`reflections`:** `count`, `probes` (`{ index, position, shape, boxMin, boxMax,
+  rotation, radius, resolution, importance, manual, bytes, seconds, overlaps }`, `shape`
+  `"Box"` or `"Sphere"`, a box carrying `boxMin`, `boxMax` and `rotation` (a quaternion,
+  `[x, y, z, w]`) and a sphere `radius`, `resolution` the face size the bake rendered at,
+  `overlaps` the probes whose volume (the turned box or the sphere) this one's overlaps)
+  and `picks`: **which
   probe each active drawn object reflects**, at its bounds' centre as the renderer takes
   it (the mesh's local bounds under its world matrix) (`{ entity, name, centre, probe, weight,
   second, secondWeight }`, `probe` `nil` for the sky). The picks rank the scene's whole

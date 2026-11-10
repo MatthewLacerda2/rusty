@@ -24,7 +24,8 @@ pub(super) fn start(list: Vec<String>, kind: Kind, bc: bool) -> Receiver<Result<
 }
 
 /// Upload a finished load, or warn of why it failed: unreadable, or more or larger
-/// pages than the device's limits take (`fits`, #1704).
+/// pages than the device's limits take, or more bytes than an array may (`fits`,
+/// #1704, #1996).
 pub(super) fn finish(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -32,7 +33,8 @@ pub(super) fn finish(
     result: Result<Loaded, String>,
 ) -> Option<Rc<LightmapArray>> {
     let limits = device.limits();
-    match result.and_then(|l| fits(&limits, l.edge, l.layers.len()).map(|()| l)) {
+    let fit = |l: Loaded| fits(&limits, l.edge, l.layers.len(), l.bytes()).map(|()| l);
+    match result.and_then(fit) {
         Ok(loaded) => Some(Rc::new(upload(device, queue, &loaded))),
         Err(e) => {
             log::warn!("[Lightmap] cannot load the pages {list:?}: {e}");

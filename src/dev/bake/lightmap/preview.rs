@@ -3,8 +3,8 @@
 //! stand to an encoder thread of its own (`encoder::Encoder`), so the trace goes on at
 //! once; the encoder writes them beside the scene as `lightmap_preview_<bake>_*`
 //! pages,
-//! cheaply (uncompressed PNGs of one level, which the renderer loads as it loads
-//! any `.png` page), and the editor's next frame points the scene at them
+//! cheaply (uncompressed PNGs of one level; the renderer uploads a colour or
+//! direction page's one level as it is and makes only a shadowmask's mips), and the editor's next frame points the scene at them
 //! ([`Previews::show`]). A pass not yet shown when the next one is in is skipped,
 //! and the writer removes its pages; while the writer is busy, the bake builds
 //! no lightmaps for a preview at all (`Encoder::busy`).

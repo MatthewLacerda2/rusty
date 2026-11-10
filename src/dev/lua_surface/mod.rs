@@ -1,7 +1,7 @@
 //! src/dev/lua_surface/mod.rs — the dev-only part of the Lua surface (#737).
 //!
 //! `Debug.*`, the GPU bake verbs (`Lighting.Bake`, `Reflection.Bake`, `Probe.Bake`,
-//! `Lighting.Generate`) with their reports (`GetBakeReport`, #1980) and the provider verbs `Speech.Generate` (#386) and
+//! `Lighting.Generate`, `Lighting.GenerateAsync`) with their reports (`GetBakeReport`, #1980) and the provider verbs `Speech.Generate` (#386) and
 //! `Sfx.Generate` (#388), the play switch `Editor.*` (#1360) and the audio capture
 //! `Audio.StartCapture` (#1579) belong to the one API surface, but they render, spend or
 //! record, so

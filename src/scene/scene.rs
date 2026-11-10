@@ -142,6 +142,14 @@ pub struct Scene {
     /// `Lighting.Generate()` / `Lighting.Bake()` refuse while it is set. Never serialized.
     #[cfg(feature = "dev")]
     pub lighting_bake_running: bool,
+    /// A script's `Lighting.GenerateAsync()` (#1999) waiting for the editor's next
+    /// frame to start the Generate Lighting button's job. Dropped by Play (from its
+    /// request), Stop, File ▸ New and any load (`Scene::drop_bake_request`).
+    #[cfg(feature = "dev")]
+    pub lighting_bake_requested: bool,
+    /// What became of the editor's last background bake (`Lighting.GetBakeStatus`).
+    #[cfg(feature = "dev")]
+    pub lighting_bake_status: crate::scene::lighting::bake_status::BakeStatus,
     /// Each camera's history cuts (#2003, `Camera.ResetHistory`): part of its view's
     /// render history key. Never serialized.
     pub history_cuts: crate::scene::camera::HistoryCuts,
@@ -198,6 +206,10 @@ impl Default for Scene {
             screen_exposure: None,
             #[cfg(feature = "dev")]
             lighting_bake_running: false,
+            #[cfg(feature = "dev")]
+            lighting_bake_requested: false,
+            #[cfg(feature = "dev")]
+            lighting_bake_status: Default::default(),
             history_cuts: Default::default(),
             shader_overrides: Default::default(),
             ragdolls: Default::default(),
