@@ -151,6 +151,7 @@ pub fn load(source: &Path) -> Result<ImportSettings, ImportError> {
 pub fn save(source: &Path, settings: &ImportSettings) -> Result<(), ImportError> {
     let json =
         serde_json::to_string_pretty(settings).map_err(|e| ImportError::Sidecar(e.to_string()))?;
+    // lint: allow(asset-write) import settings, read fresh by `settings_of` on every import lookup, never a cache key
     fs::write_atomic(&meta_path(source), json.as_bytes())
         .map_err(|e| ImportError::Sidecar(e.to_string()))
 }

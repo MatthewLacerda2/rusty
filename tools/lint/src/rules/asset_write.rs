@@ -4,9 +4,10 @@
 //! renderer's textures and cubemaps and the audio `ClipCache` follow a re-bake
 //! (#689, #1208). A baker that writes with `std::fs::write` and tells nobody
 //! brings the stale cache back. So a non-test line of `src/` (outside
-//! `src/core/fs/`) whose code calls `fs::write(`, `File::create(` or `.save(` is a
-//! finding unless the rest of its function calls `note_written` (`written::write`
-//! is neither of those calls, so it never matches). A write no path-keyed cache
+//! `src/core/fs/`) whose code calls `fs::write(`, `File::create(`, `.save(` or
+//! `core::fs::write_atomic(` (#2005) is a finding unless the rest of its function
+//! calls `note_written` (`written::write` is none of those calls, so it never
+//! matches). A write no path-keyed cache
 //! reads (a scene, prefab, project, settings, ledger, harness or bench file) says
 //! so with `// lint: allow(asset-write) <why>`, which is also the note on why it
 //! does not notify. A heuristic over text: `.save(` with an argument also matches
@@ -20,13 +21,17 @@ use crate::code::code_lines;
 pub const RULE: &str = "asset-write";
 const HOME: &str = "src/core/fs/";
 
-/// Does `code` write a file: `fs::write(`, `File::create(` or `.save(<arg>)`?
+/// Does `code` write a file: `fs::write(`, `File::create(`, `.save(<arg>)` or a
+/// call of `write_atomic(` (its definition, `fn write_atomic(`, is not a write)?
 fn writes(code: &str) -> bool {
     let saves = code.match_indices(".save(").any(|(at, _)| {
         let arg = &code[at + ".save(".len()..];
         !arg.trim_start().starts_with(')')
     });
-    code.contains("fs::write(") || code.contains("File::create(") || saves
+    let atomic = code
+        .match_indices("write_atomic(")
+        .any(|(at, _)| !code[..at].ends_with("fn "));
+    code.contains("fs::write(") || code.contains("File::create(") || saves || atomic
 }
 
 /// Does the function holding line `from` call `note_written` at or after it?
