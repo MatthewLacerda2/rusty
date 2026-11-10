@@ -7,6 +7,7 @@
 //! not read. What only the tracer knows (the backface texels it filled) is not in
 //! it.
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use serde_json::{json, Value};
@@ -77,17 +78,18 @@ fn mesh_rows(
         .collect();
     let mut texels_lit = vec![0u64; input.lights.len()];
     let mut meshes = Vec::new();
+    // By entity, so a Dust2-sized bake's thousands of meshes look each up once.
+    let entries: BTreeMap<u32, _> = pages.entries.iter().map(|e| (e.entity, e)).collect();
+    let busy_of: BTreeMap<u32, _> = measured.times.iter().map(|t| (t.entity, t.busy)).collect();
     for (mesh, lights) in input.meshes.iter().zip(&reach) {
-        let Some(entry) = pages.entries.iter().find(|e| e.entity == mesh.entity) else {
+        let Some(entry) = entries.get(&mesh.entity) else {
             continue;
         };
         let [sx, sy, ..] = entry.scale_offset;
         let (w, h) = ((sx * page).round() as u32, (sy * page).round() as u32);
         let texels = w as u64 * h as u64;
         lights.iter().for_each(|&l| texels_lit[l] += texels);
-        let busy = (measured.times.iter())
-            .find(|t| t.entity == mesh.entity)
-            .map(|t| t.busy);
+        let busy = busy_of.get(&mesh.entity).copied();
         let rate = busy
             .filter(|b| !b.is_zero())
             .map(|b| (texels as f64 / b.as_secs_f64()).round());
