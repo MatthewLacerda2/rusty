@@ -8,11 +8,12 @@
 //! then persists those references. Headless: no GPU is involved.
 //!
 //! The lightmaps are packed into atlas pages (`lightmap::atlas`) and written by
-//! `pages`: each page as `<scene file>.lightmaps/lightmap_<page>_<tag>.ktx2` (BC6H
+//! `write`: each page as `<scene file>.lightmaps/lightmap_<page>_<tag>.ktx2` (BC6H
 //! with its mips, #1694, what the scene references and the renderer loads) and the
 //! RGBM PNG of its base level beside it under the same name (the fallback for a GPU
 //! without BC, and what an agent can open). One folder per scene, emptied of old
-//! pages first so a rebake never leaves stale ones behind. `<tag>` hashes the page,
+//! pages once the new ones are written (`write`), so a rebake never leaves stale
+//! ones behind and a failed write leaves the old ones. `<tag>` hashes the page,
 //! so a rebake that changes a page changes its path and the renderer, which caches
 //! pages by path, loads the new one. A directional bake (#810) writes each page's
 //! direction page beside it as `lightmap_dir_<page>_<tag>` (BC7, and RGBA8 PNG), and
@@ -41,13 +42,18 @@ use crate::dev::bake::report::{self, lightmaps::Measured, Stages};
 use crate::scene::lighting::lightmap::{BakeProgress, BakeScene, BakeSettings};
 use crate::scene::Scene;
 
+mod encoder;
 pub mod job;
 pub(in crate::dev::bake) mod logged;
+mod measure;
 mod pages;
+mod preview;
+mod write;
 pub use job::{BakeOutcome, LightmapBakeJob};
+pub use pages::{encode_pages, EncodedPages};
 #[cfg(test)]
-use pages::content_tag;
-pub use pages::{apply_encoded, apply_lightmaps, encode_pages, EncodedPages};
+use write::content_tag;
+pub use write::{apply_encoded, apply_lightmaps};
 
 /// The lightmap folder for a scene: `foo.scene` → `foo.scene.lightmaps/`. What
 /// lies in it is a baked page, which the texture importer leaves alone
@@ -197,6 +203,10 @@ mod limits_tests;
 #[cfg(test)]
 mod logged_tests;
 #[cfg(test)]
+mod preview_edit_tests;
+#[cfg(test)]
+mod preview_tests;
+#[cfg(test)]
 mod report_tests;
 #[cfg(test)]
 mod shadowmask_tests;
@@ -204,3 +214,5 @@ mod shadowmask_tests;
 mod survivor_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod write_tests;

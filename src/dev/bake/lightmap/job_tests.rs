@@ -30,7 +30,7 @@ fn a_background_bake_applies_what_the_synchronous_one_does() {
 
     let (mut scene, _, _) = scene();
     let path = scene_path("job_async");
-    let mut job = LightmapBakeJob::start(&mut scene, Some(&path), quick()).unwrap();
+    let mut job = LightmapBakeJob::start(&mut scene, Some(&path), quick(), None).unwrap();
     assert_eq!(job.scene_path(), path);
     assert_eq!(finish(&mut job, &mut scene), BakeOutcome::Baked(1));
     assert!(scene.lightmaps.get(floor).is_some());
@@ -57,7 +57,7 @@ fn a_cancelled_bake_keeps_the_previous_lightmaps() {
         samples: 4096,
         ..quick()
     };
-    let mut job = LightmapBakeJob::start(&mut scene, Some(&path), heavy).unwrap();
+    let mut job = LightmapBakeJob::start(&mut scene, Some(&path), heavy, None).unwrap();
     job.cancel();
     assert!(job.is_cancelled());
     assert_eq!(finish(&mut job, &mut scene), BakeOutcome::Cancelled);
@@ -84,7 +84,7 @@ fn a_cancel_during_the_encode_keeps_the_previous_lightmaps() {
     let path = scene_path("job_cancel_encode");
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
     let before = scene.lightmaps.clone();
-    let mut job = LightmapBakeJob::start(&mut scene, Some(&path), quick()).unwrap();
+    let mut job = LightmapBakeJob::start(&mut scene, Some(&path), quick(), None).unwrap();
     while !job.is_finished() {
         std::thread::sleep(Duration::from_millis(5));
     }
@@ -104,6 +104,6 @@ fn a_cancel_during_the_encode_keeps_the_previous_lightmaps() {
 #[test]
 fn an_unsaved_scene_cannot_start_a_background_bake() {
     let (mut scene, _, _) = scene();
-    let err = LightmapBakeJob::start(&mut scene, None, quick()).err();
+    let err = LightmapBakeJob::start(&mut scene, None, quick(), None).err();
     assert_eq!(err.as_deref(), Some(UNSAVED));
 }

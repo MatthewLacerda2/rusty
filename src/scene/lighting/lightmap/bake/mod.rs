@@ -24,12 +24,16 @@ mod assemble;
 mod denoise;
 pub(super) mod direction;
 pub(in crate::scene::lighting) mod pool;
+pub(super) mod progressive;
 mod settings;
+pub(super) mod view;
 
 use assemble::assemble;
 use denoise::{Chart, Cleaner};
 pub use denoise::{Denoiser, LightmapDenoiser};
+pub use progressive::{bake_progressive, Pass, PassSink};
 pub use settings::BakeSettings;
+pub use view::BakeView;
 
 /// One mesh's baked lightmap: `size`² linear texels, row-major, each the `E / π`
 /// value the forward shader multiplies by albedo (see `trace`).
@@ -83,26 +87,9 @@ pub(super) fn bake_on(
 ) -> Option<Vec<Lightmap>> {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer::new(scene, &rays);
-    // Every lightmap must fit a page with its ring around it.
-    let max = max_map_edge(settings.page());
-    // Rasterize everything first, so the total is known before the first texel.
-    let charts: Vec<(usize, u32, Vec<TexelPoint>)> = scene
-        .meshes
-        .iter()
-        .enumerate()
-        .filter(|(_, mesh)| mesh.receives_lightmap())
-        .filter_map(|(index, mesh)| {
-            let density = settings.texels_per_unit * mesh.scale_in_lightmap;
-            let size = lightmap_size(mesh, density, max)?;
-            Some((index, size, rasterize(mesh, size)))
-        })
-        .collect();
-    let texels = charts.iter().map(|(_, _, p)| p.len() as u64).sum();
-    progress.set_total(texels, charts.len() as u64);
-    let (heads, points): (Vec<(usize, u32)>, Vec<Vec<TexelPoint>>) = charts
-        .into_iter()
-        .map(|(i, size, p)| ((i, size), p))
-        .unzip();
+    let (heads, points) = receivers(scene, settings);
+    let texels = points.iter().map(|p| p.len() as u64).sum();
+    progress.set_total(texels, heads.len() as u64);
     let sizes = heads.iter().zip(&points);
     progress.set_meshes(sizes.map(|((i, _), p)| (scene.meshes[*i].entity, p.len() as u64)));
     let trace = |c: usize, _: usize, batch: &[TexelPoint]| {
@@ -122,8 +109,9 @@ pub(super) fn bake_on(
     };
     let orphans = AtomicUsize::new(0);
     let finish = |c: usize, points: Vec<TexelPoint>, light: Vec<TexelLight>| {
-        let (index, size) = heads[c];
-        let (map, lost) = lightmap(scene, (index, size), points, light, settings, cleaner);
+        let head = heads[c];
+        let shape = layout(scene, head, &points);
+        let (map, lost) = lightmap(scene, (head, &shape), points, light, settings, cleaner);
         orphans.fetch_add(lost, Ordering::Relaxed);
         progress.mesh_done();
         map
@@ -131,6 +119,28 @@ pub(super) fn bake_on(
     let maps = pool::run(points, threads, progress, trace, finish)?;
     note_buried(orphans.into_inner());
     Some(maps)
+}
+
+/// Every receiving mesh's (index, lightmap size) and its texels, rasterized
+/// before the first texel is traced so the total is known.
+pub(super) type Receivers = (Vec<(usize, u32)>, Vec<Vec<TexelPoint>>);
+
+/// The meshes `scene` bakes a lightmap for at `settings` ([`bake`]'s rule), each
+/// with its texels.
+pub(super) fn receivers(scene: &BakeScene, settings: &BakeSettings) -> Receivers {
+    // Every lightmap must fit a page with its ring around it.
+    let max = max_map_edge(settings.page());
+    scene
+        .meshes
+        .iter()
+        .enumerate()
+        .filter(|(_, mesh)| mesh.receives_lightmap())
+        .filter_map(|(index, mesh)| {
+            let density = settings.texels_per_unit * mesh.scale_in_lightmap;
+            let size = lightmap_size(mesh, density, max)?;
+            Some(((index, size), rasterize(mesh, size)))
+        })
+        .unzip()
 }
 
 /// Texel `p` of receiving mesh `mesh` traced: its validity first, from a stream of
@@ -167,18 +177,39 @@ fn note_buried(islands: usize) {
     }
 }
 
-/// One mesh's lightmap from its traced texels, and how many of its charts had no
-/// valid texel (`assemble::ChartMaps::orphans`).
-fn lightmap(
+/// Where one mesh's texels lie on its lightmap: each texel's UV chart and the
+/// world size of a texel. A progressive bake works it out once per chart and keeps
+/// it for every pass (#1970's review); it does not depend on the light.
+pub(super) struct Layout {
+    labels: Vec<u32>,
+    texel_world: f32,
+}
+
+/// The [`Layout`] of receiving mesh `index`'s `points` on its `size`² lightmap.
+pub(super) fn layout(
     scene: &BakeScene,
     (index, size): (usize, u32),
+    points: &[TexelPoint],
+) -> Layout {
+    let mesh = &scene.meshes[index];
+    let surface = mesh.surface();
+    Layout {
+        labels: texel_charts(points, &chart_of_triangles(&surface), size),
+        texel_world: world_per_uv(&surface).unwrap_or(1.0) / size as f32,
+    }
+}
+
+/// One mesh's lightmap from its traced texels laid out as `layout`, and how many of
+/// its charts had no valid texel (`assemble::ChartMaps::orphans`).
+fn lightmap(
+    scene: &BakeScene,
+    ((index, size), layout): ((usize, u32), &Layout),
     points: Vec<TexelPoint>,
     light: Vec<TexelLight>,
     settings: &BakeSettings,
     cleaner: Cleaner,
 ) -> (Lightmap, usize) {
     let mesh = &scene.meshes[index];
-    let labels = texel_charts(&points, &chart_of_triangles(&mesh.surface()), size);
     // Texels inside other geometry are dropped here and filled from their own
     // chart's valid texels in `assemble` (#1949).
     let (points, light): (Vec<TexelPoint>, Vec<TexelLight>) = points
@@ -186,14 +217,13 @@ fn lightmap(
         .zip(light)
         .filter(|(_, l)| l.valid)
         .unzip();
-    let texel_world = world_per_uv(&mesh.surface()).unwrap_or(1.0) / size as f32;
     let masked = scene.shadowmask.any();
     let chart = Chart {
         points: &points,
         size,
-        texel_world,
+        texel_world: layout.texel_world,
     };
-    let maps = assemble(chart, &labels, &light, settings, cleaner, masked);
+    let maps = assemble(chart, &layout.labels, &light, settings, cleaner, masked);
     let map = Lightmap {
         entity: mesh.entity,
         size,
