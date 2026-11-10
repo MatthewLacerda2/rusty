@@ -43,12 +43,14 @@ mod grid;
 mod grid_tests;
 #[cfg(test)]
 mod mis_tests;
+mod paths;
 #[cfg(test)]
 mod pick_tests;
 mod sources;
 mod validity;
 
 pub(super) use direct::arrival;
+pub(super) use paths::{Paths, Shown};
 
 use super::input::{BakeRun, BakeScene};
 use super::rays::{Hit, Rays};
@@ -122,37 +124,6 @@ impl<'a> Tracer<'a> {
             scene,
             rays,
             sources,
-        }
-    }
-
-    /// The lightmap value at `position` facing `normal`, in its two parts: the bounce
-    /// and sky over `samples` paths `bounces` deep, and the direct light of `Baked`
-    /// lights. The bake filters the first and adds the second.
-    pub(super) fn texel(
-        &self,
-        position: Vec3,
-        normal: Vec3,
-        samples: u32,
-        bounces: u32,
-        rng: &mut Rng,
-    ) -> TexelLight {
-        let origin = position + normal * SURFACE_OFFSET;
-        let (mut sum, mut dir_sum) = (Vec3::ZERO, Vec3::ZERO);
-        let mut picks = Picks::default();
-        for _ in 0..samples {
-            let (radiance, dir) = self.path(origin, normal, bounces, rng, &mut picks);
-            sum += radiance;
-            dir_sum += dir;
-        }
-        let n = samples.max(1) as f32;
-        let (direct, direct_dir) = self.direct(origin, normal, samples, rng);
-        TexelLight {
-            indirect: sum / n,
-            direct: direct / PI,
-            indirect_dir: dir_sum / n,
-            direct_dir: direct_dir / PI,
-            mask: self.mask(origin),
-            valid: true,
         }
     }
 

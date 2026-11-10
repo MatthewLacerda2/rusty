@@ -64,22 +64,55 @@ pub struct LightmapSet {
     /// until a bake gives it a channel.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub fell_back: BTreeSet<u32>,
+    /// While a progressive bake's preview is shown (#1970), the scene's own
+    /// lightmaps, which it hides: what a save writes ([`Self::saved`]) and what a
+    /// cancel puts back. Their one owner, so the set's edits reach them as they
+    /// reach the preview: a despawn's [`Self::remove`] takes the entity from both,
+    /// [`Self::clear`] forgets both, and [`Self::insert`] (an Undo putting an entry
+    /// back) gives it to them alone, the preview's pages being another layout.
+    /// Never serialized.
+    #[serde(skip)]
+    pub shown_over: Option<Box<LightmapSet>>,
 }
 
 impl LightmapSet {
+    /// The lightmaps a save writes: these, or while a preview is shown the ones it
+    /// is shown over ([`Self::shown_over`]), so a preview's pages never reach a file.
+    pub fn saved(&self) -> &LightmapSet {
+        self.shown_over.as_deref().unwrap_or(self)
+    }
+
     /// Where `entity`'s lightmap is, if it has one.
     pub fn get(&self, entity: u32) -> Option<&LightmapEntry> {
         self.entries.get(&entity)
     }
 
-    /// Give `entry.entity` this lightmap, replacing the one it had.
+    /// Give `entry.entity` this lightmap, replacing the one it had: in the
+    /// scene's own lightmaps, under a preview ([`Self::shown_over`]) too.
     pub fn insert(&mut self, entry: LightmapEntry) {
-        self.entries.insert(entry.entity, entry);
+        match &mut self.shown_over {
+            Some(own) => own.insert(entry),
+            None => drop(self.entries.insert(entry.entity, entry)),
+        }
     }
 
-    /// Take `entity`'s lightmap away (a despawn), returning it.
+    /// Take `entity`'s lightmap away (a despawn), returning the one a save would
+    /// have written; a preview shown loses it too.
     pub fn remove(&mut self, entity: u32) -> Option<LightmapEntry> {
-        self.entries.remove(&entity)
+        let shown = self.entries.remove(&entity);
+        match &mut self.shown_over {
+            Some(own) => own.remove(entity),
+            None => shown,
+        }
+    }
+
+    /// Keep only the entries of the entities `keep` accepts, under a preview
+    /// ([`Self::shown_over`]) too: a save drops those of entities no longer live.
+    pub fn retain(&mut self, keep: impl Fn(u32) -> bool + Copy) {
+        self.entries.retain(|&id, _| keep(id));
+        if let Some(own) = &mut self.shown_over {
+            own.retain(keep);
+        }
     }
 
     /// Every entry, in entity order.
@@ -123,7 +156,9 @@ impl LightmapSet {
     }
 
     /// Forget every lightmap: every mesh falls back to probe / ambient lighting.
+    /// A preview shown goes too, with the lightmaps it hid.
     pub fn clear(&mut self) {
+        self.shown_over = None;
         self.pages.clear();
         self.directions.clear();
         self.entries.clear();
