@@ -9,7 +9,7 @@ use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, LightMode, LightType, MaterialAsset};
 use rusty::scene::{Camera, Scene};
 
-use super::{bake, lamp, mean_gap, most, plane, point, shot};
+use super::{bake, lamp, mean_gap, most, plane, point, shot, DENSITY};
 
 /// A 3 m static seat of `albedo` and `roughness` under the issue's spot, of `mode`.
 pub(super) fn seat(mode: LightMode, albedo: f32, roughness: f32) -> Scene {
@@ -44,10 +44,10 @@ fn camera() -> Camera {
 /// plain bake: the live lamp), as luminance.
 fn pair(albedo: f32, roughness: f32, tag: &str) -> Option<[Vec<f32>; 2]> {
     let mut baked = seat(LightMode::Baked, albedo, roughness);
-    bake(&mut baked, &format!("stool_{tag}_baked"), true);
+    bake(&mut baked, &format!("stool_{tag}_baked"), true, DENSITY);
     let baked = shot(&baked, &camera(), &format!("stool_{tag}_baked"))?;
     let mut live = seat(LightMode::Mixed, albedo, roughness);
-    bake(&mut live, &format!("stool_{tag}_live"), false);
+    bake(&mut live, &format!("stool_{tag}_live"), false, DENSITY);
     Some([
         baked,
         shot(&live, &camera(), &format!("stool_{tag}_live")).unwrap(),
@@ -68,7 +68,7 @@ fn a_rough_dielectric_under_a_baked_spot_looks_as_under_the_live_one() {
     let (mean, worst) = (mean_gap(&baked, &live), most(&baked, &live));
     eprintln!("[baked-spec] stool: mean {mean:.2}, at most {worst:.1} apart");
     assert!(
-        mean <= 1.5,
+        mean <= 1.0,
         "the seat reads as under the live spot: {mean:.2}"
     );
     assert!(worst <= 8.0, "nowhere far off: {worst:.1}");

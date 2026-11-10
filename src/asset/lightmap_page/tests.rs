@@ -91,11 +91,31 @@ fn a_malformed_file_is_refused_naming_why() {
     assert!(read(&file[..40]).is_err(), "header only");
     assert!(read(b"not a ktx2").is_err());
     let mut other = file.clone();
-    other[12..16].copy_from_slice(&37u32.to_le_bytes()); // R8G8B8A8_UNORM
+    other[12..16].copy_from_slice(&145u32.to_le_bytes()); // BC7_UNORM
     assert!(read(&other).unwrap_err().contains("format"));
     let mut wide = file;
     wide[20..24].copy_from_slice(&16u32.to_le_bytes());
     assert!(read(&wide).is_err(), "not square, levels the wrong length");
+}
+
+/// A direction page (#1996): RGBA8 levels round trip as they are, and a level of
+/// the wrong length is refused.
+#[test]
+fn an_rgba8_page_round_trips_and_its_lengths_are_checked() {
+    let level = |edge: u32| (0..edge * edge * 4).map(|i| (i * 7) as u8).collect();
+    let page = Page {
+        format: PageFormat::Rgba8,
+        edge: 8,
+        levels: vec![level(8), level(4)],
+    };
+    assert_eq!(page.gpu_bytes(), 8 * 8 * 4 + 4 * 4 * 4);
+    let file = write(&page);
+    assert_eq!(read(&file), Ok(page.clone()));
+    let short = Page {
+        levels: vec![level(8), vec![0; 15]],
+        ..page
+    };
+    assert!(read(&write(&short)).unwrap_err().contains("level 1"));
 }
 
 #[test]

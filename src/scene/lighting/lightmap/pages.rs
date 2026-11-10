@@ -1,8 +1,8 @@
 //! A packed atlas page as the GPU stores it (#1694): its mip chain, then BC6H for
-//! irradiance (`asset::lightmap_page`); a direction page's and a shadowmask's
-//! levels stay RGBA8 ([`direction_levels`], [`mask_levels`]), never block-compressed:
-//! BC7 turned a lamp's direction up to 5° off a texel, which a glossy surface's
-//! baked highlight showed as a sawtooth (#1996). The levels are made
+//! irradiance (`asset::lightmap_page`); a direction page's levels stay RGBA8
+//! ([`direction_page`]), never block-compressed: BC7 turned a lamp's direction up
+//! to 5° off a texel, which a glossy surface's baked highlight showed as a
+//! sawtooth (#1996). A shadowmask's are RGBA8 too ([`mask_levels`]). The levels are made
 //! here, after the bake's chart dilation and fill (`raster::fill_rest`), so a mip
 //! averages a chart's light and its own edge, never the empty background, and
 //! the atlas's cells (`atlas`) keep every level of [`MIP_LEVELS`] inside one map.
@@ -55,8 +55,22 @@ pub fn colour_page(
     encode_bc6h(edge, &levels(page, edge), threads, stop)
 }
 
+/// A direction page, every level, as uncompressed RGBA8 (#1996): its mips made
+/// from the float directions, so the loader uploads them as they are.
+pub fn direction_page(page: &[Vec4], edge: u32) -> Page {
+    Page {
+        format: lightmap_page::PageFormat::Rgba8,
+        edge,
+        levels: direction_levels(page, edge)
+            .into_iter()
+            .map(|l| l.concat())
+            .collect(),
+    }
+}
+
 /// A direction page's levels as their RGBA8 texels (`encode::encode_direction`):
-/// what the loader uploads (`render::gpu::lightmaps`).
+/// what [`direction_page`] stores, and what the loader makes of a progressive
+/// preview's direction PNG (`render::gpu::lightmaps`).
 pub fn direction_levels(page: &[Vec4], edge: u32) -> Vec<Vec<[u8; 4]>> {
     chain(page, edge)
         .iter()

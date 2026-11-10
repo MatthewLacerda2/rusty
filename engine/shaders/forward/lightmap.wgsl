@@ -89,13 +89,6 @@ fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, behind
 // behind the surface a normal map has turned toward.
 const GRAZING_FLOOR: f32 = 0.1;
 
-// The least lamp share that is a lamp, rescaled from there to 1: a lamp under
-// about 6% of a texel's light (the fringe of its range, where a bounce outshines
-// it) gives no highlight; the ramp below has faded such a lamp's to a quarter
-// already. It once also hid BC7's lending a lamp-free texel share from its block
-// (#1695), before direction pages were stored uncompressed (#1996).
-const SHARE_FLOOR: f32 = 16.0 / 255.0;
-
 // The lamp share over which the bake turns the page's direction from the mean of
 // all the texel's light to the lamps' own (`bake::direction::LAMP_RAMP`, which
 // `lightmap::share_tests` holds this line to). Below it the lobe aims partly away
@@ -115,7 +108,7 @@ const MIN_DIRECTIONALITY: f32 = 0.02;
 // faded by the ramp below `LAMP_RAMP`, where the direction is not all the lamps'.
 fn baked_specular(texel: vec3<f32>, dir: vec4<f32>, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, roughness: f32) -> vec3<f32> {
     let aimed = saturate(dir.w / LAMP_RAMP);
-    let share = saturate((dir.w - SHARE_FLOOR) / (1.0 - SHARE_FLOOR)) * aimed * lighting.baked_specular;
+    let share = dir.w * aimed * lighting.baked_specular;
     let directionality = length(dir.xyz);
     if (share <= 0.0 || directionality < MIN_DIRECTIONALITY) {
         return vec3<f32>(0.0);

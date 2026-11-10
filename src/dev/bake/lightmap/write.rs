@@ -19,8 +19,7 @@ pub(super) const FINAL: &str = "lightmap";
 /// The file names a progressive bake's preview pages start with (#1970).
 pub(super) const PREVIEW: &str = "lightmap_preview";
 
-/// What one `size`² direction or shadowmask page takes on the GPU: RGBA8 with its
-/// mips.
+/// What one `size`² shadowmask page takes on the GPU: RGBA8 with its mips.
 fn rgba8_gpu_bytes(size: u32) -> usize {
     let levels = crate::scene::lighting::lightmap::level_count(size);
     (0..levels).map(|l| ((size >> l) as usize).pow(2) * 4).sum()
@@ -77,11 +76,13 @@ pub fn apply_encoded(
         }
     };
     warn_fell_back(&set);
-    let rgba8_pages = encoded.directions.len() + encoded.masks.len();
-    let bytes: usize = (encoded.colour.iter())
-        .map(|(p, _)| p.gpu_bytes())
-        .sum::<usize>()
-        + rgba8_pages * rgba8_gpu_bytes(size);
+    let pages = encoded
+        .colour
+        .iter()
+        .map(|(p, _)| p)
+        .chain(&encoded.directions);
+    let bytes: usize =
+        pages.map(Page::gpu_bytes).sum::<usize>() + encoded.masks.len() * rgba8_gpu_bytes(size);
     log::info!(
         "[LightmapBake] {} lightmaps in {} page(s) of {size}²{}, {:.1} MiB on the GPU, in {}",
         encoded.maps,
@@ -130,9 +131,9 @@ pub(super) fn write_set(
     for (k, (page, png)) in encoded.colour.iter().enumerate() {
         set.pages.push(write_page(dir, prefix, k, page, png)?);
     }
-    for (k, png) in encoded.directions.iter().enumerate() {
+    for (k, page) in encoded.directions.iter().enumerate() {
         set.directions
-            .push(write_png(dir, &format!("{prefix}_dir"), k, png)?);
+            .push(write_ktx2(dir, &format!("{prefix}_dir"), k, page)?);
     }
     for (k, png) in encoded.masks.iter().enumerate() {
         set.masks
@@ -166,8 +167,18 @@ fn write_page(
     Ok(crate::core::paths::to_slash(&ktx2_path))
 }
 
+/// Write one page as `<dir>/<prefix>_<k>_<tag>.ktx2`, alone, and return its path:
+/// a direction page (#1996), whose RGBA8 levels the loader uploads as they are.
+fn write_ktx2(dir: &Path, prefix: &str, k: usize, page: &Page) -> Result<String, String> {
+    let ktx2 = lightmap_page::write(page);
+    let path = dir.join(format!("{prefix}_{k}_{:08x}.ktx2", content_tag(&ktx2)));
+    std::fs::write(&path, &ktx2).map_err(|e| format!("write {}: {e}", path.display()))?;
+    crate::core::fs::written::note_written(&path.to_string_lossy());
+    Ok(crate::core::paths::to_slash(&path))
+}
+
 /// Write one page as `<dir>/<prefix>_<k>_<tag>.png` and return its path: a
-/// direction or shadowmask page, or any page of a progressive bake's preview (#1970). A page
+/// shadowmask page, or any page of a progressive bake's preview (#1970). A page
 /// already there under that name and size (its content tag) is left as it is,
 /// so a page a pass did not change (a shadowmask, once its texels are in) is
 /// neither rewritten nor reloaded.

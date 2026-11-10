@@ -68,7 +68,7 @@ pub use encode::{
 pub use input::{BakeLight, BakeMesh, BakeRun, BakeScene, LightShape};
 pub use lights::area::AreaShape;
 pub use lights::{assign_channels, taken_lights, MaskChannels, MASK_CHANNELS};
-pub use pages::{colour_page, direction_levels, level_count, levels, mask_levels};
+pub use pages::{colour_page, direction_levels, direction_page, level_count, levels, mask_levels};
 pub use probe_direct::{baked_direct_sh, mixed_occlusion};
 pub use progress::{BakeObserver, BakeProgress};
 pub use raster::{lightmap_size, MIN_RESOLUTION};

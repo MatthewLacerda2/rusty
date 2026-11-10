@@ -130,12 +130,15 @@ fn a_directional_bake_writes_a_direction_page_per_colour_page() {
     assert_eq!(set.directions.len(), set.pages.len());
     let name = set.directions[0].rsplit('/').next().unwrap();
     assert!(
-        name.starts_with("lightmap_dir_0_") && name.ends_with(".png"),
-        "an RGBA8 PNG, never block-compressed (#1996): {name}"
+        name.starts_with("lightmap_dir_0_") && name.ends_with(".ktx2"),
+        "a KTX2 alone (#1996): {name}"
     );
-    let colour = crate::asset::lightmap_page::read(&std::fs::read(&set.pages[0]).unwrap());
-    let dir = image::open(&set.directions[0]).unwrap();
-    assert_eq!(dir.width(), colour.unwrap().edge, "the colour page's size");
+    let read = |p: &str| crate::asset::lightmap_page::read(&std::fs::read(p).unwrap()).unwrap();
+    let (dir, colour) = (read(&set.directions[0]), read(&set.pages[0]));
+    assert_eq!(dir.format, crate::asset::lightmap_page::PageFormat::Rgba8);
+    assert_eq!(dir.edge, colour.edge, "the colour page's size");
+    assert_eq!(dir.levels.len(), colour.levels.len(), "and its mips");
+    assert!(!Path::new(&set.directions[0]).with_extension("png").exists());
     let flat = BakeSettings {
         directional: false,
         ..quick()

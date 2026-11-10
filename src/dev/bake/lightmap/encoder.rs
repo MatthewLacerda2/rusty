@@ -173,7 +173,10 @@ impl Queue {
 
 /// `maps` packed into pages of at most `page` texels and written into `dir` as
 /// preview pages named from `prefix`, each an uncompressed PNG of one level (no
-/// BC encode, no mips), and the set that points at them.
+/// BC encode, no mips written), and the set that points at them. A colour page
+/// uploads that one level; the loader makes a direction or mask page's mips
+/// (`render::gpu::lightmaps::load`), a preview's cost the finished bake's KTX2
+/// direction pages do not pay (#1996).
 fn write_preview(
     (dir, prefix): &(PathBuf, String),
     maps: &[Lightmap],

@@ -9,8 +9,9 @@
 //! on the CPU to linear `Rgba16Float` with the same mips. An irradiance `.png`
 //! page alone (a progressive bake's preview, or a scene baked before #1694)
 //! uploads its one level. Either way the shader reads linear light and picks its
-//! level from the UV's screen derivatives. A direction page is an RGBA8 PNG alone,
-//! uploaded as `Rgba8Unorm` with mips made on load (#1996).
+//! level from the UV's screen derivatives. A direction page is an RGBA8 KTX2,
+//! uploaded as stored (`Rgba8Unorm`, the bake's mips, #1996); a progressive
+//! preview's is a PNG whose mips are made on load.
 //!
 //! **Where it loads.** A page list is read on a worker thread in a windowed
 //! renderer, so a scene load never stalls a frame on disk; the frames before it
@@ -283,5 +284,7 @@ fn same_array(a: &Option<Rc<LightmapArray>>, b: &Option<Rc<LightmapArray>>) -> b
 mod formats_tests;
 #[cfg(test)]
 mod limits_tests;
+#[cfg(test)]
+mod load_tests;
 #[cfg(test)]
 mod tests;

@@ -1,5 +1,5 @@
-//! A lightmap page's container (#1694): KTX2, one 2D block-compressed texture with
-//! its mip chain, no supercompression. As the spec lays it out, the level index
+//! A lightmap page's container (#1694): KTX2, one 2D texture (BC6H or, for a
+//! direction page, RGBA8: #1996) with its mip chain, no supercompression. As the spec lays it out, the level index
 //! runs largest first and the level images smallest first, each 16-byte aligned,
 //! so other KTX2 tools open a page. Written by hand (the
 //! `ktx2` crate only reads) over the layout its `Reader` validates, and read back
@@ -28,7 +28,7 @@ pub fn write(page: &Page) -> Vec<u8> {
     out[0..12].copy_from_slice(&MAGIC);
     let words = [
         page.format.vk_format(),
-        1, // typeSize: 1 for a block-compressed format
+        1, // typeSize: 1 for a block-compressed format and for 8-bit channels
         page.edge,
         page.edge,
         0, // pixelDepth: 2D
@@ -90,30 +90,42 @@ pub fn read(bytes: &[u8]) -> Result<Page, String> {
     })
 }
 
-/// A Basic Data Format Descriptor for `format`: one 128-bit sample over a 4×4
-/// block, linear transfer (lightmaps hold linear light and raw directions).
+/// A Basic Data Format Descriptor for `format`, linear transfer (lightmaps hold
+/// linear light and raw directions): BC6H's one 128-bit float sample over a 4×4
+/// block, or RGBA8's four 8-bit samples over one texel.
 fn dfd(format: PageFormat) -> Vec<u8> {
-    const BLOCK: u32 = 24 + 16;
-    let model = match format {
-        PageFormat::Bc6h => 133u32, // KHR_DF_MODEL_BC6H
-    };
-    // The sample: bit offset 0, bit length 127 (+1), channel 0; BC6H's is float.
-    let qualifiers: u32 = match format {
-        PageFormat::Bc6h => 0x80, // KHR_DF_SAMPLE_DATATYPE_FLOAT
-    };
-    let words = [
-        4 + BLOCK,                      // dfdTotalSize
-        0,                              // vendorId 0 (Khronos), descriptorType 0 (basic)
-        2 | (BLOCK << 16),              // versionNumber 2, descriptorBlockSize
-        model | (1 << 8) | (1 << 16),   // model, primaries BT.709, transfer linear
-        3 | (3 << 8),                   // texel block 4×4 (each dimension less one)
-        16,                             // bytesPlane0: a block is 16 bytes
-        0,                              // bytesPlane4..7
-        127 << 16 | (qualifiers << 24), // the sample's offset, length, channel
-        0,                              // sample positions
-        0,                              // sampleLower
-        u32::MAX,                       // sampleUpper
+    // Per sample: (bit offset, bit length less one, channel and qualifiers, upper).
+    let (model, block_dims, plane0, samples): (u32, u32, u32, &[(u32, u32, u32, u32)]) =
+        match format {
+            // KHR_DF_MODEL_BC6H; channel 0 with KHR_DF_SAMPLE_DATATYPE_FLOAT.
+            PageFormat::Bc6h => (133, 3 | (3 << 8), 16, &[(0, 127, 0x80, u32::MAX)]),
+            // KHR_DF_MODEL_RGBSDA; channels R, G, B and A (15), each a byte.
+            PageFormat::Rgba8 => (
+                1,
+                0,
+                4,
+                &[
+                    (0, 7, 0, 255),
+                    (8, 7, 1, 255),
+                    (16, 7, 2, 255),
+                    (24, 7, 15, 255),
+                ],
+            ),
+        };
+    let block = 24 + 16 * samples.len() as u32;
+    let mut words = vec![
+        4 + block,                    // dfdTotalSize
+        0,                            // vendorId 0 (Khronos), descriptorType 0 (basic)
+        2 | (block << 16),            // versionNumber 2, descriptorBlockSize
+        model | (1 << 8) | (1 << 16), // model, primaries BT.709, transfer linear
+        block_dims,                   // texel block size, each dimension less one
+        plane0,                       // bytesPlane0: one block's (or texel's) bytes
+        0,                            // bytesPlane4..7
     ];
+    for &(offset, len, channel, upper) in samples {
+        // The sample's offset, length, channel; its positions; lower; upper.
+        words.extend([offset | (len << 16) | (channel << 24), 0, 0, upper]);
+    }
     words.iter().flat_map(|w| w.to_le_bytes()).collect()
 }
 

@@ -209,8 +209,8 @@ whether it is drawn live:
     come from one side (an open sky over a dark ground, a `Mixed` spot's bounce off
     the floor onto a glossy ceiling): the environment reflection reflects them. A
     `Mixed` light gives its highlight live, and its baked bounce none. A lamp
-    supplying under about 6% of a texel's light gives none either: so little is
-    taken for none.
+    supplying under a quarter of a texel's light (the fringe of its range, where a
+    bounce outshines it) has its highlight faded with its share, to none at none.
   - **One highlight per texel.** Two lamps lighting one texel give one highlight
     between them, pulled toward both and weakened (two lamps at 45° either side of
     a floor's normal keep about 0.7 of their light in it), where live lights give

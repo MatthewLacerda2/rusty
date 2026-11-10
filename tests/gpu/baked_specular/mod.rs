@@ -103,14 +103,18 @@ pub(super) fn lamp(scene: &mut Scene, at: Vec3, rotation: Quat, light: LightComp
     place(scene, lamp, at, rotation);
 }
 
-/// Bake `scene`'s lightmaps into a temp folder named `name`; returns its path.
-pub(super) fn bake(scene: &mut Scene, name: &str, directional: bool) -> String {
+/// The texels per unit most cases bake at.
+pub(super) const DENSITY: f32 = 10.0;
+
+/// Bake `scene`'s lightmaps at `density` texels a unit into a temp folder named
+/// `name`; returns its path.
+pub(super) fn bake(scene: &mut Scene, name: &str, directional: bool, density: f32) -> String {
     let dir = crate::temp::dir().join(format!("rusty_gpu_baked_spec_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let settings = BakeSettings {
-        texels_per_unit: 10.0,
+        texels_per_unit: density,
         samples: 16,
         bounces: 1,
         seed: 5,

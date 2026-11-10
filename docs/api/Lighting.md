@@ -479,16 +479,18 @@ lighting settings (above), whose defaults are the ones listed here.
   aligned to 16 texels, so no compressed block and no texel of any of the three levels
   ever mixes two lightmaps. An RGBM-encoded PNG of the same
   name sits beside it: what a GPU without BC compression loads, and a picture an agent
-  can open. A directional bake writes a `lightmap_dir_<page>_<tag>.png` beside each
+  can open. A directional bake writes a `lightmap_dir_<page>_<tag>.ktx2` beside each
   page, packed exactly like its colour page: RGB the direction scaled by its
   directionality, each component `x` stored as the byte `128 + 127·x` (so 0 is
-  exact), and A the lamp share (0–1). It is uploaded as it is, RGBA8 with its two
-  mips made on load (four bytes a texel), never block-compressed: BC7 put a lamp's
-  direction up to 5° off a texel, which a polished surface's baked highlight showed
-  as a sawtooth edge (#1996). The texture importer leaves that folder alone
+  exact), and A the lamp share (0–1). It is plain RGBA8 (`R8G8B8A8_UNORM`, four bytes
+  a texel) with the bake's two mips, uploaded as it is stored, never block-compressed:
+  BC7 put a lamp's direction up to 5° off a texel, which a polished surface's baked
+  highlight showed as a sawtooth edge (#1996). The texture importer leaves that folder alone
   (`Assets.md`). Encoding takes time after the trace, most of it the irradiance page's
-  BC6H, about 2 s a 2048² page on four cores (#1694); a direction page is only
-  compressed as a PNG (its BC7, before #1996, took twice that). A 4096² page pair takes about 105 MiB of GPU memory, but filling many of them takes a density whose trace stops a bake long before memory does; the editor's Generate Lighting
+  BC6H and its PNG: a 2048² page pair about 3.3 s on four cores (2.9 s without its
+  direction page), a 4096² pair about 14 s (11 s); a level whose biggest meshes reach
+  the default 1016 cap fills about three 4096² pairs, so about 40 s (#1704). A 4096²
+  page pair takes about 105 MiB of GPU memory (21 MiB without its direction page), but filling many of them takes a density whose trace stops a bake long before memory does; the editor's Generate Lighting
   encodes the pages and compresses their PNGs on its worker and only writes the finished
   files on the frame, so the window stays live. The scene stores the page list and, per entity, its page and
   scale/offset (Unity's lightmap index + scale/offset), and the lights the bake took

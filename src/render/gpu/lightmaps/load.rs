@@ -8,11 +8,14 @@
 //! progressive bake's preview, #1970, or a scene baked before #1694) uploads its
 //! one level. The shader then reads linear light either way, filtered linearly.
 //!
-//! Direction (#810) and shadowmask (#1695) pages are RGBA8 PNGs alone, their mips
+//! A direction page (#810) is an RGBA8 `.ktx2` alone, uploaded as it is stored
+//! (`Rgba8Unorm`, the bake's own mips): no decode, no copy, no mip build at load,
+//! with or without BC compression. It is never block-compressed: BC7 turned a
+//! lamp's direction up to 5° off a texel, which a glossy surface's baked
+//! highlight showed as a sawtooth (#1996). A progressive bake's preview direction
+//! page (#1970) and every shadowmask page (#1695) are RGBA8 PNGs alone, their mips
 //! made here by the bake's own box filter (`lightmap::direction_levels`,
-//! `lightmap::mask_levels`), uploaded as `Rgba8Unorm`. A direction page is never
-//! block-compressed: BC7 turned a lamp's direction up to 5° off a texel, which a
-//! glossy surface's baked highlight showed as a sawtooth (#1996).
+//! `lightmap::mask_levels`).
 
 use std::path::Path;
 
@@ -26,8 +29,8 @@ use crate::scene::lighting::lightmap::{
 pub(crate) enum Kind {
     /// Irradiance (`LightmapSet::pages`).
     Colour,
-    /// Directions (#810, `LightmapSet::directions`): an RGBA8 PNG alone, whose
-    /// mips are made here.
+    /// Directions (#810, `LightmapSet::directions`): an RGBA8 KTX2 as stored, or
+    /// a preview's PNG alone, whose mips are made here.
     Direction,
     /// Shadowmasks (#1695, `LightmapSet::masks`): an RGBA8 PNG alone, whose mips
     /// are made here.
@@ -36,6 +39,7 @@ pub(crate) enum Kind {
 
 /// A page list ready to upload: its format, edge, and per page every level's
 /// bytes, largest first.
+#[derive(Debug)]
 pub(crate) struct Loaded {
     pub format: wgpu::TextureFormat,
     pub edge: u32,
@@ -76,24 +80,25 @@ fn page(
     kind: Kind,
     bc: bool,
 ) -> Result<(wgpu::TextureFormat, u32, Vec<Vec<u8>>), String> {
-    match kind {
-        Kind::Direction => return rgba8_page(path, decode_direction, direction_levels),
-        Kind::Mask => return rgba8_page(path, decode_mask, mask_levels),
-        Kind::Colour => {}
-    }
     let is_ktx2 = Path::new(path)
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("ktx2"));
-    if is_ktx2 && bc {
+    let (stored, upload) = match kind {
+        Kind::Direction if !is_ktx2 => return rgba8_page(path, decode_direction, direction_levels),
+        Kind::Mask => return rgba8_page(path, decode_mask, mask_levels),
+        Kind::Direction => (PageFormat::Rgba8, wgpu::TextureFormat::Rgba8Unorm),
+        Kind::Colour => (PageFormat::Bc6h, wgpu::TextureFormat::Bc6hRgbUfloat),
+    };
+    if is_ktx2 && (bc || stored == PageFormat::Rgba8) {
         let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
         let page = lightmap_page::read(&bytes)?;
-        if page.format != PageFormat::Bc6h {
+        if page.format != stored {
             return Err(format!(
                 "a {:?} page where a {kind:?} page belongs",
                 page.format
             ));
         }
-        return Ok((wgpu::TextureFormat::Bc6hRgbUfloat, page.edge, page.levels));
+        return Ok((upload, page.edge, page.levels));
     }
     // The PNG beside a KTX2 page, or the page itself.
     let png = match is_ktx2 {
@@ -118,7 +123,7 @@ fn page(
 /// The bake's mip chain of an RGBA8 page's decoded texels, as bytes.
 type Rgba8Levels<T> = fn(&[T], u32) -> Vec<Vec<[u8; 4]>>;
 
-/// One RGBA8 page (a direction page, #810, or a shadowmask, #1695): its PNG's
+/// One RGBA8 PNG page (a preview's direction page, #1970, or a shadowmask, #1695): its PNG's
 /// texels, `decode`d, with the mips the colour pages carry (`levels`, the bake's
 /// box filter), as RGBA8.
 fn rgba8_page<T>(

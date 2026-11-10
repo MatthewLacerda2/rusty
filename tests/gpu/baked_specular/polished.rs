@@ -8,11 +8,9 @@ use std::f32::consts::FRAC_PI_2;
 
 use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, LightMode, LightType, MaterialAsset};
-use rusty::dev::bake::lightmap::bake_scene_lightmaps;
-use rusty::scene::lighting::lightmap::BakeSettings;
 use rusty::scene::{Camera, Scene};
 
-use super::{lamp, mean_gap, most, plane, point, shot};
+use super::{bake, lamp, mean_gap, most, plane, point, shot};
 
 /// A 3 m static counter of polished black granite a metre under a spot of `mode`.
 fn counter(mode: LightMode) -> Scene {
@@ -47,21 +45,7 @@ fn counter(mode: LightMode) -> Scene {
 /// `scene` baked at the issue's 8 texels a unit (`directional` or not), then shot
 /// through a long lens at the spot's mirror image, 0.53 m off its foot.
 fn baked(mut scene: Scene, name: &str, directional: bool) -> Option<Vec<f32>> {
-    let dir = crate::temp::dir().join(format!("rusty_gpu_baked_spec_{name}"));
-    std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("level.scene").to_string_lossy().into_owned();
-    let settings = BakeSettings {
-        texels_per_unit: 8.0,
-        samples: 16,
-        bounces: 1,
-        seed: 5,
-        max_lightmap_size: 64,
-        denoiser: rusty::scene::lighting::lightmap::Denoiser::Filter,
-        filter_radius: 1,
-        directional,
-        ..Default::default()
-    };
-    assert!(bake_scene_lightmaps(&mut scene, Some(&path), &settings).is_ok_and(|n| n > 0));
+    bake(&mut scene, name, directional, 8.0);
     let mut camera = Camera::new(Vec3::new(-1.0, 0.9, 0.0), 0.0, -62.2);
     camera.fov = 8.0;
     shot(&scene, &camera, name)

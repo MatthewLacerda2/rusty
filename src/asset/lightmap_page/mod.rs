@@ -7,12 +7,14 @@
 //! every file under such a folder alone ([`is_baked`]), so a page never gets a BC7
 //! sRGB cache nothing reads, and the renderer loads the page the bake wrote.
 //!
-//! **What a page is** ([`Page`]): one square level chain, block-compressed, in a
-//! KTX2 file (`container`). Irradiance is BC6H unsigned float ([`PageFormat::Bc6h`], a
+//! **What a page is** ([`Page`]): one square level chain in a KTX2 file
+//! (`container`). Irradiance is BC6H unsigned float ([`PageFormat::Bc6h`], a
 //! byte a texel, HDR stored as is: no RGBM, so bilinear filtering is linear in the
-//! light). A directional bake's direction page is not one of these: it is an RGBA8
-//! PNG alone, never block-compressed (#1996; `render::gpu::lightmaps` makes its
-//! mips on load). The
+//! light). A directional bake's direction page is plain RGBA8
+//! ([`PageFormat::Rgba8`], four bytes a texel), never block-compressed: BC7 turned
+//! a lamp's direction up to 5° off a texel, which a glossy surface's baked
+//! highlight showed as a sawtooth (#1996). Its mips are the bake's, made from its
+//! float directions, so the loader uploads the levels as they are. The
 //! bake (`scene::lighting::lightmap`) makes the levels; this module only encodes,
 //! decodes and stores them (`blocks`), as Unity, Godot 4 and Unreal store theirs.
 //! Baked reflection cubes share the BC6H level encoder ([`bc6h_level`], #1885).
@@ -42,26 +44,33 @@ pub fn is_baked(path: &Path) -> bool {
         .is_some_and(|n| n.len() > DIR_SUFFIX.len() && n.ends_with(DIR_SUFFIX))
 }
 
-/// A page's block format.
+/// A page's texel format.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PageFormat {
-    /// Unsigned-float HDR RGB: irradiance.
+    /// Unsigned-float HDR RGB, block-compressed: irradiance.
     Bc6h,
+    /// Uncompressed linear RGBA8: a direction page (#810, #1996), its bytes
+    /// `lightmap::encode_direction`'s.
+    Rgba8,
 }
 
 impl PageFormat {
-    pub const ALL: [Self; 1] = [Self::Bc6h];
+    pub const ALL: [Self; 2] = [Self::Bc6h, Self::Rgba8];
 
     /// Its `VkFormat`, what a KTX2 header names.
     pub fn vk_format(self) -> u32 {
         match self {
             Self::Bc6h => 143, // VK_FORMAT_BC6H_UFLOAT_BLOCK
+            Self::Rgba8 => 37, // VK_FORMAT_R8G8B8A8_UNORM
         }
     }
 
-    /// The bytes of one `edge`² level: 16 a 4×4 block.
+    /// The bytes of one `edge`² level: 16 a 4×4 block, or 4 a texel.
     pub fn level_len(self, edge: u32) -> usize {
-        crate::asset::texture_import::blocks_len(edge, edge, 16)
+        match self {
+            Self::Bc6h => crate::asset::texture_import::blocks_len(edge, edge, 16),
+            Self::Rgba8 => (edge as usize).pow(2) * 4,
+        }
     }
 }
 
