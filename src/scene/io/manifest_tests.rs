@@ -127,3 +127,14 @@ fn a_seed_once_file_is_written_once_and_a_deletion_is_final() {
     assert_eq!(once("v3"), SeedOutcome::Deleted);
     assert!(!dest.exists(), "a deleted seed is never recreated");
 }
+
+#[test]
+fn a_seeded_file_is_noted_for_the_caches() {
+    use crate::core::fs::written::written_since;
+    let (manifest, dest) = workspace("noted");
+    let (seen, _) = written_since(u64::MAX);
+    seed(&manifest, &dest, "v1");
+    assert!(written_since(seen)
+        .1
+        .contains(&dest.to_string_lossy().into_owned()));
+}

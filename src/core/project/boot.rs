@@ -91,6 +91,7 @@ pub fn remember_scene(root: &Path, scene: &str) -> Result<(), String> {
     let path = root.join(paths::native(LAST_SCENE_PATH));
     let parent = path.parent().unwrap_or(root);
     std::fs::create_dir_all(parent)
+        // lint: allow(asset-write) the last-open-scene record, read once on boot
         .and_then(|()| crate::core::fs::write_atomic(&path, scene.as_bytes()))
         .map_err(|e| format!("{}: {e}", path.display()))
 }
