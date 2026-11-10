@@ -7,6 +7,8 @@
 //!     once and becomes the current scene file. During play the swap is DEFERRED to
 //!     the tick's tail (the scene-load phase after the destroy phase), so it never
 //!     happens mid-dispatch and replays stay deterministic.
+//!   - `New()` — the API face of File ▸ New (#2000): an empty scene with no current
+//!     file, through the editor's own `scene::new_scene`. Edit mode only.
 //!   - `GetActivePath()` — the current scene file, `nil` when there is none.
 //!   - `DontDestroyOnLoad(id)` — the entity and its children survive play-mode loads.
 
@@ -45,6 +47,20 @@ pub fn register(
             };
             *scene_path.get(lua)?.borrow_mut() = Some(path);
             Ok(warning)
+        }),
+    )?;
+
+    // File ▸ New's scene half: an attached editor follows the new identity as it
+    // follows a scripted `Load` (selection and dirty mark drop), and the path cell
+    // is the editor's own (#1366).
+    put(
+        table,
+        "New",
+        lua.create_function(move |lua, ()| {
+            let scene = &*scene.get(lua)?;
+            let path = &*scene_path.get(lua)?;
+            let done = crate::scene::new_scene(&mut scene.borrow_mut(), &mut path.borrow_mut());
+            done.map_err(|why| runtime(format!("Scene.New: {why}")))
         }),
     )?;
 
