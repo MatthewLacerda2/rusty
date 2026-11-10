@@ -17,6 +17,7 @@ pub(super) fn key(scene: SceneId, base: Option<u32>) -> HistoryKey {
         scene,
         base,
         playing: false,
+        cuts: 0,
     }
 }
 
