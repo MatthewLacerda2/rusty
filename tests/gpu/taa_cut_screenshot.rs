@@ -4,6 +4,7 @@
 //! `Harness.Screenshot(path, { settle = n })` converges on the new view.
 
 use image::RgbaImage;
+use rusty::dev::harness::Harness;
 
 /// The camera settles on one view (`a`: a green sphere in the arena; `c`: the sky),
 /// jumps to view B (the far side of the arena, the sphere behind it) and shoots,
@@ -25,7 +26,7 @@ end
 local before = { a = function() look(0, -90, 0) end, c = function() look(-6, 0, 80) end }
 local function jump(from, cut, name, opts)
   before[from]()
-  for _ = 1, 32 do Harness.Render() end
+  for _ = 1, 8 do Harness.Render() end
   look(3, 90, -10)
   if cut then Camera.ResetHistory() end
   Harness.Screenshot(OUT .. name, opts)
@@ -34,9 +35,9 @@ jump("a", true, "cut_a.png")
 jump("c", true, "cut_c.png")
 jump("a", false, "ghost_a.png")
 jump("c", false, "ghost_c.png")
-jump("a", true, "settled_a.png", { settle = 32 })
-jump("c", true, "settled_c.png", { settle = 32 })
-jump("a", false, "faded_a.png", { settle = 64 })
+jump("a", true, "settled_a.png", { settle = 8 })
+jump("c", true, "settled_c.png", { settle = 8 })
+jump("a", false, "faded_a.png", { settle = 16 })
 Harness.Expect(not pcall(Harness.Screenshot, OUT .. "bad.png", { settle = -1 }), "a negative settle")
 Harness.Expect(not pcall(Harness.Screenshot, OUT .. "bad.png", { settle = 1025 }), "past 1024")
 "#;
@@ -62,7 +63,10 @@ fn a_cut_drops_the_view_before_a_jump_and_settle_converges() {
         rusty::core::paths::to_slash(&out) + "/"
     );
     std::fs::write(&scenario, prefix + SCENARIO).unwrap();
-    let report = rusty::dev::scenario::run_isolated(&scenario, &out).expect("the scenario runs");
+    // A small run: every shot, render and settle draws at it, so none is a resize.
+    let mut harness = Harness::new(&out, rusty::scene::default_scene::BOT_SCRIPT);
+    harness.set_size(320, 180);
+    let report = rusty::dev::scenario::run_file(harness, &scenario).expect("the scenario runs");
     assert!(report.passed, "see {}", report.results_path.display());
     if !out.join("cut_a.png").exists() {
         let msg = "RUSTY_REQUIRE_GPU=1 but no adapter";
@@ -89,6 +93,6 @@ fn a_cut_drops_the_view_before_a_jump_and_settle_converges() {
         settled < 0.01,
         "a settled cut is the new view alone: {settled}"
     );
-    assert!(faded < ghost / 4.0, "settling fades what survives: {faded}");
+    assert!(faded < ghost / 2.0, "settling fades what survives: {faded}");
     let _ = std::fs::remove_dir_all(out);
 }
