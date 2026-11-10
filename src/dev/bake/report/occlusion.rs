@@ -3,7 +3,7 @@
 //! the mean and most objects a cell sees, the share culled, and the objects every
 //! cell sees. All of it is read from the bake's report and its PVS, outside the
 //! bake: the time per cell and the slowest cells need hooks inside it, and stay
-//! `null` until they have them (`slowestCells`).
+//! `null` until they have them (`slowestCells`, #1987).
 
 use serde_json::{json, Value};
 

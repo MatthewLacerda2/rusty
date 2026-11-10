@@ -658,7 +658,7 @@ Then each kind's own:
   cell sees), `culledFraction` (the share of the objects a cell culls, on average),
   `alwaysVisible` (how many objects every cell sees; the never culled are among them) and
   `alwaysVisibleNames` (at most 20). `slowestCells` is `nil`: the time per cell needs
-  hooks inside the bake.
+  hooks inside the bake (#1987).
 
 A stage baked in the editor a step a frame (the probes) counts the frames between its
 steps too. Lists of "heaviest first" keep the top 20; the counts hold them all.
