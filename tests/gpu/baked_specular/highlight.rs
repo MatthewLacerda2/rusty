@@ -16,7 +16,7 @@ fn camera() -> Camera {
 
 /// `scene` baked (`directional` or not) under `name`, then shot.
 fn baked(mut scene: Scene, name: &str, directional: bool) -> Option<Vec<f32>> {
-    bake(&mut scene, name, directional);
+    bake(&mut scene, name, directional, super::DENSITY);
     shot(&scene, &camera(), name)
 }
 

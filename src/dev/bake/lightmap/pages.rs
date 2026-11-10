@@ -1,6 +1,8 @@
 //! Writing a bake's pages (#438, #1694). The bake's lightmaps are packed
-//! (`lightmap::pack`) and each page encoded ([`encode_pages`]: BC6H irradiance and
-//! a BC7 direction page, every mip, plus the RGBM PNG fallback, compressed), which
+//! (`lightmap::pack`) and each page encoded ([`encode_pages`]: BC6H irradiance,
+//! every mip, plus the RGBM PNG fallback, compressed; a direction page as RGBA8,
+//! every mip, in a KTX2 alone; a shadowmask as an RGBA8 PNG alone, whose mips the
+//! loader makes), which
 //! is the slow part and needs no scene, so it runs on the bake's worker, counting
 //! its pages into the bake's `BakeProgress` and stopping between two levels when
 //! that is cancelled; then `write::apply_encoded` only writes the finished bytes
@@ -12,8 +14,8 @@ use std::io::Cursor;
 
 use crate::asset::lightmap_page::Page;
 use crate::scene::lighting::lightmap::{
-    check_page_count, colour_page, direction_page, encode_directions, encode_masks, encode_texels,
-    pack, BakeProgress, Lightmap, LightmapEntry, MaskChannels, MAX_PAGES,
+    check_page_count, colour_page, direction_page, encode_masks, encode_texels, pack, BakeProgress,
+    Lightmap, LightmapEntry, MaskChannels, MAX_PAGES,
 };
 
 /// A bake's pages encoded, ready to write.
@@ -24,8 +26,10 @@ pub struct EncodedPages {
     pub page_size: u32,
     /// Per colour page: its BC6H page and its RGBM PNG file's bytes.
     pub colour: Vec<(Page, Vec<u8>)>,
-    /// Per direction page (#810): its BC7 page and its RGBA8 PNG file's bytes.
-    pub directions: Vec<(Page, Vec<u8>)>,
+    /// Per direction page (#810): its RGBA8 levels, every mip. Not
+    /// block-compressed: BC7 turned a lamp's direction up to 5° off a texel, which
+    /// a glossy surface's baked highlight showed as a sawtooth (#1996).
+    pub directions: Vec<Page>,
     pub entries: Vec<LightmapEntry>,
     /// The lights the bake took in (`LightmapSet::lights`, #1750), set by whoever
     /// gathered its input (`taken_lights`); empty from [`encode_pages`].
@@ -67,14 +71,14 @@ pub fn encode_pages(
     }
     let mut directions = Vec::with_capacity(atlas.directions.len());
     for dirs in &atlas.directions {
-        let Some(page) = direction_page(dirs, size, threads, &stop) else {
+        if stop() {
             return Ok(None);
-        };
-        directions.push((page, png(size, encode_directions(dirs))?));
+        }
+        directions.push(direction_page(dirs, size));
         progress.page_done();
     }
-    // A mask page is its RGBA8 PNG alone: the loader makes its mips (#1695).
     let mut masks = Vec::with_capacity(atlas.masks.len());
+    // A mask page is its RGBA8 PNG alone: the loader makes its mips.
     for mask in &atlas.masks {
         if stop() {
             return Ok(None);

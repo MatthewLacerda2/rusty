@@ -10,14 +10,19 @@
 //!   bright-walled room aims its lobe at itself.
 //! * `capture`: a bake capture never draws it.
 //! * `behind`: a two-sided surface's back face reads its front's baked light.
+//! * `stool`, `polished`: the issue's seat and counter (#1996): a rough dielectric
+//!   and a mirror-polished one each look as under the same lamp live.
 //!
 //! Skips (passes without asserting) when no GPU / software adapter is present.
 
 mod behind;
 mod capture;
 mod highlight;
+mod measure;
+mod polished;
 mod room;
 mod sky;
+mod stool;
 
 use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent};
@@ -26,6 +31,8 @@ use rusty::dev::screenshot::capture;
 use rusty::scene::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::lighting::lightmap::BakeSettings;
 use rusty::scene::{Camera, Scene};
+
+pub(super) use measure::{mean_gap, most, peak};
 
 pub(super) const SIZE: u32 = 96;
 
@@ -96,14 +103,18 @@ pub(super) fn lamp(scene: &mut Scene, at: Vec3, rotation: Quat, light: LightComp
     place(scene, lamp, at, rotation);
 }
 
-/// Bake `scene`'s lightmaps into a temp folder named `name`; returns its path.
-pub(super) fn bake(scene: &mut Scene, name: &str, directional: bool) -> String {
+/// The texels per unit most cases bake at.
+pub(super) const DENSITY: f32 = 10.0;
+
+/// Bake `scene`'s lightmaps at `density` texels a unit into a temp folder named
+/// `name`; returns its path.
+pub(super) fn bake(scene: &mut Scene, name: &str, directional: bool, density: f32) -> String {
     let dir = crate::temp::dir().join(format!("rusty_gpu_baked_spec_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let settings = BakeSettings {
-        texels_per_unit: 10.0,
+        texels_per_unit: density,
         samples: 16,
         bounces: 1,
         seed: 5,
@@ -129,22 +140,4 @@ pub(super) fn shot(scene: &Scene, camera: &Camera, name: &str) -> Option<Vec<f32
     let luma =
         |p: &image::Rgb<u8>| 0.2126 * p[0] as f32 + 0.7152 * p[1] as f32 + 0.0722 * p[2] as f32;
     Some(img.pixels().map(luma).collect())
-}
-
-/// Where `a` exceeds `b` most, as (x, y, by how much).
-pub(super) fn peak(a: &[f32], b: &[f32]) -> (u32, u32, f32) {
-    let diffs = a.iter().zip(b).map(|(a, b)| a - b).enumerate();
-    let (i, d) = diffs.fold(
-        (0, f32::MIN),
-        |best, (i, d)| if d > best.1 { (i, d) } else { best },
-    );
-    (i as u32 % SIZE, i as u32 / SIZE, d)
-}
-
-/// The most `a` and `b` differ by at any pixel.
-pub(super) fn most(a: &[f32], b: &[f32]) -> f32 {
-    a.iter()
-        .zip(b)
-        .map(|(a, b)| (a - b).abs())
-        .fold(0.0, f32::max)
 }

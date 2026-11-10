@@ -19,10 +19,18 @@ pub(super) const FINAL: &str = "lightmap";
 /// The file names a progressive bake's preview pages start with (#1970).
 pub(super) const PREVIEW: &str = "lightmap_preview";
 
-/// What one `size`² shadowmask page takes on the GPU: RGBA8 with its mips.
-fn mask_gpu_bytes(size: u32) -> usize {
+/// What `encoded`'s pages take on the GPU, every mip: its colour and direction
+/// pages as stored, and each shadowmask page as RGBA8 with the mips made on load.
+fn gpu_bytes(encoded: &EncodedPages) -> usize {
+    let size = encoded.page_size;
     let levels = crate::scene::lighting::lightmap::level_count(size);
-    (0..levels).map(|l| ((size >> l) as usize).pow(2) * 4).sum()
+    let mask: usize = (0..levels).map(|l| ((size >> l) as usize).pow(2) * 4).sum();
+    let stored = encoded
+        .colour
+        .iter()
+        .map(|(p, _)| p)
+        .chain(&encoded.directions);
+    stored.map(Page::gpu_bytes).sum::<usize>() + encoded.masks.len() * mask
 }
 
 /// [`encode_pages`] then [`apply_encoded`]: write `maps` beside `scene_path`, on
@@ -76,12 +84,7 @@ pub fn apply_encoded(
         }
     };
     warn_fell_back(&set);
-    let mask_bytes = encoded.masks.len() * mask_gpu_bytes(size);
-    let bytes: usize = (encoded.colour.iter())
-        .chain(&encoded.directions)
-        .map(|(p, _)| p.gpu_bytes())
-        .sum::<usize>()
-        + mask_bytes;
+    let bytes = gpu_bytes(encoded);
     log::info!(
         "[LightmapBake] {} lightmaps in {} page(s) of {size}²{}, {:.1} MiB on the GPU, in {}",
         encoded.maps,
@@ -110,8 +113,8 @@ fn warn_unremoved(cleared: Result<(), String>) {
     }
 }
 
-/// The file stems (`lightmap_0_<tag>`) of every page `set` points at: a KTX2
-/// page's PNG beside it shares its stem.
+/// The file stems (`lightmap_0_<tag>`) of every page `set` points at: an
+/// irradiance KTX2 page's PNG beside it shares its stem.
 pub(super) fn stems(set: &LightmapSet) -> BTreeSet<String> {
     let paths = set.pages.iter().chain(&set.directions).chain(&set.masks);
     let stem = |p: &String| Some(Path::new(p).file_stem()?.to_string_lossy().into_owned());
@@ -130,9 +133,9 @@ pub(super) fn write_set(
     for (k, (page, png)) in encoded.colour.iter().enumerate() {
         set.pages.push(write_page(dir, prefix, k, page, png)?);
     }
-    for (k, (page, png)) in encoded.directions.iter().enumerate() {
-        let name = format!("{prefix}_dir");
-        set.directions.push(write_page(dir, &name, k, page, png)?);
+    for (k, page) in encoded.directions.iter().enumerate() {
+        set.directions
+            .push(write_ktx2(dir, &format!("{prefix}_dir"), k, page)?);
     }
     for (k, png) in encoded.masks.iter().enumerate() {
         set.masks
@@ -164,6 +167,16 @@ fn write_page(
     }
     // The scene document stores `/` paths on every OS, like its other assets (#819).
     Ok(crate::core::paths::to_slash(&ktx2_path))
+}
+
+/// Write one page as `<dir>/<prefix>_<k>_<tag>.ktx2`, alone, and return its path:
+/// a direction page (#1996), whose RGBA8 levels the loader uploads as they are.
+fn write_ktx2(dir: &Path, prefix: &str, k: usize, page: &Page) -> Result<String, String> {
+    let ktx2 = lightmap_page::write(page);
+    let path = dir.join(format!("{prefix}_{k}_{:08x}.ktx2", content_tag(&ktx2)));
+    crate::core::fs::written::write(&path, &ktx2)
+        .map_err(|e| format!("write {}: {e}", path.display()))?;
+    Ok(crate::core::paths::to_slash(&path))
 }
 
 /// Write one page as `<dir>/<prefix>_<k>_<tag>.png` and return its path: a
