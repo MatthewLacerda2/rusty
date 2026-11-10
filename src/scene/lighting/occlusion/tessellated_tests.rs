@@ -3,19 +3,15 @@
 //! all the same, so its rays are proved stopped instead of cast. Counted in
 //! rays, not timed (#1883), so it holds on any machine.
 
-use glam::Vec3;
-
-use super::bench::shift;
 use super::bench::town::{town, Make};
 use super::gather_occlusion;
 
-/// Rays cast baking `cells` cells spread over `make`'s town, per cell. The
-/// town is moved and scaled off round coordinates, as an imported level's
-/// corners are, so faces join only where they share a corner bit for bit.
+/// Rays cast baking `cells` cells spread over `make`'s town, per cell. The town
+/// sits on round coordinates: moved off them, a tessellated wall fuses to the
+/// texel at its edges where a box's own face proves exactly, and it casts about
+/// twice its twin's rays (PR #1989).
 fn rays_per_cell(make: Make, cells: u64) -> u64 {
-    let mut level = town(3, 0.25, 2, make);
-    shift(&mut level, Vec3::new(0.137, 0.053, -0.211), 1.07);
-    let input = gather_occlusion(&level);
+    let input = gather_occlusion(&town(3, 0.25, 2, make));
     let sampler = input.sampler().expect("a grid");
     sampler.spread(cells);
     sampler.rays_cast() / cells
