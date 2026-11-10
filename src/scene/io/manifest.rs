@@ -95,13 +95,14 @@ impl SeedManifest {
                 return outcome;
             }
             SeedOutcome::Written | SeedOutcome::Refreshed => {
-                if let Err(e) = write_atomic(dest, bundled) {
+                // A seeded script or starter `.gltf` is read by path-keyed caches
+                // (the script classes, the import cache): the write is noted.
+                if let Err(e) = make_parent(dest)
+                    .and_then(|()| fs::written::write(dest, bundled).map_err(|e| e.to_string()))
+                {
                     eprintln!("[Seed] {key}: seeding failed: {e}");
                     return outcome;
                 }
-                // A seeded script or starter `.gltf` is read by path-keyed caches
-                // (the script classes, the import cache), which drop it on this note.
-                fs::written::note_written(&dest.to_string_lossy());
                 if outcome == SeedOutcome::Refreshed {
                     eprintln!("[Seed] {key}: refreshed to the engine's current default");
                 }
@@ -137,8 +138,10 @@ impl SeedManifest {
             .iter()
             .map(|(k, h)| format!("{h:016x} {k}\n"))
             .collect();
+        make_parent(&self.path)?;
         // lint: allow(asset-write) the seed manifest's own record, read only by the next seed
-        write_atomic(&self.path, text.as_bytes())
+        fs::write_atomic(&self.path, text.as_bytes())
+            .map_err(|e| format!("{}: {e}", self.path.display()))
     }
 }
 
@@ -153,14 +156,16 @@ fn read_entries(path: &Path) -> BTreeMap<String, u64> {
         .collect()
 }
 
-/// Write `bytes` at `dest` atomically ([`fs::write_atomic`]), creating its folder:
-/// a reader in another process sees the whole file or the old one, never half of it.
-fn write_atomic(dest: &Path, bytes: &[u8]) -> Result<(), String> {
-    if let Some(parent) = dest.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+/// Create `dest`'s folder, so its write can land: every write here is atomic
+/// ([`fs::write_atomic`]), and a reader in another process sees the whole file or
+/// the old one, never half of it.
+fn make_parent(dest: &Path) -> Result<(), String> {
+    match dest.parent() {
+        Some(parent) => {
+            std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))
+        }
+        None => Ok(()),
     }
-    // lint: allow(asset-write) the shared writer: `seed` notes each seeded file after it, the manifest needs no note
-    fs::write_atomic(dest, bytes).map_err(|e| format!("{}: {e}", dest.display()))
 }
 
 #[cfg(test)]

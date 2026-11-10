@@ -33,6 +33,25 @@ fn passes_the_helper_a_note_and_an_empty_save() {
 fn a_note_in_the_next_function_does_not_count() {
     let src = "fn a() {\n    fs::write(p, b)?;\n}\nfn b() {\n    note_written(p);\n}\n";
     assert_eq!(lines("src/a.rs", src), [2]);
+    for start in [
+        "pub(super) fn",
+        "pub(in crate::a) fn",
+        "const fn",
+        "async fn",
+    ] {
+        let src = format!("fn a() {{\n    fs::write_atomic(p, b)?;\n}}\n{start} b() {{\n    note_written(p);\n}}\n");
+        assert_eq!(lines("src/a.rs", &src), [2], "{start}");
+    }
+    let src = "fn a() {\n    fs::write(p, b)?;\n}\npub unsafe extern \"C\" fn b() {\n    note_written(p);\n}\n";
+    assert_eq!(lines("src/a.rs", src), [2]);
+}
+
+#[test]
+fn a_longer_name_or_a_string_is_not_a_write_atomic_call() {
+    assert!(lines("src/a.rs", "try_write_atomic(p, b)?;\n").is_empty());
+    assert!(lines("src/a.rs", "log(\"use write_atomic(p)\");\n").is_empty());
+    assert!(lines("src/a.rs", "let s = \"a\nfs::write(p, b)\";\n").is_empty());
+    assert_eq!(lines("src/a.rs", "log(\"é\"); write_atomic(p, b)?;\n"), [1]);
 }
 
 #[test]

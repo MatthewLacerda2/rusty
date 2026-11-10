@@ -4,8 +4,8 @@
 //! renderer's textures and cubemaps and the audio `ClipCache` follow a re-bake
 //! (#689, #1208). A baker that writes with `std::fs::write` and tells nobody
 //! brings the stale cache back. So a non-test line of `src/` (outside
-//! `src/core/fs/`) whose code calls `fs::write(`, `File::create(`, `.save(` or
-//! `core::fs::write_atomic(` (#2005) is a finding unless the rest of its function
+//! `src/core/fs/`) whose code (outside string literals) calls `fs::write(`,
+//! `File::create(`, `.save(` or any `write_atomic(` (#2005) is a finding unless the rest of its function
 //! calls `note_written` (`written::write` is none of those calls, so it never
 //! matches). A write no path-keyed cache
 //! reads (a scene, prefab, project, settings, ledger, harness or bench file) says
@@ -16,26 +16,48 @@
 
 use super::finding::Finding;
 use super::scan::Scan;
-use crate::code::code_lines;
+use crate::code::{code_of, is_ident, Open};
 
 pub const RULE: &str = "asset-write";
 const HOME: &str = "src/core/fs/";
 
 /// Does `code` write a file: `fs::write(`, `File::create(`, `.save(<arg>)` or a
-/// call of `write_atomic(` (its definition, `fn write_atomic(`, is not a write)?
+/// call of any `write_atomic(` (a whole identifier: `try_write_atomic(` is not
+/// one, and its definition, `fn write_atomic(`, is not a write)? `code` has its
+/// string literals blanked ([`bare_lines`]), so a string naming a call is none.
 fn writes(code: &str) -> bool {
     let saves = code.match_indices(".save(").any(|(at, _)| {
         let arg = &code[at + ".save(".len()..];
         !arg.trim_start().starts_with(')')
     });
-    let atomic = code
-        .match_indices("write_atomic(")
-        .any(|(at, _)| !code[..at].ends_with("fn "));
+    let atomic = code.match_indices("write_atomic(").any(|(at, _)| {
+        let before = &code[..at];
+        !before.chars().next_back().is_some_and(is_ident) && !before.ends_with("fn ")
+    });
     code.contains("fs::write(") || code.contains("File::create(") || saves || atomic
 }
 
+/// Every line of `source` as code, its comments cut and every char inside a
+/// string or char literal turned to a space.
+fn bare_lines(source: &str) -> Vec<String> {
+    let mut open = Open::None;
+    source
+        .lines()
+        .map(|line| {
+            let mut bare: Vec<char> = Vec::new();
+            let code = code_of(line, &mut open, |at, c| {
+                let col = line[..at].chars().count();
+                bare.resize(col, ' ');
+                bare.push(c);
+            });
+            bare.resize(code.chars().count(), ' ');
+            bare.into_iter().collect()
+        })
+        .collect()
+}
+
 /// Does the function holding line `from` call `note_written` at or after it?
-fn notes_after(code: &[std::borrow::Cow<str>], from: usize) -> bool {
+fn notes_after(code: &[String], from: usize) -> bool {
     for line in &code[from..] {
         if line.contains("note_written(") {
             return true;
@@ -44,18 +66,37 @@ fn notes_after(code: &[std::borrow::Cow<str>], from: usize) -> bool {
     false
 }
 
+/// Does `line` start a function: `fn `, after any visibility (`pub`, `pub(…)`)
+/// and qualifiers (`const`, `async`, `unsafe`, `extern "…"`)? `line` is a
+/// [`bare_lines`] line.
+fn starts_fn(line: &str) -> bool {
+    let mut l = line.trim_start();
+    if let Some(rest) = l.strip_prefix("pub") {
+        l = match rest.strip_prefix('(') {
+            Some(scoped) => scoped.split_once(')').map_or(rest, |(_, r)| r),
+            None => rest,
+        };
+        if !l.starts_with(' ') {
+            return false;
+        }
+        l = l.trim_start();
+    }
+    loop {
+        // `extern "C"`: the ABI string is blanked to spaces, as every literal is.
+        let next = ["const ", "async ", "unsafe ", "extern "]
+            .iter()
+            .find_map(|q| l.strip_prefix(q));
+        match next {
+            Some(rest) => l = rest.trim_start(),
+            None => return l.starts_with("fn "),
+        }
+    }
+}
+
 /// The 0-based end of the function holding `from`: the line before the next `fn`.
-fn fn_end(code: &[std::borrow::Cow<str>], from: usize) -> usize {
-    let is_fn = |l: &str| {
-        let l = l.trim_start();
-        let l = l
-            .strip_prefix("pub(crate) ")
-            .or(l.strip_prefix("pub "))
-            .unwrap_or(l);
-        l.starts_with("fn ")
-    };
+fn fn_end(code: &[String], from: usize) -> usize {
     (from + 1..code.len())
-        .find(|&i| is_fn(&code[i]))
+        .find(|&i| starts_fn(&code[i]))
         .unwrap_or(code.len())
 }
 
@@ -65,7 +106,7 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     if !path.starts_with("src/") || path.starts_with(HOME) {
         return Vec::new();
     }
-    let code = code_lines(source);
+    let code = bare_lines(source);
     (0..code.len())
         .filter(|&i| !test.get(i).copied().unwrap_or(false) && writes(&code[i]))
         .filter(|&i| !notes_after(&code[..fn_end(&code, i)], i))

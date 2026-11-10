@@ -148,11 +148,15 @@ pub fn load(source: &Path) -> Result<ImportSettings, ImportError> {
 /// "asset unavailable", which degrades silently (a preview quietly showing a
 /// fallback sphere, say). Two systems importing the same asset at once is ordinary,
 /// so the reader must never observe a partial file.
+///
+/// The write is noted ([`fs::written::write`]): a `.meta` is followed by path —
+/// a borrowing model's import (`import_cache::reads::files_of`), a texture's
+/// upload (`render::gpu::textures::freshness`) and the texture import queue all
+/// drop what they cached when it changes.
 pub fn save(source: &Path, settings: &ImportSettings) -> Result<(), ImportError> {
     let json =
         serde_json::to_string_pretty(settings).map_err(|e| ImportError::Sidecar(e.to_string()))?;
-    // lint: allow(asset-write) import settings, read fresh by `settings_of` on every import lookup, never a cache key
-    fs::write_atomic(&meta_path(source), json.as_bytes())
+    fs::written::write(&meta_path(source), json.as_bytes())
         .map_err(|e| ImportError::Sidecar(e.to_string()))
 }
 
