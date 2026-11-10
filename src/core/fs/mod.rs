@@ -36,6 +36,9 @@ pub const TEMP_SUFFIX: &str = "tmp";
 /// Every document the developer authored or the engine reads back whole as the
 /// source of truth (a scene, a prefab, a project file, the save data) is written
 /// with it; only a cache the engine re-makes by itself may use a plain write.
+///
+/// The rename replaces the file's folder entry, so it needs the folder writable,
+/// and a file read-only or linked there becomes a plain file of the default mode.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let temp = unique_sibling(path, TEMP_SUFFIX);
     // Windows refuses the rename for a moment while a reader holds the target.
