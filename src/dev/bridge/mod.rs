@@ -169,15 +169,15 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
         "Screenshot",
         lua.create_function(move |_, (path, opts): (String, Option<mlua::Table>)| {
             let mut h = h.borrow_mut();
-            let (size, gizmos, settle) = match opts {
+            let shot = match opts {
                 Some(opts) => shot_options(&opts)?,
-                None => (None, false, 0),
+                None => ShotOptions::default(),
             };
-            let size = size.unwrap_or_else(|| h.size());
-            if !h.settle(size, settle) {
+            let size = shot.size.unwrap_or_else(|| h.size());
+            if !h.settle(size, shot.settle) {
                 return Ok(false);
             }
-            Ok(h.screenshot_with(path, size, gizmos))
+            Ok(h.screenshot_with(path, size, shot.gizmos))
         })?,
     )?;
 
@@ -208,9 +208,19 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
 /// kept about 0.1% of an old view by 64 (0.9^64), so 1024 only catches a typo.
 const MAX_SETTLE: u32 = 1024;
 
-/// A `Screenshot`'s options: its size (both of `width` and `height`, or neither),
-/// `gizmos` (a boolean, default false) and `settle` (whole frames, default 0).
-fn shot_options(opts: &mlua::Table) -> LuaResult<(Option<(u32, u32)>, bool, u32)> {
+/// A `Screenshot`'s options (all optional).
+#[derive(Default)]
+struct ShotOptions {
+    /// Its size: both of `width` and `height`, or neither (the run's).
+    size: Option<(u32, u32)>,
+    /// Draw the gizmos over the frame (default false).
+    gizmos: bool,
+    /// Frames drawn before the shot, with no sim step (default 0).
+    settle: u32,
+}
+
+/// Read a `Screenshot`'s options table.
+fn shot_options(opts: &mlua::Table) -> LuaResult<ShotOptions> {
     let gizmos = match opts.get::<mlua::Value>("gizmos")? {
         mlua::Value::Nil => false,
         mlua::Value::Boolean(on) => on,
@@ -230,7 +240,11 @@ fn shot_options(opts: &mlua::Table) -> LuaResult<(Option<(u32, u32)>, bool, u32)
             return Err(mlua::Error::RuntimeError(msg));
         }
     };
-    Ok((size, gizmos, settle))
+    Ok(ShotOptions {
+        size,
+        gizmos,
+        settle,
+    })
 }
 
 /// A `Screenshot`'s `{ width =, height = }`: both whole pixels, 1 to

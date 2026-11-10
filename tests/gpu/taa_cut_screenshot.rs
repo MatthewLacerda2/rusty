@@ -57,7 +57,10 @@ fn a_cut_drops_the_view_before_a_jump_and_settle_converges() {
     let out = crate::temp::dir().join(format!("rusty_taa_cut_{}", std::process::id()));
     std::fs::create_dir_all(&out).unwrap();
     let scenario = out.join("cut.lua");
-    let prefix = format!("local OUT = {:?}\n", format!("{}/", out.display()));
+    let prefix = format!(
+        "local OUT = {:?}\n",
+        rusty::core::paths::to_slash(&out) + "/"
+    );
     std::fs::write(&scenario, prefix + SCENARIO).unwrap();
     let report = rusty::dev::scenario::run_isolated(&scenario, &out).expect("the scenario runs");
     assert!(report.passed, "see {}", report.results_path.display());
