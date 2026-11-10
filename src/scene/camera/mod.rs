@@ -7,11 +7,13 @@
 use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
 
+mod history;
 mod lens;
 mod main;
 mod projection;
 mod view;
 
+pub use history::HistoryCuts;
 pub use lens::{held_fov, held_lens, Lens, MAX_LENS_EXTENT};
 pub use main::{active_cameras, camera_volume, main_camera, render_order, screen_cameras};
 pub use projection::ScreenPoint;
