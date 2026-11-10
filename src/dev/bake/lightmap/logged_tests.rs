@@ -14,8 +14,8 @@ use crate::scene::lighting::lightmap::BakeProgress;
 fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
     let (scene, ..) = scene();
     let input = gather_bake_input(&scene);
-    let plain = bake_logged(&input, &quick(), &mut BakeLog::off());
-    let (plain, untimed) = plain.unwrap();
+    let plain = bake_logged(&input, &quick(), &mut BakeLog::off()).unwrap();
+    let (plain, untimed) = (plain.pages, plain.measured.times);
     // A clock that jumps a minute per read, so every observation prints.
     let now = Cell::new(Duration::ZERO);
     let lines: RefCell<Vec<Line>> = RefCell::default();
@@ -24,12 +24,13 @@ fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
         now.get()
     };
     let mut log = BakeLog::new(clock, |l| lines.borrow_mut().push(l));
-    let (logged, times) = bake_logged(&input, &quick(), &mut log).unwrap();
+    let logged = bake_logged(&input, &quick(), &mut log).unwrap();
+    let (logged, times) = (logged.pages, logged.measured.times);
     drop(log);
     assert!(plain.maps > 0);
     assert_eq!(logged, plain, "a log never changes a byte");
-    // Only a logged bake times its meshes (#1891), one entry per lightmap.
-    assert_eq!((times.len(), untimed.len()), (plain.maps, 0));
+    // Every bake times its meshes (#1891, and #1980's report), one entry each.
+    assert_eq!((times.len(), untimed.len()), (plain.maps, plain.maps));
     assert!(
         times.iter().all(|t| t.texels > 0 && !t.busy.is_zero()),
         "{times:?}"

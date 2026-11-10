@@ -46,7 +46,7 @@ impl OcclusionBakeJob {
         let watch = Arc::clone(&progress);
         let worker = thread::Builder::new()
             .name("occlusion-bake".into())
-            .spawn(move || input.bake(threads(), &watch))
+            .spawn(move || input.bake(crate::dev::bake::report::threads(), &watch))
             .map_err(|e| format!("start the occlusion bake: {e}"))?;
         Ok(Self {
             progress,
@@ -103,7 +103,7 @@ fn bake(
     progress: &OcclusionProgress,
 ) -> Result<(Option<OcclusionData>, OcclusionBakeReport), String> {
     input
-        .bake(threads(), progress)
+        .bake(crate::dev::bake::report::threads(), progress)
         .ok_or_else(|| "never cancelled".to_string())
 }
 
@@ -116,11 +116,6 @@ fn read(progress: &OcclusionProgress) -> Progress {
         total: total as u64,
         meshes: None,
     }
-}
-
-/// The workers a bake uses: every core.
-fn threads() -> usize {
-    thread::available_parallelism().map_or(1, |n| n.get())
 }
 
 #[cfg(test)]

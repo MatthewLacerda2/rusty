@@ -1,7 +1,7 @@
 //! src/dev/lua_surface/mod.rs — the dev-only part of the Lua surface (#737).
 //!
 //! `Debug.*`, the GPU bake verbs (`Lighting.Bake`, `Reflection.Bake`, `Probe.Bake`,
-//! `Lighting.Generate`) and the provider verbs `Speech.Generate` (#386) and
+//! `Lighting.Generate`) with their reports (`GetBakeReport`, #1980) and the provider verbs `Speech.Generate` (#386) and
 //! `Sfx.Generate` (#388), the play switch `Editor.*` (#1360) and the audio capture
 //! `Audio.StartCapture` (#1579) belong to the one API surface, but they render, spend or
 //! record, so
@@ -18,6 +18,7 @@
 
 // sorted: one module per dev namespace; kept in order so parallel branches don't collide
 mod bake;
+mod bake_report;
 mod capture;
 mod debug;
 mod editor;
@@ -44,6 +45,7 @@ fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // sorted: each registrar adds its own table or extends one `api` made; `voices`
     // extends `Speech`, which `speech` sorts before
     bake::register(lua, ctx)?;
+    bake_report::register(lua, ctx)?;
     capture::register(lua, ctx)?;
     debug::register(lua, ctx)?;
     editor::register(lua, ctx)?;
@@ -53,6 +55,8 @@ fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     voices::register(lua, ctx)
 }
 
+#[cfg(test)]
+mod bake_report_tests;
 #[cfg(test)]
 mod editor_tests;
 #[cfg(test)]

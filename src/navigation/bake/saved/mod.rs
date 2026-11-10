@@ -25,6 +25,12 @@ use super::BakeState;
 use crate::scene::Scene;
 use file::{Layer, Saved, Shape};
 
+/// The fingerprint of what the bake that wrote `bytes` read (the bake report's
+/// input fingerprint, #1980); `None` when they do not decode.
+pub fn baked_fingerprint(bytes: &[u8]) -> Option<u64> {
+    file::decode(bytes).ok().map(|saved| saved.fingerprint)
+}
+
 impl NavigationGraph {
     /// Bake `scene` in full ([`Self::bake`]) and return the bytes that restore it.
     pub fn bake_to_bytes(&mut self, scene: &Scene) -> Vec<u8> {

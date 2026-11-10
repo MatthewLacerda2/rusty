@@ -7,43 +7,78 @@
 //! batches (#1891) for the log's slowest-meshes lines: the sim says where each batch
 //! starts and ends to a [`MeshClocks`], which reads the clock on this side. Both
 //! paths lend the bake OIDN when its settings pick it (#1884, [`lend_denoiser`]),
-//! and a logged one says what OIDN took.
+//! and a logged one says what OIDN took. Every run times the trace, the encode
+//! and each mesh for the bake's report (#1980), with or without a log.
 
 use std::sync::{mpsc, Arc};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::{encode_pages, lend_denoiser, EncodedPages};
-use crate::dev::bake::progress::{BakeLog, MeshClocks, MeshTime, Progress, Step};
+use crate::dev::bake::progress::{BakeLog, MeshClocks, Progress, Step};
+use crate::dev::bake::report::lightmaps::Measured;
 use crate::scene::lighting::lightmap::BakeSettings;
 use crate::scene::lighting::lightmap::{bake_with_progress, BakeProgress, BakeScene};
 
 /// How often the calling thread reads the counters (the log decides what prints).
 const POLL: Duration = Duration::from_millis(200);
 
+/// A finished logged bake: its pages, the trace's and the encode's wall time, and
+/// what it measured for its report (#1980).
+pub(super) struct Run {
+    pub pages: EncodedPages,
+    pub trace: Duration,
+    pub encode: Duration,
+    pub measured: Measured,
+}
+
 /// Bake and encode `input`, reporting into `log`, with each mesh's worker time
-/// (#1891). An off log runs in line, with no worker and no timing.
+/// (#1891). An off log runs in line, with no worker.
 pub(super) fn bake_logged(
     input: &BakeScene,
     settings: &BakeSettings,
     log: &mut BakeLog,
-) -> Result<(EncodedPages, Vec<MeshTime>), String> {
+) -> Result<Run, String> {
+    // Nobody cancels this one, so it always runs to the end.
     let run = |progress: &BakeProgress| {
-        // Nobody cancels this one, so it always runs to the end.
-        let maps = bake_with_progress(input, settings, progress).unwrap_or_default();
-        encode_pages(&maps, settings.page(), progress)?.ok_or_else(|| "never cancelled".to_string())
+        timed(input, settings, progress)?.ok_or_else(|| "never cancelled".to_string())
     };
-    if !log.is_on() {
-        let (progress, _) = lend_denoiser(BakeProgress::default(), settings);
-        return Ok((run(&progress)?, Vec::new()));
-    }
     let clocks = Arc::new(MeshClocks::default());
     let (progress, oidn) = lend_denoiser(BakeProgress::observed(clocks.clone()), settings);
-    let pages = watch(&progress, read, log, run)?;
-    if let Some((charts, busy)) = oidn.map(|o| o.spent()) {
+    let (pages, trace, encode) = match log.is_on() {
+        true => watch(&progress, read, log, run)?,
+        false => run(&progress)?,
+    };
+    let denoised = oidn.map(|o| o.spent());
+    if let Some((charts, busy)) = denoised {
         log.denoised(charts, busy);
     }
-    Ok((pages, clocks.times()))
+    let measured = Measured {
+        times: clocks.times(),
+        denoised,
+    };
+    Ok(Run {
+        pages,
+        trace,
+        encode,
+        measured,
+    })
+}
+
+/// Bake and encode `input` on this thread, counting into `progress`: the pages,
+/// and how long the trace and the encode took. `Ok(None)` when it was cancelled.
+pub(super) fn timed(
+    input: &BakeScene,
+    settings: &BakeSettings,
+    progress: &BakeProgress,
+) -> Result<Option<(EncodedPages, Duration, Duration)>, String> {
+    let started = Instant::now();
+    let Some(maps) = bake_with_progress(input, settings, progress) else {
+        return Ok(None);
+    };
+    let traced = Instant::now();
+    let pages = encode_pages(&maps, settings.page(), progress)?;
+    Ok(pages.map(|p| (p, traced - started, traced.elapsed())))
 }
 
 /// Run `work` on a scoped worker while this thread logs `progress`, as `read`
