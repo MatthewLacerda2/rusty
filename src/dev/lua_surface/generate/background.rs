@@ -14,8 +14,8 @@
 
 use mlua::Lua;
 
-use super::super::bake::generate_lighting::refuse_while_baking;
 use crate::api::{global_table, put, ApiCtx, Reg};
+use crate::dev::bake::generate_lighting::refuse_while_baking;
 use crate::scene::LIGHTING_IN_PLAY;
 
 /// Why a host that steps no background bake refuses `GenerateAsync`.
@@ -62,5 +62,5 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
 }
 
 #[cfg(test)]
-#[path = "generate_async_tests.rs"]
+#[path = "background_tests.rs"]
 mod tests;

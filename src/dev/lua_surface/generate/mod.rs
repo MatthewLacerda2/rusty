@@ -1,4 +1,5 @@
-//! `Lighting.Generate()` and the scene's lighting settings (#832): the one verb
+//! `Lighting.Generate()` (and, in `background`, `GenerateAsync` / `IsRunning`, #1999)
+//! and the scene's lighting settings (#832): the one verb
 //! behind the editor's Generate Lighting button (lightmaps, probes and, #1714, the
 //! occlusion culling's PVS), `Lighting.BakeOcclusion()` behind its Bake Occlusion
 //! button (#1958: the PVS alone), and `Lighting.GetSettings()` /
@@ -111,6 +112,7 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         }),
     )?;
     register_bake_occlusion(lua, &table, ctx)?;
+    background::register(lua, ctx)?;
     register_settings(lua, &table, scene)
 }
 
@@ -258,9 +260,9 @@ fn set_reflections(t: &Table, r: &mut ReflectionSettings) -> mlua::Result<()> {
     Ok(())
 }
 
+mod background;
+
 #[cfg(test)]
-#[path = "generate_denoiser_tests.rs"]
 mod denoiser_tests;
 #[cfg(test)]
-#[path = "generate_tests.rs"]
 mod tests;

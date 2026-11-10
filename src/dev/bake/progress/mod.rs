@@ -32,8 +32,9 @@
 //! bakes step on the caller's thread. Each [`Line`] says whether it is a milestone
 //! (the lightmap step's start or the total; a probe step's start is already in the
 //! console as the job's own `Baking …` line), which the script verbs keep in the
-//! console as well; every line goes to stderr, the one stream a `play` run or an MCP
-//! client shows while the call blocks (`session-mcp`'s stdout carries only JSON-RPC).
+//! console as well; every line goes to stderr, the one stream a `play` run shows
+//! while the call blocks (`session-mcp`'s stdout carries only JSON-RPC), and to
+//! the thread's [`listen`]er, which turns it into MCP progress (#1999).
 
 use std::cell::RefCell;
 use std::time::{Duration, Instant};

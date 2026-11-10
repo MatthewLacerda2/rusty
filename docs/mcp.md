@@ -77,6 +77,19 @@ the open project's root.
 A tool whose Lua *fails* reports the error in-band (`isError: true` with the message
 as text), per MCP convention — the agent sees it and recovers, the server stays up.
 
+<!-- docrefs: allow MCP's JSON-RPC method names, not repo paths -->
+**Long calls report progress** (#1999). A `tools/call` (or any request) whose
+`params._meta.progressToken` is set, as the MCP spec's progress utility has it, gets
+a `notifications/progress` for that token for each progress line a bake prints while
+the call runs (`Lighting.Generate()`, `Lighting.Bake()`, `Probe.Bake()`, …: every 5 s
+within a step, `docs/api/Lighting.md`), `progress` counting the lines and `message`
+the line itself, then its response as always. Attached to a window, the window
+streams the lines over its socket. A request without a token gets none. A client
+such as Claude Code aborts a tool call that has sent nothing for 30 minutes; each
+notification restarts that clock. For a bake that may run longer, attached to the
+editor, `Lighting.GenerateAsync()` returns at once and `Lighting.IsRunning()` says
+when it is done.
+
 **Engine warnings come back in-band.** When the engine warned or errored while a
 call ran (an asset it skipped, a mesh collider it dropped), the `eval` or `snapshot`
 result carries a **second text block** after the answer, starting `engine warnings:`

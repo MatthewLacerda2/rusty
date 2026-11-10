@@ -23,7 +23,8 @@
 //! emits use `eprintln!` (stderr).
 //!
 //! ## Robustness
-//! A request (has an `id`) gets exactly one response line; a notification (no `id`)
+//! A request (has an `id`) gets exactly one response line, after the progress
+//! notifications its token asked for ([`progress`], #1999); a notification (no `id`)
 //! gets none. A malformed line yields a JSON-RPC parse-error response and the loop
 //! continues — a bad message never panics and never tears down the server. The loop
 //! ends only at EOF (stdin closed).

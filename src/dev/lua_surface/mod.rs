@@ -23,7 +23,6 @@ mod capture;
 mod debug;
 mod editor;
 mod generate;
-mod generate_async;
 mod sfx;
 mod speech;
 mod voices;
@@ -51,7 +50,6 @@ fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     debug::register(lua, ctx)?;
     editor::register(lua, ctx)?;
     generate::register(lua, ctx)?;
-    generate_async::register(lua, ctx)?;
     sfx::register(lua, ctx)?;
     speech::register(lua, ctx)?;
     voices::register(lua, ctx)

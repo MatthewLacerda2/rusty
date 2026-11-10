@@ -2,7 +2,7 @@
 //! loop would step its job (#1999). The round trip through the editor's job is
 //! `editor::inspector::assets::scene::bake`'s `async_tests`.
 
-use super::super::super::session::Session;
+use crate::dev::session::Session;
 
 /// A session whose host steps a background bake, as the editor window marks itself,
 /// with its scene saved under `tag` unless `saved` is false.

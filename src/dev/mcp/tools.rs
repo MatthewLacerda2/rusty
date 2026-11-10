@@ -23,7 +23,9 @@ pub fn tools_list() -> Value {
                     This is the full engine control surface: create/edit/inspect \
                     entities, author assets, save scenes, enter Play \
                     (Editor.EnterPlay), step the sim, etc. See the \
-                    scripting-api resource for the available namespaces and functions.",
+                    scripting-api resource for the available namespaces and functions. \
+                    A bake that may outlast the tool timeout: attached to the editor, \
+                    Lighting.GenerateAsync() returns at once; poll Lighting.IsRunning().",
                 "inputSchema": {
                     "type": "object",
                     "properties": {

@@ -9,6 +9,21 @@ path. The call returns when the bake is done (Unity's `Lightmapping.Bake`); the 
 bakes the same probes a step a frame — one reflection probe or a few light probes —
 so the editor and the MCP keep answering (Unity's `BakeAsync`, #1602). Both say each
 bounce pass and reflection probe in the console (`Baking reflection probe 3 of 12`).
+**`Lighting.GenerateAsync()`** (#1999, Unity's `Lightmapping.BakeAsync`) presses that
+button from a script: it starts the button's own job and returns at once, so prefer
+it for a bake that may outlast the caller's patience, above all an MCP tool call
+(Claude Code aborts a call that has sent nothing for 30 minutes, and a Dust2-sized
+level bakes for longer). Poll **`Lighting.IsRunning()`** (Unity's
+`Lightmapping.isRunning`) until it reads `false`, then read the result with
+`Lighting.GetBakeReport(kind)` and the console (`Generated lighting …`, or why it
+failed). It is refused, with an error, where the button is greyed out: during Play,
+while a bake runs (the button's, or a `GenerateAsync` not yet started), and on a
+scene never saved. Only the editor window steps the job, so a host without one (the
+headless `session` and `session-mcp` without `--attach`, the player, `play`) refuses
+it with an error naming `Lighting.Generate()`, which bakes in the one call there.
+The call only asks: the window's next frame starts the job, and a Play started in
+between refuses it in the console instead. It has no cancel; the card's Cancel button
+stops the lightmap step.
 The two individual verbs stay for a script that wants only one of them. On a
 `Shadowmask` scene (#1695) the lightmap bake records each masked light's channel and
 only a probe bake writes the probes' occlusion on it, reading those channels from the
@@ -21,6 +36,8 @@ first.
 | Function | Signature | Returns |
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
+| `Lighting.GenerateAsync` *(dev-only)* | `()` | `true` once the editor's Generate Lighting job is asked for; returns at once (*Generate Lighting*, above). Errors during Play, while a bake runs, on an unsaved scene, and in a host with no editor window to step the job |
+| `Lighting.IsRunning` *(dev-only)* | `()` | `true` while the editor's Generate Lighting or Bake Occlusion runs, or a `GenerateAsync` waits to start it |
 | `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the counts `0` when nothing occludes, and `tooLarge` (a boolean) `true`, with `cells` and `bytes` `0` and no PVS kept, when the level is too large to cull |
 | `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, samplesPerPass, prioritizeView, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
 | `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, samplesPerPass?, prioritizeView?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
@@ -116,7 +133,9 @@ first.
 - **From a script it logs its progress** (#1667), as Unity's batch-mode bake does: the
   verb blocks its caller until it returns, so a `play` scenario or a `session-mcp` call
   cannot poll, and instead the bake prints a line to **stderr** at each step and every
-  5 s within one. `Lighting.Generate()` first names its steps (#1897):
+  5 s within one. An MCP tool call that carries a progress token hears the same
+  lines as `notifications/progress` (#1999, `docs/mcp.md`), so the client sees the
+  call is alive. `Lighting.Generate()` first names its steps (#1897):
   `[Lighting] steps: lightmaps → lightmap pages → light probes → reflection probes → occlusion`.
   Each line then starts with the time since the bake began (#1891), gives an ETA from
   the step's rate over its last 2 minutes (#1890: a texel's cost varies with the lights
