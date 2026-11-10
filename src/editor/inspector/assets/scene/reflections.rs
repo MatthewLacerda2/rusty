@@ -7,10 +7,11 @@
 
 use egui_phosphor::regular as icon;
 
+use crate::components::transform::{euler_degrees, from_euler_degrees};
 use crate::editor::widgets::DragRange;
 use crate::editor::EditorUi;
 use crate::scene::lighting::settings::ReflectionSettings;
-use crate::scene::{ReflectionProbe, Scene};
+use crate::scene::{ProbeShape, ReflectionProbe, Scene};
 
 /// The face sizes the resolution menus offer: Unity's.
 const SIZES: [u32; 8] = [16, 32, 64, 128, 256, 512, 1024, 2048];
@@ -115,8 +116,27 @@ fn draw_probe(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe, default: u32
         .on_hover_text("What objects outside every probe's box reflect instead of the sky")
         .changed();
     changed |= vec_row(ui, "Position", &mut p.position);
-    changed |= vec_row(ui, "Box min", &mut p.box_min);
-    changed |= vec_row(ui, "Box max", &mut p.box_max);
+    changed |= shape_menu(ui, i, &mut p.shape);
+    match p.shape {
+        ProbeShape::Box => {
+            changed |= vec_row(ui, "Box min", &mut p.box_min);
+            changed |= vec_row(ui, "Box max", &mut p.box_max);
+            // Written back only when edited, so a round trip through Euler
+            // angles never nudges a stored rotation.
+            let mut euler = euler_degrees(p.rotation);
+            if vec_row(ui, "Rotation", &mut euler) {
+                p.rotation = from_euler_degrees(euler);
+                changed = true;
+            }
+        }
+        ProbeShape::Sphere => {
+            let radius = egui::DragValue::new(&mut p.radius).ranged(0.01..=f32::MAX);
+            ui.horizontal(|ui| {
+                changed |= ui.add(radius.speed(0.05)).changed();
+                ui.label("Radius");
+            });
+        }
+    }
     changed |= ui
         .checkbox(&mut p.box_projection, "Box projection")
         .changed();
@@ -155,6 +175,22 @@ fn draw_probe(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe, default: u32
         ui.label("Baked before normalisation: re-bake to darken it in dark corners");
     }
     changed
+}
+
+/// Probe `i`'s *Shape* menu (#1995); returns whether it changed.
+fn shape_menu(ui: &mut egui::Ui, i: usize, shape: &mut ProbeShape) -> bool {
+    let before = *shape;
+    ui.horizontal(|ui| {
+        egui::ComboBox::from_id_salt(("reflection_shape", i))
+            .selected_text(format!("{shape:?}"))
+            .show_ui(ui, |ui| {
+                for s in [ProbeShape::Box, ProbeShape::Sphere] {
+                    ui.selectable_value(shape, s, format!("{s:?}"));
+                }
+            });
+        ui.label("Shape");
+    });
+    *shape != before
 }
 
 /// A labelled x/y/z row; returns whether one changed.

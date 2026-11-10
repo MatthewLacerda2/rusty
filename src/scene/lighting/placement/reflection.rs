@@ -115,11 +115,13 @@ pub fn plan_reflection_probes(
 
 /// Whether manual probe `m` takes `plan`'s place: its box covers at least half of
 /// the plan's box (#1737). A small manual probe in a corner of a room leaves the
-/// room its own probe.
+/// room its own probe. An oriented box or a sphere (#1995) is judged by its
+/// world-aligned bounds.
 fn covers(m: &ReflectionProbe, plan: &ReflectionPlan) -> bool {
     let volume = |lo: Vec3, hi: Vec3| (hi - lo).max(Vec3::ZERO).element_product();
     let own = volume(plan.box_min, plan.box_max);
-    let shared = volume(m.box_min.max(plan.box_min), m.box_max.min(plan.box_max));
+    let (lo, hi) = m.world_bounds();
+    let shared = volume(lo.max(plan.box_min), hi.min(plan.box_max));
     match own > 0.0 {
         true => shared >= own * 0.5,
         false => m.contains(plan.position),

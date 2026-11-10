@@ -5,7 +5,8 @@ use crate::core::color::luminance;
 use crate::scene::lighting::sh::Sh9;
 use crate::scene::ReflectionProbe;
 
-/// One resident probe as the shader reads it: its capture point, its parallax box,
+/// One resident probe as the shader reads it: its capture point and parallax box in
+/// its volume's frame (`ProbeFrame`, #1995) and the rotation into that frame,
 /// its cube's array layer, where the cube's mip chain sits in it, its intensity,
 /// box-projection, fallback and normalisation switches, and the luminance SH of its
 /// stored irradiance. Mirrors `ReflectionProbe` in
@@ -30,6 +31,11 @@ pub(crate) struct ReflectionProbeUniform {
     /// over π ([`Sh9::convolved_over_pi`]), so one dot product with the basis along
     /// `N` gives E/π, the unit the lightmap and the light-probe term hold.
     pub irradiance: [[f32; 4]; 3],
+    /// The quaternion (`x, y, z, w`) that turns a world vector into the volume's
+    /// frame (#1995): identity for a world-aligned box.
+    pub rotation: [f32; 4],
+    /// `x` 1 for a sphere, `y` its radius (#1995); `zw` unused.
+    pub shape: [f32; 4],
 }
 
 impl ReflectionProbeUniform {
@@ -37,12 +43,13 @@ impl ReflectionProbeUniform {
     /// mips below the array's base.
     pub(super) fn of(probe: &ReflectionProbe, shift: u32, mips: u32, layer: u32) -> Self {
         let flag = |on: bool| f32::from(u8::from(on));
+        let frame = probe.frame();
         Self {
-            center: probe.position.to_array(),
+            center: frame.center.to_array(),
             mip_base: shift as f32,
-            box_min: probe.box_min.to_array(),
+            box_min: frame.box_min.to_array(),
             mip_count: mips as f32,
-            box_max: probe.box_max.to_array(),
+            box_max: frame.box_max.to_array(),
             layer,
             params: [
                 probe.intensity,
@@ -51,6 +58,13 @@ impl ReflectionProbeUniform {
                 flag(probe.irradiance.is_some()),
             ],
             irradiance: probe.irradiance.map_or([[0.0; 4]; 3], luminance_sh),
+            rotation: frame.inverse.to_array(),
+            shape: [
+                flag(frame.sphere.is_some()),
+                frame.sphere.unwrap_or(0.0),
+                0.0,
+                0.0,
+            ],
         }
     }
 }

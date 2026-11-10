@@ -82,7 +82,7 @@ pub use io::{
 pub use lighting::io::{sidecar_path, LightingData};
 pub use lighting::probe::{Probe, ProbeGrid, ProbeVolume};
 pub use lighting::probe_fill::analytic_fill;
-pub use lighting::reflection_probe::{ReflectionProbe, ReflectionProbeSet};
+pub use lighting::reflection_probe::{ProbeShape, ReflectionProbe, ReflectionProbeSet};
 pub use lighting::sh::Sh9;
 pub use prefab::link::{list_instance_overrides, reimport_instance, revert_instance_overrides};
 pub use prefab::{

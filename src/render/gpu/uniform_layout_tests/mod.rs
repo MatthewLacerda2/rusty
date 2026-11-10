@@ -150,6 +150,9 @@ fn lighting_uniform_matches_wgsl_layout() {
         ("box_max", offset_of!(ReflectionProbeUniform, box_max)),
         ("layer", offset_of!(ReflectionProbeUniform, layer)),
         ("params", offset_of!(ReflectionProbeUniform, params)),
+        ("irradiance", offset_of!(ReflectionProbeUniform, irradiance)),
+        ("rotation", offset_of!(ReflectionProbeUniform, rotation)),
+        ("shape", offset_of!(ReflectionProbeUniform, shape)),
     ];
     assert_layout(
         "ReflectionProbe",

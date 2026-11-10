@@ -75,6 +75,7 @@ mod probe_normalisation_screenshot;
 mod proxy_volume_clamp;
 mod proxy_volume_screenshot;
 mod reflection_probe_per_object_screenshot;
+mod reflection_probe_seam_screenshot;
 mod render_texture_scene;
 mod render_texture_screenshot;
 mod ribbons_screenshot;

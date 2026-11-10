@@ -149,7 +149,7 @@ pub(super) fn ranked(probes: &[ReflectionProbe], camera_pos: Vec3) -> Vec<usize>
     let mut order: Vec<usize> = (0..probes.len())
         .filter(|&i| !probes[i].cubemap_path.is_empty())
         .collect();
-    let distance = |i: usize| probes[i].box_distance_sq(camera_pos);
+    let distance = |i: usize| probes[i].volume_distance_sq(camera_pos);
     order.sort_by(|&a, &b| {
         (!probes[a].fallback)
             .cmp(&!probes[b].fallback)

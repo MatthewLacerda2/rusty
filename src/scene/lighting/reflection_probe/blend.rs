@@ -36,7 +36,7 @@ impl ReflectionProbe {
     /// How strongly this probe applies at `point`: 1 in its box, falling linearly to
     /// 0 at [`Self::blend_distance`] past it.
     pub fn influence(&self, point: Vec3) -> f32 {
-        let outside = self.box_distance_sq(point);
+        let outside = self.volume_distance_sq(point);
         if outside <= 0.0 {
             return 1.0;
         }

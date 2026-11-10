@@ -34,8 +34,16 @@ pub fn report(
         usize,
         &crate::scene::lighting::reflection_probe::ReflectionProbe,
     )| {
+        // World-aligned bounds, so an oriented box or a sphere (#1995) is judged by
+        // what it could reach.
+        let (a0, a1) = p.world_bounds();
         let overlaps = (set.probes.iter().enumerate())
-            .filter(|&(j, q)| j != i && boxes_overlap(p.box_min, p.box_max, q.box_min, q.box_max))
+            .filter(|&(j, q)| {
+                j != i && {
+                    let (b0, b1) = q.world_bounds();
+                    boxes_overlap(a0, a1, b0, b1)
+                }
+            })
             .map(|(j, _)| j);
         json!({
             "index": i,
