@@ -7,11 +7,12 @@
 //!
 //! - [`generators`] — sources with no input (constant, noise and its fBM / ridged /
 //!   turbulence family, Voronoi F1 / F2 / edges, gradient,
-//!   wave, brick, shape, checker, white noise, and an image file).
-//! - [`color`] — color ramp, mix (blend modes), invert, bright/contrast, HSV, gamma,
-//!   auto levels.
+//!   wave, brick, shape, checker, white noise, the pixel's own coordinates, and an
+//!   image file).
+//! - [`color`] — mix (blend modes), invert, bright/contrast, HSV, gamma, auto
+//!   levels; [`ramp`] — the color ramp.
 //! - [`vector`] — domain mapping, domain warp, bump→normal, normal blend,
-//!   combine/separate RGB;
+//!   combine/separate RGB; [`sample`] — sampling a map at given coordinates;
 //!   [`tile`] — the seeded grid scatter.
 //! - [`math`] — math (against a constant or a second image), map range, clamp,
 //!   RGB→BW.
@@ -36,6 +37,8 @@ pub mod filter;
 pub mod flood;
 pub mod generators;
 pub mod math;
+pub mod ramp;
+pub mod sample;
 pub mod tile;
 pub mod vector;
 
@@ -94,4 +97,4 @@ mod link_tests;
 #[cfg(test)]
 mod seed_tests;
 #[cfg(test)]
-mod test_graph;
+pub(crate) mod test_graph;

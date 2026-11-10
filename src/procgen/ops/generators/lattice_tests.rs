@@ -60,6 +60,7 @@ pub(super) fn distorted_ops(s: f32) -> Vec<OpKind> {
     ops.push(OpKind::Noise(Noise {
         kind,
         scale,
+        aspect: [1.0, 1.0],
         octaves,
         lacunarity,
         gain,

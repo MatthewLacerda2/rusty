@@ -3,7 +3,8 @@
 //! The runner produces a linear `[f32; 4]` buffer; the bake turns it into an RGBA
 //! `.png` the renderer's `load_texture` already consumes: 8 bits per channel for
 //! every slot but `data`, which bakes 16 (#1491) so a height field used as
-//! displacement or a terrain heightmap doesn't terrace into 256 steps. The crucial step is
+//! displacement or a terrain heightmap doesn't terrace into 256 steps, and
+//! `normal16`, a normal map at 16 (#2002) for relief subtler than one 8-bit step. The crucial step is
 //! **per-slot encoding**, so a baked map drops straight into a glTF material slot
 //! with the right color space and channel layout:
 //!
@@ -32,6 +33,9 @@ pub enum Slot {
     Emissive,
     /// Tangent-space normal map — linear, channels passed through.
     Normal,
+    /// [`Slot::Normal`] at 16 bits per channel (#2002): a slope under about 1/255
+    /// that 8 bits round flat survives. It fills `normal_map` as `normal` does.
+    Normal16,
     /// Standalone linear roughness map.
     Roughness,
     /// Standalone linear metallic map.
@@ -46,7 +50,7 @@ pub enum Slot {
 impl Slot {
     /// The canonical slot names, as an unknown-slot error lists them.
     const NAMES: &'static str =
-        "base_color (albedo), emissive, normal, roughness, metallic, metallic_roughness (orm), data";
+        "base_color (albedo), emissive, normal, normal16, roughness, metallic, metallic_roughness (orm), data";
 
     /// Parse a slot name (case-insensitive, `-`/`_` ignored). An unknown name is an
     /// error listing the valid ones (#395): a typo like `basecolour` must not
@@ -58,6 +62,7 @@ impl Slot {
                 "basecolor" | "albedo" | "color" => Slot::BaseColor,
                 "emissive" | "emission" => Slot::Emissive,
                 "normal" => Slot::Normal,
+                "normal16" => Slot::Normal16,
                 "roughness" => Slot::Roughness,
                 "metallic" => Slot::Metallic,
                 "metallicroughness" | "mr" | "orm" => Slot::MetallicRoughness,
@@ -79,6 +84,7 @@ impl Slot {
             Slot::BaseColor => "base_color",
             Slot::Emissive => "emissive",
             Slot::Normal => "normal",
+            Slot::Normal16 => "normal16",
             Slot::Roughness => "roughness",
             Slot::Metallic => "metallic",
             Slot::MetallicRoughness => "metallic_roughness",
@@ -93,11 +99,20 @@ impl Slot {
         match self {
             Slot::BaseColor => &["base_color_map"],
             Slot::Emissive => &["emissive_map"],
-            Slot::Normal => &["normal_map"],
+            Slot::Normal | Slot::Normal16 => &["normal_map"],
             Slot::Roughness => &["roughness_map"],
             Slot::Metallic => &["metallic_map"],
             Slot::MetallicRoughness => &["metallic_map", "roughness_map"],
             Slot::Data => &[],
+        }
+    }
+
+    /// The slot a set may name once: a slot at another bit depth is that slot, so
+    /// `normal` and `normal16` in one set are the normal map twice.
+    pub fn kind(self) -> Slot {
+        match self {
+            Slot::Normal16 => Slot::Normal,
+            other => other,
         }
     }
 
@@ -136,8 +151,8 @@ fn to_u8(v: f32) -> u8 {
 }
 
 /// Encode `img` for `slot` into an 8-bit RGBA [`ImageBuffer`] — the in-memory PNG
-/// pixels, before writing, for every slot but [`Slot::Data`], which bakes through
-/// [`encode_data`]. Exposed so tests can assert bytes without disk I/O.
+/// pixels, before writing, for every slot but [`Slot::Data`] and [`Slot::Normal16`],
+/// which bake through [`encode_data`]. Exposed so tests can assert bytes without disk I/O.
 pub fn encode(img: &Image, slot: Slot) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let w = img.width();
     let mut buf = ImageBuffer::new(w, img.height());
@@ -149,8 +164,8 @@ pub fn encode(img: &Image, slot: Slot) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     buf
 }
 
-/// Encode `img` as a [`Slot::Data`] map: 16-bit linear RGBA, each channel clamped
-/// to `[0, 1]` and rounded to the nearest of 65536 steps.
+/// Encode `img` as a [`Slot::Data`] or [`Slot::Normal16`] map: 16-bit linear RGBA,
+/// each channel clamped to `[0, 1]` and rounded to the nearest of 65536 steps.
 pub fn encode_data(img: &Image) -> ImageBuffer<Rgba<u16>, Vec<u16>> {
     let raw = img
         .pixels()
@@ -165,7 +180,7 @@ pub fn encode_data(img: &Image) -> ImageBuffer<Rgba<u16>, Vec<u16>> {
 /// it (#689). Returns the path.
 pub fn bake_to_png(img: &Image, slot: Slot, path: &str) -> Result<String, String> {
     match slot {
-        Slot::Data => encode_data(img).save(path),
+        Slot::Data | Slot::Normal16 => encode_data(img).save(path),
         _ => encode(img, slot).save(path),
     }
     .map_err(|e| format!("cannot write {path}: {e}"))?;
@@ -242,6 +257,25 @@ mod tests {
                 p[0]
             );
         }
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn normal16_keeps_a_slope_8_bits_round_flat() {
+        // 0.5 + 1/1024 is a quarter of an 8-bit step: `normal` rounds it to 128,
+        // `normal16` keeps it to 1/65535.
+        let img = Image::filled(2, [0.5 + 1.0 / 1024.0, 0.5, 1.0, 1.0]);
+        assert_eq!(encode(&img, Slot::Normal).get_pixel(0, 0).0[0], 128);
+        let path = crate::test_temp::dir().join("rusty_bake_normal16_2002.png");
+        bake_to_png(&img, Slot::Normal16, path.to_str().unwrap()).unwrap();
+        let back = image::open(&path).unwrap();
+        assert_eq!(back.color(), image::ColorType::Rgba16);
+        let r = f32::from(back.to_rgba16().get_pixel(0, 0).0[0]) / 65535.0;
+        assert!((r - img.pixels()[0][0]).abs() <= 0.5 / 65535.0, "{r}");
+        assert_eq!(
+            Slot::parse("normal16").unwrap().material_maps(),
+            ["normal_map"]
+        );
         std::fs::remove_file(path).ok();
     }
 

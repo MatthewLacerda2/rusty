@@ -46,28 +46,34 @@ pub const MAX_DISTORTION: f32 = 1000.0;
 /// The seed salts of the warp's two push octaves, apart from every fBM octave's.
 const WARP_SALT: [u64; 2] = [0x5bd1_e995, 0x27d4_eb2f];
 
-/// The sampler for a [`NoiseKind`] at `scale` lattice cells per tile, its octaves
+/// The sampler for a [`NoiseKind`] at `scale` lattice cells per tile across and down
+/// (each rounded on its own, so a non-square map can extend the pattern), its octaves
 /// `(count, lacunarity, gain)`, the gain read at each pixel (#1494), and its
 /// `distortion` in lattice cells (NaN reads 0, the rest is capped at
 /// [`MAX_DISTORTION`]). `perlin` is a single octave whatever `octaves` says.
 pub fn sampler(
     kind: NoiseKind,
-    scale: f32,
+    scale: [f32; 2],
     (octave_count, lacunarity, gain): (u32, f32, Field<'_>),
     distortion: f32,
     seed: u64,
 ) -> Sampler<'_> {
-    let base = count(scale);
-    let warp = finite(distortion, 0.0).clamp(-MAX_DISTORTION, MAX_DISTORTION) / base;
+    let base = scale.map(count);
+    let push = finite(distortion, 0.0).clamp(-MAX_DISTORTION, MAX_DISTORTION);
+    let warp = base.map(|b| push / b);
     Box::new(move |u, v| {
         // The gain is read at the pixel, before the warp: a warped read would leave
         // the tile and clamp, opening a seam a tiling link doesn't have.
         let gain = gain.at_pixel(u, v);
-        let (u, v) = if warp == 0.0 {
+        let (u, v) = if push == 0.0 {
             (u, v)
         } else {
-            let push = |salt: u64| warp * perlin_tiling(u, v, base, seed ^ salt) * UNIT;
-            (u + push(WARP_SALT[0]), v + push(WARP_SALT[1]))
+            // `w × n × UNIT`, in that order: the bytes a square warp always baked.
+            let push = |w: f32, salt: u64| w * perlin_tiling(u, v, base, seed ^ salt) * UNIT;
+            (
+                u + push(warp[0], WARP_SALT[0]),
+                v + push(warp[1], WARP_SALT[1]),
+            )
         };
         let octaves = match kind {
             NoiseKind::Perlin => Octaves::new(1, 2.0, 0.5),
@@ -86,10 +92,10 @@ pub fn sampler(
 
 /// Sum `octaves` Perlin octaves, each passed through `shape`, normalized by the total
 /// amplitude. Octave 0's seed is the recipe seed unchanged.
-fn sum(u: f32, v: f32, base: f32, oct: Octaves, seed: u64, shape: impl Fn(f32) -> f32) -> f32 {
+fn sum(u: f32, v: f32, base: [f32; 2], oct: Octaves, seed: u64, shape: impl Fn(f32) -> f32) -> f32 {
     let (mut total, mut amp, mut freq, mut norm) = (0.0, 1.0, 1.0, 0.0);
     for o in 0..oct.count {
-        let period = count(base * freq);
+        let period = base.map(|b| count(b * freq));
         total += amp
             * shape(perlin_tiling(
                 u,
@@ -107,18 +113,26 @@ fn sum(u: f32, v: f32, base: f32, oct: Octaves, seed: u64, shape: impl Fn(f32) -
 /// `octaves` doubling fBM octaves of signed Perlin at `period` cells per tile, about
 /// `[-1, 1]`: the noise `wave`'s `distortion` pushes its phase by.
 pub(super) fn signed_fbm(u: f32, v: f32, period: f32, octaves: u32, seed: u64) -> f32 {
-    sum(u, v, period, Octaves::new(octaves, 2.0, 0.5), seed, |n| n) * UNIT
+    sum(
+        u,
+        v,
+        [period; 2],
+        Octaves::new(octaves, 2.0, 0.5),
+        seed,
+        |n| n,
+    ) * UNIT
 }
 
 /// A single octave of tiling gradient (Perlin) noise in `[-1, 1]`. `period` is a
-/// whole number; the integer lattice is taken modulo it so the field is periodic.
-fn perlin_tiling(u: f32, v: f32, period: f32, seed: u64) -> f32 {
-    let (x, y) = (u * period, v * period);
+/// whole number per axis; the integer lattice is taken modulo it so the field is
+/// periodic.
+fn perlin_tiling(u: f32, v: f32, period: [f32; 2], seed: u64) -> f32 {
+    let (x, y) = (u * period[0], v * period[1]);
     let (x0, y0) = (x.floor() as i64, y.floor() as i64);
     let (fx, fy) = (x - x0 as f32, y - y0 as f32);
-    let per = period as i64;
+    let per = period.map(|p| p as i64);
     let corner = |cx: i64, cy: i64, lx: f32, ly: f32| {
-        let (wx, wy) = (cx.rem_euclid(per), cy.rem_euclid(per));
+        let (wx, wy) = (cx.rem_euclid(per[0]), cy.rem_euclid(per[1]));
         let ang = hash::unit2(wx, wy, 6, seed) * std::f32::consts::TAU;
         ang.cos() * lx + ang.sin() * ly
     };

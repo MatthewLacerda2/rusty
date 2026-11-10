@@ -18,6 +18,10 @@ use crate::procgen::recipe::{
 pub struct Noise {
     pub kind: NoiseKind,
     pub scale: f32,
+    /// `scale`'s multiplier across and down (#2002): `{1, 2}` packs twice the cells
+    /// down as across, for a map twice as tall as it is wide.
+    #[serde(default = "square")]
+    pub aspect: [f32; 2],
     #[serde(default = "one")]
     pub octaves: u32,
     #[serde(default = "two")]
@@ -38,6 +42,7 @@ impl Row for Noise {
         &[
             choice("kind", &["perlin", "fbm", "ridged", "turbulence"]),
             req("scale", "number"),
+            opt("aspect", "vec2", Lit::Vec2([1.0, 1.0])),
             opt("octaves", "integer", Lit::Integer(1)),
             opt("lacunarity", "number", Lit::Number(2.0)),
             socket(opt("gain", "number", Lit::Number(0.5))),
@@ -71,4 +76,8 @@ fn two() -> f32 {
 
 fn half() -> Param {
     Param::Num(0.5)
+}
+
+fn square() -> [f32; 2] {
+    [1.0, 1.0]
 }

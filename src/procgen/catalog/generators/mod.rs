@@ -13,6 +13,7 @@ pub mod anisotropic_noise;
 pub mod brick;
 pub mod checker;
 pub mod constant;
+pub mod coordinates;
 pub mod gradient;
 pub mod image;
 pub mod noise;

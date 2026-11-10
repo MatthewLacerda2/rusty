@@ -7,38 +7,38 @@ use crate::procgen::hash;
 use crate::procgen::ops::field::{Field, PerCell};
 use crate::procgen::recipe::{VoronoiMetric, VoronoiOutput};
 
-/// The `scale`-cells-per-tile Voronoi sampler. Each cell's feature point sits at the
+/// The Voronoi sampler, `scale` cells per tile across and down (each a whole count). Each cell's feature point sits at the
 /// cell centre pushed by `randomness` (clamped to `[0, 1]`) of a full-cell jitter, so
 /// 0 is a regular grid and 1 is anywhere in the cell; `metric` measures distance.
 /// A linked `randomness` is read at each cell's centre, wrapped, so the cell keeps
 /// one point and the pattern still tiles (#1494). `smoothness` (clamped to
 /// `[0, 1]`, NaN reading 0) is `SmoothF1`'s.
 pub fn sampler(
-    scale: f32,
+    scale: [f32; 2],
     (output, metric): (VoronoiOutput, VoronoiMetric),
     randomness: Field<'_>,
     smoothness: f32,
     seed: u64,
 ) -> Sampler<'_> {
     let smooth = SmoothMin::new(smoothness);
-    let cells = count(scale);
-    let per = cells as i64;
+    let cells = scale.map(count);
+    let per = cells.map(|c| c as i64);
     let reach = reach(output, metric);
-    let centre = move |c: i64| (c as f32 + 0.5) / cells;
-    let jitters = PerCell::new(per, &[randomness], move |cell: (i64, i64)| {
+    let centre = move |c: i64, axis: usize| (c as f32 + 0.5) / cells[axis];
+    let jitters = PerCell::grid((per[0], per[1]), &[randomness], move |cell: (i64, i64)| {
         randomness
-            .at_uv(centre(cell.0), centre(cell.1))
+            .at_uv(centre(cell.0, 0), centre(cell.1, 1))
             .clamp(0.0, 1.0)
     });
     Box::new(move |u, v| {
-        let (px, py) = (u * cells, v * cells);
+        let (px, py) = (u * cells[0], v * cells[1]);
         let (gx, gy) = (px.floor() as i64, py.floor() as i64);
         let (mut f1, mut f2, mut best_cell) = (f32::MAX, f32::MAX, (0, 0));
         let mut soft = None;
         for dy in -reach..=reach {
             for dx in -reach..=reach {
                 let (cx, cy) = (gx + dx, gy + dy);
-                let cell = (cx.rem_euclid(per), cy.rem_euclid(per));
+                let cell = (cx.rem_euclid(per[0]), cy.rem_euclid(per[1]));
                 let jitter = jitters.get(cell);
                 let at = |ch| 0.5 + jitter * (hash::unit2(cell.0, cell.1, ch, seed) - 0.5);
                 let dist = measure(metric, cx as f32 + at(1) - px, cy as f32 + at(2) - py);

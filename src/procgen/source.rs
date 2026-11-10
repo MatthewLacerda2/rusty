@@ -6,8 +6,15 @@
 //! the bytes, and hands them here to decode. [`Sources`] maps each path, as the
 //! recipe spells it, to its [`Source`]; the runner refuses a recipe whose `image`
 //! node has none, before anything evaluates.
+//!
+//! A decoded file is `width × height` RGBA f32, half a gigabyte at 8192 × 4096, so
+//! a caller with large files hands in a **loader** instead ([`Sources::lazy`], #2002):
+//! the runner decodes a file only when an `image` node that reads it runs, which
+//! a requested output must need, and drops it once the last such node has run.
+//! Laziness moves memory, never bytes: the texels are the same either way.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use super::image_buf::Rgba;
 
@@ -69,10 +76,28 @@ impl Source {
     }
 }
 
-/// The decoded files of a recipe's `image` nodes, keyed by path as the recipe
-/// writes it. Empty by default: a recipe without `image` nodes needs none.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Sources(BTreeMap<String, Source>);
+/// Reads and decodes one file on demand: the caller's, since procgen reads no files.
+pub type Loader = Arc<dyn Fn(&str) -> Result<Source, String> + Send + Sync>;
+
+/// The files of a recipe's `image` nodes, keyed by path as the recipe writes it:
+/// each decoded already ([`Self::insert`]) or named for [`Self::lazy`]'s loader to
+/// decode when the runner needs it. Empty by default: a recipe without `image`
+/// nodes needs none.
+#[derive(Clone, Default)]
+pub struct Sources {
+    decoded: BTreeMap<String, Source>,
+    lazy: BTreeSet<String>,
+    loader: Option<Loader>,
+}
+
+impl std::fmt::Debug for Sources {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Sources")
+            .field("decoded", &self.decoded.keys().collect::<Vec<_>>())
+            .field("lazy", &self.lazy)
+            .finish()
+    }
+}
 
 impl Sources {
     /// No sources.
@@ -80,14 +105,41 @@ impl Sources {
         Self::default()
     }
 
-    /// Add (or replace) the source for `path`.
-    pub fn insert(&mut self, path: impl Into<String>, source: Source) {
-        self.0.insert(path.into(), source);
+    /// The files at `paths`, none decoded yet: `loader` decodes one when a node
+    /// that reads it runs, and the runner drops it after the last such node.
+    pub fn lazy(paths: impl IntoIterator<Item = String>, loader: Loader) -> Self {
+        Self {
+            decoded: BTreeMap::new(),
+            lazy: paths.into_iter().collect(),
+            loader: Some(loader),
+        }
     }
 
-    /// The source for `path`, if the caller provided one.
+    /// Add (or replace) the decoded source for `path`.
+    pub fn insert(&mut self, path: impl Into<String>, source: Source) {
+        self.decoded.insert(path.into(), source);
+    }
+
+    /// The decoded source for `path`, if the caller handed one in decoded.
     pub fn get(&self, path: &str) -> Option<&Source> {
-        self.0.get(path)
+        self.decoded.get(path)
+    }
+
+    /// Free `path`'s decoded file.
+    pub fn remove(&mut self, path: &str) {
+        self.decoded.remove(path);
+    }
+
+    /// Whether `path` is here, decoded or for the loader.
+    pub fn has(&self, path: &str) -> bool {
+        self.decoded.contains_key(path) || self.lazy.contains(path)
+    }
+
+    /// Decode `path` through the loader: `None` when it is decoded already or not
+    /// here at all.
+    pub fn load(&self, path: &str) -> Option<Result<Source, String>> {
+        let loader = self.loader.as_ref()?;
+        (self.lazy.contains(path) && !self.decoded.contains_key(path)).then(|| loader(path))
     }
 }
 
@@ -112,6 +164,19 @@ mod tests {
         assert_eq!(source.size(), (2, 1));
         let [r, g, b, a] = source.texels()[1];
         assert_eq!((r, g, b, a), (1.0 / 65535.0, 32768.0 / 65535.0, 1.0, 1.0));
+    }
+
+    #[test]
+    fn a_lazy_path_is_here_but_decoded_only_on_load() {
+        let loader: Loader = Arc::new(|path| match path {
+            "a.png" => Source::from_texels(1, 1, vec![[1.0; 4]]),
+            _ => Err("no such file".into()),
+        });
+        let sources = Sources::lazy(["a.png".into(), "b.png".into()], loader);
+        assert!(sources.has("a.png") && sources.get("a.png").is_none());
+        assert_eq!(sources.load("a.png").unwrap().unwrap().texels(), [[1.0; 4]]);
+        assert!(sources.load("b.png").unwrap().is_err());
+        assert!(!sources.has("c.png") && sources.load("c.png").is_none());
     }
 
     #[test]

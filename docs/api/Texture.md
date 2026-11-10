@@ -38,14 +38,16 @@ lists the valid ones — a typo like `"basecolour"` never silently bakes linear 
 | `base_color` / `albedo` | **sRGB** | — |
 | `emissive` | **sRGB** | — |
 | `normal` | linear | tangent-space (use a `bump_to_normal` op) |
+| `normal16` | linear, **16-bit** | as `normal`, for relief subtler than one 8-bit step |
 | `roughness` | linear | — |
 | `metallic` | linear | — |
 | `metallic_roughness` / `orm` | linear | reads **metallic from the input's R, roughness from its G** (input B is ignored), and writes them as glTF's packed map: **metallic → B, roughness → G**, R = 0 |
 | `data` | linear, **16-bit** | — (height/masks/anything raw; the explicit way to get unencoded output) |
 
-Every slot bakes 8 bits per channel except `data`, which bakes a **16-bit** PNG
-(#1491): a height field used as displacement or a terrain heightmap keeps 65536
-levels instead of terracing into 256 steps. The 16 bits are the file's: the renderer
+Every slot bakes 8 bits per channel except `data` and `normal16`, which bake a
+**16-bit** PNG (#1491, #2002): a height field used as displacement or a terrain
+heightmap keeps 65536 levels instead of terracing into 256 steps, and a normal map
+keeps slopes under about 0.004 that 8 bits round flat (a mirror-polished stone). The 16 bits are the file's: the renderer
 loads it as a material map like any other PNG, but uploads every map at 8 bits per
 channel at most today (and block-compressed below that once the import cache has
 made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the extra precision serves what reads the file itself (an
@@ -55,8 +57,8 @@ made its copy, unless its `compression` is `"None"`; see `Assets.md`), so the ex
 occlusion-roughness-metallic map: rusty's material has no occlusion map, so nothing
 is written to R.
 
-**The target folder.** `Bake` and `BakeSet` make the missing folders above `path`
-(or above `prefix`) when they lie inside the project, so a new set can bake to
+**The target folder.** `Bake`, `BakeSet` and `Preview` make the missing folders
+above `path` (or above `prefix`) when they lie inside the project, so a new set can bake to
 `assets/textures/<new set>/brick` at once (#1850). A target outside the project is
 written only into a folder that already exists. A write that still fails names the
 verb and the path: `Texture.BakeSet: cannot write <path>: <os error>`.
@@ -95,6 +97,7 @@ and the file name use the canonical name: `albedo` → `base_color`, `orm` →
 | `base_color` | `base_color_map` |
 | `emissive` | `emissive_map` |
 | `normal` | `normal_map` |
+| `normal16` | `normal_map` (a set names `normal` or `normal16`, not both) |
 | `roughness` | `roughness_map` |
 | `metallic` | `metallic_map` |
 | `metallic_roughness` | `metallic_map` **and** `roughness_map` (the same PNG) |
@@ -210,6 +213,9 @@ everywhere in a recipe — on the recipe itself, on a node, on a ramp stop: `{ o
 "noise", scael = 8 }` is refused with a message naming `scael` and the params `noise`
 takes, rather than baking with the default scale. The runner evaluates the DAG
 in dependency order in linear `[f32]` RGBA, then the bake encodes/packs per `slot`.
+It runs only the nodes the requested outputs need, frees each image after its last
+reader, and holds a grayscale image waiting for its readers as one channel, a
+quarter of its RGBA size; none of that changes a baked byte.
 A node `id` holds no `/` or `.`: those name a graph's inner nodes and outputs. A
 recipe may also declare `params` and `inputs`, which make it a graph another recipe
 instances as one node (*Graphs* below).
@@ -262,7 +268,8 @@ transform: a 0.5 mask shows as 188, not 128. Alpha is not shown.
 `size` defaults to 128, or the recipe's longer side when that is smaller; a `size`
 above that side is an error, since a tile larger than the image adds nothing.
 Both verbs refuse a recipe whose `output` or `outputs` names a missing node, as the
-bakes do.
+bakes do. `Preview` makes the missing folders above `path` as `Bake` does (*The
+target folder*).
 
 ```lua no-run
 local p = Texture.Preview(recipe, "out/preview.png", 96)
@@ -368,10 +375,16 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
 - `color_ramp {stops, interpolation="linear"|"constant"|"ease"}` (*color*, 1 input):
   as Blender's ColorRamp: `constant` holds each stop's colour from its position up to
   the next stop — hard bands for toon, stylized and posterized looks — and `ease` is
-  a smoothstep between stops, soft into and out of each colour.
-- `combine_rgb` (*vector*, 1 to 3 inputs): grayscale inputs → R, G, B; a channel
-  without an input reads 0.
+  a smoothstep between stops, soft into and out of each colour. Each pixel finds its
+  stops by binary search, so a lookup ramp of thousands of stops stays cheap.
+- `combine_rgb` (*vector*, 1 to 4 inputs): grayscale inputs → R, G, B and alpha (each
+  input's red); a colour channel without an input reads 0, alpha without one reads 1.
 - `constant {color}` (*generator*).
+- `coordinates` (*generator*): each pixel centre's position in the tile, `u` in red
+  and `v` in green (blue 0, alpha 1), Blender's *Texture Coordinate*. Shape it with
+  `math` (`sin`, `cos`, `atan2`, `divide`, …) and feed it to `sample_at` to remap a
+  map by any per-pixel function: a perspective ground, a polar unwrap. It is a ramp,
+  so it does not tile on its own.
 - `curvature {radius, strength=1}` (*filter*, 1 input): height → `0.5 + strength × (h
   − mean of h on a ring radius away)`: above mid-grey on convex edges — edge wear —
   below in concave grooves — grime; `map_range` it into a hard mask.
@@ -475,10 +488,13 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   diagonal ones. For streaks at any angle, `directional_blur` a noise (or
   `directional_warp` it).
 - `math {func, value=0.5}` (*math*, 1 or 2 inputs) with `func` ∈
-  `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt`: the right-hand side is
-  `value`, or with a second input wired, that input's matching channel per pixel
-  (`value` is then ignored, Blender's Math with both sockets linked). `abs`, `fract`
-  and `sqrt` have no right-hand side, so they take exactly 1 input.
+  `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt/sin/cos/atan2`: the
+  right-hand side is `value`, or with a second input wired, that input's matching
+  channel per pixel (`value` is then ignored, Blender's Math with both sockets
+  linked). `abs`, `fract`, `sqrt`, `sin` and `cos` have no right-hand side, so they
+  take exactly 1 input. The trig funcs work in **radians**, as Blender's: `sin` of a
+  `coordinates` channel times `2π` is one cycle per tile, and `atan2` is the angle of
+  the point (right-hand side, channel), `-π` to `π`.
 - `mix {mode, factor=1}` (*color*, 2 or 3 inputs) with `mode` ∈
   `mix/add/multiply/screen/overlay/subtract/difference/lighten/darken/divide`: inputs
   `{a, b, mask}`; the result is `a` blended toward `mode(a, b)` by `factor`, and an
@@ -487,8 +503,9 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   min — the way to combine height fields (rivets over a panel, stones over mortar),
   where `add` overshoots; `divide` is `a / b`, and a channel of `b` at (near) 0 leaves
   `a`.
-- `noise {kind="perlin"|"fbm"|"ridged"|"turbulence", scale, octaves=1, lacunarity=2,
-  gain=0.5, distortion=0, seed=0}` (*generator*): `ridged` is `1 − |n|` squared — rock
+- `noise {kind="perlin"|"fbm"|"ridged"|"turbulence", scale, aspect={1,1}, octaves=1,
+  lacunarity=2, gain=0.5, distortion=0, seed=0}` (*generator*): `aspect` multiplies
+  `scale` across and down, each rounded on its own (*Non-square bakes*); `ridged` is `1 − |n|` squared — rock
   veins, scratches; `turbulence` is `|n|` — smoke, grime; the fBM family stacks
   `octaves`, each `lacunarity`× the frequency and `gain`× the amplitude of the last;
   `perlin` is one octave. `distortion` is Blender's Noise Texture *Distortion*: a
@@ -503,6 +520,14 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   side returns the other. Never `mix` normal maps: adding or averaging their RGB
   flattens them.
 - `rgb_to_bw` (*math*, 1 input).
+- `sample_at` (*vector*, 2 or 3 inputs): input A read at the domain point the other
+  inputs name, in tile units and wrapped: with two inputs B's red is `u` and its
+  green `v` (what `coordinates` writes), with three B's red is `u` and C's red is
+  `v`. Each pixel is filtered by its footprint (how far the coordinates move to its
+  neighbours) through a mip chain of A, trilinear, so a remap that shrinks A reads
+  its average instead of aliasing. A jump in the coordinates (a `fract` wrap) is not
+  taken as a footprint, so it stays sharp. `sample_at` of `coordinates` is A
+  unchanged.
 - `separate_rgb {channel=0..3}` (*vector*, 1 input).
 - `shape {kind="circle"|"rect"|"rounded_rect"|"line"|"polygon"|"star", size=[w,h],
   roundness=0.25, softness=0, sides=6, points=5, inner_radius=0.5,
@@ -568,8 +593,11 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   thin; output alpha is left as `max` leaves it. A NaN `probability` or
   `value_jitter` is ignored, an out-of-range one clamped. Rivets are `shape circle`
   → `tile`.
-- `voronoi {scale, output="distance"|"cells"|"f2"|"edges"|"smooth_f1",
-  metric="euclidean"|"manhattan"|"chebyshev", randomness=1, smoothness=1, seed=0}` (*generator*):
+- `voronoi {scale, aspect={1,1}, output="distance"|"cells"|"f2"|"edges"|"smooth_f1",
+  metric="euclidean"|"manhattan"|"chebyshev", randomness=1, smoothness=1,
+  grayscale=false, seed=0}` (*generator*): `cells` is a random **colour** per cell
+  unless `grayscale` makes it one gray value (a mask, a height, a per-stone tint
+  amount): fed straight to albedo, colour cells speckle it;
   `f2` is the distance to the second-nearest point, `edges` is F2 − F1 — ~0 on cell
   borders: cracks, dried mud, cobble outlines; `metric` is how distance is measured:
   `euclidean` gives round cells, `manhattan` (`|dx| + |dy|`) diamond-cut ones,
@@ -593,7 +621,7 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   no `warp` chain. It costs about 0.85 s of one core at 2048² with `detail = 2`; 0 costs
   nothing.
   Capped at ±1000; a NaN reads 0.
-- `white_noise {seed=0}` (*generator*).
+- `white_noise {seed=0}` (*generator*): one uniform gray value per pixel (R = G = B).
 
 ### Linked params — a node drives a value
 
@@ -689,9 +717,14 @@ imported model, a provider-generated image, an earlier bake, a hand-made mask or
   source stays seamless through the graph.
 - Any format the importer reads: png, jpeg, tga.
 - A file that can't be read or decoded is an **error** naming the node and the path,
-  never a black canvas. Every verb reads the files when it runs (`Texture.Bake`,
+  never a black canvas: a missing one before anything runs, one that doesn't decode
+  when its node runs. Every verb reads the files when it runs (`Texture.Bake`,
   `BakeSet`, `Stats`, `Preview`, and a material's maps via `Material.DefineAsset` /
   `Material.Rebake`), so a rebake picks up an edited source.
+- A file is decoded **only when a node that reads it runs**, which an output the verb
+  asked for must need, and freed after the last such node: a decoded file is RGBA
+  f32, about 512 MiB at 8192 × 4096, so a graph with many large sources holds each
+  only from its first reader to its last, not all of them for the whole bake.
 
 ```lua no-run
 Texture.Bake({ resolution = 512, nodes = {
@@ -795,7 +828,7 @@ field stays a number, so `4.5` is accepted — it bakes as `5`), and capped at 2
 
 | Op | Param | Rounds to |
 |---|---|---|
-| noise, voronoi | `scale` | nearest whole number ≥ 1 |
+| noise, voronoi | `scale × aspect`, per axis | nearest whole number ≥ 1, across and down on their own |
 | noise (fBM family) | each octave's `scale × lacunarity^octave` | nearest whole number ≥ 1 (so a fractional `lacunarity` still tiles) |
 | wave | `frequency` | nearest whole number ≥ 1 |
 | anisotropic_noise | `scale`, and `scale ÷ anisotropy` along the fibres | nearest whole number ≥ 1, at most 4096, per lattice direction (at least 2 along on an axis) |
@@ -808,9 +841,11 @@ field stays a number, so `4.5` is accepted — it bakes as `5`), and capped at 2
 | mapping (`tiling = true`) | `rotation` | nearest quarter turn |
 
 `mapping { tiling = false }` honours free scale and rotation — for decals and one-off
-maps that are never tiled; it opens a seam. `gradient linear` (0→1 left to right) is
-the one generator that does **not** tile — it has a hard edge at the wrap; use it under
-a mask, or use `linear_tiling` (0→1→0) for a seamless ramp. `gradient radial` and
+maps that are never tiled; it opens a seam. `gradient linear` (0→1 left to right) and
+`coordinates` (the same ramp on each axis) are the generators that do **not** tile —
+each has a hard edge at the wrap; use one under a mask, or use `linear_tiling` (0→1→0)
+for a seamless ramp. `coordinates` is meant for `sample_at`, whose output tiles when
+the function of the coordinates does (`sin` and `cos` of `2π u` do). `gradient radial` and
 `wave rings` meet the edge mirror-symmetrically: continuous across the seam, and so
 does `shape` (a shape larger than the tile is clipped at the edge, symmetrically;
 a `polygon` or `star`, which an odd count leaves lopsided top to bottom, is instead
@@ -869,7 +904,11 @@ pattern **stretches**. Every param keeps its meaning (a `blur.radius` of 0.01 is
 of each side, a `distance.radius` is in tiles of each axis), and every periodic
 count stays a whole number per tile, so the map still tiles on both axes. To get
 square features back, scale the counts by the aspect: on a 4:1 strip, `cols = 4 ×
-rows` gives square bricks, and `scale = {4, 1}` on a `mapping` squares up its input.
+rows` gives square bricks, `aspect = {4, 1}` on a `noise` or `voronoi` gives
+square cells (`scale` of them down, four times that across), and `scale = {4, 1}` on
+a `mapping` squares up its input. `aspect` grows the pattern itself, so a 1 × 2 m
+tile at `{1, 2}` has twice the cells down with no repeat, where tiling a square map
+twice would repeat it.
 
 ```lua no-run
 Texture.Bake({ size = {2048, 512}, seed = 1, nodes = {
