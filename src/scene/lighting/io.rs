@@ -156,10 +156,16 @@ pub fn load_lighting_sidecar(scene: &mut Scene, scene_path: &str) -> Result<(), 
     let data: LightingData = serde_json::from_str(&json)
         .map_err(|e| format!("Failed to deserialize lighting sidecar: {}", e))?;
     if data.probes != Some(ProbeKey::of(scene)) {
+        let why = match data.probes {
+            None => "by an older engine, with no probe key",
+            Some(_) => {
+                "for other probe positions than the scene's (they were re-placed and \
+                 the scene saved over since?)"
+            }
+        };
         log::warn!(
-            "[Lighting] {} was saved for other probe positions than the scene's (they \
-             were re-placed and the scene saved over since?): its SH is not applied, \
-             and the probes are unbaked until Generate Lighting",
+            "[Lighting] {} was saved {why}: its SH is not applied, and the probes are \
+             unbaked until Generate Lighting",
             path.display()
         );
         return Ok(());

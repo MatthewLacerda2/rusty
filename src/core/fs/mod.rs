@@ -52,10 +52,11 @@ fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
     file.sync_all()
 }
 
-/// Sync the folder holding `path`, so a rename into it is on the disk. Unix only:
+/// Sync the folder holding `path`, so a rename into it, or a removal from it, is on
+/// the disk. Unix only:
 /// Windows cannot open a folder as a file, and its rename is journaled. A failure
 /// is ignored (some file systems refuse to sync a folder): the file is in place.
-fn sync_folder(path: &Path) {
+pub fn sync_folder(path: &Path) {
     #[cfg(unix)]
     {
         let folder = match path.parent() {

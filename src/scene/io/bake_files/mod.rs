@@ -183,9 +183,14 @@ impl BakeFiles {
             (Change::Same, _) if as_held => Ok(kept(None)),
             (Change::Same, _) => self.bring(&path, want, None),
             (Change::Newer, _) if seen.mark == Mark::Baked || differs => {
+                let done = if want.is_some() {
+                    "overwrote"
+                } else {
+                    "removed"
+                };
                 let warning = format!(
                     "[{tag}] {} had changed on disk since this scene read it (another \
-                     process baked it?): this scene's own bake overwrote it, the last write wins",
+                     process baked it?): this scene's own bake {done} it, the last write wins",
                     path.display()
                 );
                 self.bring(&path, want, Some(warning))
@@ -223,6 +228,7 @@ impl BakeFiles {
             None if path.exists() => {
                 std::fs::remove_file(path)
                     .map_err(|e| format!("Failed to remove {}: {e}", path.display()))?;
+                crate::core::fs::sync_folder(path);
                 Action::Removed
             }
             None => Action::Kept,

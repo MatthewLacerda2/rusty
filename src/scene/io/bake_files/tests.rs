@@ -136,5 +136,5 @@ fn a_bake_that_kept_nothing_replaces_a_newer_file_too() {
     files.baked(".occlusion");
     let saved = files.store(&path, None, "T").unwrap();
     assert_eq!(saved.action, Action::Removed);
-    assert!(saved.warning.is_some_and(|w| w.contains("overwrote")));
+    assert!(saved.warning.is_some_and(|w| w.contains("bake removed it")));
 }
