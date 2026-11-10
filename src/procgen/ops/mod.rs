@@ -36,6 +36,7 @@ pub mod filter;
 pub mod flood;
 pub mod generators;
 pub mod math;
+pub mod sample;
 pub mod tile;
 pub mod vector;
 

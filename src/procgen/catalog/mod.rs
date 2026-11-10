@@ -121,6 +121,8 @@ catalog! {
     /// channel without an input reads 0.
     CombineRgb = vector::combine_rgb::CombineRgb,
     Constant(generators::constant::Constant),
+    /// Each pixel centre's position in the tile: `u` in red, `v` in green.
+    Coordinates = generators::coordinates::Coordinates,
     Curvature(filter::relief::curvature::Curvature),
     DirectionalBlur(filter::blurs::directional_blur::DirectionalBlur),
     DirectionalWarp(vector::directional_warp::DirectionalWarp),
@@ -149,6 +151,8 @@ catalog! {
     NormalBlend(vector::normal_blend::NormalBlend),
     /// Collapse RGB to luminance (Rec. 709), written to all of RGB.
     RgbToBw = math::rgb_to_bw::RgbToBw,
+    /// Sample input A at the coordinates the other inputs give, footprint-filtered.
+    SampleAt = vector::sample_at::SampleAt,
     SeparateRgb(vector::separate_rgb::SeparateRgb),
     Shape(generators::shape::Shape),
     Sharpen(filter::blurs::sharpen::Sharpen),

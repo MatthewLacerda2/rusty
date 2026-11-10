@@ -38,13 +38,23 @@ pub enum MathOp {
     Abs,
     Fract,
     Sqrt,
+    /// Sine of the value in radians, as Blender's Math node.
+    Sin,
+    /// Cosine of the value in radians.
+    Cos,
+    /// `atan2(c, value)`, the angle in radians (`-π` to `π`) of the point
+    /// `(value, c)`: Blender's *Arctan2* with A the channel and B the right-hand side.
+    Atan2,
 }
 
 impl MathOp {
-    /// `abs`, `fract` and `sqrt` take no right-hand side, so a `math` node using one
+    /// `abs`, `fract`, `sqrt`, `sin` and `cos` take no right-hand side, so a `math` node using one
     /// accepts a single input (#1487).
     pub fn is_unary(self) -> bool {
-        matches!(self, MathOp::Abs | MathOp::Fract | MathOp::Sqrt)
+        matches!(
+            self,
+            MathOp::Abs | MathOp::Fract | MathOp::Sqrt | MathOp::Sin | MathOp::Cos
+        )
     }
 }
 

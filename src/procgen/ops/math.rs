@@ -52,6 +52,9 @@ fn apply(op: MathOp, c: f32, v: f32) -> f32 {
         MathOp::Abs => c.abs(),
         MathOp::Fract => c.rem_euclid(1.0),
         MathOp::Sqrt => c.max(0.0).sqrt(),
+        MathOp::Sin => c.sin(),
+        MathOp::Cos => c.cos(),
+        MathOp::Atan2 => c.atan2(v),
     }
 }
 
@@ -123,6 +126,18 @@ mod tests {
         assert_eq!(apply(MathOp::Abs, -3.0, 2.0), 3.0);
         assert_eq!(apply(MathOp::Fract, -0.25, 2.0), 0.75);
         assert_eq!(apply(MathOp::Sqrt, 9.0, 2.0), 3.0);
+    }
+
+    /// The trig funcs take radians, as Blender's Math node, and `atan2` reads the
+    /// channel as y and the right-hand side as x.
+    #[test]
+    fn trig_funcs_work_in_radians() {
+        use std::f32::consts::{FRAC_PI_2, PI};
+        assert!((apply(MathOp::Sin, FRAC_PI_2, 9.0) - 1.0).abs() < 1e-6);
+        assert!((apply(MathOp::Cos, PI, 9.0) + 1.0).abs() < 1e-6);
+        assert_eq!(apply(MathOp::Atan2, 1.0, 0.0), FRAC_PI_2);
+        assert_eq!(apply(MathOp::Atan2, 0.0, -1.0), PI);
+        assert_eq!(apply(MathOp::Atan2, -1.0, 0.0), -FRAC_PI_2);
     }
 
     #[test]

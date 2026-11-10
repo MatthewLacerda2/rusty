@@ -45,7 +45,7 @@ fn a_unary_math_func_refuses_a_second_input() {
             r#"{{ "id": "m", "op": "math", "func": "{func}", "inputs": [{inputs}] }}"#
         ))
     };
-    for func in ["abs", "fract", "sqrt"] {
+    for func in ["abs", "fract", "sqrt", "sin", "cos"] {
         let err = math(func, r#""a", "b""#).unwrap_err();
         assert!(
             err.contains("\"m\"") && err.contains(&format!("func \"{func}\"")),
@@ -55,6 +55,7 @@ fn a_unary_math_func_refuses_a_second_input() {
         assert!(math(func, r#""a""#).is_ok(), "{func}");
     }
     assert!(math("max", r#""a", "b""#).is_ok());
+    assert!(math("atan2", r#""a", "b""#).is_ok());
 }
 
 #[test]

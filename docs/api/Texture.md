@@ -372,6 +372,11 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
 - `combine_rgb` (*vector*, 1 to 3 inputs): grayscale inputs → R, G, B; a channel
   without an input reads 0.
 - `constant {color}` (*generator*).
+- `coordinates` (*generator*): each pixel centre's position in the tile, `u` in red
+  and `v` in green (blue 0, alpha 1), Blender's *Texture Coordinate*. Shape it with
+  `math` (`sin`, `cos`, `atan2`, `divide`, …) and feed it to `sample_at` to remap a
+  map by any per-pixel function: a perspective ground, a polar unwrap. It is a ramp,
+  so it does not tile on its own.
 - `curvature {radius, strength=1}` (*filter*, 1 input): height → `0.5 + strength × (h
   − mean of h on a ring radius away)`: above mid-grey on convex edges — edge wear —
   below in concave grooves — grime; `map_range` it into a hard mask.
@@ -475,10 +480,13 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   diagonal ones. For streaks at any angle, `directional_blur` a noise (or
   `directional_warp` it).
 - `math {func, value=0.5}` (*math*, 1 or 2 inputs) with `func` ∈
-  `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt`: the right-hand side is
-  `value`, or with a second input wired, that input's matching channel per pixel
-  (`value` is then ignored, Blender's Math with both sockets linked). `abs`, `fract`
-  and `sqrt` have no right-hand side, so they take exactly 1 input.
+  `add/subtract/multiply/divide/power/min/max/abs/fract/sqrt/sin/cos/atan2`: the
+  right-hand side is `value`, or with a second input wired, that input's matching
+  channel per pixel (`value` is then ignored, Blender's Math with both sockets
+  linked). `abs`, `fract`, `sqrt`, `sin` and `cos` have no right-hand side, so they
+  take exactly 1 input. The trig funcs work in **radians**, as Blender's: `sin` of a
+  `coordinates` channel times `2π` is one cycle per tile, and `atan2` is the angle of
+  the point (right-hand side, channel), `-π` to `π`.
 - `mix {mode, factor=1}` (*color*, 2 or 3 inputs) with `mode` ∈
   `mix/add/multiply/screen/overlay/subtract/difference/lighten/darken/divide`: inputs
   `{a, b, mask}`; the result is `a` blended toward `mode(a, b)` by `factor`, and an
@@ -503,6 +511,14 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   side returns the other. Never `mix` normal maps: adding or averaging their RGB
   flattens them.
 - `rgb_to_bw` (*math*, 1 input).
+- `sample_at` (*vector*, 2 or 3 inputs): input A read at the domain point the other
+  inputs name, in tile units and wrapped: with two inputs B's red is `u` and its
+  green `v` (what `coordinates` writes), with three B's red is `u` and C's red is
+  `v`. Each pixel is filtered by its footprint (how far the coordinates move to its
+  neighbours) through a mip chain of A, trilinear, so a remap that shrinks A reads
+  its average instead of aliasing. A jump in the coordinates (a `fract` wrap) is not
+  taken as a footprint, so it stays sharp. `sample_at` of `coordinates` is A
+  unchanged.
 - `separate_rgb {channel=0..3}` (*vector*, 1 input).
 - `shape {kind="circle"|"rect"|"rounded_rect"|"line"|"polygon"|"star", size=[w,h],
   roundness=0.25, softness=0, sides=6, points=5, inner_radius=0.5,
