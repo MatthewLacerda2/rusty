@@ -68,10 +68,11 @@ pub fn sampler(
         let (u, v) = if push == 0.0 {
             (u, v)
         } else {
-            let push = |salt: u64| perlin_tiling(u, v, base, seed ^ salt) * UNIT;
+            // `w × n × UNIT`, in that order: the bytes a square warp always baked.
+            let push = |w: f32, salt: u64| w * perlin_tiling(u, v, base, seed ^ salt) * UNIT;
             (
-                u + warp[0] * push(WARP_SALT[0]),
-                v + warp[1] * push(WARP_SALT[1]),
+                u + push(warp[0], WARP_SALT[0]),
+                v + push(warp[1], WARP_SALT[1]),
             )
         };
         let octaves = match kind {
