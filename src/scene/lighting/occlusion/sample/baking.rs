@@ -121,9 +121,10 @@ impl Baking {
                     if cell >= count || progress.is_cancelled() {
                         break;
                     }
+                    progress.cell_started(cell);
                     let bits = self.cell(grid, cell);
+                    progress.cell_done(cell);
                     out.lock().unwrap_or_else(|e| e.into_inner())[cell] = bits;
-                    progress.cell_done();
                 });
             }
         });

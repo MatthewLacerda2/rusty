@@ -1,10 +1,13 @@
 //! The occlusion bake's runs (#1714): the editor's worker and a script's logged
-//! run write the same bytes as the in-line bake, and the log says its step.
+//! run write the same bytes as the in-line bake, timed or not (#1987), and the
+//! log says its step.
 
 use std::cell::RefCell;
 use std::time::Duration;
 
-use super::{bake_occlusion_logged, OcclusionBakeJob};
+use std::sync::Arc;
+
+use super::{bake_occlusion_logged, CellClocks, OcclusionBakeJob};
 use crate::dev::bake::progress::{BakeLog, Line};
 use crate::scene::lighting::occlusion::test_level::corridors;
 use crate::scene::lighting::occlusion::{
@@ -25,16 +28,34 @@ fn the_worker_and_the_logged_run_bake_what_the_inline_bake_does() {
     let (done, total) = job.cells();
     assert_eq!((done, total), (baked.report.cells, baked.report.cells));
     assert_eq!(encode(baked.data.as_ref().unwrap()), inline);
+    assert_eq!(baked.cells.len(), baked.report.cells, "every cell timed");
 
     let lines: RefCell<Vec<Line>> = RefCell::default();
     let mut log = BakeLog::new(|| Duration::ZERO, |l| lines.borrow_mut().push(l));
     let logged = bake_occlusion_logged(&scene, &mut log).unwrap();
     drop(log);
     assert_eq!(encode(logged.data.as_ref().unwrap()), inline);
+    assert_eq!(logged.cells.len(), logged.report.cells);
     // A frozen clock: the step's first line, and no other step's.
     let lines: Vec<String> = lines.into_inner().into_iter().map(|l| l.text).collect();
     assert_eq!(lines[0], "[Lighting] 0:00 occlusion preparing", "{lines:?}");
     assert!(lines.iter().all(|l| l.contains(" occlusion ")));
+}
+
+#[test]
+fn an_observed_bake_writes_the_bytes_an_unobserved_one_does() {
+    let input = gather_occlusion(&corridors());
+    let plain = input.bake(3, &OcclusionProgress::default()).unwrap();
+    let clocks = Arc::new(CellClocks::default());
+    let observed = input.bake(3, &OcclusionProgress::observed(clocks.clone()));
+    let observed = observed.unwrap();
+    assert_eq!(observed, plain, "the observer never reaches a cell");
+    let times = clocks.times();
+    assert_eq!(times.len(), plain.1.cells);
+    assert!(
+        times.iter().sum::<Duration>() > Duration::ZERO,
+        "the cells ran"
+    );
 }
 
 #[test]
