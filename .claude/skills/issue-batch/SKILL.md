@@ -206,7 +206,9 @@ lives only in the scratchpad.
 
 **Start the queue once a draft exists, under its supervisor** (#908):
 `make queue-daemon ARGS="--no-check --since <batch start>"`, from a worktree under
-`.claude/worktrees/`. It detaches (a background command dies at two hours), logs
+`.claude/worktrees/` (`merge-queue`). From the main working tree it refuses (status 10)
+and prints the command to run instead: it would detach your checkout onto `origin/main`,
+and git cannot lock the main tree (#1983). It detaches (a background command dies at two hours), logs
 to `.git/merge-queue/queue.log`, moves its worktree to `origin/main` before each
 watch, and restarts the watch by itself on every planned exit: the deadline at
 once, "nothing left" after ten minutes (an exit with a hand-back, status 1, is timed
@@ -221,7 +223,8 @@ lines and exits non-zero, and one never seen holding it says *unconfirmed*. A st
 request left for a supervisor that is gone is removed at a fresh start (not when the
 supervisor restarts itself on a change to its own code, which keeps it).
 The supervisor's own endings are status 7 (`supervisor: worktree <path> is gone;
-stopped.`) and 8 (`supervisor: crashed: <error>; stopped.`). **Watch it with `make queue-events`**, the one `Monitor` command (#1876), never a
+stopped.`), 8 (`supervisor: crashed: <error>; stopped.`) and 11 (`supervisor: could not
+lock …; stopped.`: it never runs without its worktree lock, which `make queue-status` reads). **Watch it with `make queue-events`**, the one `Monitor` command (#1876), never a
 hand-typed `tail | grep`: it replays the log from 30 lines back (a re-arm from the
 end drops what the log said while no `Monitor` ran; two PRs sat ready and unread for
 an hour that way on 2026-10-31), passes hand-backs, merges (each once, a train's members as they land), every

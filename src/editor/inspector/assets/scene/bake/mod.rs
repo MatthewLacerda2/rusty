@@ -7,7 +7,10 @@
 //!
 //! The lightmap step runs in the background (#808): the button starts a
 //! [`LightmapBakeJob`], the card shows its progress with a Cancel button, and
-//! [`poll`] applies the result on the UI thread when the worker finishes. The probe
+//! [`poll`] applies the result on the UI thread when the worker finishes. The bake
+//! is progressive (#1970): [`poll`] shows each finished pass on the live scene, the
+//! card says the pass, the samples so far and the time left, and the Scene view's
+//! camera is the bake's Prioritize View. The probe
 //! step then runs one step a frame (#1602, Unity's `BakeAsync`): the probes capture
 //! through the GPU, so they stay on the UI thread, but no frame waits on more than a
 //! reflection probe or a few light probes, and the editor and the MCP keep answering.
@@ -34,14 +37,17 @@ use crate::dev::bake::generate_lighting::unsaved_materials_warning;
 use crate::dev::bake::lighting::LightingBakeReport;
 use crate::dev::bake::lightmap::LightmapBakeJob;
 use crate::dev::bake::occlusion::OcclusionBakeJob;
-use crate::dev::bake::steps::{LightingBake, Stage};
+use crate::dev::bake::steps::LightingBake;
 use crate::editor::EditorUi;
+use crate::scene::lighting::lightmap::BakeView;
 use crate::scene::{Scene, SceneId};
 use crate::scripting::ConsoleLogs;
 
 mod poll;
+mod progress;
 mod settings;
 pub use poll::poll;
+use progress::draw_progress;
 use settings::{draw_diffuse_model, draw_mixed_mode, draw_settings};
 
 /// A background Generate Lighting and the scene it belongs to: the scene's runtime
@@ -176,7 +182,7 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
         return console.error("Generate Lighting failed: save the scene first".into());
     };
     let settings = scene.lighting_settings.lightmaps;
-    match LightmapBakeJob::start(scene, Some(&path), settings) {
+    match LightmapBakeJob::start(scene, Some(&path), settings, Some(scene_view(editor))) {
         Ok(job) => {
             console.info("Generating lighting in the background…".into());
             warn_unsaved(scene, &path, console);
@@ -188,6 +194,17 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
             scene.lighting_bake_running = true; // a script's bake waits from now on
         }
         Err(e) => console.error(format!("Generate Lighting failed: {e}")),
+    }
+}
+
+/// What the Scene view's camera sees, for the bake's Prioritize View (#1970). The
+/// lens at a 16:9 aspect: a little wider or narrower than the panel only moves
+/// which texels go first.
+fn scene_view(editor: &EditorUi) -> BakeView {
+    let camera = editor.scene_view.camera.camera();
+    BakeView {
+        eye: camera.position,
+        view_proj: camera.projection_matrix(16.0 / 9.0) * camera.view_matrix(),
     }
 }
 
@@ -221,65 +238,6 @@ fn warn_unsaved(scene: &Scene, path: &str, console: &mut ConsoleLogs) {
     if let Some(line) = unsaved_materials_warning(scene, path) {
         console.warn(line);
     }
-}
-
-/// The running bake's bar, and its Cancel button during the lightmaps.
-fn draw_progress(ui: &mut egui::Ui, editor: &mut EditorUi) {
-    let Some(active) = &editor.dev.lightmap_bake else {
-        return;
-    };
-    let job = match &active.step {
-        Step::Lightmaps(job) => job,
-        Step::Probes { job, .. } => return draw_probe_progress(ui, job.stage()),
-        Step::Occlusion { job, .. } | Step::OcclusionOnly { job, .. } => {
-            return draw_occlusion_progress(ui, job.cells())
-        }
-    };
-    let (done, total) = job.progress();
-    let text = match (job.is_cancelled(), job.pages(), total) {
-        (true, ..) => "Cancelling…".to_string(),
-        // The page being encoded now, of them all (#1694).
-        (false, Some((done, n)), _) => format!("Encoding page {} of {n}", (done + 1).min(n)),
-        (false, None, 0) => "Preparing…".to_string(),
-        (false, None, _) => format!("Lightmaps: {done} / {total} texels"),
-    };
-    ui.horizontal(|ui| {
-        let bar = egui::ProgressBar::new(job.fraction()).text(text);
-        ui.add_sized([180.0, 20.0], bar);
-        let cancel = egui::Button::new(format!("{}  Cancel", icon::X));
-        if ui.add_enabled(!job.is_cancelled(), cancel).clicked() {
-            job.cancel();
-        }
-    });
-}
-
-/// The probe step's bar: which pass or set on a line above, `i / n` in the bar, so
-/// the text fits the inspector's default width.
-fn draw_probe_progress(ui: &mut egui::Ui, stage: Stage) {
-    let (done, total, title) = match stage {
-        Stage::Light {
-            bounce,
-            done,
-            total,
-        } => (done, total, format!("Light probes, bounce {bounce}")),
-        Stage::Reflection { done, total } => (done, total, "Reflection probes".to_string()),
-        Stage::Done => (1, 1, "Saving…".to_string()),
-    };
-    ui.label(title);
-    let bar =
-        egui::ProgressBar::new(done as f32 / total.max(1) as f32).text(format!("{done} / {total}"));
-    ui.add_sized([180.0, 20.0], bar);
-}
-
-/// The occlusion step's bar: cells baked of the grid's.
-fn draw_occlusion_progress(ui: &mut egui::Ui, (done, total): (usize, usize)) {
-    ui.label("Occlusion culling");
-    let text = match total {
-        0 => "Preparing…".to_string(),
-        _ => format!("{done} / {total} cells"),
-    };
-    let bar = egui::ProgressBar::new(done as f32 / total.max(1) as f32).text(text);
-    ui.add_sized([180.0, 20.0], bar);
 }
 
 #[cfg(test)]

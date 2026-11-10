@@ -134,9 +134,19 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
         materials: (*scene.materials).clone(),
         probes: scene.probes.clone(),
         reflection_probes: scene.reflection_probes.clone(),
-        lightmaps: (*scene.lightmaps).clone(),
+        lightmaps: saved_lightmaps(scene),
         lighting_settings: scene.lighting_settings,
     }
+}
+
+/// The lightmaps a save writes ([`LightmapSet::saved`]), less the entries of
+/// entities no longer live: a bake that finished after one was deleted keeps its
+/// entry in the scene, where an Undo of the delete finds it (#1970), but a file
+/// never names an entity it does not hold.
+fn saved_lightmaps(scene: &Scene) -> LightmapSet {
+    let mut set = scene.lightmaps.saved().clone();
+    set.retain(|id| scene.world.contains(id));
+    set
 }
 
 /// Rebuild every mesh in the document from its reference (see [`rehydrate_one`]).
