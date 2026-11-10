@@ -1,6 +1,8 @@
 //! Bake Occlusion (#1958): Generate Lighting's occlusion step alone, from a
-//! script, written beside the scene and touching nothing else.
+//! script, written beside the scene and touching nothing else; and Generate
+//! Lighting writes the PVS file only once its PVS is baked (#1982).
 
+use super::{apply_occlusion, write_lighting};
 use super::{bake_occlusion_only, OcclusionOnlyReport, UNSAVED_OCCLUSION};
 use crate::dev::bake::progress::BakeLog;
 use crate::dev::session::Session;
@@ -108,4 +110,31 @@ fn the_script_verb_warns_of_a_material_the_file_lacks() {
         *level == LogLevel::Warning && m.starts_with(r#"[Occlusion] material(s) "glass""#)
     });
     assert_eq!(warned.count(), 1, "{:?}", console.messages);
+}
+
+#[test]
+fn the_lighting_save_keeps_a_newer_pvs_and_a_failed_pvs_step_loses_nothing() {
+    let path = saved("newer");
+    let pvs = occlusion_path(&path);
+    std::fs::remove_file(&pvs).ok();
+    let mut editor = Scene::new();
+    editor.load_from_file(&path).unwrap();
+    // Another process bakes the PVS while the editor has the scene open.
+    std::fs::write(&pvs, b"theirs").unwrap();
+    let lit = write_lighting(&editor, &path);
+    assert_eq!(lit, Ok(crate::scene::LightingSave::Written));
+    assert_eq!(std::fs::read(&pvs).unwrap(), b"theirs", "the lighting save");
+    // The PVS step fails, so `finish` never runs: a plain save keeps the newer file.
+    editor.ambient_intensity = 0.5;
+    editor.save_to_file(&path).unwrap();
+    assert_eq!(std::fs::read(&pvs).unwrap(), b"theirs", "a save after");
+    assert!(editor.bake_files.warned(&pvs), "the save says it kept it");
+    // A PVS step that ends writes this world's bake (the last write wins).
+    let baked = super::super::occlusion::bake_occlusion_logged(&editor, &mut BakeLog::off());
+    apply_occlusion(&mut editor, &path, baked.unwrap()).unwrap();
+    let ours = std::fs::read(&pvs).unwrap();
+    assert!(
+        crate::scene::lighting::occlusion::decode(&ours).is_ok(),
+        "ours"
+    );
 }

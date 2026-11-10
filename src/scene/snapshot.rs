@@ -11,7 +11,7 @@
 //! applied back via `serialize::apply_world_data` on Stop, plus what the scene
 //! state inventory (`scene::state`, #1649) says Stop puts back and the document
 //! does not carry: the probes' baked SH, the edit-mode decals, the saved navmesh, the scene's
-//! identity and its disk record. Play's own requests (queued destroys and loads,
+//! identity and its disk records. Play's own requests (queued destroys and loads,
 //! `DontDestroyOnLoad`) end with the play state, in `Scene::set_playing`.
 //!
 //! A demo closing over the edit scene puts it back with this same snapshot
@@ -40,10 +40,11 @@ pub struct SceneSnapshot {
     /// The baked PVS (#1714): no document field (it is the `<scene>.occlusion`
     /// file), so it is put back as it was.
     occlusion: Option<std::sync::Arc<crate::scene::lighting::occlusion::OcclusionData>>,
-    /// Whether the PVS's file could not be read, so the next save keeps it.
-    occlusion_unread: bool,
     /// The saved navmesh's bytes (#1887): no document field either.
     navmesh: crate::scene::nav_settings::SavedNavmesh,
+    /// What the edit scene last read or wrote at its bake sidecars (#1982): a Play
+    /// load adds its own, which Stop drops.
+    bake_files: crate::scene::io::BakeFiles,
 }
 
 impl SceneSnapshot {
@@ -57,8 +58,8 @@ impl SceneSnapshot {
             id: scene.id(),
             disk_text: scene.disk_text(),
             occlusion: (*scene.occlusion).clone(),
-            occlusion_unread: scene.occlusion_unread,
             navmesh: scene.navmesh.clone(),
+            bake_files: scene.bake_files.clone(),
         }
     }
 
@@ -77,7 +78,7 @@ impl SceneSnapshot {
         if *scene.occlusion != self.occlusion {
             *scene.occlusion = self.occlusion;
         }
-        scene.occlusion_unread = self.occlusion_unread;
         scene.navmesh = self.navmesh;
+        scene.bake_files = self.bake_files;
     }
 }

@@ -100,11 +100,11 @@ pub struct Scene {
         crate::scene::revision::Revisioned<crate::scene::lighting::lightmap::LightmapSet>,
     /// The baked occlusion culling (#1714), from `<scene>.occlusion`: see its type.
     pub occlusion: crate::scene::lighting::occlusion::SceneOcclusion,
-    /// `<scene>.occlusion` was there but unreadable (not missing, not refused): a
-    /// save keeps it rather than removing it as absent.
-    pub occlusion_unread: bool,
     /// The `<scene>.navmesh` bytes (#1887, `nav_settings::saved`), checked on use.
     pub navmesh: crate::scene::nav_settings::SavedNavmesh,
+    /// What this world last read or wrote at each bake sidecar's path (#1982), so a
+    /// save never writes back a bake it only loaded over a newer one. Never serialized.
+    pub(crate) bake_files: crate::scene::io::BakeFiles,
     /// What Generate Lighting bakes with (#832), saved with the scene.
     pub lighting_settings: crate::scene::lighting::LightingSettings,
     /// Ids queued for deferred destruction by play-mode `Scene.DestroyEntity`
@@ -181,8 +181,8 @@ impl Default for Scene {
             reflection_probes: crate::scene::lighting::reflection_probe::ReflectionProbeSet::new(),
             lightmaps: Default::default(),
             occlusion: Default::default(),
-            occlusion_unread: false,
             navmesh: Default::default(),
+            bake_files: Default::default(),
             lighting_settings: Default::default(),
             pending_destroy: Vec::new(),
             playing: false,

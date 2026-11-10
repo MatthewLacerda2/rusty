@@ -112,9 +112,6 @@ authored_fields!(scene_state {
         // Keyed by entity, but checked against each entity's fingerprint on use, so
         // a despawn or a Play load leaves it as it is.
         occlusion: BakeOutput, No as ["lightmaps"];
-        // Set by the load that could not read `<scene>.occlusion`, so a save keeps
-        // it: put back on Stop with the PVS, and a load reads its own file afresh.
-        occlusion_unread: EditRuntime, No;
         // The saved navmesh (#1887) is no document field either: it is the
         // `<scene>.navmesh` file a save writes beside the scene, read on load. Checked
         // against the scene's fingerprint on use, so a despawn leaves it as it is.
@@ -136,6 +133,9 @@ authored_fields!(scene_state {
         meshes_read_at: Follow, No;
         meshes_reimported: Follow, No;
         disk_text: DiskRecord, No;
+        // What this world last read or wrote at each bake sidecar (#1982), keyed by
+        // path: an edit load starts afresh, a Play load adds its own path's.
+        bake_files: DiskRecord, No;
         history: History, No;
     }
     dev {

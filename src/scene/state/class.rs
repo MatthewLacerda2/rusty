@@ -97,8 +97,9 @@ impl Class {
             (Self::Runtime, Load) => Free,
             // A Play load leaves the play state and the phase's own request (it took
             // the load before the swap); what it keys by entity is `promise`'s. The
-            // shader clocks run on, and the disk record stays the edit scene's,
-            // which Stop puts back: a Play load reads its file and records nothing.
+            // shader clocks run on. The disk records stay: the scene text is still
+            // the edit scene's, and the bake files gain the Play scene's paths
+            // beside the edit scene's; Stop puts the edit scene's records back.
             (Self::Runtime | Self::Frame | Self::DiskRecord, PlayLoad) => Left,
             (Self::EditRuntime | Self::Identity | Self::DiskRecord, Save) => Gone,
             (Self::EditRuntime | Self::Identity | Self::DiskRecord, Stop) => Back,

@@ -25,17 +25,50 @@ use std::sync::atomic::{AtomicU64, Ordering};
 pub const TEMP_SUFFIX: &str = "tmp";
 
 /// Write `bytes` at `path` through a temp file beside it, renamed into place. The
-/// temp file is removed when the write or the rename fails, so a failure leaves no
-/// litter. The parent directory must exist.
+/// temp file is synced to the disk before the rename, and the folder after it (on
+/// Unix), so a power cut leaves the old file or the new one, never an empty one (a
+/// rename can reach the disk before the data it names). The temp file is removed
+/// when the write or the rename fails, so a failure leaves no litter. The parent
+/// directory must exist.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let temp = unique_sibling(path, TEMP_SUFFIX);
     // Windows refuses the rename for a moment while a reader holds the target.
-    let result = std::fs::write(&temp, bytes)
-        .and_then(|()| retry_transient(|| std::fs::rename(&temp, path)));
+    let result =
+        write_synced(&temp, bytes).and_then(|()| retry_transient(|| std::fs::rename(&temp, path)));
     if result.is_err() {
         let _ = std::fs::remove_file(&temp);
+        return result;
     }
-    result
+    sync_folder(path);
+    Ok(())
+}
+
+/// Write `bytes` to a new file at `path` and sync it (`F_FULLFSYNC` on macOS, where
+/// a plain `fsync` stops at the drive's cache).
+fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    use std::io::Write;
+    let mut file = std::fs::File::create(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()
+}
+
+/// Sync the folder holding `path`, so a rename into it, or a removal from it, is on
+/// the disk. Unix only:
+/// Windows cannot open a folder as a file, and its rename is journaled. A failure
+/// is ignored (some file systems refuse to sync a folder): the file is in place.
+pub fn sync_folder(path: &Path) {
+    #[cfg(unix)]
+    {
+        let folder = match path.parent() {
+            Some(p) if !p.as_os_str().is_empty() => p,
+            _ => Path::new("."),
+        };
+        if let Ok(dir) = std::fs::File::open(folder) {
+            let _ = dir.sync_all();
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = path;
 }
 
 /// `<path>.<pid>.<n>.<suffix>`: a name beside `path` no other call, in this

@@ -154,6 +154,41 @@ first.
   `Reflection.Bake()` error while the editor's Generate Lighting or Bake Occlusion
   is running.
 
+### Bake files and the scene save
+
+A scene's bakes sit beside it in files of their own: `<scene>.occlusion` and
+`<scene>.navmesh` ([`Navigation`](Navigation.md)). As Unity's lighting data is an asset a
+scene save never rewrites, `Scene.Save()` writes one only when this scene baked since it
+last read or wrote that path, or holds other bytes than it did then. So when another
+process (a headless `session-mcp`, a second editor) re-bakes a scene while it is open,
+saving the open one keeps the newer file, and the console says so once (`changed on disk
+since this scene read it … the save keeps that newer bake, and the next load uses it`). A
+scene that baked since still writes its own (the last write wins, and the warning says it
+overwrote the newer file), and a bake that kept no PVS removes the file, newer or not
+(the last write wins). A file removed outside the engine is written back when the scene
+holds a bake (the console says so). A file refused on load (corrupt, truncated) is
+rewritten or removed by the next save while it is still that file; a valid one another
+process baked there since is kept, as after a load. One that could not be read at all is
+left until the scene bakes. Generate Lighting writes the PVS file only once its PVS is
+baked: a bake that stops before (an error, the editor closing) leaves the file as it was.
+"Changed" is the file's length and content hash, so a same-length rewrite counts. Writes
+are atomic and synced to the disk: a crash or a power cut leaves the old file or the new
+one.
+
+The keep-newer rule protects only a file written after this scene's own load of that
+path. A save to a path the scene has no record for (File ▸ New or Reset Scene then a
+save over a baked scene, a *Save As* over another scene) replaces that path's bake
+files with what the scene holds, and removes the ones it does not hold, as Unity drops a
+replaced scene's lighting data.
+
+The probes' SH sidecar, `<scene>.lighting.json`, is not under that rule: its entries
+are index-aligned to the probe positions the scene document places, so it is written
+with the document on every save (removed when no probe is baked). It carries the probe
+count and a hash of their positions, and one saved for other probes than the document's
+is refused on load with a warning (the probes load unbaked), so SH never lands on the
+wrong probe. The lightmap pages and reflection cubemaps are written by their bakes
+only, never by a save.
+
 ### Light and reflection probes
 
 `Lighting.Bake()` (#246) auto-places light probes and reflection probes from the static
@@ -558,10 +593,12 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   `Lighting.Generate()` bakes it in line and logs `[Lighting] occlusion 62%
   (2260/3645 cells)` lines like the other steps.
 - **Stored** beside the scene as `<scene>.occlusion` (a small binary file, written
-  with the lighting and on every save; removed when the scene has none). A file that
+  by the bake, and by a save only by the rule in
+  [*Bake files and the scene save*](#bake-files-and-the-scene-save)). A file that
   is truncated or out of range is refused on load with a warning, and nothing is
-  occlusion-culled. One that is there but cannot be read (a permission) also culls
-  nothing, with a warning, and the next save leaves it in place.
+  occlusion-culled, and the next save removes or rewrites it. One that is there but
+  cannot be read (a permission) also culls nothing, with a warning, and the next save
+  leaves it in place.
 - **A bake older than the scene** never hides what is there: a static mesh moved,
   re-shaped (the bake hashes each mesh's triangles, corner by corner), given a
   material that occludes or faces differently (opaque or not, a surface shader, its

@@ -56,7 +56,12 @@ so *Save As* carries it along and a scene baked before its first save gets its f
 save; a save never bakes. Generate Lighting does not bake the navmesh: the two are
 independent, as in Unity. Re-run `Navigation.Bake()` after editing the level: the file is
 only a head start, and a stale one costs a full bake on load, nothing more. A save rewrites
-the file only when the scene holds bytes it lacks: a Dust2-sized navmesh is tens of MB.
+the file only when the scene baked since it last read or wrote it (or the path is new, a
+*Save As*): a Dust2-sized navmesh is tens of MB. It is the rule every bake file beside a
+scene follows ([`Lighting`](Lighting.md#bake-files-and-the-scene-save)): a save never
+writes back a navmesh it only loaded over a newer one another process baked, restores
+one removed outside the engine, and replaces the navmesh of a scene it saves over without
+having loaded it (File ▸ New, then a save over a baked scene).
 The **Bake Navigation** button is live on the open scene's card only, as Generate
 Lighting's is, so it never writes the open scene's navmesh beside another scene.
 

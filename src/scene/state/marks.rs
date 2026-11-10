@@ -107,7 +107,6 @@ pub const MARKS: &[Mark] = marks! {
         s.lightmaps.get(b).is_some();
     "occlusion" => |s, _| *s.occlusion = Some(std::sync::Arc::new(marked_occlusion())),
         s.occlusion.as_ref().is_some_and(|d| d.grid.cell == 7.0);
-    "occlusion_unread" => |s, _| s.occlusion_unread = true, s.occlusion_unread;
     "navmesh" => |s, _| s.navmesh.bytes = Some(std::sync::Arc::from(vec![7u8])),
         s.navmesh.bytes.as_deref() == Some(&[7u8][..]);
     "lighting_settings" => |s, _| s.lighting_settings.reflections.budget_mb = 77,
@@ -128,6 +127,8 @@ pub const MARKS: &[Mark] = marks! {
         s.meshes_reimported.contains_key("marked.glb");
     "disk_text" => |s, _| s.disk_text.record("marked.scene", "marked".into()),
         s.is_disk_text("marked.scene", "marked");
+    "bake_files" => |s, _| s.bake_files.loaded(std::path::Path::new("marked.occlusion"), None, None),
+        s.bake_files.has(std::path::Path::new("marked.occlusion"));
     "history" => |s, b| {
             s.begin_edits();
             if let Some(mut t) = s.world.transform_mut(b) {
