@@ -6,8 +6,8 @@
 //! frame's poses replace last frame's when the stack ends ([`MotionHistory::end`]).
 //! An entity not drawn this frame (culled, hidden) has no pose next frame. Entity ids
 //! are per scene, so the history is per view and starts over when the scene, the base
-//! camera or the play state changes ([`HistoryKey`]). Each camera's matrix is kept by
-//! its entity, not its place in the stack, so a camera swapped in at the same place
+//! camera or the play state changes, or the base camera is cut ([`HistoryKey`]).
+//! Each camera's matrix is kept by its entity, not its place in the stack, so a camera swapped in at the same place
 //! (a weapon switch's viewmodel camera) starts with no last frame.
 
 use glam::Mat4;
@@ -28,6 +28,9 @@ pub(crate) struct HistoryKey {
     /// is: Stop restores the edit scene under the same id, and its first frame must
     /// not reproject from the last Play pose.
     pub playing: bool,
+    /// The base camera's cut count (`scene::camera::HistoryCuts`, #2003): a
+    /// `Camera.ResetHistory` changes it, so the next frame starts over.
+    pub cuts: u32,
 }
 
 impl HistoryKey {
@@ -37,6 +40,7 @@ impl HistoryKey {
             scene: scene.id(),
             base,
             playing: scene.is_playing(),
+            cuts: scene.history_cuts.of(base),
         }
     }
 }
