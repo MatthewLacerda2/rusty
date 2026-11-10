@@ -17,7 +17,8 @@ use crate::scene::io::Saved;
 use crate::scene::Scene;
 
 const MAGIC: &[u8; 4] = b"RPVS";
-const SUFFIX: &str = ".occlusion";
+/// What `<scene>` takes to name its PVS file.
+pub const SUFFIX: &str = ".occlusion";
 
 /// Where `scene_path`'s PVS is kept: `foo.scene` → `foo.scene.occlusion`.
 pub fn occlusion_path(scene_path: &str) -> PathBuf {
@@ -98,9 +99,9 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
 
 /// Bring the PVS file beside `scene_path` to what `scene` holds, by the bake
 /// files' rule (`scene::io::BakeFiles`, #1982): written only when this world baked
-/// since it last read or wrote the file, removed only when its bake was cleared and
-/// it read or wrote the file being removed, and never over a newer file with bytes
-/// it only loaded. A file it could not read stays ([`load_sidecar`]).
+/// since it last read or wrote the file, or holds other bytes than it did, and never
+/// over a newer file with bytes it only loaded. A file it could not read stays
+/// until it bakes; one it refused is rewritten or removed ([`load_sidecar`]).
 pub fn save_sidecar(scene: &Scene, scene_path: &str) -> Result<Saved, String> {
     let path = occlusion_path(scene_path);
     let want = scene.occlusion.as_deref().map(encode);
@@ -108,44 +109,52 @@ pub fn save_sidecar(scene: &Scene, scene_path: &str) -> Result<Saved, String> {
 }
 
 /// Load the PVS beside `scene_path` onto `scene`: none when there is no file, and
-/// none, with a warning, when the file is refused. A file that is there but cannot
-/// be read (a permission, a transient failure) also loads none, with a warning, and
-/// marks the scene so its next save keeps the file.
+/// none, with a warning, when the file is refused (the next save then rewrites or
+/// removes it). A file that is there but cannot be read (a permission, a transient
+/// failure) also loads none, with a warning, and the next save keeps it.
 pub fn load_sidecar(scene: &mut Scene, scene_path: &str) {
     let path = occlusion_path(scene_path);
-    scene.occlusion_unread = false;
+    *scene.occlusion = None;
     let bytes = match std::fs::read(&path) {
-        Ok(bytes) => Some(bytes),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return scene.bake_files.loaded(&path, None, None);
+        }
         Err(e) => {
             log::warn!(
                 "[Occlusion] could not read {} ({e}): nothing is occlusion-culled, and \
                  the file is kept",
                 path.display()
             );
-            scene.occlusion_unread = true;
-            scene.bake_files.forget(&path);
-            *scene.occlusion = None;
-            return;
+            return scene.bake_files.unreadable(&path);
         }
     };
-    let data = bytes.as_deref().and_then(|b| {
-        decode(b)
-            .map_err(|e| {
-                log::warn!(
-                    "[Occlusion] {} refused ({e}): nothing is occlusion-culled",
-                    path.display()
-                )
-            })
-            .ok()
-    });
+    let data = match decode(&bytes) {
+        Ok(data) => data,
+        Err(e) => {
+            log::warn!(
+                "[Occlusion] {} refused ({e}): nothing is occlusion-culled, and the next \
+                 save removes it",
+                path.display()
+            );
+            return scene.bake_files.refused(&path, &bytes);
+        }
+    };
     // What a save would write, encoded afresh: a file that does not round-trip
     // byte for byte never reads as a bake since.
-    let held = data.as_ref().map(encode);
-    scene
-        .bake_files
-        .loaded(&path, bytes.as_deref(), held.as_deref());
-    *scene.occlusion = data.map(Arc::new);
+    let held = encode(&data);
+    scene.bake_files.loaded(&path, Some(&bytes), Some(&held));
+    *scene.occlusion = Some(Arc::new(data));
+}
+
+impl Scene {
+    /// Put a bake's PVS on the scene (`None`: the bake kept none): the one place a
+    /// bake's output lands, so its next save writes it, even over a newer file
+    /// another process baked (#1982).
+    pub fn put_baked_occlusion(&mut self, data: Option<OcclusionData>) {
+        self.bake_files.baked(SUFFIX);
+        *self.occlusion = data.map(Arc::new);
+    }
 }
 
 fn put(out: &mut Vec<u8>, v: u32) {

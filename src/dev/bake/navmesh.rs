@@ -23,12 +23,11 @@ pub fn bake_navmesh(
         nav.bake(scene);
         return Ok(None);
     }
-    scene.navmesh.bytes = Some(nav.bake_to_bytes(scene).into());
+    // Marked baked: written even over a newer file another process baked (#1982).
+    scene.put_baked_navmesh(nav.bake_to_bytes(scene).into());
     let Some(path) = path else {
         return Ok(None);
     };
-    // A bake is written even over a newer file another process baked (#1982).
-    scene.bake_files.baked(&navmesh_path(path));
     save_navmesh(scene, path)?;
     Ok(Some(navmesh_path(path).to_string_lossy().into_owned()))
 }

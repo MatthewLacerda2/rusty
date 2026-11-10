@@ -64,7 +64,7 @@ pub fn load_navmesh(scene: &mut Scene, scene_path: &str) {
                 "[Navigation] could not read {} ({e}): Play bakes the navmesh in full",
                 path.display()
             );
-            scene.bake_files.forget(&path);
+            scene.bake_files.unreadable(&path);
             scene.navmesh = SavedNavmesh::default();
             return;
         }
@@ -73,6 +73,16 @@ pub fn load_navmesh(scene: &mut Scene, scene_path: &str) {
         .bake_files
         .loaded(&path, bytes.as_deref(), bytes.as_deref());
     scene.navmesh = SavedNavmesh { bytes };
+}
+
+impl Scene {
+    /// Put a navmesh bake's bytes on the scene: the one place a bake's output
+    /// lands, so its next save writes them, even over a newer file another process
+    /// baked (#1982).
+    pub fn put_baked_navmesh(&mut self, bytes: Arc<[u8]>) {
+        self.bake_files.baked(SUFFIX);
+        self.navmesh = SavedNavmesh::new(Some(bytes));
+    }
 }
 
 #[cfg(test)]

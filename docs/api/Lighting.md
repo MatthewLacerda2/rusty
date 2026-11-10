@@ -152,20 +152,34 @@ first.
 
 ### Bake files and the scene save
 
-A scene's bakes sit beside it in files of their own: `<scene>.occlusion`,
-`<scene>.lighting.json` and `<scene>.navmesh` ([`Navigation`](Navigation.md)). As
-Unity's lighting data is an asset a scene save never rewrites, `Scene.Save()` writes one
-only when this scene holds a bake other than the one it last read or wrote at that path:
-it baked since, its bake was cleared, or the save is a *Save As* to a new path. So when
-another process (a headless `session-mcp`, a second editor) re-bakes a scene while it is
-open, saving the open one keeps the newer file, and the console says so once
-(`changed on disk since this scene read it … the save keeps that newer bake, and the
-next load uses it`). A scene that baked since still writes its own (the last write wins,
-and the warning says it overwrote the newer file). A cleared bake removes only the file
-this scene read or wrote, unchanged since; a file it never saw, or could not read, is
-left. "Changed" is the file's length and content hash, so a same-length rewrite counts.
-The lightmap pages and reflection cubemaps are written by their bakes only, never by a
-save.
+A scene's bakes sit beside it in files of their own: `<scene>.occlusion` and
+`<scene>.navmesh` ([`Navigation`](Navigation.md)). As Unity's lighting data is an asset a
+scene save never rewrites, `Scene.Save()` writes one only when this scene baked since it
+last read or wrote that path, or holds other bytes than it did then. So when another
+process (a headless `session-mcp`, a second editor) re-bakes a scene while it is open,
+saving the open one keeps the newer file, and the console says so once (`changed on disk
+since this scene read it … the save keeps that newer bake, and the next load uses it`). A
+scene that baked since still writes its own (the last write wins, and the warning says it
+overwrote the newer file). A cleared bake removes the file unless it changed on disk
+since. A file removed outside the engine is written back when the scene holds a bake
+(the console says so). A file refused on load (corrupt, truncated) is rewritten or
+removed by the next save; one that could not be read at all is left until the scene
+bakes. "Changed" is the file's length and content hash, so a same-length rewrite counts.
+Writes are atomic: a crash leaves the old file or the new one.
+
+The keep-newer rule protects only a file written after this scene's own load of that
+path. A save to a path the scene has no record for (File ▸ New or Reset Scene then a
+save over a baked scene, a *Save As* over another scene) replaces that path's bake
+files with what the scene holds, and removes the ones it does not hold, as Unity drops a
+replaced scene's lighting data.
+
+The probes' SH sidecar, `<scene>.lighting.json`, is not under that rule: its entries
+are index-aligned to the probe positions the scene document places, so it is written
+with the document on every save (removed when no probe is baked). It carries the probe
+count and a hash of their positions, and one saved for other probes than the document's
+is refused on load with a warning (the probes load unbaked), so SH never lands on the
+wrong probe. The lightmap pages and reflection cubemaps are written by their bakes
+only, never by a save.
 
 ### Light and reflection probes
 
@@ -517,8 +531,9 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   by the bake, and by a save only by the rule in
   [*Bake files and the scene save*](#bake-files-and-the-scene-save)). A file that
   is truncated or out of range is refused on load with a warning, and nothing is
-  occlusion-culled. One that is there but cannot be read (a permission) also culls
-  nothing, with a warning, and the next save leaves it in place.
+  occlusion-culled, and the next save removes or rewrites it. One that is there but
+  cannot be read (a permission) also culls nothing, with a warning, and the next save
+  leaves it in place.
 - **A bake older than the scene** never hides what is there: a static mesh moved,
   re-shaped (the bake hashes each mesh's triangles, corner by corner), given a
   material that occludes or faces differently (opaque or not, a surface shader, its

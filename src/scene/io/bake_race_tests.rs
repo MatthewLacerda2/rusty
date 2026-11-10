@@ -1,4 +1,4 @@
-//! The issue's repro (#1982) for every bake sidecar a scene save writes: a world
+//! The issue's repro (#1982) for every bake sidecar the keep-newer rule covers: a world
 //! that only loaded a bake never writes it back over a newer one another `Scene`
 //! (another process) baked, a world that baked since does, Save As carries it, and
 //! a cleared bake removes only the file this world saw.
@@ -18,7 +18,7 @@ struct Kind {
     bake: fn(&mut Scene, u8),
 }
 
-const KINDS: [Kind; 3] = [
+const KINDS: [Kind; 2] = [
     Kind {
         name: "occlusion",
         path: occlusion_path,
@@ -37,20 +37,14 @@ const KINDS: [Kind; 3] = [
         path: crate::scene::nav_settings::navmesh_path,
         bake: |s, n| s.navmesh.bytes = (n > 0).then(|| Arc::from(vec![n; 4])),
     },
-    Kind {
-        name: "lighting",
-        path: crate::scene::lighting::io::sidecar_path,
-        bake: |s, n| s.probes.probes_mut()[0].sh.coeffs[0] = [f32::from(n); 3],
-    },
 ];
 
-/// A saved scene with one probe and every kind baked as `1`; its path.
+/// A saved scene with every kind baked as `1`; its path.
 fn level(name: &str) -> String {
     let dir = crate::test_temp::dir().join("bake_race").join(name);
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let mut scene = Scene::new();
-    scene.probes.add_probe(Vec3::ZERO);
     KINDS.iter().for_each(|k| (k.bake)(&mut scene, 1));
     scene.save_to_file(&path).unwrap();
     path

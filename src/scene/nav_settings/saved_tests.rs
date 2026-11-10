@@ -1,5 +1,5 @@
-//! The `<scene>.navmesh` sidecar (#1887): it loads back, a scene holding none leaves
-//! a file it never saw alone, and a save that would write the bytes it last read or
+//! The `<scene>.navmesh` sidecar (#1887): it loads back, a scene holding none removes
+//! a file at a path it has no record for, and a save that would write the bytes it last read or
 //! wrote there does not (#1982, `scene::io::BakeFiles`).
 
 use std::sync::Arc;
@@ -19,12 +19,13 @@ fn action(scene: &Scene, path: &str) -> Action {
 }
 
 #[test]
-fn a_saved_navmesh_loads_back_and_none_leaves_the_file() {
+fn a_saved_navmesh_loads_back_and_a_new_scene_holding_none_removes_it() {
     let dir = crate::test_temp::dir().join("rusty_navmesh_sidecar");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("n.scene").to_string_lossy().into_owned();
     assert_eq!(action(&holding(&[1, 2, 3]), &path), Action::Written);
-    assert_eq!(action(&Scene::default(), &path), Action::Kept);
+    assert_eq!(action(&Scene::default(), &path), Action::Removed);
+    assert_eq!(action(&holding(&[1, 2, 3]), &path), Action::Written);
     let mut back = Scene::default();
     load_navmesh(&mut back, &path);
     assert_eq!(back.navmesh.bytes.as_deref(), Some(&[1u8, 2, 3][..]));
@@ -58,8 +59,8 @@ fn an_unchanged_navmesh_is_not_written_again() {
     std::fs::remove_file(navmesh_path(&path)).unwrap();
     assert_eq!(
         action(&loaded, &path),
-        Action::Kept,
-        "a file deleted outside since the load stays deleted"
+        Action::Written,
+        "a file deleted outside since the load is restored"
     );
     loaded.navmesh.bytes = Some(Arc::from(vec![9u8, 9, 9]));
     assert_eq!(

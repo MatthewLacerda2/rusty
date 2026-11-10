@@ -142,9 +142,11 @@ pub fn start_probes(
 /// on disk however its last step ends.
 pub fn write_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> {
     refuse_in_play(scene)?;
-    // The probes just baked: their sidecar is written even over a newer one (#1982).
-    let sidecar = crate::scene::lighting::io::sidecar_path(path);
-    scene.bake_files.baked(&sidecar);
+    // The PVS bakes next and `finish` writes it: this save writes the one held now
+    // rather than warn that it keeps a newer file the bake replaces anyway (#1982).
+    scene
+        .bake_files
+        .baked(crate::scene::lighting::occlusion::OCCLUSION_SUFFIX);
     save_lighting(scene, path)
 }
 
@@ -167,7 +169,7 @@ pub fn finish(
         }
         LightingSave::NeedsSceneSave => {
             let (report, ms) = (occlusion.report, occlusion.ms);
-            put_occlusion(scene, path, occlusion);
+            put_occlusion(scene, occlusion);
             (report, ms)
         }
     };
@@ -233,18 +235,15 @@ pub fn apply_occlusion(
         occlusion: baked.report,
         ms: baked.ms,
     };
-    put_occlusion(scene, path, baked);
+    put_occlusion(scene, baked);
     crate::scene::lighting::occlusion::save_sidecar(scene, path)?;
     Ok(report)
 }
 
-/// Put a finished bake's PVS on `scene`, as read: the next save of `path` writes
-/// it, even over a newer file another process baked (#1982).
-fn put_occlusion(scene: &mut Scene, path: &str, baked: BakedOcclusion) {
-    let file = crate::scene::lighting::occlusion::occlusion_path(path);
-    scene.bake_files.baked(&file);
-    *scene.occlusion = baked.data.map(std::sync::Arc::new);
-    scene.occlusion_unread = false;
+/// Put a finished bake's PVS on `scene`: the next save writes it
+/// ([`Scene::put_baked_occlusion`]).
+fn put_occlusion(scene: &mut Scene, baked: BakedOcclusion) {
+    scene.put_baked_occlusion(baked.data);
 }
 
 /// The warning a bake gives when the scene file at `path` lacks, or holds

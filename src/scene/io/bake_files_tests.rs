@@ -1,6 +1,6 @@
 //! The bake files' rule (#1982) on raw bytes: a save writes only what this world
-//! baked, never writes back what it only loaded over a newer file, and removes only
-//! a file it read or wrote.
+//! baked, never writes back what it only loaded over a newer file, restores a file
+//! removed outside, and removes a newer file never.
 
 use std::path::{Path, PathBuf};
 
@@ -55,7 +55,7 @@ fn a_rebake_of_the_same_bytes_is_still_written() {
     let path = file("rebaked.occlusion", b"old");
     let files = loaded(&path);
     std::fs::write(&path, b"theirs").unwrap();
-    files.baked(&path);
+    files.baked(".occlusion");
     let saved = files.store(&path, Some(b"old"), "T").unwrap();
     assert_eq!(saved.action, Action::Written);
     assert_eq!(std::fs::read(&path).unwrap(), b"old");
@@ -83,8 +83,11 @@ fn a_cleared_bake_removes_only_the_file_this_world_saw_unchanged() {
 
     let unseen = file("unseen.occlusion", b"theirs");
     let saved = BakeFiles::default().store(&unseen, None, "T").unwrap();
-    assert_eq!((saved.action, saved.warning), (Action::Kept, None));
-    assert!(unseen.exists(), "never read or written here: left");
+    assert_eq!((saved.action, saved.warning), (Action::Removed, None));
+    assert!(
+        !unseen.exists(),
+        "no record: a path saved over gets what is held"
+    );
 
     let changed = file("changed.occlusion", b"old");
     let files = loaded(&changed);
@@ -108,4 +111,18 @@ fn a_file_written_where_none_was_read_is_newer_too() {
     assert_eq!(saved.action, Action::Kept);
     assert!(saved.warning.is_some());
     assert!(path.exists());
+}
+
+#[test]
+fn a_file_removed_outside_is_written_back_when_a_bake_is_held() {
+    let path = file("removed.navmesh", b"mine");
+    let files = loaded(&path);
+    std::fs::remove_file(&path).unwrap();
+    let saved = files.store(&path, Some(b"mine"), "T").unwrap();
+    assert_eq!(saved.action, Action::Written);
+    assert!(saved.warning.is_some_and(|w| w.contains("removed outside")));
+    assert_eq!(std::fs::read(&path).unwrap(), b"mine");
+    std::fs::remove_file(&path).unwrap();
+    let saved = files.store(&path, None, "T").unwrap();
+    assert_eq!((saved.action, saved.warning), (Action::Kept, None));
 }
