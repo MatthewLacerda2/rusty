@@ -80,6 +80,13 @@ impl BakeMesh {
         self.cast_shadows.is_visible() && self.scale_in_lightmap > 0.0
     }
 
+    /// The texels per world unit a lightmap `edge` texels a side gives this mesh:
+    /// beside the density it asked for, what a bake report shows (#1980). `None`
+    /// when its lightmap UVs enclose no area.
+    pub fn texel_density(&self, edge: u32) -> Option<f32> {
+        super::raster::world_per_uv(&self.surface()).map(|w| edge as f32 / w)
+    }
+
     /// The run index `index` (into `indices`) belongs to; the last run past the end.
     pub fn run_at(&self, index: u32) -> &BakeRun {
         let k = self.runs.partition_point(|r| r.end <= index);

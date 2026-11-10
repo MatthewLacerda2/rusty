@@ -22,16 +22,18 @@ first.
 |---|---|---|
 | `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
 | `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the counts `0` when nothing occludes, and `tooLarge` (a boolean) `true`, with `cells` and `bytes` `0` and no PVS kept, when the level is too large to cull |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, samplesPerPass, prioritizeView, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, samplesPerPass?, prioritizeView?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
+| `Lighting.GetBakeReport` *(dev-only)* | `(kind)` | the last report the `kind` bake (`"lightmaps"`, `"probes"`, `"reflections"` or `"occlusion"`) wrote beside the open scene, as a table (*Bake reports*, below); `nil` when the scene is unsaved or that bake never wrote one; an unknown kind errors |
 
 ### Generate Lighting
 
 - **Settings live with the scene** (Unity's Lighting Settings): texels per unit, samples,
-  bounces, seed, Max Lightmap Size, the denoiser, Backface Tolerance and the directional mode are saved in the scene file's
+  bounces, seed, Max Lightmap Size, the denoiser, Backface Tolerance, the directional mode and
+  the progressive bake's samples per pass and Prioritize View are saved in the scene file's
   `lighting_settings` block, so a rebake never asks for them again.
   `Lighting.SetSettings{ samples = 256 }` changes only the fields it names (each clamped
   to the editor's range: `0.25`–`64` texels per unit, `1`–`4096` samples, `1`–`16`
@@ -102,7 +104,9 @@ first.
   probe step needs a GPU/software adapter and skips gracefully without one, as
   `Lighting.Bake` does.
 - **In the editor** the lightmap step runs in the background (#808) with a progress
-  bar and **Cancel**; a cancelled run writes nothing and keeps the old lighting. When
+  bar and **Cancel**, and **progressively** (#1970, *Progressive bake*, below): the
+  whole scene sharpens in place pass by pass. A cancelled run writes nothing and keeps
+  the old lighting. When
   the lightmaps land they are applied (the probes are captured under them), then the
   probe step runs a step a frame and the console logs one summary line at the end.
   The probe step's placement is planned whole in the frame it starts: about 0.75 s
@@ -299,13 +303,53 @@ afterward to persist the baked SH (`<scene>.lighting.json`) and the cubemap path
 `Lighting.BakeLightmaps()` (#438) bakes per-texel lighting for **static geometry**: bounce
 light, the sky, emissive surfaces, and the direct light of `Baked` lights (see the light
 **Mode** in [`Light`](Light.md)). It is the lightmap half of Generate Lighting; the
-editor's button runs this exact path as its first step, in the background (#808): the
-window stays live, a progress bar counts texels done and then the pages it encodes
-("Encoding page k of n"), and **Cancel** stops the bake, during the trace or the encode,
-and keeps the previous lightmaps. The result is applied when the bake finishes,
-byte-identical to the script verb's; a bake whose scene was swapped out meanwhile is
-dropped. The script verb itself stays synchronous. An argument left out takes the
-scene's lighting settings (above), whose defaults are the ones listed here.
+editor's button runs the same bake as its first step, in the background (#808) and
+progressively (#1970): the window stays live, a progress bar counts texels done (over
+every pass) and then the pages it encodes ("Encoding page k of n"), and **Cancel** stops
+the bake, during the trace or the encode, and keeps the previous lightmaps. The result
+is applied when the bake finishes, byte-identical to the script verb's; a bake whose
+scene was swapped out meanwhile is dropped. The script verb itself stays synchronous
+and one-shot, as does `Lighting.Generate()`. An argument left out takes the scene's
+lighting settings (above), whose defaults are the ones listed here.
+
+- **Progressive bake** (#1970, Unity's Progressive Lightmapper; the editor's Generate
+  Lighting). The trace runs in passes over **every texel of the scene**, not mesh by
+  mesh: each pass adds `samplesPerPass` paths (default `8`, `1`–`4096`; eight passes at
+  the default 64 samples) to every texel, up to `samples`. After each pass but the last
+  the live scene shows the lightmaps as they stand: the paths so far averaged, buried
+  texels filled, the bounce cleaned by the denoiser, packed into pages. A writer
+  thread beside the bake stores them as `lightmap_preview_<bake>_*` pages in the scene's
+  lightmap folder (uncompressed PNGs of one level, no BC encode, while the trace goes
+  on; a page a pass left unchanged is not written again); a pass still unshown when
+  the next is in is skipped and its pages removed,
+  and while the writer is busy the bake builds no preview at all, so a pass that
+  would only be dropped costs no denoise. The card and the log say
+  the passes done, the samples so far and the time left at the pace since the first
+  pass (`[LightmapBake] lightmaps pass 3/8 (24/64 samples), ~3 min 5 s left`).
+  **The finished bake's bytes are the one-shot bake's** at the same settings and seed:
+  each texel keeps its own seeded stream and its running sums between passes, so the
+  pass size never shows. Only a finished bake is written: a save during the bake
+  writes the scene's previous lightmaps, never a preview, and **Cancel** puts them
+  back and removes the preview pages. Edits during the bake reach those hidden
+  lightmaps: a deleted entity leaves them and the preview, and
+  `Lighting.ClearLightmaps()` clears them and the preview. The finished bake still
+  keeps the deleted entity's new entry, so an Undo of the delete brings it back lit by
+  this bake; a save writes no entry for an entity the scene no longer holds. Each shown pass
+  costs a display denoise and a preview write, so a smaller `samplesPerPass`
+  refreshes more often and bakes a little longer. Until the first pass is done the
+  card says `first pass`. The texels' state between passes
+  is held once, updated in place.
+  Rebaking on edit (Unity's *Auto Generate*) is not built yet.
+- **Prioritize View** (`prioritizeView`, default `true`, Unity's setting of that name).
+  The texels the **Scene view's** camera sees converge first: in its frustum, facing
+  it (for an orthographic view, its view direction), with nothing static the camera
+  draws in between (one ray per texel, before the first pass; a `"ShadowsOnly"` mesh
+  hides nothing). The whole scene gets its first pass, so it shows at once; then the
+  seen texels get all their other passes, each shown, then the rest get theirs. So a
+  bake whose view sees part of the scene makes more steps than passes (`pass 3/15
+  (8/64 samples, 24 in view)`), and the same paths in all. Only when each texel is
+  traced changes, never the bytes; off, or with a view that sees all or none of the
+  scene, every pass covers every texel.
 
 - **Who gets one.** Every active, **static**, opaque mesh with a **second UV map** (the
   lightmap UV: glTF `TEXCOORD_1`, or one generated at import by the model's **Generate
@@ -637,6 +681,70 @@ is wholly behind depth the camera drew this frame.
   draw each; past a per-camera budget (8M indices) a batch is tested whole.
 - **Measure** with `Debug.Stats().hiz_tested` and `hiz_culled` (read back a frame
   or so late), and `cluster_tested` / `cluster_culled` for the clusters.
+
+### Bake reports
+
+Every bake writes what it measured and what it found **beside the scene** (#1980), one
+JSON file per kind: `<scene>.bake/lightmaps.json`, `probes.json`, `reflections.json`,
+`occlusion.json` and `navmesh.json` ([`Navigation.md`](Navigation.md)). The next bake of
+that kind overwrites it, so two bakes compare by copying the file between them;
+Generate Lighting writes the ones for the steps it ran. Only a bake writes one, never a
+scene save; nothing reads them at runtime, and an export leaves the `.bake` folder
+behind. A report that cannot be written is a console warning, never a failed bake. A bake
+of an unsaved scene (`Lighting.Bake()` before the first save) writes none.
+`Lighting.GetBakeReport(kind)` returns the file as a table, so a scenario can assert on a
+bake: `assert(Lighting.GetBakeReport("occlusion").visibility.culledFraction >= 0.4)`.
+A value the bake could not measure is `null` in the file and `nil` in the table.
+
+Every report opens with the same fields:
+
+| Field | What it holds |
+|---|---|
+| `kind` | the report's kind |
+| `engine` | the engine commit that baked it (the one the project file records) |
+| `timestamp` | when it was written, Unix seconds |
+| `threads` | what the bake ran on: the CPU workers it used for `lightmaps` and `occlusion` (every core), `1` for `navmesh` (one thread), `"gpu"` for `probes` and `reflections` (a GPU capture) |
+| `stages` | `{ name, seconds }` per stage, in order; `wallSeconds` is their total |
+| `settings` | the settings the bake used |
+| `inputFingerprint` | a hash of every input the bake read, hex: the same scene and settings give the same one, and a change to anything the bake reads (for the probes and reflections: the static geometry, its materials' colours, emission and textures, the lights, ambient, sky, skybox, fog, the lightmaps and the lighting settings) gives another |
+| `outputBytes` | the bytes it wrote (for the light probes, the SH they carry: their sidecar is written with the scene's lighting) |
+
+Then each kind's own:
+
+- **`lightmaps`:** `maps`, `pageSize`, `pages` (`{ page, maps, occupancy }`, the share of
+  the page's texels its maps cover), `meshes`, slowest first (`{ entity, name, page, size,
+  texels, charts, seconds, texelsPerSecond, lightsInReach, requestedDensity,
+  actualDensity }`: `seconds` is worker time over every thread, the densities are texels
+  per metre asked for (texels per unit × Scale In Lightmap) and got), `zeroScaleInLightmap`
+  (the meshes left out at Scale In Lightmap 0), `denoise` (`{ charts, seconds }`, `nil`
+  without OIDN) and `lights` (`{ index, kind, position, range, bakesDirect, texelsInReach }`).
+  A light is in reach of a mesh when the mesh's bounds meet the sphere of its range (a
+  directional light reaches every mesh): a spot light's cone is not read.
+  `invalidTexels` (the backface texels the bake filled) is `nil`: only the tracer knows it.
+- **`probes`:** `count`, `manual`, `bounds` (`{ min, max }`), `bounces` (the wall time of
+  each bounce pass), `sampling` (`"grid"`, trilinear, or `"nearest"`, the four nearest
+  blended: there is no tetrahedral mesh, so no tetrahedra to count) and `farObjects`
+  (`{ count, list }`: the active dynamic drawn objects whose centre (as the renderer takes
+  it: the mesh's local bounds under its world matrix, halved) is over
+  8 m from the nearest probe, farthest first, each `{ entity, name, centre, nearest }`).
+- **`reflections`:** `count`, `probes` (`{ index, position, boxMin, boxMax, resolution,
+  importance, manual, bytes, seconds, overlaps }`, `resolution` the face size the bake
+  rendered at, `overlaps` the probes whose box this one's overlaps) and `picks`: **which
+  probe each active drawn object reflects**, at its bounds' centre as the renderer takes
+  it (the mesh's local bounds under its world matrix) (`{ entity, name, centre, probe, weight,
+  second, secondWeight }`, `probe` `nil` for the sky). The picks rank the scene's whole
+  set: a probe the memory budget leaves out at runtime is not skipped here.
+- **`occlusion`:** `cells`, `cellSize`, `tooLarge`, `rows`, `dataBytes`, `objects`,
+  `occluders`, `neverCulled`, `occluderTriangles`, `biggestOccluders` (`{ entity, name,
+  triangles }`, at most 20) and `visibility`: `meanVisible` and `maxVisible` (objects a
+  cell sees), `culledFraction` (the share of the objects a cell culls, on average),
+  `alwaysVisible` (how many objects every cell sees; the never culled are among them) and
+  `alwaysVisibleNames` (at most 20). `neverCulled` is a count with no names of its own:
+  which objects the bake could not sample is known only inside it. `slowestCells` is `nil`: the time per cell needs
+  hooks inside the bake (#1987).
+
+A stage baked in the editor a step a frame (the probes) counts the frames between its
+steps too. Lists of "heaviest first" keep the top 20; the counts hold them all.
 
 ### Environment
 

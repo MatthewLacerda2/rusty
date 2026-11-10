@@ -22,7 +22,11 @@ dies at two hours), runs the watch, reads how it ended, and decides
 It ends with its own statuses too ([`supervise`], #1450): **its worktree is
 gone** (7), say `make reclaim` removed it mid-wait; or **it crashed** (8), any
 exception the loop did not expect, logged as one `supervisor: crashed:` line
-instead of a traceback. Both lines end `stopped.`, the word the orchestrator's
+instead of a traceback. It stops too when **it cannot lock its worktree** (11,
+#1983): `make queue-status` and `make reclaim` read that lock, and a supervisor
+running without it is one the tools contradict each other about. Before any of
+that, `queue-daemon.py` **refuses the main working tree** (10, #1983) without
+forking. The supervisor's lines end `stopped.`, the word the orchestrator's
 `Monitor` greps for.
 
 Before every launch it moves its checkout to `origin/main` (refusing one with
@@ -59,6 +63,12 @@ AGAIN, GIVE_UP = "again", "give up"
 GONE_STATUS = 7
 
 CRASHED_STATUS = 8
+
+# Started from the repository's main working tree, refused before forking
+# ([`tenancy.main_tree`], #1983); and its worktree could not be locked.
+MAIN_TREE_STATUS = 10
+
+UNLOCKED_STATUS = 11
 
 
 def next_step(status: int, ended: str, failures: int) -> tuple[str, float, str]:
@@ -133,16 +143,23 @@ def vanished(path: str, say) -> int:
     return GONE_STATUS
 
 
+def unlocked(why: str, say) -> int:
+    """Say the worktree could not be locked, and end with [`UNLOCKED_STATUS`]."""
+    say(f"supervisor: {why}; `make queue-status` and `make reclaim` read that lock; stopped.")
+    return UNLOCKED_STATUS
+
+
 def supervise(begin, gone, say) -> int:
     """[`run`] the effects `begin()` returns, ending with a line and a status
     rather than a traceback: a git call in a worktree removed between two
     checks raises `FileNotFoundError`. `begin` (locking the worktree, clearing
     a stale stop, noting the supervisor's code) runs inside the same `try`, so
     a worktree that vanished across a restart ends the same way (#1450, review
-    of PR #1451); `gone` and `say` stand in for the effects that never came."""
+    of PR #1451); `gone` and `say` stand in for the effects that never came.
+    A `begin` that ended the run itself (a failed lock) returns its status."""
     try:
         fx = begin()
-        return run(fx)
+        return fx if isinstance(fx, int) else run(fx)
     except Exception as err:  # noqa: BLE001 -- the point: one line, not a traceback
         if gone():
             return vanished(gone(), say)

@@ -45,6 +45,7 @@ mod sync;
 mod tests;
 
 pub use region::CellRect;
+pub use saved::baked_fingerprint;
 pub use state::BakeState;
 pub use still::Start;
 pub(super) use still::StaticWatch;

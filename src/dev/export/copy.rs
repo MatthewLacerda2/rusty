@@ -74,7 +74,10 @@ pub(super) fn tree(
 /// …, and `.blend@`), which holds the same source, or an `.mp3`, audio's source
 /// format: the export's refresh made its `.wav`, which ships, and one the refresh
 /// skipped (its `.wav` already there, or it does not decode) ships neither way.
+/// Nor does a bake report (`<scene>.bake/`, #1980): the game never reads one.
 pub(super) fn left_behind(rel: &Path) -> bool {
+    let in_reports = (rel.parent().into_iter().flat_map(Path::components))
+        .any(|c| is_report_dir(&c.as_os_str().to_string_lossy()));
     let blender_leftover = rel
         .extension()
         .and_then(|e| e.to_str())
@@ -84,7 +87,18 @@ pub(super) fn left_behind(rel: &Path) -> bool {
                 .map(str::to_owned)
         })
         .is_some_and(|n| n == "@" || (!n.is_empty() && n.bytes().all(|b| b.is_ascii_digit())));
-    converter_for(rel).is_some() || blender_leftover || paths::has_extension(rel, "mp3")
+    converter_for(rel).is_some()
+        || blender_leftover
+        || in_reports
+        || paths::has_extension(rel, "mp3")
+}
+
+/// Whether a folder named `name` holds a scene's bake reports: `<scene
+/// file>.bake`, as `report::report_dir` names it. Another folder ending in
+/// `.bake` (`bread.bake/`) is the game's own and ships.
+fn is_report_dir(name: &str) -> bool {
+    let scene = name.strip_suffix(crate::dev::bake::report::DIR_SUFFIX);
+    scene.is_some_and(|s| paths::has_extension(Path::new(s), crate::scene::SCENE_EXTENSION))
 }
 
 /// Copy the import cache of each source in `sources` (project-relative), under

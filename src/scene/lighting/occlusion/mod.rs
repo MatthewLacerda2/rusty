@@ -217,7 +217,9 @@ impl OcclusionData {
         self.objects.len() * 21 + self.rows.len() * 8 + self.cells.len() * 4 + 64
     }
 
-    pub(super) fn parts(&self) -> (&[u64], &[u32]) {
+    /// The distinct rows (`words` words each, bit `i` object `i`) and each cell's
+    /// row: what the file stores, and what a bake report counts (#1980).
+    pub fn parts(&self) -> (&[u64], &[u32]) {
         (&self.rows, &self.cells)
     }
 }

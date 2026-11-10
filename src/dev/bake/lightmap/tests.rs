@@ -41,6 +41,7 @@ pub(super) fn quick() -> BakeSettings {
         filter_radius: 1,
         directional: true,
         backface_tolerance: BakeSettings::DEFAULT_BACKFACE_TOLERANCE,
+        ..Default::default()
     }
 }
 

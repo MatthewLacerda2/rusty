@@ -893,7 +893,9 @@ scene.lighting_settings.lightmaps.denoiser: enum Oidn|Filter|None
 scene.lighting_settings.lightmaps.directional: bool
 scene.lighting_settings.lightmaps.filter_radius: u32
 scene.lighting_settings.lightmaps.max_lightmap_size: u32
+scene.lighting_settings.lightmaps.prioritize_view: bool
 scene.lighting_settings.lightmaps.samples: u32
+scene.lighting_settings.lightmaps.samples_per_pass: u32
 scene.lighting_settings.lightmaps.seed: u64
 scene.lighting_settings.lightmaps.texels_per_unit: f32
 scene.lighting_settings.mixed_lighting_mode: enum BakedIndirect|Shadowmask
