@@ -253,7 +253,8 @@ its check and its command changed to match).
   branch, which lavapipe hides and Metal does not.
 - CI (`.github/workflows/ci.yml`) and `make test` run the engine suite with
   **cargo-nextest** plus `cargo test --doc`, both feature sets; the lint xtask keeps
-  plain `cargo test`. See *The test runner* below.
+  plain `cargo test`. The macOS leg (`build-test-cross`) runs the nextest suite with
+  `dev` only, the superset, and the doctests with both (#1976). See *The test runner* below.
 - A test never reads a developer's game project (#782). `Harness::new` runs in a
   workspace of its own, `<out_dir>/workspace`, seeded fresh from the test-fixture
   project's scripts and the bundled ones, and the scene's relative script paths
@@ -306,7 +307,8 @@ its check and its command changed to match).
 ## The test runner: cargo-nextest
 `make test` and CI run the suite with [cargo-nextest](https://nexte.st) (#484),
 configured in `.config/nextest.toml`. Install it once: `cargo install --locked
-cargo-nextest` (CI uses `taiki-e/install-action`). What it buys over `cargo test`:
+cargo-nextest` (CI installs a pinned version through `.github/actions/install-tool`,
+which caches it, #1973). What it buys over `cargo test`:
 
 - **Each test is its own process**, so one test's panic, leaked global or stuck
   thread cannot take its neighbours with it.

@@ -46,7 +46,7 @@ coder *changing* it must know.
 - **`make scripts` is a hard gate** (in `make gates` and `lint.yml`): `unittest` over
   `.github/scripts/tests/` (and `tools/launcher/tests/`). Tests are grouped there by area — `verdict/`, `queue/`,
   `watch/`, `reclaim/`, `board/`, `checks/`, `mutants/`, `dispatch/`, `health/`,
-  `resolved/`, `ruleset/`, `proved/` (#1784), `view/` (#1876), `after/` (#1934) — each a package; a new area gets its own folder. A test never
+  `resolved/`, `ruleset/`, `proved/` (#1784), `view/` (#1876), `after/` (#1934), `slowest/` (#1976) — each a package; a new area gets its own folder. A test never
   reaches GitHub or pushes: it fakes `gh` and `git` the way
   `.github/scripts/tests/watch/fakes.py` and the `fixtures.py` files do.
 - **The size gate measures `.py`** (#926): 300 lines of code, 150 for a file under a

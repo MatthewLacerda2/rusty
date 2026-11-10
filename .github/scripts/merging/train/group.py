@@ -30,7 +30,7 @@ CAP = 4
 # `tools/lint/` is the gate's own code, so it goes alone, but not the tables in it
 # that feature branches edit as data (#1785's review: 2 of 9 ready pull requests
 # on 2026-11-04 touched only these): the train's tree proves them like any file.
-ALONE_PREFIXES = (".github/scripts/merging/", ".github/workflows/", "tools/lint/")
+ALONE_PREFIXES = (".github/actions/", ".github/scripts/merging/", ".github/workflows/", "tools/lint/")
 ALONE_FILES = (
     "Makefile", "Cargo.toml", "Cargo.lock",
     ".github/scripts/merge-queue.py", ".github/scripts/queue-daemon.py",

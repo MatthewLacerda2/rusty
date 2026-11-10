@@ -9,11 +9,7 @@ use super::collider::manager_with_collider;
 use super::lifecycle::write_script;
 use crate::physics::{CollisionEvents, CollisionPair, Contact, PhysicsEvents};
 use crate::scene::authoring::defaults::default_collider;
-
-fn asset(name: &str) -> String {
-    let path = crate::test_temp::dir().join(name);
-    path.to_string_lossy().replace('\\', "/")
-}
+use crate::test_temp::lua_path as asset;
 
 #[test]
 fn an_asset_is_created_named_and_retuned_from_lua() {

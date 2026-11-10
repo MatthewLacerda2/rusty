@@ -48,9 +48,13 @@ fn a_missing_library_is_an_error_not_a_crash() {
 
 #[test]
 fn a_library_that_loads_without_oidns_calls_is_passed_over() {
-    let decoy = PathBuf::from(match cfg!(target_os = "macos") {
-        true => "/usr/lib/libSystem.B.dylib",
-        false => "libm.so.6",
+    // A system library every machine of that OS loads, with no OIDN symbols in it.
+    let decoy = PathBuf::from(if cfg!(target_os = "macos") {
+        "/usr/lib/libSystem.B.dylib"
+    } else if cfg!(windows) {
+        "kernel32.dll"
+    } else {
+        "libm.so.6"
     });
     let err = ffi::Api::open(std::slice::from_ref(&decoy))
         .err()

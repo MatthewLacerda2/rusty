@@ -9,7 +9,8 @@ use crate::scene::serialize::{apply_scene_data, to_scene_data};
 use crate::scene::Scene;
 
 /// A bumpy `Chair` of `n`×`n` quads (2n² triangles, 0.1 high) and a two-triangle `Chair_col`,
-/// written as `file`, its sidecar's `Chair` collider built from `mesh`. Returns the path.
+/// written as `file`, its sidecar's `Chair` collider built from `mesh`. Returns the path,
+/// slashed ([`crate::test_temp::lua_path`]) so a test can put it in a Lua literal.
 pub(crate) fn chair(file: &str, n: u32, mesh: Option<&str>) -> String {
     let mut obj = String::from("o Chair\n");
     for z in 0..=n {
@@ -38,7 +39,7 @@ pub(crate) fn chair(file: &str, n: u32, mesh: Option<&str>) -> String {
     };
     settings.colliders.insert("Chair".into(), entry);
     sidecar::save(&path, &settings).unwrap();
-    path.to_string_lossy().into_owned()
+    crate::test_temp::lua_path(file)
 }
 
 /// The model at `path` spawned whole, and its child entities' names and ids.
