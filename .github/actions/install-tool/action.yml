@@ -1,0 +1,134 @@
+# Install cargo tools at a pinned version, from the Actions cache when it has
+# them (#1973). Every workflow installs its tools through this one action.
+#
+# Why: `taiki-e/install-action` downloads its tool from GitHub releases on every
+# job, and when that host answers 504 the job fails before anything is built:
+# `main`'s `ci` went red that way (#1936), and PR #1972 lost a CI round to it on
+# 2026-11-09, the queue's one setup re-run (#1932) included. The tools are fixed
+# versions, so after the first download they come from the cache and a release
+# outage no longer reaches a run.
+#
+# - The versions are pinned here, once (`PINNED`, below), so the cache key is
+#   exact and a new release cannot change what CI runs. They are what
+#   install-action's `latest` installed on 2026-11-09. Bump one by editing its
+#   line: the key moves with it, and the first run after downloads it again.
+# - The key names every tool and version and the runner's OS and arch, as the
+#   `oidn-cache` step in `ci.yml` does: `tools-cargo-nextest@0.9.151-Linux-X64`.
+# - A miss behaves as before (install-action, with its checksum check and its
+#   own retries), plus one more attempt a minute later; then the binaries are
+#   copied into `~/.rusty-tools/bin` and saved under the key.
+# - Any ref saves, unlike the rust-cache steps' `main`-only rule (#482): an
+#   entry is a few MB, and a key `main` already holds is restored, never saved
+#   again, so a pull request writes one only in the window after a bump.
+#   `proved_tree.py` runs `main`'s push in full when this directory changes,
+#   so `main` writes the new key itself.
+# - The calling step's `name:` is what the jobs API reports and what
+#   `merging/verdict/setup.py`'s `SETUP` matches; the steps inside are not
+#   listed there, so keep the callers' names (`Install cargo-nextest`).
+name: Install cargo tools (cached)
+description: Install pinned cargo tools, restoring them from the Actions cache when it has them.
+inputs:
+  tool:
+    description: Comma-separated tool names, each one listed in PINNED (e.g. `cargo-mutants,cargo-nextest`).
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Pin and key
+      id: pin
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tool }}
+      run: |
+        set -euo pipefail
+        # PINNED: one line per tool, `name version`.
+        PINNED="cargo-llvm-cov 0.9.1
+        cargo-mutants 27.1.0
+        cargo-nextest 0.9.151"
+        specs=() names=()
+        IFS=',' read -ra wanted <<< "$TOOLS"
+        for tool in "${wanted[@]}"; do
+          tool="${tool// /}"
+          version=$(printf '%s\n' "$PINNED" | awk -v t="$tool" '$1 == t { print $2 }')
+          if [ -z "$version" ]; then
+            echo "::error::install-tool: $tool has no pinned version; add it to PINNED in .github/actions/install-tool/action.yml"
+            exit 1
+          fi
+          specs+=("$tool@$version") names+=("$tool")
+        done
+        spec=$(IFS=','; echo "${specs[*]}")
+        echo "spec=$spec" >> "$GITHUB_OUTPUT"
+        echo "names=${names[*]}" >> "$GITHUB_OUTPUT"
+        echo "key=tools-${spec//,/+}-${RUNNER_OS}-${RUNNER_ARCH}" >> "$GITHUB_OUTPUT"
+    - name: Restore
+      id: cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/.rusty-tools/bin
+        key: ${{ steps.pin.outputs.key }}
+    - name: Download (cache miss)
+      id: first
+      if: steps.cache.outputs.cache-hit != 'true'
+      continue-on-error: true
+      uses: taiki-e/install-action@v2
+      with:
+        tool: ${{ steps.pin.outputs.spec }}
+    - name: Wait before the retry
+      if: steps.cache.outputs.cache-hit != 'true' && steps.first.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "install-tool: the download failed; one more attempt in 60 s"
+        sleep 60
+    - name: Download (retry)
+      if: steps.cache.outputs.cache-hit != 'true' && steps.first.outcome == 'failure'
+      uses: taiki-e/install-action@v2
+      with:
+        tool: ${{ steps.pin.outputs.spec }}
+    - name: Keep the binaries
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        NAMES: ${{ steps.pin.outputs.names }}
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.rusty-tools/bin
+        # install-action puts a tool in ~/.cargo/bin on Linux and Windows and in
+        # ~/.install-action/bin on macOS; look in both, then on PATH. `.exe`
+        # first: Git Bash's `-f foo` is true for `foo.exe` too, and copying it as
+        # `foo` would leave cargo nothing to run on Windows.
+        for name in $NAMES; do
+          found=""
+          for candidate in ~/.install-action/bin/"$name" ~/.cargo/bin/"$name" "$(command -v "$name" || true)"; do
+            for path in "$candidate.exe" "$candidate"; do
+              if [ -z "$found" ] && [ -f "$path" ]; then found="$path"; fi
+            done
+          done
+          [ -n "$found" ] || { echo "::error::install-tool: $name was installed but not found"; exit 1; }
+          cp "$found" ~/.rusty-tools/bin/
+        done
+    - name: Save
+      if: steps.cache.outputs.cache-hit != 'true'
+      # A save that loses a race with a parallel job's (same key) only warns;
+      # the job has its tools either way.
+      continue-on-error: true
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.rusty-tools/bin
+        key: ${{ steps.pin.outputs.key }}
+    - name: Put on PATH
+      shell: bash
+      env:
+        NAMES: ${{ steps.pin.outputs.names }}
+        HIT: ${{ steps.cache.outputs.cache-hit }}
+      run: |
+        set -euo pipefail
+        bin=~/.rusty-tools/bin
+        # Windows' PATH takes `C:\…`, not Git Bash's `/c/…`.
+        if command -v cygpath >/dev/null; then cygpath -w "$bin"; else echo "$bin"; fi >> "$GITHUB_PATH"
+        echo "install-tool: cache hit: ${HIT:-false} (${{ steps.pin.outputs.key }})"
+        # Which copy runs, and its version: on a hit it must be the cached one.
+        ls "$bin"
+        for name in $NAMES; do
+          PATH="$bin:$PATH" command -v "$name"
+          PATH="$bin:$PATH" cargo "${name#cargo-}" --version
+        done

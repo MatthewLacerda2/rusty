@@ -106,7 +106,7 @@ class RunsInFull(unittest.TestCase):
 
     def test_a_changed_lockfile_or_toolchain_or_workflow(self):
         for path in ("Cargo.lock", "tools/lint/Cargo.toml", "rust-toolchain.toml", ".cargo/config.toml",
-                     ".github/workflows/ci.yml"):
+                     ".github/workflows/ci.yml", ".github/actions/install-tool/action.yml"):
             with self.subTest(path=path):
                 self.assert_runs(Fake(files=("src/lib.rs", path)))
 

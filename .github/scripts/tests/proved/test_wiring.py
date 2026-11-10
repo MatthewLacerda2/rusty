@@ -19,6 +19,13 @@ def body(workflow: str) -> str:
     return (SCRIPTS.parent / "workflows" / workflow).read_text(encoding="utf-8")
 
 
+def job(text: str, base: str) -> str:
+    """The job called `base`, up to the next job."""
+    start = text.index(f"\n  {base}:\n")
+    end = re.search(r"\n  \S", text[start + 1:])
+    return text[start:start + 1 + end.start()] if end else text[start:]
+
+
 def step(text: str, name: str) -> str:
     """The step called `name`, up to the next step or job."""
     start = text.index(f"- name: {name}\n")
@@ -34,7 +41,7 @@ class Wiring(unittest.TestCase):
                 with self.subTest(workflow=workflow, job=base):
                     self.assertIn(f"\n  {base}:\n", text)
                     if name:
-                        self.assertIn(f"- name: {name}\n", text)
+                        self.assertIn(f"- name: {name}\n", job(text, base))
 
     def test_each_changes_job_asks_and_folds_the_answer_into_code(self):
         for workflow in proved_tree.BUILT:
@@ -57,10 +64,8 @@ class Wiring(unittest.TestCase):
             with self.subTest(workflow=workflow):
                 self.assertRegex(text, r"\n  schedule:\n    - cron: '")
             for base in jobs:
-                job = text[text.index(f"\n  {base}:\n"):]
-                job = job[:re.search(r"\n  \S", job[1:]).start() + 1]
                 with self.subTest(workflow=workflow, job=base):
-                    self.assertIn("github.event_name == 'schedule'", job)
+                    self.assertIn("github.event_name == 'schedule'", job(text, base))
 
 
 if __name__ == "__main__":

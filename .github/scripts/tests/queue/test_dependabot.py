@@ -73,6 +73,10 @@ class WorkflowBumps(unittest.TestCase):
     def test_a_bot_editing_workflows_is_held_and_names_them(self):
         self.assertEqual(board.held(pr(1, bot=True, files=self.BUMP[::-1]), BOTS), list(self.BUMP))
 
+    def test_a_bot_editing_a_composite_action_is_held(self):
+        action = ".github/actions/install-tool/action.yml"  # #1973
+        self.assertEqual(board.held(pr(1, bot=True, files=[action]), BOTS), [action])
+
     def test_a_bot_editing_only_the_lockfile_is_not_held(self):
         self.assertEqual(board.held(pr(1, bot=True, files=["Cargo.lock"]), BOTS), [])
 
