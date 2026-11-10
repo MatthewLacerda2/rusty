@@ -38,10 +38,12 @@ struct Polygon {
 }
 
 impl Polygons {
-    pub fn of(tris: &[Tri], faces: &[Face]) -> Self {
+    /// The polygons of `tris`, whose corners are `corners` as gathered: not
+    /// rebuilt from a `Tri`'s edges, whose float sum can lose a shared vertex's
+    /// low bits, so two faces sharing a corner share it bit for bit (`sheets`).
+    pub fn of(tris: &[Tri], corners: &[[Vec3; 3]], faces: &[Face]) -> Self {
         let (mut of, mut polygons) = (Vec::with_capacity(tris.len()), Vec::<Polygon>::new());
-        for (i, t) in tris.iter().enumerate() {
-            let corners = [t.a, t.a + t.e1, t.a + t.e2];
+        for (i, (t, &corners)) in tris.iter().zip(corners).enumerate() {
             let joins = i > 0 && tris[i - 1].mesh == t.mesh && faces[i - 1] == faces[i];
             let last = polygons.last_mut().filter(|_| joins);
             if !last.is_some_and(|p| p.merge(corners)) {

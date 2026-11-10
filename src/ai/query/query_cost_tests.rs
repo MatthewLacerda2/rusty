@@ -10,7 +10,7 @@ use super::{run, Anchor, Filter, Generator, Measure, QuerySpec, QueryWorld, Test
 use crate::components::ColliderShape;
 use crate::navigation::{NavigationGraph, ALL_AREAS};
 use crate::physics::PhysicsWorld;
-use crate::scene::lighting::occlusion::bench_level::rooms;
+use crate::scene::lighting::occlusion::bench::level::rooms;
 use crate::scene::{Camera, ColliderComponent, Scene};
 
 /// The bench level with a box collider on every block, baked at `cell` metres.

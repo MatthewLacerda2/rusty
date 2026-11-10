@@ -1,7 +1,7 @@
 //! The navmesh bake's cost (#1887), measured by hand in a release build:
 //! `cargo nextest run --release --features dev --run-ignored only -E
 //! 'test(navmesh_bake_cost)' --no-capture`. A measurement, never a gate. The
-//! Dust2-sized level is the occlusion bench's (`bench_level::rooms(20)`, 200 ×
+//! Dust2-sized level is the occlusion bench's (`bench::level::rooms(20)`, 200 ×
 //! 200 m on two storeys) with a box collider on every block; it bakes whole at the
 //! old 1 m cell and the 0.25 m default, then a crate moves and the incremental
 //! rebake is timed against the full one. On 2026-11-08, in a 4-core container:
@@ -14,7 +14,7 @@ use glam::Vec3;
 
 use crate::components::{ColliderComponent, ColliderShape};
 use crate::navigation::{NavigationGraph, Rebake};
-use crate::scene::lighting::occlusion::bench_level::rooms;
+use crate::scene::lighting::occlusion::bench::level::rooms;
 use crate::scene::Scene;
 
 /// The process's peak resident memory, MB (Linux; 0 elsewhere).

@@ -23,8 +23,4 @@ mod lightmap_cost_tests;
 #[cfg(test)]
 mod navmesh_cost_tests;
 #[cfg(test)]
-mod occlusion_cost_tests;
-#[cfg(test)]
-mod occlusion_tests;
-#[cfg(test)]
 mod open_world_tests;

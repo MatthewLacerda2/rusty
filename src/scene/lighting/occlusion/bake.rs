@@ -71,21 +71,33 @@ pub fn bake_occlusion(
 }
 
 impl OcclusionInput {
+    /// The scene ready to sample and its grid, for a measurement that times or
+    /// counts cells one by one; `None` when no grid is laid.
+    #[cfg(all(test, feature = "dev"))]
+    pub(crate) fn sampler(&self) -> Option<Sampler> {
+        let baking = Baking::of(&self.objects);
+        let (min, max) = baking.bounds?;
+        let grid = Grid::over(min, max)?;
+        Some(Sampler { baking, grid })
+    }
+
+    /// The index entity `entity` has in what a cell sees, `None` when the bake
+    /// reads no object for it.
+    #[cfg(all(test, feature = "dev"))]
+    pub(crate) fn object(&self, entity: u32) -> Option<usize> {
+        self.objects.iter().position(|o| o.entity == entity)
+    }
+
     /// Bake `count` cells spread over the grid on this thread, for a measurement
     /// of a level too large to bake whole in a test: the grid's cell count and
     /// edge, and the sheets the occluders fused into (count, bytes). `None` when
     /// no grid is laid.
     #[cfg(all(test, feature = "dev"))]
     pub(crate) fn bake_sample(&self, count: usize) -> Option<(usize, f32, (usize, usize))> {
-        let scene = Baking::of(&self.objects);
-        let (min, max) = scene.bounds?;
-        let grid = Grid::over(min, max)?;
-        let cells = grid.cell_count() as u64;
-        for k in 0..count as u64 {
-            let cell = k.wrapping_mul(0x9E37_79B9_7F4A_7C15) % cells;
-            std::hint::black_box(scene.cell(&grid, cell as usize));
-        }
-        Some((grid.cell_count(), grid.cell, scene.sheets()))
+        let sampler = self.sampler()?;
+        sampler.spread(count as u64);
+        let grid = &sampler.grid;
+        Some((grid.cell_count(), grid.cell, sampler.baking.sheets()))
     }
 
     /// Bake the PVS on `threads` workers, counting into `progress`; `None` when it
@@ -134,6 +146,36 @@ impl OcclusionInput {
             ..report
         };
         Some((Some(data), report))
+    }
+}
+
+/// One bake's sampling, a cell at a time ([`OcclusionInput::sampler`]).
+#[cfg(all(test, feature = "dev"))]
+pub(crate) struct Sampler {
+    baking: Baking,
+    pub grid: Grid,
+}
+
+#[cfg(all(test, feature = "dev"))]
+impl Sampler {
+    /// What cell `index` sees on its own, as the bake samples it.
+    pub fn cell(&self, index: usize) -> Vec<u64> {
+        self.baking.cell(&self.grid, index)
+    }
+
+    /// Bake `count` cells spread over the grid, one after another, on this
+    /// thread: the same cells for the same level and count.
+    pub fn spread(&self, count: u64) {
+        let cells = self.grid.cell_count() as u64;
+        for k in 0..count {
+            let cell = k.wrapping_mul(0x9E37_79B9_7F4A_7C15) % cells;
+            std::hint::black_box(self.cell(cell as usize));
+        }
+    }
+
+    /// Rays cast so far, either kind.
+    pub fn rays_cast(&self) -> u64 {
+        self.baking.rays_cast()
     }
 }
 

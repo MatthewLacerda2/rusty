@@ -70,6 +70,7 @@ pub use file::{
 };
 pub use gather::{fingerprint, Fingerprints};
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
+pub use progress::OcclusionObserver;
 pub use progress::OcclusionProgress;
 pub use sample::{MAX_TARGETS, TARGET_SPACING, VOXEL};
 pub use unsaved::unsaved_materials;
@@ -77,7 +78,7 @@ pub use unsaved::unsaved_materials;
 #[cfg(test)]
 mod bake_tests;
 #[cfg(all(test, feature = "dev"))]
-pub(crate) mod bench_level;
+pub(crate) mod bench;
 #[cfg(test)]
 mod carry_tests;
 #[cfg(test)]
@@ -86,10 +87,14 @@ mod dense_tests;
 mod file_tests;
 #[cfg(test)]
 mod grid_tests;
+#[cfg(all(test, feature = "dev"))]
+mod opening_tests;
 #[cfg(test)]
 mod print_tests;
 #[cfg(test)]
 mod sampling_tests;
+#[cfg(all(test, feature = "dev"))]
+mod tessellated_tests;
 #[cfg(test)]
 pub(crate) mod test_gap;
 #[cfg(test)]

@@ -156,7 +156,7 @@ pub fn finish(
     scene: &mut Scene,
     path: &str,
     (lightmaps, probes, saved): (usize, LightingBakeReport, LightingSave),
-    occlusion: BakedOcclusion,
+    mut occlusion: BakedOcclusion,
 ) -> Result<GenerateReport, String> {
     refuse_in_play(scene)?;
     let (report, ms) = match saved {
@@ -166,9 +166,10 @@ pub fn finish(
         }
         LightingSave::NeedsSceneSave => {
             let (report, ms) = (occlusion.report, occlusion.ms);
+            let cells = std::mem::take(&mut occlusion.cells);
             put_occlusion(scene, occlusion);
             // Nothing is written until the scene saves; the bake is reported now.
-            super::report::occlusion::keep(scene, path, (&report, ms), None);
+            super::report::occlusion::keep(scene, path, (&report, ms, &cells), None);
             (report, ms)
         }
     };
@@ -227,18 +228,20 @@ impl OcclusionOnlyReport {
 pub fn apply_occlusion(
     scene: &mut Scene,
     path: &str,
-    baked: BakedOcclusion,
+    mut baked: BakedOcclusion,
 ) -> Result<OcclusionOnlyReport, String> {
     refuse_in_play(scene)?;
     let report = OcclusionOnlyReport {
         occlusion: baked.report,
         ms: baked.ms,
     };
+    let cells = std::mem::take(&mut baked.cells);
     put_occlusion(scene, baked);
     let saving = std::time::Instant::now();
     crate::scene::lighting::occlusion::save_sidecar(scene, path)?;
     let saved = Some(saving.elapsed());
-    super::report::occlusion::keep(scene, path, (&report.occlusion, report.ms), saved);
+    let measured = (&report.occlusion, report.ms, &cells[..]);
+    super::report::occlusion::keep(scene, path, measured, saved);
     Ok(report)
 }
 

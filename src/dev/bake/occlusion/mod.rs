@@ -8,10 +8,13 @@
 //! from a scene edited meanwhile is still safe to apply: the renderer culls only
 //! objects whose fingerprint is what was baked, and none at all once a baked
 //! occluder changed (`render::scene::occlusion`).
+//!
+//! Both runs lend the bake [`CellClocks`], so each cell's sampling time reaches
+//! the bake report's `slowestCells` (#1987) without a clock inside the sim.
 
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::dev::bake::lightmap::logged::watch;
 use crate::dev::bake::progress::{BakeLog, Progress, Step};
@@ -20,13 +23,19 @@ use crate::scene::lighting::occlusion::{
 };
 use crate::scene::Scene;
 
+mod clocks;
+
+pub use clocks::CellClocks;
+
 /// A finished occlusion bake: its PVS (`None` when nothing occludes or the level is too large to cull), its report,
-/// and the wall-clock milliseconds it took.
+/// the wall-clock milliseconds it took, and each cell's sampling time by cell
+/// index (#1987; empty when no grid was laid).
 #[derive(Debug)]
 pub struct BakedOcclusion {
     pub data: Option<OcclusionData>,
     pub report: OcclusionBakeReport,
     pub ms: u64,
+    pub cells: Vec<Duration>,
 }
 
 type Baked = Option<(Option<OcclusionData>, OcclusionBakeReport)>;
@@ -34,6 +43,7 @@ type Baked = Option<(Option<OcclusionData>, OcclusionBakeReport)>;
 /// An occlusion bake on a worker thread.
 pub struct OcclusionBakeJob {
     progress: Arc<OcclusionProgress>,
+    clocks: Arc<CellClocks>,
     worker: Option<JoinHandle<Baked>>,
     started: Instant,
 }
@@ -42,7 +52,8 @@ impl OcclusionBakeJob {
     /// Gather `scene`'s statics and start baking them on a worker.
     pub fn start(scene: &Scene) -> Result<Self, String> {
         let input = gather_occlusion(scene);
-        let progress = Arc::new(OcclusionProgress::default());
+        let clocks = Arc::new(CellClocks::default());
+        let progress = Arc::new(OcclusionProgress::observed(clocks.clone()));
         let watch = Arc::clone(&progress);
         let worker = thread::Builder::new()
             .name("occlusion-bake".into())
@@ -50,6 +61,7 @@ impl OcclusionBakeJob {
             .map_err(|e| format!("start the occlusion bake: {e}"))?;
         Ok(Self {
             progress,
+            clocks,
             worker: Some(worker),
             started: Instant::now(),
         })
@@ -68,7 +80,12 @@ impl OcclusionBakeJob {
         }
         let ms = self.started.elapsed().as_millis() as u64;
         Some(match self.worker.take()?.join() {
-            Ok(Some((data, report))) => Ok(BakedOcclusion { data, report, ms }),
+            Ok(Some((data, report))) => Ok(BakedOcclusion {
+                data,
+                report,
+                ms,
+                cells: self.clocks.times(),
+            }),
             Ok(None) => Err("the occlusion bake was stopped".into()),
             Err(_) => Err("the occlusion bake worker panicked".into()),
         })
@@ -88,14 +105,21 @@ impl Drop for OcclusionBakeJob {
 pub fn bake_occlusion_logged(scene: &Scene, log: &mut BakeLog) -> Result<BakedOcclusion, String> {
     let started = Instant::now();
     let input = gather_occlusion(scene);
-    let progress = OcclusionProgress::default();
+    let clocks = Arc::new(CellClocks::default());
+    let progress = OcclusionProgress::observed(clocks.clone());
     let run = |p: &OcclusionProgress| bake(&input, p);
     let (data, report) = match log.is_on() {
         true => watch(&progress, read, log, run)?,
         false => run(&progress)?,
     };
     let ms = started.elapsed().as_millis() as u64;
-    Ok(BakedOcclusion { data, report, ms })
+    let cells = clocks.times();
+    Ok(BakedOcclusion {
+        data,
+        report,
+        ms,
+        cells,
+    })
 }
 
 fn bake(
@@ -117,3 +141,10 @@ fn read(progress: &OcclusionProgress) -> Progress {
         meshes: None,
     }
 }
+
+#[cfg(test)]
+mod cost_tests;
+#[cfg(test)]
+mod tests;
+#[cfg(test)]
+mod town_cost_tests;

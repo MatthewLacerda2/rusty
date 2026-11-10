@@ -14,7 +14,7 @@ use glam::Vec3;
 use crate::scene::lighting::lightmap::{
     trace_texels, AreaShape, BakeLight, BakeScene, BakeSettings, LightShape,
 };
-use crate::scene::lighting::occlusion::bench_level::rooms;
+use crate::scene::lighting::occlusion::bench::level::rooms;
 
 /// The `n × n`-rooms bench level as the bake sees it, with its lamps.
 pub(in crate::dev::bake) fn lit_level(n: usize) -> BakeScene {
