@@ -122,7 +122,7 @@ fn server(engine: &Path, args: &[&str]) -> Value {
 
 fn put(path: &Path, text: &str) -> Result<(), String> {
     // lint: allow(asset-write) project settings, not read by a path-keyed cache
-    std::fs::write(path, text).map_err(|e| e.to_string())
+    crate::core::fs::write_atomic(path, text.as_bytes()).map_err(|e| e.to_string())
 }
 
 fn warning(file: &str, why: &str) -> String {

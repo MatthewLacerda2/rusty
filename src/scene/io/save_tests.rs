@@ -46,3 +46,62 @@ fn a_playing_scene_is_never_saved() {
         "saves again after Stop"
     );
 }
+
+/// A save over an existing scene goes through a temp file renamed into place
+/// (#1991): the new bytes are there and nothing is left beside them.
+#[test]
+fn a_save_over_a_scene_leaves_the_new_bytes_and_no_temp_file() {
+    let dir = crate::test_temp::dir();
+    let path = dir.join("level.scene").to_string_lossy().into_owned();
+    let mut scene = Scene::new();
+    save_to_file(&scene, &path).unwrap();
+    scene.add_entity("Added".to_string());
+    save_to_file(&scene, &path).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        scene_json(&scene).unwrap()
+    );
+    let names: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name())
+        .collect();
+    assert!(
+        names.iter().all(|n| !n.to_string_lossy().ends_with(".tmp")),
+        "{names:?}"
+    );
+}
+
+/// A save that cannot write (the folder read-only) leaves the old scene whole,
+/// where a plain write would have truncated it first (#1991).
+#[cfg(unix)]
+#[test]
+fn a_failed_save_leaves_the_old_scene_whole() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = crate::test_temp::dir().join("locked");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("level.scene").to_string_lossy().into_owned();
+    let mut scene = Scene::new();
+    scene.add_entity("Authored".to_string());
+    save_to_file(&scene, &path).unwrap();
+    let before = std::fs::read(&path).unwrap();
+    let mode = |m| std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(m));
+    mode(0o555).unwrap();
+    // Root writes through any mode: then there is nothing to prove.
+    let probe = dir.join("probe");
+    if std::fs::write(&probe, "").is_ok() {
+        let _ = std::fs::remove_file(probe);
+        mode(0o755).unwrap();
+        eprintln!("skipped: this user writes into a read-only folder");
+        return;
+    }
+    scene.add_entity("Unsaved".to_string());
+    let result = save_to_file(&scene, &path);
+    mode(0o755).unwrap();
+    assert!(result.is_err(), "the save reports the failure");
+    assert_eq!(
+        std::fs::read(&path).unwrap(),
+        before,
+        "the old scene is whole"
+    );
+}

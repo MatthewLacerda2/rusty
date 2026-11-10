@@ -4,7 +4,9 @@
 //! that moment sees an empty or torn file. [`write_atomic`] writes beside the
 //! target and renames over it: a reader gets the whole old file or the whole new
 //! one. It is the one copy: the import sidecar, the import cache's stamp, the seed
-//! manifest, the authored UI widgets and imported audio all write through it, and
+//! manifest, the authored UI widgets, imported audio, the bake files, and every
+//! authored document (scene, prefab, animation graph, project file, save data, the
+//! provider ledger, #1991) all write through it, and
 //! the `atomic-write` rule (`make rules`) flags a `std::fs::rename` anywhere else.
 //! [`written`] is the log of asset files the engine wrote, which path-keyed caches
 //! drain to drop what went stale (#1207), each through a [`freshness::Freshness`]
@@ -30,6 +32,10 @@ pub const TEMP_SUFFIX: &str = "tmp";
 /// rename can reach the disk before the data it names). The temp file is removed
 /// when the write or the rename fails, so a failure leaves no litter. The parent
 /// directory must exist.
+///
+/// Every document the developer authored or the engine reads back whole as the
+/// source of truth (a scene, a prefab, a project file, the save data) is written
+/// with it; only a cache the engine re-makes by itself may use a plain write.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let temp = unique_sibling(path, TEMP_SUFFIX);
     // Windows refuses the rename for a moment while a reader holds the target.
