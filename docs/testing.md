@@ -655,6 +655,7 @@ recipe and scripts are committed; the project is regenerable output.
 
 | Game | What it is for |
 |---|---|
+| `arena` | The CS:GO yardstick in miniature: a two-floor deathmatch from primitives (a staircase, a ladder link, a drop, a crate to jump onto, a 10 cm wall bullets go through), snowman bots on `NavMeshAgent` + `AIPerception` + `EnvironmentQuery` fighting everyone, raycast guns with spread and recoil, a smoke grenade that blocks sight. Scenarios: `nav` (every spawn reaches every room and both floors), `match` (bots reach the kill limit, each scores and dies), `shot` (a wallbang hurts, a 40 cm wall stops it). `--param size=dust2` lays out 25 blocks, 120 m a side, for map-scale work (run on request). |
 | `showroom` | Lighting and reflections in one interior room: a polished floor (SSR from a minimum smoothness of 0.1), a mirror, a clear and a tinted glass pane, a drinking glass before the mirror, a lacquered pedestal (`ior`, `KHR_materials_specular`), an emissive sign, daylight through a window, a turned box and a sphere reflection probe, six light probes and a ball rolling through them with a proxy volume. Scenarios: `load`, `ball` (its probe light rises in the sun), `probes` (the volumes drawn as gizmos), `bake` (only with `--param bake=true`: a tiny Generate Lighting, applied on load). |
 | `smoke` | The generator's own proof: a floor, a crate with a Snyder texture, a looping zimmer blip and `mover.lua` sliding it along +X, a sun, a camera; one scenario asserting the crate moved, two shots. |
 
@@ -699,6 +700,8 @@ games/<name>/
   key it does not know (`games/smoke/recipe.lua` shows the four lines).
 - **Deterministic**: the same recipe and parameters write the same bytes. Draw from
   a `seed` parameter (`Texture`'s and `Sound`'s `seed`, `Random`), never a clock.
+  The check leaves a scene's bake reports (`<scene>.bake/`) out: they record when
+  and how long a bake ran, by design, while the baked data they describe is compared.
 - **Every test game is 3D**, and has no lightmap bake by default: a `bake`
   parameter may offer a tiny, lowest-resolution one, off unless asked for.
 - The generator clears its output folder before writing, but only one it made

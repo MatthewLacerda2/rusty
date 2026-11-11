@@ -43,7 +43,7 @@ use crate::dev::bake::lightmap::LightmapBakeJob;
 use crate::dev::bake::occlusion::OcclusionBakeJob;
 use crate::dev::bake::steps::LightingBake;
 use crate::editor::EditorUi;
-use crate::scene::lighting::bake_status::BakeStatus;
+use crate::scene::lighting::bake_status::{BakeProgress, BakeStatus};
 use crate::scene::lighting::lightmap::BakeView;
 use crate::scene::{Scene, SceneId};
 use crate::scripting::ConsoleLogs;
@@ -202,7 +202,7 @@ fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
                 path: Some(path),
             });
             scene.lighting_bake_running = true; // a script's bake waits from now on
-            scene.lighting_bake_status = BakeStatus::Running;
+            scene.lighting_bake_status = BakeStatus::Running(BakeProgress::starting("lighting"));
         }
         Err(e) => not_started(scene, console, format!("Generate Lighting failed: {e}")),
     }
@@ -216,10 +216,9 @@ fn not_started(scene: &mut Scene, console: &mut ConsoleLogs, line: String) {
 }
 
 /// A script's `Lighting.GenerateAsync()` (#1999): press the button for it, once.
-/// The verb refused what the button refuses when it was called, and asking for
-/// Play, Stop, File ▸ New and a load drop the request (`Scene::drop_bake_request`,
-/// `shell::editor::sync` before the draw); a button pressed
-/// since refuses it here.
+/// The verb refused what the button refuses when it was called, Play is refused
+/// while it waits (`Scene::play_refusal`, #2042), and File ▸ New and a load drop
+/// it (`Scene::drop_bake_request`); a button pressed since refuses it here.
 fn take_request(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) {
     if !std::mem::take(&mut scene.lighting_bake_requested) {
         return;
@@ -266,7 +265,7 @@ fn start_occlusion(editor: &mut EditorUi, scene: &mut Scene, console: &mut Conso
                 path: Some(path),
             });
             scene.lighting_bake_running = true;
-            scene.lighting_bake_status = BakeStatus::Running;
+            scene.lighting_bake_status = BakeStatus::Running(BakeProgress::starting("occlusion"));
         }
         Err(e) => not_started(scene, console, format!("Bake Occlusion failed: {e}")),
     }
@@ -288,5 +287,7 @@ mod drop_tests;
 mod occlusion_drop_tests;
 #[cfg(test)]
 mod occlusion_only_tests;
+#[cfg(test)]
+mod play_tests;
 #[cfg(test)]
 mod tests;

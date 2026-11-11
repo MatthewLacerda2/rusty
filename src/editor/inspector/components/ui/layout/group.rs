@@ -128,3 +128,12 @@ fn write_back(g: &mut LayoutGroupComponent, e: &LayoutGroupComponent) {
     ops::set_start_corner(g, e.start_corner);
     ops::set_start_vertical(g, e.start_vertical);
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::LayoutGroupComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Ui;
+    const LABEL: &'static str = "Layout Group";
+    const ICON: &'static str = egui_phosphor::regular::LAYOUT;
+}

@@ -87,3 +87,10 @@ fn draw_points(ui: &mut egui::Ui, points: &[glam::Vec3]) -> Option<Vec<glam::Vec
     }
     changed.then_some(edited)
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::LineComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Effects;
+    const LABEL: &'static str = "Line Renderer";
+    const ICON: &'static str = egui_phosphor::regular::LINE_SEGMENTS;
+}

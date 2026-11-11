@@ -164,3 +164,12 @@ fn draw_determinism(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterCompo
     }
     changed
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::ParticleEmitterComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Effects;
+    const LABEL: &'static str = "Particle System";
+    const ICON: &'static str = egui_phosphor::regular::SPARKLE;
+}

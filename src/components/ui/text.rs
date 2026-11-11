@@ -150,3 +150,8 @@ impl Default for TextComponent {
         }
     }
 }
+
+impl crate::components::FirstClass for TextComponent {
+    const NAME: &'static str = "Text";
+    const ALIASES: &'static [&'static str] = &["textmeshpro", "textmeshprougui"];
+}

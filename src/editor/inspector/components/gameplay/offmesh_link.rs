@@ -96,3 +96,12 @@ pub fn draw_offmesh_link(
         remove_component(world, id, ComponentKind::OffMeshLink, d);
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::OffMeshLinkComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Navigation;
+    const LABEL: &'static str = "Off-Mesh Link";
+    const ICON: &'static str = egui_phosphor::regular::LADDER_SIMPLE;
+}

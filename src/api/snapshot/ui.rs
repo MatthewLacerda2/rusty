@@ -211,3 +211,18 @@ pub(crate) fn layout_element_value(e: &crate::components::LayoutElementComponent
         "fit": [e.horizontal_fit.name(), e.vertical_fit.name()],
     })
 }
+
+super::fields::snapshot! {
+    CanvasComponent => canvas_value,
+    RectTransformComponent => rect_transform_value,
+    ImageComponent => image_value,
+    ShapeComponent => shape_value,
+    CanvasGroupComponent => canvas_group_value,
+    crate::components::SelectableComponent => selectable_value,
+    RectMaskComponent => rect_mask_value,
+    crate::components::MaskComponent => mask_value,
+    crate::components::BackdropFilterComponent => backdrop_filter_value,
+    crate::components::TextComponent => text_value,
+    crate::components::LayoutGroupComponent => layout_group_value,
+    crate::components::LayoutElementComponent => layout_element_value,
+}

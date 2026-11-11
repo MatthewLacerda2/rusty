@@ -29,3 +29,7 @@ pub(crate) fn mesh_value(m: &MeshComponent) -> Value {
     }
     v
 }
+
+super::fields::snapshot! {
+    MeshComponent => mesh_value,
+}

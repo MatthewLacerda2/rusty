@@ -492,8 +492,8 @@ new flag, gate, CI step or baseline.
   that governs no entries (a blank line under it, or a first entry indented deeper
   than it) is itself a finding. Rust files and the tracked Markdown under `docs/`,
   `.claude/skills/` and the repo root are scanned. A list
-  whose order matters (`src/app/registry.rs`'s `build()`, the `Entity` fields,
-  `ComponentKind`, `docs/api/index.md`'s namespaces) gets a comment saying why instead of a marker
+  whose order matters (`src/app/registry.rs`'s `build()`, `docs/api/index.md`'s
+  namespaces) gets a comment saying why instead of a marker
   (`rules/sorted.rs`).
 - **`stored-format`** (#1966) — `make review-level` reviews a change to an on-disk
   format at `high`, and its hand-kept path table missed a new format three times in
@@ -702,16 +702,20 @@ zero violations (#494), and it is the groundwork the crate split (#495) needs.
 
 ## Component completeness (`--components`)
 A first-class component is only "done" when it appears on all four axes that
-deliberately live in non-dependent layers: a field on `Entity`, an Add Component
-entry (`inspector/components/add/`: a `!world.has_<field>(id)` gate, or a
-`ComponentKind` row, resolved to its field through `authoring::has_kind`'s arms), an inspector card (some `inspector/components/*.rs`), and an API
+deliberately live in non-dependent layers: a row in the component registry
+(`src/components/registry.rs`'s `first_class!`, #2023, which generates its `Entity`
+field), an Add Component entry (`inspector/components/add/`: a
+`!world.has_<field>(id)` gate, or the menu generated from the registry, which
+offers every row behind `authoring::has_kind`; there the `AddEntry` bound holds the
+axis at compile time, and the text check only confirms the menu's code, not a
+comment, expands `first_class!`), an inspector card (some `inspector/components/*.rs`), and an API
 namespace (`src/api/<x>.rs` registered in `api/mod.rs` and documented in
 `docs/api/`, as the field or its Lua spelling: `layout_group` is `LayoutGroup`). The
-gate discovers components from `Entity`'s `Option<…Component>` fields — so a new one
-can't slip through — and fails on any missing axis. It *finds* `pub struct Entity`
+gate discovers components from the registry's rows — so a new one can't slip
+through — and fails on any missing axis. It *finds* `macro_rules! first_class`
 under `src/components/` rather than reading a fixed path, and fails loudly
-(`NO_ENTITY` / `NO_COMPONENTS`) when it can't or when the struct yields no
-component fields: for weeks after `entity.rs` became `entity/mod.rs` both gates
+(`NO_REGISTRY` / `NO_COMPONENTS`) when it can't or when it yields no rows (the
+`full-literal` rule reads the same rows, with a real-tree test of its own): for weeks after `entity.rs` became `entity/mod.rs` both gates
 checked zero components and printed ok (#959). A test-lint test runs discovery on
 the real tree. Nothing is grandfathered: the burn-down list emptied under #82 (every
 gap closed or waived) and was retired in #926, so a missing axis is closed or waived.
@@ -751,7 +755,7 @@ route every change through `scene::authoring::material::*`, the same ops the
 `Material.*` Lua API calls.
 
 This gate keeps migrated cards honest. It discovers components the same way
-`--components` does — from `Entity`'s `Option<…Component>` fields — and, for each one
+`--components` does — from the component registry's rows — and, for each one
 that has an inspector card, classifies the card as:
 
 - **routed** — reads a snapshot immutably and routes every write through an

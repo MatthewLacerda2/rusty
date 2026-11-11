@@ -272,6 +272,11 @@ pub fn clip_runs(runs: impl Iterator<Item = Range<u32>>, count: u32) -> Vec<Rang
         .collect()
 }
 
+impl crate::components::FirstClass for MeshComponent {
+    const NAME: &'static str = "Mesh";
+    const ALIASES: &'static [&'static str] = &["meshfilter", "meshrenderer"];
+}
+
 #[cfg(test)]
 mod box_lightmap_tests;
 #[cfg(test)]

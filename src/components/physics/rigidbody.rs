@@ -43,3 +43,8 @@ pub struct RigidBodyComponent {
     #[serde(default)]
     pub collision_detection: CollisionDetection,
 }
+
+impl crate::components::FirstClass for RigidBodyComponent {
+    const NAME: &'static str = "RigidBody";
+    const INVENTORY: &'static str = "Rigidbody";
+}

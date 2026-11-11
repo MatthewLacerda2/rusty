@@ -141,3 +141,12 @@ fn draw_carving(
         write(world, id, d, |o| obstacle_ops::set_time_to_stationary(o, v));
     }
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::NavMeshObstacleComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Navigation;
+    const LABEL: &'static str = "NavMesh Obstacle";
+    const ICON: &'static str = egui_phosphor::regular::TRAFFIC_CONE;
+}

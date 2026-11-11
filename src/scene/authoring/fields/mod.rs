@@ -8,6 +8,7 @@
 //! `scene`'s and `scene` sits below `api` in the layer table.
 
 mod hold;
+mod inspect;
 pub(crate) mod introspect;
 mod kinds;
 pub(crate) mod table;

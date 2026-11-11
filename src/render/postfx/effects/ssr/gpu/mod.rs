@@ -10,5 +10,6 @@ mod glossy;
 mod packing;
 mod reach;
 mod reflect;
+mod resolve;
 mod silhouette;
 mod transparent;

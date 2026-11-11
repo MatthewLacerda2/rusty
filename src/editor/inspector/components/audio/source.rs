@@ -216,3 +216,12 @@ fn clamped(
     })
     .inner
 }
+
+impl crate::editor::inspector::components::add::AddEntry
+    for crate::components::AudioSourceComponent
+{
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Audio;
+    const LABEL: &'static str = "Audio Source";
+    const ICON: &'static str = egui_phosphor::regular::SPEAKER_HIGH;
+}

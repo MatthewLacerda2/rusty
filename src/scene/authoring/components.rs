@@ -7,77 +7,56 @@
 //! size cap; re-exported from there so existing `authoring::ComponentKind` paths
 //! still resolve.
 
+use crate::components::registry::first_class;
+use crate::components::FirstClass;
 use crate::scene::authoring::defaults::attach_default_material;
 use crate::scene::authoring::dependency;
 use crate::scene::authoring::fields::KINDS;
 use crate::scene::Scene;
 
-/// Declares `ComponentKind` and `ComponentKind::ALL` from one list, so a new kind is
-/// one line and `ALL` can never miss a variant, carry a stale length, or drift out of
-/// declaration order (#570).
+/// Declares `ComponentKind`, `ComponentKind::ALL` and `ComponentKind::parse` from
+/// the registry (`components::registry`), so a new kind is its row and `ALL` can
+/// never miss a variant, carry a stale length, or drift out of declaration order
+/// (#570). The order is the registry's.
 macro_rules! component_kinds {
-    ($(#[$meta:meta])* $vis:vis enum $name:ident { $($variant:ident),+ $(,)? }) => {
-        $(#[$meta])*
-        $vis enum $name {
-            $($variant),+
+    ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
+        /// The first-class components the inspector's "Add Component" menu can
+        /// attach / detach. `Script` is excluded: a script attachment carries a path
+        /// (it is "add *which* script"), so it has its own verb rather than a
+        /// defaulted add ([`add_script`](super::add_script), `Scene.AddScript`).
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub enum ComponentKind {
+            $($kind),*
         }
 
-        impl $name {
-            /// Every first-class kind, in declaration order (the Add Component menu
-            /// and inspector order) — for the dependency machinery's reverse lookups:
-            /// finding a removed kind's dependents ([`dependency::remove_with_cascade`])
-            /// and reconciling/enforcing unmet requirements. Generated with the enum,
-            /// so it is complete by construction.
-            pub const ALL: &'static [$name] = &[$(Self::$variant),+];
+        impl ComponentKind {
+            /// Every first-class kind, in declaration order — for the dependency
+            /// machinery's reverse lookups: finding a removed kind's dependents
+            /// ([`dependency::remove_with_cascade`]) and reconciling/enforcing unmet
+            /// requirements. Generated with the enum, so it is complete by
+            /// construction.
+            pub const ALL: &'static [ComponentKind] = &[$(Self::$kind),*];
+
+            /// Parse an "Add Component" kind name (any case): the kind's own name,
+            /// the name `Component.*` gives it, or one of its aliases
+            /// ([`FirstClass`]), e.g. `RigidBody`, `Texture`, `MeshRenderer`.
+            pub fn parse(name: &str) -> Option<Self> {
+                let lower = name.to_lowercase();
+                $(
+                    if lower.eq_ignore_ascii_case(stringify!($kind))
+                        || lower.eq_ignore_ascii_case(<$ty as FirstClass>::NAME)
+                        || <$ty as FirstClass>::ALIASES.contains(&lower.as_str())
+                    {
+                        return Some(Self::$kind);
+                    }
+                )*
+                None
+            }
         }
     };
 }
 
-// Not sorted (#911): declaration order is the Add Component menu's order.
-component_kinds! {
-    /// The first-class components the inspector's "Add Component" menu can attach /
-    /// detach. `Script` is excluded: a script attachment carries a path (it is "add
-    /// *which* script"), so it has its own verb rather than a defaulted add
-    /// ([`add_script`](super::add_script), `Scene.AddScript`).
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub enum ComponentKind {
-        Mesh,
-        Light,
-        Animator,
-        Collider,
-        RigidBody,
-        Texture,
-        NavMeshAgent,
-        NavMeshObstacle,
-        OffMeshLink,
-        NavMeshModifierVolume,
-        NavMeshModifier,
-        AIPerception,
-        Camera,
-        Particles,
-        PostProcessing,
-        Audio,
-        ReverbZone,
-        Canvas,
-        RectTransform,
-        Image,
-        CanvasGroup,
-        RectMask,
-        Mask,
-        BackdropFilter,
-        Text,
-        Selectable,
-        LayoutGroup,
-        LayoutElement,
-        Joint,
-        CharacterController,
-        LodGroup,
-        LightProbeProxyVolume,
-        Trail,
-        Line,
-        Shape,
-    }
-}
+first_class!(component_kinds);
 
 impl ComponentKind {
     /// The first-class components this kind depends on — rusty's `RequireComponent`
@@ -107,49 +86,6 @@ impl ComponentKind {
             | ComponentKind::LayoutElement => &[ComponentKind::RectTransform],
             ComponentKind::Joint => &[ComponentKind::RigidBody],
             _ => &[],
-        }
-    }
-
-    /// Parse an "Add Component" kind name (case-insensitive). Accepts the short
-    /// names the menu uses (e.g. `RigidBody`, `Texture`, `NavMeshAgent`).
-    pub fn parse(name: &str) -> Option<Self> {
-        match name.to_lowercase().as_str() {
-            "mesh" | "meshfilter" | "meshrenderer" => Some(Self::Mesh),
-            "light" => Some(Self::Light),
-            "animator" => Some(Self::Animator),
-            "collider" => Some(Self::Collider),
-            "rigidbody" => Some(Self::RigidBody),
-            "texture" | "material" => Some(Self::Texture),
-            "navmeshagent" | "navagent" => Some(Self::NavMeshAgent),
-            "navmeshobstacle" | "navobstacle" => Some(Self::NavMeshObstacle),
-            "offmeshlink" | "navmeshlink" => Some(Self::OffMeshLink),
-            "navmeshmodifiervolume" | "navmodifiervolume" => Some(Self::NavMeshModifierVolume),
-            "navmeshmodifier" | "navmodifier" => Some(Self::NavMeshModifier),
-            "aiperception" | "perception" => Some(Self::AIPerception),
-            "camera" => Some(Self::Camera),
-            "particles" | "particlesystem" => Some(Self::Particles),
-            "postprocessing" => Some(Self::PostProcessing),
-            "audio" | "audiosource" => Some(Self::Audio),
-            "reverbzone" | "audioreverbzone" => Some(Self::ReverbZone),
-            "canvas" => Some(Self::Canvas),
-            "recttransform" => Some(Self::RectTransform),
-            "image" => Some(Self::Image),
-            "canvasgroup" => Some(Self::CanvasGroup),
-            "rectmask" | "rectmask2d" => Some(Self::RectMask),
-            "mask" => Some(Self::Mask),
-            "backdropfilter" | "backdrop" => Some(Self::BackdropFilter),
-            "text" | "textmeshpro" | "textmeshprougui" => Some(Self::Text),
-            "selectable" => Some(Self::Selectable),
-            "layoutgroup" => Some(Self::LayoutGroup),
-            "layoutelement" | "contentsizefitter" => Some(Self::LayoutElement),
-            "joint" | "fixedjoint" | "hingejoint" | "characterjoint" => Some(Self::Joint),
-            "charactercontroller" | "character" => Some(Self::CharacterController),
-            "lodgroup" | "lod" => Some(Self::LodGroup),
-            "lightprobeproxyvolume" | "proxyvolume" | "lppv" => Some(Self::LightProbeProxyVolume),
-            "trail" | "trailrenderer" => Some(Self::Trail),
-            "line" | "linerenderer" => Some(Self::Line),
-            "shape" => Some(Self::Shape),
-            _ => None,
         }
     }
 

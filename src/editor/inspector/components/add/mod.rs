@@ -3,6 +3,7 @@
 
 use egui_phosphor::regular as icon;
 
+use crate::components::registry::first_class;
 use crate::scene::authoring::{self, ComponentKind};
 use crate::scene::DEFAULT_SCRIPTS_DEST_DIR;
 
@@ -28,9 +29,13 @@ fn add_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) -> bool {
     // built-ins are the burn-down in #82); helper modules without a lifecycle
     // table are not. An entity can hold many scripts (#83), so each pick appends.
     let mut added = add_script_menu(ui, world, id);
-    for &(kind, glyph, name) in ENTRIES {
+    let mut group = None;
+    for (category, &(kind, _, glyph, name)) in menu_order() {
         if authoring::has_kind(world, id, kind) {
             continue;
+        }
+        if group.replace(category) != Some(category) {
+            ui.separator();
         }
         let label = if glyph.is_empty() {
             name.to_string()
@@ -45,97 +50,74 @@ fn add_menu(ui: &mut egui::Ui, world: &mut crate::ecs::World, id: u32) -> bool {
     added
 }
 
-/// The first-class entries of the Add Component menu, in menu order: the kind, its
-/// glyph (empty for none yet, the burn-down in #82) and its label. Each is offered
-/// only when absent, and picking one goes through the shared dependency verb, so the
-/// menu adds exactly what `Scene.AddComponent` adds, requirements included (#359).
-/// Material stages its default library asset on the entity; the inspector folds it
-/// into `scene.materials` once the entity guard drops.
-const ENTRIES: &[(ComponentKind, &str, &str)] = &[
-    (ComponentKind::Mesh, icon::CUBE, "Mesh"),
-    (ComponentKind::Light, "", "Light Component"),
-    (ComponentKind::Animator, "", "Animator Component"),
-    (ComponentKind::Collider, "", "Collider Component"),
-    (ComponentKind::RigidBody, "", "RigidBody Component"),
-    (ComponentKind::Texture, "", "Material / Texture Component"),
-    (ComponentKind::NavMeshAgent, "", "NavMesh Agent Component"),
-    (
-        ComponentKind::NavMeshObstacle,
-        icon::TRAFFIC_CONE,
-        "NavMesh Obstacle",
-    ),
-    (
-        ComponentKind::OffMeshLink,
-        icon::LADDER_SIMPLE,
-        "Off-Mesh Link",
-    ),
-    (
-        ComponentKind::NavMeshModifierVolume,
-        icon::SELECTION,
-        "NavMesh Modifier Volume",
-    ),
-    (
-        ComponentKind::NavMeshModifier,
-        icon::FUNNEL,
-        "NavMesh Modifier",
-    ),
-    // AI (#1900): what an agent senses.
-    (ComponentKind::AIPerception, icon::EYE, "AI Perception"),
-    (ComponentKind::Joint, icon::LINK, "Joint"),
-    (
-        ComponentKind::CharacterController,
-        icon::PERSON_SIMPLE_WALK,
-        "Character Controller",
-    ),
-    (ComponentKind::Camera, "", "Camera Component"),
-    (ComponentKind::Particles, icon::SPARKLE, "Particle System"),
-    (ComponentKind::Trail, icon::WIND, "Trail Renderer"),
-    (ComponentKind::Line, icon::LINE_SEGMENTS, "Line Renderer"),
-    (
-        ComponentKind::PostProcessing,
-        "",
-        "Post Processing Component",
-    ),
-    (ComponentKind::LodGroup, icon::STACK_SIMPLE, "LOD Group"),
-    (
-        ComponentKind::LightProbeProxyVolume,
-        icon::CUBE_TRANSPARENT,
-        "Light Probe Proxy Volume",
-    ),
-    (ComponentKind::Audio, icon::SPEAKER_HIGH, "Audio Source"),
-    (
-        ComponentKind::ReverbZone,
-        icon::WAVEFORM,
-        "Audio Reverb Zone",
-    ),
-    // The in-game UI (#417–#421, #425, #426, #428): a Canvas makes the entity a UI
-    // root, a RectTransform a UI element; the graphics, masks, Selectable and the
-    // layout pair require a RectTransform.
-    (ComponentKind::Canvas, icon::MONITOR, "Canvas"),
-    (
-        ComponentKind::RectTransform,
-        icon::FRAME_CORNERS,
-        "Rect Transform",
-    ),
-    (ComponentKind::Image, icon::IMAGE, "Image"),
-    (ComponentKind::CanvasGroup, icon::STACK, "Canvas Group"),
-    (ComponentKind::Text, icon::TEXT_T, "Text"),
-    (ComponentKind::Shape, icon::SHAPES, "Shape"),
-    (ComponentKind::RectMask, icon::CROP, "Rect Mask"),
-    (ComponentKind::Mask, icon::CIRCLE_DASHED, "Mask"),
-    (
-        ComponentKind::BackdropFilter,
-        icon::DROP_HALF,
-        "Backdrop Filter",
-    ),
-    (ComponentKind::Selectable, icon::CURSOR_CLICK, "Selectable"),
-    (ComponentKind::LayoutGroup, icon::LAYOUT, "Layout Group"),
-    (
-        ComponentKind::LayoutElement,
-        icon::ARROWS_OUT,
-        "Layout Element",
-    ),
-];
+/// A group of the Add Component menu, in menu order (Unity's categories).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Category {
+    Rendering,
+    Animation,
+    Physics,
+    Navigation,
+    Ai,
+    Effects,
+    Audio,
+    Ui,
+}
+
+impl Category {
+    /// Every category, in menu order.
+    const ALL: [Category; 8] = [
+        Category::Rendering,
+        Category::Animation,
+        Category::Physics,
+        Category::Navigation,
+        Category::Ai,
+        Category::Effects,
+        Category::Audio,
+        Category::Ui,
+    ];
+}
+
+/// A first-class component's Add Component entry: its group, label and glyph
+/// (empty for none yet, the burn-down in #82). Implemented beside the component's
+/// inspector card; the menu lists every registry row (`components::registry`), so a
+/// component without one does not compile.
+pub trait AddEntry {
+    const CATEGORY: Category;
+    const LABEL: &'static str;
+    const ICON: &'static str = "";
+}
+
+/// One menu entry: the kind, its group, glyph and label.
+type Entry = (ComponentKind, Category, &'static str, &'static str);
+
+macro_rules! entries {
+    ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
+        /// The first-class entries of the Add Component menu, one per registry row.
+        /// Each is offered only when absent, and picking one goes through the shared
+        /// dependency verb, so the menu adds exactly what `Scene.AddComponent` adds,
+        /// requirements included (#359). Material stages its default library asset
+        /// on the entity; the inspector folds it into `scene.materials` once the
+        /// entity guard drops.
+        const ENTRIES: &[Entry] = &[$((
+            ComponentKind::$kind,
+            <$ty as AddEntry>::CATEGORY,
+            <$ty as AddEntry>::ICON,
+            <$ty as AddEntry>::LABEL,
+        ),)*];
+    };
+}
+
+first_class!(entries);
+
+/// The entries in menu order: by [`Category`], then the registry's order.
+fn menu_order() -> impl Iterator<Item = (Category, &'static Entry)> {
+    Category::ALL.into_iter().flat_map(|c| {
+        ENTRIES
+            .iter()
+            .filter(move |e| e.1 == c)
+            .map(move |e| (c, e))
+    })
+}
 
 /// List the project's MonoBehaviour scripts (any `.lua` exposing a lifecycle
 /// table) under the moon glyph; picking one appends a `ScriptComponent` to the

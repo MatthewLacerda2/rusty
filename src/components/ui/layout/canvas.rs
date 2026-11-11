@@ -134,3 +134,7 @@ impl CanvasComponent {
         self.render_mode == CanvasRenderMode::WorldSpace
     }
 }
+
+impl crate::components::FirstClass for CanvasComponent {
+    const NAME: &'static str = "Canvas";
+}

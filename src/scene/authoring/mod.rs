@@ -3,7 +3,8 @@
 //! The one place the engine knows how to change scene *structure*: create an
 //! entity (optionally as one of the hierarchy toolbar's primitives), attach or
 //! detach a first-class component with the inspector's "Add Component" defaults,
-//! and the primitive-mesh geometry shared with serialization's rehydrate path.
+//! and the primitives the Create menu offers (`primitive`: their mesh, light and
+//! collider, and the geometry shared with serialization's rehydrate path).
 //!
 //! BOTH callers route through here so editor and API can never drift: the editor
 //! (`hierarchy.rs` create, `inspector/components/add/` add-menu) and the API surface
@@ -25,18 +26,14 @@ pub mod material;
 pub mod nav;
 pub mod particles;
 pub mod physics;
+mod primitive;
 pub mod rendering;
 pub mod ribbon;
 mod sanitize;
 pub mod script;
 pub mod ui;
 
-use glam::Vec3;
-
-use crate::components::mesh::primitives;
-use crate::components::mesh::Vertex;
-use crate::scene::authoring::defaults::light;
-use crate::scene::{LightComponent, LightType, MeshComponent, Scene};
+use crate::scene::Scene;
 
 // Re-export the per-component defaults so callers (editor add-menu, `Scene.AddComponent`
 // API) reach them through this one entry point; they live in `authoring_defaults`
@@ -46,123 +43,40 @@ pub use crate::scene::authoring::defaults::{
     default_material, default_nav_agent, default_post_processing, default_rigidbody,
     material_asset_from_import,
 };
+pub use crate::scene::authoring::primitive::{
+    primitive_collider, primitive_geometry, primitive_mesh_component, subdivided_geometry,
+    Primitive,
+};
 pub use crate::scene::authoring::script::add_script;
 
-/// The primitive set the hierarchy toolbar's "Create" dropdown offers — meshes
-/// and lights. A `None` primitive (or an unrecognised name) creates a bare entity
-/// carrying only its mandatory `Transform`, matching the toolbar's behaviour for
-/// a name with no primitive picked.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Primitive {
-    Box,
-    Sphere,
-    Plane,
-    Cylinder,
-    Capsule,
-    PointLight,
-    DirectionalLight,
-    SpotLight,
-}
-
-impl Primitive {
-    /// Parse a toolbar/API primitive name (case-insensitive). Returns `None` for
-    /// an empty/unknown name, so the caller creates a bare entity.
-    pub fn parse(name: &str) -> Option<Self> {
-        match name.to_lowercase().as_str() {
-            "box" => Some(Self::Box),
-            "sphere" => Some(Self::Sphere),
-            "plane" => Some(Self::Plane),
-            "cylinder" => Some(Self::Cylinder),
-            "capsule" => Some(Self::Capsule),
-            "pointlight" => Some(Self::PointLight),
-            "directionallight" => Some(Self::DirectionalLight),
-            "spotlight" => Some(Self::SpotLight),
-            _ => None,
-        }
-    }
-}
-
-/// The geometry for a primitive mesh (`Box`/`Sphere`/`Plane`/`Cylinder`/`Capsule`). This is
-/// the single source of truth for primitive shapes, reused by serialization's
-/// `rehydrate_one` so a created primitive and a loaded one are byte-identical.
-/// Returns `None` for the light primitives, which carry no mesh.
-pub fn primitive_geometry(primitive: Primitive) -> Option<(Vec<Vertex>, Vec<u32>)> {
-    subdivided_geometry(primitive, 1)
-}
-
-/// [`primitive_geometry`], a `Plane` cut into `subdivisions` quads per side (#1524,
-/// `MeshComponent::subdivisions`, clamped to its range); every other shape ignores it.
-pub fn subdivided_geometry(
-    primitive: Primitive,
-    subdivisions: u32,
-) -> Option<(Vec<Vertex>, Vec<u32>)> {
-    match primitive {
-        Primitive::Box => Some(primitives::generate_box(1.0, 1.0, 1.0)),
-        Primitive::Sphere => Some(primitives::generate_sphere(0.5, 16, 16)),
-        Primitive::Plane => Some(primitives::generate_plane_grid(15.0, 15.0, subdivisions)),
-        // Unity's Cylinder: diameter 1, height 2, along Y (#1621).
-        Primitive::Cylinder => Some(primitives::generate_cylinder(
-            Vec3::new(0.0, -1.0, 0.0),
-            Vec3::new(0.0, 1.0, 0.0),
-            0.5,
-            12,
-        )),
-        // Unity's Capsule: radius 0.5, full height 2, along Y.
-        Primitive::Capsule => Some(primitives::generate_capsule(0.5, 2.0, 16, 8)),
-        Primitive::PointLight | Primitive::DirectionalLight | Primitive::SpotLight => None,
-    }
-}
-
-/// The canonical primitive-mesh name (matches `MeshComponent::primitive_type` and
-/// the `rehydrate_one` keys), or `None` for the light primitives.
-fn primitive_mesh_name(primitive: Primitive) -> Option<&'static str> {
-    match primitive {
-        Primitive::Box => Some("Box"),
-        Primitive::Sphere => Some("Sphere"),
-        Primitive::Plane => Some("Plane"),
-        Primitive::Cylinder => Some("Cylinder"),
-        Primitive::Capsule => Some("Capsule"),
-        _ => None,
-    }
-}
-
-/// Build the `MeshComponent` for a mesh primitive (geometry + the on-disk
-/// `primitive_type` reference). Returns `None` for the light primitives.
-pub fn primitive_mesh_component(primitive: Primitive) -> Option<MeshComponent> {
-    let name = primitive_mesh_name(primitive)?;
-    let (vertices, indices) = primitive_geometry(primitive)?;
-    Some(MeshComponent::new(name, vertices, indices))
-}
-
-/// The default light for a light primitive (the hierarchy toolbar's values).
-fn primitive_light(primitive: Primitive) -> Option<LightComponent> {
-    match primitive {
-        Primitive::PointLight => Some(light(LightType::Point, Vec3::ONE, 1.5, 10.0)),
-        Primitive::DirectionalLight => Some(light(
-            LightType::Directional,
-            Vec3::new(1.0, 0.95, 0.8),
-            2.0,
-            0.0,
-        )),
-        Primitive::SpotLight => Some(light(LightType::Spotlight, Vec3::ONE, 2.0, 15.0)),
-        _ => None,
-    }
-}
-
-/// Create an entity named `name`, configured for `primitive` (a mesh primitive
-/// gets a `MeshComponent`, a light primitive a `LightComponent`, `None` a bare
-/// transform-only entity). Returns the new entity's stable id. This is the path
-/// the hierarchy toolbar's "Create" button and the `Scene.CreateEntity` API both
-/// call, so editor and API behaviour match exactly.
+/// Create an entity named `name`, configured for `primitive` as Unity's
+/// `GameObject.CreatePrimitive` does (#2051): a mesh primitive gets a `MeshComponent`
+/// and the collider matching it ([`primitive_collider`]), a light primitive a
+/// `LightComponent`, `None` a bare transform-only entity. Returns the new entity's
+/// stable id. The hierarchy's Create menu and the `Scene.CreateEntity` API both
+/// call this, so editor and API behaviour match exactly; a part meant to be drawn
+/// only removes its collider afterwards, as in Unity.
 pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>) -> u32 {
     let id = scene.add_entity(name.to_string());
-    if let Some(primitive) = primitive {
-        if let Some(mesh) = primitive_mesh_component(primitive) {
-            scene.world.set_mesh(id, Some(mesh));
-        } else if let Some(light) = primitive_light(primitive) {
-            scene.world.set_light(id, Some(light));
-        }
+    let Some(primitive) = primitive else {
+        return id;
+    };
+    if let Some(mesh) = primitive_mesh_component(primitive) {
+        let collider = primitive_collider(primitive, &mesh);
+        scene.world.set_mesh(id, Some(mesh));
+        scene.world.set_collider(id, collider);
+    } else if let Some(light) = primitive::primitive_light(primitive) {
+        scene.world.set_light(id, Some(light));
     }
+    id
+}
+
+/// [`create_entity`] without the collider a mesh primitive comes with: a part the
+/// engine builds to be drawn only (a preview subject, a water surface, a body a
+/// `CharacterController` carries).
+pub fn create_drawn_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>) -> u32 {
+    let id = create_entity(scene, name, primitive);
+    scene.world.set_collider(id, None);
     id
 }
 
@@ -206,6 +120,8 @@ pub use crate::scene::model_instance::instantiate_model;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scene::LightType;
+    use glam::Vec3;
 
     #[test]
     fn create_entity_configures_per_primitive() {
@@ -226,6 +142,75 @@ mod tests {
             scene.world.light(lamp).unwrap().light_type,
             LightType::Point
         );
+    }
+
+    /// Each mesh primitive comes with the collider Unity's `CreatePrimitive` gives
+    /// it, sized to the engine's mesh (#2051); a light gets none.
+    #[test]
+    fn create_entity_gives_each_mesh_primitive_its_collider() {
+        use crate::components::{CapsuleAxis, ColliderShape};
+        let capsule = ColliderShape::Capsule {
+            radius: 0.5,
+            height: 2.0,
+            axis: CapsuleAxis::Y,
+        };
+        let plane = ColliderShape::Mesh {
+            convex: false,
+            local_min: Vec3::new(-7.5, 0.0, -7.5),
+            local_max: Vec3::new(7.5, 0.0, 7.5),
+        };
+        let mut scene = Scene::new();
+        for (primitive, shape) in [
+            (Primitive::Box, ColliderShape::Box { size: Vec3::ONE }),
+            (Primitive::Sphere, ColliderShape::Sphere { radius: 0.5 }),
+            (Primitive::Capsule, capsule.clone()),
+            (Primitive::Cylinder, capsule),
+            (Primitive::Plane, plane),
+        ] {
+            let id = create_entity(&mut scene, "Part", Some(primitive));
+            let c = scene.world.collider(id).expect("a mesh primitive is solid");
+            assert_eq!(c.shape, shape, "{primitive:?}");
+            assert!(c.active && !c.is_trigger, "{primitive:?}");
+        }
+        for light in [
+            Primitive::PointLight,
+            Primitive::DirectionalLight,
+            Primitive::SpotLight,
+        ] {
+            let id = create_entity(&mut scene, "Lamp", Some(light));
+            assert!(!scene.world.has_collider(id), "{light:?} gets no collider");
+        }
+        let bare = create_entity(&mut scene, "Empty", None);
+        assert!(!scene.world.has_collider(bare));
+    }
+
+    /// The mesh a sized collider stands for spans exactly that size: a mesh builder
+    /// retuned without its collider fails here.
+    #[test]
+    fn primitive_colliders_match_their_meshes() {
+        use crate::scene::rehydrate::bounds_of;
+        for primitive in [
+            Primitive::Box,
+            Primitive::Sphere,
+            Primitive::Capsule,
+            Primitive::Cylinder,
+        ] {
+            let mesh = primitive_mesh_component(primitive).unwrap();
+            let (lo, hi) = bounds_of(mesh.vertices.iter().map(|v| v.position)).unwrap();
+            let c = primitive_collider(primitive, &mesh).unwrap();
+            let (n, x) = c.shape.scaled(Vec3::ONE).local_box();
+            assert!(
+                lo.abs_diff_eq(n, 1e-4) && hi.abs_diff_eq(x, 1e-4),
+                "{primitive:?}: {lo}..{hi} vs {n}..{x}"
+            );
+        }
+    }
+
+    #[test]
+    fn create_drawn_entity_keeps_the_mesh_and_drops_the_collider() {
+        let mut scene = Scene::new();
+        let id = create_drawn_entity(&mut scene, "Water", Some(Primitive::Plane));
+        assert!(scene.world.has_mesh(id) && !scene.world.has_collider(id));
     }
 
     #[test]

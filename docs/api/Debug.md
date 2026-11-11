@@ -192,7 +192,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `ssil` | screen-space indirect lighting (#1750): its gather, blur, accumulate and upsample before the base camera's opaque pass, and the source it keeps after it; the depth prepass it draws on a camera without SSAO is under `ssao_prepass` |
 | `volumetric_fog` | volumetric fog (#1703): its froxels' scatter and integrate, before the base camera draws |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
-| `ssr` | screen-space reflections (#1526): the march over the base camera's opaque image; the copy of that image it reads and its mip pyramid (#1736) are recorded before the timed pass, untimed, so they aren't counted |
+| `ssr` | screen-space reflections (#1526): from the march over the base camera's opaque image to the resolve that averages its hits and draws them (#2028), the hits' pyramids between them included; the copy of the opaque image the march reads and its mip pyramid (#1736) are recorded before, untimed, so they aren't counted |
 | `transparent` | translucent solids |
 | `ribbons` | trails and lines |
 | `particles` | particle systems |
@@ -306,7 +306,7 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
 {
   "id": 1, "name": "Crate", "active": true, "active_in_hierarchy": true, "static": false, "layer": 0,
   "parent": null, "children": [],
-  "components": ["Mesh", "Material", "Collider"],   // optional-component inventory
+  "components": ["Collider", "Material", "Mesh"],   // optional-component inventory
   "transform": { "pos": [x,y,z], "rot": [x,y,z], "scale": [x,y,z] },  // rot = Euler°
   "bounds": { "min": [x,y,z], "max": [x,y,z] },     // world-space AABB, or null
   "scripts": ["assets/scripts/foo.lua"],
@@ -373,8 +373,11 @@ Each `<entity>` (also what `Debug.SnapshotEntity(id)` returns):
 }
 ```
 
-Every per-component key is present only when the entity carries that component
-(absent ones serialize as `null`); `bounds` comes from the mesh when geometry is
+Every first-class component has its key, keyed by its saved name (the ones not
+shown above too: `post_processing`, `joint`, `trail`, …, each as the component's own
+fields); it holds a value only when the entity carries that component (absent ones
+serialize as `null`), and `components` lists the carried ones in the registry's
+order, then `Script`; `bounds` comes from the mesh when geometry is
 present, else the collider, else `null`. `ui_rect` is the element's computed UI
 layout (see `UI.GetRect`) — `null` unless it is a canvas or laid out under one —
 so the agent can reason about the UI without a screenshot. The shape is shared with the harness's

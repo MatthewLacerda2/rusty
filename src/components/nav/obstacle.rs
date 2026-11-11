@@ -105,6 +105,11 @@ impl NavMeshObstacleComponent {
     }
 }
 
+impl crate::components::FirstClass for NavMeshObstacleComponent {
+    const NAME: &'static str = "NavMeshObstacle";
+    const ALIASES: &'static [&'static str] = &["navobstacle"];
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

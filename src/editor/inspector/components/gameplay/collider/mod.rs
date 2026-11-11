@@ -177,3 +177,9 @@ fn drag(ui: &mut egui::Ui, value: &mut f32) -> bool {
     ui.add(egui::DragValue::new(value).speed(0.05).ranged(0.01..=100.0))
         .changed()
 }
+
+impl crate::editor::inspector::components::add::AddEntry for crate::components::ColliderComponent {
+    const CATEGORY: crate::editor::inspector::components::add::Category =
+        crate::editor::inspector::components::add::Category::Physics;
+    const LABEL: &'static str = "Collider Component";
+}

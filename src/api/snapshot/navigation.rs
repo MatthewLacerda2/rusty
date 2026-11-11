@@ -78,3 +78,11 @@ pub(crate) fn ai_perception_value(p: &AIPerceptionComponent) -> Value {
         "in_sight": p.memory.in_sight.iter().collect::<Vec<_>>(),
     })
 }
+
+super::fields::snapshot! {
+    NavMeshObstacleComponent => nav_obstacle_value,
+    OffMeshLinkComponent => offmesh_link_value,
+    NavMeshModifierVolumeComponent => nav_modifier_value,
+    NavMeshModifierComponent => nav_mesh_modifier_value,
+    AIPerceptionComponent => ai_perception_value,
+}
