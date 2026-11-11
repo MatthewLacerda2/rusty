@@ -211,9 +211,16 @@ fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tan
         lengths = vec3<f32>(stored_length(texel_x), lengths.y, stored_length(texel_z));
         w = c.weights;
     }
+    return NormalSample(whiteout(tx, ty, tz, w, n), dot(lengths, w));
+}
+
+// Tangent-space normals `tx`, `ty`, `tz`, read along world X, Y and Z, reoriented
+// onto normal `n` and blended by `w` (Golus's whiteout blend): a world mapping's
+// normal. `sample_normal` reads the main normal map through it, and the detail
+// layer (`forward::detail`) its own over the main shading normal.
+fn whiteout(tx: vec3<f32>, ty: vec3<f32>, tz: vec3<f32>, w: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
     let nx = vec3<f32>(tx.xy + n.zy, abs(tx.z) * n.x);
     let ny = vec3<f32>(ty.xy + n.xz, abs(ty.z) * n.y);
     let nz = vec3<f32>(tz.xy + n.xy, abs(tz.z) * n.z);
-    let normal = normalize(nx.zyx * w.x + ny.xzy * w.y + nz.xyz * w.z);
-    return NormalSample(normal, dot(lengths, w));
+    return normalize(nx.zyx * w.x + ny.xzy * w.y + nz.xyz * w.z);
 }

@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use crate::render::draw::materials::material_group;
 use crate::render::gpu::bind_layouts;
+use crate::render::gpu::material_cache::MATERIAL_MAPS;
 use crate::render::gpu::shaders::ShaderRegistry;
 use crate::render::gpu::textures::MipGenerator;
 use crate::render::{GpuTexture, Renderer};
@@ -70,8 +71,8 @@ pub(crate) fn create_textures(
     }
 }
 
-/// A group(2) material bind group with all five texture slots (albedo, metallic,
-/// roughness, normal, emissive) pointing at the default texture and every extra
+/// A group(2) material bind group with all six map slots (albedo, metallic,
+/// roughness, normal, emissive, detail) pointing at the default texture and every extra
 /// shader texture slot at white (#400).
 /// Bound by passes that need group(2) but never sample the maps (the editor grid
 /// and gizmos) (#202, #207).
@@ -81,7 +82,7 @@ fn create_default_material_bind_group(
     [default_texture, white_texture]: [&GpuTexture; 2],
     zero_params: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
-    let maps = std::array::from_fn(|i| match i < 5 {
+    let maps = std::array::from_fn(|i| match i < MATERIAL_MAPS {
         true => default_texture,
         false => white_texture,
     });

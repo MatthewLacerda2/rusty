@@ -191,7 +191,7 @@ pub struct Renderer {
     pub white_texture: Rc<GpuTexture>,
     /// Draws every uploaded image's mip chain (#1322).
     pub(crate) mip_generator: gpu::textures::MipGenerator,
-    /// A group(2) material bind group whose five map slots point at
+    /// A group(2) material bind group whose six map slots point at
     /// `default_texture` (its shader slots at `white_texture`) — used by the
     /// editor-grid and gizmo passes, which never sample the maps (they render unlit /
     /// use the default checker) but still must supply a bind group matching the

@@ -25,6 +25,7 @@ impl Default for MaterialAsset {
             uv_mapping: UvMapping::Uv0,
             world_size: default_one(),
             blend_sharpness: default_blend_sharpness(),
+            detail: None,
             render_mode: RenderMode::Opaque,
             render_face: RenderFace::Front,
             alpha: default_alpha(),

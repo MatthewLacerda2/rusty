@@ -16,6 +16,7 @@ use crate::scene::Scene;
 
 use super::mesh::{build_mesh_shape, MeshFit, Skip};
 use crate::physics::compound::world_pose;
+use crate::physics::contact;
 use crate::physics::writes::Damping;
 
 /// Body class derived from the entity flags. Mirrors the legacy solver's encoding:
@@ -229,7 +230,10 @@ pub(in crate::physics) fn try_build_shape(
 }
 
 /// `try_build_shape` on a body that is `dynamic` or not: a concave mesh on a
-/// dynamic one is decomposed into convex pieces (`MeshFit`, #1886).
+/// dynamic one is decomposed into convex pieces (`MeshFit`, #1886), and a
+/// cylinder or capsule on a dynamic one is built to roll (`physics::contact`,
+/// #2071): the cylinder carries the mark the contact dispatcher hulls, and both
+/// keep their pairs out of rapier's contact recycling.
 pub(in crate::physics) fn try_build_body_shape(
     shape: &ColliderShape,
     scale: Vec3,
@@ -242,7 +246,7 @@ pub(in crate::physics) fn try_build_body_shape(
         ScaledShape::Cylinder {
             half_height,
             radius,
-        } => ColliderBuilder::cylinder(half_height, radius),
+        } => contact::cylinder(half_height, radius, dynamic),
         ScaledShape::Capsule {
             half_segment,
             radius,
@@ -257,7 +261,7 @@ pub(in crate::physics) fn try_build_body_shape(
             return build_mesh_shape(fit, scale, mesh.ok_or(Skip::NoMesh)?);
         }
     };
-    Ok(collider.build())
+    Ok(contact::rolling(collider, shape, dynamic).build())
 }
 
 /// rapier collision + solver groups for a collider on `layer`: it is a member of

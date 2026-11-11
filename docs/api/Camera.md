@@ -8,7 +8,8 @@
 | `Camera.GetRight` | `()` | `x, y, z` (unit right vector) |
 | `Camera.GetYaw` / `SetYaw` | `()` / `(yaw)` | degrees |
 | `Camera.GetPitch` / `SetPitch` | `()` / `(pitch)` | degrees (clamped ±89) |
-| `Camera.GetFov` / `SetFov` | `()` / `(fov)` | degrees (clamped 1–179); the main camera entity's field of view when there is one (same as `SetFieldOfView` on it), else the free view camera's |
+| `Camera.GetFov` / `SetFov` | `()` / `(fov)` | the **vertical** field of view, in degrees (clamped 1–179); the main camera entity's field of view when there is one (same as `SetFieldOfView` on it), else the free view camera's |
+| `Camera.VerticalToHorizontalFov` / `HorizontalToVerticalFov` | `(degrees, aspect)` | degrees: the same view's angle along the other axis at `aspect` (width / height), Unity's `VerticalToHorizontalFieldOfView` / `HorizontalToVerticalFieldOfView`. A 90° horizontal view at 16:9 is about 58.7° vertical. As in Unity, neither checks its input (an aspect of 0 or a NaN passes through); `SetFieldOfView` holds the result to 1–179 |
 | `Camera.WorldToScreen` | `(x, y, z [, canvas])` | `sx, sy, depth, onScreen` — see below |
 | `Camera.ScreenToWorldRay` | `(x, y)` | `ox, oy, oz, dx, dy, dz` — the ray's origin (on the near plane) and unit direction |
 | `Camera.ResetHistory` | `([id])` | — the next frame of camera `id`'s view (the main camera when omitted or `nil`) starts every history over; see *Teleports* |
@@ -78,7 +79,8 @@ return `nil` without a camera; setters are then no-ops.
 | Function | Signature | Returns |
 |---|---|---|
 | `Camera.GetProjection` / `SetProjection` | `(id)` / `(id, name [, size])` | `name, size` — `"Perspective"` (size `nil`) or `"Orthographic"`, in any case; an unknown name changes nothing (no error). `size` is half the view's height in world units (Unity's `orthographicSize`, at least 0.01; omitted keeps the current one, else 5) |
-| `Camera.GetFieldOfView` / `SetFieldOfView` | `(id)` / `(id, degrees)` | the vertical field of view (Unity's `fieldOfView`), clamped 1–179 (NaN takes 1); a loaded value out of range reads back held |
+| `Camera.GetFieldOfView` / `SetFieldOfView` | `(id)` / `(id, degrees)` | the **vertical** field of view (Unity's `fieldOfView`), clamped 1–179 (NaN takes 1); a loaded value out of range reads back held. Always vertical, whatever the camera's FOV axis |
+| `Camera.GetFovAxis` / `SetFovAxis` | `(id)` / `(id, name)` | `"Vertical"` (default) or `"Horizontal"`, in any case: the axis the inspector's Camera card shows and edits the field of view along (Unity's *FOV Axis*, #2038). Display only: it never changes the stored vertical value or what the camera draws. An unknown name is an error |
 | `Camera.GetClipPlanes` / `SetClipPlanes` | `(id)` / `(id, near, far)` | `near, far` (Unity's `nearClipPlane` / `farClipPlane`): `near` is at least 0.01, `far` at least 0.01 beyond it; a NaN or infinite plane takes that bound. A loaded value reads back held the same way (and `near` at most 1e18, `far` at most `f32::MAX / near`) |
 | `Camera.GetRenderOrder` / `SetRenderOrder` | `(id)` / `(id, order)` | the stacking order (Unity's `depth`, default 0): screen cameras draw from lowest to highest, so a higher one composites on top |
 | `Camera.GetClearFlags` / `SetClearFlags` | `(id)` / `(id, name)` | `"Skybox"` (default), `"SolidColor"` or `"DepthOnly"` — what the camera clears before it draws (Unity's `clearFlags`); any case, and Unity's `"Color"` / `"Depth"` too. An unknown name is an error |

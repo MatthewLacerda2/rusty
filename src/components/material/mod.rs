@@ -9,6 +9,7 @@
 
 mod decal;
 mod defaults;
+mod detail;
 mod mapping;
 mod surface;
 mod temporal;
@@ -20,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use crate::asset::MapRef;
 use crate::procgen::TextureRecipe;
 pub use decal::DecalBlend;
+pub use detail::DetailLayer;
 pub use mapping::UvMapping;
 use mapping::{default_blend_sharpness, default_tiling};
 use surface::{default_ior, default_one, white};
@@ -99,6 +101,9 @@ pub struct MaterialAsset {
     /// components are raised to this power before they weight the three. 4 by default.
     #[serde(default = "default_blend_sharpness")]
     pub blend_sharpness: f32,
+    /// HDRP Lit's detail map (#1997, [`DetailLayer`]); `None` by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<DetailLayer>,
     /// Compositing mode (#242); `Opaque` when absent.
     #[serde(default)]
     pub render_mode: RenderMode,
