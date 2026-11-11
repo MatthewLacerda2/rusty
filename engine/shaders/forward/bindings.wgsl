@@ -93,6 +93,19 @@ struct MaterialData {
     // `KHR_materials_specular`) in rgb, its F90 (`dielectric_f90`, `specular`) in w;
     // mixed toward a metal's by metallic in `fs_main`.
     dielectric_reflectance: vec4<f32>,
+    // The detail layer (#1997, `forward/detail.wgsl`): `DetailUniform` flat. Its
+    // scale/offset (under UV0 over the main maps' tiled UV, under a world mapping
+    // over the projection at `detail_world_scale`), 1 when the map is sampled, and
+    // HDRP's three detail scales.
+    detail_st: vec4<f32>,
+    use_detail_map: u32,
+    detail_world_scale: f32,
+    detail_albedo_scale: f32,
+    detail_normal_scale: f32,
+    detail_smoothness_scale: f32,
+    detail_pad_a: u32,
+    detail_pad_b: u32,
+    detail_pad_c: u32,
 };
 
 // One object a kept scene draws (#1706), at its slot of `objects`: what the object
@@ -330,6 +343,13 @@ var s_roughness: sampler;
 var s_normal: sampler;
 @group(2) @binding(21)
 var s_emissive: sampler;
+// The packed detail map (#1997): R albedo, G normal Y, B smoothness, A normal X,
+// raw (data) texels. At 15, the last texture binding below the samplers' offset,
+// so the surface shaders' extra slots keep the bindings after the param uniform.
+@group(2) @binding(15)
+var t_detail: texture_2d<f32>;
+@group(2) @binding(31)
+var s_detail: sampler;
 
 // The sun's cascaded shadow maps (#435): `lighting::cascades`.
 @group(3) @binding(0)
@@ -354,7 +374,7 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 // transparent one with a surface that refracts or absorbs. Linear, clamped sampler.
 // In the opaque pass of a base camera running SSIL (`camera.ssil.x`, #1750), which
 // reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel, so
-// the stage binds no texture more than `render::setup::limits` allows (17).
+// the stage binds no texture more than `render::setup::limits` allows (19).
 @group(3) @binding(6)
 var t_opaque: texture_2d<f32>;
 @group(3) @binding(7)

@@ -44,8 +44,8 @@ pub use entity::{
     PART_KEY, SIZE_TOKEN,
 };
 pub use material::{
-    BlendMode, DecalBlend, MaterialAsset, MaterialComponent, RefractionModel, RenderFace,
-    RenderMode, TaaReactive, UvMapping, MAX_REACTIVE,
+    BlendMode, DecalBlend, DetailLayer, MaterialAsset, MaterialComponent, RefractionModel,
+    RenderFace, RenderMode, TaaReactive, UvMapping, MAX_REACTIVE,
 };
 pub use mesh::{MeshComponent, MeshRevision, ShadowCasting};
 pub use nav::agent::{NavMeshAgentComponent, NavPathStatus, MAX_AVOIDANCE_PRIORITY};

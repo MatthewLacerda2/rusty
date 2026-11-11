@@ -3,7 +3,8 @@
 //! (`key`), and its `Material.Set<api>` / `Material.Get<api>` pair. The Lua adapter,
 //! `Material.DefineAsset`'s recipe and the Inspector's Material card all walk
 //! [`material_fields`] (the render face's row in `face.rs`, the transparent
-//! surface's in `surface.rs`, then the map coordinates' in `coordinates.rs`), so a
+//! surface's in `surface.rs`, the map coordinates' in `coordinates.rs`, then the
+//! detail layer's in `detail.rs`), so a
 //! new field adds one row and nothing to those three.
 //!
 //! Pure.
@@ -115,10 +116,12 @@ impl SurfaceKind {
 }
 
 /// Every material field the table drives: the render face (#1615), the
-/// transparent-surface rows, then the map coordinates' (#1573).
+/// transparent-surface rows, the map coordinates' (#1573), then the detail
+/// layer's (#1997).
 pub fn material_fields() -> impl Iterator<Item = &'static SurfaceField> {
     let rows = super::FACE_FIELDS.iter().chain(super::SURFACE_FIELDS);
     rows.chain(super::COORDINATE_FIELDS)
+        .chain(super::DETAIL_FIELDS)
 }
 
 /// The row whose `key` or `api` is `name` (in any case).
