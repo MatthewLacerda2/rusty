@@ -23,7 +23,7 @@ fn clear_refuses_a_folder_it_did_not_make() {
 fn clear_empties_a_generated_folder_and_makes_a_missing_one() {
     let dir = scratch("generated");
     write(&dir.join(MARKER), "smoke\n");
-    write(&dir.join("assets/old.scene"), "stale");
+    write(&dir.join("assets").join("old.scene"), "stale");
     clear(&dir).unwrap();
     assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
     let missing = dir.join("new");
@@ -34,8 +34,8 @@ fn clear_empties_a_generated_folder_and_makes_a_missing_one() {
 #[test]
 fn copy_dir_keeps_the_relative_paths() {
     let dir = scratch("copy");
-    write(&dir.join("from/a.lua"), "a");
-    write(&dir.join("from/sub/b.lua"), "b");
+    write(&dir.join("from").join("a.lua"), "a");
+    write(&dir.join("from").join("sub").join("b.lua"), "b");
     copy_dir(&dir.join("from"), &dir.join("to")).unwrap();
     copy_dir(&dir.join("absent"), &dir.join("to")).unwrap();
     assert!(differences(&dir.join("from"), &dir.join("to"))

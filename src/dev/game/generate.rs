@@ -33,6 +33,7 @@ pub fn generate(game: &Game, out: &Path, params: &Params) -> Result<(), String> 
         }
     }
     let marker = out.join(tree::MARKER);
+    // lint: allow(asset-write) the generator's own marker, which no path-keyed cache reads
     std::fs::write(&marker, format!("{}\n", game.name))
         .map_err(|e| format!("{}: {e}", marker.display()))?;
 

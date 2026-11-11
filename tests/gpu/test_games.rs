@@ -47,7 +47,7 @@ fn a_failing_scenario_fails_the_play_test() {
                   Application.SetStartupScene(\"assets/scenes/broken.scene\")\n";
     std::fs::write(game.join("recipe.lua"), recipe).unwrap();
     let scenario = "Harness.Step(1)\nHarness.Expect(false, \"this always fails\")\n";
-    std::fs::write(game.join("scenarios/fails.lua"), scenario).unwrap();
+    std::fs::write(game.join("scenarios").join("fails.lua"), scenario).unwrap();
     let out = game_test("broken", Some(&games));
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert_eq!(out.status.code(), Some(1), "{stdout}");

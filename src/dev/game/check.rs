@@ -8,9 +8,11 @@ use crate::core::project::{boot_scene, Access, Opened};
 use crate::dev::harness::Harness;
 use crate::dev::scenario;
 
-/// Where in the generated project a check writes: one folder per scenario, and
-/// `shots/` (`cache/` is the project's regenerable folder).
-const TEST_DIR: &str = "cache/test";
+/// Where in the generated project `out` a check writes: one folder per scenario,
+/// and `shots/` (`cache/` is the project's regenerable folder).
+fn test_dir(out: &Path) -> PathBuf {
+    out.join("cache").join("test")
+}
 
 /// What a [`check`] found: one line per step, and whether all of them passed.
 #[derive(Debug, Default)]
@@ -49,7 +51,7 @@ pub fn check(game: &Game, out: &Path, params: &Params) -> Result<Report, String>
             .unwrap_or_default()
             .to_string_lossy()
             .into_owned();
-        let dir = out.join(TEST_DIR).join(&stem);
+        let dir = test_dir(&out).join(&stem);
         let run = scenario::run(
             &path,
             &dir,
@@ -72,6 +74,7 @@ fn deterministic(game: &Game, out: &Path, params: &Params) -> Result<bool, Strin
     generate(game, out, params)?;
     let first = out.with_extension("first");
     let _ = std::fs::remove_dir_all(&first);
+    // lint: allow(atomic-write) moves the first generation aside whole; it writes nothing
     std::fs::rename(out, &first).map_err(|e| format!("{}: {e}", out.display()))?;
     generate(game, out, params)?;
     let differ = tree::differences(&first, out)?;
@@ -131,7 +134,7 @@ end
 
 /// Take the shots and check each PNG written is not all one colour.
 fn shots(out: &Path, scene: &str, opened: &Opened, report: &mut Report) -> Result<(), String> {
-    let dir = out.join(TEST_DIR).join("shots");
+    let dir = test_dir(out).join("shots");
     let harness = Harness::in_user_workspace(&dir, scene, opened.settings.clone())?;
     let run = scenario::run_code(harness, SHOTS_SCENARIO, SHOTS)?;
     report.step(
