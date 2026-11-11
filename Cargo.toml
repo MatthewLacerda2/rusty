@@ -57,6 +57,12 @@ name = "session-mcp"
 path = "src/bin/session_mcp.rs"
 required-features = ["dev"]
 
+# Generate and play-test a test game from `games/<name>/` (#2029): `make game`.
+[[bin]]
+name = "game"
+path = "src/bin/game.rs"
+required-features = ["dev"]
+
 # Headless editor capture (#731): the egui editor over a scene, offscreen, to a PNG —
 # what an editor-visible PR attaches. Dev-only, and needs the editor.
 [[bin]]

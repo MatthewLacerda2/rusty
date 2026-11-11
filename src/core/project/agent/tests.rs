@@ -1,7 +1,7 @@
 //! The agent files an edit-open writes at the project root (#1313).
 
-use super::agent::{write, write_for};
-use super::*;
+use super::super::*;
+use super::{write, write_for};
 
 pub(super) fn fresh(name: &str) -> PathBuf {
     let dir = crate::test_temp::dir().join("project_agent").join(name);
