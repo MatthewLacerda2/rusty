@@ -9,32 +9,73 @@
 //! dynamic bodies' types, which the copy keeps.
 //!
 //! The copy is cached and remade only when the table's handles or types
-//! change, so a move pays one pass over the handles, not a copy of every body.
-//! Nothing else in it is read: a fixed body has no ride, and autostep asks a
-//! dynamic one only its type.
+//! change, so a move pays a lock, not a pass over every body. Change is an
+//! exact counter: every insert, remove and retype of a body goes through
+//! [`PhysicsWorld::insert_body`], [`PhysicsWorld::remove_body`] or
+//! [`ControllerBodies::retype`], which bump it, and the `body-table` lint rule
+//! fails any other call in `src/physics/`. Nothing else in the copy is read: a
+//! fixed body has no ride, and autostep asks a dynamic one only its type.
 
 use std::sync::{Arc, Mutex, PoisonError};
 
 use rapier3d::prelude::*;
 
-/// The cached copy and the fingerprint of the table it was made from.
+use crate::physics::world::PhysicsWorld;
+
+/// The body table's change counter, and the cached copy with the count it was
+/// made at.
 #[derive(Default)]
-pub(in crate::physics) struct ControllerBodies(Mutex<Option<(u64, Arc<RigidBodySet>)>>);
+pub(in crate::physics) struct ControllerBodies {
+    revision: u64,
+    cached: Mutex<Option<(u64, Arc<RigidBodySet>)>>,
+}
 
 impl ControllerBodies {
-    /// The controller's copy of `bodies`, remade if `bodies` changed handles or
-    /// types since the last one.
+    /// The controller's copy of `bodies`, remade if a body was inserted,
+    /// removed or retyped since the last one.
     pub(super) fn of(&self, bodies: &RigidBodySet) -> Arc<RigidBodySet> {
-        let print = fingerprint(bodies);
-        let mut cached = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut cached = self.cached.lock().unwrap_or_else(PoisonError::into_inner);
         match cached.as_ref() {
-            Some((p, copy)) if *p == print => Arc::clone(copy),
+            Some((at, copy)) if *at == self.revision => Arc::clone(copy),
             _ => {
                 let copy = Arc::new(without_kinematics(bodies));
-                *cached = Some((print, Arc::clone(&copy)));
+                *cached = Some((self.revision, Arc::clone(&copy)));
                 copy
             }
         }
+    }
+
+    /// Switch `body` to `class` (waking it), counting the change. `body` is one
+    /// of the table's: the caller borrowed it from the world's `bodies`.
+    pub(in crate::physics) fn retype(&mut self, body: &mut RigidBody, class: RigidBodyType) {
+        self.revision += 1;
+        // lint: allow(body-table) the one retype: the revision moved above
+        body.set_body_type(class, true);
+    }
+}
+
+impl PhysicsWorld {
+    /// Insert `body` into the world, counting the change.
+    pub(in crate::physics) fn insert_body(&mut self, body: RigidBody) -> RigidBodyHandle {
+        self.controller_bodies.revision += 1;
+        // lint: allow(body-table) the one insert: the revision moved above
+        self.bodies.insert(body)
+    }
+
+    /// Remove `handle`'s body and every collider and joint attached to it,
+    /// counting the change.
+    pub(in crate::physics) fn remove_body(&mut self, handle: RigidBodyHandle) {
+        self.controller_bodies.revision += 1;
+        // lint: allow(body-table) the one remove: the revision moved above
+        self.bodies.remove(
+            handle,
+            &mut self.islands,
+            &mut self.colliders,
+            &mut self.impulse_joints,
+            &mut self.multibody_joints,
+            &mut self.soft_bodies,
+            true,
+        );
     }
 }
 
@@ -43,43 +84,13 @@ fn without_kinematics(bodies: &RigidBodySet) -> RigidBodySet {
     let mut copy = bodies.clone();
     for (_, body) in copy.iter_mut() {
         if body.is_kinematic() {
+            // lint: allow(body-table) the controller's own copy, not the world's table
             body.set_body_type(RigidBodyType::Fixed, false);
         }
     }
     copy
 }
 
-/// Each body's handle and type, folded (FNV-1a): equal for two tables the
-/// controller reads alike.
-fn fingerprint(bodies: &RigidBodySet) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    let mut mix = |v: u64| h = (h ^ v).wrapping_mul(0x0100_0000_01b3);
-    mix(bodies.len() as u64);
-    for (handle, body) in bodies.iter() {
-        let (index, generation) = handle.into_raw_parts();
-        mix(u64::from(index) << 32 | u64::from(generation));
-        mix(body.body_type() as u64);
-    }
-    h
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn shows_kinematics_fixed_keeps_dynamics_and_remakes_on_a_type_change() {
-        let mut bodies = RigidBodySet::new();
-        let kin = bodies.insert(RigidBodyBuilder::kinematic_position_based());
-        let dyn_ = bodies.insert(RigidBodyBuilder::dynamic());
-        let cache = ControllerBodies::default();
-        let first = cache.of(&bodies);
-        assert!(first[kin].is_fixed());
-        assert!(first[dyn_].is_dynamic());
-        assert!(Arc::ptr_eq(&first, &cache.of(&bodies)), "unchanged: reused");
-        bodies[dyn_].set_body_type(RigidBodyType::KinematicPositionBased, false);
-        let second = cache.of(&bodies);
-        assert!(!Arc::ptr_eq(&first, &second), "a type change remakes it");
-        assert!(second[dyn_].is_fixed());
-    }
-}
+#[path = "bodies_tests.rs"]
+mod tests;

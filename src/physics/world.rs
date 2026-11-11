@@ -146,7 +146,7 @@ impl PhysicsWorld {
             // A Rigidbody switched class mid-play (`SetKinematic`, a ragdoll
             // handoff, #466): the body changes in place at the entity's current
             // pose, so its colliders, joints and contacts survive.
-            body.set_body_type(class, true);
+            self.controller_bodies.retype(body, class);
             body.set_position(pose, true);
         }
         // Write the CCD mode whenever it differs, so `Physics.SetCollisionDetection`
