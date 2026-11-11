@@ -7,14 +7,13 @@
 //! `Graphics.*` registrar, its Inspector section, its section in
 //! `docs/api/Graphics.md` (`<!-- effect: <name> -->`) naming every knob's tween
 //! path, and, when it is player-facing, its `GraphicsOption` named after it with a
-//! row in the doc's *Player options* table. Each declares whether it reads history
-//! (#2092), with a reason when it reads none: `Harness.Screenshot`'s `settle`
-//! skips its frames when no effect does. Each composite texture it declares is
-//! bound in the assembled composite and passed to its own function, at its place
-//! (#1473).
+//! row in the doc's *Player options* table. It declares whether it reads history
+//! (#2092), with a reason when it reads none. Each composite texture it declares
+//! is bound in the assembled composite and passed to its own function, at its
+//! place (#1473).
 
 use super::textures::{composite_textures, PlacedTexture, GROUP};
-use super::{assemble, History, Owner, POST_EFFECTS};
+use super::{assemble, History, Owner, PostEffect, POST_EFFECTS};
 use crate::components::PostProcessingComponent;
 use crate::core::settings::graphics_options::GraphicsOption;
 use crate::scene::authoring::fields;
@@ -83,22 +82,8 @@ pub(super) fn engine() -> Layers {
     let not_effect = |f: &String| !PostProcessingComponent::NOT_EFFECTS.contains(&f.as_str());
     let docs = std::fs::read_to_string("docs/api/Graphics.md").expect("docs/api/Graphics.md");
     Layers {
-        render: POST_EFFECTS
-            .iter()
-            .map(|e| {
-                (
-                    e.name.into(),
-                    e.owner,
-                    e.gate.option.map(|o| o.name().into()),
-                )
-            })
-            .collect(),
-        history: (POST_EFFECTS.iter())
-            .map(|e| match e.history {
-                History::None(why) => (e.name.into(), Some(why)),
-                History::Reads(_) => (e.name.into(), None),
-            })
-            .collect(),
+        render: POST_EFFECTS.iter().map(rendered).collect(),
+        history: POST_EFFECTS.iter().map(history).collect(),
         settings: fields_of("PostProcessing")
             .into_iter()
             .filter(not_effect)
@@ -127,6 +112,21 @@ pub(super) fn engine() -> Layers {
         textures: texture_uses(),
         composite: assemble::composite_source(),
     }
+}
+
+/// An effect as [`Layers::render`] holds it.
+fn rendered(e: &PostEffect) -> (String, Owner, Option<String>) {
+    let option = e.gate.option.map(|o| o.name().into());
+    (e.name.into(), e.owner, option)
+}
+
+/// An effect's history declaration, as [`Layers::history`] holds it.
+fn history(e: &PostEffect) -> (String, Option<&'static str>) {
+    let why = match e.history {
+        History::None(why) => Some(why),
+        History::Reads(_) => None,
+    };
+    (e.name.into(), why)
 }
 
 /// The camera effects' knob tables, each with its knob paths.
