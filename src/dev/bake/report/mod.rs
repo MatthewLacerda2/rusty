@@ -16,13 +16,14 @@
 //!
 //! Dev-only and never read at runtime: only a bake writes one (never a scene save),
 //! the player never opens one, and an export leaves the folder behind
-//! (`dev::export::copy::left_behind`). The clock is read here, the platform side;
+//! (`dev::export::copy::left_behind`); a test game's determinism check leaves
+//! the reports out of its comparison too ([`in_report_dir`]). The clock is read here, the platform side;
 //! the bakes themselves stay pure. A report that cannot be written is a warning,
 //! never a failed bake ([`keep`]).
 //!
 //! stored-format: the bake reports, `<scene>.bake/<kind>.json`
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use serde_json::{json, Map, Value};
@@ -61,6 +62,24 @@ crate::core::named_enum! {
 /// The report folder for a scene: `foo.scene` → `foo.scene.bake/`.
 pub fn report_dir(scene_path: &str) -> PathBuf {
     PathBuf::from(format!("{scene_path}{DIR_SUFFIX}"))
+}
+
+/// Whether a folder named `name` holds a scene's bake reports: `<scene
+/// file>.bake`, as [`report_dir`] names it. Another folder ending in `.bake`
+/// (`bread.bake/`) is the game's own: it ships and is compared.
+pub fn is_report_dir(name: &str) -> bool {
+    let scene = name.strip_suffix(DIR_SUFFIX);
+    scene.is_some_and(|s| {
+        crate::core::paths::has_extension(Path::new(s), crate::scene::SCENE_EXTENSION)
+    })
+}
+
+/// Whether the relative path `rel` is a file inside a scene's report folder
+/// ([`is_report_dir`]): what an export leaves behind and a test game's
+/// determinism check leaves out, since a report is a measurement by design.
+pub fn in_report_dir(rel: &Path) -> bool {
+    (rel.parent().into_iter().flat_map(Path::components))
+        .any(|c| is_report_dir(&c.as_os_str().to_string_lossy()))
 }
 
 /// Where `kind`'s report of the scene at `scene_path` lives.
