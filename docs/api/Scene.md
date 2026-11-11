@@ -81,7 +81,8 @@ with `Component.Set(id, "Mesh", { subdivisions = 64 })`: 1–256 quads per side,
 Mesh card has the same field). A count out of range, or on another shape, is an
 error. As Unity's `GameObject.CreatePrimitive`, a mesh primitive comes with the
 `Collider` matching its mesh, so a level built from primitives is solid (rays hit
-it, the navmesh bakes on it): the Box a `Box` 1 × 1 × 1, the Sphere a `Sphere` of
+it; the navmesh bakes on the parts marked `Scene.SetStatic(id, true)`, as it reads only
+static colliders): the Box a `Box` 1 × 1 × 1, the Sphere a `Sphere` of
 radius 0.5, the Capsule *and the Cylinder* a `Capsule` of radius 0.5 and height 2
 along Y (Unity gives a cylinder a capsule too), and the Plane a `Mesh` collider
 (`convex = false`) on its own mesh. A light primitive gets none. For a draw-only

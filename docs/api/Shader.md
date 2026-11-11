@@ -399,6 +399,7 @@ smearing. It runs on game time, so it is still in edit mode and while paused.
 
 ```lua no-run
 local pool = Scene.CreateEntity("PoolWater", "Plane")
+Scene.RemoveComponent(pool, "Collider")   -- water is seen, never stood on
 Component.Set(pool, "Mesh", { subdivisions = 64 })
 Shader.Bake({ pass = "surface", name = "pool_water",
               blocks = { { id = "vertex_waves", params = { wavelength = 3, count = 4 } },
