@@ -86,6 +86,20 @@ fn draw_rb_drag(
     });
 }
 
+/// The Drag and Angular Drag rows.
+fn draw_rb_drags(
+    ui: &mut egui::Ui,
+    world: &mut crate::ecs::World,
+    id: u32,
+    (drag, angular): (f32, f32),
+    is_dirty: &mut bool,
+) {
+    let set = rigidbody_ops::set_drag;
+    draw_rb_drag(ui, world, id, ("Drag:", drag), set, is_dirty);
+    let set = rigidbody_ops::set_angular_drag;
+    draw_rb_drag(ui, world, id, ("Angular Drag:", angular), set, is_dirty);
+}
+
 /// 3EG. RigidBody Component
 pub fn draw_rigidbody(
     ui: &mut egui::Ui,
@@ -126,17 +140,7 @@ pub fn draw_rigidbody(
             is_dirty,
         );
         draw_rb_mass(ui, world, id, rb.mass, is_dirty);
-        let (drag, angular) = (rb.drag, rb.angular_drag);
-        draw_rb_drag(
-            ui,
-            world,
-            id,
-            ("Drag:", drag),
-            rigidbody_ops::set_drag,
-            is_dirty,
-        );
-        let set = rigidbody_ops::set_angular_drag;
-        draw_rb_drag(ui, world, id, ("Angular Drag:", angular), set, is_dirty);
+        draw_rb_drags(ui, world, id, (rb.drag, rb.angular_drag), is_dirty);
         draw_rb_velocity(ui, world, id, rb.velocity, is_dirty);
         draw_rb_angular_velocity(ui, world, id, rb.angular_velocity, is_dirty);
         draw_rb_collision_detection(ui, world, id, rb.collision_detection, is_dirty);

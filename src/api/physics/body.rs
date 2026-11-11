@@ -56,23 +56,14 @@ pub(super) fn register(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) ->
         |rb| rb.angular_drag,
         rb_ops::set_angular_drag,
     )?;
-    let f = lua.create_function(move |lua, id: EntityArg| {
-        Ok(scene
-            .get(lua)?
-            .borrow()
-            .world
-            .rigidbody(id.read())
-            .map_or(0.0, |rb| rb.mass))
-    });
-    put(table, "GetMass", f)?;
-    let f = lua.create_function(move |lua, (id, mass): (EntityArg, f32)| {
-        let id = id.live("Physics", "SetMass")?;
-        if let Some(mut rb) = scene.get(lua)?.borrow_mut().world.rigidbody_mut(id) {
-            rb_ops::set_mass(&mut rb, mass);
-        }
-        Ok(())
-    });
-    put(table, "SetMass", f)?;
+    number_pair(
+        lua,
+        table,
+        scene,
+        ("GetMass", "SetMass"),
+        |rb| rb.mass,
+        rb_ops::set_mass,
+    )?;
     let f = lua.create_function(move |lua, id: EntityArg| {
         let scene = &*scene.get(lua)?;
         let world = &scene.borrow().world;
