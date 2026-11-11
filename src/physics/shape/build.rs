@@ -16,6 +16,7 @@ use crate::scene::Scene;
 
 use super::mesh::{build_mesh_shape, MeshFit, Skip};
 use crate::physics::compound::world_pose;
+use crate::physics::writes::Damping;
 
 /// Body class derived from the entity flags. Mirrors the legacy solver's encoding:
 /// static (fixed), kinematic (position-driven), or dynamic (gravity + solver).
@@ -136,6 +137,8 @@ pub(in crate::physics) struct BodyInputs {
     pub use_gravity: bool,
     /// Discrete vs. Continuous (CCD) contact detection for this body (#321).
     pub collision_detection: CollisionDetection,
+    /// rapier's linear and angular damping (Unity: `drag`, `angularDrag`, #2062).
+    pub damping: Damping,
 }
 
 /// Snapshot the body-level inputs of owner `id`.
@@ -148,6 +151,7 @@ pub(in crate::physics) fn body_inputs(world: &World, id: u32) -> BodyInputs {
         angular_velocity: rb.map(|r| r.angular_velocity).unwrap_or(Vec3::ZERO),
         use_gravity: rb.is_none_or(|r| r.use_gravity),
         collision_detection: rb.map(|r| r.collision_detection).unwrap_or_default(),
+        damping: Damping::of(rb),
     }
 }
 
@@ -166,6 +170,9 @@ pub(in crate::physics) struct EntityBodyState {
     /// is written, so flipping the mode mid-play (`Physics.SetCollisionDetection`)
     /// takes effect on the next step (#321, #1707).
     pub ccd_enabled: bool,
+    /// `drag` / `angular_drag`, re-applied to a dynamic body whenever they differ,
+    /// so a change in Play takes effect on the next step (#2062).
+    pub damping: Damping,
 }
 
 /// Snapshot an owner's world pose/velocity/body-class state for one tick
@@ -188,6 +195,7 @@ pub(in crate::physics) fn body_state(scene: &Scene, id: u32) -> Option<EntityBod
         is_static: matches!(class, BodyClass::Static),
         use_gravity,
         ccd_enabled: ccd_enabled(collision_detection),
+        damping: Damping::of(rb),
     })
 }
 

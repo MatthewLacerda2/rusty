@@ -81,6 +81,8 @@ pub fn default_rigidbody() -> RigidBodyComponent {
         angular_velocity: Vec3::ZERO,
         use_gravity: true,
         collision_detection: CollisionDetection::Discrete,
+        drag: 0.0,
+        angular_drag: crate::components::DEFAULT_ANGULAR_DRAG,
     }
 }
 

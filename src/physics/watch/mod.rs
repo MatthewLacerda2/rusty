@@ -20,7 +20,7 @@
 //! | `sync_masses` | the Rigidbody's `mass`, each collider's volume and sensor flag (a crouch resizes a capsule) | `RigidBodyComponent`, `ColliderComponent`, `CharacterControllerComponent`, `WorldPose` (scale) |
 //! | `sync_mesh_fits` | the owner's body class (as body state reads it), each concave mesh collider's shape and geometry | `RigidBodyComponent`, `StaticSet`, `CharacterControllerComponent`, `ColliderComponent` |
 //! | `sync_characters` | the CharacterController, the owner's and the capsule's world pose | `CharacterControllerComponent`, `WorldPose` |
-//! | body state (`apply_body_state`) | the owner's world pose, its Rigidbody (class, velocities, gravity, CCD), its static flag, a CharacterController's presence | `WorldPose`, `RigidBodyComponent`, `StaticSet`, `CharacterControllerComponent` |
+//! | body state (`apply_body_state`) | the owner's world pose, its Rigidbody (class, velocities, gravity, CCD, damping), its static flag, a CharacterController's presence | `WorldPose`, `RigidBodyComponent`, `StaticSet`, `CharacterControllerComponent` |
 //! | compound parts | the owner's and each part's world pose | `WorldPose` |
 //!
 //! No pass reads a settings value, and the one asset a pass reads is a physics
