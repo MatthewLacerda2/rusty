@@ -507,6 +507,9 @@ links it) and skip those tests. The bake's own denoiser logic is tested with moc
 **Running them on a GPU-less Linux box** (a container, a cloud session): install
 lavapipe — `sudo apt-get install -y mesa-vulkan-drivers libvulkan1` — and the same
 tests render there as in Linux CI. Set `RUSTY_REQUIRE_GPU=1` to be sure they did.
+CI installs the same packages through `.github/actions/system-libs`, which keeps
+the `.deb`s in the Actions cache per runner image, so a mirror outage fails no run
+that image has served before (#2101).
 
 **Runner image.** The gating jobs run on pinned images, `ubuntu-24.04` and
 `macos-26`, never `-latest` (#930): lavapipe comes from the image's apt archive, so a

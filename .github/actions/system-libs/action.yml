@@ -1,0 +1,74 @@
+# Install Ubuntu packages from the Actions cache when it has them (#2101).
+# Every workflow installs its apt packages through this one action.
+#
+# Why: each job ran `sudo apt-get update && sudo apt-get install …`, so when
+# GitHub's runners could not resolve `azure.archive.ubuntu.com` (2026-11-11,
+# about 14:40-14:55 UTC) the step failed with nothing built, and the merge
+# queue handed back PRs #2094 and #2096 twice each in one hour, their code
+# green. The packages a runner image lacks are the same on every run of that
+# image, so after the first download they come from the cache and a mirror
+# outage no longer reaches a run that has run before.
+#
+# - The key is the sorted package list and a hash of every package dpkg
+#   already has installed (`dpkg-query -W`): the runner image, plus whatever
+#   an earlier call in the same job added. So the cached `.deb`s are exactly
+#   the ones apt fetched for that state, a new image is a new key, and the
+#   lavapipe call after the winit/wgpu one keys on both. `ImageOS` and the
+#   arch are in the key only to make it readable.
+# - A hit installs the `.deb`s with `dpkg -i` and never runs `apt-get update`.
+#   A miss downloads with `Acquire::Retries`, a timeout and three attempts,
+#   then installs; `install.sh` says what each path does, and both end by
+#   checking with dpkg that every package is installed, so a mirror that is
+#   down on a miss fails the step loudly, never a half-install.
+# - Any ref saves, as `install-tool` does: an entry is tens of MB and a key
+#   `main` already holds is restored, never saved again.
+# - The calling step's `name:` is what the jobs API reports and what
+#   `merging/verdict/setup.py`'s `SETUP` matches; keep the callers' names
+#   (`System libs for winit/wgpu builds`, `Software Vulkan driver (lavapipe)`).
+name: Install system packages (cached)
+description: Install apt packages, restoring their .debs from the Actions cache when it has them.
+inputs:
+  packages:
+    description: Space-separated apt package names (e.g. `mesa-vulkan-drivers libvulkan1`).
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Key
+      id: key
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+      run: |
+        set -euo pipefail
+        sorted=$(printf '%s\n' $PACKAGES | sort -u | tr '\n' ' ')
+        state=$(dpkg-query -W -f='${Package}=${Version}\n' | sort | sha256sum | cut -c1-16)
+        list=$(printf '%s' "$sorted" | sha256sum | cut -c1-16)
+        echo "dir=$HOME/.rusty-apt/$list" >> "$GITHUB_OUTPUT"
+        echo "packages=$sorted" >> "$GITHUB_OUTPUT"
+        echo "key=apt-${ImageOS:-unknown}-${RUNNER_ARCH}-$list-$state" >> "$GITHUB_OUTPUT"
+    - name: Restore
+      id: cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.key.outputs.dir }}
+        key: ${{ steps.key.outputs.key }}
+    - name: Install
+      shell: bash
+      env:
+        DIR: ${{ steps.key.outputs.dir }}
+        HIT: ${{ steps.cache.outputs.cache-hit }}
+        PACKAGES: ${{ steps.key.outputs.packages }}
+      run: |
+        echo "system-libs: cache hit: ${HIT:-false} (${{ steps.key.outputs.key }})"
+        # shellcheck disable=SC2086 # one word per package
+        "$GITHUB_ACTION_PATH/install.sh" "$DIR" "${HIT:-false}" $PACKAGES
+    - name: Save
+      if: steps.cache.outputs.cache-hit != 'true'
+      # A save that loses a race with a parallel job's (same key) only warns;
+      # the job has its packages either way.
+      continue-on-error: true
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ steps.key.outputs.dir }}
+        key: ${{ steps.key.outputs.key }}
