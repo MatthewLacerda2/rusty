@@ -150,14 +150,14 @@ pub struct ReflectionSettings {
 }
 
 impl Default for ReflectionSettings {
-    /// 128-texel cubes, Unity's default probe resolution and Unreal's
-    /// (`r.ReflectionCaptureResolution`, #2085): 128 KB each in BC6H with their
-    /// mips (#1885), 1 MB in half floats on a GPU without BC, so the 256 MB budget
-    /// keeps the 32 the renderer shades at most resident either way, and a
-    /// Dust2-sized bake's 250 probes write about 33 MB, not the 500 MB 512-texel
-    /// cubes did. A probe or a scene that wants sharper reflections asks for more.
-    /// 512 probes cover a Dust2-sized level (200 m of 20 m rooms takes 400 at 12 m
-    /// tiles).
+    /// 128-texel cubes, Unreal's default (`r.ReflectionCaptureResolution`) and
+    /// the resolution Unity's Reflection Probe Inspector starts at (#2085):
+    /// 128 KiB each in BC6H with their mips (#1885), 1 MiB in half floats on a GPU
+    /// without BC, so the 256 MiB budget keeps the 32 the renderer shades at most
+    /// resident either way, and a Dust2-sized bake's 250 probes write about
+    /// 31 MiB, not the 500 MiB 512-texel cubes did. A probe or a scene that wants
+    /// sharper reflections asks for more. 512 probes cover a Dust2-sized level
+    /// (200 m of 20 m rooms takes 400 at 12 m tiles).
     fn default() -> Self {
         Self {
             resolution: 128,
