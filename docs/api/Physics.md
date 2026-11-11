@@ -551,8 +551,10 @@ A Rigidbody's **drag** (default `0`) and **angular drag** (default `0.05`) are
 Unity's `Rigidbody.drag` and `angularDrag`: each tick the body's linear velocity
 is scaled by `1 / (1 + dt · drag)` and its spin by `1 / (1 + dt · angularDrag)`.
 Drag gives a falling body a terminal speed and slows debris in the air; the
-default angular drag is what brings a barrel rolling on its side to rest, where
-`0` lets it roll for good. Both are floored at `0`, saved with the scene, shown in
+default angular drag is what brings a ball or a round prop rolling on the floor to rest,
+where `0` lets it roll for good. (A `Cylinder` collider rolling on its side is the
+exception today: the physics engine feeds it energy faster than the default drag
+takes it out, #2071, so give a barrel a box collider until that is fixed.) Both are floored at `0`, saved with the scene, shown in
 the inspector's Rigidbody card, and a change in Play takes effect on the next
 step. `Component.Set(id, "RigidBody", { drag =, angular_drag = })` writes them
 too.

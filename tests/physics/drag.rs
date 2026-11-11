@@ -17,7 +17,7 @@ fn collider(shape: ColliderShape) -> ColliderComponent {
 }
 
 /// A ball (radius 0.4, a grenade or a can) on a wide static floor, rolling along
-/// +X at 0.3 m/s. A ball and not a ball: rapier 0.36 feeds energy into a
+/// +X at 0.3 m/s. A ball and not a cylinder: rapier 0.36 feeds energy into a
 /// cylinder rolling on a box, faster than Unity's default angular drag takes it
 /// out, so a cylinder test would measure that, not drag (#2071).
 fn rolling_ball(angular_drag: f32) -> (Scene, u32) {

@@ -48,7 +48,8 @@ pub struct RigidBodyComponent {
     #[serde(default)]
     pub drag: f32,
     /// Angular damping, ≥ 0 (Unity: `Rigidbody.angularDrag`, default `0.05`): the
-    /// same decay on the spin, so a barrel rolling on its side comes to rest.
+    /// same decay on the spin, so a ball rolling on the floor comes to rest (a rolling
+    /// `Cylinder` does not yet, #2071).
     #[serde(default = "default_angular_drag")]
     pub angular_drag: f32,
 }

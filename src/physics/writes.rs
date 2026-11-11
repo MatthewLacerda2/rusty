@@ -85,9 +85,11 @@ pub(in crate::physics) struct Damping {
 
 impl Damping {
     pub(in crate::physics) fn of(rb: Option<&RigidBodyComponent>) -> Self {
+        // Floored here as `mass` is where physics reads it: a file can hold a
+        // negative drag, and rapier's `1 / (1 + dt·d)` would turn it into a gain.
         rb.map_or_else(Self::default, |r| Self {
-            linear: r.drag,
-            angular: r.angular_drag,
+            linear: r.drag.max(0.0),
+            angular: r.angular_drag.max(0.0),
         })
     }
 
