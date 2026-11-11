@@ -54,34 +54,21 @@ fn a_value_edit_rewrites_and_a_key_edit_rekeys() {
         f(&mut m);
         m
     };
-    let values: [fn(&mut MaterialAsset); 6] = [
+    let values: [fn(&mut MaterialAsset); 5] = [
         |m| m.base_color = [0.2, 0.3, 0.4],
         |m| m.metallic = 0.7,
         |m| m.emissive = [4.0; 3],
         |m| m.tiling = [2.0, 2.0],
         |m| drop(m.shader_params.insert("tint".into(), vec![1.0])),
-        |m| {
-            m.detail = Some(DetailLayer {
-                albedo_scale: 2.0,
-                ..Default::default()
-            })
-        },
     ];
     for f in values {
         assert!(!rekeys(&base, &with(f)), "{:?}", with(f));
     }
-    let keys: [fn(&mut MaterialAsset); 5] = [
+    let keys: [fn(&mut MaterialAsset); 4] = [
         |m| m.render_mode = RenderMode::Transparent,
         |m| m.render_face = RenderFace::Both,
         |m| m.shader = Some("dissolve".into()),
         |m| m.base_color_map = Some("a.png".into()),
-        // The detail map binds in the material's group (#1997).
-        |m| {
-            m.detail = Some(DetailLayer {
-                map: Some("d.png".into()),
-                ..Default::default()
-            })
-        },
     ];
     for f in keys {
         assert!(rekeys(&base, &with(f)), "{:?}", with(f));
@@ -102,4 +89,30 @@ fn a_value_edit_rewrites_and_a_key_edit_rekeys() {
     assert!(!rekeys(&glass, &faded));
     faded.blend_mode = crate::components::BlendMode::Additive;
     assert!(rekeys(&glass, &faded));
+}
+
+#[test]
+fn a_detail_value_edit_rewrites_and_its_map_rekeys() {
+    let base = MaterialAsset::default();
+    let layer = |map: Option<&str>, albedo_scale| MaterialAsset {
+        detail: Some(DetailLayer {
+            map: map.map(Into::into),
+            albedo_scale,
+            ..DetailLayer::default()
+        }),
+        ..MaterialAsset::default()
+    };
+    assert!(
+        !rekeys(&base, &layer(None, 2.0)),
+        "a mapless layer binds nothing"
+    );
+    assert!(
+        rekeys(&base, &layer(Some("d.png"), 1.0)),
+        "its map binds (#1997)"
+    );
+    let mapped = layer(Some("d.png"), 1.0);
+    assert!(
+        !rekeys(&mapped, &layer(Some("d.png"), 0.5)),
+        "a scale is a value"
+    );
 }

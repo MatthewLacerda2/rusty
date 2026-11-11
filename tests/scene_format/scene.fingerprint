@@ -938,6 +938,17 @@ scene.materials{}.decal.normal: f32
 scene.materials{}.decal.occlusion: f32
 scene.materials{}.decal.roughness: f32
 scene.materials{}.depth_postpass: bool
+scene.materials{}.detail.albedo_scale: f32
+scene.materials{}.detail.map: option
+scene.materials{}.detail.map: string
+scene.materials{}.detail.normal_scale: f32
+scene.materials{}.detail.offset: tuple(2)
+scene.materials{}.detail.offset[]: f32
+scene.materials{}.detail.smoothness_scale: f32
+scene.materials{}.detail.tiling: tuple(2)
+scene.materials{}.detail.tiling[]: f32
+scene.materials{}.detail.world_size: f32
+scene.materials{}.detail: option
 scene.materials{}.emissive: tuple(3)
 scene.materials{}.emissive[]: f32
 scene.materials{}.emissive_map: option
